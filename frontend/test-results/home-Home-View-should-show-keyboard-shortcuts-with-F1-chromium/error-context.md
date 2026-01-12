@@ -1,0 +1,323 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e1]:
+  - generic [ref=e3]:
+    - generic [ref=e5]:
+      - generic [ref=e6] [cursor=pointer]: Archivo
+      - generic [ref=e7] [cursor=pointer]: Edición
+      - generic [ref=e8] [cursor=pointer]: Ver
+      - generic [ref=e9] [cursor=pointer]: Ayuda
+    - generic [ref=e11]:
+      - generic [ref=e12]:
+        - heading "Proyectos" [level=1] [ref=e14]
+        - generic [ref=e15]:
+          - generic [ref=e16]:
+            - textbox "Buscar proyectos..." [ref=e17]
+            - generic [ref=e18]: 
+          - generic [ref=e19] [cursor=pointer]:
+            - combobox "Última modificación" [ref=e20]
+            - img [ref=e22]
+          - button "Nuevo Proyecto" [ref=e24] [cursor=pointer]:
+            - generic [ref=e25]: 
+            - generic [ref=e26]: Nuevo Proyecto
+      - generic [ref=e29]:
+        - generic [ref=e30] [cursor=pointer]:
+          - generic [ref=e32]:
+            - generic [ref=e33]:
+              - generic [ref=e34]: 
+              - text: docx
+            - button "" [ref=e36]:
+              - generic [ref=e37]: 
+          - generic [ref=e38]:
+            - generic [ref=e39]:
+              - generic [ref=e40]: Test DOCX
+              - generic [ref=e43]:
+                - generic [ref=e44]: 
+                - text: Hoy
+            - generic [ref=e45]:
+              - generic [ref=e46]:
+                - generic [ref=e47]:
+                  - generic [ref=e48]: 8,494
+                  - generic [ref=e49]: palabras
+                - generic [ref=e50]:
+                  - generic [ref=e51]: "0"
+                  - generic [ref=e52]: capítulos
+                - generic [ref=e53]:
+                  - generic [ref=e54]: 0%
+                  - generic [ref=e55]: analizado
+              - progressbar [ref=e56]
+            - button "Abrir" [ref=e59]:
+              - generic [ref=e60]: 
+              - generic [ref=e61]: Abrir
+        - generic [ref=e62] [cursor=pointer]:
+          - generic [ref=e64]:
+            - generic [ref=e65]:
+              - generic [ref=e66]: 
+              - text: txt
+            - button "" [ref=e68]:
+              - generic [ref=e69]: 
+          - generic [ref=e70]:
+            - generic [ref=e71]:
+              - generic [ref=e72]: Test Pipeline
+              - generic [ref=e75]:
+                - generic [ref=e76]: 
+                - text: Hoy
+            - generic [ref=e77]:
+              - generic [ref=e78]:
+                - generic [ref=e79]:
+                  - generic [ref=e80]: "83"
+                  - generic [ref=e81]: palabras
+                - generic [ref=e82]:
+                  - generic [ref=e83]: "0"
+                  - generic [ref=e84]: capítulos
+                - generic [ref=e85]:
+                  - generic [ref=e86]: 0%
+                  - generic [ref=e87]: analizado
+              - progressbar [ref=e88]
+            - button "Abrir" [ref=e91]:
+              - generic [ref=e92]: 
+              - generic [ref=e93]: Abrir
+        - generic [ref=e94] [cursor=pointer]:
+          - generic [ref=e96]:
+            - generic [ref=e97]:
+              - generic [ref=e98]: 
+              - text: txt
+            - button "" [ref=e100]:
+              - generic [ref=e101]: 
+          - generic [ref=e102]:
+            - generic [ref=e103]:
+              - generic [ref=e104]: new test
+              - generic [ref=e107]:
+                - generic [ref=e108]: 
+                - text: Hoy
+            - generic [ref=e110]:
+              - generic [ref=e111]:
+                - generic [ref=e112]: 1,791
+                - generic [ref=e113]: palabras
+              - generic [ref=e114]:
+                - generic [ref=e115]: "3"
+                - generic [ref=e116]: capítulos
+              - generic [ref=e117]:
+                - generic [ref=e118]: 100%
+                - generic [ref=e119]: analizado
+            - button "Abrir" [ref=e122]:
+              - generic [ref=e123]: 
+              - generic [ref=e124]: Abrir
+        - generic [ref=e125] [cursor=pointer]:
+          - generic [ref=e127]:
+            - generic [ref=e128]:
+              - generic [ref=e129]: 
+              - text: txt
+            - button "" [ref=e131]:
+              - generic [ref=e132]: 
+          - generic [ref=e133]:
+            - generic [ref=e134]:
+              - generic [ref=e135]: Test_1768124852
+              - generic [ref=e138]:
+                - generic [ref=e139]: 
+                - text: Hoy
+            - generic [ref=e140]:
+              - generic [ref=e141]:
+                - generic [ref=e142]:
+                  - generic [ref=e143]: "321"
+                  - generic [ref=e144]: palabras
+                - generic [ref=e145]:
+                  - generic [ref=e146]: "0"
+                  - generic [ref=e147]: capítulos
+                - generic [ref=e148]:
+                  - generic [ref=e149]: 0%
+                  - generic [ref=e150]: analizado
+              - progressbar [ref=e151]
+            - button "Abrir" [ref=e154]:
+              - generic [ref=e155]: 
+              - generic [ref=e156]: Abrir
+        - generic [ref=e157] [cursor=pointer]:
+          - generic [ref=e159]:
+            - generic [ref=e160]:
+              - generic [ref=e161]: 
+              - text: txt
+            - button "" [ref=e163]:
+              - generic [ref=e164]: 
+          - generic [ref=e165]:
+            - generic [ref=e166]:
+              - generic [ref=e167]: Test_1768124500
+              - generic [ref=e170]:
+                - generic [ref=e171]: 
+                - text: Hoy
+            - generic [ref=e172]:
+              - generic [ref=e173]:
+                - generic [ref=e174]:
+                  - generic [ref=e175]: "318"
+                  - generic [ref=e176]: palabras
+                - generic [ref=e177]:
+                  - generic [ref=e178]: "0"
+                  - generic [ref=e179]: capítulos
+                - generic [ref=e180]:
+                  - generic [ref=e181]: 0%
+                  - generic [ref=e182]: analizado
+              - progressbar [ref=e183]
+            - button "Abrir" [ref=e186]:
+              - generic [ref=e187]: 
+              - generic [ref=e188]: Abrir
+        - generic [ref=e189] [cursor=pointer]:
+          - generic [ref=e191]:
+            - generic [ref=e192]:
+              - generic [ref=e193]: 
+              - text: txt
+            - button "" [ref=e195]:
+              - generic [ref=e196]: 
+          - generic [ref=e197]:
+            - generic [ref=e198]:
+              - generic [ref=e199]: Test_1768124372
+              - generic [ref=e202]:
+                - generic [ref=e203]: 
+                - text: Hoy
+            - generic [ref=e204]:
+              - generic [ref=e205]:
+                - generic [ref=e206]:
+                  - generic [ref=e207]: "315"
+                  - generic [ref=e208]: palabras
+                - generic [ref=e209]:
+                  - generic [ref=e210]: "0"
+                  - generic [ref=e211]: capítulos
+                - generic [ref=e212]:
+                  - generic [ref=e213]: 0%
+                  - generic [ref=e214]: analizado
+              - progressbar [ref=e215]
+            - button "Abrir" [ref=e218]:
+              - generic [ref=e219]: 
+              - generic [ref=e220]: Abrir
+        - generic [ref=e221] [cursor=pointer]:
+          - generic [ref=e223]:
+            - generic [ref=e224]:
+              - generic [ref=e225]: 
+              - text: txt
+            - button "" [ref=e227]:
+              - generic [ref=e228]: 
+          - generic [ref=e229]:
+            - generic [ref=e230]:
+              - generic [ref=e231]: Test_1768123906
+              - generic [ref=e234]:
+                - generic [ref=e235]: 
+                - text: Hoy
+            - generic [ref=e236]:
+              - generic [ref=e237]:
+                - generic [ref=e238]:
+                  - generic [ref=e239]: "306"
+                  - generic [ref=e240]: palabras
+                - generic [ref=e241]:
+                  - generic [ref=e242]: "0"
+                  - generic [ref=e243]: capítulos
+                - generic [ref=e244]:
+                  - generic [ref=e245]: 0%
+                  - generic [ref=e246]: analizado
+              - progressbar [ref=e247]
+            - button "Abrir" [ref=e250]:
+              - generic [ref=e251]: 
+              - generic [ref=e252]: Abrir
+  - dialog "Atajos de Teclado" [ref=e254]:
+    - generic [ref=e256]:
+      - generic [ref=e257]: Atajos de Teclado
+      - button "Close" [active] [ref=e259] [cursor=pointer]:
+        - img [ref=e260]
+    - generic [ref=e263]:
+      - paragraph [ref=e264]:
+        - generic [ref=e265]: 
+        - text: Usa
+        - generic [ref=e266]: F1
+        - text: o
+        - generic [ref=e267]: Ctrl/Cmd
+        - text: +
+        - generic [ref=e268]: /
+        - text: para mostrar esta ayuda en cualquier momento
+      - generic [ref=e269]:
+        - generic [ref=e270]:
+          - heading "Navegación" [level=3] [ref=e271]
+          - generic [ref=e272]:
+            - generic [ref=e273]:
+              - generic [ref=e274]:
+                - generic [ref=e275]: Ctrl/Cmd
+                - generic [ref=e276]: H
+              - generic [ref=e277]: Ir a inicio
+            - generic [ref=e278]:
+              - generic [ref=e279]:
+                - generic [ref=e280]: Ctrl/Cmd
+                - generic [ref=e281]: P
+              - generic [ref=e282]: Ir a proyectos
+            - generic [ref=e283]:
+              - generic [ref=e284]:
+                - generic [ref=e285]: Ctrl/Cmd
+                - generic [ref=e286]: D
+              - generic [ref=e287]: Ir al dashboard del proyecto
+            - generic [ref=e288]:
+              - generic [ref=e289]:
+                - generic [ref=e290]: Ctrl/Cmd
+                - generic [ref=e291]: E
+              - generic [ref=e292]: Ir a entidades
+            - generic [ref=e293]:
+              - generic [ref=e294]:
+                - generic [ref=e295]: Ctrl/Cmd
+                - generic [ref=e296]: A
+              - generic [ref=e297]: Ir a alertas
+            - generic [ref=e298]:
+              - generic [ref=e299]:
+                - generic [ref=e300]: Ctrl/Cmd
+                - generic [ref=e301]: ","
+              - generic [ref=e302]: Abrir configuración
+        - generic [ref=e303]:
+          - heading "Alertas" [level=3] [ref=e304]
+          - generic [ref=e305]:
+            - generic [ref=e306]:
+              - generic [ref=e308]: F8
+              - generic [ref=e309]: Siguiente alerta
+            - generic [ref=e310]:
+              - generic [ref=e311]:
+                - generic [ref=e312]: Shift
+                - generic [ref=e313]: F8
+              - generic [ref=e314]: Alerta anterior
+            - generic [ref=e315]:
+              - generic [ref=e317]: Enter
+              - generic [ref=e318]: Resolver alerta seleccionada
+            - generic [ref=e319]:
+              - generic [ref=e321]: Delete
+              - generic [ref=e322]: Descartar alerta seleccionada
+        - generic [ref=e323]:
+          - heading "Interfaz" [level=3] [ref=e324]
+          - generic [ref=e325]:
+            - generic [ref=e326]:
+              - generic [ref=e327]:
+                - generic [ref=e328]: Ctrl/Cmd
+                - generic [ref=e329]: B
+              - generic [ref=e330]: Mostrar/ocultar sidebar
+            - generic [ref=e331]:
+              - generic [ref=e332]:
+                - generic [ref=e333]: Ctrl/Cmd
+                - generic [ref=e334]: F
+              - generic [ref=e335]: Buscar
+            - generic [ref=e336]:
+              - generic [ref=e337]:
+                - generic [ref=e338]: Ctrl/Cmd
+                - generic [ref=e339]: X
+              - generic [ref=e340]: Exportar
+            - generic [ref=e341]:
+              - generic [ref=e342]:
+                - generic [ref=e343]: Ctrl/Cmd
+                - generic [ref=e344]: Shift
+                - generic [ref=e345]: D
+              - generic [ref=e346]: Cambiar tema
+            - generic [ref=e347]:
+              - generic [ref=e349]: Escape
+              - generic [ref=e350]: Cerrar modal/cancelar
+        - generic [ref=e351]:
+          - heading "Ayuda" [level=3] [ref=e352]
+          - generic [ref=e353]:
+            - generic [ref=e354]:
+              - generic [ref=e356]: F1
+              - generic [ref=e357]: Mostrar ayuda
+            - generic [ref=e358]:
+              - generic [ref=e359]:
+                - generic [ref=e360]: Ctrl/Cmd
+                - generic [ref=e361]: /
+              - generic [ref=e362]: Mostrar atajos de teclado
+```

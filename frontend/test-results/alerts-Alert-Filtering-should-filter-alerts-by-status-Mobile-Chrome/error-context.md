@@ -1,0 +1,44 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - generic [ref=e5]:
+    - generic [ref=e6] [cursor=pointer]: Archivo
+    - generic [ref=e7] [cursor=pointer]: Edición
+    - generic [ref=e8] [cursor=pointer]: Ver
+    - generic [ref=e9] [cursor=pointer]: Ayuda
+  - generic [ref=e11]:
+    - generic [ref=e12]:
+      - generic [ref=e13]:
+        - button "" [ref=e14] [cursor=pointer]:
+          - generic [ref=e15]: 
+        - heading "Alertas" [level=1] [ref=e17]
+      - generic [ref=e18]:
+        - button "Exportar" [ref=e19] [cursor=pointer]:
+          - generic [ref=e20]: 
+          - generic [ref=e21]: Exportar
+        - button "Resolver todas" [disabled]:
+          - generic: 
+          - generic: Resolver todas
+    - generic [ref=e22]:
+      - generic [ref=e23]:
+        - generic [ref=e24]: 
+        - generic [ref=e25]: "0"
+        - generic [ref=e26]: Críticas
+      - generic [ref=e27]:
+        - generic [ref=e28]: 
+        - generic [ref=e29]: "0"
+        - generic [ref=e30]: Advertencias
+      - generic [ref=e31]:
+        - generic [ref=e32]: 
+        - generic [ref=e33]: "0"
+        - generic [ref=e34]: Informativas
+      - generic [ref=e35]:
+        - generic [ref=e36]: 
+        - generic [ref=e37]: "0"
+        - generic [ref=e38]: Resueltas
+    - generic [ref=e40]:
+      - progressbar [ref=e41]:
+        - img [ref=e42]
+      - paragraph [ref=e44]: Cargando alertas...
+```

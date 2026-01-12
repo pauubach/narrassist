@@ -1,0 +1,607 @@
+/**
+ * Overrides específicos para componentes de PrimeVue
+ * Este archivo se carga DESPUÉS del tema de PrimeVue para asegurar que los estilos tengan prioridad
+ *
+ * Nota: PrimeVue 4 usa clases diferentes. Incluimos selectores para ambas versiones.
+ */
+
+/* ============================================================================
+   DROPDOWN COMPONENT - Mejor padding y UX
+   ============================================================================ */
+
+/* Items del dropdown - PrimeVue 3 y 4 */
+.p-dropdown .p-dropdown-item,
+.p-dropdown-item,
+.p-select-option,
+.p-listbox-option {
+  padding: 0.75rem 1.25rem !important;
+  min-height: 2.5rem !important;
+  line-height: 1.5 !important;
+  font-size: 0.9375rem !important;
+  margin: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* Container de items - PrimeVue 3 y 4 */
+.p-dropdown-panel .p-dropdown-items,
+.p-dropdown-items,
+.p-select-list,
+.p-listbox-list {
+  padding: 0.5rem 0 !important;
+}
+
+/* Dropdown panel overlay */
+.p-dropdown-panel,
+.p-select-overlay {
+  border-radius: 6px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* ============================================================================
+   MENU COMPONENT - Mejor padding para menús contextuales
+   ============================================================================ */
+
+/* Items del menú contextual - PrimeVue 3 y 4 */
+.p-menu .p-menuitem-link,
+.p-menu .p-menuitem-content,
+.p-contextmenu .p-menuitem-link,
+.p-contextmenu .p-menuitem-content,
+.p-tieredmenu .p-menuitem-link,
+.p-tieredmenu .p-menuitem-content {
+  padding: 0.75rem 1.25rem !important;
+  gap: 0.75rem !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* Iconos del menú */
+.p-menu .p-menuitem-icon,
+.p-contextmenu .p-menuitem-icon,
+.p-tieredmenu .p-menuitem-icon {
+  font-size: 1rem !important;
+  width: 1.25rem !important;
+  margin-right: 0.5rem !important;
+  flex-shrink: 0 !important;
+}
+
+/* Texto del menú */
+.p-menu .p-menuitem-text,
+.p-contextmenu .p-menuitem-text,
+.p-tieredmenu .p-menuitem-text {
+  font-size: 0.9375rem !important;
+  flex: 1 !important;
+}
+
+/* Items del menú - sin márgenes */
+.p-menu .p-menuitem,
+.p-contextmenu .p-menuitem,
+.p-tieredmenu .p-menuitem {
+  margin: 0 !important;
+}
+
+/* Menú overlay - tamaño mínimo */
+.p-menu.p-menu-overlay,
+.p-contextmenu,
+.p-tieredmenu {
+  min-width: 180px !important;
+  border-radius: 6px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Separadores de menú */
+.p-menu .p-menu-separator,
+.p-contextmenu .p-menu-separator {
+  margin: 0.25rem 0 !important;
+  border-top: 1px solid var(--surface-border) !important;
+}
+
+/* ============================================================================
+   TAG COMPONENT - Padding consistente en toda la aplicación
+   ============================================================================ */
+
+/* Tags/Badges con padding adecuado y centrado vertical correcto - PrimeVue 3 y 4 */
+.p-tag {
+  padding: 0.25em 0.65em !important;
+  font-size: 0.8125rem !important;
+  font-weight: 500 !important;
+  border-radius: 4px !important;
+  line-height: 1 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.35rem !important;
+  vertical-align: middle !important;
+  height: auto !important;
+  box-sizing: border-box !important;
+}
+
+/* Tags pequeños (cuando se usa severity o rounded) */
+.p-tag.p-tag-sm,
+.p-tag[data-pc-section="root"].p-tag-sm {
+  padding: 0.2em 0.5em !important;
+  font-size: 0.75rem !important;
+  line-height: 1 !important;
+}
+
+/* Tags grandes */
+.p-tag.p-tag-lg {
+  padding: 0.35em 0.85em !important;
+  font-size: 0.9375rem !important;
+  line-height: 1 !important;
+}
+
+/* Iconos dentro de tags */
+.p-tag .p-tag-icon,
+.p-tag i,
+.p-tag .pi {
+  font-size: 0.75rem !important;
+  margin-right: 0.25rem !important;
+}
+
+/* Tags redondeados (pills) */
+.p-tag.p-tag-rounded {
+  border-radius: 1rem !important;
+  padding: 0.25em 0.75em !important;
+}
+
+/* Colores de severidad con mejor contraste */
+.p-tag.p-tag-success {
+  background: var(--green-500) !important;
+  color: white !important;
+}
+
+.p-tag.p-tag-info {
+  background: var(--blue-500) !important;
+  color: white !important;
+}
+
+.p-tag.p-tag-warning {
+  background: var(--yellow-500) !important;
+  color: var(--gray-900) !important;
+}
+
+.p-tag.p-tag-danger {
+  background: var(--red-500) !important;
+  color: white !important;
+}
+
+/* Tags secundarios (outline style) */
+.p-tag.p-tag-secondary {
+  background: var(--surface-100) !important;
+  color: var(--text-color-secondary) !important;
+  border: 1px solid var(--surface-border) !important;
+}
+
+/* ============================================================================
+   BADGE COMPONENT - Padding consistente para badges
+   ============================================================================ */
+
+/* Badges con padding adecuado y centrado vertical correcto */
+.p-badge {
+  padding: 0.25em 0.5em !important;
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  border-radius: 4px !important;
+  line-height: 1.2 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  vertical-align: middle !important;
+  height: auto !important;
+  min-height: 1.25rem !important;
+  box-sizing: border-box !important;
+}
+
+/* Badges grandes */
+.p-badge.p-badge-lg,
+.p-badge-lg {
+  padding: 0.35em 0.65em !important;
+  font-size: 0.875rem !important;
+}
+
+/* Badges extra grandes */
+.p-badge.p-badge-xl,
+.p-badge-xl {
+  padding: 0.4em 0.75em !important;
+  font-size: 1rem !important;
+}
+
+/* Colores de badges */
+.p-badge.p-badge-info,
+.p-badge-info {
+  background: var(--blue-500) !important;
+  color: white !important;
+}
+
+.p-badge.p-badge-success,
+.p-badge-success {
+  background: var(--green-500) !important;
+  color: white !important;
+}
+
+.p-badge.p-badge-warning,
+.p-badge-warning {
+  background: var(--yellow-500) !important;
+  color: var(--gray-900) !important;
+}
+
+.p-badge.p-badge-danger,
+.p-badge-danger {
+  background: var(--red-500) !important;
+  color: white !important;
+}
+
+.p-badge.p-badge-secondary,
+.p-badge-secondary {
+  background: var(--surface-200) !important;
+  color: var(--text-color) !important;
+}
+
+/* ============================================================================
+   MULTISELECT COMPONENT - Panel, checkboxes y tokens
+   ============================================================================ */
+
+/* Panel del MultiSelect - se renderiza en el body via Teleport */
+.p-multiselect-panel {
+  border-radius: 6px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  overflow: hidden !important;
+}
+
+/* Items wrapper - asegurar redondeo en esquinas inferiores */
+.p-multiselect-items-wrapper {
+  border-radius: 0 0 6px 6px !important;
+}
+
+/* Lista de items - padding vertical */
+.p-multiselect-items {
+  padding: 0.5rem 0 !important;
+}
+
+/* Cada item del dropdown */
+.p-multiselect-item {
+  padding: 0.5rem 0.75rem !important;
+  gap: 0.75rem !important;
+}
+
+/* Checkbox dentro de cada item - anadir margen izquierdo */
+.p-multiselect-item > .p-checkbox {
+  margin-left: 0.25rem !important;
+  margin-right: 0.5rem !important;
+  flex-shrink: 0 !important;
+}
+
+/* ============================================================================
+   MULTISELECT CHIP MODE - Tokens que NO se cortan y centrados verticalmente
+   ============================================================================ */
+
+/* Contenedor principal del multiselect en modo chip - altura minima adecuada */
+.p-multiselect.p-multiselect-chip {
+  min-height: 2.75rem !important;
+  display: flex !important;
+  align-items: stretch !important;
+}
+
+/* Contenedor de label - flex para centrado vertical correcto */
+.p-multiselect.p-multiselect-chip .p-multiselect-label-container {
+  display: flex !important;
+  align-items: center !important;
+  flex: 1 !important;
+  overflow: visible !important;
+}
+
+/* Label en modo chip - flex para wrap correcto de tokens, centrado vertical */
+.p-multiselect.p-multiselect-chip .p-multiselect-label {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  align-content: center !important;
+  gap: 0.375rem !important;
+  padding: 0.375rem 0.5rem !important;
+  min-height: unset !important;
+  height: auto !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  line-height: 1.4 !important;
+}
+
+/* Tokens/chips de valores seleccionados - padding visible, sin recorte, centrado vertical */
+.p-multiselect.p-multiselect-chip .p-multiselect-token {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0.3rem 0.625rem !important;
+  margin: 0.125rem 0 !important;
+  border-radius: 1rem !important;
+  font-size: 0.8125rem !important;
+  line-height: 1.2 !important;
+  height: auto !important;
+  min-height: 1.625rem !important;
+  max-height: none !important;
+  overflow: visible !important;
+  flex-shrink: 0 !important;
+  background: var(--surface-200, #e5e7eb) !important;
+  color: var(--text-color, #4b5563) !important;
+  box-sizing: border-box !important;
+  vertical-align: middle !important;
+}
+
+/* Label del token - texto visible completo y centrado */
+.p-multiselect.p-multiselect-chip .p-multiselect-token-label {
+  line-height: 1.2 !important;
+  white-space: nowrap !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+}
+
+/* Icono de eliminar token - separacion y tamano adecuados */
+.p-multiselect.p-multiselect-chip .p-multiselect-token-icon {
+  margin-left: 0.375rem !important;
+  font-size: 0.75rem !important;
+  cursor: pointer !important;
+  flex-shrink: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Fallback para modo comma (no chip) - mantener estilos originales */
+.p-multiselect:not(.p-multiselect-chip) .p-multiselect-label {
+  min-height: 2.5rem !important;
+  padding: 0.75rem !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* Header del MultiSelect (cuando tiene filtro o toggle all) */
+.p-multiselect-header {
+  padding: 0.75rem !important;
+  border-bottom: 1px solid var(--surface-border) !important;
+}
+
+/* Checkbox del header (select all) */
+.p-multiselect-header > .p-checkbox {
+  margin-left: 0.25rem !important;
+  margin-right: 0.5rem !important;
+}
+
+/* ============================================================================
+   MULTISELECT OPTIONS - Badges de velocidad con padding y centrado correcto
+   ============================================================================ */
+
+/* Tags/Badges dentro del panel del MultiSelect (badges de velocidad, etc) */
+.p-multiselect-panel .p-tag,
+.p-multiselect-panel .p-badge {
+  padding: 0.25em 0.5em !important;
+  font-size: 0.7rem !important;
+  font-weight: 600 !important;
+  line-height: 1.2 !important;
+  margin-left: 0.25rem !important;
+  vertical-align: middle !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: auto !important;
+  min-height: 1.125rem !important;
+}
+
+/* Contenedor de badges en opciones - centrado vertical */
+.p-multiselect-item .method-badges,
+.p-multiselect-panel .method-badges {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 0.25rem !important;
+}
+
+/* ============================================================================
+   TOAST / MESSAGE COMPONENT - Notificaciones flotantes con padding correcto
+   ============================================================================ */
+
+/* Toast container - padding y estructura */
+.p-toast-message,
+.p-toast .p-toast-message {
+  padding: 1rem 1.25rem !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  margin-bottom: 0.75rem !important;
+}
+
+/* Toast message content - flexbox para alineación correcta */
+.p-toast-message-content,
+.p-toast .p-toast-message-content {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 0.875rem !important;
+  padding: 0 !important;
+}
+
+/* Toast icon - alineación vertical centrada con primera línea de texto */
+.p-toast-message-icon,
+.p-toast .p-toast-message-icon {
+  font-size: 1.25rem !important;
+  flex-shrink: 0 !important;
+  margin-top: 0.125rem !important;
+  width: 1.5rem !important;
+  height: 1.5rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Toast text container - flex column para summary y detail */
+.p-toast-message-text,
+.p-toast .p-toast-message-text {
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0.25rem !important;
+  min-width: 0 !important;
+}
+
+/* Toast summary (título) */
+.p-toast-summary,
+.p-toast .p-toast-summary {
+  font-weight: 600 !important;
+  font-size: 0.9375rem !important;
+  line-height: 1.4 !important;
+  margin: 0 !important;
+}
+
+/* Toast detail (descripción) */
+.p-toast-detail,
+.p-toast .p-toast-detail {
+  font-size: 0.875rem !important;
+  line-height: 1.5 !important;
+  margin: 0 !important;
+  color: inherit !important;
+  opacity: 0.9 !important;
+}
+
+/* Toast close button - posición y tamaño */
+.p-toast-icon-close,
+.p-toast .p-toast-icon-close {
+  width: 1.75rem !important;
+  height: 1.75rem !important;
+  border-radius: 50% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  margin-left: 0.5rem !important;
+  opacity: 0.7 !important;
+  transition: opacity 0.2s ease !important;
+}
+
+.p-toast-icon-close:hover {
+  opacity: 1 !important;
+}
+
+/* ============================================================================
+   MESSAGE COMPONENT - Mensajes inline con padding correcto
+   ============================================================================ */
+
+/* Message container */
+.p-message,
+.p-inline-message {
+  padding: 1rem 1.25rem !important;
+  border-radius: 8px !important;
+  margin: 0.5rem 0 !important;
+}
+
+/* Message content - flexbox para alineación */
+.p-message-wrapper,
+.p-message .p-message-wrapper,
+.p-inline-message-text {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 0.875rem !important;
+  padding: 0 !important;
+}
+
+/* Message icon */
+.p-message-icon,
+.p-message .p-message-icon,
+.p-inline-message-icon {
+  font-size: 1.25rem !important;
+  flex-shrink: 0 !important;
+  margin-top: 0.125rem !important;
+  width: 1.5rem !important;
+  height: 1.5rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Message text */
+.p-message-text,
+.p-message .p-message-text {
+  flex: 1 !important;
+  line-height: 1.5 !important;
+  font-size: 0.9375rem !important;
+}
+
+/* Message close button */
+.p-message-close,
+.p-message .p-message-close {
+  width: 1.75rem !important;
+  height: 1.75rem !important;
+  border-radius: 50% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  margin-left: 0.5rem !important;
+}
+
+/* ============================================================================
+   SEVERITY COLORS - Colores consistentes para toast y message
+   ============================================================================ */
+
+/* Info severity */
+.p-toast-message-info,
+.p-message-info {
+  background: var(--blue-50, #eff6ff) !important;
+  border: 1px solid var(--blue-200, #bfdbfe) !important;
+  color: var(--blue-700, #1d4ed8) !important;
+}
+
+.p-toast-message-info .p-toast-message-icon,
+.p-message-info .p-message-icon {
+  color: var(--blue-500, #3b82f6) !important;
+}
+
+/* Success severity */
+.p-toast-message-success,
+.p-message-success {
+  background: var(--green-50, #f0fdf4) !important;
+  border: 1px solid var(--green-200, #bbf7d0) !important;
+  color: var(--green-700, #15803d) !important;
+}
+
+.p-toast-message-success .p-toast-message-icon,
+.p-message-success .p-message-icon {
+  color: var(--green-500, #22c55e) !important;
+}
+
+/* Warning severity */
+.p-toast-message-warn,
+.p-message-warn {
+  background: var(--yellow-50, #fefce8) !important;
+  border: 1px solid var(--yellow-200, #fef08a) !important;
+  color: var(--yellow-700, #a16207) !important;
+}
+
+.p-toast-message-warn .p-toast-message-icon,
+.p-message-warn .p-message-icon {
+  color: var(--yellow-500, #eab308) !important;
+}
+
+/* Error severity */
+.p-toast-message-error,
+.p-message-error {
+  background: var(--red-50, #fef2f2) !important;
+  border: 1px solid var(--red-200, #fecaca) !important;
+  color: var(--red-700, #b91c1c) !important;
+}
+
+.p-toast-message-error .p-toast-message-icon,
+.p-message-error .p-message-icon {
+  color: var(--red-500, #ef4444) !important;
+}
+
+/* ============================================================================
+   GENERAL COMPONENT FIXES
+   ============================================================================ */
+
+/* Asegurar que los componentes respetan el box-sizing */
+.p-component,
+.p-component *,
+.p-component *::before,
+.p-component *::after {
+  box-sizing: border-box;
+}

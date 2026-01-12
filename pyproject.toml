@@ -1,0 +1,179 @@
+[project]
+name = "narrative-assistant"
+version = "0.1.0"
+description = "Asistente de Corrección Narrativa - Herramienta offline de análisis narrativo para correctores profesionales"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [
+    { name = "Pau Ubach" }
+]
+requires-python = ">=3.11"
+keywords = ["nlp", "narrative", "editing", "proofreading", "spacy"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Text Processing :: Linguistic",
+]
+
+dependencies = [
+    # Core NLP
+    "spacy>=3.7.0,<4.0.0",
+    # coreferee incompatible con spacy>=3.7 - hacer opcional con fallback
+    "sentence-transformers>=2.2.0,<3.0.0",
+
+    # Document parsing (MVP)
+    "python-docx>=1.1.0",
+    "chardet>=5.0.0",
+
+    # Database
+    "sqlite-utils>=3.35",
+
+    # CLI
+    "rich>=13.0.0",
+    "typer>=0.9.0",
+
+    # Utilities
+    "numpy>=1.24.0",
+]
+
+[project.optional-dependencies]
+# GPU CUDA (Linux/Windows con NVIDIA)
+cuda = [
+    "cupy-cuda12x>=12.0.0",
+]
+
+# GPU Apple Silicon (macOS)
+apple = [
+    "thinc-apple-ops>=1.0.0",
+]
+
+# PDF support
+pdf = [
+    "pdfplumber>=0.10.0",
+    "pypdf>=4.0.0",
+]
+
+# EPUB/ODT support
+ebook = [
+    "ebooklib>=0.18",
+    "odfpy>=1.4.0",
+]
+
+# Coreference (experimental - incompatible con spacy>=3.7)
+coref = [
+    "coreferee>=1.1.0,<1.5.0",
+]
+
+# Development
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "pytest-mock>=3.10",
+    "ruff>=0.1.0",
+    "mypy>=1.0",
+    "pre-commit>=3.0",
+    "factory-boy>=3.2",
+    "syrupy>=4.0",
+]
+
+# Full installation (all optional except GPU)
+full = [
+    "narrative-assistant[pdf,ebook,dev]",
+]
+
+[project.scripts]
+narrative-assistant = "narrative_assistant.cli:main"
+na = "narrative_assistant.cli:main"
+
+[project.urls]
+Repository = "https://github.com/paubach/tfm"
+
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# =============================================================================
+# Ruff (Linting & Formatting)
+# =============================================================================
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "UP",   # pyupgrade
+    "N",    # pep8-naming
+    "C4",   # flake8-comprehensions
+    "SIM",  # flake8-simplify
+]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "N818",   # exception name should end in Error
+    "SIM108", # ternary operator (readability preference)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["narrative_assistant"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+# =============================================================================
+# MyPy (Type Checking)
+# =============================================================================
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+exclude = ["tests", "docs"]
+
+# =============================================================================
+# Pytest
+# =============================================================================
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
+markers = [
+    "slow: marks tests as slow (NLP integration)",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
+# =============================================================================
+# Coverage
+# =============================================================================
+[tool.coverage.run]
+source = ["src/narrative_assistant"]
+branch = true
+omit = [
+    "*/tests/*",
+    "*/__pycache__/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+]

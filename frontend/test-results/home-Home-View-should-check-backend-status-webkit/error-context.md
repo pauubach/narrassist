@@ -1,0 +1,216 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - generic [ref=e5]:
+    - generic [ref=e6] [cursor=pointer]: Archivo
+    - generic [ref=e7] [cursor=pointer]: Edición
+    - generic [ref=e8] [cursor=pointer]: Ver
+    - generic [ref=e9] [cursor=pointer]: Ayuda
+  - generic [ref=e11]:
+    - generic [ref=e12]:
+      - heading "Proyectos" [level=1] [ref=e14]
+      - generic [ref=e15]:
+        - generic [ref=e16]:
+          - textbox "Buscar proyectos..." [ref=e17]
+          - generic [ref=e18]: 
+        - generic [ref=e19] [cursor=pointer]:
+          - combobox "Última modificación" [ref=e20]
+          - img [ref=e22]
+        - button "Nuevo Proyecto" [ref=e24] [cursor=pointer]:
+          - generic [ref=e25]: 
+          - generic [ref=e26]: Nuevo Proyecto
+    - generic [ref=e29]:
+      - generic [ref=e30] [cursor=pointer]:
+        - generic [ref=e32]:
+          - generic [ref=e33]:
+            - generic [ref=e34]: 
+            - text: txt
+          - button "" [ref=e36]:
+            - generic [ref=e37]: 
+        - generic [ref=e38]:
+          - generic [ref=e39]:
+            - generic [ref=e40]: Test_1768124852
+            - generic [ref=e43]:
+              - generic [ref=e44]: 
+              - text: Hoy
+          - generic [ref=e46]:
+            - generic [ref=e47]:
+              - generic [ref=e48]: 1,923
+              - generic [ref=e49]: palabras
+            - generic [ref=e50]:
+              - generic [ref=e51]: "3"
+              - generic [ref=e52]: capítulos
+            - generic [ref=e53]:
+              - generic [ref=e54]: 100%
+              - generic [ref=e55]: analizado
+          - button "Abrir" [ref=e58]:
+            - generic [ref=e59]: 
+            - generic [ref=e60]: Abrir
+      - generic [ref=e61] [cursor=pointer]:
+        - generic [ref=e63]:
+          - generic [ref=e64]:
+            - generic [ref=e65]: 
+            - text: docx
+          - button "" [ref=e67]:
+            - generic [ref=e68]: 
+        - generic [ref=e69]:
+          - generic [ref=e70]:
+            - generic [ref=e71]: Test DOCX
+            - generic [ref=e74]:
+              - generic [ref=e75]: 
+              - text: Hoy
+          - generic [ref=e76]:
+            - generic [ref=e77]:
+              - generic [ref=e78]:
+                - generic [ref=e79]: 8,494
+                - generic [ref=e80]: palabras
+              - generic [ref=e81]:
+                - generic [ref=e82]: "0"
+                - generic [ref=e83]: capítulos
+              - generic [ref=e84]:
+                - generic [ref=e85]: 0%
+                - generic [ref=e86]: analizado
+            - progressbar [ref=e87]
+          - button "Abrir" [ref=e90]:
+            - generic [ref=e91]: 
+            - generic [ref=e92]: Abrir
+      - generic [ref=e93] [cursor=pointer]:
+        - generic [ref=e95]:
+          - generic [ref=e96]:
+            - generic [ref=e97]: 
+            - text: txt
+          - button "" [ref=e99]:
+            - generic [ref=e100]: 
+        - generic [ref=e101]:
+          - generic [ref=e102]:
+            - generic [ref=e103]: Test Pipeline
+            - generic [ref=e106]:
+              - generic [ref=e107]: 
+              - text: Hoy
+          - generic [ref=e108]:
+            - generic [ref=e109]:
+              - generic [ref=e110]:
+                - generic [ref=e111]: "83"
+                - generic [ref=e112]: palabras
+              - generic [ref=e113]:
+                - generic [ref=e114]: "0"
+                - generic [ref=e115]: capítulos
+              - generic [ref=e116]:
+                - generic [ref=e117]: 0%
+                - generic [ref=e118]: analizado
+            - progressbar [ref=e119]
+          - button "Abrir" [ref=e122]:
+            - generic [ref=e123]: 
+            - generic [ref=e124]: Abrir
+      - generic [ref=e125] [cursor=pointer]:
+        - generic [ref=e127]:
+          - generic [ref=e128]:
+            - generic [ref=e129]: 
+            - text: txt
+          - button "" [ref=e131]:
+            - generic [ref=e132]: 
+        - generic [ref=e133]:
+          - generic [ref=e134]:
+            - generic [ref=e135]: new test
+            - generic [ref=e138]:
+              - generic [ref=e139]: 
+              - text: Hoy
+          - generic [ref=e141]:
+            - generic [ref=e142]:
+              - generic [ref=e143]: 1,791
+              - generic [ref=e144]: palabras
+            - generic [ref=e145]:
+              - generic [ref=e146]: "3"
+              - generic [ref=e147]: capítulos
+            - generic [ref=e148]:
+              - generic [ref=e149]: 100%
+              - generic [ref=e150]: analizado
+          - button "Abrir" [ref=e153]:
+            - generic [ref=e154]: 
+            - generic [ref=e155]: Abrir
+      - generic [ref=e156] [cursor=pointer]:
+        - generic [ref=e158]:
+          - generic [ref=e159]:
+            - generic [ref=e160]: 
+            - text: txt
+          - button "" [ref=e162]:
+            - generic [ref=e163]: 
+        - generic [ref=e164]:
+          - generic [ref=e165]:
+            - generic [ref=e166]: Test_1768124500
+            - generic [ref=e169]:
+              - generic [ref=e170]: 
+              - text: Hoy
+          - generic [ref=e171]:
+            - generic [ref=e172]:
+              - generic [ref=e173]:
+                - generic [ref=e174]: "318"
+                - generic [ref=e175]: palabras
+              - generic [ref=e176]:
+                - generic [ref=e177]: "0"
+                - generic [ref=e178]: capítulos
+              - generic [ref=e179]:
+                - generic [ref=e180]: 0%
+                - generic [ref=e181]: analizado
+            - progressbar [ref=e182]
+          - button "Abrir" [ref=e185]:
+            - generic [ref=e186]: 
+            - generic [ref=e187]: Abrir
+      - generic [ref=e188] [cursor=pointer]:
+        - generic [ref=e190]:
+          - generic [ref=e191]:
+            - generic [ref=e192]: 
+            - text: txt
+          - button "" [ref=e194]:
+            - generic [ref=e195]: 
+        - generic [ref=e196]:
+          - generic [ref=e197]:
+            - generic [ref=e198]: Test_1768124372
+            - generic [ref=e201]:
+              - generic [ref=e202]: 
+              - text: Hoy
+          - generic [ref=e203]:
+            - generic [ref=e204]:
+              - generic [ref=e205]:
+                - generic [ref=e206]: "315"
+                - generic [ref=e207]: palabras
+              - generic [ref=e208]:
+                - generic [ref=e209]: "0"
+                - generic [ref=e210]: capítulos
+              - generic [ref=e211]:
+                - generic [ref=e212]: 0%
+                - generic [ref=e213]: analizado
+            - progressbar [ref=e214]
+          - button "Abrir" [ref=e217]:
+            - generic [ref=e218]: 
+            - generic [ref=e219]: Abrir
+      - generic [ref=e220] [cursor=pointer]:
+        - generic [ref=e222]:
+          - generic [ref=e223]:
+            - generic [ref=e224]: 
+            - text: txt
+          - button "" [ref=e226]:
+            - generic [ref=e227]: 
+        - generic [ref=e228]:
+          - generic [ref=e229]:
+            - generic [ref=e230]: Test_1768123906
+            - generic [ref=e233]:
+              - generic [ref=e234]: 
+              - text: Hoy
+          - generic [ref=e235]:
+            - generic [ref=e236]:
+              - generic [ref=e237]:
+                - generic [ref=e238]: "306"
+                - generic [ref=e239]: palabras
+              - generic [ref=e240]:
+                - generic [ref=e241]: "0"
+                - generic [ref=e242]: capítulos
+              - generic [ref=e243]:
+                - generic [ref=e244]: 0%
+                - generic [ref=e245]: analizado
+            - progressbar [ref=e246]
+          - button "Abrir" [ref=e249]:
+            - generic [ref=e250]: 
+            - generic [ref=e251]: Abrir
+```

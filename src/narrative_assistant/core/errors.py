@@ -1,0 +1,292 @@
+"""
+Jerarquía de excepciones para el Asistente de Corrección Narrativa.
+
+Severidades:
+- RECOVERABLE: Continuar con advertencia (ej: un capítulo falló de 10)
+- DEGRADED: Continuar con funcionalidad reducida (ej: sin GPU)
+- FATAL: Abortar operación (ej: documento corrupto)
+"""
+
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any, Optional
+
+
+class ErrorSeverity(Enum):
+    """Nivel de severidad para decidir si abortar o continuar."""
+
+    RECOVERABLE = "recoverable"  # Continuar con advertencia
+    DEGRADED = "degraded"  # Continuar con funcionalidad reducida
+    FATAL = "fatal"  # Abortar operación
+
+
+@dataclass
+class NarrativeError(Exception):
+    """
+    Base para todos los errores de la aplicación.
+
+    Attributes:
+        message: Mensaje técnico (para logs/debug)
+        severity: Nivel de severidad
+        user_message: Mensaje amigable para el usuario
+        context: Datos adicionales para debug (sanitizados)
+    """
+
+    message: str
+    severity: ErrorSeverity = ErrorSeverity.RECOVERABLE
+    user_message: Optional[str] = None
+    context: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self):
+        if self.user_message is None:
+            self.user_message = self.message
+        super().__init__(self.message)
+
+    def __str__(self) -> str:
+        return self.message
+
+
+# =============================================================================
+# Errores de Parsing
+# =============================================================================
+
+
+class ParsingError(NarrativeError):
+    """Errores al parsear documentos."""
+
+    pass
+
+
+@dataclass
+class CorruptedDocumentError(ParsingError):
+    """Documento corrupto o no válido."""
+
+    file_path: str = ""
+    original_error: str = ""
+    message: str = field(init=False)
+    severity: ErrorSeverity = field(default=ErrorSeverity.FATAL, init=False)
+    user_message: Optional[str] = field(default=None, init=False)
+    context: dict[str, Any] = field(default_factory=dict, init=False)
+
+    def __post_init__(self):
+        self.message = f"Cannot parse document: {self.original_error}"
+        self.user_message = (
+            f"El documento '{self.file_path}' está corrupto o no es válido."
+        )
+        self.context = {
+            "file_path": self.file_path,
+            "original_error": self.original_error,
+        }
+        super().__post_init__()
+
+
+@dataclass
+class EmptyDocumentError(ParsingError):
+    """Documento sin contenido textual."""
+
+    file_path: str = ""
+    message: str = field(init=False)
+    severity: ErrorSeverity = field(default=ErrorSeverity.FATAL, init=False)
+    user_message: Optional[str] = field(default=None, init=False)
+    context: dict[str, Any] = field(default_factory=dict, init=False)
+
+    def __post_init__(self):
+        self.message = "Document has no text content"
+        self.user_message = (
+            f"El documento '{self.file_path}' está vacío o solo contiene imágenes."
+        )
+        self.context = {"file_path": self.file_path}
+        super().__post_init__()
+
+
+@dataclass
+class UnsupportedFormatError(ParsingError):
+    """Formato de documento no soportado."""
+
+    file_path: str = ""
+    detected_format: str = ""
+    message: str = field(init=False)
+    severity: ErrorSeverity = field(default=ErrorSeverity.FATAL, init=False)
+    user_message: Optional[str] = field(default=None, init=False)
+    context: dict[str, Any] = field(default_factory=dict, init=False)
+
+    def __post_init__(self):
+        self.message = f"Unsupported format: {self.detected_format}"
+        self.user_message = (
+            f"Formato '{self.detected_format}' no soportado. "
+            "Formatos válidos: DOCX, TXT, MD, PDF, EPUB, ODT."
+        )
+        self.context = {
+            "file_path": self.file_path,
+            "detected_format": self.detected_format,
+        }
+        super().__post_init__()
+
+
+@dataclass
+class ScannedPDFError(ParsingError):
+    """PDF escaneado que requiere OCR externo."""
+
+    file_path: str = ""
+    message: str = field(init=False)
+    severity: ErrorSeverity = field(default=ErrorSeverity.FATAL, init=False)
+    user_message: Optional[str] = field(default=None, init=False)
+    context: dict[str, Any] = field(default_factory=dict, init=False)
+
+    def __post_init__(self):
+        self.message = "PDF appears to be scanned (no text layer)"
+        self.user_message = (
+            f"El PDF '{self.file_path}' parece ser escaneado y no contiene texto extraíble. "
+            "Usa una herramienta de OCR externa como:\n"
+            "  - ocrmypdf input.pdf output.pdf\n"
+            "  - Adobe Acrobat Pro\n"
+            "  - Google Docs (importar PDF, exportar DOCX)"
+        )
+        self.context = {"file_path": self.file_path}
+        super().__post_init__()
+
+
+# =============================================================================
+# Errores de NLP
+# =============================================================================
+
+
+class NLPError(NarrativeError):
+    """Errores en el pipeline NLP."""
+
+    pass
+
+
+@dataclass
+class ModelNotLoadedError(NLPError):
+    """Modelo NLP no disponible en local."""
+
+    model_name: str = ""
+    hint: Optional[str] = None  # Mensaje personalizado
+    message: str = field(init=False)
+    severity: ErrorSeverity = field(default=ErrorSeverity.FATAL, init=False)
+    user_message: Optional[str] = field(default=None, init=False)
+    context: dict[str, Any] = field(default_factory=dict, init=False)
+
+    def __post_init__(self):
+        self.message = f"Model '{self.model_name}' not loaded"
+        if self.hint:
+            self.user_message = self.hint
+        else:
+            self.user_message = (
+                f"Modelo '{self.model_name}' no encontrado en local.\n"
+                f"Ejecuta: python scripts/download_models.py"
+            )
+        self.context = {"model_name": self.model_name}
+        super().__post_init__()
+
+
+@dataclass
+class ChapterProcessingError(NLPError):
+    """Error procesando un capítulo específico - continuar con otros."""
+
+    chapter_num: int = 0
+    original_error: str = ""
+    message: str = field(init=False)
+    severity: ErrorSeverity = field(default=ErrorSeverity.RECOVERABLE, init=False)
+    user_message: Optional[str] = field(default=None, init=False)
+    context: dict[str, Any] = field(default_factory=dict, init=False)
+
+    def __post_init__(self):
+        self.message = f"Error processing chapter {self.chapter_num}: {self.original_error}"
+        self.user_message = (
+            f"Error al analizar el capítulo {self.chapter_num}. "
+            "Se continuará con el resto."
+        )
+        self.context = {
+            "chapter_num": self.chapter_num,
+            "original_error": self.original_error,
+        }
+        super().__post_init__()
+
+
+# =============================================================================
+# Errores de Base de Datos
+# =============================================================================
+
+
+class DatabaseError(NarrativeError):
+    """Errores de SQLite."""
+
+    pass
+
+
+@dataclass
+class ProjectNotFoundError(DatabaseError):
+    """Proyecto no existe en BD."""
+
+    project_id: int = 0
+    message: str = field(init=False)
+    severity: ErrorSeverity = field(default=ErrorSeverity.FATAL, init=False)
+    user_message: Optional[str] = field(default=None, init=False)
+    context: dict[str, Any] = field(default_factory=dict, init=False)
+
+    def __post_init__(self):
+        self.message = f"Project {self.project_id} not found"
+        self.user_message = f"No se encontró el proyecto con ID {self.project_id}."
+        self.context = {"project_id": self.project_id}
+        super().__post_init__()
+
+
+@dataclass
+class DocumentAlreadyExistsError(DatabaseError):
+    """Documento ya existe en el proyecto."""
+
+    document_fingerprint: str = ""
+    existing_project_name: str = ""
+    message: str = field(init=False)
+    severity: ErrorSeverity = field(default=ErrorSeverity.RECOVERABLE, init=False)
+    user_message: Optional[str] = field(default=None, init=False)
+    context: dict[str, Any] = field(default_factory=dict, init=False)
+
+    def __post_init__(self):
+        self.message = f"Document with fingerprint {self.document_fingerprint} already exists"
+        self.user_message = (
+            f"Este documento ya fue analizado en el proyecto '{self.existing_project_name}'.\n"
+            "¿Deseas continuar donde lo dejaste o crear un análisis nuevo?"
+        )
+        self.context = {
+            "document_fingerprint": self.document_fingerprint,
+            "existing_project_name": self.existing_project_name,
+        }
+        super().__post_init__()
+
+
+# =============================================================================
+# Errores de Recursos
+# =============================================================================
+
+
+class ResourceError(NarrativeError):
+    """Errores de recursos del sistema."""
+
+    pass
+
+
+@dataclass
+class OutOfMemoryError(ResourceError):
+    """Memoria insuficiente."""
+
+    operation: str = ""
+    estimated_mb: int = 0
+    message: str = field(init=False)
+    severity: ErrorSeverity = field(default=ErrorSeverity.DEGRADED, init=False)
+    user_message: Optional[str] = field(default=None, init=False)
+    context: dict[str, Any] = field(default_factory=dict, init=False)
+
+    def __post_init__(self):
+        self.message = f"Insufficient memory for {self.operation}"
+        self.user_message = (
+            f"Memoria insuficiente para '{self.operation}'.\n"
+            "Intenta cerrar otras aplicaciones o procesar por capítulos."
+        )
+        self.context = {
+            "operation": self.operation,
+            "estimated_mb": self.estimated_mb,
+        }
+        super().__post_init__()

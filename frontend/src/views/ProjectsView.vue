@@ -1,0 +1,808 @@
+<template>
+  <div class="projects-view">
+    <div class="header">
+      <div class="header-left">
+        <h1>Proyectos</h1>
+      </div>
+      <div class="header-right">
+        <span class="p-input-icon-right search-wrapper">
+          <InputText
+            v-model="searchQuery"
+            placeholder="Buscar proyectos..."
+            class="search-input"
+          />
+          <i class="pi pi-search" />
+        </span>
+        <Dropdown
+          v-model="sortBy"
+          :options="sortOptions"
+          optionLabel="label"
+          optionValue="value"
+          placeholder="Ordenar por"
+          class="sort-dropdown"
+          appendTo="self"
+        />
+        <Button
+          label="Nuevo Proyecto"
+          icon="pi pi-plus"
+          @click="showCreateDialog = true"
+          severity="success"
+        />
+      </div>
+    </div>
+
+    <div class="content">
+      <!-- Estado: Cargando -->
+      <div v-if="projectsStore.loading" class="loading-state">
+        <ProgressSpinner />
+        <p>Cargando proyectos...</p>
+      </div>
+
+      <!-- Estado: Error -->
+      <Message v-else-if="projectsStore.error" severity="error" :closable="false" class="error-message">
+        <p>{{ projectsStore.error }}</p>
+        <Button
+          label="Reintentar"
+          icon="pi pi-refresh"
+          @click="loadProjects"
+          text
+        />
+      </Message>
+
+      <!-- Estado: Sin proyectos -->
+      <div v-else-if="!projectsStore.hasProjects" class="empty-state">
+        <i class="pi pi-folder-open empty-icon"></i>
+        <h2>No hay proyectos</h2>
+        <p>Crea tu primer proyecto para comenzar a analizar un manuscrito</p>
+        <Button
+          label="Crear Primer Proyecto"
+          icon="pi pi-plus"
+          @click="showCreateDialog = true"
+          size="large"
+        />
+      </div>
+
+      <!-- Estado: Lista de proyectos -->
+      <div v-else class="projects-list">
+
+        <!-- Grid de proyectos -->
+        <div class="projects-grid">
+          <Card
+            v-for="project in filteredProjects"
+            :key="project.id"
+            class="project-card"
+            @click="openProject(project.id)"
+          >
+            <template #header>
+              <div class="card-header">
+                <div class="format-badge">
+                  <i :class="getFormatIcon(project.document_format)"></i>
+                  {{ project.document_format }}
+                </div>
+                <div class="card-actions">
+                  <Badge
+                    v-if="project.open_alerts_count && project.open_alerts_count > 0"
+                    :value="project.open_alerts_count"
+                    :severity="getAlertSeverity(project.highest_alert_severity)"
+                    class="alert-badge"
+                  />
+                  <Button
+                    icon="pi pi-ellipsis-v"
+                    text
+                    rounded
+                    @click.stop="showProjectMenu($event, project)"
+                  />
+                </div>
+              </div>
+            </template>
+
+            <template #title>
+              {{ project.name }}
+            </template>
+
+            <template #subtitle>
+              <div class="project-meta">
+                <span><i class="pi pi-calendar"></i> {{ formatDate(project.last_modified) }}</span>
+              </div>
+            </template>
+
+            <template #content>
+              <div class="project-stats">
+                <div class="stat">
+                  <span class="stat-value">{{ project.word_count.toLocaleString() }}</span>
+                  <span class="stat-label">palabras</span>
+                </div>
+                <div class="stat">
+                  <span class="stat-value">{{ project.chapter_count }}</span>
+                  <span class="stat-label">capítulos</span>
+                </div>
+                <div class="stat">
+                  <span class="stat-value">{{ project.analysis_progress ?? 0 }}%</span>
+                  <span class="stat-label">analizado</span>
+                </div>
+              </div>
+
+              <ProgressBar
+                v-if="(project.analysis_progress ?? 0) < 100"
+                :value="project.analysis_progress ?? 0"
+                :showValue="false"
+                class="mt-3"
+              />
+            </template>
+
+            <template #footer>
+              <div class="card-footer">
+                <Button
+                  label="Abrir"
+                  icon="pi pi-arrow-right"
+                  text
+                  @click.stop="openProject(project.id)"
+                />
+              </div>
+            </template>
+          </Card>
+        </div>
+      </div>
+    </div>
+
+    <!-- Diálogo: Crear proyecto -->
+    <Dialog
+      v-model:visible="showCreateDialog"
+      modal
+      header="Nuevo Proyecto"
+      :style="{ width: '500px' }"
+    >
+      <div class="create-dialog">
+        <div class="field">
+          <label for="project-name">Nombre del proyecto *</label>
+          <InputText
+            id="project-name"
+            v-model="newProject.name"
+            placeholder="Ej: Mi Novela - Borrador 1"
+            class="w-full"
+            :class="{ 'p-invalid': !newProject.name && showValidation }"
+          />
+          <small v-if="!newProject.name && showValidation" class="p-error">
+            El nombre es obligatorio
+          </small>
+        </div>
+
+        <div class="field">
+          <label for="project-description">Descripción (opcional)</label>
+          <Textarea
+            id="project-description"
+            v-model="newProject.description"
+            rows="3"
+            placeholder="Breve descripción del manuscrito..."
+            class="w-full"
+          />
+        </div>
+
+        <div class="field">
+          <label>Documento *</label>
+          <FileUpload
+            mode="basic"
+            accept=".docx,.doc,.txt,.md,.pdf,.epub"
+            :maxFileSize="50000000"
+            :auto="false"
+            chooseLabel="Seleccionar archivo"
+            @select="onFileSelect"
+            :class="{ 'p-invalid': !newProject.file && showValidation }"
+          />
+          <small class="p-text-secondary">
+            Formatos soportados: DOCX, DOC, TXT, MD, PDF, EPUB (máx. 50 MB)
+          </small>
+          <small v-if="!newProject.file && showValidation" class="p-error block">
+            Debes seleccionar un archivo
+          </small>
+          <div v-if="newProject.file" class="selected-file">
+            <i class="pi pi-file"></i>
+            <span>{{ newProject.file.name }}</span>
+            <Button icon="pi pi-times" text rounded @click="newProject.file = null" />
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <Button
+          label="Cancelar"
+          icon="pi pi-times"
+          @click="closeCreateDialog"
+          text
+        />
+        <Button
+          label="Crear y Analizar"
+          icon="pi pi-check"
+          @click="createProject"
+          :loading="creatingProject"
+        />
+      </template>
+    </Dialog>
+
+    <!-- Menu contextual de proyecto -->
+    <Menu ref="projectMenu" :model="projectMenuItems" :popup="true" />
+
+    <!-- Overlay de análisis (se puede cerrar para continuar trabajando) -->
+    <AnalysisProgressOverlay
+      :visible="showAnalysisOverlay"
+      :project-id="analyzingProjectId"
+      @complete="onAnalysisComplete"
+      @error="onAnalysisError"
+      @close="onAnalysisClose"
+    />
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, computed, onMounted, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
+import { useProjectsStore } from '@/stores/projects'
+import { useAnalysisStore } from '@/stores/analysis'
+import Button from 'primevue/button'
+import Card from 'primevue/card'
+import Dialog from 'primevue/dialog'
+import InputText from 'primevue/inputtext'
+import Textarea from 'primevue/textarea'
+import FileUpload from 'primevue/fileupload'
+import Dropdown from 'primevue/dropdown'
+import ProgressBar from 'primevue/progressbar'
+import ProgressSpinner from 'primevue/progressspinner'
+import Message from 'primevue/message'
+import Menu from 'primevue/menu'
+import Badge from 'primevue/badge'
+import AnalysisProgressOverlay from '@/components/AnalysisProgressOverlay.vue'
+import { useToast } from 'primevue/usetoast'
+import type { Project } from '@/types'
+
+const router = useRouter()
+const toast = useToast()
+const projectsStore = useProjectsStore()
+const analysisStore = useAnalysisStore()
+
+// Estado de la vista
+const showCreateDialog = ref(false)
+const showValidation = ref(false)
+const creatingProject = ref(false)
+const searchQuery = ref('')
+const sortBy = ref('last_modified')
+const projectMenu = ref()
+const selectedProject = ref<Project | null>(null)
+
+// Estado del análisis
+const showAnalysisOverlay = ref(false)
+const analyzingProjectId = ref<number | undefined>(undefined)
+
+// Opciones de ordenamiento
+const sortOptions = [
+  { label: 'Última modificación', value: 'last_modified' },
+  { label: 'Nombre', value: 'name' },
+  { label: 'Fecha de creación', value: 'created_at' },
+  { label: 'Progreso', value: 'analysis_progress' }
+]
+
+// Formulario de nuevo proyecto
+const newProject = ref({
+  name: '',
+  description: '',
+  file: null as File | null
+})
+
+// Items del menú contextual
+const projectMenuItems = computed(() => [
+  {
+    label: 'Abrir',
+    icon: 'pi pi-folder-open',
+    command: () => selectedProject.value && openProject(selectedProject.value.id)
+  },
+  {
+    label: 'Re-analizar',
+    icon: 'pi pi-refresh',
+    command: () => console.log('Re-analyze')
+  },
+  { separator: true },
+  {
+    label: 'Exportar',
+    icon: 'pi pi-download',
+    command: () => console.log('Export')
+  },
+  { separator: true },
+  {
+    label: 'Eliminar',
+    icon: 'pi pi-trash',
+    command: () => selectedProject.value && deleteProject(selectedProject.value.id),
+    class: 'text-red-500'
+  }
+])
+
+// Proyectos filtrados y ordenados
+const filteredProjects = computed(() => {
+  let filtered = projectsStore.projects
+
+  // Filtrar por búsqueda
+  if (searchQuery.value) {
+    const query = searchQuery.value.toLowerCase()
+    filtered = filtered.filter(p =>
+      p.name.toLowerCase().includes(query) ||
+      p.description?.toLowerCase().includes(query)
+    )
+  }
+
+  // Ordenar
+  return [...filtered].sort((a, b) => {
+    switch (sortBy.value) {
+      case 'name':
+        return a.name.localeCompare(b.name)
+      case 'created_at':
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      case 'analysis_progress':
+        return b.analysis_progress - a.analysis_progress
+      case 'last_modified':
+      default:
+        return new Date(b.last_modified).getTime() - new Date(a.last_modified).getTime()
+    }
+  })
+})
+
+// Funciones
+const loadProjects = async () => {
+  await projectsStore.fetchProjects()
+}
+
+const openProject = (projectId: number) => {
+  router.push({ name: 'project', params: { id: projectId } })
+}
+
+const onFileSelect = (event: any) => {
+  newProject.value.file = event.files[0]
+  showValidation.value = false
+}
+
+const createProject = async () => {
+  showValidation.value = true
+
+  if (!newProject.value.name || !newProject.value.file) {
+    return
+  }
+
+  creatingProject.value = true
+  const fileToAnalyze = newProject.value.file
+
+  try {
+    const project = await projectsStore.createProject(
+      newProject.value.name,
+      newProject.value.description,
+      newProject.value.file
+    )
+
+    // Iniciar análisis automáticamente
+    if (project && fileToAnalyze) {
+      // Primero configurar el overlay y mostrarlo
+      analyzingProjectId.value = project.id
+      showAnalysisOverlay.value = true
+
+      // Cerrar el diálogo de creación DESPUÉS de mostrar el overlay
+      closeCreateDialog()
+
+      // Iniciar el análisis (esto puede tomar tiempo mientras sube el archivo)
+      const success = await analysisStore.startAnalysis(project.id, fileToAnalyze)
+      if (!success) {
+        console.error('Failed to start analysis')
+        showAnalysisOverlay.value = false
+        toast.add({
+          severity: 'error',
+          summary: 'Error al iniciar análisis',
+          detail: analysisStore.error || 'No se pudo iniciar el análisis',
+          life: 5000
+        })
+      }
+    } else {
+      // Si no hay archivo o proyecto, solo cerrar el diálogo
+      closeCreateDialog()
+    }
+  } catch (error) {
+    console.error('Error creating project:', error)
+    toast.add({
+      severity: 'error',
+      summary: 'Error al crear proyecto',
+      detail: error instanceof Error ? error.message : 'Error desconocido',
+      life: 5000
+    })
+    // Cerrar diálogo también en caso de error para que el usuario pueda ver la lista
+    closeCreateDialog()
+  } finally {
+    creatingProject.value = false
+  }
+}
+
+const onAnalysisComplete = async (_projectId: number) => {
+  showAnalysisOverlay.value = false
+  analysisStore.clearAnalysis()
+
+  toast.add({
+    severity: 'success',
+    summary: 'Análisis completado',
+    detail: 'El manuscrito ha sido analizado correctamente',
+    life: 5000
+  })
+
+  // Recargar lista de proyectos para mostrar el progreso actualizado
+  await projectsStore.fetchProjects()
+
+  // No redirigimos automáticamente - el usuario puede abrir el proyecto cuando quiera
+  // El proyecto ya aparecerá en la lista con el progreso actualizado
+}
+
+const onAnalysisError = (error: string) => {
+  showAnalysisOverlay.value = false
+  analysisStore.clearAnalysis()
+  console.error('Analysis error:', error)
+  toast.add({
+    severity: 'error',
+    summary: 'Error en el análisis',
+    detail: error,
+    life: 8000
+  })
+  // Recargar proyectos para mostrar el estado actualizado
+  projectsStore.fetchProjects()
+}
+
+const onAnalysisClose = () => {
+  // Usuario cerró el overlay pero el análisis continúa en segundo plano
+  showAnalysisOverlay.value = false
+  // El análisis sigue corriendo y actualizará el progreso en la lista de proyectos
+}
+
+const closeCreateDialog = () => {
+  showCreateDialog.value = false
+  showValidation.value = false
+  newProject.value = {
+    name: '',
+    description: '',
+    file: null
+  }
+}
+
+const showProjectMenu = (event: Event, project: Project) => {
+  selectedProject.value = project
+  projectMenu.value.toggle(event)
+}
+
+const deleteProject = async (projectId: number) => {
+  if (!selectedProject.value) return
+
+  // Mostrar confirmación
+  const confirmed = confirm(
+    `¿Estás seguro de que deseas eliminar el proyecto "${selectedProject.value.name}"?\n\nEsta acción no se puede deshacer.`
+  )
+
+  if (!confirmed) return
+
+  try {
+    // Llamar al endpoint DELETE
+    const response = await fetch(`http://localhost:8008/api/projects/${projectId}`, {
+      method: 'DELETE'
+    })
+
+    if (!response.ok) {
+      throw new Error('Error al eliminar el proyecto')
+    }
+
+    // Recargar la lista de proyectos
+    await projectsStore.fetchProjects()
+  } catch (error) {
+    console.error('Error deleting project:', error)
+    alert('Error al eliminar el proyecto. Por favor, inténtalo de nuevo.')
+  }
+}
+
+const getFormatIcon = (format: string) => {
+  const icons: Record<string, string> = {
+    'DOCX': 'pi pi-file-word',
+    'TXT': 'pi pi-file',
+    'MD': 'pi pi-file-edit'
+  }
+  return icons[format] || 'pi pi-file'
+}
+
+const formatDate = (dateString: string) => {
+  const date = new Date(dateString)
+  const now = new Date()
+  const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24))
+
+  if (diffDays === 0) return 'Hoy'
+  if (diffDays === 1) return 'Ayer'
+  if (diffDays < 7) return `Hace ${diffDays} días`
+
+  return date.toLocaleDateString('es-ES', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  })
+}
+
+const getAlertSeverity = (severity?: string | null) => {
+  if (!severity) return undefined
+
+  const severityMap: Record<string, 'danger' | 'warning' | 'info' | 'secondary'> = {
+    'critical': 'danger',
+    'warning': 'warning',
+    'info': 'info',
+    'hint': 'secondary'
+  }
+
+  return severityMap[severity] || 'secondary'
+}
+
+// Lifecycle
+onMounted(async () => {
+  await loadProjects()
+})
+</script>
+
+<style scoped>
+.projects-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem 2rem;
+  border-bottom: 1px solid var(--surface-border);
+  background: var(--surface-card);
+  flex-shrink: 0;
+}
+
+.header-left h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-color);
+  margin: 0;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.search-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-input {
+  width: 300px;
+  padding-right: 2.5rem;
+}
+
+.search-wrapper .pi-search {
+  position: absolute;
+  right: 1rem;
+  color: var(--text-color-secondary);
+}
+
+.sort-dropdown {
+  min-width: 200px;
+}
+
+.content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 2rem;
+}
+
+/* Estados vacíos */
+.loading-state,
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  text-align: center;
+}
+
+.loading-state p {
+  margin-top: 1rem;
+  color: var(--text-color-secondary);
+}
+
+.empty-icon {
+  font-size: 4rem;
+  color: var(--text-color-secondary);
+  opacity: 0.5;
+  margin-bottom: 1rem;
+}
+
+.empty-state h2 {
+  font-size: 1.5rem;
+  margin-bottom: 0.5rem;
+  color: var(--text-color);
+}
+
+.empty-state p {
+  color: var(--text-color-secondary);
+  margin-bottom: 2rem;
+}
+
+/* Estado de error */
+.error-message {
+  margin: 0;
+}
+
+.error-message :deep(.p-message-wrapper) {
+  padding: 1rem 1.25rem;
+}
+
+.error-message p {
+  margin: 0 0 0.5rem 0;
+  line-height: 1.5;
+}
+
+.error-message .p-button {
+  margin-top: 0;
+}
+
+/* Grid de proyectos - usa auto-fit para llenar todo el ancho disponible */
+.projects-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  gap: 1.5rem;
+}
+
+/* Responsive: 1 columna en móviles */
+@media (max-width: 768px) {
+  .projects-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.project-card {
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+  height: 100%;
+  border: 1px solid var(--surface-border);
+}
+
+.project-card:hover {
+  background-color: var(--surface-hover);
+  border-color: var(--primary-color);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background: var(--surface-50);
+}
+
+.format-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.75rem;
+  background: var(--surface-0);
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-color-secondary);
+}
+
+.card-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.alert-badge {
+  font-size: 0.75rem;
+  min-width: 1.5rem;
+}
+
+.project-meta {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  color: var(--text-color-secondary);
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
+.project-meta i {
+  font-size: 0.75rem;
+}
+
+.project-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--primary-color);
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: var(--text-color-secondary);
+  text-transform: uppercase;
+  margin-top: 0.25rem;
+}
+
+.card-footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Diálogo de creación */
+.create-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1rem 0;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.field label {
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+.selected-file {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: var(--surface-50);
+  border-radius: 4px;
+  margin-top: 0.5rem;
+}
+
+.selected-file i {
+  color: var(--primary-color);
+}
+
+.selected-file span {
+  flex: 1;
+  font-size: 0.875rem;
+}
+
+/* Utilidades */
+.w-full {
+  width: 100%;
+}
+
+.mt-3 {
+  margin-top: 1rem;
+}
+
+.block {
+  display: block;
+}
+
+.text-red-500 {
+  color: #ef4444;
+}
+</style>

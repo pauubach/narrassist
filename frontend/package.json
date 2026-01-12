@@ -1,0 +1,40 @@
+{
+  "name": "narrative-assistant-ui",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Interfaz de usuario para Narrative Assistant - Herramienta de corrección narrativa",
+  "author": "Pau Ubach",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc && vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore",
+    "type-check": "vue-tsc --noEmit"
+  },
+  "dependencies": {
+    "@primeuix/themes": "^2.0.2",
+    "@primevue/themes": "^4.5.4",
+    "axios": "^1.6.7",
+    "pinia": "^2.1.7",
+    "primeicons": "^7.0.0",
+    "primevue": "^4.5.4",
+    "vis-data": "^8.0.3",
+    "vis-network": "^10.0.2",
+    "vue": "^3.5.26",
+    "vue-router": "^4.6.4"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.57.0",
+    "@types/node": "^20.11.17",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
+    "@vitejs/plugin-vue": "^6.0.3",
+    "@vue/tsconfig": "^0.5.1",
+    "eslint": "^8.56.0",
+    "eslint-plugin-vue": "^9.21.1",
+    "typescript": "~5.3.3",
+    "vite": "^5.1.4",
+    "vue-tsc": "^3.2.2"
+  }
+}

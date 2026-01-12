@@ -1,0 +1,440 @@
+/* Animations and Transitions for Narrative Assistant UI */
+/* Based on UI Design Proposal - Fase 5: Polish y Distribución */
+
+/* ==================== */
+/* Page Transitions     */
+/* ==================== */
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.slide-enter-active,
+.slide-leave-active {
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.slide-enter-from {
+  transform: translateX(-20px);
+  opacity: 0;
+}
+
+.slide-leave-to {
+  transform: translateX(20px);
+  opacity: 0;
+}
+
+/* ==================== */
+/* List Transitions     */
+/* ==================== */
+
+.list-enter-active,
+.list-leave-active {
+  transition: all 0.3s ease;
+}
+
+.list-enter-from {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.list-leave-to {
+  opacity: 0;
+  transform: translateY(-20px);
+}
+
+.list-move {
+  transition: transform 0.3s ease;
+}
+
+/* ==================== */
+/* Modal Transitions    */
+/* ==================== */
+
+.modal-enter-active,
+.modal-leave-active {
+  transition: all 0.3s ease;
+}
+
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
+  transform: scale(0.95);
+}
+
+/* ==================== */
+/* Loading Animations   */
+/* ==================== */
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.loading-pulse {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -468px 0;
+  }
+  100% {
+    background-position: 468px 0;
+  }
+}
+
+.skeleton-loader {
+  background: linear-gradient(
+    90deg,
+    var(--surface-100) 0px,
+    var(--surface-200) 40px,
+    var(--surface-100) 80px
+  );
+  background-size: 600px;
+  animation: shimmer 1.5s infinite;
+}
+
+/* ==================== */
+/* Hover Animations     */
+/* ==================== */
+
+.hover-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.hover-scale {
+  transition: transform 0.2s ease;
+}
+
+.hover-scale:hover {
+  transform: scale(1.05);
+}
+
+.hover-glow {
+  transition: box-shadow 0.3s ease;
+}
+
+.hover-glow:hover {
+  box-shadow: 0 0 20px rgba(var(--primary-color-rgb), 0.3);
+}
+
+/* ==================== */
+/* Button Animations    */
+/* ==================== */
+
+.button-click {
+  transition: all 0.1s ease;
+}
+
+.button-click:active {
+  transform: scale(0.95);
+}
+
+/* ==================== */
+/* Alert Animations     */
+/* ==================== */
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.alert-enter {
+  animation: slideInRight 0.3s ease;
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  10%,
+  30%,
+  50%,
+  70%,
+  90% {
+    transform: translateX(-4px);
+  }
+  20%,
+  40%,
+  60%,
+  80% {
+    transform: translateX(4px);
+  }
+}
+
+.shake {
+  animation: shake 0.5s ease;
+}
+
+/* ==================== */
+/* Progress Animations  */
+/* ==================== */
+
+@keyframes progressBar {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+.progress-indeterminate::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 30%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.5),
+    transparent
+  );
+  animation: progressBar 1.5s ease-in-out infinite;
+}
+
+/* ==================== */
+/* Highlight Animations */
+/* ==================== */
+
+@keyframes highlightFade {
+  0% {
+    background-color: var(--highlight-warning-bg);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.highlight-flash {
+  animation: highlightFade 1.5s ease;
+}
+
+/* ==================== */
+/* Sidebar Transitions  */
+/* ==================== */
+
+.sidebar-enter-active,
+.sidebar-leave-active {
+  transition: transform 0.3s ease;
+}
+
+.sidebar-enter-from,
+.sidebar-leave-to {
+  transform: translateX(-100%);
+}
+
+.sidebar-right-enter-from,
+.sidebar-right-leave-to {
+  transform: translateX(100%);
+}
+
+/* ==================== */
+/* Dropdown Animations  */
+/* ==================== */
+
+.dropdown-enter-active,
+.dropdown-leave-active {
+  transition: all 0.2s ease;
+}
+
+.dropdown-enter-from,
+.dropdown-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+/* ==================== */
+/* Tooltip Animations   */
+/* ==================== */
+
+.tooltip-enter-active,
+.tooltip-leave-active {
+  transition: all 0.2s ease;
+}
+
+.tooltip-enter-from,
+.tooltip-leave-to {
+  opacity: 0;
+  transform: scale(0.9);
+}
+
+/* ==================== */
+/* Card Flip Animation  */
+/* ==================== */
+
+@keyframes cardFlip {
+  0% {
+    transform: rotateY(0deg);
+  }
+  100% {
+    transform: rotateY(180deg);
+  }
+}
+
+.card-flip {
+  animation: cardFlip 0.6s ease;
+}
+
+/* ==================== */
+/* Focus Animations     */
+/* ==================== */
+
+.focus-ring {
+  transition: box-shadow 0.2s ease;
+}
+
+.focus-ring:focus,
+.focus-ring:focus-within {
+  box-shadow: 0 0 0 3px rgba(var(--primary-color-rgb), 0.25);
+  outline: none;
+}
+
+/* ==================== */
+/* Scroll Animations    */
+/* ==================== */
+
+.scroll-fade-enter {
+  opacity: 0;
+  transform: translateY(30px);
+}
+
+.scroll-fade-enter-active {
+  transition: all 0.6s ease;
+}
+
+/* ==================== */
+/* Success Animations   */
+/* ==================== */
+
+@keyframes checkmark {
+  0% {
+    stroke-dashoffset: 100;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+.checkmark-animation {
+  stroke-dasharray: 100;
+  animation: checkmark 0.5s ease forwards;
+}
+
+@keyframes successPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(16, 185, 129, 0);
+  }
+}
+
+.success-pulse {
+  animation: successPulse 1s ease-out;
+}
+
+/* ==================== */
+/* Error Animations     */
+/* ==================== */
+
+@keyframes errorShake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-10px);
+  }
+  75% {
+    transform: translateX(10px);
+  }
+}
+
+.error-shake {
+  animation: errorShake 0.4s ease;
+}
+
+/* ==================== */
+/* Utility Classes      */
+/* ==================== */
+
+.animate-fast {
+  animation-duration: 0.15s !important;
+  transition-duration: 0.15s !important;
+}
+
+.animate-slow {
+  animation-duration: 0.6s !important;
+  transition-duration: 0.6s !important;
+}
+
+.no-animation {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ==================== */
+/* Smooth Scroll        */
+/* ==================== */
+
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}

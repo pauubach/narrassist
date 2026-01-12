@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(*)",
+      "Read(*)",
+      "Write(*)",
+      "Edit(*)",
+      "Glob(*)",
+      "Grep(*)",
+      "Task(*)",
+      "NotebookEdit(*)",
+      "Bash(npx playwright test --reporter=list)",
+      "Bash(npx playwright test:*)",
+      "Bash(ls:*)",
+      "Bash(start /wait \"D:\\\\repos\\\\tfm\\\\OllamaSetup.exe\" /S)",
+      "Bash(timeout /t 30 /nobreak)",
+      "Bash(powershell -Command \"Get-Command ollama -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source\")",
+      "Bash(ollama --version:*)",
+      "Bash(powershell -Command \"& ''C:\\\\Users\\\\pauub\\\\AppData\\\\Local\\\\Programs\\\\Ollama\\\\ollama.exe'' pull qwen2.5\")",
+      "Bash(npm install:*)",
+      "Bash(timeout 10 npm run dev:*)",
+      "Bash(git init:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ],
+    "additionalDirectories": [
+      "d:\\repos\\tfm"
+    ]
+  }
+}

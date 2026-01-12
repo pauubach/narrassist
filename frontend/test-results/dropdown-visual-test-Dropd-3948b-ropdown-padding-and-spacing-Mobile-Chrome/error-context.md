@@ -1,0 +1,60 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e3]:
+  - generic [ref=e5]:
+    - generic [ref=e6] [cursor=pointer]: Archivo
+    - generic [ref=e7] [cursor=pointer]: Edición
+    - generic [ref=e8] [cursor=pointer]: Ver
+    - generic [ref=e9] [cursor=pointer]: Ayuda
+  - generic [ref=e11]:
+    - generic [ref=e12]:
+      - heading "Proyectos" [level=1] [ref=e14]
+      - generic [ref=e15]:
+        - generic [ref=e16]:
+          - textbox "Buscar proyectos..." [ref=e17]
+          - generic [ref=e18]: 
+        - generic [ref=e19] [cursor=pointer]:
+          - combobox "Última modificación" [expanded] [active] [ref=e20]
+          - img [ref=e22]
+          - generic [ref=e24]:
+            - listbox "Option List" [ref=e27]:
+              - option "Última modificación" [selected] [ref=e28]:
+                - generic [ref=e29]: Última modificación
+              - option "Nombre" [ref=e30]:
+                - generic [ref=e31]: Nombre
+              - option "Fecha de creación" [ref=e32]:
+                - generic [ref=e33]: Fecha de creación
+              - option "Progreso" [ref=e34]:
+                - generic [ref=e35]: Progreso
+            - status [ref=e36]: 1 items selected
+        - button "Nuevo Proyecto" [ref=e38] [cursor=pointer]:
+          - generic [ref=e39]: 
+          - generic [ref=e40]: Nuevo Proyecto
+    - generic [ref=e44] [cursor=pointer]:
+      - generic [ref=e46]:
+        - generic [ref=e47]:
+          - generic [ref=e48]: 
+          - text: txt
+        - button "" [ref=e50]:
+          - generic [ref=e51]: 
+      - generic [ref=e52]:
+        - generic [ref=e53]:
+          - generic [ref=e54]: Don Quijote - Prueba
+          - generic [ref=e57]:
+            - generic [ref=e58]: 
+            - text: Hoy
+        - generic [ref=e60]:
+          - generic [ref=e61]:
+            - generic [ref=e62]: 1,649
+            - generic [ref=e63]: palabras
+          - generic [ref=e64]:
+            - generic [ref=e65]: "1"
+            - generic [ref=e66]: capítulos
+          - generic [ref=e67]:
+            - generic [ref=e68]: 100%
+            - generic [ref=e69]: analizado
+        - button "Abrir" [ref=e72]:
+          - generic [ref=e73]: 
+          - generic [ref=e74]: Abrir
+```

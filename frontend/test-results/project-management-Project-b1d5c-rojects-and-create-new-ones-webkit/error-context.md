@@ -1,0 +1,61 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - generic [ref=e5]:
+      - generic [ref=e6] [cursor=pointer]: Archivo
+      - generic [ref=e7] [cursor=pointer]: Edición
+      - generic [ref=e8] [cursor=pointer]: Ver
+      - generic [ref=e9] [cursor=pointer]: Ayuda
+    - generic [ref=e11]:
+      - generic [ref=e12]:
+        - heading "Proyectos" [level=1] [ref=e14]
+        - generic [ref=e15]:
+          - generic [ref=e16]:
+            - textbox "Buscar proyectos..." [ref=e17]
+            - generic [ref=e18]: 
+          - generic [ref=e19] [cursor=pointer]:
+            - combobox "Última modificación" [ref=e20]
+            - img [ref=e22]
+          - button "Nuevo Proyecto" [ref=e24] [cursor=pointer]:
+            - generic [ref=e25]: 
+            - generic [ref=e26]: Nuevo Proyecto
+      - generic [ref=e28]:
+        - progressbar [ref=e29]:
+          - img [ref=e30]
+        - paragraph [ref=e32]: Cargando proyectos...
+  - dialog "Nuevo Proyecto" [ref=e34]:
+    - generic [ref=e36]:
+      - generic [ref=e37]: Nuevo Proyecto
+      - button "Close" [ref=e39] [cursor=pointer]:
+        - img [ref=e40]
+    - generic [ref=e43]:
+      - generic [ref=e44]:
+        - generic [ref=e45]: Nombre del proyecto *
+        - textbox "Nombre del proyecto *" [ref=e46]:
+          - /placeholder: "Ej: Mi Novela - Borrador 1"
+          - text: Don Quijote - Prueba
+      - generic [ref=e47]:
+        - generic [ref=e48]: Descripción (opcional)
+        - textbox "Descripción (opcional)" [ref=e49]:
+          - /placeholder: Breve descripción del manuscrito...
+      - generic [ref=e50]:
+        - generic [ref=e51]: Documento *
+        - generic [ref=e53] [cursor=pointer]:
+          - img [ref=e54]
+          - generic [ref=e56]: test_book_1.txt
+        - generic [ref=e57]: "Formatos soportados: DOCX, DOC, TXT, MD, PDF, EPUB (máx. 50 MB)"
+        - generic [ref=e58]:
+          - generic [ref=e59]: 
+          - generic [ref=e60]: test_book_1.txt
+          - button "" [ref=e61] [cursor=pointer]:
+            - generic [ref=e62]: 
+    - generic [ref=e63]:
+      - button "Cancelar" [ref=e64] [cursor=pointer]:
+        - generic [ref=e65]: 
+        - generic [ref=e66]: Cancelar
+      - button "Crear y Analizar" [disabled]:
+        - img
+        - generic: Crear y Analizar
+```

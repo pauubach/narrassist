@@ -1,0 +1,154 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - generic [ref=e5]:
+      - generic [ref=e6] [cursor=pointer]: Archivo
+      - generic [ref=e7] [cursor=pointer]: Edición
+      - generic [ref=e8] [cursor=pointer]: Ver
+      - generic [ref=e9] [cursor=pointer]: Ayuda
+    - generic [ref=e11]:
+      - generic [ref=e12]:
+        - heading "Proyectos" [level=1] [ref=e14]
+        - generic [ref=e15]:
+          - generic [ref=e16]:
+            - textbox "Buscar proyectos..." [ref=e17]
+            - generic [ref=e18]: 
+          - generic [ref=e19] [cursor=pointer]:
+            - combobox "Última modificación" [ref=e20]
+            - img [ref=e22]
+          - button "Nuevo Proyecto" [ref=e24] [cursor=pointer]:
+            - generic [ref=e25]: 
+            - generic [ref=e26]: Nuevo Proyecto
+      - generic [ref=e30] [cursor=pointer]:
+        - generic [ref=e32]:
+          - generic [ref=e33]:
+            - generic [ref=e34]: 
+            - text: txt
+          - button "" [ref=e36]:
+            - generic [ref=e37]: 
+        - generic [ref=e38]:
+          - generic [ref=e39]:
+            - generic [ref=e40]: Don Quijote - Prueba
+            - generic [ref=e43]:
+              - generic [ref=e44]: 
+              - text: Hoy
+          - generic [ref=e46]:
+            - generic [ref=e47]:
+              - generic [ref=e48]: 1,649
+              - generic [ref=e49]: palabras
+            - generic [ref=e50]:
+              - generic [ref=e51]: "1"
+              - generic [ref=e52]: capítulos
+            - generic [ref=e53]:
+              - generic [ref=e54]: 100%
+              - generic [ref=e55]: analizado
+          - button "Abrir" [ref=e58]:
+            - generic [ref=e59]: 
+            - generic [ref=e60]: Abrir
+  - dialog "Atajos de Teclado" [ref=e62]:
+    - generic [ref=e64]:
+      - generic [ref=e65]: Atajos de Teclado
+      - button "Close" [ref=e67] [cursor=pointer]:
+        - img [ref=e68]
+    - generic [ref=e71]:
+      - paragraph [ref=e72]:
+        - generic [ref=e73]: 
+        - text: Usa
+        - generic [ref=e74]: F1
+        - text: o
+        - generic [ref=e75]: Ctrl/Cmd
+        - text: +
+        - generic [ref=e76]: /
+        - text: para mostrar esta ayuda en cualquier momento
+      - generic [ref=e77]:
+        - generic [ref=e78]:
+          - heading "Navegación" [level=3] [ref=e79]
+          - generic [ref=e80]:
+            - generic [ref=e81]:
+              - generic [ref=e82]:
+                - generic [ref=e83]: Ctrl/Cmd
+                - generic [ref=e84]: H
+              - generic [ref=e85]: Ir a inicio
+            - generic [ref=e86]:
+              - generic [ref=e87]:
+                - generic [ref=e88]: Ctrl/Cmd
+                - generic [ref=e89]: P
+              - generic [ref=e90]: Ir a proyectos
+            - generic [ref=e91]:
+              - generic [ref=e92]:
+                - generic [ref=e93]: Ctrl/Cmd
+                - generic [ref=e94]: D
+              - generic [ref=e95]: Ir al dashboard del proyecto
+            - generic [ref=e96]:
+              - generic [ref=e97]:
+                - generic [ref=e98]: Ctrl/Cmd
+                - generic [ref=e99]: E
+              - generic [ref=e100]: Ir a entidades
+            - generic [ref=e101]:
+              - generic [ref=e102]:
+                - generic [ref=e103]: Ctrl/Cmd
+                - generic [ref=e104]: A
+              - generic [ref=e105]: Ir a alertas
+            - generic [ref=e106]:
+              - generic [ref=e107]:
+                - generic [ref=e108]: Ctrl/Cmd
+                - generic [ref=e109]: ","
+              - generic [ref=e110]: Abrir configuración
+        - generic [ref=e111]:
+          - heading "Alertas" [level=3] [ref=e112]
+          - generic [ref=e113]:
+            - generic [ref=e114]:
+              - generic [ref=e116]: F8
+              - generic [ref=e117]: Siguiente alerta
+            - generic [ref=e118]:
+              - generic [ref=e119]:
+                - generic [ref=e120]: Shift
+                - generic [ref=e121]: F8
+              - generic [ref=e122]: Alerta anterior
+            - generic [ref=e123]:
+              - generic [ref=e125]: Enter
+              - generic [ref=e126]: Resolver alerta seleccionada
+            - generic [ref=e127]:
+              - generic [ref=e129]: Delete
+              - generic [ref=e130]: Descartar alerta seleccionada
+        - generic [ref=e131]:
+          - heading "Interfaz" [level=3] [ref=e132]
+          - generic [ref=e133]:
+            - generic [ref=e134]:
+              - generic [ref=e135]:
+                - generic [ref=e136]: Ctrl/Cmd
+                - generic [ref=e137]: B
+              - generic [ref=e138]: Mostrar/ocultar sidebar
+            - generic [ref=e139]:
+              - generic [ref=e140]:
+                - generic [ref=e141]: Ctrl/Cmd
+                - generic [ref=e142]: F
+              - generic [ref=e143]: Buscar
+            - generic [ref=e144]:
+              - generic [ref=e145]:
+                - generic [ref=e146]: Ctrl/Cmd
+                - generic [ref=e147]: X
+              - generic [ref=e148]: Exportar
+            - generic [ref=e149]:
+              - generic [ref=e150]:
+                - generic [ref=e151]: Ctrl/Cmd
+                - generic [ref=e152]: Shift
+                - generic [ref=e153]: D
+              - generic [ref=e154]: Cambiar tema
+            - generic [ref=e155]:
+              - generic [ref=e157]: Escape
+              - generic [ref=e158]: Cerrar modal/cancelar
+        - generic [ref=e159]:
+          - heading "Ayuda" [level=3] [ref=e160]
+          - generic [ref=e161]:
+            - generic [ref=e162]:
+              - generic [ref=e164]: F1
+              - generic [ref=e165]: Mostrar ayuda
+            - generic [ref=e166]:
+              - generic [ref=e167]:
+                - generic [ref=e168]: Ctrl/Cmd
+                - generic [ref=e169]: /
+              - generic [ref=e170]: Mostrar atajos de teclado
+```
