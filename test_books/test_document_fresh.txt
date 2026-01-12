@@ -32,7 +32,3 @@ Juan, que ahora parecía tener cincuenta años y canas en su barba, la saludó c
 - Imposible - dijo María - mis ojos siempre han sido azules, como los de mi madre.
 
 Juan la miró confundido. Algo extraño estaba pasando, pero no sabía qué.
-Test do., 11 de ene. de 2026 10:31:23
-Fresh test do., 11 de ene. de 2026 10:39:30
-Test pipeline 1768124492
-Pipeline test 1768124844

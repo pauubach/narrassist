@@ -1205,7 +1205,193 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
 
                 logger.info(f"NER complete: {len(entities)} entities")
 
-                # ========== FASE 4: ATRIBUTOS (55-75%) ==========
+                # ========== FASE 3.5: FUSIÓN DE ENTIDADES (55-60%) ==========
+                # Esta fase fusiona entidades que son la misma persona/lugar
+                # por ejemplo: "María" y "María Sánchez", "Juan" y "Juan Pérez"
+                # También resuelve correferencias: "Él" → "Juan"
+                phase_fusion_start = time.time()
+                analysis_progress_storage[project_id]["progress"] = 55
+                analysis_progress_storage[project_id]["current_phase"] = "Fusionando entidades similares y resolviendo correferencias"
+
+                try:
+                    from narrative_assistant.entities.semantic_fusion import get_semantic_fusion_service
+                    from narrative_assistant.nlp.coref import resolve_coreferences
+                    from narrative_assistant.entities.models import EntityType
+
+                    fusion_service = get_semantic_fusion_service()
+                    entity_repo = get_entity_repository()
+
+                    # 1. Aplicar fusión semántica a entidades del mismo tipo
+                    entities_by_type: dict[EntityType, list] = {}
+                    for ent in entities:
+                        if ent.entity_type not in entities_by_type:
+                            entities_by_type[ent.entity_type] = []
+                        entities_by_type[ent.entity_type].append(ent)
+
+                    fusion_pairs: list[tuple] = []  # (entity_to_keep, entity_to_merge)
+
+                    for entity_type, type_entities in entities_by_type.items():
+                        # Solo fusionar si hay más de una entidad del mismo tipo
+                        if len(type_entities) < 2:
+                            continue
+
+                        # Comparar cada par de entidades
+                        for i, ent1 in enumerate(type_entities):
+                            for j, ent2 in enumerate(type_entities):
+                                if i >= j:  # Evitar duplicados y compararse consigo mismo
+                                    continue
+
+                                # Calcular si deben fusionarse
+                                result = fusion_service.should_merge(ent1, ent2)
+
+                                if result.should_merge:
+                                    logger.info(
+                                        f"Fusión sugerida: '{ent1.canonical_name}' + '{ent2.canonical_name}' "
+                                        f"(similaridad: {result.similarity:.2f}, razón: {result.reason})"
+                                    )
+                                    # Mantener la entidad con más menciones o nombre más largo
+                                    if (ent1.mention_count or 0) >= (ent2.mention_count or 0):
+                                        fusion_pairs.append((ent1, ent2))
+                                    else:
+                                        fusion_pairs.append((ent2, ent1))
+
+                    # Ejecutar las fusiones
+                    merged_entity_ids = set()
+                    for keep_entity, merge_entity in fusion_pairs:
+                        if merge_entity.id in merged_entity_ids:
+                            continue  # Ya fue fusionada
+
+                        try:
+                            # Añadir como alias
+                            if keep_entity.aliases is None:
+                                keep_entity.aliases = []
+                            if merge_entity.canonical_name not in keep_entity.aliases:
+                                keep_entity.aliases.append(merge_entity.canonical_name)
+
+                            # Sumar menciones
+                            keep_entity.mention_count = (keep_entity.mention_count or 0) + (merge_entity.mention_count or 0)
+
+                            # Registrar fusión
+                            if keep_entity.merged_from_ids is None:
+                                keep_entity.merged_from_ids = []
+                            if merge_entity.id:
+                                keep_entity.merged_from_ids.append(merge_entity.id)
+
+                            # Actualizar entidad en BD
+                            entity_repo.update_entity(
+                                entity_id=keep_entity.id,
+                                aliases=keep_entity.aliases,
+                                merged_from_ids=keep_entity.merged_from_ids,
+                            )
+                            entity_repo.increment_mention_count(keep_entity.id, merge_entity.mention_count or 0)
+
+                            # Reasignar menciones de la entidad fusionada
+                            if merge_entity.id and keep_entity.id:
+                                entity_repo.move_mentions(merge_entity.id, keep_entity.id)
+
+                            # Desactivar entidad fusionada
+                            entity_repo.delete_entity(merge_entity.id, hard_delete=False)
+
+                            merged_entity_ids.add(merge_entity.id)
+
+                            logger.info(
+                                f"Fusión ejecutada: '{merge_entity.canonical_name}' → '{keep_entity.canonical_name}'"
+                            )
+                        except Exception as e:
+                            logger.warning(f"Error fusionando {merge_entity.canonical_name} → {keep_entity.canonical_name}: {e}")
+
+                    # Actualizar lista de entidades activas
+                    entities = [e for e in entities if e.id not in merged_entity_ids]
+
+                    analysis_progress_storage[project_id]["progress"] = 57
+                    update_time_remaining()
+
+                    # 2. Aplicar resolución de correferencias para pronombres
+                    # Esto vincula pronombres como "él", "ella" con entidades nombradas
+                    analysis_progress_storage[project_id]["current_phase"] = "Resolviendo correferencias (pronombres)"
+
+                    coref_result = resolve_coreferences(full_text)
+
+                    if coref_result.is_success and coref_result.value:
+                        coref_data = coref_result.value
+                        logger.info(
+                            f"Correferencias: {len(coref_data.chains)} cadenas, "
+                            f"{coref_data.total_mentions} menciones, "
+                            f"{len(coref_data.unresolved_pronouns)} pronombres sin resolver"
+                        )
+
+                        # Para cada cadena de correferencia, buscar si contiene una entidad nombrada
+                        # y añadir las otras menciones como aliases
+                        character_entities = [e for e in entities if e.entity_type == EntityType.CHARACTER]
+
+                        for chain in coref_data.chains:
+                            # Buscar si alguna mención coincide con una entidad
+                            matching_entity = None
+                            for mention in chain.mentions:
+                                # Buscar coincidencia por posición o texto
+                                for ent in character_entities:
+                                    # Coincidir por nombre (case insensitive)
+                                    if ent.canonical_name and mention.text.lower() == ent.canonical_name.lower():
+                                        matching_entity = ent
+                                        break
+                                    # Coincidir por alias
+                                    if ent.aliases:
+                                        for alias in ent.aliases:
+                                            if mention.text.lower() == alias.lower():
+                                                matching_entity = ent
+                                                break
+                                if matching_entity:
+                                    break
+
+                            # Si encontramos una entidad, actualizar sus menciones con pronombres
+                            if matching_entity:
+                                # Añadir main_mention como alias si no es igual al nombre canónico
+                                if chain.main_mention and chain.main_mention.lower() != matching_entity.canonical_name.lower():
+                                    if matching_entity.aliases is None:
+                                        matching_entity.aliases = []
+                                    if chain.main_mention not in matching_entity.aliases:
+                                        matching_entity.aliases.append(chain.main_mention)
+
+                                # Contar menciones adicionales de pronombres
+                                pronoun_mentions = sum(
+                                    1 for m in chain.mentions
+                                    if m.mention_type.value == "pronoun"
+                                )
+                                if pronoun_mentions > 0:
+                                    try:
+                                        entity_repo.increment_mention_count(matching_entity.id, pronoun_mentions)
+                                        matching_entity.mention_count = (matching_entity.mention_count or 0) + pronoun_mentions
+                                        logger.debug(
+                                            f"Correferencia: +{pronoun_mentions} menciones para '{matching_entity.canonical_name}'"
+                                        )
+                                    except Exception as e:
+                                        logger.warning(f"Error actualizando correferencias para {matching_entity.canonical_name}: {e}")
+
+                                # Actualizar aliases si hay nuevos
+                                if matching_entity.aliases:
+                                    try:
+                                        entity_repo.update_entity(
+                                            entity_id=matching_entity.id,
+                                            aliases=matching_entity.aliases,
+                                        )
+                                    except Exception as e:
+                                        logger.warning(f"Error actualizando aliases para {matching_entity.canonical_name}: {e}")
+
+                    analysis_progress_storage[project_id]["progress"] = 60
+                    update_time_remaining()
+
+                    fusion_duration = round(time.time() - phase_fusion_start, 1)
+                    logger.info(
+                        f"Fusión de entidades completada en {fusion_duration}s: "
+                        f"{len(merged_entity_ids)} entidades fusionadas, "
+                        f"{len(entities)} entidades activas"
+                    )
+
+                except Exception as e:
+                    logger.warning(f"Error en fusión de entidades (continuando sin fusión): {e}")
+                    # No fallamos el análisis, solo continuamos sin fusión
+
+                # ========== FASE 4: ATRIBUTOS (60-75%) ==========
                 phase_start = time.time()
                 phases[3]["current"] = True
                 analysis_progress_storage[project_id]["progress"] = 60
