@@ -189,6 +189,25 @@
                 </span>
               </template>
               <div class="summary-content">
+                <!-- Información del Documento -->
+                <div class="summary-section document-info-section">
+                  <h4>Información del Documento</h4>
+                  <div class="document-info">
+                    <div class="info-row" v-if="originalDocumentName">
+                      <i class="pi pi-file"></i>
+                      <span class="info-label">Archivo:</span>
+                      <span class="info-value">{{ originalDocumentName }}</span>
+                    </div>
+                    <div class="info-row description-row" v-if="project.description">
+                      <i class="pi pi-align-left"></i>
+                      <span class="info-label">Descripción:</span>
+                      <span class="info-value description-text">{{ project.description }}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <Divider />
+
                 <div class="summary-section">
                   <h4>Análisis Completo</h4>
                   <ProgressBar :value="project.analysis_progress" :showValue="true" />
@@ -304,6 +323,16 @@ const highlightedEntityId = ref<number | null>(null)
 const scrollToChapterId = ref<number | null>(null)
 
 const project = computed(() => projectsStore.currentProject)
+
+// Computed: nombre original del documento (sin prefijo hash)
+const originalDocumentName = computed(() => {
+  if (!project.value?.document_path) return null
+  const filename = project.value.document_path.split('/').pop() || project.value.document_path
+  // El nombre tiene formato: hash_nombreoriginal.ext (32 caracteres de hash + underscore)
+  // Ejemplo: fe02239b8ca74b8e81bcbcb37b410819_test_document_fresh.txt
+  const match = filename.match(/^[a-f0-9]{32}_(.+)$/)
+  return match ? match[1] : filename
+})
 
 // Computed stats
 const entitiesCount = computed(() => entities.value.length)
@@ -776,6 +805,66 @@ const startReanalysis = async () => {
 
 .summary-section {
   padding: 0;
+}
+
+/* Document Info Section */
+.document-info-section {
+  background: var(--surface-50);
+  padding: 1rem;
+  border-radius: 6px;
+  border-left: 4px solid var(--primary-color);
+}
+
+.document-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.info-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.info-row i {
+  color: var(--primary-color);
+  margin-top: 0.15rem;
+  flex-shrink: 0;
+}
+
+.info-label {
+  color: var(--text-secondary);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.info-value {
+  color: var(--text-color);
+  word-break: break-word;
+}
+
+.description-row {
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.description-row .info-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.description-row .info-label i {
+  margin-top: 0;
+}
+
+.description-text {
+  padding-left: 1.5rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  font-style: italic;
 }
 
 .summary-section h4 {

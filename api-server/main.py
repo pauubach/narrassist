@@ -968,7 +968,7 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
         }
 
         logger.info(f"Analysis started for project {project_id}")
-        logger.info(f"File: {file.filename}, temp path: {tmp_path}")
+        logger.info(f"File: {file.filename if file else 'stored document'}, temp path: {tmp_path}")
 
         # Ejecutar análisis REAL en background thread
         import threading
@@ -1306,76 +1306,120 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                     analysis_progress_storage[project_id]["progress"] = 57
                     update_time_remaining()
 
-                    # 2. Aplicar resolución de correferencias para pronombres
-                    # Esto vincula pronombres como "él", "ella" con entidades nombradas
-                    analysis_progress_storage[project_id]["current_phase"] = "Resolviendo correferencias (pronombres)"
+                    # 2. Aplicar resolución de correferencias con votación multi-método
+                    # Usa: embeddings semánticos, LLM local (Ollama), análisis morfosintáctico, heurísticas
+                    analysis_progress_storage[project_id]["current_phase"] = "Resolviendo correferencias (votación multi-método)"
 
-                    coref_result = resolve_coreferences(full_text)
-
-                    if coref_result.is_success and coref_result.value:
-                        coref_data = coref_result.value
-                        logger.info(
-                            f"Correferencias: {len(coref_data.chains)} cadenas, "
-                            f"{coref_data.total_mentions} menciones, "
-                            f"{len(coref_data.unresolved_pronouns)} pronombres sin resolver"
+                    try:
+                        from narrative_assistant.nlp.coreference_resolver import (
+                            resolve_coreferences_voting,
+                            CorefConfig,
+                            CorefMethod,
+                            MentionType as CorefMentionType,
                         )
 
-                        # Para cada cadena de correferencia, buscar si contiene una entidad nombrada
-                        # y añadir las otras menciones como aliases
+                        # Configurar métodos de resolución
+                        coref_config = CorefConfig(
+                            enabled_methods=[
+                                CorefMethod.EMBEDDINGS,
+                                CorefMethod.LLM,
+                                CorefMethod.MORPHO,
+                                CorefMethod.HEURISTICS,
+                            ],
+                            min_confidence=0.5,
+                            consensus_threshold=0.6,
+                            use_chapter_boundaries=True,
+                            ollama_model="llama3.2",
+                        )
+
+                        # Resolver con información de capítulos
+                        coref_result = resolve_coreferences_voting(
+                            text=full_text,
+                            chapters=chapters_data,
+                            config=coref_config,
+                        )
+
+                        logger.info(
+                            f"Correferencias (votación): {coref_result.total_chains} cadenas, "
+                            f"{coref_result.total_mentions} menciones, "
+                            f"{len(coref_result.unresolved)} sin resolver"
+                        )
+
+                        # Log de contribución de métodos
+                        for method, count in coref_result.method_contributions.items():
+                            logger.debug(f"  Método {method.value}: {count} resoluciones")
+
+                        # Vincular cadenas con entidades
                         character_entities = [e for e in entities if e.entity_type == EntityType.CHARACTER]
 
-                        for chain in coref_data.chains:
-                            # Buscar si alguna mención coincide con una entidad
+                        for chain in coref_result.chains:
+                            # Buscar entidad que coincida con la mención principal
                             matching_entity = None
-                            for mention in chain.mentions:
-                                # Buscar coincidencia por posición o texto
-                                for ent in character_entities:
-                                    # Coincidir por nombre (case insensitive)
-                                    if ent.canonical_name and mention.text.lower() == ent.canonical_name.lower():
-                                        matching_entity = ent
-                                        break
-                                    # Coincidir por alias
-                                    if ent.aliases:
-                                        for alias in ent.aliases:
-                                            if mention.text.lower() == alias.lower():
-                                                matching_entity = ent
-                                                break
-                                if matching_entity:
+
+                            for ent in character_entities:
+                                # Coincidir por nombre canónico
+                                if (ent.canonical_name and chain.main_mention and
+                                    ent.canonical_name.lower() == chain.main_mention.lower()):
+                                    matching_entity = ent
                                     break
 
-                            # Si encontramos una entidad, actualizar sus menciones con pronombres
-                            if matching_entity:
-                                # Añadir main_mention como alias si no es igual al nombre canónico
-                                if chain.main_mention and chain.main_mention.lower() != matching_entity.canonical_name.lower():
-                                    if matching_entity.aliases is None:
-                                        matching_entity.aliases = []
-                                    if chain.main_mention not in matching_entity.aliases:
-                                        matching_entity.aliases.append(chain.main_mention)
+                                # Coincidir por alias
+                                if ent.aliases:
+                                    for alias in ent.aliases:
+                                        if chain.main_mention and alias.lower() == chain.main_mention.lower():
+                                            matching_entity = ent
+                                            break
 
-                                # Contar menciones adicionales de pronombres
-                                pronoun_mentions = sum(
+                                # Coincidir por cualquier mención en la cadena
+                                if not matching_entity:
+                                    for mention in chain.mentions:
+                                        if (ent.canonical_name and
+                                            mention.text.lower() == ent.canonical_name.lower()):
+                                            matching_entity = ent
+                                            break
+
+                            if matching_entity:
+                                # Contar menciones de pronombres en la cadena
+                                pronoun_count = sum(
                                     1 for m in chain.mentions
-                                    if m.mention_type.value == "pronoun"
+                                    if m.mention_type == CorefMentionType.PRONOUN
                                 )
-                                if pronoun_mentions > 0:
+
+                                if pronoun_count > 0:
                                     try:
-                                        entity_repo.increment_mention_count(matching_entity.id, pronoun_mentions)
-                                        matching_entity.mention_count = (matching_entity.mention_count or 0) + pronoun_mentions
+                                        entity_repo.increment_mention_count(matching_entity.id, pronoun_count)
+                                        matching_entity.mention_count = (matching_entity.mention_count or 0) + pronoun_count
                                         logger.debug(
-                                            f"Correferencia: +{pronoun_mentions} menciones para '{matching_entity.canonical_name}'"
+                                            f"Correferencia: +{pronoun_count} pronombres → '{matching_entity.canonical_name}'"
                                         )
                                     except Exception as e:
-                                        logger.warning(f"Error actualizando correferencias para {matching_entity.canonical_name}: {e}")
+                                        logger.warning(f"Error actualizando correferencias: {e}")
 
-                                # Actualizar aliases si hay nuevos
-                                if matching_entity.aliases:
+                                # Añadir aliases nuevos
+                                new_aliases = []
+                                for mention in chain.mentions:
+                                    if (mention.mention_type == CorefMentionType.PROPER_NOUN and
+                                        mention.text.lower() != matching_entity.canonical_name.lower()):
+                                        if matching_entity.aliases is None:
+                                            matching_entity.aliases = []
+                                        if mention.text not in matching_entity.aliases:
+                                            matching_entity.aliases.append(mention.text)
+                                            new_aliases.append(mention.text)
+
+                                if new_aliases:
                                     try:
                                         entity_repo.update_entity(
                                             entity_id=matching_entity.id,
                                             aliases=matching_entity.aliases,
                                         )
+                                        logger.debug(f"Nuevos aliases para '{matching_entity.canonical_name}': {new_aliases}")
                                     except Exception as e:
-                                        logger.warning(f"Error actualizando aliases para {matching_entity.canonical_name}: {e}")
+                                        logger.warning(f"Error actualizando aliases: {e}")
+
+                    except ImportError as e:
+                        logger.warning(f"Módulo de correferencias no disponible: {e}")
+                    except Exception as e:
+                        logger.warning(f"Error en resolución de correferencias: {e}")
 
                     analysis_progress_storage[project_id]["progress"] = 60
                     update_time_remaining()

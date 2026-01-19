@@ -247,8 +247,32 @@ src/narrative_assistant/
 └── nlp/            # Procesamiento NLP
     ├── spacy_gpu.py    # setup_spacy_gpu(), load_spacy_model()
     ├── embeddings.py   # EmbeddingsModel con fallback OOM
-    └── chunking.py     # TextChunker para docs grandes
+    ├── chunking.py     # TextChunker para docs grandes
+    ├── ner.py          # NERExtractor - extracción de entidades
+    └── coreference_resolver.py  # Sistema de correferencias multi-método
 ```
+
+### Sistema de Correferencias (Votación Multi-Método)
+
+El sistema usa **4 métodos independientes** con votación ponderada:
+
+| Método | Peso | Descripción |
+|--------|------|-------------|
+| `embeddings` | 30% | Similitud semántica (sentence-transformers) |
+| `llm` | 35% | LLM local (Ollama: llama3.2, mistral, qwen2.5) |
+| `morpho` | 20% | Análisis morfosintáctico (spaCy) |
+| `heuristics` | 15% | Heurísticas narrativas (proximidad, patrones) |
+
+**Uso**:
+```python
+from narrative_assistant.nlp.coreference_resolver import resolve_coreferences_voting
+
+result = resolve_coreferences_voting(text, chapters=chapters_data)
+# result.chains -> cadenas de correferencia
+# result.unresolved -> menciones sin resolver
+```
+
+**Documentación completa**: [docs/COREFERENCE_RESOLUTION.md](docs/COREFERENCE_RESOLUTION.md)
 
 ---
 
