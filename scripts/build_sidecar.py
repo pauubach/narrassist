@@ -5,6 +5,9 @@ Script para construir el sidecar de Narrative Assistant con PyInstaller.
 Este script empaqueta el servidor FastAPI como un ejecutable standalone
 que puede ser usado como sidecar de Tauri.
 
+NOTA: El sidecar se construye SIN las dependencias NLP pesadas (spacy, torch, etc.)
+Los modelos NLP se descargan automáticamente al primer inicio de la aplicación.
+
 Uso:
     python scripts/build_sidecar.py [--debug] [--clean]
 
@@ -84,6 +87,8 @@ def build_sidecar(project_root: Path, debug: bool = False, target: str | None = 
         raise FileNotFoundError(f"No se encontro {main_script}")
 
     # Construir comando PyInstaller
+    # IMPORTANTE: Excluimos las dependencias pesadas de NLP
+    # Los modelos se descargan al primer inicio
     pyinstaller_args = [
         sys.executable, "-m", "PyInstaller",
         "--onefile",
@@ -93,46 +98,83 @@ def build_sidecar(project_root: Path, debug: bool = False, target: str | None = 
         "--specpath", str(project_root / "build"),
         # Incluir el paquete narrative_assistant
         "--paths", str(project_root / "src"),
-        # Ocultos imports necesarios para uvicorn/FastAPI
+        # Hidden imports para FastAPI/uvicorn
         "--hidden-import", "uvicorn",
         "--hidden-import", "uvicorn.main",
         "--hidden-import", "uvicorn.config",
         "--hidden-import", "uvicorn.server",
         "--hidden-import", "fastapi",
         "--hidden-import", "starlette",
+        "--hidden-import", "starlette.routing",
+        "--hidden-import", "starlette.responses",
+        "--hidden-import", "starlette.middleware",
+        "--hidden-import", "starlette.middleware.cors",
         "--hidden-import", "pydantic",
+        "--hidden-import", "pydantic_core",
         "--hidden-import", "anyio",
+        "--hidden-import", "anyio._backends",
         "--hidden-import", "anyio._backends._asyncio",
+        "--hidden-import", "httptools",
+        "--hidden-import", "websockets",
+        "--hidden-import", "watchfiles",
+        # Hidden imports para narrative_assistant (core only)
         "--hidden-import", "narrative_assistant",
         "--hidden-import", "narrative_assistant.core",
         "--hidden-import", "narrative_assistant.core.config",
+        "--hidden-import", "narrative_assistant.core.errors",
         "--hidden-import", "narrative_assistant.persistence",
-        "--hidden-import", "narrative_assistant.persistence.project",
         "--hidden-import", "narrative_assistant.persistence.database",
-        "--hidden-import", "narrative_assistant.parsers",
+        "--hidden-import", "narrative_assistant.persistence.project",
+        "--hidden-import", "narrative_assistant.persistence.chapter",
         "--hidden-import", "narrative_assistant.entities",
         "--hidden-import", "narrative_assistant.entities.repository",
+        "--hidden-import", "narrative_assistant.entities.models",
         "--hidden-import", "narrative_assistant.alerts",
         "--hidden-import", "narrative_assistant.alerts.repository",
-        # Excluir modulos no necesarios para reducir tamano
-        "--exclude-module", "tkinter",
+        "--hidden-import", "narrative_assistant.alerts.models",
+        "--hidden-import", "narrative_assistant.parsers",
+        "--hidden-import", "narrative_assistant.parsers.base",
+        "--hidden-import", "narrative_assistant.parsers.docx_parser",
+        # Python-docx for document parsing
+        "--hidden-import", "docx",
+        "--hidden-import", "lxml",
+        # SQLite
+        "--hidden-import", "sqlite3",
+        # Excluir modulos pesados que NO necesitamos en el sidecar
+        # Los modelos NLP se cargan dinámicamente cuando se necesitan
+        "--exclude-module", "torch",
+        "--exclude-module", "torchvision",
+        "--exclude-module", "torchaudio",
+        "--exclude-module", "nvidia",
+        "--exclude-module", "triton",
+        "--exclude-module", "tensorboard",
+        "--exclude-module", "tensorflow",
+        "--exclude-module", "keras",
+        "--exclude-module", "spacy",
+        "--exclude-module", "thinc",
+        "--exclude-module", "sentence_transformers",
+        "--exclude-module", "transformers",
+        "--exclude-module", "huggingface_hub",
+        "--exclude-module", "tokenizers",
+        "--exclude-module", "safetensors",
+        "--exclude-module", "scipy",
+        "--exclude-module", "sklearn",
+        "--exclude-module", "scikit-learn",
+        "--exclude-module", "numpy",  # Se incluirá solo si es necesario
+        "--exclude-module", "pandas",
         "--exclude-module", "matplotlib",
         "--exclude-module", "PIL",
+        "--exclude-module", "cv2",
+        "--exclude-module", "opencv",
+        "--exclude-module", "tkinter",
         "--exclude-module", "notebook",
         "--exclude-module", "jupyter",
         "--exclude-module", "IPython",
         "--exclude-module", "pytest",
-        "--exclude-module", "py",
         "--exclude-module", "test",
         "--exclude-module", "tests",
-        # Excluir CUDA/GPU - los modelos usan CPU en produccion
-        "--exclude-module", "torch.cuda",
-        "--exclude-module", "nvidia",
-        "--exclude-module", "triton",
-        "--exclude-module", "tensorboard",
-        # Excluir scipy pesado que no se usa directamente
-        "--exclude-module", "scipy.spatial.transform",
-        "--exclude-module", "scipy.io.matlab",
+        "--exclude-module", "sympy",
+        "--exclude-module", "networkx",
         # Consola oculta en Windows release
         *(["--noconsole"] if system == "windows" and not debug else []),
         # Debug
@@ -145,7 +187,11 @@ def build_sidecar(project_root: Path, debug: bool = False, target: str | None = 
     pyinstaller_args = [arg for arg in pyinstaller_args if arg]
 
     print(f"Construyendo sidecar para {target_triple}...")
-    print(f"Comando: {' '.join(pyinstaller_args[:10])}...")
+    print(f"Comando: {' '.join(pyinstaller_args[:15])}...")
+    print("")
+    print("NOTA: Excluyendo dependencias NLP pesadas (torch, spacy, transformers)")
+    print("      Los modelos se descargaran al primer inicio de la aplicacion.")
+    print("")
 
     result = subprocess.run(pyinstaller_args, cwd=project_root)
 
@@ -163,55 +209,23 @@ def build_sidecar(project_root: Path, debug: bool = False, target: str | None = 
                     break
 
     if output_path.exists():
-        print(f"Sidecar construido: {output_path}")
-        print(f"Tamano: {output_path.stat().st_size / 1024 / 1024:.1f} MB")
+        size_mb = output_path.stat().st_size / 1024 / 1024
+        print(f"\nSidecar construido: {output_path}")
+        print(f"Tamano: {size_mb:.1f} MB")
+
+        if size_mb > 100:
+            print(f"\nADVERTENCIA: El ejecutable es grande ({size_mb:.0f} MB).")
+            print("Considera revisar las exclusiones si es demasiado grande.")
+
         return output_path
     else:
         raise RuntimeError(f"No se genero el ejecutable en {output_path}")
-
-
-def update_tauri_config(project_root: Path):
-    """Actualiza tauri.conf.json para incluir el sidecar."""
-    import json
-
-    config_path = project_root / "src-tauri" / "tauri.conf.json"
-    if not config_path.exists():
-        print("No se encontro tauri.conf.json")
-        return
-
-    with open(config_path) as f:
-        config = json.load(f)
-
-    # Agregar externalBin si no existe
-    if "bundle" not in config:
-        config["bundle"] = {}
-
-    config["bundle"]["externalBin"] = ["binaries/narrative-assistant-server"]
-
-    # Agregar scope de shell si no existe
-    if "plugins" not in config:
-        config["plugins"] = {}
-    if "shell" not in config["plugins"]:
-        config["plugins"]["shell"] = {}
-
-    config["plugins"]["shell"]["scope"] = [
-        {
-            "name": "binaries/narrative-assistant-server",
-            "sidecar": True
-        }
-    ]
-
-    with open(config_path, "w") as f:
-        json.dump(config, f, indent=2)
-
-    print(f"Actualizado {config_path}")
 
 
 def main():
     parser = argparse.ArgumentParser(description="Construir sidecar de Narrative Assistant")
     parser.add_argument("--debug", action="store_true", help="Build con simbolos de debug")
     parser.add_argument("--clean", action="store_true", help="Limpiar builds anteriores")
-    parser.add_argument("--update-config", action="store_true", help="Actualizar tauri.conf.json")
     parser.add_argument("--target", type=str, help="Target triple (ej: x86_64-apple-darwin)")
     args = parser.parse_args()
 
@@ -229,9 +243,6 @@ def main():
 
     try:
         output_path = build_sidecar(project_root, debug=args.debug, target=args.target)
-
-        if args.update_config:
-            update_tauri_config(project_root)
 
         print("\n[OK] Build completado exitosamente")
         print(f"Ejecutable: {output_path}")
