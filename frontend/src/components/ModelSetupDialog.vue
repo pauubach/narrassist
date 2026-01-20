@@ -2,7 +2,6 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useSystemStore } from '@/stores/system'
 import Dialog from 'primevue/dialog'
-import Button from 'primevue/button'
 import ProgressBar from 'primevue/progressbar'
 
 const systemStore = useSystemStore()
@@ -11,11 +10,13 @@ const visible = ref(false)
 const downloadStarted = ref(false)
 const downloadProgress = ref(0)
 
-// Check models on mount
+// Check models on mount and start download automatically if needed
 onMounted(async () => {
   await systemStore.checkModelsStatus()
   if (!systemStore.modelsReady) {
     visible.value = true
+    // Start download automatically
+    startDownload()
   }
 })
 
@@ -26,7 +27,7 @@ watch(() => systemStore.modelsReady, (ready) => {
     setTimeout(() => {
       visible.value = false
       downloadStarted.value = false
-    }, 1500)
+    }, 2000)
   }
 })
 
@@ -36,7 +37,7 @@ watch(() => systemStore.modelsDownloading, (downloading) => {
     downloadProgress.value = 0
     const interval = setInterval(() => {
       if (downloadProgress.value < 95) {
-        downloadProgress.value += Math.random() * 5
+        downloadProgress.value += Math.random() * 3
       }
       if (!systemStore.modelsDownloading) {
         clearInterval(interval)
@@ -66,73 +67,33 @@ async function startDownload() {
   downloadStarted.value = true
   await systemStore.downloadModels()
 }
-
-function skipForNow() {
-  visible.value = false
-}
 </script>
 
 <template>
   <Dialog
     v-model:visible="visible"
-    :closable="!downloadStarted"
+    :closable="false"
     :modal="true"
     :draggable="false"
     header="Configuracion inicial"
     class="model-setup-dialog"
-    :style="{ width: '500px' }"
+    :style="{ width: '450px' }"
   >
     <div class="dialog-content">
-      <!-- Initial state: show what needs to be downloaded -->
-      <template v-if="!downloadStarted && !systemStore.modelsReady">
-        <div class="info-section">
-          <i class="pi pi-download info-icon"></i>
-          <h3>Descargar modelos necesarios</h3>
-          <p>
-            Narrative Assistant necesita descargar modelos de procesamiento de lenguaje
-            para funcionar. Esta descarga solo se realiza una vez.
-          </p>
-        </div>
-
-        <div class="models-list">
-          <div v-for="model in missingModels" :key="model.name" class="model-item">
-            <i class="pi pi-box"></i>
-            <span class="model-name">{{ model.displayName }}</span>
-            <span class="model-size">~{{ model.sizeMb }} MB</span>
-          </div>
-        </div>
-
-        <div class="total-size">
-          <strong>Total a descargar:</strong> ~{{ totalDownloadSize }} MB
-        </div>
-
-        <div class="actions">
-          <Button
-            label="Descargar ahora"
-            icon="pi pi-download"
-            @click="startDownload"
-            :loading="systemStore.modelsLoading"
-          />
-          <Button
-            label="Omitir por ahora"
-            severity="secondary"
-            text
-            @click="skipForNow"
-          />
-        </div>
-
-        <p class="note">
-          <i class="pi pi-info-circle"></i>
-          Sin estos modelos, algunas funciones no estaran disponibles.
-        </p>
-      </template>
-
-      <!-- Downloading state -->
-      <template v-else-if="downloadStarted && !systemStore.modelsReady">
+      <!-- Downloading state (automatic) -->
+      <template v-if="downloadStarted && !systemStore.modelsReady">
         <div class="download-progress">
           <i class="pi pi-spin pi-spinner download-spinner"></i>
           <h3>Descargando modelos...</h3>
-          <p>Por favor, no cierres la aplicacion.</p>
+          <p>Preparando Narrative Assistant para su primer uso.</p>
+
+          <div class="models-downloading">
+            <div v-for="model in missingModels" :key="model.name" class="model-item-small">
+              <i class="pi pi-box"></i>
+              <span>{{ model.displayName }}</span>
+              <span class="model-size">~{{ model.sizeMb }} MB</span>
+            </div>
+          </div>
 
           <ProgressBar
             :value="downloadProgress"
@@ -141,7 +102,12 @@ function skipForNow() {
           />
 
           <p class="progress-text">
-            {{ Math.round(downloadProgress) }}% completado
+            {{ Math.round(downloadProgress) }}% - Total: ~{{ totalDownloadSize }} MB
+          </p>
+
+          <p class="note">
+            <i class="pi pi-info-circle"></i>
+            Esta descarga solo se realiza una vez.
           </p>
         </div>
       </template>
@@ -150,8 +116,8 @@ function skipForNow() {
       <template v-else-if="systemStore.modelsReady">
         <div class="download-complete">
           <i class="pi pi-check-circle complete-icon"></i>
-          <h3>Modelos instalados correctamente</h3>
-          <p>Narrative Assistant esta listo para usar.</p>
+          <h3>Listo para usar</h3>
+          <p>Los modelos se han instalado correctamente.</p>
         </div>
       </template>
 
@@ -193,49 +159,33 @@ function skipForNow() {
   line-height: 1.5;
 }
 
-.models-list {
+.models-downloading {
   background: var(--p-surface-100);
-  border-radius: 8px;
-  padding: 1rem;
+  border-radius: 6px;
+  padding: 0.75rem;
   margin-bottom: 1rem;
 }
 
-.model-item {
+.model-item-small {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.5rem 0;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+  font-size: 0.875rem;
 }
 
-.model-item:not(:last-child) {
-  border-bottom: 1px solid var(--p-surface-200);
-}
-
-.model-item i {
+.model-item-small i {
   color: var(--p-text-muted-color);
+  font-size: 0.75rem;
 }
 
-.model-name {
+.model-item-small span:first-of-type {
   flex: 1;
-  font-weight: 500;
 }
 
 .model-size {
   color: var(--p-text-muted-color);
-  font-size: 0.875rem;
-}
-
-.total-size {
-  text-align: right;
-  margin-bottom: 1.5rem;
-  color: var(--p-text-muted-color);
-}
-
-.actions {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  align-items: center;
+  font-size: 0.75rem;
 }
 
 .note {
@@ -306,12 +256,8 @@ function skipForNow() {
 }
 
 /* Dark mode */
-.dark .models-list {
+.dark .models-downloading {
   background: var(--p-surface-800);
-}
-
-.dark .model-item:not(:last-child) {
-  border-bottom-color: var(--p-surface-700);
 }
 
 .dark .download-complete h3 {
