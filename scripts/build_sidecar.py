@@ -64,9 +64,9 @@ def clean_build_dirs(project_root: Path):
             shutil.rmtree(dir_path)
 
 
-def build_sidecar(project_root: Path, debug: bool = False) -> Path:
+def build_sidecar(project_root: Path, debug: bool = False, target: str | None = None) -> Path:
     """Construye el sidecar con PyInstaller."""
-    target_triple = get_target_triple()
+    target_triple = target or get_target_triple()
     system = platform.system().lower()
 
     # Nombre del ejecutable
@@ -198,6 +198,7 @@ def main():
     parser.add_argument("--debug", action="store_true", help="Build con simbolos de debug")
     parser.add_argument("--clean", action="store_true", help="Limpiar builds anteriores")
     parser.add_argument("--update-config", action="store_true", help="Actualizar tauri.conf.json")
+    parser.add_argument("--target", type=str, help="Target triple (ej: x86_64-apple-darwin)")
     args = parser.parse_args()
 
     # Encontrar raiz del proyecto
@@ -205,14 +206,15 @@ def main():
     if not (project_root / "src-tauri").exists():
         raise RuntimeError("No se encontro src-tauri. Ejecutar desde la raiz del proyecto.")
 
+    target = args.target or get_target_triple()
     print(f"Proyecto: {project_root}")
-    print(f"Target: {get_target_triple()}")
+    print(f"Target: {target}")
 
     if args.clean:
         clean_build_dirs(project_root)
 
     try:
-        output_path = build_sidecar(project_root, debug=args.debug)
+        output_path = build_sidecar(project_root, debug=args.debug, target=args.target)
 
         if args.update_config:
             update_tauri_config(project_root)
