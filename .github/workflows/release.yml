@@ -45,18 +45,13 @@ jobs:
       - name: Install Python dependencies
         run: pip install -e ".[build]"
 
-      - name: Download NLP models (to bundle with installer)
-        run: python scripts/download_models.py --all
-        env:
-          NA_MODELS_DIR: ${{ github.workspace }}/models
-
       - name: Build sidecar
         run: python scripts/build_sidecar.py --clean
 
       - name: Prepare resources
         run: |
-          New-Item -ItemType Directory -Force -Path src-tauri/resources/models
-          Copy-Item -Recurse models/* src-tauri/resources/models/
+          New-Item -ItemType Directory -Force -Path src-tauri/resources
+          Copy-Item scripts/install_models.py src-tauri/resources/
         shell: pwsh
 
       - name: Build Tauri
@@ -108,18 +103,13 @@ jobs:
       - name: Install Python dependencies
         run: pip install -e ".[build]"
 
-      - name: Download NLP models (to bundle with installer)
-        run: python scripts/download_models.py --all
-        env:
-          NA_MODELS_DIR: ${{ github.workspace }}/models
-
       - name: Build sidecar
         run: python scripts/build_sidecar.py --clean
 
       - name: Prepare resources
         run: |
-          mkdir -p src-tauri/resources/models
-          cp -R models/* src-tauri/resources/models/
+          mkdir -p src-tauri/resources
+          cp scripts/install_models.py src-tauri/resources/
 
       - name: Build Tauri
         run: cargo tauri build
@@ -154,7 +144,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup_python@v5
         with:
           python-version: '3.11'
 
@@ -173,18 +163,13 @@ jobs:
       - name: Install Python dependencies
         run: pip install -e ".[build]"
 
-      - name: Download NLP models (to bundle with installer)
-        run: python scripts/download_models.py --all
-        env:
-          NA_MODELS_DIR: ${{ github.workspace }}/models
-
       - name: Build sidecar
         run: python scripts/build_sidecar.py --clean
 
       - name: Prepare resources
         run: |
-          mkdir -p src-tauri/resources/models
-          cp -R models/* src-tauri/resources/models/
+          mkdir -p src-tauri/resources
+          cp scripts/install_models.py src-tauri/resources/
 
       - name: Build Tauri
         run: cargo tauri build

@@ -66,12 +66,12 @@ FunctionEnd
         StrCpy $1 "python"
     ${EndIf}
 
-    ; Run post_install.py with silent mode
-    DetailPrint "Ejecutando post_install.py..."
+    ; Run install_models.py with silent mode
+    DetailPrint "Ejecutando install_models.py..."
     SetDetailsPrint both
 
-    ; Execute the post-install script
-    nsExec::ExecToLog '$1 "$INSTDIR\resources\post_install.py" --silent'
+    ; Execute the model installation script
+    nsExec::ExecToLog '$1 "$INSTDIR\resources\install_models.py" --silent'
     Pop $0
 
     ${If} $0 == 0

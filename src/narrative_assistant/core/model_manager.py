@@ -165,6 +165,14 @@ class ModelManager:
         # Cuando la app se ejecuta como bundle, los modelos están en resources/models
         self.bundled_models_dir = self._find_bundled_models_dir()
 
+        # Lock para operaciones de descarga (evitar descargas duplicadas)
+        self._download_locks: dict[ModelType, threading.Lock] = {
+            model_type: threading.Lock() for model_type in ModelType
+        }
+
+        # Cache de rutas verificadas
+        self._verified_paths: dict[ModelType, Path] = {}
+
         logger.info(f"ModelManager inicializado. Directorio: {self.models_dir}")
         if self.bundled_models_dir:
             logger.info(f"Modelos bundled encontrados en: {self.bundled_models_dir}")
@@ -206,14 +214,6 @@ class ModelManager:
                     return path
 
         return None
-
-        # Lock para operaciones de descarga (evitar descargas duplicadas)
-        self._download_locks: dict[ModelType, threading.Lock] = {
-            model_type: threading.Lock() for model_type in ModelType
-        }
-
-        # Cache de rutas verificadas
-        self._verified_paths: dict[ModelType, Path] = {}
 
     def get_model_path(self, model_type: ModelType) -> Optional[Path]:
         """
