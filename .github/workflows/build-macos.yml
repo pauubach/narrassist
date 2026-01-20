@@ -1,18 +1,13 @@
 name: Build macOS Installer
 
 on:
-  # Ejecutar manualmente desde la UI de GitHub
+  # Solo ejecutar manualmente (el release.yml se encarga de tags)
   workflow_dispatch:
     inputs:
       version:
         description: 'Version (e.g., 1.0.0-beta)'
         required: false
         default: 'dev'
-
-  # Ejecutar en push a tags de versión
-  push:
-    tags:
-      - 'v*'
 
 jobs:
   build-macos:
