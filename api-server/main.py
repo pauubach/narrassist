@@ -256,6 +256,122 @@ async def system_info():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/models/status")
+async def models_status():
+    """
+    Verifica el estado de los modelos NLP necesarios.
+
+    Returns:
+        ApiResponse con estado de cada modelo (instalado, tamaño, ruta)
+    """
+    try:
+        from narrative_assistant.core.model_manager import get_model_manager
+
+        manager = get_model_manager()
+        status = manager.get_all_models_status()
+
+        # Añadir info de Ollama
+        import shutil
+        import subprocess
+
+        ollama_installed = shutil.which("ollama") is not None
+        ollama_models = []
+
+        if ollama_installed:
+            try:
+                output = subprocess.check_output(
+                    ["ollama", "list"],
+                    stderr=subprocess.DEVNULL,
+                    text=True,
+                    timeout=5
+                )
+                # Parse output to get model names
+                for line in output.strip().split("\n")[1:]:  # Skip header
+                    if line.strip():
+                        model_name = line.split()[0]
+                        ollama_models.append(model_name)
+            except Exception:
+                pass
+
+        return ApiResponse(
+            success=True,
+            data={
+                "nlp_models": status,
+                "ollama": {
+                    "installed": ollama_installed,
+                    "models": ollama_models,
+                },
+                "all_required_installed": all(
+                    info.get("installed", False)
+                    for info in status.values()
+                ),
+            },
+        )
+    except ImportError:
+        return ApiResponse(
+            success=False,
+            error="Model manager not available",
+            data={"all_required_installed": False},
+        )
+    except Exception as e:
+        logger.error(f"Error checking models status: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class DownloadModelsRequest(BaseModel):
+    """Request para descargar modelos"""
+    models: list[str] = Field(default=["spacy", "embeddings"], description="Modelos a descargar")
+    force: bool = Field(default=False, description="Forzar re-descarga")
+
+
+@app.post("/api/models/download")
+async def download_models(request: DownloadModelsRequest):
+    """
+    Descarga los modelos NLP necesarios.
+
+    Este endpoint inicia la descarga de modelos en segundo plano.
+    El frontend debe hacer polling a /api/models/status para ver el progreso.
+
+    Args:
+        request: Modelos a descargar y opciones
+
+    Returns:
+        ApiResponse indicando que la descarga ha comenzado
+    """
+    try:
+        from narrative_assistant.core.model_manager import get_model_manager, ModelType
+        import threading
+
+        manager = get_model_manager()
+
+        def download_task():
+            for model_name in request.models:
+                try:
+                    if model_name == "spacy":
+                        manager.ensure_model(ModelType.SPACY, force_download=request.force)
+                    elif model_name == "embeddings":
+                        manager.ensure_model(ModelType.EMBEDDINGS, force_download=request.force)
+                    logger.info(f"Model {model_name} downloaded successfully")
+                except Exception as e:
+                    logger.error(f"Error downloading {model_name}: {e}")
+
+        # Ejecutar en segundo plano
+        thread = threading.Thread(target=download_task, daemon=True)
+        thread.start()
+
+        return ApiResponse(
+            success=True,
+            message="Model download started",
+            data={"models": request.models},
+        )
+
+    except ImportError:
+        raise HTTPException(status_code=500, detail="Model manager not available")
+    except Exception as e:
+        logger.error(f"Error starting model download: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/system/capabilities")
 async def system_capabilities():
     """

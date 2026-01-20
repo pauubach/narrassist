@@ -1,4 +1,4 @@
-name: Build macOS Installer
+name: Build Windows Installer
 
 on:
   # Ejecutar manualmente desde la UI de GitHub
@@ -9,14 +9,14 @@ on:
         required: false
         default: 'dev'
 
-  # Ejecutar en push a tags de versión
+  # Ejecutar en push a tags de version
   push:
     tags:
       - 'v*'
 
 jobs:
-  build-macos:
-    runs-on: macos-14  # Apple Silicon runner (M1)
+  build-windows:
+    runs-on: windows-latest
 
     steps:
       - name: Checkout repository
@@ -32,8 +32,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          # Universal binary: Intel + Apple Silicon
-          targets: aarch64-apple-darwin,x86_64-apple-darwin
+          targets: x86_64-pc-windows-msvc
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -56,42 +55,42 @@ jobs:
 
       - name: Copy resources for installer
         run: |
-          mkdir -p src-tauri/resources
-          cp scripts/post_install.py src-tauri/resources/
-          cp scripts/download_models.py src-tauri/resources/
+          New-Item -ItemType Directory -Force -Path src-tauri/resources
+          Copy-Item scripts/post_install.py src-tauri/resources/
+          Copy-Item scripts/download_models.py src-tauri/resources/
+        shell: pwsh
 
-      - name: Build Python sidecar for macOS
+      - name: Build Python sidecar for Windows
         run: |
-          # Build sidecar (detecta arquitectura automáticamente: aarch64 en M1)
           python scripts/build_sidecar.py --clean
 
-      - name: Build Tauri app
+      - name: Build Tauri app (NSIS installer)
         working-directory: frontend
         run: npm run tauri build
         env:
-          # Clave para firmar actualizaciones (opcional, genera con: cargo tauri signer generate)
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
       - name: List built artifacts
         run: |
-          echo "=== DMG files ==="
-          find src-tauri/target -name "*.dmg" -type f 2>/dev/null || echo "No DMG found"
-          echo "=== App bundles ==="
-          find src-tauri/target -name "*.app" -type d 2>/dev/null || echo "No .app found"
+          echo "=== NSIS installers ==="
+          Get-ChildItem -Path src-tauri/target -Recurse -Filter "*.exe" | Where-Object { $_.FullName -like "*nsis*" } | ForEach-Object { $_.FullName }
+          echo "=== MSI installers ==="
+          Get-ChildItem -Path src-tauri/target -Recurse -Filter "*.msi" | ForEach-Object { $_.FullName }
+        shell: pwsh
 
-      - name: Upload DMG installer
+      - name: Upload NSIS installer
         uses: actions/upload-artifact@v4
         with:
-          name: NarrativeAssistant-macOS-${{ github.event.inputs.version || github.ref_name || 'dev' }}
-          path: src-tauri/target/release/bundle/dmg/*.dmg
+          name: NarrativeAssistant-Windows-${{ github.event.inputs.version || github.ref_name || 'dev' }}
+          path: src-tauri/target/release/bundle/nsis/*.exe
           if-no-files-found: warn
           retention-days: 30
 
-      - name: Upload app bundle (for testing)
+      - name: Upload portable (for testing)
         uses: actions/upload-artifact@v4
         with:
-          name: NarrativeAssistant-macOS-app-${{ github.event.inputs.version || github.ref_name || 'dev' }}
-          path: src-tauri/target/release/bundle/macos/*.app
+          name: NarrativeAssistant-Windows-portable-${{ github.event.inputs.version || github.ref_name || 'dev' }}
+          path: src-tauri/target/release/narrative-assistant.exe
           if-no-files-found: warn
           retention-days: 7

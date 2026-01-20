@@ -1,9 +1,34 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+
+export interface ModelStatus {
+  installed: boolean
+  display_name: string
+  size_mb: number
+  path?: string
+}
+
+export interface ModelsStatus {
+  nlp_models: Record<string, ModelStatus>
+  ollama: {
+    installed: boolean
+    models: string[]
+  }
+  all_required_installed: boolean
+}
 
 export const useSystemStore = defineStore('system', () => {
   const backendConnected = ref(false)
   const backendVersion = ref('unknown')
+
+  // Model status
+  const modelsStatus = ref<ModelsStatus | null>(null)
+  const modelsLoading = ref(false)
+  const modelsDownloading = ref(false)
+  const modelsError = ref<string | null>(null)
+
+  // Computed: are all required models installed?
+  const modelsReady = computed(() => modelsStatus.value?.all_required_installed ?? false)
 
   async function checkBackendStatus() {
     try {
@@ -20,12 +45,107 @@ export const useSystemStore = defineStore('system', () => {
     }
   }
 
+  async function checkModelsStatus(): Promise<ModelsStatus | null> {
+    modelsLoading.value = true
+    modelsError.value = null
+
+    try {
+      const response = await fetch('/api/models/status')
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success) {
+          modelsStatus.value = data.data
+          return data.data
+        } else {
+          modelsError.value = data.error || 'Error checking models'
+        }
+      } else {
+        modelsError.value = 'Failed to check models status'
+      }
+    } catch (error) {
+      modelsError.value = error instanceof Error ? error.message : 'Network error'
+    } finally {
+      modelsLoading.value = false
+    }
+    return null
+  }
+
+  async function downloadModels(models: string[] = ['spacy', 'embeddings'], force = false): Promise<boolean> {
+    modelsDownloading.value = true
+    modelsError.value = null
+
+    try {
+      const response = await fetch('/api/models/download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ models, force })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success) {
+          // Start polling for status
+          pollModelsStatus()
+          return true
+        } else {
+          modelsError.value = data.error || 'Error starting download'
+        }
+      } else {
+        modelsError.value = 'Failed to start model download'
+      }
+    } catch (error) {
+      modelsError.value = error instanceof Error ? error.message : 'Network error'
+    } finally {
+      modelsDownloading.value = false
+    }
+    return false
+  }
+
+  // Poll models status while downloading
+  let pollInterval: number | null = null
+
+  function pollModelsStatus() {
+    if (pollInterval) return
+
+    pollInterval = window.setInterval(async () => {
+      const status = await checkModelsStatus()
+      if (status?.all_required_installed) {
+        // All models ready, stop polling
+        if (pollInterval) {
+          clearInterval(pollInterval)
+          pollInterval = null
+        }
+        modelsDownloading.value = false
+      }
+    }, 3000) // Check every 3 seconds
+  }
+
+  function stopPolling() {
+    if (pollInterval) {
+      clearInterval(pollInterval)
+      pollInterval = null
+    }
+  }
+
   // Check backend status on store creation
   checkBackendStatus()
 
   return {
+    // State
     backendConnected,
     backendVersion,
-    checkBackendStatus
+    modelsStatus,
+    modelsLoading,
+    modelsDownloading,
+    modelsError,
+
+    // Computed
+    modelsReady,
+
+    // Actions
+    checkBackendStatus,
+    checkModelsStatus,
+    downloadModels,
+    stopPolling
   }
 })

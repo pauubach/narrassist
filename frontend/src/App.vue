@@ -26,6 +26,7 @@
       :visible="showUserGuide"
       @update:visible="showUserGuide = $event"
     />
+    <ModelSetupDialog />
   </div>
 </template>
 
@@ -41,6 +42,7 @@ import AboutDialog from '@/components/AboutDialog.vue'
 import TutorialDialog from '@/components/TutorialDialog.vue'
 import UserGuideDialog from '@/components/UserGuideDialog.vue'
 import MenuBar from '@/components/MenuBar.vue'
+import ModelSetupDialog from '@/components/ModelSetupDialog.vue'
 
 const appStore = useAppStore()
 const themeStore = useThemeStore()

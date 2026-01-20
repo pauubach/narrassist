@@ -22,17 +22,30 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": [],
+    "resources": [
+      "resources/post_install.py",
+      "resources/download_models.py"
+    ],
     "windows": {
       "certificateThumbprint": null,
       "digestAlgorithm": "sha256",
-      "timestampUrl": ""
+      "timestampUrl": "",
+      "nsis": {
+        "installerHooks": "nsis-hooks.nsi"
+      }
+    },
+    "macOS": {
+      "minimumSystemVersion": "10.15",
+      "dmg": {
+        "appPosition": { "x": 180, "y": 170 },
+        "applicationFolderPosition": { "x": 480, "y": 170 }
+      }
     },
     "longDescription": "Herramienta de asistencia a correctores literarios profesionales para detectar inconsistencias en manuscritos de ficción.",
     "shortDescription": "Asistente de corrección narrativa",
     "linux": {
       "deb": {
-        "depends": []
+        "depends": ["python3", "python3-pip"]
       }
     }
   },
