@@ -35,10 +35,12 @@ jobs:
         with:
           workspaces: src-tauri
 
-      - name: Install dependencies
-        run: |
-          cd frontend && npm ci
-          pip install -e ".[build]"
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install Python dependencies
+        run: pip install -e ".[build]"
 
       - name: Copy resources
         run: |
@@ -90,10 +92,12 @@ jobs:
         with:
           workspaces: src-tauri
 
-      - name: Install dependencies
-        run: |
-          cd frontend && npm ci
-          pip install -e ".[build]"
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install Python dependencies
+        run: pip install -e ".[build]"
 
       - name: Copy resources
         run: |
@@ -147,10 +151,12 @@ jobs:
         with:
           workspaces: src-tauri
 
-      - name: Install dependencies
-        run: |
-          cd frontend && npm ci
-          pip install -e ".[build]"
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install Python dependencies
+        run: pip install -e ".[build]"
 
       - name: Copy resources
         run: |
