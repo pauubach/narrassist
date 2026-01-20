@@ -81,15 +81,22 @@ class InferredRelation:
 class CharacterCluster:
     """Grupo de personajes relacionados."""
     id: int
-    name: str  # Nombre descriptivo del grupo
+    name: str  # Nombre descriptivo del grupo (autogenerado)
     entity_ids: list[int]
     entity_names: list[str]
-    centroid_entity_id: Optional[int] = None  # Personaje central
+    centroid_entity_id: Optional[int] = None  # Personaje central (más conectado)
+    centroid_entity_name: Optional[str] = None  # Nombre del personaje central
     cohesion_score: float = 0.0  # Qué tan cohesivo es el grupo
+    custom_name: Optional[str] = None  # Nombre personalizado por el usuario
 
     # Metadatos
     detection_method: str = ""  # "hierarchical", "louvain", "voting"
     chapters_active: list[int] = field(default_factory=list)
+
+    @property
+    def display_name(self) -> str:
+        """Retorna el nombre a mostrar: custom_name si existe, sino name."""
+        return self.custom_name if self.custom_name else self.name
 
 
 @dataclass
@@ -627,6 +634,7 @@ class RelationshipClusteringEngine:
 
             # Encontrar centroide (entidad más conectada)
             centroid = self._find_centroid(members)
+            centroid_name = self._entity_names.get(centroid) if centroid else None
 
             # Calcular cohesión
             cohesion = self._calculate_cohesion(members)
@@ -637,8 +645,8 @@ class RelationshipClusteringEngine:
                 if cooc.entity1_id in members or cooc.entity2_id in members:
                     chapters.add(cooc.chapter)
 
-            # Generar nombre descriptivo
-            cluster_name = self._generate_cluster_name(names)
+            # Generar nombre descriptivo usando el centroide
+            cluster_name = self._generate_cluster_name(names, centroid_name)
 
             clusters.append(CharacterCluster(
                 id=cid,
@@ -646,6 +654,7 @@ class RelationshipClusteringEngine:
                 entity_ids=members,
                 entity_names=names,
                 centroid_entity_id=centroid,
+                centroid_entity_name=centroid_name,
                 cohesion_score=cohesion,
                 detection_method="louvain" if communities else "hierarchical",
                 chapters_active=sorted(list(chapters)),
@@ -688,12 +697,45 @@ class RelationshipClusteringEngine:
 
         return min(1.0, existing / possible) if possible > 0 else 0.0
 
-    def _generate_cluster_name(self, names: list[str]) -> str:
-        """Genera un nombre descriptivo para el cluster."""
-        if len(names) <= 3:
-            return " y ".join(names)
-        else:
-            return f"{names[0]}, {names[1]} y {len(names) - 2} más"
+    def _generate_cluster_name(
+        self,
+        names: list[str],
+        centroid_name: Optional[str] = None
+    ) -> str:
+        """
+        Genera un nombre descriptivo para el cluster.
+
+        Usa el personaje centroide (más conectado) como referencia principal:
+        - "Círculo de María" para clusters con un personaje central claro
+        - "María y Juan" para parejas
+        - "María, Juan y Pedro" para tríos
+        - "Grupo de María" para clusters grandes
+
+        Args:
+            names: Lista de nombres de entidades en el cluster
+            centroid_name: Nombre del personaje central (si se conoce)
+
+        Returns:
+            Nombre descriptivo del cluster
+        """
+        if not names:
+            return "Cluster vacío"
+
+        if len(names) == 1:
+            return names[0]
+
+        if len(names) == 2:
+            return f"{names[0]} y {names[1]}"
+
+        if len(names) == 3:
+            return f"{names[0]}, {names[1]} y {names[2]}"
+
+        # Para clusters más grandes, usar el centroide como referencia
+        if centroid_name:
+            return f"Círculo de {centroid_name}"
+
+        # Fallback si no hay centroide
+        return f"{names[0]}, {names[1]} y {len(names) - 2} más"
 
     def _analyze_knowledge_asymmetry(
         self,
@@ -736,12 +778,16 @@ class RelationshipClusteringEngine:
         return {
             "id": cluster.id,
             "name": cluster.name,
+            "display_name": cluster.display_name,
+            "custom_name": cluster.custom_name,
             "entity_ids": cluster.entity_ids,
             "entity_names": cluster.entity_names,
             "centroid_entity_id": cluster.centroid_entity_id,
+            "centroid_entity_name": cluster.centroid_entity_name,
             "cohesion_score": round(cluster.cohesion_score, 3),
             "detection_method": cluster.detection_method,
             "chapters_active": cluster.chapters_active,
+            "member_count": len(cluster.entity_ids),
         }
 
     def _asymmetry_to_dict(self, asym: KnowledgeAsymmetry) -> dict:

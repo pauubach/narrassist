@@ -30,6 +30,7 @@ from .sanitization import (
 )
 from .structure_detector import (
     StructureType,
+    Section,
     Scene,
     Chapter,
     DocumentStructure,
@@ -58,6 +59,7 @@ __all__ = [
     "get_allowed_document_extensions",
     # Structure
     "StructureType",
+    "Section",
     "Scene",
     "Chapter",
     "DocumentStructure",

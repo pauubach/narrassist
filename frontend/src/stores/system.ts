@@ -7,7 +7,7 @@ export const useSystemStore = defineStore('system', () => {
 
   async function checkBackendStatus() {
     try {
-      const response = await fetch('http://localhost:8008/api/health')
+      const response = await fetch('/api/health')
       if (response.ok) {
         const data = await response.json()
         backendConnected.value = data.status === 'ok'

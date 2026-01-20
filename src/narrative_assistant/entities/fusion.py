@@ -471,10 +471,17 @@ class EntityFusionService:
                 semantic_service = get_semantic_fusion_service()
                 semantic_result = semantic_service.should_merge(e1, e2)
 
-                if semantic_result.similarity > max_similarity:
+                # IMPORTANTE: Solo usar la similaridad semántica si should_merge es True
+                # Esto respeta los filtros de tipos incompatibles, estructuras diferentes, etc.
+                if semantic_result.should_merge and semantic_result.similarity > max_similarity:
                     max_similarity = semantic_result.similarity
                     reason = semantic_result.reason
                     evidence.append(f"Embeddings: {semantic_result.similarity:.2f}")
+                elif not semantic_result.should_merge:
+                    logger.debug(
+                        f"Semantic fusion rechazó fusión de '{e1.canonical_name}' + '{e2.canonical_name}': "
+                        f"{semantic_result.reason}"
+                    )
             except Exception as e:
                 logger.debug(f"Semantic fusion not available: {e}")
 
@@ -653,3 +660,140 @@ def reset_fusion_service() -> None:
     global _fusion_service
     with _fusion_lock:
         _fusion_service = None
+
+
+def run_automatic_fusion(
+    project_id: int,
+    session_id: Optional[int] = None,
+    coreference_chains: Optional[list] = None,
+    auto_merge_threshold: float = 0.90,
+) -> Result[int]:
+    """
+    Ejecuta fusión automática de entidades para un proyecto.
+
+    Proceso:
+    1. Obtiene sugerencias de fusión basadas en similaridad
+    2. Si hay cadenas de correferencia, las usa para crear más sugerencias
+    3. Fusiona automáticamente pares con alta confianza
+
+    Args:
+        project_id: ID del proyecto
+        session_id: ID de sesión para historial
+        coreference_chains: Cadenas de correferencia del análisis
+        auto_merge_threshold: Umbral de similaridad para fusión automática (default 0.90)
+
+    Returns:
+        Result con número de entidades fusionadas
+    """
+    service = get_fusion_service()
+    merged_count = 0
+
+    try:
+        # 1. Obtener sugerencias de fusión por similaridad
+        suggestions = service.suggest_merges(project_id)
+
+        # 2. Si hay cadenas de correferencia, añadir sugerencias basadas en ellas
+        if coreference_chains:
+            coref_suggestions = _get_coreference_merge_suggestions(
+                project_id, coreference_chains, service.repo
+            )
+            # Añadir sin duplicados
+            existing_pairs = {
+                (s.entity1.id, s.entity2.id) for s in suggestions
+            }
+            for cs in coref_suggestions:
+                pair = (cs.entity1.id, cs.entity2.id)
+                if pair not in existing_pairs:
+                    suggestions.append(cs)
+                    existing_pairs.add(pair)
+
+        # 3. Fusionar automáticamente pares de alta confianza
+        for suggestion in suggestions:
+            if suggestion.similarity >= auto_merge_threshold:
+                result = service.merge_entities(
+                    entity_ids=[suggestion.entity1.id, suggestion.entity2.id],
+                    canonical_name=suggestion.entity1.canonical_name,
+                    session_id=session_id,
+                )
+                if result.is_success:
+                    merged_count += 1
+                    logger.info(
+                        f"Auto-fusión: '{suggestion.entity1.canonical_name}' + "
+                        f"'{suggestion.entity2.canonical_name}' "
+                        f"(similaridad={suggestion.similarity:.2f})"
+                    )
+
+        return Result.success(merged_count)
+
+    except Exception as e:
+        logger.error(f"Error en fusión automática: {e}")
+        return Result.failure(FusionError(original_error=str(e)))
+
+
+def _get_coreference_merge_suggestions(
+    project_id: int,
+    coreference_chains: list,
+    repo: EntityRepository,
+) -> list[MergeSuggestion]:
+    """
+    Genera sugerencias de fusión basadas en cadenas de correferencia.
+
+    Si la correferencia indica que "el Magistral" y "Fermín" son la misma
+    persona, generamos una sugerencia de fusión entre esas entidades.
+
+    Args:
+        project_id: ID del proyecto
+        coreference_chains: Lista de cadenas de correferencia
+        repo: Repositorio de entidades
+
+    Returns:
+        Lista de sugerencias de fusión
+    """
+    suggestions = []
+
+    # Cargar entidades del proyecto
+    entities = repo.get_entities_by_project(project_id, active_only=True)
+    entity_by_name = {e.canonical_name.lower(): e for e in entities}
+
+    # También indexar por menciones
+    for entity in entities:
+        for mention in entity.mentions:
+            entity_by_name[mention.text.lower()] = entity
+
+    # Procesar cada cadena de correferencia
+    for chain in coreference_chains:
+        # chain.representative = nombre canónico (ej: "Fermín de Pas")
+        # chain.mentions = lista de menciones (ej: ["el Magistral", "don Fermín", ...])
+        representative = getattr(chain, 'representative', None)
+        mentions = getattr(chain, 'mentions', [])
+
+        if not representative or not mentions:
+            continue
+
+        # Buscar la entidad representativa
+        rep_entity = entity_by_name.get(representative.lower())
+
+        if not rep_entity:
+            continue
+
+        # Para cada mención, buscar si hay una entidad diferente
+        for mention in mentions:
+            mention_text = getattr(mention, 'text', str(mention))
+            mention_entity = entity_by_name.get(mention_text.lower())
+
+            # Si la mención corresponde a una entidad diferente, sugerir fusión
+            if mention_entity and mention_entity.id != rep_entity.id:
+                suggestion = MergeSuggestion(
+                    entity1=rep_entity,
+                    entity2=mention_entity,
+                    similarity=0.85,  # Alta confianza por correferencia
+                    reason=f"Correferencia: '{mention_text}' → '{representative}'",
+                    evidence=["Detectado por resolución de correferencias"],
+                )
+                suggestions.append(suggestion)
+                logger.debug(
+                    f"Sugerencia por correferencia: "
+                    f"'{rep_entity.canonical_name}' + '{mention_entity.canonical_name}'"
+                )
+
+    return suggestions

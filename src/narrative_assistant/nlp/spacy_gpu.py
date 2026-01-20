@@ -10,17 +10,18 @@ IMPORTANTE: El beneficio de GPU en spaCy es MODERADO (~1.5-2x) porque:
 - es_core_news_lg es CNN, no transformer
 - Para beneficio real usar: es_dep_news_trf (si disponible)
 
-SEGURIDAD: Los modelos DEBEN estar en local. No se permite descarga automática
-para garantizar que los manuscritos nunca salen de la máquina del usuario.
+Los modelos se descargan bajo demanda la primera vez que se necesitan
+y se guardan en ~/.narrative_assistant/models/ para uso offline posterior.
 """
 
 import logging
 import threading
-from typing import Optional
+from typing import Callable, Optional
 
 from ..core.config import get_config
 from ..core.device import get_device_detector, DeviceType
 from ..core.errors import ModelNotLoadedError
+from ..core.model_manager import ModelType, ensure_spacy_model, get_model_manager
 
 logger = logging.getLogger(__name__)
 
@@ -117,20 +118,27 @@ def load_spacy_model(
     model_name: Optional[str] = None,
     enable_gpu: Optional[bool] = None,
     disable_components: Optional[list[str]] = None,
+    auto_download: bool = True,
+    progress_callback: Optional[Callable[[str, float], None]] = None,
 ):
     """
     Carga modelo spaCy con configuración de GPU.
+
+    El modelo se descarga automáticamente la primera vez que se necesita
+    y se guarda en ~/.narrative_assistant/models/ para uso offline posterior.
 
     Args:
         model_name: Nombre del modelo (default: config)
         enable_gpu: Forzar GPU (None = auto desde config)
         disable_components: Componentes a deshabilitar para mejor rendimiento
+        auto_download: Si True, descarga el modelo si no existe (default: True)
+        progress_callback: Función para reportar progreso de descarga (mensaje, porcentaje)
 
     Returns:
         Modelo spaCy cargado
 
     Raises:
-        ModelNotLoadedError: Si el modelo no está disponible
+        ModelNotLoadedError: Si el modelo no está disponible y no se puede descargar
     """
     import spacy
 
@@ -146,23 +154,46 @@ def load_spacy_model(
     else:
         spacy.require_cpu()
 
-    # SEGURIDAD: Usar SOLO modelo local
-    # No permitir descarga automática para proteger manuscritos
+    # Buscar modelo: primero en config explícita, luego en ModelManager
     model_path = config.spacy_model_path
 
     if model_path is None:
-        raise ModelNotLoadedError(
-            model_name=model_name,
-            hint=(
-                "Modelo spaCy no encontrado en local. "
-                "Ejecuta: python scripts/download_models.py\n"
-                "SEGURIDAD: No se permite descarga automática para "
-                "proteger los manuscritos del usuario."
-            ),
-        )
+        # Intentar obtener del ModelManager (descarga bajo demanda)
+        manager = get_model_manager()
+        existing_path = manager.get_model_path(ModelType.SPACY)
+
+        if existing_path:
+            model_path = existing_path
+        elif auto_download:
+            # Descargar modelo
+            logger.info(f"Modelo spaCy no encontrado. Iniciando descarga...")
+            result = ensure_spacy_model(
+                force_download=False, progress_callback=progress_callback
+            )
+            if result.is_failure:
+                error = result.error
+                raise ModelNotLoadedError(
+                    model_name=model_name,
+                    hint=(
+                        f"No se pudo descargar el modelo spaCy.\n"
+                        f"Error: {error.message if error else 'Desconocido'}\n\n"
+                        "Verifica tu conexión a internet o descarga manualmente:\n"
+                        "  narrative-assistant download-models"
+                    ),
+                )
+            model_path = result.value
+        else:
+            raise ModelNotLoadedError(
+                model_name=model_name,
+                hint=(
+                    "Modelo spaCy no encontrado en local.\n"
+                    "Descarga con: narrative-assistant download-models\n"
+                    "O habilita auto_download=True para descarga automática."
+                ),
+            )
 
     model_to_load = str(model_path)
-    logger.info(f"Cargando modelo spaCy local: {model_to_load}")
+    logger.info(f"Cargando modelo spaCy: {model_to_load}")
 
     try:
         if disable_components:
@@ -173,7 +204,7 @@ def load_spacy_model(
     except OSError as e:
         raise ModelNotLoadedError(
             model_name=model_name,
-            hint=f"Error cargando modelo local: {e}",
+            hint=f"Error cargando modelo: {e}",
         ) from e
 
     # Log información del modelo

@@ -1,9 +1,11 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import type { Project, ApiResponse } from '@/types'
+import type { ApiProject } from '@/types/api'
+import { transformProject, transformProjects } from '@/types/transformers'
 
 export const useProjectsStore = defineStore('projects', () => {
-  // Estado
+  // Estado - usando domain types (camelCase)
   const projects = ref<Project[]>([])
   const currentProject = ref<Project | null>(null)
   const loading = ref(false)
@@ -14,7 +16,7 @@ export const useProjectsStore = defineStore('projects', () => {
   const hasProjects = computed(() => projectCount.value > 0)
   const recentProjects = computed(() =>
     [...projects.value]
-      .sort((a, b) => new Date(b.last_modified).getTime() - new Date(a.last_modified).getTime())
+      .sort((a, b) => b.lastModified.getTime() - a.lastModified.getTime())
       .slice(0, 5)
   )
 
@@ -29,9 +31,10 @@ export const useProjectsStore = defineStore('projects', () => {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
 
-      const data: ApiResponse<Project[]> = await response.json()
+      const data: ApiResponse<ApiProject[]> = await response.json()
       if (data.success && data.data) {
-        projects.value = data.data
+        // Transformar de API (snake_case) a Domain (camelCase)
+        projects.value = transformProjects(data.data)
       } else {
         throw new Error(data.error || 'Error desconocido al cargar proyectos')
       }
@@ -53,14 +56,16 @@ export const useProjectsStore = defineStore('projects', () => {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
 
-      const data: ApiResponse<Project> = await response.json()
+      const data: ApiResponse<ApiProject> = await response.json()
       if (data.success && data.data) {
-        currentProject.value = data.data
+        // Transformar de API a Domain
+        const transformed = transformProject(data.data)
+        currentProject.value = transformed
 
         // Actualizar en la lista si existe
         const index = projects.value.findIndex(p => p.id === id)
         if (index !== -1) {
-          projects.value[index] = data.data
+          projects.value[index] = transformed
         }
       } else {
         throw new Error(data.error || 'Error desconocido al cargar proyecto')
@@ -73,9 +78,7 @@ export const useProjectsStore = defineStore('projects', () => {
     }
   }
 
-  async function createProject(name: string, description?: string, file?: File) {
-    // NO usamos loading.value aquí para evitar que la UI muestre "Cargando proyectos..."
-    // El componente que llama usa su propio estado (creatingProject)
+  async function createProject(name: string, description?: string, file?: File, rules?: string) {
     error.value = null
 
     try {
@@ -87,11 +90,13 @@ export const useProjectsStore = defineStore('projects', () => {
       if (file) {
         formData.append('file', file)
       }
+      if (rules) {
+        formData.append('rules', rules)
+      }
 
       const response = await fetch('/api/projects', {
         method: 'POST',
         body: formData
-        // No establecer Content-Type, el navegador lo hará automáticamente con boundary
       })
 
       if (!response.ok) {
@@ -99,11 +104,13 @@ export const useProjectsStore = defineStore('projects', () => {
         throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`)
       }
 
-      const data: ApiResponse<Project> = await response.json()
+      const data: ApiResponse<ApiProject> = await response.json()
       if (data.success && data.data) {
-        projects.value.push(data.data)
-        currentProject.value = data.data
-        return data.data
+        // Transformar de API a Domain
+        const transformed = transformProject(data.data)
+        projects.value.push(transformed)
+        currentProject.value = transformed
+        return transformed
       } else {
         throw new Error(data.error || 'Error desconocido al crear proyecto')
       }
@@ -112,7 +119,6 @@ export const useProjectsStore = defineStore('projects', () => {
       console.error('Failed to create project:', err)
       throw err
     }
-    // No hay finally con loading.value = false porque no lo pusimos a true
   }
 
   function clearError() {

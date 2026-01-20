@@ -16,10 +16,17 @@ class AlertCategory(Enum):
 
     CONSISTENCY = "consistency"  # Inconsistencias de atributos/tiempo
     STYLE = "style"  # Repeticiones, voz, estilo narrativo
+    BEHAVIORAL = "behavioral"  # Inconsistencias de comportamiento de personajes
     FOCALIZATION = "focalization"  # Violaciones de focalización/PDV
     STRUCTURE = "structure"  # Problemas estructurales
     WORLD = "world"  # Inconsistencias del mundo narrativo
     ENTITY = "entity"  # Problemas con entidades (fusión, detección)
+    ORTHOGRAPHY = "orthography"  # Errores ortográficos
+    GRAMMAR = "grammar"  # Errores gramaticales
+    TIMELINE_ISSUE = "timeline"  # Inconsistencias temporales (timeline)
+    CHARACTER_CONSISTENCY = "character_consistency"  # Inconsistencias de personajes (edades, etc.)
+    VOICE_DEVIATION = "voice_deviation"  # Desviaciones de voz/registro de personajes
+    EMOTIONAL = "emotional"  # Incoherencias emocionales (emoción vs diálogo/acción)
     OTHER = "other"  # Otras alertas no categorizadas
 
 

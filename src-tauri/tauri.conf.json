@@ -11,7 +11,10 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["nsis", "deb", "dmg"],
+    "externalBin": [
+      "binaries/narrative-assistant-server"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -20,9 +23,6 @@
       "icons/icon.ico"
     ],
     "resources": [],
-    "externalBin": [
-      "binaries/narrative-assistant-server"
-    ],
     "windows": {
       "certificateThumbprint": null,
       "digestAlgorithm": "sha256",
@@ -55,10 +55,12 @@
   "plugins": {
     "shell": {
       "open": true,
+      "sidecar": true,
       "scope": [
         {
           "name": "binaries/narrative-assistant-server",
-          "sidecar": true
+          "sidecar": true,
+          "args": true
         }
       ]
     }

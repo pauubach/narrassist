@@ -151,9 +151,9 @@
               <i class="pi pi-book"></i>
               <span>Capítulo {{ selectedAlert.chapter }}</span>
             </div>
-            <div v-if="selectedAlert.position_start" class="location-item">
+            <div v-if="selectedAlert.spanStart" class="location-item">
               <i class="pi pi-map-marker"></i>
-              <span>Posición {{ selectedAlert.position_start }}</span>
+              <span>Posición {{ selectedAlert.spanStart }}</span>
             </div>
           </div>
           <Button
@@ -168,13 +168,13 @@
         <Divider />
 
         <!-- Entidades relacionadas -->
-        <div v-if="selectedAlert.entities && selectedAlert.entities.length > 0" class="detail-section">
+        <div v-if="selectedAlert.entityIds && selectedAlert.entityIds.length > 0" class="detail-section">
           <h4>Entidades relacionadas</h4>
           <div class="entities-grid">
             <Chip
-              v-for="entity in selectedAlert.entities"
-              :key="entity.id"
-              :label="entity.canonical_name"
+              v-for="entityId in selectedAlert.entityIds"
+              :key="entityId"
+              :label="`Entidad #${entityId}`"
               icon="pi pi-user"
             />
           </div>
@@ -193,16 +193,16 @@
               </Tag>
             </div>
             <div class="metadata-item">
-              <span class="metadata-label">Tipo</span>
-              <span class="metadata-value">{{ selectedAlert.alert_type }}</span>
+              <span class="metadata-label">Categoría</span>
+              <span class="metadata-value">{{ getCategoryLabel(selectedAlert.category) }}</span>
             </div>
             <div class="metadata-item">
               <span class="metadata-label">Creada</span>
-              <span class="metadata-value">{{ formatDate(selectedAlert.created_at) }}</span>
+              <span class="metadata-value">{{ formatDate(selectedAlert.createdAt) }}</span>
             </div>
-            <div v-if="selectedAlert.resolved_at" class="metadata-item">
+            <div v-if="selectedAlert.resolvedAt" class="metadata-item">
               <span class="metadata-label">Resuelta</span>
-              <span class="metadata-value">{{ formatDate(selectedAlert.resolved_at) }}</span>
+              <span class="metadata-value">{{ formatDate(selectedAlert.resolvedAt) }}</span>
             </div>
           </div>
         </div>
@@ -214,7 +214,7 @@
           <h4>Acciones</h4>
           <div class="detail-actions">
             <Button
-              v-if="selectedAlert.status === 'open'"
+              v-if="isAlertOpenStatus(selectedAlert.status)"
               label="Marcar como resuelta"
               icon="pi pi-check"
               severity="success"
@@ -222,7 +222,7 @@
               class="w-full"
             />
             <Button
-              v-if="selectedAlert.status === 'open'"
+              v-if="isAlertOpenStatus(selectedAlert.status)"
               label="Descartar alerta"
               icon="pi pi-times"
               severity="secondary"
@@ -231,7 +231,7 @@
               class="w-full"
             />
             <Button
-              v-if="selectedAlert.status !== 'open'"
+              v-if="!isAlertOpenStatus(selectedAlert.status)"
               label="Reabrir alerta"
               icon="pi pi-replay"
               outlined
@@ -290,10 +290,13 @@ import Panel from 'primevue/panel'
 import Divider from 'primevue/divider'
 import AlertList from '@/components/AlertList.vue'
 import type { Alert } from '@/types'
+import { transformAlerts, normalizeAlertSeverity, normalizeAlertStatus } from '@/types/transformers'
+import { useToast } from 'primevue/usetoast'
 
 const route = useRoute()
 const router = useRouter()
 const projectsStore = useProjectsStore()
+const toast = useToast()
 
 // Estado
 const loading = ref(true)
@@ -307,17 +310,23 @@ const showResolveAllDialog = ref(false)
 const project = computed(() => projectsStore.currentProject)
 const projectId = computed(() => parseInt(route.params.id as string))
 
+// Helper para verificar si una alerta está "abierta" (no resuelta/descartada)
+const isAlertOpenStatus = (status: string): boolean => {
+  // Domain status: active, dismissed, resolved
+  return status === 'active'
+}
+
 // Computed stats
 const criticalCount = computed(() =>
-  alerts.value.filter(a => a.severity === 'critical' && a.status === 'open').length
+  alerts.value.filter(a => a.severity === 'critical' && isAlertOpenStatus(a.status)).length
 )
 
 const warningCount = computed(() =>
-  alerts.value.filter(a => a.severity === 'warning' && a.status === 'open').length
+  alerts.value.filter(a => a.severity === 'high' && isAlertOpenStatus(a.status)).length
 )
 
 const infoCount = computed(() =>
-  alerts.value.filter(a => a.severity === 'info' && a.status === 'open').length
+  alerts.value.filter(a => a.severity === 'info' && isAlertOpenStatus(a.status)).length
 )
 
 const resolvedCount = computed(() =>
@@ -325,7 +334,7 @@ const resolvedCount = computed(() =>
 )
 
 const openAlertsCount = computed(() =>
-  alerts.value.filter(a => a.status === 'open').length
+  alerts.value.filter(a => isAlertOpenStatus(a.status)).length
 )
 
 // Funciones
@@ -338,7 +347,8 @@ const loadAlerts = async () => {
     const data = await response.json()
 
     if (data.success) {
-      alerts.value = data.data || []
+      // Transform API response to domain types
+      alerts.value = transformAlerts(data.data || [])
     } else {
       error.value = 'Error cargando alertas'
     }
@@ -443,45 +453,102 @@ const confirmResolveAll = async () => {
 }
 
 const exportAlerts = () => {
-  // TODO: Implementar exportación
-  console.log('Export alerts')
+  if (!alerts.value || alerts.value.length === 0) {
+    toast.add({ severity: 'warn', summary: 'Sin datos', detail: 'No hay alertas para exportar', life: 4000 })
+    return
+  }
+
+  try {
+    const content = {
+      projectId: projectId.value,
+      exportedAt: new Date().toISOString(),
+      totalAlerts: alerts.value.length,
+      bySeverity: {
+        critical: alerts.value.filter(a => a.severity === 'critical').length,
+        high: alerts.value.filter(a => a.severity === 'high').length,
+        medium: alerts.value.filter(a => a.severity === 'medium').length,
+        low: alerts.value.filter(a => a.severity === 'low').length,
+        info: alerts.value.filter(a => a.severity === 'info').length,
+      },
+      byStatus: {
+        active: alerts.value.filter(a => a.status === 'active').length,
+        resolved: alerts.value.filter(a => a.status === 'resolved').length,
+        dismissed: alerts.value.filter(a => a.status === 'dismissed').length,
+      },
+      alerts: alerts.value.map(a => ({
+        id: a.id,
+        title: a.title,
+        description: a.description,
+        severity: a.severity,
+        category: a.category,
+        status: a.status,
+        chapter: a.chapter,
+        confidence: a.confidence,
+        createdAt: a.createdAt,
+      })),
+    }
+
+    const blob = new Blob([JSON.stringify(content, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `alertas_proyecto_${projectId.value}.json`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  } catch (err) {
+    console.error('Error exporting alerts:', err)
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Error al exportar alertas', life: 5000 })
+  }
 }
 
 // Helpers
 const getSeverityColor = (severity: string): string => {
+  // Domain severity: critical, high, medium, low, info
   const colors: Record<string, string> = {
     'critical': 'danger',
-    'warning': 'warning',
-    'info': 'info',
-    'hint': 'secondary'
+    'high': 'warning',
+    'medium': 'info',
+    'low': 'secondary',
+    'info': 'info'
   }
   return colors[severity] || 'secondary'
 }
 
 const getSeverityIcon = (severity: string): string => {
+  // Domain severity: critical, high, medium, low, info
   const icons: Record<string, string> = {
     'critical': 'pi pi-exclamation-circle',
-    'warning': 'pi pi-exclamation-triangle',
-    'info': 'pi pi-info-circle',
-    'hint': 'pi pi-lightbulb'
+    'high': 'pi pi-exclamation-triangle',
+    'medium': 'pi pi-info-circle',
+    'low': 'pi pi-lightbulb',
+    'info': 'pi pi-info-circle'
   }
   return icons[severity] || 'pi pi-info-circle'
 }
 
 const getCategoryLabel = (category: string): string => {
+  // Domain categories: attribute, timeline, relationship, location, behavior, knowledge, style, grammar, structure, other
   const labels: Record<string, string> = {
-    'consistency': 'Consistencia',
-    'continuity': 'Continuidad',
-    'characterization': 'Caracterización',
-    'chronology': 'Cronología',
-    'style': 'Estilo'
+    'attribute': 'Atributos',
+    'timeline': 'Cronología',
+    'relationship': 'Relaciones',
+    'location': 'Ubicaciones',
+    'behavior': 'Comportamiento',
+    'knowledge': 'Conocimiento',
+    'style': 'Estilo',
+    'grammar': 'Gramática',
+    'structure': 'Estructura',
+    'other': 'Otro'
   }
   return labels[category] || category
 }
 
 const getStatusSeverity = (status: string): string => {
+  // Domain status: active, dismissed, resolved
   const severities: Record<string, string> = {
-    'open': 'warning',
+    'active': 'warning',
     'resolved': 'success',
     'dismissed': 'secondary'
   }
@@ -489,17 +556,19 @@ const getStatusSeverity = (status: string): string => {
 }
 
 const getStatusLabel = (status: string): string => {
+  // Domain status: active, dismissed, resolved
   const labels: Record<string, string> = {
-    'open': 'Abierta',
+    'active': 'Activa',
     'resolved': 'Resuelta',
     'dismissed': 'Descartada'
   }
   return labels[status] || status
 }
 
-const formatDate = (dateString: string): string => {
-  const date = new Date(dateString)
-  return date.toLocaleDateString('es-ES', {
+const formatDate = (date: Date | string | undefined): string => {
+  if (!date) return 'N/A'
+  const dateObj = typeof date === 'string' ? new Date(date) : date
+  return dateObj.toLocaleDateString('es-ES', {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
@@ -528,8 +597,8 @@ onMounted(async () => {
   justify-content: space-between;
   align-items: center;
   padding: 1.5rem 2rem;
-  background: white;
-  border-bottom: 1px solid var(--surface-border);
+  background: var(--p-surface-0, white);
+  border-bottom: 1px solid var(--p-surface-border, #e2e8f0);
 }
 
 .header-left {
@@ -542,12 +611,12 @@ onMounted(async () => {
   font-size: 1.5rem;
   font-weight: 700;
   margin: 0;
-  color: var(--text-color);
+  color: var(--p-text-color);
 }
 
 .header-info p {
   margin: 0.25rem 0 0 0;
-  color: var(--text-color-secondary);
+  color: var(--p-text-color-secondary, #64748b);
   font-size: 0.9rem;
 }
 
@@ -560,8 +629,8 @@ onMounted(async () => {
   display: flex;
   gap: 2rem;
   padding: 1rem 2rem;
-  background: white;
-  border-bottom: 1px solid var(--surface-border);
+  background: var(--p-surface-0, white);
+  border-bottom: 1px solid var(--p-surface-border, #e2e8f0);
 }
 
 .stat-item {

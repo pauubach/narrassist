@@ -13,6 +13,7 @@
 - ✅ Refactorizar código sin preguntar previamente
 - ✅ Eliminar código muerto o duplicado
 - ✅ Crear y modificar tests
+- ✅ Realizar búsquedas web (WebSearch) con cualquier query para investigar metodologías, papers, documentación, etc.
 
 **NO es necesario pedir permiso antes de**:
 - Revisar o explorar el código
@@ -29,9 +30,9 @@
 
 ---
 
-## Setup Rápido (Nueva Máquina)
+## Setup Rapido (Nueva Maquina)
 
-**IMPORTANTE**: Solo copiar la carpeta del proyecto. Los modelos están incluidos localmente.
+Los modelos NLP se descargan automaticamente la primera vez que se necesitan.
 
 ```bash
 # 1. Crear entorno virtual
@@ -46,20 +47,23 @@ pip install -e ".[dev]"
 # 3. Instalar/Configurar Ollama para LLM local
 python scripts/setup_ollama.py
 
-# 4. Verificar (NO requiere internet)
+# 4. Descargar modelos NLP (opcional, se descargan automaticamente al usar)
+python scripts/download_models.py
+
+# 5. Verificar
 python scripts/verify_environment.py
 # o
 narrative-assistant verify
 ```
 
-**No se necesita `spacy download`** - el modelo está en `models/spacy/`.
-**Ollama se instala y configura con** `setup_ollama.py` - descarga modelos locales automáticamente.
+**Modelos NLP**: Se descargan bajo demanda la primera vez que se usan y se guardan en `~/.narrative_assistant/models/`.
+**Ollama**: Se instala y configura con `setup_ollama.py` - descarga modelos LLM locales automaticamente.
 
 ---
 
 ## Proyecto
 
-**Asistente de Corrección Narrativa** - Herramienta de asistencia a correctores literarios profesionales para detectar inconsistencias en manuscritos de ficción.
+**Asistente de Corrección Narrativa** - Herramienta de asistencia a escritores, editores y correctores profesionales para detectar inconsistencias en cualquier tipo de manuscrito: novelas, memorias, libros de autoayuda, cocina, ensayos, manuales técnicos y más.
 
 ### Stack Tecnológico
 - **Python** 3.11+
@@ -70,42 +74,72 @@ narrative-assistant verify
 - **Formatos**: DOCX (prioritario), TXT, MD, PDF, EPUB
 
 ### Requisito de Red
-- **Único acceso a internet**: Sistema de licencias (verificación) e instalación inicial de Ollama
-- **Modelos NLP y LLM**: 100% offline desde `models/` y Ollama local
+- **Primera ejecucion**: Descarga automatica de modelos NLP (~1 GB)
+- **Sistema de licencias**: Verificacion online
+- **Ollama**: Descarga inicial de modelos LLM
+- **Uso posterior**: 100% offline desde `~/.narrative_assistant/models/` y Ollama local
 
 ---
 
-## Modelos Locales
+## Modelos NLP (Descarga Bajo Demanda)
 
-Los modelos se almacenan en el proyecto para funcionamiento offline:
+Los modelos NLP se descargan automaticamente la primera vez que se necesitan y se almacenan en el directorio del usuario para uso offline posterior.
 
+### Ubicacion de modelos
 ```
-tfm/
-├── models/
-│   ├── spacy/
-│   │   └── es_core_news_lg/     # Modelo spaCy español (~500 MB)
-│   └── embeddings/
-│       └── paraphrase-multilingual-MiniLM-L12-v2/  # sentence-transformers (~500 MB)
+~/.narrative_assistant/
+└── models/
+    ├── spacy/
+    │   └── es_core_news_lg/     # Modelo spaCy espanol (~500 MB)
+    └── embeddings/
+        └── paraphrase-multilingual-MiniLM-L12-v2/  # sentence-transformers (~500 MB)
 ```
 
-### Primera vez: Descargar modelos
-Si `models/` no existe (primera instalación o proyecto nuevo):
+### Comportamiento de descarga
+1. **Primera ejecucion**: Si el modelo no existe, se descarga automaticamente de HuggingFace/spaCy
+2. **Cache local**: Los modelos se guardan en `~/.narrative_assistant/models/`
+3. **Uso offline**: Las ejecuciones posteriores usan el cache local (sin internet)
+4. **Sin red y sin cache**: Falla con mensaje claro indicando como descargar
+
+### Descargar modelos manualmente
 ```bash
+# Descargar todos los modelos
 python scripts/download_models.py
+
+# Descargar solo spaCy
+python scripts/download_models.py --spacy
+
+# Descargar solo embeddings
+python scripts/download_models.py --embeddings
+
+# Forzar re-descarga
+python scripts/download_models.py --force
+
+# Ver estado de modelos
+python scripts/download_models.py --status
 ```
-Esto descarga los modelos (~1 GB total) y los guarda en `models/`.
 
-### Configuración automática
-El sistema busca modelos en este orden:
-1. `./models/` (proyecto local) - **PREFERIDO**
-2. `~/.narrative_assistant/models/` (usuario)
-3. Cache de HuggingFace/spaCy (requiere internet)
+### Orden de busqueda de modelos
+1. Ruta explicita via `NA_SPACY_MODEL_PATH` / `NA_EMBEDDINGS_MODEL_PATH`
+2. `~/.narrative_assistant/models/` (cache del usuario) - **DEFAULT**
+3. Descarga automatica si hay conexion a internet
 
-### Variables de entorno para modelos locales
+### Variables de entorno para modelos
 ```bash
-# Opcional - por defecto usa ./models/
-NA_SPACY_MODEL_PATH=./models/spacy/es_core_news_lg
-NA_EMBEDDINGS_MODEL_PATH=./models/embeddings/paraphrase-multilingual-MiniLM-L12-v2
+# Directorio alternativo para modelos (default: ~/.narrative_assistant/models/)
+NA_MODELS_DIR=/path/to/custom/models
+
+# Rutas explicitas (override completo)
+NA_SPACY_MODEL_PATH=/path/to/spacy/model
+NA_EMBEDDINGS_MODEL_PATH=/path/to/embeddings/model
+```
+
+### Deshabilitar descarga automatica
+Si prefieres control manual sobre las descargas:
+```python
+# En codigo
+nlp = load_spacy_model(auto_download=False)
+model = EmbeddingsModel(auto_download=False)
 ```
 
 ---
@@ -148,6 +182,9 @@ ollama pull mistral      # Opcional, mayor calidad (~4 GB)
 ### Iniciar servicio
 ```bash
 ollama serve  # Corre en localhost:11434
+
+# Windows con GPU vieja o poca VRAM - forzar CPU:
+scripts\start_ollama_cpu.bat  # Inicia minimizado en modo CPU
 ```
 
 ### Sistema Multi-Modelo (Votación)
@@ -226,9 +263,10 @@ def parse(self, path: Path) -> Result[RawDocument]:
 ```
 src/narrative_assistant/
 ├── core/           # Infraestructura base
-│   ├── config.py   # Configuración centralizada (GPUConfig, NLPConfig, etc.)
-│   ├── device.py   # Detección GPU (CUDA, MPS, CPU)
-│   ├── errors.py   # Jerarquía de errores (NarrativeError, severity levels)
+│   ├── config.py   # Configuracion centralizada (GPUConfig, NLPConfig, etc.)
+│   ├── device.py   # Deteccion GPU (CUDA, MPS, CPU)
+│   ├── errors.py   # Jerarquia de errores (NarrativeError, severity levels)
+│   ├── model_manager.py  # Gestion de modelos NLP (descarga bajo demanda)
 │   └── result.py   # Result[T] pattern
 │
 ├── persistence/    # Estado y base de datos
@@ -311,8 +349,9 @@ mypy src/
 | `NA_BATCH_SIZE_CPU` | int | 16 | Batch size en CPU |
 | `NA_LOG_LEVEL` | DEBUG, INFO, WARNING, ERROR | INFO | Nivel de logging |
 | `NA_DATA_DIR` | path | ~/.narrative_assistant | Directorio de datos |
-| `NA_SPACY_MODEL_PATH` | path | ./models/spacy/es_core_news_lg | Modelo spaCy local |
-| `NA_EMBEDDINGS_MODEL_PATH` | path | ./models/embeddings/... | Modelo embeddings local |
+| `NA_MODELS_DIR` | path | ~/.narrative_assistant/models | Directorio de modelos |
+| `NA_SPACY_MODEL_PATH` | path | (auto) | Ruta explicita modelo spaCy |
+| `NA_EMBEDDINGS_MODEL_PATH` | path | (auto) | Ruta explicita modelo embeddings |
 
 ---
 
@@ -327,10 +366,25 @@ export NA_DEVICE=cpu  # Forzar CPU
 ```
 
 ### Modelo no encontrado
-Verificar que `models/` esté copiado con el proyecto:
+Los modelos se descargan automaticamente. Si falla:
 ```bash
-ls -la models/spacy/es_core_news_lg/
-ls -la models/embeddings/
+# Verificar estado de modelos
+python scripts/download_models.py --status
+
+# Descargar manualmente
+python scripts/download_models.py
+
+# Verificar directorio de cache
+ls -la ~/.narrative_assistant/models/
+```
+
+### Sin conexion a internet
+Si no hay conexion y el modelo no esta en cache:
+```bash
+# El sistema mostrara un error claro indicando:
+# - Que modelo falta
+# - Como descargarlo manualmente
+# - Que se necesita conexion a internet para la primera descarga
 ```
 
 ### Import errors
@@ -343,27 +397,35 @@ pip install -e .
 
 ## Seguridad - Aislamiento de Manuscritos
 
-**CRÍTICO**: Los manuscritos NUNCA deben salir de la máquina del usuario.
+**CRITICO**: Los manuscritos NUNCA deben salir de la maquina del usuario.
 
 ### Reglas de seguridad obligatorias
 
-1. **Sin acceso a internet** excepto verificación de licencias
-2. **Modelos NLP solo locales** - fallar si no están en `models/`
-3. **Sin telemetría** ni analytics de ningún tipo
+1. **Acceso a internet limitado**:
+   - Verificacion de licencias
+   - Descarga inicial de modelos NLP (solo a HuggingFace/spaCy)
+   - Descarga inicial de modelos Ollama
+2. **Despues de primera descarga**: 100% offline
+3. **Sin telemetria** ni analytics de ningun tipo
 4. **Sin auto-updates** de modelos o dependencias
 
-### Variables de entorno forzadas
-```python
-os.environ["HF_HUB_OFFLINE"] = "1"
-os.environ["TRANSFORMERS_OFFLINE"] = "1"
-```
+### Descarga de modelos - Seguridad
 
-### Al generar código - PROHIBIDO:
-- ❌ `requests`, `urllib`, `httpx`, `aiohttp`
-- ❌ Cualquier llamada HTTP/HTTPS (excepto licencias)
-- ❌ Enviar datos a servicios externos
-- ❌ Descargas automáticas de modelos
-- ❌ Analytics, telemetría, logging remoto
+La descarga de modelos es la UNICA excepcion al modo offline:
+- Solo se conecta a HuggingFace Hub y repositorios de spaCy
+- Solo descarga modelos conocidos y verificados
+- Los manuscritos NUNCA se envian a internet
+- Despues de la descarga inicial, todo funciona offline
+
+### Al generar codigo - PROHIBIDO:
+- Enviar datos de manuscritos a servicios externos
+- Analytics, telemetria, logging remoto
+- Conexiones de red durante el analisis de documentos
+
+### Al generar codigo - PERMITIDO:
+- Descarga de modelos NLP via ModelManager
+- Verificacion de licencias
+- Conexion a Ollama local (localhost)
 
 Ver: [docs/02-architecture/SECURITY.md](docs/02-architecture/SECURITY.md)
 

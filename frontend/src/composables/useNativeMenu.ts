@@ -1,0 +1,164 @@
+/**
+ * Composable para manejar eventos del menu nativo de Tauri
+ */
+import { onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
+
+interface MenuEventHandlers {
+  onNewProject?: () => void
+  onOpenProject?: () => void
+  onCloseProject?: () => void
+  onImport?: () => void
+  onExport?: () => void
+  onSettings?: () => void
+  onViewChange?: (view: string) => void
+  onToggleInspector?: () => void
+  onToggleSidebar?: () => void
+  onRunAnalysis?: () => void
+  onPauseAnalysis?: () => void
+  onTutorial?: () => void
+  onKeyboardShortcuts?: () => void
+}
+
+export function useNativeMenu(handlers: MenuEventHandlers = {}) {
+  const router = useRouter()
+
+  let unlisten: (() => void) | null = null
+
+  const handleMenuEvent = async (eventId: string) => {
+    console.log('[Menu] Handling event:', eventId)
+
+    switch (eventId) {
+      // Archivo
+      case 'new_project':
+        if (handlers.onNewProject) {
+          handlers.onNewProject()
+        } else {
+          // Navigate to projects and emit event to open dialog
+          router.push('/projects')
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('menubar:new-project'))
+          }, 100)
+        }
+        break
+
+      case 'open_project':
+        if (handlers.onOpenProject) {
+          handlers.onOpenProject()
+        } else {
+          router.push('/projects')
+        }
+        break
+
+      case 'close_project':
+        handlers.onCloseProject?.()
+        break
+
+      case 'import':
+        handlers.onImport?.()
+        break
+
+      case 'export':
+        handlers.onExport?.()
+        break
+
+      case 'settings':
+        if (handlers.onSettings) {
+          handlers.onSettings()
+        } else {
+          router.push('/settings')
+        }
+        break
+
+      // Ver
+      case 'view_chapters':
+        handlers.onViewChange?.('chapters')
+        break
+
+      case 'view_entities':
+        handlers.onViewChange?.('entities')
+        break
+
+      case 'view_alerts':
+        handlers.onViewChange?.('alerts')
+        break
+
+      case 'view_relationships':
+        handlers.onViewChange?.('relationships')
+        break
+
+      case 'view_timeline':
+        handlers.onViewChange?.('timeline')
+        break
+
+      case 'toggle_inspector':
+        handlers.onToggleInspector?.()
+        break
+
+      case 'toggle_sidebar':
+        handlers.onToggleSidebar?.()
+        break
+
+      // Analisis
+      case 'run_analysis':
+        handlers.onRunAnalysis?.()
+        break
+
+      case 'pause_analysis':
+        handlers.onPauseAnalysis?.()
+        break
+
+      case 'analyze_structure':
+      case 'analyze_entities':
+      case 'analyze_consistency':
+      case 'analyze_style':
+        // Estos se manejan igual que run_analysis pero con fase especifica
+        handlers.onRunAnalysis?.()
+        break
+
+      // Ayuda
+      case 'tutorial':
+        handlers.onTutorial?.()
+        break
+
+      case 'keyboard_shortcuts':
+        handlers.onKeyboardShortcuts?.()
+        break
+
+      case 'check_updates':
+        // TODO: Implementar verificacion de actualizaciones
+        console.log('[Menu] Check updates - not implemented yet')
+        break
+    }
+  }
+
+  onMounted(async () => {
+    // Solo configurar listener si estamos en Tauri
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const win = window as any
+    if (typeof window !== 'undefined' && '__TAURI__' in window) {
+      try {
+        // Usar el objeto global de Tauri si esta disponible
+        if (win.__TAURI__?.event?.listen) {
+          unlisten = await win.__TAURI__.event.listen('menu-event', (event: { payload: string }) => {
+            handleMenuEvent(event.payload)
+          })
+        }
+      } catch (error) {
+        console.warn('[Menu] Failed to setup Tauri menu listener:', error)
+      }
+    }
+  })
+
+  onUnmounted(() => {
+    if (unlisten) {
+      unlisten()
+    }
+  })
+
+  return {
+    handleMenuEvent,
+  }
+}
+
+export default useNativeMenu

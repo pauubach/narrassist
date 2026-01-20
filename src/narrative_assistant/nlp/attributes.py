@@ -1,8 +1,22 @@
 """
 Extracción de Atributos de entidades narrativas.
 
-Detecta atributos físicos, psicológicos y relacionales de personajes
-y otras entidades a partir del texto circundante a sus menciones.
+.. note:: MÓDULO EN PROCESO DE UNIFICACIÓN
+
+    Este módulo coexiste con `narrative_assistant.nlp.extraction` que proporciona
+    una arquitectura más limpia con Strategy Pattern. Ambos sistemas funcionan
+    y están integrados en el pipeline.
+
+    Para nuevos desarrollos, se recomienda usar directamente:
+    - `from narrative_assistant.nlp.extraction import AttributeExtractionPipeline`
+
+    Este módulo (`attributes.py`) seguirá funcionando y manteniéndose.
+
+Sistema multi-método con votación:
+1. LLM (Ollama): Extracción semántica profunda - Peso 40%
+2. Embeddings: Similitud semántica con patrones - Peso 25%
+3. Dependency Parsing (spaCy): Análisis sintáctico - Peso 20%
+4. Patrones (regex): Alta precisión para casos conocidos - Peso 15%
 
 Incluye filtro de metáforas para evitar falsos positivos como
 "sus ojos eran dos luceros" o "era alto como un roble".
@@ -13,16 +27,62 @@ Tipos de atributos soportados:
 - Objetos: material, color, tamaño, estado
 """
 
+import json
 import logging
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
+from pathlib import Path
+from typing import Any, Optional
 
 from ..core.result import Result
 from ..core.errors import NLPError, ErrorSeverity
 
 logger = logging.getLogger(__name__)
+
+# Pesos de votación por método (defaults heurísticos)
+# Se reemplazan automáticamente por pesos aprendidos si existe default_weights.json
+DEFAULT_METHOD_WEIGHTS = {
+    "llm": 0.40,        # Mayor peso - comprensión semántica
+    "embeddings": 0.25,  # Similitud semántica
+    "dependency": 0.20,  # Análisis sintáctico
+    "patterns": 0.15,    # Patrones regex (fallback)
+}
+
+# Pesos activos (pueden cambiar si se cargan pesos entrenados)
+METHOD_WEIGHTS = dict(DEFAULT_METHOD_WEIGHTS)
+
+
+def _load_default_trained_weights() -> None:
+    """
+    Carga pesos entrenados por defecto si existe el archivo.
+
+    Se ejecuta automáticamente al importar el módulo.
+    Busca en: training_data/default_weights.json
+    """
+    global METHOD_WEIGHTS
+
+    try:
+        weights_file = Path(__file__).parent / "training_data" / "default_weights.json"
+        if weights_file.exists():
+            with open(weights_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            weights = data.get("weights", {})
+            if weights:
+                METHOD_WEIGHTS.update(weights)
+                # Normalizar
+                total = sum(METHOD_WEIGHTS.values())
+                if total > 0:
+                    for method in METHOD_WEIGHTS:
+                        METHOD_WEIGHTS[method] /= total
+                logger.debug(f"Pesos entrenados cargados: {METHOD_WEIGHTS}")
+    except Exception as e:
+        logger.debug(f"No se pudieron cargar pesos entrenados: {e}")
+
+
+# Cargar pesos entrenados automáticamente al importar
+_load_default_trained_weights()
 
 
 class AttributeCategory(Enum):
@@ -268,7 +328,7 @@ ATTRIBUTE_PATTERNS: list[tuple[str, AttributeKey, AttributeCategory, float, bool
         r"sus\s+ojos\s+(\w+)",
         AttributeKey.EYE_COLOR,
         AttributeCategory.PHYSICAL,
-        0.6,  # Menor confianza, necesita resolver "sus"
+        0.75,  # Confianza media-alta, resuelve "sus" con _find_nearest_entity
         False,
     ),
     # "de ojos azules" (requiere contexto de entidad cercana)
@@ -427,8 +487,9 @@ ATTRIBUTE_PATTERNS: list[tuple[str, AttributeKey, AttributeCategory, float, bool
         False,
     ),
     # "Era un hombre/mujer alto/bajo y fornido/delgada" (para pronombres)
+    # Usa grupo no-capturador (?:muy\s+)? para ignorar "muy"
     (
-        r"[EeÉé]l?\s+era\s+(?:un\s+)?(?:hombre|mujer)\s+(muy\s+)?(alto|alta|bajo|baja|"
+        r"[EeÉé]l?\s+era\s+(?:un\s+)?(?:hombre|mujer)\s+(?:muy\s+)?(alto|alta|bajo|baja|"
         r"delgado|delgada|corpulento|corpulenta|fornido|fornida)",
         AttributeKey.HEIGHT,
         AttributeCategory.PHYSICAL,
@@ -676,25 +737,34 @@ class AttributeExtractor:
     """
     Extractor de atributos de entidades narrativas.
 
-    Combina dos estrategias:
-    1. Patrones regex predefinidos (alta precisión)
-    2. Dependency parsing con spaCy (alta cobertura)
+    Sistema multi-método con votación ponderada:
+    1. LLM (Ollama): Extracción semántica profunda - comprende contexto
+    2. Embeddings: Similitud semántica con descripciones conocidas
+    3. Dependency parsing (spaCy): Análisis sintáctico - relaciones gramaticales
+    4. Patrones regex: Alta precisión para casos conocidos (fallback)
 
-    La extracción por dependencias analiza el árbol sintáctico para
-    encontrar relaciones sujeto-verbo-atributo genéricas que no
-    requieren patrones específicos.
+    La combinación de métodos permite:
+    - Generalizar a textos con errores ortográficos
+    - Capturar atributos implícitos ("estudiaba lingüística" → profesión)
+    - Mantener alta precisión con patrones conocidos
 
     Attributes:
         filter_metaphors: Si filtrar expresiones metafóricas
         min_confidence: Confianza mínima para incluir atributos
+        use_llm: Usar LLM para extracción semántica
+        use_embeddings: Usar embeddings para similitud
         use_dependency_extraction: Usar extracción por dependencias
+        use_patterns: Usar patrones regex
     """
 
     def __init__(
         self,
         filter_metaphors: bool = True,
         min_confidence: float = 0.5,
+        use_llm: bool = True,
+        use_embeddings: bool = True,
         use_dependency_extraction: bool = True,
+        use_patterns: bool = True,
     ):
         """
         Inicializa el extractor.
@@ -702,14 +772,22 @@ class AttributeExtractor:
         Args:
             filter_metaphors: Filtrar metáforas y comparaciones
             min_confidence: Confianza mínima (0.0-1.0)
+            use_llm: Habilitar extracción por LLM
+            use_embeddings: Habilitar extracción por embeddings
             use_dependency_extraction: Habilitar extracción por dependencias
+            use_patterns: Habilitar extracción por patrones regex
         """
         self.filter_metaphors = filter_metaphors
         self.min_confidence = min_confidence
+        self.use_llm = use_llm
+        self.use_embeddings = use_embeddings
         self.use_dependency_extraction = use_dependency_extraction
+        self.use_patterns = use_patterns
 
-        # spaCy para dependency parsing
-        self._nlp = None
+        # Lazy-loaded components
+        self._nlp = None  # spaCy
+        self._llm_client = None  # Ollama client
+        self._embeddings_model = None  # Sentence transformers
 
         # Compilar patrones
         self._compiled_patterns = [
@@ -748,6 +826,36 @@ class AttributeExtractor:
                 self._nlp = False  # Marca que falló
         return self._nlp if self._nlp else None
 
+    def _get_llm_client(self):
+        """Obtiene el cliente LLM (lazy loading)."""
+        if self._llm_client is None:
+            try:
+                from ..llm.client import get_llm_client
+                self._llm_client = get_llm_client()
+                if self._llm_client and self._llm_client.is_available:
+                    logger.info(f"LLM disponible para atributos: {self._llm_client.model_name}")
+                else:
+                    self._llm_client = False
+            except Exception as e:
+                logger.warning(f"No se pudo cargar LLM client: {e}")
+                self._llm_client = False
+        return self._llm_client if self._llm_client else None
+
+    def _get_embeddings_model(self):
+        """Obtiene el modelo de embeddings (lazy loading)."""
+        if self._embeddings_model is None:
+            try:
+                from .embeddings import get_embeddings_model
+                self._embeddings_model = get_embeddings_model()
+                if self._embeddings_model:
+                    logger.info("Embeddings disponible para atributos")
+                else:
+                    self._embeddings_model = False
+            except Exception as e:
+                logger.warning(f"No se pudo cargar embeddings: {e}")
+                self._embeddings_model = False
+        return self._embeddings_model if self._embeddings_model else None
+
     def extract_attributes(
         self,
         text: str,
@@ -755,7 +863,13 @@ class AttributeExtractor:
         chapter_id: Optional[int] = None,
     ) -> Result[AttributeExtractionResult]:
         """
-        Extrae atributos del texto.
+        Extrae atributos del texto usando votación multi-método.
+
+        Combina resultados de:
+        1. LLM (Ollama) - comprensión semántica profunda
+        2. Embeddings - similitud con descripciones conocidas
+        3. Dependency parsing (spaCy) - análisis sintáctico
+        4. Patrones regex - alta precisión para casos conocidos
 
         Args:
             text: Texto a procesar
@@ -769,81 +883,57 @@ class AttributeExtractor:
             return Result.success(AttributeExtractionResult(processed_chars=0))
 
         result = AttributeExtractionResult(processed_chars=len(text))
+        all_extractions: dict[str, list[ExtractedAttribute]] = {}  # método -> atributos
 
         try:
-            for pattern, key, category, base_conf, swap_groups in self._compiled_patterns:
-                for match in pattern.finditer(text):
-                    # Obtener contexto para análisis
-                    context_start = max(0, match.start() - 50)
-                    context_end = min(len(text), match.end() + 50)
-                    context = text[context_start:context_end]
-
-                    # Verificar si es metáfora
-                    is_metaphor = self._is_metaphor(context)
-                    if is_metaphor and self.filter_metaphors:
-                        result.metaphors_filtered += 1
-                        continue
-
-                    # Verificar negación
-                    is_negated = self._is_negated(context, match.start() - context_start)
-
-                    # Extraer grupos
-                    groups = match.groups()
-                    if len(groups) < 2:
-                        # Patrón con un solo grupo (ej: "sus ojos verdes")
-                        value = groups[0] if groups else None
-                        entity_name = self._find_nearest_entity(
-                            text, match.start(), entity_mentions
-                        )
-                        if not entity_name:
-                            continue
-                    elif swap_groups:
-                        value, entity_name = groups[0], groups[1]
-                    else:
-                        entity_name, value = groups[0], groups[1]
-
-                    # Validar valor según tipo de atributo
-                    if not self._validate_value(key, value):
-                        continue
-
-                    # Ajustar confianza
-                    confidence = base_conf
-                    if is_metaphor:
-                        confidence *= 0.5  # Reducir si es metáfora pero no filtrada
-                    if is_negated:
-                        confidence *= 0.9  # Ligeramente menor para negaciones
-
-                    if confidence < self.min_confidence:
-                        continue
-
-                    attr = ExtractedAttribute(
-                        entity_name=entity_name,
-                        category=category,
-                        key=key,
-                        value=value.lower() if value else "",
-                        source_text=match.group(0),
-                        start_char=match.start(),
-                        end_char=match.end(),
-                        confidence=confidence,
-                        is_negated=is_negated,
-                        is_metaphor=is_metaphor,
-                        chapter_id=chapter_id,
+            # 1. Extracción por LLM (mayor peso)
+            if self.use_llm:
+                llm_client = self._get_llm_client()
+                if llm_client:
+                    llm_attrs = self._extract_by_llm(
+                        text, entity_mentions, chapter_id, llm_client
                     )
-                    result.attributes.append(attr)
+                    all_extractions["llm"] = llm_attrs
+                    logger.debug(f"LLM extrajo {len(llm_attrs)} atributos")
 
-            # Extracción por dependencias (más genérica)
+            # 2. Extracción por embeddings
+            if self.use_embeddings:
+                embeddings_model = self._get_embeddings_model()
+                if embeddings_model:
+                    emb_attrs = self._extract_by_embeddings(
+                        text, entity_mentions, chapter_id, embeddings_model
+                    )
+                    all_extractions["embeddings"] = emb_attrs
+                    logger.debug(f"Embeddings extrajo {len(emb_attrs)} atributos")
+
+            # 3. Extracción por dependencias (spaCy)
             if self.use_dependency_extraction:
                 dep_attrs = self._extract_by_dependency(
                     text, entity_mentions, chapter_id
                 )
-                result.attributes.extend(dep_attrs)
+                all_extractions["dependency"] = dep_attrs
+                logger.debug(f"Dependency extrajo {len(dep_attrs)} atributos")
 
-            # Eliminar duplicados (mismo atributo extraído por múltiples patrones)
+            # 4. Extracción por patrones regex (fallback)
+            if self.use_patterns:
+                pattern_attrs = self._extract_by_patterns(
+                    text, entity_mentions, chapter_id
+                )
+                all_extractions["patterns"] = pattern_attrs
+                result.metaphors_filtered = sum(
+                    1 for a in pattern_attrs if a.is_metaphor
+                )
+                logger.debug(f"Patterns extrajo {len(pattern_attrs)} atributos")
+
+            # Votación ponderada para combinar resultados
+            result.attributes = self._vote_attributes(all_extractions)
+
+            # Eliminar duplicados finales
             result.attributes = self._deduplicate(result.attributes)
 
-            logger.debug(
-                f"Atributos extraídos: {len(result.attributes)}, "
-                f"metáforas filtradas: {result.metaphors_filtered}"
+            logger.info(
+                f"Atributos finales (votación): {len(result.attributes)}, "
+                f"métodos activos: {list(all_extractions.keys())}"
             )
 
             return Result.success(result)
@@ -855,6 +945,604 @@ class AttributeExtractor:
             )
             logger.error(f"Error extrayendo atributos: {e}")
             return Result.partial(result, [error])
+
+    def _extract_by_llm(
+        self,
+        text: str,
+        entity_mentions: Optional[list[tuple[str, int, int]]],
+        chapter_id: Optional[int],
+        llm_client: Any,
+    ) -> list[ExtractedAttribute]:
+        """
+        Extrae atributos usando LLM (Ollama).
+
+        El LLM puede entender contexto semántico, detectar atributos implícitos
+        y manejar errores ortográficos.
+        """
+        attributes: list[ExtractedAttribute] = []
+
+        # Construir lista de entidades conocidas
+        known_entities = []
+        if entity_mentions:
+            known_entities = list(set(name for name, _, _ in entity_mentions))
+
+        # Limitar texto para no sobrecargar el LLM
+        text_sample = text[:3000] if len(text) > 3000 else text
+
+        prompt = f"""Extrae atributos físicos de personajes. Responde SOLO con JSON válido.
+
+TEXTO:
+{text_sample}
+
+PERSONAJES: {', '.join(known_entities) if known_entities else 'Detectar'}
+
+REGLAS:
+- Una entrada por CADA mención (si un atributo aparece dos veces, dos entradas)
+- Ignora metáforas
+- Keys válidas: eye_color, hair_color, hair_type, age, height, build, profession
+
+RESPONDE SOLO JSON (sin markdown, sin explicaciones):
+{{"attributes":[{{"entity":"María","key":"eye_color","value":"azules","evidence":"ojos azules brillaban"}}]}}"""
+
+        try:
+            response = llm_client.complete(
+                prompt,
+                system="Responde ÚNICAMENTE con JSON válido. Sin explicaciones ni markdown.",
+                temperature=0.0,  # Determinístico para consistencia
+            )
+
+            if not response:
+                return attributes
+
+            # Parsear JSON de la respuesta
+            data = self._parse_llm_json(response)
+            if not data or "attributes" not in data:
+                return attributes
+
+            for attr_data in data["attributes"]:
+                try:
+                    # Mapear categoría
+                    cat_str = attr_data.get("category", "physical").lower()
+                    category = {
+                        "physical": AttributeCategory.PHYSICAL,
+                        "psychological": AttributeCategory.PSYCHOLOGICAL,
+                        "social": AttributeCategory.SOCIAL,
+                        "ability": AttributeCategory.ABILITY,
+                    }.get(cat_str, AttributeCategory.PHYSICAL)
+
+                    # Mapear key
+                    key_str = attr_data.get("key", "other").lower()
+                    key = self._map_attribute_key(key_str)
+
+                    # Encontrar posición en texto
+                    evidence = attr_data.get("evidence", "")
+                    start_char = text.find(evidence) if evidence else 0
+                    end_char = start_char + len(evidence) if start_char >= 0 else 0
+
+                    attr = ExtractedAttribute(
+                        entity_name=attr_data.get("entity", ""),
+                        category=category,
+                        key=key,
+                        value=attr_data.get("value", "").lower(),
+                        source_text=evidence,
+                        start_char=max(0, start_char),
+                        end_char=max(0, end_char),
+                        confidence=float(attr_data.get("confidence", 0.8)),
+                        is_negated=attr_data.get("is_negated", False),
+                        chapter_id=chapter_id,
+                    )
+                    attributes.append(attr)
+
+                except (KeyError, ValueError, TypeError) as e:
+                    logger.debug(f"Error parseando atributo LLM: {e}")
+                    continue
+
+        except Exception as e:
+            logger.warning(f"Error en extracción LLM: {e}")
+
+        return attributes
+
+    def _extract_by_embeddings(
+        self,
+        text: str,
+        entity_mentions: Optional[list[tuple[str, int, int]]],
+        chapter_id: Optional[int],
+        embeddings_model: Any,
+    ) -> list[ExtractedAttribute]:
+        """
+        Extrae atributos usando similitud de embeddings.
+
+        Compara frases del texto con descripciones canónicas de atributos.
+        """
+        attributes: list[ExtractedAttribute] = []
+
+        # Descripciones canónicas para detectar por similitud
+        canonical_descriptions = {
+            # Físicos
+            ("physical", "eye_color"): [
+                "tiene ojos azules", "tiene ojos verdes", "tiene ojos marrones",
+                "ojos de color", "sus ojos son", "la mirada",
+            ],
+            ("physical", "hair_color"): [
+                "pelo rubio", "cabello negro", "pelo castaño", "pelirrojo",
+                "es rubia", "es rubio", "tiene el pelo", "su cabello",
+            ],
+            ("physical", "age"): [
+                "tiene años", "de edad", "joven", "viejo", "anciano", "niño",
+            ],
+            ("physical", "build"): [
+                "alto", "baja", "delgado", "corpulento", "musculoso", "esbelto",
+            ],
+            # Psicológicos
+            ("psychological", "personality"): [
+                "es amable", "persona curiosa", "carácter", "temperamento",
+                "personalidad", "siempre fue", "era conocido por",
+            ],
+            # Sociales
+            ("social", "profession"): [
+                "trabaja como", "es médico", "profesión", "estudios como",
+                "se dedica a", "lingüista", "profesor", "abogado",
+            ],
+        }
+
+        try:
+            # Dividir texto en oraciones
+            sentences = self._split_sentences(text)
+
+            for sentence in sentences:
+                if len(sentence) < 10:
+                    continue
+
+                # Obtener embedding de la oración
+                try:
+                    sent_embedding = embeddings_model.encode(sentence)
+                except Exception:
+                    continue
+
+                # Comparar con cada descripción canónica
+                for (category_str, key_str), descriptions in canonical_descriptions.items():
+                    for desc in descriptions:
+                        try:
+                            desc_embedding = embeddings_model.encode(desc)
+
+                            # Calcular similitud coseno
+                            similarity = self._cosine_similarity(
+                                sent_embedding, desc_embedding
+                            )
+
+                            if similarity > 0.5:  # Umbral de similitud
+                                # Encontrar entidad en la oración
+                                entity = self._find_entity_in_sentence(
+                                    sentence, entity_mentions, text
+                                )
+
+                                if entity:
+                                    # Extraer valor del atributo
+                                    value = self._extract_value_from_sentence(
+                                        sentence, key_str
+                                    )
+
+                                    if value:
+                                        category = {
+                                            "physical": AttributeCategory.PHYSICAL,
+                                            "psychological": AttributeCategory.PSYCHOLOGICAL,
+                                            "social": AttributeCategory.SOCIAL,
+                                        }.get(category_str, AttributeCategory.PHYSICAL)
+
+                                        key = self._map_attribute_key(key_str)
+
+                                        start_char = text.find(sentence)
+                                        attr = ExtractedAttribute(
+                                            entity_name=entity,
+                                            category=category,
+                                            key=key,
+                                            value=value.lower(),
+                                            source_text=sentence,
+                                            start_char=max(0, start_char),
+                                            end_char=max(0, start_char + len(sentence)),
+                                            confidence=min(0.9, similarity),
+                                            chapter_id=chapter_id,
+                                        )
+                                        attributes.append(attr)
+                                        break  # Solo un match por descripción
+
+                        except Exception as e:
+                            logger.debug(f"Error comparando embeddings: {e}")
+
+        except Exception as e:
+            logger.warning(f"Error en extracción por embeddings: {e}")
+
+        return attributes
+
+    def _extract_by_patterns(
+        self,
+        text: str,
+        entity_mentions: Optional[list[tuple[str, int, int]]],
+        chapter_id: Optional[int],
+    ) -> list[ExtractedAttribute]:
+        """
+        Extrae atributos usando patrones regex (método original).
+
+        Mantiene alta precisión para casos conocidos.
+        """
+        attributes: list[ExtractedAttribute] = []
+
+        for pattern, key, category, base_conf, swap_groups in self._compiled_patterns:
+            for match in pattern.finditer(text):
+                # Obtener contexto para análisis
+                context_start = max(0, match.start() - 50)
+                context_end = min(len(text), match.end() + 50)
+                context = text[context_start:context_end]
+
+                # Verificar si es metáfora
+                is_metaphor = self._is_metaphor(context)
+                if is_metaphor and self.filter_metaphors:
+                    continue
+
+                # Verificar negación
+                is_negated = self._is_negated(context, match.start() - context_start)
+
+                # Extraer grupos
+                groups = match.groups()
+                if len(groups) < 2:
+                    value = groups[0] if groups else None
+                    entity_name = self._find_nearest_entity(
+                        text, match.start(), entity_mentions
+                    )
+                    if not entity_name:
+                        continue
+                elif swap_groups:
+                    value, entity_name = groups[0], groups[1]
+                else:
+                    entity_name, value = groups[0], groups[1]
+
+                # Validar valor
+                if not self._validate_value(key, value):
+                    continue
+
+                # Ajustar confianza
+                confidence = base_conf
+                if is_metaphor:
+                    confidence *= 0.5
+                if is_negated:
+                    confidence *= 0.9
+
+                if confidence < self.min_confidence:
+                    continue
+
+                attr = ExtractedAttribute(
+                    entity_name=entity_name,
+                    category=category,
+                    key=key,
+                    value=value.lower() if value else "",
+                    source_text=match.group(0),
+                    start_char=match.start(),
+                    end_char=match.end(),
+                    confidence=confidence,
+                    is_negated=is_negated,
+                    is_metaphor=is_metaphor,
+                    chapter_id=chapter_id,
+                )
+                attributes.append(attr)
+
+        return attributes
+
+    def _vote_attributes(
+        self,
+        extractions: dict[str, list[ExtractedAttribute]],
+    ) -> list[ExtractedAttribute]:
+        """
+        Combina atributos de múltiples métodos usando votación ponderada (weighted voting).
+
+        Fórmula de confianza final:
+        - Un método: conf_final = conf_original * (0.8 + method_weight * 0.5)
+          - LLM (0.40): factor = 1.0 -> mantiene confianza
+          - Patterns (0.15): factor = 0.875 -> reduce ligeramente
+        - Múltiples métodos: conf_final = conf_promedio_ponderado + bonus_consenso
+          - Promedio ponderado por peso de cada método
+          - Bonus por consenso (más métodos = más confianza)
+
+        Esto permite:
+        - Aceptar atributos de un solo método si tienen confianza alta
+        - Dar prioridad a atributos detectados por múltiples métodos
+        - No filtrar arbitrariamente atributos válidos
+        """
+        # Agrupar atributos por (entidad, key, value_normalizado)
+        grouped: dict[tuple, list[tuple[str, ExtractedAttribute]]] = {}
+
+        for method, attrs in extractions.items():
+            for attr in attrs:
+                # Filtrar atributos sin entidad o valor
+                if not attr.entity_name or not attr.value:
+                    logger.debug(f"Atributo ignorado (sin entidad/valor): {attr}")
+                    continue
+
+                # Normalizar para comparación
+                # Usar solo entity + key para agrupar valores similares
+                key = (
+                    attr.entity_name.lower(),
+                    attr.key,
+                    attr.value.lower().strip(),
+                )
+                if key not in grouped:
+                    grouped[key] = []
+                grouped[key].append((method, attr))
+
+        # Votar y generar atributos finales
+        final_attributes: list[ExtractedAttribute] = []
+        num_active_methods = len(extractions)
+
+        for group_key, method_attrs in grouped.items():
+            methods_with_attrs = list(method_attrs)
+            unique_methods = set(m for m, _ in methods_with_attrs)
+            num_votes = len(unique_methods)
+
+            if num_votes == 1:
+                # Solo un método detectó este atributo
+                method, attr = methods_with_attrs[0]
+                method_weight = METHOD_WEIGHTS.get(method, 0.15)
+
+                # Factor de escala más generoso para no filtrar atributos válidos
+                # LLM (0.40): 0.8 + 0.4*0.5 = 1.0 (mantiene confianza)
+                # Embeddings (0.25): 0.8 + 0.25*0.5 = 0.925
+                # Dependency (0.20): 0.8 + 0.2*0.5 = 0.9
+                # Patterns (0.15): 0.8 + 0.15*0.5 = 0.875
+                scale_factor = 0.8 + (method_weight * 0.5)
+                new_confidence = attr.confidence * scale_factor
+                best_attr = attr
+
+            else:
+                # Múltiples métodos coinciden - weighted average + consensus bonus
+                total_weight = 0.0
+                weighted_conf_sum = 0.0
+                best_attr = None
+                best_conf = 0.0
+
+                for method, attr in methods_with_attrs:
+                    weight = METHOD_WEIGHTS.get(method, 0.15)
+                    total_weight += weight
+                    weighted_conf_sum += attr.confidence * weight
+
+                    if attr.confidence > best_conf:
+                        best_conf = attr.confidence
+                        best_attr = attr
+
+                # Promedio ponderado
+                avg_weighted_conf = weighted_conf_sum / total_weight if total_weight > 0 else 0.5
+
+                # Bonus por consenso: más métodos = más confianza
+                # 2 métodos: +0.05, 3 métodos: +0.10, 4 métodos: +0.15
+                consensus_bonus = min(0.15, (num_votes - 1) * 0.05)
+
+                new_confidence = min(1.0, avg_weighted_conf + consensus_bonus)
+
+            new_confidence = min(1.0, max(0.0, new_confidence))
+
+            # Solo incluir si supera umbral mínimo
+            if new_confidence >= self.min_confidence and best_attr is not None:
+                final_attr = ExtractedAttribute(
+                    entity_name=best_attr.entity_name,
+                    category=best_attr.category,
+                    key=best_attr.key,
+                    value=best_attr.value,
+                    source_text=best_attr.source_text,
+                    start_char=best_attr.start_char,
+                    end_char=best_attr.end_char,
+                    confidence=new_confidence,
+                    is_negated=best_attr.is_negated,
+                    is_metaphor=best_attr.is_metaphor,
+                    chapter_id=best_attr.chapter_id,
+                )
+                final_attributes.append(final_attr)
+
+                logger.debug(
+                    f"Atributo votado: {best_attr.entity_name}.{best_attr.key.value}="
+                    f"{best_attr.value} (métodos: {unique_methods}, votos: {num_votes}/{num_active_methods}, "
+                    f"conf: {best_attr.confidence:.2f} -> {new_confidence:.2f})"
+                )
+
+        return final_attributes
+
+    def _map_attribute_key(self, key_str: str) -> AttributeKey:
+        """Mapea string a AttributeKey."""
+        mapping = {
+            "eye_color": AttributeKey.EYE_COLOR,
+            "hair_color": AttributeKey.HAIR_COLOR,
+            "hair_type": AttributeKey.HAIR_TYPE,
+            "age": AttributeKey.AGE,
+            "height": AttributeKey.HEIGHT,
+            "build": AttributeKey.BUILD,
+            "skin": AttributeKey.SKIN,
+            "distinctive_feature": AttributeKey.DISTINCTIVE_FEATURE,
+            "personality": AttributeKey.PERSONALITY,
+            "temperament": AttributeKey.TEMPERAMENT,
+            "fear": AttributeKey.FEAR,
+            "desire": AttributeKey.DESIRE,
+            "profession": AttributeKey.PROFESSION,
+            "title": AttributeKey.TITLE,
+            "relationship": AttributeKey.RELATIONSHIP,
+            "nationality": AttributeKey.NATIONALITY,
+            "color": AttributeKey.COLOR,
+            "material": AttributeKey.MATERIAL,
+            "condition": AttributeKey.CONDITION,
+        }
+        return mapping.get(key_str.lower(), AttributeKey.OTHER)
+
+    def _parse_llm_json(self, response: str) -> Optional[dict]:
+        """Parsea respuesta JSON del LLM con limpieza y fallback."""
+        try:
+            # Limpiar respuesta
+            cleaned = response.strip()
+
+            # Remover bloques de código markdown
+            if "```" in cleaned:
+                lines = cleaned.split("\n")
+                lines = [l for l in lines if not l.startswith("```")]
+                cleaned = "\n".join(lines)
+
+            # Encontrar JSON
+            start_idx = cleaned.find("{")
+            end_idx = cleaned.rfind("}") + 1
+
+            if start_idx != -1 and end_idx > start_idx:
+                json_str = cleaned[start_idx:end_idx]
+                return json.loads(json_str)
+
+            # Fallback: parsear texto formateado con markdown
+            # El LLM a veces responde con formato tipo "**key**: value"
+            return self._parse_markdown_response(response)
+
+        except json.JSONDecodeError as e:
+            logger.debug(f"Error parseando JSON del LLM: {e}")
+            # Intentar parsear como markdown
+            return self._parse_markdown_response(response)
+
+    def _parse_markdown_response(self, response: str) -> Optional[dict]:
+        """
+        Parsea respuesta formateada del LLM cuando no devuelve JSON.
+
+        Maneja formatos como:
+        **María Sánchez**
+        * **Eye color**: azules ("Sus ojos azules brillaban")
+        """
+        attributes = []
+        current_entity = None
+
+        # Patrones para extraer información
+        entity_pattern = re.compile(r'\*\*([^*]+)\*\*')
+        attr_pattern = re.compile(
+            r'\*\s*\*\*([^*]+)\*\*:\s*([^(]+)(?:\("([^"]+)"\))?'
+        )
+
+        for line in response.split('\n'):
+            line = line.strip()
+            if not line:
+                continue
+
+            # Detectar nombre de entidad
+            entity_match = entity_pattern.match(line)
+            if entity_match and not ':' in line:
+                current_entity = entity_match.group(1).strip()
+                # Limpiar "(en la cafetería)" y similares
+                if '(' in current_entity:
+                    current_entity = current_entity.split('(')[0].strip()
+                continue
+
+            # Detectar atributo
+            attr_match = attr_pattern.match(line)
+            if attr_match and current_entity:
+                key_raw = attr_match.group(1).strip().lower()
+                value = attr_match.group(2).strip()
+                evidence = attr_match.group(3) if attr_match.lastindex >= 3 else ""
+
+                # Mapear key
+                key_mapping = {
+                    'eye color': 'eye_color',
+                    'hair color': 'hair_color',
+                    'hair type': 'hair_type',
+                    'height': 'height',
+                    'build': 'build',
+                    'age': 'age',
+                    'profession': 'profession',
+                }
+                key = key_mapping.get(key_raw, key_raw.replace(' ', '_'))
+
+                if key in ['eye_color', 'hair_color', 'hair_type', 'height', 'build', 'age', 'profession']:
+                    attributes.append({
+                        'entity': current_entity,
+                        'key': key,
+                        'value': value,
+                        'evidence': evidence or '',
+                    })
+
+        if attributes:
+            logger.debug(f"Parseados {len(attributes)} atributos desde markdown")
+            return {'attributes': attributes}
+        return None
+
+    def _split_sentences(self, text: str) -> list[str]:
+        """Divide texto en oraciones."""
+        # Simple split por puntuación
+        sentences = re.split(r'[.!?]+', text)
+        return [s.strip() for s in sentences if s.strip()]
+
+    def _cosine_similarity(self, vec1, vec2) -> float:
+        """Calcula similitud coseno entre dos vectores."""
+        import numpy as np
+        # Aplanar a 1D si vienen como 2D (batch de 1)
+        v1 = np.array(vec1).flatten()
+        v2 = np.array(vec2).flatten()
+        dot = np.dot(v1, v2)
+        norm1 = np.linalg.norm(v1)
+        norm2 = np.linalg.norm(v2)
+        if norm1 == 0 or norm2 == 0:
+            return 0.0
+        return float(dot / (norm1 * norm2))
+
+    def _find_entity_in_sentence(
+        self,
+        sentence: str,
+        entity_mentions: Optional[list[tuple[str, int, int]]],
+        full_text: str,
+    ) -> Optional[str]:
+        """Encuentra entidad en una oración."""
+        if not entity_mentions:
+            return None
+
+        sentence_lower = sentence.lower()
+        sentence_start = full_text.find(sentence)
+
+        # Buscar entidades que aparezcan en la oración
+        for name, start, end in entity_mentions:
+            if name.lower() in sentence_lower:
+                return name
+            # También verificar por posición
+            if sentence_start >= 0:
+                if start >= sentence_start and end <= sentence_start + len(sentence):
+                    return name
+
+        return None
+
+    def _extract_value_from_sentence(
+        self,
+        sentence: str,
+        key_str: str,
+    ) -> Optional[str]:
+        """Extrae valor de atributo de una oración."""
+        sentence_lower = sentence.lower()
+
+        if key_str == "hair_color":
+            for color in COLORS:
+                if color in sentence_lower:
+                    return color
+
+        elif key_str == "eye_color":
+            for color in COLORS:
+                if color in sentence_lower and "ojo" in sentence_lower:
+                    return color
+
+        elif key_str == "build":
+            for build in BUILD_TYPES:
+                if build in sentence_lower:
+                    return build
+
+        elif key_str == "personality":
+            for trait in PERSONALITY_TRAITS:
+                if trait in sentence_lower:
+                    return trait
+
+        elif key_str == "profession":
+            # Buscar profesiones comunes
+            professions = [
+                "lingüista", "médico", "médica", "abogado", "abogada",
+                "profesor", "profesora", "escritor", "escritora",
+                "doctor", "doctora", "ingeniero", "ingeniera",
+            ]
+            for prof in professions:
+                if prof in sentence_lower:
+                    return prof
+
+        return None
 
     def _is_metaphor(self, context: str) -> bool:
         """Detecta si el contexto sugiere una metáfora."""
@@ -973,11 +1661,93 @@ class AttributeExtractor:
         has_possessive = bool(regex_module.search(r'\b(su|sus)\b', immediate_context + " " + context_forward, regex_module.IGNORECASE))
         has_object_pronoun = bool(regex_module.search(r'\b(la|lo|le)\b', immediate_context, regex_module.IGNORECASE))
 
+        # Detectar pronombres de sujeto explícitos (Él/Ella) o indicadores de género (hombre/mujer)
+        # Esto tiene MÁXIMA prioridad porque indica claramente el género del referente
+        subject_pronoun_match = regex_module.search(
+            r'\b(él|ella)\b', immediate_context + " " + context_forward, regex_module.IGNORECASE
+        )
+        gender_noun_match = regex_module.search(
+            r'\b(hombre|mujer|chico|chica|señor|señora|niño|niña)\b',
+            immediate_context + " " + context_forward, regex_module.IGNORECASE
+        )
+
         # Estrategia de selección mejorada:
+        # -1. Si hay pronombre de sujeto (Él/Ella) o indicador (hombre/mujer) → buscar por género
         # 0. Si hay "su/sus" después de un pronombre objeto "la/lo/le" → buscar referente del objeto
         # 1. Si hay verbo en 3ª persona SIN sujeto explícito cerca → sujeto elíptico, buscar persona en oración anterior
         # 2. Si hay pronombre → buscar persona más cercana
         # 3. Si no hay indicadores → usar persona más cercana pero penalizar lugares
+
+        # Caso -1: Pronombre de sujeto explícito o indicador de género
+        # "Él era un hombre bajo" → buscar entidad masculina (Juan, no María)
+        # "Ella era alta" → buscar entidad femenina
+        if (subject_pronoun_match or gender_noun_match) and person_candidates:
+            # Determinar género
+            is_feminine = False
+            if subject_pronoun_match:
+                pronoun = subject_pronoun_match.group(1).lower()
+                is_feminine = (pronoun == "ella")
+            elif gender_noun_match:
+                noun = gender_noun_match.group(1).lower()
+                is_feminine = noun in ("mujer", "chica", "señora", "niña")
+
+            # Buscar candidatos con género coincidente
+            gendered_candidates = []
+            for name, start, end, distance in person_candidates:
+                name_lower = name.lower()
+                first_name = name_lower.split()[0] if name_lower else ""
+
+                # Nombres femeninos comunes en español
+                feminine_names = {
+                    'maría', 'ana', 'elena', 'laura', 'carmen', 'isabel', 'rosa',
+                    'lucía', 'marta', 'paula', 'sara', 'andrea', 'claudia', 'sofía',
+                    'julia', 'clara', 'alba', 'irene', 'nuria', 'eva', 'raquel',
+                    'silvia', 'cristina', 'patricia', 'mónica', 'beatriz', 'alicia'
+                }
+                # Nombres masculinos comunes en español
+                masculine_names = {
+                    'juan', 'pedro', 'carlos', 'antonio', 'josé', 'luis', 'miguel',
+                    'francisco', 'javier', 'david', 'daniel', 'pablo', 'alejandro',
+                    'sergio', 'fernando', 'alberto', 'manuel', 'rafael', 'jorge',
+                    'mario', 'andrés', 'roberto', 'enrique', 'ricardo', 'diego'
+                }
+
+                # Determinar si el nombre coincide con el género buscado
+                name_is_feminine = (
+                    first_name in feminine_names or
+                    (first_name.endswith('a') and first_name not in masculine_names)
+                )
+                name_is_masculine = (
+                    first_name in masculine_names or
+                    (first_name.endswith('o') and first_name not in feminine_names)
+                )
+
+                # Calcular ajuste de distancia por género
+                gender_adjustment = 0
+                if is_feminine and name_is_feminine:
+                    gender_adjustment = -100  # Gran boost para coincidencia de género
+                elif not is_feminine and name_is_masculine:
+                    gender_adjustment = -100  # Gran boost para coincidencia de género
+                elif is_feminine and name_is_masculine:
+                    gender_adjustment = 200  # Penalización fuerte por género incorrecto
+                elif not is_feminine and name_is_feminine:
+                    gender_adjustment = 200  # Penalización fuerte por género incorrecto
+
+                adjusted_distance = distance + gender_adjustment
+                gendered_candidates.append((name, adjusted_distance, distance))
+
+            if gendered_candidates:
+                # Ordenar por distancia ajustada
+                gendered_candidates.sort(key=lambda x: x[1])
+                best_candidate = gendered_candidates[0]
+                # Aceptar si la distancia ajustada es razonable
+                if best_candidate[1] < 400:
+                    logger.debug(
+                        f"Género detectado ({'femenino' if is_feminine else 'masculino'}): "
+                        f"seleccionando '{best_candidate[0]}' (dist={best_candidate[2]}, "
+                        f"ajustada={best_candidate[1]})"
+                    )
+                    return best_candidate[0]
 
         # Caso 0: Pronombre posesivo refiriéndose al objeto
         # Patrón: "Juan la saludó... su cabello" -> "su" se refiere a "la" (María), no a Juan
@@ -1405,6 +2175,10 @@ _attribute_extractor: Optional[AttributeExtractor] = None
 def get_attribute_extractor(
     filter_metaphors: bool = True,
     min_confidence: float = 0.5,
+    use_llm: bool = True,
+    use_embeddings: bool = True,
+    use_dependency_extraction: bool = True,
+    use_patterns: bool = True,
 ) -> AttributeExtractor:
     """
     Obtiene el singleton del extractor de atributos.
@@ -1412,6 +2186,10 @@ def get_attribute_extractor(
     Args:
         filter_metaphors: Filtrar expresiones metafóricas
         min_confidence: Confianza mínima
+        use_llm: Habilitar extracción por LLM
+        use_embeddings: Habilitar extracción por embeddings
+        use_dependency_extraction: Habilitar extracción por dependencias
+        use_patterns: Habilitar extracción por patrones
 
     Returns:
         Instancia única del AttributeExtractor
@@ -1424,6 +2202,10 @@ def get_attribute_extractor(
                 _attribute_extractor = AttributeExtractor(
                     filter_metaphors=filter_metaphors,
                     min_confidence=min_confidence,
+                    use_llm=use_llm,
+                    use_embeddings=use_embeddings,
+                    use_dependency_extraction=use_dependency_extraction,
+                    use_patterns=use_patterns,
                 )
 
     return _attribute_extractor
@@ -1434,3 +2216,301 @@ def reset_attribute_extractor() -> None:
     global _attribute_extractor
     with _extractor_lock:
         _attribute_extractor = None
+
+
+# =============================================================================
+# Resolución de atributos con correferencias
+# =============================================================================
+
+def resolve_attributes_with_coreferences(
+    attributes: list[ExtractedAttribute],
+    coref_chains: list,  # list[CoreferenceChain] - evitar import circular
+    text: str,
+) -> list[ExtractedAttribute]:
+    """
+    Resuelve nombres de entidades en atributos usando cadenas de correferencia.
+
+    Cuando un atributo tiene entity_name="Ella" o "él", busca en las cadenas
+    de correferencia para encontrar el nombre propio correspondiente.
+
+    Args:
+        attributes: Lista de atributos extraídos
+        coref_chains: Cadenas de correferencia (del CorefResult)
+        text: Texto original para buscar posiciones
+
+    Returns:
+        Lista de atributos con entity_name resueltos
+
+    Example:
+        >>> # Antes: Ella.hair_color = "rubio"
+        >>> # Después: María.hair_color = "rubio" (si Ella -> María en coref)
+    """
+    if not coref_chains or not attributes:
+        return attributes
+
+    # Construir mapa de menciones -> nombre principal
+    mention_to_entity: dict[str, str] = {}
+    position_to_entity: dict[tuple[int, int], str] = {}
+
+    for chain in coref_chains:
+        # Obtener el nombre principal de la cadena
+        main_name = chain.main_mention
+        if not main_name:
+            # Buscar la primera mención que sea nombre propio
+            for mention in chain.mentions:
+                if hasattr(mention, 'mention_type'):
+                    # MentionType.PROPER_NOUN
+                    if mention.mention_type.value == "proper_noun":
+                        main_name = mention.text
+                        break
+                elif mention.text and mention.text[0].isupper():
+                    # Heurística: empieza con mayúscula
+                    text_lower = mention.text.lower()
+                    # No es pronombre
+                    if text_lower not in {
+                        "él", "ella", "ellos", "ellas", "este", "esta",
+                        "ese", "esa", "aquel", "aquella", "lo", "la", "le",
+                    }:
+                        main_name = mention.text
+                        break
+
+        if not main_name:
+            continue
+
+        # Mapear todas las menciones de la cadena al nombre principal
+        for mention in chain.mentions:
+            mention_text_lower = mention.text.lower().strip()
+            mention_to_entity[mention_text_lower] = main_name
+
+            # También mapear por posición
+            if hasattr(mention, 'start_char') and hasattr(mention, 'end_char'):
+                position_to_entity[(mention.start_char, mention.end_char)] = main_name
+
+    # Resolver atributos
+    resolved_attributes = []
+    pronouns = {
+        "él", "ella", "ellos", "ellas", "este", "esta", "ese", "esa",
+        "aquel", "aquella", "lo", "la", "le", "les", "su", "sus",
+    }
+
+    for attr in attributes:
+        entity_lower = attr.entity_name.lower().strip()
+
+        # Verificar si es pronombre o mención que necesita resolución
+        needs_resolution = (
+            entity_lower in pronouns or
+            entity_lower in mention_to_entity or
+            not attr.entity_name[0].isupper()  # No empieza con mayúscula
+        )
+
+        if needs_resolution:
+            resolved_name = None
+
+            # 1. Buscar por posición exacta
+            attr_pos = (attr.start_char, attr.end_char)
+            if attr_pos in position_to_entity:
+                resolved_name = position_to_entity[attr_pos]
+
+            # 2. Buscar por texto de mención
+            if not resolved_name and entity_lower in mention_to_entity:
+                resolved_name = mention_to_entity[entity_lower]
+
+            # 3. Buscar por proximidad en el texto
+            if not resolved_name:
+                resolved_name = _find_nearest_antecedent(
+                    attr.start_char,
+                    position_to_entity,
+                    text,
+                )
+
+            if resolved_name:
+                # Crear nuevo atributo con nombre resuelto
+                resolved_attr = ExtractedAttribute(
+                    entity_name=resolved_name,
+                    category=attr.category,
+                    key=attr.key,
+                    value=attr.value,
+                    source_text=attr.source_text,
+                    start_char=attr.start_char,
+                    end_char=attr.end_char,
+                    confidence=attr.confidence * 0.95,  # Ligera penalización por resolución
+                    is_negated=attr.is_negated,
+                    is_metaphor=attr.is_metaphor,
+                    chapter_id=attr.chapter_id,
+                )
+                resolved_attributes.append(resolved_attr)
+                logger.debug(
+                    f"Atributo resuelto: {attr.entity_name} -> {resolved_name} "
+                    f"({attr.key.value}={attr.value})"
+                )
+                continue
+
+        # No necesita resolución o no se pudo resolver
+        resolved_attributes.append(attr)
+
+    return resolved_attributes
+
+
+def _find_nearest_antecedent(
+    position: int,
+    position_to_entity: dict[tuple[int, int], str],
+    text: str,
+    max_distance: int = 500,
+) -> Optional[str]:
+    """
+    Encuentra el antecedente más cercano por posición en el texto.
+
+    Busca hacia atrás desde la posición del atributo.
+    """
+    nearest_name = None
+    nearest_distance = max_distance
+
+    for (start, end), name in position_to_entity.items():
+        # Solo considerar menciones anteriores
+        if end <= position:
+            distance = position - end
+            if distance < nearest_distance:
+                nearest_distance = distance
+                nearest_name = name
+
+    return nearest_name
+
+
+# =============================================================================
+# Funciones para pesos entrenables
+# =============================================================================
+
+def set_method_weights(weights: dict[str, float]) -> None:
+    """
+    Establece pesos personalizados para los métodos de votación.
+
+    Args:
+        weights: Diccionario {método: peso}
+                 Métodos válidos: llm, embeddings, dependency, patterns
+
+    Example:
+        >>> set_method_weights({"llm": 0.88, "embeddings": 0.04, "dependency": 0.04, "patterns": 0.04})
+    """
+    global METHOD_WEIGHTS
+
+    # Validar métodos
+    valid_methods = {"llm", "embeddings", "dependency", "patterns"}
+    for method in weights:
+        if method not in valid_methods:
+            raise ValueError(f"Método desconocido: {method}. Válidos: {valid_methods}")
+
+    # Actualizar pesos
+    METHOD_WEIGHTS.update(weights)
+
+    # Normalizar para que sumen 1.0
+    total = sum(METHOD_WEIGHTS.values())
+    if total > 0:
+        for method in METHOD_WEIGHTS:
+            METHOD_WEIGHTS[method] /= total
+
+    logger.info(f"Pesos de votación actualizados: {METHOD_WEIGHTS}")
+
+
+def load_trained_weights(path: "Path") -> dict[str, float]:
+    """
+    Carga pesos entrenados desde archivo y los aplica.
+
+    Args:
+        path: Ruta al archivo JSON con pesos entrenados
+              (generado por TrainableWeightedVoting.save())
+
+    Returns:
+        Diccionario con los pesos cargados
+
+    Example:
+        >>> from pathlib import Path
+        >>> weights = load_trained_weights(Path("weights.json"))
+        >>> print(weights)
+        {'llm': 0.88, 'embeddings': 0.04, 'dependency': 0.04, 'patterns': 0.04}
+    """
+    from pathlib import Path as PathClass
+    import json
+
+    path = PathClass(path)
+    if not path.exists():
+        raise FileNotFoundError(f"Archivo de pesos no encontrado: {path}")
+
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    weights = data.get("weights", {})
+    if not weights:
+        raise ValueError(f"No se encontraron pesos en {path}")
+
+    set_method_weights(weights)
+
+    logger.info(f"Pesos cargados desde {path}: {weights}")
+    return weights
+
+
+def reset_method_weights() -> None:
+    """Restablece los pesos a los valores por defecto."""
+    global METHOD_WEIGHTS
+    METHOD_WEIGHTS = dict(DEFAULT_METHOD_WEIGHTS)
+    logger.info(f"Pesos restablecidos a defaults: {METHOD_WEIGHTS}")
+
+
+def get_current_weights() -> dict[str, float]:
+    """Obtiene los pesos de votación actuales."""
+    return dict(METHOD_WEIGHTS)
+
+
+def train_weights_from_examples(
+    num_synthetic_examples: int = 10,
+    output_path: Optional["Path"] = None,
+    method: str = "nnls",
+    apply_weights: bool = True,
+) -> dict[str, float]:
+    """
+    Entrena pesos usando ejemplos sintéticos y opcionalmente los aplica.
+
+    Esta función es una conveniencia para entrenar pesos sin necesidad
+    de importar el módulo training_data.
+
+    Args:
+        num_synthetic_examples: Ejemplos por escenario (5-20 recomendado)
+        output_path: Ruta para guardar los pesos (opcional)
+        method: Método de optimización ('nnls' o 'grid_search')
+        apply_weights: Si aplicar los pesos entrenados inmediatamente
+
+    Returns:
+        Diccionario con los pesos aprendidos
+
+    Example:
+        >>> weights = train_weights_from_examples(num_synthetic_examples=10)
+        >>> print(weights)
+        {'llm': 0.88, 'embeddings': 0.04, 'dependency': 0.04, 'patterns': 0.04}
+    """
+    from pathlib import Path as PathClass
+    from .training_data import generate_synthetic_dataset, TrainableWeightedVoting
+
+    # Generar dataset sintético
+    examples = generate_synthetic_dataset(
+        num_examples_per_scenario=num_synthetic_examples,
+        add_noise=True,
+    )
+
+    # Entrenar
+    learner = TrainableWeightedVoting()
+    result = learner.train(examples, method=method)
+
+    # Guardar si se especifica ruta
+    if output_path:
+        output_path = PathClass(output_path)
+        learner.save(output_path)
+
+    # Aplicar si se solicita
+    if apply_weights:
+        set_method_weights(result.weights)
+
+    logger.info(
+        f"Pesos entrenados con {len(examples)} ejemplos: {result.weights}\n"
+        f"MSE: {result.mse:.4f}, Accuracy: {result.accuracy:.2%}"
+    )
+
+    return result.weights

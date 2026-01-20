@@ -23,20 +23,13 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
-    path: '/projects/:id/entities',
-    name: 'entities',
-    component: () => import('../views/EntitiesView.vue'),
-    meta: {
-      title: 'Entidades - Narrative Assistant'
-    }
-  },
-  {
     path: '/projects/:projectId/characters/:id',
     name: 'character',
-    component: () => import('../views/CharacterView.vue'),
-    meta: {
-      title: 'Ficha de Personaje - Narrative Assistant'
-    }
+    redirect: to => ({
+      name: 'project',
+      params: { id: to.params.projectId },
+      query: { tab: 'entities', entity: to.params.id }
+    })
   },
   {
     path: '/projects/:id/alerts',

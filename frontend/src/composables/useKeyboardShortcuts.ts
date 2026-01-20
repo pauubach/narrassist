@@ -42,10 +42,11 @@ export function useKeyboardShortcuts() {
       window.dispatchEvent(new CustomEvent('keyboard:toggle-sidebar'))
     } else if (modifier && key === 'e') {
       event.preventDefault()
-      // Navegar a entidades si estamos en un proyecto
+      // Navegar al proyecto y mostrar pestaña de entidades
       const currentRoute = router.currentRoute.value
-      if (currentRoute.params.id) {
-        router.push({ name: 'entities', params: { id: currentRoute.params.id } })
+      const projectId = currentRoute.params.id || currentRoute.params.projectId
+      if (projectId) {
+        router.push({ name: 'project', params: { id: projectId }, query: { tab: 'entities' } })
       }
     } else if (modifier && key === 'a') {
       event.preventDefault()
@@ -104,7 +105,7 @@ export function useKeyboardShortcuts() {
     // Navegación general
     else if (modifier && key === 'h') {
       event.preventDefault()
-      router.push({ name: 'home' })
+      router.push({ name: 'projects' })
     } else if (modifier && key === 'p') {
       event.preventDefault()
       router.push({ name: 'projects' })

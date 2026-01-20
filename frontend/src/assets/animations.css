@@ -438,3 +438,73 @@ html {
     scroll-behavior: auto;
   }
 }
+
+/* ==================== */
+/* Error Highlights     */
+/* ==================== */
+
+/* Variables de color para errores */
+:root {
+  --error-spelling-color: #ef4444;
+  --error-grammar-color: #3b82f6;
+}
+
+/* Error de ortografia - wavy underline rojo */
+.error-spelling {
+  text-decoration: underline wavy var(--error-spelling-color);
+  text-underline-offset: 3px;
+  text-decoration-thickness: 2px;
+}
+
+/* Error de gramatica - wavy underline azul */
+.error-grammar {
+  text-decoration: underline wavy var(--error-grammar-color);
+  text-underline-offset: 3px;
+  text-decoration-thickness: 2px;
+}
+
+/* Animacion de pulso para errores destacados */
+@keyframes error-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+.error-highlight-pulse {
+  animation: error-pulse 1.5s ease-in-out 3;
+}
+
+/* Hover states para errores */
+.error-spelling:hover,
+.error-grammar:hover {
+  cursor: pointer;
+}
+
+.error-spelling:hover {
+  background-color: rgba(239, 68, 68, 0.1);
+  border-radius: 2px;
+}
+
+.error-grammar:hover {
+  background-color: rgba(59, 130, 246, 0.1);
+  border-radius: 2px;
+}
+
+/* Animacion de aparicion del popup de sugerencias */
+@keyframes error-popup-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.error-popup-animate {
+  animation: error-popup-enter 0.15s ease-out;
+}

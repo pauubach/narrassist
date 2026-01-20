@@ -54,6 +54,31 @@ class MentionInfo:
 
 
 @dataclass
+class VoiceProfileSummary:
+    """Resumen del perfil de voz del personaje."""
+
+    total_interventions: int
+    avg_intervention_length: float
+    formality_score: float
+    type_token_ratio: float
+    uses_usted: bool
+    uses_tu: bool
+    characteristic_fillers: list[str]
+    predominant_register: str = "neutral"
+
+
+@dataclass
+class AlertSummary:
+    """Resumen de alertas asociadas al personaje."""
+
+    total_alerts: int
+    by_category: dict[str, int]
+    critical_count: int
+    warning_count: int
+    descriptions: list[str]  # Top 5 descripciones
+
+
+@dataclass
 class CharacterSheet:
     """
     Ficha completa de un personaje.
@@ -78,6 +103,12 @@ class CharacterSheet:
 
     # Relaciones (placeholder para futura implementación)
     relationships: list[dict[str, Any]] = field(default_factory=list)
+
+    # Perfil de voz (si hay diálogos)
+    voice_profile: Optional[VoiceProfileSummary] = None
+
+    # Alertas/inconsistencias asociadas
+    alerts: Optional[AlertSummary] = None
 
     # Metadata
     project_id: int = 0
@@ -146,11 +177,41 @@ class CharacterSheet:
                 lines.append(f"- **{attr.key.replace('_', ' ').title()}:** {attr.value}")
             lines.append("")
 
+        # Perfil de voz
+        if self.voice_profile:
+            vp = self.voice_profile
+            lines.append("## Perfil de Voz")
+            lines.append(f"- **Total intervenciones:** {vp.total_interventions}")
+            lines.append(f"- **Longitud media:** {vp.avg_intervention_length:.1f} palabras")
+            lines.append(f"- **Formalidad:** {vp.formality_score:.0%}")
+            lines.append(f"- **Riqueza léxica (TTR):** {vp.type_token_ratio:.3f}")
+            lines.append(f"- **Usa 'usted':** {'Sí' if vp.uses_usted else 'No'}")
+            lines.append(f"- **Usa 'tú':** {'Sí' if vp.uses_tu else 'No'}")
+            lines.append(f"- **Registro predominante:** {vp.predominant_register}")
+            if vp.characteristic_fillers:
+                lines.append(f"- **Muletillas:** {', '.join(vp.characteristic_fillers)}")
+            lines.append("")
+
         # Relaciones (futuro)
         if self.relationships:
             lines.append("## Relaciones")
             for rel in self.relationships:
                 lines.append(f"- {rel}")
+            lines.append("")
+
+        # Alertas/inconsistencias
+        if self.alerts and self.alerts.total_alerts > 0:
+            lines.append("## ⚠️ Alertas e Inconsistencias")
+            lines.append(f"**Total alertas:** {self.alerts.total_alerts}")
+            if self.alerts.critical_count > 0:
+                lines.append(f"- 🔴 Críticas: {self.alerts.critical_count}")
+            if self.alerts.warning_count > 0:
+                lines.append(f"- 🟡 Advertencias: {self.alerts.warning_count}")
+            lines.append("")
+            if self.alerts.descriptions:
+                lines.append("### Detalle:")
+                for desc in self.alerts.descriptions[:5]:
+                    lines.append(f"- {desc}")
             lines.append("")
 
         # Footer

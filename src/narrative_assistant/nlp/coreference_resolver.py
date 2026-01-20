@@ -91,6 +91,58 @@ DEFAULT_COREF_WEIGHTS = {
 
 # Mapeo de pronombres españoles a género/número
 SPANISH_PRONOUNS = {
+    # =========================================================================
+    # PRIMERA PERSONA (narrador)
+    # =========================================================================
+    # Sujeto
+    "yo": (Gender.NEUTRAL, Number.SINGULAR),  # Género se infiere del contexto
+    # Objeto directo/indirecto
+    "me": (Gender.NEUTRAL, Number.SINGULAR),
+    "mí": (Gender.NEUTRAL, Number.SINGULAR),
+    "mi": (Gender.NEUTRAL, Number.SINGULAR),  # posesivo átono
+    "conmigo": (Gender.NEUTRAL, Number.SINGULAR),
+    # Plural
+    "nosotros": (Gender.MASCULINE, Number.PLURAL),
+    "nosotras": (Gender.FEMININE, Number.PLURAL),
+    "nos": (Gender.NEUTRAL, Number.PLURAL),
+    # Posesivos primera persona
+    "mío": (Gender.MASCULINE, Number.SINGULAR),
+    "mía": (Gender.FEMININE, Number.SINGULAR),
+    "míos": (Gender.MASCULINE, Number.PLURAL),
+    "mías": (Gender.FEMININE, Number.PLURAL),
+    "mis": (Gender.NEUTRAL, Number.PLURAL),  # átono plural
+    "nuestro": (Gender.MASCULINE, Number.SINGULAR),
+    "nuestra": (Gender.FEMININE, Number.SINGULAR),
+    "nuestros": (Gender.MASCULINE, Number.PLURAL),
+    "nuestras": (Gender.FEMININE, Number.PLURAL),
+    # =========================================================================
+    # SEGUNDA PERSONA (interlocutor)
+    # =========================================================================
+    "tú": (Gender.NEUTRAL, Number.SINGULAR),
+    "te": (Gender.NEUTRAL, Number.SINGULAR),
+    "ti": (Gender.NEUTRAL, Number.SINGULAR),
+    "contigo": (Gender.NEUTRAL, Number.SINGULAR),
+    "usted": (Gender.NEUTRAL, Number.SINGULAR),
+    "ustedes": (Gender.NEUTRAL, Number.PLURAL),
+    "vosotros": (Gender.MASCULINE, Number.PLURAL),
+    "vosotras": (Gender.FEMININE, Number.PLURAL),
+    "os": (Gender.NEUTRAL, Number.PLURAL),
+    # Posesivos segunda persona
+    "tu": (Gender.NEUTRAL, Number.SINGULAR),  # átono
+    "tus": (Gender.NEUTRAL, Number.PLURAL),
+    "tuyo": (Gender.MASCULINE, Number.SINGULAR),
+    "tuya": (Gender.FEMININE, Number.SINGULAR),
+    "tuyos": (Gender.MASCULINE, Number.PLURAL),
+    "tuyas": (Gender.FEMININE, Number.PLURAL),
+    "vuestro": (Gender.MASCULINE, Number.SINGULAR),
+    "vuestra": (Gender.FEMININE, Number.SINGULAR),
+    "vuestros": (Gender.MASCULINE, Number.PLURAL),
+    "vuestras": (Gender.FEMININE, Number.PLURAL),
+    "su": (Gender.NEUTRAL, Number.SINGULAR),  # de usted/ustedes
+    "sus": (Gender.NEUTRAL, Number.PLURAL),
+    # =========================================================================
+    # TERCERA PERSONA
+    # =========================================================================
     # Pronombres personales sujeto
     "él": (Gender.MASCULINE, Number.SINGULAR),
     "ella": (Gender.FEMININE, Number.SINGULAR),
@@ -107,7 +159,8 @@ SPANISH_PRONOUNS = {
     # Reflexivos
     "se": (Gender.NEUTRAL, Number.UNKNOWN),
     "sí": (Gender.NEUTRAL, Number.UNKNOWN),
-    # Posesivos tónicos
+    "consigo": (Gender.NEUTRAL, Number.UNKNOWN),
+    # Posesivos tónicos tercera persona
     "suyo": (Gender.MASCULINE, Number.SINGULAR),
     "suya": (Gender.FEMININE, Number.SINGULAR),
     "suyos": (Gender.MASCULINE, Number.PLURAL),
@@ -129,6 +182,90 @@ SPANISH_DEMONSTRATIVES = {
     "aquellos": (Gender.MASCULINE, Number.PLURAL),
     "aquellas": (Gender.FEMININE, Number.PLURAL),
 }
+
+# =============================================================================
+# Sustantivos que refieren a personas (para DEFINITE_NP)
+# =============================================================================
+
+# Artículos definidos y su género/número
+DEFINITE_ARTICLES = {
+    "el": (Gender.MASCULINE, Number.SINGULAR),
+    "la": (Gender.FEMININE, Number.SINGULAR),
+    "los": (Gender.MASCULINE, Number.PLURAL),
+    "las": (Gender.FEMININE, Number.PLURAL),
+}
+
+# Sustantivos que típicamente refieren a personas en narrativa
+# Organizados por género para validación
+PERSON_NOUNS_MASCULINE = {
+    # Relaciones familiares
+    "padre", "papá", "abuelo", "hijo", "nieto", "hermano", "tío", "sobrino",
+    "primo", "cuñado", "suegro", "yerno", "marido", "esposo", "novio",
+    # Edades/roles genéricos
+    "hombre", "joven", "chico", "muchacho", "niño", "anciano", "viejo",
+    "adolescente", "bebé", "adulto",
+    # Profesiones/roles (masculino)
+    "médico", "doctor", "abogado", "juez", "profesor", "maestro",
+    "conductor", "chofer", "taxista", "piloto", "capitán", "general",
+    "coronel", "teniente", "sargento", "soldado", "policía", "guardia",
+    "jefe", "director", "gerente", "presidente", "ministro", "rey", "príncipe",
+    "camarero", "cocinero", "portero", "conserje", "jardinero", "obrero",
+    "empleado", "secretario", "asistente", "ayudante",
+    "sacerdote", "cura", "fraile", "monje", "rabino", "imán",
+    "escritor", "pintor", "escultor", "músico", "cantante", "actor",
+    "detective", "inspector", "comisario", "fiscal", "testigo", "acusado",
+    # Descriptivos
+    "desconocido", "extraño", "intruso", "visitante", "huésped", "invitado",
+    "vecino", "amigo", "enemigo", "rival", "compañero", "colega",
+    "líder", "guía", "mentor", "discípulo", "alumno", "estudiante",
+}
+
+PERSON_NOUNS_FEMININE = {
+    # Relaciones familiares
+    "madre", "mamá", "abuela", "hija", "nieta", "hermana", "tía", "sobrina",
+    "prima", "cuñada", "suegra", "nuera", "esposa", "mujer", "novia",
+    # Edades/roles genéricos
+    "joven", "chica", "muchacha", "niña", "anciana", "vieja",
+    "adolescente", "adulta",
+    # Profesiones/roles (femenino)
+    "médica", "doctora", "abogada", "jueza", "profesora", "maestra",
+    "conductora", "pilota", "capitana", "generala", "coronela",
+    "teniente", "sargenta", "soldada", "policía", "guardia",
+    "jefa", "directora", "gerenta", "presidenta", "ministra", "reina", "princesa",
+    "camarera", "cocinera", "portera", "conserja", "jardinera", "obrera",
+    "empleada", "secretaria", "asistenta", "ayudante",
+    "monja", "religiosa", "rabina",
+    "escritora", "pintora", "escultora", "música", "cantante", "actriz",
+    "detective", "inspectora", "comisaria", "fiscal", "testigo", "acusada",
+    # Descriptivos
+    "desconocida", "extraña", "intrusa", "visitante", "huésped", "invitada",
+    "vecina", "amiga", "enemiga", "rival", "compañera", "colega",
+    "líder", "guía", "mentora", "discípula", "alumna", "estudiante",
+    # Específicos femeninos
+    "dama", "señora", "señorita", "doncella", "criada", "sirvienta",
+}
+
+# Todos los sustantivos de persona (para búsqueda rápida)
+ALL_PERSON_NOUNS = PERSON_NOUNS_MASCULINE | PERSON_NOUNS_FEMININE
+
+# Pronombres de primera persona (para detectar narrador)
+FIRST_PERSON_PRONOUNS = {
+    "yo", "me", "mí", "mi", "mis", "conmigo",
+    "mío", "mía", "míos", "mías",
+    "nosotros", "nosotras", "nos", "nuestro", "nuestra", "nuestros", "nuestras",
+}
+
+# Patrones para detectar auto-identificación del narrador
+# El nombre debe terminar en punto, coma, o fin de línea para evitar falsos positivos
+# como "me llamó con malos modales" vs "me llamo Marta."
+NARRATOR_PATTERNS = [
+    r"me\s+llamo\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)(?:\s*[,.\n]|$)",
+    r"mi\s+nombre\s+es\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)(?:\s*[,.\n]|$)",
+    r"soy\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)(?:\s*[,.\n])",
+    r"me\s+llaman\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)(?:\s*[,.\n]|$)",
+    r"pueden\s+llamarme\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)(?:\s*[,.\n]|$)",
+    r"me\s+dicen\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)(?:\s*[,.\n]|$)",
+]
 
 
 # =============================================================================
@@ -215,21 +352,37 @@ class CoreferenceChain:
             self.main_mention = self._find_main_mention()
 
     def _find_main_mention(self) -> str:
-        """Encuentra la mención más informativa."""
+        """
+        Encuentra la mención más informativa.
+
+        REGLA CRÍTICA: Un pronombre NUNCA puede ser la mención principal.
+        Si la cadena solo tiene pronombres, devuelve vacío.
+        """
         priority = {
             MentionType.PROPER_NOUN: 4,
             MentionType.DEFINITE_NP: 3,
             MentionType.DEMONSTRATIVE: 2,
             MentionType.POSSESSIVE: 1,
-            MentionType.PRONOUN: 0,
+            MentionType.PRONOUN: 0,  # Pronombres: prioridad mínima
             MentionType.ZERO: -1,
         }
 
         if not self.mentions:
             return ""
 
+        # Filtrar pronombres y menciones cero - nunca pueden ser la mención principal
+        non_pronoun_mentions = [
+            m for m in self.mentions
+            if m.mention_type not in (MentionType.PRONOUN, MentionType.ZERO)
+        ]
+
+        # Si no hay menciones que no sean pronombres, devolver vacío
+        # Una cadena con solo pronombres no tiene entidad principal identificable
+        if not non_pronoun_mentions:
+            return ""
+
         sorted_mentions = sorted(
-            self.mentions,
+            non_pronoun_mentions,
             key=lambda m: (priority.get(m.mention_type, 0), len(m.text)),
             reverse=True
         )
@@ -268,17 +421,57 @@ class CorefResult:
         return len(self.chains)
 
 
+def _get_default_coref_methods() -> list[CorefMethod]:
+    """
+    Retorna los métodos de correferencia habilitados por defecto.
+
+    - Con GPU: Todos los métodos (incluyendo LLM)
+    - Sin GPU: Solo métodos rápidos (sin LLM)
+    """
+    try:
+        from ..core.device import get_device_config
+        device_config = get_device_config()
+        has_gpu = device_config.device_type in ("cuda", "mps")
+    except Exception:
+        has_gpu = False
+
+    if has_gpu:
+        # GPU disponible: usar todos los métodos
+        return list(CorefMethod)
+    else:
+        # Solo CPU: excluir LLM (muy lento)
+        return [
+            CorefMethod.EMBEDDINGS,
+            CorefMethod.MORPHO,
+            CorefMethod.HEURISTICS,
+        ]
+
+
 @dataclass
 class CorefConfig:
     """Configuración del sistema de correferencias."""
-    enabled_methods: list[CorefMethod] = field(default_factory=lambda: list(CorefMethod))
+    enabled_methods: list[CorefMethod] = field(default_factory=_get_default_coref_methods)
     method_weights: dict[CorefMethod, float] = field(default_factory=lambda: DEFAULT_COREF_WEIGHTS.copy())
     min_confidence: float = 0.5
     consensus_threshold: float = 0.6  # Mínimo % de métodos que deben acordar
     max_antecedent_distance: int = 5  # Máx oraciones hacia atrás
     use_chapter_boundaries: bool = True  # Respetar límites de capítulo
     ollama_model: str = "llama3.2"  # Modelo LLM por defecto
-    ollama_timeout: int = 30  # Timeout para LLM
+    ollama_timeout: int = 600  # 10 min - CPU sin GPU es muy lento
+    use_llm_for_coref: bool = field(default=None)  # None = auto (GPU sí, CPU no)
+
+    def __post_init__(self):
+        """Ajusta configuración según hardware si use_llm_for_coref es None."""
+        if self.use_llm_for_coref is None:
+            # Auto-detectar
+            has_llm = CorefMethod.LLM in self.enabled_methods
+            self.use_llm_for_coref = has_llm
+        elif self.use_llm_for_coref and CorefMethod.LLM not in self.enabled_methods:
+            # Usuario quiere LLM pero no está habilitado
+            self.enabled_methods.append(CorefMethod.LLM)
+        elif not self.use_llm_for_coref and CorefMethod.LLM in self.enabled_methods:
+            # Usuario no quiere LLM pero está habilitado
+            self.enabled_methods.remove(CorefMethod.LLM)
 
 
 # =============================================================================
@@ -396,9 +589,9 @@ class LLMCorefMethod:
     para resolver correferencias complejas.
     """
 
-    def __init__(self, model: str = "llama3.2", timeout: int = 30):
+    def __init__(self, model: str = "llama3.2", timeout: int = 600):
         self.model = model
-        self.timeout = timeout
+        self.timeout = timeout  # 10 min default - CPU sin GPU es lento
         self._client = None
         self._lock = threading.Lock()
 
@@ -453,7 +646,7 @@ RAZÓN: [explicación breve]"""
         try:
             response = self.client.complete(
                 prompt=prompt,
-                system_prompt="Eres un experto en análisis lingüístico del español. Tu tarea es resolver correferencias (determinar a quién o qué se refiere un pronombre o expresión).",
+                system="Eres un experto en análisis lingüístico del español. Tu tarea es resolver correferencias (determinar a quién o qué se refiere un pronombre o expresión).",
                 max_tokens=200,
                 temperature=0.1,
             )
@@ -743,16 +936,56 @@ class CoreferenceVotingResolver:
         if not mentions:
             return result
 
+        # Detectar narrador en primera persona
+        narrator_info = self._detect_narrator(text, mentions)
+
         # Separar anáforas y posibles antecedentes
         anaphors = [m for m in mentions if self._is_anaphor(m)]
         potential_antecedents = [m for m in mentions if self._is_potential_antecedent(m)]
 
+        # Si hay narrador, añadirlo como antecedente potencial
+        if narrator_info:
+            narrator_name, narrator_gender = narrator_info
+            # Buscar si ya existe en antecedentes
+            narrator_exists = any(
+                m.text == narrator_name for m in potential_antecedents
+            )
+            if not narrator_exists:
+                for pattern in NARRATOR_PATTERNS:
+                    match = re.search(pattern, text, re.IGNORECASE)
+                    if match:
+                        narrator_mention = Mention(
+                            text=narrator_name,
+                            start_char=match.start(1),
+                            end_char=match.end(1),
+                            mention_type=MentionType.PROPER_NOUN,
+                            gender=narrator_gender,
+                            number=Number.SINGULAR,
+                            sentence_idx=0,
+                        )
+                        potential_antecedents.append(narrator_mention)
+                        break
+
         logger.info(f"Anáforas: {len(anaphors)}, Antecedentes potenciales: {len(potential_antecedents)}")
 
-        # Resolver cada anáfora
+        # Si hay narrador, resolver primero los pronombres de primera persona
+        # y excluirlos de la resolución normal
+        first_person_already_resolved: set[int] = set()
+        if narrator_info:
+            first_person_resolved = self._resolve_first_person(
+                text, mentions, narrator_info
+            )
+            for anaphor, antecedent, score in first_person_resolved:
+                first_person_already_resolved.add(anaphor.start_char)
+
+        # Resolver cada anáfora (excluyendo las de primera persona ya resueltas)
         resolved_pairs: list[tuple[Mention, Mention, float]] = []
 
         for anaphor in anaphors:
+            # Si es pronombre de primera persona y hay narrador, saltar
+            if anaphor.start_char in first_person_already_resolved:
+                continue
+
             # Filtrar candidatos válidos (anteriores y cercanos)
             candidates = self._filter_candidates(anaphor, potential_antecedents)
 
@@ -790,6 +1023,17 @@ class CoreferenceVotingResolver:
                         result.method_contributions.get(method, 0) + 1
             else:
                 result.unresolved.append(anaphor)
+
+        # Añadir resoluciones de primera persona al narrador
+        if narrator_info and first_person_already_resolved:
+            first_person_resolved = self._resolve_first_person(
+                text, mentions, narrator_info
+            )
+            for anaphor, antecedent, score in first_person_resolved:
+                resolved_pairs.append((anaphor, antecedent, score))
+                # Marcar como contribución del narrador (usamos HEURISTICS como indicador)
+                result.method_contributions[CorefMethod.HEURISTICS] = \
+                    result.method_contributions.get(CorefMethod.HEURISTICS, 0) + 1
 
         # Construir cadenas de correferencia
         result.chains = self._build_chains(resolved_pairs, potential_antecedents)
@@ -831,9 +1075,26 @@ class CoreferenceVotingResolver:
                     return i
             return None
 
+        # Mapear oración a índice real (no índice de token)
+        sentence_to_idx = {}
+        for i, sent in enumerate(doc.sents):
+            sentence_to_idx[sent.start] = i
+
+        def get_sentence_idx(token_or_span) -> int:
+            """Obtiene el índice real de la oración (0, 1, 2, ...)."""
+            sent = token_or_span.sent if hasattr(token_or_span, 'sent') else None
+            if sent is None:
+                return 0
+            return sentence_to_idx.get(sent.start, 0)
+
         # Extraer entidades nombradas (nombres propios)
         for ent in doc.ents:
             if ent.label_ in ("PER", "PERSON", "LOC", "ORG"):
+                # Filtrar menciones inválidas
+                if not self._is_valid_mention(ent.text):
+                    logger.debug(f"Mención filtrada: '{ent.text}'")
+                    continue
+
                 gender, number = self._infer_gender_number(ent.text, doc[ent.start])
                 mentions.append(Mention(
                     text=ent.text,
@@ -842,7 +1103,7 @@ class CoreferenceVotingResolver:
                     mention_type=MentionType.PROPER_NOUN,
                     gender=gender,
                     number=number,
-                    sentence_idx=ent.sent.start if ent.sent else 0,
+                    sentence_idx=get_sentence_idx(doc[ent.start]),
                     chapter_idx=get_chapter_idx(ent.start_char),
                     context=self._get_context(text, None, window=50,
                                              start=ent.start_char, end=ent.end_char),
@@ -862,7 +1123,7 @@ class CoreferenceVotingResolver:
                     mention_type=MentionType.PRONOUN,
                     gender=gender,
                     number=number,
-                    sentence_idx=token.sent.start if token.sent else 0,
+                    sentence_idx=get_sentence_idx(token),
                     chapter_idx=get_chapter_idx(token.idx),
                     context=self._get_context(text, None, window=50,
                                              start=token.idx, end=token.idx + len(token.text)),
@@ -878,9 +1139,14 @@ class CoreferenceVotingResolver:
                     mention_type=MentionType.DEMONSTRATIVE,
                     gender=gender,
                     number=number,
-                    sentence_idx=token.sent.start if token.sent else 0,
+                    sentence_idx=get_sentence_idx(token),
                     chapter_idx=get_chapter_idx(token.idx),
                 ))
+
+        # Extraer sintagmas nominales definidos (DEFINITE_NP)
+        # Patrones como "el padre", "la niña", "el conductor del autobús"
+        definite_nps = self._extract_definite_nps(doc, text, get_sentence_idx, get_chapter_idx)
+        mentions.extend(definite_nps)
 
         # Ordenar por posición
         mentions.sort(key=lambda m: m.start_char)
@@ -911,6 +1177,142 @@ class CoreferenceVotingResolver:
         mentions.sort(key=lambda m: m.start_char)
         return mentions
 
+    def _extract_definite_nps(
+        self,
+        doc,
+        text: str,
+        get_sentence_idx,
+        get_chapter_idx,
+    ) -> list[Mention]:
+        """
+        Extrae sintagmas nominales definidos que refieren a personas.
+
+        Detecta patrones como:
+        - "el padre", "la niña", "el joven"
+        - "el conductor del autobús", "la mujer de la tienda"
+        - "el viejo profesor", "la joven estudiante"
+
+        Returns:
+            Lista de menciones de tipo DEFINITE_NP
+        """
+        mentions = []
+        seen_spans = set()  # Evitar duplicados
+
+        # Estrategia 1: Usar chunks de spaCy para sintagmas nominales
+        for chunk in doc.noun_chunks:
+            chunk_text = chunk.text.strip()
+            chunk_lower = chunk_text.lower()
+
+            # Debe empezar con artículo definido
+            first_word = chunk_lower.split()[0] if chunk_lower else ""
+            if first_word not in DEFINITE_ARTICLES:
+                continue
+
+            # La cabeza del chunk debe ser un sustantivo de persona
+            head = chunk.root
+            head_lemma = head.lemma_.lower()
+
+            if head_lemma not in ALL_PERSON_NOUNS:
+                continue
+
+            # Evitar duplicados y solapamientos con entidades ya detectadas
+            span_key = (chunk.start_char, chunk.end_char)
+            if span_key in seen_spans:
+                continue
+            seen_spans.add(span_key)
+
+            # Determinar género y número
+            # El artículo tiene prioridad para sustantivos ambiguos (estudiante, colega, etc.)
+            art_gender, _ = DEFINITE_ARTICLES.get(first_word, (Gender.UNKNOWN, Number.UNKNOWN))
+
+            # Si el sustantivo está SOLO en masculino o SOLO en femenino, usar eso
+            in_masc = head_lemma in PERSON_NOUNS_MASCULINE
+            in_fem = head_lemma in PERSON_NOUNS_FEMININE
+
+            if in_masc and not in_fem:
+                gender = Gender.MASCULINE
+            elif in_fem and not in_masc:
+                gender = Gender.FEMININE
+            else:
+                # Sustantivo ambiguo o desconocido: usar el artículo
+                gender = art_gender
+
+            # Número del artículo
+            _, number = DEFINITE_ARTICLES.get(first_word, (Gender.UNKNOWN, Number.UNKNOWN))
+
+            mentions.append(Mention(
+                text=chunk_text,
+                start_char=chunk.start_char,
+                end_char=chunk.end_char,
+                mention_type=MentionType.DEFINITE_NP,
+                gender=gender,
+                number=number,
+                sentence_idx=get_sentence_idx(head),
+                chapter_idx=get_chapter_idx(chunk.start_char),
+                head_text=head.text,
+                context=self._get_context(text, None, window=50,
+                                         start=chunk.start_char, end=chunk.end_char),
+            ))
+
+        # Estrategia 2: Regex para patrones no capturados por chunks
+        # Patrones como "el conductor del autobús"
+        for article, (art_gender, art_number) in DEFINITE_ARTICLES.items():
+            # Patrón: artículo + (adjetivo?) + sustantivo_persona + (complemento?)
+            for noun in ALL_PERSON_NOUNS:
+                # Patrón simple: "el padre", "la niña"
+                pattern = rf'\b{article}\s+{noun}\b'
+                for match in re.finditer(pattern, text, re.IGNORECASE):
+                    span_key = (match.start(), match.end())
+                    if span_key in seen_spans:
+                        continue
+
+                    # Verificar que no está dentro de un span ya detectado
+                    is_subspan = any(
+                        s <= match.start() and e >= match.end()
+                        for (s, e) in seen_spans
+                    )
+                    if is_subspan:
+                        continue
+
+                    seen_spans.add(span_key)
+
+                    # Determinar género del sustantivo
+                    if noun in PERSON_NOUNS_MASCULINE:
+                        gender = Gender.MASCULINE
+                    elif noun in PERSON_NOUNS_FEMININE:
+                        gender = Gender.FEMININE
+                    else:
+                        gender = art_gender
+
+                    mentions.append(Mention(
+                        text=match.group(),
+                        start_char=match.start(),
+                        end_char=match.end(),
+                        mention_type=MentionType.DEFINITE_NP,
+                        gender=gender,
+                        number=art_number,
+                        head_text=noun,
+                    ))
+
+        return mentions
+
+    # Nombres españoles comunes por género (para inferencia cuando spaCy no detecta)
+    FEMININE_NAMES = {
+        "maría", "maria", "ana", "carmen", "laura", "marta", "elena", "sara",
+        "paula", "lucía", "lucia", "sofía", "sofia", "isabel", "rosa", "pilar",
+        "teresa", "julia", "clara", "alicia", "beatriz", "andrea", "cristina",
+        "diana", "eva", "irene", "lorena", "nuria", "olga", "patricia", "raquel",
+        "silvia", "susana", "verónica", "veronica", "virginia", "inés", "ines",
+    }
+
+    MASCULINE_NAMES = {
+        "juan", "pedro", "carlos", "miguel", "josé", "jose", "antonio", "manuel",
+        "francisco", "david", "jorge", "pablo", "andrés", "andres", "luis",
+        "javier", "sergio", "fernando", "alejandro", "alberto", "daniel", "diego",
+        "enrique", "felipe", "gabriel", "héctor", "hector", "ignacio", "jaime",
+        "mario", "rafael", "ramón", "ramon", "roberto", "víctor", "victor",
+    }
+
     def _infer_gender_number(self, text: str, token) -> tuple[Gender, Number]:
         """Infiere género y número de un token."""
         gender = Gender.UNKNOWN
@@ -928,7 +1330,71 @@ class CoreferenceVotingResolver:
         elif "Number=Plur" in morph:
             number = Number.PLURAL
 
+        # Si spaCy no detectó género, intentar por nombre propio
+        if gender == Gender.UNKNOWN:
+            text_lower = text.lower().strip()
+            # Extraer primera palabra (nombre) si hay varias
+            first_word = text_lower.split()[0] if text_lower else ""
+
+            if first_word in self.FEMININE_NAMES or text_lower in self.FEMININE_NAMES:
+                gender = Gender.FEMININE
+                logger.debug(f"Género inferido por nombre: {text} -> femenino")
+            elif first_word in self.MASCULINE_NAMES or text_lower in self.MASCULINE_NAMES:
+                gender = Gender.MASCULINE
+                logger.debug(f"Género inferido por nombre: {text} -> masculino")
+            # Heurística: nombres terminados en -a suelen ser femeninos en español
+            elif first_word.endswith("a") and len(first_word) > 2:
+                gender = Gender.FEMININE
+                logger.debug(f"Género inferido por terminación -a: {text} -> femenino")
+            # Heurística: nombres terminados en -o suelen ser masculinos
+            elif first_word.endswith("o") and len(first_word) > 2:
+                gender = Gender.MASCULINE
+                logger.debug(f"Género inferido por terminación -o: {text} -> masculino")
+
         return gender, number
+
+    def _is_valid_mention(self, text: str) -> bool:
+        """
+        Valida si un texto es una mención válida para correferencias.
+
+        Filtra:
+        - Saludos como "Hola Juan", "Buenos días María"
+        - Frases con verbos (oraciones, no entidades)
+        - Textos muy largos o con errores de segmentación
+        """
+        if not text or len(text) < 2:
+            return False
+
+        text_stripped = text.strip()
+        text_lower = text_stripped.lower()
+        words = text_stripped.split()
+
+        # Filtrar entidades muy largas (probablemente error de segmentación)
+        if len(words) > 5 or len(text_stripped) > 50:
+            return False
+
+        # Filtrar saludos: "Hola X", "Buenos días X", etc.
+        saludo_starters = {"hola", "adiós", "buenos", "buenas", "hey", "oye"}
+        if words and words[0].lower() in saludo_starters:
+            return False
+
+        # Filtrar frases que contienen verbos o pronombres clíticos
+        verb_indicators = {
+            "se", "me", "te", "le", "lo", "la", "nos", "os", "les",
+            "acerco", "acercó", "dijo", "respondió", "preguntó", "miró", "vio",
+            "saludo", "saludó", "entró", "salió", "llegó", "fue", "era", "estaba",
+            "tenía", "había", "hizo", "quería", "podía", "sabía",
+        }
+        if len(words) >= 3:
+            words_lower = [w.lower() for w in words]
+            if any(w in verb_indicators for w in words_lower[1:]):
+                return False
+
+        # Filtrar errores de segmentación (saltos de línea, puntuación final)
+        if '\n' in text or (text_stripped and text_stripped[-1] in '.,:;!?'):
+            return False
+
+        return True
 
     def _is_anaphor(self, mention: Mention) -> bool:
         """Determina si una mención es anafórica."""
@@ -944,6 +1410,274 @@ class CoreferenceVotingResolver:
             MentionType.PROPER_NOUN,
             MentionType.DEFINITE_NP,
         )
+
+    def _detect_narrator(
+        self,
+        text: str,
+        mentions: list[Mention],
+    ) -> Optional[tuple[str, Gender]]:
+        """
+        Detecta el nombre del narrador en primera persona usando LLM.
+
+        El LLM analiza semánticamente el texto para identificar si hay un
+        narrador en primera persona y cuál es su nombre/género.
+
+        Returns:
+            Tupla (nombre_narrador, género) o None si no se detecta
+        """
+        # Verificar si hay pronombres de primera persona (indicador de narrador)
+        has_first_person = any(
+            word in text.lower()
+            for word in ["yo", " me ", " mi ", " mis ", "mí"]
+        )
+
+        if not has_first_person:
+            return None
+
+        # Usar LLM para detectar narrador semánticamente
+        if CorefMethod.LLM in self._methods:
+            llm_method = self._methods[CorefMethod.LLM]
+            if llm_method.client and llm_method.client.is_available:
+                return self._detect_narrator_with_llm(text, llm_method.client)
+
+        # Fallback a patrones si LLM no está disponible
+        return self._detect_narrator_with_patterns(text, mentions)
+
+    def _detect_narrator_with_llm(
+        self,
+        text: str,
+        llm_client,
+    ) -> Optional[tuple[str, Gender]]:
+        """Detecta el narrador usando LLM para análisis semántico."""
+        # Tomar solo los primeros 2000 caracteres para eficiencia
+        text_sample = text[:2000] if len(text) > 2000 else text
+
+        prompt = f"""Analiza el siguiente texto narrativo en español.
+
+TEXTO:
+{text_sample}
+
+PREGUNTA: ¿El texto está narrado en primera persona? Si es así, ¿el narrador se presenta o identifica con un nombre propio en algún momento?
+
+Responde en formato:
+NARRADOR_PRIMERA_PERSONA: [sí/no]
+NOMBRE_NARRADOR: [nombre si se identifica, o "desconocido"]
+GENERO_NARRADOR: [masculino/femenino/desconocido]
+EVIDENCIA: [frase donde se identifica, si existe]"""
+
+        try:
+            response = llm_client.complete(
+                prompt=prompt,
+                system="Eres un experto en análisis narrativo. Detecta narradores en primera persona con precisión. Busca patrones como 'me llamo X', 'soy X', 'mi nombre es X', o cualquier forma en que el narrador revele su identidad.",
+                max_tokens=200,
+                temperature=0.1,
+            )
+
+            if not response:
+                return None
+
+            # Parsear respuesta
+            is_first_person = "sí" in response.lower() and "NARRADOR_PRIMERA_PERSONA:" in response.upper()
+
+            if not is_first_person:
+                return None
+
+            # Extraer nombre
+            name_match = re.search(
+                r"NOMBRE_NARRADOR:\s*([A-ZÁÉÍÓÚÑa-záéíóúñ]+)",
+                response,
+                re.IGNORECASE
+            )
+            if name_match:
+                name = name_match.group(1).strip()
+                if name.lower() in ("desconocido", "no", "ninguno", "sin"):
+                    return None
+
+                # Extraer género
+                gender = Gender.NEUTRAL
+                if "GENERO_NARRADOR:" in response.upper():
+                    if "femenino" in response.lower():
+                        gender = Gender.FEMININE
+                    elif "masculino" in response.lower():
+                        gender = Gender.MASCULINE
+
+                logger.info(f"Narrador detectado por LLM: {name} ({gender.value})")
+                return (name, gender)
+
+        except Exception as e:
+            logger.debug(f"Error detectando narrador con LLM: {e}")
+
+        return None
+
+    def _detect_narrator_with_patterns(
+        self,
+        text: str,
+        mentions: list[Mention],
+    ) -> Optional[tuple[str, Gender]]:
+        """Fallback: detecta narrador con patrones regex."""
+        for pattern in NARRATOR_PATTERNS:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                name = match.group(1)
+                gender = self._infer_narrator_gender(text, name, mentions)
+                logger.info(f"Narrador detectado por patrones: {name} ({gender.value})")
+                return (name, gender)
+        return None
+
+    def _infer_narrator_gender(
+        self,
+        text: str,
+        name: str,
+        mentions: list[Mention],
+    ) -> Gender:
+        """
+        Infiere el género del narrador basándose en contexto.
+
+        Busca adjetivos y participios que concuerden con el narrador.
+        """
+        # Buscar patrones de género en el contexto del narrador
+        # "soy una persona curiosa", "he sido tímido/tímida"
+        fem_patterns = [
+            r"\bsoy\s+(?:una|la)\b",
+            r"\bhe\s+sido\s+\w+a\b",  # participios femeninos
+            r"\bestoy\s+\w+a\b",  # adjetivos femeninos
+            r"\bfui\s+\w+a\b",
+            r"\bera\s+\w+a\b",
+            r"\bme\s+siento\s+\w+a\b",
+        ]
+        masc_patterns = [
+            r"\bsoy\s+(?:un|el)\b",
+            r"\bhe\s+sido\s+\w+o\b",  # participios masculinos
+            r"\bestoy\s+\w+o\b",  # adjetivos masculinos
+            r"\bfui\s+\w+o\b",
+            r"\bera\s+\w+o\b",
+            r"\bme\s+siento\s+\w+o\b",
+        ]
+
+        fem_count = sum(1 for p in fem_patterns if re.search(p, text, re.IGNORECASE))
+        masc_count = sum(1 for p in masc_patterns if re.search(p, text, re.IGNORECASE))
+
+        if fem_count > masc_count:
+            return Gender.FEMININE
+        elif masc_count > fem_count:
+            return Gender.MASCULINE
+
+        # Intentar inferir del nombre
+        if name.endswith("a"):
+            return Gender.FEMININE
+        elif name.endswith("o"):
+            return Gender.MASCULINE
+
+        return Gender.NEUTRAL
+
+    def _is_in_dialogue(self, text: str, start_char: int, end_char: int) -> bool:
+        """
+        Determina si una posición está dentro de un diálogo.
+
+        Detecta diálogos entre:
+        - Guiones largos (—) o medios (–) o simples (-)
+        - Comillas españolas («»)
+        - Comillas inglesas ("")
+        """
+        # Buscar el inicio del contexto relevante (última línea/párrafo)
+        line_start = text.rfind("\n", 0, start_char)
+        if line_start == -1:
+            line_start = 0
+        else:
+            line_start += 1
+
+        line_text = text[line_start:end_char + 50] if end_char + 50 < len(text) else text[line_start:]
+
+        # Posición relativa dentro de la línea
+        rel_pos = start_char - line_start
+
+        # Detectar si hay guion de diálogo al inicio
+        line_stripped = line_text.lstrip()
+        if line_stripped.startswith(("-", "—", "–")):
+            # Está en línea de diálogo
+            # Verificar si está después del cierre del diálogo (narrador)
+            # Patrón: "- Texto del diálogo - dijo el narrador."
+            # El segundo guion marca el fin del diálogo
+            guion_positions = [i for i, c in enumerate(line_text) if c in "-—–"]
+            if len(guion_positions) >= 2:
+                # Hay apertura y cierre
+                second_guion = guion_positions[1]
+                if rel_pos > second_guion:
+                    # Está después del cierre, es narración
+                    return False
+            return True
+
+        # Detectar comillas
+        # Contar comillas antes de la posición
+        quotes_before = line_text[:rel_pos]
+        open_spanish = quotes_before.count("«") - quotes_before.count("»")
+        open_english = quotes_before.count('"') % 2  # Alternancia abrir/cerrar
+
+        if open_spanish > 0 or open_english > 0:
+            return True
+
+        return False
+
+    def _resolve_first_person(
+        self,
+        text: str,
+        mentions: list[Mention],
+        narrator_info: Optional[tuple[str, Gender]],
+    ) -> list[tuple[Mention, Mention, float]]:
+        """
+        Resuelve menciones de primera persona al narrador.
+
+        Solo asigna al narrador los pronombres que NO están en diálogo.
+        """
+        if not narrator_info:
+            return []
+
+        narrator_name, narrator_gender = narrator_info
+        resolved = []
+
+        # Crear mención sintética para el narrador
+        narrator_mention = None
+        for m in mentions:
+            if m.mention_type == MentionType.PROPER_NOUN and m.text == narrator_name:
+                narrator_mention = m
+                break
+
+        if not narrator_mention:
+            # Buscar dónde se presenta el narrador
+            for pattern in NARRATOR_PATTERNS:
+                match = re.search(pattern, text, re.IGNORECASE)
+                if match:
+                    narrator_mention = Mention(
+                        text=narrator_name,
+                        start_char=match.start(1),
+                        end_char=match.end(1),
+                        mention_type=MentionType.PROPER_NOUN,
+                        gender=narrator_gender,
+                        number=Number.SINGULAR,
+                        sentence_idx=0,  # Se actualizará si es necesario
+                    )
+                    break
+
+        if not narrator_mention:
+            return []
+
+        # Vincular pronombres de primera persona fuera de diálogo
+        for m in mentions:
+            if m.mention_type != MentionType.PRONOUN:
+                continue
+
+            if m.text.lower() not in FIRST_PERSON_PRONOUNS:
+                continue
+
+            # Verificar si está en diálogo
+            if self._is_in_dialogue(text, m.start_char, m.end_char):
+                continue  # No asignar al narrador, puede ser otro personaje
+
+            # Asignar al narrador
+            resolved.append((m, narrator_mention, 0.9))
+            logger.debug(f"'{m.text}' (pos {m.start_char}) -> narrador '{narrator_name}'")
+
+        return resolved
 
     def _filter_candidates(
         self,

@@ -154,9 +154,95 @@ class AlertRepository:
         except Exception as e:
             error = DatabaseError(
                 message="Error retrieving alerts",
-                details={"error": str(e), "project_id": project_id},
+                context={"error": str(e), "project_id": project_id},
             )
             logger.error(f"Failed to get alerts for project {project_id}: {e}")
+            return Result.failure(error)
+
+    def get_by_project_prioritized(
+        self,
+        project_id: int,
+        current_chapter: Optional[int] = None,
+        status_filter: Optional[list[AlertStatus]] = None,
+    ) -> Result[list[Alert]]:
+        """
+        Obtiene alertas priorizadas por relevancia al capítulo actual.
+
+        Orden de priorización:
+        1. Alertas del capítulo actual (si se especifica)
+        2. Alertas de capítulos cercanos (±2 capítulos)
+        3. Por severidad (critical > high > medium > low > info)
+        4. Por confianza (mayor primero)
+        5. Por fecha de creación (más recientes primero)
+
+        Args:
+            project_id: ID del proyecto
+            current_chapter: Capítulo que el usuario está viendo (None = sin priorización)
+            status_filter: Lista de estados a incluir (None = todos)
+
+        Returns:
+            Result con lista de alertas priorizadas
+        """
+        try:
+            # Construir query base
+            query = """
+                SELECT *,
+                    CASE
+                        WHEN chapter = ? THEN 0
+                        WHEN chapter BETWEEN ? AND ? THEN 1
+                        ELSE 2
+                    END as chapter_priority,
+                    CASE severity
+                        WHEN 'critical' THEN 0
+                        WHEN 'high' THEN 1
+                        WHEN 'medium' THEN 2
+                        WHEN 'low' THEN 3
+                        WHEN 'info' THEN 4
+                        ELSE 5
+                    END as severity_priority
+                FROM alerts
+                WHERE project_id = ?
+            """
+
+            # Parámetros base para chapter_priority
+            chapter_for_priority = current_chapter if current_chapter is not None else -999
+            nearby_start = chapter_for_priority - 2
+            nearby_end = chapter_for_priority + 2
+
+            params: list = [chapter_for_priority, nearby_start, nearby_end, project_id]
+
+            # Añadir filtro de status si se especifica
+            if status_filter:
+                placeholders = ",".join("?" * len(status_filter))
+                query += f" AND status IN ({placeholders})"
+                params.extend([s.value for s in status_filter])
+
+            # Ordenar por prioridad
+            query += """
+                ORDER BY
+                    chapter_priority ASC,
+                    severity_priority ASC,
+                    confidence DESC,
+                    created_at DESC
+            """
+
+            with self.db.connection() as conn:
+                cursor = conn.execute(query, params)
+                rows = cursor.fetchall()
+
+            alerts = [self._row_to_alert(row) for row in rows]
+            logger.debug(
+                f"Retrieved {len(alerts)} prioritized alerts for project {project_id}, "
+                f"current_chapter={current_chapter}"
+            )
+            return Result.success(alerts)
+
+        except Exception as e:
+            error = DatabaseError(
+                message="Error retrieving prioritized alerts",
+                context={"error": str(e), "project_id": project_id, "current_chapter": current_chapter},
+            )
+            logger.error(f"Failed to get prioritized alerts for project {project_id}: {e}")
             return Result.failure(error)
 
     def update(self, alert: Alert) -> Result[Alert]:
@@ -215,7 +301,7 @@ class AlertRepository:
         except Exception as e:
             error = DatabaseError(
                 message="Error updating alert",
-                details={"error": str(e), "alert_id": alert.id},
+                context={"error": str(e), "alert_id": alert.id},
             )
             logger.error(f"Failed to update alert {alert.id}: {e}")
             return Result.failure(error)
@@ -274,7 +360,7 @@ class AlertRepository:
         except Exception as e:
             error = DatabaseError(
                 message="Error counting alerts",
-                details={"error": str(e), "project_id": project_id},
+                context={"error": str(e), "project_id": project_id},
             )
             logger.error(f"Failed to count alerts for project {project_id}: {e}")
             return Result.failure(error)

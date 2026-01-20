@@ -1,0 +1,619 @@
+/**
+ * COMPONENTS CSS - Refinamientos de Componentes PrimeVue
+ * =======================================================
+ * Ajustes finos a componentes PrimeVue usando tokens semánticos.
+ * SIN !important - la especificidad correcta es suficiente.
+ *
+ * Orden de carga: 1. core.css → 2. PrimeVue preset → 3. semantic.css → 4. components.css
+ */
+
+/* ============================================================================
+   DROPDOWN / SELECT
+   ============================================================================ */
+
+.p-dropdown,
+.p-select {
+  background: var(--app-bg-card);
+  border-color: var(--app-border-base);
+  transition: border-color var(--transition-fast) var(--ease-in-out);
+}
+
+.p-dropdown:hover,
+.p-select:hover {
+  border-color: var(--app-border-strong);
+}
+
+.p-dropdown:focus,
+.p-select:focus,
+.p-dropdown.p-focus,
+.p-select.p-focus {
+  border-color: var(--app-primary);
+  box-shadow: 0 0 0 var(--app-focus-ring-width) color-mix(in srgb, var(--app-focus-ring) 25%, transparent);
+}
+
+.p-dropdown-panel,
+.p-select-overlay {
+  background: var(--app-bg-overlay);
+  border: 1px solid var(--app-border-base);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+}
+
+.p-dropdown-item,
+.p-select-option {
+  padding: 0.75rem 1.25rem;
+  color: var(--app-text-base);
+  transition: background var(--transition-fast) var(--ease-in-out);
+}
+
+.p-dropdown-item:hover,
+.p-select-option:hover {
+  background: var(--app-bg-hover);
+}
+
+.p-dropdown-item.p-highlight,
+.p-select-option.p-highlight,
+.p-dropdown-item[aria-selected="true"],
+.p-select-option[aria-selected="true"] {
+  background: var(--app-primary-bg);
+  color: var(--app-primary-text);
+}
+
+/* ============================================================================
+   INPUT / TEXTAREA
+   ============================================================================ */
+
+.p-inputtext,
+.p-textarea {
+  background: var(--app-bg-card);
+  border-color: var(--app-border-base);
+  color: var(--app-text-base);
+  transition: border-color var(--transition-fast) var(--ease-in-out),
+              box-shadow var(--transition-fast) var(--ease-in-out);
+}
+
+.p-inputtext::placeholder,
+.p-textarea::placeholder {
+  color: var(--app-text-tertiary);
+}
+
+.p-inputtext:hover,
+.p-textarea:hover {
+  border-color: var(--app-border-strong);
+}
+
+.p-inputtext:focus,
+.p-textarea:focus {
+  border-color: var(--app-primary);
+  box-shadow: 0 0 0 var(--app-focus-ring-width) color-mix(in srgb, var(--app-focus-ring) 25%, transparent);
+}
+
+.p-inputtext:disabled,
+.p-textarea:disabled {
+  background: var(--app-bg-subtle);
+  color: var(--app-text-tertiary);
+  cursor: not-allowed;
+}
+
+/* ============================================================================
+   BUTTON
+   ============================================================================ */
+
+/* Primary button */
+.p-button {
+  transition: background var(--transition-fast) var(--ease-in-out),
+              border-color var(--transition-fast) var(--ease-in-out),
+              box-shadow var(--transition-fast) var(--ease-in-out);
+}
+
+.p-button:focus-visible {
+  box-shadow: 0 0 0 var(--app-focus-ring-width) color-mix(in srgb, var(--app-focus-ring) 25%, transparent);
+}
+
+/* Text button - garantizar contraste */
+.p-button.p-button-text {
+  color: var(--app-primary-text);
+}
+
+.p-button.p-button-text:hover {
+  background: var(--app-primary-bg);
+  color: var(--app-primary-text-dark);
+}
+
+/* Outlined button */
+.p-button.p-button-outlined {
+  background: transparent;
+  border-color: var(--app-primary);
+  color: var(--app-primary-text);
+}
+
+.p-button.p-button-outlined:hover {
+  background: var(--app-primary-bg);
+}
+
+/* Secondary button */
+.p-button.p-button-secondary {
+  background: var(--app-bg-hover);
+  border-color: var(--app-border-base);
+  color: var(--app-text-base);
+}
+
+.p-button.p-button-secondary:hover {
+  background: var(--app-bg-active);
+  border-color: var(--app-border-strong);
+}
+
+/* Success button text */
+.p-button.p-button-text.p-button-success {
+  color: var(--app-success-text);
+}
+
+.p-button.p-button-text.p-button-success:hover {
+  background: var(--app-success-bg);
+  color: var(--app-success-text-dark);
+}
+
+/* Danger button text */
+.p-button.p-button-text.p-button-danger {
+  color: var(--app-danger-text);
+}
+
+.p-button.p-button-text.p-button-danger:hover {
+  background: var(--app-danger-bg);
+  color: var(--app-danger-text-dark);
+}
+
+/* Warning button text */
+.p-button.p-button-text.p-button-warning {
+  color: var(--app-warning-text);
+}
+
+.p-button.p-button-text.p-button-warning:hover {
+  background: var(--app-warning-bg);
+  color: var(--app-warning-text-dark);
+}
+
+/* ============================================================================
+   CARD
+   ============================================================================ */
+
+.p-card {
+  background: var(--app-bg-card);
+  border: 1px solid var(--app-border-base);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.p-card .p-card-header {
+  background: var(--app-bg-elevated);
+  border-bottom: 1px solid var(--app-border-base);
+}
+
+.p-card .p-card-body {
+  background: var(--app-bg-card);
+}
+
+.p-card .p-card-footer {
+  background: var(--app-bg-subtle);
+  border-top: 1px solid var(--app-border-base);
+}
+
+/* ============================================================================
+   DIALOG
+   ============================================================================ */
+
+.p-dialog {
+  background: var(--app-bg-card);
+  border: 1px solid var(--app-border-base);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-2xl);
+}
+
+.p-dialog .p-dialog-header {
+  background: var(--app-bg-elevated);
+  border-bottom: 1px solid var(--app-border-base);
+  color: var(--app-text-base);
+}
+
+.p-dialog .p-dialog-header .p-dialog-title {
+  color: var(--app-text-base);
+  font-weight: var(--font-semibold);
+}
+
+.p-dialog .p-dialog-content {
+  background: var(--app-bg-card);
+  color: var(--app-text-base);
+}
+
+.p-dialog .p-dialog-footer {
+  background: var(--app-bg-subtle);
+  border-top: 1px solid var(--app-border-base);
+}
+
+/* ============================================================================
+   MENU / CONTEXTMENU
+   ============================================================================ */
+
+.p-menu,
+.p-contextmenu,
+.p-tieredmenu {
+  background: var(--app-bg-overlay);
+  border: 1px solid var(--app-border-base);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+}
+
+.p-menu .p-menuitem-content,
+.p-contextmenu .p-menuitem-content,
+.p-tieredmenu .p-menuitem-content {
+  color: var(--app-text-base);
+  padding: 0.75rem 1.25rem;
+  transition: background var(--transition-fast) var(--ease-in-out);
+}
+
+.p-menu .p-menuitem-content:hover,
+.p-contextmenu .p-menuitem-content:hover,
+.p-tieredmenu .p-menuitem-content:hover {
+  background: var(--app-bg-hover);
+}
+
+.p-menu .p-menuitem-text,
+.p-contextmenu .p-menuitem-text,
+.p-tieredmenu .p-menuitem-text {
+  color: var(--app-text-base);
+}
+
+.p-menu .p-menuitem-icon,
+.p-contextmenu .p-menuitem-icon,
+.p-tieredmenu .p-menuitem-icon {
+  color: var(--app-text-secondary);
+}
+
+.p-menu .p-menu-separator,
+.p-contextmenu .p-menu-separator {
+  border-color: var(--app-border-subtle);
+}
+
+/* ============================================================================
+   TABVIEW
+   ============================================================================ */
+
+.p-tabview .p-tabview-nav {
+  background: var(--app-bg-subtle);
+  border-bottom: 1px solid var(--app-border-base);
+}
+
+.p-tabview .p-tabview-nav-link {
+  color: var(--app-text-secondary);
+  transition: color var(--transition-fast) var(--ease-in-out),
+              border-color var(--transition-fast) var(--ease-in-out);
+}
+
+.p-tabview .p-tabview-nav-link:hover {
+  color: var(--app-text-base);
+}
+
+.p-tabview .p-tabview-nav-link[aria-selected="true"],
+.p-tabview .p-tabview-nav-link.p-tabview-nav-link-active {
+  color: var(--app-primary);
+  border-bottom-color: var(--app-primary);
+}
+
+.p-tabview .p-tabview-panels {
+  background: var(--app-bg-card);
+}
+
+/* ============================================================================
+   TAG
+   ============================================================================ */
+
+.p-tag {
+  padding: 0.25em 0.65em;
+  font-size: var(--font-sm);
+  font-weight: var(--font-medium);
+  border-radius: var(--radius-default);
+}
+
+.p-tag.p-tag-success {
+  background: var(--app-success);
+  color: var(--app-success-contrast);
+}
+
+.p-tag.p-tag-warning {
+  background: var(--app-warning);
+  color: var(--app-warning-contrast);
+}
+
+.p-tag.p-tag-danger {
+  background: var(--app-danger);
+  color: var(--app-danger-contrast);
+}
+
+.p-tag.p-tag-info {
+  background: var(--app-info);
+  color: var(--app-info-contrast);
+}
+
+/* ============================================================================
+   MESSAGE / TOAST
+   ============================================================================ */
+
+.p-message,
+.p-toast-message {
+  border-radius: var(--radius-lg);
+}
+
+.p-message-info,
+.p-toast-message-info {
+  background: var(--app-info-bg);
+  border-color: var(--app-info-subtle);
+  color: var(--app-info-text);
+}
+
+.p-message-success,
+.p-toast-message-success {
+  background: var(--app-success-bg);
+  border-color: var(--app-success-subtle);
+  color: var(--app-success-text);
+}
+
+.p-message-warn,
+.p-toast-message-warn {
+  background: var(--app-warning-bg);
+  border-color: var(--app-warning-subtle);
+  color: var(--app-warning-text);
+}
+
+.p-message-error,
+.p-toast-message-error {
+  background: var(--app-danger-bg);
+  border-color: var(--app-danger-subtle);
+  color: var(--app-danger-text);
+}
+
+/* ============================================================================
+   DATATABLE
+   ============================================================================ */
+
+.p-datatable {
+  background: var(--app-bg-card);
+}
+
+.p-datatable .p-datatable-header {
+  background: var(--app-bg-elevated);
+  border-bottom: 1px solid var(--app-border-base);
+  color: var(--app-text-base);
+}
+
+.p-datatable .p-datatable-thead > tr > th {
+  background: var(--app-bg-subtle);
+  border-bottom: 1px solid var(--app-border-base);
+  color: var(--app-text-base);
+  font-weight: var(--font-semibold);
+}
+
+.p-datatable .p-datatable-tbody > tr {
+  background: var(--app-bg-card);
+  color: var(--app-text-base);
+  border-bottom: 1px solid var(--app-border-subtle);
+}
+
+.p-datatable .p-datatable-tbody > tr:nth-child(even) {
+  background: var(--app-bg-subtle);
+}
+
+.p-datatable .p-datatable-tbody > tr:hover {
+  background: var(--app-bg-hover);
+}
+
+.p-datatable .p-datatable-tbody > tr.p-highlight {
+  background: var(--app-primary-bg);
+  color: var(--app-primary-text);
+}
+
+/* ============================================================================
+   TREE
+   ============================================================================ */
+
+.p-tree {
+  background: var(--app-bg-card);
+  border: 1px solid var(--app-border-base);
+  border-radius: var(--radius-md);
+}
+
+.p-tree .p-tree-container .p-treenode-content {
+  color: var(--app-text-base);
+  transition: background var(--transition-fast) var(--ease-in-out);
+}
+
+.p-tree .p-tree-container .p-treenode-content:hover {
+  background: var(--app-bg-hover);
+}
+
+.p-tree .p-tree-container .p-treenode-content.p-highlight {
+  background: var(--app-primary-bg);
+  color: var(--app-primary-text);
+}
+
+.p-tree .p-treenode-label {
+  color: inherit;
+}
+
+/* ============================================================================
+   PROGRESSBAR
+   ============================================================================ */
+
+.p-progressbar {
+  background: var(--app-bg-active);
+  border-radius: var(--radius-full);
+}
+
+.p-progressbar .p-progressbar-value {
+  background: var(--app-primary);
+  border-radius: var(--radius-full);
+}
+
+/* ============================================================================
+   CHIP
+   ============================================================================ */
+
+.p-chip {
+  background: var(--app-bg-active);
+  color: var(--app-text-base);
+  border-radius: var(--radius-full);
+}
+
+.p-chip .p-chip-remove-icon {
+  color: var(--app-text-secondary);
+}
+
+.p-chip .p-chip-remove-icon:hover {
+  color: var(--app-text-base);
+}
+
+/* ============================================================================
+   MULTISELECT
+   ============================================================================ */
+
+.p-multiselect {
+  background: var(--app-bg-card);
+  border-color: var(--app-border-base);
+}
+
+.p-multiselect:hover {
+  border-color: var(--app-border-strong);
+}
+
+.p-multiselect.p-focus {
+  border-color: var(--app-primary);
+  box-shadow: 0 0 0 var(--app-focus-ring-width) color-mix(in srgb, var(--app-focus-ring) 25%, transparent);
+}
+
+.p-multiselect-panel {
+  background: var(--app-bg-overlay);
+  border: 1px solid var(--app-border-base);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+}
+
+.p-multiselect-item {
+  color: var(--app-text-base);
+}
+
+.p-multiselect-item:hover {
+  background: var(--app-bg-hover);
+}
+
+.p-multiselect-item.p-highlight {
+  background: var(--app-primary-bg);
+  color: var(--app-primary-text);
+}
+
+.p-multiselect-token {
+  background: var(--app-bg-active);
+  color: var(--app-text-base);
+}
+
+/* ============================================================================
+   SCROLLBAR
+   ============================================================================ */
+
+/* Webkit browsers */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--app-scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--app-scrollbar-thumb);
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--app-scrollbar-thumb-hover);
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--app-scrollbar-thumb) var(--app-scrollbar-track);
+}
+
+/* ============================================================================
+   PANEL
+   ============================================================================ */
+
+.p-panel {
+  background: var(--app-bg-card);
+  border: 1px solid var(--app-border-base);
+  border-radius: var(--radius-lg);
+}
+
+.p-panel .p-panel-header {
+  background: var(--app-bg-elevated);
+  border-bottom: 1px solid var(--app-border-base);
+  color: var(--app-text-base);
+}
+
+.p-panel .p-panel-content {
+  background: var(--app-bg-card);
+  color: var(--app-text-base);
+}
+
+/* ============================================================================
+   ACCORDION
+   ============================================================================ */
+
+.p-accordion .p-accordion-header .p-accordion-header-link {
+  background: var(--app-bg-subtle);
+  border-color: var(--app-border-base);
+  color: var(--app-text-base);
+  transition: background var(--transition-fast) var(--ease-in-out);
+}
+
+.p-accordion .p-accordion-header:not(.p-disabled) .p-accordion-header-link:hover {
+  background: var(--app-bg-hover);
+}
+
+.p-accordion .p-accordion-header:not(.p-disabled).p-highlight .p-accordion-header-link {
+  background: var(--app-primary-bg);
+  color: var(--app-primary-text);
+}
+
+.p-accordion .p-accordion-content {
+  background: var(--app-bg-card);
+  border-color: var(--app-border-base);
+  color: var(--app-text-base);
+}
+
+/* ============================================================================
+   TOOLTIP
+   ============================================================================ */
+
+.p-tooltip .p-tooltip-text {
+  background: var(--color-gray-800);
+  color: var(--color-white);
+  border-radius: var(--radius-md);
+  padding: 0.5rem 0.75rem;
+  font-size: var(--font-sm);
+  box-shadow: var(--shadow-lg);
+}
+
+.p-tooltip .p-tooltip-arrow {
+  border-color: var(--color-gray-800);
+}
+
+/* Dark mode tooltip */
+.dark .p-tooltip .p-tooltip-text,
+html.dark .p-tooltip .p-tooltip-text {
+  background: var(--color-gray-700);
+}
+
+.dark .p-tooltip .p-tooltip-arrow,
+html.dark .p-tooltip .p-tooltip-arrow {
+  border-color: var(--color-gray-700);
+}

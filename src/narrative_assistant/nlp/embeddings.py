@@ -8,27 +8,23 @@ sentence-transformers usa PyTorch, que soporta:
 
 El modelo por defecto es multilingüe y funciona bien para español.
 
-SEGURIDAD: Los modelos DEBEN estar en local. No se permite descarga automática
-para garantizar que los manuscritos nunca salen de la máquina del usuario.
+Los modelos se descargan bajo demanda la primera vez que se necesitan
+y se guardan en ~/.narrative_assistant/models/ para uso offline posterior.
 """
 
 import logging
 import os
 import threading
-from typing import Optional, Union
+from typing import Callable, Optional, Union
 
 import numpy as np
 
 from ..core.config import get_config
 from ..core.device import get_device_detector, get_torch_device_string, DeviceType
 from ..core.errors import ModelNotLoadedError
+from ..core.model_manager import ModelType, ensure_embeddings_model, get_model_manager
 
 logger = logging.getLogger(__name__)
-
-# SEGURIDAD: Forzar modo offline para HuggingFace/transformers
-# Esto previene cualquier descarga automática de modelos
-os.environ.setdefault("HF_HUB_OFFLINE", "1")
-os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
 
 # Lock para thread-safety en singleton
 _embeddings_lock = threading.Lock()
@@ -41,6 +37,9 @@ class EmbeddingsModel:
     """
     Modelo de embeddings con soporte GPU automático.
 
+    El modelo se descarga automáticamente la primera vez que se necesita
+    y se guarda en ~/.narrative_assistant/models/ para uso offline posterior.
+
     Uso:
         model = EmbeddingsModel()
         embeddings = model.encode(["texto 1", "texto 2"])
@@ -52,6 +51,8 @@ class EmbeddingsModel:
         model_name: Optional[str] = None,
         device: Optional[str] = None,
         batch_size: Optional[int] = None,
+        auto_download: bool = True,
+        progress_callback: Optional[Callable[[str, float], None]] = None,
     ):
         """
         Inicializa modelo de embeddings.
@@ -60,6 +61,8 @@ class EmbeddingsModel:
             model_name: Nombre del modelo HuggingFace (default: config)
             device: "cuda", "mps", "cpu", o None (auto)
             batch_size: Tamaño de batch (default: auto según device)
+            auto_download: Si True, descarga el modelo si no existe (default: True)
+            progress_callback: Función para reportar progreso de descarga (mensaje, porcentaje)
         """
         from sentence_transformers import SentenceTransformer
 
@@ -84,32 +87,55 @@ class EmbeddingsModel:
         else:
             self.batch_size = batch_size
 
-        # SEGURIDAD: Usar SOLO modelo local
-        # No permitir descarga automática para proteger manuscritos
+        # Buscar modelo: primero en config explícita, luego en ModelManager
         model_path = config.embeddings_model_path
 
         if model_path is None:
-            raise ModelNotLoadedError(
-                model_name=self.model_name,
-                hint=(
-                    "Modelo de embeddings no encontrado en local. "
-                    "Ejecuta: python scripts/download_models.py\n"
-                    "SEGURIDAD: No se permite descarga automática para "
-                    "proteger los manuscritos del usuario."
-                ),
-            )
+            # Intentar obtener del ModelManager (descarga bajo demanda)
+            manager = get_model_manager()
+            existing_path = manager.get_model_path(ModelType.EMBEDDINGS)
+
+            if existing_path:
+                model_path = existing_path
+            elif auto_download:
+                # Descargar modelo
+                logger.info(f"Modelo embeddings no encontrado. Iniciando descarga...")
+                result = ensure_embeddings_model(
+                    force_download=False, progress_callback=progress_callback
+                )
+                if result.is_failure:
+                    error = result.error
+                    raise ModelNotLoadedError(
+                        model_name=self.model_name,
+                        hint=(
+                            f"No se pudo descargar el modelo de embeddings.\n"
+                            f"Error: {error.message if error else 'Desconocido'}\n\n"
+                            "Verifica tu conexión a internet o descarga manualmente:\n"
+                            "  narrative-assistant download-models"
+                        ),
+                    )
+                model_path = result.value
+            else:
+                raise ModelNotLoadedError(
+                    model_name=self.model_name,
+                    hint=(
+                        "Modelo de embeddings no encontrado en local.\n"
+                        "Descarga con: narrative-assistant download-models\n"
+                        "O habilita auto_download=True para descarga automática."
+                    ),
+                )
 
         model_to_load = str(model_path)
-        logger.info(f"Cargando modelo embeddings local: {model_to_load}")
+        logger.info(f"Cargando modelo embeddings: {model_to_load}")
         logger.info(f"Dispositivo: {self.device}, batch_size: {self.batch_size}")
 
-        # Cargar modelo (modo offline forzado por variables de entorno)
+        # Cargar modelo
         try:
             self.model = SentenceTransformer(model_to_load, device=self.device)
         except Exception as e:
             raise ModelNotLoadedError(
                 model_name=self.model_name,
-                hint=f"Error cargando modelo local: {e}",
+                hint=f"Error cargando modelo: {e}",
             ) from e
 
         # Dimensión de los embeddings

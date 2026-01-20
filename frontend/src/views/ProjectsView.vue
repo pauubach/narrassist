@@ -76,14 +76,14 @@
             <template #header>
               <div class="card-header">
                 <div class="format-badge">
-                  <i :class="getFormatIcon(project.document_format)"></i>
-                  {{ project.document_format }}
+                  <i :class="getFormatIcon(project.documentFormat)"></i>
+                  {{ project.documentFormat }}
                 </div>
                 <div class="card-actions">
                   <Badge
-                    v-if="project.open_alerts_count && project.open_alerts_count > 0"
-                    :value="project.open_alerts_count"
-                    :severity="getAlertSeverity(project.highest_alert_severity)"
+                    v-if="project.openAlertsCount && project.openAlertsCount > 0"
+                    :value="project.openAlertsCount"
+                    :severity="getAlertSeverity(project.highestAlertSeverity)"
                     class="alert-badge"
                   />
                   <Button
@@ -102,29 +102,29 @@
 
             <template #subtitle>
               <div class="project-meta">
-                <span><i class="pi pi-calendar"></i> {{ formatDate(project.last_modified) }}</span>
+                <span><i class="pi pi-calendar"></i> {{ formatDate(project.lastModified) }}</span>
               </div>
             </template>
 
             <template #content>
               <div class="project-stats">
                 <div class="stat">
-                  <span class="stat-value">{{ project.word_count.toLocaleString() }}</span>
+                  <span class="stat-value">{{ project.wordCount.toLocaleString() }}</span>
                   <span class="stat-label">palabras</span>
                 </div>
                 <div class="stat">
-                  <span class="stat-value">{{ project.chapter_count }}</span>
+                  <span class="stat-value">{{ project.chapterCount }}</span>
                   <span class="stat-label">capítulos</span>
                 </div>
                 <div class="stat">
-                  <span class="stat-value">{{ project.analysis_progress ?? 0 }}%</span>
+                  <span class="stat-value">{{ project.analysisProgress ?? 0 }}%</span>
                   <span class="stat-label">analizado</span>
                 </div>
               </div>
 
               <ProgressBar
-                v-if="(project.analysis_progress ?? 0) < 100"
-                :value="project.analysis_progress ?? 0"
+                v-if="(project.analysisProgress ?? 0) < 100"
+                :value="project.analysisProgress ?? 0"
                 :showValue="false"
                 class="mt-3"
               />
@@ -201,6 +201,20 @@
             <Button icon="pi pi-times" text rounded @click="newProject.file = null" />
           </div>
         </div>
+
+        <div class="field">
+          <label for="project-rules">Normas y preferencias (opcional)</label>
+          <Textarea
+            id="project-rules"
+            v-model="newProject.rules"
+            rows="4"
+            placeholder="Ej: Usar coma antes de 'pero'. Evitar gerundios al inicio de frase. Los diálogos usan raya (—). Verificar concordancia de tiempos verbales..."
+            class="w-full"
+          />
+          <small class="p-text-secondary">
+            Normas editoriales, preferencias de estilo o criterios específicos para este manuscrito
+          </small>
+        </div>
       </div>
 
       <template #footer>
@@ -221,20 +235,11 @@
 
     <!-- Menu contextual de proyecto -->
     <Menu ref="projectMenu" :model="projectMenuItems" :popup="true" />
-
-    <!-- Overlay de análisis (se puede cerrar para continuar trabajando) -->
-    <AnalysisProgressOverlay
-      :visible="showAnalysisOverlay"
-      :project-id="analyzingProjectId"
-      @complete="onAnalysisComplete"
-      @error="onAnalysisError"
-      @close="onAnalysisClose"
-    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useProjectsStore } from '@/stores/projects'
 import { useAnalysisStore } from '@/stores/analysis'
@@ -250,9 +255,9 @@ import ProgressSpinner from 'primevue/progressspinner'
 import Message from 'primevue/message'
 import Menu from 'primevue/menu'
 import Badge from 'primevue/badge'
-import AnalysisProgressOverlay from '@/components/AnalysisProgressOverlay.vue'
 import { useToast } from 'primevue/usetoast'
 import type { Project } from '@/types'
+import { transformProjects, transformProject } from '@/types/transformers'
 
 const router = useRouter()
 const toast = useToast()
@@ -264,27 +269,24 @@ const showCreateDialog = ref(false)
 const showValidation = ref(false)
 const creatingProject = ref(false)
 const searchQuery = ref('')
-const sortBy = ref('last_modified')
+const sortBy = ref('lastModified')
 const projectMenu = ref()
 const selectedProject = ref<Project | null>(null)
 
-// Estado del análisis
-const showAnalysisOverlay = ref(false)
-const analyzingProjectId = ref<number | undefined>(undefined)
-
-// Opciones de ordenamiento
+// Opciones de ordenamiento - using domain camelCase properties
 const sortOptions = [
-  { label: 'Última modificación', value: 'last_modified' },
+  { label: 'Última modificación', value: 'lastModified' },
   { label: 'Nombre', value: 'name' },
-  { label: 'Fecha de creación', value: 'created_at' },
-  { label: 'Progreso', value: 'analysis_progress' }
+  { label: 'Fecha de creación', value: 'createdAt' },
+  { label: 'Progreso', value: 'analysisProgress' }
 ]
 
 // Formulario de nuevo proyecto
 const newProject = ref({
   name: '',
   description: '',
-  file: null as File | null
+  file: null as File | null,
+  rules: ''
 })
 
 // Items del menú contextual
@@ -327,18 +329,18 @@ const filteredProjects = computed(() => {
     )
   }
 
-  // Ordenar
+  // Ordenar - using domain property names (camelCase)
   return [...filtered].sort((a, b) => {
     switch (sortBy.value) {
       case 'name':
         return a.name.localeCompare(b.name)
-      case 'created_at':
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      case 'analysis_progress':
-        return b.analysis_progress - a.analysis_progress
-      case 'last_modified':
+      case 'createdAt':
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      case 'analysisProgress':
+        return b.analysisProgress - a.analysisProgress
+      case 'lastModified':
       default:
-        return new Date(b.last_modified).getTime() - new Date(a.last_modified).getTime()
+        return new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime()
     }
   })
 })
@@ -371,32 +373,32 @@ const createProject = async () => {
     const project = await projectsStore.createProject(
       newProject.value.name,
       newProject.value.description,
-      newProject.value.file
+      newProject.value.file,
+      newProject.value.rules
     )
 
-    // Iniciar análisis automáticamente
-    if (project && fileToAnalyze) {
-      // Primero configurar el overlay y mostrarlo
-      analyzingProjectId.value = project.id
-      showAnalysisOverlay.value = true
-
-      // Cerrar el diálogo de creación DESPUÉS de mostrar el overlay
+    if (project) {
+      // Cerrar diálogo inmediatamente
       closeCreateDialog()
 
-      // Iniciar el análisis (esto puede tomar tiempo mientras sube el archivo)
-      const success = await analysisStore.startAnalysis(project.id, fileToAnalyze)
-      if (!success) {
-        console.error('Failed to start analysis')
-        showAnalysisOverlay.value = false
-        toast.add({
-          severity: 'error',
-          summary: 'Error al iniciar análisis',
-          detail: analysisStore.error || 'No se pudo iniciar el análisis',
-          life: 5000
+      // Navegar al proyecto INMEDIATAMENTE (análisis no bloqueante)
+      // El documento será visible desde el primer momento
+      // El análisis correrá en background con progreso en StatusBar
+      router.push({ name: 'project', params: { id: project.id } })
+
+      // Iniciar análisis en background (no bloquea la navegación)
+      if (fileToAnalyze) {
+        analysisStore.startAnalysis(project.id, fileToAnalyze).catch((error) => {
+          console.error('Error starting analysis:', error)
+          toast.add({
+            severity: 'error',
+            summary: 'Error al iniciar análisis',
+            detail: 'El análisis no pudo iniciarse. Puedes intentar re-analizar desde el proyecto.',
+            life: 5000
+          })
         })
       }
     } else {
-      // Si no hay archivo o proyecto, solo cerrar el diálogo
       closeCreateDialog()
     }
   } catch (error) {
@@ -407,49 +409,10 @@ const createProject = async () => {
       detail: error instanceof Error ? error.message : 'Error desconocido',
       life: 5000
     })
-    // Cerrar diálogo también en caso de error para que el usuario pueda ver la lista
     closeCreateDialog()
   } finally {
     creatingProject.value = false
   }
-}
-
-const onAnalysisComplete = async (_projectId: number) => {
-  showAnalysisOverlay.value = false
-  analysisStore.clearAnalysis()
-
-  toast.add({
-    severity: 'success',
-    summary: 'Análisis completado',
-    detail: 'El manuscrito ha sido analizado correctamente',
-    life: 5000
-  })
-
-  // Recargar lista de proyectos para mostrar el progreso actualizado
-  await projectsStore.fetchProjects()
-
-  // No redirigimos automáticamente - el usuario puede abrir el proyecto cuando quiera
-  // El proyecto ya aparecerá en la lista con el progreso actualizado
-}
-
-const onAnalysisError = (error: string) => {
-  showAnalysisOverlay.value = false
-  analysisStore.clearAnalysis()
-  console.error('Analysis error:', error)
-  toast.add({
-    severity: 'error',
-    summary: 'Error en el análisis',
-    detail: error,
-    life: 8000
-  })
-  // Recargar proyectos para mostrar el estado actualizado
-  projectsStore.fetchProjects()
-}
-
-const onAnalysisClose = () => {
-  // Usuario cerró el overlay pero el análisis continúa en segundo plano
-  showAnalysisOverlay.value = false
-  // El análisis sigue corriendo y actualizará el progreso en la lista de proyectos
 }
 
 const closeCreateDialog = () => {
@@ -458,7 +421,8 @@ const closeCreateDialog = () => {
   newProject.value = {
     name: '',
     description: '',
-    file: null
+    file: null,
+    rules: ''
   }
 }
 
@@ -491,7 +455,7 @@ const deleteProject = async (projectId: number) => {
     await projectsStore.fetchProjects()
   } catch (error) {
     console.error('Error deleting project:', error)
-    alert('Error al eliminar el proyecto. Por favor, inténtalo de nuevo.')
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Error al eliminar el proyecto. Por favor, inténtalo de nuevo.', life: 5000 })
   }
 }
 
@@ -504,16 +468,16 @@ const getFormatIcon = (format: string) => {
   return icons[format] || 'pi pi-file'
 }
 
-const formatDate = (dateString: string) => {
-  const date = new Date(dateString)
+const formatDate = (date: Date | string) => {
+  const dateObj = typeof date === 'string' ? new Date(date) : date
   const now = new Date()
-  const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24))
+  const diffDays = Math.floor((now.getTime() - dateObj.getTime()) / (1000 * 60 * 60 * 24))
 
   if (diffDays === 0) return 'Hoy'
   if (diffDays === 1) return 'Ayer'
   if (diffDays < 7) return `Hace ${diffDays} días`
 
-  return date.toLocaleDateString('es-ES', {
+  return dateObj.toLocaleDateString('es-ES', {
     day: 'numeric',
     month: 'short',
     year: 'numeric'
@@ -523,19 +487,31 @@ const formatDate = (dateString: string) => {
 const getAlertSeverity = (severity?: string | null) => {
   if (!severity) return undefined
 
+  // Domain AlertSeverity: critical, high, medium, low, info
   const severityMap: Record<string, 'danger' | 'warning' | 'info' | 'secondary'> = {
     'critical': 'danger',
-    'warning': 'warning',
-    'info': 'info',
-    'hint': 'secondary'
+    'high': 'warning',
+    'medium': 'info',
+    'low': 'secondary',
+    'info': 'info'
   }
 
   return severityMap[severity] || 'secondary'
 }
 
+// Handle menu event for new project
+const handleNewProjectEvent = () => {
+  showCreateDialog.value = true
+}
+
 // Lifecycle
 onMounted(async () => {
+  window.addEventListener('menubar:new-project', handleNewProjectEvent)
   await loadProjects()
+})
+
+onUnmounted(() => {
+  window.removeEventListener('menubar:new-project', handleNewProjectEvent)
 })
 </script>
 
@@ -579,6 +555,17 @@ onMounted(async () => {
 .search-input {
   width: 300px;
   padding-right: 2.5rem;
+  height: 2.5rem; /* Match button and dropdown height */
+}
+
+/* Ensure all header controls have consistent height */
+.header-right .p-button {
+  height: 2.5rem;
+}
+
+.header-right .p-dropdown,
+.header-right .p-select {
+  height: 2.5rem;
 }
 
 .search-wrapper .pi-search {

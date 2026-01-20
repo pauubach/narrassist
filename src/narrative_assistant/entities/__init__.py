@@ -24,6 +24,14 @@ from .fusion import (
     EntityFusionService,
     get_fusion_service,
     reset_fusion_service,
+    run_automatic_fusion,
+)
+from .semantic_fusion import (
+    SemanticFusionService,
+    SemanticFusionResult,
+    get_semantic_fusion_service,
+    reset_semantic_fusion_service,
+    update_fusion_threshold,
 )
 
 __all__ = [
@@ -42,4 +50,11 @@ __all__ = [
     "EntityFusionService",
     "get_fusion_service",
     "reset_fusion_service",
+    "run_automatic_fusion",
+    # Semantic Fusion
+    "SemanticFusionService",
+    "SemanticFusionResult",
+    "get_semantic_fusion_service",
+    "reset_semantic_fusion_service",
+    "update_fusion_threshold",
 ]

@@ -29,6 +29,55 @@ from ..nlp.attributes import (
 logger = logging.getLogger(__name__)
 
 
+# Traducciones de claves de atributos a español
+# (nombre, género: 'm'=masculino, 'f'=femenino)
+ATTRIBUTE_KEY_INFO: dict[str, tuple[str, str]] = {
+    "eye_color": ("color de ojos", "m"),
+    "hair_color": ("color de cabello", "m"),
+    "hair_type": ("tipo de cabello", "m"),
+    "age": ("edad", "f"),
+    "height": ("altura", "f"),
+    "build": ("complexión", "f"),
+    "skin": ("piel", "f"),
+    "distinctive_feature": ("rasgo distintivo", "m"),
+    "personality": ("personalidad", "f"),
+    "temperament": ("temperamento", "m"),
+    "fear": ("miedo", "m"),
+    "desire": ("deseo", "m"),
+    "profession": ("profesión", "f"),
+    "title": ("título", "m"),
+    "relationship": ("relación", "f"),
+    "nationality": ("nacionalidad", "f"),
+    "climate": ("clima", "m"),
+    "terrain": ("terreno", "m"),
+    "size": ("tamaño", "m"),
+    "location": ("ubicación", "f"),
+    "material": ("material", "m"),
+    "color": ("color", "m"),
+    "condition": ("estado", "m"),
+    "other": ("atributo", "m"),
+}
+
+# Compatibilidad hacia atrás
+ATTRIBUTE_KEY_TRANSLATIONS = {k: v[0] for k, v in ATTRIBUTE_KEY_INFO.items()}
+
+
+def get_attribute_display_name(attr_key: "AttributeKey") -> str:
+    """Obtiene el nombre traducido de un atributo."""
+    key_value = attr_key.value if hasattr(attr_key, 'value') else str(attr_key)
+    info = ATTRIBUTE_KEY_INFO.get(key_value)
+    if info:
+        return info[0]
+    return key_value.replace("_", " ")
+
+
+def get_attribute_gender(attr_key: "AttributeKey") -> str:
+    """Obtiene el género gramatical de un atributo ('m' o 'f')."""
+    key_value = attr_key.value if hasattr(attr_key, 'value') else str(attr_key)
+    info = ATTRIBUTE_KEY_INFO.get(key_value)
+    return info[1] if info else "m"  # masculino por defecto
+
+
 class InconsistencyType(Enum):
     """Tipos de inconsistencia detectada."""
 
@@ -50,9 +99,11 @@ class AttributeInconsistency:
         value1: Primer valor encontrado
         value1_chapter: Capítulo del primer valor
         value1_excerpt: Extracto del texto
+        value1_position: Posición en caracteres del primer valor
         value2: Segundo valor encontrado
         value2_chapter: Capítulo del segundo valor
         value2_excerpt: Extracto del texto
+        value2_position: Posición en caracteres del segundo valor
         inconsistency_type: Tipo de inconsistencia
         confidence: Confianza de que sea inconsistencia real (0.0-1.0)
         explanation: Explicación legible
@@ -67,9 +118,11 @@ class AttributeInconsistency:
     value2: str
     value2_chapter: Optional[int]
     value2_excerpt: str
-    inconsistency_type: InconsistencyType
-    confidence: float
-    explanation: str
+    value1_position: int = 0
+    value2_position: int = 0
+    inconsistency_type: InconsistencyType = InconsistencyType.VALUE_CHANGE
+    confidence: float = 0.5
+    explanation: str = ""
 
     def to_dict(self) -> dict:
         """Convierte a diccionario para serialización."""
@@ -80,9 +133,11 @@ class AttributeInconsistency:
             "value1": self.value1,
             "value1_chapter": self.value1_chapter,
             "value1_excerpt": self.value1_excerpt,
+            "value1_position": self.value1_position,
             "value2": self.value2,
             "value2_chapter": self.value2_chapter,
             "value2_excerpt": self.value2_excerpt,
+            "value2_position": self.value2_position,
             "inconsistency_type": self.inconsistency_type.value,
             "confidence": self.confidence,
             "explanation": self.explanation,
@@ -194,6 +249,59 @@ def reset_lemma_cache() -> None:
     _lemma_cache = {}
     _spacy_nlp = None
     _spacy_checked = False
+
+
+# =============================================================================
+# Atributos temporales (pueden cambiar sin ser inconsistencia)
+# =============================================================================
+
+
+def is_temporal_attribute(attr_key: AttributeKey, value: str) -> bool:
+    """
+    Determina si un atributo representa algo que puede cambiar
+    legítimamente en una narrativa (peinados, ropa, etc.).
+
+    Usa análisis semántico en lugar de listas fijas para escalar mejor.
+
+    Args:
+        attr_key: Tipo de atributo
+        value: Valor del atributo
+
+    Returns:
+        True si es un atributo temporal que puede cambiar
+    """
+    value_lower = value.lower().strip()
+
+    # HAIR_TYPE: distinguir textura natural vs estilo temporal
+    if attr_key == AttributeKey.HAIR_TYPE:
+        # Texturas naturales (inconsistencias válidas)
+        natural_textures = {"liso", "rizado", "ondulado", "encrespado", "lacio"}
+        # Si menciona longitud (largo/corto) también es más permanente
+        if value_lower in natural_textures:
+            return False
+        if "largo" in value_lower or "corto" in value_lower:
+            return False
+
+        # Todo lo demás son peinados temporales
+        # (trenza, coleta, recogido, suelto, moño, etc.)
+        return True
+
+    # Atributos que son inherentemente permanentes
+    permanent_keys = {
+        AttributeKey.EYE_COLOR,    # Color de ojos no cambia (excepto lentillas)
+        AttributeKey.HAIR_COLOR,   # El color natural es relevante
+        AttributeKey.HEIGHT,       # La altura no cambia
+        AttributeKey.BUILD,        # La constitución puede cambiar pero lentamente
+        AttributeKey.AGE,          # La edad es permanente en un momento dado
+        AttributeKey.SKIN,         # Color de piel
+        AttributeKey.DISTINCTIVE_FEATURE,  # Cicatrices, tatuajes, lunares
+    }
+
+    if attr_key in permanent_keys:
+        return False
+
+    # Por defecto, asumir que puede ser temporal para evitar falsos positivos
+    return False
 
 
 # =============================================================================
@@ -428,6 +536,67 @@ class AttributeConsistencyChecker:
                 self._embeddings_model = False
         return self._embeddings_model if self._embeddings_model else None
 
+    def _build_entity_name_mapping(
+        self,
+        attributes: list[ExtractedAttribute],
+    ) -> dict[str, str]:
+        """
+        Construye un mapeo de nombres de entidades para normalizar variantes.
+
+        "María Sánchez" y "María" se mapean a "maría sánchez" (nombre completo)
+        "Juan Pérez" y "Juan" se mapean a "juan pérez" (nombre completo)
+
+        IMPORTANTE: Solo agrupa nombres cuando hay evidencia clara de que son la misma
+        entidad (uno es prefijo del otro Y ambos aparecen en el mismo contexto).
+        """
+        # Extraer todos los nombres únicos
+        all_names = set(attr.entity_name.lower() for attr in attributes)
+
+        # Crear mapeo - cada nombre se mapea a sí mismo por defecto
+        mapping: dict[str, str] = {name: name for name in all_names}
+
+        # Lista de nombres ordenados por longitud (más largos primero)
+        # Preferimos el nombre más completo como base
+        sorted_names = sorted(all_names, key=len, reverse=True)
+
+        # Agrupar solo nombres que claramente son la misma entidad
+        processed = set()
+        for full_name in sorted_names:
+            if full_name in processed:
+                continue
+
+            # Buscar nombres más cortos que sean prefijo de este
+            first_word = full_name.split()[0]
+            for other_name in sorted_names:
+                if other_name == full_name or other_name in processed:
+                    continue
+
+                # Solo agrupar si other_name es exactamente el primer nombre
+                # y full_name es nombre + apellido
+                if other_name == first_word and len(full_name.split()) > 1:
+                    # Verificar que no haya OTRO nombre completo que empiece con este primer nombre
+                    # Ej: Si hay "Juan Pérez" y "Juan García", no agrupar "Juan" con ninguno
+                    conflicting_names = [
+                        n for n in all_names
+                        if n != full_name and n.startswith(first_word + " ")
+                    ]
+
+                    if not conflicting_names:
+                        # Seguro de agrupar: solo hay una entidad con este primer nombre
+                        mapping[other_name] = full_name
+                        mapping[full_name] = full_name
+                        processed.add(other_name)
+                        logger.debug(f"Normalización: '{other_name}' -> '{full_name}'")
+                    else:
+                        # Hay conflicto: mantener separados para evitar confusión
+                        logger.debug(
+                            f"NO agrupando '{other_name}' - conflicto con: {conflicting_names}"
+                        )
+
+            processed.add(full_name)
+
+        return mapping
+
     def check_consistency(
         self,
         attributes: list[ExtractedAttribute],
@@ -450,11 +619,18 @@ class AttributeConsistencyChecker:
         inconsistencies: list[AttributeInconsistency] = []
 
         try:
-            # Agrupar por (entity_name, attribute_key)
+            # Normalizar nombres de entidades para agrupar variantes
+            # "María Sánchez" y "María" -> ambas agrupadas bajo "maría"
+            # "Juan Pérez" y "Juan" -> ambas agrupadas bajo "juan"
+            normalized_names = self._build_entity_name_mapping(attributes)
+
+            # Agrupar por (entity_name_normalizado, attribute_key)
             grouped: dict[tuple[str, AttributeKey], list[ExtractedAttribute]] = {}
 
             for attr in attributes:
-                key = (attr.entity_name.lower(), attr.key)
+                # Usar nombre normalizado para agrupar
+                entity_key = normalized_names.get(attr.entity_name.lower(), attr.entity_name.lower())
+                key = (entity_key, attr.key)
                 if key not in grouped:
                     grouped[key] = []
                 grouped[key].append(attr)
@@ -481,6 +657,11 @@ class AttributeConsistencyChecker:
                             logger.debug(f"  Skipping {attr1.value} vs {attr2.value} (both negated)")
                             continue
 
+                        # Saltar atributos temporales que pueden cambiar
+                        if is_temporal_attribute(attr_key, attr1.value) or is_temporal_attribute(attr_key, attr2.value):
+                            logger.debug(f"  Skipping {attr1.value} vs {attr2.value} (temporal attribute)")
+                            continue
+
                         # Calcular confianza de inconsistencia
                         confidence, inc_type = self._calculate_inconsistency(
                             attr1, attr2, attr_key
@@ -503,9 +684,11 @@ class AttributeConsistencyChecker:
                                     value1=attr1.value,
                                     value1_chapter=attr1.chapter_id,
                                     value1_excerpt=attr1.source_text,
+                                    value1_position=attr1.start_char,
                                     value2=attr2.value,
                                     value2_chapter=attr2.chapter_id,
                                     value2_excerpt=attr2.source_text,
+                                    value2_position=attr2.start_char,
                                     inconsistency_type=inc_type,
                                     confidence=confidence,
                                     explanation=explanation,
@@ -654,8 +837,15 @@ class AttributeConsistencyChecker:
         confidence: float,
     ) -> str:
         """Genera una explicación legible de la inconsistencia."""
-        key_name = attr_key.value.replace("_", " ")
+        key_name = get_attribute_display_name(attr_key)
+        gender = get_attribute_gender(attr_key)
         entity = attr1.entity_name
+
+        # Adjetivos con concordancia de género
+        # Usamos plural porque hablamos de "valores" o "descripciones"
+        adj_contradictorio = "contradictorias" if gender == "f" else "contradictorios"
+        adj_diferente = "diferentes"
+        adj_opuesto = "opuestas" if gender == "f" else "opuestos"
 
         # Ubicación
         loc1 = f"cap. {attr1.chapter_id}" if attr1.chapter_id else "texto"
@@ -663,20 +853,20 @@ class AttributeConsistencyChecker:
 
         if inc_type == InconsistencyType.ANTONYM:
             return (
-                f"'{entity}' tiene {key_name} contradictorios: "
+                f"'{entity}' tiene descripciones de {key_name} {adj_contradictorio}: "
                 f"'{attr1.value}' ({loc1}) vs '{attr2.value}' ({loc2}). "
-                f"Son valores opuestos."
+                f"Son valores {adj_opuesto}."
             )
 
         if inc_type == InconsistencyType.CONTRADICTORY:
             return (
-                f"'{entity}' tiene {key_name} muy diferentes: "
+                f"'{entity}' tiene descripciones de {key_name} muy {adj_diferente}: "
                 f"'{attr1.value}' ({loc1}) vs '{attr2.value}' ({loc2}). "
-                f"Probable error de continuidad."
+                f"Posible error de continuidad."
             )
 
         return (
-            f"'{entity}' tiene {key_name} diferentes: "
+            f"'{entity}' tiene descripciones de {key_name} {adj_diferente}: "
             f"'{attr1.value}' ({loc1}) vs '{attr2.value}' ({loc2}). "
             f"Verificar si es intencional."
         )

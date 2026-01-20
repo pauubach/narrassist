@@ -13,6 +13,7 @@ from typing import Any
 
 from ..alerts.models import Alert
 from ..core.result import Result
+from ..core.utils import format_duration
 from ..entities.models import Entity
 from .analysis_pipeline import AnalysisReport
 
@@ -99,7 +100,7 @@ def export_report_markdown(
         lines.append("")
         lines.append(f"**Documento:** {Path(report.document_path).name}")
         lines.append(f"**Fecha:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        lines.append(f"**Duración:** {report.duration_seconds:.2f}s")
+        lines.append(f"**Duración:** {format_duration(report.duration_seconds)}")
         lines.append("")
         lines.append("---")
         lines.append("")

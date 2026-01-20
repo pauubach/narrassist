@@ -826,9 +826,9 @@ A partir de 2026-01-14, cualquier feature nueva DEBE incluir:
 
 | # | Item | Tiempo | Estado |
 |---|------|--------|--------|
-| 22 | Parser PDF | 4-6h | ❌ No implementado |
-| 23 | Parser EPUB | 2-4h | ❌ No implementado |
-| 24 | Tests E2E completos | 4h | ⚠️ Parcial - 8 specs, algunos fallando |
+| 22 | Parser PDF | 4-6h | ✅ **COMPLETADO** (2026-01-19) |
+| 23 | Parser EPUB | 2-4h | ✅ **COMPLETADO** (2026-01-19) |
+| 24 | Tests E2E completos | 4h | ✅ **COMPLETADO** - 12 specs |
 | 25 | Auto-update Tauri | 4h | ❌ No configurado |
 | 26 | Redis state | 2-3h | ❌ No implementado (no necesario MVP) |
 | 27 | Swagger/OpenAPI docs | 2-3h | ❌ No implementado |
@@ -837,7 +837,7 @@ A partir de 2026-01-14, cualquier feature nueva DEBE incluir:
 | 30 | CI/CD pipeline | 4h | ❌ No hay .github/workflows |
 | 31 | Landing page | 4h | ❌ No implementado |
 
-**Subtotal P3: 1/10 parcialmente completado**
+**Subtotal P3: 4/10 completados**
 
 ---
 
@@ -848,7 +848,7 @@ A partir de 2026-01-14, cualquier feature nueva DEBE incluir:
 | **P0** | 8 | 8/8 | ✅ **100% COMPLETADO** |
 | **P1** | 7 | 7/7 | ✅ **100% COMPLETADO** |
 | **P2** | 8 | 6/8 | ✅ **75%** (code signing pendiente) |
-| **P3** | 10 | 1/10 | ⚠️ **10%** (post-MVP) |
+| **P3** | 10 | 4/10 | ⚠️ **40%** (post-MVP) |
 
 ### Lo que queda por hacer
 
@@ -857,7 +857,8 @@ A partir de 2026-01-14, cualquier feature nueva DEBE incluir:
 - macOS: Apple Developer Program ($99/año)
 
 **P3 - Post-MVP**:
-- Parsers PDF/EPUB si hay demanda
+- ✅ Parsers PDF/EPUB implementados
+- ✅ Tests E2E completos (12 specs)
 - CI/CD cuando se prepare para producción
 - i18n si se expande a otros mercados
 

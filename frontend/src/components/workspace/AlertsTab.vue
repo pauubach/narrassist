@@ -1,0 +1,590 @@
+<script setup lang="ts">
+import { ref, computed, watch, onMounted } from 'vue'
+import Button from 'primevue/button'
+import InputText from 'primevue/inputtext'
+import Dropdown from 'primevue/dropdown'
+import MultiSelect from 'primevue/multiselect'
+import DsBadge from '@/components/ds/DsBadge.vue'
+import DsEmptyState from '@/components/ds/DsEmptyState.vue'
+import type { Alert, AlertSeverity } from '@/types'
+import { useAlertUtils } from '@/composables/useAlertUtils'
+import { useWorkspaceStore } from '@/stores/workspace'
+
+/**
+ * AlertsTab - Pestaña de gestión de alertas
+ *
+ * Muestra todas las alertas del proyecto con:
+ * - Filtros avanzados (severidad, categoría, estado, capítulo, confianza)
+ * - Acciones de resolución y descarte
+ * - Navegación al texto
+ */
+
+interface Props {
+  /** Alertas del proyecto */
+  alerts: Alert[]
+  /** Si está cargando */
+  loading?: boolean
+  /** Capítulos disponibles (para filtro) */
+  chapters?: Array<{ id: number; chapterNumber: number; title: string }>
+  /** Si el análisis de alertas ya se ejecutó */
+  analysisExecuted?: boolean
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  loading: false,
+  chapters: () => [],
+  analysisExecuted: true
+})
+
+const emit = defineEmits<{
+  'alert-select': [alert: Alert]
+  'alert-resolve': [alert: Alert]
+  'alert-dismiss': [alert: Alert]
+  'alert-navigate': [alert: Alert]
+  'refresh': []
+}>()
+
+const { getSeverityConfig, getSeverityLabel } = useAlertUtils()
+const workspaceStore = useWorkspaceStore()
+
+// Estado de filtros
+const searchQuery = ref('')
+const selectedSeverities = ref<AlertSeverity[]>([])
+
+// Sincronizar con el filtro de severidad del store
+watch(() => workspaceStore.alertSeverityFilter, (newFilter) => {
+  if (newFilter) {
+    // Aplicar el filtro desde el store (ej: desde el dashboard)
+    selectedSeverities.value = [newFilter as AlertSeverity]
+    // Limpiar el filtro del store después de aplicarlo
+    workspaceStore.setAlertSeverityFilter(null)
+  }
+}, { immediate: true })
+
+onMounted(() => {
+  // Aplicar filtro pendiente al montar
+  if (workspaceStore.alertSeverityFilter) {
+    selectedSeverities.value = [workspaceStore.alertSeverityFilter as AlertSeverity]
+    workspaceStore.setAlertSeverityFilter(null)
+  }
+})
+const selectedCategories = ref<string[]>([])
+const selectedStatuses = ref<string[]>(['active'])
+const selectedChapter = ref<number | null>(null)
+const minConfidence = ref<number | null>(null)
+
+// Opciones de filtros
+const severityOptions: Array<{ label: string; value: AlertSeverity }> = [
+  { label: 'Crítica', value: 'critical' },
+  { label: 'Alta', value: 'high' },
+  { label: 'Media', value: 'medium' },
+  { label: 'Baja', value: 'low' },
+  { label: 'Info', value: 'info' }
+]
+
+const categoryOptions = computed(() => {
+  const categories = new Set(props.alerts.map(a => a.category).filter(Boolean))
+  return Array.from(categories).map(cat => ({
+    label: getCategoryLabel(cat!),
+    value: cat
+  }))
+})
+
+const statusOptions = [
+  { label: 'Activas', value: 'active' },
+  { label: 'Resueltas', value: 'resolved' },
+  { label: 'Descartadas', value: 'dismissed' }
+]
+
+const chapterOptions = computed(() => [
+  { label: 'Todos los capítulos', value: null },
+  ...props.chapters.map(ch => ({
+    label: `Cap. ${ch.chapterNumber}: ${ch.title}`,
+    value: ch.chapterNumber
+  }))
+])
+
+const confidenceOptions = [
+  { label: 'Cualquier confianza', value: null },
+  { label: '> 90%', value: 90 },
+  { label: '> 80%', value: 80 },
+  { label: '> 70%', value: 70 }
+]
+
+// Alertas filtradas
+const filteredAlerts = computed(() => {
+  let result = props.alerts
+
+  // Filtrar por búsqueda
+  if (searchQuery.value) {
+    const query = searchQuery.value.toLowerCase()
+    result = result.filter(a =>
+      a.title.toLowerCase().includes(query) ||
+      a.description?.toLowerCase().includes(query)
+    )
+  }
+
+  // Filtrar por severidad
+  if (selectedSeverities.value.length > 0) {
+    result = result.filter(a => selectedSeverities.value.includes(a.severity))
+  }
+
+  // Filtrar por categoría
+  if (selectedCategories.value.length > 0) {
+    result = result.filter(a => a.category && selectedCategories.value.includes(a.category))
+  }
+
+  // Filtrar por estado
+  if (selectedStatuses.value.length > 0) {
+    result = result.filter(a => selectedStatuses.value.includes(a.status))
+  }
+
+  // Filtrar por capítulo
+  if (selectedChapter.value !== null) {
+    result = result.filter(a => a.chapter === selectedChapter.value)
+  }
+
+  // Filtrar por confianza
+  if (minConfidence.value !== null) {
+    result = result.filter(a => (a.confidence ?? 0) >= minConfidence.value!)
+  }
+
+  // Ordenar por severidad y luego por capítulo
+  const severityOrder = { critical: 0, high: 1, medium: 2, low: 3, info: 4 }
+  return [...result].sort((a, b) => {
+    const severityDiff = severityOrder[a.severity] - severityOrder[b.severity]
+    if (severityDiff !== 0) return severityDiff
+    return (a.chapter ?? 999) - (b.chapter ?? 999)
+  })
+})
+
+// Estadísticas
+const stats = computed(() => ({
+  total: props.alerts.length,
+  filtered: filteredAlerts.value.length,
+  bySeverity: props.alerts.reduce((acc, a) => {
+    acc[a.severity] = (acc[a.severity] || 0) + 1
+    return acc
+  }, {} as Record<string, number>),
+  active: props.alerts.filter(a => a.status === 'active').length
+}))
+
+// Helpers
+function getCategoryLabel(category: string): string {
+  const labels: Record<string, string> = {
+    'consistency': 'Consistencia',
+    'grammar': 'Gramática',
+    'style': 'Estilo',
+    'behavioral': 'Comportamiento',
+    'temporal': 'Temporal',
+    'attribute': 'Atributo'
+  }
+  return labels[category] || category
+}
+
+function clearFilters() {
+  searchQuery.value = ''
+  selectedSeverities.value = []
+  selectedCategories.value = []
+  selectedStatuses.value = ['active']
+  selectedChapter.value = null
+  minConfidence.value = null
+}
+
+// Handlers
+function handleAlertClick(alert: Alert) {
+  emit('alert-select', alert)
+}
+</script>
+
+<template>
+  <div class="alerts-tab">
+    <!-- Toolbar de filtros -->
+    <div class="alerts-toolbar">
+      <div class="toolbar-row">
+        <span class="p-input-icon-right search-wrapper">
+          <InputText
+            v-model="searchQuery"
+            placeholder="Buscar alertas..."
+            class="search-input"
+          />
+          <i class="pi pi-search" />
+        </span>
+
+        <MultiSelect
+          v-model="selectedSeverities"
+          :options="severityOptions"
+          optionLabel="label"
+          optionValue="value"
+          placeholder="Severidad"
+          class="severity-filter"
+          :maxSelectedLabels="2"
+        />
+
+        <MultiSelect
+          v-if="categoryOptions.length > 0"
+          v-model="selectedCategories"
+          :options="categoryOptions"
+          optionLabel="label"
+          optionValue="value"
+          placeholder="Categoría"
+          class="category-filter"
+          :maxSelectedLabels="2"
+        />
+
+        <Dropdown
+          v-model="selectedChapter"
+          :options="chapterOptions"
+          optionLabel="label"
+          optionValue="value"
+          placeholder="Capítulo"
+          class="chapter-filter"
+        />
+
+        <Dropdown
+          v-model="minConfidence"
+          :options="confidenceOptions"
+          optionLabel="label"
+          optionValue="value"
+          placeholder="Confianza"
+          class="confidence-filter"
+        />
+      </div>
+
+      <div class="toolbar-row toolbar-row-secondary">
+        <MultiSelect
+          v-model="selectedStatuses"
+          :options="statusOptions"
+          optionLabel="label"
+          optionValue="value"
+          placeholder="Estado"
+          class="status-filter"
+        />
+
+        <Button
+          v-if="searchQuery || selectedSeverities.length || selectedCategories.length || selectedChapter !== null || minConfidence !== null"
+          label="Limpiar filtros"
+          icon="pi pi-times"
+          text
+          size="small"
+          @click="clearFilters"
+        />
+
+        <div class="toolbar-spacer"></div>
+
+        <span class="results-count">
+          {{ stats.filtered }} de {{ stats.total }} alertas
+          <span v-if="stats.active > 0" class="active-count">
+            ({{ stats.active }} activas)
+          </span>
+        </span>
+
+        <Button
+          icon="pi pi-refresh"
+          text
+          rounded
+          @click="emit('refresh')"
+          v-tooltip="'Actualizar'"
+        />
+      </div>
+    </div>
+
+    <!-- Estadísticas rápidas -->
+    <div class="alerts-stats">
+      <div
+        v-for="severity in ['critical', 'high', 'medium', 'low', 'info']"
+        :key="severity"
+        class="stat-item"
+        :class="{ 'stat-active': selectedSeverities.includes(severity as AlertSeverity) }"
+        @click="selectedSeverities = selectedSeverities.includes(severity as AlertSeverity)
+          ? selectedSeverities.filter(s => s !== severity)
+          : [...selectedSeverities, severity as AlertSeverity]"
+      >
+        <DsBadge :severity="severity as AlertSeverity" size="sm">
+          {{ stats.bySeverity[severity] || 0 }}
+        </DsBadge>
+      </div>
+    </div>
+
+    <!-- Lista de alertas -->
+    <div class="alerts-list">
+      <DsEmptyState
+        v-if="filteredAlerts.length === 0 && !loading"
+        :icon="analysisExecuted ? 'pi pi-check-circle' : 'pi pi-clock'"
+        :title="analysisExecuted ? 'Sin alertas' : 'Análisis pendiente'"
+        :description="!analysisExecuted
+          ? 'Las alertas se generarán cuando se complete el análisis del documento'
+          : searchQuery || selectedSeverities.length
+            ? 'No se encontraron alertas con los filtros aplicados'
+            : 'No hay alertas pendientes en este proyecto'"
+      />
+
+      <div
+        v-for="alert in filteredAlerts"
+        :key="alert.id"
+        class="alert-item"
+        :class="`alert-${alert.severity}`"
+        @click="handleAlertClick(alert)"
+      >
+        <div class="alert-header">
+          <DsBadge :severity="alert.severity" size="sm">
+            {{ getSeverityLabel(alert.severity) }}
+          </DsBadge>
+          <span class="alert-title">{{ alert.title }}</span>
+          <span v-if="alert.chapter" class="alert-chapter">
+            Cap. {{ alert.chapter }}
+          </span>
+        </div>
+
+        <p v-if="alert.description" class="alert-description">
+          {{ alert.description }}
+        </p>
+
+        <div class="alert-footer">
+          <span v-if="alert.confidence" class="alert-confidence">
+            <i class="pi pi-chart-bar"></i>
+            {{ Math.round(alert.confidence * 100) }}% confianza
+          </span>
+          <span v-if="alert.category" class="alert-category">
+            {{ getCategoryLabel(alert.category) }}
+          </span>
+
+          <div class="alert-actions">
+            <Button
+              icon="pi pi-eye"
+              text
+              rounded
+              size="small"
+              @click.stop="emit('alert-navigate', alert)"
+              v-tooltip="'Ver en texto'"
+            />
+            <Button
+              icon="pi pi-check"
+              text
+              rounded
+              size="small"
+              severity="success"
+              @click.stop="emit('alert-resolve', alert)"
+              v-tooltip="'Resolver'"
+            />
+            <Button
+              icon="pi pi-times"
+              text
+              rounded
+              size="small"
+              severity="secondary"
+              @click.stop="emit('alert-dismiss', alert)"
+              v-tooltip="'Descartar'"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.alerts-tab {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: visible; /* Permitir que los badges se muestren completos */
+}
+
+/* Toolbar */
+.alerts-toolbar {
+  padding: 0.75rem 1rem;
+  background: var(--surface-card);
+  border-bottom: 1px solid var(--surface-border);
+}
+
+.toolbar-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.toolbar-row-secondary {
+  margin-top: 0.5rem;
+}
+
+.toolbar-spacer {
+  flex: 1;
+}
+
+.search-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-input {
+  width: 180px;
+  padding-right: 2.5rem;
+}
+
+.search-wrapper .pi-search {
+  position: absolute;
+  right: 1rem;
+  color: var(--text-color-secondary);
+  pointer-events: none;
+}
+
+.severity-filter,
+.category-filter,
+.chapter-filter,
+.confidence-filter,
+.status-filter {
+  min-width: 120px;
+}
+
+.results-count {
+  font-size: 0.875rem;
+  color: var(--text-color-secondary);
+}
+
+.active-count {
+  color: var(--orange-500);
+}
+
+/* Stats */
+.alerts-stats {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: var(--surface-50);
+  border-bottom: 1px solid var(--surface-border);
+  overflow: visible; /* Asegurar que los badges no se corten */
+}
+
+.stat-item {
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+
+.stat-item:hover {
+  background: var(--surface-200);
+}
+
+.stat-item.stat-active {
+  background: var(--primary-100);
+}
+
+/* Lista */
+.alerts-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.5rem;
+}
+
+.alert-item {
+  padding: 0.75rem;
+  border-radius: 6px;
+  border-left: 3px solid transparent;
+  cursor: pointer;
+  transition: background 0.15s;
+  margin-bottom: 0.5rem;
+}
+
+.alert-item:hover {
+  background: var(--surface-hover);
+}
+
+.alert-critical {
+  border-left-color: var(--red-500);
+}
+
+.alert-high {
+  border-left-color: var(--orange-500);
+}
+
+.alert-medium {
+  border-left-color: var(--yellow-500);
+}
+
+.alert-low {
+  border-left-color: var(--blue-500);
+}
+
+.alert-info {
+  border-left-color: var(--gray-400);
+}
+
+.alert-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.alert-title {
+  font-weight: 600;
+  color: var(--text-color);
+  flex: 1;
+}
+
+.alert-chapter {
+  font-size: 0.75rem;
+  color: var(--text-color-secondary);
+  background: var(--surface-100);
+  padding: 0.125rem 0.5rem;
+  border-radius: 4px;
+}
+
+.alert-description {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.875rem;
+  color: var(--text-color-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.alert-footer {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.75rem;
+  color: var(--text-color-secondary);
+}
+
+.alert-confidence,
+.alert-category {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.alert-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 0.25rem;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.alert-item:hover .alert-actions {
+  opacity: 1;
+}
+
+/* Dark mode */
+.dark .alerts-stats {
+  background: var(--surface-800);
+}
+
+.dark .alert-chapter {
+  background: var(--surface-700);
+}
+
+.dark .stat-item:hover {
+  background: var(--surface-700);
+}
+
+.dark .stat-item.stat-active {
+  background: var(--primary-900);
+}
+</style>

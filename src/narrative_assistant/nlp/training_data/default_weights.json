@@ -1,0 +1,28 @@
+{
+  "methods": [
+    "llm",
+    "embeddings",
+    "dependency",
+    "patterns"
+  ],
+  "weights": {
+    "llm": 0.8846582138245596,
+    "embeddings": 0.03844726205848013,
+    "dependency": 0.03844726205848013,
+    "patterns": 0.03844726205848013
+  },
+  "is_trained": true,
+  "training_result": {
+    "weights": {
+      "llm": 0.8846582138245596,
+      "embeddings": 0.03844726205848013,
+      "dependency": 0.03844726205848013,
+      "patterns": 0.03844726205848013
+    },
+    "mse": 0.05068417033274386,
+    "accuracy": 1.0,
+    "cv_mean": 0.050721076604457994,
+    "cv_std": 0.011456244008535366,
+    "n_examples": 180
+  }
+}

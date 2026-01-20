@@ -21,7 +21,11 @@
     <div class="welcome-container">
       <div class="welcome-header">
         <h1>Narrative Assistant</h1>
-        <p class="subtitle">Herramienta de corrección narrativa para editores profesionales</p>
+        <p class="subtitle">Asistente de corrección con IA para escritores, editores y correctores profesionales</p>
+        <p class="privacy-note">
+          <i class="pi pi-shield"></i>
+          <span>IA 100% local · Tu manuscrito nunca se sube a internet</span>
+        </p>
       </div>
 
       <div class="status-card">
@@ -47,11 +51,6 @@
       <div class="actions">
         <Button label="Ver Proyectos" icon="pi pi-folder" @click="goToProjects" size="large" />
         <Button label="Nuevo Proyecto" icon="pi pi-plus" severity="secondary" size="large" outlined />
-      </div>
-
-      <div class="info-box">
-        <p><strong>Fase 0:</strong> Setup Base completado</p>
-        <p><strong>Siguiente:</strong> Implementar FastAPI server</p>
       </div>
     </div>
   </div>
@@ -127,6 +126,29 @@ const goToSettings = () => {
   color: var(--text-color-secondary);
 }
 
+.privacy-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding: 0.5rem 1rem;
+  background: var(--green-50);
+  border: 1px solid var(--green-200);
+  border-radius: 20px;
+  font-size: 0.875rem;
+  color: var(--green-700);
+}
+
+:global(.dark) .privacy-note {
+  background: var(--green-900);
+  border-color: var(--green-700);
+  color: var(--green-300);
+}
+
+.privacy-note i {
+  color: var(--green-500);
+}
+
 .status-card {
   background: var(--surface-50);
   border: 1px solid var(--surface-border);
@@ -178,23 +200,5 @@ const goToSettings = () => {
 .actions {
   display: flex;
   gap: 1rem;
-  margin-bottom: 2rem;
-}
-
-.info-box {
-  background: #eff6ff;
-  border-left: 4px solid #3b82f6;
-  padding: 1rem;
-  border-radius: 4px;
-  font-size: 0.9rem;
-}
-
-.info-box p {
-  margin: 0.25rem 0;
-  color: #1e40af;
-}
-
-.info-box strong {
-  color: #1e3a8a;
 }
 </style>

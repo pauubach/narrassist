@@ -35,12 +35,13 @@
   --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
 
-  /* Spacing */
-  --spacing-xs: 0.25rem;
-  --spacing-sm: 0.5rem;
-  --spacing-md: 1rem;
-  --spacing-lg: 1.5rem;
-  --spacing-xl: 2rem;
+  /* Spacing - se escala con --app-spacing-scale */
+  --app-spacing-scale: 1;
+  --spacing-xs: calc(0.25rem * var(--app-spacing-scale));
+  --spacing-sm: calc(0.5rem * var(--app-spacing-scale));
+  --spacing-md: calc(1rem * var(--app-spacing-scale));
+  --spacing-lg: calc(1.5rem * var(--app-spacing-scale));
+  --spacing-xl: calc(2rem * var(--app-spacing-scale));
 
   /* Typography */
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;

@@ -166,6 +166,35 @@
   color: white !important;
 }
 
+/* Dark mode: Tags con mejor contraste y visibilidad */
+.dark .p-tag.p-tag-info,
+html.dark .p-tag.p-tag-info {
+  background: var(--blue-400) !important;
+  color: var(--blue-950, #172554) !important;
+  font-weight: 600 !important;
+}
+
+.dark .p-tag.p-tag-success,
+html.dark .p-tag.p-tag-success {
+  background: var(--green-400) !important;
+  color: var(--green-950, #052e16) !important;
+  font-weight: 600 !important;
+}
+
+.dark .p-tag.p-tag-warning,
+html.dark .p-tag.p-tag-warning {
+  background: var(--yellow-400) !important;
+  color: var(--yellow-950, #422006) !important;
+  font-weight: 600 !important;
+}
+
+.dark .p-tag.p-tag-danger,
+html.dark .p-tag.p-tag-danger {
+  background: var(--red-400) !important;
+  color: var(--red-950, #450a0a) !important;
+  font-weight: 600 !important;
+}
+
 /* Tags secundarios (outline style) */
 .p-tag.p-tag-secondary {
   background: var(--surface-100) !important;
@@ -605,3 +634,903 @@
 .p-component *::after {
   box-sizing: border-box;
 }
+
+/* ============================================================================
+   UI COMPACTNESS / DENSITY - Ajuste de espaciado por densidad de interfaz
+   Se añaden clases ui-compact, ui-normal, ui-comfortable al html element
+   ============================================================================ */
+
+/* Variable de escala base (se establece desde theme.ts) */
+:root {
+  --app-spacing-scale: 1;
+}
+
+/* ---- COMPACT MODE ---- */
+html.ui-compact .p-button {
+  padding: 0.4rem 0.65rem !important;
+  font-size: 0.8125rem !important;
+}
+
+html.ui-compact .p-inputtext,
+html.ui-compact .p-textarea,
+html.ui-compact .p-dropdown,
+html.ui-compact .p-select,
+html.ui-compact .p-multiselect {
+  padding: 0.4rem 0.65rem !important;
+  font-size: 0.8125rem !important;
+  min-height: 2rem !important;
+}
+
+html.ui-compact .p-card .p-card-body,
+html.ui-compact .p-panel .p-panel-content {
+  padding: 0.625rem !important;
+}
+
+html.ui-compact .p-card .p-card-header,
+html.ui-compact .p-panel .p-panel-header {
+  padding: 0.5rem 0.625rem !important;
+}
+
+html.ui-compact .p-datatable .p-datatable-tbody > tr > td,
+html.ui-compact .p-datatable .p-datatable-thead > tr > th {
+  padding: 0.375rem 0.5rem !important;
+}
+
+html.ui-compact .p-tabview .p-tabview-nav li .p-tabview-nav-link,
+html.ui-compact .p-tabview-nav-link {
+  padding: 0.5rem 0.75rem !important;
+}
+
+html.ui-compact .p-tree .p-treenode-content {
+  padding: 0.25rem !important;
+}
+
+html.ui-compact .p-menu .p-menuitem-link,
+html.ui-compact .p-menu .p-menuitem-content {
+  padding: 0.5rem 0.75rem !important;
+}
+
+/* ---- COMFORTABLE MODE ---- */
+html.ui-comfortable .p-button {
+  padding: 0.75rem 1.25rem !important;
+  font-size: 1rem !important;
+}
+
+html.ui-comfortable .p-inputtext,
+html.ui-comfortable .p-textarea,
+html.ui-comfortable .p-dropdown,
+html.ui-comfortable .p-select,
+html.ui-comfortable .p-multiselect {
+  padding: 0.75rem 1rem !important;
+  font-size: 1rem !important;
+  min-height: 3rem !important;
+}
+
+html.ui-comfortable .p-card .p-card-body,
+html.ui-comfortable .p-panel .p-panel-content {
+  padding: 1.5rem !important;
+}
+
+html.ui-comfortable .p-card .p-card-header,
+html.ui-comfortable .p-panel .p-panel-header {
+  padding: 1rem 1.5rem !important;
+}
+
+html.ui-comfortable .p-datatable .p-datatable-tbody > tr > td,
+html.ui-comfortable .p-datatable .p-datatable-thead > tr > th {
+  padding: 1rem 1.25rem !important;
+}
+
+html.ui-comfortable .p-tabview .p-tabview-nav li .p-tabview-nav-link,
+html.ui-comfortable .p-tabview-nav-link {
+  padding: 1rem 1.5rem !important;
+}
+
+html.ui-comfortable .p-tree .p-treenode-content {
+  padding: 0.625rem !important;
+}
+
+html.ui-comfortable .p-menu .p-menuitem-link,
+html.ui-comfortable .p-menu .p-menuitem-content {
+  padding: 1rem 1.5rem !important;
+}
+
+/* Gaps universales que respetan la escala */
+.p-card,
+.p-panel,
+.p-fieldset,
+.p-accordion {
+  --p-content-padding: calc(1rem * var(--app-spacing-scale, 1));
+}
+
+/* ============================================================================
+   STANDARDIZED FORM CONTROL HEIGHTS - Altura consistente en toda la aplicación
+   ============================================================================ */
+
+/* Altura base para controles de formulario */
+:root {
+  --form-control-height: 2.25rem;
+  --form-control-height-sm: 1.875rem;
+  --form-control-height-lg: 2.75rem;
+}
+
+/* InputText estándar */
+.p-inputtext {
+  height: var(--form-control-height) !important;
+  padding: 0.5rem 0.75rem !important;
+  font-size: 0.875rem !important;
+  box-sizing: border-box !important;
+}
+
+/* Dropdown / Select estándar */
+.p-dropdown,
+.p-select {
+  height: var(--form-control-height) !important;
+  box-sizing: border-box !important;
+}
+
+.p-dropdown .p-dropdown-label,
+.p-select .p-select-label {
+  padding: 0.5rem 0.75rem !important;
+  font-size: 0.875rem !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+.p-dropdown .p-dropdown-trigger,
+.p-select .p-select-dropdown {
+  width: 2rem !important;
+}
+
+/* Button estándar (mismo alto que inputs) */
+.p-button:not(.p-button-icon-only):not(.p-button-rounded) {
+  height: var(--form-control-height) !important;
+  padding: 0 1rem !important;
+  font-size: 0.875rem !important;
+  box-sizing: border-box !important;
+}
+
+/* Icon-only buttons - cuadrados */
+.p-button.p-button-icon-only {
+  width: var(--form-control-height) !important;
+  height: var(--form-control-height) !important;
+  padding: 0 !important;
+}
+
+/* Small variants */
+.p-inputtext.p-inputtext-sm,
+.p-dropdown.p-dropdown-sm,
+.p-select.p-select-sm,
+.p-button.p-button-sm:not(.p-button-icon-only) {
+  height: var(--form-control-height-sm) !important;
+  font-size: 0.8125rem !important;
+}
+
+.p-button.p-button-sm.p-button-icon-only {
+  width: var(--form-control-height-sm) !important;
+  height: var(--form-control-height-sm) !important;
+}
+
+/* Large variants */
+.p-inputtext.p-inputtext-lg,
+.p-dropdown.p-dropdown-lg,
+.p-select.p-select-lg,
+.p-button.p-button-lg:not(.p-button-icon-only) {
+  height: var(--form-control-height-lg) !important;
+  font-size: 1rem !important;
+}
+
+.p-button.p-button-lg.p-button-icon-only {
+  width: var(--form-control-height-lg) !important;
+  height: var(--form-control-height-lg) !important;
+}
+
+/* Asegurar alineación vertical en contenedores flex */
+.p-inputgroup,
+.p-inputgroup > * {
+  height: var(--form-control-height) !important;
+}
+
+/* Chips/Textarea mantienen altura automática */
+.p-textarea,
+.p-chips {
+  height: auto !important;
+  min-height: var(--form-control-height) !important;
+}
+
+/* MultiSelect estándar - misma altura que otros controles */
+.p-multiselect:not(.p-multiselect-chip) {
+  height: var(--form-control-height) !important;
+  box-sizing: border-box !important;
+}
+
+.p-multiselect:not(.p-multiselect-chip) .p-multiselect-label {
+  padding: 0.5rem 0.75rem !important;
+  font-size: 0.875rem !important;
+  display: flex !important;
+  align-items: center !important;
+  min-height: unset !important;
+}
+
+.p-multiselect .p-multiselect-trigger {
+  width: 2rem !important;
+}
+
+/* ============================================================================
+   DARK MODE ENHANCEMENTS - Mejoras de legibilidad para modo oscuro
+   ============================================================================ */
+
+/* --- Fondos que eran 'white' hardcodeado → usar variables --- */
+.dark .entity-list,
+.dark .entity-item,
+.dark .chapter-tree,
+.dark .character-sheet,
+.dark .document-viewer,
+.dark .entity-inspector,
+.dark .merge-dialog-content,
+.dark .timeline-view,
+.dark .alerts-view,
+html.dark .entity-list,
+html.dark .entity-item,
+html.dark .chapter-tree,
+html.dark .character-sheet,
+html.dark .document-viewer,
+html.dark .entity-inspector,
+html.dark .merge-dialog-content,
+html.dark .timeline-view,
+html.dark .alerts-view {
+  background: var(--p-surface-800, #1e293b) !important;
+  color: var(--p-text-color, #f1f5f9) !important;
+}
+
+/* Cards y paneles en dark mode */
+.dark .p-card,
+.dark .p-panel,
+.dark .p-dialog,
+html.dark .p-card,
+html.dark .p-panel,
+html.dark .p-dialog {
+  background: var(--p-surface-800, #1e293b) !important;
+}
+
+.dark .p-card .p-card-body,
+.dark .p-panel .p-panel-content,
+html.dark .p-card .p-card-body,
+html.dark .p-panel .p-panel-content {
+  background: var(--p-surface-800, #1e293b) !important;
+}
+
+/* --- Texto secundario con mejor contraste --- */
+.dark .text-secondary,
+.dark .text-muted,
+.dark [class*="text-color-secondary"],
+html.dark .text-secondary,
+html.dark .text-muted,
+html.dark [class*="text-color-secondary"] {
+  color: var(--p-surface-400, #94a3b8) !important;
+}
+
+/* Texto en elementos de lista y menús */
+.dark .p-menuitem-text,
+.dark .p-listbox-item,
+.dark .p-dropdown-item,
+.dark .p-tree-node-label,
+html.dark .p-menuitem-text,
+html.dark .p-listbox-item,
+html.dark .p-dropdown-item,
+html.dark .p-tree-node-label {
+  color: var(--p-text-color, #f1f5f9) !important;
+}
+
+/* --- Bordes más visibles en dark mode --- */
+.dark .p-card,
+.dark .p-panel,
+.dark .p-inputtext,
+.dark .p-dropdown,
+.dark .p-multiselect,
+.dark .p-textarea,
+html.dark .p-card,
+html.dark .p-panel,
+html.dark .p-inputtext,
+html.dark .p-dropdown,
+html.dark .p-multiselect,
+html.dark .p-textarea {
+  border-color: var(--p-surface-600, #475569) !important;
+}
+
+/* --- Headers y títulos en dark mode --- */
+.dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6,
+html.dark h1, html.dark h2, html.dark h3, html.dark h4, html.dark h5, html.dark h6 {
+  color: var(--p-text-color, #f8fafc) !important;
+}
+
+/* --- Mensajes y alertas en dark mode con mejor contraste --- */
+.dark .p-message-info,
+.dark .p-toast-message-info,
+html.dark .p-message-info,
+html.dark .p-toast-message-info {
+  background: rgba(59, 130, 246, 0.15) !important;
+  border-color: rgba(59, 130, 246, 0.4) !important;
+  color: #93c5fd !important;
+}
+
+.dark .p-message-success,
+.dark .p-toast-message-success,
+html.dark .p-message-success,
+html.dark .p-toast-message-success {
+  background: rgba(34, 197, 94, 0.15) !important;
+  border-color: rgba(34, 197, 94, 0.4) !important;
+  color: #86efac !important;
+}
+
+.dark .p-message-warn,
+.dark .p-toast-message-warn,
+html.dark .p-message-warn,
+html.dark .p-toast-message-warn {
+  background: rgba(234, 179, 8, 0.15) !important;
+  border-color: rgba(234, 179, 8, 0.4) !important;
+  color: #fde047 !important;
+}
+
+.dark .p-message-error,
+.dark .p-toast-message-error,
+html.dark .p-message-error,
+html.dark .p-toast-message-error {
+  background: rgba(239, 68, 68, 0.15) !important;
+  border-color: rgba(239, 68, 68, 0.4) !important;
+  color: #fca5a5 !important;
+}
+
+/* Iconos de mensaje en dark mode */
+.dark .p-message-icon,
+.dark .p-toast-message-icon,
+html.dark .p-message-icon,
+html.dark .p-toast-message-icon {
+  color: inherit !important;
+}
+
+/* --- Dropdowns y overlays en dark mode --- */
+.dark .p-dropdown-panel,
+.dark .p-multiselect-panel,
+.dark .p-menu,
+.dark .p-contextmenu,
+.dark .p-tieredmenu,
+html.dark .p-dropdown-panel,
+html.dark .p-multiselect-panel,
+html.dark .p-menu,
+html.dark .p-contextmenu,
+html.dark .p-tieredmenu {
+  background: var(--p-surface-800, #1e293b) !important;
+  border-color: var(--p-surface-600, #475569) !important;
+}
+
+.dark .p-dropdown-item:hover,
+.dark .p-multiselect-item:hover,
+.dark .p-menuitem-content:hover,
+html.dark .p-dropdown-item:hover,
+html.dark .p-multiselect-item:hover,
+html.dark .p-menuitem-content:hover {
+  background: var(--p-surface-700, #334155) !important;
+}
+
+/* --- Tabs en dark mode --- */
+.dark .p-tabview-panels,
+.dark .p-tabview-nav,
+html.dark .p-tabview-panels,
+html.dark .p-tabview-nav {
+  background: var(--p-surface-800, #1e293b) !important;
+}
+
+.dark .p-tabview-nav-link,
+html.dark .p-tabview-nav-link {
+  color: var(--p-surface-400, #94a3b8) !important;
+}
+
+.dark .p-tabview-nav-link.p-tabview-nav-link-active,
+.dark .p-tabview-nav-link[aria-selected="true"],
+html.dark .p-tabview-nav-link.p-tabview-nav-link-active,
+html.dark .p-tabview-nav-link[aria-selected="true"] {
+  color: var(--p-primary-color, #60a5fa) !important;
+}
+
+/* --- Inputs en dark mode con texto legible --- */
+.dark .p-inputtext,
+.dark .p-textarea,
+.dark .p-dropdown .p-dropdown-label,
+.dark .p-multiselect .p-multiselect-label,
+html.dark .p-inputtext,
+html.dark .p-textarea,
+html.dark .p-dropdown .p-dropdown-label,
+html.dark .p-multiselect .p-multiselect-label {
+  background: var(--p-surface-900, #0f172a) !important;
+  color: var(--p-text-color, #f1f5f9) !important;
+}
+
+/* Placeholder en dark mode - WCAG AA: mínimo 4.5:1 */
+.dark .p-inputtext::placeholder,
+.dark .p-textarea::placeholder,
+html.dark .p-inputtext::placeholder,
+html.dark .p-textarea::placeholder {
+  color: #94a3b8 !important; /* gray-400: 5.5:1 sobre #0f172a */
+}
+
+/* Placeholder en light mode - garantizar contraste en todos los temas */
+.p-inputtext::placeholder,
+.p-textarea::placeholder {
+  color: #64748b !important; /* gray-500: 4.6:1 sobre blanco */
+}
+
+/* --- Botones secundarios y outlined en dark mode --- */
+.dark .p-button-secondary,
+.dark .p-button-outlined,
+html.dark .p-button-secondary,
+html.dark .p-button-outlined {
+  color: var(--p-text-color, #f1f5f9) !important;
+  border-color: var(--p-surface-500, #64748b) !important;
+}
+
+.dark .p-button-secondary:hover,
+.dark .p-button-outlined:hover,
+html.dark .p-button-secondary:hover,
+html.dark .p-button-outlined:hover {
+  background: var(--p-surface-700, #334155) !important;
+}
+
+/* --- DataTable en dark mode --- */
+.dark .p-datatable,
+.dark .p-datatable-header,
+.dark .p-datatable-thead > tr > th,
+.dark .p-datatable-tbody > tr,
+html.dark .p-datatable,
+html.dark .p-datatable-header,
+html.dark .p-datatable-thead > tr > th,
+html.dark .p-datatable-tbody > tr {
+  background: var(--p-surface-800, #1e293b) !important;
+  color: var(--p-text-color, #f1f5f9) !important;
+}
+
+.dark .p-datatable-tbody > tr:nth-child(even),
+html.dark .p-datatable-tbody > tr:nth-child(even) {
+  background: var(--p-surface-850, #1a2332) !important;
+}
+
+.dark .p-datatable-tbody > tr:hover,
+html.dark .p-datatable-tbody > tr:hover {
+  background: var(--p-surface-700, #334155) !important;
+}
+
+/* --- Dialog en dark mode --- */
+.dark .p-dialog-header,
+.dark .p-dialog-content,
+.dark .p-dialog-footer,
+html.dark .p-dialog-header,
+html.dark .p-dialog-content,
+html.dark .p-dialog-footer {
+  background: var(--p-surface-800, #1e293b) !important;
+  color: var(--p-text-color, #f1f5f9) !important;
+}
+
+.dark .p-dialog-header,
+html.dark .p-dialog-header {
+  border-bottom-color: var(--p-surface-600, #475569) !important;
+}
+
+.dark .p-dialog-footer,
+html.dark .p-dialog-footer {
+  border-top-color: var(--p-surface-600, #475569) !important;
+}
+
+/* --- Chips/Tokens en dark mode --- */
+.dark .p-chip,
+.dark .p-multiselect-token,
+html.dark .p-chip,
+html.dark .p-multiselect-token {
+  background: var(--p-surface-600, #475569) !important;
+  color: var(--p-text-color, #f1f5f9) !important;
+}
+
+/* --- Tree en dark mode --- */
+.dark .p-tree,
+.dark .p-tree-container,
+html.dark .p-tree,
+html.dark .p-tree-container {
+  background: var(--p-surface-800, #1e293b) !important;
+}
+
+.dark .p-treenode-content:hover,
+html.dark .p-treenode-content:hover {
+  background: var(--p-surface-700, #334155) !important;
+}
+
+/* --- Scrollbar en dark mode --- */
+.dark ::-webkit-scrollbar-track,
+html.dark ::-webkit-scrollbar-track {
+  background: var(--p-surface-800, #1e293b) !important;
+}
+
+.dark ::-webkit-scrollbar-thumb,
+html.dark ::-webkit-scrollbar-thumb {
+  background: var(--p-surface-600, #475569) !important;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover,
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: var(--p-surface-500, #64748b) !important;
+}
+
+/* ============================================================================
+   BUTTON TEXT CONTRAST - Garantizar contraste en todos los temas
+   ============================================================================ */
+
+/* Botones text deben tener color con buen contraste */
+.p-button-text {
+  color: var(--p-primary-600, #2563eb) !important;
+}
+
+.p-button-text:hover {
+  background: color-mix(in srgb, var(--p-primary-500, #3b82f6) 12%, transparent) !important;
+  color: var(--p-primary-700, #1d4ed8) !important;
+}
+
+/* Dark mode: botones text más brillantes */
+.dark .p-button-text,
+html.dark .p-button-text {
+  color: var(--p-primary-400, #60a5fa) !important;
+}
+
+.dark .p-button-text:hover,
+html.dark .p-button-text:hover {
+  background: color-mix(in srgb, var(--p-primary-400, #60a5fa) 15%, transparent) !important;
+  color: var(--p-primary-300, #93c5fd) !important;
+}
+
+/* Botones text con severity */
+.p-button-text.p-button-success {
+  color: var(--p-green-700, #15803d) !important;
+}
+
+.p-button-text.p-button-danger {
+  color: var(--p-red-700, #b91c1c) !important;
+}
+
+.p-button-text.p-button-warning {
+  color: var(--p-yellow-700, #a16207) !important;
+}
+
+.p-button-text.p-button-secondary {
+  color: var(--p-text-color, #374151) !important;
+}
+
+/* Dark mode severity buttons */
+.dark .p-button-text.p-button-success,
+html.dark .p-button-text.p-button-success {
+  color: var(--p-green-400, #4ade80) !important;
+}
+
+.dark .p-button-text.p-button-danger,
+html.dark .p-button-text.p-button-danger {
+  color: var(--p-red-400, #f87171) !important;
+}
+
+.dark .p-button-text.p-button-warning,
+html.dark .p-button-text.p-button-warning {
+  color: var(--p-yellow-400, #facc15) !important;
+}
+
+.dark .p-button-text.p-button-secondary,
+html.dark .p-button-text.p-button-secondary {
+  color: var(--p-surface-400, #9ca3af) !important;
+}
+
+/* ============================================================================
+   ICON-ONLY BUTTONS - Garantizar contraste en TODOS los temas
+   ============================================================================ */
+
+/* Botones icon-only (text + rounded) necesitan color oscuro fijo */
+.p-button-text.p-button-rounded:not(.p-button-success):not(.p-button-danger):not(.p-button-warning) {
+  color: #1d4ed8 !important; /* blue-700: 4.6:1 sobre blanco, 4.0:1 sobre sepia */
+}
+
+.p-button-text.p-button-rounded:hover {
+  background: rgba(59, 130, 246, 0.12) !important;
+  color: #1e40af !important; /* blue-800 */
+}
+
+/* Dark mode icon buttons */
+.dark .p-button-text.p-button-rounded:not(.p-button-success):not(.p-button-danger):not(.p-button-warning),
+html.dark .p-button-text.p-button-rounded:not(.p-button-success):not(.p-button-danger):not(.p-button-warning) {
+  color: #93c5fd !important; /* blue-300: 8.5:1 sobre dark bg */
+}
+
+.dark .p-button-text.p-button-rounded:hover,
+html.dark .p-button-text.p-button-rounded:hover {
+  background: rgba(147, 197, 253, 0.15) !important;
+  color: #bfdbfe !important; /* blue-200 */
+}
+
+/* Botones outlined necesitan mejor contraste */
+.p-button-outlined {
+  color: #1d4ed8 !important; /* blue-700 */
+  border-color: #3b82f6 !important; /* blue-500 */
+}
+
+.p-button-outlined:hover {
+  background: rgba(59, 130, 246, 0.08) !important;
+  color: #1e40af !important;
+}
+
+.dark .p-button-outlined,
+html.dark .p-button-outlined {
+  color: #93c5fd !important; /* blue-300 */
+  border-color: #60a5fa !important; /* blue-400 */
+}
+
+.dark .p-button-outlined:hover,
+html.dark .p-button-outlined:hover {
+  background: rgba(147, 197, 253, 0.12) !important;
+  color: #bfdbfe !important;
+}
+
+/* ============================================================================
+   FLOATING ACTION BUTTONS - WCAG compliant in all themes
+   ============================================================================ */
+
+/* Floating action buttons container - consistent background across themes */
+.floating-actions {
+  background: var(--p-surface-0, #ffffff) !important;
+}
+
+.dark .floating-actions,
+html.dark .floating-actions {
+  background: var(--p-surface-800, #1e293b) !important;
+}
+
+/* Force icon buttons in floating actions to have proper contrast */
+.floating-actions .p-button {
+  color: #1e40af !important; /* blue-800: 8.5:1 on white */
+}
+
+.floating-actions .p-button:hover {
+  color: #1d4ed8 !important; /* blue-700 */
+  background: rgba(59, 130, 246, 0.12) !important;
+}
+
+/* Dark mode floating action buttons */
+.dark .floating-actions .p-button,
+html.dark .floating-actions .p-button {
+  color: #93c5fd !important; /* blue-300: 8.5:1 on dark */
+}
+
+.dark .floating-actions .p-button:hover,
+html.dark .floating-actions .p-button:hover {
+  color: #bfdbfe !important; /* blue-200 */
+  background: rgba(147, 197, 253, 0.15) !important;
+}
+
+/* ============================================================================
+   TEXT BUTTONS (general) - More specific selectors for all themes
+   ============================================================================ */
+
+/* Light mode: all themes including Scrivener sepia */
+.p-button.p-button-text:not([class*="-success"]):not([class*="-danger"]):not([class*="-warning"]):not([class*="-secondary"]) {
+  color: #1e40af !important; /* blue-800: 8.5:1 on white, 7.2:1 on sepia */
+}
+
+.p-button.p-button-text:not([class*="-success"]):not([class*="-danger"]):not([class*="-warning"]):not([class*="-secondary"]):hover {
+  color: #1d4ed8 !important;
+  background: rgba(59, 130, 246, 0.1) !important;
+}
+
+/* Dark mode text buttons */
+.dark .p-button.p-button-text:not([class*="-success"]):not([class*="-danger"]):not([class*="-warning"]):not([class*="-secondary"]),
+html.dark .p-button.p-button-text:not([class*="-success"]):not([class*="-danger"]):not([class*="-warning"]):not([class*="-secondary"]) {
+  color: #93c5fd !important; /* blue-300 */
+}
+
+.dark .p-button.p-button-text:not([class*="-success"]):not([class*="-danger"]):not([class*="-warning"]):not([class*="-secondary"]):hover,
+html.dark .p-button.p-button-text:not([class*="-success"]):not([class*="-danger"]):not([class*="-warning"]):not([class*="-secondary"]):hover {
+  color: #bfdbfe !important;
+  background: rgba(147, 197, 253, 0.12) !important;
+}
+
+/* ============================================================================
+   DOCUMENT VIEWER THEME CSS VARIABLES
+   ============================================================================
+   These variables control the document viewer appearance across all themes.
+   Each theme sets its own values; fallbacks use PrimeVue variables.
+   ============================================================================ */
+
+/* --- Default / Standard Themes (Aura, Lara, Material, Nora) - Light Mode --- */
+html:not(.dark):not(.scrivener-theme):not(.grammarly-theme),
+:root:not(.dark):not(.scrivener-theme):not(.grammarly-theme) {
+  --app-document-bg: var(--p-surface-0, #ffffff);
+  --app-document-text: var(--p-text-color, #1f2937);
+  --app-toolbar-bg: var(--p-surface-50, #fafafa);
+  --app-toolbar-border: var(--p-surface-200, #e5e5e5);
+  --app-text-secondary: var(--p-text-muted-color, #6b7280);
+}
+
+/* --- Default / Standard Themes - Dark Mode --- */
+html.dark:not(.scrivener-theme):not(.grammarly-theme) {
+  --app-document-bg: var(--p-surface-0, #0f172a);
+  --app-document-text: var(--p-text-color, #e2e8f0);
+  --app-toolbar-bg: var(--p-surface-50, #1e293b);
+  --app-toolbar-border: var(--p-surface-200, #334155);
+  --app-text-secondary: var(--p-text-muted-color, #94a3b8);
+}
+
+/* ============================================================================
+   GRAMMARLY THEME - Paleta gris neutra
+   ============================================================================
+   Grammarly usa grises neutros profesionales.
+   Light: #FFFFFF → #121212
+   Dark:  #121212 → #FAFAFA
+   ============================================================================ */
+
+/* --- Grammarly Light Mode --- */
+html.grammarly-theme:not(.dark),
+.grammarly-theme:not(.dark) {
+  --app-document-bg: #FFFFFF;
+  --app-document-text: #212121;
+  --app-toolbar-bg: #FAFAFA;
+  --app-toolbar-border: #E0E0E0;
+  --app-text-secondary: #757575;
+}
+
+/* --- Grammarly Dark Mode --- */
+html.grammarly-theme.dark,
+.grammarly-theme.dark {
+  --app-document-bg: #121212;
+  --app-document-text: #E5E5E5;
+  --app-toolbar-bg: #1E1E1E;
+  --app-toolbar-border: #2C2C2C;
+  --app-text-secondary: #A8A8A8;
+}
+
+/* Document viewer específico para Grammarly */
+html.grammarly-theme .document-viewer,
+html.grammarly-theme .viewer-content,
+.grammarly-theme .document-viewer,
+.grammarly-theme .viewer-content {
+  background: var(--app-document-bg) !important;
+  color: var(--app-document-text) !important;
+}
+
+html.grammarly-theme .viewer-toolbar,
+.grammarly-theme .viewer-toolbar {
+  background: var(--app-toolbar-bg) !important;
+  border-color: var(--app-toolbar-border) !important;
+}
+
+html.grammarly-theme .document-content,
+html.grammarly-theme .chapter-text,
+html.grammarly-theme .chapter-text p,
+html.grammarly-theme .chapter-title,
+.grammarly-theme .document-content,
+.grammarly-theme .chapter-text,
+.grammarly-theme .chapter-text p,
+.grammarly-theme .chapter-title {
+  color: var(--app-document-text) !important;
+}
+
+html.grammarly-theme .word-count,
+.grammarly-theme .word-count {
+  color: var(--app-text-secondary) !important;
+}
+
+/* ============================================================================
+   SCRIVENER THEME - Paleta sepia específica
+   ============================================================================
+   Scrivener usa tonos sepia cálidos, NO grises/azules estándar.
+   Light: #FBF7F0 (base) → #1A170F (oscuro)
+   Dark:  #1A170F (base) → #F7F2E8 (claro)
+   ============================================================================ */
+
+/* --- Scrivener Light Mode --- */
+/* Set CSS variables at root level for theme-aware components */
+html.scrivener-theme:not(.dark),
+.scrivener-theme:not(.dark) {
+  --app-document-bg: #FBF7F0;
+  --app-document-text: #322E20;
+  --app-toolbar-bg: #F7F2E8;
+  --app-toolbar-border: #E8DCC8;
+  --app-text-secondary: #6E6248;
+}
+
+/* --- Scrivener Dark Mode --- */
+html.scrivener-theme.dark,
+.scrivener-theme.dark {
+  --app-document-bg: #1A170F;
+  --app-document-text: #E8DCC8;
+  --app-toolbar-bg: #252114;
+  --app-toolbar-border: #3E3626;
+  --app-text-secondary: #A89878;
+}
+
+/* Document viewer específico para Scrivener - force override scoped styles */
+html.scrivener-theme .document-viewer,
+html.scrivener-theme .viewer-content,
+.scrivener-theme .document-viewer,
+.scrivener-theme .viewer-content {
+  background: var(--app-document-bg) !important;
+  color: var(--app-document-text) !important;
+}
+
+html.scrivener-theme .viewer-toolbar,
+.scrivener-theme .viewer-toolbar {
+  background: var(--app-toolbar-bg) !important;
+  border-color: var(--app-toolbar-border) !important;
+}
+
+/* Texto del documento en Scrivener */
+html.scrivener-theme .document-content,
+html.scrivener-theme .chapter-text,
+html.scrivener-theme .chapter-text p,
+html.scrivener-theme .chapter-title,
+.scrivener-theme .document-content,
+.scrivener-theme .chapter-text,
+.scrivener-theme .chapter-text p,
+.scrivener-theme .chapter-title {
+  color: var(--app-document-text) !important;
+}
+
+/* Textos secundarios (word count, etc) en Scrivener */
+html.scrivener-theme .word-count,
+html.scrivener-theme .text-color-secondary,
+.scrivener-theme .word-count,
+.scrivener-theme .text-color-secondary {
+  color: var(--app-text-secondary) !important;
+}
+
+/* Botones del toolbar en Scrivener dark - contraste WCAG AA */
+.scrivener-theme.dark .viewer-toolbar .p-button,
+.scrivener-theme.dark .viewer-toolbar .p-button-text,
+html.scrivener-theme.dark .viewer-toolbar .p-button,
+html.scrivener-theme.dark .viewer-toolbar .p-button-text {
+  color: #D8CAB0 !important; /* sepia-300: 6.5:1 sobre #1A170F */
+}
+
+.scrivener-theme.dark .viewer-toolbar .p-button:hover,
+.scrivener-theme.dark .viewer-toolbar .p-button-text:hover,
+html.scrivener-theme.dark .viewer-toolbar .p-button:hover,
+html.scrivener-theme.dark .viewer-toolbar .p-button-text:hover {
+  color: #E8DCC8 !important; /* sepia-200: más claro */
+  background: rgba(216, 202, 176, 0.12) !important;
+}
+
+/* Botones icon-only en Scrivener dark */
+.scrivener-theme.dark .p-button-text.p-button-rounded,
+html.scrivener-theme.dark .p-button-text.p-button-rounded {
+  color: #C4B494 !important; /* sepia-400: 4.9:1 - WCAG AA */
+}
+
+.scrivener-theme.dark .p-button-text.p-button-rounded:hover,
+html.scrivener-theme.dark .p-button-text.p-button-rounded:hover {
+  color: #D8CAB0 !important;
+  background: rgba(196, 180, 148, 0.15) !important;
+}
+
+/* Floating actions en Scrivener */
+.scrivener-theme .floating-actions {
+  background: var(--app-toolbar-bg, #F7F2E8) !important;
+  border-color: var(--app-toolbar-border, #E8DCC8) !important;
+}
+
+.scrivener-theme.dark .floating-actions,
+html.scrivener-theme.dark .floating-actions {
+  background: #252114 !important; /* sepia-50 dark */
+  border-color: #3E3626 !important;
+}
+
+.scrivener-theme.dark .floating-actions .p-button,
+html.scrivener-theme.dark .floating-actions .p-button {
+  color: #C4B494 !important;
+}
+
+.scrivener-theme.dark .floating-actions .p-button:hover,
+html.scrivener-theme.dark .floating-actions .p-button:hover {
+  color: #D8CAB0 !important;
+  background: rgba(196, 180, 148, 0.15) !important;
+}
+
+/* Grammarly Theme - Additional styles moved to main Grammarly section above */

@@ -45,3 +45,26 @@ frontend/node_modules/
 *.tmp
 .cache/
 nul
+
+# Test results and reports
+frontend/test-results/
+frontend/playwright-report/
+test-results/
+*.spec.ts-snapshots/
+
+# Tauri build artifacts
+src-tauri/target/
+src-tauri/binaries/
+src-tauri/gen/
+
+# Evaluation outputs (development only)
+ner_eval_output.txt
+NER_EVALUATION_REPORT.md
+QUICK_FIXES_NER.md
+
+# Test books (contain copyrighted content)
+test_books/
+
+# Development scripts outputs
+*.spec (PyInstaller)
+api-server/*.spec

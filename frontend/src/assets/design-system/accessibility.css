@@ -1,0 +1,429 @@
+/**
+ * Accessibility Styles - WCAG 2.1 AA Compliance
+ *
+ * Este archivo contiene estilos globales para mejorar la accesibilidad:
+ * - Focus rings visibles y consistentes
+ * - Skip links para navegación por teclado
+ * - Soporte para prefers-reduced-motion
+ * - Mejoras de contraste
+ * - Estilos para lectores de pantalla
+ */
+
+/* =============================================================================
+   1. SKIP LINKS
+   ============================================================================= */
+
+/**
+ * Skip link para saltar al contenido principal.
+ * Visible solo cuando tiene focus (navegación por teclado).
+ */
+.skip-link {
+  position: fixed;
+  top: -100%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10000;
+  padding: 1rem 2rem;
+  background: var(--p-primary-color, var(--ds-primary-500));
+  color: var(--p-primary-contrast-color, white);
+  font-weight: 600;
+  text-decoration: none;
+  border-radius: var(--ds-radius-md);
+  box-shadow: var(--ds-shadow-lg);
+  transition: top var(--ds-duration-fast) var(--ds-ease-out);
+}
+
+.skip-link:focus {
+  top: 1rem;
+  outline: none;
+}
+
+/* =============================================================================
+   2. FOCUS STATES - Global Overrides
+   ============================================================================= */
+
+/**
+ * Focus ring por defecto para todos los elementos interactivos.
+ * Usamos :focus-visible para no mostrar el ring en clicks de mouse.
+ */
+
+/* Reset del outline por defecto */
+*:focus {
+  outline: none;
+}
+
+/* Focus visible - ring azul consistente */
+*:focus-visible {
+  outline: 2px solid var(--p-primary-color, var(--ds-primary-500));
+  outline-offset: 2px;
+}
+
+/* Botones, inputs y elementos de formulario */
+button:focus-visible,
+[role="button"]:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible:not([tabindex="-1"]) {
+  outline: 2px solid var(--p-primary-color, var(--ds-primary-500));
+  outline-offset: 2px;
+  box-shadow: var(--ds-focus-ring);
+}
+
+/* Links */
+a:focus-visible {
+  outline: 2px solid var(--p-primary-color, var(--ds-primary-500));
+  outline-offset: 2px;
+  border-radius: var(--ds-radius-sm);
+}
+
+/* =============================================================================
+   3. PRIMEVUE FOCUS OVERRIDES
+   ============================================================================= */
+
+/**
+ * Mejorar los focus rings de PrimeVue para mayor visibilidad.
+ */
+
+/* Botones PrimeVue */
+.p-button:focus-visible {
+  outline: 2px solid var(--p-primary-color) !important;
+  outline-offset: 2px !important;
+  box-shadow: var(--ds-focus-ring) !important;
+}
+
+/* Inputs PrimeVue */
+.p-inputtext:focus-visible,
+.p-textarea:focus-visible,
+.p-dropdown:focus-visible,
+.p-multiselect:focus-visible,
+.p-autocomplete-input:focus-visible {
+  outline: 2px solid var(--p-primary-color) !important;
+  outline-offset: 0 !important;
+  border-color: var(--p-primary-color) !important;
+}
+
+/* Checkboxes y Radio buttons */
+.p-checkbox:focus-visible .p-checkbox-box,
+.p-radiobutton:focus-visible .p-radiobutton-box {
+  outline: 2px solid var(--p-primary-color);
+  outline-offset: 2px;
+}
+
+/* Select buttons */
+.p-selectbutton .p-button:focus-visible {
+  outline: 2px solid var(--p-primary-color) !important;
+  outline-offset: -2px !important;
+  z-index: 1;
+}
+
+/* Tabs */
+.p-tabview-nav-link:focus-visible {
+  outline: 2px solid var(--p-primary-color) !important;
+  outline-offset: -2px !important;
+}
+
+/* Menu items */
+.p-menuitem-link:focus-visible,
+.p-listbox-item:focus-visible,
+.p-dropdown-item:focus-visible {
+  outline: 2px solid var(--p-primary-color) !important;
+  outline-offset: -2px !important;
+  background: color-mix(in srgb, var(--p-primary-color) 10%, transparent) !important;
+}
+
+/* Cards interactivas */
+.p-card:focus-visible {
+  outline: 2px solid var(--p-primary-color);
+  outline-offset: 2px;
+}
+
+/* DataTable rows */
+.p-datatable-row:focus-visible {
+  outline: 2px solid var(--p-primary-color);
+  outline-offset: -2px;
+}
+
+/* Tree nodes */
+.p-tree-node-content:focus-visible {
+  outline: 2px solid var(--p-primary-color) !important;
+  outline-offset: -2px !important;
+}
+
+/* Dialog close button */
+.p-dialog-header-close:focus-visible {
+  outline: 2px solid var(--p-primary-color) !important;
+  outline-offset: 2px !important;
+}
+
+/* =============================================================================
+   4. REDUCED MOTION
+   ============================================================================= */
+
+/**
+ * Respetar la preferencia del usuario de reducir animaciones.
+ * Aplicado globalmente cuando el usuario tiene esta preferencia activa.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/**
+ * Clase para forzar reducción de movimiento desde la configuración de la app.
+ * Se añade a <html> cuando el usuario activa la opción en preferencias.
+ */
+.reduced-motion,
+.reduced-motion *,
+.reduced-motion *::before,
+.reduced-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* =============================================================================
+   5. HIGH CONTRAST MODE
+   ============================================================================= */
+
+/**
+ * Mejoras para modo de alto contraste de Windows.
+ */
+@media (forced-colors: active) {
+  /* Asegurar que los focus rings sean visibles */
+  *:focus-visible {
+    outline: 3px solid CanvasText !important;
+    outline-offset: 2px !important;
+  }
+
+  /* Botones con borde visible */
+  button,
+  [role="button"],
+  .p-button {
+    border: 2px solid ButtonText !important;
+  }
+
+  /* Links distinguibles */
+  a {
+    text-decoration: underline !important;
+  }
+}
+
+/* =============================================================================
+   6. SCREEN READER UTILITIES
+   ============================================================================= */
+
+/**
+ * Ocultar visualmente pero mantener accesible para lectores de pantalla.
+ */
+.sr-only,
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/**
+ * Mostrar solo cuando tiene focus (útil para skip links).
+ */
+.sr-only-focusable:focus,
+.sr-only-focusable:focus-within {
+  position: static;
+  width: auto;
+  height: auto;
+  padding: inherit;
+  margin: inherit;
+  overflow: visible;
+  clip: auto;
+  clip-path: none;
+  white-space: normal;
+}
+
+/* =============================================================================
+   7. ARIA LIVE REGIONS
+   ============================================================================= */
+
+/**
+ * Estilos para regiones ARIA live que anuncian cambios.
+ * Por defecto ocultas visualmente.
+ */
+[aria-live="polite"],
+[aria-live="assertive"] {
+  /* Puede estar visible o usar sr-only según el caso */
+}
+
+/* Región de estado oculta */
+.status-announcer {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* =============================================================================
+   8. TOUCH TARGETS
+   ============================================================================= */
+
+/**
+ * Asegurar targets de toque mínimos de 44x44px (WCAG 2.5.5).
+ */
+@media (pointer: coarse) {
+  button,
+  [role="button"],
+  a,
+  input[type="checkbox"],
+  input[type="radio"],
+  .p-button,
+  .p-checkbox,
+  .p-radiobutton {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* Elementos de lista clickeables */
+  .p-listbox-item,
+  .p-dropdown-item,
+  .p-menuitem-link {
+    min-height: 44px;
+    padding-block: 0.75rem;
+  }
+}
+
+/* =============================================================================
+   9. TEXT SELECTION
+   ============================================================================= */
+
+/**
+ * Mejorar la selección de texto para mejor visibilidad.
+ */
+::selection {
+  background: var(--p-primary-color, var(--ds-primary-500));
+  color: var(--p-primary-contrast-color, white);
+}
+
+::-moz-selection {
+  background: var(--p-primary-color, var(--ds-primary-500));
+  color: var(--p-primary-contrast-color, white);
+}
+
+/* =============================================================================
+   10. CONTRAST ENHANCEMENTS
+   ============================================================================= */
+
+/**
+ * Asegurar contraste mínimo WCAG AA (4.5:1 para texto normal, 3:1 para texto grande).
+ * Estos ajustes mejoran la legibilidad en todos los temas.
+ */
+
+/* Texto deshabilitado con mejor contraste */
+.p-disabled,
+[disabled],
+:disabled {
+  opacity: 0.6 !important; /* Mejora de 0.38 default a 0.6 para mejor legibilidad */
+}
+
+/* Labels de formulario con buen contraste */
+label,
+.p-label {
+  color: var(--p-text-color);
+  font-weight: 500;
+}
+
+/* Texto secundario/muted más legible */
+.text-muted,
+.p-text-secondary {
+  color: var(--p-text-muted-color, var(--p-surface-600));
+}
+
+.dark .text-muted,
+.dark .p-text-secondary {
+  color: var(--p-text-muted-color, var(--p-surface-400));
+}
+
+/* Placeholders con contraste adecuado */
+::placeholder {
+  color: var(--p-surface-500);
+  opacity: 1;
+}
+
+.dark ::placeholder {
+  color: var(--p-surface-500);
+}
+
+/* Bordes más visibles */
+.p-inputtext,
+.p-dropdown,
+.p-multiselect,
+.p-textarea {
+  border-color: var(--p-surface-300);
+}
+
+.dark .p-inputtext,
+.dark .p-dropdown,
+.dark .p-multiselect,
+.dark .p-textarea {
+  border-color: var(--p-surface-600);
+}
+
+/* Badges y tags con mejor contraste */
+.p-tag,
+.p-badge {
+  font-weight: 600;
+}
+
+/* Enlaces con subrayado por defecto para distinguirlos */
+main a:not(.p-button):not([role="button"]) {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+main a:not(.p-button):not([role="button"]):hover {
+  text-decoration-thickness: 2px;
+}
+
+/* =============================================================================
+   11. PRINT STYLES
+   ============================================================================= */
+
+@media print {
+  /* Mostrar URLs de links */
+  a[href]:after {
+    content: " (" attr(href) ")";
+    font-size: 0.8em;
+    color: #666;
+  }
+
+  /* No mostrar para links internos o javascript */
+  a[href^="#"]:after,
+  a[href^="javascript:"]:after {
+    content: "";
+  }
+
+  /* Ocultar elementos interactivos */
+  .skip-link,
+  button,
+  [role="button"],
+  nav {
+    display: none !important;
+  }
+}

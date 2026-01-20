@@ -95,7 +95,17 @@
 
       <!-- Behavioral Expectations -->
       <div class="profile-section">
-        <h4><i class="pi pi-eye"></i> Expectativas Comportamentales</h4>
+        <div class="section-header">
+          <h4><i class="pi pi-eye"></i> Expectativas Comportamentales</h4>
+          <Button
+            icon="pi pi-plus"
+            text
+            rounded
+            size="small"
+            @click="openAddExpectation"
+            v-tooltip.left="'Añadir expectativa manual'"
+          />
+        </div>
         <div v-if="profile.expectations.length > 0" class="expectations-list">
           <div
             v-for="(exp, idx) in profile.expectations"
@@ -108,6 +118,25 @@
                 {{ getExpectationTypeLabel(exp.expectation_type) }}
               </Tag>
               <span class="confidence">{{ (exp.confidence * 100).toFixed(0) }}% confianza</span>
+              <div class="expectation-actions">
+                <Button
+                  icon="pi pi-pencil"
+                  text
+                  rounded
+                  size="small"
+                  @click="openEditExpectation(idx)"
+                  v-tooltip.top="'Editar'"
+                />
+                <Button
+                  icon="pi pi-trash"
+                  text
+                  rounded
+                  size="small"
+                  severity="danger"
+                  @click="deleteExpectation(idx)"
+                  v-tooltip.top="'Eliminar'"
+                />
+              </div>
             </div>
             <p class="expectation-description">{{ exp.description }}</p>
             <div class="expectation-reasoning">
@@ -197,6 +226,64 @@
       <i class="pi pi-lightbulb empty-icon"></i>
       <p>Haz clic en "Analizar" para que la IA infiera las expectativas de comportamiento del personaje.</p>
     </div>
+
+    <!-- Diálogo de edición de expectativa -->
+    <Dialog
+      :visible="showExpectationDialog"
+      @update:visible="showExpectationDialog = $event"
+      modal
+      :header="editingExpectationIndex === -1 ? 'Añadir Expectativa' : 'Editar Expectativa'"
+      :style="{ width: '500px' }"
+    >
+      <div class="expectation-form">
+        <div class="form-field">
+          <label>Tipo de expectativa</label>
+          <Dropdown
+            v-model="editingExpectation.expectation_type"
+            :options="expectationTypes"
+            optionLabel="label"
+            optionValue="value"
+            placeholder="Selecciona un tipo"
+            class="w-full"
+          />
+        </div>
+
+        <div class="form-field">
+          <label>Descripción</label>
+          <Textarea
+            v-model="editingExpectation.description"
+            rows="3"
+            placeholder="Describe la expectativa de comportamiento..."
+            class="w-full"
+          />
+        </div>
+
+        <div class="form-field">
+          <label>Razonamiento</label>
+          <Textarea
+            v-model="editingExpectation.reasoning"
+            rows="2"
+            placeholder="¿Por qué se espera este comportamiento?"
+            class="w-full"
+          />
+        </div>
+
+        <div class="form-field">
+          <label>Confianza: {{ (editingExpectation.confidence * 100).toFixed(0) }}%</label>
+          <Slider v-model="editingExpectation.confidence" :min="0" :max="1" :step="0.05" class="w-full" />
+        </div>
+      </div>
+
+      <template #footer>
+        <Button label="Cancelar" text @click="showExpectationDialog = false" />
+        <Button
+          :label="editingExpectationIndex === -1 ? 'Añadir' : 'Guardar'"
+          icon="pi pi-check"
+          @click="saveExpectation"
+          :disabled="!editingExpectation.description.trim()"
+        />
+      </template>
+    </Dialog>
   </div>
 </template>
 
@@ -204,6 +291,10 @@
 import { ref, onMounted } from 'vue'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
+import Dialog from 'primevue/dialog'
+import Dropdown from 'primevue/dropdown'
+import Textarea from 'primevue/textarea'
+import Slider from 'primevue/slider'
 import ProgressSpinner from 'primevue/progressspinner'
 
 interface BehaviorProfile {
@@ -256,6 +347,28 @@ const llmModel = ref<string | null>(null)
 const availableMethods = ref<string[]>([])
 const profile = ref<BehaviorProfile | null>(null)
 const violations = ref<Violation[]>([])
+
+// Estado para edición de expectativas
+const showExpectationDialog = ref(false)
+const editingExpectationIndex = ref(-1)
+const editingExpectation = ref({
+  expectation_type: 'behavioral',
+  description: '',
+  reasoning: '',
+  confidence: 0.8,
+  source_chapters: [] as number[],
+  related_traits: [] as string[],
+  inference_method: 'manual'
+})
+
+const expectationTypes = [
+  { label: 'Comportamiento', value: 'behavioral' },
+  { label: 'Relacional', value: 'relational' },
+  { label: 'Conocimiento', value: 'knowledge' },
+  { label: 'Capacidad', value: 'capability' },
+  { label: 'Temporal', value: 'temporal' },
+  { label: 'Contextual', value: 'contextual' }
+]
 
 // Check LLM availability on mount
 onMounted(async () => {
@@ -393,6 +506,69 @@ const getMethodSeverity = (method: string): string => {
     'embeddings': 'contrast'
   }
   return severities[method] || 'secondary'
+}
+
+// Funciones de edición de expectativas
+const openAddExpectation = () => {
+  editingExpectationIndex.value = -1
+  editingExpectation.value = {
+    expectation_type: 'behavioral',
+    description: '',
+    reasoning: '',
+    confidence: 0.8,
+    source_chapters: [],
+    related_traits: [],
+    inference_method: 'manual'
+  }
+  showExpectationDialog.value = true
+}
+
+const openEditExpectation = (index: number) => {
+  if (!profile.value) return
+  editingExpectationIndex.value = index
+  const exp = profile.value.expectations[index]
+  editingExpectation.value = {
+    expectation_type: exp.expectation_type,
+    description: exp.description,
+    reasoning: exp.reasoning,
+    confidence: exp.confidence,
+    source_chapters: [...exp.source_chapters],
+    related_traits: [...exp.related_traits],
+    inference_method: exp.inference_method || 'manual'
+  }
+  showExpectationDialog.value = true
+}
+
+const saveExpectation = () => {
+  if (!profile.value) return
+
+  const newExp = {
+    expectation_type: editingExpectation.value.expectation_type,
+    description: editingExpectation.value.description,
+    reasoning: editingExpectation.value.reasoning,
+    confidence: editingExpectation.value.confidence,
+    source_chapters: editingExpectation.value.source_chapters,
+    related_traits: editingExpectation.value.related_traits,
+    inference_method: 'manual',
+    votes: { 'manual': 1.0 }
+  }
+
+  if (editingExpectationIndex.value === -1) {
+    // Añadir nueva
+    profile.value.expectations.push(newExp)
+  } else {
+    // Actualizar existente
+    profile.value.expectations[editingExpectationIndex.value] = newExp
+  }
+
+  showExpectationDialog.value = false
+  emit('profileLoaded', profile.value)
+}
+
+const deleteExpectation = (index: number) => {
+  if (!profile.value) return
+  profile.value.expectations.splice(index, 1)
+  emit('profileLoaded', profile.value)
 }
 </script>
 
@@ -730,5 +906,56 @@ const getMethodSeverity = (method: string): string => {
   padding: 0.125rem 0.25rem;
   border-radius: 3px;
   font-size: 0.8rem;
+}
+
+/* Estilos para edición de expectativas */
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.section-header h4 {
+  margin: 0;
+}
+
+.expectation-header {
+  position: relative;
+}
+
+.expectation-actions {
+  position: absolute;
+  right: 0;
+  top: 0;
+  display: flex;
+  gap: 0.25rem;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.expectation-item:hover .expectation-actions {
+  opacity: 1;
+}
+
+.expectation-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-field label {
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: var(--text-color);
+}
+
+.w-full {
+  width: 100%;
 }
 </style>

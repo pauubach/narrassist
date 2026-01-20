@@ -1,10 +1,14 @@
 <template>
   <div id="app" class="app-container">
+    <!-- Skip link para accesibilidad - permite saltar navegación -->
+    <a href="#main-content" class="skip-link">
+      Saltar al contenido principal
+    </a>
     <MenuBar />
-    <div class="app-content">
-      <Toast position="top-right" />
+    <main id="main-content" class="app-content" role="main" aria-label="Contenido principal">
+      <Toast position="top-right" aria-live="polite" />
       <RouterView />
-    </div>
+    </main>
     <KeyboardShortcutsDialog
       :visible="showShortcutsHelp"
       @update:visible="showShortcutsHelp = $event"
@@ -12,6 +16,15 @@
     <AboutDialog
       :visible="showAbout"
       @update:visible="showAbout = $event"
+    />
+    <TutorialDialog
+      :visible="showTutorial"
+      @update:visible="onTutorialVisibilityChange"
+      @complete="onTutorialComplete"
+    />
+    <UserGuideDialog
+      :visible="showUserGuide"
+      @update:visible="showUserGuide = $event"
     />
   </div>
 </template>
@@ -21,22 +34,84 @@ import { RouterView } from 'vue-router'
 import { onMounted, ref } from 'vue'
 import Toast from 'primevue/toast'
 import { useAppStore } from '@/stores/app'
+import { useThemeStore } from '@/stores/theme'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import KeyboardShortcutsDialog from '@/components/KeyboardShortcutsDialog.vue'
 import AboutDialog from '@/components/AboutDialog.vue'
+import TutorialDialog from '@/components/TutorialDialog.vue'
+import UserGuideDialog from '@/components/UserGuideDialog.vue'
 import MenuBar from '@/components/MenuBar.vue'
 
 const appStore = useAppStore()
+const themeStore = useThemeStore()
 const showShortcutsHelp = ref(false)
 const showAbout = ref(false)
+const showTutorial = ref(false)
+const showUserGuide = ref(false)
 
 // Activar atajos de teclado globales
 useKeyboardShortcuts()
+
+// Verificar si se debe mostrar el tutorial al inicio
+const checkTutorialStatus = () => {
+  // Si el usuario marcó "no mostrar más", no mostrar
+  const tutorialCompleted = localStorage.getItem('narrative_assistant_tutorial_completed')
+  console.log('[Tutorial] tutorialCompleted:', tutorialCompleted)
+  if (tutorialCompleted === 'true') {
+    console.log('[Tutorial] No mostrar: usuario marcó "no mostrar más"')
+    return false
+  }
+
+  // Si ya se mostró en esta sesión, no mostrar
+  const shownThisSession = sessionStorage.getItem('narrative_assistant_tutorial_shown')
+  console.log('[Tutorial] shownThisSession:', shownThisSession)
+  if (shownThisSession === 'true') {
+    console.log('[Tutorial] No mostrar: ya se mostró en esta sesión')
+    return false
+  }
+
+  console.log('[Tutorial] Mostrando tutorial')
+  return true
+}
+
+const onTutorialComplete = () => {
+  console.log('[Tutorial] onTutorialComplete llamado')
+  // Marcar como mostrado en esta sesión
+  sessionStorage.setItem('narrative_assistant_tutorial_shown', 'true')
+}
+
+// También marcar como mostrado cuando se cierra el tutorial (de cualquier forma)
+const onTutorialVisibilityChange = (visible: boolean) => {
+  console.log('[Tutorial] onTutorialVisibilityChange:', visible)
+  showTutorial.value = visible
+  // Si se cierra el diálogo, marcar como mostrado en esta sesión
+  if (!visible) {
+    sessionStorage.setItem('narrative_assistant_tutorial_shown', 'true')
+  }
+}
+
+// Función para mostrar el tutorial desde el menú
+const openTutorial = () => {
+  showTutorial.value = true
+}
 
 onMounted(() => {
   console.log('Narrative Assistant UI - v0.4.0')
   console.log('Vue 3.5 + PrimeVue 4')
   console.log(`Tema: ${appStore.theme} | Modo oscuro: ${appStore.isDark}`)
+
+  // Mostrar tutorial si es necesario
+  const shouldShowTutorial = checkTutorialStatus()
+  console.log('[Tutorial] shouldShowTutorial:', shouldShowTutorial)
+
+  if (shouldShowTutorial) {
+    // Delay más largo para asegurar que PrimeVue Dialog esté listo
+    setTimeout(() => {
+      console.log('[Tutorial] Activando showTutorial.value = true')
+      showTutorial.value = true
+      console.log('[Tutorial] showTutorial.value =', showTutorial.value)
+    }, 800)
+  }
 
   // Listeners para eventos de teclado
   window.addEventListener('keyboard:show-help', () => {
@@ -44,12 +119,30 @@ onMounted(() => {
   })
 
   window.addEventListener('keyboard:toggle-theme', () => {
-    appStore.toggleTheme()
+    themeStore.toggleMode()
   })
 
   // Listener para mostrar diálogo "Acerca de"
   window.addEventListener('menubar:about', () => {
     showAbout.value = true
+  })
+
+  // Listener para mostrar tutorial desde menú
+  window.addEventListener('menubar:tutorial', () => {
+    openTutorial()
+  })
+
+  // Listener para mostrar guía de usuario
+  window.addEventListener('menubar:user-guide', () => {
+    showUserGuide.value = true
+  })
+
+  // Listener para F1 - abrir ayuda
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'F1') {
+      e.preventDefault()
+      showUserGuide.value = true
+    }
   })
 })
 </script>

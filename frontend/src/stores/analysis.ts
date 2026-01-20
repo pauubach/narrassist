@@ -24,11 +24,124 @@ export interface AnalysisProgress {
   error?: string
 }
 
+/**
+ * Estado de fases ejecutadas para un proyecto.
+ * Permite mostrar tabs condicionales según qué análisis se han ejecutado.
+ */
+export interface ExecutedPhases {
+  // Parsing y estructura
+  parsing: boolean
+  structure: boolean
+  // Extracción
+  entities: boolean
+  coreference: boolean
+  attributes: boolean
+  // Relaciones e interacciones
+  relationships: boolean
+  interactions: boolean
+  // Calidad
+  spelling: boolean
+  grammar: boolean
+  register: boolean
+  pacing: boolean
+  coherence: boolean
+  // Análisis avanzado
+  temporal: boolean
+  emotional: boolean
+  sentiment: boolean
+  focalization: boolean
+  voice_profiles: boolean
+}
+
+/**
+ * Mapa de dependencias entre análisis.
+ * Un análisis no puede ejecutarse si sus dependencias no están completas.
+ */
+export const ANALYSIS_DEPENDENCIES: Record<keyof ExecutedPhases, (keyof ExecutedPhases)[]> = {
+  parsing: [],
+  structure: ['parsing'],
+  entities: ['parsing'],
+  coreference: ['entities'],
+  attributes: ['entities', 'coreference'],
+  relationships: ['entities', 'coreference'],
+  interactions: ['entities'],
+  spelling: ['parsing'],
+  grammar: ['parsing'],
+  register: ['parsing'],
+  pacing: ['structure'],
+  coherence: ['entities', 'structure'],
+  temporal: ['parsing'],
+  emotional: ['entities'],
+  sentiment: ['parsing'],
+  focalization: ['entities', 'structure'],
+  voice_profiles: ['entities', 'attributes'],
+}
+
+/**
+ * Nombres legibles para mostrar en la UI.
+ */
+export const PHASE_LABELS: Record<keyof ExecutedPhases, string> = {
+  parsing: 'Análisis inicial',
+  structure: 'Detección de estructura',
+  entities: 'Extracción de entidades',
+  coreference: 'Resolución de correferencias',
+  attributes: 'Extracción de atributos',
+  relationships: 'Detección de relaciones',
+  interactions: 'Detección de interacciones',
+  spelling: 'Ortografía',
+  grammar: 'Gramática',
+  register: 'Análisis de registro',
+  pacing: 'Análisis de ritmo',
+  coherence: 'Coherencia narrativa',
+  temporal: 'Marcadores temporales',
+  emotional: 'Análisis emocional',
+  sentiment: 'Arcos de sentimiento',
+  focalization: 'Focalización',
+  voice_profiles: 'Perfiles de voz',
+}
+
+/**
+ * Mapeo de tabs del workspace a las fases de análisis que requieren.
+ * Si una tab no está en el mapa, no requiere análisis específico.
+ */
+export type WorkspaceTab = 'text' | 'entities' | 'relationships' | 'alerts' | 'timeline' | 'style' | 'summary'
+
+export const TAB_REQUIRED_PHASES: Partial<Record<WorkspaceTab, keyof ExecutedPhases>> = {
+  // text: 'parsing', // Siempre disponible tras análisis inicial
+  entities: 'entities',
+  relationships: 'relationships',
+  // alerts: se generan progresivamente, siempre mostramos las disponibles
+  timeline: 'temporal',
+  style: 'register',
+  // summary: siempre disponible
+}
+
+/**
+ * Descripción de qué contenido se verá cuando se ejecute la fase.
+ */
+export const TAB_PHASE_DESCRIPTIONS: Partial<Record<WorkspaceTab, string>> = {
+  entities: 'Extrae personajes, lugares, objetos y otros elementos de tu documento.',
+  relationships: 'Detecta las relaciones entre personajes y entidades.',
+  timeline: 'Analiza marcadores temporales y construye la línea temporal del documento.',
+  style: 'Analiza el registro, gramática y estilo del texto.',
+}
+
 export const useAnalysisStore = defineStore('analysis', () => {
   // Estado
   const currentAnalysis = ref<AnalysisProgress | null>(null)
   const isAnalyzing = ref(false)
   const error = ref<string | null>(null)
+
+  /**
+   * Estado de fases ejecutadas por proyecto.
+   * Se carga al abrir un proyecto y se actualiza tras cada análisis.
+   */
+  const executedPhases = ref<Record<number, Partial<ExecutedPhases>>>({})
+
+  /**
+   * Fases actualmente en ejecución (para mostrar loading).
+   */
+  const runningPhases = ref<Set<keyof ExecutedPhases>>(new Set())
 
   // Getters
   const hasActiveAnalysis = computed(() => isAnalyzing.value && currentAnalysis.value !== null)
@@ -114,11 +227,189 @@ export const useAnalysisStore = defineStore('analysis', () => {
     error.value = null
   }
 
+  /**
+   * Marca el inicio de un análisis (para cuando se llama desde fuera del store)
+   */
+  function setAnalyzing(projectId: number, analyzing: boolean) {
+    isAnalyzing.value = analyzing
+    if (analyzing) {
+      currentAnalysis.value = {
+        project_id: projectId,
+        status: 'running',
+        progress: 0,
+        current_phase: 'Iniciando análisis...',
+        phases: []
+      }
+      error.value = null
+    } else if (!analyzing && currentAnalysis.value?.project_id === projectId) {
+      // Solo limpiar si es el mismo proyecto
+      currentAnalysis.value = null
+    }
+  }
+
+  /**
+   * Verifica si hay un análisis en curso para un proyecto
+   * Útil al cargar la página para recuperar el estado
+   * IMPORTANTE: Limpia el estado si no hay análisis activo
+   */
+  async function checkAnalysisStatus(projectId: number): Promise<boolean> {
+    try {
+      const response = await fetch(`/api/projects/${projectId}/analysis/progress`)
+      if (!response.ok) {
+        // No hay análisis en curso, limpiar estado
+        clearAnalysis()
+        return false
+      }
+
+      const data = await response.json()
+      if (data.success && data.data) {
+        const status = data.data.status
+        if (status === 'running' || status === 'pending') {
+          currentAnalysis.value = data.data
+          isAnalyzing.value = true
+          return true
+        }
+      }
+      // No hay análisis activo, limpiar estado previo si lo hay
+      clearAnalysis()
+      return false
+    } catch (err) {
+      console.error('Error checking analysis status:', err)
+      // En caso de error, asumir que no hay análisis
+      clearAnalysis()
+      return false
+    }
+  }
+
+  // ============================================================================
+  // Métodos para fases ejecutadas
+  // ============================================================================
+
+  /**
+   * Obtiene las fases ejecutadas para un proyecto desde el backend.
+   */
+  async function loadExecutedPhases(projectId: number): Promise<Partial<ExecutedPhases> | null> {
+    try {
+      const response = await fetch(`/api/projects/${projectId}/analysis-status`)
+      if (!response.ok) {
+        return null
+      }
+      const data = await response.json()
+      if (data.success && data.data?.executed) {
+        executedPhases.value[projectId] = data.data.executed
+        return data.data.executed
+      }
+      return null
+    } catch (err) {
+      console.error('Error loading executed phases:', err)
+      return null
+    }
+  }
+
+  /**
+   * Verifica si una fase específica fue ejecutada para un proyecto.
+   */
+  function isPhaseExecuted(projectId: number, phase: keyof ExecutedPhases): boolean {
+    return executedPhases.value[projectId]?.[phase] ?? false
+  }
+
+  /**
+   * Obtiene las dependencias faltantes para ejecutar una fase.
+   */
+  function getMissingDependencies(projectId: number, phase: keyof ExecutedPhases): (keyof ExecutedPhases)[] {
+    const deps = ANALYSIS_DEPENDENCIES[phase]
+    return deps.filter(dep => !isPhaseExecuted(projectId, dep))
+  }
+
+  /**
+   * Verifica si una fase puede ejecutarse (todas sus dependencias están completas).
+   */
+  function canRunPhase(projectId: number, phase: keyof ExecutedPhases): boolean {
+    return getMissingDependencies(projectId, phase).length === 0
+  }
+
+  /**
+   * Ejecuta un análisis parcial (solo ciertas fases).
+   */
+  async function runPartialAnalysis(
+    projectId: number,
+    phases: (keyof ExecutedPhases)[],
+    force: boolean = false
+  ): Promise<boolean> {
+    // Añadir a fases en ejecución
+    phases.forEach(p => runningPhases.value.add(p))
+
+    // Actualizar estado global de análisis (source of truth)
+    isAnalyzing.value = true
+    currentAnalysis.value = {
+      project_id: projectId,
+      status: 'running',
+      progress: 0,
+      current_phase: PHASE_LABELS[phases[0]] || 'Analizando...',
+      phases: phases.map(p => ({
+        id: p,
+        name: PHASE_LABELS[p],
+        completed: false,
+        current: p === phases[0]
+      }))
+    }
+    error.value = null
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}/analyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phases, force })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.detail || `HTTP ${response.status}`)
+      }
+
+      const data = await response.json()
+      if (data.success) {
+        // Actualizar fases ejecutadas
+        await loadExecutedPhases(projectId)
+        return true
+      }
+      throw new Error(data.error || 'Error ejecutando análisis')
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Error desconocido'
+      console.error('Error in partial analysis:', err)
+      return false
+    } finally {
+      // Quitar de fases en ejecución
+      phases.forEach(p => runningPhases.value.delete(p))
+      // Limpiar estado global si no quedan fases corriendo
+      if (runningPhases.value.size === 0) {
+        isAnalyzing.value = false
+        currentAnalysis.value = null
+      }
+    }
+  }
+
+  /**
+   * Verifica si una fase está actualmente ejecutándose.
+   */
+  function isPhaseRunning(phase: keyof ExecutedPhases): boolean {
+    return runningPhases.value.has(phase)
+  }
+
+  /**
+   * Obtiene todas las fases ejecutadas de un proyecto.
+   */
+  function getProjectPhases(projectId: number): Partial<ExecutedPhases> {
+    return executedPhases.value[projectId] ?? {}
+  }
+
   return {
     // State
     currentAnalysis,
     isAnalyzing,
     error,
+    executedPhases,
+    runningPhases,
     // Getters
     hasActiveAnalysis,
     progressPercentage,
@@ -126,6 +417,16 @@ export const useAnalysisStore = defineStore('analysis', () => {
     startAnalysis,
     getProgress,
     clearAnalysis,
-    clearError
+    clearError,
+    setAnalyzing,
+    checkAnalysisStatus,
+    // Phase tracking
+    loadExecutedPhases,
+    isPhaseExecuted,
+    getMissingDependencies,
+    canRunPhase,
+    runPartialAnalysis,
+    isPhaseRunning,
+    getProjectPhases,
   }
 })

@@ -10,7 +10,10 @@
     "build": "vue-tsc && vite build",
     "preview": "vite preview",
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore",
-    "type-check": "vue-tsc --noEmit"
+    "type-check": "vue-tsc --noEmit",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@primeuix/themes": "^2.0.2",
@@ -21,20 +24,26 @@
     "primevue": "^4.5.4",
     "vis-data": "^8.0.3",
     "vis-network": "^10.0.2",
+    "vis-timeline": "^8.5.0",
     "vue": "^3.5.26",
     "vue-router": "^4.6.4"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.11.0",
     "@playwright/test": "^1.57.0",
     "@types/node": "^20.11.17",
     "@typescript-eslint/eslint-plugin": "^6.21.0",
     "@typescript-eslint/parser": "^6.21.0",
     "@vitejs/plugin-vue": "^6.0.3",
+    "@vitest/coverage-v8": "^4.0.17",
+    "@vue/test-utils": "^2.4.6",
     "@vue/tsconfig": "^0.5.1",
     "eslint": "^8.56.0",
     "eslint-plugin-vue": "^9.21.1",
+    "happy-dom": "^20.1.0",
     "typescript": "~5.3.3",
     "vite": "^5.1.4",
+    "vitest": "^4.0.17",
     "vue-tsc": "^3.2.2"
   }
 }

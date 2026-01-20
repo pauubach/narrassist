@@ -1,6 +1,6 @@
 # Resumen Ejecutivo
 
-[← Volver al índice principal](../../README.md)
+[← Volver al índice principal](../README.md)
 
 ---
 

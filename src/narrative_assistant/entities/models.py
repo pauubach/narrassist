@@ -61,8 +61,8 @@ class EntityType(Enum):
 class EntityImportance(Enum):
     """Nivel de importancia de una entidad (genérico para todos los tipos)."""
 
-    CRITICAL = "critical"  # Importancia crítica (protagonista principal, lugar central)
-    HIGH = "high"  # Importancia alta (co-protagonistas, lugares principales, objetos clave)
+    PRINCIPAL = "principal"  # Importancia máxima (protagonista, lugar central, objeto clave)
+    HIGH = "high"  # Importancia alta (co-protagonistas, lugares principales)
     MEDIUM = "medium"  # Importancia media (secundarios recurrentes, lugares frecuentes)
     LOW = "low"  # Importancia baja (personajes menores, menciones ocasionales)
     MINIMAL = "minimal"  # Importancia mínima (solo mencionado una vez)
@@ -78,7 +78,8 @@ class EntityImportance(Enum):
         legacy_mapping = {
             "secondary": cls.MEDIUM,
             "primary": cls.HIGH,
-            "main": cls.CRITICAL,
+            "main": cls.PRINCIPAL,
+            "critical": cls.PRINCIPAL,  # Migración de valor antiguo
             "minor": cls.LOW,
             "background": cls.MINIMAL,
         }

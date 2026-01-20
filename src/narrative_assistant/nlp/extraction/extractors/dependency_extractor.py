@@ -243,8 +243,8 @@ class DependencyExtractor(BaseExtractor):
                 if subject_text in entity_names:
                     entity_name = subject.text
                 elif subject.pos_ == "PRON":
-                    # Resolver pronombre a última entidad
-                    entity_name = self._resolve_pronoun(doc, token, entity_names)
+                    # Resolver pronombre a última entidad (usar subject, no token)
+                    entity_name = self._resolve_pronoun(doc, subject, entity_names)
 
                 if not entity_name:
                     continue
@@ -539,14 +539,58 @@ class DependencyExtractor(BaseExtractor):
         pronoun_token: Any,
         entity_names: set[str],
     ) -> Optional[str]:
-        """Resuelve un pronombre a la última entidad mencionada."""
-        # Buscar hacia atrás la última entidad
+        """
+        Resuelve un pronombre a la última entidad mencionada.
+
+        Considera el género gramatical del pronombre para mejor precisión:
+        - "él" -> busca entidades masculinas
+        - "ella" -> busca entidades femeninas
+        """
+        pronoun_text = pronoun_token.text.lower()
+        pronoun_morph = pronoun_token.morph
+
+        # Determinar género del pronombre si spaCy lo proporciona
+        pronoun_gender = None
+        if pronoun_morph:
+            gender_str = pronoun_morph.get("Gender")
+            if gender_str:
+                pronoun_gender = gender_str[0] if isinstance(gender_str, list) else gender_str
+
+        # Inferir género de pronombres comunes si no hay morph
+        if not pronoun_gender:
+            masc_pronouns = {"él", "el", "este", "ese", "aquel", "lo", "le"}
+            fem_pronouns = {"ella", "esta", "esa", "aquella", "la"}
+            if pronoun_text in masc_pronouns:
+                pronoun_gender = "Masc"
+            elif pronoun_text in fem_pronouns:
+                pronoun_gender = "Fem"
+
+        # Buscar hacia atrás la última entidad que coincida con el género
         for token in reversed(list(doc[:pronoun_token.i])):
-            if token.text.lower() in entity_names:
-                return token.text
-            for name in entity_names:
-                if token.text.lower() in name.lower():
-                    return name
+            token_lower = token.text.lower()
+
+            # Verificar si el token es una entidad conocida
+            matched_entity = None
+            if token_lower in entity_names:
+                matched_entity = token.text
+            else:
+                for name in entity_names:
+                    name_parts = name.lower().split()
+                    if token_lower in name_parts or token_lower == name.lower():
+                        matched_entity = name
+                        break
+
+            if matched_entity:
+                # Si tenemos género del pronombre, verificar compatibilidad
+                if pronoun_gender and token.pos_ in {"PROPN", "NOUN"}:
+                    token_gender_list = token.morph.get("Gender") if token.morph else None
+                    if token_gender_list:
+                        token_gender = token_gender_list[0] if isinstance(token_gender_list, list) else token_gender_list
+                        # Solo aceptar si los géneros coinciden o si no sabemos
+                        if token_gender != pronoun_gender:
+                            continue
+
+                return matched_entity
 
         return None
 

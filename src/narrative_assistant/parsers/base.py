@@ -7,7 +7,10 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional, Union, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .coordinates import TextCoordinateSystem
 
 from ..core.errors import UnsupportedFormatError, NarrativeError, ErrorSeverity
 from ..core.result import Result
@@ -94,6 +97,7 @@ class RawDocument:
         source_format: Formato detectado
         full_text: Texto completo concatenado
         warnings: Advertencias durante el parseo
+        _coordinate_system: Sistema de coordenadas (interno, se construye bajo demanda)
     """
 
     paragraphs: list[RawParagraph] = field(default_factory=list)
@@ -101,11 +105,31 @@ class RawDocument:
     source_path: Optional[Path] = None
     source_format: DocumentFormat = DocumentFormat.UNKNOWN
     warnings: list[str] = field(default_factory=list)
+    _coordinate_system: Optional["TextCoordinateSystem"] = field(default=None, repr=False)
+
+    def __post_init__(self):
+        """Inicializa el sistema de coordenadas si hay párrafos."""
+        if self.paragraphs and self._coordinate_system is None:
+            self._build_coordinate_system()
+
+    def _build_coordinate_system(self) -> None:
+        """Construye el sistema de coordenadas y actualiza posiciones de párrafos."""
+        from .coordinates import TextCoordinateSystem
+        self._coordinate_system = TextCoordinateSystem(self.paragraphs, filter_empty=True)
+        # Actualizar posiciones de párrafos para que coincidan con full_text
+        self._coordinate_system.recalculate_paragraph_positions(self.paragraphs)
+
+    @property
+    def coordinate_system(self) -> "TextCoordinateSystem":
+        """Obtiene el sistema de coordenadas, construyéndolo si es necesario."""
+        if self._coordinate_system is None:
+            self._build_coordinate_system()
+        return self._coordinate_system
 
     @property
     def full_text(self) -> str:
-        """Texto completo del documento."""
-        return "\n\n".join(p.text for p in self.paragraphs if not p.is_empty)
+        """Texto completo del documento (usa sistema de coordenadas)."""
+        return self.coordinate_system.full_text
 
     @property
     def word_count(self) -> int:

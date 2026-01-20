@@ -1,0 +1,631 @@
+"""
+Constructor de timeline narrativo.
+
+Construye una línea temporal a partir de marcadores temporales:
+- Ordena eventos cronológicamente
+- Detecta flashbacks (analepsis) y flashforwards (prolepsis)
+- Verifica coherencia de edades de personajes
+- Exporta a diferentes formatos (Mermaid, JSON)
+"""
+
+import logging
+from collections import defaultdict
+from dataclasses import dataclass, field
+from datetime import date, timedelta
+from enum import Enum
+from typing import Optional
+
+from .markers import MarkerType, TemporalMarker, WORD_TO_NUM, MONTHS
+
+logger = logging.getLogger(__name__)
+
+
+class TimelineResolution(Enum):
+    """Resolución temporal de un evento."""
+
+    EXACT_DATE = "exact_date"  # 15 de marzo de 1985
+    MONTH = "month"  # marzo de 1985
+    YEAR = "year"  # 1985
+    SEASON = "season"  # verano de 1985
+    RELATIVE = "relative"  # 3 días después
+    UNKNOWN = "unknown"  # sin fecha determinable
+
+
+class NarrativeOrder(Enum):
+    """Orden narrativo del evento."""
+
+    CHRONOLOGICAL = "chronological"  # Orden lineal
+    ANALEPSIS = "analepsis"  # Flashback
+    PROLEPSIS = "prolepsis"  # Flashforward
+
+
+@dataclass
+class TimelineEvent:
+    """
+    Evento en la línea temporal narrativa.
+
+    Attributes:
+        id: Identificador único del evento
+        description: Descripción del evento
+        chapter: Número de capítulo
+        paragraph: Número de párrafo
+        story_date: Fecha en el tiempo de la historia
+        story_date_resolution: Resolución de la fecha
+        discourse_position: Posición en el texto (orden del discurso)
+        relative_to: ID del evento de referencia (para relativos)
+        relative_offset: Offset temporal respecto al evento de referencia
+        narrative_order: Clasificación narrativa (cronológico, analepsis, prolepsis)
+        entity_ids: IDs de personajes involucrados
+        markers: Marcadores temporales asociados
+        confidence: Nivel de confianza (0-1)
+    """
+
+    id: int
+    description: str
+    chapter: int
+    paragraph: int = 0
+
+    # Tiempo de la historia (story time)
+    story_date: Optional[date] = None
+    story_date_resolution: TimelineResolution = TimelineResolution.UNKNOWN
+
+    # Tiempo del discurso (discourse time)
+    discourse_position: int = 0
+
+    # Relaciones temporales
+    relative_to: Optional[int] = None
+    relative_offset: Optional[timedelta] = None
+
+    # Clasificación narrativa
+    narrative_order: NarrativeOrder = NarrativeOrder.CHRONOLOGICAL
+
+    # Personajes involucrados
+    entity_ids: list[int] = field(default_factory=list)
+
+    # Marcadores asociados
+    markers: list[TemporalMarker] = field(default_factory=list)
+
+    # Confianza
+    confidence: float = 0.5
+
+
+@dataclass
+class Timeline:
+    """
+    Línea temporal completa de la narrativa.
+
+    Attributes:
+        events: Lista de eventos temporales
+        anchor_events: IDs de eventos con fecha absoluta (anclas)
+    """
+
+    events: list[TimelineEvent] = field(default_factory=list)
+    anchor_events: list[int] = field(default_factory=list)
+
+    def add_event(self, event: TimelineEvent) -> None:
+        """Añade un evento a la timeline."""
+        self.events.append(event)
+        if event.story_date_resolution == TimelineResolution.EXACT_DATE:
+            self.anchor_events.append(event.id)
+
+    def get_event_by_id(self, event_id: int) -> Optional[TimelineEvent]:
+        """Obtiene un evento por su ID."""
+        for event in self.events:
+            if event.id == event_id:
+                return event
+        return None
+
+    def get_chronological_order(self) -> list[TimelineEvent]:
+        """Devuelve eventos ordenados por tiempo de historia."""
+        dated = [e for e in self.events if e.story_date]
+        undated = [e for e in self.events if not e.story_date]
+
+        sorted_dated = sorted(dated, key=lambda e: e.story_date)  # type: ignore
+        return sorted_dated + undated
+
+    def get_discourse_order(self) -> list[TimelineEvent]:
+        """Devuelve eventos ordenados por aparición en el texto."""
+        return sorted(self.events, key=lambda e: e.discourse_position)
+
+    def get_events_by_chapter(self, chapter: int) -> list[TimelineEvent]:
+        """Devuelve eventos de un capítulo específico."""
+        return [e for e in self.events if e.chapter == chapter]
+
+    def get_analepsis_events(self) -> list[TimelineEvent]:
+        """Devuelve eventos clasificados como analepsis (flashback)."""
+        return [e for e in self.events if e.narrative_order == NarrativeOrder.ANALEPSIS]
+
+    def get_prolepsis_events(self) -> list[TimelineEvent]:
+        """Devuelve eventos clasificados como prolepsis (flashforward)."""
+        return [e for e in self.events if e.narrative_order == NarrativeOrder.PROLEPSIS]
+
+    def get_time_span(self) -> Optional[tuple[date, date]]:
+        """Devuelve el rango temporal de la historia (fecha mínima, fecha máxima)."""
+        dated = [e for e in self.events if e.story_date]
+        if not dated:
+            return None
+        dates = [e.story_date for e in dated]
+        return min(dates), max(dates)  # type: ignore
+
+
+class TimelineBuilder:
+    """
+    Constructor de timeline a partir de marcadores temporales.
+
+    Ejemplo de uso:
+        builder = TimelineBuilder()
+        timeline = builder.build_from_markers(markers, chapters)
+    """
+
+    def __init__(self):
+        """Inicializa el constructor de timeline."""
+        self.timeline = Timeline()
+        self.event_counter = 0
+
+    def build_from_markers(
+        self,
+        markers: list[TemporalMarker],
+        chapters: list[dict],
+    ) -> Timeline:
+        """
+        Construye timeline a partir de marcadores temporales.
+
+        Args:
+            markers: Lista de marcadores temporales
+            chapters: Lista de capítulos con estructura:
+                      {"number": int, "title": str, "start_position": int}
+
+        Returns:
+            Timeline construido
+        """
+        self.timeline = Timeline()
+        self.event_counter = 0
+
+        # 1. Crear eventos base para cada capítulo
+        for chapter in chapters:
+            self._create_chapter_event(chapter)
+
+        # 2. Procesar marcadores absolutos (anclas)
+        absolute_markers = [
+            m for m in markers if m.marker_type == MarkerType.ABSOLUTE_DATE
+        ]
+        for marker in sorted(absolute_markers, key=lambda m: m.confidence, reverse=True):
+            self._add_absolute_anchor(marker)
+
+        # 3. Procesar marcadores relativos
+        relative_markers = [
+            m for m in markers if m.marker_type == MarkerType.RELATIVE_TIME
+        ]
+
+        # Si no hay anclas absolutas pero hay marcadores relativos,
+        # crear una fecha sintética de referencia (Día 0)
+        if relative_markers and not self.timeline.anchor_events:
+            self._create_synthetic_anchor(relative_markers, chapters)
+
+        self._resolve_relative_markers(relative_markers)
+
+        # 4. Procesar edades de personajes
+        age_markers = [m for m in markers if m.marker_type == MarkerType.CHARACTER_AGE]
+        self._process_age_markers(age_markers)
+
+        # 5. Detectar analepsis/prolepsis
+        self._detect_narrative_order()
+
+        logger.info(
+            f"Built timeline with {len(self.timeline.events)} events, "
+            f"{len(self.timeline.anchor_events)} anchors"
+        )
+
+        return self.timeline
+
+    def _create_chapter_event(self, chapter: dict) -> TimelineEvent:
+        """Crea un evento base para un capítulo."""
+        self.event_counter += 1
+        event = TimelineEvent(
+            id=self.event_counter,
+            description=f"Capítulo {chapter.get('number', '?')}: {chapter.get('title', 'Sin título')}",
+            chapter=chapter.get("number", 0),
+            paragraph=0,
+            discourse_position=chapter.get("start_position", 0),
+        )
+        self.timeline.add_event(event)
+        return event
+
+    def _create_synthetic_anchor(
+        self,
+        relative_markers: list[TemporalMarker],
+        chapters: list[dict],
+    ) -> None:
+        """
+        Crea un ancla sintética cuando no hay fechas absolutas.
+
+        Usa el primer marcador temporal o el inicio del primer capítulo
+        como "Día 0" para poder construir una línea temporal relativa.
+        """
+        if not chapters:
+            return
+
+        # Usar una fecha sintética: 1 de enero del año 1 (ficticio)
+        # Esto permite calcular offsets relativos sin importar la fecha real
+        synthetic_date = date(1, 1, 1)
+
+        # Encontrar el primer evento de capítulo
+        first_chapter = min(chapters, key=lambda c: c.get("number", 0))
+        first_chapter_num = first_chapter.get("number", 1)
+
+        # Buscar el evento del primer capítulo
+        for event in self.timeline.events:
+            if event.chapter == first_chapter_num:
+                event.story_date = synthetic_date
+                event.story_date_resolution = TimelineResolution.RELATIVE
+                event.description = f"{event.description} (Día 0 - referencia)"
+                if event.id not in self.timeline.anchor_events:
+                    self.timeline.anchor_events.append(event.id)
+                logger.debug(
+                    f"Created synthetic anchor at chapter {first_chapter_num}: {event.description}"
+                )
+                break
+
+    def _add_absolute_anchor(self, marker: TemporalMarker) -> None:
+        """Añade un punto de anclaje con fecha absoluta."""
+        parsed_date = self._parse_date_from_marker(marker)
+        if not parsed_date:
+            return
+
+        # Determinar resolución
+        resolution = TimelineResolution.UNKNOWN
+        if marker.day and marker.month and marker.year:
+            resolution = TimelineResolution.EXACT_DATE
+        elif marker.month and marker.year:
+            resolution = TimelineResolution.MONTH
+        elif marker.year:
+            resolution = TimelineResolution.YEAR
+
+        # Buscar evento del capítulo para actualizar
+        if marker.chapter:
+            chapter_events = [
+                e for e in self.timeline.events if e.chapter == marker.chapter
+            ]
+            if chapter_events:
+                event = chapter_events[0]
+                # Solo actualizar si no tiene fecha o la nueva es más precisa
+                if not event.story_date or resolution.value < event.story_date_resolution.value:
+                    event.story_date = parsed_date
+                    event.story_date_resolution = resolution
+                    event.confidence = marker.confidence
+                    event.markers.append(marker)
+                    if event.id not in self.timeline.anchor_events:
+                        self.timeline.anchor_events.append(event.id)
+                return
+
+        # Crear nuevo evento si no hay capítulo asociado
+        self.event_counter += 1
+        event = TimelineEvent(
+            id=self.event_counter,
+            description=f"Fecha: {marker.text}",
+            chapter=marker.chapter or 0,
+            paragraph=marker.paragraph or 0,
+            discourse_position=marker.start_char,
+            story_date=parsed_date,
+            story_date_resolution=resolution,
+            confidence=marker.confidence,
+            markers=[marker],
+        )
+        self.timeline.add_event(event)
+
+    def _parse_date_from_marker(self, marker: TemporalMarker) -> Optional[date]:
+        """Extrae fecha de un marcador."""
+        # Si ya tiene componentes parseados
+        if marker.year:
+            try:
+                return date(
+                    marker.year,
+                    marker.month or 1,
+                    marker.day or 1,
+                )
+            except ValueError:
+                return None
+
+        # Intentar parsear del texto
+        text_lower = marker.text.lower()
+
+        # Patrón completo: "15 de marzo de 1985"
+        import re
+
+        full_match = re.search(
+            r"(\d{1,2})\s+de\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\s+de\s+(\d{4})",
+            text_lower,
+        )
+        if full_match:
+            try:
+                return date(
+                    int(full_match.group(3)),
+                    MONTHS.get(full_match.group(2), 1),
+                    int(full_match.group(1)),
+                )
+            except ValueError:
+                return None
+
+        # Solo año
+        year_match = re.search(r"\b(19\d{2}|20[0-2]\d)\b", text_lower)
+        if year_match:
+            return date(int(year_match.group(1)), 1, 1)
+
+        return None
+
+    def _resolve_relative_markers(self, markers: list[TemporalMarker]) -> None:
+        """
+        Resuelve marcadores relativos usando anclas o encadenándolos entre sí.
+
+        Los marcadores se procesan en orden de aparición en el texto.
+        Cada marcador relativo usa el evento anterior con fecha como referencia,
+        permitiendo construir una cadena temporal incluso sin fechas absolutas.
+        """
+        # Ordenar marcadores por posición en el texto
+        sorted_markers = sorted(markers, key=lambda m: (m.chapter or 0, m.start_char))
+
+        # Último evento con fecha creado (para encadenar relativos)
+        last_dated_event: Optional[TimelineEvent] = None
+
+        # Inicializar con el ancla si existe
+        if self.timeline.anchor_events:
+            for event in self.timeline.events:
+                if event.id in self.timeline.anchor_events and event.story_date:
+                    last_dated_event = event
+                    break
+
+        for marker in sorted_markers:
+            # Prioridad para referencia:
+            # 1. Último evento con fecha (encadenamiento de relativos)
+            # 2. Ancla absoluta más cercana
+            # 3. Evento del capítulo
+            reference_event = last_dated_event
+
+            if not reference_event:
+                # Intentar con ancla absoluta
+                anchor = self._find_nearest_anchor(
+                    marker.chapter or 0, marker.start_char
+                )
+                reference_event = anchor
+
+            if not reference_event:
+                # Usar el evento del capítulo como referencia
+                chapter_events = [
+                    e for e in self.timeline.events
+                    if e.chapter == (marker.chapter or 0)
+                ]
+                if chapter_events:
+                    reference_event = chapter_events[0]
+
+            # Calcular offset
+            offset = self._calculate_offset(marker)
+
+            # Calcular nueva fecha basada en la referencia
+            new_date = None
+            if reference_event and reference_event.story_date and offset:
+                direction = marker.direction or "future"  # Default a futuro
+                if direction == "future":
+                    new_date = reference_event.story_date + offset
+                elif direction == "past":
+                    new_date = reference_event.story_date - offset
+            elif reference_event and reference_event.story_date and not offset:
+                # Sin offset explícito, asumir mismo día o día siguiente
+                # Depende del contexto del marcador
+                new_date = reference_event.story_date
+
+            # Crear evento
+            self.event_counter += 1
+            event = TimelineEvent(
+                id=self.event_counter,
+                description=f"{marker.text}",
+                chapter=marker.chapter or 0,
+                paragraph=marker.paragraph or 0,
+                discourse_position=marker.start_char,
+                story_date=new_date,
+                story_date_resolution=(
+                    TimelineResolution.RELATIVE
+                    if new_date
+                    else TimelineResolution.UNKNOWN
+                ),
+                relative_to=reference_event.id if reference_event else None,
+                relative_offset=offset,
+                confidence=marker.confidence * 0.8,
+                markers=[marker],
+            )
+            self.timeline.add_event(event)
+
+            # Actualizar último evento con fecha para encadenamiento
+            if new_date:
+                last_dated_event = event
+
+    def _find_nearest_anchor(
+        self,
+        chapter: int,
+        position: int,
+    ) -> Optional[TimelineEvent]:
+        """Encuentra el evento ancla más cercano."""
+        anchors = [
+            e
+            for e in self.timeline.events
+            if e.id in self.timeline.anchor_events and e.story_date
+        ]
+
+        if not anchors:
+            return None
+
+        # Buscar en mismo capítulo primero
+        same_chapter = [
+            a for a in anchors if a.chapter == chapter and a.discourse_position <= position
+        ]
+        if same_chapter:
+            return max(same_chapter, key=lambda a: a.discourse_position)
+
+        # Buscar en capítulos anteriores
+        previous = [a for a in anchors if a.chapter < chapter]
+        if previous:
+            return max(previous, key=lambda a: a.discourse_position)
+
+        # Devolver el primer ancla disponible
+        return anchors[0]
+
+    def _calculate_offset(self, marker: TemporalMarker) -> Optional[timedelta]:
+        """Calcula el offset temporal de un marcador relativo."""
+        text_lower = marker.text.lower()
+
+        # Intentar valores por defecto para expresiones comunes
+        if not marker.quantity or not marker.magnitude:
+            if "día siguiente" in text_lower or "mañana siguiente" in text_lower:
+                return timedelta(days=1)
+            if "noche anterior" in text_lower or "día anterior" in text_lower:
+                return timedelta(days=1)
+            if "poco después" in text_lower:
+                return timedelta(hours=2)
+            if "más tarde" in text_lower:
+                return timedelta(hours=4)
+            # Expresiones con días de semana o momentos del día
+            if any(d in text_lower for d in ["aquella", "aquel", "esa", "ese"]):
+                # "aquella mañana", "ese día" - asumir mismo día o cercano
+                return timedelta(days=0)
+            return None
+
+        magnitude_to_days = {
+            "día": 1,
+            "semana": 7,
+            "mes": 30,
+            "año": 365,
+            "hora": 0.042,  # ~1 hora
+        }
+
+        days = marker.quantity * magnitude_to_days.get(marker.magnitude, 1)
+        return timedelta(days=days)
+
+    def _process_age_markers(self, markers: list[TemporalMarker]) -> None:
+        """Procesa marcadores de edad de personajes."""
+        for marker in markers:
+            if not marker.age:
+                continue
+
+            # Crear evento para la mención de edad
+            self.event_counter += 1
+            event = TimelineEvent(
+                id=self.event_counter,
+                description=f"Edad mencionada: {marker.text}",
+                chapter=marker.chapter or 0,
+                paragraph=marker.paragraph or 0,
+                discourse_position=marker.start_char,
+                entity_ids=[marker.entity_id] if marker.entity_id else [],
+                confidence=marker.confidence,
+                markers=[marker],
+            )
+            self.timeline.add_event(event)
+
+    def _detect_narrative_order(self) -> None:
+        """Detecta analepsis y prolepsis comparando orden cronológico vs discurso."""
+        chronological = self.timeline.get_chronological_order()
+        discourse = self.timeline.get_discourse_order()
+
+        # Solo eventos con fecha conocida
+        dated_chrono = [e for e in chronological if e.story_date]
+        dated_discourse = [e for e in discourse if e.story_date]
+
+        if len(dated_chrono) < 2:
+            return
+
+        # Crear índice cronológico
+        chrono_index = {e.id: i for i, e in enumerate(dated_chrono)}
+
+        # Comparar con orden del discurso
+        for i, event in enumerate(dated_discourse):
+            if i == 0:
+                continue
+
+            prev_event = dated_discourse[i - 1]
+
+            chrono_pos_current = chrono_index.get(event.id, 0)
+            chrono_pos_prev = chrono_index.get(prev_event.id, 0)
+
+            # El evento actual ocurrió antes cronológicamente
+            # pero aparece después en el discurso = analepsis
+            if chrono_pos_current < chrono_pos_prev:
+                event.narrative_order = NarrativeOrder.ANALEPSIS
+                logger.debug(f"Detected analepsis at event {event.id}: {event.description}")
+            # Salto grande hacia adelante podría ser prolepsis
+            elif chrono_pos_current > chrono_pos_prev + 3:
+                # Verificar si realmente es un salto significativo
+                if event.story_date and prev_event.story_date:
+                    delta = event.story_date - prev_event.story_date
+                    if delta.days > 365:  # Más de un año de salto
+                        event.narrative_order = NarrativeOrder.PROLEPSIS
+                        logger.debug(
+                            f"Detected prolepsis at event {event.id}: {event.description}"
+                        )
+
+    def export_to_mermaid(self) -> str:
+        """Exporta timeline a diagrama Mermaid (Gantt)."""
+        lines = ["gantt", "    title Timeline Narrativo", "    dateFormat YYYY-MM-DD"]
+
+        chrono = self.timeline.get_chronological_order()
+        dated = [e for e in chrono if e.story_date]
+
+        if not dated:
+            return "No hay eventos con fechas determinadas."
+
+        # Agrupar por año
+        by_year: dict[int, list[TimelineEvent]] = defaultdict(list)
+        for event in dated:
+            if event.story_date:
+                by_year[event.story_date.year].append(event)
+
+        for year in sorted(by_year.keys()):
+            lines.append(f"    section {year}")
+            for event in by_year[year]:
+                desc = event.description[:30].replace(":", "-").replace(",", " ")
+                date_str = event.story_date.strftime("%Y-%m-%d") if event.story_date else ""
+                # Marcar analepsis/prolepsis
+                marker = ""
+                if event.narrative_order == NarrativeOrder.ANALEPSIS:
+                    marker = " [FLASHBACK]"
+                elif event.narrative_order == NarrativeOrder.PROLEPSIS:
+                    marker = " [FLASHFORWARD]"
+                lines.append(f"    {desc}{marker} :{date_str}, 1d")
+
+        return "\n".join(lines)
+
+    def export_to_json(self) -> dict:
+        """Exporta timeline a formato JSON serializable."""
+        events_data = []
+        for event in self.timeline.events:
+            events_data.append(
+                {
+                    "id": event.id,
+                    "description": event.description,
+                    "chapter": event.chapter,
+                    "paragraph": event.paragraph,
+                    "story_date": (
+                        event.story_date.isoformat() if event.story_date else None
+                    ),
+                    "story_date_resolution": event.story_date_resolution.value,
+                    "discourse_position": event.discourse_position,
+                    "narrative_order": event.narrative_order.value,
+                    "entity_ids": event.entity_ids,
+                    "confidence": event.confidence,
+                }
+            )
+
+        time_span = self.timeline.get_time_span()
+
+        return {
+            "total_events": len(self.timeline.events),
+            "anchor_events": len(self.timeline.anchor_events),
+            "analepsis_count": len(self.timeline.get_analepsis_events()),
+            "prolepsis_count": len(self.timeline.get_prolepsis_events()),
+            "time_span": (
+                {
+                    "start": time_span[0].isoformat(),
+                    "end": time_span[1].isoformat(),
+                }
+                if time_span
+                else None
+            ),
+            "events": events_data,
+        }

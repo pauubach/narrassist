@@ -1,21 +1,41 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
-import { usePreset, updatePreset, palette } from '@primeuix/themes'
+import { usePreset, updatePreset, palette, definePreset } from '@primeuix/themes'
 import Aura from '@primeuix/themes/aura'
 import Lara from '@primeuix/themes/lara'
 import Material from '@primeuix/themes/material'
 import Nora from '@primeuix/themes/nora'
 
+import { customPresets, type ThemePresetConfig, type CustomPresetKey } from '@/themes/presets'
+
 // ============================================================================
 // Types
 // ============================================================================
 
-export type ThemePreset = 'aura' | 'lara' | 'material' | 'nora'
+/** Presets base de PrimeVue */
+export type PrimeVuePreset = 'aura' | 'lara' | 'material' | 'nora'
+
+/** Presets personalizados para escritura */
+export type CustomThemePreset = CustomPresetKey
+
+/** Todos los presets disponibles */
+export type ThemePreset = PrimeVuePreset | CustomThemePreset
 export type ThemeMode = 'light' | 'dark' | 'auto'
 export type FontSize = 'small' | 'medium' | 'large' | 'xlarge'
 export type LineHeight = 'compact' | 'normal' | 'relaxed' | 'loose'
 export type UIRadius = 'none' | 'small' | 'medium' | 'large'
 export type UICompactness = 'compact' | 'normal' | 'comfortable'
+
+/** Fuentes disponibles para la interfaz */
+export type FontFamily =
+  // Generales (sans-serif)
+  | 'system' | 'inter' | 'source-sans' | 'nunito'
+  // Lectura (serif modernas)
+  | 'literata' | 'merriweather' | 'source-serif' | 'lora'
+  // Clásicas (estilo Word/tradicional)
+  | 'garamond' | 'baskerville' | 'crimson' | 'playfair' | 'pt-serif' | 'cormorant' | 'ibm-plex-serif' | 'spectral'
+  // Accesibles y especializadas
+  | 'atkinson' | 'roboto-serif' | 'noto-serif' | 'caslon'
 
 export interface PrimaryColor {
   name: string
@@ -32,6 +52,8 @@ export interface ThemeConfig {
   radius: UIRadius
   compactness: UICompactness
   reducedMotion: boolean
+  fontFamily: FontFamily
+  fontFamilyReading: FontFamily
 }
 
 // ============================================================================
@@ -40,11 +62,82 @@ export interface ThemeConfig {
 
 const STORAGE_KEY = 'narrative_assistant_theme_config'
 
-export const PRESETS: Record<ThemePreset, { name: string; value: typeof Aura }> = {
-  aura: { name: 'Aura', value: Aura },
-  lara: { name: 'Lara', value: Lara },
-  material: { name: 'Material', value: Material },
-  nora: { name: 'Nora', value: Nora }
+/** Info de un preset para UI */
+export interface PresetInfo {
+  name: string
+  description: string
+  category: 'general' | 'writing'
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  value: any // Los presets de PrimeVue tienen tipos complejos
+}
+
+/** Presets base de PrimeVue */
+export const PRIMEVUE_PRESETS: Record<PrimeVuePreset, PresetInfo> = {
+  aura: {
+    name: 'Aura',
+    description: 'Moderno y minimalista',
+    category: 'general',
+    value: Aura
+  },
+  lara: {
+    name: 'Lara',
+    description: 'Clásico y profesional',
+    category: 'general',
+    value: Lara
+  },
+  material: {
+    name: 'Material',
+    description: 'Google Material Design',
+    category: 'general',
+    value: Material
+  },
+  nora: {
+    name: 'Nora',
+    description: 'Sutil y elegante',
+    category: 'general',
+    value: Nora
+  }
+}
+
+/**
+ * Crea un preset PrimeVue a partir de una configuración personalizada.
+ * Extiende Aura con las superficies personalizadas para light y dark.
+ */
+function createCustomPreset(config: ThemePresetConfig) {
+  return definePreset(Aura, {
+    semantic: {
+      colorScheme: {
+        light: {
+          surface: config.lightSurface
+        },
+        dark: {
+          surface: config.darkSurface
+        }
+      }
+    }
+  })
+}
+
+/** Presets personalizados para escritura */
+export const CUSTOM_PRESETS: Record<CustomThemePreset, PresetInfo> = {
+  grammarly: {
+    name: customPresets.grammarly.name,
+    description: customPresets.grammarly.description,
+    category: customPresets.grammarly.category,
+    value: createCustomPreset(customPresets.grammarly)
+  },
+  scrivener: {
+    name: customPresets.scrivener.name,
+    description: customPresets.scrivener.description,
+    category: customPresets.scrivener.category,
+    value: createCustomPreset(customPresets.scrivener)
+  }
+}
+
+/** Todos los presets disponibles */
+export const PRESETS: Record<ThemePreset, PresetInfo> = {
+  ...PRIMEVUE_PRESETS,
+  ...CUSTOM_PRESETS
 }
 
 export const PRIMARY_COLORS: PrimaryColor[] = [
@@ -89,6 +182,141 @@ export const UI_COMPACTNESS: Record<UICompactness, { label: string; scale: numbe
   comfortable: { label: 'Espacioso', scale: 1.125 }
 }
 
+/** Información de cada fuente */
+export interface FontInfo {
+  label: string
+  description: string
+  category: 'general' | 'reading'
+  cssVar: string
+}
+
+export const FONT_FAMILIES: Record<FontFamily, FontInfo> = {
+  // === Fuentes generales (sans-serif para interfaz) ===
+  system: {
+    label: 'Sistema',
+    description: 'Fuente nativa del sistema operativo',
+    category: 'general',
+    cssVar: 'var(--font-system)'
+  },
+  inter: {
+    label: 'Inter',
+    description: 'Moderna, excelente para interfaces',
+    category: 'general',
+    cssVar: 'var(--font-inter)'
+  },
+  'source-sans': {
+    label: 'Source Sans',
+    description: 'Limpia y profesional',
+    category: 'general',
+    cssVar: 'var(--font-source-sans)'
+  },
+  nunito: {
+    label: 'Nunito',
+    description: 'Suave y amigable',
+    category: 'general',
+    cssVar: 'var(--font-nunito)'
+  },
+  // === Fuentes de lectura (serif modernas) ===
+  literata: {
+    label: 'Literata',
+    description: 'Optimizada para lectura digital prolongada',
+    category: 'reading',
+    cssVar: 'var(--font-literata)'
+  },
+  merriweather: {
+    label: 'Merriweather',
+    description: 'Serif moderna, muy legible en pantalla',
+    category: 'reading',
+    cssVar: 'var(--font-merriweather)'
+  },
+  'source-serif': {
+    label: 'Source Serif',
+    description: 'Elegante, ideal para manuscritos',
+    category: 'reading',
+    cssVar: 'var(--font-source-serif)'
+  },
+  lora: {
+    label: 'Lora',
+    description: 'Contemporánea con toques caligráficos',
+    category: 'reading',
+    cssVar: 'var(--font-lora)'
+  },
+  // === Fuentes clásicas (estilo Word/tradicional) ===
+  garamond: {
+    label: 'Garamond',
+    description: 'Clásica editorial francesa, muy elegante',
+    category: 'reading',
+    cssVar: 'var(--font-garamond)'
+  },
+  baskerville: {
+    label: 'Baskerville',
+    description: 'Clásica inglesa del s. XVIII, muy legible',
+    category: 'reading',
+    cssVar: 'var(--font-baskerville)'
+  },
+  crimson: {
+    label: 'Crimson',
+    description: 'Inspirada en tipos clásicos, elegante',
+    category: 'reading',
+    cssVar: 'var(--font-crimson)'
+  },
+  playfair: {
+    label: 'Playfair Display',
+    description: 'Alto contraste, ideal para títulos',
+    category: 'reading',
+    cssVar: 'var(--font-playfair)'
+  },
+  'pt-serif': {
+    label: 'PT Serif',
+    description: 'Profesional, muy legible en cualquier tamaño',
+    category: 'reading',
+    cssVar: 'var(--font-pt-serif)'
+  },
+  cormorant: {
+    label: 'Cormorant',
+    description: 'Elegante y refinada, estilo Garamond',
+    category: 'reading',
+    cssVar: 'var(--font-cormorant)'
+  },
+  'ibm-plex-serif': {
+    label: 'IBM Plex Serif',
+    description: 'Moderna pero con raíces clásicas',
+    category: 'reading',
+    cssVar: 'var(--font-ibm-plex-serif)'
+  },
+  spectral: {
+    label: 'Spectral',
+    description: 'Diseñada para pantalla, muy legible',
+    category: 'reading',
+    cssVar: 'var(--font-spectral)'
+  },
+  // === Fuentes accesibles y especializadas ===
+  atkinson: {
+    label: 'Atkinson Hyperlegible',
+    description: 'Máxima legibilidad, ideal para baja visión',
+    category: 'general',
+    cssVar: 'var(--font-atkinson)'
+  },
+  'roboto-serif': {
+    label: 'Roboto Serif',
+    description: 'Versión serif de Roboto, muy versátil',
+    category: 'reading',
+    cssVar: 'var(--font-roboto-serif)'
+  },
+  'noto-serif': {
+    label: 'Noto Serif',
+    description: 'Universal de Google, excelente cobertura',
+    category: 'reading',
+    cssVar: 'var(--font-noto-serif)'
+  },
+  caslon: {
+    label: 'Caslon',
+    description: 'Clásica inglesa del s. XVIII, elegante',
+    category: 'reading',
+    cssVar: 'var(--font-caslon)'
+  }
+}
+
 const DEFAULT_CONFIG: ThemeConfig = {
   preset: 'aura',
   primaryColor: '#3B82F6',
@@ -97,7 +325,9 @@ const DEFAULT_CONFIG: ThemeConfig = {
   lineHeight: 'normal',
   radius: 'medium',
   compactness: 'normal',
-  reducedMotion: false
+  reducedMotion: false,
+  fontFamily: 'inter',
+  fontFamilyReading: 'literata'
 }
 
 // ============================================================================
@@ -115,8 +345,8 @@ export const useThemeStore = defineStore('theme', () => {
 
   // Computed
   const currentPreset = computed(() => PRESETS[config.value.preset])
-  const currentPrimaryColor = computed(() =>
-    PRIMARY_COLORS.find(c => c.value === config.value.primaryColor) || PRIMARY_COLORS[0]
+  const currentPrimaryColor = computed(
+    () => PRIMARY_COLORS.find(c => c.value === config.value.primaryColor) || PRIMARY_COLORS[0]
   )
 
   // ============================================================================
@@ -140,22 +370,40 @@ export const useThemeStore = defineStore('theme', () => {
     console.log('[Theme] Dark mode:', isDark.value)
   }
 
+  /** Verifica si es un preset personalizado */
+  function isCustomPreset(preset: ThemePreset): preset is CustomThemePreset {
+    return preset in CUSTOM_PRESETS
+  }
+
   function applyPresetAndColor() {
     try {
-      const basePreset = PRESETS[config.value.preset].value
-      const colorPalette = palette(config.value.primaryColor)
+      const presetKey = config.value.preset
+      const presetInfo = PRESETS[presetKey]
+      const basePreset = presetInfo.value
 
       // Use usePreset to change the base preset completely
       usePreset(basePreset)
 
-      // Then update the primary color
+      // Agregar clase de tema activo para CSS específico por tema
+      // Esto permite selectores como .scrivener-theme .document-viewer
+      const themeClasses = ['aura-theme', 'lara-theme', 'material-theme', 'nora-theme', 'grammarly-theme', 'scrivener-theme']
+      document.documentElement.classList.remove(...themeClasses)
+      document.documentElement.classList.add(`${presetKey}-theme`)
+
+      // Aplicar el color primario a TODOS los temas (incluidos los personalizados)
+      const colorPalette = palette(config.value.primaryColor)
       updatePreset(basePreset, {
         semantic: {
           primary: colorPalette
         }
       })
 
-      console.log('[Theme] Applied preset:', config.value.preset, 'with color:', config.value.primaryColor)
+      console.log(
+        '[Theme] Applied preset:',
+        presetKey,
+        'with color:',
+        config.value.primaryColor
+      )
     } catch (e) {
       console.error('[Theme] Error applying preset:', e)
     }
@@ -189,7 +437,12 @@ export const useThemeStore = defineStore('theme', () => {
     // Apply scaling to common spacing variables
     const baseGap = 1 * scale
     document.documentElement.style.setProperty('--app-gap', `${baseGap}rem`)
-    console.log('[Theme] Compactness scale:', scale)
+
+    // Add CSS class for compactness mode
+    document.documentElement.classList.remove('ui-compact', 'ui-normal', 'ui-comfortable')
+    document.documentElement.classList.add(`ui-${config.value.compactness}`)
+
+    console.log('[Theme] Compactness scale:', scale, 'class:', `ui-${config.value.compactness}`)
   }
 
   function applyReducedMotion() {
@@ -202,6 +455,20 @@ export const useThemeStore = defineStore('theme', () => {
     console.log('[Theme] Reduced motion:', shouldReduce)
   }
 
+  function applyFontFamily() {
+    const fontInfo = FONT_FAMILIES[config.value.fontFamily]
+    const fontInfoReading = FONT_FAMILIES[config.value.fontFamilyReading]
+
+    // Aplicar fuente de interfaz
+    document.documentElement.style.setProperty('--font-family-active', fontInfo.cssVar)
+    document.documentElement.style.fontFamily = fontInfo.cssVar
+
+    // Aplicar fuente de lectura
+    document.documentElement.style.setProperty('--font-family-reading', fontInfoReading.cssVar)
+
+    console.log('[Theme] Font family:', config.value.fontFamily, '| Reading:', config.value.fontFamilyReading)
+  }
+
   function applyAllStyles() {
     applyDarkMode()
     applyPresetAndColor()
@@ -210,6 +477,7 @@ export const useThemeStore = defineStore('theme', () => {
     applyRadius()
     applyCompactness()
     applyReducedMotion()
+    applyFontFamily()
   }
 
   // ============================================================================
@@ -225,6 +493,15 @@ export const useThemeStore = defineStore('theme', () => {
     if (saved) {
       try {
         const parsed = JSON.parse(saved) as Partial<ThemeConfig>
+        // Migrar presets eliminados (nord, dracula) a aura
+        const preset = parsed.preset as string | undefined
+        if (preset === 'nord' || preset === 'dracula') {
+          parsed.preset = 'aura'
+        }
+        // Validar que el preset existe
+        if (parsed.preset && !(parsed.preset in PRESETS)) {
+          parsed.preset = 'aura'
+        }
         config.value = { ...DEFAULT_CONFIG, ...parsed }
       } catch (e) {
         console.warn('[Theme] Failed to parse theme config:', e)
@@ -252,6 +529,7 @@ export const useThemeStore = defineStore('theme', () => {
   function setMode(mode: ThemeMode) {
     config.value.mode = mode
     applyDarkMode()
+    applyPresetAndColor() // Re-apply to ensure colors work in new mode
     saveConfig()
   }
 
@@ -260,6 +538,7 @@ export const useThemeStore = defineStore('theme', () => {
     const currentIndex = modes.indexOf(config.value.mode)
     config.value.mode = modes[(currentIndex + 1) % modes.length]
     applyDarkMode()
+    applyPresetAndColor() // Re-apply to ensure colors work in new mode
     saveConfig()
   }
 
@@ -293,6 +572,18 @@ export const useThemeStore = defineStore('theme', () => {
     saveConfig()
   }
 
+  function setFontFamily(font: FontFamily) {
+    config.value.fontFamily = font
+    applyFontFamily()
+    saveConfig()
+  }
+
+  function setFontFamilyReading(font: FontFamily) {
+    config.value.fontFamilyReading = font
+    applyFontFamily()
+    saveConfig()
+  }
+
   function resetToDefaults() {
     config.value = { ...DEFAULT_CONFIG }
     applyAllStyles()
@@ -312,6 +603,7 @@ export const useThemeStore = defineStore('theme', () => {
     prefersDark.addEventListener('change', () => {
       if (config.value.mode === 'auto') {
         applyDarkMode()
+        applyPresetAndColor() // Re-apply colors for new mode
       }
     })
 
@@ -331,11 +623,16 @@ export const useThemeStore = defineStore('theme', () => {
     currentPrimaryColor,
     // Constants (exported for UI)
     PRESETS,
+    PRIMEVUE_PRESETS,
+    CUSTOM_PRESETS,
     PRIMARY_COLORS,
     FONT_SIZES,
     LINE_HEIGHTS,
     UI_RADIUS,
     UI_COMPACTNESS,
+    FONT_FAMILIES,
+    // Helpers
+    isCustomPreset,
     // Actions
     setPreset,
     setPrimaryColor,
@@ -346,6 +643,8 @@ export const useThemeStore = defineStore('theme', () => {
     setRadius,
     setCompactness,
     setReducedMotion,
+    setFontFamily,
+    setFontFamilyReading,
     resetToDefaults,
     initialize
   }

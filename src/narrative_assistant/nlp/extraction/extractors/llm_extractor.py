@@ -198,7 +198,7 @@ class LLMExtractor(BaseExtractor):
         min_votes_for_consensus: int = 2,
         # Configuración general
         base_url: str = "http://localhost:11434",
-        timeout: int = 120,
+        timeout: int = 600,  # 10 min - CPU sin GPU es lento
         max_parallel_models: int = 3,
     ):
         """

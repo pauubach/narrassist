@@ -8,6 +8,7 @@ import pytest
 from pathlib import Path
 import tempfile
 import shutil
+import os
 
 
 @pytest.fixture
@@ -26,6 +27,41 @@ def temp_db():
 
     # Cleanup
     shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+@pytest.fixture(autouse=True)
+def isolated_database(tmp_path):
+    """
+    Fixture que aísla la BD para cada test.
+
+    Se ejecuta automáticamente antes de cada test para asegurar
+    que cada test tiene su propia BD limpia con el schema actual.
+    """
+    from narrative_assistant.persistence.database import reset_database, get_database
+
+    # Crear directorio temporal para la BD de este test
+    test_db_dir = tmp_path / "narrative_assistant"
+    test_db_dir.mkdir(parents=True, exist_ok=True)
+    test_db_path = test_db_dir / "test.db"
+
+    # Setear variable de entorno para que el sistema use esta BD
+    old_data_dir = os.environ.get("NA_DATA_DIR")
+    os.environ["NA_DATA_DIR"] = str(tmp_path)
+
+    # Resetear singleton para que use la nueva ubicación
+    reset_database()
+
+    # Inicializar BD con schema actual (esto crea las tablas)
+    db = get_database(test_db_path)
+
+    yield db
+
+    # Cleanup: restaurar variable de entorno
+    reset_database()
+    if old_data_dir:
+        os.environ["NA_DATA_DIR"] = old_data_dir
+    elif "NA_DATA_DIR" in os.environ:
+        del os.environ["NA_DATA_DIR"]
 
 
 @pytest.fixture

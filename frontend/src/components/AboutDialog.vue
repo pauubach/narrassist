@@ -12,7 +12,12 @@
         <h2>Narrative Assistant</h2>
         <p class="version">Versión {{ version }}</p>
         <p class="description">
-          Herramienta de corrección narrativa para editores profesionales
+          Asistente de corrección con IA para escritores, editores y correctores profesionales.
+          Detecta inconsistencias en cualquier tipo de manuscrito.
+        </p>
+        <p class="privacy-badge">
+          <i class="pi pi-shield"></i>
+          <span>IA 100% local · Tu manuscrito nunca se sube a internet</span>
         </p>
       </div>
 
@@ -22,31 +27,34 @@
         <div class="status-item">
           <span class="status-label">Backend Python:</span>
           <Tag
-            :value="backendStatus.connected ? 'Conectado' : 'Desconectado'"
             :severity="backendStatus.connected ? 'success' : 'danger'"
-          />
+          >
+            {{ backendStatus.connected ? 'Conectado' : 'Desconectado' }}
+          </Tag>
         </div>
 
         <div class="status-item">
           <span class="status-label">Base de datos:</span>
           <Tag
-            :value="backendStatus.database"
-            :severity="backendStatus.database === 'SQLite Ready' ? 'success' : 'warning'"
-          />
+            :severity="backendStatus.connected ? 'success' : 'warn'"
+          >
+            {{ backendStatus.database }}
+          </Tag>
         </div>
 
         <div class="status-item">
-          <span class="status-label">Modelos NLP:</span>
+          <span class="status-label">Modelos IA:</span>
           <Tag
-            :value="backendStatus.models"
-            :severity="backendStatus.models === 'Offline (Local)' ? 'success' : 'info'"
-          />
+            :severity="backendStatus.connected ? 'success' : 'warn'"
+          >
+            {{ backendStatus.models }}
+          </Tag>
         </div>
       </div>
 
       <div class="copyright">
         <p>&copy; 2026 Narrative Assistant</p>
-        <p class="tech-stack">Vue 3 · FastAPI · spaCy · SQLite</p>
+        <p class="license">Todos los derechos reservados</p>
       </div>
     </div>
   </Dialog>
@@ -76,12 +84,13 @@ const isVisible = computed({
   set: (value) => emit('update:visible', value)
 })
 
-const version = ref('0.1.0')
+// Versión desde el backend
+const version = computed(() => systemStore.backendVersion || '0.1.0')
 
 const backendStatus = computed(() => ({
   connected: systemStore.backendConnected,
-  database: systemStore.backendConnected ? 'SQLite Ready' : 'No disponible',
-  models: systemStore.backendConnected ? 'Offline (Local)' : 'No disponible'
+  database: systemStore.backendConnected ? 'Operativa' : 'No disponible',
+  models: systemStore.backendConnected ? 'Cargados' : 'No disponible'
 }))
 
 // Refrescar estado al abrir el diálogo
@@ -89,7 +98,7 @@ watch(() => props.visible, (newValue) => {
   if (newValue) {
     systemStore.checkBackendStatus()
   }
-})
+}, { immediate: true })
 </script>
 
 <style scoped>
@@ -129,6 +138,29 @@ watch(() => props.visible, (newValue) => {
   line-height: 1.5;
 }
 
+.privacy-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding: 0.5rem 1rem;
+  background: var(--green-50);
+  border: 1px solid var(--green-200);
+  border-radius: 20px;
+  font-size: 0.8125rem;
+  color: var(--green-700);
+}
+
+:global(.dark) .privacy-badge {
+  background: var(--green-900);
+  border-color: var(--green-700);
+  color: var(--green-300);
+}
+
+.privacy-badge i {
+  color: var(--green-500);
+}
+
 .system-status h3 {
   font-size: 1.125rem;
   margin: 0 0 1rem 0;
@@ -164,7 +196,7 @@ watch(() => props.visible, (newValue) => {
   font-size: 0.875rem;
 }
 
-.tech-stack {
+.license {
   font-size: 0.8125rem;
   opacity: 0.7;
 }

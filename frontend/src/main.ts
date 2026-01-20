@@ -12,10 +12,18 @@ import Aura from '@primevue/themes/aura'
 // PrimeIcons
 import 'primeicons/primeicons.css'
 
+// Fuentes (locales para funcionamiento offline)
+import './assets/fonts/fonts-local.css'
+
 // Estilos globales
 import './assets/main.css'
 import './assets/themes.css'
 import './assets/animations.css'
+
+// Design System tokens, utilities y accesibilidad
+import './assets/design-system/tokens.css'
+import './assets/design-system/utilities.css'
+import './assets/design-system/accessibility.css'
 
 // Overrides de PrimeVue - DEBE cargarse después del tema
 import './assets/primevue-overrides.css'

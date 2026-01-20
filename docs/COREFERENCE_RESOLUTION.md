@@ -350,6 +350,19 @@ WARNING: No se pudo conectar LLM: ...
 ```
 **Solución**: Iniciar Ollama (`ollama serve`) o desactivar método LLM en config.
 
+### GPU con poca VRAM o crash de CUDA
+```
+error="llama runner process has terminated: exit status 2"
+```
+**Solución**: Usar el script `scripts/start_ollama_cpu.bat` para forzar modo CPU:
+```batch
+scripts\start_ollama_cpu.bat
+```
+Este script:
+- Desactiva CUDA completamente
+- Inicia Ollama minimizado en segundo plano
+- Espera a que el servidor esté listo
+
 ### Embeddings lentos
 ```python
 # Reducir peso de embeddings o desactivar

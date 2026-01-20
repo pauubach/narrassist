@@ -26,37 +26,82 @@
         :key="chapter.id"
         class="chapter-item"
         :class="{ 'chapter-active': activeChapterId === chapter.id }"
-        @click="selectChapter(chapter.id)"
       >
-        <div class="chapter-header">
+        <div class="chapter-header" @click="selectChapter(chapter.id)">
           <div class="chapter-info">
             <i class="pi pi-book chapter-icon"></i>
             <span class="chapter-title">{{ chapter.title }}</span>
           </div>
           <div class="chapter-meta">
             <span class="chapter-words" v-tooltip.left="'Palabras'">
-              {{ chapter.word_count.toLocaleString() }}
+              {{ chapter.wordCount.toLocaleString() }}
             </span>
+          </div>
+        </div>
+
+        <!-- Secciones del capítulo (H2, H3, H4) -->
+        <div v-if="chapter.sections && chapter.sections.length > 0" class="sections-list">
+          <div
+            v-for="section in chapter.sections"
+            :key="`section-${section.id}`"
+            class="section-tree"
+          >
+            <div
+              class="section-item"
+              :class="[`level-${section.headingLevel}`, { 'section-active': activeSectionId === section.id }]"
+              @click.stop="selectSection(chapter.id, section.id, section.startChar)"
+            >
+              <i class="pi pi-list section-icon"></i>
+              <span class="section-title">{{ section.title || `Sección ${section.sectionNumber}` }}</span>
+            </div>
+
+            <!-- Subsecciones recursivas -->
+            <template v-if="section.subsections && section.subsections.length > 0">
+              <div
+                v-for="sub in section.subsections"
+                :key="`sub-${sub.id}`"
+                class="section-item"
+                :class="[`level-${sub.headingLevel}`, { 'section-active': activeSectionId === sub.id }]"
+                @click.stop="selectSection(chapter.id, sub.id, sub.startChar)"
+              >
+                <i class="pi pi-minus section-icon"></i>
+                <span class="section-title">{{ sub.title || `Subsección ${sub.sectionNumber}` }}</span>
+              </div>
+
+              <!-- Nivel 4 (si existe) -->
+              <template v-for="sub in section.subsections">
+                <div
+                  v-for="sub4 in sub.subsections || []"
+                  :key="`sub4-${sub.id}-${sub4.id}`"
+                  class="section-item"
+                  :class="[`level-${sub4.headingLevel}`, { 'section-active': activeSectionId === sub4.id }]"
+                  @click.stop="selectSection(chapter.id, sub4.id, sub4.startChar)"
+                >
+                  <i class="pi pi-circle-fill section-icon tiny"></i>
+                  <span class="section-title">{{ sub4.title || `Subsección ${sub4.sectionNumber}` }}</span>
+                </div>
+              </template>
+            </template>
           </div>
         </div>
 
         <!-- Stats del capítulo -->
         <div class="chapter-stats">
           <div
-            v-if="chapter.entities_count"
+            v-if="chapter.entitiesCount"
             class="stat-item"
             v-tooltip.bottom="'Entidades mencionadas'"
           >
             <i class="pi pi-users"></i>
-            <span>{{ chapter.entities_count }}</span>
+            <span>{{ chapter.entitiesCount }}</span>
           </div>
           <div
-            v-if="chapter.alerts_count"
+            v-if="chapter.alertsCount"
             class="stat-item stat-alerts"
             v-tooltip.bottom="'Alertas detectadas'"
           >
             <i class="pi pi-exclamation-triangle"></i>
-            <span>{{ chapter.alerts_count }}</span>
+            <span>{{ chapter.alertsCount }}</span>
           </div>
         </div>
       </div>
@@ -69,56 +114,45 @@
       <small>El análisis aún no ha detectado la estructura del documento</small>
     </div>
 
-    <!-- Footer con resumen -->
-    <div v-if="chapters.length > 0" class="tree-footer">
-      <div class="footer-stat">
-        <i class="pi pi-book"></i>
-        <span>{{ chapters.length }} capítulos</span>
-      </div>
-      <div class="footer-stat">
-        <i class="pi pi-file"></i>
-        <span>{{ totalWords.toLocaleString() }} palabras</span>
-      </div>
-    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import Button from 'primevue/button'
 import ProgressSpinner from 'primevue/progressspinner'
+import type { Chapter } from '@/types'
 
-interface Chapter {
-  id: number
-  project_id: number
-  title: string
-  chapter_number: number
-  word_count: number
-  position_start: number
-  position_end: number
-  entities_count?: number
-  alerts_count?: number
+// Extendemos Chapter para incluir stats opcionales
+interface ChapterWithStats extends Chapter {
+  entitiesCount?: number
+  alertsCount?: number
 }
 
 const props = defineProps<{
-  chapters: Chapter[]
+  chapters: ChapterWithStats[]
   loading?: boolean
   activeChapterId?: number | null
 }>()
 
 const emit = defineEmits<{
   chapterSelect: [chapterId: number]
+  sectionSelect: [chapterId: number, sectionId: number, startChar: number]
   refresh: []
 }>()
 
-// Computed
-const totalWords = computed(() => {
-  return props.chapters.reduce((sum, ch) => sum + ch.word_count, 0)
-})
+// Estado local para sección activa
+const activeSectionId = ref<number | null>(null)
 
 // Funciones
 const selectChapter = (chapterId: number) => {
+  activeSectionId.value = null
   emit('chapterSelect', chapterId)
+}
+
+const selectSection = (chapterId: number, sectionId: number, startChar: number) => {
+  activeSectionId.value = sectionId
+  emit('sectionSelect', chapterId, sectionId, startChar)
 }
 </script>
 
@@ -127,7 +161,7 @@ const selectChapter = (chapterId: number) => {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: white;
+  background: var(--p-surface-0, white);
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
@@ -258,6 +292,69 @@ const selectChapter = (chapterId: number) => {
   color: var(--orange-500);
 }
 
+/* Secciones */
+.sections-list {
+  margin-top: 0.5rem;
+  padding-left: 1rem;
+  border-left: 2px solid var(--surface-200);
+}
+
+.section-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  margin: 0.15rem 0;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-size: 0.8rem;
+  color: var(--text-color-secondary);
+}
+
+.section-item:hover {
+  background: var(--surface-100);
+  color: var(--text-color);
+}
+
+.section-item.section-active {
+  background: var(--primary-50);
+  color: var(--primary-color);
+}
+
+.section-icon {
+  font-size: 0.65rem;
+  color: var(--surface-400);
+  flex-shrink: 0;
+}
+
+.section-icon.tiny {
+  font-size: 0.4rem;
+}
+
+.section-item.section-active .section-icon {
+  color: var(--primary-color);
+}
+
+.section-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Indentación por nivel */
+.section-item.level-2 {
+  padding-left: 0.5rem;
+}
+
+.section-item.level-3 {
+  padding-left: 1rem;
+}
+
+.section-item.level-4 {
+  padding-left: 1.5rem;
+}
+
 .tree-empty {
   display: flex;
   flex-direction: column;
@@ -283,28 +380,6 @@ const selectChapter = (chapterId: number) => {
 .tree-empty small {
   font-size: 0.75rem;
   line-height: 1.4;
-}
-
-.tree-footer {
-  padding: 0.75rem 1rem;
-  background: var(--surface-50);
-  border-top: 1px solid var(--surface-200);
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.footer-stat {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.75rem;
-  color: var(--text-color-secondary);
-}
-
-.footer-stat i {
-  font-size: 0.875rem;
-  color: var(--primary-color);
 }
 
 /* Scrollbar styling */

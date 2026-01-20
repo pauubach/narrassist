@@ -27,9 +27,9 @@
             </a>
           </li>
           <li>
-            <a href="#ia-local" @click.prevent="scrollToSection('ia-local')" :class="{ active: activeSection === 'ia-local' }">
-              <i class="pi pi-microchip-ai"></i>
-              <span>IA Local</span>
+            <a href="#metodos-nlp" @click.prevent="scrollToSection('metodos-nlp')" :class="{ active: activeSection === 'metodos-nlp' }">
+              <i class="pi pi-sliders-h"></i>
+              <span>Métodos de Análisis</span>
             </a>
           </li>
           <li>
@@ -45,15 +45,15 @@
             </a>
           </li>
           <li>
-            <a href="#mantenimiento" @click.prevent="scrollToSection('mantenimiento')" :class="{ active: activeSection === 'mantenimiento' }">
-              <i class="pi pi-wrench"></i>
-              <span>Mantenimiento</span>
+            <a href="#filtros-entidades" @click.prevent="scrollToSection('filtros-entidades')" :class="{ active: activeSection === 'filtros-entidades' }">
+              <i class="pi pi-filter"></i>
+              <span>Filtros de Entidades</span>
             </a>
           </li>
           <li>
-            <a href="#acerca-de" @click.prevent="scrollToSection('acerca-de')" :class="{ active: activeSection === 'acerca-de' }">
-              <i class="pi pi-info-circle"></i>
-              <span>Acerca de</span>
+            <a href="#mantenimiento" @click.prevent="scrollToSection('mantenimiento')" :class="{ active: activeSection === 'mantenimiento' }">
+              <i class="pi pi-wrench"></i>
+              <span>Mantenimiento</span>
             </a>
           </li>
         </ul>
@@ -91,20 +91,37 @@
           <div class="setting-item">
             <div class="setting-info">
               <label class="setting-label">Estilo visual</label>
-              <p class="setting-description">Selecciona el estilo base de la interfaz</p>
+              <p class="setting-description">Selecciona el estilo base de la interfaz. Los temas de escritura están optimizados para largas sesiones de lectura.</p>
             </div>
-            <div class="setting-control">
+            <div class="setting-control wide">
               <Dropdown
                 :modelValue="themeStore.config.preset"
                 @update:modelValue="onPresetChange"
-                :options="presetOptions"
+                :options="groupedPresetOptions"
                 optionLabel="label"
                 optionValue="value"
+                optionGroupLabel="label"
+                optionGroupChildren="items"
+                class="preset-dropdown"
               >
+                <template #value="slotProps">
+                  <div v-if="slotProps.value" class="preset-selected">
+                    <span class="preset-name">{{ PRESETS[slotProps.value as ThemePreset]?.name }}</span>
+                  </div>
+                  <span v-else>Selecciona un tema</span>
+                </template>
+                <template #optiongroup="slotProps">
+                  <div class="preset-group-header">
+                    <i :class="getCategoryIcon(slotProps.option.label)"></i>
+                    <span>{{ slotProps.option.label }}</span>
+                  </div>
+                </template>
                 <template #option="slotProps">
                   <div class="preset-option">
-                    <span class="preset-name">{{ slotProps.option.label }}</span>
-                    <span class="preset-desc">{{ slotProps.option.description }}</span>
+                    <div class="preset-info">
+                      <span class="preset-name">{{ slotProps.option.label }}</span>
+                      <span class="preset-desc">{{ slotProps.option.description }}</span>
+                    </div>
                   </div>
                 </template>
               </Dropdown>
@@ -131,6 +148,82 @@
                   <i v-if="themeStore.config.primaryColor === color.value" class="pi pi-check"></i>
                 </button>
               </div>
+            </div>
+          </div>
+
+          <!-- Fuente de interfaz -->
+          <div class="setting-item">
+            <div class="setting-info">
+              <label class="setting-label">Fuente de interfaz</label>
+              <p class="setting-description">Tipografía para menús, botones y controles</p>
+            </div>
+            <div class="setting-control wide">
+              <Dropdown
+                :modelValue="themeStore.config.fontFamily"
+                @update:modelValue="onFontFamilyChange"
+                :options="groupedFontOptions"
+                optionLabel="label"
+                optionValue="value"
+                optionGroupLabel="label"
+                optionGroupChildren="items"
+                class="font-dropdown"
+              >
+                <template #value="slotProps">
+                  <span v-if="slotProps.value" :class="`font-${slotProps.value}`">
+                    {{ FONT_FAMILIES[slotProps.value as FontFamily]?.label }}
+                  </span>
+                </template>
+                <template #optiongroup="slotProps">
+                  <div class="font-group-header">
+                    <i :class="slotProps.option.label === 'Generales' ? 'pi pi-desktop' : 'pi pi-book'"></i>
+                    <span>{{ slotProps.option.label }}</span>
+                  </div>
+                </template>
+                <template #option="slotProps">
+                  <div class="font-option" :class="`font-${slotProps.option.value}`">
+                    <span class="font-name">{{ slotProps.option.label }}</span>
+                    <span class="font-desc">{{ slotProps.option.description }}</span>
+                  </div>
+                </template>
+              </Dropdown>
+            </div>
+          </div>
+
+          <!-- Fuente de lectura -->
+          <div class="setting-item">
+            <div class="setting-info">
+              <label class="setting-label">Fuente de lectura</label>
+              <p class="setting-description">Tipografía para visualizar el manuscrito</p>
+            </div>
+            <div class="setting-control wide">
+              <Dropdown
+                :modelValue="themeStore.config.fontFamilyReading"
+                @update:modelValue="onFontFamilyReadingChange"
+                :options="groupedFontOptions"
+                optionLabel="label"
+                optionValue="value"
+                optionGroupLabel="label"
+                optionGroupChildren="items"
+                class="font-dropdown"
+              >
+                <template #value="slotProps">
+                  <span v-if="slotProps.value" :class="`font-${slotProps.value}`">
+                    {{ FONT_FAMILIES[slotProps.value as FontFamily]?.label }}
+                  </span>
+                </template>
+                <template #optiongroup="slotProps">
+                  <div class="font-group-header">
+                    <i :class="slotProps.option.label === 'Generales' ? 'pi pi-desktop' : 'pi pi-book'"></i>
+                    <span>{{ slotProps.option.label }}</span>
+                  </div>
+                </template>
+                <template #option="slotProps">
+                  <div class="font-option" :class="`font-${slotProps.option.value}`">
+                    <span class="font-name">{{ slotProps.option.label }}</span>
+                    <span class="font-desc">{{ slotProps.option.description }}</span>
+                  </div>
+                </template>
+              </Dropdown>
             </div>
           </div>
 
@@ -245,21 +338,122 @@
           </div>
         </template>
         <template #content>
-          <div class="setting-item">
-            <div class="setting-info">
-              <label class="setting-label">Confianza mínima para alertas</label>
+          <!-- Sensibilidad del análisis - Control unificado -->
+          <div class="sensitivity-section">
+            <div class="sensitivity-header">
+              <label class="setting-label">¿Cuántas sugerencias quieres ver?</label>
               <p class="setting-description">
-                Solo mostrar alertas con confianza superior a este valor ({{ settings.minConfidence }}%)
+                Ajusta cuánto debería avisarte el asistente
               </p>
             </div>
-            <div class="setting-control">
+
+            <!-- Presets como botones -->
+            <div class="sensitivity-presets">
+              <button
+                v-for="preset in sensitivityPresets"
+                :key="preset.value"
+                class="preset-button"
+                :class="{ active: settings.sensitivityPreset === preset.value }"
+                @click="selectSensitivityPreset(preset.value)"
+              >
+                <i :class="preset.icon"></i>
+                <div class="preset-content">
+                  <span class="preset-title">{{ preset.label }}</span>
+                  <span class="preset-desc">{{ preset.description }}</span>
+                </div>
+                <i v-if="preset.recommended" class="pi pi-star-fill recommended-star" title="Recomendado"></i>
+              </button>
+            </div>
+
+            <!-- Slider de ajuste fino (siempre visible pero con etiqueta contextual) -->
+            <div class="sensitivity-slider">
+              <div class="slider-header">
+                <span class="slider-label">Ajuste fino</span>
+                <span class="slider-value">{{ sensitivityLabel }}</span>
+              </div>
               <Slider
-                v-model="settings.minConfidence"
+                v-model="settings.sensitivity"
                 :min="0"
                 :max="100"
                 :step="5"
-                @change="onSliderChange"
+                @change="onSensitivityChange"
               />
+              <div class="slider-hints">
+                <span>Menos avisos</span>
+                <span>Más avisos</span>
+              </div>
+            </div>
+
+            <!-- Panel avanzado colapsable -->
+            <div class="advanced-panel">
+              <button
+                class="advanced-toggle"
+                @click="showAdvancedSensitivity = !showAdvancedSensitivity"
+              >
+                <i :class="showAdvancedSensitivity ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"></i>
+                <span>Opciones avanzadas</span>
+              </button>
+
+              <div v-if="showAdvancedSensitivity" class="advanced-content">
+                <p class="advanced-note">
+                  Estos valores se calculan automáticamente según la sensibilidad elegida.
+                  Solo modifícalos si necesitas control preciso.
+                </p>
+
+                <div class="advanced-slider">
+                  <div class="advanced-slider-header">
+                    <label>Certeza para mostrar alertas</label>
+                    <span>{{ settings.minConfidence }}%</span>
+                  </div>
+                  <p class="slider-help">Qué tan seguro debe estar el sistema para mostrarte una alerta. Más bajo = más alertas (algunas pueden ser falsas).</p>
+                  <Slider
+                    v-model="settings.minConfidence"
+                    :min="20"
+                    :max="95"
+                    :step="5"
+                    @change="onAdvancedSliderChange"
+                  />
+                </div>
+
+                <div class="advanced-slider">
+                  <div class="advanced-slider-header">
+                    <label>Certeza para detectar personajes</label>
+                    <span>{{ settings.inferenceMinConfidence }}%</span>
+                  </div>
+                  <p class="slider-help">Qué tan seguro debe estar para identificar que dos menciones son el mismo personaje.</p>
+                  <Slider
+                    v-model="settings.inferenceMinConfidence"
+                    :min="20"
+                    :max="90"
+                    :step="5"
+                    @change="onAdvancedSliderChange"
+                  />
+                </div>
+
+                <div class="advanced-slider">
+                  <div class="advanced-slider-header">
+                    <label>Acuerdo entre métodos</label>
+                    <span>{{ settings.inferenceMinConsensus }}%</span>
+                  </div>
+                  <p class="slider-help">Cuántos métodos deben coincidir para aceptar una detección. Más alto = más fiable pero puede perder algunas.</p>
+                  <Slider
+                    v-model="settings.inferenceMinConsensus"
+                    :min="30"
+                    :max="100"
+                    :step="10"
+                    @change="onAdvancedSliderChange"
+                  />
+                </div>
+
+                <Button
+                  label="Restaurar valores calculados"
+                  icon="pi pi-refresh"
+                  severity="secondary"
+                  text
+                  size="small"
+                  @click="recalculateFromSensitivity"
+                />
+              </div>
             </div>
           </div>
 
@@ -291,104 +485,245 @@
         </template>
       </Card>
 
-      <!-- LLM / Inferencia -->
-      <Card id="ia-local">
+      <!-- Métodos de Análisis -->
+      <Card id="metodos-nlp">
         <template #title>
           <div class="section-title">
-            <i class="pi pi-microchip-ai"></i>
-            <span>Análisis con IA Local</span>
+            <i class="pi pi-sliders-h"></i>
+            <span>Métodos de Análisis</span>
+            <Tag v-if="loadingCapabilities" value="Cargando..." severity="info" />
           </div>
         </template>
         <template #content>
-          <div class="setting-item">
-            <div class="setting-info">
-              <label class="setting-label">Modelos LLM adicionales</label>
-              <p class="setting-description">
-                Selecciona modelos LLM para análisis avanzado.
-                Los métodos básicos (reglas y embeddings) siempre están activos.
-              </p>
+          <!-- 1. Hardware Info Banner (CPU/GPU) -->
+          <Message v-if="systemCapabilities" :severity="systemCapabilities.hardware.has_gpu ? 'success' : 'info'" :closable="false" class="hardware-banner">
+            <div class="hardware-info">
+              <i :class="systemCapabilities.hardware.has_gpu ? 'pi pi-bolt' : 'pi pi-desktop'"></i>
+              <div>
+                <strong>{{ systemCapabilities.hardware.has_gpu ? 'GPU detectada' : 'Modo CPU' }}</strong>
+                <span v-if="systemCapabilities.hardware.gpu">
+                  - {{ systemCapabilities.hardware.gpu.name }}
+                  <template v-if="systemCapabilities.hardware.gpu.memory_gb">
+                    ({{ systemCapabilities.hardware.gpu.memory_gb.toFixed(1) }} GB)
+                  </template>
+                </span>
+                <span v-else>
+                  - {{ systemCapabilities.hardware.cpu.name }}
+                </span>
+              </div>
             </div>
-            <div class="setting-control wide">
-              <MultiSelect
-                v-model="settings.enabledInferenceMethods"
-                :options="inferenceMethodOptions"
-                optionLabel="label"
-                optionValue="value"
-                placeholder="Seleccionar modelos LLM"
-                display="chip"
-                :showToggleAll="false"
-                @change="onSettingChange"
+          </Message>
+
+          <!-- 2. Analizador Semántico (Ollama + modelos) -->
+          <div class="nlp-category">
+            <div class="category-header">
+              <h4><i class="pi pi-microchip-ai"></i> Analizador Semántico</h4>
+              <span class="category-desc">Motor de análisis avanzado del significado y contexto</span>
+            </div>
+
+            <!-- Estado del analizador compacto cuando está listo -->
+            <div v-if="systemCapabilities && ollamaState === 'ready'" class="ollama-ready-bar">
+              <div class="ollama-ready-info">
+                <i class="pi pi-check-circle"></i>
+                <span>Analizador listo · {{ systemCapabilities.ollama.models.length }} modelo(s)</span>
+              </div>
+            </div>
+
+            <!-- Banner de acción cuando el analizador NO está listo -->
+            <div v-if="systemCapabilities && ollamaState !== 'ready'" class="ollama-action-card" :class="'ollama-state-' + ollamaState">
+              <div class="ollama-action-content">
+                <i :class="[
+                  ollamaState === 'no_models' ? 'pi pi-info-circle' : 'pi pi-exclamation-triangle'
+                ]"></i>
+                <div class="ollama-action-text">
+                  <strong>{{
+                    ollamaState === 'not_installed' ? 'Analizador no disponible' :
+                    ollamaState === 'not_running' ? 'Analizador no iniciado' :
+                    'Sin modelos de análisis'
+                  }}</strong>
+                  <span>{{ ollamaStatusMessage }}</span>
+                </div>
+                <Button
+                  :label="ollamaActionConfig.label"
+                  :icon="ollamaActionConfig.icon"
+                  :severity="ollamaActionConfig.severity"
+                  size="small"
+                  :loading="ollamaStarting || modelDownloading"
+                  @click="ollamaActionConfig.action"
+                />
+              </div>
+            </div>
+
+            <!-- Selector de modelos -->
+            <div class="setting-item" :class="{ 'setting-disabled': ollamaState !== 'ready' }">
+              <div class="setting-info">
+                <label class="setting-label">Modelos de análisis</label>
+                <p class="setting-description">
+                  Selecciona qué modelos usar para el análisis semántico.
+                </p>
+              </div>
+              <div class="setting-control wide">
+                <MultiSelect
+                  v-model="settings.enabledInferenceMethods"
+                  :options="availableLLMOptions"
+                  optionLabel="label"
+                  optionValue="value"
+                  placeholder="Seleccionar modelos"
+                  display="chip"
+                  :showToggleAll="false"
+                  :disabled="ollamaState !== 'ready'"
+                  @change="onSettingChange"
+                >
+                  <template #option="slotProps">
+                    <div class="method-option">
+                      <div class="method-info">
+                        <span class="method-name">{{ slotProps.option.label }}</span>
+                        <span class="method-desc">{{ slotProps.option.description }}</span>
+                      </div>
+                      <div class="method-badges">
+                        <Badge
+                          :value="getSpeedLabel(slotProps.option.speed)"
+                          :severity="getSpeedSeverity(slotProps.option.speed)"
+                          class="speed-badge"
+                        />
+                        <Tag
+                          v-if="!slotProps.option.installed"
+                          value="No instalado"
+                          severity="warning"
+                          class="method-tag"
+                        />
+                      </div>
+                    </div>
+                  </template>
+                </MultiSelect>
+              </div>
+            </div>
+
+            <div class="setting-item">
+              <div class="setting-info">
+                <label class="setting-label">Priorizar velocidad</label>
+                <p class="setting-description">
+                  Usar configuración optimizada para respuestas rápidas sobre calidad
+                </p>
+              </div>
+              <div class="setting-control">
+                <InputSwitch
+                  v-model="settings.prioritizeSpeed"
+                  :disabled="ollamaState !== 'ready'"
+                  @change="onSettingChange"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. Correferencia -->
+          <div class="nlp-category">
+            <div class="category-header">
+              <h4><i class="pi pi-link"></i> Seguimiento de referencias</h4>
+              <span class="category-desc">Detecta cuándo "él", "la detective" o "María" se refieren al mismo personaje</span>
+            </div>
+            <div class="methods-grid">
+              <div
+                v-for="(method, key) in getNLPMethodsForCategory('coreference')"
+                :key="key"
+                class="method-card"
+                :class="{ disabled: !method.available, enabled: isMethodEnabled('coreference', key as string) }"
               >
-                <template #option="slotProps">
-                  <div class="method-option">
-                    <div class="method-info">
-                      <span class="method-name">{{ slotProps.option.label }}</span>
-                      <span class="method-desc">{{ slotProps.option.description }}</span>
-                    </div>
-                    <div class="method-badges">
-                      <Badge
-                        :value="getSpeedLabel(slotProps.option.speed)"
-                        :severity="getSpeedSeverity(slotProps.option.speed)"
-                        class="speed-badge"
-                      />
-                    </div>
-                  </div>
-                </template>
-              </MultiSelect>
+                <div class="method-header">
+                  <InputSwitch
+                    :modelValue="isMethodEnabled('coreference', key as string)"
+                    @update:modelValue="toggleMethod('coreference', key as string, $event)"
+                    :disabled="!method.available"
+                  />
+                  <span class="method-name">{{ method.name }}</span>
+                  <Tag v-if="method.recommended_gpu && !method.requires_gpu" value="GPU recomendada" severity="info" class="method-tag" />
+                  <Tag v-if="method.requires_gpu" value="Requiere GPU" severity="warning" class="method-tag" />
+                  <Tag v-if="!method.available" value="No disponible" severity="danger" class="method-tag" />
+                </div>
+                <p class="method-description">{{ method.description }}</p>
+                <div v-if="method.weight" class="method-weight">
+                  Peso en votación: {{ (method.weight * 100).toFixed(0) }}%
+                </div>
+              </div>
             </div>
           </div>
 
+          <!-- 4. NER -->
+          <div class="nlp-category">
+            <div class="category-header">
+              <h4><i class="pi pi-user"></i> Detección de personajes y lugares</h4>
+              <span class="category-desc">Identifica automáticamente nombres de personas, lugares y organizaciones</span>
+            </div>
+            <div class="methods-grid">
+              <div
+                v-for="(method, key) in getNLPMethodsForCategory('ner')"
+                :key="key"
+                class="method-card"
+                :class="{ disabled: !method.available, enabled: isMethodEnabled('ner', key as string) }"
+              >
+                <div class="method-header">
+                  <InputSwitch
+                    :modelValue="isMethodEnabled('ner', key as string)"
+                    @update:modelValue="toggleMethod('ner', key as string, $event)"
+                    :disabled="!method.available"
+                  />
+                  <span class="method-name">{{ method.name }}</span>
+                  <Tag v-if="method.recommended_gpu && !method.requires_gpu" value="GPU recomendada" severity="info" class="method-tag" />
+                  <Tag v-if="method.requires_gpu" value="Requiere GPU" severity="warning" class="method-tag" />
+                  <Tag v-if="!method.available" value="No disponible" severity="danger" class="method-tag" />
+                </div>
+                <p class="method-description">{{ method.description }}</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 5. Gramática -->
+          <div class="nlp-category">
+            <div class="category-header">
+              <h4><i class="pi pi-check-circle"></i> Corrección gramatical</h4>
+              <span class="category-desc">Detecta errores de concordancia, puntuación y otros problemas gramaticales</span>
+            </div>
+            <div class="methods-grid">
+              <div
+                v-for="(method, key) in getNLPMethodsForCategory('grammar')"
+                :key="key"
+                class="method-card"
+                :class="{ disabled: !method.available, enabled: isMethodEnabled('grammar', key as string) }"
+              >
+                <div class="method-header">
+                  <InputSwitch
+                    :modelValue="isMethodEnabled('grammar', key as string)"
+                    @update:modelValue="toggleMethod('grammar', key as string, $event)"
+                    :disabled="!method.available"
+                  />
+                  <span class="method-name">{{ method.name }}</span>
+                  <Tag v-if="method.recommended_gpu && !method.requires_gpu" value="GPU recomendada" severity="info" class="method-tag" />
+                  <Tag v-if="method.requires_gpu" value="Requiere GPU" severity="warning" class="method-tag" />
+                  <Tag v-if="!method.available" value="No disponible" severity="danger" class="method-tag" />
+                </div>
+                <p class="method-description">{{ method.description }}</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Botón para aplicar configuración recomendada -->
           <div class="setting-item">
             <div class="setting-info">
-              <label class="setting-label">Priorizar velocidad</label>
-              <p class="setting-description">
-                Usar configuración optimizada para respuestas rápidas
-              </p>
+              <label class="setting-label">Configuración recomendada</label>
+              <p class="setting-description">Aplicar configuración óptima según tu hardware detectado</p>
             </div>
             <div class="setting-control">
-              <InputSwitch
-                v-model="settings.prioritizeSpeed"
-                @change="onSettingChange"
+              <Button
+                label="Aplicar recomendada"
+                icon="pi pi-sparkles"
+                severity="secondary"
+                outlined
+                size="small"
+                @click="applyRecommendedConfig"
+                :disabled="!systemCapabilities"
               />
             </div>
           </div>
-
-          <div class="setting-item">
-            <div class="setting-info">
-              <label class="setting-label">Confianza mínima de inferencia</label>
-              <p class="setting-description">
-                Solo mostrar expectativas con confianza superior a {{ settings.inferenceMinConfidence }}%
-              </p>
-            </div>
-            <div class="setting-control">
-              <Slider
-                v-model="settings.inferenceMinConfidence"
-                :min="20"
-                :max="90"
-                :step="5"
-                @change="onSliderChange"
-              />
-            </div>
-          </div>
-
-          <div class="setting-item">
-            <div class="setting-info">
-              <label class="setting-label">Consenso mínimo para violaciones</label>
-              <p class="setting-description">
-                Porcentaje de métodos que deben coincidir ({{ settings.inferenceMinConsensus }}%)
-              </p>
-            </div>
-            <div class="setting-control">
-              <Slider
-                v-model="settings.inferenceMinConsensus"
-                :min="30"
-                :max="100"
-                :step="10"
-                @change="onSliderChange"
-              />
-            </div>
-          </div>
-
         </template>
       </Card>
 
@@ -464,6 +799,113 @@
         </template>
       </Card>
 
+      <!-- Filtros de Entidades -->
+      <Card id="filtros-entidades">
+        <template #title>
+          <div class="section-title">
+            <i class="pi pi-filter"></i>
+            <span>Filtros de Entidades</span>
+          </div>
+        </template>
+        <template #content>
+          <p class="section-description mb-4">
+            Gestiona qué expresiones se filtran automáticamente durante la detección de entidades.
+            Esto ayuda a reducir falsos positivos como marcadores temporales o palabras comunes.
+          </p>
+
+          <!-- Estadísticas -->
+          <div class="filter-stats mb-4" v-if="filterStats">
+            <div class="stat-item">
+              <span class="stat-value">{{ filterStats.system_patterns_active }}</span>
+              <span class="stat-label">Patrones activos</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-value">{{ filterStats.user_rejections }}</span>
+              <span class="stat-label">Rechazos globales</span>
+            </div>
+          </div>
+
+          <!-- Patrones del sistema -->
+          <div class="setting-item column">
+            <div class="setting-info">
+              <label class="setting-label">Patrones del sistema</label>
+              <p class="setting-description">
+                Patrones predefinidos para filtrar expresiones comunes.
+                Puedes activar o desactivar cada patrón según tus necesidades.
+              </p>
+            </div>
+            <div class="system-patterns-list" v-if="systemPatterns.length">
+              <div
+                v-for="category in groupedSystemPatterns"
+                :key="category.name"
+                class="pattern-category"
+              >
+                <h4 class="category-title">{{ getCategoryLabel(category.name) }}</h4>
+                <div class="patterns-grid">
+                  <div
+                    v-for="pattern in category.patterns"
+                    :key="pattern.id"
+                    class="pattern-item"
+                    :class="{ inactive: !pattern.isActive }"
+                  >
+                    <Checkbox
+                      :modelValue="pattern.isActive"
+                      @update:modelValue="toggleSystemPattern(pattern.id, $event)"
+                      :inputId="`pattern-${pattern.id}`"
+                      binary
+                    />
+                    <label :for="`pattern-${pattern.id}`" class="pattern-label">
+                      <code class="pattern-text">{{ pattern.pattern }}</code>
+                      <span class="pattern-desc" v-if="pattern.description">{{ pattern.description }}</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div v-else class="loading-patterns">
+              <ProgressSpinner style="width: 24px; height: 24px" />
+              <span>Cargando patrones...</span>
+            </div>
+          </div>
+
+          <!-- Rechazos globales del usuario -->
+          <div class="setting-item column mt-4">
+            <div class="setting-info">
+              <label class="setting-label">Rechazos globales</label>
+              <p class="setting-description">
+                Entidades que has rechazado y que no aparecerán en ninguno de tus proyectos.
+                Puedes restaurarlas si te equivocaste.
+              </p>
+            </div>
+            <div class="user-rejections-list" v-if="userRejections.length">
+              <div
+                v-for="rejection in userRejections"
+                :key="rejection.id"
+                class="rejection-item"
+              >
+                <div class="rejection-info">
+                  <span class="rejection-name">{{ rejection.entityName }}</span>
+                  <Tag v-if="rejection.entityType" :value="rejection.entityType" severity="secondary" class="ml-2" />
+                  <span class="rejection-reason" v-if="rejection.reason">— {{ rejection.reason }}</span>
+                </div>
+                <Button
+                  icon="pi pi-undo"
+                  text
+                  rounded
+                  severity="secondary"
+                  @click="removeUserRejection(rejection)"
+                  v-tooltip.top="'Restaurar entidad'"
+                />
+              </div>
+            </div>
+            <div v-else class="empty-rejections">
+              <i class="pi pi-check-circle"></i>
+              <span>No tienes entidades rechazadas globalmente</span>
+            </div>
+          </div>
+        </template>
+      </Card>
+
       <!-- Acciones -->
       <Card id="mantenimiento">
         <template #title>
@@ -507,39 +949,6 @@
         </template>
       </Card>
 
-      <!-- Acerca de -->
-      <Card id="acerca-de">
-        <template #title>
-          <div class="section-title">
-            <i class="pi pi-info-circle"></i>
-            <span>Acerca de</span>
-          </div>
-        </template>
-        <template #content>
-          <div class="about-info">
-            <h3>Narrative Assistant</h3>
-            <p class="version">Versión 0.2.0</p>
-            <p class="description">
-              Herramienta de asistencia a correctores literarios profesionales para detectar
-              inconsistencias en manuscritos de ficción.
-            </p>
-            <div class="about-links">
-              <Button
-                label="Documentación"
-                icon="pi pi-book"
-                link
-                @click="openDocumentation"
-              />
-              <Button
-                label="Reportar problema"
-                icon="pi pi-github"
-                link
-                @click="openIssues"
-              />
-            </div>
-          </div>
-        </template>
-      </Card>
       </div>
     </div>
 
@@ -560,6 +969,59 @@
         <Button label="Restablecer" severity="danger" @click="resetSettings" />
       </template>
     </Dialog>
+
+    <!-- Change Data Location Dialog -->
+    <Dialog
+      :visible="showDataLocationDialog"
+      @update:visible="showDataLocationDialog = $event"
+      modal
+      header="Cambiar ubicación de datos"
+      :style="{ width: '550px' }"
+    >
+      <div class="data-location-dialog">
+        <p class="dialog-description">
+          Selecciona una nueva carpeta donde se guardarán los proyectos y datos de la aplicación.
+        </p>
+
+        <div class="location-input">
+          <label class="input-label">Nueva ubicación</label>
+          <InputText
+            v-model="newDataLocation"
+            placeholder="Ej: C:\Users\Usuario\Documents\NarrativeAssistant"
+            class="location-field"
+          />
+        </div>
+
+        <div class="migrate-option">
+          <InputSwitch v-model="migrateData" />
+          <div class="migrate-info">
+            <label>Migrar datos existentes</label>
+            <span class="migrate-description">
+              Copia los proyectos y configuración actual a la nueva ubicación
+            </span>
+          </div>
+        </div>
+
+        <Message severity="info" :closable="false" class="location-info-message">
+          <span>Necesitarás reiniciar la aplicación después de cambiar la ubicación.</span>
+        </Message>
+      </div>
+
+      <template #footer>
+        <Button
+          label="Cancelar"
+          severity="secondary"
+          @click="showDataLocationDialog = false"
+          :disabled="changingLocation"
+        />
+        <Button
+          label="Cambiar ubicación"
+          icon="pi pi-check"
+          @click="confirmChangeDataLocation"
+          :loading="changingLocation"
+        />
+      </template>
+    </Dialog>
   </div>
 </template>
 
@@ -573,10 +1035,14 @@ import Dropdown from 'primevue/dropdown'
 import Slider from 'primevue/slider'
 import InputSwitch from 'primevue/inputswitch'
 import InputNumber from 'primevue/inputnumber'
+import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import Dialog from 'primevue/dialog'
 import MultiSelect from 'primevue/multiselect'
 import Badge from 'primevue/badge'
+import Tag from 'primevue/tag'
+import Checkbox from 'primevue/checkbox'
+import ProgressSpinner from 'primevue/progressspinner'
 import { useToast } from 'primevue/usetoast'
 import {
   useThemeStore,
@@ -585,11 +1051,15 @@ import {
   LINE_HEIGHTS,
   UI_RADIUS,
   UI_COMPACTNESS,
+  FONT_FAMILIES,
+  PRESETS,
   type ThemePreset,
   type FontSize,
   type LineHeight,
   type UIRadius,
-  type UICompactness
+  type UICompactness,
+  type FontFamily,
+  type PresetInfo
 } from '@/stores/theme'
 
 const router = useRouter()
@@ -603,12 +1073,36 @@ const modeOptions = [
   { label: 'Auto', value: 'auto' }
 ]
 
-const presetOptions = [
-  { label: 'Aura', value: 'aura', description: 'Moderno y minimalista' },
-  { label: 'Lara', value: 'lara', description: 'Inspirado en Bootstrap' },
-  { label: 'Material', value: 'material', description: 'Google Material Design' },
-  { label: 'Nora', value: 'nora', description: 'Empresarial y profesional' }
-]
+// Construir opciones de preset desde el store con categorías
+interface PresetOption {
+  label: string
+  value: ThemePreset
+  description: string
+  category: 'general' | 'writing'
+}
+
+const presetOptions = computed<PresetOption[]>(() => {
+  return Object.entries(PRESETS).map(([key, info]) => ({
+    label: info.name,
+    value: key as ThemePreset,
+    description: info.description,
+    category: info.category
+  }))
+})
+
+// Agrupar presets por categoría para el dropdown
+const groupedPresetOptions = computed(() => {
+  const categories = {
+    general: { label: 'Generales', items: [] as PresetOption[] },
+    writing: { label: 'Para escritura', items: [] as PresetOption[] }
+  }
+
+  for (const preset of presetOptions.value) {
+    categories[preset.category].items.push(preset)
+  }
+
+  return Object.values(categories).filter(cat => cat.items.length > 0)
+})
 
 const fontSizeOptions = Object.entries(FONT_SIZES).map(([key, val]) => ({
   label: (val as { label: string }).label,
@@ -629,6 +1123,36 @@ const compactnessOptions = Object.entries(UI_COMPACTNESS).map(([key, val]) => ({
   label: (val as { label: string }).label,
   value: key
 }))
+
+// Opciones de fuentes agrupadas por categoría
+interface FontOption {
+  label: string
+  value: FontFamily
+  description: string
+  category: 'general' | 'reading'
+}
+
+const fontOptions = computed<FontOption[]>(() => {
+  return Object.entries(FONT_FAMILIES).map(([key, info]) => ({
+    label: info.label,
+    value: key as FontFamily,
+    description: info.description,
+    category: info.category
+  }))
+})
+
+const groupedFontOptions = computed(() => {
+  const categories = {
+    general: { label: 'Generales', items: [] as FontOption[] },
+    reading: { label: 'Para lectura', items: [] as FontOption[] }
+  }
+
+  for (const font of fontOptions.value) {
+    categories[font.category].items.push(font)
+  }
+
+  return Object.values(categories).filter(cat => cat.items.length > 0)
+})
 
 // Métodos de inferencia LLM disponibles (solo los avanzados, los básicos siempre están activos)
 const inferenceMethodOptions = [
@@ -662,40 +1186,454 @@ const inferenceMethodOptions = [
   }
 ]
 
+// Computed que combina opciones de LLM con información de modelos instalados
+const availableLLMOptions = computed(() => {
+  const installedModels = systemCapabilities.value?.ollama.models.map(m => m.name.split(':')[0]) || []
+
+  return inferenceMethodOptions.map(opt => ({
+    ...opt,
+    installed: installedModels.includes(opt.value)
+  }))
+})
+
+interface NLPMethod {
+  name: string
+  description: string
+  weight?: number
+  available: boolean
+  default_enabled: boolean
+  requires_gpu: boolean
+  recommended_gpu: boolean
+}
+
+interface SystemCapabilities {
+  hardware: {
+    gpu: { type: string; name: string; memory_gb: number | null; device_id: number } | null
+    gpu_type: string
+    has_gpu: boolean
+    has_high_vram: boolean
+    has_cupy: boolean
+    cpu: { name: string }
+  }
+  ollama: {
+    installed: boolean
+    available: boolean
+    models: Array<{ name: string; size: number; modified: string }>
+    recommended_models: string[]
+  }
+  nlp_methods: {
+    coreference: Record<string, NLPMethod>
+    ner: Record<string, NLPMethod>
+    grammar: Record<string, NLPMethod>
+  }
+  recommended_config: {
+    device_preference: string
+    spacy_gpu_enabled: boolean
+    embeddings_gpu_enabled: boolean
+    batch_size: number
+  }
+}
+
+interface EnabledMethods {
+  coreference: string[]
+  ner: string[]
+  grammar: string[]
+}
+
 interface Settings {
   theme: 'light' | 'dark' | 'auto'
   fontSize: 'small' | 'medium' | 'large'
   lineHeight: string
+  // Sensibilidad unificada (nuevo sistema simplificado)
+  sensitivityPreset: 'conservador' | 'balanceado' | 'exhaustivo' | 'custom'
+  sensitivity: number  // 0-100, control de ajuste fino
+  // Valores calculados automáticamente (accesibles en modo avanzado)
   minConfidence: number
+  inferenceMinConfidence: number
+  inferenceMinConsensus: number
+  // General
   autoAnalysis: boolean
   showPartialResults: boolean
   notifyAnalysisComplete: boolean
   soundEnabled: boolean
   // LLM/Inferencia
   enabledInferenceMethods: string[]
-  inferenceMinConfidence: number
-  inferenceMinConsensus: number
   prioritizeSpeed: boolean
+  // Métodos NLP granulares
+  enabledNLPMethods: EnabledMethods
 }
 
 const settings = ref<Settings>({
   theme: 'auto',
   fontSize: 'medium',
   lineHeight: '1.6',
-  minConfidence: 70,
+  // Sensibilidad unificada (nuevo sistema simplificado)
+  sensitivityPreset: 'balanceado',
+  sensitivity: 50,  // 0-100, corresponde a "balanceado"
+  // Valores calculados automáticamente desde sensibilidad
+  minConfidence: 65,
+  inferenceMinConfidence: 55,
+  inferenceMinConsensus: 60,
+  // General
   autoAnalysis: true,
   showPartialResults: true,
   notifyAnalysisComplete: true,
   soundEnabled: true,
   // LLM/Inferencia defaults (solo modelos LLM, los básicos siempre están activos)
   enabledInferenceMethods: ['llama3.2'],
-  inferenceMinConfidence: 50,
-  inferenceMinConsensus: 60,
-  prioritizeSpeed: true
+  prioritizeSpeed: true,
+  // Métodos NLP - se inicializan desde las capacidades del sistema
+  enabledNLPMethods: {
+    coreference: ['embeddings', 'morpho', 'heuristics'],
+    ner: ['spacy', 'gazetteer'],
+    grammar: ['spacy_rules']
+  }
 })
+
+// Capacidades del sistema
+const systemCapabilities = ref<SystemCapabilities | null>(null)
+const loadingCapabilities = ref(false)
 
 const dataLocation = ref('~/.narrative_assistant')
 const showResetDialog = ref(false)
+const showDataLocationDialog = ref(false)
+const newDataLocation = ref('')
+const migrateData = ref(true)
+const changingLocation = ref(false)
+
+// ============================================================================
+// Sistema de Filtros de Entidades
+// ============================================================================
+
+interface SystemPattern {
+  id: number
+  pattern: string
+  patternType: string
+  entityType: string | null
+  category: string | null
+  description: string | null
+  isActive: boolean
+}
+
+interface UserRejection {
+  id: number
+  entityName: string
+  entityType: string | null
+  reason: string | null
+  rejectedAt: string
+}
+
+interface FilterStats {
+  system_patterns_total: number
+  system_patterns_active: number
+  user_rejections: number
+  project_overrides_reject: number
+  project_overrides_include: number
+}
+
+const systemPatterns = ref<SystemPattern[]>([])
+const userRejections = ref<UserRejection[]>([])
+const filterStats = ref<FilterStats | null>(null)
+
+// Agrupar patrones por categoría
+const groupedSystemPatterns = computed(() => {
+  const groups: Record<string, { name: string; patterns: SystemPattern[] }> = {}
+
+  for (const pattern of systemPatterns.value) {
+    const cat = pattern.category || 'other'
+    if (!groups[cat]) {
+      groups[cat] = { name: cat, patterns: [] }
+    }
+    groups[cat].patterns.push(pattern)
+  }
+
+  return Object.values(groups)
+})
+
+// Labels para categorías de patrones
+const getCategoryLabel = (category: string): string => {
+  const labels: Record<string, string> = {
+    temporal: 'Marcadores temporales',
+    article: 'Artículos y determinantes',
+    pronoun: 'Pronombres',
+    connector: 'Conectores',
+    numeric: 'Números y cantidades',
+    generic_location: 'Lugares genéricos',
+    generic_concept: 'Conceptos genéricos',
+    other: 'Otros'
+  }
+  return labels[category] || category
+}
+
+// Cargar datos de filtros
+async function loadFilterData() {
+  try {
+    // Cargar en paralelo
+    const [statsRes, patternsRes, rejectionsRes] = await Promise.all([
+      fetch('/api/entity-filters/stats'),
+      fetch('/api/entity-filters/system-patterns?language=es'),
+      fetch('/api/entity-filters/user-rejections')
+    ])
+
+    const [statsData, patternsData, rejectionsData] = await Promise.all([
+      statsRes.json(),
+      patternsRes.json(),
+      rejectionsRes.json()
+    ])
+
+    if (statsData.success) {
+      filterStats.value = statsData.data
+    }
+
+    if (patternsData.success) {
+      systemPatterns.value = patternsData.data.patterns
+    }
+
+    if (rejectionsData.success) {
+      userRejections.value = rejectionsData.data
+    }
+  } catch (err) {
+    console.error('Error loading filter data:', err)
+  }
+}
+
+// Toggle patrón del sistema
+async function toggleSystemPattern(patternId: number, isActive: boolean) {
+  try {
+    const response = await fetch(`/api/entity-filters/system-patterns/${patternId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_active: isActive })
+    })
+
+    const data = await response.json()
+    if (data.success) {
+      // Actualizar local
+      const pattern = systemPatterns.value.find(p => p.id === patternId)
+      if (pattern) {
+        pattern.isActive = isActive
+      }
+      // Actualizar stats
+      if (filterStats.value) {
+        filterStats.value.system_patterns_active += isActive ? 1 : -1
+      }
+    } else {
+      toast.add({ severity: 'error', summary: 'Error', detail: data.error, life: 3000 })
+    }
+  } catch (err) {
+    console.error('Error toggling pattern:', err)
+    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo actualizar el patrón', life: 3000 })
+  }
+}
+
+// Eliminar rechazo global del usuario
+async function removeUserRejection(rejection: UserRejection) {
+  try {
+    const response = await fetch(`/api/entity-filters/user-rejections/${rejection.id}`, {
+      method: 'DELETE'
+    })
+
+    const data = await response.json()
+    if (data.success) {
+      userRejections.value = userRejections.value.filter(r => r.id !== rejection.id)
+      if (filterStats.value) {
+        filterStats.value.user_rejections--
+      }
+      toast.add({
+        severity: 'success',
+        summary: 'Restaurada',
+        detail: `"${rejection.entityName}" podrá aparecer de nuevo`,
+        life: 3000
+      })
+    } else {
+      toast.add({ severity: 'error', summary: 'Error', detail: data.error, life: 3000 })
+    }
+  } catch (err) {
+    console.error('Error removing rejection:', err)
+    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo restaurar la entidad', life: 3000 })
+  }
+}
+
+// Estado para acciones de Ollama
+const ollamaStarting = ref(false)
+const modelDownloading = ref(false)
+
+// ============================================================================
+// Sistema de Sensibilidad Unificado
+// ============================================================================
+
+// Estado para panel avanzado
+const showAdvancedSensitivity = ref(false)
+
+// Presets de sensibilidad con valores calculados
+interface SensitivityPreset {
+  value: 'conservador' | 'balanceado' | 'exhaustivo'
+  label: string
+  description: string
+  icon: string
+  recommended?: boolean
+  // Valores internos que se aplican
+  sensitivity: number
+  minConfidence: number
+  inferenceMinConfidence: number
+  inferenceMinConsensus: number
+}
+
+const sensitivityPresets: SensitivityPreset[] = [
+  {
+    value: 'conservador',
+    label: 'Solo lo importante',
+    description: 'Menos avisos, solo inconsistencias claras',
+    icon: 'pi pi-shield',
+    sensitivity: 20,
+    minConfidence: 80,
+    inferenceMinConfidence: 70,
+    inferenceMinConsensus: 75
+  },
+  {
+    value: 'balanceado',
+    label: 'Equilibrado',
+    description: 'Balance entre detección y ruido',
+    icon: 'pi pi-sliders-h',
+    recommended: true,
+    sensitivity: 50,
+    minConfidence: 65,
+    inferenceMinConfidence: 55,
+    inferenceMinConsensus: 60
+  },
+  {
+    value: 'exhaustivo',
+    label: 'Revisar todo',
+    description: 'Más sugerencias para que tú decidas',
+    icon: 'pi pi-search',
+    sensitivity: 80,
+    minConfidence: 45,
+    inferenceMinConfidence: 40,
+    inferenceMinConsensus: 40
+  }
+]
+
+// Etiqueta contextual del slider de sensibilidad
+const sensitivityLabel = computed(() => {
+  const s = settings.value.sensitivity
+  if (s <= 25) return 'Conservador'
+  if (s <= 45) return 'Algo conservador'
+  if (s <= 55) return 'Equilibrado'
+  if (s <= 75) return 'Algo exhaustivo'
+  return 'Exhaustivo'
+})
+
+// Seleccionar un preset
+const selectSensitivityPreset = (presetValue: 'conservador' | 'balanceado' | 'exhaustivo') => {
+  const preset = sensitivityPresets.find(p => p.value === presetValue)
+  if (!preset) return
+
+  settings.value.sensitivityPreset = presetValue
+  settings.value.sensitivity = preset.sensitivity
+  settings.value.minConfidence = preset.minConfidence
+  settings.value.inferenceMinConfidence = preset.inferenceMinConfidence
+  settings.value.inferenceMinConsensus = preset.inferenceMinConsensus
+
+  saveSettings()
+}
+
+// Cuando el slider de sensibilidad cambia
+const onSensitivityChange = () => {
+  // Marcar como custom si no coincide con ningún preset
+  const s = settings.value.sensitivity
+  const matchingPreset = sensitivityPresets.find(p => Math.abs(p.sensitivity - s) < 5)
+
+  if (matchingPreset) {
+    settings.value.sensitivityPreset = matchingPreset.value
+    settings.value.minConfidence = matchingPreset.minConfidence
+    settings.value.inferenceMinConfidence = matchingPreset.inferenceMinConfidence
+    settings.value.inferenceMinConsensus = matchingPreset.inferenceMinConsensus
+  } else {
+    settings.value.sensitivityPreset = 'custom'
+    // Calcular valores interpolados
+    // Sensibilidad alta = umbrales bajos = más alertas
+    settings.value.minConfidence = Math.round(90 - (s * 0.55))  // 90 -> 35
+    settings.value.inferenceMinConfidence = Math.round(80 - (s * 0.5))  // 80 -> 30
+    settings.value.inferenceMinConsensus = Math.round(80 - (s * 0.45))  // 80 -> 35
+  }
+
+  onSliderChange()
+}
+
+// Cuando un slider avanzado cambia manualmente
+const onAdvancedSliderChange = () => {
+  settings.value.sensitivityPreset = 'custom'
+  onSliderChange()
+}
+
+// Recalcular valores desde la sensibilidad actual
+const recalculateFromSensitivity = () => {
+  const s = settings.value.sensitivity
+  const matchingPreset = sensitivityPresets.find(p => Math.abs(p.sensitivity - s) < 10)
+
+  if (matchingPreset) {
+    selectSensitivityPreset(matchingPreset.value)
+  } else {
+    // Interpolar
+    settings.value.minConfidence = Math.round(90 - (s * 0.55))
+    settings.value.inferenceMinConfidence = Math.round(80 - (s * 0.5))
+    settings.value.inferenceMinConsensus = Math.round(80 - (s * 0.45))
+    saveSettings()
+  }
+}
+
+// Estado inteligente de Ollama para el botón único
+type OllamaState = 'not_installed' | 'not_running' | 'no_models' | 'ready'
+
+const ollamaState = computed<OllamaState>(() => {
+  if (!systemCapabilities.value) return 'not_installed'
+
+  const ollama = systemCapabilities.value.ollama
+  if (!ollama.installed) return 'not_installed'
+  if (!ollama.available) return 'not_running'
+  if (ollama.models.length === 0) return 'no_models'
+  return 'ready'
+})
+
+const ollamaActionConfig = computed(() => {
+  const configs: Record<OllamaState, { label: string; icon: string; severity: string; action: () => void }> = {
+    not_installed: {
+      label: 'Configurar analizador',
+      icon: 'pi pi-download',
+      severity: 'warning',
+      action: openOllamaDownload
+    },
+    not_running: {
+      label: 'Iniciar analizador',
+      icon: 'pi pi-play',
+      severity: 'warning',
+      action: startOllama
+    },
+    no_models: {
+      label: 'Descargar modelo',
+      icon: 'pi pi-download',
+      severity: 'info',
+      action: downloadDefaultModel
+    },
+    ready: {
+      label: 'Listo',
+      icon: 'pi pi-check',
+      severity: 'success',
+      action: () => {}
+    }
+  }
+  return configs[ollamaState.value]
+})
+
+const ollamaStatusMessage = computed(() => {
+  const messages: Record<OllamaState, string> = {
+    not_installed: 'Necesitas instalar el motor de análisis semántico',
+    not_running: 'El analizador está instalado pero no se ha iniciado',
+    no_models: 'El analizador está listo, pero necesitas descargar un modelo',
+    ready: `${systemCapabilities.value?.ollama.models.length || 0} modelo(s) disponible(s)`
+  }
+  return messages[ollamaState.value]
+})
 
 // Debounce timer para sliders
 let saveDebounceTimer: ReturnType<typeof setTimeout> | null = null
@@ -704,8 +1642,11 @@ let saveDebounceTimer: ReturnType<typeof setTimeout> | null = null
 const activeSection = ref('apariencia')
 const contentArea = ref<HTMLElement | null>(null)
 
-onMounted(() => {
+onMounted(async () => {
   loadSettings()
+  await loadSystemCapabilities()
+  await loadCurrentDataLocation()
+  await loadFilterData()
 })
 
 onUnmounted(() => {
@@ -726,18 +1667,142 @@ const loadSettings = () => {
       const filteredMethods = (parsed.enabledInferenceMethods || ['llama3.2'])
         .filter((m: string) => validMethodValues.includes(m))
 
+      // Migrar configuraciones antiguas sin sensibilidad unificada
+      const hasSensitivity = 'sensitivityPreset' in parsed && 'sensitivity' in parsed
+      const sensitivityPreset = hasSensitivity ? parsed.sensitivityPreset : 'balanceado'
+      const sensitivity = hasSensitivity ? parsed.sensitivity : 50
+
       settings.value = {
         ...settings.value,
         ...parsed,
-        enabledInferenceMethods: filteredMethods.length > 0 ? filteredMethods : ['llama3.2'],
-        inferenceMinConfidence: parsed.inferenceMinConfidence ?? 50,
+        // Sistema de sensibilidad unificado
+        sensitivityPreset: sensitivityPreset,
+        sensitivity: sensitivity,
+        // Valores calculados (usar existentes si los hay)
+        minConfidence: parsed.minConfidence ?? 65,
+        inferenceMinConfidence: parsed.inferenceMinConfidence ?? 55,
         inferenceMinConsensus: parsed.inferenceMinConsensus ?? 60,
-        prioritizeSpeed: parsed.prioritizeSpeed ?? true
+        // Otros campos
+        enabledInferenceMethods: filteredMethods.length > 0 ? filteredMethods : ['llama3.2'],
+        prioritizeSpeed: parsed.prioritizeSpeed ?? true,
+        enabledNLPMethods: parsed.enabledNLPMethods ?? {
+          coreference: ['embeddings', 'morpho', 'heuristics'],
+          ner: ['spacy', 'gazetteer'],
+          grammar: ['spacy_rules']
+        }
       }
     } catch (error) {
       console.error('Error loading settings:', error)
     }
   }
+}
+
+const loadSystemCapabilities = async (): Promise<boolean> => {
+  loadingCapabilities.value = true
+  try {
+    const response = await fetch('http://localhost:8008/api/system/capabilities')
+    if (response.ok) {
+      const result = await response.json()
+      if (result.success && result.data) {
+        systemCapabilities.value = result.data
+
+        // Si es la primera vez (no hay settings guardados), aplicar defaults según hardware
+        const savedSettings = localStorage.getItem('narrative_assistant_settings')
+        if (!savedSettings) {
+          applyDefaultsFromCapabilities(result.data)
+        }
+        return true
+      }
+    }
+    console.error('Error loading system capabilities: response not ok or no data')
+    return false
+  } catch (error) {
+    console.error('Error loading system capabilities:', error)
+    return false
+  } finally {
+    loadingCapabilities.value = false
+  }
+}
+
+const applyDefaultsFromCapabilities = (capabilities: SystemCapabilities) => {
+  const methods = capabilities.nlp_methods
+  const enabledMethods: EnabledMethods = {
+    coreference: [],
+    ner: [],
+    grammar: []
+  }
+
+  // Aplicar defaults basados en lo que está disponible y recomendado
+  for (const [key, method] of Object.entries(methods.coreference)) {
+    if (method.available && method.default_enabled) {
+      enabledMethods.coreference.push(key)
+    }
+  }
+  for (const [key, method] of Object.entries(methods.ner)) {
+    if (method.available && method.default_enabled) {
+      enabledMethods.ner.push(key)
+    }
+  }
+  for (const [key, method] of Object.entries(methods.grammar)) {
+    if (method.available && method.default_enabled) {
+      enabledMethods.grammar.push(key)
+    }
+  }
+
+  settings.value.enabledNLPMethods = enabledMethods
+  saveSettings()
+}
+
+const getNLPMethodsForCategory = (category: 'coreference' | 'ner' | 'grammar'): Record<string, NLPMethod> => {
+  if (!systemCapabilities.value) {
+    // Devolver métodos por defecto mientras carga (LLM no disponible hasta verificar)
+    const defaults: Record<string, Record<string, NLPMethod>> = {
+      coreference: {
+        embeddings: { name: 'Análisis de significado similar', description: 'Cargando...', available: true, default_enabled: true, requires_gpu: false, recommended_gpu: true },
+        llm: { name: 'Analizador inteligente', description: 'Requiere iniciar el analizador inteligente', available: false, default_enabled: false, requires_gpu: false, recommended_gpu: true },
+        morpho: { name: 'Análisis de estructura gramatical', description: 'Cargando...', available: true, default_enabled: true, requires_gpu: false, recommended_gpu: false },
+        heuristics: { name: 'Reglas narrativas', description: 'Cargando...', available: true, default_enabled: true, requires_gpu: false, recommended_gpu: false }
+      },
+      ner: {
+        spacy: { name: 'Detector de nombres', description: 'Cargando...', available: true, default_enabled: true, requires_gpu: false, recommended_gpu: true }
+      },
+      grammar: {
+        spacy_rules: { name: 'Corrector básico', description: 'Cargando...', available: true, default_enabled: true, requires_gpu: false, recommended_gpu: false }
+      }
+    }
+    return defaults[category]
+  }
+  return systemCapabilities.value.nlp_methods[category]
+}
+
+const isMethodEnabled = (category: 'coreference' | 'ner' | 'grammar', methodKey: string): boolean => {
+  return settings.value.enabledNLPMethods[category].includes(methodKey)
+}
+
+const toggleMethod = (category: 'coreference' | 'ner' | 'grammar', methodKey: string, enabled: boolean) => {
+  const methods = settings.value.enabledNLPMethods[category]
+  if (enabled && !methods.includes(methodKey)) {
+    methods.push(methodKey)
+  } else if (!enabled) {
+    const index = methods.indexOf(methodKey)
+    if (index > -1) {
+      methods.splice(index, 1)
+    }
+  }
+  saveSettings()
+}
+
+const applyRecommendedConfig = () => {
+  if (!systemCapabilities.value) return
+
+  applyDefaultsFromCapabilities(systemCapabilities.value)
+
+  toast.add({
+    severity: 'success',
+    summary: 'Configuración aplicada',
+    detail: 'Se ha aplicado la configuración recomendada para tu hardware',
+    life: 3000
+  })
 }
 
 const saveSettings = () => {
@@ -757,6 +1822,15 @@ const onThemeChange = () => {
   saveSettings()
 }
 
+// Helper para iconos de categoría de temas
+const getCategoryIcon = (categoryLabel: string): string => {
+  const icons: Record<string, string> = {
+    'Generales': 'pi pi-palette',
+    'Para escritura': 'pi pi-pencil'
+  }
+  return icons[categoryLabel] || 'pi pi-circle'
+}
+
 // Handlers para controles de apariencia del themeStore
 const onPresetChange = (val: ThemePreset) => {
   themeStore.setPreset(val)
@@ -764,6 +1838,14 @@ const onPresetChange = (val: ThemePreset) => {
 
 const onLineHeightChange = (val: LineHeight) => {
   themeStore.setLineHeight(val)
+}
+
+const onFontFamilyChange = (val: FontFamily) => {
+  themeStore.setFontFamily(val)
+}
+
+const onFontFamilyReadingChange = (val: FontFamily) => {
+  themeStore.setFontFamilyReading(val)
 }
 
 const onReducedMotionChange = (val: boolean) => {
@@ -817,12 +1899,93 @@ const getSpeedSeverity = (speed: string): string => {
 }
 
 const changeDataLocation = () => {
-  toast.add({
-    severity: 'info',
-    summary: 'Función en desarrollo',
-    detail: 'Esta funcionalidad estará disponible próximamente',
-    life: 3000
-  })
+  // Cargar la ubicación actual
+  loadCurrentDataLocation()
+  showDataLocationDialog.value = true
+}
+
+const loadCurrentDataLocation = async () => {
+  try {
+    const response = await fetch('http://localhost:8008/api/maintenance/data-location')
+    if (response.ok) {
+      const result = await response.json()
+      if (result.success && result.data) {
+        dataLocation.value = result.data.path
+        newDataLocation.value = result.data.path
+      }
+    }
+  } catch (error) {
+    console.error('Error loading data location:', error)
+  }
+}
+
+const confirmChangeDataLocation = async () => {
+  if (!newDataLocation.value.trim()) {
+    toast.add({
+      severity: 'warn',
+      summary: 'Ruta vacía',
+      detail: 'Introduce una ruta válida',
+      life: 3000
+    })
+    return
+  }
+
+  changingLocation.value = true
+
+  try {
+    const response = await fetch('http://localhost:8008/api/maintenance/data-location', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        new_path: newDataLocation.value,
+        migrate_data: migrateData.value
+      })
+    })
+
+    const result = await response.json()
+
+    if (result.success) {
+      dataLocation.value = newDataLocation.value
+      showDataLocationDialog.value = false
+
+      toast.add({
+        severity: 'success',
+        summary: 'Ubicación actualizada',
+        detail: result.data?.restart_required
+          ? 'Reinicia la aplicación para aplicar los cambios'
+          : 'La ubicación de datos ha sido actualizada',
+        life: 5000
+      })
+
+      if (result.data?.migrated_items?.length > 0) {
+        toast.add({
+          severity: 'info',
+          summary: 'Datos migrados',
+          detail: `Se han migrado: ${result.data.migrated_items.join(', ')}`,
+          life: 5000
+        })
+      }
+    } else {
+      toast.add({
+        severity: 'error',
+        summary: 'Error',
+        detail: result.error || 'No se pudo cambiar la ubicación',
+        life: 5000
+      })
+    }
+  } catch (error) {
+    console.error('Error changing data location:', error)
+    toast.add({
+      severity: 'error',
+      summary: 'Error de conexión',
+      detail: 'No se pudo conectar con el servidor',
+      life: 3000
+    })
+  } finally {
+    changingLocation.value = false
+  }
 }
 
 const clearCache = async () => {
@@ -861,17 +2024,34 @@ const resetSettings = () => {
     theme: 'auto',
     fontSize: 'medium',
     lineHeight: '1.6',
-    minConfidence: 70,
+    // Sensibilidad unificada
+    sensitivityPreset: 'balanceado',
+    sensitivity: 50,
+    // Valores calculados
+    minConfidence: 65,
+    inferenceMinConfidence: 55,
+    inferenceMinConsensus: 60,
+    // General
     autoAnalysis: true,
     showPartialResults: true,
     notifyAnalysisComplete: true,
     soundEnabled: true,
     enabledInferenceMethods: ['llama3.2'],
-    inferenceMinConfidence: 50,
-    inferenceMinConsensus: 60,
-    prioritizeSpeed: true
+    prioritizeSpeed: true,
+    enabledNLPMethods: {
+      coreference: ['embeddings', 'morpho', 'heuristics'],
+      ner: ['spacy', 'gazetteer'],
+      grammar: ['spacy_rules']
+    }
   }
-  saveSettings()
+
+  // Si hay capacidades del sistema, aplicar defaults basados en hardware
+  if (systemCapabilities.value) {
+    applyDefaultsFromCapabilities(systemCapabilities.value)
+  } else {
+    saveSettings()
+  }
+
   themeStore.resetToDefaults()
   showResetDialog.value = false
 
@@ -884,23 +2064,128 @@ const resetSettings = () => {
 }
 
 const openDocumentation = () => {
-  // En producción, esto abriría la documentación externa
+  // Abrir guía de usuario
+  window.dispatchEvent(new CustomEvent('menubar:user-guide'))
+}
+
+// Funciones para gestión de Ollama
+const startOllama = async () => {
+  ollamaStarting.value = true
+  try {
+    const response = await fetch('http://localhost:8008/api/ollama/start', {
+      method: 'POST'
+    })
+    const result = await response.json()
+
+    if (result.success) {
+      // Esperar un momento antes de recargar capacidades
+      // para asegurar que Ollama esté completamente listo
+      await new Promise(resolve => setTimeout(resolve, 2000))
+
+      // Recargar capacidades del sistema y verificar que funcionó
+      await loadSystemCapabilities()
+
+      // Solo mostrar éxito si Ollama está disponible ahora
+      if (systemCapabilities.value?.ollama?.available) {
+        toast.add({
+          severity: 'success',
+          summary: 'Analizador iniciado',
+          detail: 'El analizador semántico está ahora disponible',
+          life: 3000
+        })
+      } else {
+        // El inicio reportó éxito pero no se detecta como disponible
+        toast.add({
+          severity: 'warn',
+          summary: 'Estado incierto',
+          detail: 'El analizador puede estar iniciando. Recarga la página en unos segundos.',
+          life: 5000
+        })
+      }
+    } else {
+      // Si no está instalado, mostrar mensaje con enlace
+      if (result.data?.action_required === 'install') {
+        toast.add({
+          severity: 'warn',
+          summary: 'Analizador no instalado',
+          detail: 'Necesitas instalar el motor de análisis primero',
+          life: 5000
+        })
+      } else {
+        toast.add({
+          severity: 'error',
+          summary: 'Error al iniciar',
+          detail: result.error || 'No se pudo iniciar el analizador',
+          life: 5000
+        })
+      }
+    }
+  } catch (error) {
+    console.error('Error starting Ollama:', error)
+    toast.add({
+      severity: 'error',
+      summary: 'Error de conexión',
+      detail: 'No se pudo conectar con el servidor',
+      life: 3000
+    })
+  } finally {
+    ollamaStarting.value = false
+  }
+}
+
+const openOllamaDownload = () => {
+  window.open('https://ollama.com/download', '_blank')
   toast.add({
     severity: 'info',
-    summary: 'Documentación',
-    detail: 'Abriendo documentación...',
-    life: 3000
+    summary: 'Configuración del analizador',
+    detail: 'Después de instalar, vuelve aquí y haz clic en "Iniciar analizador"',
+    life: 5000
   })
 }
 
-const openIssues = () => {
-  // En producción, esto abriría el repositorio de issues
+const downloadDefaultModel = async () => {
+  modelDownloading.value = true
   toast.add({
     severity: 'info',
-    summary: 'GitHub',
-    detail: 'Abriendo página de issues...',
-    life: 3000
+    summary: 'Descargando modelo',
+    detail: 'Descargando modelo de análisis (~2GB). Esto puede tardar varios minutos...',
+    life: 10000
   })
+
+  try {
+    const response = await fetch('http://localhost:8008/api/ollama/pull/llama3.2', {
+      method: 'POST'
+    })
+    const result = await response.json()
+
+    if (result.success) {
+      toast.add({
+        severity: 'success',
+        summary: 'Modelo descargado',
+        detail: 'El modelo está listo para usar',
+        life: 3000
+      })
+      // Recargar capacidades del sistema
+      await loadSystemCapabilities()
+    } else {
+      toast.add({
+        severity: 'error',
+        summary: 'Error de descarga',
+        detail: result.error || 'No se pudo descargar el modelo',
+        life: 5000
+      })
+    }
+  } catch (error) {
+    console.error('Error downloading model:', error)
+    toast.add({
+      severity: 'error',
+      summary: 'Error de conexión',
+      detail: 'No se pudo conectar con el servidor',
+      life: 3000
+    })
+  } finally {
+    modelDownloading.value = false
+  }
 }
 
 const goBack = () => {
@@ -932,7 +2217,7 @@ const scrollToSection = (sectionId: string) => {
 const handleScroll = () => {
   if (!contentArea.value) return
 
-  const sections = ['apariencia', 'analisis', 'ia-local', 'notificaciones', 'privacidad', 'mantenimiento', 'acerca-de']
+  const sections = ['apariencia', 'analisis', 'metodos-nlp', 'notificaciones', 'privacidad', 'mantenimiento', 'acerca-de']
   const scrollPosition = contentArea.value.scrollTop + 100
 
   for (const sectionId of sections) {
@@ -1010,14 +2295,18 @@ const handleScroll = () => {
   margin: 0;
 }
 
-.nav-menu a {
+.nav-menu a,
+.nav-menu a:link,
+.nav-menu a:visited,
+.nav-menu a:hover,
+.nav-menu a:active {
   display: flex;
   align-items: center;
   gap: 0.75rem;
   padding: 0.875rem 1.5rem;
   color: var(--p-text-color);
-  text-decoration: none;
-  transition: all 0.15s ease;
+  text-decoration: none !important;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
   border-left: 3px solid transparent;
   cursor: pointer;
   user-select: none;
@@ -1048,10 +2337,12 @@ const handleScroll = () => {
   font-size: 1.1rem;
   width: 1.5rem;
   text-align: center;
+  text-decoration: none !important;
 }
 
 .nav-menu a span {
   font-size: 0.95rem;
+  text-decoration: none !important;
 }
 
 .settings-content {
@@ -1292,12 +2583,50 @@ const handleScroll = () => {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
-/* Preset options en dropdown */
+/* ============================================================================
+   Preset selector styles
+   ============================================================================ */
+
+.preset-dropdown {
+  width: 100%;
+  min-width: 280px;
+}
+
+.preset-selected {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.preset-group-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  color: var(--p-text-muted-color);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.preset-group-header i {
+  font-size: 0.9rem;
+}
+
 .preset-option {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem 0.25rem;
+  width: 100%;
+}
+
+.preset-info {
   display: flex;
   flex-direction: column;
   gap: 0.125rem;
-  padding: 0.25rem 0;
+  flex: 1;
 }
 
 .preset-name {
@@ -1306,11 +2635,830 @@ const handleScroll = () => {
 
 .preset-desc {
   font-size: 0.8rem;
-  color: var(--text-color-secondary);
+  color: var(--p-text-muted-color);
 }
 
 /* Dark mode ajustes para color swatches */
 .dark .color-swatch.active {
   box-shadow: 0 0 0 2px var(--p-surface-900), 0 0 0 4px var(--p-text-color);
+}
+
+/* ============================================================================
+   Font selector styles
+   ============================================================================ */
+
+.font-dropdown {
+  width: 100%;
+  min-width: 280px;
+}
+
+.font-group-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  color: var(--p-text-muted-color);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.font-group-header i {
+  font-size: 0.9rem;
+}
+
+.font-option {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  padding: 0.25rem 0;
+}
+
+.font-name {
+  font-weight: 500;
+}
+
+.font-desc {
+  font-size: 0.8rem;
+  color: var(--p-text-muted-color);
+}
+
+/* Clases de fuente para previsualización */
+/* Generales */
+.font-system { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+.font-inter { font-family: 'Inter', sans-serif; }
+.font-source-sans { font-family: 'Source Sans 3', sans-serif; }
+.font-nunito { font-family: 'Nunito', sans-serif; }
+/* Lectura modernas */
+.font-literata { font-family: 'Literata', Georgia, serif; }
+.font-merriweather { font-family: 'Merriweather', Georgia, serif; }
+.font-source-serif { font-family: 'Source Serif 4', Georgia, serif; }
+.font-lora { font-family: 'Lora', Georgia, serif; }
+/* Clásicas */
+.font-garamond { font-family: 'EB Garamond', Garamond, serif; }
+.font-baskerville { font-family: 'Libre Baskerville', Baskerville, serif; }
+.font-crimson { font-family: 'Crimson Pro', serif; }
+.font-playfair { font-family: 'Playfair Display', serif; }
+.font-pt-serif { font-family: 'PT Serif', serif; }
+.font-cormorant { font-family: 'Cormorant Garamond', Garamond, serif; }
+.font-ibm-plex-serif { font-family: 'IBM Plex Serif', serif; }
+.font-spectral { font-family: 'Spectral', serif; }
+/* Accesibles y especializadas */
+.font-atkinson { font-family: 'Atkinson Hyperlegible', sans-serif; }
+.font-roboto-serif { font-family: 'Roboto Serif', serif; }
+.font-noto-serif { font-family: 'Noto Serif', serif; }
+.font-caslon { font-family: 'Libre Caslon Text', serif; }
+
+/* Aumentar el tamaño de fuente en las previsualizaciones del selector para que se vea bien */
+.font-option .font-name {
+  font-size: 1.1rem;
+}
+
+/* ============================================================================
+   Métodos NLP - Sección de configuración granular
+   ============================================================================ */
+
+.hardware-banner {
+  margin-bottom: 1.5rem;
+}
+
+.hardware-banner :deep(.p-message-wrapper) {
+  padding: 0.75rem 1rem;
+}
+
+.hardware-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.hardware-info i {
+  font-size: 1.25rem;
+}
+
+.hardware-info div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.hardware-info span {
+  font-size: 0.9rem;
+  color: var(--p-text-muted-color);
+}
+
+.nlp-category {
+  margin-bottom: 2rem;
+}
+
+.nlp-category:last-of-type {
+  margin-bottom: 1rem;
+}
+
+.category-header {
+  margin-bottom: 1rem;
+}
+
+.category-header h4 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.25rem 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--p-text-color);
+}
+
+.category-header h4 i {
+  color: var(--p-primary-color);
+}
+
+.category-desc {
+  font-size: 0.85rem;
+  color: var(--p-text-muted-color);
+}
+
+.methods-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.method-card {
+  background: var(--p-surface-50);
+  border: 1px solid var(--p-surface-200);
+  border-radius: var(--p-border-radius);
+  padding: 1rem;
+  transition: all 0.15s ease;
+}
+
+:global(.dark) .method-card {
+  background: var(--p-surface-800);
+  border-color: var(--p-surface-700);
+}
+
+.method-card.enabled {
+  border-color: var(--p-primary-color);
+  background: color-mix(in srgb, var(--p-primary-color) 5%, var(--p-surface-50));
+}
+
+:global(.dark) .method-card.enabled {
+  background: color-mix(in srgb, var(--p-primary-color) 10%, var(--p-surface-800));
+}
+
+.method-card.disabled {
+  opacity: 0.6;
+}
+
+.method-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.method-header .method-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  flex: 1;
+  min-width: 120px;
+}
+
+.method-tag {
+  font-size: 0.7rem;
+  padding: 0.2rem 0.5rem;
+  font-weight: 600;
+}
+
+/* Tags de método con mejor visibilidad en todos los modos */
+.method-card .method-tag.p-tag-info {
+  background: var(--blue-100) !important;
+  color: var(--blue-700) !important;
+  border: 1px solid var(--blue-300) !important;
+}
+
+.method-card .method-tag.p-tag-warning {
+  background: var(--yellow-100) !important;
+  color: var(--yellow-800) !important;
+  border: 1px solid var(--yellow-400) !important;
+}
+
+.method-card .method-tag.p-tag-danger {
+  background: var(--red-100) !important;
+  color: var(--red-700) !important;
+  border: 1px solid var(--red-300) !important;
+}
+
+/* Dark mode: Tags con fondo más visible */
+:global(.dark) .method-card .method-tag.p-tag-info {
+  background: var(--blue-900) !important;
+  color: var(--blue-200) !important;
+  border: 1px solid var(--blue-600) !important;
+}
+
+:global(.dark) .method-card .method-tag.p-tag-warning {
+  background: var(--yellow-900) !important;
+  color: var(--yellow-200) !important;
+  border: 1px solid var(--yellow-600) !important;
+}
+
+:global(.dark) .method-card .method-tag.p-tag-danger {
+  background: var(--red-900) !important;
+  color: var(--red-200) !important;
+  border: 1px solid var(--red-600) !important;
+}
+
+.method-description {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--p-text-muted-color);
+  line-height: 1.4;
+}
+
+.method-weight {
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--p-text-muted-color);
+  font-style: italic;
+}
+
+/* Ollama ready bar - compacto cuando está listo */
+.ollama-ready-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  background: var(--green-50);
+  border: 1px solid var(--green-200);
+  border-radius: 6px;
+  margin-bottom: 1rem;
+}
+
+.ollama-ready-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--green-700);
+}
+
+.ollama-ready-info i {
+  color: var(--green-500);
+}
+
+/* Ollama action card - cuando necesita acción */
+.ollama-action-card {
+  background: var(--yellow-50);
+  border: 1px solid var(--yellow-200);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  margin-top: 0.75rem;
+}
+
+.ollama-action-card.ollama-state-no_models {
+  background: var(--blue-50);
+  border-color: var(--blue-200);
+}
+
+.ollama-action-content {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.ollama-action-content > i {
+  font-size: 1.25rem;
+  color: var(--yellow-600);
+  flex-shrink: 0;
+}
+
+.ollama-action-card.ollama-state-no_models .ollama-action-content > i {
+  color: var(--blue-500);
+}
+
+.ollama-action-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.ollama-action-text strong {
+  font-size: 0.9rem;
+  color: var(--p-text-color);
+}
+
+.ollama-action-text span {
+  font-size: 0.8rem;
+  color: var(--p-text-muted-color);
+}
+
+/* Setting deshabilitado visualmente */
+.setting-item.setting-disabled {
+  opacity: 0.6;
+}
+
+/* Dark mode para Ollama */
+:global(.dark) .ollama-ready-bar {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: var(--green-800);
+}
+
+:global(.dark) .ollama-ready-info {
+  color: var(--green-400);
+}
+
+:global(.dark) .ollama-action-card {
+  background: rgba(234, 179, 8, 0.1);
+  border-color: var(--yellow-800);
+}
+
+:global(.dark) .ollama-action-card.ollama-state-no_models {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: var(--blue-800);
+}
+
+:global(.dark) .ollama-action-content > i {
+  color: var(--yellow-400);
+}
+
+:global(.dark) .ollama-action-card.ollama-state-no_models .ollama-action-content > i {
+  color: var(--blue-400);
+}
+
+/* ============================================================================
+   Data Location Dialog
+   ============================================================================ */
+
+.data-location-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.dialog-description {
+  margin: 0;
+  color: var(--p-text-muted-color);
+  line-height: 1.5;
+}
+
+.location-input {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.input-label {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.location-field {
+  width: 100%;
+}
+
+.migrate-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: var(--p-surface-50);
+  border-radius: var(--p-border-radius);
+}
+
+:global(.dark) .migrate-option {
+  background: var(--p-surface-800);
+}
+
+.migrate-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.migrate-info label {
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.migrate-description {
+  font-size: 0.85rem;
+  color: var(--p-text-muted-color);
+}
+
+.location-info-message {
+  margin: 0;
+}
+
+.location-info-message :deep(.p-message-wrapper) {
+  padding: 0.75rem 1rem;
+}
+
+/* ============================================================================
+   Sistema de Sensibilidad Unificado
+   ============================================================================ */
+
+.sensitivity-section {
+  padding: 0.5rem 0;
+}
+
+.sensitivity-header {
+  margin-bottom: 1.25rem;
+}
+
+.sensitivity-header .setting-label {
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+}
+
+/* Presets como botones grandes */
+.sensitivity-presets {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.preset-button {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  background: var(--p-surface-50);
+  border: 2px solid var(--p-surface-200);
+  border-radius: var(--p-border-radius);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+  width: 100%;
+}
+
+.preset-button:hover {
+  border-color: var(--p-primary-color);
+  background: color-mix(in srgb, var(--p-primary-color) 5%, var(--p-surface-50));
+}
+
+.preset-button.active {
+  border-color: var(--p-primary-color);
+  background: color-mix(in srgb, var(--p-primary-color) 10%, var(--p-surface-50));
+}
+
+.preset-button > i:first-child {
+  font-size: 1.5rem;
+  color: var(--p-text-muted-color);
+  width: 2rem;
+  text-align: center;
+}
+
+.preset-button.active > i:first-child {
+  color: var(--p-primary-color);
+}
+
+.preset-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.preset-title {
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--p-text-color);
+}
+
+.preset-button .preset-desc {
+  font-size: 0.85rem;
+  color: var(--p-text-muted-color);
+}
+
+.recommended-star {
+  color: var(--yellow-500);
+  font-size: 0.9rem;
+}
+
+/* Dark mode para presets */
+:global(.dark) .preset-button {
+  background: var(--p-surface-800);
+  border-color: var(--p-surface-700);
+}
+
+:global(.dark) .preset-button:hover {
+  background: color-mix(in srgb, var(--p-primary-color) 15%, var(--p-surface-800));
+}
+
+:global(.dark) .preset-button.active {
+  background: color-mix(in srgb, var(--p-primary-color) 20%, var(--p-surface-800));
+}
+
+/* Slider de ajuste fino */
+.sensitivity-slider {
+  padding: 1rem 1.25rem;
+  background: var(--p-surface-50);
+  border-radius: var(--p-border-radius);
+  margin-bottom: 1rem;
+}
+
+:global(.dark) .sensitivity-slider {
+  background: var(--p-surface-800);
+}
+
+.slider-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.slider-label {
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: var(--p-text-color);
+}
+
+.slider-value {
+  font-size: 0.85rem;
+  color: var(--p-primary-color);
+  font-weight: 600;
+}
+
+.slider-hints {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--p-text-muted-color);
+}
+
+/* Panel avanzado */
+.advanced-panel {
+  border-top: 1px solid var(--p-surface-200);
+  padding-top: 1rem;
+  margin-top: 0.5rem;
+}
+
+:global(.dark) .advanced-panel {
+  border-top-color: var(--p-surface-700);
+}
+
+.advanced-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: none;
+  border: none;
+  color: var(--p-text-muted-color);
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 0.5rem 0;
+  transition: color 0.15s ease;
+}
+
+.advanced-toggle:hover {
+  color: var(--p-primary-color);
+}
+
+.advanced-toggle i {
+  font-size: 0.75rem;
+}
+
+.advanced-content {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: var(--p-surface-50);
+  border-radius: var(--p-border-radius);
+}
+
+:global(.dark) .advanced-content {
+  background: var(--p-surface-800);
+}
+
+.advanced-note {
+  margin: 0 0 1rem 0;
+  font-size: 0.85rem;
+  color: var(--p-text-muted-color);
+  font-style: italic;
+}
+
+.advanced-slider {
+  margin-bottom: 1rem;
+}
+
+.advanced-slider:last-of-type {
+  margin-bottom: 1.25rem;
+}
+
+.advanced-slider-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.advanced-slider-header label {
+  font-size: 0.85rem;
+  color: var(--p-text-color);
+}
+
+.advanced-slider-header span {
+  font-size: 0.85rem;
+  color: var(--p-primary-color);
+  font-weight: 500;
+}
+
+.slider-help {
+  font-size: 0.75rem;
+  color: var(--p-text-secondary-color);
+  margin: 0 0 0.5rem 0;
+  line-height: 1.4;
+}
+
+/* ============================================================================
+   Filtros de Entidades
+   ============================================================================ */
+
+.section-description {
+  color: var(--p-text-secondary-color);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.filter-stats {
+  display: flex;
+  gap: 2rem;
+  padding: 1rem;
+  background: var(--p-surface-100);
+  border-radius: var(--p-border-radius);
+}
+
+:global(.dark) .filter-stats {
+  background: var(--p-surface-800);
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--p-primary-color);
+}
+
+.stat-label {
+  font-size: 0.8rem;
+  color: var(--p-text-secondary-color);
+}
+
+.system-patterns-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.pattern-category {
+  border: 1px solid var(--p-surface-200);
+  border-radius: var(--p-border-radius);
+  overflow: hidden;
+}
+
+:global(.dark) .pattern-category {
+  border-color: var(--p-surface-700);
+}
+
+.category-title {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  background: var(--p-surface-100);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--p-text-color);
+}
+
+:global(.dark) .category-title {
+  background: var(--p-surface-800);
+}
+
+.patterns-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0.5rem;
+  padding: 0.75rem;
+}
+
+.pattern-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  border-radius: var(--p-border-radius);
+  transition: background 0.15s ease;
+}
+
+.pattern-item:hover {
+  background: var(--p-surface-100);
+}
+
+:global(.dark) .pattern-item:hover {
+  background: var(--p-surface-800);
+}
+
+.pattern-item.inactive {
+  opacity: 0.5;
+}
+
+.pattern-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  cursor: pointer;
+}
+
+.pattern-text {
+  font-family: var(--p-font-family-mono, monospace);
+  font-size: 0.8rem;
+  color: var(--p-text-color);
+  background: var(--p-surface-200);
+  padding: 0.125rem 0.375rem;
+  border-radius: 3px;
+}
+
+:global(.dark) .pattern-text {
+  background: var(--p-surface-700);
+}
+
+.pattern-desc {
+  font-size: 0.75rem;
+  color: var(--p-text-secondary-color);
+}
+
+.loading-patterns {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  color: var(--p-text-secondary-color);
+}
+
+.user-rejections-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.rejection-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: var(--p-surface-100);
+  border-radius: var(--p-border-radius);
+}
+
+:global(.dark) .rejection-item {
+  background: var(--p-surface-800);
+}
+
+.rejection-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.rejection-name {
+  font-weight: 500;
+  color: var(--p-text-color);
+}
+
+.rejection-reason {
+  font-size: 0.85rem;
+  color: var(--p-text-secondary-color);
+}
+
+.empty-rejections {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.5rem;
+  color: var(--p-text-secondary-color);
+  background: var(--p-surface-100);
+  border-radius: var(--p-border-radius);
+}
+
+:global(.dark) .empty-rejections {
+  background: var(--p-surface-800);
+}
+
+.empty-rejections i {
+  font-size: 1.25rem;
+  color: var(--p-green-500);
 }
 </style>

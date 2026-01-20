@@ -6,7 +6,12 @@ LLM locales. Soporta:
 1. Ollama (servidor local con modelos como Llama, Mistral, etc.)
 2. Transformers (modelos HuggingFace descargados localmente)
 
-IMPORTANTE: Este módulo funciona 100% offline. No requiere acceso a internet.
+IMPORTANTE: Este módulo funciona 100% offline. No requiere acceso a internet
+una vez que los modelos están descargados.
+
+Instalación bajo demanda:
+- Ollama se instala solo cuando el usuario intenta usar funcionalidades LLM
+- Los modelos se descargan cuando el usuario los selecciona en Settings
 """
 
 import json
@@ -15,7 +20,7 @@ import os
 import threading
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal, Optional
+from typing import Any, Callable, Literal, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +29,9 @@ _client_lock = threading.Lock()
 _client: Optional["LocalLLMClient"] = None
 
 LLMBackend = Literal["ollama", "transformers", "none"]
+
+# Callback para solicitar instalación de Ollama
+_installation_prompt_callback: Optional[Callable[[], bool]] = None
 
 
 @dataclass
@@ -44,7 +52,12 @@ class LocalLLMConfig:
     # Parámetros de generación
     max_tokens: int = 2048
     temperature: float = 0.3  # Bajo para análisis consistente
-    timeout: int = 120  # Segundos (modelos locales son más lentos)
+    timeout: int = 600  # 10 minutos - modelos locales en CPU son MUY lentos
+
+    # Instalación bajo demanda
+    auto_install_ollama: bool = False  # Si True, instala Ollama automáticamente
+    auto_start_service: bool = True  # Si True, inicia el servicio automáticamente
+    force_cpu: bool = False  # Si True, fuerza modo CPU para Ollama
 
 
 class LocalLLMClient:
@@ -91,11 +104,62 @@ class LocalLLMClient:
         self._backend = "none"
 
     def _try_init_ollama(self) -> bool:
-        """Intenta inicializar Ollama."""
+        """
+        Intenta inicializar Ollama.
+
+        Comportamiento bajo demanda:
+        1. Verifica si Ollama está instalado
+        2. Si no está instalado y hay callback de instalación, lo invoca
+        3. Si está instalado pero no corriendo, intenta iniciarlo
+        4. Verifica que el modelo esté disponible
+        """
+        from .ollama_manager import get_ollama_manager, OllamaStatus
+
+        manager = get_ollama_manager()
+        status = manager.status
+
+        # Caso 1: Ollama no instalado
+        if status == OllamaStatus.NOT_INSTALLED:
+            if self._config.auto_install_ollama:
+                logger.info("Instalando Ollama automáticamente...")
+                success, msg = manager.install_ollama(silent=True)
+                if not success:
+                    logger.warning(f"No se pudo instalar Ollama: {msg}")
+                    return False
+            elif _installation_prompt_callback:
+                # Preguntar al usuario si quiere instalar
+                if _installation_prompt_callback():
+                    success, msg = manager.install_ollama()
+                    if not success:
+                        logger.warning(f"No se pudo instalar Ollama: {msg}")
+                        return False
+                else:
+                    logger.info("Usuario rechazó la instalación de Ollama")
+                    return False
+            else:
+                logger.debug("Ollama no instalado, instalación bajo demanda deshabilitada")
+                return False
+
+        # Caso 2: Ollama instalado pero no corriendo
+        if not manager.is_running:
+            if self._config.auto_start_service:
+                logger.info("Iniciando servicio Ollama...")
+                success, msg = manager.start_service(force_cpu=self._config.force_cpu)
+                if not success:
+                    logger.warning(f"No se pudo iniciar Ollama: {msg}")
+                    return False
+            else:
+                logger.debug("Ollama no está corriendo, inicio automático deshabilitado")
+                return False
+
+        # Caso 3: Ollama corriendo, verificar modelo
+        return self._verify_ollama_model(manager)
+
+    def _verify_ollama_model(self, manager: Any) -> bool:
+        """Verifica que el modelo configurado esté disponible."""
         try:
             import httpx
 
-            # Verificar que Ollama está corriendo
             response = httpx.get(
                 f"{self._config.ollama_host}/api/tags",
                 timeout=5.0
@@ -121,12 +185,16 @@ class LocalLLMClient:
                         f"Modelo {self._config.ollama_model} no encontrado en Ollama. "
                         f"Modelos disponibles: {models}"
                     )
-                    # Intentar con el primer modelo disponible
+                    # Seleccionar el mejor modelo disponible según el hardware
                     if models:
-                        self._config.ollama_model = models[0].split(":")[0]
+                        best_model = self._select_best_available_model(models)
+                        self._config.ollama_model = best_model
                         self._backend = "ollama"
-                        logger.info(f"Usando modelo alternativo: {self._config.ollama_model}")
+                        logger.info(f"Usando modelo óptimo para tu hardware: {self._config.ollama_model}")
                         return True
+                    else:
+                        logger.warning("No hay modelos descargados en Ollama")
+                        return False
 
         except ImportError:
             logger.debug("httpx no instalado, no se puede usar Ollama")
@@ -134,6 +202,60 @@ class LocalLLMClient:
             logger.debug(f"Ollama no disponible: {e}")
 
         return False
+
+    def _select_best_available_model(self, available_models: list[str]) -> str:
+        """
+        Selecciona el mejor modelo disponible según el hardware.
+
+        Prioridad según calidad/velocidad:
+        - GPU con alta VRAM (>8GB): qwen2.5 > mistral > llama3.2 > gemma2
+        - GPU con VRAM media (4-8GB): llama3.2 > qwen2.5 > mistral
+        - CPU o poca VRAM: llama3.2 (3B es rápido en CPU)
+        """
+        # Detectar capacidades de hardware
+        has_gpu = False
+        has_high_vram = False
+
+        try:
+            from ..core.device import get_gpu_device
+            gpu = get_gpu_device()
+            if gpu:
+                has_gpu = True
+                # Considerar "alta VRAM" si tiene más de 8GB
+                if gpu.total_memory_gb and gpu.total_memory_gb > 8:
+                    has_high_vram = True
+        except Exception:
+            pass
+
+        # Normalizar nombres de modelos (quitar tags como :latest)
+        normalized = [m.split(":")[0] for m in available_models]
+
+        # Definir orden de preferencia según hardware
+        if has_high_vram:
+            # GPU potente: preferir modelos más grandes/capaces
+            preference_order = ["qwen2.5", "mistral", "gemma2", "llama3.2", "llama3.1", "llama3"]
+        elif has_gpu:
+            # GPU con VRAM limitada: preferir modelos medianos
+            preference_order = ["llama3.2", "qwen2.5", "mistral", "llama3.1", "llama3"]
+        else:
+            # CPU: preferir modelos pequeños y rápidos
+            preference_order = ["llama3.2", "phi3", "gemma2:2b", "llama3.1", "qwen2.5"]
+
+        # Buscar el primer modelo disponible según preferencia
+        for preferred in preference_order:
+            for model in normalized:
+                if preferred in model:
+                    # Devolver el nombre original con tag
+                    idx = normalized.index(model)
+                    selected = available_models[idx].split(":")[0]
+                    logger.info(
+                        f"Modelo seleccionado automáticamente: {selected} "
+                        f"(GPU: {has_gpu}, Alta VRAM: {has_high_vram})"
+                    )
+                    return selected
+
+        # Si no hay coincidencia, usar el primero
+        return available_models[0].split(":")[0]
 
     def _try_init_transformers(self) -> bool:
         """Intenta inicializar Transformers con modelo local."""
@@ -245,6 +367,14 @@ class LocalLLMClient:
                 messages.append({"role": "system", "content": system})
             messages.append({"role": "user", "content": prompt})
 
+            # Timeout alto para CPU sin GPU - puede tardar varios minutos
+            timeout_config = httpx.Timeout(
+                connect=10.0,  # 10s para conectar
+                read=self._config.timeout,  # 10 min para leer respuesta
+                write=30.0,  # 30s para enviar request
+                pool=10.0,  # 10s para obtener conexión del pool
+            )
+
             response = httpx.post(
                 f"{self._config.ollama_host}/api/chat",
                 json={
@@ -256,7 +386,7 @@ class LocalLLMClient:
                         "temperature": temperature or self._config.temperature,
                     }
                 },
-                timeout=self._config.timeout,
+                timeout=timeout_config,
             )
 
             if response.status_code == 200:
@@ -424,3 +554,151 @@ def reset_client() -> None:
 
 # Alias para compatibilidad
 get_claude_client = get_llm_client  # Deprecated, usar get_llm_client
+
+
+def set_installation_prompt_callback(callback: Optional[Callable[[], bool]]) -> None:
+    """
+    Establece un callback para solicitar instalación de Ollama al usuario.
+
+    El callback debe retornar True si el usuario acepta la instalación,
+    False si la rechaza.
+
+    Args:
+        callback: Función que retorna bool, o None para desactivar
+    """
+    global _installation_prompt_callback
+    _installation_prompt_callback = callback
+
+
+def get_ollama_status() -> dict[str, Any]:
+    """
+    Obtiene información del estado de Ollama.
+
+    Returns:
+        Diccionario con:
+        - installed: bool
+        - running: bool
+        - version: str o None
+        - models: lista de modelos descargados
+        - available_models: lista de modelos disponibles para descargar
+    """
+    from .ollama_manager import get_ollama_manager
+
+    manager = get_ollama_manager()
+
+    return {
+        "installed": manager.is_installed,
+        "running": manager.is_running,
+        "version": manager.get_version(),
+        "models": manager.downloaded_models,
+        "available_models": [
+            {
+                "name": m.name,
+                "display_name": m.display_name,
+                "size_gb": m.size_gb,
+                "description": m.description,
+                "is_downloaded": m.is_downloaded,
+                "is_default": m.is_default,
+            }
+            for m in manager.available_models
+        ],
+    }
+
+
+def install_ollama_if_needed(
+    force: bool = False,
+    progress_callback: Optional[Callable[[Any], None]] = None,
+) -> tuple[bool, str]:
+    """
+    Instala Ollama si no está instalado.
+
+    Args:
+        force: Si True, reinstala aunque ya esté instalado
+        progress_callback: Callback para reportar progreso
+
+    Returns:
+        Tupla (éxito, mensaje)
+    """
+    from .ollama_manager import get_ollama_manager
+
+    manager = get_ollama_manager()
+
+    if manager.is_installed and not force:
+        return True, "Ollama ya está instalado"
+
+    return manager.install_ollama(progress_callback=progress_callback)
+
+
+def download_ollama_model(
+    model_name: str,
+    progress_callback: Optional[Callable[[Any], None]] = None,
+) -> tuple[bool, str]:
+    """
+    Descarga un modelo de Ollama.
+
+    Args:
+        model_name: Nombre del modelo (llama3.2, qwen2.5, mistral, gemma2)
+        progress_callback: Callback para reportar progreso
+
+    Returns:
+        Tupla (éxito, mensaje)
+    """
+    from .ollama_manager import get_ollama_manager
+
+    manager = get_ollama_manager()
+
+    # Asegurar que Ollama está corriendo
+    if not manager.is_running:
+        success, msg = manager.ensure_running()
+        if not success:
+            return False, f"No se puede descargar: {msg}"
+
+    return manager.download_model(model_name, progress_callback)
+
+
+def ensure_llm_ready(
+    install_if_missing: bool = False,
+    download_default_model: bool = False,
+) -> tuple[bool, str]:
+    """
+    Asegura que el sistema LLM esté listo para usar.
+
+    Esta función es el punto de entrada principal para verificar y preparar
+    el sistema LLM antes de usarlo.
+
+    Args:
+        install_if_missing: Si True, instala Ollama si no está
+        download_default_model: Si True, descarga el modelo por defecto si no hay ninguno
+
+    Returns:
+        Tupla (éxito, mensaje)
+    """
+    from .ollama_manager import get_ollama_manager
+
+    manager = get_ollama_manager()
+
+    # Verificar instalación
+    if not manager.is_installed:
+        if install_if_missing:
+            success, msg = manager.install_ollama()
+            if not success:
+                return False, f"Error instalando Ollama: {msg}"
+        else:
+            return False, "Ollama no está instalado. Usa install_ollama_if_needed() para instalarlo."
+
+    # Verificar servicio
+    if not manager.is_running:
+        success, msg = manager.start_service()
+        if not success:
+            return False, f"Error iniciando servicio: {msg}"
+
+    # Verificar modelos
+    if not manager.downloaded_models:
+        if download_default_model:
+            success, msg = manager.download_model("llama3.2")
+            if not success:
+                return False, f"Error descargando modelo: {msg}"
+        else:
+            return False, "No hay modelos descargados. Usa download_ollama_model() para descargar uno."
+
+    return True, "Sistema LLM listo"

@@ -53,6 +53,18 @@ from .character_knowledge import (
     CharacterKnowledgeAnalyzer,
 )
 
+from .emotional_coherence import (
+    # Tipos
+    IncoherenceType,
+    # Dataclasses
+    EmotionalIncoherence,
+    # Clase principal
+    EmotionalCoherenceChecker,
+    # Funciones de conveniencia
+    get_emotional_coherence_checker,
+    reset_emotional_coherence_checker,
+)
+
 __all__ = [
     # Tipos - Consistency
     "AttributeInconsistency",
@@ -88,4 +100,13 @@ __all__ = [
     "KnowledgeAsymmetryReport",
     # Clase - Character Knowledge
     "CharacterKnowledgeAnalyzer",
+    # Tipos - Emotional Coherence
+    "IncoherenceType",
+    # Dataclasses - Emotional Coherence
+    "EmotionalIncoherence",
+    # Clase - Emotional Coherence
+    "EmotionalCoherenceChecker",
+    # Funciones - Emotional Coherence
+    "get_emotional_coherence_checker",
+    "reset_emotional_coherence_checker",
 ]

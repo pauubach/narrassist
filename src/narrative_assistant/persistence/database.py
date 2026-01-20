@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 _database_lock = threading.Lock()
 
 # Versión del schema actual
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 7
 
 # SQL de creación de tablas
 SCHEMA_SQL = """
@@ -65,6 +65,27 @@ CREATE TABLE IF NOT EXISTS chapters (
 );
 
 CREATE INDEX IF NOT EXISTS idx_chapters_project ON chapters(project_id);
+
+-- Secciones dentro de capítulos (H2, H3, H4)
+CREATE TABLE IF NOT EXISTS sections (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    chapter_id INTEGER NOT NULL,
+    parent_section_id INTEGER,  -- NULL si es sección de nivel superior, sino ID de la sección padre
+    section_number INTEGER NOT NULL,
+    title TEXT,
+    heading_level INTEGER NOT NULL,  -- 2=H2, 3=H3, 4=H4, etc.
+    start_char INTEGER NOT NULL,
+    end_char INTEGER NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE CASCADE,
+    FOREIGN KEY (parent_section_id) REFERENCES sections(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_sections_project ON sections(project_id);
+CREATE INDEX IF NOT EXISTS idx_sections_chapter ON sections(chapter_id);
+CREATE INDEX IF NOT EXISTS idx_sections_parent ON sections(parent_section_id);
 
 -- Entidades (personajes, lugares, objetos)
 CREATE TABLE IF NOT EXISTS entities (
@@ -237,14 +258,357 @@ CREATE TABLE IF NOT EXISTS sessions (
 
 CREATE INDEX IF NOT EXISTS idx_sessions_project ON sessions(project_id);
 
+-- Declaraciones de focalización
+CREATE TABLE IF NOT EXISTS focalization_declarations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    chapter INTEGER NOT NULL,
+    scene INTEGER,  -- NULL = todo el capítulo
+
+    -- Tipo y focalizadores
+    focalization_type TEXT NOT NULL,  -- zero, internal_fixed, internal_variable, internal_multiple, external
+    focalizer_ids TEXT,  -- JSON array de entity IDs
+
+    -- Metadata
+    declared_at TEXT NOT NULL DEFAULT (datetime('now')),
+    declared_by TEXT DEFAULT 'user',  -- 'user' o 'system_suggestion'
+    notes TEXT,
+
+    -- Validación
+    is_validated INTEGER DEFAULT 0,
+    violations_count INTEGER DEFAULT 0,
+
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    UNIQUE (project_id, chapter, scene)
+);
+
+CREATE INDEX IF NOT EXISTS idx_focalization_project ON focalization_declarations(project_id);
+CREATE INDEX IF NOT EXISTS idx_focalization_chapter ON focalization_declarations(project_id, chapter);
+
+-- Reglas editoriales personalizadas por proyecto
+CREATE TABLE IF NOT EXISTS editorial_rules (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    rules_text TEXT NOT NULL,  -- Texto libre con las reglas del corrector
+    enabled INTEGER DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    UNIQUE (project_id)  -- Solo un registro de reglas por proyecto
+);
+
+CREATE INDEX IF NOT EXISTS idx_editorial_rules_project ON editorial_rules(project_id);
+
+-- Entidades rechazadas por el usuario (feedback loop para validación NER)
+CREATE TABLE IF NOT EXISTS rejected_entities (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    entity_text TEXT NOT NULL,  -- Texto normalizado (lowercase) de la entidad rechazada
+    rejection_reason TEXT,      -- Razón opcional del rechazo
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    UNIQUE (project_id, entity_text)  -- Una entidad solo puede rechazarse una vez por proyecto
+);
+
+CREATE INDEX IF NOT EXISTS idx_rejected_entities_project ON rejected_entities(project_id);
+
 -- Metadatos del schema
 CREATE TABLE IF NOT EXISTS schema_info (
     key TEXT PRIMARY KEY,
     value TEXT
 );
 
+-- Timeline: Eventos temporales del proyecto
+CREATE TABLE IF NOT EXISTS timeline_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    event_id TEXT NOT NULL,              -- ID único del evento en el timeline
+    chapter INTEGER,
+    paragraph INTEGER,
+    description TEXT NOT NULL,
+    story_date TEXT,                     -- Fecha en la historia (ISO format o NULL)
+    story_date_resolution TEXT,          -- EXACT_DATE, MONTH, YEAR, SEASON, RELATIVE, UNKNOWN
+    narrative_order TEXT DEFAULT 'CHRONOLOGICAL',  -- CHRONOLOGICAL, ANALEPSIS, PROLEPSIS
+    discourse_position INTEGER,          -- Orden en el discurso narrativo
+    confidence REAL DEFAULT 0.5,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_timeline_events_project ON timeline_events(project_id);
+CREATE INDEX IF NOT EXISTS idx_timeline_events_chapter ON timeline_events(chapter);
+
+-- Timeline: Marcadores temporales extraídos del texto
+CREATE TABLE IF NOT EXISTS temporal_markers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    chapter INTEGER NOT NULL,
+    marker_type TEXT NOT NULL,           -- ABSOLUTE_DATE, RELATIVE_TIME, SEASON_EPOCH, CHARACTER_AGE, DURATION, FREQUENCY
+    text TEXT NOT NULL,                  -- Texto original del marcador
+    start_char INTEGER NOT NULL,
+    end_char INTEGER NOT NULL,
+    confidence REAL DEFAULT 0.5,
+    -- Componentes parseados (para fechas absolutas)
+    year INTEGER,
+    month INTEGER,
+    day INTEGER,
+    -- Para marcadores relativos
+    direction TEXT,                      -- past, future
+    quantity INTEGER,
+    magnitude TEXT,                      -- days, weeks, months, years
+    -- Para edades de personajes
+    age INTEGER,
+    entity_id INTEGER,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    FOREIGN KEY (entity_id) REFERENCES entities(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_temporal_markers_project ON temporal_markers(project_id);
+CREATE INDEX IF NOT EXISTS idx_temporal_markers_chapter ON temporal_markers(chapter);
+
+-- ===================================================================
+-- NUEVAS TABLAS: Persistencia de resultados de análisis (versión 6)
+-- ===================================================================
+
+-- Ejecuciones de análisis
+CREATE TABLE IF NOT EXISTS analysis_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    session_id INTEGER,
+    config_json TEXT,                    -- UnifiedConfig serializado
+    quality_profile TEXT,                -- 'express', 'standard', 'deep', 'complete'
+    started_at TEXT NOT NULL DEFAULT (datetime('now')),
+    completed_at TEXT,
+    status TEXT DEFAULT 'running',       -- 'running', 'completed', 'failed', 'cancelled'
+    error_message TEXT,
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_analysis_runs_project ON analysis_runs(project_id);
+CREATE INDEX IF NOT EXISTS idx_analysis_runs_status ON analysis_runs(status);
+
+-- Fases de análisis ejecutadas en cada run
+CREATE TABLE IF NOT EXISTS analysis_phases (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id INTEGER NOT NULL,
+    phase_name TEXT NOT NULL,            -- 'parsing', 'ner', 'coreference', 'attributes', 'relationships', etc.
+    executed INTEGER DEFAULT 0,
+    started_at TEXT,
+    completed_at TEXT,
+    result_count INTEGER DEFAULT 0,      -- Número de items encontrados
+    error_message TEXT,
+    metadata_json TEXT,                  -- Metadata adicional de la fase
+    FOREIGN KEY (run_id) REFERENCES analysis_runs(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_analysis_phases_run ON analysis_phases(run_id);
+CREATE INDEX IF NOT EXISTS idx_analysis_phases_name ON analysis_phases(phase_name);
+
+-- Relaciones entre entidades
+CREATE TABLE IF NOT EXISTS relationships (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    entity1_id INTEGER NOT NULL,
+    entity2_id INTEGER NOT NULL,
+    relation_type TEXT NOT NULL,         -- 'FAMILY', 'ROMANTIC', 'PROFESSIONAL', 'FRIENDSHIP', 'RIVALRY', 'HIERARCHICAL'
+    subtype TEXT,                        -- 'hermano', 'esposo', 'jefe', 'mentor', etc.
+    direction TEXT DEFAULT 'bidirectional',  -- 'bidirectional', 'from_1_to_2', 'from_2_to_1'
+    confidence REAL DEFAULT 0.8,
+    chapter_id INTEGER,
+    start_char INTEGER,
+    end_char INTEGER,
+    source_text TEXT,
+    detection_method TEXT,               -- 'pattern', 'clustering', 'llm', 'dependency'
+    is_inferred INTEGER DEFAULT 0,       -- 1 si fue inferido, 0 si explícito
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    FOREIGN KEY (entity1_id) REFERENCES entities(id) ON DELETE CASCADE,
+    FOREIGN KEY (entity2_id) REFERENCES entities(id) ON DELETE CASCADE,
+    FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_relationships_project ON relationships(project_id);
+CREATE INDEX IF NOT EXISTS idx_relationships_entity1 ON relationships(entity1_id);
+CREATE INDEX IF NOT EXISTS idx_relationships_entity2 ON relationships(entity2_id);
+CREATE INDEX IF NOT EXISTS idx_relationships_type ON relationships(relation_type);
+
+-- Interacciones entre entidades
+CREATE TABLE IF NOT EXISTS interactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    entity1_id INTEGER NOT NULL,
+    entity2_id INTEGER,                  -- NULL para acciones unilaterales
+    interaction_type TEXT NOT NULL,      -- 'DIALOGUE', 'PHYSICAL', 'THOUGHT', 'OBSERVATION', 'REFERENCE'
+    tone TEXT DEFAULT 'NEUTRAL',         -- 'POSITIVE', 'NEGATIVE', 'NEUTRAL', 'MIXED'
+    intensity REAL DEFAULT 0.5,          -- 0.0 - 1.0
+    chapter_id INTEGER,
+    position INTEGER,
+    start_char INTEGER,
+    end_char INTEGER,
+    text_excerpt TEXT,
+    is_in_dialogue INTEGER DEFAULT 0,    -- 1 si ocurre dentro de diálogo
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    FOREIGN KEY (entity1_id) REFERENCES entities(id) ON DELETE CASCADE,
+    FOREIGN KEY (entity2_id) REFERENCES entities(id) ON DELETE SET NULL,
+    FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_interactions_project ON interactions(project_id);
+CREATE INDEX IF NOT EXISTS idx_interactions_entity1 ON interactions(entity1_id);
+CREATE INDEX IF NOT EXISTS idx_interactions_chapter ON interactions(chapter_id);
+CREATE INDEX IF NOT EXISTS idx_interactions_type ON interactions(interaction_type);
+
+-- Cambios de registro detectados
+CREATE TABLE IF NOT EXISTS register_changes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    from_register TEXT NOT NULL,         -- 'formal', 'coloquial', 'tecnico', 'poetico'
+    to_register TEXT NOT NULL,
+    chapter_id INTEGER,
+    start_char INTEGER NOT NULL,
+    end_char INTEGER NOT NULL,
+    position INTEGER,
+    text_excerpt TEXT,
+    severity TEXT DEFAULT 'medium',      -- 'low', 'medium', 'high'
+    explanation TEXT,
+    confidence REAL DEFAULT 0.8,
+    is_justified INTEGER DEFAULT 0,      -- 1 si es cambio intencionado (diálogo, cita)
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_register_changes_project ON register_changes(project_id);
+CREATE INDEX IF NOT EXISTS idx_register_changes_chapter ON register_changes(chapter_id);
+
+-- Métricas de pacing por capítulo
+CREATE TABLE IF NOT EXISTS pacing_metrics (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    chapter_id INTEGER NOT NULL,
+    word_count INTEGER NOT NULL,
+    sentence_count INTEGER,
+    paragraph_count INTEGER,
+    dialogue_count INTEGER,              -- Número de diálogos
+    dialogue_ratio REAL,                 -- 0.0 - 1.0
+    avg_sentence_length REAL,
+    avg_paragraph_length REAL,
+    lexical_density REAL,                -- Type-token ratio
+    unique_words INTEGER,
+    longest_sentence_words INTEGER,
+    action_verb_ratio REAL,              -- Ratio de verbos de acción
+    pacing_score REAL,                   -- 0.0 (lento) - 1.0 (rápido)
+    balance_deviation REAL,              -- Desviación respecto a la media del libro
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE CASCADE,
+    UNIQUE (project_id, chapter_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_pacing_metrics_project ON pacing_metrics(project_id);
+CREATE INDEX IF NOT EXISTS idx_pacing_metrics_chapter ON pacing_metrics(chapter_id);
+
+-- Arcos emocionales (sentimiento por segmento)
+CREATE TABLE IF NOT EXISTS emotional_arcs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    chapter_id INTEGER NOT NULL,
+    segment_index INTEGER NOT NULL,      -- Índice del segmento dentro del capítulo
+    segment_start INTEGER NOT NULL,
+    segment_end INTEGER NOT NULL,
+    sentiment_label TEXT,                -- 'positive', 'negative', 'neutral'
+    sentiment_score REAL,                -- -1.0 (negativo) a 1.0 (positivo)
+    dominant_emotion TEXT,               -- 'joy', 'sadness', 'anger', 'fear', 'surprise', 'disgust'
+    emotion_confidence REAL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_emotional_arcs_project ON emotional_arcs(project_id);
+CREATE INDEX IF NOT EXISTS idx_emotional_arcs_chapter ON emotional_arcs(chapter_id);
+
+-- Perfiles de voz por personaje
+CREATE TABLE IF NOT EXISTS voice_profiles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    entity_id INTEGER NOT NULL,
+    avg_sentence_length REAL,
+    vocabulary_richness REAL,            -- Type-token ratio
+    formality_score REAL,                -- 0 (informal) - 1 (formal)
+    dialogue_count INTEGER,              -- Número de diálogos analizados
+    characteristic_words TEXT,           -- JSON array de palabras características
+    filler_words TEXT,                   -- JSON array de muletillas
+    exclamation_ratio REAL,
+    question_ratio REAL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    FOREIGN KEY (entity_id) REFERENCES entities(id) ON DELETE CASCADE,
+    UNIQUE (project_id, entity_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_voice_profiles_project ON voice_profiles(project_id);
+CREATE INDEX IF NOT EXISTS idx_voice_profiles_entity ON voice_profiles(entity_id);
+
+-- ===================================================================
+-- NUEVAS TABLAS: Sistema híbrido de filtros de entidades (versión 7)
+-- ===================================================================
+
+-- Patrones de falsos positivos del sistema (predefinidos, solo lectura para usuario)
+-- El usuario solo puede activar/desactivar patrones, no modificarlos
+CREATE TABLE IF NOT EXISTS system_entity_patterns (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pattern TEXT NOT NULL,                -- Texto o patrón regex
+    pattern_type TEXT NOT NULL,           -- 'exact', 'regex', 'startswith', 'endswith', 'contains'
+    entity_type TEXT,                     -- NULL = aplica a todos los tipos
+    language TEXT DEFAULT 'es',           -- Idioma al que aplica
+    category TEXT,                        -- Categoría (temporal, numeric, article, etc.)
+    description TEXT,                     -- Descripción para mostrar al usuario
+    is_active INTEGER DEFAULT 1,          -- Si el usuario ha activado/desactivado este patrón
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (pattern, pattern_type, entity_type, language)
+);
+
+CREATE INDEX IF NOT EXISTS idx_system_patterns_active ON system_entity_patterns(is_active);
+CREATE INDEX IF NOT EXISTS idx_system_patterns_type ON system_entity_patterns(pattern_type);
+CREATE INDEX IF NOT EXISTS idx_system_patterns_language ON system_entity_patterns(language);
+
+-- Entidades rechazadas a nivel global del usuario (aplica a todos sus proyectos)
+CREATE TABLE IF NOT EXISTS user_rejected_entities (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    entity_name TEXT NOT NULL,            -- Texto normalizado (lowercase)
+    entity_type TEXT,                     -- Tipo de entidad (NULL = todos los tipos)
+    reason TEXT,                          -- Razón del rechazo
+    rejected_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (entity_name, entity_type)     -- Una entidad/tipo solo puede rechazarse una vez
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_rejected_name ON user_rejected_entities(entity_name);
+CREATE INDEX IF NOT EXISTS idx_user_rejected_type ON user_rejected_entities(entity_type);
+
+-- Overrides a nivel de proyecto (máxima prioridad)
+-- Permite rechazar o forzar inclusión de entidades específicas por proyecto
+CREATE TABLE IF NOT EXISTS project_entity_overrides (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    entity_name TEXT NOT NULL,            -- Texto normalizado (lowercase)
+    entity_type TEXT,                     -- Tipo de entidad (NULL = todos los tipos)
+    action TEXT NOT NULL,                 -- 'reject' o 'force_include'
+    reason TEXT,                          -- Razón del override
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    UNIQUE (project_id, entity_name, entity_type)
+);
+
+CREATE INDEX IF NOT EXISTS idx_project_overrides_project ON project_entity_overrides(project_id);
+CREATE INDEX IF NOT EXISTS idx_project_overrides_action ON project_entity_overrides(action);
+
 -- Insertar versión del schema
-INSERT OR REPLACE INTO schema_info (key, value) VALUES ('version', '1');
+INSERT OR REPLACE INTO schema_info (key, value) VALUES ('version', '7');
 """
 
 

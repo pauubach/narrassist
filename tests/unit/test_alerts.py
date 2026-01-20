@@ -297,3 +297,185 @@ class TestAlertRepository:
         assert hasattr(repo, "get")
         assert hasattr(repo, "delete")
         assert hasattr(repo, "get_by_project")
+
+
+class TestAlertEngine:
+    """Tests para el motor de alertas."""
+
+    @pytest.fixture
+    def engine(self):
+        """Crea un motor de alertas para tests."""
+        from narrative_assistant.alerts.engine import AlertEngine
+        from unittest.mock import MagicMock
+
+        # Mock del repositorio para evitar DB real
+        mock_repo = MagicMock()
+        mock_repo.create.return_value = MagicMock(
+            is_success=True,
+            value=Alert(
+                id=1,
+                project_id=1,
+                category=AlertCategory.CONSISTENCY,
+                severity=AlertSeverity.WARNING,
+                alert_type="test",
+                title="Test",
+                description="Test",
+                explanation="Test",
+            )
+        )
+        return AlertEngine(repository=mock_repo)
+
+    def test_calculate_severity_from_confidence(self, engine):
+        """Test calculo automatico de severidad."""
+        assert engine.calculate_severity_from_confidence(0.95) == AlertSeverity.CRITICAL
+        assert engine.calculate_severity_from_confidence(0.75) == AlertSeverity.WARNING
+        assert engine.calculate_severity_from_confidence(0.55) == AlertSeverity.INFO
+        assert engine.calculate_severity_from_confidence(0.3) == AlertSeverity.HINT
+
+    def test_create_from_temporal_inconsistency(self, engine):
+        """Test creacion de alerta temporal."""
+        result = engine.create_from_temporal_inconsistency(
+            project_id=1,
+            inconsistency_type="timeline_gap",
+            description="Salto temporal inexplicado",
+            explanation="Hay una semana sin explicar entre eventos",
+            chapter=3,
+            start_char=1000,
+            end_char=1100,
+            excerpt="texto de ejemplo",
+            confidence=0.85,
+        )
+
+        # Verificamos que se llamo al repositorio
+        engine.repo.create.assert_called_once()
+        call_args = engine.repo.create.call_args[0][0]
+        assert call_args.category == AlertCategory.TIMELINE_ISSUE
+        assert call_args.alert_type == "temporal_timeline_gap"
+
+    def test_create_from_voice_deviation(self, engine):
+        """Test creacion de alerta de desviacion de voz."""
+        result = engine.create_from_voice_deviation(
+            project_id=1,
+            entity_id=5,
+            entity_name="Juan",
+            deviation_type="formality_shift",
+            expected_value="formal",
+            actual_value="colloquial",
+            description="Juan usa lenguaje coloquial inesperado",
+            explanation="El perfil indica que Juan habla formalmente",
+            chapter=2,
+            start_char=500,
+            end_char=600,
+            excerpt="Bro, eso mola",
+            confidence=0.75,
+        )
+
+        engine.repo.create.assert_called_once()
+        call_args = engine.repo.create.call_args[0][0]
+        assert call_args.category == AlertCategory.VOICE_DEVIATION
+        assert call_args.entity_ids == [5]
+
+    def test_create_from_register_change(self, engine):
+        """Test creacion de alerta de cambio de registro."""
+        result = engine.create_from_register_change(
+            project_id=1,
+            from_register="formal_literary",
+            to_register="colloquial",
+            severity_level="high",
+            chapter=4,
+            position=2000,
+            context_before="Contempló la vastedad del horizonte",
+            context_after="Bro, eso flipaba mogollón",
+            explanation="Cambio abrupto de registro narrativo",
+            confidence=0.8,
+        )
+
+        engine.repo.create.assert_called_once()
+        call_args = engine.repo.create.call_args[0][0]
+        assert call_args.category == AlertCategory.STYLE
+        assert call_args.alert_type == "register_change"
+        assert call_args.severity == AlertSeverity.WARNING  # high -> WARNING
+
+    def test_create_from_focalization_violation(self, engine):
+        """Test creacion de alerta de violacion de focalizacion."""
+        result = engine.create_from_focalization_violation(
+            project_id=1,
+            violation_type="unauthorized_pov",
+            declared_focalizer="María",
+            violated_rule="No se puede acceder a pensamientos de otros personajes",
+            description="Acceso a pensamientos de Juan desde perspectiva de María",
+            explanation="María no debería saber qué piensa Juan",
+            chapter=5,
+            start_char=3000,
+            end_char=3100,
+            excerpt="Juan pensó que María era tonta",
+            confidence=0.9,
+            entity_ids=[1, 2],
+        )
+
+        engine.repo.create.assert_called_once()
+        call_args = engine.repo.create.call_args[0][0]
+        assert call_args.category == AlertCategory.FOCALIZATION
+        assert "unauthorized_pov" in call_args.alert_type
+
+    def test_create_from_speaker_attribution_unknown(self, engine):
+        """Test creacion de alerta de hablante ambiguo."""
+        result = engine.create_from_speaker_attribution(
+            project_id=1,
+            dialogue_text="No sé qué hacer con esto",
+            chapter=1,
+            start_char=100,
+            end_char=130,
+            attribution_confidence="unknown",
+            possible_speakers=["María", "Juan"],
+            context="Estaban solos en la habitación",
+        )
+
+        engine.repo.create.assert_called_once()
+        call_args = engine.repo.create.call_args[0][0]
+        assert call_args.category == AlertCategory.STYLE
+        assert call_args.alert_type == "speaker_attribution_ambiguous"
+        assert call_args.severity == AlertSeverity.WARNING  # unknown -> WARNING
+
+    def test_create_from_speaker_attribution_high_confidence_skipped(self, engine):
+        """Test que atribucion con alta confianza no genera alerta."""
+        result = engine.create_from_speaker_attribution(
+            project_id=1,
+            dialogue_text="Hola María",
+            chapter=1,
+            start_char=100,
+            end_char=110,
+            attribution_confidence="high",  # Alta confianza
+            possible_speakers=["Juan"],
+            context="Juan dijo:",
+        )
+
+        # No debería llamar al repositorio
+        engine.repo.create.assert_not_called()
+
+    def test_prioritize_alerts(self, engine):
+        """Test priorizacion de alertas."""
+        alerts = [
+            Alert(
+                id=1, project_id=1, category=AlertCategory.CONSISTENCY,
+                severity=AlertSeverity.INFO, alert_type="test", title="A",
+                description="A", explanation="A", confidence=0.5, chapter=1
+            ),
+            Alert(
+                id=2, project_id=1, category=AlertCategory.CONSISTENCY,
+                severity=AlertSeverity.CRITICAL, alert_type="test", title="B",
+                description="B", explanation="B", confidence=0.9, chapter=2
+            ),
+            Alert(
+                id=3, project_id=1, category=AlertCategory.CONSISTENCY,
+                severity=AlertSeverity.WARNING, alert_type="test", title="C",
+                description="C", explanation="C", confidence=0.95, chapter=1
+            ),
+        ]
+
+        sorted_alerts = engine.prioritize_alerts(alerts)
+
+        # CRITICAL primero, luego WARNING, luego INFO
+        assert sorted_alerts[0].severity == AlertSeverity.CRITICAL
+        assert sorted_alerts[1].severity == AlertSeverity.WARNING
+        assert sorted_alerts[2].severity == AlertSeverity.INFO

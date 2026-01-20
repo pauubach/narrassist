@@ -541,7 +541,7 @@ Extrae la siguiente información sobre el personaje:
                         "num_predict": 2048,
                     }
                 },
-                timeout=120.0,
+                timeout=600.0,  # 10 min - CPU sin GPU es muy lento
             )
 
             if response.status_code == 200:
@@ -790,10 +790,132 @@ Extrae la siguiente información sobre el personaje:
         chapter_number: int,
         position: int,
     ) -> list[ExpectationViolation]:
-        """Detecta violaciones usando LLM."""
-        # Implementación simplificada - el LLM analiza el texto
-        # En producción esto sería más elaborado
-        return []
+        """
+        Detecta violaciones de expectativas usando LLM.
+
+        Envía el perfil del personaje y el texto al modelo LLM para
+        analizar si hay comportamientos que contradicen la caracterización.
+        """
+        import httpx
+        import json
+
+        violations = []
+
+        try:
+            # Preparar contexto del personaje
+            traits_text = ", ".join(profile.personality_traits[:10]) if profile.personality_traits else "sin rasgos definidos"
+            values_text = ", ".join(profile.values[:5]) if profile.values else "sin valores definidos"
+
+            # Formatear expectativas para el prompt
+            expectations_text = "\n".join([
+                f"- [{e.expectation_type.value}] {e.description} (confianza: {e.confidence:.0%})"
+                for e in profile.expectations[:5]
+            ]) if profile.expectations else "Sin expectativas definidas"
+
+            prompt = f"""Analiza si el siguiente texto contiene comportamientos que contradicen la caracterización establecida del personaje.
+
+PERSONAJE: {profile.character_name}
+
+RASGOS DE PERSONALIDAD: {traits_text}
+
+VALORES: {values_text}
+
+EXPECTATIVAS COMPORTAMENTALES:
+{expectations_text}
+
+TEXTO A ANALIZAR:
+"{text[:2000]}"
+
+Si encuentras violaciones de las expectativas, responde con JSON:
+{{
+  "violations": [
+    {{
+      "violation_text": "extracto corto del texto donde ocurre la violación",
+      "severity": "critical|high|medium|low",
+      "explanation": "explicación de por qué es una violación",
+      "expectation_violated": "descripción de la expectativa violada",
+      "justifications": ["posible justificación 1", "posible justificación 2"]
+    }}
+  ]
+}}
+
+Si NO hay violaciones, responde:
+{{"violations": []}}
+
+IMPORTANTE: Solo marca como violación si claramente contradice la caracterización. No marques si es ambiguo o podría tener justificación narrativa."""
+
+            response = httpx.post(
+                "http://localhost:11434/api/generate",
+                json={
+                    "model": model_name,
+                    "prompt": f"{self.CHARACTER_ANALYSIS_SYSTEM}\n\n{prompt}",
+                    "stream": False,
+                    "options": {
+                        "temperature": 0.2,  # Bajo para más consistencia
+                        "num_predict": 1024,
+                    }
+                },
+                timeout=120.0,
+            )
+
+            if response.status_code == 200:
+                response_text = response.json().get("response", "")
+
+                # Extraer JSON de la respuesta
+                start = response_text.find("{")
+                end = response_text.rfind("}") + 1
+                if start != -1 and end > start:
+                    data = json.loads(response_text[start:end])
+
+                    for v in data.get("violations", []):
+                        # Mapear severidad
+                        severity_map = {
+                            "critical": ViolationSeverity.CRITICAL,
+                            "high": ViolationSeverity.HIGH,
+                            "medium": ViolationSeverity.MEDIUM,
+                            "low": ViolationSeverity.LOW,
+                        }
+                        severity = severity_map.get(v.get("severity", "medium"), ViolationSeverity.MEDIUM)
+
+                        # Encontrar o crear expectativa relacionada
+                        related_exp = next(
+                            (e for e in profile.expectations
+                             if v.get("expectation_violated", "").lower() in e.description.lower()),
+                            None
+                        )
+                        if not related_exp:
+                            related_exp = BehavioralExpectation(
+                                character_id=profile.character_id,
+                                character_name=profile.character_name,
+                                expectation_type=ExpectationType.BEHAVIORAL,
+                                description=v.get("expectation_violated", "Expectativa de comportamiento"),
+                                reasoning="Detectado por análisis LLM",
+                                confidence=0.6,
+                            )
+
+                        violation = ExpectationViolation(
+                            expectation=related_exp,
+                            violation_text=v.get("violation_text", text[:100]),
+                            chapter_number=chapter_number,
+                            position=position,
+                            severity=severity,
+                            explanation=v.get("explanation", ""),
+                            possible_justifications=v.get("justifications", []),
+                            detection_methods=[model_name],
+                            consensus_score=0.6,  # Un solo método
+                        )
+                        violations.append(violation)
+
+                    logger.debug(f"LLM ({model_name}) detectó {len(violations)} violaciones")
+
+        except json.JSONDecodeError as e:
+            logger.debug(f"Error parseando respuesta JSON de {model_name}: {e}")
+        except httpx.TimeoutException:
+            logger.debug(f"Timeout en detección LLM ({model_name})")
+        except Exception as e:
+            logger.debug(f"Error en detección LLM ({model_name}): {e}")
+
+        return violations
 
     def get_profile(self, character_id: int) -> Optional[CharacterBehaviorProfile]:
         """Obtiene el perfil cacheado de un personaje."""

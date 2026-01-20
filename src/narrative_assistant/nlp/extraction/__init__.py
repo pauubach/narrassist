@@ -29,7 +29,12 @@ from .base import (
 )
 from .router import ComplexityRouter, ComplexityScore
 from .aggregator import ResultAggregator
-from .pipeline import AttributeExtractionPipeline, PipelineConfig
+from .pipeline import (
+    AttributeExtractionPipeline,
+    PipelineConfig,
+    get_extraction_pipeline,
+    reset_extraction_pipeline,
+)
 
 __all__ = [
     # Base
@@ -48,4 +53,6 @@ __all__ = [
     # Pipeline
     "AttributeExtractionPipeline",
     "PipelineConfig",
+    "get_extraction_pipeline",
+    "reset_extraction_pipeline",
 ]

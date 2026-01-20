@@ -22,13 +22,13 @@
     <!-- Filtros -->
     <div v-if="showFilters" class="filters-section">
       <!-- Búsqueda -->
-      <span class="p-input-icon-left search-wrapper">
-        <i class="pi pi-search" />
+      <span class="p-input-icon-right search-wrapper">
         <InputText
           v-model="searchQuery"
           placeholder="Buscar alertas..."
           class="search-input"
         />
+        <i class="pi pi-search" />
       </span>
 
       <!-- Filtros por severidad -->
@@ -93,6 +93,110 @@
       />
     </div>
 
+    <!-- Lista virtualizada para muchos items (>50) sin paginación -->
+    <VirtualScroller
+      v-else-if="shouldVirtualize"
+      :items="filteredAlerts"
+      :itemSize="compact ? 120 : 180"
+      class="alerts-container alerts-virtual"
+      :class="{ 'compact': compact }"
+    >
+      <template #item="{ item: alert, options }">
+        <div
+          :key="alert.id"
+          class="alert-item"
+          :class="[
+            `alert-${alert.severity}`,
+            { 'alert-selected': selectedAlertId === alert.id },
+            { 'alert-clickable': clickable },
+            { 'alert-odd': options.odd }
+          ]"
+          @click="onAlertClick(alert)"
+        >
+          <!-- Severidad indicator -->
+          <div class="alert-severity-bar" :class="`severity-${alert.severity}`"></div>
+
+          <!-- Contenido -->
+          <div class="alert-content">
+            <!-- Header -->
+            <div class="alert-header">
+              <Tag :severity="getSeverityColor(alert.severity)" class="severity-tag">
+                <i :class="getSeverityIcon(alert.severity)"></i>
+                {{ alert.severity.toUpperCase() }}
+              </Tag>
+              <Tag severity="secondary" class="category-tag">
+                {{ getCategoryLabel(alert.category) }}
+              </Tag>
+              <span v-if="alert.chapter" class="alert-chapter">
+                <i class="pi pi-book"></i>
+                Cap. {{ alert.chapter }}
+              </span>
+            </div>
+
+            <!-- Título y descripción -->
+            <div class="alert-body">
+              <h4 class="alert-title">{{ alert.title }}</h4>
+              <p class="alert-description">{{ alert.description }}</p>
+            </div>
+
+            <!-- Entidades relacionadas -->
+            <div v-if="alert.entityIds && alert.entityIds.length > 0" class="alert-entities">
+              <i class="pi pi-users"></i>
+              <span class="entities-label">Entidades:</span>
+              <div class="entity-chips">
+                <Chip
+                  v-for="entityId in alert.entityIds.slice(0, 3)"
+                  :key="entityId"
+                  :label="`Entidad #${entityId}`"
+                  size="small"
+                />
+                <span v-if="alert.entityIds.length > 3" class="more-entities">
+                  +{{ alert.entityIds.length - 3 }}
+                </span>
+              </div>
+            </div>
+
+            <!-- Footer con acciones -->
+            <div class="alert-footer">
+              <div class="alert-meta">
+                <small class="alert-date">{{ alert.createdAt ? formatDate(alert.createdAt) : '' }}</small>
+                <Tag v-if="alert.status" :severity="getStatusSeverity(alert.status)">
+                  {{ getStatusLabel(alert.status) }}
+                </Tag>
+              </div>
+              <div v-if="showActions" class="alert-actions">
+                <Button
+                  label="Ver contexto"
+                  icon="pi pi-search"
+                  text
+                  size="small"
+                  @click.stop="$emit('view-context', alert)"
+                />
+                <Button
+                  v-if="isAlertOpenStatus(alert.status)"
+                  label="Resolver"
+                  icon="pi pi-check"
+                  text
+                  size="small"
+                  @click.stop="$emit('resolve', alert)"
+                />
+                <Button
+                  v-if="isAlertOpenStatus(alert.status)"
+                  label="Descartar"
+                  icon="pi pi-times"
+                  text
+                  size="small"
+                  severity="secondary"
+                  @click.stop="$emit('dismiss', alert)"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+    </VirtualScroller>
+
+    <!-- Lista normal para pocos items o con paginación -->
     <div v-else class="alerts-container" :class="{ 'compact': compact }">
       <div
         v-for="alert in paginatedAlerts"
@@ -132,18 +236,18 @@
           </div>
 
           <!-- Entidades relacionadas -->
-          <div v-if="alert.entities && alert.entities.length > 0" class="alert-entities">
+          <div v-if="alert.entityIds && alert.entityIds.length > 0" class="alert-entities">
             <i class="pi pi-users"></i>
             <span class="entities-label">Entidades:</span>
             <div class="entity-chips">
               <Chip
-                v-for="entity in alert.entities.slice(0, 3)"
-                :key="entity.id"
-                :label="entity.canonical_name"
+                v-for="entityId in alert.entityIds.slice(0, 3)"
+                :key="entityId"
+                :label="`Entidad #${entityId}`"
                 size="small"
               />
-              <span v-if="alert.entities.length > 3" class="more-entities">
-                +{{ alert.entities.length - 3 }}
+              <span v-if="alert.entityIds.length > 3" class="more-entities">
+                +{{ alert.entityIds.length - 3 }}
               </span>
             </div>
           </div>
@@ -151,7 +255,7 @@
           <!-- Footer con acciones -->
           <div class="alert-footer">
             <div class="alert-meta">
-              <small class="alert-date">{{ formatDate(alert.created_at) }}</small>
+              <small class="alert-date">{{ alert.createdAt ? formatDate(alert.createdAt) : '' }}</small>
               <Tag v-if="alert.status" :severity="getStatusSeverity(alert.status)">
                 {{ getStatusLabel(alert.status) }}
               </Tag>
@@ -165,7 +269,7 @@
                 @click.stop="$emit('view-context', alert)"
               />
               <Button
-                v-if="alert.status === 'open'"
+                v-if="isAlertOpenStatus(alert.status)"
                 label="Resolver"
                 icon="pi pi-check"
                 text
@@ -173,7 +277,7 @@
                 @click.stop="$emit('resolve', alert)"
               />
               <Button
-                v-if="alert.status === 'open'"
+                v-if="isAlertOpenStatus(alert.status)"
                 label="Descartar"
                 icon="pi pi-times"
                 text
@@ -208,7 +312,12 @@ import Tag from 'primevue/tag'
 import Chip from 'primevue/chip'
 import ProgressSpinner from 'primevue/progressspinner'
 import Paginator from 'primevue/paginator'
+import VirtualScroller from 'primevue/virtualscroller'
 import type { Alert } from '@/types'
+import { debounce } from '@/composables'
+
+// Umbral para activar virtualización
+const VIRTUALIZATION_THRESHOLD = 50
 
 const props = withDefaults(defineProps<{
   alerts: Alert[]
@@ -245,10 +354,27 @@ const emit = defineEmits<{
 
 // Estado
 const searchQuery = ref('')
+const debouncedSearchQuery = ref('') // Query con debounce para filtrado
 const selectedSeverity = ref('all')
 const selectedCategory = ref('all')
 const selectedStatus = ref('all')
 const currentPage = ref(0)
+
+// Debounce para búsqueda (300ms de espera)
+const updateDebouncedSearch = debounce((query: string) => {
+  debouncedSearchQuery.value = query
+  currentPage.value = 0
+}, 300)
+
+// Watcher para aplicar debounce a la búsqueda
+watch(searchQuery, (newQuery) => {
+  updateDebouncedSearch(newQuery)
+})
+
+// Determina si usar virtualización
+const shouldVirtualize = computed(() => {
+  return filteredAlerts.value.length > VIRTUALIZATION_THRESHOLD && !props.showPagination
+})
 
 // Niveles de severidad
 const severityLevels = [
@@ -272,41 +398,55 @@ const categoryOptions = [
 // Opciones de estado
 const statusOptions = [
   { label: 'Todas', value: 'all' },
-  { label: 'Abiertas', value: 'open' },
+  { label: 'Abiertas', value: 'open' },  // Incluye new, open, acknowledged, in_progress
   { label: 'Resueltas', value: 'resolved' },
   { label: 'Descartadas', value: 'dismissed' }
 ]
 
-// Computed
+// Helper para verificar si una alerta está "abierta"
+const isAlertOpenStatus = (status: string): boolean => {
+  const openStatuses = ['new', 'open', 'acknowledged', 'in_progress']
+  return openStatuses.includes(status)
+}
+
+// Computed - Optimizado con memoización por etapas y debounced search
+// Paso 1: Filtrar por severidad
+const severityFilteredAlerts = computed(() => {
+  if (selectedSeverity.value === 'all') {
+    return props.alerts
+  }
+  return props.alerts.filter(a => a.severity === selectedSeverity.value)
+})
+
+// Paso 2: Filtrar por categoría
+const categoryFilteredAlerts = computed(() => {
+  if (selectedCategory.value === 'all') {
+    return severityFilteredAlerts.value
+  }
+  return severityFilteredAlerts.value.filter(a => a.category === selectedCategory.value)
+})
+
+// Paso 3: Filtrar por estado
+const statusFilteredAlerts = computed(() => {
+  if (selectedStatus.value === 'all') {
+    return categoryFilteredAlerts.value
+  }
+  if (selectedStatus.value === 'open') {
+    return categoryFilteredAlerts.value.filter(a => isAlertOpenStatus(a.status))
+  }
+  return categoryFilteredAlerts.value.filter(a => a.status === selectedStatus.value)
+})
+
+// Paso 4: Filtrar por búsqueda (usa query con debounce)
 const filteredAlerts = computed(() => {
-  let filtered = props.alerts
-
-  // Filtrar por severidad
-  if (selectedSeverity.value !== 'all') {
-    filtered = filtered.filter(a => a.severity === selectedSeverity.value)
+  if (!debouncedSearchQuery.value) {
+    return statusFilteredAlerts.value
   }
-
-  // Filtrar por categoría
-  if (selectedCategory.value !== 'all') {
-    filtered = filtered.filter(a => a.category === selectedCategory.value)
-  }
-
-  // Filtrar por estado
-  if (selectedStatus.value !== 'all') {
-    filtered = filtered.filter(a => a.status === selectedStatus.value)
-  }
-
-  // Filtrar por búsqueda
-  if (searchQuery.value) {
-    const query = searchQuery.value.toLowerCase()
-    filtered = filtered.filter(a =>
-      a.title.toLowerCase().includes(query) ||
-      a.description.toLowerCase().includes(query) ||
-      a.entities?.some(e => e.canonical_name.toLowerCase().includes(query))
-    )
-  }
-
-  return filtered
+  const query = debouncedSearchQuery.value.toLowerCase()
+  return statusFilteredAlerts.value.filter(a =>
+    a.title?.toLowerCase().includes(query) ||
+    a.description?.toLowerCase().includes(query)
+  )
 })
 
 const totalPages = computed(() => Math.ceil(filteredAlerts.value.length / props.itemsPerPage))
@@ -397,9 +537,9 @@ const getStatusLabel = (status: string): string => {
   return labels[status] || status
 }
 
-const formatDate = (dateString: string): string => {
-  const date = new Date(dateString)
-  return date.toLocaleDateString('es-ES', {
+const formatDate = (date: Date | string): string => {
+  const d = date instanceof Date ? date : new Date(date)
+  return d.toLocaleDateString('es-ES', {
     day: 'numeric',
     month: 'short',
     year: 'numeric'
@@ -671,21 +811,38 @@ watch(() => props.alerts, () => {
   background: var(--surface-50);
 }
 
-/* Scrollbar styling */
-.alerts-container::-webkit-scrollbar {
-  width: 6px;
+/* VirtualScroller styling */
+.alerts-virtual {
+  height: 100%;
 }
 
-.alerts-container::-webkit-scrollbar-track {
+.alerts-virtual :deep(.p-virtualscroller-content) {
+  padding: 1rem;
+}
+
+.alert-item.alert-odd {
   background: var(--surface-50);
 }
 
-.alerts-container::-webkit-scrollbar-thumb {
+/* Scrollbar styling */
+.alerts-container::-webkit-scrollbar,
+.alerts-virtual :deep(.p-virtualscroller-content)::-webkit-scrollbar {
+  width: 6px;
+}
+
+.alerts-container::-webkit-scrollbar-track,
+.alerts-virtual :deep(.p-virtualscroller-content)::-webkit-scrollbar-track {
+  background: var(--surface-50);
+}
+
+.alerts-container::-webkit-scrollbar-thumb,
+.alerts-virtual :deep(.p-virtualscroller-content)::-webkit-scrollbar-thumb {
   background: var(--surface-300);
   border-radius: 3px;
 }
 
-.alerts-container::-webkit-scrollbar-thumb:hover {
+.alerts-container::-webkit-scrollbar-thumb:hover,
+.alerts-virtual :deep(.p-virtualscroller-content)::-webkit-scrollbar-thumb:hover {
   background: var(--surface-400);
 }
 </style>

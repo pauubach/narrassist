@@ -290,3 +290,167 @@ class OutOfMemoryError(ResourceError):
             "estimated_mb": self.estimated_mb,
         }
         super().__post_init__()
+
+
+# =============================================================================
+# Errores de Licencias
+# =============================================================================
+
+
+class LicensingError(NarrativeError):
+    """Errores relacionados con licencias."""
+
+    pass
+
+
+@dataclass
+class LicenseNotFoundError(LicensingError):
+    """No se encontró licencia válida."""
+
+    message: str = field(default="No license found", init=False)
+    severity: ErrorSeverity = field(default=ErrorSeverity.FATAL, init=False)
+    user_message: Optional[str] = field(default=None, init=False)
+    context: dict[str, Any] = field(default_factory=dict, init=False)
+
+    def __post_init__(self):
+        self.user_message = (
+            "No se encontró una licencia válida. "
+            "Por favor, introduce tu clave de licencia en Configuración."
+        )
+        super().__post_init__()
+
+
+@dataclass
+class LicenseExpiredError(LicensingError):
+    """Licencia expirada."""
+
+    expired_at: Optional[str] = None
+    message: str = field(init=False)
+    severity: ErrorSeverity = field(default=ErrorSeverity.FATAL, init=False)
+    user_message: Optional[str] = field(default=None, init=False)
+    context: dict[str, Any] = field(default_factory=dict, init=False)
+
+    def __post_init__(self):
+        self.message = "License expired"
+        self.user_message = (
+            "Tu licencia ha expirado. "
+            "Por favor, renueva tu suscripción para continuar."
+        )
+        self.context = {"expired_at": self.expired_at}
+        super().__post_init__()
+
+
+@dataclass
+class LicenseOfflineError(LicensingError):
+    """No se puede verificar licencia sin conexión."""
+
+    grace_days_remaining: int = 0
+    message: str = field(init=False)
+    severity: ErrorSeverity = field(default=ErrorSeverity.DEGRADED, init=False)
+    user_message: Optional[str] = field(default=None, init=False)
+    context: dict[str, Any] = field(default_factory=dict, init=False)
+
+    def __post_init__(self):
+        self.message = "Cannot verify license offline"
+        if self.grace_days_remaining > 0:
+            self.user_message = (
+                f"Sin conexión. Modo offline activo ({self.grace_days_remaining} días restantes). "
+                "Conéctate a internet para verificar tu licencia."
+            )
+        else:
+            self.user_message = (
+                "No se puede verificar la licencia sin conexión a internet."
+            )
+        self.context = {"grace_days_remaining": self.grace_days_remaining}
+        super().__post_init__()
+
+
+@dataclass
+class DeviceLimitError(LicensingError):
+    """Límite de dispositivos alcanzado."""
+
+    current_devices: int = 0
+    max_devices: int = 0
+    message: str = field(init=False)
+    severity: ErrorSeverity = field(default=ErrorSeverity.FATAL, init=False)
+    user_message: Optional[str] = field(default=None, init=False)
+    context: dict[str, Any] = field(default_factory=dict, init=False)
+
+    def __post_init__(self):
+        self.message = f"Device limit reached ({self.current_devices}/{self.max_devices})"
+        self.user_message = (
+            f"Has alcanzado el límite de {self.max_devices} dispositivo(s). "
+            "Desactiva un dispositivo existente o actualiza tu plan."
+        )
+        self.context = {
+            "current_devices": self.current_devices,
+            "max_devices": self.max_devices,
+        }
+        super().__post_init__()
+
+
+@dataclass
+class DeviceCooldownError(LicensingError):
+    """Dispositivo en período de cooldown tras desactivación."""
+
+    hours_remaining: int = 0
+    message: str = field(init=False)
+    severity: ErrorSeverity = field(default=ErrorSeverity.FATAL, init=False)
+    user_message: Optional[str] = field(default=None, init=False)
+    context: dict[str, Any] = field(default_factory=dict, init=False)
+
+    def __post_init__(self):
+        self.message = f"Device in cooldown period ({self.hours_remaining}h remaining)"
+        self.user_message = (
+            f"Este dispositivo fue desactivado recientemente. "
+            f"Podrás reactivarlo en {self.hours_remaining} horas."
+        )
+        self.context = {"hours_remaining": self.hours_remaining}
+        super().__post_init__()
+
+
+@dataclass
+class QuotaExceededError(LicensingError):
+    """Cuota de manuscritos excedida."""
+
+    current_usage: int = 0
+    max_usage: int = 0
+    billing_period: str = ""
+    message: str = field(init=False)
+    severity: ErrorSeverity = field(default=ErrorSeverity.FATAL, init=False)
+    user_message: Optional[str] = field(default=None, init=False)
+    context: dict[str, Any] = field(default_factory=dict, init=False)
+
+    def __post_init__(self):
+        self.message = f"Manuscript quota exceeded ({self.current_usage}/{self.max_usage})"
+        self.user_message = (
+            f"Has alcanzado el límite de {self.max_usage} manuscritos este mes "
+            f"({self.current_usage}/{self.max_usage}). "
+            "Espera al próximo período o actualiza tu plan."
+        )
+        self.context = {
+            "current_usage": self.current_usage,
+            "max_usage": self.max_usage,
+            "billing_period": self.billing_period,
+        }
+        super().__post_init__()
+
+
+@dataclass
+class ModuleNotLicensedError(LicensingError):
+    """Módulo no incluido en la licencia actual."""
+
+    module_name: str = ""
+    message: str = field(init=False)
+    severity: ErrorSeverity = field(default=ErrorSeverity.FATAL, init=False)
+    user_message: Optional[str] = field(default=None, init=False)
+    context: dict[str, Any] = field(default_factory=dict, init=False)
+
+    def __post_init__(self):
+        self.message = f"Module '{self.module_name}' not licensed"
+        self.user_message = (
+            f"Tu licencia no incluye el módulo '{self.module_name}'. "
+            "Actualiza tu plan para acceder a esta funcionalidad."
+        )
+        self.context = {"module_name": self.module_name}
+        super().__post_init__()

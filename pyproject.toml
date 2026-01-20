@@ -52,10 +52,15 @@ apple = [
     "thinc-apple-ops>=1.0.0",
 ]
 
-# PDF support
+# PDF support (reading)
 pdf = [
     "pdfplumber>=0.10.0",
     "pypdf>=4.0.0",
+]
+
+# PDF export (writing)
+pdf-export = [
+    "reportlab>=4.0.0",
 ]
 
 # EPUB/ODT support
@@ -67,6 +72,13 @@ ebook = [
 # Coreference (experimental - incompatible con spacy>=3.7)
 coref = [
     "coreferee>=1.1.0,<1.5.0",
+]
+
+# Spelling checkers (sistema de votación multi-corrector)
+spelling = [
+    "pyspellchecker>=0.8.0",    # Pure Python, diccionario español incluido
+    "chunspell>=2.0.4",         # Hunspell precompilado para Windows/Linux/macOS
+    "symspellpy>=6.7.0",        # Algoritmo SymSpell de alta velocidad
 ]
 
 # Development
@@ -83,7 +95,7 @@ dev = [
 
 # Full installation (all optional except GPU)
 full = [
-    "narrative-assistant[pdf,ebook,dev]",
+    "narrative-assistant[pdf,pdf-export,ebook,spelling,dev]",
 ]
 
 [project.scripts]

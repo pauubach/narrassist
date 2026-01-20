@@ -39,18 +39,30 @@ class StructureType(Enum):
 # =============================================================================
 
 # Patrones para detectar inicio de capítulo (case insensitive)
+# NOTA: Los patrones deben ser flexibles para capturar variaciones comunes:
+# - Con o sin número: "Capítulo 1", "Capítulo Uno", "Capítulo Primero"
+# - Con título: "Capítulo 1: El comienzo", "Capítulo 1 - El comienzo"
+# - Solo título de capítulo: "1. El comienzo" (con punto)
+# - Variantes sin tilde: "Capitulo" (sin tilde en 'i')
 CHAPTER_PATTERNS = [
-    # Español
-    r"^Capítulo\s+(\d+|[IVXLCDM]+)(?:\s*[:\.\-—]\s*(.+))?$",
-    r"^CAPÍTULO\s+(\d+|[IVXLCDM]+)(?:\s*[:\.\-—]\s*(.+))?$",
+    # Español con número arábigo
+    r"^Cap[íi]tulo\s+(\d+|[IVXLCDM]+)(?:\s*[:\.\-—]\s*(.+))?$",
+    r"^CAP[ÍI]TULO\s+(\d+|[IVXLCDM]+)(?:\s*[:\.\-—]\s*(.+))?$",
     r"^Cap\.?\s*(\d+)(?:\s*[:\.\-—]\s*(.+))?$",
+    # Con número escrito: "Capítulo Uno", "Capítulo Primero"
+    r"^Cap[íi]tulo\s+(uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|primero|segundo|tercero|cuarto|quinto|sexto|séptimo|octavo|noveno|décimo)(?:\s*[:\.\-—]\s*(.+))?$",
     # Inglés (para manuscritos en inglés)
     r"^Chapter\s+(\d+|[IVXLCDM]+)(?:\s*[:\.\-—]\s*(.+))?$",
     r"^CHAPTER\s+(\d+|[IVXLCDM]+)(?:\s*[:\.\-—]\s*(.+))?$",
+    # Solo número seguido de punto y título (muy común)
+    # "1. El comienzo" o "1 - El comienzo"
+    r"^(\d{1,3})\s*[:\.\-—]\s*([A-ZÁÉÍÓÚÑ].*)$",
     # Solo número (menos fiable, requiere contexto)
     r"^(\d{1,3})\s*$",
     # Solo número romano
     r"^([IVXLCDM]+)\s*$",
+    # Solo número romano con punto
+    r"^([IVXLCDM]+)\s*\.\s*(.+)?$",
 ]
 
 # Patrones para prólogo/epílogo
@@ -101,6 +113,52 @@ AVG_CHARS_PER_WORD = 5
 
 
 @dataclass
+class Section:
+    """
+    Sección dentro de un capítulo.
+
+    Representa subniveles estructurales (H2, H3, H4, etc.) dentro de un capítulo.
+    Pueden anidarse jerárquicamente.
+
+    Attributes:
+        number: Número de sección dentro del capítulo (1-indexed)
+        title: Título de la sección
+        heading_level: Nivel del heading (2 para H2, 3 para H3, etc.)
+        start_char: Posición de inicio en el texto del documento
+        end_char: Posición de fin en el texto del documento
+        subsections: Subsecciones anidadas (nivel inferior)
+    """
+
+    number: int
+    title: str
+    heading_level: int
+    start_char: int
+    end_char: int
+    subsections: list["Section"] = field(default_factory=list)
+
+    @property
+    def char_count(self) -> int:
+        """Número de caracteres en la sección."""
+        return self.end_char - self.start_char
+
+    def get_text(self, full_text: str) -> str:
+        """Extrae el texto de la sección del documento completo."""
+        return full_text[self.start_char : self.end_char]
+
+    def to_dict(self) -> dict:
+        """Convierte la sección a diccionario."""
+        return {
+            "number": self.number,
+            "title": self.title,
+            "heading_level": self.heading_level,
+            "start_char": self.start_char,
+            "end_char": self.end_char,
+            "char_count": self.char_count,
+            "subsections": [s.to_dict() for s in self.subsections],
+        }
+
+
+@dataclass
 class Scene:
     """
     Escena dentro de un capítulo.
@@ -141,6 +199,7 @@ class Chapter:
         start_char: Posición de inicio en el texto del documento
         end_char: Posición de fin en el texto del documento
         scenes: Lista de escenas dentro del capítulo
+        sections: Lista de secciones (subniveles H2, H3, etc.)
         structure_type: Tipo (chapter, prologue, epilogue, etc.)
         heading_level: Nivel del heading en Word (1-6) si aplica
         detected_by: Método de detección ("style", "pattern", "heuristic")
@@ -151,6 +210,7 @@ class Chapter:
     start_char: int
     end_char: int
     scenes: list[Scene] = field(default_factory=list)
+    sections: list[Section] = field(default_factory=list)
     structure_type: StructureType = StructureType.CHAPTER
     heading_level: Optional[int] = None
     detected_by: str = "pattern"
@@ -164,6 +224,27 @@ class Chapter:
     def scene_count(self) -> int:
         """Número de escenas en el capítulo."""
         return len(self.scenes)
+
+    @property
+    def section_count(self) -> int:
+        """Número de secciones directas en el capítulo."""
+        return len(self.sections)
+
+    def get_all_sections(self) -> list[Section]:
+        """Retorna todas las secciones incluyendo subsecciones anidadas."""
+        all_sections = []
+        for section in self.sections:
+            all_sections.append(section)
+            all_sections.extend(self._get_nested_sections(section))
+        return all_sections
+
+    def _get_nested_sections(self, section: Section) -> list[Section]:
+        """Recursivamente obtiene todas las subsecciones."""
+        nested = []
+        for sub in section.subsections:
+            nested.append(sub)
+            nested.extend(self._get_nested_sections(sub))
+        return nested
 
     def get_text(self, full_text: str, include_title: bool = False) -> str:
         """
@@ -355,13 +436,16 @@ class StructureDetector:
                     "No se detectaron capítulos. El documento se trata como un solo capítulo."
                 )
 
-            # 4. Detectar escenas dentro de cada capítulo
+            # 4. Detectar secciones (subniveles) dentro de cada capítulo
+            self._detect_sections_in_chapters(document, structure.chapters)
+
+            # 5. Detectar escenas dentro de cada capítulo
             if self.detect_scenes:
                 full_text = document.full_text
                 for chapter in structure.chapters:
                     chapter.scenes = self._detect_scenes_in_chapter(chapter, full_text)
 
-            # 5. Validar estructura
+            # 6. Validar estructura
             self._validate_structure(structure)
 
             logger.info(
@@ -386,7 +470,32 @@ class StructureDetector:
         chapters: list[Chapter] = []
 
         # Filtrar párrafos que son headings
-        headings = [p for p in document.paragraphs if p.is_heading and p.heading_level]
+        # IMPORTANTE: Excluir párrafos marcados como "is_chapter_title" (son títulos
+        # de capítulo, no marcadores de capítulo), párrafos vacíos, y párrafos
+        # con start_char=-1 (no tienen posición válida en el documento)
+        headings = [
+            p for p in document.paragraphs
+            if p.is_heading
+            and p.heading_level
+            and not p.metadata.get("is_chapter_title")
+            and p.text.strip()
+            and p.start_char >= 0
+        ]
+
+        if not headings:
+            # También buscar párrafos con estilo que contenga "Heading" o "Título"
+            # aunque no estén marcados como is_heading (bug en algunos DOCX)
+            for p in document.paragraphs:
+                if p.metadata.get("is_chapter_title") or not p.text.strip() or p.start_char < 0:
+                    continue
+                style = p.style_name.lower() if p.style_name else ""
+                if any(s in style for s in ("heading", "título", "titulo", "chapter", "capítulo")):
+                    if p.heading_level is None:
+                        # Inferir nivel del nombre del estilo
+                        match = re.search(r'(\d)', p.style_name)
+                        p.heading_level = int(match.group(1)) if match else 1
+                        p.is_heading = True
+                        headings.append(p)
 
         if not headings:
             return chapters
@@ -408,6 +517,14 @@ class StructureDetector:
             struct_type, number, title = self._parse_chapter_heading(
                 heading.text, i + 1
             )
+
+            # Usar título del metadata si está disponible (detectado por docx_parser)
+            if heading.metadata.get("chapter_title"):
+                title = heading.metadata["chapter_title"]
+
+            # Usar número del metadata si está disponible
+            if heading.metadata.get("chapter_number"):
+                number = heading.metadata["chapter_number"]
 
             chapter = Chapter(
                 number=number,
@@ -487,6 +604,107 @@ class StructureDetector:
         self._renumber_chapters(chapters)
 
         return chapters
+
+    def _detect_sections_in_chapters(
+        self, document: RawDocument, chapters: list[Chapter]
+    ) -> None:
+        """
+        Detecta secciones (subniveles H2, H3, H4...) dentro de cada capítulo.
+
+        Las secciones se organizan jerárquicamente según su nivel de heading.
+        Modifica los capítulos in-place añadiendo sus secciones.
+        """
+        if not chapters:
+            return
+
+        # Obtener todos los headings de subnivel (H2+)
+        subheadings = [
+            p for p in document.paragraphs
+            if p.is_heading
+            and p.heading_level
+            and p.heading_level > 1  # Solo H2, H3, H4, etc.
+            and not p.metadata.get("is_chapter_title")
+            and p.text.strip()
+            and p.start_char >= 0
+        ]
+
+        if not subheadings:
+            return
+
+        # Asignar cada subheading a su capítulo correspondiente
+        for chapter in chapters:
+            chapter_subheadings = [
+                h for h in subheadings
+                if chapter.start_char <= h.start_char < chapter.end_char
+            ]
+
+            if not chapter_subheadings:
+                continue
+
+            # Construir árbol de secciones jerárquicamente
+            chapter.sections = self._build_section_tree(
+                chapter_subheadings, chapter.end_char
+            )
+
+            logger.debug(
+                f"Capítulo {chapter.number}: {len(chapter.sections)} secciones "
+                f"({sum(1 for s in chapter.get_all_sections())} total con subsecciones)"
+            )
+
+    def _build_section_tree(
+        self, headings: list[RawParagraph], chapter_end: int
+    ) -> list[Section]:
+        """
+        Construye un árbol de secciones a partir de los headings.
+
+        Los headings de nivel superior (H2) contienen a los de nivel inferior (H3, H4, etc.)
+        """
+        if not headings:
+            return []
+
+        sections: list[Section] = []
+        i = 0
+
+        while i < len(headings):
+            heading = headings[i]
+            level = heading.heading_level
+
+            # Calcular fin de esta sección
+            # La sección termina cuando:
+            # 1. Encontramos un heading del mismo nivel o superior
+            # 2. Llegamos al final del capítulo
+            end_char = chapter_end
+            subsection_headings: list[RawParagraph] = []
+
+            j = i + 1
+            while j < len(headings):
+                next_heading = headings[j]
+                next_level = next_heading.heading_level
+
+                if next_level <= level:
+                    # Heading del mismo nivel o superior: fin de sección
+                    end_char = next_heading.start_char
+                    break
+                else:
+                    # Heading de nivel inferior: es una subsección
+                    subsection_headings.append(next_heading)
+                j += 1
+
+            # Crear la sección
+            section = Section(
+                number=len(sections) + 1,
+                title=heading.text.strip(),
+                heading_level=level,
+                start_char=heading.start_char,
+                end_char=end_char,
+                subsections=self._build_section_tree(subsection_headings, end_char),
+            )
+            sections.append(section)
+
+            # Avanzar al siguiente heading del mismo nivel
+            i = j
+
+        return sections
 
     def _detect_scenes_in_chapter(
         self, chapter: Chapter, full_text: str
@@ -605,14 +823,35 @@ class StructureDetector:
         return StructureType.CHAPTER, default_number, text if text else None
 
     def _parse_number(self, num_str: str) -> int:
-        """Convierte string numérico (arábigo o romano) a int."""
-        num_str = num_str.strip().upper()
+        """Convierte string numérico (arábigo, romano o escrito) a int."""
+        num_str = num_str.strip()
+        num_upper = num_str.upper()
+        num_lower = num_str.lower()
 
         # Intentar como número arábigo
         try:
             return int(num_str)
         except ValueError:
             pass
+
+        # Intentar como número escrito en español
+        spanish_numbers = {
+            "uno": 1, "una": 1, "primero": 1, "primera": 1,
+            "dos": 2, "segundo": 2, "segunda": 2,
+            "tres": 3, "tercero": 3, "tercera": 3,
+            "cuatro": 4, "cuarto": 4, "cuarta": 4,
+            "cinco": 5, "quinto": 5, "quinta": 5,
+            "seis": 6, "sexto": 6, "sexta": 6,
+            "siete": 7, "séptimo": 7, "séptima": 7, "septimo": 7,
+            "ocho": 8, "octavo": 8, "octava": 8,
+            "nueve": 9, "noveno": 9, "novena": 9,
+            "diez": 10, "décimo": 10, "décima": 10, "decimo": 10,
+            "once": 11, "doce": 12, "trece": 13, "catorce": 14, "quince": 15,
+            "dieciséis": 16, "diecisiete": 17, "dieciocho": 18, "diecinueve": 19,
+            "veinte": 20, "veintiuno": 21, "veintidós": 22,
+        }
+        if num_lower in spanish_numbers:
+            return spanish_numbers[num_lower]
 
         # Intentar como número romano
         roman_values = {
@@ -627,7 +866,7 @@ class StructureDetector:
         result = 0
         prev_value = 0
 
-        for char in reversed(num_str):
+        for char in reversed(num_upper):
             if char not in roman_values:
                 return 1  # Default si no es válido
             value = roman_values[char]

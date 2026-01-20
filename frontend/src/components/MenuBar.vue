@@ -1,53 +1,84 @@
 <template>
-  <div class="menubar">
+  <nav class="menubar" role="menubar" aria-label="Menú principal">
     <div class="menubar-items">
-      <div
-        v-for="menu in menus"
+      <button
+        v-for="(menu, index) in menus"
         :key="menu.label"
+        :id="`menu-trigger-${index}`"
         class="menubar-item"
-        @click="toggleMenu(menu.label)"
+        role="menuitem"
+        :aria-haspopup="true"
+        :aria-expanded="activeMenu === menu.label"
+        :aria-controls="`menu-dropdown-${index}`"
+        @click="toggleMenu(menu.label, index)"
         @mouseenter="hoveredMenu = menu.label"
+        @keydown="handleMenuKeydown($event, menu.label, index)"
       >
         {{ menu.label }}
-      </div>
+      </button>
     </div>
 
     <!-- Dropdown Menus -->
     <Transition name="dropdown">
       <div
         v-if="activeMenu"
+        :id="`menu-dropdown-${activeMenuIndex}`"
         class="menu-dropdown"
+        role="menu"
+        :aria-labelledby="`menu-trigger-${activeMenuIndex}`"
         :style="{ left: menuPosition + 'px' }"
         @mouseleave="closeMenu"
+        @keydown="handleDropdownKeydown"
       >
-        <div
-          v-for="item in activeMenuItems"
-          :key="item.label"
-          class="menu-item"
-          :class="{ disabled: item.disabled, divider: item.divider }"
-          @click="!item.disabled && handleMenuAction(item)"
-        >
-          <i v-if="item.icon" :class="'pi pi-' + item.icon" class="menu-icon"></i>
-          <span class="menu-label">{{ item.label }}</span>
-          <span v-if="item.shortcut" class="menu-shortcut">{{ item.shortcut }}</span>
-        </div>
+        <template v-for="(item, itemIndex) in activeMenuItems" :key="item.label">
+          <div
+            v-if="item.divider"
+            class="menu-item divider"
+            role="separator"
+          ></div>
+          <button
+            v-else
+            :ref="el => setItemRef(el, itemIndex)"
+            class="menu-item"
+            :class="{ disabled: item.disabled }"
+            role="menuitem"
+            :aria-disabled="item.disabled"
+            :tabindex="focusedItemIndex === itemIndex ? 0 : -1"
+            @click="!item.disabled && handleMenuAction(item)"
+          >
+            <i v-if="item.icon" :class="'pi pi-' + item.icon" class="menu-icon" aria-hidden="true"></i>
+            <span class="menu-label">{{ item.label }}</span>
+            <span v-if="item.shortcut" class="menu-shortcut" aria-label="Atajo de teclado">{{ item.shortcut }}</span>
+          </button>
+        </template>
       </div>
     </Transition>
-  </div>
+  </nav>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { useThemeStore } from '@/stores/theme'
 
 const router = useRouter()
 const route = useRoute()
-const themeStore = useThemeStore()
 
 const activeMenu = ref<string | null>(null)
+const activeMenuIndex = ref<number>(0)
 const hoveredMenu = ref<string | null>(null)
 const menuPosition = ref(0)
+const focusedItemIndex = ref<number>(0)
+const itemRefs = ref<(HTMLElement | null)[]>([])
+
+// Función para guardar referencias a los items del menú
+const setItemRef = (el: Element | ComponentPublicInstance | null, index: number) => {
+  if (el) {
+    itemRefs.value[index] = el as HTMLElement
+  }
+}
+
+// Importar tipo para refs
+import type { ComponentPublicInstance } from 'vue'
 
 interface MenuItem {
   label: string
@@ -81,10 +112,7 @@ const menus = computed<Menu[]>(() => {
     )
   }
 
-  viewItems.push(
-    { divider: true, label: '' },
-    { label: 'Alternar Tema', action: 'toggleTheme', icon: 'moon', shortcut: 'Ctrl+T' }
-  )
+  // El tema se cambia desde Configuración
 
   return [
     {
@@ -104,9 +132,6 @@ const menus = computed<Menu[]>(() => {
     {
       label: 'Edición',
       items: [
-        { label: 'Deshacer', action: 'undo', icon: 'undo', shortcut: 'Ctrl+Z', disabled: true },
-        { label: 'Rehacer', action: 'redo', icon: 'refresh', shortcut: 'Ctrl+Y', disabled: true },
-        { divider: true, label: '' },
         { label: 'Buscar', action: 'find', icon: 'search', shortcut: 'Ctrl+F' },
         { label: 'Reemplazar', action: 'replace', icon: 'sync', shortcut: 'Ctrl+H' },
       ]
@@ -118,6 +143,7 @@ const menus = computed<Menu[]>(() => {
     {
       label: 'Ayuda',
       items: [
+        { label: 'Tutorial de Bienvenida', action: 'tutorial', icon: 'compass' },
         { label: 'Atajos de Teclado', action: 'shortcuts', icon: 'hashtag', shortcut: 'F1' },
         { label: 'Documentación', action: 'docs', icon: 'book' },
         { divider: true, label: '' },
@@ -132,21 +158,107 @@ const activeMenuItems = computed(() => {
   return menu ? menu.items : []
 })
 
-const toggleMenu = (label: string) => {
+const toggleMenu = (label: string, index: number) => {
   if (activeMenu.value === label) {
     activeMenu.value = null
   } else {
     activeMenu.value = label
+    activeMenuIndex.value = index
+    focusedItemIndex.value = 0
+    itemRefs.value = []
     // Calcular posición del dropdown
-    const menubarItem = document.querySelector(`.menubar-item:nth-child(${menus.value.findIndex(m => m.label === label) + 1})`)
+    const menubarItem = document.querySelector(`.menubar-item:nth-child(${index + 1})`)
     if (menubarItem) {
       menuPosition.value = (menubarItem as HTMLElement).offsetLeft
     }
+    // Enfocar primer item después del render
+    nextTick(() => {
+      const firstItem = itemRefs.value.find(el => el !== null)
+      firstItem?.focus()
+    })
   }
 }
 
 const closeMenu = () => {
   activeMenu.value = null
+  focusedItemIndex.value = 0
+}
+
+// Navegación por teclado en el menubar
+const handleMenuKeydown = (event: KeyboardEvent, label: string, index: number) => {
+  switch (event.key) {
+    case 'Enter':
+    case ' ':
+    case 'ArrowDown':
+      event.preventDefault()
+      toggleMenu(label, index)
+      break
+    case 'ArrowRight':
+      event.preventDefault()
+      if (index < menus.value.length - 1) {
+        const nextButton = document.getElementById(`menu-trigger-${index + 1}`)
+        nextButton?.focus()
+      }
+      break
+    case 'ArrowLeft':
+      event.preventDefault()
+      if (index > 0) {
+        const prevButton = document.getElementById(`menu-trigger-${index - 1}`)
+        prevButton?.focus()
+      }
+      break
+  }
+}
+
+// Navegación por teclado en el dropdown
+const handleDropdownKeydown = (event: KeyboardEvent) => {
+  const items = activeMenuItems.value.filter(item => !item.divider)
+  const currentIndex = focusedItemIndex.value
+
+  switch (event.key) {
+    case 'ArrowDown':
+      event.preventDefault()
+      if (currentIndex < items.length - 1) {
+        focusedItemIndex.value = currentIndex + 1
+        nextTick(() => {
+          itemRefs.value[focusedItemIndex.value]?.focus()
+        })
+      }
+      break
+    case 'ArrowUp':
+      event.preventDefault()
+      if (currentIndex > 0) {
+        focusedItemIndex.value = currentIndex - 1
+        nextTick(() => {
+          itemRefs.value[focusedItemIndex.value]?.focus()
+        })
+      }
+      break
+    case 'Escape':
+      event.preventDefault()
+      closeMenu()
+      // Devolver foco al trigger del menú
+      const trigger = document.getElementById(`menu-trigger-${activeMenuIndex.value}`)
+      trigger?.focus()
+      break
+    case 'Tab':
+      closeMenu()
+      break
+    case 'Home':
+      event.preventDefault()
+      focusedItemIndex.value = 0
+      nextTick(() => {
+        itemRefs.value[0]?.focus()
+      })
+      break
+    case 'End':
+      event.preventDefault()
+      focusedItemIndex.value = items.length - 1
+      nextTick(() => {
+        itemRefs.value[focusedItemIndex.value]?.focus()
+      })
+      break
+  }
 }
 
 const handleMenuAction = (item: MenuItem) => {
@@ -156,7 +268,11 @@ const handleMenuAction = (item: MenuItem) => {
 
   switch (item.action) {
     case 'newProject':
-      router.push('/projects/new')
+      // Emit event to open new project dialog in ProjectsView
+      router.push('/projects')
+      nextTick(() => {
+        window.dispatchEvent(new CustomEvent('menubar:new-project'))
+      })
       break
     case 'openProject':
       router.push('/projects')
@@ -178,19 +294,29 @@ const handleMenuAction = (item: MenuItem) => {
       router.push('/projects')
       break
     case 'viewEntities':
-      // Navigate to current project entities
+      // Navigate to current project entities tab
+      if (route.params.id) {
+        window.dispatchEvent(new CustomEvent('menubar:view-tab', { detail: { tab: 'entities' } }))
+      }
       break
     case 'viewAlerts':
-      // Navigate to current project alerts
-      break
-    case 'toggleTheme':
-      themeStore.toggleMode()
+      // Navigate to current project alerts tab
+      if (route.params.id) {
+        window.dispatchEvent(new CustomEvent('menubar:view-tab', { detail: { tab: 'alerts' } }))
+      }
       break
     case 'shortcuts':
       window.dispatchEvent(new CustomEvent('keyboard:show-help'))
       break
+    case 'tutorial':
+      window.dispatchEvent(new CustomEvent('menubar:tutorial'))
+      break
     case 'about':
       window.dispatchEvent(new CustomEvent('menubar:about'))
+      break
+    case 'docs':
+      // Abrir guía de usuario integrada
+      window.dispatchEvent(new CustomEvent('menubar:user-guide'))
       break
   }
 }
@@ -224,11 +350,19 @@ const handleMenuAction = (item: MenuItem) => {
   cursor: pointer;
   border-radius: 4px;
   color: var(--p-text-color);
+  background: transparent;
+  border: none;
+  font-family: inherit;
   transition: background-color 0.1s ease;
 }
 
 .menubar-item:hover {
   background: var(--p-surface-100);
+}
+
+.menubar-item:focus-visible {
+  outline: 2px solid var(--p-primary-color);
+  outline-offset: -2px;
 }
 
 .menu-dropdown {
@@ -251,12 +385,22 @@ const handleMenuAction = (item: MenuItem) => {
   font-size: 0.875rem;
   cursor: pointer;
   color: var(--p-text-color);
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
   transition: background-color 0.1s ease;
   min-height: 36px;
 }
 
 .menu-item:hover:not(.disabled):not(.divider) {
   background: var(--p-surface-100);
+}
+
+.menu-item:focus-visible {
+  outline: none;
+  background: var(--p-primary-100);
 }
 
 .menu-item.disabled {
@@ -323,6 +467,10 @@ const handleMenuAction = (item: MenuItem) => {
 
 .dark .menu-item:hover:not(.disabled):not(.divider) {
   background: var(--p-surface-800);
+}
+
+.dark .menu-item:focus-visible {
+  background: var(--p-primary-900);
 }
 
 .dark .menu-item.divider {

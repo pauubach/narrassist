@@ -18,6 +18,15 @@ from .errors import (
     DocumentAlreadyExistsError,
     ResourceError,
     OutOfMemoryError,
+    # Licensing errors
+    LicensingError,
+    LicenseNotFoundError,
+    LicenseExpiredError,
+    LicenseOfflineError,
+    DeviceLimitError,
+    DeviceCooldownError,
+    QuotaExceededError,
+    ModuleNotLicensedError,
 )
 from .result import Result
 from .device import (
@@ -40,6 +49,10 @@ from .config import (
     set_config,
     reset_config,
 )
+from .utils import (
+    format_duration,
+    format_duration_verbose,
+)
 
 __all__ = [
     # Errors
@@ -58,6 +71,15 @@ __all__ = [
     "DocumentAlreadyExistsError",
     "ResourceError",
     "OutOfMemoryError",
+    # Licensing Errors
+    "LicensingError",
+    "LicenseNotFoundError",
+    "LicenseExpiredError",
+    "LicenseOfflineError",
+    "DeviceLimitError",
+    "DeviceCooldownError",
+    "QuotaExceededError",
+    "ModuleNotLicensedError",
     # Result
     "Result",
     # Device
@@ -78,4 +100,7 @@ __all__ = [
     "get_config",
     "set_config",
     "reset_config",
+    # Utils
+    "format_duration",
+    "format_duration_verbose",
 ]

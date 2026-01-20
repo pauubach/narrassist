@@ -322,6 +322,54 @@ class EntityRepository:
         )
         return [EntityMention.from_row(row) for row in rows]
 
+    def find_mention_by_position(
+        self,
+        entity_id: int,
+        start_char: int,
+        end_char: int,
+        chapter_id: Optional[int] = None,
+    ) -> Optional[EntityMention]:
+        """
+        Busca una mención por entity_id y posición de caracteres.
+
+        Útil para vincular atributos extraídos con sus menciones de origen.
+
+        Args:
+            entity_id: ID de la entidad
+            start_char: Posición inicial del carácter
+            end_char: Posición final del carácter
+            chapter_id: ID del capítulo (opcional, para búsqueda más precisa)
+
+        Returns:
+            EntityMention si se encuentra, None si no
+        """
+        if chapter_id is not None:
+            # Búsqueda exacta con chapter_id
+            row = self.db.fetchone(
+                """
+                SELECT * FROM entity_mentions
+                WHERE entity_id = ? AND chapter_id = ?
+                AND start_char <= ? AND end_char >= ?
+                ORDER BY ABS(start_char - ?) + ABS(end_char - ?)
+                LIMIT 1
+                """,
+                (entity_id, chapter_id, start_char, end_char, start_char, end_char),
+            )
+        else:
+            # Búsqueda sin chapter_id - buscar la mención más cercana
+            row = self.db.fetchone(
+                """
+                SELECT * FROM entity_mentions
+                WHERE entity_id = ?
+                AND start_char <= ? AND end_char >= ?
+                ORDER BY ABS(start_char - ?) + ABS(end_char - ?)
+                LIMIT 1
+                """,
+                (entity_id, start_char, end_char, start_char, end_char),
+            )
+
+        return EntityMention.from_row(row) if row else None
+
     def move_mentions(self, from_entity_id: int, to_entity_id: int) -> int:
         """
         Mueve todas las menciones de una entidad a otra.
@@ -418,6 +466,122 @@ class EntityRepository:
                 (to_entity_id, from_entity_id),
             )
             return cursor.rowcount
+
+    def get_attributes_by_entity(self, entity_id: int) -> list[dict]:
+        """
+        Obtiene todos los atributos de una entidad específica.
+
+        Args:
+            entity_id: ID de la entidad
+
+        Returns:
+            Lista de atributos con sus datos, incluyendo información de la mención fuente
+        """
+        rows = self.db.fetchall(
+            """
+            SELECT
+                ea.id,
+                ea.entity_id,
+                ea.attribute_type,
+                ea.attribute_key,
+                ea.attribute_value,
+                ea.confidence,
+                ea.source_mention_id,
+                ea.is_verified,
+                ea.created_at,
+                em.start_char,
+                em.end_char,
+                em.chapter_id,
+                c.chapter_number
+            FROM entity_attributes ea
+            LEFT JOIN entity_mentions em ON ea.source_mention_id = em.id
+            LEFT JOIN chapters c ON em.chapter_id = c.id
+            WHERE ea.entity_id = ?
+            ORDER BY ea.attribute_type, ea.attribute_key
+            """,
+            (entity_id,),
+        )
+
+        result = []
+        for row in rows:
+            result.append({
+                "id": row["id"],
+                "entity_id": row["entity_id"],
+                "category": row["attribute_type"],
+                "name": row["attribute_key"],
+                "value": row["attribute_value"],
+                "confidence": row["confidence"],
+                "source_mention_id": row["source_mention_id"],
+                "is_verified": bool(row["is_verified"]),
+                "created_at": row["created_at"],
+                "span_start": row["start_char"],
+                "span_end": row["end_char"],
+                "chapter_id": row["chapter_id"],
+                "chapter": row["chapter_number"],
+            })
+
+        return result
+
+    def update_attribute(
+        self,
+        attribute_id: int,
+        attribute_key: Optional[str] = None,
+        attribute_value: Optional[str] = None,
+        is_verified: Optional[bool] = None,
+    ) -> bool:
+        """
+        Actualiza un atributo existente.
+
+        Args:
+            attribute_id: ID del atributo
+            attribute_key: Nueva clave/nombre (opcional)
+            attribute_value: Nuevo valor (opcional)
+            is_verified: Marcar como verificado (opcional)
+
+        Returns:
+            True si se actualizó
+        """
+        updates = []
+        params = []
+
+        if attribute_key is not None:
+            updates.append("attribute_key = ?")
+            params.append(attribute_key)
+
+        if attribute_value is not None:
+            updates.append("attribute_value = ?")
+            params.append(attribute_value)
+
+        if is_verified is not None:
+            updates.append("is_verified = ?")
+            params.append(1 if is_verified else 0)
+
+        if not updates:
+            return False
+
+        params.append(attribute_id)
+        sql = f"UPDATE entity_attributes SET {', '.join(updates)} WHERE id = ?"
+
+        with self.db.connection() as conn:
+            cursor = conn.execute(sql, tuple(params))
+            return cursor.rowcount > 0
+
+    def delete_attribute(self, attribute_id: int) -> bool:
+        """
+        Elimina un atributo.
+
+        Args:
+            attribute_id: ID del atributo
+
+        Returns:
+            True si se eliminó
+        """
+        with self.db.connection() as conn:
+            cursor = conn.execute(
+                "DELETE FROM entity_attributes WHERE id = ?",
+                (attribute_id,),
+            )
+            return cursor.rowcount > 0
 
     def get_attribute_evidences(self, attribute_id: int) -> list[dict]:
         """

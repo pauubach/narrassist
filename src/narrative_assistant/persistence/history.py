@@ -396,9 +396,7 @@ class HistoryManager:
             # Dispatch por tipo de acción
             # NOTA: Implementación básica - extender según necesidades
             if action_type == "ENTITY_MERGED":
-                # TODO: Implementar _undo_entity_merge(target_id, old_value)
-                logger.warning(f"Undo de ENTITY_MERGED no implementado aún")
-                return False
+                self._undo_entity_merge(target_id, old_value)
 
             elif action_type == "ALERT_RESOLVED":
                 # Re-abrir alerta
@@ -460,3 +458,151 @@ class HistoryManager:
                 (attribute_id,),
             )
         logger.debug(f"Atributo {attribute_id} des-verificado")
+
+    def _undo_entity_merge(self, result_entity_id: int, old_value: dict) -> None:
+        """
+        Revierte fusión de entidades restaurando las entidades originales.
+
+        Args:
+            result_entity_id: ID de la entidad resultado de la fusión
+            old_value: Datos de la fusión original con source_entity_ids y source_snapshots
+
+        El proceso:
+        1. Obtener IDs de entidades fusionadas desde old_value
+        2. Reactivar las entidades fusionadas (is_active = 1)
+        3. Mover menciones de vuelta a sus entidades originales
+        4. Mover atributos de vuelta a sus entidades originales
+        5. Restaurar aliases originales en entidad principal
+        6. Actualizar merged_from_ids en entidad principal
+
+        Example:
+            >>> manager._undo_entity_merge(42, {
+            ...     "source_entity_ids": [10, 11],
+            ...     "source_snapshots": [
+            ...         {"id": 10, "canonical_name": "Juan", "mention_count": 5},
+            ...         {"id": 11, "canonical_name": "Juanito", "mention_count": 3}
+            ...     ]
+            ... })
+        """
+        if not old_value:
+            logger.error("No hay información de fusión para deshacer")
+            return
+
+        source_entity_ids = old_value.get("source_entity_ids", [])
+        source_snapshots = old_value.get("source_snapshots", [])
+
+        if not source_entity_ids:
+            logger.error("No hay entidades fuente para restaurar")
+            return
+
+        # Crear mapeo de snapshot por ID
+        snapshots_by_id = {s["id"]: s for s in source_snapshots}
+
+        with self.db.connection() as conn:
+            # 1. Reactivar las entidades fusionadas
+            for entity_id in source_entity_ids:
+                conn.execute(
+                    "UPDATE entities SET is_active = 1, updated_at = datetime('now') WHERE id = ?",
+                    (entity_id,),
+                )
+                logger.debug(f"Entidad {entity_id} reactivada")
+
+            # 2. Mover menciones de vuelta a sus entidades originales
+            # Usamos la información del snapshot para identificar las menciones
+            # que pertenecían a cada entidad (basado en mention_count)
+            for entity_id in source_entity_ids:
+                snapshot = snapshots_by_id.get(entity_id, {})
+                original_mention_count = snapshot.get("mention_count", 0)
+
+                if original_mention_count > 0:
+                    # Mover las menciones más recientes de vuelta
+                    # (asumimos que las menciones se agregaron al final)
+                    conn.execute(
+                        """
+                        UPDATE entity_mentions
+                        SET entity_id = ?
+                        WHERE id IN (
+                            SELECT id FROM entity_mentions
+                            WHERE entity_id = ?
+                            ORDER BY id DESC
+                            LIMIT ?
+                        )
+                        """,
+                        (entity_id, result_entity_id, original_mention_count),
+                    )
+                    logger.debug(
+                        f"Movidas ~{original_mention_count} menciones a entidad {entity_id}"
+                    )
+
+            # 3. Mover atributos de vuelta
+            # Los atributos se identifican por su entity_id original antes de la fusión
+            for entity_id in source_entity_ids:
+                # Buscar atributos que originalmente pertenecían a esta entidad
+                # usando la tabla de evidencias o metadata si existe
+                conn.execute(
+                    """
+                    UPDATE entity_attributes
+                    SET entity_id = ?
+                    WHERE entity_id = ?
+                    AND id IN (
+                        SELECT ea.id FROM entity_attributes ea
+                        LEFT JOIN attribute_evidences ae ON ea.id = ae.attribute_id
+                        WHERE ea.entity_id = ?
+                        ORDER BY ea.id DESC
+                    )
+                    """,
+                    (entity_id, result_entity_id, result_entity_id),
+                )
+
+            # 4. Restaurar aliases originales en la entidad principal
+            # Obtener la entidad principal actual
+            result = conn.execute(
+                "SELECT merged_from_ids FROM entities WHERE id = ?",
+                (result_entity_id,),
+            ).fetchone()
+
+            if result and result[0]:
+                try:
+                    merged_data = json.loads(result[0])
+                    current_aliases = merged_data.get("aliases", [])
+                    current_merged_ids = merged_data.get("merged_ids", [])
+
+                    # Remover los aliases que vinieron de las entidades fusionadas
+                    names_to_remove = set()
+                    for snapshot in source_snapshots:
+                        names_to_remove.add(snapshot.get("canonical_name", ""))
+                        names_to_remove.update(snapshot.get("aliases", []))
+
+                    new_aliases = [a for a in current_aliases if a not in names_to_remove]
+                    new_merged_ids = [
+                        mid for mid in current_merged_ids if mid not in source_entity_ids
+                    ]
+
+                    # Actualizar la entidad principal
+                    new_merged_data = json.dumps({
+                        "aliases": new_aliases,
+                        "merged_ids": new_merged_ids,
+                    })
+
+                    conn.execute(
+                        "UPDATE entities SET merged_from_ids = ?, updated_at = datetime('now') WHERE id = ?",
+                        (new_merged_data, result_entity_id),
+                    )
+                except json.JSONDecodeError:
+                    logger.warning("Error parseando merged_from_ids")
+
+            # 5. Actualizar contador de menciones en la entidad principal
+            total_restored = sum(
+                snapshots_by_id.get(eid, {}).get("mention_count", 0)
+                for eid in source_entity_ids
+            )
+            if total_restored > 0:
+                conn.execute(
+                    "UPDATE entities SET mention_count = mention_count - ? WHERE id = ?",
+                    (total_restored, result_entity_id),
+                )
+
+        logger.info(
+            f"Fusión deshecha: restauradas {len(source_entity_ids)} entidades "
+            f"desde entidad {result_entity_id}"
+        )

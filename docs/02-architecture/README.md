@@ -1,6 +1,6 @@
 # Arquitectura de Alto Nivel
 
-[← Volver al índice principal](../../README.md)
+[← Volver al índice principal](../README.md)
 
 ---
 

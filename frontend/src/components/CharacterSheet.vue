@@ -3,18 +3,36 @@
     <!-- Header -->
     <div class="sheet-header">
       <div class="character-avatar">
-        <i class="pi pi-user"></i>
+        <i :class="entityTypeIcon"></i>
       </div>
       <div class="character-header-info">
-        <h2>{{ character.canonical_name }}</h2>
+        <h2>{{ character.name }}</h2>
         <div class="header-tags">
-          <Tag severity="success">Personaje</Tag>
+          <Tag :severity="entityTypeSeverity">{{ entityTypeLabel }}</Tag>
           <Tag :severity="getImportanceSeverity(character.importance)">
             {{ getImportanceLabel(character.importance) }}
+          </Tag>
+          <Tag
+            v-if="isMerged"
+            severity="info"
+            class="merged-tag"
+            v-tooltip.bottom="'Esta entidad es resultado de una fusion'"
+          >
+            <i class="pi pi-link"></i>
+            Fusionada
           </Tag>
         </div>
       </div>
       <div v-if="editable" class="header-actions">
+        <Button
+          v-if="isMerged"
+          icon="pi pi-replay"
+          rounded
+          text
+          severity="warning"
+          @click="$emit('undo-merge')"
+          v-tooltip.left="'Deshacer fusion'"
+        />
         <Button
           icon="pi pi-pencil"
           rounded
@@ -55,15 +73,15 @@
         <div class="stat-card">
           <i class="pi pi-hashtag stat-icon"></i>
           <div class="stat-info">
-            <span class="stat-value">{{ character.mention_count || 0 }}</span>
-            <span class="stat-label">Menciones totales</span>
+            <span class="stat-value">{{ character.mentionCount || 0 }}</span>
+            <span class="stat-label">Apariciones totales</span>
           </div>
         </div>
         <div class="stat-card">
           <i class="pi pi-book stat-icon"></i>
           <div class="stat-info">
             <span class="stat-value">
-              {{ character.first_mention_chapter ? `Cap. ${character.first_mention_chapter}` : 'N/A' }}
+              {{ character.firstMentionChapter ? `Cap. ${character.firstMentionChapter}` : 'N/A' }}
             </span>
             <span class="stat-label">Primera aparición</span>
           </div>
@@ -73,137 +91,100 @@
 
     <Divider />
 
-    <!-- Atributos físicos -->
-    <div class="sheet-section">
-      <div class="section-header">
-        <i class="pi pi-user"></i>
-        <h3>Atributos físicos</h3>
-        <Button
-          v-if="editable"
-          icon="pi pi-plus"
-          text
-          rounded
-          size="small"
-          @click="showAddAttributeDialog('physical')"
-          v-tooltip.top="'Añadir atributo'"
-        />
-      </div>
-      <div v-if="physicalAttributes.length > 0" class="attributes-list">
-        <div
-          v-for="attr in physicalAttributes"
-          :key="attr.id"
-          class="attribute-item"
-        >
-          <div class="attribute-content">
-            <span class="attribute-name">{{ attr.attribute_name }}</span>
-            <span class="attribute-value">{{ attr.attribute_value }}</span>
-          </div>
-          <div v-if="attr.first_mention_chapter" class="attribute-meta">
-            <small>Primera mención: Cap. {{ attr.first_mention_chapter }}</small>
-          </div>
+    <!-- Secciones de atributos dinámicas según tipo de entidad -->
+    <div
+      v-for="(section, sectionIdx) in attributeConfig"
+      :key="`section-${sectionIdx}`"
+      class="sheet-section-wrapper"
+    >
+      <div class="sheet-section">
+        <div class="section-header">
+          <i :class="section.icon"></i>
+          <h3>{{ section.label }}</h3>
           <Button
             v-if="editable"
-            icon="pi pi-times"
+            icon="pi pi-plus"
             text
             rounded
             size="small"
-            severity="danger"
-            @click="$emit('delete-attribute', attr.id)"
+            @click="showAddAttributeDialog(section.categories[0])"
+            v-tooltip.top="'Añadir atributo'"
           />
         </div>
+        <div v-if="getAttributesBySection(sectionIdx).length > 0" class="attributes-list">
+          <div
+            v-for="attr in getAttributesBySection(sectionIdx)"
+            :key="attr.id"
+            class="attribute-item"
+          >
+            <div class="attribute-content">
+              <span class="attribute-name">{{ attr.name }}</span>
+              <span class="attribute-value">{{ attr.value }}</span>
+            </div>
+            <div v-if="attr.firstMentionChapter" class="attribute-meta">
+              <small>Primera aparición: Cap. {{ attr.firstMentionChapter }}</small>
+            </div>
+            <Button
+              v-if="editable"
+              icon="pi pi-times"
+              text
+              rounded
+              size="small"
+              severity="danger"
+              @click="$emit('delete-attribute', attr.id)"
+            />
+          </div>
+        </div>
+        <p v-else class="empty-text">No hay {{ section.label.toLowerCase() }} registrados</p>
       </div>
-      <p v-else class="empty-text">No hay atributos físicos registrados</p>
+      <Divider />
     </div>
 
-    <Divider />
-
-    <!-- Atributos psicológicos -->
-    <div class="sheet-section">
-      <div class="section-header">
-        <i class="pi pi-comments"></i>
-        <h3>Atributos psicológicos</h3>
-        <Button
-          v-if="editable"
-          icon="pi pi-plus"
-          text
-          rounded
-          size="small"
-          @click="showAddAttributeDialog('psychological')"
-          v-tooltip.top="'Añadir atributo'"
-        />
-      </div>
-      <div v-if="psychologicalAttributes.length > 0" class="attributes-list">
-        <div
-          v-for="attr in psychologicalAttributes"
-          :key="attr.id"
-          class="attribute-item"
-        >
-          <div class="attribute-content">
-            <span class="attribute-name">{{ attr.attribute_name }}</span>
-            <span class="attribute-value">{{ attr.attribute_value }}</span>
-          </div>
-          <div v-if="attr.first_mention_chapter" class="attribute-meta">
-            <small>Primera mención: Cap. {{ attr.first_mention_chapter }}</small>
-          </div>
+    <!-- Relaciones (solo para personajes y organizaciones) -->
+    <template v-if="supportsRelationships">
+      <div class="sheet-section">
+        <div class="section-header">
+          <i class="pi pi-sitemap"></i>
+          <h3>Relaciones</h3>
           <Button
             v-if="editable"
-            icon="pi pi-times"
+            icon="pi pi-plus"
             text
             rounded
             size="small"
-            severity="danger"
-            @click="$emit('delete-attribute', attr.id)"
+            @click="showAddRelationshipDialog"
+            v-tooltip.top="'Añadir relación'"
           />
         </div>
-      </div>
-      <p v-else class="empty-text">No hay atributos psicológicos registrados</p>
-    </div>
-
-    <Divider />
-
-    <!-- Relaciones -->
-    <div class="sheet-section">
-      <div class="section-header">
-        <i class="pi pi-sitemap"></i>
-        <h3>Relaciones</h3>
-        <Button
-          v-if="editable"
-          icon="pi pi-plus"
-          text
-          rounded
-          size="small"
-          @click="showAddRelationshipDialog"
-          v-tooltip.top="'Añadir relación'"
-        />
-      </div>
-      <div v-if="relationships.length > 0" class="relationships-list">
-        <div
-          v-for="rel in relationships"
-          :key="rel.id"
-          class="relationship-item"
-        >
-          <div class="relationship-icon">
-            <i :class="getRelationshipIcon(rel.relationship_type)"></i>
+        <div v-if="relationships.length > 0" class="relationships-list">
+          <div
+            v-for="rel in relationships"
+            :key="rel.id"
+            class="relationship-item"
+          >
+            <div class="relationship-icon">
+              <i :class="getRelationshipIcon(rel.relationshipType)"></i>
+            </div>
+            <div class="relationship-content">
+              <span class="relationship-entity">{{ rel.relatedEntityName }}</span>
+              <span class="relationship-type">{{ rel.relationshipType }}</span>
+            </div>
+            <Button
+              v-if="editable"
+              icon="pi pi-times"
+              text
+              rounded
+              size="small"
+              severity="danger"
+              @click="$emit('delete-relationship', rel.id)"
+            />
           </div>
-          <div class="relationship-content">
-            <span class="relationship-entity">{{ rel.related_entity_name }}</span>
-            <span class="relationship-type">{{ rel.relationship_type }}</span>
-          </div>
-          <Button
-            v-if="editable"
-            icon="pi pi-times"
-            text
-            rounded
-            size="small"
-            severity="danger"
-            @click="$emit('delete-relationship', rel.id)"
-          />
         </div>
+        <p v-else class="empty-text">No hay relaciones registradas</p>
       </div>
-      <p v-else class="empty-text">No hay relaciones registradas</p>
-    </div>
 
-    <Divider />
+      <Divider />
+    </template>
 
     <!-- Timeline -->
     <div class="sheet-section">
@@ -226,6 +207,30 @@
       </Timeline>
       <p v-else class="empty-text">No hay eventos en la línea temporal</p>
     </div>
+
+    <!-- Análisis avanzado solo para personajes -->
+    <template v-if="projectId && supportsBehaviorAnalysis">
+      <Divider />
+
+      <!-- Análisis de Comportamiento (LLM) -->
+      <div class="sheet-section">
+        <BehaviorExpectations
+          :project-id="projectId"
+          :character-id="character.id"
+          :character-name="character.name"
+        />
+      </div>
+
+      <Divider />
+
+      <!-- Análisis Emocional -->
+      <div class="sheet-section">
+        <EmotionalAnalysis
+          :project-id="projectId"
+          :character-name="character.name"
+        />
+      </div>
+    </template>
   </div>
 </template>
 
@@ -236,6 +241,8 @@ import Tag from 'primevue/tag'
 import Chip from 'primevue/chip'
 import Divider from 'primevue/divider'
 import Timeline from 'primevue/timeline'
+import BehaviorExpectations from '@/components/BehaviorExpectations.vue'
+import EmotionalAnalysis from '@/components/EmotionalAnalysis.vue'
 import type { Entity, CharacterAttribute, CharacterRelationship } from '@/types'
 
 interface TimelineEvent {
@@ -246,11 +253,13 @@ interface TimelineEvent {
 
 const props = withDefaults(defineProps<{
   character: Entity
+  projectId?: number
   attributes?: CharacterAttribute[]
   relationships?: CharacterRelationship[]
   timeline?: TimelineEvent[]
   editable?: boolean
 }>(), {
+  projectId: undefined,
   attributes: () => [],
   relationships: () => [],
   timeline: () => [],
@@ -263,15 +272,109 @@ const emit = defineEmits<{
   'delete-attribute': [id: number | undefined]
   'add-relationship': []
   'delete-relationship': [id: number | undefined]
+  'undo-merge': []
 }>()
 
+// Configuración de atributos válidos por tipo de entidad
+const ATTRIBUTE_CONFIG: Record<string, { categories: string[], icon: string, label: string }[]> = {
+  character: [
+    { categories: ['physical'], icon: 'pi pi-user', label: 'Atributos físicos' },
+    { categories: ['psychological'], icon: 'pi pi-comments', label: 'Atributos psicológicos' },
+  ],
+  location: [
+    { categories: ['physical', 'geographic'], icon: 'pi pi-map', label: 'Características del lugar' },
+    { categories: ['atmosphere'], icon: 'pi pi-sun', label: 'Atmósfera y ambiente' },
+  ],
+  object: [
+    { categories: ['physical', 'appearance'], icon: 'pi pi-box', label: 'Características físicas' },
+    { categories: ['function', 'history'], icon: 'pi pi-info-circle', label: 'Función e historia' },
+  ],
+  organization: [
+    { categories: ['structure'], icon: 'pi pi-sitemap', label: 'Estructura' },
+    { categories: ['purpose', 'history'], icon: 'pi pi-flag', label: 'Propósito e historia' },
+  ],
+  event: [
+    { categories: ['temporal'], icon: 'pi pi-calendar', label: 'Información temporal' },
+    { categories: ['participants', 'consequences'], icon: 'pi pi-users', label: 'Participantes y consecuencias' },
+  ],
+  concept: [
+    { categories: ['definition'], icon: 'pi pi-book', label: 'Definición' },
+    { categories: ['examples', 'related'], icon: 'pi pi-link', label: 'Ejemplos y relaciones' },
+  ],
+}
+
 // Computed
+const isMerged = computed(() => {
+  return props.character.mergedFromIds && props.character.mergedFromIds.length > 0
+})
+
+// Obtener configuración de atributos para el tipo de entidad actual
+const attributeConfig = computed(() => {
+  const entityType = props.character.type || 'character'
+  return ATTRIBUTE_CONFIG[entityType] || ATTRIBUTE_CONFIG.character
+})
+
+// Filtrar atributos por las categorías configuradas para este tipo
+const getAttributesBySection = (sectionIndex: number) => {
+  const config = attributeConfig.value[sectionIndex]
+  if (!config) return []
+  return props.attributes.filter(attr => config.categories.includes(attr.category))
+}
+
+// Para compatibilidad con el código existente
 const physicalAttributes = computed(() => {
-  return props.attributes.filter(attr => attr.attribute_category === 'physical')
+  return props.attributes.filter(attr => attr.category === 'physical')
 })
 
 const psychologicalAttributes = computed(() => {
-  return props.attributes.filter(attr => attr.attribute_category === 'psychological')
+  return props.attributes.filter(attr => attr.category === 'psychological')
+})
+
+// Verificar si el tipo de entidad soporta relaciones (principalmente personajes y organizaciones)
+const supportsRelationships = computed(() => {
+  return ['character', 'organization'].includes(props.character.type || 'character')
+})
+
+// Verificar si el tipo soporta análisis de comportamiento (solo personajes)
+const supportsBehaviorAnalysis = computed(() => {
+  return props.character.type === 'character'
+})
+
+// Iconos y labels por tipo de entidad
+const entityTypeIcon = computed(() => {
+  const icons: Record<string, string> = {
+    character: 'pi pi-user',
+    location: 'pi pi-map-marker',
+    object: 'pi pi-box',
+    organization: 'pi pi-building',
+    event: 'pi pi-calendar',
+    concept: 'pi pi-lightbulb',
+  }
+  return icons[props.character.type] || 'pi pi-tag'
+})
+
+const entityTypeLabel = computed(() => {
+  const labels: Record<string, string> = {
+    character: 'Personaje',
+    location: 'Lugar',
+    object: 'Objeto',
+    organization: 'Organización',
+    event: 'Evento',
+    concept: 'Concepto',
+  }
+  return labels[props.character.type] || 'Entidad'
+})
+
+const entityTypeSeverity = computed(() => {
+  const severities: Record<string, string> = {
+    character: 'success',
+    location: 'danger',
+    object: 'warning',
+    organization: 'info',
+    event: 'secondary',
+    concept: 'contrast',
+  }
+  return severities[props.character.type] || 'secondary'
 })
 
 // Funciones
@@ -285,18 +388,18 @@ const showAddRelationshipDialog = () => {
 
 const getImportanceSeverity = (importance: string): string => {
   const severities: Record<string, string> = {
-    'high': 'danger',
-    'medium': 'warning',
-    'low': 'info'
+    'main': 'success',
+    'secondary': 'warning',
+    'minor': 'secondary'
   }
   return severities[importance] || 'secondary'
 }
 
 const getImportanceLabel = (importance: string): string => {
   const labels: Record<string, string> = {
-    'high': 'Alta Importancia',
-    'medium': 'Media Importancia',
-    'low': 'Baja Importancia'
+    'main': 'Principal',
+    'secondary': 'Secundario',
+    'minor': 'Menor'
   }
   return labels[importance] || importance
 }
@@ -318,7 +421,7 @@ const getRelationshipIcon = (type: string): string => {
   display: flex;
   flex-direction: column;
   gap: 0;
-  background: white;
+  background: var(--p-surface-0, white);
   border-radius: 8px;
   padding: 1.5rem;
 }
@@ -359,6 +462,17 @@ const getRelationshipIcon = (type: string): string => {
 .header-tags {
   display: flex;
   gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.merged-tag {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.merged-tag i {
+  font-size: 0.75rem;
 }
 
 .header-actions {
