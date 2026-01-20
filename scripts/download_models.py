@@ -240,6 +240,13 @@ Variables de entorno:
         help="Mostrar estado de modelos instalados",
     )
 
+    parser.add_argument(
+        "--all",
+        "-a",
+        action="store_true",
+        help="Descargar todos los modelos (equivalente a no especificar ninguno)",
+    )
+
     args = parser.parse_args()
 
     # Si se pide status, mostrar y salir

@@ -35,6 +35,9 @@ jobs:
         with:
           workspaces: src-tauri
 
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version "^2.0"
+
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
@@ -42,19 +45,22 @@ jobs:
       - name: Install Python dependencies
         run: pip install -e ".[build]"
 
-      - name: Copy resources
-        run: |
-          New-Item -ItemType Directory -Force -Path src-tauri/resources
-          Copy-Item scripts/post_install.py src-tauri/resources/
-          Copy-Item scripts/download_models.py src-tauri/resources/
-        shell: pwsh
+      - name: Download NLP models (to bundle with installer)
+        run: python scripts/download_models.py --all
+        env:
+          NA_MODELS_DIR: ${{ github.workspace }}/models
 
       - name: Build sidecar
         run: python scripts/build_sidecar.py --clean
 
+      - name: Prepare resources
+        run: |
+          New-Item -ItemType Directory -Force -Path src-tauri/resources/models
+          Copy-Item -Recurse models/* src-tauri/resources/models/
+        shell: pwsh
+
       - name: Build Tauri
-        working-directory: frontend
-        run: npm run tauri build
+        run: cargo tauri build
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
@@ -92,6 +98,9 @@ jobs:
         with:
           workspaces: src-tauri
 
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version "^2.0"
+
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
@@ -99,18 +108,21 @@ jobs:
       - name: Install Python dependencies
         run: pip install -e ".[build]"
 
-      - name: Copy resources
-        run: |
-          mkdir -p src-tauri/resources
-          cp scripts/post_install.py src-tauri/resources/
-          cp scripts/download_models.py src-tauri/resources/
+      - name: Download NLP models (to bundle with installer)
+        run: python scripts/download_models.py --all
+        env:
+          NA_MODELS_DIR: ${{ github.workspace }}/models
 
       - name: Build sidecar
         run: python scripts/build_sidecar.py --clean
 
+      - name: Prepare resources
+        run: |
+          mkdir -p src-tauri/resources/models
+          cp -R models/* src-tauri/resources/models/
+
       - name: Build Tauri
-        working-directory: frontend
-        run: npm run tauri build
+        run: cargo tauri build
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
@@ -151,6 +163,9 @@ jobs:
         with:
           workspaces: src-tauri
 
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version "^2.0"
+
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
@@ -158,18 +173,21 @@ jobs:
       - name: Install Python dependencies
         run: pip install -e ".[build]"
 
-      - name: Copy resources
-        run: |
-          mkdir -p src-tauri/resources
-          cp scripts/post_install.py src-tauri/resources/
-          cp scripts/download_models.py src-tauri/resources/
+      - name: Download NLP models (to bundle with installer)
+        run: python scripts/download_models.py --all
+        env:
+          NA_MODELS_DIR: ${{ github.workspace }}/models
 
       - name: Build sidecar
         run: python scripts/build_sidecar.py --clean
 
+      - name: Prepare resources
+        run: |
+          mkdir -p src-tauri/resources/models
+          cp -R models/* src-tauri/resources/models/
+
       - name: Build Tauri
-        working-directory: frontend
-        run: npm run tauri build
+        run: cargo tauri build
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}

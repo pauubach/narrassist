@@ -160,7 +160,52 @@ class ModelManager:
             self.models_dir = Path.home() / ".narrative_assistant" / "models"
 
         self.models_dir.mkdir(parents=True, exist_ok=True)
+
+        # Directorio de recursos bundled (Tauri app)
+        # Cuando la app se ejecuta como bundle, los modelos están en resources/models
+        self.bundled_models_dir = self._find_bundled_models_dir()
+
         logger.info(f"ModelManager inicializado. Directorio: {self.models_dir}")
+        if self.bundled_models_dir:
+            logger.info(f"Modelos bundled encontrados en: {self.bundled_models_dir}")
+
+    def _find_bundled_models_dir(self) -> Optional[Path]:
+        """
+        Busca el directorio de modelos bundled con la app.
+
+        Tauri coloca recursos en diferentes ubicaciones según el OS:
+        - Windows: {app_dir}/resources/
+        - macOS: {app_bundle}/Contents/Resources/
+        - Linux: /usr/share/{app}/resources/ o junto al ejecutable
+        """
+        import sys
+
+        # Obtener directorio del ejecutable
+        if getattr(sys, 'frozen', False):
+            # Running as compiled
+            exe_dir = Path(sys.executable).parent
+        else:
+            # Running in Python
+            exe_dir = Path(__file__).parent.parent.parent.parent
+
+        # Posibles ubicaciones de modelos bundled
+        possible_paths = [
+            exe_dir / "resources" / "models",
+            exe_dir / "_internal" / "resources" / "models",  # PyInstaller
+            exe_dir.parent / "Resources" / "models",  # macOS .app
+            exe_dir.parent / "share" / "models",  # Linux
+            Path("/usr/share/narrative-assistant/models"),  # Linux system install
+        ]
+
+        for path in possible_paths:
+            if path.exists() and path.is_dir():
+                # Verificar que tiene contenido
+                spacy_dir = path / "spacy"
+                embeddings_dir = path / "embeddings"
+                if spacy_dir.exists() or embeddings_dir.exists():
+                    return path
+
+        return None
 
         # Lock para operaciones de descarga (evitar descargas duplicadas)
         self._download_locks: dict[ModelType, threading.Lock] = {
@@ -173,6 +218,11 @@ class ModelManager:
     def get_model_path(self, model_type: ModelType) -> Optional[Path]:
         """
         Obtiene la ruta al modelo si existe localmente.
+
+        Busca en orden:
+        1. Cache verificado
+        2. Modelos bundled con la app (instalador)
+        3. Directorio de modelos del usuario (~/.narrative_assistant/models/)
 
         Args:
             model_type: Tipo de modelo (SPACY, EMBEDDINGS)
@@ -189,6 +239,15 @@ class ModelManager:
             logger.error(f"Tipo de modelo desconocido: {model_type}")
             return None
 
+        # Buscar en modelos bundled primero (instalador)
+        if self.bundled_models_dir:
+            bundled_path = self.bundled_models_dir / model_info.subdirectory / model_info.name
+            if bundled_path.exists() and self._verify_model_structure(model_type, bundled_path):
+                logger.info(f"Usando modelo bundled: {bundled_path}")
+                self._verified_paths[model_type] = bundled_path
+                return bundled_path
+
+        # Buscar en directorio de usuario
         model_path = self.models_dir / model_info.subdirectory / model_info.name
 
         if not model_path.exists():

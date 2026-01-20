@@ -23,8 +23,7 @@
       "icons/icon.ico"
     ],
     "resources": [
-      "resources/post_install.py",
-      "resources/download_models.py"
+      "resources/models/**/*"
     ],
     "windows": {
       "certificateThumbprint": null,
