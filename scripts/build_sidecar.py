@@ -93,8 +93,6 @@ def build_sidecar(project_root: Path, debug: bool = False) -> Path:
         "--specpath", str(project_root / "build"),
         # Incluir el paquete narrative_assistant
         "--paths", str(project_root / "src"),
-        # Datos adicionales
-        "--add-data", f"{project_root / 'models'}:models" if (project_root / "models").exists() else "",
         # Ocultos imports necesarios
         "--hidden-import", "uvicorn.logging",
         "--hidden-import", "uvicorn.loops",
