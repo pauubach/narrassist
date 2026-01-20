@@ -1087,6 +1087,9 @@ const startReanalysis = async () => {
   display: flex;
   flex-direction: column;
   height: 100%;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .sidebar-tabs {
@@ -1261,6 +1264,7 @@ const startReanalysis = async () => {
   background: var(--surface-card);
   border-right: 1px solid var(--surface-border);
   position: relative;
+  box-sizing: border-box;
 }
 
 .center-panel {
