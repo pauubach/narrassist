@@ -93,6 +93,11 @@ dev = [
     "syrupy>=4.0",
 ]
 
+# Build (for creating installers)
+build = [
+    "pyinstaller>=6.0.0",
+]
+
 # Full installation (all optional except GPU)
 full = [
     "narrative-assistant[pdf,pdf-export,ebook,spelling,dev]",
