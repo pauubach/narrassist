@@ -68,3 +68,8 @@ test_books/
 # Development scripts outputs
 *.spec (PyInstaller)
 api-server/*.spec
+
+# Large binary files (download separately)
+tools/
+*.exe
+*.zip
