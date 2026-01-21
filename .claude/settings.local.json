@@ -88,7 +88,13 @@
       "Bash(start /B \"\" \"C:\\\\Users\\\\pauub\\\\AppData\\\\Local\\\\Programs\\\\Ollama\\\\ollama.exe\" serve)",
       "Bash(netstat:*)",
       "Bash(gh auth status:*)",
-      "Bash(git credential-manager:*)"
+      "Bash(git credential-manager:*)",
+      "Bash(git remote add:*)",
+      "Bash(git remote set-url:*)",
+      "Bash(git push:*)",
+      "Bash(git filter-branch:*)",
+      "Bash(git stash:*)",
+      "Bash(git tag:*)"
     ],
     "additionalDirectories": [
       "d:\\repos\\tfm"
