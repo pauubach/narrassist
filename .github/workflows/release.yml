@@ -43,7 +43,9 @@ jobs:
         run: npm ci
 
       - name: Install Python dependencies
-        run: pip install -e ".[build]"
+        run: |
+          pip install -e ".[build]"
+          pip install -r api-server/requirements.txt
 
       - name: Build sidecar
         run: python scripts/build_sidecar.py --clean
@@ -98,7 +100,9 @@ jobs:
         run: npm ci
 
       - name: Install Python dependencies
-        run: pip install -e ".[build]"
+        run: |
+          pip install -e ".[build]"
+          pip install -r api-server/requirements.txt
 
       - name: Build sidecar
         run: python scripts/build_sidecar.py --clean
@@ -155,7 +159,9 @@ jobs:
         run: npm ci
 
       - name: Install Python dependencies
-        run: pip install -e ".[build]"
+        run: |
+          pip install -e ".[build]"
+          pip install -r api-server/requirements.txt
 
       - name: Build sidecar
         run: python scripts/build_sidecar.py --clean
