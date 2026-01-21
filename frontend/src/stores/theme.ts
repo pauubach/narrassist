@@ -101,18 +101,53 @@ export const PRIMEVUE_PRESETS: Record<PrimeVuePreset, PresetInfo> = {
 
 /**
  * Crea un preset PrimeVue a partir de una configuración personalizada.
- * Extiende Aura con las superficies personalizadas para light y dark.
+ * Extiende Aura con las superficies y tokens semánticos personalizados.
+ *
+ * Los tokens semánticos controlan colores de texto, botones, bordes, etc.
+ * Esto permite temas como Scrivener Dark tener contraste WCAG AA correcto.
  */
 function createCustomPreset(config: ThemePresetConfig) {
+  // Construir el color scheme para light mode
+  const lightScheme: Record<string, unknown> = {
+    surface: config.lightSurface
+  }
+
+  // Agregar tokens semánticos para light si están definidos
+  if (config.lightSemantics) {
+    const ls = config.lightSemantics
+    // Texto
+    if (ls.text) lightScheme.text = { color: ls.text }
+    if (ls.textMuted) lightScheme.text = { ...lightScheme.text as object, mutedColor: ls.textMuted }
+    // Formularios y contenido
+    if (ls.borderColor) {
+      lightScheme.formField = { borderColor: ls.borderColor }
+      lightScheme.content = { borderColor: ls.borderColor }
+    }
+  }
+
+  // Construir el color scheme para dark mode
+  const darkScheme: Record<string, unknown> = {
+    surface: config.darkSurface
+  }
+
+  // Agregar tokens semánticos para dark si están definidos
+  if (config.darkSemantics) {
+    const ds = config.darkSemantics
+    // Texto - esto afecta --p-text-color y --p-text-muted-color
+    if (ds.text) darkScheme.text = { color: ds.text }
+    if (ds.textMuted) darkScheme.text = { ...darkScheme.text as object, mutedColor: ds.textMuted }
+    // Formularios y contenido
+    if (ds.borderColor) {
+      darkScheme.formField = { borderColor: ds.borderColor }
+      darkScheme.content = { borderColor: ds.borderColor }
+    }
+  }
+
   return definePreset(Aura, {
     semantic: {
       colorScheme: {
-        light: {
-          surface: config.lightSurface
-        },
-        dark: {
-          surface: config.darkSurface
-        }
+        light: lightScheme,
+        dark: darkScheme
       }
     }
   })

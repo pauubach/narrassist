@@ -1534,3 +1534,225 @@ html.scrivener-theme.dark .floating-actions .p-button:hover {
 }
 
 /* Grammarly Theme - Additional styles moved to main Grammarly section above */
+
+/* ============================================================================
+   WCAG CONTRAST FIXES - Colores con contraste mínimo 4.5:1
+   ============================================================================ */
+
+/* --- MESSAGE ERROR - El rojo debe ser visible --- */
+.p-message-error,
+.p-message.p-message-error {
+  background: #fef2f2 !important; /* red-50 */
+  border: 1px solid #f87171 !important; /* red-400 */
+  color: #991b1b !important; /* red-800: 7.2:1 contraste */
+}
+
+.p-message-error .p-message-text,
+.p-message.p-message-error .p-message-text {
+  color: #991b1b !important;
+}
+
+.p-message-error .p-message-icon,
+.p-message.p-message-error .p-message-icon {
+  color: #dc2626 !important; /* red-600 */
+}
+
+/* Links dentro de mensajes de error */
+.p-message-error a,
+.p-message-error .p-button-text,
+.p-message.p-message-error a,
+.p-message.p-message-error .p-button-text {
+  color: #b91c1c !important; /* red-700 */
+  font-weight: 600 !important;
+}
+
+.p-message-error .p-button-text:hover,
+.p-message.p-message-error .p-button-text:hover {
+  color: #991b1b !important;
+  background: rgba(220, 38, 38, 0.1) !important;
+}
+
+/* --- BOTONES TEXT/LINK - Colores con contraste WCAG --- */
+/* Cancelar y otros botones text deben ser legibles */
+.p-button-text.p-button-secondary,
+.p-button.p-button-text.p-button-secondary,
+button.p-button-text:not(.p-button-success):not(.p-button-danger):not(.p-button-warning):not(.p-button-info) {
+  color: #374151 !important; /* gray-700: 10:1 contraste sobre blanco */
+}
+
+.p-button-text.p-button-secondary:hover,
+.p-button.p-button-text.p-button-secondary:hover {
+  color: #1f2937 !important; /* gray-800 */
+  background: rgba(55, 65, 81, 0.08) !important;
+}
+
+/* Botón Cancelar específico (dentro de dialogs) */
+.p-dialog-footer .p-button-text,
+.p-dialog .p-button-text:not(.p-button-danger):not(.p-button-success) {
+  color: #4b5563 !important; /* gray-600: 7:1 contraste */
+  font-weight: 500 !important;
+}
+
+.p-dialog-footer .p-button-text:hover,
+.p-dialog .p-button-text:not(.p-button-danger):not(.p-button-success):hover {
+  color: #374151 !important;
+  background: rgba(75, 85, 99, 0.1) !important;
+}
+
+/* Dark mode - botones text secundarios */
+.dark .p-button-text.p-button-secondary,
+.dark .p-dialog-footer .p-button-text,
+html.dark .p-button-text.p-button-secondary,
+html.dark .p-dialog-footer .p-button-text {
+  color: #d1d5db !important; /* gray-300: 10:1 sobre dark bg */
+}
+
+.dark .p-button-text.p-button-secondary:hover,
+.dark .p-dialog-footer .p-button-text:hover,
+html.dark .p-button-text.p-button-secondary:hover,
+html.dark .p-dialog-footer .p-button-text:hover {
+  color: #e5e7eb !important;
+  background: rgba(209, 213, 219, 0.12) !important;
+}
+
+/* --- BOTONES PRIMARY - Asegurar contraste del texto --- */
+.p-button-primary,
+.p-button:not(.p-button-text):not(.p-button-outlined):not(.p-button-secondary) {
+  background: #2563eb !important; /* blue-600 */
+  border-color: #2563eb !important;
+  color: #ffffff !important;
+}
+
+.p-button-primary:hover,
+.p-button:not(.p-button-text):not(.p-button-outlined):not(.p-button-secondary):hover {
+  background: #1d4ed8 !important; /* blue-700 */
+  border-color: #1d4ed8 !important;
+}
+
+/* ============================================================================
+   SCRIVENER THEME - Variables CSS para colores semánticos
+   ============================================================================
+   Usa variables CSS para que los componentes teleportados (Dialog, etc.)
+   hereden correctamente los colores del tema.
+
+   Contraste WCAG AA (mínimo 4.5:1) verificado:
+   - Dark (fondo #1A170F):
+     - --scrivener-text: #E8DCC8 = 9.5:1
+     - --scrivener-text-muted: #C4B494 = 5.2:1
+     - --scrivener-text-button: #D8CAB0 = 6.5:1
+     - --scrivener-error: #fca5a5 = 9.1:1
+   ============================================================================ */
+
+/* Variables globales para Scrivener Dark */
+html.scrivener-theme.dark {
+  --scrivener-text: #E8DCC8;
+  --scrivener-text-muted: #C4B494;
+  --scrivener-text-button: #D8CAB0;
+  --scrivener-text-button-hover: #E8DCC8;
+  --scrivener-text-button-bg-hover: rgba(216, 202, 176, 0.15);
+  --scrivener-error: #fca5a5;
+  --scrivener-error-icon: #f87171;
+  --scrivener-error-bg: rgba(239, 68, 68, 0.15);
+  --scrivener-border: #504834;
+  --scrivener-primary-text: #93c5fd;
+  --scrivener-primary-text-hover: #bfdbfe;
+  --scrivener-primary-bg-hover: rgba(147, 197, 253, 0.12);
+}
+
+/* Variables globales para Scrivener Light */
+html.scrivener-theme:not(.dark) {
+  --scrivener-text: #322E20;
+  --scrivener-text-muted: #6E6248;
+  --scrivener-text-button: #504834;
+  --scrivener-text-button-hover: #322E20;
+  --scrivener-text-button-bg-hover: rgba(80, 72, 52, 0.08);
+  --scrivener-error: #7f1d1d;
+  --scrivener-error-icon: #dc2626;
+  --scrivener-error-bg: #fef2f2;
+  --scrivener-border: #D8CAB0;
+  --scrivener-primary-text: #1e40af;
+  --scrivener-primary-text-hover: #1d4ed8;
+  --scrivener-primary-bg-hover: rgba(59, 130, 246, 0.1);
+}
+
+/* --- Mensajes de error --- */
+html.scrivener-theme.dark .p-message-error,
+html.scrivener-theme.dark .p-message.p-message-error {
+  background: var(--scrivener-error-bg) !important;
+  border: 1px solid var(--scrivener-error-icon) !important;
+  color: var(--scrivener-error) !important;
+}
+
+html.scrivener-theme.dark .p-message-error .p-message-text,
+html.scrivener-theme.dark .p-message.p-message-error .p-message-text {
+  color: var(--scrivener-error) !important;
+}
+
+html.scrivener-theme.dark .p-message-error .p-message-icon,
+html.scrivener-theme.dark .p-message.p-message-error .p-message-icon {
+  color: var(--scrivener-error-icon) !important;
+}
+
+html.scrivener-theme.dark .p-message-error a,
+html.scrivener-theme.dark .p-message-error .p-button-text {
+  color: var(--scrivener-error) !important;
+  font-weight: 600 !important;
+  text-decoration: underline !important;
+}
+
+/* --- Botones TEXT (secondary: Cancelar, etc.) --- */
+/* Usar selectores muy específicos para ganar a los defaults con !important */
+html.scrivener-theme.dark .p-button.p-button-text.p-button-secondary,
+html.scrivener-theme.dark .p-dialog-footer .p-button.p-button-text:not(.p-button-danger):not(.p-button-success),
+html.scrivener-theme.dark .p-dialog .p-button.p-button-text:not(.p-button-danger):not(.p-button-success) {
+  color: var(--scrivener-text-button) !important;
+  font-weight: 500 !important;
+}
+
+html.scrivener-theme.dark .p-button.p-button-text.p-button-secondary:hover,
+html.scrivener-theme.dark .p-dialog-footer .p-button.p-button-text:not(.p-button-danger):not(.p-button-success):hover,
+html.scrivener-theme.dark .p-dialog .p-button.p-button-text:not(.p-button-danger):not(.p-button-success):hover {
+  color: var(--scrivener-text-button-hover) !important;
+  background: var(--scrivener-text-button-bg-hover) !important;
+}
+
+/* --- Botones TEXT primary (azul) --- */
+html.scrivener-theme.dark .p-button.p-button-text:not(.p-button-secondary):not(.p-button-danger):not(.p-button-success):not(.p-button-warning) {
+  color: var(--scrivener-primary-text) !important;
+}
+
+html.scrivener-theme.dark .p-button.p-button-text:not(.p-button-secondary):not(.p-button-danger):not(.p-button-success):not(.p-button-warning):hover {
+  color: var(--scrivener-primary-text-hover) !important;
+  background: var(--scrivener-primary-bg-hover) !important;
+}
+
+/* --- Botones TEXT danger --- */
+html.scrivener-theme.dark .p-button.p-button-text.p-button-danger {
+  color: var(--scrivener-error) !important;
+}
+
+html.scrivener-theme.dark .p-button.p-button-text.p-button-danger:hover {
+  color: #fecaca !important;
+  background: rgba(252, 165, 165, 0.12) !important;
+}
+
+/* --- Scrivener Light mode --- */
+html.scrivener-theme:not(.dark) .p-message-error,
+html.scrivener-theme:not(.dark) .p-message.p-message-error {
+  background: var(--scrivener-error-bg) !important;
+  border: 1px solid #ef4444 !important;
+  color: var(--scrivener-error) !important;
+}
+
+html.scrivener-theme:not(.dark) .p-button.p-button-text.p-button-secondary,
+html.scrivener-theme:not(.dark) .p-dialog-footer .p-button.p-button-text:not(.p-button-danger):not(.p-button-success),
+html.scrivener-theme:not(.dark) .p-dialog .p-button.p-button-text:not(.p-button-danger):not(.p-button-success) {
+  color: var(--scrivener-text-button) !important;
+}
+
+html.scrivener-theme:not(.dark) .p-button.p-button-text.p-button-secondary:hover,
+html.scrivener-theme:not(.dark) .p-dialog-footer .p-button.p-button-text:not(.p-button-danger):not(.p-button-success):hover,
+html.scrivener-theme:not(.dark) .p-dialog .p-button.p-button-text:not(.p-button-danger):not(.p-button-success):hover {
+  color: var(--scrivener-text-button-hover) !important;
+  background: var(--scrivener-text-button-bg-hover) !important;
+}

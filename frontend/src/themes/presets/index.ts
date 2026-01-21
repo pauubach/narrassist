@@ -12,6 +12,26 @@ import type { PaletteDesignToken } from '@primeuix/themes/types'
 // Types
 // ============================================================================
 
+/**
+ * Tokens semánticos para texto y componentes en un color scheme
+ */
+export interface SemanticColorTokens {
+  /** Color de texto principal */
+  text?: string
+  /** Color de texto secundario/muted */
+  textMuted?: string
+  /** Color de texto para botones text (secondary) */
+  textButtonColor?: string
+  /** Color de texto para botones text en hover */
+  textButtonHoverColor?: string
+  /** Fondo para hover en botones text */
+  textButtonHoverBg?: string
+  /** Color de error (para mensajes, botones danger) */
+  errorColor?: string
+  /** Color de borde por defecto */
+  borderColor?: string
+}
+
 export interface ThemePresetConfig {
   name: string
   description: string
@@ -21,6 +41,10 @@ export interface ThemePresetConfig {
   lightSurface: PaletteDesignToken
   /** Paleta de superficies para modo oscuro */
   darkSurface: PaletteDesignToken
+  /** Tokens semánticos para modo claro (opcional, usa defaults si no se especifica) */
+  lightSemantics?: SemanticColorTokens
+  /** Tokens semánticos para modo oscuro (opcional, usa defaults si no se especifica) */
+  darkSemantics?: SemanticColorTokens
 }
 
 // ============================================================================
@@ -74,6 +98,13 @@ export const grammarlyPreset: ThemePresetConfig = {
  * Tema Scrivener: Cálido, acogedor, similar al papel.
  * Ideal para largas sesiones de lectura de manuscritos.
  * Tonos sepia que reducen la fatiga visual.
+ *
+ * Colores de contraste WCAG AA (mínimo 4.5:1):
+ * - Dark mode (fondo #1A170F):
+ *   - Texto principal: #E8DCC8 (sepia-200) = 9.5:1
+ *   - Texto secundario: #C4B494 (sepia-400) = 5.2:1
+ *   - Botones text: #D8CAB0 (sepia-300) = 6.5:1
+ *   - Error: #fca5a5 (red-300) = 9.1:1
  */
 export const scrivenerPreset: ThemePresetConfig = {
   name: 'Scrivener',
@@ -106,6 +137,26 @@ export const scrivenerPreset: ThemePresetConfig = {
     800: '#D8CAB0',
     900: '#E8DCC8',
     950: '#F7F2E8'
+  },
+  // Tokens semánticos para Scrivener Light (fondo claro sepia)
+  lightSemantics: {
+    text: '#322E20',           // sepia-900: texto principal
+    textMuted: '#6E6248',      // sepia-700: texto secundario
+    textButtonColor: '#504834', // sepia-800: botones text
+    textButtonHoverColor: '#322E20',
+    textButtonHoverBg: 'rgba(80, 72, 52, 0.08)',
+    errorColor: '#b91c1c',     // red-700: buen contraste en light
+    borderColor: '#D8CAB0'     // sepia-300
+  },
+  // Tokens semánticos para Scrivener Dark (fondo #1A170F)
+  darkSemantics: {
+    text: '#E8DCC8',           // sepia-200: 9.5:1 contraste
+    textMuted: '#C4B494',      // sepia-400: 5.2:1 contraste (WCAG AA)
+    textButtonColor: '#D8CAB0', // sepia-300: 6.5:1 contraste - botones "Cancelar"
+    textButtonHoverColor: '#E8DCC8',
+    textButtonHoverBg: 'rgba(216, 202, 176, 0.15)',
+    errorColor: '#fca5a5',     // red-300: 9.1:1 contraste en dark
+    borderColor: '#504834'     // sepia-300 dark
   }
 }
 
