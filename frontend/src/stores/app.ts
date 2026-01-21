@@ -1,6 +1,7 @@
 import { ref, computed, watch } from 'vue'
 import { defineStore } from 'pinia'
 import type { ThemeMode } from '@/types'
+import { apiUrl } from '@/config/api'
 
 export const useAppStore = defineStore('app', () => {
   // Estado
@@ -57,7 +58,7 @@ export const useAppStore = defineStore('app', () => {
     error.value = null
 
     try {
-      const response = await fetch('/api/health')
+      const response = await fetch(apiUrl('/api/health'))
       if (!response.ok) {
         throw new Error(`Backend returned ${response.status}`)
       }

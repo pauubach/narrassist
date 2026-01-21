@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { apiUrl } from '@/config/api'
 
 export interface ModelStatus {
   installed: boolean
@@ -32,7 +33,7 @@ export const useSystemStore = defineStore('system', () => {
 
   async function checkBackendStatus() {
     try {
-      const response = await fetch('/api/health')
+      const response = await fetch(apiUrl('/api/health'))
       if (response.ok) {
         const data = await response.json()
         backendConnected.value = data.status === 'ok'
@@ -50,7 +51,7 @@ export const useSystemStore = defineStore('system', () => {
     modelsError.value = null
 
     try {
-      const response = await fetch('/api/models/status')
+      const response = await fetch(apiUrl('/api/models/status'))
       if (response.ok) {
         const data = await response.json()
         if (data.success) {
@@ -75,7 +76,7 @@ export const useSystemStore = defineStore('system', () => {
     modelsError.value = null
 
     try {
-      const response = await fetch('/api/models/download', {
+      const response = await fetch(apiUrl('/api/models/download'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ models, force })

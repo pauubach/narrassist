@@ -1028,6 +1028,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { apiUrl } from '@/config/api'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
 import SelectButton from 'primevue/selectbutton'
@@ -1370,9 +1371,9 @@ async function loadFilterData() {
   try {
     // Cargar en paralelo
     const [statsRes, patternsRes, rejectionsRes] = await Promise.all([
-      fetch('/api/entity-filters/stats'),
-      fetch('/api/entity-filters/system-patterns?language=es'),
-      fetch('/api/entity-filters/user-rejections')
+      fetch(apiUrl('/api/entity-filters/stats')),
+      fetch(apiUrl('/api/entity-filters/system-patterns?language=es')),
+      fetch(apiUrl('/api/entity-filters/user-rejections'))
     ])
 
     const [statsData, patternsData, rejectionsData] = await Promise.all([

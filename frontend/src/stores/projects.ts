@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import type { Project, ApiResponse } from '@/types'
 import type { ApiProject } from '@/types/api'
 import { transformProject, transformProjects } from '@/types/transformers'
+import { apiUrl } from '@/config/api'
 
 export const useProjectsStore = defineStore('projects', () => {
   // Estado - usando domain types (camelCase)
@@ -26,7 +27,7 @@ export const useProjectsStore = defineStore('projects', () => {
     error.value = null
 
     try {
-      const response = await fetch('/api/projects')
+      const response = await fetch(apiUrl('/api/projects'))
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
@@ -51,7 +52,7 @@ export const useProjectsStore = defineStore('projects', () => {
     error.value = null
 
     try {
-      const response = await fetch(`/api/projects/${id}`)
+      const response = await fetch(apiUrl(`/api/projects/${id}`))
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
@@ -94,7 +95,7 @@ export const useProjectsStore = defineStore('projects', () => {
         formData.append('rules', rules)
       }
 
-      const response = await fetch('/api/projects', {
+      const response = await fetch(apiUrl('/api/projects'), {
         method: 'POST',
         body: formData
       })

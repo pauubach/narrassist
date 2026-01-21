@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
+import { apiUrl } from '@/config/api'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Dropdown from 'primevue/dropdown'
@@ -208,7 +209,7 @@ async function handleEntityClick(entity: Entity) {
 async function loadEntityAttributes(entityId: number) {
   loadingAttributes.value = true
   try {
-    const response = await fetch(`/api/projects/${props.projectId}/entities/${entityId}/attributes`)
+    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/entities/${entityId}/attributes`))
     const data = await response.json()
     if (data.success) {
       selectedEntityAttributes.value = data.data || []
@@ -250,7 +251,7 @@ async function onEntityDelete(entity: Entity) {
   }
 
   try {
-    const response = await fetch(`/api/projects/${props.projectId}/entities/${entity.id}`, {
+    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/entities/${entity.id}`), {
       method: 'DELETE',
     })
 
@@ -289,7 +290,7 @@ async function handleRejectEntity(scope: 'project' | 'global', reason: string) {
 
   try {
     // 1. Primero eliminar la entidad actual del proyecto
-    const deleteResponse = await fetch(`/api/projects/${props.projectId}/entities/${entity.id}/reject`, {
+    const deleteResponse = await fetch(apiUrl(`/api/projects/${props.projectId}/entities/${entity.id}/reject`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ reason })
@@ -304,7 +305,7 @@ async function handleRejectEntity(scope: 'project' | 'global', reason: string) {
     // 2. Según el alcance, añadir al filtro correspondiente
     if (scope === 'global') {
       // Añadir a rechazos globales del usuario
-      const globalResponse = await fetch('/api/entity-filters/user-rejections', {
+      const globalResponse = await fetch(apiUrl('/api/entity-filters/user-rejections'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -320,7 +321,7 @@ async function handleRejectEntity(scope: 'project' | 'global', reason: string) {
       }
     } else {
       // Añadir a overrides del proyecto
-      const projectResponse = await fetch(`/api/projects/${props.projectId}/entity-filters/overrides`, {
+      const projectResponse = await fetch(apiUrl(`/api/projects/${props.projectId}/entity-filters/overrides`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -365,7 +366,7 @@ async function saveEntity() {
   }
 
   try {
-    const response = await fetch(`/api/projects/${props.projectId}/entities/${editingEntity.value.id}`, {
+    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/entities/${editingEntity.value.id}`), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -396,7 +397,7 @@ async function saveEntity() {
 
 async function onMergeEntities(primaryEntityId: number, entityIdsToMerge: number[]) {
   try {
-    const response = await fetch(`/api/projects/${props.projectId}/entities/merge`, {
+    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/entities/merge`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
