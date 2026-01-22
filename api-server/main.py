@@ -4964,9 +4964,24 @@ JSON:"""
 
                 attributes = []
                 if entities:
-                    # Deshabilitar embeddings (muy lento con muchos personajes)
-                    # Los otros métodos (LLM, patrones, dependencias) son suficientes
-                    attr_extractor = AttributeExtractor(use_embeddings=False)
+                    # Detectar si hay GPU disponible para embeddings
+                    # Embeddings es muy lento en CPU pero rápido en GPU
+                    try:
+                        from narrative_assistant.core.device import get_device_detector
+                        detector = get_device_detector()
+                        has_gpu = detector.device_type.value in ("cuda", "mps")
+                    except Exception:
+                        has_gpu = False
+
+                    # Habilitar embeddings solo si hay GPU
+                    use_embeddings = has_gpu
+                    if use_embeddings:
+                        logger.info("GPU detectada - habilitando análisis de embeddings para atributos")
+                        analysis_progress_storage[project_id]["current_action"] = "Análisis avanzado con GPU activado"
+                    else:
+                        logger.info("Sin GPU - usando métodos rápidos para atributos (LLM, patrones)")
+
+                    attr_extractor = AttributeExtractor(use_embeddings=use_embeddings)
                     entity_repo = get_entity_repository()
 
                     # Preparar menciones de entidades para extract_attributes
