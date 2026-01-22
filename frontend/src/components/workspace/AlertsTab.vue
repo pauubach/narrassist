@@ -4,11 +4,13 @@ import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Dropdown from 'primevue/dropdown'
 import MultiSelect from 'primevue/multiselect'
+import Dialog from 'primevue/dialog'
 import DsBadge from '@/components/ds/DsBadge.vue'
 import DsEmptyState from '@/components/ds/DsEmptyState.vue'
 import type { Alert, AlertSeverity } from '@/types'
 import { useAlertUtils } from '@/composables/useAlertUtils'
 import { useWorkspaceStore } from '@/stores/workspace'
+import { useToast } from 'primevue/usetoast'
 
 /**
  * AlertsTab - Pestaña de gestión de alertas
@@ -16,12 +18,15 @@ import { useWorkspaceStore } from '@/stores/workspace'
  * Muestra todas las alertas del proyecto con:
  * - Filtros avanzados (severidad, categoría, estado, capítulo, confianza)
  * - Acciones de resolución y descarte
+ * - Acciones bulk (resolver todas, exportar)
  * - Navegación al texto
  */
 
 interface Props {
   /** Alertas del proyecto */
   alerts: Alert[]
+  /** ID del proyecto (para acciones bulk) */
+  projectId?: number
   /** Si está cargando */
   loading?: boolean
   /** Capítulos disponibles (para filtro) */
@@ -31,6 +36,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  projectId: 0,
   loading: false,
   chapters: () => [],
   analysisExecuted: true
@@ -40,12 +46,19 @@ const emit = defineEmits<{
   'alert-select': [alert: Alert]
   'alert-resolve': [alert: Alert]
   'alert-dismiss': [alert: Alert]
+  'alert-reopen': [alert: Alert]
   'alert-navigate': [alert: Alert]
+  'resolve-all': []
   'refresh': []
 }>()
 
-const { getSeverityConfig, getSeverityLabel } = useAlertUtils()
+const toast = useToast()
+
+const { getSeverityLabel } = useAlertUtils()
 const workspaceStore = useWorkspaceStore()
+
+// Estado para diálogos
+const showResolveAllDialog = ref(false)
 
 // Estado de filtros
 const searchQuery = ref('')
@@ -195,6 +208,77 @@ function clearFilters() {
 function handleAlertClick(alert: Alert) {
   emit('alert-select', alert)
 }
+
+function handleResolveAll() {
+  showResolveAllDialog.value = true
+}
+
+function confirmResolveAll() {
+  showResolveAllDialog.value = false
+  emit('resolve-all')
+}
+
+function handleReopen(alert: Alert) {
+  emit('alert-reopen', alert)
+}
+
+function exportAlerts() {
+  if (!props.alerts || props.alerts.length === 0) {
+    toast.add({ severity: 'warn', summary: 'Sin datos', detail: 'No hay alertas para exportar', life: 4000 })
+    return
+  }
+
+  try {
+    const content = {
+      projectId: props.projectId,
+      exportedAt: new Date().toISOString(),
+      totalAlerts: props.alerts.length,
+      bySeverity: {
+        critical: props.alerts.filter(a => a.severity === 'critical').length,
+        high: props.alerts.filter(a => a.severity === 'high').length,
+        medium: props.alerts.filter(a => a.severity === 'medium').length,
+        low: props.alerts.filter(a => a.severity === 'low').length,
+        info: props.alerts.filter(a => a.severity === 'info').length,
+      },
+      byStatus: {
+        active: props.alerts.filter(a => a.status === 'active').length,
+        resolved: props.alerts.filter(a => a.status === 'resolved').length,
+        dismissed: props.alerts.filter(a => a.status === 'dismissed').length,
+      },
+      alerts: props.alerts.map(a => ({
+        id: a.id,
+        title: a.title,
+        description: a.description,
+        severity: a.severity,
+        category: a.category,
+        status: a.status,
+        chapter: a.chapter,
+        confidence: a.confidence,
+        createdAt: a.createdAt,
+      })),
+    }
+
+    const blob = new Blob([JSON.stringify(content, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `alertas_proyecto_${props.projectId}.json`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+
+    toast.add({ severity: 'success', summary: 'Exportado', detail: `${props.alerts.length} alertas exportadas`, life: 3000 })
+  } catch (err) {
+    console.error('Error exporting alerts:', err)
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Error al exportar alertas', life: 5000 })
+  }
+}
+
+// Helper para verificar si alerta está activa
+function isAlertActive(status: string): boolean {
+  return status === 'active'
+}
 </script>
 
 <template>
@@ -285,6 +369,25 @@ function handleAlertClick(alert: Alert) {
           rounded
           @click="emit('refresh')"
           v-tooltip="'Actualizar'"
+        />
+
+        <Button
+          icon="pi pi-download"
+          text
+          rounded
+          @click="exportAlerts"
+          v-tooltip="'Exportar alertas'"
+          :disabled="alerts.length === 0"
+        />
+
+        <Button
+          icon="pi pi-check-circle"
+          text
+          rounded
+          severity="success"
+          @click="handleResolveAll"
+          v-tooltip="'Resolver todas las activas'"
+          :disabled="stats.active === 0"
         />
       </div>
     </div>
@@ -380,6 +483,26 @@ function handleAlertClick(alert: Alert) {
         </div>
       </div>
     </div>
+    <!-- Diálogo de confirmación para resolver todas -->
+    <Dialog
+      :visible="showResolveAllDialog"
+      @update:visible="showResolveAllDialog = $event"
+      header="Resolver todas las alertas"
+      :modal="true"
+      :style="{ width: '400px' }"
+    >
+      <p>
+        ¿Estás seguro de que deseas marcar como resueltas todas las
+        <strong>{{ stats.active }}</strong> alertas activas?
+      </p>
+      <p class="text-secondary text-sm">
+        Esta acción no se puede deshacer.
+      </p>
+      <template #footer>
+        <Button label="Cancelar" text @click="showResolveAllDialog = false" />
+        <Button label="Resolver todas" severity="success" @click="confirmResolveAll" />
+      </template>
+    </Dialog>
   </div>
 </template>
 

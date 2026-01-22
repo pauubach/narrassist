@@ -176,13 +176,13 @@
   --ds-alert-medium-bg: #FFFDE7;
   --ds-alert-medium-border: #FFEB3B;
 
-  --ds-alert-low: #1976D2;
-  --ds-alert-low-bg: #E3F2FD;
-  --ds-alert-low-border: #2196F3;
+  --ds-alert-low: #00897B;
+  --ds-alert-low-bg: #E0F2F1;
+  --ds-alert-low-border: #26A69A;
 
-  --ds-alert-info: #757575;
-  --ds-alert-info-bg: #F5F5F5;
-  --ds-alert-info-border: #9E9E9E;
+  --ds-alert-info: #1976D2;
+  --ds-alert-info-bg: #E3F2FD;
+  --ds-alert-info-border: #2196F3;
 
   /* Legacy aliases */
   --ds-alert-warning: var(--ds-alert-high);
@@ -411,13 +411,13 @@
   --ds-alert-medium-bg: #3E3A1F;
   --ds-alert-medium-border: #FFEB3B;
 
-  --ds-alert-low: #42A5F5;
-  --ds-alert-low-bg: #1F2D3E;
-  --ds-alert-low-border: #2196F3;
+  --ds-alert-low: #80CBC4;
+  --ds-alert-low-bg: #1F2D2C;
+  --ds-alert-low-border: #4DB6AC;
 
-  --ds-alert-info: #9E9E9E;
-  --ds-alert-info-bg: #2D2D30;
-  --ds-alert-info-border: #757575;
+  --ds-alert-info: #42A5F5;
+  --ds-alert-info-bg: #1F2D3E;
+  --ds-alert-info-border: #2196F3;
 
   /* Legacy aliases */
   --ds-alert-warning: var(--ds-alert-high);

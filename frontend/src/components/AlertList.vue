@@ -376,37 +376,43 @@ const shouldVirtualize = computed(() => {
   return filteredAlerts.value.length > VIRTUALIZATION_THRESHOLD && !props.showPagination
 })
 
-// Niveles de severidad
+// Niveles de severidad (domain values: critical, high, medium, low, info)
 const severityLevels = [
   { label: 'Todas', value: 'all', severity: 'secondary', icon: 'pi pi-list' },
   { label: 'Críticas', value: 'critical', severity: 'danger', icon: 'pi pi-exclamation-circle' },
-  { label: 'Advertencias', value: 'warning', severity: 'warning', icon: 'pi pi-exclamation-triangle' },
-  { label: 'Info', value: 'info', severity: 'info', icon: 'pi pi-info-circle' },
-  { label: 'Sugerencias', value: 'hint', severity: 'secondary', icon: 'pi pi-lightbulb' }
+  { label: 'Altas', value: 'high', severity: 'warn', icon: 'pi pi-exclamation-triangle' },
+  { label: 'Medias', value: 'medium', severity: 'warn', icon: 'pi pi-info-circle' },
+  { label: 'Bajas', value: 'low', severity: 'secondary', icon: 'pi pi-circle' },
+  { label: 'Info', value: 'info', severity: 'info', icon: 'pi pi-lightbulb' }
 ]
 
-// Opciones de categorías
+// Opciones de categorías (domain values)
 const categoryOptions = [
   { label: 'Todas', value: 'all' },
-  { label: 'Consistencia', value: 'consistency' },
-  { label: 'Continuidad', value: 'continuity' },
-  { label: 'Caracterización', value: 'characterization' },
-  { label: 'Cronología', value: 'chronology' },
-  { label: 'Estilo', value: 'style' }
+  { label: 'Atributos', value: 'attribute' },
+  { label: 'Línea temporal', value: 'timeline' },
+  { label: 'Relaciones', value: 'relationship' },
+  { label: 'Ubicación', value: 'location' },
+  { label: 'Comportamiento', value: 'behavior' },
+  { label: 'Conocimiento', value: 'knowledge' },
+  { label: 'Estilo', value: 'style' },
+  { label: 'Gramática', value: 'grammar' },
+  { label: 'Estructura', value: 'structure' },
+  { label: 'Otros', value: 'other' }
 ]
 
-// Opciones de estado
+// Opciones de estado (domain values: active, dismissed, resolved)
 const statusOptions = [
   { label: 'Todas', value: 'all' },
-  { label: 'Abiertas', value: 'open' },  // Incluye new, open, acknowledged, in_progress
+  { label: 'Activas', value: 'active' },
   { label: 'Resueltas', value: 'resolved' },
   { label: 'Descartadas', value: 'dismissed' }
 ]
 
-// Helper para verificar si una alerta está "abierta"
+// Helper para verificar si una alerta está "activa" (domain: active, or legacy API statuses)
 const isAlertOpenStatus = (status: string): boolean => {
-  const openStatuses = ['new', 'open', 'acknowledged', 'in_progress']
-  return openStatuses.includes(status)
+  const activeStatuses = ['active', 'new', 'open', 'acknowledged', 'in_progress']
+  return activeStatuses.includes(status)
 }
 
 // Computed - Optimizado con memoización por etapas y debounced search
@@ -431,7 +437,8 @@ const statusFilteredAlerts = computed(() => {
   if (selectedStatus.value === 'all') {
     return categoryFilteredAlerts.value
   }
-  if (selectedStatus.value === 'open') {
+  // 'active' covers legacy statuses: new, open, acknowledged, in_progress
+  if (selectedStatus.value === 'active') {
     return categoryFilteredAlerts.value.filter(a => isAlertOpenStatus(a.status))
   }
   return categoryFilteredAlerts.value.filter(a => a.status === selectedStatus.value)
@@ -489,50 +496,83 @@ const getSeverityCount = (severity: string): number => {
 }
 
 const getSeverityColor = (severity: string): string => {
+  // Map domain severities to PrimeVue Tag severities
   const colors: Record<string, string> = {
     'critical': 'danger',
-    'warning': 'warning',
+    'high': 'warn',
+    'medium': 'warn',
+    'low': 'secondary',
     'info': 'info',
+    // Legacy API severities (just in case)
+    'warning': 'warn',
     'hint': 'secondary'
   }
   return colors[severity] || 'secondary'
 }
 
 const getSeverityIcon = (severity: string): string => {
+  // Map domain severities to icons
   const icons: Record<string, string> = {
     'critical': 'pi pi-exclamation-circle',
+    'high': 'pi pi-exclamation-triangle',
+    'medium': 'pi pi-info-circle',
+    'low': 'pi pi-circle',
+    'info': 'pi pi-lightbulb',
+    // Legacy API severities
     'warning': 'pi pi-exclamation-triangle',
-    'info': 'pi pi-info-circle',
     'hint': 'pi pi-lightbulb'
   }
   return icons[severity] || 'pi pi-info-circle'
 }
 
 const getCategoryLabel = (category: string): string => {
+  // Domain category labels
   const labels: Record<string, string> = {
+    'attribute': 'Atributos',
+    'timeline': 'Línea temporal',
+    'relationship': 'Relaciones',
+    'location': 'Ubicación',
+    'behavior': 'Comportamiento',
+    'knowledge': 'Conocimiento',
+    'style': 'Estilo',
+    'grammar': 'Gramática',
+    'structure': 'Estructura',
+    'other': 'Otros',
+    // Legacy API categories
     'consistency': 'Consistencia',
     'continuity': 'Continuidad',
     'characterization': 'Caracterización',
-    'chronology': 'Cronología',
-    'style': 'Estilo'
+    'chronology': 'Cronología'
   }
   return labels[category] || category
 }
 
 const getStatusSeverity = (status: string): string => {
+  // Domain status values: active, dismissed, resolved
   const severities: Record<string, string> = {
-    'open': 'warning',
+    'active': 'warn',
     'resolved': 'success',
-    'dismissed': 'secondary'
+    'dismissed': 'secondary',
+    // Legacy API statuses
+    'open': 'warn',
+    'new': 'warn',
+    'acknowledged': 'warn',
+    'in_progress': 'warn'
   }
   return severities[status] || 'secondary'
 }
 
 const getStatusLabel = (status: string): string => {
+  // Domain status values: active, dismissed, resolved
   const labels: Record<string, string> = {
-    'open': 'Abierta',
+    'active': 'Activa',
     'resolved': 'Resuelta',
-    'dismissed': 'Descartada'
+    'dismissed': 'Descartada',
+    // Legacy API statuses
+    'open': 'Abierta',
+    'new': 'Nueva',
+    'acknowledged': 'Vista',
+    'in_progress': 'En progreso'
   }
   return labels[status] || status
 }
@@ -681,20 +721,34 @@ watch(() => props.alerts, () => {
   flex-shrink: 0;
 }
 
+/* Domain severity colors */
 .alert-severity-bar.severity-critical {
-  background: var(--red-500);
+  background: var(--ds-alert-critical, var(--red-500));
 }
 
-.alert-severity-bar.severity-warning {
-  background: var(--yellow-500);
+.alert-severity-bar.severity-high {
+  background: var(--ds-alert-high, var(--orange-500));
+}
+
+.alert-severity-bar.severity-medium {
+  background: var(--ds-alert-medium, var(--yellow-500));
+}
+
+.alert-severity-bar.severity-low {
+  background: var(--ds-alert-low, #80CBC4);
 }
 
 .alert-severity-bar.severity-info {
-  background: var(--blue-500);
+  background: var(--ds-alert-info, var(--blue-500));
+}
+
+/* Legacy API severity names (fallback) */
+.alert-severity-bar.severity-warning {
+  background: var(--ds-alert-high, var(--orange-500));
 }
 
 .alert-severity-bar.severity-hint {
-  background: var(--surface-400);
+  background: var(--ds-alert-low, var(--surface-400));
 }
 
 .alert-content {

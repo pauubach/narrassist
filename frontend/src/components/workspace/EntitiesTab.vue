@@ -18,6 +18,7 @@ import RejectEntityDialog from '@/components/RejectEntityDialog.vue'
 import type { Entity, MergeHistoryEntry, EntityAttribute } from '@/types'
 import { useEntityUtils } from '@/composables/useEntityUtils'
 import { useWorkspaceStore } from '@/stores/workspace'
+import { useSelectionStore } from '@/stores/selection'
 import { useRouter, useRoute } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 
@@ -56,6 +57,7 @@ const toast = useToast()
 const router = useRouter()
 const route = useRoute()
 const workspaceStore = useWorkspaceStore()
+const selectionStore = useSelectionStore()
 const { getEntityIcon, getEntityLabel, getEntityColor } = useEntityUtils()
 
 // Estado de filtros
@@ -460,7 +462,7 @@ async function onUndoMergeFromHistory(entry: MergeHistoryEntry) {
 }
 
 function viewMentions(entity: Entity) {
-  // Seleccionar la entidad
+  // Seleccionar la entidad correcta para mostrar en el inspector
   emit('entity-select', entity)
   // Navegar a la pestaña de texto mostrando las menciones de esta entidad
   workspaceStore.navigateToEntityMentions(entity.id)
@@ -525,6 +527,21 @@ function getImportanceSeverity(importance: string): string {
     'minor': 'secondary'
   }
   return severities[importance] || 'secondary'
+}
+
+// Mapeo para DsBadge severity (usa los valores del design system)
+function getImportanceSeverityForBadge(importance: string): 'critical' | 'high' | 'medium' | 'low' | 'info' {
+  const severities: Record<string, 'critical' | 'high' | 'medium' | 'low' | 'info'> = {
+    'main': 'high',       // Naranja - Principal
+    'principal': 'high',
+    'high': 'medium',     // Amarillo - Alto
+    'secondary': 'low',   // Azul - Secundario
+    'medium': 'low',
+    'minor': 'info',      // Gris - Menor
+    'low': 'info',
+    'minimal': 'info'
+  }
+  return severities[importance] || 'info'
 }
 
 function getImportanceLabel(importance: string): string {
@@ -797,12 +814,11 @@ function navigateToAttributeSource(attr: EntityAttribute) {
               <div class="entity-header-info">
                 <h2 class="entity-title">{{ selectedEntity.name }}</h2>
                 <div class="entity-badges">
-                  <Tag :severity="getTypeSeverity(selectedEntity.type)">{{ getEntityLabel(selectedEntity.type) }}</Tag>
-                  <Tag :severity="getImportanceSeverity(selectedEntity.importance)">{{ getImportanceLabel(selectedEntity.importance) }}</Tag>
-                  <Tag v-if="selectedEntity.mergedFromIds && selectedEntity.mergedFromIds.length > 0" severity="info">
-                    <i class="pi pi-link" style="font-size: 0.625rem; margin-right: 0.25rem;"></i>
+                  <DsBadge :entity-type="selectedEntity.type">{{ getEntityLabel(selectedEntity.type) }}</DsBadge>
+                  <DsBadge :severity="getImportanceSeverityForBadge(selectedEntity.importance)">{{ getImportanceLabel(selectedEntity.importance) }}</DsBadge>
+                  <DsBadge v-if="selectedEntity.mergedFromIds && selectedEntity.mergedFromIds.length > 0" color="info" icon="pi pi-link">
                     Fusionada
-                  </Tag>
+                  </DsBadge>
                 </div>
               </div>
             </div>

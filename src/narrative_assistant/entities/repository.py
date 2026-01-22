@@ -222,6 +222,27 @@ class EntityRepository:
             cursor = conn.execute(sql, (entity_id,))
             return cursor.rowcount > 0
 
+    def delete_entities_by_project(self, project_id: int) -> int:
+        """
+        Elimina todas las entidades de un proyecto (hard delete).
+
+        También elimina las menciones asociadas gracias a ON DELETE CASCADE.
+
+        Args:
+            project_id: ID del proyecto
+
+        Returns:
+            Número de entidades eliminadas
+        """
+        with self.db.connection() as conn:
+            cursor = conn.execute(
+                "DELETE FROM entities WHERE project_id = ?",
+                (project_id,),
+            )
+            count = cursor.rowcount
+            logger.info(f"Deleted {count} entities for project {project_id}")
+            return count
+
     def increment_mention_count(self, entity_id: int, delta: int = 1) -> None:
         """Incrementa el contador de menciones."""
         self.db.execute(

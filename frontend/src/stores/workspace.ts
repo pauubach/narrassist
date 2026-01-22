@@ -120,6 +120,9 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   /** Texto a resaltar al hacer scroll */
   const scrollToText = ref<string | null>(null)
 
+  /** ID del capítulo al que hacer scroll (para navegación directa) */
+  const scrollToChapterId = ref<number | null>(null)
+
   // ============================================================================
   // Getters
   // ============================================================================
@@ -291,12 +294,14 @@ export const useWorkspaceStore = defineStore('workspace', () => {
 
   /**
    * Navega a una posición específica en el texto
-   * @param position Posición de carácter (global en el documento)
+   * @param position Posición de carácter (dentro del capítulo si chapterId se proporciona, sino global)
    * @param text Texto a resaltar (opcional, para mejor precisión)
+   * @param chapterId ID del capítulo (opcional, para navegación directa)
    */
-  function navigateToTextPosition(position: number, text?: string) {
+  function navigateToTextPosition(position: number, text?: string, chapterId?: number | null) {
     scrollToPosition.value = position
     scrollToText.value = text || null
+    scrollToChapterId.value = chapterId || null
     setActiveTab('text')
   }
 
@@ -306,6 +311,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   function clearScrollToPosition() {
     scrollToPosition.value = null
     scrollToText.value = null
+    scrollToChapterId.value = null
   }
 
   /**
@@ -333,6 +339,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     selectedEntityForMentions.value = null
     scrollToPosition.value = null
     scrollToText.value = null
+    scrollToChapterId.value = null
   }
 
   return {
@@ -348,6 +355,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     selectedEntityForMentions,
     scrollToPosition,
     scrollToText,
+    scrollToChapterId,
 
     // Getters
     centerWidth,

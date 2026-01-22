@@ -30,13 +30,19 @@ const isExecuted = computed(() =>
   analysisStore.isPhaseExecuted(props.projectId, props.requiredPhase)
 )
 
-// Verificar si esta fase está corriendo O si hay análisis global en progreso para este proyecto
+// Verificar si esta fase específica está corriendo
+// IMPORTANTE: Si la fase requerida ya se ejecutó, NO mostrar overlay de "ejecutando"
+// aunque otras fases del análisis sigan corriendo
 const isRunning = computed(() => {
+  // Si la fase ya se ejecutó, no bloquear aunque el análisis general siga
+  if (isExecuted.value) {
+    return false
+  }
   // Si esta fase específica está corriendo
   if (analysisStore.isPhaseRunning(props.requiredPhase)) {
     return true
   }
-  // Si hay un análisis global en curso para este proyecto
+  // Si hay un análisis global en curso para este proyecto Y la fase no está ejecutada
   if (analysisStore.isAnalyzing && analysisStore.currentAnalysis?.project_id === props.projectId) {
     return true
   }

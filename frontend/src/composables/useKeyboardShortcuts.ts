@@ -42,18 +42,31 @@ export function useKeyboardShortcuts() {
       window.dispatchEvent(new CustomEvent('keyboard:toggle-sidebar'))
     } else if (modifier && key === 'e') {
       event.preventDefault()
-      // Navegar al proyecto y mostrar pestaña de entidades
+      // Ir al tab de entidades si estamos en un proyecto
       const currentRoute = router.currentRoute.value
-      const projectId = currentRoute.params.id || currentRoute.params.projectId
-      if (projectId) {
-        router.push({ name: 'project', params: { id: projectId }, query: { tab: 'entities' } })
+      if (currentRoute.params.id || currentRoute.params.projectId) {
+        window.dispatchEvent(new CustomEvent('menubar:view-tab', { detail: { tab: 'entities' } }))
       }
     } else if (modifier && key === 'a') {
       event.preventDefault()
-      // Navegar a alertas si estamos en un proyecto
+      // Ir al tab de alertas si estamos en un proyecto
       const currentRoute = router.currentRoute.value
-      if (currentRoute.params.id) {
-        router.push({ name: 'alerts', params: { id: currentRoute.params.id } })
+      if (currentRoute.params.id || currentRoute.params.projectId) {
+        window.dispatchEvent(new CustomEvent('menubar:view-tab', { detail: { tab: 'alerts' } }))
+      }
+    } else if (modifier && key === 't') {
+      event.preventDefault()
+      // Ir al tab de texto si estamos en un proyecto
+      const currentRoute = router.currentRoute.value
+      if (currentRoute.params.id || currentRoute.params.projectId) {
+        window.dispatchEvent(new CustomEvent('menubar:view-tab', { detail: { tab: 'text' } }))
+      }
+    } else if (modifier && key === 'r') {
+      event.preventDefault()
+      // Ir al tab de relaciones si estamos en un proyecto
+      const currentRoute = router.currentRoute.value
+      if (currentRoute.params.id || currentRoute.params.projectId) {
+        window.dispatchEvent(new CustomEvent('menubar:view-tab', { detail: { tab: 'relations' } }))
       }
     } else if (modifier && key === 'd') {
       event.preventDefault()
@@ -144,8 +157,10 @@ export const KEYBOARD_SHORTCUTS = [
       { keys: ['Ctrl/Cmd', 'H'], description: 'Ir a inicio' },
       { keys: ['Ctrl/Cmd', 'P'], description: 'Ir a proyectos' },
       { keys: ['Ctrl/Cmd', 'D'], description: 'Ir al dashboard del proyecto' },
-      { keys: ['Ctrl/Cmd', 'E'], description: 'Ir a entidades' },
-      { keys: ['Ctrl/Cmd', 'A'], description: 'Ir a alertas' },
+      { keys: ['Ctrl/Cmd', 'T'], description: 'Ir a pestaña Texto' },
+      { keys: ['Ctrl/Cmd', 'E'], description: 'Ir a pestaña Entidades' },
+      { keys: ['Ctrl/Cmd', 'R'], description: 'Ir a pestaña Relaciones' },
+      { keys: ['Ctrl/Cmd', 'A'], description: 'Ir a pestaña Alertas' },
       { keys: ['Ctrl/Cmd', ','], description: 'Abrir configuración' }
     ]
   },

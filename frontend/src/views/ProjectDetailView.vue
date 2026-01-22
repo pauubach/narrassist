@@ -34,10 +34,9 @@
           />
           <Button label="Exportar" icon="pi pi-download" outlined @click="showExportDialog = true" />
           <Button
-            :label="hasBeenAnalyzed ? 'Re-analizar' : 'Analizar'"
-            :icon="hasBeenAnalyzed ? 'pi pi-refresh' : 'pi pi-play'"
+            :label="isAnalyzing ? 'Analizando...' : (hasBeenAnalyzed ? 'Re-analizar' : 'Analizar')"
+            :icon="isAnalyzing ? 'pi pi-spin pi-spinner' : (hasBeenAnalyzed ? 'pi pi-refresh' : 'pi pi-play')"
             :disabled="isAnalyzing"
-            :loading="isAnalyzing"
             @click="showReanalyzeDialog = true"
           />
         </div>
@@ -423,7 +422,10 @@ let entitiesLoadedDuringAnalysis = false
 const isAnalyzing = computed(() => {
   if (!project.value) return false
   const status = project.value.analysisStatus
-  return status === 'pending' || status === 'in_progress' || status === 'analyzing'
+  // Solo estados activos de análisis deshabilitan el botón
+  // Si el status es null, undefined, 'completed', 'error', etc. - permitir re-analizar
+  const activeStatuses = ['pending', 'in_progress', 'analyzing']
+  return status ? activeStatuses.includes(status) : false
 })
 
 /** Indica si el proyecto ya fue analizado alguna vez (tiene capítulos o entidades) */
@@ -448,7 +450,8 @@ const analysisPhase = computed(() => {
 // Polling del progreso de análisis
 async function pollAnalysisProgress() {
   if (!project.value) {
-    console.log('[Polling] No project, skipping')
+    console.log('[Polling] No project, stopping polling')
+    stopAnalysisPolling()
     return
   }
 
@@ -458,46 +461,79 @@ async function pollAnalysisProgress() {
     const progressData = await analysisStore.getProgress(project.value.id)
     console.log('[Polling] Progress data:', progressData)
 
-    if (progressData) {
-      analysisProgressData.value = {
-        progress: progressData.progress || 0,
-        phase: progressData.current_phase || 'Analizando...',
-        error: progressData.error,
-        metrics: progressData.metrics
-      }
+    // Si no hay datos de progreso, significa que no hay análisis activo
+    // Detener el polling para evitar llamadas innecesarias
+    if (!progressData) {
+      console.log('[Polling] No progress data returned, stopping polling')
+      stopAnalysisPolling()
+      analysisProgressData.value = null
+      return
+    }
 
-      // Si hay capítulos disponibles y aún no los cargamos, cargarlos ahora
-      const chaptersFound = progressData.metrics?.chapters_found
-      if (chaptersFound && chaptersFound > 0 && !chaptersLoadedDuringAnalysis && chapters.value.length === 0) {
-        console.log('[Polling] Chapters found in analysis, loading chapters:', chaptersFound)
-        chaptersLoadedDuringAnalysis = true
-        loadChapters(project.value!.id)
-      }
+    analysisProgressData.value = {
+      progress: progressData.progress || 0,
+      phase: progressData.current_phase || 'Analizando...',
+      error: progressData.error,
+      metrics: progressData.metrics
+    }
 
-      // Si hay entidades disponibles y aún no las cargamos, cargarlas ahora
-      const entitiesFound = progressData.metrics?.entities_found
-      if (entitiesFound && entitiesFound > 0 && !entitiesLoadedDuringAnalysis && entities.value.length === 0) {
-        console.log('[Polling] Entities found in analysis, loading entities:', entitiesFound)
-        entitiesLoadedDuringAnalysis = true
-        loadEntities(project.value!.id)
-      }
+    // Si hay capítulos disponibles y aún no los cargamos, cargarlos ahora
+    const chaptersFound = progressData.metrics?.chapters_found
+    if (chaptersFound && chaptersFound > 0 && !chaptersLoadedDuringAnalysis && chapters.value.length === 0) {
+      console.log('[Polling] Chapters found in analysis, loading chapters:', chaptersFound)
+      chaptersLoadedDuringAnalysis = true
+      loadChapters(project.value!.id)
+    }
 
-      // Si completado o error, detener polling y recargar datos
-      if (progressData.status === 'completed' || progressData.status === 'error' || progressData.status === 'failed') {
-        console.log('[Polling] Analysis finished with status:', progressData.status)
-        stopAnalysisPolling()
-        // Recargar proyecto y datos
-        await projectsStore.fetchProject(project.value!.id)
-        // Recargar fases ejecutadas para actualizar tabs
-        await analysisStore.loadExecutedPhases(project.value!.id)
-        await loadEntities(project.value!.id)
-        await loadAlerts(project.value!.id)
-        await loadChapters(project.value!.id)
-        analysisProgressData.value = null
+    // Si hay entidades disponibles y aún no las cargamos, cargarlas ahora
+    const entitiesFound = progressData.metrics?.entities_found
+    if (entitiesFound && entitiesFound > 0 && !entitiesLoadedDuringAnalysis && entities.value.length === 0) {
+      console.log('[Polling] Entities found in analysis, loading entities:', entitiesFound)
+      entitiesLoadedDuringAnalysis = true
+      loadEntities(project.value!.id)
+    }
+
+    // Si idle (no hay análisis activo), detener polling silenciosamente
+    if (progressData.status === 'idle') {
+      console.log('[Polling] No active analysis (idle), stopping polling')
+      stopAnalysisPolling()
+      analysisProgressData.value = null
+      return
+    }
+
+    // Si completado o error, detener polling y recargar datos
+    if (progressData.status === 'completed' || progressData.status === 'error' || progressData.status === 'failed') {
+      console.log('[Polling] Analysis finished with status:', progressData.status)
+      stopAnalysisPolling()
+
+      // Pequeño delay para asegurar que la BD se haya actualizado completamente
+      // (el análisis corre en background thread y puede haber una condición de carrera)
+      await new Promise(resolve => setTimeout(resolve, 500))
+
+      // Recargar proyecto y datos
+      await projectsStore.fetchProject(project.value!.id)
+      // Recargar fases ejecutadas para actualizar tabs
+      await analysisStore.loadExecutedPhases(project.value!.id)
+      await loadEntities(project.value!.id)
+      await loadAlerts(project.value!.id)
+      await loadChapters(project.value!.id)
+      analysisProgressData.value = null
+
+      // Verificar que los datos se cargaron correctamente
+      // Si wordCount sigue siendo 0 pero hay capítulos, reintentar
+      if (project.value && project.value.wordCount === 0 && (progressData.metrics?.chapters_found || 0) > 0) {
+        console.log('[Polling] Data seems stale, retrying fetch after delay...')
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        await projectsStore.fetchProject(project.value.id)
+        await loadChapters(project.value.id)
       }
     }
   } catch (err) {
     console.error('Error polling analysis progress:', err)
+    // Si hay error de red o el endpoint no responde, detener polling
+    // para evitar spam de errores
+    console.log('[Polling] Stopping polling due to error')
+    stopAnalysisPolling()
   }
 }
 

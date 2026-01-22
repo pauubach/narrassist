@@ -131,8 +131,10 @@
         </div>
 
         <div v-if="chapters.length === 0" class="no-content">
-          <i class="pi pi-file"></i>
-          <p>No hay contenido disponible</p>
+          <ProgressSpinner v-if="loading" style="width: 40px; height: 40px" />
+          <i v-else class="pi pi-file-edit"></i>
+          <p>{{ loading ? 'Leyendo documento...' : 'Identificando capítulos...' }}</p>
+          <small class="text-secondary">El contenido aparecerá en breve</small>
         </div>
       </div>
     </div>
@@ -588,11 +590,88 @@ const getHighlightedContent = (chapter: Chapter): string => {
     }
   }
 
-  // Convertir saltos de línea en párrafos
+  // Convertir saltos de línea en párrafos y detectar encabezados de sección
   return content
     .split('\n\n')
-    .map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`)
+    .map(block => {
+      const trimmedBlock = block.trim()
+
+      // Detectar si el bloque es un encabezado de sección
+      // Criterios: línea corta (< 80 chars), sin punto final, posiblemente con numeración
+      if (trimmedBlock.length > 0 && trimmedBlock.length < 80 && !trimmedBlock.includes('\n')) {
+        const isHeading = detectSectionHeading(trimmedBlock)
+        if (isHeading) {
+          return `<div class="section-${isHeading.level}">${block}</div>`
+        }
+      }
+
+      return `<p>${block.replace(/\n/g, '<br>')}</p>`
+    })
     .join('')
+}
+
+/**
+ * Detecta si un bloque de texto es un encabezado de sección
+ * Retorna el nivel del encabezado (h2, h3, h4, h5) o null si no es encabezado
+ */
+function detectSectionHeading(text: string): { level: 'h2' | 'h3' | 'h4' | 'h5' } | null {
+  const trimmed = text.trim()
+
+  // No considerar líneas muy cortas (< 3 chars) o muy largas (> 70 chars)
+  if (trimmed.length < 3 || trimmed.length > 70) return null
+
+  // No considerar líneas que terminan en punto, coma, etc. (probablemente son oraciones)
+  if (/[.,;:!?]$/.test(trimmed)) return null
+
+  // No considerar líneas que empiezan con minúscula (probablemente continuación)
+  if (/^[a-záéíóúñ]/.test(trimmed)) return null
+
+  // Patrones para H2 (secciones principales)
+  // - "PARTE I", "PARTE PRIMERA", "SECCIÓN 1", etc.
+  // - "I. Titulo", "II. Titulo" (numeración romana)
+  // - Todo en mayúsculas
+  if (
+    /^(PARTE|SECCIÓN|SECCION|LIBRO|ACTO|CAPÍTULO|CAPITULO)\s+/i.test(trimmed) ||
+    /^[IVXLCDM]+[\.\:\s]/i.test(trimmed) ||
+    (trimmed === trimmed.toUpperCase() && trimmed.length > 3 && /[A-Z]/.test(trimmed))
+  ) {
+    return { level: 'h2' }
+  }
+
+  // Patrones para H3 (subsecciones)
+  // - "1. Titulo", "2. Titulo" (numeración arábiga)
+  // - "1.1 Titulo", "1.2 Titulo" (numeración decimal simple)
+  // - Líneas cortas que empiezan con mayúscula y tienen estructura de título
+  if (
+    /^\d+\.\s+[A-ZÁÉÍÓÚÑ]/.test(trimmed) ||
+    /^\d+\.\d+\s+[A-ZÁÉÍÓÚÑ]/.test(trimmed)
+  ) {
+    return { level: 'h3' }
+  }
+
+  // Patrones para H4 (sub-subsecciones)
+  // - "a) Titulo", "b) Titulo"
+  // - "1.1.1 Titulo" (numeración decimal doble)
+  // - Líneas cortas con guion inicial
+  if (
+    /^[a-z]\)\s+[A-ZÁÉÍÓÚÑ]/.test(trimmed) ||
+    /^\d+\.\d+\.\d+\s+/.test(trimmed) ||
+    /^[-–—]\s+[A-ZÁÉÍÓÚÑ]/.test(trimmed)
+  ) {
+    return { level: 'h4' }
+  }
+
+  // Patrones para H5 (nivel más bajo)
+  // - "i) Titulo", "ii) Titulo" (numeración romana minúscula)
+  // - Numeración más profunda
+  if (
+    /^[ivx]+\)\s+/i.test(trimmed) ||
+    /^\d+\.\d+\.\d+\.\d+\s+/.test(trimmed)
+  ) {
+    return { level: 'h5' }
+  }
+
+  return null
 }
 
 // Helpers
@@ -608,58 +687,101 @@ const escapeRegex = (text: string | undefined | null): string => {
 }
 
 // Scroll a capítulo específico
-const scrollToChapter = (chapterId: number) => {
-  nextTick(() => {
-    const element = viewerContainer.value?.querySelector(`[data-chapter-id="${chapterId}"]`)
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+const scrollToChapter = async (chapterId: number) => {
+  // Encontrar el índice del capítulo objetivo
+  const targetIndex = chapters.value.findIndex(ch => ch.id === chapterId)
+  if (targetIndex === -1) {
+    console.warn(`Chapter ${chapterId} not found`)
+    return
+  }
+
+  // Cargar todos los capítulos desde el inicio hasta el objetivo
+  // Esto asegura que las alturas del DOM sean correctas para el scroll
+  for (let i = 0; i <= targetIndex; i++) {
+    const chId = chapters.value[i].id
+    if (!loadedChapters.value.has(chId)) {
+      loadedChapters.value.add(chId)
+      touchChapter(chId)
     }
-  })
+  }
+
+  // Esperar a que Vue actualice el DOM
+  await nextTick()
+
+  // Dar tiempo adicional para renderizado
+  await new Promise(resolve => setTimeout(resolve, 50))
+
+  const element = viewerContainer.value?.querySelector(`[data-chapter-id="${chapterId}"]`)
+  if (element) {
+    element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 }
 
 // Variable para almacenar el highlight temporal
 const temporaryHighlightClass = 'mention-highlight-active'
 
 // Scroll a una mención específica dentro del documento
-const scrollToMention = (target: ScrollTarget) => {
-  // Primero asegurarse de que el capítulo está cargado
-  loadedChapters.value.add(target.chapterId)
+const scrollToMention = async (target: ScrollTarget) => {
+  // Para que el scroll sea preciso, necesitamos cargar todos los capítulos
+  // desde el inicio hasta el capítulo objetivo, ya que el contenido cargado
+  // afecta las alturas del DOM y por tanto la posición de scroll
 
-  nextTick(() => {
-    const chapterElement = viewerContainer.value?.querySelector(`[data-chapter-id="${target.chapterId}"]`)
-    if (!chapterElement) return
+  // Encontrar el índice del capítulo objetivo
+  const targetIndex = chapters.value.findIndex(ch => ch.id === target.chapterId)
+  if (targetIndex === -1) {
+    console.warn(`Chapter ${target.chapterId} not found`)
+    return
+  }
 
-    // Hacer scroll al capítulo primero
-    chapterElement.scrollIntoView({ behavior: 'smooth', block: 'start' })
-
-    // Si hay texto específico a buscar
-    if (target.text) {
-      // Calcular la posición ajustada dentro del capítulo
-      const chapter = chapters.value.find(ch => ch.id === target.chapterId)
-      let adjustedPosition: number | undefined = undefined
-
-      if (chapter && target.position !== undefined) {
-        const titleOffset = getTitleOffset(chapter.content, chapter.title)
-        adjustedPosition = target.position - titleOffset
-      }
-
-      nextTick(() => {
-        // Pasar la posición ajustada para encontrar la ocurrencia correcta
-        highlightTextInChapter(chapterElement, target.text!, adjustedPosition)
-      })
-    } else if (target.position !== undefined) {
-      // Si solo hay posición, calcular el elemento aproximado
-      const chapter = chapters.value.find(ch => ch.id === target.chapterId)
-      let adjustedPosition = target.position
-      if (chapter) {
-        const titleOffset = getTitleOffset(chapter.content, chapter.title)
-        adjustedPosition = adjustedPosition - titleOffset
-      }
-      nextTick(() => {
-        highlightPositionInChapter(chapterElement, adjustedPosition)
-      })
+  // Cargar todos los capítulos desde el inicio hasta el objetivo (inclusive)
+  // Esto asegura que la altura del documento sea correcta
+  for (let i = 0; i <= targetIndex; i++) {
+    const chapterId = chapters.value[i].id
+    if (!loadedChapters.value.has(chapterId)) {
+      loadedChapters.value.add(chapterId)
+      touchChapter(chapterId)
     }
-  })
+  }
+
+  // Esperar a que Vue actualice el DOM con todos los capítulos cargados
+  await nextTick()
+
+  // Dar tiempo adicional para que el contenido HTML se renderice completamente
+  // (especialmente importante para capítulos con mucho contenido)
+  await new Promise(resolve => setTimeout(resolve, 100))
+
+  const chapterElement = viewerContainer.value?.querySelector(`[data-chapter-id="${target.chapterId}"]`)
+  if (!chapterElement) {
+    console.warn(`Chapter element not found for ${target.chapterId}`)
+    return
+  }
+
+  // Si hay texto específico a buscar, ir directamente a él (evitar doble scroll)
+  if (target.text) {
+    // Calcular la posición ajustada dentro del capítulo
+    const chapter = chapters.value.find(ch => ch.id === target.chapterId)
+    let adjustedPosition: number | undefined = undefined
+
+    if (chapter && target.position !== undefined) {
+      const titleOffset = getTitleOffset(chapter.content, chapter.title)
+      adjustedPosition = target.position - titleOffset
+    }
+
+    // Resaltar directamente el texto (incluye scroll)
+    highlightTextInChapter(chapterElement, target.text!, adjustedPosition)
+  } else if (target.position !== undefined) {
+    // Si solo hay posición, calcular el elemento aproximado
+    const chapter = chapters.value.find(ch => ch.id === target.chapterId)
+    let adjustedPosition = target.position
+    if (chapter) {
+      const titleOffset = getTitleOffset(chapter.content, chapter.title)
+      adjustedPosition = adjustedPosition - titleOffset
+    }
+    highlightPositionInChapter(chapterElement, adjustedPosition)
+  } else {
+    // Si no hay texto ni posición, scroll al capítulo
+    chapterElement.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 }
 
 // Resalta un texto específico dentro del capítulo
@@ -741,10 +863,8 @@ const highlightTextInChapter = (chapterElement: Element, text: string, position?
     return
   }
 
-  // Scroll al elemento resaltado
-  setTimeout(() => {
-    highlightSpan.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  }, 100)
+  // Scroll al elemento resaltado (único scroll, no hay doble)
+  highlightSpan.scrollIntoView({ behavior: 'smooth', block: 'center' })
 
   // Animación de entrada
   highlightSpan.classList.add('highlight-entering')
@@ -1099,6 +1219,8 @@ defineExpose({
 
 .chapter-section {
   margin-bottom: 3rem;
+  /* Offset for scroll-to navigation to account for toolbar */
+  scroll-margin-top: 80px;
 }
 
 .chapter-title {
@@ -1122,6 +1244,50 @@ defineExpose({
 
 .chapter-text :deep(p:last-child) {
   margin-bottom: 0;
+}
+
+/* Section headings inside chapter content (H2, H3, H4) - different sizes for visual hierarchy */
+.chapter-text :deep(h2),
+.chapter-text :deep(.section-h2) {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--app-document-text, var(--p-text-color, #1f2937));
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--p-surface-200, #e5e5e5);
+  scroll-margin-top: 80px;
+}
+
+.chapter-text :deep(h3),
+.chapter-text :deep(.section-h3) {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--app-document-text, var(--p-text-color, #1f2937));
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+  scroll-margin-top: 80px;
+}
+
+.chapter-text :deep(h4),
+.chapter-text :deep(.section-h4) {
+  font-size: 1.1rem;
+  font-weight: 600;
+  font-style: italic;
+  color: var(--p-text-muted-color, var(--text-color-secondary, #6b7280));
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
+  scroll-margin-top: 80px;
+}
+
+.chapter-text :deep(h5),
+.chapter-text :deep(.section-h5) {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--p-text-muted-color, var(--text-color-secondary, #6b7280));
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+  scroll-margin-top: 80px;
 }
 
 /* Resaltado de entidades */

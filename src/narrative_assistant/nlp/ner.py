@@ -62,13 +62,22 @@ class ExtractedEntity:
 
     def __post_init__(self):
         """Normaliza el texto y la forma canónica."""
-        # Limpiar guiones y espacios al final del texto (errores de segmentación)
-        # Mantiene el texto original pero ajusta end_char
-        clean_text = self.text.rstrip('–—- ')
+        # Puntuación que no debería aparecer en bordes de entidades
+        BOUNDARY_PUNCT = '–—-,.;:!?¿¡\'\"()[]{}«»""'' '
+
+        # Limpiar puntuación al final del texto (errores de segmentación)
+        clean_text = self.text.rstrip(BOUNDARY_PUNCT)
         if clean_text != self.text:
             chars_removed = len(self.text) - len(clean_text)
             self.text = clean_text
             self.end_char = self.end_char - chars_removed
+
+        # Limpiar puntuación al inicio del texto (errores de segmentación)
+        clean_text = self.text.lstrip(BOUNDARY_PUNCT)
+        if clean_text != self.text:
+            chars_removed = len(self.text) - len(clean_text)
+            self.text = clean_text
+            self.start_char = self.start_char + chars_removed
 
         # Normalizar forma canónica
         if self.canonical_form is None:
@@ -1086,14 +1095,22 @@ JSON:"""
             logger.debug(f"Entidad spaCy filtrada (segmentación): '{text[:50]}...'")
             return False
 
+        # Puntuación que no debería aparecer en bordes de entidades
+        # Incluye signos de apertura españoles ¿¡ y otros símbolos comunes
+        BOUNDARY_PUNCTUATION = '.,:;!?¿¡–—-\'\"()[]{}«»""'''
+
         # Filtrar entidades que terminan en puntuación (error de segmentación)
-        # Incluye guiones largos y cortos que a veces se incluyen erróneamente
-        if text_stripped and text_stripped[-1] in '.,:;!?–—-':
+        if text_stripped and text_stripped[-1] in BOUNDARY_PUNCTUATION:
             logger.debug(f"Entidad spaCy filtrada (puntuación final): '{text}'")
             return False
 
-        # Limpiar guiones al final y verificar si queda algo válido
-        text_clean = text_stripped.rstrip('–—- ')
+        # Filtrar entidades que empiezan con puntuación (error de segmentación)
+        if text_stripped and text_stripped[0] in BOUNDARY_PUNCTUATION:
+            logger.debug(f"Entidad spaCy filtrada (puntuación inicial): '{text}'")
+            return False
+
+        # Limpiar guiones y puntuación al final y verificar si queda algo válido
+        text_clean = text_stripped.rstrip('–—-,.;:!?¿¡ ')
         if text_clean != text_stripped:
             # Si había caracteres finales que limpiar, verificar el resultado
             if len(text_clean) < self.MIN_ENTITY_LENGTH:

@@ -32,12 +32,14 @@ const routes: RouteRecordRaw[] = [
     })
   },
   {
+    // Redirigir la ruta legacy de alertas al tab de alertas del proyecto
     path: '/projects/:id/alerts',
     name: 'alerts',
-    component: () => import('../views/AlertsView.vue'),
-    meta: {
-      title: 'Alertas - Narrative Assistant'
-    }
+    redirect: to => ({
+      name: 'project',
+      params: { id: to.params.id },
+      query: { tab: 'alerts' }
+    })
   },
   {
     path: '/settings',

@@ -36,6 +36,7 @@ try:
     from narrative_assistant.entities.repository import EntityRepository
     from narrative_assistant.alerts.repository import AlertRepository, AlertStatus, AlertSeverity
     from narrative_assistant.core.config import get_config
+    from narrative_assistant.core.result import Result
     from narrative_assistant import __version__ as NA_VERSION
 
     # Inicializar managers
@@ -779,6 +780,19 @@ async def get_project(project_id: int):
 
         project = result.value
 
+        # Verificar si el estado "analyzing" está atascado (no hay análisis real en progreso)
+        # Esto puede ocurrir si el servidor se reinició durante un análisis
+        if project.analysis_status in ['analyzing', 'in_progress', 'pending']:
+            # Si no hay análisis activo en memoria, el estado está atascado
+            if project_id not in analysis_progress_storage:
+                logger.warning(f"Project {project_id} has stuck analysis_status='{project.analysis_status}', resetting to 'completed'")
+                project.analysis_status = 'completed'
+                project.analysis_progress = 1.0
+                try:
+                    project_manager.update(project)
+                except Exception as e:
+                    logger.warning(f"Could not update stuck analysis status: {e}")
+
         # Obtener estadísticas desde la BD (source of truth)
         db = get_database()
         stats = _get_project_stats(project_id, db)
@@ -1036,7 +1050,12 @@ async def create_project(
                 raise HTTPException(status_code=400, detail=f"Error leyendo documento: {parse_result.error}")
 
             raw_doc = parse_result.value
-            document_text = raw_doc.text if hasattr(raw_doc, 'text') else str(raw_doc)
+            document_text = raw_doc.full_text
+
+            if not document_text or not document_text.strip():
+                raise HTTPException(status_code=400, detail="El documento está vacío o no se pudo leer el contenido")
+
+            logger.info(f"Document parsed: {len(document_text)} chars, {len(document_text.split())} words")
 
             # Crear proyecto usando create_from_document (el único método disponible)
             logger.info(f"Creating project '{name}' from: {document_path}")
@@ -1052,9 +1071,20 @@ async def create_project(
             )
 
             if create_result.is_failure:
-                raise HTTPException(status_code=500, detail=f"Error creando proyecto: {create_result.error}")
+                error = create_result.error
+                # Si el documento ya existe, devolver código 409 Conflict
+                if error and "already exists" in str(error.message).lower():
+                    raise HTTPException(
+                        status_code=409,
+                        detail=f"Este documento ya existe en el proyecto '{getattr(error, 'existing_project_name', 'existente')}'"
+                    )
+                raise HTTPException(status_code=500, detail=f"Error creando proyecto: {error}")
 
             project = create_result.value
+
+            if project is None:
+                logger.error(f"create_from_document returned success but value is None")
+                raise HTTPException(status_code=500, detail="Error interno: proyecto no creado")
 
             project_data = ProjectResponse(
                 id=project.id,
@@ -2159,36 +2189,37 @@ async def get_entity_mentions(project_id: int, entity_id: int):
         # Ordenar por posición (start_char)
         mentions_data.sort(key=lambda m: (m["chapterNumber"] or 0, m["startChar"]))
 
-        # Filtrar menciones solapadas (mantener la más larga si hay solapamiento)
-        # Esto evita que "María" y "María Sánchez" en la misma posición se muestren ambas
-        filtered_mentions = []
-        for mention in mentions_data:
-            # Verificar si esta mención se solapa con alguna ya añadida
-            is_overlapping = False
-            for existing in filtered_mentions:
-                # Mismo capítulo y posiciones que se solapan
-                if existing["chapterNumber"] == mention["chapterNumber"]:
-                    # Verificar solapamiento: [start1, end1] vs [start2, end2]
-                    if not (mention["endChar"] <= existing["startChar"] or
-                            existing["endChar"] <= mention["startChar"]):
-                        is_overlapping = True
-                        # Si la nueva es más larga, reemplazar
-                        if (mention["endChar"] - mention["startChar"]) > (existing["endChar"] - existing["startChar"]):
-                            filtered_mentions.remove(existing)
-                            filtered_mentions.append(mention)
-                        break
+        logger.info(f"Entity {entity_id} ({entity.canonical_name}): Found {len(mentions_data)} raw mentions from DB (entity.mention_count={entity.mention_count})")
 
-            if not is_overlapping:
-                filtered_mentions.append(mention)
+        # Log muestra de posiciones para debug
+        if mentions_data:
+            sample = mentions_data[:5]
+            logger.info(f"Entity {entity_id}: Sample positions: {[(m['chapterId'], m['startChar'], m['endChar']) for m in sample]}")
+
+        # NO FILTRAR SOLAPAMIENTOS POR AHORA - devolver todas las menciones
+        # El filtrado de solapamientos estaba siendo demasiado agresivo
+        # TODO: Revisar lógica de solapamiento si hay duplicados reales
+        filtered_mentions = mentions_data
+        removed_count = 0
 
         # Re-ordenar después de filtrar
         filtered_mentions.sort(key=lambda m: (m["chapterNumber"] or 0, m["startChar"]))
+
+        if removed_count > 0:
+            logger.info(f"Entity {entity_id} ({entity.canonical_name}): Filtered {removed_count} overlapping mentions, returning {len(filtered_mentions)}")
 
         return ApiResponse(success=True, data={
             "mentions": filtered_mentions,
             "total": len(filtered_mentions),
             "entityName": entity.canonical_name,
             "entityType": entity.entity_type.value if entity.entity_type else None,
+            # Debug info
+            "_debug": {
+                "raw_mentions_in_db": len(mentions),
+                "after_serialization": len(mentions_data),
+                "after_filtering": len(filtered_mentions),
+                "entity_mention_count_field": entity.mention_count,
+            }
         })
 
     except Exception as e:
@@ -3878,14 +3909,14 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
             "current_phase": "Iniciando análisis...",
             "current_action": "Preparando documento",
             "phases": [
-                {"id": "parsing", "name": "Extracción de texto", "completed": False, "current": False},
-                {"id": "structure", "name": "Detección de estructura", "completed": False, "current": False},
-                {"id": "ner", "name": "Reconocimiento de entidades", "completed": False, "current": False},
-                {"id": "fusion", "name": "Fusión semántica", "completed": False, "current": False},
-                {"id": "attributes", "name": "Extracción de atributos", "completed": False, "current": False},
-                {"id": "consistency", "name": "Análisis de consistencia", "completed": False, "current": False},
-                {"id": "grammar", "name": "Análisis gramatical", "completed": False, "current": False},
-                {"id": "alerts", "name": "Generación de alertas", "completed": False, "current": False}
+                {"id": "parsing", "name": "Lectura del documento", "completed": False, "current": False},
+                {"id": "structure", "name": "Identificando capítulos", "completed": False, "current": False},
+                {"id": "ner", "name": "Buscando personajes y lugares", "completed": False, "current": False},
+                {"id": "fusion", "name": "Unificando personajes", "completed": False, "current": False},
+                {"id": "attributes", "name": "Analizando características", "completed": False, "current": False},
+                {"id": "consistency", "name": "Verificando coherencia", "completed": False, "current": False},
+                {"id": "grammar", "name": "Revisando gramática y ortografía", "completed": False, "current": False},
+                {"id": "alerts", "name": "Preparando observaciones", "completed": False, "current": False}
             ],
             "metrics": {},
             "estimated_seconds_remaining": 60,
@@ -4085,7 +4116,7 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                 pct_start, pct_end = get_phase_progress_range("parsing")
                 phases[0]["current"] = True
                 analysis_progress_storage[project_id]["progress"] = pct_start
-                analysis_progress_storage[project_id]["current_phase"] = "Extrayendo texto del documento"
+                analysis_progress_storage[project_id]["current_phase"] = "Leyendo el documento..."
 
                 doc_format = detect_format(tmp_path)
                 parser = get_parser(doc_format)
@@ -4164,7 +4195,7 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                 pct_start, pct_end = get_phase_progress_range("structure")
                 phases[1]["current"] = True
                 analysis_progress_storage[project_id]["progress"] = pct_start
-                analysis_progress_storage[project_id]["current_phase"] = "Detectando capítulos y escenas"
+                analysis_progress_storage[project_id]["current_phase"] = "Identificando la estructura del documento..."
 
                 detector = StructureDetector()
                 structure_result = detector.detect(raw_document)
@@ -4246,7 +4277,7 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                 ner_pct_start, ner_pct_end = get_phase_progress_range("ner")
                 phases[2]["current"] = True
                 analysis_progress_storage[project_id]["progress"] = ner_pct_start
-                analysis_progress_storage[project_id]["current_phase"] = "Identificando entidades (personajes, lugares...)"
+                analysis_progress_storage[project_id]["current_phase"] = "Buscando personajes, lugares y otros elementos..."
 
                 # Callback para actualizar progreso durante NER
                 def ner_progress_callback(fase: str, pct: float, msg: str):
@@ -4282,14 +4313,54 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                         EntityLabel.MISC: EntityType.CONCEPT,
                     }
 
+                    # PRE-PROCESAMIENTO: Eliminar entidades solapadas, preferir la más larga
+                    # Ej: si tenemos "Laura" y "Laura Garcia" en la misma posición, quedarnos con "Laura Garcia"
+                    def filter_overlapping_entities(entities):
+                        if not entities:
+                            return []
+                        # Ordenar por posición y luego por longitud (más larga primero)
+                        sorted_ents = sorted(entities, key=lambda e: (e.start_char, -(e.end_char - e.start_char)))
+                        result = []
+                        for ent in sorted_ents:
+                            # Verificar si se solapa con alguna entidad ya aceptada
+                            overlaps = False
+                            for accepted in result:
+                                # Solapamiento: no son disjuntas
+                                if not (ent.end_char <= accepted.start_char or ent.start_char >= accepted.end_char):
+                                    overlaps = True
+                                    break
+                            if not overlaps:
+                                result.append(ent)
+                        return result
+
+                    raw_entities = filter_overlapping_entities(raw_entities)
+                    logger.info(f"After overlap filtering: {len(raw_entities)} entities")
+
                     # Agrupar entidades por nombre canónico para contar menciones
-                    entity_mentions: dict[str, list] = {}  # canonical_name -> [ExtractedEntity, ...]
+                    # IMPORTANTE: Agrupar solo por nombre, no por label, para unificar
+                    # menciones de la misma entidad con diferentes etiquetas (PER vs MISC)
+                    #
+                    # ESTRATEGIA DE AGRUPACIÓN:
+                    # 1. Normalizar a minúsculas SOLO para comparación
+                    # 2. Pero preservar el texto original con mayúsculas para el nombre canónico
+                    # 3. "Juan García" y "Juan" son entidades DIFERENTES
+                    # 4. "Papa" y "papa" serían la misma clave (pero spaCy raramente detecta "papa" como NER)
+                    entity_mentions: dict[str, list] = {}  # normalized_name -> [ExtractedEntity, ...]
                     for ent in raw_entities:
-                        canonical = ent.canonical_form or ent.text.lower().strip()
-                        key = f"{ent.label.value}:{canonical}"
+                        # Normalizar para agrupación: minúsculas + espacios normalizados
+                        normalized = ' '.join(ent.text.strip().lower().split())
+                        # Usar nombre normalizado como clave de agrupación
+                        key = normalized
                         if key not in entity_mentions:
                             entity_mentions[key] = []
                         entity_mentions[key].append(ent)
+
+                    # DEBUG: Log de agrupación de menciones
+                    logger.info(f"DEBUG NER grouping: {len(raw_entities)} raw mentions -> {len(entity_mentions)} unique entities")
+                    # Mostrar top 10 entidades por menciones
+                    sorted_entities = sorted(entity_mentions.items(), key=lambda x: len(x[1]), reverse=True)[:10]
+                    for key, mentions in sorted_entities:
+                        logger.info(f"  Entity '{key}': {len(mentions)} mentions")
 
                     # NOTA: Ya no se filtra por mínimo de menciones.
                     # El filtrado de falsos positivos se hace en NERExtractor._is_valid_entity()
@@ -4319,11 +4390,25 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                         # Primera aparición
                         first_appearance = min(m.start_char for m in mentions_list)
 
+                        # Determinar el tipo de entidad por votación (label más común)
+                        # PER tiene prioridad sobre MISC para personajes
+                        from collections import Counter
+                        label_counts = Counter(m.label for m in mentions_list)
+                        # Priorizar PER sobre MISC si hay ambos
+                        if EntityLabel.PER in label_counts and EntityLabel.MISC in label_counts:
+                            best_label = EntityLabel.PER
+                        else:
+                            best_label = label_counts.most_common(1)[0][0]
+
+                        # Usar el texto de la primera mención con el mejor label, si existe
+                        best_mentions = [m for m in mentions_list if m.label == best_label]
+                        canonical_text = best_mentions[0].text if best_mentions else first_mention.text
+
                         # Crear objeto Entity
                         entity = Entity(
                             project_id=project_id,
-                            entity_type=label_to_type.get(first_mention.label, EntityType.CONCEPT),
-                            canonical_name=first_mention.text,  # Usar texto original como nombre
+                            entity_type=label_to_type.get(best_label, EntityType.CONCEPT),
+                            canonical_name=canonical_text,  # Usar texto de mejor mención
                             aliases=[],
                             importance=importance,
                             description=None,
@@ -4339,7 +4424,8 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                             entity.id = entity_id
                             entities.append(entity)
 
-                            # Crear menciones en BD
+                            # Crear menciones en BD - usar batch para eficiencia
+                            mentions_to_create = []
                             for ent in mentions_list:
                                 # Encontrar chapter_id basado en posición
                                 mention_chapter_id = find_chapter_id_for_position(ent.start_char)
@@ -4353,7 +4439,33 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                                     confidence=ent.confidence,
                                     source=ent.source,
                                 )
-                                entity_repo.create_mention(mention)
+                                mentions_to_create.append(mention)
+
+                            # Log detallado de menciones a crear (para debug)
+                            if len(mentions_to_create) >= 5:
+                                sample_forms = [m.surface_form for m in mentions_to_create[:5]]
+                                logger.info(f"Entity '{entity.canonical_name}': Creating {len(mentions_to_create)} mentions. Sample surface forms: {sample_forms}")
+
+                            # Insertar todas las menciones en batch
+                            try:
+                                mentions_created = entity_repo.create_mentions_batch(mentions_to_create)
+                                logger.debug(f"Entity '{entity.canonical_name}': Batch created {mentions_created} mentions")
+                            except Exception as batch_err:
+                                logger.warning(f"Batch insert failed for {entity.canonical_name}, falling back to individual: {batch_err}")
+                                # Fallback a inserción individual
+                                mentions_created = 0
+                                for mention in mentions_to_create:
+                                    try:
+                                        entity_repo.create_mention(mention)
+                                        mentions_created += 1
+                                    except Exception as me:
+                                        logger.warning(f"Error creating mention for {entity.canonical_name} at {mention.start_char}: {me}")
+
+                            # Log si se crearon menos menciones de las esperadas
+                            if mentions_created != len(mentions_list):
+                                logger.warning(f"Entity '{entity.canonical_name}': Created {mentions_created}/{len(mentions_list)} mentions - MISMATCH!")
+                            else:
+                                logger.info(f"Entity '{entity.canonical_name}': Successfully created {mentions_created} mentions")
 
                             # Actualizar progreso cada 5 entidades
                             entities_created += 1
@@ -4380,7 +4492,7 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
 
                 # ========== FASE 3.25: VALIDACIÓN DE ENTIDADES CON LLM ==========
                 # Filtrar entidades que no son válidas (descripciones, frases, etc.)
-                analysis_progress_storage[project_id]["current_action"] = "Validando entidades..."
+                analysis_progress_storage[project_id]["current_action"] = "Verificando personajes detectados..."
                 try:
                     from narrative_assistant.llm.client import get_llm_client
                     import json as json_module
@@ -4469,7 +4581,7 @@ JSON:"""
                 fusion_pct_start, fusion_pct_end = get_phase_progress_range("fusion")
                 phases[3]["current"] = True  # Marcar fase fusion como activa en UI
                 analysis_progress_storage[project_id]["progress"] = fusion_pct_start
-                analysis_progress_storage[project_id]["current_phase"] = "Fusionando entidades similares y resolviendo correferencias"
+                analysis_progress_storage[project_id]["current_phase"] = "Unificando personajes mencionados de diferentes formas..."
 
                 try:
                     from narrative_assistant.entities.semantic_fusion import get_semantic_fusion_service
@@ -4612,7 +4724,7 @@ JSON:"""
 
                     # 2. Aplicar resolución de correferencias con votación multi-método
                     # Usa: embeddings semánticos, LLM local (Ollama), análisis morfosintáctico, heurísticas
-                    analysis_progress_storage[project_id]["current_phase"] = "Resolviendo correferencias (votación multi-método)"
+                    analysis_progress_storage[project_id]["current_phase"] = "Identificando referencias cruzadas entre personajes..."
 
                     coref_result = None  # Inicializar para uso posterior en extracción de atributos
                     try:
@@ -4760,7 +4872,7 @@ JSON:"""
                     analysis_progress_storage[project_id]["progress"] = fusion_pct_end
                     # Actualizar con entidades únicas (después de fusión)
                     analysis_progress_storage[project_id]["metrics"]["entities_found"] = len(entities)
-                    analysis_progress_storage[project_id]["current_action"] = f"Fusión completada: {len(entities)} entidades únicas"
+                    analysis_progress_storage[project_id]["current_action"] = f"Encontrados {len(entities)} personajes y elementos únicos"
                     # Marcar fase fusion como completada en UI
                     phases[3]["completed"] = True
                     phases[3]["current"] = False
@@ -4777,16 +4889,17 @@ JSON:"""
                     # La importancia se calcula DESPUÉS de fusiones y correferencias
                     # basada en el conteo final de menciones en la BD
                     logger.info("Recalculando importancia de entidades...")
+                    db = get_database()
                     for entity in entities:
                         try:
                             # Obtener conteo real de menciones desde la BD
-                            from sqlalchemy import text
-                            db = get_database()
-                            result = db.execute(
-                                text("SELECT COUNT(*) FROM entity_mentions WHERE entity_id = :eid"),
-                                {"eid": entity.id}
-                            )
-                            real_mention_count = result.scalar() or 0
+                            with db.connection() as conn:
+                                cursor = conn.execute(
+                                    "SELECT COUNT(*) FROM entity_mentions WHERE entity_id = ?",
+                                    (entity.id,)
+                                )
+                                row = cursor.fetchone()
+                                real_mention_count = row[0] if row else 0
 
                             # Calcular nueva importancia
                             if real_mention_count >= 20:
@@ -4807,11 +4920,11 @@ JSON:"""
                                     importance=new_importance,
                                 )
                                 # También actualizar mention_count en BD
-                                db.execute(
-                                    text("UPDATE entities SET mention_count = :count WHERE id = :eid"),
-                                    {"count": real_mention_count, "eid": entity.id}
-                                )
-                                db.commit()
+                                with db.connection() as conn:
+                                    conn.execute(
+                                        "UPDATE entities SET mention_count = ? WHERE id = ?",
+                                        (real_mention_count, entity.id)
+                                    )
                                 entity.importance = new_importance
                                 entity.mention_count = real_mention_count
                                 logger.debug(f"'{entity.canonical_name}': {real_mention_count} menciones -> {new_importance.value}")
@@ -4833,7 +4946,7 @@ JSON:"""
                 attr_pct_start, attr_pct_end = get_phase_progress_range("attributes")
                 phases[4]["current"] = True  # Index 4 after adding fusion at index 3
                 analysis_progress_storage[project_id]["progress"] = attr_pct_start
-                analysis_progress_storage[project_id]["current_phase"] = "Extrayendo atributos de personajes"
+                analysis_progress_storage[project_id]["current_phase"] = "Analizando características de los personajes..."
 
                 attributes = []
                 if entities:
@@ -4873,16 +4986,48 @@ JSON:"""
 
                         logger.info(f"Extrayendo atributos: {len(entity_mentions)} menciones de entidades")
 
-                        attr_result = attr_extractor.extract_attributes(
-                            text=full_text,
-                            entity_mentions=entity_mentions,
-                            chapter_id=None,
-                        )
+                        # Procesar personajes uno a uno para mostrar progreso detallado
+                        total_characters = len(character_entities)
+                        all_extracted_attrs = []
 
-                        if attr_result.is_failure:
-                            logger.warning(f"Error extrayendo atributos: {attr_result.error}")
-                        elif attr_result.value:
-                            logger.info(f"Atributos extraídos: {len(attr_result.value.attributes)}")
+                        for char_idx, char_entity in enumerate(character_entities):
+                            # Mostrar qué personaje se está analizando
+                            char_name = char_entity.canonical_name or "Personaje"
+                            analysis_progress_storage[project_id]["current_action"] = f"Analizando: {char_name} ({char_idx + 1}/{total_characters})"
+
+                            # Calcular progreso dentro de la fase (0-50% para extracción)
+                            extraction_progress = 0.5 * (char_idx / max(total_characters, 1))
+                            analysis_progress_storage[project_id]["progress"] = attr_pct_start + int((attr_pct_end - attr_pct_start) * extraction_progress)
+
+                            # Obtener menciones solo de este personaje
+                            char_mentions = [
+                                (name, start, end) for name, start, end in entity_mentions
+                                if name and char_entity.canonical_name and name.lower() == char_entity.canonical_name.lower()
+                            ]
+
+                            if char_mentions:
+                                try:
+                                    char_result = attr_extractor.extract_attributes(
+                                        text=full_text,
+                                        entity_mentions=char_mentions,
+                                        chapter_id=None,
+                                    )
+                                    if char_result.is_success and char_result.value:
+                                        all_extracted_attrs.extend(char_result.value.attributes)
+                                except Exception as e:
+                                    logger.warning(f"Error extrayendo atributos de {char_name}: {e}")
+
+                            check_cancelled()  # Permitir cancelación durante el proceso
+
+                        # Crear resultado combinado
+                        from narrative_assistant.nlp.attributes import AttributeExtractionResult
+                        attr_result = Result.success(AttributeExtractionResult(attributes=all_extracted_attrs))
+
+                        logger.info(f"Atributos extraídos: {len(all_extracted_attrs)}")
+
+                        # Actualizar progreso a 50% de la fase (extracción completada)
+                        analysis_progress_storage[project_id]["progress"] = attr_pct_start + int((attr_pct_end - attr_pct_start) * 0.5)
+                        analysis_progress_storage[project_id]["current_action"] = "Registrando características encontradas..."
 
                         if attr_result.is_success and attr_result.value:
                             # Resolver atributos con correferencias para asignar
@@ -4908,6 +5053,8 @@ JSON:"""
                                 except Exception as e:
                                     logger.warning(f"Error resolviendo atributos con correferencias: {e}")
 
+                            total_attrs = len(extracted_attrs)
+                            attrs_processed = 0
                             for attr in extracted_attrs:
                                 # Validar que entity_name no sea None
                                 if not attr.entity_name:
@@ -4934,6 +5081,14 @@ JSON:"""
                                     except Exception as e:
                                         logger.warning(f"Error creating attribute for {matching_entity.canonical_name}: {e}")
 
+                                # Actualizar progreso cada 10 atributos
+                                attrs_processed += 1
+                                if attrs_processed % 10 == 0 or attrs_processed == total_attrs:
+                                    # Progreso de 60% a 95% durante el guardado
+                                    save_progress = 0.6 + (0.35 * attrs_processed / max(total_attrs, 1))
+                                    analysis_progress_storage[project_id]["progress"] = attr_pct_start + int((attr_pct_end - attr_pct_start) * save_progress)
+                                    analysis_progress_storage[project_id]["current_action"] = f"Guardando características... ({attrs_processed}/{total_attrs})"
+
                 phase_durations["attributes"] = time.time() - phase_start_times["attributes"]
                 analysis_progress_storage[project_id]["progress"] = attr_pct_end
                 update_time_remaining()
@@ -4951,7 +5106,7 @@ JSON:"""
                 cons_pct_start, cons_pct_end = get_phase_progress_range("consistency")
                 phases[5]["current"] = True
                 analysis_progress_storage[project_id]["progress"] = cons_pct_start
-                analysis_progress_storage[project_id]["current_phase"] = "Analizando consistencia narrativa"
+                analysis_progress_storage[project_id]["current_phase"] = "Verificando la coherencia del relato..."
 
                 inconsistencies = []
                 if attributes:
@@ -4977,7 +5132,7 @@ JSON:"""
                 grammar_pct_start, grammar_pct_end = get_phase_progress_range("grammar")
                 phases[6]["current"] = True
                 analysis_progress_storage[project_id]["progress"] = grammar_pct_start
-                analysis_progress_storage[project_id]["current_phase"] = "Analizando gramática y ortografía"
+                analysis_progress_storage[project_id]["current_phase"] = "Revisando la redacción..."
 
                 grammar_issues = []
                 spelling_issues = []
@@ -5033,7 +5188,7 @@ JSON:"""
                 alerts_pct_start, alerts_pct_end = get_phase_progress_range("alerts")
                 phases[7]["current"] = True
                 analysis_progress_storage[project_id]["progress"] = alerts_pct_start
-                analysis_progress_storage[project_id]["current_phase"] = "Generando alertas"
+                analysis_progress_storage[project_id]["current_phase"] = "Preparando observaciones y sugerencias..."
 
                 alerts_created = 0
                 alert_engine = get_alert_engine()
@@ -5245,12 +5400,13 @@ async def get_analysis_progress(project_id: int):
 
     try:
         if project_id not in analysis_progress_storage:
-            # No hay análisis en curso, devolver estado "pending"
+            # No hay análisis en curso, devolver estado "idle" para que el frontend
+            # sepa que debe detener el polling
             return ApiResponse(
                 success=True,
                 data={
                     "project_id": project_id,
-                    "status": "pending",
+                    "status": "idle",
                     "progress": 0,
                     "current_phase": "Sin análisis en curso",
                     "phases": []

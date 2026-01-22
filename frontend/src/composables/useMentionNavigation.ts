@@ -7,6 +7,7 @@
 
 import { ref, computed, watch } from 'vue'
 import { useWorkspaceStore } from '@/stores/workspace'
+import { apiUrl } from '@/config/api'
 
 export interface Mention {
   id: number
@@ -79,7 +80,7 @@ export function useMentionNavigation(projectId: () => number) {
 
     try {
       const response = await fetch(
-        `/api/projects/${pid}/entities/${entityId}/mentions`
+        apiUrl(`/api/projects/${pid}/entities/${entityId}/mentions`)
       )
 
       if (!response.ok) {
@@ -121,9 +122,8 @@ export function useMentionNavigation(projectId: () => number) {
     if (!mention) return
 
     // Usar el store de workspace para navegar
-    // Pasar startChar (posición global) y surfaceForm (texto exacto)
-    // El frontend usará la posición para encontrar la ocurrencia exacta
-    workspaceStore.navigateToTextPosition(mention.startChar, mention.surfaceForm)
+    // Pasar startChar (posición dentro del capítulo), surfaceForm (texto exacto) y chapterId
+    workspaceStore.navigateToTextPosition(mention.startChar, mention.surfaceForm, mention.chapterId)
   }
 
   /**

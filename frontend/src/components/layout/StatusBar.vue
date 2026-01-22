@@ -468,13 +468,16 @@ function toggleDetails() {
   left: 50%;
   transform: translateX(-50%);
   width: 380px;
-  background-color: var(--p-surface-0, #ffffff);
-  border: 1px solid var(--p-surface-border, #e2e8f0);
+  /* Fondo explícito para ambos temas */
+  background-color: var(--p-surface-ground, var(--surface-ground, #1e1e1e));
+  border: 1px solid var(--p-surface-border, var(--surface-border, #3f3f46));
   border-radius: 8px;
-  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
   padding: 1rem;
   margin-bottom: 0.5rem;
   z-index: 1000;
+  /* Asegurar que el texto sea visible */
+  color: var(--p-text-color, var(--text-color, #e4e4e7));
 }
 
 .details-header {
@@ -529,7 +532,7 @@ function toggleDetails() {
 .step-percent {
   font-size: 0.6875rem;
   font-weight: 600;
-  color: #1e40af !important; /* blue-800 - visible en step-active */
+  color: var(--p-primary-color, #60a5fa) !important;
 }
 
 .step-duration {
@@ -540,14 +543,14 @@ function toggleDetails() {
 .step-progress-bar {
   height: 4px;
   margin-top: 0.35rem;
-  background: #bfdbfe !important; /* blue-200 - visible en blue-100 bg */
+  background: var(--p-surface-300, rgba(59, 130, 246, 0.3)) !important;
   border-radius: 2px;
   overflow: hidden;
 }
 
 .step-progress-fill {
   height: 100%;
-  background: #2563eb !important; /* blue-600 - buen contraste */
+  background: var(--p-primary-500, #3b82f6) !important;
   border-radius: 2px;
   transition: width 0.3s ease;
 }
@@ -559,10 +562,11 @@ function toggleDetails() {
   gap: 0.5rem;
   padding: 0.5rem 0.75rem;
   margin-bottom: 0.75rem;
-  background: #dbeafe !important; /* blue-100 */
+  background: rgba(59, 130, 246, 0.25) !important;
+  border: 1px solid rgba(96, 165, 250, 0.5);
   border-radius: 6px;
   font-size: 0.8125rem;
-  color: #1e3a8a !important; /* blue-900 - WCAG AA */
+  color: #93c5fd !important; /* Azul claro brillante - siempre visible */
 }
 
 .activity-indicator {
@@ -608,21 +612,21 @@ function toggleDetails() {
 }
 
 .step-active {
-  /* Fondo azul suave pero texto SIEMPRE oscuro para WCAG AA */
-  background: #dbeafe !important; /* blue-100 fijo */
-  color: #1e3a8a !important; /* blue-900 - ratio 8.5:1 */
-  border-left: 3px solid #2563eb;
+  /* Fondo azul que funciona en tema oscuro y claro */
+  background: var(--p-primary-100, rgba(59, 130, 246, 0.2)) !important;
+  color: var(--p-primary-color, #60a5fa) !important;
+  border-left: 3px solid var(--p-primary-500, #3b82f6);
   border-radius: 6px;
   padding-left: calc(0.5rem + 3px);
 }
 
 .step-active .step-icon i {
-  color: #1d4ed8 !important; /* blue-700 */
+  color: var(--p-primary-400, #60a5fa) !important;
 }
 
 .step-active .step-name {
   font-weight: 600;
-  color: #1e3a8a !important; /* blue-900 - máximo contraste */
+  color: var(--p-primary-color, #93c5fd) !important;
 }
 
 .step-pending {
@@ -640,13 +644,13 @@ function toggleDetails() {
   gap: 0.5rem;
   margin: 1rem 0 0 0;
   padding: 0.75rem;
-  /* Fondo verde claro fijo con texto verde oscuro - WCAG AA compliant */
-  background-color: #dcfce7 !important; /* green-100 fijo */
-  border: 2px solid #16a34a;
+  /* Fondo que funciona en tema oscuro */
+  background-color: var(--p-green-100, rgba(34, 197, 94, 0.15)) !important;
+  border: 1px solid var(--p-green-500, #22c55e);
   border-radius: 6px;
   font-size: 0.8125rem;
-  font-weight: 600;
-  color: #14532d !important; /* green-900 - ratio 7.8:1 */
+  font-weight: 500;
+  color: var(--p-green-400, #4ade80) !important;
 }
 
 /* Transitions */

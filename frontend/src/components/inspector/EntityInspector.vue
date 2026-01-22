@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
+import DsBadge from '@/components/ds/DsBadge.vue'
 import type { Entity } from '@/types'
 import { useEntityUtils } from '@/composables/useEntityUtils'
 import { useMentionNavigation } from '@/composables/useMentionNavigation'
@@ -87,16 +88,16 @@ watch(() => props.entity.id, () => {
       <div class="entity-info">
         <h3 class="entity-name">{{ entity.name }}</h3>
         <div class="entity-meta">
-          <span class="entity-type">{{ entityTypeLabel }}</span>
-          <Tag
+          <DsBadge :entity-type="entity.type" size="sm">{{ entityTypeLabel }}</DsBadge>
+          <DsBadge
             v-if="isMerged"
-            severity="info"
-            class="merged-tag"
+            color="info"
+            size="sm"
+            icon="pi pi-link"
             v-tooltip.bottom="'Esta entidad es resultado de una fusion'"
           >
-            <i class="pi pi-link"></i>
             Fusionada
-          </Tag>
+          </DsBadge>
         </div>
       </div>
     </div>
@@ -152,7 +153,7 @@ watch(() => props.entity.id, () => {
     <!-- Barra de navegación de apariciones -->
     <div v-if="isNavigating && mentionNav.isActive.value" class="mention-navigation">
       <div class="nav-header">
-        <span class="nav-title">Navegando apariciones</span>
+        <span class="nav-title">APARICIONES</span>
         <Button
           icon="pi pi-times"
           text

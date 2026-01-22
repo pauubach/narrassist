@@ -240,7 +240,7 @@ class DocumentAlreadyExistsError(DatabaseError):
     document_fingerprint: str = ""
     existing_project_name: str = ""
     message: str = field(init=False)
-    severity: ErrorSeverity = field(default=ErrorSeverity.RECOVERABLE, init=False)
+    severity: ErrorSeverity = field(default=ErrorSeverity.FATAL, init=False)
     user_message: Optional[str] = field(default=None, init=False)
     context: dict[str, Any] = field(default_factory=dict, init=False)
 

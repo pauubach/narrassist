@@ -826,51 +826,113 @@ class UnifiedAnalysisPipeline:
         Los speaker hints ayudan a:
         1. Confirmar entidades PERSON (boost de confianza)
         2. Descubrir entidades no detectadas por spaCy
+
+        Este método:
+        1. Agrupa las menciones por nombre canónico
+        2. Crea UNA entidad por nombre único
+        3. Guarda TODAS las menciones en entity_mentions
         """
         try:
             from ..nlp.ner import NERExtractor
             from ..entities.repository import get_entity_repository
-            from ..entities.models import Entity, EntityType, EntityImportance
+            from ..entities.models import Entity, EntityType, EntityImportance, EntityMention
+            from ..persistence.chapter import ChapterRepository
+
+            entity_repo = get_entity_repository()
+
+            # Limpiar entidades anteriores antes de re-analizar
+            # Esto también elimina las menciones gracias a ON DELETE CASCADE
+            deleted_count = entity_repo.delete_entities_by_project(context.project_id)
+            if deleted_count > 0:
+                logger.info(f"Cleared {deleted_count} previous entities before NER")
 
             extractor = NERExtractor()
             result = extractor.extract_entities(context.full_text)
 
             if result.is_success:
-                entities = result.value.entities if hasattr(result.value, 'entities') else []
+                extracted_mentions = result.value.entities if hasattr(result.value, 'entities') else []
 
-                # Crear mapa de entidades por nombre
-                entity_names = {e.text.lower(): e for e in entities}
+                if not extracted_mentions:
+                    logger.info("No entities extracted from NER")
+                    return
+
+                # Obtener capítulos de la base de datos para mapear posiciones a chapter_id
+                chapter_repo = ChapterRepository()
+                db_chapters = chapter_repo.get_by_project(context.project_id)
+
+                def find_chapter_id(char_position: int) -> int | None:
+                    """Encuentra el chapter_id de la BD dado una posición de carácter."""
+                    for ch in db_chapters:
+                        if ch.start_char <= char_position < ch.end_char:
+                            return ch.id
+                    return None
+
+                # Agrupar menciones por nombre canónico (case-insensitive)
+                # Cada grupo tendrá: label, todas las menciones, confianza máxima
+                from collections import defaultdict
+                entity_groups: dict[str, dict] = defaultdict(lambda: {
+                    "label": None,
+                    "mentions": [],
+                    "max_confidence": 0.0,
+                    "canonical_text": None,  # Guardar el texto original más frecuente
+                })
+
+                for mention in extracted_mentions:
+                    canonical = mention.canonical_form or mention.text.strip().lower()
+                    group = entity_groups[canonical]
+
+                    # Guardar el label (todos deberían ser iguales para el mismo nombre)
+                    if group["label"] is None:
+                        group["label"] = mention.label
+
+                    # Guardar el texto original (preferir el más largo/completo)
+                    if group["canonical_text"] is None or len(mention.text) > len(group["canonical_text"]):
+                        group["canonical_text"] = mention.text.strip()
+
+                    # Actualizar confianza máxima
+                    group["max_confidence"] = max(group["max_confidence"], mention.confidence)
+
+                    # Añadir la mención con su posición
+                    group["mentions"].append({
+                        "surface_form": mention.text.strip(),
+                        "start_char": mention.start_char,
+                        "end_char": mention.end_char,
+                        "confidence": mention.confidence,
+                        "source": mention.source,
+                    })
 
                 # Boost de confianza para entidades confirmadas por diálogos
                 for position, speaker in context.speaker_hints.items():
                     speaker_lower = speaker.lower()
-                    if speaker_lower in entity_names:
-                        # Boost de confianza
-                        entity = entity_names[speaker_lower]
-                        entity.confidence = min(1.0, entity.confidence + 0.1)
+                    if speaker_lower in entity_groups:
+                        entity_groups[speaker_lower]["max_confidence"] = min(
+                            1.0, entity_groups[speaker_lower]["max_confidence"] + 0.1
+                        )
                         logger.debug(f"Boosted confidence for '{speaker}' from dialogue attribution")
-                    else:
-                        # Añadir entidad descubierta por diálogo
-                        logger.info(f"New entity from dialogue: '{speaker}'")
-                        # Se añadirá como entidad con alta confianza
 
                 # Convertir y persistir entidades
-                entity_repo = get_entity_repository()
                 persisted = []
+                total_mentions_saved = 0
 
-                for extracted in entities:
+                for canonical_name, group in entity_groups.items():
                     # Convertir label a EntityType
-                    label_str = str(extracted.label.value if hasattr(extracted.label, 'value') else extracted.label).upper()
-                    entity_type = EntityType.CHARACTER if label_str == "PER" else EntityType.LOCATION if label_str == "LOC" else EntityType.ORGANIZATION if label_str == "ORG" else EntityType.CONCEPT
+                    label = group["label"]
+                    label_str = str(label.value if hasattr(label, 'value') else label).upper()
+                    entity_type = (
+                        EntityType.CHARACTER if label_str == "PER"
+                        else EntityType.LOCATION if label_str == "LOC"
+                        else EntityType.ORGANIZATION if label_str == "ORG"
+                        else EntityType.CONCEPT
+                    )
 
-                    # Crear Entity object
+                    # Crear Entity object con el nombre canónico más completo
                     entity = Entity(
                         id=None,
                         project_id=context.project_id,
                         entity_type=entity_type,
-                        canonical_name=extracted.text.strip(),
+                        canonical_name=group["canonical_text"] or canonical_name,
                         aliases=[],
-                        importance=EntityImportance.PRIMARY if extracted.confidence > 0.8 else EntityImportance.SECONDARY,
+                        importance=EntityImportance.PRIMARY if group["max_confidence"] > 0.8 else EntityImportance.SECONDARY,
                     )
 
                     try:
@@ -878,12 +940,46 @@ class UnifiedAnalysisPipeline:
                         if entity_id:
                             entity.id = entity_id
                             persisted.append(entity)
+
+                            # Crear menciones para esta entidad
+                            mentions_to_save = []
+                            for m in group["mentions"]:
+                                chapter_id = find_chapter_id(m["start_char"])
+
+                                # Extraer contexto (50 chars antes y después)
+                                context_start = max(0, m["start_char"] - 50)
+                                context_end = min(len(context.full_text), m["end_char"] + 50)
+                                context_before = context.full_text[context_start:m["start_char"]]
+                                context_after = context.full_text[m["end_char"]:context_end]
+
+                                mention = EntityMention(
+                                    entity_id=entity_id,
+                                    chapter_id=chapter_id,
+                                    surface_form=m["surface_form"],
+                                    start_char=m["start_char"],
+                                    end_char=m["end_char"],
+                                    context_before=context_before,
+                                    context_after=context_after,
+                                    confidence=m["confidence"],
+                                    source=m["source"],
+                                )
+                                mentions_to_save.append(mention)
+
+                            # Guardar menciones en batch
+                            if mentions_to_save:
+                                saved_count = entity_repo.create_mentions_batch(mentions_to_save)
+                                total_mentions_saved += saved_count
+                                logger.debug(f"Saved {saved_count} mentions for entity '{entity.canonical_name}'")
+
                     except Exception as e:
-                        logger.debug(f"Failed to persist entity '{entity.canonical_name}': {e}")
+                        logger.debug(f"Failed to persist entity '{canonical_name}': {e}")
 
                 context.entities = persisted
                 context.entity_map = {e.canonical_name.lower(): e.id for e in persisted}
                 context.stats["entities_detected"] = len(persisted)
+                context.stats["mentions_saved"] = total_mentions_saved
+
+                logger.info(f"NER: {len(persisted)} entities, {total_mentions_saved} mentions saved")
 
         except Exception as e:
             logger.warning(f"Enhanced NER failed: {e}")

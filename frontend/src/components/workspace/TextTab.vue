@@ -132,16 +132,27 @@ function getSeverityColor(severity: string): string {
   return colors[severity] || colors.info
 }
 
-// Computed: scroll target basado en posición de carácter
+// Computed: scroll target basado en posición de carácter y/o chapterId
 const scrollTarget = computed((): ScrollTarget | null => {
   if (props.scrollToPosition === null || props.scrollToPosition === undefined) {
     return null
   }
 
-  // Obtener el texto a resaltar del store
+  // Obtener el texto a resaltar y chapterId del store
   const textToHighlight = workspaceStore.scrollToText
+  const directChapterId = workspaceStore.scrollToChapterId
 
-  // Encontrar el capítulo que contiene esta posición
+  // Si tenemos un chapterId directo (navegación desde menciones), usarlo
+  if (directChapterId !== null) {
+    return {
+      chapterId: directChapterId,
+      // La posición ya es relativa al capítulo cuando viene de menciones
+      position: props.scrollToPosition,
+      text: textToHighlight || undefined,
+    }
+  }
+
+  // Si no tenemos chapterId, buscar el capítulo por posición global
   for (const chapter of props.chapters) {
     if (props.scrollToPosition >= chapter.positionStart &&
         props.scrollToPosition <= chapter.positionEnd) {

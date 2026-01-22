@@ -10,11 +10,18 @@ import { computed } from 'vue'
  *   <DsBadge variant="outline" color="primary">Custom</DsBadge>
  */
 
+// Todos los tipos de entidad soportados por el design system
+type EntityType =
+  | 'character' | 'location' | 'object' | 'event' | 'concept'
+  | 'organization' | 'animal' | 'creature' | 'building' | 'region'
+  | 'vehicle' | 'faction' | 'family' | 'time_period' | 'religion'
+  | 'magic_system' | 'work' | 'title' | 'language' | 'other'
+
 export interface Props {
   /** Severidad de alerta (error, warning, info, success) */
   severity?: 'critical' | 'high' | 'medium' | 'low' | 'info'
-  /** Tipo de entidad */
-  entityType?: 'character' | 'location' | 'object' | 'event' | 'concept' | 'organization' | 'other'
+  /** Tipo de entidad - usa colores del design system */
+  entityType?: EntityType
   /** Variante visual */
   variant?: 'filled' | 'outline' | 'subtle'
   /** Color personalizado (usa tokens CSS) */
@@ -182,8 +189,60 @@ const classes = computed(() => {
   background-color: var(--ds-entity-organization, var(--ds-color-info));
 }
 
+.ds-badge--filled.ds-badge--entity-animal {
+  background-color: var(--ds-entity-animal);
+}
+
+.ds-badge--filled.ds-badge--entity-creature {
+  background-color: var(--ds-entity-creature);
+}
+
+.ds-badge--filled.ds-badge--entity-building {
+  background-color: var(--ds-entity-building);
+}
+
+.ds-badge--filled.ds-badge--entity-region {
+  background-color: var(--ds-entity-region);
+}
+
+.ds-badge--filled.ds-badge--entity-vehicle {
+  background-color: var(--ds-entity-vehicle);
+}
+
+.ds-badge--filled.ds-badge--entity-faction {
+  background-color: var(--ds-entity-faction);
+}
+
+.ds-badge--filled.ds-badge--entity-family {
+  background-color: var(--ds-entity-family);
+}
+
+.ds-badge--filled.ds-badge--entity-time_period {
+  background-color: var(--ds-entity-time-period);
+}
+
+.ds-badge--filled.ds-badge--entity-religion {
+  background-color: var(--ds-entity-religion);
+}
+
+.ds-badge--filled.ds-badge--entity-magic_system {
+  background-color: var(--ds-entity-magic-system);
+}
+
+.ds-badge--filled.ds-badge--entity-work {
+  background-color: var(--ds-entity-work);
+}
+
+.ds-badge--filled.ds-badge--entity-title {
+  background-color: var(--ds-entity-title);
+}
+
+.ds-badge--filled.ds-badge--entity-language {
+  background-color: var(--ds-entity-language);
+}
+
 .ds-badge--filled.ds-badge--entity-other {
-  background-color: var(--ds-color-secondary);
+  background-color: var(--ds-entity-other);
 }
 
 /* Outline variant - WCAG AA: colores oscuros para garantizar 4.5:1 en fondos claros */

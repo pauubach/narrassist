@@ -83,6 +83,7 @@ class LocalLLMClient:
         self._ollama_client: Any = None
         self._transformers_pipeline: Any = None
         self._lock = threading.Lock()
+        self._warned_unavailable = False  # Para evitar warnings repetidos
         self._initialize_backend()
 
     def _initialize_backend(self) -> None:
@@ -340,7 +341,9 @@ class LocalLLMClient:
             Respuesta generada o None si hay error
         """
         if not self.is_available:
-            logger.warning("LLM local no disponible")
+            if not self._warned_unavailable:
+                logger.warning("LLM local no disponible - los análisis con LLM se omitirán")
+                self._warned_unavailable = True
             return None
 
         with self._lock:

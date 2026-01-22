@@ -104,10 +104,12 @@ const menus = computed<Menu[]>(() => {
     { label: 'Proyectos', action: 'viewProjects', icon: 'folder', shortcut: 'Ctrl+P' }
   ]
 
-  // Solo agregar Entidades y Alertas si estamos en un proyecto
+  // Agregar pestañas del proyecto si estamos en un proyecto
   if (isInProject.value) {
     viewItems.push(
+      { label: 'Texto', action: 'viewText', icon: 'file-edit', shortcut: 'Ctrl+T' },
       { label: 'Entidades', action: 'viewEntities', icon: 'users', shortcut: 'Ctrl+E' },
+      { label: 'Relaciones', action: 'viewRelations', icon: 'share-alt', shortcut: 'Ctrl+R' },
       { label: 'Alertas', action: 'viewAlerts', icon: 'exclamation-triangle', shortcut: 'Ctrl+A' }
     )
   }
@@ -293,10 +295,22 @@ const handleMenuAction = (item: MenuItem) => {
     case 'viewProjects':
       router.push('/projects')
       break
+    case 'viewText':
+      // Navigate to current project text tab
+      if (route.params.id) {
+        window.dispatchEvent(new CustomEvent('menubar:view-tab', { detail: { tab: 'text' } }))
+      }
+      break
     case 'viewEntities':
       // Navigate to current project entities tab
       if (route.params.id) {
         window.dispatchEvent(new CustomEvent('menubar:view-tab', { detail: { tab: 'entities' } }))
+      }
+      break
+    case 'viewRelations':
+      // Navigate to current project relations tab
+      if (route.params.id) {
+        window.dispatchEvent(new CustomEvent('menubar:view-tab', { detail: { tab: 'relations' } }))
       }
       break
     case 'viewAlerts':
