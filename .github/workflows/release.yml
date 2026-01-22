@@ -42,6 +42,10 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
       - name: Install Python dependencies
         run: |
           pip install -e ".[build]"
@@ -98,6 +102,10 @@ jobs:
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
 
       - name: Install Python dependencies
         run: |
@@ -157,6 +165,10 @@ jobs:
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
 
       - name: Install Python dependencies
         run: |
