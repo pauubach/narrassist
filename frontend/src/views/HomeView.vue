@@ -33,7 +33,7 @@
         <div class="status-grid">
           <div class="status-item">
             <span class="status-label">Backend Python:</span>
-            <span class="status-value" :class="{ 'status-ok': backendStatus }">
+            <span class="status-value" :class="{ 'status-ok': backendStatus, 'status-error': !backendStatus }">
               {{ backendStatus ? 'Conectado' : 'Desconectado' }}
             </span>
           </div>
@@ -46,6 +46,22 @@
             <span class="status-value status-ok">Offline (Local)</span>
           </div>
         </div>
+
+        <!-- Error message and retry when backend disconnected -->
+        <div v-if="!backendStatus" class="backend-error-container">
+          <p class="backend-error-message">
+            <i class="pi pi-exclamation-triangle"></i>
+            {{ backendError || 'No se puede conectar con el servidor. Reintentando...' }}
+          </p>
+          <Button
+            label="Reintentar conexión"
+            icon="pi pi-refresh"
+            severity="warning"
+            size="small"
+            @click="retryConnection"
+            :loading="isRetrying"
+          />
+        </div>
       </div>
 
       <div class="actions">
@@ -57,7 +73,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, computed } from 'vue'
+import { onMounted, computed, ref, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import Button from 'primevue/button'
@@ -66,9 +82,28 @@ const router = useRouter()
 const appStore = useAppStore()
 
 const backendStatus = computed(() => appStore.backendConnected)
+const backendError = computed(() => appStore.backendError)
+const isRetrying = ref(false)
+
+const retryConnection = async () => {
+  isRetrying.value = true
+  await appStore.checkBackendHealth()
+  if (!backendStatus.value) {
+    appStore.startRetrying()
+  }
+  isRetrying.value = false
+}
 
 onMounted(async () => {
   await appStore.checkBackendHealth()
+  // Start auto-retry if not connected
+  if (!backendStatus.value) {
+    appStore.startRetrying()
+  }
+})
+
+onUnmounted(() => {
+  // Don't stop retrying when leaving home - let it continue in background
 })
 
 const goToProjects = () => {
@@ -195,6 +230,41 @@ const goToSettings = () => {
 .status-value.status-ok {
   background: #d1fae5;
   color: #059669;
+}
+
+.status-value.status-error {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.backend-error-container {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.backend-error-message {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #92400e;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+:global(.dark) .backend-error-container {
+  background: #451a03;
+  border-color: #b45309;
+}
+
+:global(.dark) .backend-error-message {
+  color: #fcd34d;
 }
 
 .actions {

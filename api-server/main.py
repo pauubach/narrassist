@@ -4964,7 +4964,9 @@ JSON:"""
 
                 attributes = []
                 if entities:
-                    attr_extractor = AttributeExtractor()
+                    # Deshabilitar embeddings (muy lento con muchos personajes)
+                    # Los otros métodos (LLM, patrones, dependencias) son suficientes
+                    attr_extractor = AttributeExtractor(use_embeddings=False)
                     entity_repo = get_entity_repository()
 
                     # Preparar menciones de entidades para extract_attributes
@@ -5000,31 +5002,61 @@ JSON:"""
 
                         logger.info(f"Extrayendo atributos: {len(entity_mentions)} menciones de entidades")
 
-                        # Mostrar nombres de algunos personajes para dar contexto
-                        sample_names = [e.canonical_name for e in character_entities[:5] if e.canonical_name]
-                        if len(character_entities) > 5:
-                            names_preview = ", ".join(sample_names) + f" y {len(character_entities) - 5} más..."
-                        else:
-                            names_preview = ", ".join(sample_names)
+                        # Procesar personajes en lotes pequeños con progreso visual
+                        total_chars = len(character_entities)
+                        all_extracted_attrs = []
+                        batch_size = 10  # Procesar 10 personajes a la vez
 
-                        analysis_progress_storage[project_id]["current_action"] = f"Buscando descripciones de {len(character_entities)} personajes: {names_preview}"
+                        for batch_start in range(0, total_chars, batch_size):
+                            batch_end = min(batch_start + batch_size, total_chars)
+                            batch_chars = character_entities[batch_start:batch_end]
 
-                        # Actualizar progreso gradualmente mientras se procesa
-                        analysis_progress_storage[project_id]["progress"] = attr_pct_start + int((attr_pct_end - attr_pct_start) * 0.1)
+                            # Mostrar qué personajes se están analizando
+                            batch_names = [e.canonical_name for e in batch_chars if e.canonical_name][:3]
+                            if len(batch_chars) > 3:
+                                names_str = ", ".join(batch_names) + "..."
+                            else:
+                                names_str = ", ".join(batch_names)
 
-                        # Extraer atributos de todos los personajes de una vez (más eficiente)
-                        attr_result = attr_extractor.extract_attributes(
-                            text=full_text,
-                            entity_mentions=entity_mentions,
-                            chapter_id=None,
-                        )
+                            analysis_progress_storage[project_id]["current_action"] = f"Analizando: {names_str} ({batch_end}/{total_chars})"
 
-                        check_cancelled()  # Permitir cancelación
+                            # Calcular progreso (10% a 45% de la fase)
+                            batch_progress = 0.1 + (0.35 * batch_end / max(total_chars, 1))
+                            analysis_progress_storage[project_id]["progress"] = attr_pct_start + int((attr_pct_end - attr_pct_start) * batch_progress)
 
-                        if attr_result.is_failure:
-                            logger.warning(f"Error extrayendo atributos: {attr_result.error}")
-                        elif attr_result.value:
-                            logger.info(f"Atributos extraídos: {len(attr_result.value.attributes)}")
+                            # Obtener menciones solo de este lote
+                            batch_entity_names = {e.canonical_name.lower() for e in batch_chars if e.canonical_name}
+                            batch_mentions = [
+                                (name, start, end) for name, start, end in entity_mentions
+                                if name and name.lower() in batch_entity_names
+                            ]
+
+                            if batch_mentions:
+                                try:
+                                    # Usar timeout de 30 segundos por lote
+                                    import concurrent.futures
+                                    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                                        future = executor.submit(
+                                            attr_extractor.extract_attributes,
+                                            full_text,
+                                            batch_mentions,
+                                            None,  # chapter_id
+                                        )
+                                        try:
+                                            batch_result = future.result(timeout=30)
+                                            if batch_result.is_success and batch_result.value:
+                                                all_extracted_attrs.extend(batch_result.value.attributes)
+                                        except concurrent.futures.TimeoutError:
+                                            logger.warning(f"Timeout extrayendo atributos para: {names_str}")
+                                except Exception as e:
+                                    logger.warning(f"Error extrayendo atributos para {names_str}: {e}")
+
+                            check_cancelled()  # Permitir cancelación entre lotes
+
+                        # Crear resultado combinado
+                        from narrative_assistant.nlp.attributes import AttributeExtractionResult
+                        attr_result = Result.success(AttributeExtractionResult(attributes=all_extracted_attrs))
+                        logger.info(f"Atributos extraídos: {len(all_extracted_attrs)}")
 
                         # Actualizar progreso a 50% de la fase (extracción completada)
                         analysis_progress_storage[project_id]["progress"] = attr_pct_start + int((attr_pct_end - attr_pct_start) * 0.5)

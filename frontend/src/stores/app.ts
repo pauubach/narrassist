@@ -1,7 +1,21 @@
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import { defineStore } from 'pinia'
 import type { ThemeMode } from '@/types'
 import { apiUrl } from '@/config/api'
+
+// Tauri imports (only available in Tauri environment)
+let tauriListen: ((event: string, handler: (event: { payload: unknown }) => void) => Promise<() => void>) | null = null
+let tauriInvoke: ((cmd: string) => Promise<string>) | null = null
+
+// Dynamic import for Tauri (to avoid errors when running in browser)
+if (typeof window !== 'undefined' && '__TAURI__' in window) {
+  import('@tauri-apps/api/event').then(module => {
+    tauriListen = module.listen
+  })
+  import('@tauri-apps/api/core').then(module => {
+    tauriInvoke = module.invoke
+  })
+}
 
 export const useAppStore = defineStore('app', () => {
   // Estado
@@ -9,8 +23,11 @@ export const useAppStore = defineStore('app', () => {
   const backendVersion = ref<string | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
+  const backendError = ref<string | null>(null)
   const theme = ref<ThemeMode>('auto')
   const isDark = ref(false)
+  let retryInterval: number | null = null
+  let unlisten: (() => void) | null = null
 
   // Inicializar tema desde localStorage
   const savedTheme = localStorage.getItem('narrative_assistant_theme') as ThemeMode | null
@@ -66,6 +83,8 @@ export const useAppStore = defineStore('app', () => {
       const data = await response.json()
       backendConnected.value = true
       backendVersion.value = data.version || null
+      backendError.value = null
+      stopRetrying() // Stop retrying once connected
     } catch (err) {
       backendConnected.value = false
       backendVersion.value = null
@@ -75,6 +94,67 @@ export const useAppStore = defineStore('app', () => {
       loading.value = false
     }
   }
+
+  // Start retrying backend connection
+  function startRetrying() {
+    if (retryInterval) return
+    retryInterval = window.setInterval(async () => {
+      if (!backendConnected.value) {
+        await checkBackendHealth()
+      } else {
+        stopRetrying()
+      }
+    }, 3000) // Retry every 3 seconds
+  }
+
+  // Stop retrying
+  function stopRetrying() {
+    if (retryInterval) {
+      clearInterval(retryInterval)
+      retryInterval = null
+    }
+  }
+
+  // Initialize Tauri event listener
+  async function initTauriListener() {
+    if (!tauriListen) return
+
+    try {
+      unlisten = await tauriListen('backend-status', (event) => {
+        const payload = event.payload as { status: string; message: string }
+        console.log('[Tauri] Backend status event:', payload)
+
+        if (payload.status === 'running') {
+          backendConnected.value = true
+          backendError.value = null
+          stopRetrying()
+        } else if (payload.status === 'error') {
+          backendConnected.value = false
+          backendError.value = payload.message
+          startRetrying()
+        }
+      })
+    } catch (err) {
+      console.error('Failed to listen for Tauri events:', err)
+    }
+  }
+
+  // Start backend server (Tauri only)
+  async function startBackendServer(): Promise<string | null> {
+    if (!tauriInvoke) return null
+
+    try {
+      const result = await tauriInvoke('start_backend_server')
+      return result
+    } catch (err) {
+      console.error('Failed to start backend server:', err)
+      backendError.value = err instanceof Error ? err.message : 'Error iniciando servidor'
+      return null
+    }
+  }
+
+  // Initialize Tauri listener on store creation
+  initTauriListener()
 
   function clearError() {
     error.value = null
@@ -100,6 +180,7 @@ export const useAppStore = defineStore('app', () => {
     backendVersion,
     loading,
     error,
+    backendError,
     theme,
     isDark,
     // Getters
@@ -108,6 +189,9 @@ export const useAppStore = defineStore('app', () => {
     checkBackendHealth,
     clearError,
     setTheme,
-    toggleTheme
+    toggleTheme,
+    startRetrying,
+    stopRetrying,
+    startBackendServer
   }
 })

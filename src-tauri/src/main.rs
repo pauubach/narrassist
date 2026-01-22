@@ -165,8 +165,22 @@ fn main() {
 
                 // Intentar iniciar el servidor
                 match start_backend_server(app_handle.clone(), server_state).await {
-                    Ok(msg) => println!("[Setup] {}", msg),
-                    Err(e) => eprintln!("[Setup Error] Failed to start backend: {}", e),
+                    Ok(msg) => {
+                        println!("[Setup] {}", msg);
+                        // Emitir evento al frontend indicando que el backend está listo
+                        let _ = app_handle.emit("backend-status", serde_json::json!({
+                            "status": "running",
+                            "message": msg
+                        }));
+                    },
+                    Err(e) => {
+                        eprintln!("[Setup Error] Failed to start backend: {}", e);
+                        // Emitir evento de error al frontend
+                        let _ = app_handle.emit("backend-status", serde_json::json!({
+                            "status": "error",
+                            "message": format!("Error iniciando servidor: {}", e)
+                        }));
+                    }
                 }
             });
 
