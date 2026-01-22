@@ -4582,6 +4582,7 @@ JSON:"""
                 phases[3]["current"] = True  # Marcar fase fusion como activa en UI
                 analysis_progress_storage[project_id]["progress"] = fusion_pct_start
                 analysis_progress_storage[project_id]["current_phase"] = "Unificando personajes mencionados de diferentes formas..."
+                analysis_progress_storage[project_id]["current_action"] = "Preparando unificación..."
 
                 try:
                     from narrative_assistant.entities.semantic_fusion import get_semantic_fusion_service
@@ -4590,6 +4591,8 @@ JSON:"""
 
                     fusion_service = get_semantic_fusion_service()
                     entity_repo = get_entity_repository()
+
+                    analysis_progress_storage[project_id]["current_action"] = f"Comparando {len(entities)} entidades..."
 
                     # 1. Aplicar fusión semántica a entidades del mismo tipo
                     entities_by_type: dict[EntityType, list] = {}
@@ -4652,7 +4655,10 @@ JSON:"""
 
                     # Ejecutar las fusiones
                     merged_entity_ids = set()
-                    for keep_entity, merge_entity in fusion_pairs:
+                    if fusion_pairs:
+                        analysis_progress_storage[project_id]["current_action"] = f"Unificando {len(fusion_pairs)} pares de nombres similares..."
+
+                    for idx, (keep_entity, merge_entity) in enumerate(fusion_pairs):
                         if merge_entity.id in merged_entity_ids:
                             continue  # Ya fue fusionada
 
@@ -4713,11 +4719,19 @@ JSON:"""
                             logger.info(
                                 f"Fusión ejecutada: '{merge_entity.canonical_name}' → '{keep_entity.canonical_name}'"
                             )
+
+                            # Actualizar progreso cada 5 fusiones
+                            if (idx + 1) % 5 == 0:
+                                analysis_progress_storage[project_id]["current_action"] = f"Unificando nombres: {keep_entity.canonical_name}... ({idx + 1}/{len(fusion_pairs)})"
+
                         except Exception as e:
                             logger.warning(f"Error fusionando {merge_entity.canonical_name} → {keep_entity.canonical_name}: {e}")
 
                     # Actualizar lista de entidades activas
                     entities = [e for e in entities if e.id not in merged_entity_ids]
+
+                    if fusion_pairs:
+                        analysis_progress_storage[project_id]["current_action"] = f"Unificados {len(merged_entity_ids)} personajes duplicados"
 
                     analysis_progress_storage[project_id]["progress"] = 57
                     update_time_remaining()
@@ -4986,44 +5000,31 @@ JSON:"""
 
                         logger.info(f"Extrayendo atributos: {len(entity_mentions)} menciones de entidades")
 
-                        # Procesar personajes uno a uno para mostrar progreso detallado
-                        total_characters = len(character_entities)
-                        all_extracted_attrs = []
+                        # Mostrar nombres de algunos personajes para dar contexto
+                        sample_names = [e.canonical_name for e in character_entities[:5] if e.canonical_name]
+                        if len(character_entities) > 5:
+                            names_preview = ", ".join(sample_names) + f" y {len(character_entities) - 5} más..."
+                        else:
+                            names_preview = ", ".join(sample_names)
 
-                        for char_idx, char_entity in enumerate(character_entities):
-                            # Mostrar qué personaje se está analizando
-                            char_name = char_entity.canonical_name or "Personaje"
-                            analysis_progress_storage[project_id]["current_action"] = f"Analizando: {char_name} ({char_idx + 1}/{total_characters})"
+                        analysis_progress_storage[project_id]["current_action"] = f"Buscando descripciones de {len(character_entities)} personajes: {names_preview}"
 
-                            # Calcular progreso dentro de la fase (0-50% para extracción)
-                            extraction_progress = 0.5 * (char_idx / max(total_characters, 1))
-                            analysis_progress_storage[project_id]["progress"] = attr_pct_start + int((attr_pct_end - attr_pct_start) * extraction_progress)
+                        # Actualizar progreso gradualmente mientras se procesa
+                        analysis_progress_storage[project_id]["progress"] = attr_pct_start + int((attr_pct_end - attr_pct_start) * 0.1)
 
-                            # Obtener menciones solo de este personaje
-                            char_mentions = [
-                                (name, start, end) for name, start, end in entity_mentions
-                                if name and char_entity.canonical_name and name.lower() == char_entity.canonical_name.lower()
-                            ]
+                        # Extraer atributos de todos los personajes de una vez (más eficiente)
+                        attr_result = attr_extractor.extract_attributes(
+                            text=full_text,
+                            entity_mentions=entity_mentions,
+                            chapter_id=None,
+                        )
 
-                            if char_mentions:
-                                try:
-                                    char_result = attr_extractor.extract_attributes(
-                                        text=full_text,
-                                        entity_mentions=char_mentions,
-                                        chapter_id=None,
-                                    )
-                                    if char_result.is_success and char_result.value:
-                                        all_extracted_attrs.extend(char_result.value.attributes)
-                                except Exception as e:
-                                    logger.warning(f"Error extrayendo atributos de {char_name}: {e}")
+                        check_cancelled()  # Permitir cancelación
 
-                            check_cancelled()  # Permitir cancelación durante el proceso
-
-                        # Crear resultado combinado
-                        from narrative_assistant.nlp.attributes import AttributeExtractionResult
-                        attr_result = Result.success(AttributeExtractionResult(attributes=all_extracted_attrs))
-
-                        logger.info(f"Atributos extraídos: {len(all_extracted_attrs)}")
+                        if attr_result.is_failure:
+                            logger.warning(f"Error extrayendo atributos: {attr_result.error}")
+                        elif attr_result.value:
+                            logger.info(f"Atributos extraídos: {len(attr_result.value.attributes)}")
 
                         # Actualizar progreso a 50% de la fase (extracción completada)
                         analysis_progress_storage[project_id]["progress"] = attr_pct_start + int((attr_pct_end - attr_pct_start) * 0.5)

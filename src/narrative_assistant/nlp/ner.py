@@ -1684,9 +1684,9 @@ JSON:"""
             # 0. Preprocesamiento con LLM (si habilitado)
             llm_entities: list[ExtractedEntity] = []
             if self.use_llm_preprocessing:
-                report_progress("ner", 0.0, "Analizando texto con LLM...")
+                report_progress("ner", 0.0, "Analizando el texto...")
                 llm_entities = self._preprocess_with_llm(text)
-                report_progress("ner", 0.3, f"LLM: {len(llm_entities)} entidades detectadas")
+                report_progress("ner", 0.3, f"Encontrados {len(llm_entities)} posibles nombres...")
                 logger.info(f"LLM preprocesador: {len(llm_entities)} entidades detectadas")
 
                 # Añadir entidades del LLM primero (tienen prioridad)
@@ -1696,9 +1696,9 @@ JSON:"""
                         result.entities.append(entity)
                         entities_found.add(pos)
 
-            report_progress("ner", 0.4, "Procesando con spaCy NER...")
+            report_progress("ner", 0.4, "Buscando personajes y lugares...")
             doc = self.nlp(text)
-            report_progress("ner", 0.7, "Extrayendo entidades de spaCy...")
+            report_progress("ner", 0.7, "Identificando menciones en el texto...")
 
             # 1. Entidades detectadas por spaCy
             for ent in doc.ents:
@@ -1776,7 +1776,7 @@ JSON:"""
 
             # 2. Detección heurística (gazetteer dinámico)
             if self.enable_gazetteer:
-                report_progress("ner", 0.80, "Aplicando gazetteer dinámico...")
+                report_progress("ner", 0.80, "Buscando más apariciones de nombres conocidos...")
                 gazetteer_entities = self._detect_gazetteer_entities(doc, entities_found)
                 result.entities.extend(gazetteer_entities)
 
@@ -1786,7 +1786,7 @@ JSON:"""
 
             # 2.3 Detección de patrones título+apellido ("doctor Ramírez", "coronel Salgado")
             # NOTA: Esta función MODIFICA result.entities in-place para extender entidades
-            report_progress("ner", 0.82, "Detectando patrones título+nombre...")
+            report_progress("ner", 0.82, "Detectando títulos (doctor, señor...)...")
             title_entities = self._detect_title_name_patterns(
                 doc, text, entities_found, result.entities
             )
@@ -1796,7 +1796,7 @@ JSON:"""
 
             # 2.4 Detección de lugares compuestos ("Valle Marineris", "Monte Olimpo")
             # NOTA: Similar a títulos, extiende entidades LOC existentes
-            report_progress("ner", 0.83, "Detectando lugares compuestos...")
+            report_progress("ner", 0.83, "Identificando nombres de lugares...")
             compound_loc_entities = self._detect_compound_locations(
                 doc, text, entities_found, result.entities
             )
@@ -1804,12 +1804,12 @@ JSON:"""
                 result.entities.append(ent)
 
             # 2.5 Separar entidades coordinadas ("Pedro y Carmen" -> ["Pedro", "Carmen"])
-            report_progress("ner", 0.85, "Separando entidades coordinadas...")
+            report_progress("ner", 0.85, "Analizando nombres compuestos...")
             result.entities = self._split_coordinated_entities(doc, result.entities)
 
             # 3. Validación multi-capa (filtra falsos positivos)
             if enable_validation and result.entities:
-                report_progress("ner", 0.90, "Validando entidades detectadas...")
+                report_progress("ner", 0.90, "Verificando detecciones...")
                 validator = get_entity_validator()
                 validation_result = validator.validate(
                     entities=result.entities,
@@ -1834,7 +1834,7 @@ JSON:"""
 
             # 4. Verificación LLM para entidades de baja confianza (segunda capa)
             if self.use_llm_preprocessing and result.entities:
-                report_progress("ner", 0.93, "Verificando entidades con LLM...")
+                report_progress("ner", 0.93, "Confirmando resultados...")
                 result.entities = self._llm_verify_low_confidence_entities(
                     text, result.entities, result.validation_scores
                 )
@@ -1850,7 +1850,7 @@ JSON:"""
             for e in result.entities:
                 sources[e.source] = sources.get(e.source, 0) + 1
 
-            report_progress("ner", 1.0, f"NER completado: {len(result.entities)} menciones detectadas")
+            report_progress("ner", 1.0, f"Encontradas {len(result.entities)} menciones")
 
             logger.info(
                 f"NER: {len(result.entities)} entidades extraídas "
