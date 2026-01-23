@@ -188,6 +188,7 @@
               :project-id="project.id"
               :loading="loading"
               :initial-entity-id="initialEntityId"
+              :chapter-count="chapters.length"
               @entity-select="onEntitySelect"
               @refresh="loadEntities(project.id)"
             />
@@ -197,7 +198,7 @@
           <AnalysisRequired
             v-else-if="workspaceStore.activeTab === 'relationships'"
             :project-id="project.id"
-            required-phase="relationships"
+            required-phase="coreference"
             :description="TAB_PHASE_DESCRIPTIONS.relationships"
             @analysis-completed="onAnalysisCompleted"
           >
@@ -222,13 +223,14 @@
             @alert-resolve="onAlertResolve"
             @alert-dismiss="onAlertDismiss"
             @refresh="loadAlerts(project.id)"
+            @open-correction-config="workspaceStore.openCorrectionConfig()"
           />
 
           <!-- Tab Timeline -->
           <AnalysisRequired
             v-else-if="workspaceStore.activeTab === 'timeline'"
             :project-id="project.id"
-            required-phase="temporal"
+            required-phase="structure"
             :description="TAB_PHASE_DESCRIPTIONS.timeline"
             @analysis-completed="onAnalysisCompleted"
           >
@@ -245,14 +247,22 @@
             :analysis-status="project.analysisStatus"
           />
 
+          <!-- Tab Glosario (siempre disponible) -->
+          <GlossaryTab
+            v-else-if="workspaceStore.activeTab === 'glossary'"
+            :project-id="project.id"
+          />
+
           <!-- Tab Resumen -->
           <ResumenTab
             v-else-if="workspaceStore.activeTab === 'summary'"
             :project="project"
             :entities="entities"
             :alerts="alerts"
+            :chapters="chapters"
             @export="showExportDialog = true"
             @export-style-guide="handleExportStyleGuide"
+            @export-corrected="handleExportCorrected"
             @re-analyze="showReanalyzeDialog = true"
           />
         </div>
@@ -311,7 +321,8 @@
                 <AlertInspector
                   v-else-if="selectedAlert"
                   :alert="selectedAlert"
-                  @navigate="onAlertNavigate(selectedAlert)"
+                  :chapters="chapters"
+                  @navigate="onAlertNavigate(selectedAlert, $event)"
                   @resolve="onAlertResolve(selectedAlert)"
                   @dismiss="onAlertDismiss(selectedAlert)"
                   @close="selectionStore.clearAll()"
@@ -348,14 +359,15 @@ import Message from 'primevue/message'
 import Dialog from 'primevue/dialog'
 import ExportDialog from '@/components/ExportDialog.vue'
 import StatusBar from '@/components/layout/StatusBar.vue'
-import { WorkspaceTabs, TextTab, AlertsTab, EntitiesTab, RelationsTab, StyleTab, ResumenTab, PanelResizer } from '@/components/workspace'
+import { WorkspaceTabs, TextTab, AlertsTab, EntitiesTab, RelationsTab, StyleTab, GlossaryTab, ResumenTab, PanelResizer } from '@/components/workspace'
 import { AnalysisRequired } from '@/components/analysis'
 import { TimelineView } from '@/components/timeline'
 import { ChaptersPanel, AlertsPanel, CharactersPanel, AssistantPanel } from '@/components/sidebar'
 import { ProjectSummary, EntityInspector, AlertInspector } from '@/components/inspector'
 import type { SidebarTab } from '@/stores/workspace'
-import type { Entity, Alert, Chapter } from '@/types'
+import type { Entity, Alert, Chapter, AlertSource } from '@/types'
 import { transformEntities, transformAlerts, transformChapters } from '@/types/transformers'
+import { useAlertUtils } from '@/composables/useAlertUtils'
 
 const route = useRoute()
 const router = useRouter()
@@ -418,6 +430,7 @@ let analysisPollingInterval: ReturnType<typeof setInterval> | null = null
 // Track what was already loaded during this analysis session
 let chaptersLoadedDuringAnalysis = false
 let entitiesLoadedDuringAnalysis = false
+let alertsLoadedDuringAnalysis = false
 
 const isAnalyzing = computed(() => {
   if (!project.value) return false
@@ -493,6 +506,14 @@ async function pollAnalysisProgress() {
       loadEntities(project.value!.id)
     }
 
+    // Cargar alertas cuando la fase grammar esté completada (las alertas se van generando)
+    const grammarPhase = progressData.phases?.find((p: { id: string }) => p.id === 'grammar')
+    if (grammarPhase?.completed && !alertsLoadedDuringAnalysis && alerts.value.length === 0) {
+      console.log('[Polling] Grammar phase completed, loading alerts')
+      alertsLoadedDuringAnalysis = true
+      loadAlerts(project.value!.id)
+    }
+
     // Si idle (no hay análisis activo), detener polling silenciosamente
     if (progressData.status === 'idle') {
       console.log('[Polling] No active analysis (idle), stopping polling')
@@ -542,6 +563,7 @@ function startAnalysisPolling() {
   // Reset the flags when starting a new polling session
   chaptersLoadedDuringAnalysis = false
   entitiesLoadedDuringAnalysis = false
+  alertsLoadedDuringAnalysis = false
   analysisPollingInterval = setInterval(pollAnalysisProgress, 1500)
   // Hacer primera llamada inmediatamente
   pollAnalysisProgress()
@@ -641,16 +663,12 @@ const rightPanelWidth = computed(() => {
   return preferredWidth ?? workspaceStore.rightPanel.width
 })
 
+// Usar composable centralizado para alertas
+const { getSeverityConfig } = useAlertUtils()
+
 // Helper para label de severidad
 const getSeverityLabel = (severity: string) => {
-  const labels: Record<string, string> = {
-    critical: 'Críticas',
-    high: 'Altas',
-    medium: 'Medias',
-    low: 'Bajas',
-    info: 'Info'
-  }
-  return labels[severity] || severity
+  return getSeverityConfig(severity as any).label
 }
 
 // Helper para label de tipo de entidad
@@ -730,8 +748,16 @@ onMounted(async () => {
       const alertId = parseInt(alertParam)
       const targetAlert = alerts.value.find(a => a.id === alertId)
       if (targetAlert && targetAlert.spanStart !== undefined) {
+        // Convertir chapter number a chapter ID
+        const targetChapter = chapters.value.find(c => c.chapterNumber === targetAlert.chapter)
+        const chapterId = targetChapter?.id ?? null
+
         // Navegar a la posición de la alerta en el texto
-        workspaceStore.navigateToTextPosition(targetAlert.spanStart, targetAlert.excerpt)
+        workspaceStore.navigateToTextPosition(
+          targetAlert.spanStart,
+          targetAlert.excerpt || undefined,
+          chapterId
+        )
         // Seleccionar la alerta en el inspector
         selectionStore.selectAlert(targetAlert)
       }
@@ -866,10 +892,38 @@ const onAlertClickFromText = (alert: Alert) => {
   selectionStore.selectAlert(alert)
 }
 
-const onAlertNavigate = (alert: Alert) => {
-  if (alert.chapter !== undefined) {
-    // alert.chapter es el número de capítulo (1-indexed), necesitamos el ID
-    const chapter = chapters.value.find(c => c.chapterNumber === alert.chapter)
+/**
+ * Navega al texto de una alerta.
+ * Si se proporciona un source (para inconsistencias), navega a la ubicación de ese source
+ * en lugar de la ubicación principal de la alerta.
+ */
+const onAlertNavigate = (alert: Alert, source?: AlertSource) => {
+  // Convertir chapter NUMBER a chapter ID si es necesario
+  const getChapterId = (chapterNumber: number | undefined | null): number | null => {
+    if (chapterNumber === undefined || chapterNumber === null) return null
+    const chapter = chapters.value.find(c => c.chapterNumber === chapterNumber)
+    return chapter?.id ?? null
+  }
+
+  // Si hay un source específico, usar sus datos de ubicación
+  const targetChapter = source?.chapter ?? alert.chapter
+  const targetPosition = source?.startChar ?? alert.spanStart
+  const targetExcerpt = source?.excerpt ?? alert.excerpt
+
+  // Navegar al texto con posición precisa si está disponible
+  if (targetPosition !== undefined) {
+    // Obtener el ID del capítulo a partir del número
+    const chapterId = getChapterId(targetChapter)
+
+    // Usar navigateToTextPosition para scroll preciso con resaltado
+    workspaceStore.navigateToTextPosition(
+      targetPosition,
+      targetExcerpt || undefined,
+      chapterId
+    )
+  } else if (targetChapter !== undefined && targetChapter !== null) {
+    // Fallback: solo navegar al capítulo si no hay posición exacta
+    const chapter = chapters.value.find(c => c.chapterNumber === targetChapter)
     if (chapter) {
       scrollToChapterId.value = chapter.id
       activeChapterId.value = chapter.id
@@ -940,6 +994,47 @@ const handleGoToMentions = (entity: Entity) => {
 
 const handleExportStyleGuide = () => {
   showExportDialog.value = true
+}
+
+const handleExportCorrected = async () => {
+  if (!project.value) return
+
+  try {
+    // Descargar documento con correcciones como Track Changes
+    const url = `/api/projects/${project.value.id}/export/corrected?min_confidence=0.5&as_track_changes=true`
+
+    const response = await fetch(url)
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.error || 'Error al exportar documento corregido')
+    }
+
+    // Obtener el blob del documento
+    const blob = await response.blob()
+
+    // Obtener nombre del archivo del header o usar default
+    const contentDisposition = response.headers.get('Content-Disposition')
+    let filename = 'documento_corregido.docx'
+    if (contentDisposition) {
+      const match = contentDisposition.match(/filename="?([^"]+)"?/)
+      if (match) filename = match[1]
+    }
+
+    // Descargar
+    const downloadUrl = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = downloadUrl
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(downloadUrl)
+
+  } catch (err) {
+    console.error('Error exporting corrected document:', err)
+    alert(err instanceof Error ? err.message : 'Error al exportar documento corregido')
+  }
 }
 
 const quickExportStyleGuide = async () => {

@@ -28,6 +28,11 @@ from .document_exporter import (
     ProjectExportData,
     collect_export_data,
 )
+from .corrected_document_exporter import (
+    CorrectedDocumentExporter,
+    TrackChangeOptions,
+    export_with_track_changes,
+)
 
 __all__ = [
     # Character sheets
@@ -48,4 +53,8 @@ __all__ = [
     "ExportSection",
     "ProjectExportData",
     "collect_export_data",
+    # Corrected document exporter
+    "CorrectedDocumentExporter",
+    "TrackChangeOptions",
+    "export_with_track_changes",
 ]

@@ -7,8 +7,10 @@ import MultiSelect from 'primevue/multiselect'
 import Dialog from 'primevue/dialog'
 import DsBadge from '@/components/ds/DsBadge.vue'
 import DsEmptyState from '@/components/ds/DsEmptyState.vue'
-import type { Alert, AlertSeverity } from '@/types'
+import SequentialCorrectionMode from './SequentialCorrectionMode.vue'
+import type { Alert, AlertSeverity, AlertStatus, AlertSource } from '@/types'
 import { useAlertUtils } from '@/composables/useAlertUtils'
+import { useSequentialMode } from '@/composables/useSequentialMode'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { useToast } from 'primevue/usetoast'
 
@@ -47,15 +49,30 @@ const emit = defineEmits<{
   'alert-resolve': [alert: Alert]
   'alert-dismiss': [alert: Alert]
   'alert-reopen': [alert: Alert]
-  'alert-navigate': [alert: Alert]
+  /** Navega al texto de la alerta, opcionalmente a una fuente específica */
+  'alert-navigate': [alert: Alert, source?: AlertSource]
   'resolve-all': []
   'refresh': []
+  'open-correction-config': []
 }>()
 
 const toast = useToast()
 
-const { getSeverityLabel } = useAlertUtils()
+const { getSeverityLabel, getCategoryConfig } = useAlertUtils()
 const workspaceStore = useWorkspaceStore()
+
+// Sequential mode
+const sequentialMode = useSequentialMode(
+  () => props.alerts,
+  () => props.projectId,
+  (alertId: number, newStatus: AlertStatus) => {
+    // Update local alert status when changed in sequential mode
+    const alert = props.alerts.find(a => a.id === alertId)
+    if (alert) {
+      alert.status = newStatus
+    }
+  }
+)
 
 // Estado para diálogos
 const showResolveAllDialog = ref(false)
@@ -182,17 +199,9 @@ const stats = computed(() => ({
   active: props.alerts.filter(a => a.status === 'active').length
 }))
 
-// Helpers
+// Helpers - usar composable centralizado
 function getCategoryLabel(category: string): string {
-  const labels: Record<string, string> = {
-    'consistency': 'Consistencia',
-    'grammar': 'Gramática',
-    'style': 'Estilo',
-    'behavioral': 'Comportamiento',
-    'temporal': 'Temporal',
-    'attribute': 'Atributo'
-  }
-  return labels[category] || category
+  return getCategoryConfig(category as any).label
 }
 
 function clearFilters() {
@@ -279,6 +288,19 @@ function exportAlerts() {
 function isAlertActive(status: string): boolean {
   return status === 'active'
 }
+
+/**
+ * Navigate to text from sequential mode.
+ * If a specific source is provided (for inconsistency alerts),
+ * navigate to that source's location instead of the main alert location.
+ */
+function handleNavigateFromSequential(source?: AlertSource) {
+  const alert = sequentialMode.currentAlert.value
+  if (alert) {
+    emit('alert-navigate', alert, source)
+    sequentialMode.exit()
+  }
+}
 </script>
 
 <template>
@@ -364,6 +386,14 @@ function isAlertActive(status: string): boolean {
         </span>
 
         <Button
+          icon="pi pi-sliders-h"
+          text
+          rounded
+          @click="emit('open-correction-config')"
+          v-tooltip="'Configurar detectores'"
+        />
+
+        <Button
           icon="pi pi-refresh"
           text
           rounded
@@ -387,6 +417,16 @@ function isAlertActive(status: string): boolean {
           severity="success"
           @click="handleResolveAll"
           v-tooltip="'Resolver todas las activas'"
+          :disabled="stats.active === 0"
+        />
+
+        <Button
+          icon="pi pi-list-check"
+          label="Modo secuencial"
+          severity="info"
+          size="small"
+          @click="sequentialMode.enter({ statuses: ['active'] })"
+          v-tooltip="'Revisar alertas una por una'"
           :disabled="stats.active === 0"
         />
       </div>
@@ -502,6 +542,40 @@ function isAlertActive(status: string): boolean {
         <Button label="Cancelar" text @click="showResolveAllDialog = false" />
         <Button label="Resolver todas" severity="success" @click="confirmResolveAll" />
       </template>
+    </Dialog>
+
+    <!-- Modo de corrección secuencial -->
+    <Dialog
+      :visible="sequentialMode.active.value"
+      @update:visible="!$event && sequentialMode.exit()"
+      :modal="true"
+      :closable="false"
+      :showHeader="false"
+      :style="{ width: '95vw', maxWidth: '1000px', height: '90vh' }"
+      :contentStyle="{ padding: 0, height: '100%', display: 'flex', flexDirection: 'column' }"
+      :pt="{ root: { class: 'sequential-dialog' } }"
+    >
+      <SequentialCorrectionMode
+        :current-alert="sequentialMode.currentAlert.value"
+        :progress="sequentialMode.progress.value"
+        :has-next="sequentialMode.hasNext.value"
+        :has-previous="sequentialMode.hasPrevious.value"
+        :can-undo="sequentialMode.canUndo.value"
+        :updating="sequentialMode.updating.value"
+        :recent-actions="sequentialMode.recentActions.value"
+        :show-resolved="sequentialMode.settings.value.showResolved"
+        :chapters="chapters"
+        @next="sequentialMode.next()"
+        @previous="sequentialMode.previous()"
+        @resolve="sequentialMode.resolveCurrentAndAdvance()"
+        @dismiss="sequentialMode.dismissCurrentAndAdvance()"
+        @skip="sequentialMode.skipToNext()"
+        @flag="sequentialMode.flagCurrentAndAdvance()"
+        @undo="sequentialMode.undoLastAction()"
+        @exit="sequentialMode.exit()"
+        @update:show-resolved="sequentialMode.setSettings({ showResolved: $event })"
+        @navigate-to-text="handleNavigateFromSequential($event)"
+      />
     </Dialog>
   </div>
 </template>
@@ -661,10 +735,6 @@ function isAlertActive(status: string): boolean {
   margin: 0 0 0.5rem 0;
   font-size: 0.875rem;
   color: var(--text-color-secondary);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 
 .alert-footer {
@@ -709,5 +779,24 @@ function isAlertActive(status: string): boolean {
 
 .dark .stat-item.stat-active {
   background: var(--primary-900);
+}
+
+/* Sequential mode dialog */
+:deep(.sequential-dialog) {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+:deep(.sequential-dialog .p-dialog-header) {
+  display: none;
+}
+
+:deep(.sequential-dialog .p-dialog-content) {
+  padding: 0 !important;
+  height: 100%;
+}
+
+.dark :deep(.sequential-dialog) {
+  background: var(--surface-900);
 }
 </style>

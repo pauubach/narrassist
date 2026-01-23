@@ -127,6 +127,10 @@ function getPhaseClass(phase: AnalysisPhase): string {
           <span class="stat-value">{{ progress.stats.chapters }}</span>
           <span class="stat-label">Capítulos</span>
         </div>
+        <div v-if="progress.stats.corrections" class="analysis-progress__stat">
+          <span class="stat-value stat-value--corrections">{{ progress.stats.corrections }}</span>
+          <span class="stat-label">Sugerencias</span>
+        </div>
       </div>
 
       <!-- Actions -->
@@ -324,6 +328,10 @@ function getPhaseClass(phase: AnalysisPhase): string {
 .analysis-progress__stat .stat-label {
   font-size: var(--ds-font-size-xs);
   color: var(--ds-color-text-muted);
+}
+
+.analysis-progress__stat .stat-value--corrections {
+  color: var(--ds-color-warning, var(--yellow-500));
 }
 
 /* Actions */

@@ -81,7 +81,7 @@
           <i class="pi pi-book stat-icon"></i>
           <div class="stat-info">
             <span class="stat-value">
-              {{ character.firstMentionChapter ? `Cap. ${character.firstMentionChapter}` : 'N/A' }}
+              {{ formatChapterLabel(character.firstMentionChapter) || 'N/A' }}
             </span>
             <span class="stat-label">Primera aparición</span>
           </div>
@@ -118,11 +118,11 @@
             class="attribute-item"
           >
             <div class="attribute-content">
-              <span class="attribute-name">{{ attr.name }}</span>
+              <span class="attribute-name">{{ getAttributeLabel(attr.name) }}</span>
               <span class="attribute-value">{{ attr.value }}</span>
             </div>
             <div v-if="attr.firstMentionChapter" class="attribute-meta">
-              <small>Primera aparición: Cap. {{ attr.firstMentionChapter }}</small>
+              <small>Primera aparición: {{ formatChapterLabel(attr.firstMentionChapter) }}</small>
             </div>
             <Button
               v-if="editable"
@@ -244,6 +244,30 @@ import Timeline from 'primevue/timeline'
 import BehaviorExpectations from '@/components/BehaviorExpectations.vue'
 import EmotionalAnalysis from '@/components/EmotionalAnalysis.vue'
 import type { Entity, CharacterAttribute, CharacterRelationship } from '@/types'
+import { useAlertUtils } from '@/composables/useAlertUtils'
+
+// Traduce claves de atributos en inglés a etiquetas en español
+const ATTRIBUTE_LABELS: Record<string, string> = {
+  eye_color: 'Color de ojos',
+  hair_color: 'Color de pelo',
+  hair_type: 'Tipo de pelo',
+  age: 'Edad',
+  height: 'Altura',
+  build: 'Complexión',
+  skin: 'Piel',
+  distinctive_feature: 'Rasgo distintivo',
+  profession: 'Profesión',
+  occupation: 'Ocupación',
+  personality: 'Personalidad',
+  temperament: 'Temperamento',
+}
+
+function getAttributeLabel(key: string): string {
+  if (key in ATTRIBUTE_LABELS) return ATTRIBUTE_LABELS[key]
+  return key.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+}
+
+const { formatChapterLabel } = useAlertUtils()
 
 interface TimelineEvent {
   chapter: number

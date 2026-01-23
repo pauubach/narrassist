@@ -18,7 +18,7 @@
         </template>
         <template #content>
           <p class="export-description">
-            Informe profesional completo en Word o PDF con portada, indice y todas las secciones del analisis.
+            Informe profesional completo en Word o PDF con portada, índice y todas las secciones del análisis.
           </p>
 
           <!-- Secciones a incluir -->

@@ -5,14 +5,13 @@
         <h1>Proyectos</h1>
       </div>
       <div class="header-right">
-        <span class="p-input-icon-right search-wrapper">
-          <InputText
-            v-model="searchQuery"
-            placeholder="Buscar proyectos..."
-            class="search-input"
-          />
-          <i class="pi pi-search" />
-        </span>
+        <DsInput
+          v-model="searchQuery"
+          placeholder="Buscar proyectos..."
+          icon="pi pi-search"
+          clearable
+          class="search-input"
+        />
         <Dropdown
           v-model="sortBy"
           :options="sortOptions"
@@ -248,6 +247,7 @@ import Card from 'primevue/card'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Textarea from 'primevue/textarea'
+import DsInput from '@/components/ds/DsInput.vue'
 import FileUpload from 'primevue/fileupload'
 import Dropdown from 'primevue/dropdown'
 import ProgressBar from 'primevue/progressbar'

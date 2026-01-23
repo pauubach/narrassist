@@ -13,6 +13,8 @@ Componentes:
 - orthography: Corrección ortográfica
 - grammar: Corrección gramatical
 - sentiment: Análisis de sentimiento y emociones
+- title_preprocessor: Preprocesamiento de títulos para spaCy
+- spacy_title_integration: Integración de títulos con pipelines de análisis
 """
 
 from .spacy_gpu import (
@@ -105,6 +107,26 @@ from .sentiment import (
     SentimentAnalyzer,
     get_sentiment_analyzer,
 )
+from .title_preprocessor import (
+    TitleType,
+    ProcessedParagraph,
+    ProcessedDocument,
+    TitleDetector,
+    TitlePreprocessor,
+    is_title,
+    preprocess_text_for_spacy,
+    split_by_titles,
+)
+from .spacy_title_integration import (
+    TitleAwareDoc,
+    TitleAwareAnalysisResult,
+    analyze_with_title_handling,
+    analyze_paragraphs_separately,
+    extract_entities_by_title,
+    extract_dependencies_by_title,
+    get_parsing_quality_metrics,
+    debug_parsing,
+)
 
 __all__ = [
     # spaCy
@@ -185,4 +207,22 @@ __all__ = [
     "EmotionalInconsistency",
     "SentimentAnalyzer",
     "get_sentiment_analyzer",
+    # Title Preprocessing
+    "TitleType",
+    "ProcessedParagraph",
+    "ProcessedDocument",
+    "TitleDetector",
+    "TitlePreprocessor",
+    "is_title",
+    "preprocess_text_for_spacy",
+    "split_by_titles",
+    # Title Integration
+    "TitleAwareDoc",
+    "TitleAwareAnalysisResult",
+    "analyze_with_title_handling",
+    "analyze_paragraphs_separately",
+    "extract_entities_by_title",
+    "extract_dependencies_by_title",
+    "get_parsing_quality_metrics",
+    "debug_parsing",
 ]

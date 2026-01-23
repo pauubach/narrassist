@@ -597,6 +597,35 @@ class AttributeConsistencyChecker:
 
         return mapping
 
+    def _get_canonical_name(
+        self,
+        normalized_key: str,
+        name1: str,
+        name2: str,
+    ) -> str:
+        """
+        Obtiene el nombre canónico para usar en la inconsistencia.
+
+        Prefiere el nombre más largo (más específico) para que coincida
+        con entity_map que usa nombres canónicos completos.
+
+        Args:
+            normalized_key: Clave normalizada usada para agrupar
+            name1: Nombre de la primera entidad
+            name2: Nombre de la segunda entidad
+
+        Returns:
+            Nombre canónico (el más largo/específico)
+        """
+        # Preferir el nombre más largo (más específico)
+        if len(name1) > len(name2):
+            return name1
+        elif len(name2) > len(name1):
+            return name2
+        else:
+            # Misma longitud, usar el normalizado
+            return normalized_key
+
     def check_consistency(
         self,
         attributes: list[ExtractedAttribute],
@@ -676,9 +705,12 @@ class AttributeConsistencyChecker:
 
                             logger.info(f"INCONSISTENCY DETECTED: {entity_name}.{attr_key.value} '{attr1.value}' vs '{attr2.value}' (confidence: {confidence:.2f})")
 
+                            # Usar el nombre canónico para que coincida con entity_map
+                            # attr1.entity_name podría ser "María" pero entity_name es "maría sánchez"
+                            canonical_name = self._get_canonical_name(entity_name, attr1.entity_name, attr2.entity_name)
                             inconsistencies.append(
                                 AttributeInconsistency(
-                                    entity_name=attr1.entity_name,
+                                    entity_name=canonical_name,
                                     entity_id=0,  # Debe resolverse al crear alerta via EntityRepository
                                     attribute_key=attr_key,
                                     value1=attr1.value,

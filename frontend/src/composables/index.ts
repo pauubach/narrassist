@@ -41,3 +41,5 @@ export type { Mention, MentionNavigationState } from './useMentionNavigation'
 
 export { useDocumentTypeConfig } from './useDocumentTypeConfig'
 export type { DocumentTypeUIConfig } from './useDocumentTypeConfig'
+
+export { useAttributeLabels, getAttributeLabel } from './useAttributeLabels'

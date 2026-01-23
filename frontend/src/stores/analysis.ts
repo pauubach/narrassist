@@ -109,10 +109,13 @@ export type WorkspaceTab = 'text' | 'entities' | 'relationships' | 'alerts' | 't
 export const TAB_REQUIRED_PHASES: Partial<Record<WorkspaceTab, keyof ExecutedPhases>> = {
   // text: 'parsing', // Siempre disponible tras análisis inicial
   entities: 'entities',
-  relationships: 'relationships',
+  // relationships depende de coreference (fusión de entidades), disponible tras NER+fusion
+  relationships: 'coreference',
   // alerts: se generan progresivamente, siempre mostramos las disponibles
-  timeline: 'temporal',
-  style: 'register',
+  // timeline depende de structure (identificación de capítulos)
+  timeline: 'structure',
+  // style depende de grammar (incluye análisis de estilo y registro)
+  style: 'grammar',
   // summary: siempre disponible
 }
 
@@ -124,6 +127,21 @@ export const TAB_PHASE_DESCRIPTIONS: Partial<Record<WorkspaceTab, string>> = {
   relationships: 'Detecta las relaciones entre personajes y entidades.',
   timeline: 'Analiza marcadores temporales y construye la línea temporal del documento.',
   style: 'Analiza el registro, gramática y estilo del texto.',
+}
+
+/**
+ * Mapeo de IDs de fases del backend a keys de ExecutedPhases del frontend.
+ * El backend usa IDs simplificados, el frontend usa keys más detallados.
+ */
+const BACKEND_PHASE_TO_FRONTEND: Record<string, keyof ExecutedPhases | null> = {
+  parsing: 'parsing',
+  structure: 'structure',
+  ner: 'entities',
+  fusion: 'coreference',
+  attributes: 'attributes',
+  consistency: 'coherence',
+  grammar: 'grammar',
+  alerts: null, // Las alertas no son una "fase" en el sentido del frontend
 }
 
 export const useAnalysisStore = defineStore('analysis', () => {
@@ -200,6 +218,22 @@ export const useAnalysisStore = defineStore('analysis', () => {
       const data = await response.json()
       if (data.success && data.data) {
         currentAnalysis.value = data.data
+
+        // Actualizar executedPhases progresivamente según fases completadas
+        // Esto permite que las tabs se muestren sin esperar al final del análisis
+        if (data.data.phases && Array.isArray(data.data.phases)) {
+          if (!executedPhases.value[projectId]) {
+            executedPhases.value[projectId] = {}
+          }
+          for (const phase of data.data.phases) {
+            if (phase.completed) {
+              const frontendKey = BACKEND_PHASE_TO_FRONTEND[phase.id]
+              if (frontendKey) {
+                executedPhases.value[projectId][frontendKey] = true
+              }
+            }
+          }
+        }
 
         // Actualizar estado
         if (data.data.status === 'completed' || data.data.progress >= 100) {

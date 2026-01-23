@@ -5,6 +5,29 @@
  * NO modificar sin actualizar el backend también.
  */
 
+/** Fuente de una inconsistencia (ubicación donde se menciona un valor) */
+export interface ApiAlertSource {
+  chapter: number | null
+  page?: number
+  line?: number
+  start_char: number
+  end_char: number
+  excerpt: string
+  value: string
+}
+
+/** Datos adicionales de la alerta según su tipo */
+export interface ApiAlertExtraData {
+  // Para attribute_inconsistency
+  entity_name?: string
+  attribute_key?: string
+  value1?: string
+  value2?: string
+  sources?: ApiAlertSource[]
+  // Para otros tipos de alertas
+  [key: string]: unknown
+}
+
 /** Severidad de alerta del backend */
 export type ApiAlertSeverity = 'critical' | 'warning' | 'info' | 'hint'
 
@@ -29,6 +52,10 @@ export type ApiAlertCategory =
   | 'entity'
   | 'orthography'
   | 'grammar'
+  | 'typography'
+  | 'punctuation'
+  | 'repetition'
+  | 'agreement'
   | 'other'
 
 /** Alerta tal como la devuelve la API */
@@ -53,4 +80,6 @@ export interface ApiAlert {
   created_at: string
   updated_at?: string
   resolved_at: string | null
+  /** Datos adicionales específicos del tipo de alerta (sources para inconsistencias, etc.) */
+  extra_data?: ApiAlertExtraData | null
 }

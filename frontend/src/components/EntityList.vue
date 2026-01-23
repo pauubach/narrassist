@@ -38,15 +38,14 @@
 
     <!-- Filtros y búsqueda -->
     <div v-if="showFilters" class="filters-section">
-      <!-- Búsqueda con icono a la derecha -->
-      <div class="search-wrapper">
-        <InputText
-          v-model="searchQuery"
-          placeholder="Buscar entidades..."
-          class="search-input"
-        />
-        <i class="pi pi-search search-icon" />
-      </div>
+      <!-- Búsqueda -->
+      <DsInput
+        v-model="searchQuery"
+        placeholder="Buscar entidades..."
+        icon="pi pi-search"
+        clearable
+        class="search-input"
+      />
 
       <!-- Filtro por tipo -->
       <div class="type-filters">
@@ -358,7 +357,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import Button from 'primevue/button'
-import InputText from 'primevue/inputtext'
+import DsInput from '@/components/ds/DsInput.vue'
 import Dropdown from 'primevue/dropdown'
 import Badge from 'primevue/badge'
 import Tag from 'primevue/tag'

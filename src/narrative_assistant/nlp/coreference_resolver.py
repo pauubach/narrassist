@@ -1879,3 +1879,94 @@ def resolve_coreferences_voting(
     """
     resolver = get_coref_resolver(config)
     return resolver.resolve_document(text, chapters)
+
+
+def build_pronoun_resolution_map(coref_result: CorefResult) -> dict[tuple[int, int], str]:
+    """
+    Construye un mapa de posiciones de pronombres a sus antecedentes resueltos.
+
+    Este mapa es útil para la extracción de atributos: cuando se encuentra
+    un atributo asociado a un pronombre (ej: "Él era carpintero"), se puede
+    usar este mapa para resolver "Él" a su antecedente (ej: "Juan García").
+
+    Args:
+        coref_result: Resultado de la resolución de correferencias
+
+    Returns:
+        Diccionario {(start_char, end_char): entity_name}
+        Solo incluye menciones que son pronombres/demostrativos y tienen
+        un antecedente resuelto (nombre propio o SN definido).
+
+    Example:
+        >>> result = resolve_coreferences_voting(text)
+        >>> pronoun_map = build_pronoun_resolution_map(result)
+        >>> # Si "Él" en posición (100, 102) refiere a "Juan García":
+        >>> pronoun_map.get((100, 102))  # → "Juan García"
+    """
+    resolution_map: dict[tuple[int, int], str] = {}
+
+    for chain in coref_result.chains:
+        # Solo procesar cadenas con un main_mention válido
+        if not chain.main_mention:
+            continue
+
+        main_name = chain.main_mention.strip()
+        if not main_name:
+            continue
+
+        # Para cada mención en la cadena que NO sea el nombre principal
+        for mention in chain.mentions:
+            # Solo mapear pronombres, demostrativos y posesivos
+            if mention.mention_type in (
+                MentionType.PRONOUN,
+                MentionType.DEMONSTRATIVE,
+                MentionType.POSSESSIVE,
+                MentionType.ZERO,
+            ):
+                key = (mention.start_char, mention.end_char)
+                resolution_map[key] = main_name
+
+    logger.debug(
+        f"Mapa de resolución construido: {len(resolution_map)} pronombres mapeados"
+    )
+    return resolution_map
+
+
+def resolve_entity_name(
+    entity_name: str,
+    position: tuple[int, int],
+    pronoun_map: dict[tuple[int, int], str],
+) -> str:
+    """
+    Resuelve un nombre de entidad usando el mapa de correferencias.
+
+    Si el nombre es un pronombre y tenemos su posición en el mapa,
+    devuelve el nombre del antecedente. En caso contrario, devuelve
+    el nombre original.
+
+    Args:
+        entity_name: Nombre de la entidad (puede ser pronombre)
+        position: Posición (start_char, end_char) en el texto
+        pronoun_map: Mapa de resolución de pronombres
+
+    Returns:
+        Nombre resuelto o el original si no se puede resolver
+    """
+    # Pronombres comunes en español
+    PRONOUNS = {
+        "él", "ella", "ellos", "ellas",
+        "este", "esta", "esto", "estos", "estas",
+        "ese", "esa", "eso", "esos", "esas",
+        "aquel", "aquella", "aquello", "aquellos", "aquellas",
+        "su", "sus", "suyo", "suya", "suyos", "suyas",
+        "lo", "la", "los", "las", "le", "les",
+    }
+
+    # Si es un pronombre conocido, intentar resolver
+    if entity_name.lower() in PRONOUNS:
+        resolved = pronoun_map.get(position)
+        if resolved:
+            logger.debug(f"Pronombre '{entity_name}' resuelto a '{resolved}'")
+            return resolved
+
+    return entity_name

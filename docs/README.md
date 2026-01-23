@@ -1,7 +1,7 @@
 # Narrative Assistant - Documentación
 
-**Última actualización**: 2026-01-14
-**Estado**: Backend completo (Fases 0-9), Frontend completo (Fases 10-14)
+**Última actualización**: 2026-01-23
+**Estado**: MVP completo (Fases 0-14)
 
 ---
 
@@ -119,10 +119,11 @@ docs/
 
 ## Estadísticas del Proyecto
 
-- **Backend**: 16 módulos + 4 submódulos NLP
-- **Frontend**: 53 componentes Vue, 6 stores Pinia
-- **Tests**: 612 passing
-- **Líneas de código**: ~30,000 LoC
+- **Backend**: 103 archivos Python, ~49,000 LoC
+- **Frontend**: 53 componentes Vue, 7 stores Pinia, ~30,000 LoC
+- **API**: 39 endpoints FastAPI
+- **Tests**: 612+ passing
+- **Total**: ~79,000 LoC
 
 ---
 

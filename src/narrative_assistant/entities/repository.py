@@ -262,10 +262,11 @@ class EntityRepository:
             mention: Mención a crear
 
         Returns:
-            ID de la mención creada
+            ID de la mención creada (0 si ya existía)
         """
+        # INSERT OR IGNORE evita duplicados cuando hay constraint único
         sql = """
-            INSERT INTO entity_mentions (
+            INSERT OR IGNORE INTO entity_mentions (
                 entity_id, chapter_id, surface_form, start_char, end_char,
                 context_before, context_after, confidence, source
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -292,17 +293,21 @@ class EntityRepository:
         """
         Crea múltiples menciones en batch.
 
+        Usa INSERT OR IGNORE para evitar duplicados cuando hay un constraint
+        único en (entity_id, start_char, end_char).
+
         Args:
             mentions: Lista de menciones
 
         Returns:
-            Número de menciones creadas
+            Número de menciones intentadas (puede haber menos insertadas si hay duplicados)
         """
         if not mentions:
             return 0
 
+        # INSERT OR IGNORE evita duplicados cuando hay constraint único
         sql = """
-            INSERT INTO entity_mentions (
+            INSERT OR IGNORE INTO entity_mentions (
                 entity_id, chapter_id, surface_form, start_char, end_char,
                 context_before, context_after, confidence, source
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)

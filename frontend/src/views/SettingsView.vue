@@ -51,6 +51,12 @@
             </a>
           </li>
           <li>
+            <a href="#correcciones" @click.prevent="scrollToSection('correcciones')" :class="{ active: activeSection === 'correcciones' }">
+              <i class="pi pi-pencil"></i>
+              <span>Correcciones</span>
+            </a>
+          </li>
+          <li>
             <a href="#mantenimiento" @click.prevent="scrollToSection('mantenimiento')" :class="{ active: activeSection === 'mantenimiento' }">
               <i class="pi pi-wrench"></i>
               <span>Mantenimiento</span>
@@ -906,6 +912,177 @@
         </template>
       </Card>
 
+      <!-- Correcciones -->
+      <Card id="correcciones">
+        <template #title>
+          <div class="section-title">
+            <i class="pi pi-pencil"></i>
+            <span>Correcciones Editoriales</span>
+          </div>
+        </template>
+        <template #content>
+          <!-- Nota informativa -->
+          <Message severity="info" :closable="false" class="mb-4">
+            <template #default>
+              <div class="correction-info-message">
+                <p>
+                  La configuración de correcciones se aplica por proyecto. Aquí puedes seleccionar un preset base
+                  que se aplicará a nuevos proyectos. Para ajustar la configuración de un proyecto específico,
+                  accede a sus ajustes desde el panel del proyecto.
+                </p>
+              </div>
+            </template>
+          </Message>
+
+          <!-- Preset para nuevos proyectos -->
+          <div class="setting-item">
+            <div class="setting-info">
+              <label class="setting-label">Preset por defecto</label>
+              <p class="setting-description">
+                Configuración base que se aplicará a nuevos proyectos. Puedes personalizarla después.
+              </p>
+            </div>
+            <div class="setting-control wide">
+              <Dropdown
+                v-model="defaultCorrectionPreset"
+                :options="correctionPresetOptions"
+                optionLabel="name"
+                optionValue="id"
+                placeholder="Selecciona un preset"
+                class="w-full"
+                @change="onDefaultPresetChange"
+              >
+                <template #option="slotProps">
+                  <div class="preset-dropdown-option">
+                    <span class="preset-name">{{ slotProps.option.name }}</span>
+                    <span class="preset-description">{{ slotProps.option.description }}</span>
+                  </div>
+                </template>
+              </Dropdown>
+            </div>
+          </div>
+
+          <!-- Resumen de configuración actual -->
+          <div class="setting-item column" v-if="defaultCorrectionConfig">
+            <div class="setting-info">
+              <label class="setting-label">Resumen de configuración</label>
+              <p class="setting-description">
+                Vista previa de la configuración del preset seleccionado
+              </p>
+            </div>
+            <div class="correction-config-summary">
+              <div class="config-grid">
+                <!-- Perfil de documento -->
+                <div class="config-section">
+                  <h4><i class="pi pi-file"></i> Perfil de documento</h4>
+                  <div class="config-items">
+                    <div class="config-item">
+                      <span class="config-label">Tipo:</span>
+                      <Tag :value="getFieldLabel(defaultCorrectionConfig.profile?.document_field)" severity="info" />
+                    </div>
+                    <div class="config-item">
+                      <span class="config-label">Registro:</span>
+                      <Tag :value="getRegisterLabel(defaultCorrectionConfig.profile?.register)" severity="secondary" />
+                    </div>
+                    <div class="config-item">
+                      <span class="config-label">Audiencia:</span>
+                      <span>{{ getAudienceLabel(defaultCorrectionConfig.profile?.audience) }}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Tipografía -->
+                <div class="config-section">
+                  <h4><i class="pi pi-align-left"></i> Tipografía</h4>
+                  <div class="config-items">
+                    <div class="config-item">
+                      <span class="config-label">Habilitado:</span>
+                      <i :class="defaultCorrectionConfig.typography?.enabled ? 'pi pi-check text-green-500' : 'pi pi-times text-red-500'"></i>
+                    </div>
+                    <div class="config-item">
+                      <span class="config-label">Guiones:</span>
+                      <span>{{ getDashLabel(defaultCorrectionConfig.typography?.dialogue_dash) }}</span>
+                    </div>
+                    <div class="config-item">
+                      <span class="config-label">Comillas:</span>
+                      <span>{{ getQuoteLabel(defaultCorrectionConfig.typography?.quote_style) }}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Repeticiones -->
+                <div class="config-section">
+                  <h4><i class="pi pi-copy"></i> Repeticiones</h4>
+                  <div class="config-items">
+                    <div class="config-item">
+                      <span class="config-label">Habilitado:</span>
+                      <i :class="defaultCorrectionConfig.repetition?.enabled ? 'pi pi-check text-green-500' : 'pi pi-times text-red-500'"></i>
+                    </div>
+                    <div class="config-item">
+                      <span class="config-label">Distancia mín:</span>
+                      <span>{{ defaultCorrectionConfig.repetition?.min_distance }} palabras</span>
+                    </div>
+                    <div class="config-item">
+                      <span class="config-label">Sensibilidad:</span>
+                      <Tag :value="getSensitivityLabel(defaultCorrectionConfig.repetition?.sensitivity)" :severity="getSensitivitySeverity(defaultCorrectionConfig.repetition?.sensitivity)" />
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Regional -->
+                <div class="config-section">
+                  <h4><i class="pi pi-globe"></i> Vocabulario regional</h4>
+                  <div class="config-items">
+                    <div class="config-item">
+                      <span class="config-label">Habilitado:</span>
+                      <i :class="defaultCorrectionConfig.regional?.enabled ? 'pi pi-check text-green-500' : 'pi pi-times text-red-500'"></i>
+                    </div>
+                    <div class="config-item">
+                      <span class="config-label">Región:</span>
+                      <span>{{ getRegionLabel(defaultCorrectionConfig.regional?.target_region) }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Variante regional por defecto -->
+          <div class="setting-item">
+            <div class="setting-info">
+              <label class="setting-label">Variante regional preferida</label>
+              <p class="setting-description">
+                Variante del español para nuevos proyectos
+              </p>
+            </div>
+            <div class="setting-control">
+              <Dropdown
+                v-model="defaultRegion"
+                :options="regionOptions"
+                optionLabel="label"
+                optionValue="value"
+                placeholder="Selecciona región"
+                @change="onDefaultRegionChange"
+              />
+            </div>
+          </div>
+
+          <!-- Revisión con LLM -->
+          <div class="setting-item">
+            <div class="setting-info">
+              <label class="setting-label">Revisión con LLM</label>
+              <p class="setting-description">
+                Usar inteligencia artificial local para filtrar falsos positivos en las alertas de corrección.
+                Requiere Ollama instalado.
+              </p>
+            </div>
+            <div class="setting-control">
+              <ToggleSwitch v-model="useLLMReview" @change="onLLMReviewChange" />
+            </div>
+          </div>
+        </template>
+      </Card>
+
       <!-- Acciones -->
       <Card id="mantenimiento">
         <template #title>
@@ -1303,6 +1480,177 @@ const migrateData = ref(true)
 const changingLocation = ref(false)
 
 // ============================================================================
+// Configuración de Correcciones
+// ============================================================================
+
+interface CorrectionPreset {
+  id: string
+  name: string
+  description: string
+  config: Record<string, unknown>
+}
+
+interface CorrectionOptions {
+  document_fields: Array<{ value: string; label: string }>
+  register_levels: Array<{ value: string; label: string }>
+  audience_types: Array<{ value: string; label: string }>
+  regions: Array<{ value: string; label: string }>
+  quote_styles: Array<{ value: string; label: string }>
+  dialogue_dashes: Array<{ value: string; label: string }>
+  sensitivity_levels: Array<{ value: string; label: string }>
+}
+
+const correctionPresetOptions = ref<CorrectionPreset[]>([])
+const correctionOptions = ref<CorrectionOptions | null>(null)
+const defaultCorrectionPreset = ref<string>('default')
+const defaultCorrectionConfig = ref<Record<string, unknown> | null>(null)
+const defaultRegion = ref<string>('es_ES')
+const useLLMReview = ref<boolean>(false)
+
+const regionOptions = computed(() => correctionOptions.value?.regions || [
+  { value: 'es_ES', label: 'Espana' },
+  { value: 'es_MX', label: 'Mexico' },
+  { value: 'es_AR', label: 'Argentina' },
+  { value: 'es_CO', label: 'Colombia' },
+])
+
+// Cargar presets de correcciones
+async function loadCorrectionPresets() {
+  try {
+    const response = await fetch('/api/correction-presets')
+    const data = await response.json()
+
+    if (data.success && data.data) {
+      correctionPresetOptions.value = data.data.presets || []
+      correctionOptions.value = data.data.options || null
+
+      // Cargar configuracion guardada
+      const savedPreset = localStorage.getItem('defaultCorrectionPreset')
+      if (savedPreset) {
+        defaultCorrectionPreset.value = savedPreset
+        const preset = correctionPresetOptions.value.find(p => p.id === savedPreset)
+        if (preset) {
+          defaultCorrectionConfig.value = preset.config
+        }
+      } else if (correctionPresetOptions.value.length > 0) {
+        defaultCorrectionConfig.value = correctionPresetOptions.value[0].config
+      }
+
+      const savedRegion = localStorage.getItem('defaultCorrectionRegion')
+      if (savedRegion) {
+        defaultRegion.value = savedRegion
+      }
+
+      useLLMReview.value = localStorage.getItem('useLLMReview') === 'true'
+    }
+  } catch (error) {
+    console.error('Error loading correction presets:', error)
+  }
+}
+
+function onDefaultPresetChange() {
+  const preset = correctionPresetOptions.value.find(p => p.id === defaultCorrectionPreset.value)
+  if (preset) {
+    defaultCorrectionConfig.value = preset.config
+    localStorage.setItem('defaultCorrectionPreset', preset.id)
+  }
+}
+
+function onDefaultRegionChange() {
+  localStorage.setItem('defaultCorrectionRegion', defaultRegion.value)
+}
+
+function onLLMReviewChange() {
+  localStorage.setItem('useLLMReview', useLLMReview.value.toString())
+}
+
+// Helper functions para labels
+function getFieldLabel(field: string | undefined): string {
+  const labels: Record<string, string> = {
+    general: 'General',
+    literary: 'Literario',
+    journalistic: 'Periodistico',
+    academic: 'Academico',
+    technical: 'Tecnico',
+    legal: 'Juridico',
+    medical: 'Medico',
+    business: 'Empresarial',
+    selfhelp: 'Autoayuda',
+    culinary: 'Gastronomia',
+  }
+  return labels[field || 'general'] || field || 'General'
+}
+
+function getRegisterLabel(register: string | undefined): string {
+  const labels: Record<string, string> = {
+    formal: 'Formal',
+    neutral: 'Neutro',
+    colloquial: 'Coloquial',
+    vulgar: 'Vulgar',
+  }
+  return labels[register || 'neutral'] || register || 'Neutro'
+}
+
+function getAudienceLabel(audience: string | undefined): string {
+  const labels: Record<string, string> = {
+    general: 'Publico general',
+    children: 'Infantil/Juvenil',
+    adult: 'Adultos',
+    specialist: 'Especialistas',
+    mixed: 'Mixta',
+  }
+  return labels[audience || 'general'] || audience || 'General'
+}
+
+function getDashLabel(dash: string | undefined): string {
+  const labels: Record<string, string> = {
+    em: 'Raya (--)',
+    en: 'Semiraya (-)',
+    hyphen: 'Guion (-)',
+  }
+  return labels[dash || 'em'] || dash || 'Raya'
+}
+
+function getQuoteLabel(quote: string | undefined): string {
+  const labels: Record<string, string> = {
+    angular: 'Angulares «»',
+    curly: 'Inglesas tipográficas \u201C\u201D',  // " "
+    straight: 'Rectas \u0022\u0022',              // " "
+  }
+  return labels[quote || 'angular'] || quote || 'Angulares'
+}
+
+function getSensitivityLabel(sensitivity: string | undefined): string {
+  const labels: Record<string, string> = {
+    low: 'Baja',
+    medium: 'Media',
+    high: 'Alta',
+  }
+  return labels[sensitivity || 'medium'] || sensitivity || 'Media'
+}
+
+function getSensitivitySeverity(sensitivity: string | undefined): 'success' | 'info' | 'warn' | 'danger' | 'secondary' | 'contrast' {
+  const severities: Record<string, 'success' | 'info' | 'warn' | 'danger' | 'secondary' | 'contrast'> = {
+    low: 'success',
+    medium: 'info',
+    high: 'warn',
+  }
+  return severities[sensitivity || 'medium'] || 'info'
+}
+
+function getRegionLabel(region: string | undefined): string {
+  const labels: Record<string, string> = {
+    es_ES: 'Espana',
+    es_MX: 'Mexico',
+    es_AR: 'Argentina',
+    es_CO: 'Colombia',
+    es_CL: 'Chile',
+    es_PE: 'Peru',
+  }
+  return labels[region || 'es_ES'] || region || 'Espana'
+}
+
+// ============================================================================
 // Sistema de Filtros de Entidades
 // ============================================================================
 
@@ -1648,6 +1996,7 @@ onMounted(async () => {
   await loadSystemCapabilities()
   await loadCurrentDataLocation()
   await loadFilterData()
+  await loadCorrectionPresets()
 })
 
 onUnmounted(() => {
@@ -2218,7 +2567,7 @@ const scrollToSection = (sectionId: string) => {
 const handleScroll = () => {
   if (!contentArea.value) return
 
-  const sections = ['apariencia', 'analisis', 'metodos-nlp', 'notificaciones', 'privacidad', 'mantenimiento', 'acerca-de']
+  const sections = ['apariencia', 'analisis', 'metodos-nlp', 'notificaciones', 'privacidad', 'filtros-entidades', 'correcciones', 'mantenimiento', 'acerca-de']
   const scrollPosition = contentArea.value.scrollTop + 100
 
   for (const sectionId of sections) {
@@ -3461,5 +3810,99 @@ const handleScroll = () => {
 .empty-rejections i {
   font-size: 1.25rem;
   color: var(--p-green-500);
+}
+
+/* ============================================================================
+   Configuracion de Correcciones
+   ============================================================================ */
+
+.correction-info-message {
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.correction-info-message p {
+  margin: 0;
+}
+
+.correction-config-summary {
+  background: var(--p-surface-100);
+  border-radius: var(--p-border-radius);
+  padding: 1rem;
+}
+
+:global(.dark) .correction-config-summary {
+  background: var(--p-surface-800);
+}
+
+.config-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.config-section {
+  background: var(--p-surface-0);
+  border-radius: var(--p-border-radius);
+  padding: 1rem;
+}
+
+:global(.dark) .config-section {
+  background: var(--p-surface-900);
+}
+
+.config-section h4 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.75rem 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--p-primary-color);
+}
+
+.config-section h4 i {
+  font-size: 1rem;
+}
+
+.config-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.config-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.config-label {
+  color: var(--p-text-secondary-color);
+  min-width: 80px;
+}
+
+.preset-dropdown-option {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.preset-dropdown-option .preset-name {
+  font-weight: 500;
+}
+
+.preset-dropdown-option .preset-description {
+  font-size: 0.8rem;
+  color: var(--p-text-secondary-color);
+}
+
+.text-green-500 {
+  color: var(--p-green-500);
+}
+
+.text-red-500 {
+  color: var(--p-red-500);
 }
 </style>

@@ -22,14 +22,13 @@
     <!-- Filtros -->
     <div v-if="showFilters" class="filters-section">
       <!-- Búsqueda -->
-      <span class="p-input-icon-right search-wrapper">
-        <InputText
-          v-model="searchQuery"
-          placeholder="Buscar alertas..."
-          class="search-input"
-        />
-        <i class="pi pi-search" />
-      </span>
+      <DsInput
+        v-model="searchQuery"
+        placeholder="Buscar alertas..."
+        icon="pi pi-search"
+        clearable
+        class="search-input"
+      />
 
       <!-- Filtros por severidad -->
       <div class="severity-filters">
@@ -305,7 +304,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import Button from 'primevue/button'
-import InputText from 'primevue/inputtext'
+import DsInput from '@/components/ds/DsInput.vue'
 import SelectButton from 'primevue/selectbutton'
 import Badge from 'primevue/badge'
 import Tag from 'primevue/tag'
@@ -315,6 +314,15 @@ import Paginator from 'primevue/paginator'
 import VirtualScroller from 'primevue/virtualscroller'
 import type { Alert } from '@/types'
 import { debounce } from '@/composables'
+import { useAlertUtils } from '@/composables/useAlertUtils'
+
+// Usar composable centralizado para utilidades de alertas
+const {
+  getSeverityConfig,
+  getCategoryConfig,
+  getStatusConfig,
+  getSeverityLabel,
+} = useAlertUtils()
 
 // Umbral para activar virtualización
 const VIRTUALIZATION_THRESHOLD = 50
@@ -398,6 +406,10 @@ const categoryOptions = [
   { label: 'Estilo', value: 'style' },
   { label: 'Gramática', value: 'grammar' },
   { label: 'Estructura', value: 'structure' },
+  { label: 'Tipografía', value: 'typography' },
+  { label: 'Puntuación', value: 'punctuation' },
+  { label: 'Repeticiones', value: 'repetition' },
+  { label: 'Concordancia', value: 'agreement' },
   { label: 'Otros', value: 'other' }
 ]
 
@@ -495,86 +507,39 @@ const getSeverityCount = (severity: string): number => {
   return props.alerts.filter(a => a.severity === severity).length
 }
 
+// Usar composable para obtener configuración centralizada
 const getSeverityColor = (severity: string): string => {
-  // Map domain severities to PrimeVue Tag severities
-  const colors: Record<string, string> = {
+  // Map to PrimeVue Tag severity values
+  const primeVueMap: Record<string, string> = {
     'critical': 'danger',
     'high': 'warn',
     'medium': 'warn',
     'low': 'secondary',
     'info': 'info',
-    // Legacy API severities (just in case)
-    'warning': 'warn',
-    'hint': 'secondary'
   }
-  return colors[severity] || 'secondary'
+  return primeVueMap[severity] || 'secondary'
 }
 
 const getSeverityIcon = (severity: string): string => {
-  // Map domain severities to icons
-  const icons: Record<string, string> = {
-    'critical': 'pi pi-exclamation-circle',
-    'high': 'pi pi-exclamation-triangle',
-    'medium': 'pi pi-info-circle',
-    'low': 'pi pi-circle',
-    'info': 'pi pi-lightbulb',
-    // Legacy API severities
-    'warning': 'pi pi-exclamation-triangle',
-    'hint': 'pi pi-lightbulb'
-  }
-  return icons[severity] || 'pi pi-info-circle'
+  return getSeverityConfig(severity as any).icon
 }
 
 const getCategoryLabel = (category: string): string => {
-  // Domain category labels
-  const labels: Record<string, string> = {
-    'attribute': 'Atributos',
-    'timeline': 'Línea temporal',
-    'relationship': 'Relaciones',
-    'location': 'Ubicación',
-    'behavior': 'Comportamiento',
-    'knowledge': 'Conocimiento',
-    'style': 'Estilo',
-    'grammar': 'Gramática',
-    'structure': 'Estructura',
-    'other': 'Otros',
-    // Legacy API categories
-    'consistency': 'Consistencia',
-    'continuity': 'Continuidad',
-    'characterization': 'Caracterización',
-    'chronology': 'Cronología'
-  }
-  return labels[category] || category
+  return getCategoryConfig(category as any).label
 }
 
 const getStatusSeverity = (status: string): string => {
-  // Domain status values: active, dismissed, resolved
-  const severities: Record<string, string> = {
+  // Map to PrimeVue Tag severity values
+  const primeVueMap: Record<string, string> = {
     'active': 'warn',
     'resolved': 'success',
     'dismissed': 'secondary',
-    // Legacy API statuses
-    'open': 'warn',
-    'new': 'warn',
-    'acknowledged': 'warn',
-    'in_progress': 'warn'
   }
-  return severities[status] || 'secondary'
+  return primeVueMap[status] || 'secondary'
 }
 
 const getStatusLabel = (status: string): string => {
-  // Domain status values: active, dismissed, resolved
-  const labels: Record<string, string> = {
-    'active': 'Activa',
-    'resolved': 'Resuelta',
-    'dismissed': 'Descartada',
-    // Legacy API statuses
-    'open': 'Abierta',
-    'new': 'Nueva',
-    'acknowledged': 'Vista',
-    'in_progress': 'En progreso'
-  }
-  return labels[status] || status
+  return getStatusConfig(status as any).label
 }
 
 const formatDate = (date: Date | string): string => {

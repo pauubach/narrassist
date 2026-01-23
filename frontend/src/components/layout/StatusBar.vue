@@ -209,7 +209,7 @@ function toggleDetails() {
         {{ chapterCount }} capítulos
       </span>
       <span class="stat-item" v-if="entityCount > 0">
-        <i class="pi pi-users"></i>
+        <i class="pi pi-th-large"></i>
         {{ entityCount }} entidades
       </span>
       <span class="stat-item stat-alerts" v-if="alertCount > 0">

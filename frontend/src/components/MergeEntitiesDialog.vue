@@ -20,14 +20,13 @@
         <h3>Paso 1: Selecciona las entidades a fusionar</h3>
 
         <!-- Búsqueda de entidades -->
-        <span class="p-input-icon-right search-wrapper">
-          <InputText
-            v-model="searchQuery"
-            placeholder="Buscar entidades..."
-            class="w-full"
-          />
-          <i class="pi pi-search" />
-        </span>
+        <DsInput
+          v-model="searchQuery"
+          placeholder="Buscar entidades..."
+          icon="pi pi-search"
+          clearable
+          class="w-full"
+        />
 
         <!-- Lista de entidades disponibles -->
         <div class="entities-selection">
@@ -172,7 +171,7 @@
           <div class="similarity-analysis">
             <h4>
               <i class="pi pi-chart-bar"></i>
-              Analisis de similitud
+              Análisis de similitud
             </h4>
 
             <div v-if="similarityData" class="similarity-content">
@@ -414,7 +413,7 @@
 import { ref, computed, watch } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
-import InputText from 'primevue/inputtext'
+import DsInput from '@/components/ds/DsInput.vue'
 import Checkbox from 'primevue/checkbox'
 import RadioButton from 'primevue/radiobutton'
 import Chip from 'primevue/chip'

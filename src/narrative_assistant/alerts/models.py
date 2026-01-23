@@ -27,6 +27,11 @@ class AlertCategory(Enum):
     CHARACTER_CONSISTENCY = "character_consistency"  # Inconsistencias de personajes (edades, etc.)
     VOICE_DEVIATION = "voice_deviation"  # Desviaciones de voz/registro de personajes
     EMOTIONAL = "emotional"  # Incoherencias emocionales (emoción vs diálogo/acción)
+    # Nuevas categorías de corrección editorial
+    TYPOGRAPHY = "typography"  # Errores tipográficos (comillas, espacios)
+    PUNCTUATION = "punctuation"  # Puntuación (raya de diálogo, puntos suspensivos)
+    REPETITION = "repetition"  # Repeticiones léxicas cercanas
+    AGREEMENT = "agreement"  # Concordancia gramatical (género, número)
     OTHER = "other"  # Otras alertas no categorizadas
 
 

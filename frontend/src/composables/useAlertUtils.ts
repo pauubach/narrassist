@@ -6,6 +6,127 @@
 
 import type { Alert, AlertSeverity, AlertCategory, AlertStatus } from '@/types'
 
+/**
+ * Traducciones de claves de atributos a español.
+ * Centralizado para evitar duplicación entre componentes.
+ */
+export const ATTRIBUTE_TRANSLATIONS: Record<string, string> = {
+  // Físicos - personajes
+  eye_color: 'Color de ojos',
+  hair_color: 'Color de cabello',
+  hair_type: 'Tipo de cabello',
+  age: 'Edad',
+  height: 'Altura',
+  build: 'Complexión',
+  skin: 'Piel',
+  skin_color: 'Color de piel',
+  distinctive_feature: 'Rasgo distintivo',
+  weight: 'Peso',
+  scar: 'Cicatriz',
+  tattoo: 'Tatuaje',
+
+  // Psicológicos
+  personality: 'Personalidad',
+  temperament: 'Temperamento',
+  fear: 'Miedo',
+  desire: 'Deseo',
+  goal: 'Objetivo',
+  trait: 'Rasgo',
+  motivation: 'Motivación',
+  quirk: 'Peculiaridad',
+  habit: 'Hábito',
+  mannerism: 'Manierismo',
+  like: 'Gusto',
+  dislike: 'Disgusto',
+  favorite: 'Favorito',
+
+  // Sociales
+  profession: 'Profesión',
+  occupation: 'Ocupación',
+  title: 'Título',
+  role: 'Rol',
+  relationship: 'Relación',
+  nationality: 'Nacionalidad',
+  family: 'Familia',
+  friend: 'Amigo',
+  enemy: 'Enemigo',
+  ally: 'Aliado',
+  affiliation: 'Afiliación',
+  organization: 'Organización',
+  group: 'Grupo',
+  faction: 'Facción',
+  allegiance: 'Lealtad',
+  rank: 'Rango',
+
+  // Origen y especie
+  background: 'Trasfondo',
+  origin: 'Origen',
+  species: 'Especie',
+  race: 'Raza',
+  class: 'Clase',
+
+  // Comunicación
+  language: 'Idioma',
+  accent: 'Acento',
+  voice: 'Voz',
+
+  // Lugares
+  climate: 'Clima',
+  terrain: 'Terreno',
+  size: 'Tamaño',
+  location: 'Ubicación',
+  address: 'Dirección',
+
+  // Objetos
+  material: 'Material',
+  color: 'Color',
+  condition: 'Estado',
+  appearance: 'Apariencia',
+  clothing: 'Vestimenta',
+  weapon: 'Arma',
+  vehicle: 'Vehículo',
+  symbol: 'Símbolo',
+  mark: 'Marca',
+
+  // Habilidades
+  skill: 'Habilidad',
+  power: 'Poder',
+  weakness: 'Debilidad',
+  strength: 'Fortaleza',
+  hobby: 'Pasatiempo',
+
+  // Genérico
+  other: 'Otro',
+  name: 'Nombre',
+  alias: 'Alias',
+  description: 'Descripción',
+  status: 'Estado',
+  pet: 'Mascota',
+  birth_date: 'Fecha de nacimiento',
+  birthdate: 'Fecha de nacimiento',
+  death_date: 'Fecha de fallecimiento',
+  gender: 'Género',
+}
+
+/**
+ * Traduce un nombre de atributo del inglés al español.
+ * @param key - Clave del atributo en inglés (ej: "hair_type")
+ * @returns Nombre traducido (ej: "Tipo de cabello")
+ */
+export function translateAttributeName(key: string): string {
+  // Normalizar: manejar tanto snake_case como espacios
+  const normalizedKey = key.toLowerCase().replace(/\s+/g, '_')
+
+  if (normalizedKey in ATTRIBUTE_TRANSLATIONS) {
+    return ATTRIBUTE_TRANSLATIONS[normalizedKey]
+  }
+
+  // Fallback: convertir snake_case a Title Case
+  return key
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, l => l.toUpperCase())
+}
+
 export interface SeverityConfig {
   label: string
   icon: string
@@ -103,6 +224,26 @@ const categoryConfigs: Record<AlertCategory, CategoryConfig> = {
     description: 'Problemas en la estructura narrativa',
     icon: 'pi pi-sitemap',
   },
+  typography: {
+    label: 'Tipografía',
+    description: 'Comillas, espaciado incorrecto',
+    icon: 'pi pi-minus',
+  },
+  punctuation: {
+    label: 'Puntuación',
+    description: 'Raya de diálogo, puntos suspensivos',
+    icon: 'pi pi-ellipsis-h',
+  },
+  repetition: {
+    label: 'Repetición',
+    description: 'Palabras repetidas en proximidad',
+    icon: 'pi pi-clone',
+  },
+  agreement: {
+    label: 'Concordancia',
+    description: 'Errores de concordancia género/número',
+    icon: 'pi pi-link',
+  },
   other: {
     label: 'Otra inconsistencia',
     description: 'Otro tipo de problema narrativo',
@@ -166,6 +307,13 @@ export function useAlertUtils() {
    */
   function getSeverityLabel(severity: AlertSeverity): string {
     return getSeverityConfig(severity).label
+  }
+
+  /**
+   * Obtiene el label traducido para una categoría
+   */
+  function getCategoryLabel(category: AlertCategory): string {
+    return getCategoryConfig(category).label
   }
 
   /**
@@ -328,6 +476,35 @@ export function useAlertUtils() {
     )
   }
 
+  /**
+   * Formatea la etiqueta de capítulo de forma inteligente.
+   *
+   * Si el documento no tiene estructura de capítulos real (un solo capítulo sin título),
+   * no muestra "Cap. 1" para evitar confusión.
+   *
+   * @param chapterNumber - Número del capítulo
+   * @param totalChapters - Total de capítulos en el documento (opcional)
+   * @param hasChapterTitle - Si el capítulo tiene título (opcional)
+   * @returns String con la etiqueta o null si no debe mostrarse
+   */
+  function formatChapterLabel(
+    chapterNumber: number | null | undefined,
+    totalChapters?: number,
+    hasChapterTitle?: boolean
+  ): string | null {
+    // Si no hay número de capítulo, no mostrar nada
+    if (chapterNumber === null || chapterNumber === undefined) {
+      return null
+    }
+
+    // Si hay solo 1 capítulo sin título, es probablemente un documento sin estructura de capítulos
+    if (totalChapters === 1 && chapterNumber === 1 && !hasChapterTitle) {
+      return null
+    }
+
+    return `Cap. ${chapterNumber}`
+  }
+
   return {
     getSeverityConfig,
     getCategoryConfig,
@@ -335,6 +512,7 @@ export function useAlertUtils() {
     getSeverityColor,
     getSeverityIcon,
     getSeverityLabel,
+    getCategoryLabel,
     sortAlerts,
     groupAlertsByCategory,
     groupAlertsBySeverity,
@@ -343,7 +521,9 @@ export function useAlertUtils() {
     countByStatus,
     getActiveAlerts,
     formatAlertLocation,
+    formatChapterLabel,
     getAllSeverityConfigs,
     getAllCategoryConfigs,
+    translateAttributeName,
   }
 }

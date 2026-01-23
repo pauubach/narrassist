@@ -1041,6 +1041,28 @@ html.scrivener-theme.dark .p-menuitem-content:hover {
   background-color: #3E3626 !important;   /* sepia-200 dark */
 }
 
+/* Menu hover - usando data attributes para mayor especificidad (PrimeVue 4) */
+html.scrivener-theme.dark .p-menu .p-menuitem > .p-menuitem-content:hover,
+html.scrivener-theme.dark .p-contextmenu .p-menuitem > .p-menuitem-content:hover,
+html.scrivener-theme.dark .p-tieredmenu .p-menuitem > .p-menuitem-content:hover,
+html.scrivener-theme.dark [data-pc-name="menu"] [data-pc-section="itemcontent"]:hover,
+html.scrivener-theme.dark [data-pc-name="contextmenu"] [data-pc-section="itemcontent"]:hover,
+html.scrivener-theme.dark [data-pc-name="tieredmenu"] [data-pc-section="itemcontent"]:hover {
+  background-color: #5A4A32 !important;
+  color: #E8DCC8 !important;
+}
+
+/* Estados focus/active en menús */
+html.scrivener-theme.dark .p-menuitem.p-focus > .p-menuitem-content,
+html.scrivener-theme.dark .p-menuitem-content:focus,
+html.scrivener-theme.dark [data-pc-section="itemcontent"]:focus,
+html.scrivener-theme.dark [data-p-focused="true"] > .p-menuitem-content {
+  background-color: #5A4A32 !important;
+  box-shadow: none !important;
+  outline: 2px solid #6E5C40 !important;
+  outline-offset: -2px;
+}
+
 html.scrivener-theme.dark .p-dropdown-panel,
 html.scrivener-theme.dark .p-multiselect-panel {
   background-color: #252114 !important;
@@ -3073,4 +3095,702 @@ html.scrivener-theme.dark .chapter-text h4 {
 html.scrivener-theme.dark .chapter-text .section-h5,
 html.scrivener-theme.dark .chapter-text h5 {
   color: #A89878 !important;
+}
+
+/* ============================================================================
+   GLOBAL TabView Overrides - Consistent with WorkspaceTabs
+   Estas reglas aseguran que TODOS los TabView se vean igual en toda la app
+   ============================================================================ */
+
+/* Barra de navegación de tabs */
+.p-tabview > .p-tabview-nav-container > .p-tabview-nav-content > .p-tabview-nav {
+  border-bottom: 1px solid var(--ds-color-border, var(--p-surface-200));
+  gap: var(--ds-space-1, 0.25rem);
+  background: transparent;
+}
+
+/* Ocultar ink-bar por defecto de PrimeVue (usamos pseudo-elemento) */
+.p-tabview .p-tabview-ink-bar {
+  display: none !important;
+}
+
+/* Tabs individuales - estilo base */
+.p-tabview .p-tabview-nav .p-tabview-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border: none !important;
+  border-bottom: none !important;
+  background: transparent !important;
+  color: var(--ds-color-text-secondary, var(--p-text-muted-color));
+  font-size: var(--ds-font-size-sm, 0.875rem);
+  font-weight: var(--ds-font-weight-medium, 500);
+  transition: color 0.15s ease;
+  position: relative;
+}
+
+/* Icono dentro del tab - padding por defecto */
+.p-tabview .p-tabview-nav .p-tabview-nav-link i,
+.p-tabview .p-tabview-nav .p-tabview-nav-link .pi {
+  font-size: 1rem;
+  margin-right: 0.25rem;
+}
+
+/* Hover state */
+.p-tabview .p-tabview-nav .p-tabview-nav-link:hover {
+  color: var(--ds-color-text, var(--p-text-color)) !important;
+  background: transparent !important;
+}
+
+/* Tab activo - texto e icono en color primario */
+.p-tabview .p-tabview-nav .p-tabview-header.p-tabview-header-active .p-tabview-nav-link,
+.p-tabview .p-tabview-nav .p-tabview-header.p-highlight .p-tabview-nav-link,
+.p-tabview .p-tabview-nav .p-tabview-nav-link[aria-selected="true"] {
+  color: var(--ds-color-primary, var(--p-primary-color)) !important;
+  background: transparent !important;
+  border: none !important;
+}
+
+/* Tab activo - icono también en color primario */
+.p-tabview .p-tabview-nav .p-tabview-header.p-tabview-header-active .p-tabview-nav-link i,
+.p-tabview .p-tabview-nav .p-tabview-header.p-highlight .p-tabview-nav-link i,
+.p-tabview .p-tabview-nav .p-tabview-nav-link[aria-selected="true"] i {
+  color: var(--ds-color-primary, var(--p-primary-color)) !important;
+}
+
+/* Underline del tab activo - pseudo-elemento consistente con WorkspaceTabs */
+.p-tabview .p-tabview-nav .p-tabview-header.p-tabview-header-active .p-tabview-nav-link::after,
+.p-tabview .p-tabview-nav .p-tabview-header.p-highlight .p-tabview-nav-link::after,
+.p-tabview .p-tabview-nav .p-tabview-nav-link[aria-selected="true"]::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0.5rem;
+  right: 0.5rem;
+  height: 2px;
+  background-color: var(--ds-color-primary, var(--p-primary-color));
+  border-radius: 2px 2px 0 0;
+}
+
+/* Tabs no activos - sin underline */
+.p-tabview .p-tabview-nav .p-tabview-nav-link::after {
+  content: none;
+}
+
+/* Fix para que PrimeVue no añada bordes extras */
+.p-tabview .p-tabview-nav .p-tabview-header .p-tabview-nav-link {
+  border-bottom-width: 0 !important;
+}
+
+/* Panel de contenido - sin borde superior extra */
+.p-tabview .p-tabview-panels {
+  border-top: none;
+}
+
+/* ============================================================================
+   SCRIVENER DARK - TabView específico
+   ============================================================================ */
+html.scrivener-theme.dark .p-tabview > .p-tabview-nav-container > .p-tabview-nav-content > .p-tabview-nav {
+  background-color: transparent !important;
+  border-bottom-color: #504834 !important;
+}
+
+html.scrivener-theme.dark .p-tabview .p-tabview-nav .p-tabview-nav-link {
+  color: #C4B494 !important;
+}
+
+html.scrivener-theme.dark .p-tabview .p-tabview-nav .p-tabview-nav-link:hover {
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .p-tabview .p-tabview-nav .p-tabview-header.p-tabview-header-active .p-tabview-nav-link,
+html.scrivener-theme.dark .p-tabview .p-tabview-nav .p-tabview-header.p-highlight .p-tabview-nav-link,
+html.scrivener-theme.dark .p-tabview .p-tabview-nav .p-tabview-nav-link[aria-selected="true"] {
+  color: var(--p-primary-color, #60a5fa) !important;
+}
+
+html.scrivener-theme.dark .p-tabview .p-tabview-nav .p-tabview-header.p-tabview-header-active .p-tabview-nav-link i,
+html.scrivener-theme.dark .p-tabview .p-tabview-nav .p-tabview-header.p-highlight .p-tabview-nav-link i,
+html.scrivener-theme.dark .p-tabview .p-tabview-nav .p-tabview-nav-link[aria-selected="true"] i {
+  color: var(--p-primary-color, #60a5fa) !important;
+}
+
+html.scrivener-theme.dark .p-tabview .p-tabview-panels {
+  background-color: #1A170F !important;
+}
+
+/* ============================================================================
+   GLOBAL SelectButton Overrides - Dark Mode Fix
+   ============================================================================ */
+
+/* Base styling para todos los temas */
+.p-selectbutton {
+  display: inline-flex;
+  gap: 0;
+}
+
+.p-selectbutton .p-button {
+  border-radius: 0;
+  border-right-width: 0;
+}
+
+.p-selectbutton .p-button:first-child {
+  border-top-left-radius: var(--ds-radius-md, 6px);
+  border-bottom-left-radius: var(--ds-radius-md, 6px);
+}
+
+.p-selectbutton .p-button:last-child {
+  border-top-right-radius: var(--ds-radius-md, 6px);
+  border-bottom-right-radius: var(--ds-radius-md, 6px);
+  border-right-width: 1px;
+}
+
+/* Dark mode genérico */
+html.dark .p-selectbutton .p-button {
+  background-color: var(--p-surface-800, #1e293b);
+  border-color: var(--p-surface-600, #475569);
+  color: var(--p-surface-300, #cbd5e1);
+}
+
+html.dark .p-selectbutton .p-button:hover:not(.p-highlight) {
+  background-color: var(--p-surface-700, #334155);
+}
+
+html.dark .p-selectbutton .p-button.p-highlight {
+  background-color: var(--p-primary-color, #3b82f6);
+  border-color: var(--p-primary-color, #3b82f6);
+  color: #ffffff;
+}
+
+/* ============================================================================
+   SCRIVENER DARK - SelectButton específico
+   PrimeVue 4 usa ToggleButton internamente - selectors actualizados
+   ============================================================================ */
+html.scrivener-theme.dark .p-selectbutton.p-selectbutton,
+html.scrivener-theme.dark .p-selectbutton[data-pc-name="selectbutton"],
+html.scrivener-theme.dark [data-pc-name="selectbutton"] {
+  background-color: transparent !important;
+}
+
+/* SelectButton - Target interno ToggleButton (PrimeVue 4) */
+html.scrivener-theme.dark .p-selectbutton .p-button,
+html.scrivener-theme.dark .p-selectbutton .p-togglebutton,
+html.scrivener-theme.dark .p-selectbutton [data-pc-name="pcToggleButton"],
+html.scrivener-theme.dark .p-selectbutton [data-pc-name="togglebutton"],
+html.scrivener-theme.dark [data-pc-name="selectbutton"] .p-togglebutton,
+html.scrivener-theme.dark [data-pc-name="selectbutton"] [data-pc-name="pcToggleButton"] {
+  background-color: #302A1C !important;
+  border-color: #504834 !important;
+  color: #C4B494 !important;
+  font-weight: 500 !important;
+  padding: 0.5rem 0.875rem !important;
+  transition: all 0.15s ease !important;
+}
+
+/* Contenido del toggle button */
+html.scrivener-theme.dark .p-selectbutton .p-togglebutton-content,
+html.scrivener-theme.dark [data-pc-name="selectbutton"] [data-pc-section="content"] {
+  color: inherit !important;
+}
+
+/* Hover en no seleccionados */
+html.scrivener-theme.dark .p-selectbutton .p-togglebutton:not(.p-togglebutton-checked):hover,
+html.scrivener-theme.dark .p-selectbutton .p-button:hover:not(.p-highlight):not([aria-pressed="true"]),
+html.scrivener-theme.dark [data-pc-name="selectbutton"] [data-pc-name="pcToggleButton"]:not([data-p-checked="true"]):hover {
+  background-color: #3E3626 !important;
+  color: #E8DCC8 !important;
+}
+
+/* Estado seleccionado/checked */
+html.scrivener-theme.dark .p-selectbutton .p-togglebutton.p-togglebutton-checked,
+html.scrivener-theme.dark .p-selectbutton .p-button.p-highlight,
+html.scrivener-theme.dark .p-selectbutton [aria-pressed="true"],
+html.scrivener-theme.dark [data-pc-name="selectbutton"] [data-p-checked="true"],
+html.scrivener-theme.dark [data-pc-name="selectbutton"] .p-togglebutton-checked {
+  background-color: #5A4A32 !important;
+  border-color: #6E5C40 !important;
+  color: #E8DCC8 !important;
+}
+
+/* Hover en seleccionados */
+html.scrivener-theme.dark .p-selectbutton .p-togglebutton.p-togglebutton-checked:hover,
+html.scrivener-theme.dark .p-selectbutton .p-button.p-highlight:hover,
+html.scrivener-theme.dark [data-pc-name="selectbutton"] [data-p-checked="true"]:hover {
+  background-color: #6E5C40 !important;
+}
+
+/* Focus state - WCAG compliant */
+html.scrivener-theme.dark .p-selectbutton .p-togglebutton:focus,
+html.scrivener-theme.dark .p-selectbutton .p-button:focus,
+html.scrivener-theme.dark .p-selectbutton .p-button:focus-visible {
+  box-shadow: 0 0 0 2px rgba(212, 198, 164, 0.3) !important;
+  outline: none !important;
+}
+
+/* ============================================================================
+   SCRIVENER DARK - Slider específico
+   ============================================================================ */
+html.scrivener-theme.dark .p-slider {
+  background-color: #302A1C !important;
+}
+
+html.scrivener-theme.dark .p-slider .p-slider-range {
+  background-color: #6E5C40 !important;
+}
+
+html.scrivener-theme.dark .p-slider .p-slider-handle {
+  background-color: #E8DCC8 !important;
+  border-color: #6E5C40 !important;
+}
+
+html.scrivener-theme.dark .p-slider .p-slider-handle:hover {
+  background-color: #D4C6A4 !important;
+  border-color: #8C7C5C !important;
+}
+
+/* ============================================================================
+   SCRIVENER DARK - ToggleSwitch específico
+   ============================================================================ */
+html.scrivener-theme.dark .p-toggleswitch .p-toggleswitch-slider {
+  background-color: #302A1C !important;
+  border-color: #504834 !important;
+}
+
+html.scrivener-theme.dark .p-toggleswitch.p-toggleswitch-checked .p-toggleswitch-slider {
+  background-color: #5A4A32 !important;
+  border-color: #6E5C40 !important;
+}
+
+html.scrivener-theme.dark .p-toggleswitch .p-toggleswitch-slider::before {
+  background-color: #C4B494 !important;
+}
+
+html.scrivener-theme.dark .p-toggleswitch.p-toggleswitch-checked .p-toggleswitch-slider::before {
+  background-color: #E8DCC8 !important;
+}
+
+/* ============================================================================
+   SCRIVENER DARK - Dialog
+   ============================================================================ */
+html.scrivener-theme.dark .p-dialog {
+  background-color: #252015 !important;
+  border: 1px solid #504834 !important;
+}
+
+html.scrivener-theme.dark .p-dialog .p-dialog-header {
+  background-color: #1A170F !important;
+  border-bottom: 1px solid #504834 !important;
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .p-dialog .p-dialog-title {
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .p-dialog .p-dialog-header-close {
+  color: #C4B494 !important;
+}
+
+html.scrivener-theme.dark .p-dialog .p-dialog-header-close:hover {
+  background-color: #3E3626 !important;
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .p-dialog .p-dialog-content {
+  background-color: #252015 !important;
+  color: #C4B494 !important;
+}
+
+html.scrivener-theme.dark .p-dialog .p-dialog-footer {
+  background-color: #1A170F !important;
+  border-top: 1px solid #504834 !important;
+}
+
+/* ============================================================================
+   SCRIVENER DARK - InputText
+   ============================================================================ */
+html.scrivener-theme.dark .p-inputtext {
+  background-color: #302A1C !important;
+  border-color: #504834 !important;
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .p-inputtext:hover {
+  border-color: #6E5C40 !important;
+}
+
+html.scrivener-theme.dark .p-inputtext:focus {
+  border-color: #8C7C5C !important;
+  box-shadow: 0 0 0 2px rgba(140, 124, 92, 0.2) !important;
+}
+
+html.scrivener-theme.dark .p-inputtext::placeholder {
+  color: #8C7C5C !important;
+}
+
+/* ============================================================================
+   SCRIVENER DARK - Dropdown
+   ============================================================================ */
+html.scrivener-theme.dark .p-dropdown {
+  background-color: #302A1C !important;
+  border-color: #504834 !important;
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .p-dropdown:hover {
+  border-color: #6E5C40 !important;
+}
+
+html.scrivener-theme.dark .p-dropdown .p-dropdown-label {
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .p-dropdown .p-dropdown-trigger {
+  color: #C4B494 !important;
+}
+
+html.scrivener-theme.dark .p-dropdown-panel {
+  background-color: #252015 !important;
+  border-color: #504834 !important;
+}
+
+html.scrivener-theme.dark .p-dropdown-panel .p-dropdown-items .p-dropdown-item {
+  color: #C4B494 !important;
+}
+
+html.scrivener-theme.dark .p-dropdown-panel .p-dropdown-items .p-dropdown-item:hover {
+  background-color: #3E3626 !important;
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .p-dropdown-panel .p-dropdown-items .p-dropdown-item.p-highlight {
+  background-color: #5A4A32 !important;
+  color: #E8DCC8 !important;
+}
+
+/* ============================================================================
+   SCRIVENER DARK - Chips (InputChips en PrimeVue 4)
+   Selectores actualizados para v4
+   ============================================================================ */
+html.scrivener-theme.dark .p-chips,
+html.scrivener-theme.dark .p-inputchips,
+html.scrivener-theme.dark [data-pc-name="chips"],
+html.scrivener-theme.dark [data-pc-name="inputchips"] {
+  background-color: transparent !important;
+}
+
+/* Contenedor principal del input */
+html.scrivener-theme.dark .p-chips .p-chips-multiple-container,
+html.scrivener-theme.dark .p-inputchips .p-inputchips-input,
+html.scrivener-theme.dark [data-pc-name="chips"] [data-pc-section="container"],
+html.scrivener-theme.dark [data-pc-name="inputchips"] [data-pc-section="container"],
+html.scrivener-theme.dark .p-chips .p-inputtext,
+html.scrivener-theme.dark .p-inputchips .p-inputtext {
+  background-color: #302A1C !important;
+  border-color: #504834 !important;
+  padding: 0.375rem 0.5rem !important;
+  gap: 0.375rem !important;
+  min-height: 2.5rem !important;
+}
+
+/* Hover */
+html.scrivener-theme.dark .p-chips .p-chips-multiple-container:hover,
+html.scrivener-theme.dark .p-inputchips:hover .p-inputchips-input,
+html.scrivener-theme.dark [data-pc-name="inputchips"]:hover [data-pc-section="container"] {
+  border-color: #6E5C40 !important;
+}
+
+/* Focus */
+html.scrivener-theme.dark .p-chips:focus-within .p-chips-multiple-container,
+html.scrivener-theme.dark .p-inputchips:focus-within .p-inputchips-input,
+html.scrivener-theme.dark [data-pc-name="inputchips"]:focus-within [data-pc-section="container"] {
+  border-color: #8C7C5C !important;
+  box-shadow: 0 0 0 2px rgba(140, 124, 92, 0.2) !important;
+  outline: none !important;
+}
+
+/* Tokens/Chips individuales */
+html.scrivener-theme.dark .p-chips .p-chips-token,
+html.scrivener-theme.dark .p-chips .p-chip,
+html.scrivener-theme.dark .p-inputchips .p-chip,
+html.scrivener-theme.dark [data-pc-name="inputchips"] [data-pc-name="chip"],
+html.scrivener-theme.dark [data-pc-section="token"] {
+  background-color: #5A4A32 !important;
+  color: #E8DCC8 !important;
+  padding: 0.25rem 0.5rem !important;
+  border-radius: 4px !important;
+  border: none !important;
+}
+
+/* Icono de eliminar */
+html.scrivener-theme.dark .p-chips .p-chips-token-icon,
+html.scrivener-theme.dark .p-chips .p-chip-remove-icon,
+html.scrivener-theme.dark .p-inputchips .p-chip-remove-icon,
+html.scrivener-theme.dark [data-pc-section="removeicon"] {
+  color: #C4B494 !important;
+  margin-left: 0.375rem !important;
+}
+
+html.scrivener-theme.dark .p-chips .p-chips-token-icon:hover,
+html.scrivener-theme.dark .p-chips .p-chip-remove-icon:hover,
+html.scrivener-theme.dark .p-inputchips .p-chip-remove-icon:hover,
+html.scrivener-theme.dark [data-pc-section="removeicon"]:hover {
+  color: #E8DCC8 !important;
+}
+
+/* Input interno */
+html.scrivener-theme.dark .p-chips .p-chips-input-token input,
+html.scrivener-theme.dark .p-inputchips [data-pc-section="inputtoken"] input,
+html.scrivener-theme.dark [data-pc-name="inputchips"] input {
+  color: #E8DCC8 !important;
+  background: transparent !important;
+  border: none !important;
+}
+
+html.scrivener-theme.dark .p-chips .p-chips-input-token input::placeholder,
+html.scrivener-theme.dark .p-chips input.p-inputtext::placeholder,
+html.scrivener-theme.dark .p-chips [data-pc-section="input"]::placeholder {
+  color: #8C7C5C !important;
+}
+
+/* ============================================================================
+   SCRIVENER DARK - Form Labels
+   ============================================================================ */
+html.scrivener-theme.dark .field label,
+html.scrivener-theme.dark .edit-dialog label {
+  color: #C4B494 !important;
+}
+
+/* ============================================================================
+   SCRIVENER DARK - Button en Dialog footer
+   ============================================================================ */
+html.scrivener-theme.dark .p-dialog-footer .p-button {
+  background-color: #5A4A32 !important;
+  border-color: #6E5C40 !important;
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .p-dialog-footer .p-button:hover {
+  background-color: #6E5C40 !important;
+  border-color: #8C7C5C !important;
+}
+
+html.scrivener-theme.dark .p-dialog-footer .p-button.p-button-text {
+  background-color: transparent !important;
+  color: #C4B494 !important;
+}
+
+html.scrivener-theme.dark .p-dialog-footer .p-button.p-button-text:hover {
+  background-color: #3E3626 !important;
+  color: #E8DCC8 !important;
+}
+
+/* ============================================================================
+   SCRIVENER DARK - Issue Fixes (Jan 2026)
+   ============================================================================ */
+
+/* ----------------------------------------------------------------------------
+   FIX 1: SelectButton "Principal" - Better contrast for selected state
+   Current: bg #5A4A32 with text #E8DCC8 is hard to read
+   Solution: Use lighter background OR darker text with better contrast ratio
+   ---------------------------------------------------------------------------- */
+html.scrivener-theme.dark .p-selectbutton .p-togglebutton.p-togglebutton-checked,
+html.scrivener-theme.dark .p-selectbutton .p-button.p-highlight,
+html.scrivener-theme.dark .p-selectbutton [aria-pressed="true"],
+html.scrivener-theme.dark [data-pc-name="selectbutton"] [data-p-checked="true"],
+html.scrivener-theme.dark [data-pc-name="selectbutton"] .p-togglebutton-checked {
+  background-color: #7A6A4A !important;  /* Lighter brown for better contrast */
+  border-color: #9A8A6A !important;
+  color: #FFFBF5 !important;  /* Near-white for max readability */
+  font-weight: 600 !important;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.3) !important;
+}
+
+html.scrivener-theme.dark .p-selectbutton .p-togglebutton.p-togglebutton-checked:hover,
+html.scrivener-theme.dark .p-selectbutton .p-button.p-highlight:hover,
+html.scrivener-theme.dark [data-pc-name="selectbutton"] [data-p-checked="true"]:hover {
+  background-color: #8A7A5A !important;
+  border-color: #AA9A7A !important;
+}
+
+/* Non-selected buttons - ensure they look clearly different */
+html.scrivener-theme.dark .p-selectbutton .p-button:not(.p-highlight):not([aria-pressed="true"]),
+html.scrivener-theme.dark .p-selectbutton .p-togglebutton:not(.p-togglebutton-checked),
+html.scrivener-theme.dark [data-pc-name="selectbutton"] [data-p-checked="false"] {
+  background-color: #252015 !important;
+  border-color: #504834 !important;
+  color: #A89878 !important;  /* Muted text for unselected */
+}
+
+/* ----------------------------------------------------------------------------
+   FIX 2: Menu selected/focused item - Visible selection state
+   Problem: Dark on dark, selection not visible
+   ---------------------------------------------------------------------------- */
+html.scrivener-theme.dark .p-menu .p-menuitem.p-highlight > .p-menuitem-content,
+html.scrivener-theme.dark .p-menu [data-p-highlight="true"] > .p-menuitem-content,
+html.scrivener-theme.dark .p-contextmenu .p-menuitem.p-highlight > .p-menuitem-content,
+html.scrivener-theme.dark .p-contextmenu [data-p-highlight="true"] > .p-menuitem-content,
+html.scrivener-theme.dark .p-tieredmenu .p-menuitem.p-highlight > .p-menuitem-content,
+html.scrivener-theme.dark .p-tieredmenu [data-p-highlight="true"] > .p-menuitem-content {
+  background-color: #5A4A32 !important;
+  color: #FFFBF5 !important;
+}
+
+html.scrivener-theme.dark .p-menu .p-menuitem.p-highlight .p-menuitem-text,
+html.scrivener-theme.dark .p-menu .p-menuitem.p-highlight .p-menuitem-icon,
+html.scrivener-theme.dark .p-menu [data-p-highlight="true"] .p-menuitem-text,
+html.scrivener-theme.dark .p-menu [data-p-highlight="true"] .p-menuitem-icon,
+html.scrivener-theme.dark .p-contextmenu .p-menuitem.p-highlight .p-menuitem-text,
+html.scrivener-theme.dark .p-contextmenu .p-menuitem.p-highlight .p-menuitem-icon,
+html.scrivener-theme.dark .p-tieredmenu .p-menuitem.p-highlight .p-menuitem-text,
+html.scrivener-theme.dark .p-tieredmenu .p-menuitem.p-highlight .p-menuitem-icon {
+  color: #FFFBF5 !important;
+}
+
+/* Keyboard focus state - distinct from hover */
+html.scrivener-theme.dark .p-menu .p-menuitem.p-focus > .p-menuitem-content,
+html.scrivener-theme.dark .p-menu [data-p-focused="true"] > .p-menuitem-content,
+html.scrivener-theme.dark .p-contextmenu .p-menuitem.p-focus > .p-menuitem-content,
+html.scrivener-theme.dark .p-tieredmenu .p-menuitem.p-focus > .p-menuitem-content {
+  background-color: #3E3626 !important;
+  outline: 2px solid #7A6A4A !important;
+  outline-offset: -2px !important;
+}
+
+/* ----------------------------------------------------------------------------
+   FIX 3: Sub-tabs (Detectores/Reglas editoriales) - Match main tab styling
+   Problem: Underlines and different icon styling than main navigation
+   Solution: Remove underlines, consistent icon/text styling
+   ---------------------------------------------------------------------------- */
+/* Target TabView inside StyleTab specifically */
+html.scrivener-theme.dark .style-tabview .p-tabview-nav,
+html.scrivener-theme.dark .style-tabview .p-tabview-nav-content {
+  background-color: transparent !important;
+  border-bottom: 1px solid #504834 !important;
+}
+
+html.scrivener-theme.dark .style-tabview .p-tabview-nav .p-tabview-header,
+html.scrivener-theme.dark .style-tabview [data-pc-section="nav"] [data-pc-section="header"] {
+  margin-bottom: -1px !important;
+}
+
+html.scrivener-theme.dark .style-tabview .p-tabview-nav-link,
+html.scrivener-theme.dark .style-tabview [data-pc-section="headeraction"] {
+  background-color: transparent !important;
+  border: 1px solid transparent !important;
+  border-bottom: none !important;
+  border-radius: 6px 6px 0 0 !important;
+  color: #A89878 !important;
+  padding: 0.75rem 1rem !important;
+  gap: 0.5rem !important;
+  transition: all 0.15s ease !important;
+}
+
+html.scrivener-theme.dark .style-tabview .p-tabview-nav-link:hover,
+html.scrivener-theme.dark .style-tabview [data-pc-section="headeraction"]:hover {
+  background-color: #302A1C !important;
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .style-tabview .p-tabview-header.p-tabview-header-active .p-tabview-nav-link,
+html.scrivener-theme.dark .style-tabview .p-tabview-header.p-highlight .p-tabview-nav-link,
+html.scrivener-theme.dark .style-tabview [data-p-active="true"] [data-pc-section="headeraction"] {
+  background-color: #252015 !important;
+  border-color: #504834 #504834 #252015 #504834 !important;
+  color: #E8DCC8 !important;
+  font-weight: 500 !important;
+}
+
+/* Remove underline indicator - use border-based active state instead */
+html.scrivener-theme.dark .style-tabview .p-tabview-ink-bar,
+html.scrivener-theme.dark .style-tabview [data-pc-section="inkbar"] {
+  display: none !important;
+}
+
+/* Icons in sub-tabs - consistent sizing */
+html.scrivener-theme.dark .style-tabview .p-tabview-nav-link i,
+html.scrivener-theme.dark .style-tabview [data-pc-section="headeraction"] i {
+  font-size: 1rem !important;
+  opacity: 0.8 !important;
+}
+
+html.scrivener-theme.dark .style-tabview .p-tabview-header.p-tabview-header-active .p-tabview-nav-link i,
+html.scrivener-theme.dark .style-tabview .p-tabview-header.p-highlight .p-tabview-nav-link i,
+html.scrivener-theme.dark .style-tabview [data-p-active="true"] i {
+  opacity: 1 !important;
+}
+
+/* ----------------------------------------------------------------------------
+   FIX 4: Dialog footer buttons - More spacing from content
+   Problem: Buttons too close to content above
+   ---------------------------------------------------------------------------- */
+html.scrivener-theme.dark .p-dialog .p-dialog-footer {
+  padding: 1.25rem 1.5rem !important;
+  margin-top: 0.5rem !important;
+  gap: 0.75rem !important;
+}
+
+html.scrivener-theme.dark .p-dialog .p-dialog-content {
+  padding-bottom: 1rem !important;
+}
+
+/* Add visual separator */
+html.scrivener-theme.dark .p-dialog .p-dialog-footer {
+  border-top: 1px solid #504834 !important;
+}
+
+/* ----------------------------------------------------------------------------
+   FIX 5: Quote selector buttons - Better differentiation
+   Problem: Quote style options look identical
+   Solution: Add visual indicators showing actual quote characters
+   ---------------------------------------------------------------------------- */
+/* Quote style SelectButton - show actual quote characters */
+html.scrivener-theme.dark .p-selectbutton.quote-selector .p-togglebutton,
+html.scrivener-theme.dark .p-selectbutton.quote-selector .p-button,
+html.scrivener-theme.dark [data-pc-name="selectbutton"].quote-selector .p-togglebutton {
+  min-width: 5rem !important;
+  padding: 0.5rem 0.75rem !important;
+}
+
+/* Generic fix for any SelectButton showing quote options via option content */
+html.scrivener-theme.dark .p-selectbutton .p-togglebutton-content,
+html.scrivener-theme.dark .p-selectbutton .p-button-label {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.25rem !important;
+}
+
+/* Better visual differentiation for all SelectButton options */
+html.scrivener-theme.dark .p-selectbutton {
+  border: 1px solid #504834 !important;
+  border-radius: 6px !important;
+  padding: 2px !important;
+  background-color: #1A170F !important;
+}
+
+html.scrivener-theme.dark .p-selectbutton .p-togglebutton,
+html.scrivener-theme.dark .p-selectbutton .p-button {
+  border-radius: 4px !important;
+  margin: 0 !important;
+}
+
+/* First button in group */
+html.scrivener-theme.dark .p-selectbutton .p-togglebutton:first-child,
+html.scrivener-theme.dark .p-selectbutton .p-button:first-child {
+  border-top-left-radius: 4px !important;
+  border-bottom-left-radius: 4px !important;
+}
+
+/* Last button in group */
+html.scrivener-theme.dark .p-selectbutton .p-togglebutton:last-child,
+html.scrivener-theme.dark .p-selectbutton .p-button:last-child {
+  border-top-right-radius: 4px !important;
+  border-bottom-right-radius: 4px !important;
+}
+
+/* Separator between buttons */
+html.scrivener-theme.dark .p-selectbutton .p-togglebutton:not(:last-child),
+html.scrivener-theme.dark .p-selectbutton .p-button:not(:last-child) {
+  border-right: 1px solid #3E3626 !important;
 }

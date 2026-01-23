@@ -361,6 +361,7 @@ import TimelineEventVue from './TimelineEvent.vue'
 import VisTimeline from './VisTimeline.vue'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { transformTimeline } from '@/types/transformers'
+import { useAlertUtils } from '@/composables/useAlertUtils'
 import type {
   Timeline,
   TimelineEvent,
@@ -380,6 +381,7 @@ const emit = defineEmits<{
 }>()
 
 const workspaceStore = useWorkspaceStore()
+const { getSeverityConfig } = useAlertUtils()
 
 // Estado
 const loading = ref(false)
@@ -612,14 +614,9 @@ const getSeverityColor = (severity: InconsistencySeverity): string => {
   }
 }
 
+// Usar composable centralizado
 const getSeverityLabel = (severity: InconsistencySeverity): string => {
-  switch (severity) {
-    case 'critical': return 'Critico'
-    case 'high': return 'Alto'
-    case 'medium': return 'Medio'
-    case 'low': return 'Bajo'
-    default: return severity
-  }
+  return getSeverityConfig(severity as any).label
 }
 
 const getConfidenceClass = (confidence: number): string => {

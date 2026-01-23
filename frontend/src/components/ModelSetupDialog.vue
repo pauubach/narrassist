@@ -54,7 +54,7 @@ function startProgressSimulation() {
       if (downloadProgress.value < 50) {
         currentModel.value = 'spaCy (modelo de lenguaje)'
       } else {
-        currentModel.value = 'Embeddings (analisis semantico)'
+        currentModel.value = 'Embeddings (análisis semántico)'
       }
     }
   }, 500)
@@ -118,7 +118,7 @@ function retryDownload() {
     :closable="false"
     :modal="true"
     :draggable="false"
-    header="Configuracion inicial"
+    header="Configuración inicial"
     class="model-setup-dialog"
     :style="{ width: '500px' }"
   >
@@ -127,7 +127,7 @@ function retryDownload() {
       <template v-if="downloadPhase === 'checking'">
         <div class="checking-state">
           <i class="pi pi-spin pi-spinner checking-spinner"></i>
-          <p>Verificando configuracion...</p>
+          <p>Verificando configuración...</p>
         </div>
       </template>
 
@@ -137,8 +137,8 @@ function retryDownload() {
           <div class="download-header">
             <i class="pi pi-download download-icon"></i>
             <div>
-              <h3>Completando instalacion</h3>
-              <p class="subtitle">Descargando modelos de analisis de texto</p>
+              <h3>Completando instalación</h3>
+              <p class="subtitle">Descargando modelos de análisis de texto</p>
             </div>
           </div>
 

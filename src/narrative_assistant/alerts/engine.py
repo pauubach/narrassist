@@ -15,6 +15,7 @@ from ..core.result import Result
 from ..analysis.attribute_consistency import get_attribute_display_name
 from .models import Alert, AlertCategory, AlertFilter, AlertSeverity, AlertStatus
 from .repository import AlertRepository, get_alert_repository
+from .formatter import AlertFormatter
 
 logger = logging.getLogger(__name__)
 
@@ -497,7 +498,7 @@ class AlertEngine:
             alert_type=f"spelling_{error_type}",
             title=f"Error ortográfico: '{word}'",
             description=explanation,
-            explanation=f"En contexto: «{sentence[:100]}...»" if len(sentence) > 100 else f"En contexto: «{sentence}»",
+            explanation=AlertFormatter.format_context(sentence),
             suggestion=suggestion_text,
             chapter=chapter,
             start_char=start_char,
@@ -554,7 +555,7 @@ class AlertEngine:
             alert_type=f"grammar_{error_type}",
             title=f"Error gramatical: {explanation[:50]}",
             description=f"'{text}' → '{suggestion}'" if suggestion else f"'{text}'",
-            explanation=f"En contexto: «{sentence[:100]}...»" if len(sentence) > 100 else f"En contexto: «{sentence}»",
+            explanation=AlertFormatter.format_context(sentence),
             suggestion=suggestion,
             chapter=chapter,
             start_char=start_char,
@@ -565,6 +566,94 @@ class AlertEngine:
             extra_data={
                 "text": text,
                 "error_type": error_type,
+                "rule_id": rule_id,
+            },
+        )
+
+    def create_from_correction_issue(
+        self,
+        project_id: int,
+        category: str,
+        issue_type: str,
+        text: str,
+        start_char: int,
+        end_char: int,
+        explanation: str,
+        suggestion: Optional[str] = None,
+        confidence: float = 0.8,
+        context: str = "",
+        chapter: Optional[int] = None,
+        rule_id: str = "",
+        extra_data: Optional[dict] = None,
+    ) -> Result[Alert]:
+        """
+        Crea alerta desde un issue de corrección editorial.
+
+        Soporta tipografía, repeticiones y concordancia.
+
+        Args:
+            project_id: ID del proyecto
+            category: Categoría (typography, repetition, agreement)
+            issue_type: Tipo específico de issue
+            text: Fragmento problemático
+            start_char: Posición inicio
+            end_char: Posición fin
+            explanation: Explicación para el corrector
+            suggestion: Sugerencia de corrección (opcional)
+            confidence: Confianza (0.0-1.0)
+            context: Contexto alrededor del problema
+            chapter: Número de capítulo (opcional)
+            rule_id: ID de la regla
+            extra_data: Datos adicionales
+
+        Returns:
+            Result con la alerta creada
+        """
+        # Mapear categoría de corrección a AlertCategory
+        category_map = {
+            "typography": AlertCategory.TYPOGRAPHY,
+            "punctuation": AlertCategory.PUNCTUATION,
+            "repetition": AlertCategory.REPETITION,
+            "agreement": AlertCategory.AGREEMENT,
+        }
+        alert_category = category_map.get(category, AlertCategory.STYLE)
+
+        # Calcular severidad basada en confianza y tipo
+        severity = self.calculate_severity_from_confidence(confidence)
+
+        # Títulos legibles según categoría
+        category_titles = {
+            "typography": "Tipografía",
+            "punctuation": "Puntuación",
+            "repetition": "Repetición",
+            "agreement": "Concordancia",
+        }
+        title_prefix = category_titles.get(category, "Corrección")
+
+        # Descripción según si hay sugerencia
+        if suggestion:
+            description = f"'{text}' → '{suggestion}'"
+        else:
+            description = f"'{text}'"
+
+        return self.create_alert(
+            project_id=project_id,
+            category=alert_category,
+            severity=severity,
+            alert_type=f"{category}_{issue_type}",
+            title=f"{title_prefix}: {explanation[:50]}{'...' if len(explanation) > 50 else ''}",
+            description=description,
+            explanation=AlertFormatter.format_context(context, prefix="Contexto") or explanation,
+            suggestion=suggestion,
+            chapter=chapter,
+            start_char=start_char,
+            end_char=end_char,
+            excerpt=context or text,
+            confidence=confidence,
+            source_module="corrections_detector",
+            extra_data=extra_data or {
+                "text": text,
+                "issue_type": issue_type,
                 "rule_id": rule_id,
             },
         )
@@ -600,7 +689,7 @@ class AlertEngine:
                 "alert_type": f"spelling_{issue.error_type.value}",
                 "title": f"Error ortográfico: '{issue.word}'",
                 "description": issue.explanation,
-                "explanation": f"En contexto: «{issue.sentence[:100]}...»" if len(issue.sentence) > 100 else f"En contexto: «{issue.sentence}»",
+                "explanation": AlertFormatter.format_context(issue.sentence),
                 "suggestion": f"Sugerencias: {', '.join(issue.suggestions[:3])}" if issue.suggestions else None,
                 "chapter": chapter,
                 "start_char": issue.start_char,
@@ -648,7 +737,7 @@ class AlertEngine:
                 "alert_type": f"grammar_{issue.error_type.value}",
                 "title": f"Error gramatical: {issue.explanation[:50]}",
                 "description": f"'{issue.text}' → '{issue.suggestion}'" if issue.suggestion else f"'{issue.text}'",
-                "explanation": f"En contexto: «{issue.sentence[:100]}...»" if len(issue.sentence) > 100 else f"En contexto: «{issue.sentence}»",
+                "explanation": AlertFormatter.format_context(issue.sentence),
                 "suggestion": issue.suggestion,
                 "chapter": chapter,
                 "start_char": issue.start_char,

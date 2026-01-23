@@ -9,6 +9,8 @@ import type {
   ApiAlertSeverity,
   ApiAlertStatus,
   ApiAlertCategory,
+  ApiAlertExtraData,
+  ApiAlertSource,
 } from '../api/alerts'
 
 import type {
@@ -16,6 +18,8 @@ import type {
   AlertSeverity,
   AlertStatus,
   AlertCategory,
+  AlertExtraData,
+  AlertSource,
 } from '../domain/alerts'
 
 // =============================================================================
@@ -49,6 +53,10 @@ const CATEGORY_MAP: Record<ApiAlertCategory, AlertCategory> = {
   entity: 'other',
   orthography: 'grammar',
   grammar: 'grammar',
+  typography: 'typography',
+  punctuation: 'punctuation',
+  repetition: 'repetition',
+  agreement: 'agreement',
   other: 'other',
 }
 
@@ -77,6 +85,10 @@ const CATEGORY_TO_API: Record<AlertCategory, ApiAlertCategory> = {
   style: 'style',
   grammar: 'grammar',
   structure: 'structure',
+  typography: 'typography',
+  punctuation: 'punctuation',
+  repetition: 'repetition',
+  agreement: 'agreement',
   other: 'other',
 }
 
@@ -99,6 +111,54 @@ export function transformAlertCategory(apiCategory: ApiAlertCategory): AlertCate
   return CATEGORY_MAP[apiCategory] ?? 'other'
 }
 
+/** Transforma AlertSource de API a Domain */
+export function transformAlertSource(apiSource: ApiAlertSource): AlertSource {
+  return {
+    chapter: apiSource.chapter,
+    page: apiSource.page,
+    line: apiSource.line,
+    startChar: apiSource.start_char,
+    endChar: apiSource.end_char,
+    excerpt: apiSource.excerpt,
+    value: apiSource.value,
+  }
+}
+
+/** Transforma AlertExtraData de API a Domain */
+export function transformAlertExtraData(apiExtraData: ApiAlertExtraData | null | undefined): AlertExtraData | undefined {
+  if (!apiExtraData) return undefined
+
+  const result: AlertExtraData = {}
+
+  // Transformar campos específicos de inconsistencias de atributo
+  if (apiExtraData.entity_name) {
+    result.entityName = apiExtraData.entity_name
+  }
+  if (apiExtraData.attribute_key) {
+    result.attributeKey = apiExtraData.attribute_key
+  }
+  if (apiExtraData.value1) {
+    result.value1 = apiExtraData.value1
+  }
+  if (apiExtraData.value2) {
+    result.value2 = apiExtraData.value2
+  }
+
+  // Transformar sources si existen
+  if (apiExtraData.sources && Array.isArray(apiExtraData.sources)) {
+    result.sources = apiExtraData.sources.map(transformAlertSource)
+  }
+
+  // Copiar otros campos sin transformar
+  for (const [key, value] of Object.entries(apiExtraData)) {
+    if (!['entity_name', 'attribute_key', 'value1', 'value2', 'sources', 'value1_source', 'value2_source'].includes(key)) {
+      result[key] = value
+    }
+  }
+
+  return Object.keys(result).length > 0 ? result : undefined
+}
+
 /** Transforma una alerta de API a Domain */
 export function transformAlert(api: ApiAlert): Alert {
   return {
@@ -119,6 +179,7 @@ export function transformAlert(api: ApiAlert): Alert {
     confidence: api.confidence,
     createdAt: new Date(api.created_at),
     resolvedAt: api.resolved_at ? new Date(api.resolved_at) : undefined,
+    extraData: transformAlertExtraData(api.extra_data),
   }
 }
 
@@ -185,7 +246,8 @@ export function normalizeAlertCategory(category: string): AlertCategory {
   // Si ya es un valor domain válido
   const validDomain: AlertCategory[] = [
     'attribute', 'timeline', 'relationship', 'location',
-    'behavior', 'knowledge', 'style', 'grammar', 'structure', 'other'
+    'behavior', 'knowledge', 'style', 'grammar', 'structure',
+    'typography', 'punctuation', 'repetition', 'agreement', 'other'
   ]
   if (validDomain.includes(lower as AlertCategory)) {
     return lower as AlertCategory

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import Button from 'primevue/button'
-import type { Alert } from '@/types'
+import type { Alert, AlertSource } from '@/types'
 import { useAlertUtils } from '@/composables/useAlertUtils'
 
 /**
@@ -10,19 +10,28 @@ import { useAlertUtils } from '@/composables/useAlertUtils'
  * Muestra información detallada de una alerta seleccionada:
  * - Severidad y categoría
  * - Título y descripción
- * - Ubicación en el texto
+ * - Ubicación en el texto (con título de capítulo si disponible)
  * - Sugerencia de corrección
  * - Acciones (resolver, descartar, ir al texto)
+ * - Múltiples botones de navegación para alertas de inconsistencia
  */
+
+interface ChapterInfo {
+  id: number
+  chapterNumber: number
+  title: string
+}
 
 const props = defineProps<{
   /** Alerta a mostrar */
   alert: Alert
+  /** Capítulos disponibles para mostrar títulos */
+  chapters?: ChapterInfo[]
 }>()
 
 const emit = defineEmits<{
-  /** Ir al texto donde está la alerta */
-  (e: 'navigate'): void
+  /** Ir al texto donde está la alerta, opcionalmente a una fuente específica */
+  (e: 'navigate', source?: AlertSource): void
   /** Marcar como resuelta */
   (e: 'resolve'): void
   /** Descartar alerta */
@@ -39,6 +48,58 @@ const severityIcon = computed(() => getSeverityIcon(props.alert.severity))
 const categoryLabel = computed(() => getCategoryConfig(props.alert.category).label)
 
 const confidencePercent = computed(() => Math.round(props.alert.confidence * 100))
+
+/**
+ * Obtiene el título del capítulo por número.
+ */
+function getChapterTitle(chapterNumber: number): string {
+  const chapter = props.chapters?.find(c => c.chapterNumber === chapterNumber)
+  if (chapter?.title && chapter.title.trim()) {
+    return chapter.title
+  }
+  return `Capítulo ${chapterNumber}`
+}
+
+/**
+ * Etiqueta del capítulo con título si está disponible.
+ */
+const chapterLabel = computed(() => {
+  if (!props.alert.chapter) return null
+  return getChapterTitle(props.alert.chapter)
+})
+
+/**
+ * Verifica si la alerta tiene múltiples fuentes (inconsistencia).
+ */
+const hasMultipleSources = computed(() => {
+  const sources = props.alert.extraData?.sources
+  return Array.isArray(sources) && sources.length > 1
+})
+
+/**
+ * Fuentes de la alerta para navegación múltiple.
+ */
+const alertSources = computed(() => {
+  return props.alert.extraData?.sources ?? []
+})
+
+/**
+ * Genera etiqueta para un valor de fuente.
+ */
+function getSourceLabel(source: AlertSource): string {
+  return `"${source.value}"`
+}
+
+/**
+ * Genera ubicación de una fuente.
+ */
+function getSourceLocation(source: AlertSource): string {
+  const parts: string[] = []
+  if (source.chapter) {
+    parts.push(getChapterTitle(source.chapter))
+  }
+  return parts.join(', ') || ''
+}
 </script>
 
 <template>
@@ -96,7 +157,7 @@ const confidencePercent = computed(() => Math.round(props.alert.confidence * 100
         <div class="section-label">Ubicación</div>
         <div class="location-info">
           <i class="pi pi-map-marker"></i>
-          <span>Capítulo {{ alert.chapter }}</span>
+          <span>{{ chapterLabel }}</span>
         </div>
       </div>
 
@@ -123,7 +184,26 @@ const confidencePercent = computed(() => Math.round(props.alert.confidence * 100
 
     <!-- Acciones -->
     <div class="inspector-actions">
+      <!-- Múltiples botones de navegación para alertas de inconsistencia -->
+      <div v-if="hasMultipleSources" class="multi-source-nav">
+        <span class="nav-label">Ver en documento:</span>
+        <div class="source-buttons">
+          <Button
+            v-for="(source, index) in alertSources"
+            :key="index"
+            :label="getSourceLabel(source)"
+            icon="pi pi-arrow-right"
+            size="small"
+            outlined
+            @click="emit('navigate', source)"
+            v-tooltip.top="getSourceLocation(source)"
+            class="source-btn"
+          />
+        </div>
+      </div>
+      <!-- Botón único para alertas sin múltiples fuentes -->
       <Button
+        v-else
         label="Ir al texto"
         icon="pi pi-arrow-right"
         size="small"
@@ -366,5 +446,36 @@ const confidencePercent = computed(() => Math.round(props.alert.confidence * 100
 
 .action-row > * {
   flex: 1;
+}
+
+/* Multi-source navigation for inconsistency alerts */
+.multi-source-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-2);
+}
+
+.nav-label {
+  font-size: var(--ds-font-size-xs);
+  font-weight: var(--ds-font-weight-medium);
+  color: var(--ds-color-text-secondary);
+}
+
+.source-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ds-space-2);
+}
+
+.source-btn {
+  flex: 1;
+  min-width: 80px;
+}
+
+.source-btn :deep(.p-button-label) {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>

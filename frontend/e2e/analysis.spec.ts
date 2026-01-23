@@ -1,5 +1,6 @@
 import { test, expect, Page } from '@playwright/test'
-import { join } from 'path'
+import { join, dirname } from 'path'
+import { fileURLToPath } from 'url'
 
 /**
  * Tests E2E para el Flujo de Análisis
@@ -9,6 +10,9 @@ import { join } from 'path'
  * - Progreso de análisis
  * - Visualización de resultados
  */
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
 
 const API_URL = 'http://localhost:8008/api'
 const FRONTEND_URL = 'http://localhost:5173'

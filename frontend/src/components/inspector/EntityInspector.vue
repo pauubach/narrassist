@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, watch } from 'vue'
 import Button from 'primevue/button'
-import Tag from 'primevue/tag'
 import DsBadge from '@/components/ds/DsBadge.vue'
 import type { Entity } from '@/types'
 import { useEntityUtils } from '@/composables/useEntityUtils'
 import { useMentionNavigation } from '@/composables/useMentionNavigation'
+import { useAlertUtils } from '@/composables/useAlertUtils'
+
+const { formatChapterLabel } = useAlertUtils()
 
 /**
  * EntityInspector - Panel de detalles de entidad para el inspector.
@@ -40,9 +42,6 @@ const emit = defineEmits<{
 // Navegación de menciones
 const mentionNav = useMentionNavigation(() => props.projectId)
 
-// Estado local para controlar si está activa la navegación
-const isNavigating = ref(false)
-
 const { getEntityIcon, getEntityLabel, getEntityColor } = useEntityUtils()
 
 const entityIcon = computed(() => getEntityIcon(props.entity.type))
@@ -58,24 +57,18 @@ const isMerged = computed(() =>
   props.entity.mergedFromIds && props.entity.mergedFromIds.length > 0
 )
 
-/** Inicia la navegación de menciones */
-async function startMentionNavigation() {
-  isNavigating.value = true
-  await mentionNav.startNavigation(props.entity.id)
-}
-
-/** Detener navegación y limpiar */
-function stopNavigation() {
-  mentionNav.clear()
-  isNavigating.value = false
-}
-
-/** Detener navegación cuando cambia la entidad */
-watch(() => props.entity.id, () => {
-  if (isNavigating.value) {
-    stopNavigation()
-  }
-})
+/** Auto-cargar menciones cuando cambia la entidad */
+watch(
+  () => props.entity.id,
+  async (newId) => {
+    if (newId && props.entity.mentionCount && props.entity.mentionCount > 0) {
+      await mentionNav.loadMentions(newId)
+    } else {
+      mentionNav.clear()
+    }
+  },
+  { immediate: true }
+)
 </script>
 
 <template>
@@ -124,12 +117,12 @@ watch(() => props.entity.id, () => {
         <div class="stats-grid">
           <div class="stat-item">
             <i class="pi pi-comment"></i>
-            <span class="stat-value">{{ entity.mentionCount || 0 }}</span>
+            <span class="stat-value">{{ mentionNav.totalMentions.value || entity.mentionCount || 0 }}</span>
             <span class="stat-label">apariciones</span>
           </div>
-          <div v-if="entity.firstMentionChapter" class="stat-item">
+          <div v-if="formatChapterLabel(entity.firstMentionChapter)" class="stat-item">
             <i class="pi pi-bookmark"></i>
-            <span class="stat-value">Cap. {{ entity.firstMentionChapter }}</span>
+            <span class="stat-value">{{ formatChapterLabel(entity.firstMentionChapter) }}</span>
             <span class="stat-label">primera aparición</span>
           </div>
         </div>
@@ -150,18 +143,10 @@ watch(() => props.entity.id, () => {
       </div>
     </div>
 
-    <!-- Barra de navegación de apariciones -->
-    <div v-if="isNavigating && mentionNav.isActive.value" class="mention-navigation">
+    <!-- Barra de navegación de apariciones (siempre visible si hay menciones) -->
+    <div v-if="mentionNav.isActive.value" class="mention-navigation">
       <div class="nav-header">
         <span class="nav-title">APARICIONES</span>
-        <Button
-          icon="pi pi-times"
-          text
-          rounded
-          size="small"
-          @click="stopNavigation"
-          v-tooltip.left="'Cerrar navegación'"
-        />
       </div>
       <div class="nav-controls">
         <Button
@@ -203,16 +188,6 @@ watch(() => props.entity.id, () => {
         icon="pi pi-external-link"
         size="small"
         @click="emit('view-details')"
-      />
-      <Button
-        v-if="!isNavigating"
-        :label="mentionNav.state.value.loading ? 'Cargando...' : 'Ver en texto'"
-        icon="pi pi-search"
-        size="small"
-        outlined
-        :loading="mentionNav.state.value.loading"
-        :disabled="!entity.mentionCount || entity.mentionCount === 0"
-        @click="startMentionNavigation"
       />
       <Button
         v-if="isMerged"

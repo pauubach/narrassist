@@ -66,15 +66,16 @@ steps/
 ### P2 - Mejoras
 | Tarea | Descripción |
 |-------|-------------|
-| Code signing | Firma para Windows/macOS |
-| Tests E2E completos | Playwright para flujos completos |
+| Code signing | Firma para Windows/macOS (requiere certificados) |
+| CI/CD pipeline | GitHub Actions para build y tests automáticos |
 
 ### P3 - Futuro
 | Tarea | Descripción |
 |-------|-------------|
-| Parser PDF | Soporte para PDFs |
-| Parser EPUB | Soporte para EPUBs |
-| i18n | Internacionalización |
+| i18n | Internacionalización de UI |
+| Auto-update | Sistema de actualizaciones Tauri |
+| Detector de muletillas | Análisis de filler words |
+| Análisis de legibilidad | Índice Flesch-Szigriszt español |
 
 ---
 

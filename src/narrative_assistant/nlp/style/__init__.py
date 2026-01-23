@@ -61,6 +61,27 @@ from .editorial_rules import (
     check_with_user_rules,
 )
 
+from .filler_detector import (
+    Filler,
+    FillerOccurrence,
+    FillerReport,
+    FillerType,
+    FillerSeverity,
+    FillerDetector,
+    get_filler_detector,
+    reset_filler_detector,
+)
+
+from .readability import (
+    ReadabilityLevel,
+    ReadabilityReport,
+    SentenceStats,
+    ReadabilityAnalyzer,
+    get_readability_analyzer,
+    reset_readability_analyzer,
+    count_syllables_spanish,
+)
+
 __all__ = [
     # Repeticiones
     "Repetition",
@@ -91,4 +112,21 @@ __all__ = [
     "PREDEFINED_RULES",
     "parse_user_rules",
     "check_with_user_rules",
+    # Muletillas
+    "Filler",
+    "FillerOccurrence",
+    "FillerReport",
+    "FillerType",
+    "FillerSeverity",
+    "FillerDetector",
+    "get_filler_detector",
+    "reset_filler_detector",
+    # Legibilidad
+    "ReadabilityLevel",
+    "ReadabilityReport",
+    "SentenceStats",
+    "ReadabilityAnalyzer",
+    "get_readability_analyzer",
+    "reset_readability_analyzer",
+    "count_syllables_spanish",
 ]

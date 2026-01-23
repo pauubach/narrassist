@@ -4,6 +4,46 @@
  * Tipos simplificados para uso interno en la UI.
  */
 
+/**
+ * Fuente de una inconsistencia (ubicación donde se menciona un valor).
+ * Usado para navegación a múltiples ubicaciones en alertas de inconsistencia.
+ */
+export interface AlertSource {
+  /** Número de capítulo (1-indexed) */
+  chapter: number | null
+  /** Página estimada */
+  page?: number
+  /** Línea estimada */
+  line?: number
+  /** Posición de inicio en caracteres */
+  startChar: number
+  /** Posición de fin en caracteres */
+  endChar: number
+  /** Texto donde aparece el valor */
+  excerpt: string
+  /** Valor del atributo en esta ubicación */
+  value: string
+}
+
+/**
+ * Datos adicionales de la alerta según su tipo.
+ * Permite acceder a información específica como sources para inconsistencias.
+ */
+export interface AlertExtraData {
+  /** Nombre de la entidad (para inconsistencias de atributo) */
+  entityName?: string
+  /** Clave del atributo (para inconsistencias de atributo) */
+  attributeKey?: string
+  /** Primer valor conflictivo */
+  value1?: string
+  /** Segundo valor conflictivo */
+  value2?: string
+  /** Fuentes de cada valor para navegación múltiple */
+  sources?: AlertSource[]
+  /** Otros datos específicos del tipo de alerta */
+  [key: string]: unknown
+}
+
 /** Severidad de alerta normalizada para la UI */
 export type AlertSeverity = 'critical' | 'high' | 'medium' | 'low' | 'info'
 
@@ -21,6 +61,10 @@ export type AlertCategory =
   | 'style'         // style
   | 'grammar'       // grammar, orthography
   | 'structure'     // structure
+  | 'typography'    // tipografía (guiones, comillas, espaciado)
+  | 'punctuation'   // puntuación (raya de diálogo, puntos suspensivos)
+  | 'repetition'    // repeticiones léxicas
+  | 'agreement'     // concordancia género/número
   | 'other'         // entity, other
 
 /** Alerta para uso en componentes */
@@ -43,6 +87,12 @@ export interface Alert {
   confidence: number
   createdAt: Date
   resolvedAt?: Date
+  /**
+   * Datos adicionales específicos del tipo de alerta.
+   * Para inconsistencias de atributo, contiene sources[] con ubicaciones
+   * de cada valor conflictivo para navegación múltiple.
+   */
+  extraData?: AlertExtraData
 }
 
 /** Filtros para alertas */

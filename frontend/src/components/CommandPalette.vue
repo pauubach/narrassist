@@ -4,6 +4,7 @@ import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { useSelectionStore } from '@/stores/selection'
+import { useAlertUtils } from '@/composables/useAlertUtils'
 import type { Entity, Alert, Chapter } from '@/types'
 
 /**
@@ -29,6 +30,7 @@ const props = defineProps<{
 
 const workspaceStore = useWorkspaceStore()
 const selectionStore = useSelectionStore()
+const { getSeverityConfig } = useAlertUtils()
 
 // Estado
 const visible = ref(false)
@@ -245,27 +247,15 @@ function getEntityLabel(type: string): string {
   return labels[type] || type
 }
 
-// Helpers de alertas
+// Helpers de alertas - usar composable centralizado
 function getSeverityIcon(severity: string): string {
-  const icons: Record<string, string> = {
-    critical: 'pi-exclamation-circle',
-    high: 'pi-exclamation-triangle',
-    medium: 'pi-info-circle',
-    low: 'pi-info',
-    info: 'pi-info'
-  }
-  return icons[severity] || 'pi-info-circle'
+  // Extraer solo el nombre de clase sin 'pi ' prefix
+  const fullIcon = getSeverityConfig(severity as any).icon
+  return fullIcon.replace('pi ', '')
 }
 
 function getSeverityLabel(severity: string): string {
-  const labels: Record<string, string> = {
-    critical: 'Crítico',
-    high: 'Alto',
-    medium: 'Medio',
-    low: 'Bajo',
-    info: 'Info'
-  }
-  return labels[severity] || severity
+  return getSeverityConfig(severity as any).label
 }
 
 // Abrir/cerrar

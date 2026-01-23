@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useWorkspaceStore, type WorkspaceTab } from '@/stores/workspace'
 import { useDocumentTypeConfig } from '@/composables/useDocumentTypeConfig'
 import type { DocumentType, RecommendedAnalysis } from '@/types/domain/projects'
+import { storeToRefs } from 'pinia'
 
 /**
  * WorkspaceTabs - Barra de pestanas del workspace.
@@ -12,6 +13,8 @@ import type { DocumentType, RecommendedAnalysis } from '@/types/domain/projects'
  */
 
 const workspaceStore = useWorkspaceStore()
+// Usar storeToRefs para asegurar reactividad correcta
+const { activeTab } = storeToRefs(workspaceStore)
 
 interface TabConfig {
   id: WorkspaceTab
@@ -47,6 +50,7 @@ const tabConfigMapping: Record<WorkspaceTab, string> = {
   alerts: 'alerts',
   timeline: 'timeline',
   style: 'style',
+  glossary: 'text', // Siempre visible
   summary: 'text', // Siempre visible
 }
 
@@ -58,6 +62,7 @@ const allTabs: TabConfig[] = [
   { id: 'alerts', label: 'Alertas', icon: 'pi pi-exclamation-triangle', configKey: 'alerts' },
   { id: 'timeline', label: 'Timeline', icon: 'pi pi-clock', configKey: 'timeline' },
   { id: 'style', label: 'Estilo', icon: 'pi pi-pencil', configKey: 'style' },
+  { id: 'glossary', label: 'Glosario', icon: 'pi pi-book', configKey: 'text' },
   { id: 'summary', label: 'Resumen', icon: 'pi pi-chart-bar', configKey: 'text' },
 ]
 
@@ -65,16 +70,16 @@ const allTabs: TabConfig[] = [
 const tabs = computed<TabConfig[]>(() => {
   return allTabs
     .filter(tab => {
-      // Summary siempre visible
-      if (tab.id === 'summary') return true
+      // Summary y Glossary siempre visibles
+      if (tab.id === 'summary' || tab.id === 'glossary') return true
       // Usar configKey para verificar visibilidad
       const configKey = tab.configKey || tab.id
       return isTabVisible(configKey)
     })
     .map(tab => ({
       ...tab,
-      // Aplicar label dinámico según tipo de documento (excepto summary que mantiene su label fijo)
-      label: tab.id === 'summary' ? tab.label :
+      // Aplicar label dinámico según tipo de documento (excepto summary/glossary que mantienen su label fijo)
+      label: (tab.id === 'summary' || tab.id === 'glossary') ? tab.label :
              (tab.configKey ? getTabLabel(tab.configKey) : tab.label),
       // Añadir badges
       badge: tab.id === 'entities' ? props.entityCount :
@@ -124,9 +129,9 @@ function handleKeydown(event: KeyboardEvent, index: number) {
       type="button"
       role="tab"
       class="workspace-tabs__tab"
-      :class="{ 'workspace-tabs__tab--active': workspaceStore.activeTab === tab.id }"
-      :aria-selected="workspaceStore.activeTab === tab.id"
-      :tabindex="workspaceStore.activeTab === tab.id ? 0 : -1"
+      :class="{ 'workspace-tabs__tab--active': activeTab === tab.id }"
+      :aria-selected="activeTab === tab.id"
+      :tabindex="activeTab === tab.id ? 0 : -1"
       @click="selectTab(tab.id)"
       @keydown="handleKeydown($event, index)"
     >

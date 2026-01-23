@@ -292,6 +292,9 @@ import AlertList from '@/components/AlertList.vue'
 import type { Alert } from '@/types'
 import { transformAlerts, normalizeAlertSeverity, normalizeAlertStatus } from '@/types/transformers'
 import { useToast } from 'primevue/usetoast'
+import { useAlertUtils } from '@/composables/useAlertUtils'
+
+const { getSeverityConfig, getCategoryConfig, getStatusConfig } = useAlertUtils()
 
 const route = useRoute()
 const router = useRouter()
@@ -516,53 +519,27 @@ const getSeverityColor = (severity: string): string => {
   return colors[severity] || 'secondary'
 }
 
+// Usar composable centralizado
 const getSeverityIcon = (severity: string): string => {
-  // Domain severity: critical, high, medium, low, info
-  const icons: Record<string, string> = {
-    'critical': 'pi pi-exclamation-circle',
-    'high': 'pi pi-exclamation-triangle',
-    'medium': 'pi pi-info-circle',
-    'low': 'pi pi-lightbulb',
-    'info': 'pi pi-info-circle'
-  }
-  return icons[severity] || 'pi pi-info-circle'
+  return getSeverityConfig(severity as any).icon
 }
 
 const getCategoryLabel = (category: string): string => {
-  // Domain categories: attribute, timeline, relationship, location, behavior, knowledge, style, grammar, structure, other
-  const labels: Record<string, string> = {
-    'attribute': 'Atributos',
-    'timeline': 'Cronología',
-    'relationship': 'Relaciones',
-    'location': 'Ubicaciones',
-    'behavior': 'Comportamiento',
-    'knowledge': 'Conocimiento',
-    'style': 'Estilo',
-    'grammar': 'Gramática',
-    'structure': 'Estructura',
-    'other': 'Otro'
-  }
-  return labels[category] || category
+  return getCategoryConfig(category as any).label
 }
 
 const getStatusSeverity = (status: string): string => {
-  // Domain status: active, dismissed, resolved
-  const severities: Record<string, string> = {
+  // Map to PrimeVue Tag severity values
+  const primeVueMap: Record<string, string> = {
     'active': 'warning',
     'resolved': 'success',
     'dismissed': 'secondary'
   }
-  return severities[status] || 'secondary'
+  return primeVueMap[status] || 'secondary'
 }
 
 const getStatusLabel = (status: string): string => {
-  // Domain status: active, dismissed, resolved
-  const labels: Record<string, string> = {
-    'active': 'Activa',
-    'resolved': 'Resuelta',
-    'dismissed': 'Descartada'
-  }
-  return labels[status] || status
+  return getStatusConfig(status as any).label
 }
 
 const formatDate = (date: Date | string | undefined): string => {

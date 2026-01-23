@@ -5,6 +5,8 @@
  * Permite al corrector definir reglas editoriales personalizadas
  * en texto libre que se aplican durante el analisis.
  *
+ * Incluye configuracion de detectores de correcciones.
+ *
  * Las reglas son por proyecto y tienen persistencia.
  */
 
@@ -14,13 +16,30 @@ import Button from 'primevue/button'
 import Message from 'primevue/message'
 import ToggleSwitch from 'primevue/toggleswitch'
 import Card from 'primevue/card'
+import TabView from 'primevue/tabview'
+import TabPanel from 'primevue/tabpanel'
 import { useToast } from 'primevue/usetoast'
+import { useWorkspaceStore } from '@/stores/workspace'
+import CorrectionConfigPanel from './CorrectionConfigPanel.vue'
 
 const props = defineProps<{
   projectId: number
   /** Estado del análisis del proyecto */
   analysisStatus?: string
 }>()
+
+const workspaceStore = useWorkspaceStore()
+
+// Active tab index
+const activeTab = ref(0)
+
+// Watch for external navigation requests (e.g., from alerts panel)
+watch(() => workspaceStore.styleTabSubtab, (newSubtab) => {
+  if (newSubtab !== null) {
+    activeTab.value = newSubtab
+    workspaceStore.clearStyleTabSubtab()
+  }
+}, { immediate: true })
 
 const toast = useToast()
 
@@ -183,147 +202,171 @@ function insertExample() {
       <div class="header-info">
         <h2>
           <i class="pi pi-pencil"></i>
-          Reglas Editoriales
+          Estilo y Correcciones
         </h2>
         <p class="subtitle">
-          Define las normas de estilo especificas para este manuscrito.
+          Configura las normas de estilo y los detectores de correcciones.
         </p>
       </div>
-      <div class="header-actions">
-        <div class="toggle-container">
-          <label>Reglas activas</label>
-          <ToggleSwitch v-model="rulesEnabled" />
-        </div>
-        <Button
-          label="Guardar"
-          icon="pi pi-save"
-          :loading="saving"
-          :disabled="!hasChanges"
-          @click="saveRules"
-        />
-      </div>
     </div>
 
-    <!-- Mensaje informativo sobre cuando se aplican las reglas -->
-    <Message
-      v-if="analysisStatus !== 'completed'"
-      severity="info"
-      :closable="false"
-      class="rules-info-message"
-    >
-      <i class="pi pi-info-circle"></i>
-      Las reglas que definas se aplicaran durante el proximo analisis del documento.
-      Puedes escribirlas ahora y se usaran automaticamente.
-    </Message>
+    <TabView :activeIndex="activeTab" @update:activeIndex="activeTab = $event" class="style-tabview">
+      <!-- Tab 1: Configuracion de Correcciones -->
+      <TabPanel>
+        <template #header>
+          <i class="pi pi-sliders-h"></i>
+          <span>Detectores</span>
+        </template>
 
-    <div class="style-content">
-      <!-- Panel izquierdo: Editor de reglas -->
-      <div class="rules-editor">
-        <Card>
-          <template #title>
-            <div class="card-title">
-              <span>Reglas del proyecto</span>
-              <Button
-                label="Insertar ejemplo"
-                icon="pi pi-plus"
-                text
-                size="small"
-                @click="insertExample"
-              />
+        <div class="tab-content corrections-tab">
+          <CorrectionConfigPanel :project-id="projectId" />
+        </div>
+      </TabPanel>
+
+      <!-- Tab 2: Reglas Editoriales -->
+      <TabPanel>
+        <template #header>
+          <i class="pi pi-file-edit"></i>
+          <span>Reglas editoriales</span>
+        </template>
+
+        <div class="tab-content">
+          <div class="rules-header">
+            <div class="toggle-container">
+              <label>Reglas activas</label>
+              <ToggleSwitch v-model="rulesEnabled" />
             </div>
-          </template>
-          <template #content>
-            <Textarea
-              v-model="rulesText"
-              :disabled="loading"
-              placeholder="Escribe aqui las reglas editoriales para este manuscrito...
+            <Button
+              label="Guardar"
+              icon="pi pi-save"
+              :loading="saving"
+              :disabled="!hasChanges"
+              @click="saveRules"
+            />
+          </div>
+
+          <!-- Mensaje informativo sobre cuando se aplican las reglas -->
+          <Message
+            v-if="analysisStatus !== 'completed'"
+            severity="info"
+            :closable="false"
+            class="rules-info-message"
+          >
+            <i class="pi pi-info-circle"></i>
+            Las reglas que definas se aplicarán durante el próximo análisis del documento.
+          </Message>
+
+          <div class="style-content">
+            <!-- Panel izquierdo: Editor de reglas -->
+            <div class="rules-editor">
+              <Card>
+                <template #title>
+                  <div class="card-title">
+                    <span>Reglas del proyecto</span>
+                    <Button
+                      label="Insertar ejemplo"
+                      icon="pi pi-plus"
+                      text
+                      size="small"
+                      @click="insertExample"
+                    />
+                  </div>
+                </template>
+                <template #content>
+                  <Textarea
+                    v-model="rulesText"
+                    :disabled="loading"
+                    placeholder="Escribe aquí las reglas editoriales para este manuscrito...
 
 Ejemplos:
-- 'quizas' -> 'quiza'
-- Edades con numeros, duraciones con letra
+- 'quizás' -> 'quizá'
+- Edades con números, duraciones con letra
 - Demostrativos sin tilde
-- Sistema inmunitario (no inmunologico)"
-              :autoResize="false"
-              rows="25"
-              class="rules-textarea"
-            />
-            <div class="editor-footer">
-              <span class="last-saved" v-if="lastSaved">
-                <i class="pi pi-clock"></i>
-                Guardado: {{ formatDate(lastSaved) }}
-              </span>
-              <span class="unsaved-indicator" v-if="hasChanges">
-                <i class="pi pi-circle-fill"></i>
-                Sin guardar
-              </span>
+- Sistema inmunitario (no inmunológico)"
+                    :autoResize="false"
+                    rows="20"
+                    class="rules-textarea"
+                  />
+                  <div class="editor-footer">
+                    <span class="last-saved" v-if="lastSaved">
+                      <i class="pi pi-clock"></i>
+                      Guardado: {{ formatDate(lastSaved) }}
+                    </span>
+                    <span class="unsaved-indicator" v-if="hasChanges">
+                      <i class="pi pi-circle-fill"></i>
+                      Sin guardar
+                    </span>
+                  </div>
+                </template>
+              </Card>
             </div>
-          </template>
-        </Card>
-      </div>
 
-      <!-- Panel derecho: Ayuda e informacion -->
-      <div class="rules-help">
-        <Card class="help-card">
-          <template #title>
-            <i class="pi pi-info-circle"></i>
-            Como escribir reglas
-          </template>
-          <template #content>
-            <div class="help-content">
-              <p>
-                Escribe las reglas en texto libre. El sistema las interpretara
-                y las aplicara durante el analisis del manuscrito.
-              </p>
+            <!-- Panel derecho: Ayuda e informacion -->
+            <div class="rules-help">
+              <Card class="help-card">
+                <template #title>
+                  <i class="pi pi-info-circle"></i>
+                  Cómo escribir reglas
+                </template>
+                <template #content>
+                  <div class="help-content">
+                    <p>
+                      Escribe las reglas en texto libre. El sistema las interpretará
+                      y las aplicará durante el análisis del manuscrito.
+                    </p>
 
-              <h4>Formato recomendado</h4>
-              <ul>
-                <li>Usa <code>-></code> para sustituciones: <code>"quizas" -> "quiza"</code></li>
-                <li>Agrupa reglas por categoria con <code>##</code></li>
-                <li>Anade explicaciones para recordar el motivo</li>
-              </ul>
+                    <h4>Formato recomendado</h4>
+                    <ul>
+                      <li>Usa <code>-></code> para sustituciones: <code>"quizás" -> "quizá"</code></li>
+                      <li>Agrupa reglas por categoría con <code>##</code></li>
+                      <li>Añade explicaciones para recordar el motivo</li>
+                    </ul>
 
-              <h4>Tipos de reglas soportadas</h4>
-              <ul>
-                <li><strong>Sustituciones:</strong> palabra A -> palabra B</li>
-                <li><strong>Preferencias:</strong> preferir X sobre Y</li>
-                <li><strong>Patrones:</strong> edades con numeros</li>
-                <li><strong>Prohibiciones:</strong> evitar X</li>
-              </ul>
+                    <h4>Tipos de reglas soportadas</h4>
+                    <ul>
+                      <li><strong>Sustituciones:</strong> palabra A -> palabra B</li>
+                      <li><strong>Preferencias:</strong> preferir X sobre Y</li>
+                      <li><strong>Patrones:</strong> edades con números</li>
+                      <li><strong>Prohibiciones:</strong> evitar X</li>
+                    </ul>
 
-              <Message severity="info" :closable="false" class="help-message">
-                <p>
-                  Las reglas son <strong>por proyecto</strong>.
-                  Cada manuscrito puede tener sus propias normas editoriales.
-                </p>
-              </Message>
+                    <Message severity="info" :closable="false" class="help-message">
+                      <p>
+                        Las reglas son <strong>por proyecto</strong>.
+                        Cada manuscrito puede tener sus propias normas editoriales.
+                      </p>
+                    </Message>
+                  </div>
+                </template>
+              </Card>
+
+              <Card class="predefined-card">
+                <template #title>
+                  <i class="pi pi-list"></i>
+                  Reglas predefinidas activas
+                </template>
+                <template #content>
+                  <p class="predefined-intro">
+                    El sistema incluye reglas básicas que siempre están activas:
+                  </p>
+                  <ul class="predefined-list">
+                    <li>Órganos únicos en singular (corazón, cerebro, mente)</li>
+                    <li>Demostrativos sin tilde (RAE 2010)</li>
+                    <li>"Solo" sin tilde</li>
+                    <li>Partitivos con artículo</li>
+                    <li>Rayas en incisos (no guiones)</li>
+                    <li>Dobles espacios</li>
+                  </ul>
+                  <p class="predefined-note">
+                    Tus reglas personalizadas se suman a estas.
+                  </p>
+                </template>
+              </Card>
             </div>
-          </template>
-        </Card>
-
-        <Card class="predefined-card">
-          <template #title>
-            <i class="pi pi-list"></i>
-            Reglas predefinidas activas
-          </template>
-          <template #content>
-            <p class="predefined-intro">
-              El sistema incluye reglas basicas que siempre estan activas:
-            </p>
-            <ul class="predefined-list">
-              <li>Organos unicos en singular (corazon, cerebro, mente)</li>
-              <li>Demostrativos sin tilde (RAE 2010)</li>
-              <li>"Solo" sin tilde</li>
-              <li>Partitivos con articulo</li>
-              <li>Rayas en incisos (no guiones)</li>
-              <li>Dobles espacios</li>
-            </ul>
-            <p class="predefined-note">
-              Tus reglas personalizadas se suman a estas.
-            </p>
-          </template>
-        </Card>
-      </div>
-    </div>
+          </div>
+        </div>
+      </TabPanel>
+    </TabView>
   </div>
 </template>
 
@@ -333,24 +376,12 @@ Ejemplos:
   flex-direction: column;
   height: 100%;
   padding: var(--ds-space-4);
-  gap: var(--ds-space-4);
-  overflow: auto;
+  gap: var(--ds-space-3);
+  overflow: hidden;
 }
 
 .style-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  padding-bottom: var(--ds-space-4);
-  border-bottom: 1px solid var(--ds-border-color);
-}
-
-.rules-info-message {
-  margin: 0;
-}
-
-.rules-info-message i {
-  margin-right: var(--ds-space-2);
+  flex-shrink: 0;
 }
 
 .header-info h2 {
@@ -363,14 +394,51 @@ Ejemplos:
 }
 
 .header-info .subtitle {
-  margin: var(--ds-space-2) 0 0;
+  margin: var(--ds-space-1) 0 0;
   color: var(--ds-color-text-secondary);
+  font-size: var(--ds-font-size-sm);
 }
 
-.header-actions {
+.style-tabview {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.style-tabview :deep(.p-tabview-panels) {
+  flex: 1;
+  overflow: auto;
+  padding: 0;
+}
+
+.style-tabview :deep(.p-tabview-panel) {
+  height: 100%;
+}
+
+/* Tab styles are now handled by global primevue-overrides.css */
+
+.tab-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-3);
+  padding: var(--ds-space-3) 0;
+  height: 100%;
+}
+
+.rules-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--ds-space-4);
+}
+
+.rules-info-message {
+  margin: 0;
+}
+
+.rules-info-message i {
+  margin-right: var(--ds-space-2);
 }
 
 .toggle-container {
@@ -384,36 +452,46 @@ Ejemplos:
   color: var(--ds-color-text-secondary);
 }
 
+.corrections-tab {
+  overflow: auto;
+  padding-right: var(--ds-space-2);
+}
+
 .style-content {
   display: grid;
-  grid-template-columns: 1fr 350px;
+  grid-template-columns: 1fr 320px;
   gap: var(--ds-space-4);
   flex: 1;
   min-height: 0;
+  overflow: hidden;
 }
 
 .rules-editor {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  overflow: hidden;
 }
 
 .rules-editor :deep(.p-card) {
   height: 100%;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .rules-editor :deep(.p-card-body) {
   flex: 1;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .rules-editor :deep(.p-card-content) {
   flex: 1;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .card-title {
@@ -464,7 +542,8 @@ Ejemplos:
 .rules-help {
   display: flex;
   flex-direction: column;
-  gap: var(--ds-space-4);
+  gap: var(--ds-space-3);
+  overflow: auto;
 }
 
 .help-card :deep(.p-card-title),
@@ -540,6 +619,7 @@ Ejemplos:
 @media (max-width: 1024px) {
   .style-content {
     grid-template-columns: 1fr;
+    overflow: auto;
   }
 
   .rules-help {
@@ -552,18 +632,19 @@ Ejemplos:
 }
 
 @media (max-width: 768px) {
-  .style-header {
+  .rules-header {
     flex-direction: column;
-    gap: var(--ds-space-3);
-  }
-
-  .header-actions {
-    width: 100%;
-    justify-content: space-between;
+    align-items: flex-start;
+    gap: var(--ds-space-2);
   }
 
   .rules-help {
     flex-direction: column;
+  }
+
+  .style-tabview :deep(.p-tabview-nav-link) {
+    padding: 0.75rem;
+    font-size: var(--ds-font-size-sm);
   }
 }
 </style>

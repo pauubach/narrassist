@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
 import DsBadge from '@/components/ds/DsBadge.vue'
-import type { Project, Entity, Alert } from '@/types'
+import type { Project, Entity, Alert, Chapter } from '@/types'
 import { useEntityUtils } from '@/composables/useEntityUtils'
 
 /**
@@ -24,13 +24,18 @@ interface Props {
   entities: Entity[]
   /** Alertas del proyecto */
   alerts: Alert[]
+  /** Capítulos del proyecto (para mostrar nombres) */
+  chapters?: Chapter[]
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  chapters: () => []
+})
 
 const emit = defineEmits<{
   'export': []
   'export-style-guide': []
+  'export-corrected': []
   're-analyze': []
 }>()
 
@@ -79,6 +84,77 @@ const topCharacters = computed(() => {
     .filter(e => e.type === 'character')
     .sort((a, b) => (b.mentionCount || 0) - (a.mentionCount || 0))
     .slice(0, 5)
+})
+
+// Mapa de número de capítulo a nombre
+const chapterNameMap = computed(() => {
+  const map: Record<number, string> = {}
+  for (const ch of props.chapters) {
+    map[ch.chapterNumber] = ch.title || `Capítulo ${ch.chapterNumber}`
+  }
+  return map
+})
+
+// Densidad de alertas por capítulo
+const chapterDensity = computed(() => {
+  // Agrupar alertas por capítulo
+  const byChapter: Record<number, { count: number; bySeverity: Record<string, number> }> = {}
+
+  for (const alert of props.alerts) {
+    if (alert.status !== 'active') continue
+    const chapter = alert.chapter ?? 0
+
+    if (!byChapter[chapter]) {
+      byChapter[chapter] = { count: 0, bySeverity: { critical: 0, high: 0, medium: 0, low: 0, info: 0 } }
+    }
+    byChapter[chapter].count++
+    byChapter[chapter].bySeverity[alert.severity]++
+  }
+
+  // Convertir a array ordenado
+  const chapters = Object.entries(byChapter)
+    .map(([chapterNum, data]) => {
+      const num = parseInt(chapterNum)
+      return {
+        chapter: num,
+        // Usar el nombre del capítulo si existe, si no "Sin capítulo" para 0
+        name: num === 0 ? 'Sin capítulo' : (chapterNameMap.value[num] || `Capítulo ${num}`),
+        count: data.count,
+        bySeverity: data.bySeverity,
+      }
+    })
+    .sort((a, b) => a.chapter - b.chapter)
+
+  // Calcular el máximo para normalizar barras
+  const maxCount = Math.max(...chapters.map(c => c.count), 1)
+
+  return { chapters, maxCount }
+})
+
+// Tendencia de errores (mejorando o empeorando)
+const errorTrend = computed(() => {
+  const chapters = chapterDensity.value.chapters
+  if (chapters.length < 3) return null
+
+  // Comparar primera mitad con segunda mitad
+  const mid = Math.floor(chapters.length / 2)
+  const firstHalf = chapters.slice(0, mid)
+  const secondHalf = chapters.slice(mid)
+
+  const avgFirst = firstHalf.reduce((sum, c) => sum + c.count, 0) / firstHalf.length
+  const avgSecond = secondHalf.reduce((sum, c) => sum + c.count, 0) / secondHalf.length
+
+  const percentChange = ((avgSecond - avgFirst) / Math.max(avgFirst, 1)) * 100
+
+  if (percentChange < -15) return { direction: 'improving', percent: Math.abs(percentChange) }
+  if (percentChange > 15) return { direction: 'worsening', percent: percentChange }
+  return { direction: 'stable', percent: Math.abs(percentChange) }
+})
+
+// Verificar si el documento es Word (para exportar con Track Changes)
+const isWordDocument = computed(() => {
+  const path = props.project.documentPath || props.project.source_path || ''
+  return path.toLowerCase().endsWith('.docx')
 })
 
 // Formato de fecha
@@ -276,6 +352,80 @@ const originalDocumentName = computed(() => {
         </template>
       </Card>
 
+      <!-- Alertas por capítulo (junto a Distribución de Alertas) -->
+      <Card v-if="chapterDensity.chapters.length > 0" class="density-card">
+        <template #title>
+          <i class="pi pi-chart-bar"></i>
+          Alertas por Capítulo
+          <span
+            v-if="errorTrend"
+            class="trend-badge"
+            :class="'trend-' + errorTrend.direction"
+            :title="errorTrend.direction === 'improving'
+              ? 'Menos alertas en la segunda mitad del documento'
+              : errorTrend.direction === 'worsening'
+              ? 'Más alertas en la segunda mitad del documento'
+              : 'Distribución uniforme de alertas'"
+          >
+            <i :class="errorTrend.direction === 'improving' ? 'pi pi-arrow-down' : errorTrend.direction === 'worsening' ? 'pi pi-arrow-up' : 'pi pi-minus'"></i>
+            {{ errorTrend.direction === 'improving' ? 'Menos al final' : errorTrend.direction === 'worsening' ? 'Más al final' : 'Uniforme' }}
+          </span>
+        </template>
+        <template #content>
+          <div class="density-chart">
+            <div
+              v-for="item in chapterDensity.chapters"
+              :key="item.chapter"
+              class="density-row"
+            >
+              <span class="density-label" :title="item.name">{{ item.name }}</span>
+              <div class="density-bar-container">
+                <div class="density-bar-stack">
+                  <div
+                    v-if="item.bySeverity.critical > 0"
+                    class="density-segment density-critical"
+                    :style="{ width: (item.bySeverity.critical / chapterDensity.maxCount) * 100 + '%' }"
+                    :title="`${item.bySeverity.critical} críticas`"
+                  ></div>
+                  <div
+                    v-if="item.bySeverity.high > 0"
+                    class="density-segment density-high"
+                    :style="{ width: (item.bySeverity.high / chapterDensity.maxCount) * 100 + '%' }"
+                    :title="`${item.bySeverity.high} altas`"
+                  ></div>
+                  <div
+                    v-if="item.bySeverity.medium > 0"
+                    class="density-segment density-medium"
+                    :style="{ width: (item.bySeverity.medium / chapterDensity.maxCount) * 100 + '%' }"
+                    :title="`${item.bySeverity.medium} medias`"
+                  ></div>
+                  <div
+                    v-if="item.bySeverity.low > 0"
+                    class="density-segment density-low"
+                    :style="{ width: (item.bySeverity.low / chapterDensity.maxCount) * 100 + '%' }"
+                    :title="`${item.bySeverity.low} bajas`"
+                  ></div>
+                  <div
+                    v-if="item.bySeverity.info > 0"
+                    class="density-segment density-info"
+                    :style="{ width: (item.bySeverity.info / chapterDensity.maxCount) * 100 + '%' }"
+                    :title="`${item.bySeverity.info} info`"
+                  ></div>
+                </div>
+              </div>
+              <span class="density-count">{{ item.count }}</span>
+            </div>
+          </div>
+          <div class="density-legend">
+            <span class="legend-item"><span class="legend-dot legend-critical"></span> Crítica</span>
+            <span class="legend-item"><span class="legend-dot legend-high"></span> Alta</span>
+            <span class="legend-item"><span class="legend-dot legend-medium"></span> Media</span>
+            <span class="legend-item"><span class="legend-dot legend-low"></span> Baja</span>
+            <span class="legend-item"><span class="legend-dot legend-info"></span> Info</span>
+          </div>
+        </template>
+      </Card>
+
       <!-- Entidades por tipo -->
       <Card class="entities-card">
         <template #title>
@@ -331,6 +481,15 @@ const originalDocumentName = computed(() => {
               icon="pi pi-download"
               outlined
               @click="emit('export')"
+            />
+            <Button
+              v-if="isWordDocument"
+              label="Documento con Correcciones"
+              icon="pi pi-file-edit"
+              outlined
+              severity="help"
+              v-tooltip.top="'Exporta el documento Word con las correcciones como revisiones (Track Changes)'"
+              @click="emit('export-corrected')"
             />
             <Button
               label="Guía de Estilo"
@@ -598,6 +757,127 @@ const originalDocumentName = computed(() => {
   color: var(--text-color-secondary);
 }
 
+/* Density map */
+.density-card :deep(.p-card-title) {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1rem;
+  flex-wrap: wrap;
+}
+
+.trend-badge {
+  margin-left: auto;
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-weight: 500;
+}
+
+.trend-improving {
+  background: var(--green-100);
+  color: var(--green-700);
+}
+
+.trend-worsening {
+  background: var(--red-100);
+  color: var(--red-700);
+}
+
+.trend-stable {
+  background: var(--gray-100);
+  color: var(--gray-700);
+}
+
+.density-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.density-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.density-label {
+  width: 140px;
+  min-width: 140px;
+  max-width: 140px;
+  font-size: 0.8125rem;
+  color: var(--text-color-secondary);
+  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.density-bar-container {
+  flex: 1;
+  height: 16px;
+  background: var(--surface-100);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.density-bar-stack {
+  display: flex;
+  height: 100%;
+}
+
+.density-segment {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.density-critical { background: var(--red-500); }
+.density-high { background: var(--orange-500); }
+.density-medium { background: var(--yellow-500); }
+.density-low { background: var(--blue-500); }
+.density-info { background: var(--gray-400); }
+
+.density-count {
+  width: 35px;
+  text-align: right;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+.density-legend {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--surface-100);
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--text-color-secondary);
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.legend-critical { background: var(--red-500); }
+.legend-high { background: var(--orange-500); }
+.legend-medium { background: var(--yellow-500); }
+.legend-low { background: var(--blue-500); }
+.legend-info { background: var(--gray-400); }
+
 /* Actions */
 .actions-grid {
   display: flex;
@@ -632,5 +912,28 @@ const originalDocumentName = computed(() => {
 .dark .character-rank {
   background: var(--primary-900);
   color: var(--primary-300);
+}
+
+.dark .density-bar-container {
+  background: var(--surface-700);
+}
+
+.dark .density-legend {
+  border-top-color: var(--surface-600);
+}
+
+.dark .trend-improving {
+  background: var(--green-900);
+  color: var(--green-300);
+}
+
+.dark .trend-worsening {
+  background: var(--red-900);
+  color: var(--red-300);
+}
+
+.dark .trend-stable {
+  background: var(--gray-800);
+  color: var(--gray-300);
 }
 </style>

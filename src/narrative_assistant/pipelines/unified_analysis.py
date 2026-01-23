@@ -1293,29 +1293,84 @@ class UnifiedAnalysisPipeline:
         return Result.success(None)
 
     def _extract_attributes(self, context: AnalysisContext) -> None:
-        """Extraer atributos de entidades."""
+        """Extraer atributos de entidades usando el sistema multi-método con votación."""
         try:
-            from ..nlp.extraction import AttributeExtractionPipeline, PipelineConfig
+            from ..nlp.attributes import get_attribute_extractor
+            from ..entities.repository import get_entity_repository
 
-            entity_names = [e.canonical_name for e in context.entities]
+            # Cargar menciones de todas las entidades para resolución de pronombres
+            entity_mentions = []
+            entity_repo = get_entity_repository()
+            for entity in context.entities:
+                mentions = entity_repo.get_mentions_by_entity(entity.id)
+                for mention in mentions:
+                    # Usar el nombre canónico para que _find_nearest_entity lo asocie correctamente
+                    entity_mentions.append(
+                        (entity.canonical_name, mention.start_char, mention.end_char)
+                    )
 
-            pipeline = AttributeExtractionPipeline(PipelineConfig(
-                use_llm=self.config.use_llm,
-                parallel_extraction=self.config.parallel_extraction,
-            ))
-
-            result = pipeline.extract(
-                context.full_text,
-                entity_names=entity_names,
-                chapters=context.chapters if context.chapters else None
+            logger.debug(
+                f"Loaded {len(entity_mentions)} mentions for "
+                f"{len(context.entities)} entities for attribute extraction"
             )
 
-            if result.is_success:
-                context.attributes = result.value.attributes
-                context.stats["attributes_extracted"] = len(context.attributes)
+            # Usar el extractor de atributos que soporta entity_mentions
+            # min_confidence=0.4 para permitir atributos detectados por un solo método
+            extractor = get_attribute_extractor(
+                use_llm=self.config.use_llm,
+                min_confidence=0.4,
+            )
 
-                # Persistir
-                self._persist_attributes(context)
+            all_attributes = []
+
+            # Procesar por capítulos para mantener información de chapter_id
+            if context.chapters:
+                for ch in context.chapters:
+                    chapter_num = ch.get("number", 1)
+                    chapter_content = ch.get("content", "")
+                    chapter_start = ch.get("start_char", 0)
+
+                    if not chapter_content:
+                        continue
+
+                    # Filtrar menciones que están en este capítulo
+                    chapter_mentions = [
+                        (name, start - chapter_start, end - chapter_start)
+                        for name, start, end in entity_mentions
+                        if chapter_start <= start < ch.get("end_char", float("inf"))
+                    ]
+
+                    result = extractor.extract_attributes(
+                        chapter_content,
+                        entity_mentions=chapter_mentions if chapter_mentions else None,
+                        chapter_id=chapter_num,
+                    )
+
+                    if result.is_success:
+                        # Ajustar posiciones al texto completo
+                        for attr in result.value.attributes:
+                            attr.start_char += chapter_start
+                            attr.end_char += chapter_start
+                        all_attributes.extend(result.value.attributes)
+                        logger.debug(
+                            f"Chapter {chapter_num}: {len(result.value.attributes)} attributes"
+                        )
+            else:
+                # Sin capítulos, procesar texto completo
+                result = extractor.extract_attributes(
+                    context.full_text,
+                    entity_mentions=entity_mentions if entity_mentions else None,
+                )
+                if result.is_success:
+                    all_attributes = result.value.attributes
+
+            context.attributes = all_attributes
+            context.stats["attributes_extracted"] = len(all_attributes)
+
+            # Persistir
+            self._persist_attributes(context)
+
+            logger.info(f"Attribute extraction: {len(all_attributes)} attributes total")
 
         except Exception as e:
             logger.warning(f"Attribute extraction failed: {e}")
@@ -2003,7 +2058,7 @@ class UnifiedAnalysisPipeline:
             from ..analysis.attribute_consistency import AttributeConsistencyChecker
 
             checker = AttributeConsistencyChecker()
-            result = checker.check(context.attributes)
+            result = checker.check_consistency(context.attributes)
 
             if result.is_success:
                 context.inconsistencies = result.value
@@ -2293,15 +2348,27 @@ class UnifiedAnalysisPipeline:
 
             # Alertas de inconsistencias de atributos
             for inc in context.inconsistencies:
+                # Convertir attribute_key enum a string para la API
+                attr_key_str = inc.attribute_key.value if hasattr(inc.attribute_key, 'value') else str(inc.attribute_key)
                 result = engine.create_from_attribute_inconsistency(
                     project_id=context.project_id,
                     entity_name=inc.entity_name,
                     entity_id=context.entity_map.get(inc.entity_name.lower(), 0),
-                    attribute_key=inc.attribute_key,
+                    attribute_key=attr_key_str,
                     value1=inc.value1,
                     value2=inc.value2,
-                    value1_source={"chapter": inc.value1_chapter, "excerpt": inc.value1_excerpt},
-                    value2_source={"chapter": inc.value2_chapter, "excerpt": inc.value2_excerpt},
+                    value1_source={
+                        "chapter": inc.value1_chapter,
+                        "excerpt": inc.value1_excerpt,
+                        "start_char": inc.value1_position,
+                        "end_char": inc.value1_position + len(inc.value1_excerpt) if inc.value1_excerpt else 0,
+                    },
+                    value2_source={
+                        "chapter": inc.value2_chapter,
+                        "excerpt": inc.value2_excerpt,
+                        "start_char": inc.value2_position,
+                        "end_char": inc.value2_position + len(inc.value2_excerpt) if inc.value2_excerpt else 0,
+                    },
                     explanation=inc.explanation,
                     confidence=inc.confidence,
                 )

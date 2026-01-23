@@ -1693,10 +1693,15 @@ def _create_alerts_from_inconsistencies(
             # Si entity_id es 0 (placeholder), buscar por nombre
             entity_id = incon.entity_id
             if entity_id == 0:
-                # find_entities_by_name devuelve lista directamente
+                # Primero intentar búsqueda exacta (case-insensitive)
                 found_entities = entity_repo.find_entities_by_name(
                     project_id=project_id, name=incon.entity_name
                 )
+                # Si no hay match exacto, intentar fuzzy (ej: "María" → "María Sánchez")
+                if not found_entities:
+                    found_entities = entity_repo.find_entities_by_name(
+                        project_id=project_id, name=incon.entity_name, fuzzy=True
+                    )
                 if found_entities:
                     entity_id = found_entities[0].id
                     logger.debug(f"Found entity_id={entity_id} for '{incon.entity_name}'")

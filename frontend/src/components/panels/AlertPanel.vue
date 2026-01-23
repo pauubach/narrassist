@@ -413,10 +413,6 @@ function getAlertMessage(alert: Alert): string {
   font-size: var(--ds-font-size-sm);
   color: var(--ds-color-text);
   line-height: var(--ds-line-height-normal);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 
 .alert-panel__item-footer {

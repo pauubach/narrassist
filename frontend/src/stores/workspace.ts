@@ -10,7 +10,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
-export type WorkspaceTab = 'text' | 'entities' | 'relationships' | 'alerts' | 'timeline' | 'style' | 'summary'
+export type WorkspaceTab = 'text' | 'entities' | 'relationships' | 'alerts' | 'timeline' | 'style' | 'glossary' | 'summary'
 
 export type SidebarTab = 'chapters' | 'alerts' | 'characters' | 'assistant'
 
@@ -63,6 +63,11 @@ export const TAB_LAYOUT_CONFIG: Record<WorkspaceTab, TabLayoutConfig> = {
   style: {
     showLeftPanel: false,
     showRightPanel: false,  // Estilo full-width
+    sidebarTabs: []
+  },
+  glossary: {
+    showLeftPanel: false,
+    showRightPanel: false,  // Glosario full-width
     sidebarTabs: []
   },
   summary: {
@@ -123,6 +128,9 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   /** ID del capítulo al que hacer scroll (para navegación directa) */
   const scrollToChapterId = ref<number | null>(null)
 
+  /** Subtab de estilo a activar (0 = detectores, 1 = reglas) */
+  const styleTabSubtab = ref<number | null>(null)
+
   // ============================================================================
   // Getters
   // ============================================================================
@@ -152,10 +160,10 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   /** Configuración de pestañas */
   const tabs = computed(() => [
     { id: 'text' as WorkspaceTab, label: 'Texto', icon: 'pi pi-file-edit' },
-    { id: 'entities' as WorkspaceTab, label: 'Entidades', icon: 'pi pi-users' },
+    { id: 'entities' as WorkspaceTab, label: 'Entidades', icon: 'pi pi-th-large' },
     { id: 'relationships' as WorkspaceTab, label: 'Relaciones', icon: 'pi pi-share-alt' },
     { id: 'alerts' as WorkspaceTab, label: 'Alertas', icon: 'pi pi-exclamation-triangle' },
-    { id: 'timeline' as WorkspaceTab, label: 'Timeline', icon: 'pi pi-clock' },
+    { id: 'timeline' as WorkspaceTab, label: 'Línea temporal', icon: 'pi pi-clock' },
     { id: 'style' as WorkspaceTab, label: 'Estilo', icon: 'pi pi-pencil' },
     { id: 'summary' as WorkspaceTab, label: 'Resumen', icon: 'pi pi-chart-bar' }
   ])
@@ -315,6 +323,29 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   }
 
   /**
+   * Navega al tab de estilo con un subtab específico
+   * @param subtab 0 = detectores de corrección, 1 = reglas editoriales
+   */
+  function navigateToStyleTab(subtab: number = 0) {
+    styleTabSubtab.value = subtab
+    setActiveTab('style')
+  }
+
+  /**
+   * Abre la configuración de correcciones (subtab=0)
+   */
+  function openCorrectionConfig() {
+    navigateToStyleTab(0)
+  }
+
+  /**
+   * Limpia el subtab de estilo pendiente
+   */
+  function clearStyleTabSubtab() {
+    styleTabSubtab.value = null
+  }
+
+  /**
    * Resetea el workspace al estado inicial
    */
   function reset() {
@@ -340,6 +371,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     scrollToPosition.value = null
     scrollToText.value = null
     scrollToChapterId.value = null
+    styleTabSubtab.value = null
   }
 
   return {
@@ -356,6 +388,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     scrollToPosition,
     scrollToText,
     scrollToChapterId,
+    styleTabSubtab,
 
     // Getters
     centerWidth,
@@ -384,6 +417,9 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     navigateToEntityMentions,
     navigateToTextPosition,
     clearScrollToPosition,
+    navigateToStyleTab,
+    openCorrectionConfig,
+    clearStyleTabSubtab,
     reset
   }
 })

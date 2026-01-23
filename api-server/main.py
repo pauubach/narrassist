@@ -15,7 +15,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional, Any
 
-from fastapi import FastAPI, HTTPException, UploadFile, File, Body, Request
+from fastapi import FastAPI, HTTPException, UploadFile, File, Body, Request, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -193,6 +193,7 @@ class AlertResponse(BaseModel):
     created_at: str
     updated_at: Optional[str] = None
     resolved_at: Optional[str] = None
+    extra_data: Optional[dict] = None  # Datos adicionales (sources para inconsistencias, etc.)
 
 # ============================================================================
 # Endpoints - Sistema
@@ -598,6 +599,12 @@ async def system_capabilities():
                     "spacy_gpu_enabled": has_gpu and has_cupy,
                     "embeddings_gpu_enabled": has_gpu,
                     "batch_size": 64 if has_gpu else 16,
+                    # Detectores con validación LLM - solo recomendar si hay GPU o modelos rápidos
+                    "detectors": {
+                        "anacoluto_llm_validation": has_gpu and ollama_available,
+                        "pov_llm_validation": has_gpu and ollama_available,
+                        "use_llm_review": has_gpu and ollama_available,  # Revisión global LLM
+                    },
                 },
             },
         )
@@ -633,6 +640,52 @@ def _check_languagetool_available() -> bool:
         logger.debug(f"Error verificando/iniciando LanguageTool: {e}")
 
     return False
+
+
+def generate_person_aliases(canonical_name: str, all_canonical_names: set[str]) -> list[str]:
+    """
+    Genera aliases automáticos para nombres de personas.
+
+    Para nombres compuestos como "María García", extrae partes útiles
+    que pueden usarse como alias para búsqueda de menciones.
+
+    Args:
+        canonical_name: Nombre canónico de la entidad (ej: "María García")
+        all_canonical_names: Set de todos los nombres canónicos para evitar conflictos
+
+    Returns:
+        Lista de aliases generados (ej: ["María"])
+    """
+    aliases = []
+    parts = canonical_name.split()
+
+    # Solo procesar nombres con múltiples palabras
+    if len(parts) < 2:
+        return aliases
+
+    # Extraer el primer nombre como alias si:
+    # 1. Tiene al menos 3 caracteres
+    # 2. No es un título común (Don, Doña, Señor, etc.)
+    # 3. No es ya un nombre canónico de otra entidad
+    first_name = parts[0]
+    titles = {"don", "doña", "señor", "señora", "sr", "sra", "dr", "dra",
+              "doctor", "doctora", "padre", "madre", "hermano", "hermana",
+              "el", "la", "los", "las"}
+
+    if (len(first_name) >= 3 and
+        first_name.lower() not in titles and
+        first_name.lower() not in {n.lower() for n in all_canonical_names}):
+        aliases.append(first_name)
+
+    # Para nombres con 3+ partes (ej: "María José García"),
+    # también considerar "María José" como alias
+    if len(parts) >= 3:
+        first_two = " ".join(parts[:2])
+        if (first_two.lower() not in {n.lower() for n in all_canonical_names} and
+            first_two != canonical_name):
+            aliases.append(first_two)
+
+    return aliases
 
 
 # ============================================================================
@@ -696,6 +749,57 @@ def _get_project_stats(project_id: int, db) -> dict:
         logger.warning(f"Error getting project stats: {e}")
 
     return stats
+
+
+def _verify_entity_ownership(entity_id: int, project_id: int) -> tuple[Any, Optional[ApiResponse]]:
+    """
+    Verifica que una entidad existe y pertenece al proyecto especificado.
+
+    Args:
+        entity_id: ID de la entidad
+        project_id: ID del proyecto
+
+    Returns:
+        tuple (entity, error_response):
+        - Si es válida: (entity, None)
+        - Si hay error: (None, ApiResponse con error)
+    """
+    entity_repo = entity_repository
+    if not entity_repo:
+        return None, ApiResponse(success=False, error="Entity repository not initialized")
+
+    entity = entity_repo.get_entity(entity_id)
+    if not entity or entity.project_id != project_id:
+        return None, ApiResponse(success=False, error="Entidad no encontrada")
+
+    return entity, None
+
+
+def _verify_alert_ownership(alert_id: int, project_id: int) -> tuple[Any, Optional[ApiResponse]]:
+    """
+    Verifica que una alerta existe y pertenece al proyecto especificado.
+
+    Args:
+        alert_id: ID de la alerta
+        project_id: ID del proyecto
+
+    Returns:
+        tuple (alert, error_response):
+        - Si es válida: (alert, None)
+        - Si hay error: (None, ApiResponse con error)
+    """
+    if not alert_repository:
+        return None, ApiResponse(success=False, error="Alert repository not initialized")
+
+    result = alert_repository.get(alert_id)
+    if result.is_failure:
+        return None, ApiResponse(success=False, error="Alerta no encontrada")
+
+    alert = result.value
+    if alert.project_id != project_id:
+        return None, ApiResponse(success=False, error="Alerta no encontrada")
+
+    return alert, None
 
 
 # ============================================================================
@@ -1860,13 +1964,12 @@ async def get_entity(project_id: int, entity_id: int):
         ApiResponse con los datos de la entidad
     """
     try:
-        entity_repo = entity_repository
         from narrative_assistant.persistence.chapter import get_chapter_repository
 
         # Verificar que la entidad existe y pertenece al proyecto
-        entity = entity_repo.get_entity(entity_id)
-        if not entity or entity.project_id != project_id:
-            return ApiResponse(success=False, error="Entidad no encontrada")
+        entity, error = _verify_entity_ownership(entity_id, project_id)
+        if error:
+            return error
 
         # Calcular first_mention_chapter desde first_appearance_char
         first_mention_chapter = None
@@ -1919,12 +2022,10 @@ async def update_entity(project_id: int, entity_id: int, request: Request):
     try:
         data = await request.json()
 
-        entity_repo = entity_repository
-
         # Verificar que la entidad existe y pertenece al proyecto
-        entity = entity_repo.get_entity(entity_id)
-        if not entity or entity.project_id != project_id:
-            return ApiResponse(success=False, error="Entidad no encontrada")
+        entity, error = _verify_entity_ownership(entity_id, project_id)
+        if error:
+            return error
 
         # Mapear campos del request a parámetros del repositorio
         canonical_name = data.get('name') or data.get('canonical_name')
@@ -1993,16 +2094,15 @@ async def delete_entity(project_id: int, entity_id: int, hard_delete: bool = Fal
         ApiResponse con resultado de la eliminación
     """
     try:
-        entity_repo = entity_repository
-
         # Verificar que la entidad existe y pertenece al proyecto
-        entity = entity_repo.get_entity(entity_id)
-        if not entity or entity.project_id != project_id:
-            return ApiResponse(success=False, error="Entidad no encontrada")
+        entity, error = _verify_entity_ownership(entity_id, project_id)
+        if error:
+            return error
 
         entity_name = entity.canonical_name
 
         # Eliminar o desactivar la entidad
+        entity_repo = entity_repository
         deleted = entity_repo.delete_entity(entity_id, hard_delete=hard_delete)
 
         if not deleted:
@@ -2044,14 +2144,13 @@ async def get_entity_timeline(project_id: int, entity_id: int):
         - mentionCount: Número de menciones en ese capítulo
     """
     try:
-        entity_repo = entity_repository
-
         # Verificar que la entidad existe y pertenece al proyecto
-        entity = entity_repo.get_entity(entity_id)
-        if not entity or entity.project_id != project_id:
-            return ApiResponse(success=False, error="Entidad no encontrada")
+        entity, error = _verify_entity_ownership(entity_id, project_id)
+        if error:
+            return error
 
         # Obtener menciones de la entidad
+        entity_repo = entity_repository
         mentions = entity_repo.get_mentions_by_entity(entity_id)
 
         if not mentions:
@@ -2196,11 +2295,129 @@ async def get_entity_mentions(project_id: int, entity_id: int):
             sample = mentions_data[:5]
             logger.info(f"Entity {entity_id}: Sample positions: {[(m['chapterId'], m['startChar'], m['endChar']) for m in sample]}")
 
-        # NO FILTRAR SOLAPAMIENTOS POR AHORA - devolver todas las menciones
-        # El filtrado de solapamientos estaba siendo demasiado agresivo
-        # TODO: Revisar lógica de solapamiento si hay duplicados reales
-        filtered_mentions = mentions_data
+        # Filtrar duplicados: menciones que se solapan
+        # Estrategia conservadora basada en discusión de expertos:
+        # 1. Límites duros: puntuación indica que hemos ido demasiado lejos
+        # 2. Artículo + sustantivo común no es parte del nombre
+        # 3. Preferir nombre más largo SOLO si es estructura válida de nombre
+        # 4. Preferir más larga solo si confianza >= 85% de la corta
+        import re
+
+        def has_invalid_extension(text: str) -> bool:
+            """Detecta si el texto contiene patrones inválidos para un nombre."""
+            # Puntuación que indica límite de nombre
+            if re.search(r'[,;:\.\!\?]', text):
+                return True
+            # Artículo + sustantivo común (aposición)
+            # "María la vecina", "Pedro el viejo"
+            if re.search(r'\s+(el|la|los|las)\s+[a-záéíóúñ]+$', text, re.IGNORECASE):
+                # Excepciones: partículas de apellido válidas
+                valid_particles = ['de la', 'del', 'de los', 'de las', 'de']
+                text_lower = text.lower()
+                if not any(f' {p} ' in text_lower or text_lower.endswith(f' {p}') for p in valid_particles):
+                    return True
+            return False
+
+        def is_valid_name_extension(short_text: str, long_text: str) -> bool:
+            """Verifica si la extensión del nombre corto al largo es válida."""
+            extension = long_text[len(short_text):].strip()
+            if not extension:
+                return True
+            # Partículas de apellido válidas
+            if re.match(r'^(de la|del|de los|de las|de)\s+[A-ZÁÉÍÓÚÑ]', extension):
+                return True
+            # Apellido simple (empieza con mayúscula, sin puntuación)
+            if re.match(r'^[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)?$', extension):
+                return True
+            return False
+
+        filtered_mentions = []
         removed_count = 0
+
+        for mention in mentions_data:
+            dominated = False
+            to_remove = None
+
+            for existing in filtered_mentions:
+                # Solo filtrar si están en el mismo capítulo
+                if existing["chapterId"] != mention["chapterId"]:
+                    continue
+
+                # Verificar solapamiento de posiciones
+                overlaps = not (
+                    mention["endChar"] <= existing["startChar"] or
+                    mention["startChar"] >= existing["endChar"]
+                )
+
+                # Deduplicar menciones con mismo texto muy cercanas (< 10 chars)
+                # Esto captura menciones duplicadas que no se solapan exactamente
+                same_text = existing["surfaceForm"].lower() == mention["surfaceForm"].lower()
+                distance = min(
+                    abs(mention["startChar"] - existing["endChar"]),
+                    abs(existing["startChar"] - mention["endChar"])
+                )
+                very_close = same_text and distance < 10
+
+                if very_close and not overlaps:
+                    # Son la misma mención con posiciones ligeramente diferentes
+                    dominated = True
+                    removed_count += 1
+                    break
+
+                if overlaps:
+                    # Determinar cuál es más larga y cuál más corta
+                    if len(mention["surfaceForm"]) > len(existing["surfaceForm"]):
+                        longer, shorter = mention, existing
+                        longer_is_new = True
+                    else:
+                        longer, shorter = existing, mention
+                        longer_is_new = False
+
+                    # Mismo texto (ignorando mayúsculas) → duplicado exacto
+                    if existing["surfaceForm"].lower() == mention["surfaceForm"].lower():
+                        dominated = True
+                        if mention["confidence"] > existing["confidence"]:
+                            to_remove = existing
+                        removed_count += 1
+                        break
+
+                    # Verificar si la extensión es válida
+                    longer_has_invalid = has_invalid_extension(longer["surfaceForm"])
+                    extension_valid = is_valid_name_extension(
+                        shorter["surfaceForm"], longer["surfaceForm"]
+                    )
+
+                    # Si la larga tiene patrones inválidos → preferir corta
+                    if longer_has_invalid or not extension_valid:
+                        if longer_is_new:
+                            dominated = True  # Descartar la nueva (larga)
+                        else:
+                            to_remove = existing  # Reemplazar existente (larga) por nueva (corta)
+                        removed_count += 1
+                        break
+
+                    # La larga es válida → verificar confianza (85% threshold)
+                    confidence_ok = longer["confidence"] >= shorter["confidence"] * 0.85
+                    if confidence_ok:
+                        # Preferir la más larga
+                        if longer_is_new:
+                            to_remove = existing
+                        else:
+                            dominated = True
+                    else:
+                        # Confianza insuficiente → preferir corta
+                        if longer_is_new:
+                            dominated = True
+                        else:
+                            to_remove = existing
+                    removed_count += 1
+                    break
+
+            if to_remove:
+                filtered_mentions.remove(to_remove)
+                filtered_mentions.append(mention)
+            elif not dominated:
+                filtered_mentions.append(mention)
 
         # Re-ordenar después de filtrar
         filtered_mentions.sort(key=lambda m: (m["chapterNumber"] or 0, m["startChar"]))
@@ -3025,6 +3242,7 @@ async def list_alerts(
                 created_at=a.created_at.isoformat() if hasattr(a.created_at, 'isoformat') else str(a.created_at),
                 updated_at=a.updated_at.isoformat() if hasattr(a, 'updated_at') and a.updated_at else None,
                 resolved_at=a.resolved_at.isoformat() if hasattr(a, 'resolved_at') and a.resolved_at else None,
+                extra_data=getattr(a, 'extra_data', None) or {},
             )
             for a in alerts
         ]
@@ -3034,101 +3252,99 @@ async def list_alerts(
         logger.error(f"Error listing alerts for project {project_id}: {e}", exc_info=True)
         return ApiResponse(success=False, error=str(e))
 
-@app.post("/api/projects/{project_id}/alerts/{alert_id}/resolve", response_model=ApiResponse)
-async def resolve_alert(project_id: int, alert_id: int):
+@app.patch("/api/projects/{project_id}/alerts/{alert_id}/status", response_model=ApiResponse)
+async def update_alert_status(project_id: int, alert_id: int, request: Request):
     """
-    Marca una alerta como resuelta.
+    Actualiza el status de una alerta.
+
+    Args:
+        project_id: ID del proyecto
+        alert_id: ID de la alerta
+        request: Body con {"status": "resolved"|"dismissed"|"open"}
+
+    Returns:
+        ApiResponse confirmando el cambio
     """
     try:
-        alert_repo = alert_repository
-        result = alert_repo.get(alert_id)
+        data = await request.json()
+        new_status_str = data.get('status', '').lower()
 
-        if result.is_failure:
-            raise HTTPException(status_code=404, detail="Alerta no encontrada")
+        # Mapear status string a enum
+        status_map = {
+            'resolved': AlertStatus.RESOLVED,
+            'dismissed': AlertStatus.DISMISSED,
+            'open': AlertStatus.OPEN,
+            'active': AlertStatus.OPEN,  # alias
+            'reopen': AlertStatus.OPEN,  # alias
+        }
 
-        alert = result.value
-        if alert.project_id != project_id:
-            raise HTTPException(status_code=404, detail="Alerta no encontrada")
+        if new_status_str not in status_map:
+            return ApiResponse(
+                success=False,
+                error=f"Status inválido: {new_status_str}. Valores válidos: resolved, dismissed, open"
+            )
 
-        # Actualizar el status de la alerta
-        alert.status = AlertStatus.RESOLVED
-        alert_repo.update(alert)
+        # Verificar que la alerta existe y pertenece al proyecto
+        alert, error = _verify_alert_ownership(alert_id, project_id)
+        if error:
+            return error
 
-        logger.info(f"Alert {alert_id} marked as resolved")
+        # Actualizar el status
+        alert.status = status_map[new_status_str]
+        alert_repository.update(alert)
+
+        status_messages = {
+            'resolved': 'Alerta marcada como resuelta',
+            'dismissed': 'Alerta descartada',
+            'open': 'Alerta reabierta',
+            'active': 'Alerta reabierta',
+            'reopen': 'Alerta reabierta',
+        }
+
+        logger.info(f"Alert {alert_id} status changed to {new_status_str}")
 
         return ApiResponse(
             success=True,
-            message="Alerta marcada como resuelta"
+            data={"id": alert_id, "status": new_status_str},
+            message=status_messages[new_status_str]
         )
-    except HTTPException:
-        raise
     except Exception as e:
-        logger.error(f"Error resolving alert {alert_id}: {e}", exc_info=True)
+        logger.error(f"Error updating alert {alert_id} status: {e}", exc_info=True)
         return ApiResponse(success=False, error=str(e))
+
+
+# Endpoints legacy para compatibilidad (redirigen al nuevo endpoint unificado)
+@app.post("/api/projects/{project_id}/alerts/{alert_id}/resolve", response_model=ApiResponse)
+async def resolve_alert(project_id: int, alert_id: int):
+    """Marca una alerta como resuelta. [DEPRECATED: usar PATCH /status]"""
+    alert, error = _verify_alert_ownership(alert_id, project_id)
+    if error:
+        return error
+    alert.status = AlertStatus.RESOLVED
+    alert_repository.update(alert)
+    return ApiResponse(success=True, message="Alerta marcada como resuelta")
+
 
 @app.post("/api/projects/{project_id}/alerts/{alert_id}/dismiss", response_model=ApiResponse)
 async def dismiss_alert(project_id: int, alert_id: int):
-    """
-    Descarta una alerta.
-    """
-    try:
-        alert_repo = alert_repository
-        result = alert_repo.get(alert_id)
+    """Descarta una alerta. [DEPRECATED: usar PATCH /status]"""
+    alert, error = _verify_alert_ownership(alert_id, project_id)
+    if error:
+        return error
+    alert.status = AlertStatus.DISMISSED
+    alert_repository.update(alert)
+    return ApiResponse(success=True, message="Alerta descartada")
 
-        if result.is_failure:
-            raise HTTPException(status_code=404, detail="Alerta no encontrada")
-
-        alert = result.value
-        if alert.project_id != project_id:
-            raise HTTPException(status_code=404, detail="Alerta no encontrada")
-
-        # Actualizar el status de la alerta
-        alert.status = AlertStatus.DISMISSED
-        alert_repo.update(alert)
-
-        logger.info(f"Alert {alert_id} dismissed")
-
-        return ApiResponse(
-            success=True,
-            message="Alerta descartada"
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error dismissing alert {alert_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
 
 @app.post("/api/projects/{project_id}/alerts/{alert_id}/reopen", response_model=ApiResponse)
 async def reopen_alert(project_id: int, alert_id: int):
-    """
-    Reabre una alerta previamente resuelta o descartada.
-    """
-    try:
-        alert_repo = alert_repository
-        result = alert_repo.get(alert_id)
-
-        if result.is_failure:
-            raise HTTPException(status_code=404, detail="Alerta no encontrada")
-
-        alert = result.value
-        if alert.project_id != project_id:
-            raise HTTPException(status_code=404, detail="Alerta no encontrada")
-
-        # Actualizar el status de la alerta
-        alert.status = AlertStatus.OPEN
-        alert_repo.update(alert)
-
-        logger.info(f"Alert {alert_id} reopened")
-
-        return ApiResponse(
-            success=True,
-            message="Alerta reabierta"
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error reopening alert {alert_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+    """Reabre una alerta. [DEPRECATED: usar PATCH /status]"""
+    alert, error = _verify_alert_ownership(alert_id, project_id)
+    if error:
+        return error
+    alert.status = AlertStatus.OPEN
+    alert_repository.update(alert)
+    return ApiResponse(success=True, message="Alerta reabierta")
 
 @app.post("/api/projects/{project_id}/alerts/resolve-all", response_model=ApiResponse)
 async def resolve_all_alerts(project_id: int):
@@ -4368,6 +4584,14 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
 
                     logger.info(f"NER: {len(raw_entities)} menciones totales, {len(entity_mentions)} entidades únicas")
 
+                    # Recolectar todos los nombres canónicos para evitar conflictos de aliases
+                    all_canonical_names = set()
+                    for key, mentions_list in entity_mentions.items():
+                        first_mention = mentions_list[0]
+                        best_mentions = [m for m in mentions_list if m.label == EntityLabel.PER]
+                        canonical_text = best_mentions[0].text if best_mentions else first_mention.text
+                        all_canonical_names.add(canonical_text)
+
                     # Crear entidades únicas con conteo de menciones
                     total_entities_to_create = len(entity_mentions)
                     entities_created = 0
@@ -4404,12 +4628,20 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                         best_mentions = [m for m in mentions_list if m.label == best_label]
                         canonical_text = best_mentions[0].text if best_mentions else first_mention.text
 
+                        # Generar aliases automáticos para personajes con nombres compuestos
+                        entity_type = label_to_type.get(best_label, EntityType.CONCEPT)
+                        auto_aliases = []
+                        if entity_type == EntityType.CHARACTER:
+                            auto_aliases = generate_person_aliases(canonical_text, all_canonical_names)
+                            if auto_aliases:
+                                logger.debug(f"Generated aliases for '{canonical_text}': {auto_aliases}")
+
                         # Crear objeto Entity
                         entity = Entity(
                             project_id=project_id,
-                            entity_type=label_to_type.get(best_label, EntityType.CONCEPT),
+                            entity_type=entity_type,
                             canonical_name=canonical_text,  # Usar texto de mejor mención
-                            aliases=[],
+                            aliases=auto_aliases,
                             importance=importance,
                             description=None,
                             first_appearance_char=first_appearance,
@@ -4899,6 +5131,75 @@ JSON:"""
                         f"{len(entities)} entidades activas"
                     )
 
+                    # ========== BUSCAR MENCIONES ADICIONALES ==========
+                    # Después de NER y fusión, buscar menciones adicionales
+                    # de nombres conocidos que el NER pudo haber pasado por alto
+                    try:
+                        from narrative_assistant.nlp.mention_finder import get_mention_finder
+
+                        mention_finder = get_mention_finder()
+                        analysis_progress_storage[project_id]["current_action"] = "Buscando menciones adicionales..."
+
+                        # Recopilar nombres y aliases de entidades
+                        entity_names = [e.canonical_name for e in entities if e.canonical_name]
+                        aliases_dict = {}
+                        for e in entities:
+                            if e.canonical_name and e.aliases:
+                                aliases_dict[e.canonical_name] = e.aliases
+
+                        # Obtener posiciones ya detectadas por NER
+                        existing_positions = set()
+                        for entity in entities:
+                            mentions_db = entity_repo.get_mentions_by_entity(entity.id)
+                            for m in mentions_db:
+                                existing_positions.add((m.start_char, m.end_char))
+
+                        # Buscar menciones adicionales
+                        additional_mentions = mention_finder.find_all_mentions(
+                            text=full_text,
+                            entity_names=entity_names,
+                            aliases=aliases_dict,
+                            existing_positions=existing_positions,
+                        )
+
+                        # Agrupar menciones por entidad y guardar
+                        from narrative_assistant.entities.models import EntityMention as EM
+                        mentions_by_entity: dict[str, list] = {}
+                        for am in additional_mentions:
+                            if am.entity_name not in mentions_by_entity:
+                                mentions_by_entity[am.entity_name] = []
+                            mentions_by_entity[am.entity_name].append(am)
+
+                        additional_count = 0
+                        for entity in entities:
+                            name = entity.canonical_name
+                            if name in mentions_by_entity:
+                                new_mentions = mentions_by_entity[name]
+                                for am in new_mentions:
+                                    # Encontrar chapter_id
+                                    ch_id = find_chapter_id_for_position(am.start_char)
+                                    mention = EM(
+                                        entity_id=entity.id,
+                                        surface_form=am.surface_form,
+                                        start_char=am.start_char,
+                                        end_char=am.end_char,
+                                        chapter_id=ch_id,
+                                        confidence=am.confidence,
+                                        source="mention_finder",
+                                    )
+                                    try:
+                                        entity_repo.create_mention(mention)
+                                        additional_count += 1
+                                    except Exception as me:
+                                        pass  # Duplicado o error, ignorar
+
+                        if additional_count > 0:
+                            logger.info(f"MentionFinder: Added {additional_count} additional mentions")
+                            analysis_progress_storage[project_id]["current_action"] = f"Encontradas {additional_count} menciones adicionales"
+
+                    except Exception as mf_err:
+                        logger.warning(f"MentionFinder failed (non-critical): {mf_err}")
+
                     # ========== RECALCULAR IMPORTANCIA FINAL ==========
                     # La importancia se calcula DESPUÉS de fusiones y correferencias
                     # basada en el conteo final de menciones en la BD
@@ -5083,9 +5384,37 @@ JSON:"""
                             # Ej: "Ella.hair_color = rubio" -> "María.hair_color = rubio"
                             extracted_attrs = attr_result.value.attributes
 
+                            # ========== ASIGNAR CAPÍTULO A CADA ATRIBUTO ==========
+                            # Esto es CRÍTICO para detectar inconsistencias entre capítulos
+                            # (ej: "ojos azules" en cap 1 vs "ojos verdes" en cap 2)
+                            if chapters_data:
+                                def find_chapter_number_for_position(char_pos: int) -> int | None:
+                                    """Encuentra el número de capítulo que contiene la posición."""
+                                    for ch in chapters_data:
+                                        if ch["start_char"] <= char_pos <= ch["end_char"]:
+                                            return ch["chapter_number"]
+                                    return None
+
+                                attrs_with_chapter = 0
+                                for attr in extracted_attrs:
+                                    if attr.start_char is not None and attr.start_char > 0:
+                                        chapter_num = find_chapter_number_for_position(attr.start_char)
+                                        if chapter_num is not None:
+                                            attr.chapter_id = chapter_num
+                                            attrs_with_chapter += 1
+
+                                logger.info(f"Asignados capítulos a {attrs_with_chapter}/{len(extracted_attrs)} atributos")
+
                             if coref_result and coref_result.chains:
                                 try:
                                     from narrative_assistant.nlp.attributes import resolve_attributes_with_coreferences
+
+                                    # Contar atributos con pronombres antes de resolver
+                                    pronouns = {"él", "ella", "ellos", "ellas", "su", "sus", "este", "esta", "ese", "esa"}
+                                    pronoun_attrs_before = sum(
+                                        1 for a in extracted_attrs
+                                        if a.entity_name and a.entity_name.lower() in pronouns
+                                    )
 
                                     resolved_attrs = resolve_attributes_with_coreferences(
                                         attributes=extracted_attrs,
@@ -5093,13 +5422,29 @@ JSON:"""
                                         text=full_text,
                                     )
 
-                                    resolved_count = len(resolved_attrs) - len(extracted_attrs)
+                                    # Contar atributos con pronombres después de resolver
+                                    pronoun_attrs_after = sum(
+                                        1 for a in resolved_attrs
+                                        if a.entity_name and a.entity_name.lower() in pronouns
+                                    )
+
+                                    resolved_count = pronoun_attrs_before - pronoun_attrs_after
                                     if resolved_count > 0:
-                                        logger.info(f"Resolución de atributos: {resolved_count} atributos de pronombres resueltos")
+                                        logger.info(
+                                            f"Correferencia de atributos: {resolved_count} atributos de pronombres "
+                                            f"resueltos a entidades ({pronoun_attrs_before} → {pronoun_attrs_after} sin resolver)"
+                                        )
+                                    elif pronoun_attrs_before > 0:
+                                        logger.warning(
+                                            f"Correferencia de atributos: {pronoun_attrs_before} atributos con pronombres "
+                                            f"no pudieron resolverse (sin antecedente en cadenas de correferencia)"
+                                        )
 
                                     extracted_attrs = resolved_attrs
                                 except Exception as e:
-                                    logger.warning(f"Error resolviendo atributos con correferencias: {e}")
+                                    logger.warning(f"Error resolviendo atributos con correferencias: {e}", exc_info=True)
+                            else:
+                                logger.info("Sin cadenas de correferencia - atributos de pronombres no se resolverán")
 
                             total_attrs = len(extracted_attrs)
                             attrs_processed = 0
@@ -5219,15 +5564,44 @@ JSON:"""
                 except Exception as e:
                     logger.warning(f"Error in grammar analysis: {e}")
 
+                # --- ANÁLISIS DE CORRECCIONES EDITORIALES ---
+                # Tipografía, repeticiones, concordancia
+                correction_issues = []
+                try:
+                    analysis_progress_storage[project_id]["current_phase"] = "Buscando repeticiones y errores tipográficos..."
+
+                    from narrative_assistant.corrections import CorrectionConfig
+                    from narrative_assistant.corrections.orchestrator import CorrectionOrchestrator
+
+                    # Usar configuración por defecto (configurable en futuro)
+                    correction_config = CorrectionConfig.default()
+                    orchestrator = CorrectionOrchestrator(config=correction_config)
+
+                    # Analizar el texto completo
+                    # Nota: spacy_doc puede pasarse para mejorar detección
+                    correction_issues = orchestrator.analyze(
+                        text=full_text,
+                        chapter_index=None,
+                        spacy_doc=None,  # TODO: pasar doc de spaCy si está disponible
+                    )
+
+                    logger.info(f"Corrections analysis found {len(correction_issues)} suggestions")
+
+                except ImportError as e:
+                    logger.warning(f"Corrections module not available: {e}")
+                except Exception as e:
+                    logger.warning(f"Error in corrections analysis: {e}")
+
                 phase_durations["grammar"] = time.time() - phase_start_times["grammar"]
                 analysis_progress_storage[project_id]["progress"] = grammar_pct_end
                 analysis_progress_storage[project_id]["metrics"]["grammar_issues_found"] = len(grammar_issues)
+                analysis_progress_storage[project_id]["metrics"]["correction_suggestions"] = len(correction_issues)
                 phases[6]["completed"] = True
                 phases[6]["current"] = False
                 phases[6]["duration"] = round(phase_durations["grammar"], 1)
                 update_time_remaining()
 
-                logger.info(f"Grammar analysis complete: {len(grammar_issues)} grammar issues")
+                logger.info(f"Grammar analysis complete: {len(grammar_issues)} grammar issues, {len(correction_issues)} correction suggestions")
                 check_cancelled()  # Verificar cancelación
 
                 # ========== FASE 7: ALERTAS ==========
@@ -5291,6 +5665,30 @@ JSON:"""
                         except Exception as e:
                             logger.warning(f"Error creating grammar alert: {e}")
 
+                # Alertas de correcciones editoriales (tipografía, repeticiones, concordancia)
+                if correction_issues:
+                    for issue in correction_issues:
+                        try:
+                            alert_result = alert_engine.create_from_correction_issue(
+                                project_id=project_id,
+                                category=issue.category,
+                                issue_type=issue.issue_type,
+                                text=issue.text,
+                                start_char=issue.start_char,
+                                end_char=issue.end_char,
+                                explanation=issue.explanation,
+                                suggestion=issue.suggestion,
+                                confidence=issue.confidence,
+                                context=issue.context,
+                                chapter=issue.chapter_index,
+                                rule_id=issue.rule_id or "",
+                                extra_data=issue.extra_data,
+                            )
+                            if alert_result.is_success:
+                                alerts_created += 1
+                        except Exception as e:
+                            logger.warning(f"Error creating correction alert: {e}")
+
                 phase_durations["alerts"] = time.time() - phase_start_times["alerts"]
                 analysis_progress_storage[project_id]["progress"] = 100
                 analysis_progress_storage[project_id]["metrics"]["alerts_generated"] = alerts_created
@@ -5305,6 +5703,19 @@ JSON:"""
 
                 total_duration = round(time.time() - start_time, 1)
                 analysis_progress_storage[project_id]["metrics"]["total_duration_seconds"] = total_duration
+
+                # Preparar stats para el frontend (UI-friendly names)
+                metrics = analysis_progress_storage[project_id]["metrics"]
+                analysis_progress_storage[project_id]["stats"] = {
+                    "entities": metrics.get("entities_found", len(entities)),
+                    "alerts": metrics.get("alerts_generated", alerts_created),
+                    "chapters": metrics.get("chapters_found", chapters_count),
+                    "corrections": metrics.get("correction_suggestions", 0),
+                    "grammar": metrics.get("grammar_issues_found", 0),
+                    "attributes": metrics.get("attributes_extracted", len(attributes)),
+                    "words": metrics.get("word_count", word_count),
+                    "duration": total_duration,
+                }
 
                 # Actualizar proyecto en BD
                 project.analysis_status = "completed"
@@ -7125,6 +7536,149 @@ async def preview_document_export(
         return ApiResponse(success=False, error=str(e))
 
 
+@app.get("/api/projects/{project_id}/export/corrected")
+async def export_corrected_document(
+    project_id: int,
+    min_confidence: float = 0.5,
+    categories: Optional[str] = None,
+    as_track_changes: bool = True,
+):
+    """
+    Exporta el documento original con correcciones como Track Changes.
+
+    A diferencia de /export/document que genera un informe, este endpoint
+    devuelve el documento original con las correcciones aplicadas como
+    revisiones de Word que el autor puede aceptar/rechazar.
+
+    Args:
+        project_id: ID del proyecto
+        min_confidence: Confianza mínima para incluir correcciones (0.0-1.0)
+        categories: Categorías a incluir (separadas por coma), None = todas
+        as_track_changes: Si True, aplica como Track Changes; si False, aplica directamente
+
+    Returns:
+        Archivo DOCX con correcciones aplicadas
+    """
+    from fastapi.responses import Response
+
+    try:
+        if not project_manager:
+            return ApiResponse(success=False, error="Project manager not initialized")
+
+        # Obtener proyecto
+        result = project_manager.get(project_id)
+        if result.is_failure:
+            return ApiResponse(success=False, error=f"Proyecto {project_id} no encontrado")
+        project = result.value
+
+        # Verificar que es un documento Word
+        if not project.source_path:
+            return ApiResponse(
+                success=False,
+                error="El proyecto no tiene documento fuente asociado"
+            )
+
+        source_path = Path(project.source_path)
+        if not source_path.exists():
+            return ApiResponse(
+                success=False,
+                error=f"El documento fuente no existe: {source_path}"
+            )
+
+        if source_path.suffix.lower() != ".docx":
+            return ApiResponse(
+                success=False,
+                error="Solo se admiten archivos .docx para exportación con Track Changes"
+            )
+
+        # Importar exportador
+        try:
+            from narrative_assistant.exporters.corrected_document_exporter import (
+                CorrectedDocumentExporter,
+                TrackChangeOptions,
+            )
+            from narrative_assistant.corrections.base import CorrectionIssue
+        except ImportError as e:
+            logger.error(f"Corrected document exporter not available: {e}")
+            return ApiResponse(
+                success=False,
+                error="Módulo de exportación de correcciones no disponible"
+            )
+
+        # Obtener correcciones del proyecto
+        corrections = []
+
+        # Buscar correcciones almacenadas en alertas
+        if alert_repository:
+            alerts = alert_repository.get_by_project(project_id)
+            correction_categories = {
+                "typography", "repetition", "agreement", "terminology",
+                "regional", "clarity", "grammar"
+            }
+
+            for alert in alerts:
+                # Solo incluir alertas de corrección con sugerencia
+                if alert.category.value.lower() in correction_categories and alert.suggestion:
+                    corrections.append(CorrectionIssue(
+                        category=alert.category.value.lower(),
+                        issue_type=alert.alert_type or "unknown",
+                        start_char=alert.start_char or 0,
+                        end_char=alert.end_char or 0,
+                        text=alert.excerpt or "",
+                        explanation=alert.description,
+                        suggestion=alert.suggestion,
+                        confidence=alert.confidence,
+                        context=alert.excerpt or "",
+                        chapter_index=alert.chapter,
+                        rule_id=None,
+                        extra_data={},
+                    ))
+
+        if not corrections:
+            return ApiResponse(
+                success=False,
+                error="No hay correcciones para aplicar. Ejecute primero el análisis de correcciones."
+            )
+
+        # Parsear categorías
+        category_list = None
+        if categories:
+            category_list = [c.strip().lower() for c in categories.split(",")]
+
+        # Configurar opciones
+        options = TrackChangeOptions(
+            author="Narrative Assistant",
+            include_comments=True,
+            min_confidence=min_confidence,
+            categories=category_list,
+            as_track_changes=as_track_changes,
+        )
+
+        # Exportar
+        exporter = CorrectedDocumentExporter()
+        result = exporter.export(source_path, corrections, options)
+
+        if result.is_failure:
+            return ApiResponse(success=False, error=str(result.error))
+
+        # Generar nombre de archivo
+        safe_name = source_path.stem
+        filename = f"{safe_name}_corregido.docx"
+
+        # Devolver archivo
+        return Response(
+            content=result.value,
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={
+                "Content-Disposition": f"attachment; filename=\"{filename}\""
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Error exporting corrected document for project {project_id}: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
 # ============================================================================
 # Licensing Endpoints
 # ============================================================================
@@ -8052,6 +8606,1054 @@ en el contexto proporcionado, indícalo claramente.
         raise
     except Exception as e:
         logger.error(f"Error in chat endpoint: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+# ============================================================================
+# Correction Configuration Endpoints
+# ============================================================================
+
+@app.get("/api/correction-presets", response_model=ApiResponse)
+async def get_correction_presets() -> ApiResponse:
+    """
+    Obtiene los presets de configuración de corrección disponibles.
+
+    Retorna una lista de presets con su nombre, descripción y configuración.
+    """
+    try:
+        from narrative_assistant.corrections.config import (
+            CorrectionConfig,
+            DocumentField,
+            RegisterLevel,
+            AudienceType,
+        )
+
+        presets = [
+            {
+                "id": "default",
+                "name": "Por defecto",
+                "description": "Configuración estándar para documentos generales",
+                "config": CorrectionConfig.default().to_dict(),
+            },
+            {
+                "id": "novel",
+                "name": "Novela literaria",
+                "description": "Optimizado para ficción: diálogos, estilo cuidado, repeticiones estrictas",
+                "config": CorrectionConfig.for_novel().to_dict(),
+            },
+            {
+                "id": "technical",
+                "name": "Manual técnico",
+                "description": "Permite repetición técnica, vocabulario especializado",
+                "config": CorrectionConfig.for_technical().to_dict(),
+            },
+            {
+                "id": "legal",
+                "name": "Texto jurídico",
+                "description": "Muy permisivo con repeticiones, terminología legal permitida",
+                "config": CorrectionConfig.for_legal().to_dict(),
+            },
+            {
+                "id": "medical",
+                "name": "Texto médico",
+                "description": "Terminología médica permitida, registro formal",
+                "config": CorrectionConfig.for_medical().to_dict(),
+            },
+            {
+                "id": "journalism",
+                "name": "Periodismo",
+                "description": "Equilibrado, sugiere alternativas accesibles",
+                "config": CorrectionConfig.for_journalism().to_dict(),
+            },
+            {
+                "id": "selfhelp",
+                "name": "Autoayuda",
+                "description": "Registro coloquial, cercano al lector",
+                "config": CorrectionConfig.for_selfhelp().to_dict(),
+            },
+        ]
+
+        # También incluir opciones de configuración
+        options = {
+            "document_fields": [
+                {"value": f.value, "label": _field_label(f)} for f in DocumentField
+            ],
+            "register_levels": [
+                {"value": r.value, "label": _register_label(r)} for r in RegisterLevel
+            ],
+            "audience_types": [
+                {"value": a.value, "label": _audience_label(a)} for a in AudienceType
+            ],
+            "regions": [
+                {"value": "es_ES", "label": "España"},
+                {"value": "es_MX", "label": "México"},
+                {"value": "es_AR", "label": "Argentina"},
+                {"value": "es_CO", "label": "Colombia"},
+                {"value": "es_CL", "label": "Chile"},
+                {"value": "es_PE", "label": "Perú"},
+            ],
+            "quote_styles": [
+                {"value": "angular", "label": "Angulares «»"},
+                {"value": "curly", "label": "Tipográficas """},
+                {"value": "straight", "label": "Rectas \"\""},
+            ],
+            "dialogue_dashes": [
+                {"value": "em", "label": "Raya (—)"},
+                {"value": "en", "label": "Semiraya (–)"},
+                {"value": "hyphen", "label": "Guion (-)"},
+            ],
+            "sensitivity_levels": [
+                {"value": "low", "label": "Baja"},
+                {"value": "medium", "label": "Media"},
+                {"value": "high", "label": "Alta"},
+            ],
+        }
+
+        return ApiResponse(
+            success=True,
+            data={
+                "presets": presets,
+                "options": options,
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Error getting correction presets: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+def _field_label(field) -> str:
+    """Etiqueta legible para campo de documento."""
+    from narrative_assistant.corrections.config import DocumentField
+    labels = {
+        DocumentField.GENERAL: "General",
+        DocumentField.LITERARY: "Literario (novela, cuento)",
+        DocumentField.JOURNALISTIC: "Periodístico",
+        DocumentField.ACADEMIC: "Académico (ensayo, tesis)",
+        DocumentField.TECHNICAL: "Técnico/Informático",
+        DocumentField.LEGAL: "Jurídico",
+        DocumentField.MEDICAL: "Médico/Científico",
+        DocumentField.BUSINESS: "Empresarial",
+        DocumentField.SELFHELP: "Autoayuda",
+        DocumentField.CULINARY: "Gastronomía",
+    }
+    return labels.get(field, field.value)
+
+
+def _register_label(register) -> str:
+    """Etiqueta legible para nivel de registro."""
+    from narrative_assistant.corrections.config import RegisterLevel
+    labels = {
+        RegisterLevel.FORMAL: "Formal/Académico",
+        RegisterLevel.NEUTRAL: "Neutro/Estándar",
+        RegisterLevel.COLLOQUIAL: "Coloquial/Informal",
+        RegisterLevel.VULGAR: "Vulgar (intencional)",
+    }
+    return labels.get(register, register.value)
+
+
+def _audience_label(audience) -> str:
+    """Etiqueta legible para tipo de audiencia."""
+    from narrative_assistant.corrections.config import AudienceType
+    labels = {
+        AudienceType.GENERAL: "Público general",
+        AudienceType.CHILDREN: "Infantil/Juvenil",
+        AudienceType.ADULT: "Adultos",
+        AudienceType.SPECIALIST: "Especialistas",
+        AudienceType.MIXED: "Mixta",
+    }
+    return labels.get(audience, audience.value)
+
+
+@app.get("/api/projects/{project_id}/correction-config", response_model=ApiResponse)
+async def get_project_correction_config(project_id: str) -> ApiResponse:
+    """
+    Obtiene la configuración de corrección para un proyecto.
+
+    Si el proyecto no tiene configuración personalizada, retorna la por defecto.
+    """
+    try:
+        result = project_manager.get(int(project_id))
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail="Project not found")
+        project = result.value
+
+        from narrative_assistant.corrections.config import CorrectionConfig
+
+        # Cargar configuración desde settings del proyecto
+        logger.info(f"Loading correction config for project {project_id}: settings has {len(project.settings)} keys")
+        config_data = project.settings.get("correction_config")
+        has_custom = config_data is not None
+        logger.info(f"Has custom config: {has_custom}")
+
+        if config_data:
+            config = CorrectionConfig.from_dict(config_data)
+        else:
+            # Usar preset por defecto
+            config = CorrectionConfig.default()
+
+        # Obtener preset seleccionado
+        selected_preset = project.settings.get("correction_preset", "default")
+        logger.info(f"Loaded correction config with preset: {selected_preset}")
+
+        return ApiResponse(
+            success=True,
+            data={
+                "config": config.to_dict(),
+                "hasCustomConfig": has_custom,
+                "selectedPreset": selected_preset,
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting correction config: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+class CorrectionConfigUpdate(BaseModel):
+    """Modelo para actualizar configuración de corrección."""
+    config: dict
+    selectedPreset: Optional[str] = None
+
+
+@app.put("/api/projects/{project_id}/correction-config", response_model=ApiResponse)
+async def update_project_correction_config(
+    project_id: str,
+    update: CorrectionConfigUpdate,
+) -> ApiResponse:
+    """
+    Actualiza la configuración de corrección de un proyecto.
+    """
+    try:
+        result = project_manager.get(int(project_id))
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail="Project not found")
+        project = result.value
+
+        from narrative_assistant.corrections.config import CorrectionConfig
+
+        # Validar la configuración
+        try:
+            config = CorrectionConfig.from_dict(update.config)
+        except Exception as e:
+            return ApiResponse(
+                success=False,
+                error=f"Configuración inválida: {str(e)}"
+            )
+
+        # Guardar configuración en settings del proyecto
+        project.settings["correction_config"] = config.to_dict()
+        project.settings["correction_preset"] = update.selectedPreset
+        logger.info(f"Saving correction config for project {project_id}: preset={update.selectedPreset}, settings has {len(project.settings)} keys")
+        update_result = project_manager.update(project)
+        if update_result.is_failure:
+            logger.error(f"Failed to update project {project_id}: {update_result.errors}")
+            return ApiResponse(success=False, error="Error al guardar configuración")
+
+        logger.info(f"Successfully updated correction config for project {project_id}")
+
+        return ApiResponse(
+            success=True,
+            data={
+                "config": config.to_dict(),
+                "message": "Configuración guardada correctamente",
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating correction config: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.post("/api/projects/{project_id}/correction-config/apply-preset", response_model=ApiResponse)
+async def apply_correction_preset(
+    project_id: str,
+    preset_id: str = Query(..., description="ID del preset a aplicar"),
+) -> ApiResponse:
+    """
+    Aplica un preset de configuración a un proyecto.
+    """
+    try:
+        result = project_manager.get(int(project_id))
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail="Project not found")
+        project = result.value
+
+        from narrative_assistant.corrections.config import CorrectionConfig
+
+        # Obtener el preset
+        presets = {
+            "default": CorrectionConfig.default,
+            "novel": CorrectionConfig.for_novel,
+            "technical": CorrectionConfig.for_technical,
+            "legal": CorrectionConfig.for_legal,
+            "medical": CorrectionConfig.for_medical,
+            "journalism": CorrectionConfig.for_journalism,
+            "selfhelp": CorrectionConfig.for_selfhelp,
+        }
+
+        if preset_id not in presets:
+            return ApiResponse(
+                success=False,
+                error=f"Preset '{preset_id}' no encontrado"
+            )
+
+        config = presets[preset_id]()
+
+        # Guardar configuración en settings del proyecto
+        project.settings["correction_config"] = config.to_dict()
+        project.settings["correction_preset"] = preset_id
+        update_result = project_manager.update(project)
+        if update_result.is_failure:
+            return ApiResponse(success=False, error="Error al guardar configuración")
+
+        logger.info(f"Applied preset '{preset_id}' to project {project_id}")
+
+        return ApiResponse(
+            success=True,
+            data={
+                "config": config.to_dict(),
+                "preset": preset_id,
+                "message": f"Preset '{preset_id}' aplicado correctamente",
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error applying preset: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.delete("/api/projects/{project_id}/correction-config", response_model=ApiResponse)
+async def reset_project_correction_config(project_id: str) -> ApiResponse:
+    """
+    Elimina la configuración personalizada y vuelve a la por defecto.
+    """
+    try:
+        result = project_manager.get(int(project_id))
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail="Project not found")
+        project = result.value
+
+        from narrative_assistant.corrections.config import CorrectionConfig
+
+        # Eliminar configuración de settings del proyecto
+        needs_update = False
+        if "correction_config" in project.settings:
+            del project.settings["correction_config"]
+            needs_update = True
+        if "correction_preset" in project.settings:
+            del project.settings["correction_preset"]
+            needs_update = True
+
+        if needs_update:
+            update_result = project_manager.update(project)
+            if update_result.is_failure:
+                return ApiResponse(success=False, error="Error al guardar configuración")
+            logger.info(f"Deleted custom correction config for project {project_id}")
+
+        return ApiResponse(
+            success=True,
+            data={
+                "config": CorrectionConfig.default().to_dict(),
+                "message": "Configuración restaurada a valores por defecto",
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error resetting correction config: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.post("/api/projects/{project_id}/correction-config/detect", response_model=ApiResponse)
+async def detect_document_profile(project_id: str) -> ApiResponse:
+    """
+    Analiza el documento y sugiere un perfil de configuración.
+
+    Detecta automáticamente:
+    - Tipo de documento (literario, técnico, jurídico, etc.)
+    - Nivel de registro (formal, coloquial)
+    - Variante regional predominante
+    - Presencia de diálogos
+    """
+    try:
+        result = project_manager.get(int(project_id))
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail="Project not found")
+        project = result.value
+
+        from narrative_assistant.corrections.config import (
+            CorrectionConfig,
+            DocumentField,
+            RegisterLevel,
+            AudienceType,
+        )
+        from narrative_assistant.corrections.detectors.regional import RegionalDetector
+        from narrative_assistant.corrections.detectors.field_terminology import BUILTIN_FIELD_TERMS
+
+        # Obtener texto del documento (primeros capítulos)
+        chapters = chapter_repository.get_by_project(int(project_id)) if chapter_repository else []
+        if not chapters:
+            return ApiResponse(
+                success=True,
+                data={
+                    "detected": False,
+                    "reason": "No hay capítulos analizados",
+                    "suggested_preset": "default",
+                }
+            )
+
+        # Tomar muestra de texto (primeros 3 capítulos o 50000 chars)
+        sample_text = ""
+        for chapter in chapters[:3]:
+            sample_text += (chapter.content or "") + "\n\n"
+            if len(sample_text) > 50000:
+                break
+        sample_text = sample_text[:50000].lower()
+
+        # === Detección de características ===
+
+        # 1. Detectar diálogos (rayas, comillas con verbos de habla)
+        dialogue_indicators = [
+            "—", "–",  # Rayas de diálogo
+            "dijo", "preguntó", "respondió", "exclamó", "susurró",
+            "murmuró", "gritó", "contestó", "añadió", "explicó",
+        ]
+        dialogue_count = sum(sample_text.count(ind) for ind in dialogue_indicators)
+        has_dialogues = dialogue_count > 10
+
+        # 2. Detectar registro (formal vs coloquial)
+        formal_indicators = [
+            "asimismo", "no obstante", "cabe destacar", "en consecuencia",
+            "por consiguiente", "dicho lo cual", "en virtud de", "habida cuenta",
+        ]
+        colloquial_indicators = [
+            "vale", "tío", "mola", "guay", "flipar", "curro", "pasta",
+            "joder", "hostia", "coño", "gilipollas", "mierda",
+        ]
+        formal_count = sum(sample_text.count(ind) for ind in formal_indicators)
+        colloquial_count = sum(sample_text.count(ind) for ind in colloquial_indicators)
+
+        if formal_count > colloquial_count * 2:
+            detected_register = "formal"
+        elif colloquial_count > formal_count * 2:
+            detected_register = "colloquial"
+        else:
+            detected_register = "neutral"
+
+        # 3. Detectar campo/dominio por terminología
+        field_scores = {field: 0 for field in DocumentField}
+
+        for term, info in BUILTIN_FIELD_TERMS.items():
+            if term in sample_text:
+                field = info["field"]
+                field_scores[field] += sample_text.count(term)
+
+        # Detectar términos jurídicos específicos
+        legal_terms = ["demandante", "demandado", "sentencia", "recurso", "tribunal",
+                      "jurisprudencia", "ley", "artículo", "código", "contrato"]
+        for term in legal_terms:
+            if term in sample_text:
+                field_scores[DocumentField.LEGAL] += sample_text.count(term) * 2
+
+        # Detectar términos médicos específicos
+        medical_terms = ["paciente", "diagnóstico", "tratamiento", "síntoma",
+                        "enfermedad", "medicamento", "dosis", "clínico"]
+        for term in medical_terms:
+            if term in sample_text:
+                field_scores[DocumentField.MEDICAL] += sample_text.count(term) * 2
+
+        # Detectar términos técnicos/informáticos
+        tech_terms = ["código", "programa", "sistema", "datos", "servidor",
+                     "aplicación", "usuario", "interfaz", "algoritmo"]
+        for term in tech_terms:
+            if term in sample_text:
+                field_scores[DocumentField.TECHNICAL] += sample_text.count(term)
+
+        # El campo con mayor puntuación
+        max_field = max(field_scores.keys(), key=lambda f: field_scores[f])
+        max_score = field_scores[max_field]
+
+        # Si tiene diálogos y no hay campo técnico dominante, es literario
+        if has_dialogues and max_score < 20:
+            detected_field = DocumentField.LITERARY
+        elif max_score > 15:
+            detected_field = max_field
+        else:
+            detected_field = DocumentField.GENERAL
+
+        # 4. Detectar variante regional
+        region_scores = {"es_ES": 0, "es_MX": 0, "es_AR": 0}
+
+        for term, info in RegionalDetector.BUILTIN_REGIONAL_TERMS.items():
+            if term in sample_text:
+                region = info["region"]
+                if region in region_scores:
+                    region_scores[region] += sample_text.count(term)
+
+        detected_region = max(region_scores.keys(), key=lambda r: region_scores[r])
+        if region_scores[detected_region] < 3:
+            detected_region = "es_ES"  # Default si no hay suficiente evidencia
+
+        # === Seleccionar preset recomendado ===
+        preset_map = {
+            DocumentField.LITERARY: "novel",
+            DocumentField.TECHNICAL: "technical",
+            DocumentField.LEGAL: "legal",
+            DocumentField.MEDICAL: "medical",
+            DocumentField.JOURNALISTIC: "journalism",
+            DocumentField.SELFHELP: "selfhelp",
+            DocumentField.ACADEMIC: "technical",  # Similar a técnico
+            DocumentField.BUSINESS: "technical",
+            DocumentField.GENERAL: "default",
+            DocumentField.CULINARY: "default",
+        }
+        suggested_preset = preset_map.get(detected_field, "default")
+
+        # Obtener la config del preset
+        preset_configs = {
+            "default": CorrectionConfig.default,
+            "novel": CorrectionConfig.for_novel,
+            "technical": CorrectionConfig.for_technical,
+            "legal": CorrectionConfig.for_legal,
+            "medical": CorrectionConfig.for_medical,
+            "journalism": CorrectionConfig.for_journalism,
+            "selfhelp": CorrectionConfig.for_selfhelp,
+        }
+        suggested_config = preset_configs[suggested_preset]()
+
+        # Ajustar la config según detección
+        config_dict = suggested_config.to_dict()
+        config_dict["profile"]["region"] = detected_region
+        config_dict["profile"]["register"] = detected_register
+        config_dict["regional"]["target_region"] = detected_region
+
+        # Construir explicación
+        detection_reasons = []
+        if has_dialogues:
+            detection_reasons.append(f"Diálogos detectados ({dialogue_count} indicadores)")
+        if detected_field != DocumentField.GENERAL:
+            detection_reasons.append(f"Terminología de {_field_label(detected_field).lower()}")
+        if detected_register != "neutral":
+            reg_label = "formal" if detected_register == "formal" else "coloquial"
+            detection_reasons.append(f"Registro {reg_label}")
+        if region_scores[detected_region] >= 3:
+            detection_reasons.append(f"Variante regional: {detected_region}")
+
+        return ApiResponse(
+            success=True,
+            data={
+                "detected": True,
+                "suggested_preset": suggested_preset,
+                "suggested_config": config_dict,
+                "detection": {
+                    "field": detected_field.value,
+                    "field_label": _field_label(detected_field),
+                    "register": detected_register,
+                    "region": detected_region,
+                    "has_dialogues": has_dialogues,
+                    "dialogue_count": dialogue_count,
+                    "field_scores": {f.value: s for f, s in field_scores.items() if s > 0},
+                    "region_scores": region_scores,
+                },
+                "reasons": detection_reasons,
+                "confidence": min(0.9, 0.5 + (max_score / 50) + (0.2 if has_dialogues else 0)),
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error detecting document profile: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+# ============================================================================
+# Glossary Endpoints
+# ============================================================================
+
+# Pydantic models for glossary
+class GlossaryEntryRequest(BaseModel):
+    """Request para crear/actualizar entrada de glosario"""
+    term: str = Field(..., min_length=1, max_length=200)
+    definition: str = Field(..., min_length=1)
+    variants: list[str] = []
+    category: str = "general"
+    subcategory: Optional[str] = None
+    context_notes: str = ""
+    related_terms: list[str] = []
+    usage_example: str = ""
+    is_technical: bool = False
+    is_invented: bool = False
+    is_proper_noun: bool = False
+    include_in_publication_glossary: bool = False
+
+
+class GlossaryEntryResponse(BaseModel):
+    """Respuesta con datos de una entrada de glosario"""
+    id: int
+    project_id: int
+    term: str
+    definition: str
+    variants: list[str]
+    category: str
+    subcategory: Optional[str]
+    context_notes: str
+    related_terms: list[str]
+    usage_example: str
+    is_technical: bool
+    is_invented: bool
+    is_proper_noun: bool
+    include_in_publication_glossary: bool
+    usage_count: int
+    first_chapter: Optional[int]
+    created_at: Optional[str]
+    updated_at: Optional[str]
+
+
+@app.get("/api/projects/{project_id}/glossary", response_model=ApiResponse)
+async def list_glossary_entries(
+    project_id: str,
+    category: Optional[str] = None,
+    only_technical: bool = False,
+    only_invented: bool = False,
+    only_for_publication: bool = False,
+) -> ApiResponse:
+    """
+    Lista todas las entradas del glosario de un proyecto.
+
+    Args:
+        project_id: ID del proyecto
+        category: Filtrar por categoría (personaje, lugar, objeto, concepto, técnico)
+        only_technical: Solo términos técnicos
+        only_invented: Solo términos inventados
+        only_for_publication: Solo para glosario de publicación
+    """
+    try:
+        result = project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail="Project not found")
+        project = result.value
+
+        from narrative_assistant.persistence.glossary import GlossaryRepository
+
+        repo = GlossaryRepository()
+        entries = repo.list_by_project(
+            project_id=int(project_id),
+            category=category,
+            only_technical=only_technical,
+            only_invented=only_invented,
+            only_for_publication=only_for_publication,
+        )
+
+        return ApiResponse(
+            success=True,
+            data={
+                "entries": [entry.to_dict() for entry in entries],
+                "total": len(entries),
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error listing glossary entries: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.post("/api/projects/{project_id}/glossary", response_model=ApiResponse)
+async def create_glossary_entry(
+    project_id: str,
+    request: GlossaryEntryRequest,
+) -> ApiResponse:
+    """
+    Crea una nueva entrada en el glosario.
+    """
+    try:
+        result = project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail="Project not found")
+        project = result.value
+
+        from narrative_assistant.persistence.glossary import GlossaryEntry, GlossaryRepository
+
+        repo = GlossaryRepository()
+
+        entry = GlossaryEntry(
+            project_id=int(project_id),
+            term=request.term,
+            definition=request.definition,
+            variants=request.variants,
+            category=request.category,
+            subcategory=request.subcategory,
+            context_notes=request.context_notes,
+            related_terms=request.related_terms,
+            usage_example=request.usage_example,
+            is_technical=request.is_technical,
+            is_invented=request.is_invented,
+            is_proper_noun=request.is_proper_noun,
+            include_in_publication_glossary=request.include_in_publication_glossary,
+        )
+
+        created = repo.create(entry)
+
+        return ApiResponse(
+            success=True,
+            data=created.to_dict(),
+            message=f"Término '{request.term}' añadido al glosario",
+        )
+
+    except ValueError as e:
+        # Término duplicado
+        return ApiResponse(success=False, error=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating glossary entry: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.get("/api/projects/{project_id}/glossary/{entry_id}", response_model=ApiResponse)
+async def get_glossary_entry(
+    project_id: str,
+    entry_id: int,
+) -> ApiResponse:
+    """
+    Obtiene una entrada específica del glosario.
+    """
+    try:
+        result = project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail="Project not found")
+        project = result.value
+
+        from narrative_assistant.persistence.glossary import GlossaryRepository
+
+        repo = GlossaryRepository()
+        entry = repo.get(entry_id)
+
+        if not entry or entry.project_id != int(project_id):
+            raise HTTPException(status_code=404, detail="Glossary entry not found")
+
+        return ApiResponse(success=True, data=entry.to_dict())
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting glossary entry: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.put("/api/projects/{project_id}/glossary/{entry_id}", response_model=ApiResponse)
+async def update_glossary_entry(
+    project_id: str,
+    entry_id: int,
+    request: GlossaryEntryRequest,
+) -> ApiResponse:
+    """
+    Actualiza una entrada existente del glosario.
+    """
+    try:
+        result = project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail="Project not found")
+        project = result.value
+
+        from narrative_assistant.persistence.glossary import GlossaryRepository
+
+        repo = GlossaryRepository()
+        existing = repo.get(entry_id)
+
+        if not existing or existing.project_id != int(project_id):
+            raise HTTPException(status_code=404, detail="Glossary entry not found")
+
+        # Actualizar campos
+        existing.term = request.term
+        existing.definition = request.definition
+        existing.variants = request.variants
+        existing.category = request.category
+        existing.subcategory = request.subcategory
+        existing.context_notes = request.context_notes
+        existing.related_terms = request.related_terms
+        existing.usage_example = request.usage_example
+        existing.is_technical = request.is_technical
+        existing.is_invented = request.is_invented
+        existing.is_proper_noun = request.is_proper_noun
+        existing.include_in_publication_glossary = request.include_in_publication_glossary
+
+        repo.update(existing)
+
+        return ApiResponse(
+            success=True,
+            data=existing.to_dict(),
+            message=f"Término '{request.term}' actualizado",
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating glossary entry: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.delete("/api/projects/{project_id}/glossary/{entry_id}", response_model=ApiResponse)
+async def delete_glossary_entry(
+    project_id: str,
+    entry_id: int,
+) -> ApiResponse:
+    """
+    Elimina una entrada del glosario.
+    """
+    try:
+        result = project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail="Project not found")
+        project = result.value
+
+        from narrative_assistant.persistence.glossary import GlossaryRepository
+
+        repo = GlossaryRepository()
+        existing = repo.get(entry_id)
+
+        if not existing or existing.project_id != int(project_id):
+            raise HTTPException(status_code=404, detail="Glossary entry not found")
+
+        term = existing.term
+        repo.delete(entry_id)
+
+        return ApiResponse(
+            success=True,
+            message=f"Término '{term}' eliminado del glosario",
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting glossary entry: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.get("/api/projects/{project_id}/glossary/context/llm", response_model=ApiResponse)
+async def get_glossary_llm_context(
+    project_id: str,
+    max_entries: int = 50,
+    categories: Optional[str] = None,
+) -> ApiResponse:
+    """
+    Genera el contexto del glosario para el LLM.
+
+    Args:
+        project_id: ID del proyecto
+        max_entries: Máximo de entradas a incluir
+        categories: Categorías a incluir (separadas por coma)
+    """
+    try:
+        result = project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail="Project not found")
+        project = result.value
+
+        from narrative_assistant.persistence.glossary import GlossaryRepository
+
+        repo = GlossaryRepository()
+
+        category_list = None
+        if categories:
+            category_list = [c.strip() for c in categories.split(",")]
+
+        context = repo.generate_llm_context(
+            project_id=int(project_id),
+            max_entries=max_entries,
+            categories=category_list,
+        )
+
+        return ApiResponse(
+            success=True,
+            data={
+                "context": context,
+                "length": len(context),
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating glossary LLM context: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.get("/api/projects/{project_id}/glossary/export/publication", response_model=ApiResponse)
+async def export_glossary_for_publication(project_id: str) -> ApiResponse:
+    """
+    Exporta el glosario formateado para incluir en la publicación.
+
+    Solo incluye términos marcados para publicación.
+    """
+    try:
+        result = project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail="Project not found")
+        project = result.value
+
+        from narrative_assistant.persistence.glossary import GlossaryRepository
+
+        repo = GlossaryRepository()
+        content = repo.export_for_publication(int(project_id))
+
+        return ApiResponse(
+            success=True,
+            data={
+                "content": content,
+                "format": "markdown",
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error exporting glossary: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.post("/api/projects/{project_id}/glossary/import", response_model=ApiResponse)
+async def import_glossary(
+    project_id: str,
+    entries: list[dict] = Body(...),
+    merge: bool = True,
+) -> ApiResponse:
+    """
+    Importa entradas al glosario desde una lista JSON.
+
+    Args:
+        project_id: ID del proyecto
+        entries: Lista de entradas con formato {term, definition, variants?, category?, ...}
+        merge: Si True, actualiza existentes; si False, salta duplicados
+    """
+    try:
+        result = project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail="Project not found")
+        project = result.value
+
+        from narrative_assistant.persistence.glossary import GlossaryRepository
+
+        repo = GlossaryRepository()
+        created, updated = repo.import_from_dict(int(project_id), entries, merge=merge)
+
+        return ApiResponse(
+            success=True,
+            data={
+                "created": created,
+                "updated": updated,
+                "total_processed": len(entries),
+            },
+            message=f"Importados {created} términos nuevos, actualizados {updated}",
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error importing glossary: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.get("/api/projects/{project_id}/glossary/search", response_model=ApiResponse)
+async def search_glossary(
+    project_id: str,
+    q: str = Query(..., min_length=1, description="Término a buscar"),
+) -> ApiResponse:
+    """
+    Busca un término en el glosario (por término principal o variantes).
+    """
+    try:
+        result = project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail="Project not found")
+        project = result.value
+
+        from narrative_assistant.persistence.glossary import GlossaryRepository
+
+        repo = GlossaryRepository()
+        entry = repo.find_by_term_or_variant(int(project_id), q)
+
+        if entry:
+            return ApiResponse(
+                success=True,
+                data={
+                    "found": True,
+                    "entry": entry.to_dict(),
+                }
+            )
+        else:
+            return ApiResponse(
+                success=True,
+                data={
+                    "found": False,
+                    "entry": None,
+                }
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error searching glossary: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.get("/api/projects/{project_id}/glossary/summary", response_model=ApiResponse)
+async def get_glossary_summary(project_id: str) -> ApiResponse:
+    """
+    Obtiene un resumen del glosario del proyecto.
+    """
+    try:
+        result = project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail="Project not found")
+        project = result.value
+
+        from narrative_assistant.persistence.glossary import GlossaryRepository
+
+        repo = GlossaryRepository()
+        entries = repo.list_by_project(int(project_id))
+
+        # Calcular estadísticas
+        by_category = {}
+        technical_count = 0
+        invented_count = 0
+        for_publication = 0
+
+        for entry in entries:
+            cat = entry.category or "general"
+            by_category[cat] = by_category.get(cat, 0) + 1
+            if entry.is_technical:
+                technical_count += 1
+            if entry.is_invented:
+                invented_count += 1
+            if entry.include_in_publication_glossary:
+                for_publication += 1
+
+        return ApiResponse(
+            success=True,
+            data={
+                "total_entries": len(entries),
+                "by_category": by_category,
+                "technical_count": technical_count,
+                "invented_count": invented_count,
+                "for_publication_count": for_publication,
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting glossary summary: {e}", exc_info=True)
         return ApiResponse(success=False, error=str(e))
 
 

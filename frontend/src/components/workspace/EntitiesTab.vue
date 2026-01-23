@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { apiUrl } from '@/config/api'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
+import DsInput from '@/components/ds/DsInput.vue'
 import Dropdown from 'primevue/dropdown'
 import Dialog from 'primevue/dialog'
 import SelectButton from 'primevue/selectbutton'
@@ -17,6 +18,7 @@ import MergeHistoryPanel from '@/components/MergeHistoryPanel.vue'
 import RejectEntityDialog from '@/components/RejectEntityDialog.vue'
 import type { Entity, MergeHistoryEntry, EntityAttribute } from '@/types'
 import { useEntityUtils } from '@/composables/useEntityUtils'
+import { useAlertUtils } from '@/composables/useAlertUtils'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { useSelectionStore } from '@/stores/selection'
 import { useRouter, useRoute } from 'vue-router'
@@ -41,11 +43,14 @@ interface Props {
   projectId: number
   /** ID de entidad a seleccionar inicialmente (para navegación desde /characters/:id) */
   initialEntityId?: number | null
+  /** Total de capítulos en el documento (para formateo inteligente) */
+  chapterCount?: number
 }
 
 const props = withDefaults(defineProps<Props>(), {
   loading: false,
-  initialEntityId: null
+  initialEntityId: null,
+  chapterCount: 0
 })
 
 const emit = defineEmits<{
@@ -59,6 +64,7 @@ const route = useRoute()
 const workspaceStore = useWorkspaceStore()
 const selectionStore = useSelectionStore()
 const { getEntityIcon, getEntityLabel, getEntityColor } = useEntityUtils()
+const { formatChapterLabel } = useAlertUtils()
 
 // Estado de filtros
 const searchQuery = ref('')
@@ -102,7 +108,24 @@ watch(() => props.initialEntityId, async (entityId) => {
 }, { immediate: true })
 
 // También cuando se cargan las entidades
-watch(() => props.entities, async (newEntities) => {
+watch(() => props.entities, async (newEntities, oldEntities) => {
+  // Si hay una entidad seleccionada y las entidades cambiaron, refrescar atributos
+  // Esto es necesario después de un re-análisis
+  if (selectedEntity.value && newEntities.length > 0 && oldEntities && oldEntities.length > 0) {
+    const updatedEntity = newEntities.find(e => e.id === selectedEntity.value!.id)
+    if (updatedEntity) {
+      // Actualizar la referencia a la entidad con los nuevos datos
+      selectedEntity.value = updatedEntity
+      // Recargar atributos desde el backend
+      await loadEntityAttributes(updatedEntity.id)
+    } else {
+      // La entidad ya no existe, limpiar selección
+      selectedEntity.value = null
+      selectedEntityAttributes.value = []
+    }
+  }
+
+  // Selección inicial si viene de navegación
   if (props.initialEntityId && props.initialEntityId !== lastAutoSelectedId.value && newEntities.length > 0 && !selectedEntity.value) {
     const entity = newEntities.find(e => e.id === props.initialEntityId)
     if (entity) {
@@ -617,82 +640,8 @@ function getTypeTextColor(type: string): string {
 }
 
 /** Traduce nombres de atributos del inglés al español */
-function translateAttributeName(name: string): string {
-  const translations: Record<string, string> = {
-    'height': 'Altura',
-    'weight': 'Peso',
-    'age': 'Edad',
-    'hair_color': 'Color de pelo',
-    'hair color': 'Color de pelo',
-    'eye_color': 'Color de ojos',
-    'eye color': 'Color de ojos',
-    'occupation': 'Ocupación',
-    'profession': 'Profesión',
-    'nationality': 'Nacionalidad',
-    'gender': 'Género',
-    'birth_date': 'Fecha de nacimiento',
-    'birthdate': 'Fecha de nacimiento',
-    'death_date': 'Fecha de fallecimiento',
-    'location': 'Ubicación',
-    'address': 'Dirección',
-    'relationship': 'Relación',
-    'status': 'Estado',
-    'description': 'Descripción',
-    'personality': 'Personalidad',
-    'appearance': 'Apariencia',
-    'name': 'Nombre',
-    'alias': 'Alias',
-    'title': 'Título',
-    'role': 'Rol',
-    'skin_color': 'Color de piel',
-    'skin color': 'Color de piel',
-    'build': 'Complexión',
-    'clothing': 'Vestimenta',
-    'weapon': 'Arma',
-    'vehicle': 'Vehículo',
-    'pet': 'Mascota',
-    'family': 'Familia',
-    'friend': 'Amigo',
-    'enemy': 'Enemigo',
-    'ally': 'Aliado',
-    'trait': 'Rasgo',
-    'skill': 'Habilidad',
-    'power': 'Poder',
-    'weakness': 'Debilidad',
-    'strength': 'Fortaleza',
-    'fear': 'Miedo',
-    'goal': 'Objetivo',
-    'motivation': 'Motivación',
-    'background': 'Trasfondo',
-    'origin': 'Origen',
-    'species': 'Especie',
-    'race': 'Raza',
-    'class': 'Clase',
-    'rank': 'Rango',
-    'affiliation': 'Afiliación',
-    'organization': 'Organización',
-    'group': 'Grupo',
-    'faction': 'Facción',
-    'allegiance': 'Lealtad',
-    'language': 'Idioma',
-    'accent': 'Acento',
-    'voice': 'Voz',
-    'mannerism': 'Manierismo',
-    'quirk': 'Peculiaridad',
-    'habit': 'Hábito',
-    'hobby': 'Pasatiempo',
-    'like': 'Gusto',
-    'dislike': 'Disgusto',
-    'favorite': 'Favorito',
-    'symbol': 'Símbolo',
-    'mark': 'Marca',
-    'scar': 'Cicatriz',
-    'tattoo': 'Tatuaje'
-  }
-  // Buscar traducción exacta o con lowercase
-  const lowerName = name.toLowerCase()
-  return translations[lowerName] || translations[name] || name
-}
+// Usa la función centralizada de useAlertUtils
+const { translateAttributeName } = useAlertUtils()
 
 /**
  * Navega al texto donde se encontró el atributo
@@ -714,14 +663,13 @@ function navigateToAttributeSource(attr: EntityAttribute) {
         <!-- Toolbar compacto - filtros en dos filas -->
         <div class="sidebar-toolbar">
           <div class="toolbar-row">
-            <span class="p-input-icon-right search-wrapper">
-              <InputText
-                v-model="searchQuery"
-                placeholder="Buscar..."
-                class="search-input"
-              />
-              <i class="pi pi-search" />
-            </span>
+            <DsInput
+              v-model="searchQuery"
+              placeholder="Buscar..."
+              icon="pi pi-search"
+              clearable
+              class="search-input"
+            />
             <Button
               v-if="searchQuery || selectedType || selectedImportance"
               icon="pi pi-times"
@@ -864,12 +812,12 @@ function navigateToAttributeSource(attr: EntityAttribute) {
                     <span class="stat-card-label">apariciones</span>
                   </div>
                 </div>
-                <div v-if="selectedEntity.firstMentionChapter" class="stat-card">
+                <div v-if="formatChapterLabel(selectedEntity.firstMentionChapter, props.chapterCount)" class="stat-card">
                   <div class="stat-card-icon">
                     <i class="pi pi-bookmark"></i>
                   </div>
                   <div class="stat-card-content">
-                    <span class="stat-card-value">Cap. {{ selectedEntity.firstMentionChapter }}</span>
+                    <span class="stat-card-value">{{ formatChapterLabel(selectedEntity.firstMentionChapter, props.chapterCount) }}</span>
                     <span class="stat-card-label">primera aparición</span>
                   </div>
                 </div>

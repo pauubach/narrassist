@@ -14,6 +14,7 @@ from .models import (
 )
 from .engine import AlertEngine, get_alert_engine
 from .repository import AlertRepository, get_alert_repository
+from .formatter import AlertFormatter, get_alert_formatter
 
 __all__ = [
     # Models
@@ -28,4 +29,7 @@ __all__ = [
     # Repository
     "AlertRepository",
     "get_alert_repository",
+    # Formatter
+    "AlertFormatter",
+    "get_alert_formatter",
 ]

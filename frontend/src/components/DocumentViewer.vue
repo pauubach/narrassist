@@ -722,6 +722,12 @@ const temporaryHighlightClass = 'mention-highlight-active'
 
 // Scroll a una mención específica dentro del documento
 const scrollToMention = async (target: ScrollTarget) => {
+  console.log('scrollToMention called:', {
+    chapterId: target.chapterId,
+    position: target.position,
+    text: target.text?.substring(0, 50) + (target.text && target.text.length > 50 ? '...' : '')
+  })
+
   // Para que el scroll sea preciso, necesitamos cargar todos los capítulos
   // desde el inicio hasta el capítulo objetivo, ya que el contenido cargado
   // afecta las alturas del DOM y por tanto la posición de scroll
@@ -729,7 +735,8 @@ const scrollToMention = async (target: ScrollTarget) => {
   // Encontrar el índice del capítulo objetivo
   const targetIndex = chapters.value.findIndex(ch => ch.id === target.chapterId)
   if (targetIndex === -1) {
-    console.warn(`Chapter ${target.chapterId} not found`)
+    console.warn(`Chapter with ID ${target.chapterId} not found. Available chapters:`,
+      chapters.value.map(ch => ({ id: ch.id, number: ch.chapterNumber })))
     return
   }
 
@@ -748,7 +755,10 @@ const scrollToMention = async (target: ScrollTarget) => {
 
   // Dar tiempo adicional para que el contenido HTML se renderice completamente
   // (especialmente importante para capítulos con mucho contenido)
-  await new Promise(resolve => setTimeout(resolve, 100))
+  await new Promise(resolve => setTimeout(resolve, 200))
+
+  // Segunda espera para asegurar que v-html se haya procesado
+  await nextTick()
 
   const chapterElement = viewerContainer.value?.querySelector(`[data-chapter-id="${target.chapterId}"]`)
   if (!chapterElement) {
@@ -768,7 +778,7 @@ const scrollToMention = async (target: ScrollTarget) => {
     }
 
     // Resaltar directamente el texto (incluye scroll)
-    highlightTextInChapter(chapterElement, target.text!, adjustedPosition)
+    await highlightTextInChapter(chapterElement, target.text!, adjustedPosition)
   } else if (target.position !== undefined) {
     // Si solo hay posición, calcular el elemento aproximado
     const chapter = chapters.value.find(ch => ch.id === target.chapterId)
@@ -784,13 +794,50 @@ const scrollToMention = async (target: ScrollTarget) => {
   }
 }
 
+// Limpia el texto de excerpt para buscar en el documento
+// Elimina elipsis, contexto extra, y normaliza espacios
+const cleanExcerptForSearch = (text: string): string => {
+  return text
+    // Eliminar elipsis al inicio y final
+    .replace(/^[.…]+\s*/g, '')
+    .replace(/\s*[.…]+$/g, '')
+    // Eliminar comillas tipográficas que pueden no coincidir
+    .replace(/[""''«»]/g, '"')
+    // Normalizar espacios múltiples
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 // Resalta un texto específico dentro del capítulo
 // position: posición de caracteres donde debería estar el texto (para desambiguar)
-const highlightTextInChapter = (chapterElement: Element, text: string, position?: number) => {
-  const contentElement = chapterElement.querySelector('.chapter-text')
-  if (!contentElement) return
+// retryCount: número de reintentos realizados (para esperar a que v-html renderice)
+const highlightTextInChapter = async (chapterElement: Element, text: string, position?: number, retryCount: number = 0) => {
+  const MAX_RETRIES = 3
+  const RETRY_DELAY = 150
 
-  // Buscar TODAS las ocurrencias exactas del texto (case-insensitive)
+  const contentElement = chapterElement.querySelector('.chapter-text')
+  if (!contentElement) {
+    console.warn('No .chapter-text element found in chapter')
+    return
+  }
+
+  // Verificar si el contenido tiene texto (v-html puede no haber renderizado aún)
+  const hasContent = contentElement.textContent && contentElement.textContent.trim().length > 0
+  if (!hasContent && retryCount < MAX_RETRIES) {
+    console.log(`Content not ready yet, retry ${retryCount + 1}/${MAX_RETRIES}...`)
+    await new Promise(resolve => setTimeout(resolve, RETRY_DELAY))
+    await nextTick()
+    return highlightTextInChapter(chapterElement, text, position, retryCount + 1)
+  }
+
+  // Limpiar el texto de búsqueda
+  const cleanText = cleanExcerptForSearch(text)
+  if (!cleanText) {
+    console.warn('Empty search text after cleaning')
+    return
+  }
+
+  // Buscar TODAS las ocurrencias del texto (case-insensitive)
   const walker = document.createTreeWalker(contentElement, NodeFilter.SHOW_TEXT, null)
 
   interface TextMatch {
@@ -803,19 +850,20 @@ const highlightTextInChapter = (chapterElement: Element, text: string, position?
   let node: Text | null
   let charCount = 0
 
+  // Primero intentar búsqueda exacta
   while ((node = walker.nextNode() as Text | null)) {
     const nodeText = node.textContent || ''
     let searchIndex = 0
 
-    // Buscar ocurrencias exactas (mismo texto, case-insensitive)
+    // Buscar ocurrencias exactas (case-insensitive)
     while (true) {
-      const index = nodeText.toLowerCase().indexOf(text.toLowerCase(), searchIndex)
+      const index = nodeText.toLowerCase().indexOf(cleanText.toLowerCase(), searchIndex)
       if (index === -1) break
 
       matches.push({
         node,
         index,
-        length: text.length,
+        length: cleanText.length,
         charPosition: charCount + index
       })
       searchIndex = index + 1
@@ -824,10 +872,60 @@ const highlightTextInChapter = (chapterElement: Element, text: string, position?
     charCount += nodeText.length
   }
 
+  // Si no hay matches, intentar con fragmentos más cortos del texto
+  if (matches.length === 0 && cleanText.length > 20) {
+    // Intentar con las primeras palabras (más probable que coincidan)
+    const words = cleanText.split(' ')
+    const shortText = words.slice(0, Math.min(5, words.length)).join(' ')
+
+    if (shortText.length >= 10) {
+      console.log(`Trying shorter search: "${shortText}"`)
+
+      // Reset walker
+      const walker2 = document.createTreeWalker(contentElement, NodeFilter.SHOW_TEXT, null)
+      charCount = 0
+
+      while ((node = walker2.nextNode() as Text | null)) {
+        const nodeText = node.textContent || ''
+        let searchIndex = 0
+
+        while (true) {
+          const index = nodeText.toLowerCase().indexOf(shortText.toLowerCase(), searchIndex)
+          if (index === -1) break
+
+          matches.push({
+            node,
+            index,
+            length: shortText.length,
+            charPosition: charCount + index
+          })
+          searchIndex = index + 1
+        }
+
+        charCount += nodeText.length
+      }
+    }
+  }
+
   if (matches.length === 0) {
-    console.warn(`Text "${text}" not found in chapter`)
+    // Si no encontramos el texto pero hay contenido, intentar un retry más
+    // (a veces v-html necesita más tiempo para procesar)
+    if (retryCount < MAX_RETRIES) {
+      console.log(`Text not found, retry ${retryCount + 1}/${MAX_RETRIES}...`)
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY))
+      await nextTick()
+      return highlightTextInChapter(chapterElement, text, position, retryCount + 1)
+    }
+
+    console.warn(`Text "${cleanText}" not found in chapter after ${MAX_RETRIES} retries. Using position fallback.`)
+    // Fallback: usar highlightPositionInChapter si tenemos posición
+    if (position !== undefined) {
+      highlightPositionInChapter(chapterElement, position)
+    }
     return
   }
+
+  console.log(`Found ${matches.length} matches for "${cleanText.substring(0, 30)}..."`, { position })
 
   // Seleccionar la ocurrencia correcta:
   // Si tenemos posición, usar la más cercana a esa posición
@@ -1532,5 +1630,63 @@ defineExpose({
 .format-option small {
   color: var(--text-color-secondary);
   font-size: 0.85rem;
+}
+</style>
+
+<!-- Estilos globales para highlight dinámico (insertado via JS, no funciona con scoped) -->
+<style>
+/* Highlight temporal para navegación a alertas/menciones */
+.mention-highlight-active {
+  background: rgba(251, 191, 36, 0.6) !important;
+  border-radius: 3px;
+  box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.4);
+  animation: mention-highlight-pulse 1.5s ease-in-out infinite;
+  padding: 2px 4px;
+  margin: -2px -4px;
+}
+
+.mention-highlight-active.highlight-entering {
+  animation: mention-highlight-enter 0.5s ease-out forwards;
+}
+
+.mention-highlight-active.highlight-leaving {
+  animation: mention-highlight-leave 0.4s ease-out forwards;
+}
+
+@keyframes mention-highlight-pulse {
+  0%, 100% {
+    background: rgba(251, 191, 36, 0.5);
+    box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.3);
+  }
+  50% {
+    background: rgba(251, 191, 36, 0.7);
+    box-shadow: 0 0 12px 4px rgba(251, 191, 36, 0.5);
+  }
+}
+
+@keyframes mention-highlight-enter {
+  0% {
+    background: rgba(251, 191, 36, 0);
+    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0);
+    transform: scale(1.2);
+  }
+  100% {
+    background: rgba(251, 191, 36, 0.6);
+    box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.4);
+    transform: scale(1);
+  }
+}
+
+@keyframes mention-highlight-leave {
+  0% {
+    background: rgba(251, 191, 36, 0.6);
+    box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.4);
+    opacity: 1;
+  }
+  100% {
+    background: rgba(251, 191, 36, 0);
+    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0);
+    opacity: 0;
+  }
 }
 </style>

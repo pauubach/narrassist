@@ -339,6 +339,16 @@ ATTRIBUTE_PATTERNS: list[tuple[str, AttributeKey, AttributeCategory, float, bool
         0.65,
         False,
     ),
+    # "con ... y ojos marrones" / "y ojos azules" (en listas de características)
+    # Ejemplo: "con barba espesa y ojos marrones"
+    (
+        r"(?:con\s+\w+(?:\s+\w+)?(?:\s+y\s+\w+(?:\s+\w+)?)?\s+y\s+)?ojos\s+"
+        r"(azules|verdes|marrones|negros|grises|castaños|miel|avellana|ámbar|claros|oscuros)",
+        AttributeKey.EYE_COLOR,
+        AttributeCategory.PHYSICAL,
+        0.7,  # Mayor confianza para colores conocidos
+        False,
+    ),
     # "ojos azules" (en diálogos o descripciones genéricas)
     (
         r"ojos\s+(\w+)",
@@ -496,14 +506,14 @@ ATTRIBUTE_PATTERNS: list[tuple[str, AttributeKey, AttributeCategory, float, bool
         0.75,
         False,
     ),
-    # "era un hombre bajo y fornido" - captura ambos
+    # "era un hombre bajo y fornido" - 1 grupo para BUILD, resolver entidad
     (
-        r"era\s+(?:un\s+)?(?:hombre|mujer)\s+(?:muy\s+)?(alto|alta|bajo|baja)\s+y\s+"
+        r"era\s+(?:un\s+)?(?:hombre|mujer)\s+(?:muy\s+)?(?:alto|alta|bajo|baja)\s+y\s+"
         r"(delgado|delgada|corpulento|corpulenta|fornido|fornida|esbelto|esbelta)",
         AttributeKey.BUILD,
         AttributeCategory.PHYSICAL,
         0.8,
-        False,
+        False,  # 1 grupo = resolver entidad con _find_nearest_entity
     ),
     # "Era alto y corpulento" (requiere contexto - un solo grupo)
     (
@@ -517,13 +527,13 @@ ATTRIBUTE_PATTERNS: list[tuple[str, AttributeKey, AttributeCategory, float, bool
         0.65,
         False,
     ),
-    # "mujer alta" / "hombre bajo" (en contexto)
+    # "mujer alta" / "hombre bajo" (en contexto) - 1 grupo, resolver entidad desde contexto
     (
-        r"(?:una?\s+)?(mujer|hombre)\s+(muy\s+)?(alto|alta|bajo|baja|delgado|delgada)",
+        r"(?:una?\s+)?(?:mujer|hombre)\s+(?:muy\s+)?(alto|alta|bajo|baja|delgado|delgada)",
         AttributeKey.HEIGHT,
         AttributeCategory.PHYSICAL,
         0.7,
-        False,
+        False,  # 1 grupo = resolver entidad con _find_nearest_entity
     ),
     # "el alto Juan" / "la delgada María"
     (
@@ -534,13 +544,13 @@ ATTRIBUTE_PATTERNS: list[tuple[str, AttributeKey, AttributeCategory, float, bool
         0.75,
         True,
     ),
-    # "Era una mujer alta, de aproximadamente treinta años"
+    # "Era una mujer alta, de aproximadamente treinta años" - 1 grupo, resolver entidad
     (
-        r"[Ee]ra\s+(?:una?\s+)?(mujer|hombre)\s+(alto|alta|bajo|baja)",
+        r"[Ee]ra\s+(?:una?\s+)?(?:mujer|hombre)\s+(alto|alta|bajo|baja)",
         AttributeKey.HEIGHT,
         AttributeCategory.PHYSICAL,
         0.75,
-        False,
+        False,  # 1 grupo = resolver entidad con _find_nearest_entity
     ),
 
     # === PERSONALIDAD ===
@@ -575,6 +585,22 @@ ATTRIBUTE_PATTERNS: list[tuple[str, AttributeKey, AttributeCategory, float, bool
         AttributeCategory.SOCIAL,
         0.85,
         True,
+    ),
+    # "era carpintero", "es médico" - profesiones con sufijos comunes (un grupo, requiere contexto)
+    (
+        r"[Ee]ra\s+(?:un\s+)?(\w+(?:ero|era|ista|or|ora|ico|ica|nte|dor|dora|tor|tora|ogo|oga|ino|ina|ario|aria|ador|adora))\b",
+        AttributeKey.PROFESSION,
+        AttributeCategory.SOCIAL,
+        0.65,
+        False,  # False = un grupo, necesita resolver entidad desde contexto
+    ),
+    # "trabaja como X", "trabajaba de X"
+    (
+        r"trabaj(?:a|aba)\s+(?:como|de)\s+(\w+)",
+        AttributeKey.PROFESSION,
+        AttributeCategory.SOCIAL,
+        0.7,
+        False,
     ),
 
     # === RASGOS DISTINTIVOS ===
@@ -980,6 +1006,7 @@ REGLAS:
 - Una entrada por CADA mención (si un atributo aparece dos veces, dos entradas)
 - Ignora metáforas
 - Keys válidas: eye_color, hair_color, hair_type, age, height, build, profession
+- IMPORTANTE: Si el atributo se refiere a un pronombre (Él, Ella, él, ella), resuelve el pronombre al nombre del personaje más cercano mencionado antes. Ejemplo: "Juan entró. Él era carpintero" -> entity="Juan", key="profession", value="carpintero"
 
 RESPONDE SOLO JSON (sin markdown, sin explicaciones):
 {{"attributes":[{{"entity":"María","key":"eye_color","value":"azules","evidence":"ojos azules brillaban"}}]}}"""
@@ -1154,6 +1181,86 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
 
         return attributes
 
+    def _is_inside_dialogue(self, text: str, position: int) -> bool:
+        """
+        Detecta si una posición está dentro de un diálogo (entre comillas o guiones).
+
+        Los atributos mencionados en diálogos no deben asignarse al hablante,
+        ya que podrían referirse a otra persona.
+
+        Ejemplos:
+        - "Tenías los ojos verdes" -> dentro de diálogo
+        - —Eras muy alta —dijo Juan. -> dentro de diálogo
+        - - Pero tenías el pelo rubio... -> dentro de diálogo
+        """
+        # Buscar hacia atrás para encontrar inicio de diálogo
+        before = text[:position]
+
+        # Contar comillas y guiones de diálogo
+        # Español usa: «», "", '', —, -
+
+        # Comillas españolas «»
+        open_spanish = before.count('«')
+        close_spanish = before.count('»')
+        if open_spanish > close_spanish:
+            return True
+
+        # Comillas dobles ""
+        open_double = before.count('"')
+        # Si número impar de comillas dobles, estamos dentro
+        if open_double % 2 == 1:
+            return True
+
+        # Comillas inglesas ""
+        open_curly = before.count('"')
+        close_curly = before.count('"')
+        if open_curly > close_curly:
+            return True
+
+        # Guiones de diálogo (— largo o - corto al inicio de línea)
+        # Buscar el último inicio de línea con guión
+        import re
+        # Patrón: inicio de línea o después de punto/salto seguido de guión
+        dialogue_start_pattern = re.compile(r'(?:^|\n)\s*[-—]')
+        matches = list(dialogue_start_pattern.finditer(before))
+
+        if matches:
+            last_dialogue_start = matches[-1].end()
+            between = before[last_dialogue_start:]
+
+            # Verificar si hay un cierre de diálogo
+            # El diálogo termina con: otro guión, salto de línea, o verbo de habla
+            speech_verbs = ['dijo', 'preguntó', 'contestó', 'respondió', 'exclamó',
+                          'murmuró', 'gritó', 'susurró', 'añadió', 'comentó']
+            has_speech_verb = any(verb in between.lower() for verb in speech_verbs)
+            has_closing_dash = bool(re.search(r'\s[-—]\s', between))
+            has_newline = '\n' in between
+
+            # Si no hay indicador de fin de diálogo, estamos dentro
+            if not has_speech_verb and not has_closing_dash and not has_newline:
+                return True
+
+            # Caso especial: "- texto - dijo X - más texto"
+            # Si hay verbo de habla pero después sigue el diálogo
+            if has_speech_verb:
+                # Buscar si hay otro guión después del verbo de habla
+                verb_match = None
+                for verb in speech_verbs:
+                    verb_pos = between.lower().find(verb)
+                    if verb_pos != -1:
+                        verb_match = verb_pos
+                        break
+                if verb_match is not None:
+                    after_verb = between[verb_match:]
+                    # Si hay otro guión después del verbo, el texto posterior está en diálogo
+                    if re.search(r'\s[-—]\s', after_verb):
+                        # La posición está después de ese segundo guión?
+                        second_dash = re.search(r'\s[-—]\s', after_verb)
+                        if second_dash:
+                            return True
+
+        return False
+
     def _extract_by_patterns(
         self,
         text: str,
@@ -1169,13 +1276,24 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
 
         for pattern, key, category, base_conf, swap_groups in self._compiled_patterns:
             for match in pattern.finditer(text):
+                # Verificar si está dentro de diálogo
+                # Los atributos en diálogos no deben asignarse automáticamente
+                if self._is_inside_dialogue(text, match.start()):
+                    logger.debug(f"Ignorando atributo en diálogo: {match.group(0)[:40]}...")
+                    continue
+
                 # Obtener contexto para análisis
                 context_start = max(0, match.start() - 50)
                 context_end = min(len(text), match.end() + 50)
                 context = text[context_start:context_end]
+                match_pos_in_context = match.start() - context_start
 
-                # Verificar si es metáfora
-                is_metaphor = self._is_metaphor(context)
+                # Verificar si es metáfora (pasando info del match para detección precisa)
+                is_metaphor = self._is_metaphor(
+                    context,
+                    match_text=match.group(0),
+                    match_pos_in_context=match_pos_in_context
+                )
                 if is_metaphor and self.filter_metaphors:
                     continue
 
@@ -1257,6 +1375,20 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                     logger.debug(f"Atributo ignorado (sin entidad/valor): {attr}")
                     continue
 
+                # Filtrar entidades inválidas (pronombres, adverbios, etc.)
+                # Incluir versiones con y sin tilde para ser robusto
+                invalid_entities = {
+                    "también", "tambien", "este", "esta", "esto", "ese", "esa", "eso",
+                    "aquel", "aquella", "aquello", "él", "el", "ella", "ellos", "ellas",
+                    "uno", "una", "algo", "alguien", "nadie", "nada", "todo",
+                    "todos", "todas", "otro", "otra", "otros", "otras", "mismo",
+                    "misma", "mismos", "mismas", "ambos", "ambas", "varios", "varias",
+                    "quien", "quién", "cual", "cuál", "cuales", "cuáles",
+                }
+                if attr.entity_name.lower() in invalid_entities:
+                    logger.debug(f"Atributo ignorado (entidad inválida): {attr.entity_name}")
+                    continue
+
                 # Normalizar para comparación
                 # Usar solo entity + key para agrupar valores similares
                 key = (
@@ -1272,6 +1404,20 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
         final_attributes: list[ExtractedAttribute] = []
         num_active_methods = len(extractions)
 
+        # Normalizar pesos basándose en métodos ACTIVOS (que están en extractions)
+        # Esto evita que los pesos entrenados para LLM penalicen otros métodos
+        # cuando LLM no está habilitado
+        active_methods = set(extractions.keys())
+        active_weights = {m: METHOD_WEIGHTS.get(m, 0.15) for m in active_methods}
+        total_active_weight = sum(active_weights.values())
+
+        if total_active_weight > 0:
+            normalized_weights = {m: w / total_active_weight for m, w in active_weights.items()}
+        else:
+            normalized_weights = {m: 1.0 / len(active_methods) for m in active_methods}
+
+        logger.debug(f"Pesos normalizados para métodos activos {active_methods}: {normalized_weights}")
+
         for group_key, method_attrs in grouped.items():
             methods_with_attrs = list(method_attrs)
             unique_methods = set(m for m, _ in methods_with_attrs)
@@ -1280,14 +1426,15 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
             if num_votes == 1:
                 # Solo un método detectó este atributo
                 method, attr = methods_with_attrs[0]
-                method_weight = METHOD_WEIGHTS.get(method, 0.15)
+                # Usar peso normalizado para métodos activos
+                method_weight = normalized_weights.get(method, 0.25)
 
-                # Factor de escala más generoso para no filtrar atributos válidos
-                # LLM (0.40): 0.8 + 0.4*0.5 = 1.0 (mantiene confianza)
-                # Embeddings (0.25): 0.8 + 0.25*0.5 = 0.925
-                # Dependency (0.20): 0.8 + 0.2*0.5 = 0.9
-                # Patterns (0.15): 0.8 + 0.15*0.5 = 0.875
-                scale_factor = 0.8 + (method_weight * 0.5)
+                # Factor de escala: con pesos normalizados, un método único tiene peso ~0.5
+                # si hay 2 métodos activos, o ~0.25 si hay 4 métodos activos.
+                # Queremos ser más permisivos cuando solo hay pocos métodos activos.
+                # Si hay N métodos activos, peso normalizado es ~1/N.
+                # Factor de escala: 0.85 + weight * 0.15 para ser más permisivo
+                scale_factor = 0.85 + (method_weight * 0.15)
                 new_confidence = attr.confidence * scale_factor
                 best_attr = attr
 
@@ -1299,7 +1446,8 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                 best_conf = 0.0
 
                 for method, attr in methods_with_attrs:
-                    weight = METHOD_WEIGHTS.get(method, 0.15)
+                    # Usar peso normalizado para métodos activos
+                    weight = normalized_weights.get(method, 0.25)
                     total_weight += weight
                     weighted_conf_sum += attr.confidence * weight
 
@@ -1485,7 +1633,7 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
         entity_mentions: Optional[list[tuple[str, int, int]]],
         full_text: str,
     ) -> Optional[str]:
-        """Encuentra entidad en una oración."""
+        """Encuentra entidad en una oración, incluyendo resolución de pronombres."""
         if not entity_mentions:
             return None
 
@@ -1500,6 +1648,27 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
             if sentence_start >= 0:
                 if start >= sentence_start and end <= sentence_start + len(sentence):
                     return name
+
+        # Si no se encontró entidad directamente, buscar pronombres y resolver
+        import re as regex_module
+        pronouns_pattern = r'\b(él|ella|este|esta|aquel|aquella|también)\b'
+        has_pronoun = regex_module.search(pronouns_pattern, sentence_lower)
+
+        if has_pronoun and sentence_start > 0:
+            # Buscar la entidad mencionada más recientemente antes de esta oración
+            text_before = full_text[:sentence_start]
+
+            # Ordenar menciones por posición (de más reciente a más antigua)
+            mentions_before = [
+                (name, start, end)
+                for name, start, end in entity_mentions
+                if end <= sentence_start
+            ]
+
+            if mentions_before:
+                # Tomar la más cercana (última mencionada antes de la oración)
+                mentions_before.sort(key=lambda x: x[1], reverse=True)
+                return mentions_before[0][0]
 
         return None
 
@@ -1532,23 +1701,97 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                     return trait
 
         elif key_str == "profession":
-            # Buscar profesiones comunes
-            professions = [
-                "lingüista", "médico", "médica", "abogado", "abogada",
-                "profesor", "profesora", "escritor", "escritora",
-                "doctor", "doctora", "ingeniero", "ingeniera",
+            # Enfoque dinámico: buscar patrones "era/es [sustantivo]"
+            # En lugar de una lista fija, extraemos el sustantivo del patrón
+            import re as regex_module
+
+            # Patrones para detectar profesiones/ocupaciones
+            profession_patterns = [
+                # "era carpintero", "es médico", "fue ingeniero"
+                r'\b(?:era|es|fue|será)\s+(?:un|una)?\s*(\w+(?:ero|era|ista|or|ora|ico|ica|nte|dor|dora|tor|tora|ogo|oga|ino|ina|ario|aria|ador|adora))\b',
+                # "trabaja como X", "trabajaba de X"
+                r'\btrabaj(?:a|aba|ó)\s+(?:como|de)\s+(\w+)\b',
+                # "se dedica a ser X", "se dedicaba a X"
+                r'\bse\s+dedica(?:ba)?\s+a\s+(?:ser\s+)?(\w+)\b',
+                # "de profesión X"
+                r'\bde\s+profesión\s+(\w+)\b',
             ]
-            for prof in professions:
+
+            for pattern in profession_patterns:
+                match = regex_module.search(pattern, sentence_lower, regex_module.IGNORECASE)
+                if match:
+                    profession = match.group(1).lower()
+                    # Excluir palabras muy genéricas que no son profesiones
+                    excluded = {
+                        "hombre", "mujer", "persona", "tipo", "chico", "chica",
+                        "joven", "viejo", "niño", "niña", "señor", "señora",
+                        "alto", "bajo", "grande", "pequeño", "bueno", "malo",
+                    }
+                    if profession not in excluded and len(profession) > 3:
+                        return profession
+
+            # Fallback: lista mínima de profesiones comunes (solo las más frecuentes)
+            common_professions = [
+                "médico", "médica", "abogado", "abogada", "profesor", "profesora",
+                "ingeniero", "ingeniera", "arquitecto", "arquitecta", "policía",
+                "bombero", "militar", "enfermero", "enfermera", "periodista",
+            ]
+            for prof in common_professions:
                 if prof in sentence_lower:
                     return prof
 
         return None
 
-    def _is_metaphor(self, context: str) -> bool:
-        """Detecta si el contexto sugiere una metáfora."""
+    def _is_metaphor(self, context: str, match_text: str = "", match_pos_in_context: int = 0) -> bool:
+        """
+        Detecta si el contexto sugiere una metáfora.
+
+        Args:
+            context: Texto de contexto alrededor del match
+            match_text: Texto que hizo match (para verificar si la metáfora lo afecta)
+            match_pos_in_context: Posición del match dentro del contexto
+
+        Returns:
+            True si es probable que sea una metáfora
+        """
         for pattern in self._metaphor_patterns:
-            if pattern.search(context):
-                return True
+            # Buscar TODAS las ocurrencias del patrón de metáfora en el contexto
+            for metaphor_match in pattern.finditer(context):
+                metaphor_pos = metaphor_match.start()
+                metaphor_end = metaphor_match.end()
+
+                # Si no tenemos info del match, cualquier metáfora cuenta
+                if not match_text or match_pos_in_context < 0:
+                    return True
+
+                match_end_in_context = match_pos_in_context + len(match_text)
+
+                # Caso 1: Metáfora está ANTES del match
+                if metaphor_end <= match_pos_in_context:
+                    between = context[metaphor_end:match_pos_in_context]
+                    # Si hay puntuación entre la metáfora y el match, no afecta
+                    if ',' in between or '.' in between or ';' in between or '\n' in between:
+                        continue
+                    # Si hay más de 20 caracteres, probablemente no afecta
+                    if len(between.strip()) > 20:
+                        continue
+                    return True
+
+                # Caso 2: Metáfora está DENTRO del match
+                elif metaphor_pos >= match_pos_in_context and metaphor_end <= match_end_in_context:
+                    return True
+
+                # Caso 3: Metáfora está DESPUÉS del match
+                elif metaphor_pos >= match_end_in_context:
+                    between = context[match_end_in_context:metaphor_pos]
+                    # Si hay puntuación entre el match y la metáfora, no afecta
+                    if ',' in between or '.' in between or ';' in between or '\n' in between:
+                        continue
+                    # Si hay más de 20 caracteres, probablemente no afecta
+                    if len(between.strip()) > 20:
+                        continue
+                    return True
+
         return False
 
     def _is_negated(self, context: str, match_pos: int) -> bool:
@@ -1586,6 +1829,16 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                 return 0 < age < 200  # Rango razonable
             except ValueError:
                 return False
+
+        if key == AttributeKey.PROFESSION:
+            # Excluir palabras genéricas que no son profesiones
+            excluded = {
+                "hombre", "mujer", "persona", "tipo", "chico", "chica",
+                "joven", "viejo", "niño", "niña", "señor", "señora",
+                "alto", "bajo", "grande", "pequeño", "bueno", "malo",
+                "mejor", "peor", "primero", "primera", "último", "última",
+            }
+            return value_lower not in excluded and len(value) > 3
 
         # Para otros tipos, aceptar cualquier valor no vacío
         return len(value) > 1

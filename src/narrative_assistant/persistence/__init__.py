@@ -8,6 +8,7 @@ from .document_fingerprint import DocumentFingerprint, FingerprintMatcher
 from .session import Session, SessionManager, AlertAction
 from .history import HistoryEntry, HistoryManager, ChangeType
 from .timeline import TimelineRepository, TimelineEventData, TemporalMarkerData
+from .glossary import GlossaryEntry, GlossaryRepository
 from .analysis import (
     AnalysisRepository,
     AnalysisRun,
@@ -47,6 +48,9 @@ __all__ = [
     "TimelineRepository",
     "TimelineEventData",
     "TemporalMarkerData",
+    # Glossary
+    "GlossaryEntry",
+    "GlossaryRepository",
     # Analysis
     "AnalysisRepository",
     "AnalysisRun",

@@ -125,6 +125,7 @@ CREATE TABLE IF NOT EXISTS entity_mentions (
 
 CREATE INDEX IF NOT EXISTS idx_mentions_entity ON entity_mentions(entity_id);
 CREATE INDEX IF NOT EXISTS idx_mentions_chapter ON entity_mentions(chapter_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_mentions_unique_position ON entity_mentions(entity_id, start_char, end_char);
 
 -- Atributos de entidades
 CREATE TABLE IF NOT EXISTS entity_attributes (
