@@ -54,6 +54,13 @@ jobs:
       - name: Build sidecar
         run: python scripts/build_sidecar.py --clean
 
+      - name: Verify sidecar was built
+        run: |
+          Write-Host "Checking binaries directory..."
+          Get-ChildItem -Path src-tauri/binaries/
+          Write-Host "Expected file for Windows: narrative-assistant-server-x86_64-pc-windows-msvc.exe"
+        shell: pwsh
+
       - name: Prepare resources
         run: |
           New-Item -ItemType Directory -Force -Path src-tauri/resources
@@ -114,6 +121,12 @@ jobs:
 
       - name: Build sidecar
         run: python scripts/build_sidecar.py --clean
+
+      - name: Verify sidecar was built
+        run: |
+          echo "Checking binaries directory..."
+          ls -la src-tauri/binaries/
+          echo "Expected file for macOS: narrative-assistant-server-*-apple-darwin*"
 
       - name: Prepare resources
         run: |
@@ -177,6 +190,12 @@ jobs:
 
       - name: Build sidecar
         run: python scripts/build_sidecar.py --clean
+
+      - name: Verify sidecar was built
+        run: |
+          echo "Checking binaries directory..."
+          ls -la src-tauri/binaries/
+          echo "Expected file for Linux: narrative-assistant-server-x86_64-unknown-linux-gnu"
 
       - name: Prepare resources
         run: |

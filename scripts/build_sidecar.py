@@ -72,7 +72,8 @@ def build_sidecar(project_root: Path, debug: bool = False, target: str | None = 
     target_triple = target or get_target_triple()
     system = platform.system().lower()
 
-    # Nombre del ejecutable
+    # Nombre del ejecutable (Tauri agrega el sufijo de plataforma automáticamente)
+    # Usamos el nombre base + sufijo de target
     exe_name = f"narrative-assistant-server-{target_triple}"
     if system == "windows":
         exe_name += ".exe"
