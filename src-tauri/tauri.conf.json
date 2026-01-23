@@ -1,11 +1,11 @@
 {
   "$schema": "https://schema.tauri.app/config/2.0",
   "productName": "Narrative Assistant",
-  "version": "0.1.1",
+  "version": "0.1.4",
   "identifier": "com.tfm.narrative-assistant",
   "build": {
     "beforeDevCommand": "",
-    "beforeBuildCommand": "",
+    "beforeBuildCommand": "cd ../frontend && npm install && npm run build",
     "devUrl": "http://localhost:5173",
     "frontendDist": "../frontend/dist"
   },
