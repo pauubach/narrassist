@@ -811,7 +811,7 @@ const cleanExcerptForSearch = (text: string): string => {
 // Resalta un texto específico dentro del capítulo
 // position: posición de caracteres donde debería estar el texto (para desambiguar)
 // retryCount: número de reintentos realizados (para esperar a que v-html renderice)
-const highlightTextInChapter = async (chapterElement: Element, text: string, position?: number, retryCount: number = 0) => {
+const highlightTextInChapter = async (chapterElement: Element, text: string, position?: number, retryCount: number = 0): Promise<void> => {
   const MAX_RETRIES = 3
   const RETRY_DELAY = 150
 

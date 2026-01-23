@@ -1239,6 +1239,7 @@ import {
   type FontFamily,
   type PresetInfo
 } from '@/stores/theme'
+import type { CorrectionConfig } from '@/types'
 
 const router = useRouter()
 const toast = useToast()
@@ -1483,11 +1484,11 @@ const changingLocation = ref(false)
 // Configuración de Correcciones
 // ============================================================================
 
-interface CorrectionPreset {
+interface CorrectionPresetLocal {
   id: string
   name: string
   description: string
-  config: Record<string, unknown>
+  config: CorrectionConfig
 }
 
 interface CorrectionOptions {
@@ -1500,10 +1501,10 @@ interface CorrectionOptions {
   sensitivity_levels: Array<{ value: string; label: string }>
 }
 
-const correctionPresetOptions = ref<CorrectionPreset[]>([])
+const correctionPresetOptions = ref<CorrectionPresetLocal[]>([])
 const correctionOptions = ref<CorrectionOptions | null>(null)
 const defaultCorrectionPreset = ref<string>('default')
-const defaultCorrectionConfig = ref<Record<string, unknown> | null>(null)
+const defaultCorrectionConfig = ref<CorrectionConfig | null>(null)
 const defaultRegion = ref<string>('es_ES')
 const useLLMReview = ref<boolean>(false)
 

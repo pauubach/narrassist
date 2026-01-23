@@ -22,6 +22,7 @@ export * from './domain/projects'
 export * from './domain/theme'
 export * from './domain/timeline'
 export * from './domain/chat'
+export * from './domain/corrections'
 
 // =============================================================================
 // API Types (namespace para claridad)

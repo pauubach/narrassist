@@ -132,6 +132,8 @@ export interface SeverityConfig {
   icon: string
   color: string
   priority: number
+  /** PrimeVue severity value for Tag/Badge components */
+  primeSeverity: 'danger' | 'warn' | 'info' | 'success' | 'secondary'
 }
 
 export interface CategoryConfig {
@@ -151,30 +153,35 @@ const severityConfigs: Record<AlertSeverity, SeverityConfig> = {
     icon: 'pi pi-exclamation-circle',
     color: 'var(--ds-alert-critical)',
     priority: 5,
+    primeSeverity: 'danger',
   },
   high: {
     label: 'Alto',
     icon: 'pi pi-exclamation-triangle',
     color: 'var(--ds-alert-high)',
     priority: 4,
+    primeSeverity: 'warn',
   },
   medium: {
     label: 'Medio',
     icon: 'pi pi-info-circle',
     color: 'var(--ds-alert-medium)',
     priority: 3,
+    primeSeverity: 'info',
   },
   low: {
     label: 'Bajo',
     icon: 'pi pi-circle',
     color: 'var(--ds-alert-low)',
     priority: 2,
+    primeSeverity: 'secondary',
   },
   info: {
     label: 'Información',
     icon: 'pi pi-info',
     color: 'var(--ds-alert-info)',
     priority: 1,
+    primeSeverity: 'info',
   },
 }
 

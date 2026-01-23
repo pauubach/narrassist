@@ -57,6 +57,8 @@ export interface Project {
   name: string
   description?: string
   documentPath?: string
+  /** @deprecated Use documentPath instead */
+  source_path?: string
   documentFormat: string
   createdAt: Date
   lastModified: Date

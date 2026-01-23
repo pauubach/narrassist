@@ -212,7 +212,7 @@ function insertExample() {
 
     <TabView :activeIndex="activeTab" @update:activeIndex="activeTab = $event" class="style-tabview">
       <!-- Tab 1: Configuracion de Correcciones -->
-      <TabPanel>
+      <TabPanel value="0">
         <template #header>
           <i class="pi pi-sliders-h"></i>
           <span>Detectores</span>
@@ -224,7 +224,7 @@ function insertExample() {
       </TabPanel>
 
       <!-- Tab 2: Reglas Editoriales -->
-      <TabPanel>
+      <TabPanel value="1">
         <template #header>
           <i class="pi pi-file-edit"></i>
           <span>Reglas editoriales</span>
