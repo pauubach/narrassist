@@ -98,7 +98,23 @@
       "Bash(cargo tauri build --help:*)",
       "Bash(gh --version:*)",
       "Bash(\"/c/Users/pauub/AppData/Local/Narrative Assistant/narrative-assistant-server.exe\" --help)",
-      "Bash(\"/c/Users/pauub/AppData/Local/Narrative Assistant/narrative-assistant-server.exe\")"
+      "Bash(\"/c/Users/pauub/AppData/Local/Narrative Assistant/narrative-assistant-server.exe\")",
+      "Bash(gh release list:*)",
+      "Bash(Start-Sleep -Seconds 3)",
+      "Bash(cargo tauri build:*)",
+      "Bash(d:/repos/tfm/api-server/.venv/Scripts/python.exe -m PyInstaller:*)",
+      "Bash(cat:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: entity detection and user-friendly progress messages\n\nEntity detection:\n- Group entities by canonical name only \\(not label+name\\) to unify \"Laura\" mentions\n- Add overlap filtering to prefer longer entity matches\n- Filter Spanish punctuation from entity boundaries\n\nProgress UX:\n- Per-character progress during attribute analysis \\(\"Analizando: Laura García 3/175\"\\)\n- User-friendly phase names \\(no technical terms like spaCy, NER, LLM\\)\n- Better loading message in DocumentViewer \\(\"El contenido aparecerá en breve\"\\)\n\nFixes:\n- DocumentAlreadyExistsError severity changed to FATAL for proper detection\n- LLM client warns only once when unavailable \\(no repeated warnings\\)\n- httpx added to api-server requirements for Ollama connection\n\nUI improvements:\n- AlertsTab resolve-all confirmation dialog\n- Various theme and styling improvements\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(gh run:*)",
+      "Bash(file:*)",
+      "Bash(git -C d:/repos/tfm log --oneline -5 -- src-tauri/icons/)",
+      "Bash(cargo tauri icon:*)",
+      "Bash(cmd.exe /c \"taskkill /F /IM ollama.exe 2>nul & d:\\\\repos\\\\tfm\\\\scripts\\\\start_ollama_cpu.bat\")",
+      "Bash(pushd:*)",
+      "Bash(cmd /c \"chcp 65001 > nul && python test_attribute_extraction_accents.py\")",
+      "Bash(.venvScriptspython.exe debug_attributes.py)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: Editorial Assistant v1.0.0 - Complete implementation\n\nMajor Features:\n- 12 editorial correction detectors \\(typography, repetitions, agreement,\n  terminology, regional vocabulary, field terminology, clarity, grammar,\n  anglicisms, crutch words, fillers, readability\\)\n- Sequential correction mode UI for efficient workflow\n- Glossary management system \\(CRUD, LLM context, export\\)\n- Track Changes export for Word documents\n- AlertFormatter utility for centralized formatting\n- useAlertUtils composable for frontend code deduplication\n- Consolidated alert status API endpoints\n\nUI Improvements:\n- ResumenTab with chapter density visualization\n- EntitiesTab with attribute refresh on re-analysis\n- DocumentViewer with retry mechanism for highlight timing\n- DsInput component migration across 6+ files\n- StyleTab with filler and readability analysis\n\nBackend Improvements:\n- _verify_entity_ownership and _verify_alert_ownership helpers\n- AlertFormatter for context formatting \\(DRY\\)\n- Filler detector and readability analyzer\n- Title preprocessing for better entity extraction\n\nDocumentation:\n- ROADMAP_V2.md with ideas from Stilus and MeaningCloud\n- EDITORIAL_ASSISTANT_ROADMAP.md updated with implementation status\n- E2E test specs for attribute extraction and alerts\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git tag -a v1.0.0 -m \"$\\(cat <<''EOF''\nRelease v1.0.0 - Editorial Assistant Complete\n\nThis is the first stable release of Narrative Assistant as a complete\neditorial assistant tool for professional proofreaders and editors.\n\n## Highlights\n\n### Editorial Correction Detectors \\(12\\)\n- Typography \\(dashes, quotes, spacing\\)\n- Lexical repetitions\n- Gender/number agreement\n- Inconsistent terminology\n- Regional vocabulary \\(es_ES, es_MX\\)\n- Field-specific terminology\n- Clarity/Style \\(long sentences\\)\n- Grammar \\(leísmo, dequeísmo\\)\n- Anglicisms\n- Author crutch words\n- Filler detection\n- Readability analysis \\(Flesch-Szigriszt\\)\n\n### Workflow Features\n- Sequential correction mode\n- Glossary management \\(CRUD, LLM context, export\\)\n- Track Changes export for Word\n- Detailed correction reports\n\n### Technical Improvements\n- Centralized AlertFormatter utility\n- useAlertUtils composable \\(DRY\\)\n- Consolidated API endpoints\n- E2E test coverage\n\n### Documentation\n- ROADMAP_V2.md with future plans\n- Ideas from Stilus and MeaningCloud research\n\n## Requirements\n- Python 3.11+\n- Ollama \\(optional, for LLM features\\)\n- ~2GB disk for NLP models\n\n## Known Issues\n- Code signing pending \\(Windows/macOS certificates required\\)\nEOF\n\\)\")"
     ],
     "additionalDirectories": [
       "d:\\repos\\tfm"

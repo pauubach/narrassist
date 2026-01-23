@@ -4,7 +4,7 @@
 mod menu;
 
 use std::sync::{Arc, Mutex};
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_shell::process::CommandChild;
 
 /// Estado compartido del servidor backend
