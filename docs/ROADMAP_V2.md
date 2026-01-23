@@ -86,7 +86,7 @@
 
 | Funcionalidad | Descripción | Complejidad |
 |---------------|-------------|-------------|
-| **Análisis de sentimiento por capítulo** | Gráfico de arco emocional del libro | Media |
+| **UI Arco emocional** | Gráfico de arco emocional del libro (backend ya implementado: `sentiment.py`, `emotional_coherence.py`) | Fácil |
 | **Ontología expandida (200+ clases)** | Clasificar entidades en subcategorías más precisas | Alta |
 | **Detección de fechas y cantidades** | Extraer y normalizar fechas, números, monedas | Media |
 
@@ -105,12 +105,13 @@
 
 | Feature | Módulo Backend | UI Necesaria |
 |---------|----------------|--------------|
-| **Knowledge Tracking** | `character_knowledge.py` | Panel "Qué sabe cada personaje" |
-| **Voice Profiles** | `voice/profiles.py` | Vista de perfiles de voz |
-| **Register Analysis** | `voice/register.py` | Indicador de registro lingüístico |
-| **Speaker Attribution** | `voice/speaker_attribution.py` | Atribución visual en diálogos |
-| **Emotional Coherence** | `emotional_coherence.py` | Arco emocional visual |
-| **Interaction Patterns** | `interactions/` | Panel de patrones de interacción |
+| **Knowledge Tracking** | `character_knowledge.py` ✅ | Panel "Qué sabe cada personaje" |
+| **Voice Profiles** | `voice/profiles.py` ✅ | Vista de perfiles de voz |
+| **Register Analysis** | `voice/register.py` ✅ | Indicador de registro lingüístico |
+| **Speaker Attribution** | `voice/speaker_attribution.py` ✅ | Atribución visual en diálogos |
+| **Sentiment Analysis** | `nlp/sentiment.py` ✅ | UI de análisis de sentimiento |
+| **Emotional Coherence** | `emotional_coherence.py` ✅ | Arco emocional visual |
+| **Interaction Patterns** | `interactions/` ✅ | Panel de patrones de interacción |
 
 ### P2 - Detectores Adicionales
 
