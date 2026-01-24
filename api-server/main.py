@@ -60,9 +60,21 @@ except Exception as e:
 import sys
 from pathlib import Path
 
+def get_log_directory():
+    """Get platform-specific log directory for Narrative Assistant"""
+    if sys.platform == 'win32':
+        # Windows: %LOCALAPPDATA%\Narrative Assistant\logs
+        return Path.home() / "AppData" / "Local" / "Narrative Assistant" / "logs"
+    elif sys.platform == 'darwin':
+        # macOS: ~/Library/Logs/Narrative Assistant
+        return Path.home() / "Library" / "Logs" / "Narrative Assistant"
+    else:
+        # Linux: ~/.local/share/narrative-assistant/logs
+        return Path.home() / ".local" / "share" / "narrative-assistant" / "logs"
+
 # Si estamos en un ejecutable empaquetado, usar un archivo de log
 if getattr(sys, 'frozen', False):
-    log_dir = Path.home() / "AppData" / "Local" / "Narrative Assistant" / "logs"
+    log_dir = get_log_directory()
     log_dir.mkdir(parents=True, exist_ok=True)
     log_file = log_dir / "narrative-assistant-server.log"
     
@@ -9739,8 +9751,7 @@ if __name__ == "__main__":
         
         # Escribir a archivo de log
         try:
-            from pathlib import Path
-            log_dir = Path.home() / "AppData" / "Local" / "Narrative Assistant" / "logs"
+            log_dir = get_log_directory()
             log_dir.mkdir(parents=True, exist_ok=True)
             error_file = log_dir / "startup_error.log"
             
