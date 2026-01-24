@@ -32,7 +32,7 @@
 
 <script setup lang="ts">
 import { RouterView } from 'vue-router'
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import Toast from 'primevue/toast'
 import { useAppStore } from '@/stores/app'
 import { useThemeStore } from '@/stores/theme'
@@ -120,7 +120,7 @@ onMounted(() => {
     } else if (shouldShowTutorial && !systemStore.modelsReady) {
       // Si los modelos no están listos, esperar hasta que lo estén
       console.log('[Tutorial] Esperando a que los modelos estén listos...')
-      const unwatch = watch(() => systemStore.modelsReady, (ready) => {
+      const unwatch = watch(() => systemStore.modelsReady, (ready: boolean) => {
         if (ready) {
           console.log('[Tutorial] Modelos listos! Mostrando tutorial')
           setTimeout(() => {
