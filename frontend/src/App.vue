@@ -43,8 +43,10 @@ import TutorialDialog from '@/components/TutorialDialog.vue'
 import UserGuideDialog from '@/components/UserGuideDialog.vue'
 import MenuBar from '@/components/MenuBar.vue'
 import ModelSetupDialog from '@/components/ModelSetupDialog.vue'
+import { useSystemStore } from '@/stores/system'
 
 const appStore = useAppStore()
+const systemStore = useSystemStore()
 const themeStore = useThemeStore()
 const showShortcutsHelp = ref(false)
 const showAbout = ref(false)
@@ -102,18 +104,36 @@ onMounted(() => {
   console.log('Vue 3.5 + PrimeVue 4')
   console.log(`Tema: ${appStore.theme} | Modo oscuro: ${appStore.isDark}`)
 
-  // Mostrar tutorial si es necesario
-  const shouldShowTutorial = checkTutorialStatus()
-  console.log('[Tutorial] shouldShowTutorial:', shouldShowTutorial)
+  // Esperar a que los modelos estén listos antes de mostrar el tutorial
+  const tryShowTutorial = () => {
+    const shouldShowTutorial = checkTutorialStatus()
+    console.log('[Tutorial] shouldShowTutorial:', shouldShowTutorial)
+    console.log('[Tutorial] modelsReady:', systemStore.modelsReady)
 
-  if (shouldShowTutorial) {
-    // Delay más largo para asegurar que PrimeVue Dialog esté listo
-    setTimeout(() => {
-      console.log('[Tutorial] Activando showTutorial.value = true')
-      showTutorial.value = true
-      console.log('[Tutorial] showTutorial.value =', showTutorial.value)
-    }, 800)
+    if (shouldShowTutorial && systemStore.modelsReady) {
+      // Solo mostrar tutorial cuando los modelos estén completamente listos
+      setTimeout(() => {
+        console.log('[Tutorial] Activando showTutorial.value = true')
+        showTutorial.value = true
+        console.log('[Tutorial] showTutorial.value =', showTutorial.value)
+      }, 1000)
+    } else if (shouldShowTutorial && !systemStore.modelsReady) {
+      // Si los modelos no están listos, esperar hasta que lo estén
+      console.log('[Tutorial] Esperando a que los modelos estén listos...')
+      const unwatch = watch(() => systemStore.modelsReady, (ready) => {
+        if (ready) {
+          console.log('[Tutorial] Modelos listos! Mostrando tutorial')
+          setTimeout(() => {
+            showTutorial.value = true
+          }, 1000)
+          unwatch() // Dejar de observar
+        }
+      })
+    }
   }
+
+  // Intentar mostrar tutorial
+  tryShowTutorial()
 
   // Listeners para eventos de teclado
   window.addEventListener('keyboard:show-help', () => {
