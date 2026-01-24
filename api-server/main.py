@@ -21,6 +21,8 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 # Imports del backend narrative_assistant
+# NOTA: Estos imports pueden fallar si las dependencias NLP no están instaladas
+# El servidor arranca de todas formas y permite instalar las dependencias via API
 project_manager = None
 entity_repository = None
 alert_repository = None
@@ -28,6 +30,9 @@ chapter_repository = None
 section_repository = None
 get_config = None
 NA_VERSION = "unknown"
+Database = None
+MODULES_LOADED = False
+MODULES_ERROR = None
 
 try:
     from narrative_assistant.persistence.project import ProjectManager
@@ -45,16 +50,14 @@ try:
     alert_repository = AlertRepository()
     chapter_repository = ChapterRepository()
     section_repository = SectionRepository()
+    MODULES_LOADED = True
 except Exception as e:
-    logging.error(f"Error initializing narrative_assistant modules: {type(e).__name__}: {e}")
-    NA_VERSION = "unknown"
-    project_manager = None
-    entity_repository = None
-    alert_repository = None
-    chapter_repository = None
-    section_repository = None
-    get_config = None
-    Database = None  # type: ignore
+    import logging as _logging
+    _logging.basicConfig(level=_logging.INFO)
+    _logging.warning(f"NLP modules not loaded: {type(e).__name__}: {e}")
+    _logging.info("Server will start in limited mode. Install dependencies via /api/models/download")
+    MODULES_ERROR = str(e)
+    NA_VERSION = "0.1.6"  # Fallback version
 
 # Configuración de logging
 import sys
@@ -238,18 +241,10 @@ async def health_check():
     Returns:
         HealthResponse con status del sistema
     """
-    backend_loaded = False
-    try:
-        # Intentar cargar config para verificar backend
-        config = get_config()
-        backend_loaded = config is not None
-    except Exception as e:
-        logger.warning(f"Backend not fully loaded: {e}")
-
     return HealthResponse(
         status="ok",
         version=NA_VERSION,
-        backend_loaded=backend_loaded,
+        backend_loaded=MODULES_LOADED,
         timestamp=datetime.now().isoformat(),
     )
 
@@ -261,6 +256,17 @@ async def system_info():
     Returns:
         Información detallada del sistema
     """
+    if not MODULES_LOADED:
+        return ApiResponse(
+            success=False,
+            message="NLP modules not loaded. Please install dependencies.",
+            data={
+                "version": NA_VERSION,
+                "backend_loaded": False,
+                "error": MODULES_ERROR,
+            }
+        )
+
     try:
         config = get_config()
 
@@ -297,6 +303,27 @@ async def models_status():
     Returns:
         ApiResponse con estado de cada modelo (instalado, tamaño, ruta)
     """
+    # Si los módulos no están cargados, retornar estado de dependencias
+    if not MODULES_LOADED:
+        import sys
+        import importlib.util
+        
+        deps_status = {
+            "numpy": importlib.util.find_spec("numpy") is not None,
+            "spacy": importlib.util.find_spec("spacy") is not None,
+            "sentence_transformers": importlib.util.find_spec("sentence_transformers") is not None,
+        }
+        
+        return ApiResponse(
+            success=True,
+            data={
+                "backend_loaded": False,
+                "dependencies_needed": True,
+                "dependencies_status": deps_status,
+                "all_installed": all(deps_status.values()),
+            }
+        )
+    
     try:
         from narrative_assistant.core.model_manager import get_model_manager
 
@@ -355,6 +382,63 @@ class DownloadModelsRequest(BaseModel):
     """Request para descargar modelos"""
     models: list[str] = Field(default=["spacy", "embeddings"], description="Modelos a descargar")
     force: bool = Field(default=False, description="Forzar re-descarga")
+
+
+@app.post("/api/dependencies/install")
+async def install_dependencies():
+    """
+    Instala las dependencias Python necesarias (numpy, spacy, sentence-transformers, etc.).
+    
+    Este endpoint debe ser llamado en el primer inicio si las dependencias no están instaladas.
+    Usa pip para instalar los paquetes necesarios.
+    
+    Returns:
+        ApiResponse indicando que la instalación ha comenzado
+    """
+    import subprocess
+    import sys
+    import threading
+    
+    def install_task():
+        try:
+            logger.info("Starting dependencies installation...")
+            
+            # Lista de dependencias necesarias
+            dependencies = [
+                "numpy>=1.24.0",
+                "spacy>=3.7.0",
+                "sentence-transformers>=2.2.0",
+                "transformers>=4.30.0",
+                "torch>=2.0.0",
+                "pandas>=2.0.0",
+                "scikit-learn>=1.3.0",
+            ]
+            
+            # Instalar usando pip
+            for dep in dependencies:
+                logger.info(f"Installing {dep}...")
+                subprocess.check_call(
+                    [sys.executable, "-m", "pip", "install", "--no-cache-dir", dep],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.PIPE
+                )
+                logger.info(f"✓ {dep} installed")
+            
+            logger.info("All dependencies installed successfully!")
+            logger.info("Please restart the application to load the new dependencies.")
+            
+        except Exception as e:
+            logger.error(f"Error installing dependencies: {e}", exc_info=True)
+    
+    # Ejecutar en segundo plano
+    thread = threading.Thread(target=install_task, daemon=True)
+    thread.start()
+    
+    return ApiResponse(
+        success=True,
+        message="Dependencies installation started. This may take several minutes. Check logs for progress.",
+        data={"restart_required": True}
+    )
 
 
 @app.post("/api/models/download")
