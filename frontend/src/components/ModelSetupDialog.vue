@@ -9,7 +9,7 @@ const systemStore = useSystemStore()
 const visible = ref(false)
 const downloadProgress = ref(0)
 const currentModel = ref('')
-const downloadPhase = ref<'checking' | 'downloading' | 'completed' | 'error'>('checking')
+const downloadPhase = ref<'checking' | 'installing-deps' | 'downloading' | 'completed' | 'error'>('checking')
 
 // Check models on mount - should be installed during installation
 // If not, download automatically (transparent to user)
@@ -17,11 +17,16 @@ onMounted(async () => {
   downloadPhase.value = 'checking'
   await systemStore.checkModelsStatus()
 
-  if (systemStore.modelsReady) {
+  if (systemStore.dependenciesNeeded) {
+    // Dependencies missing - install them first
+    visible.value = true
+    downloadPhase.value = 'installing-deps'
+    startDependenciesInstallation()
+  } else if (systemStore.modelsReady) {
     // Models already installed (normal case after installation)
     downloadPhase.value = 'completed'
   } else {
-    // Models missing - download automatically
+    // Dependencies OK but models missing - download automatically
     // This happens if installer couldn't download (no internet, etc.)
     visible.value = true
     downloadPhase.value = 'downloading'
@@ -104,6 +109,30 @@ const totalDownloadSize = computed(() => {
 async function startAutomaticDownload() {
   await systemStore.downloadModels()
 }
+
+async function startDependenciesInstallation() {
+  downloadProgress.value = 0
+  currentModel.value = 'Instalando dependencias de Python...'
+  startProgressSimulation()
+  await systemStore.installDependencies()
+}
+
+// Watch for dependencies installation
+watch(() => systemStore.dependenciesInstalling, (installing) => {
+  if (!installing && downloadPhase.value === 'installing-deps') {
+    // Dependencies installed, check if backend is ready
+    setTimeout(async () => {
+      await systemStore.checkModelsStatus()
+      if (!systemStore.dependenciesNeeded) {
+        // Dependencies OK, now download models
+        downloadPhase.value = 'downloading'
+        startAutomaticDownload()
+      } else if (systemStore.modelsError) {
+        downloadPhase.value = 'error'
+      }
+    }, 2000)
+  }
+})
 
 function retryDownload() {
   downloadPhase.value = 'downloading'

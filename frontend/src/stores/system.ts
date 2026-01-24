@@ -16,6 +16,11 @@ export interface ModelsStatus {
     models: string[]
   }
   all_required_installed: boolean
+  backend_loaded?: boolean
+  dependencies_needed?: boolean
+  dependencies_status?: Record<string, boolean>
+  all_installed?: boolean
+  installing?: boolean
 }
 
 export const useSystemStore = defineStore('system', () => {
@@ -30,6 +35,8 @@ export const useSystemStore = defineStore('system', () => {
 
   // Computed: are all required models installed?
   const modelsReady = computed(() => modelsStatus.value?.all_required_installed ?? false)
+  const dependenciesInstalling = computed(() => modelsStatus.value?.installing ?? false)
+  const dependenciesNeeded = computed(() => modelsStatus.value?.dependencies_needed ?? false)
 
   async function checkBackendStatus() {
     try {
@@ -131,6 +138,33 @@ export const useSystemStore = defineStore('system', () => {
   // Check backend status on store creation
   checkBackendStatus()
 
+  async function installDependencies(): Promise<boolean> {
+    modelsError.value = null
+    
+    try {
+      const response = await fetch(apiUrl('/api/dependencies/install'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success) {
+          // Start polling for status
+          pollModelsStatus()
+          return true
+        } else {
+          modelsError.value = data.error || 'Error installing dependencies'
+        }
+      } else {
+        modelsError.value = 'Failed to install dependencies'
+      }
+    } catch (error) {
+      modelsError.value = error instanceof Error ? error.message : 'Network error'
+    }
+    return false
+  }
+
   return {
     // State
     backendConnected,
@@ -142,11 +176,14 @@ export const useSystemStore = defineStore('system', () => {
 
     // Computed
     modelsReady,
+    dependenciesInstalling,
+    dependenciesNeeded,
 
     // Actions
     checkBackendStatus,
     checkModelsStatus,
     downloadModels,
+    installDependencies,
     stopPolling
   }
 })

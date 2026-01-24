@@ -20,6 +20,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+# Track installation status
+INSTALLING_DEPENDENCIES = False
+
 # Imports del backend narrative_assistant
 # NOTA: Estos imports pueden fallar si las dependencias NLP no están instaladas
 # El servidor arranca de todas formas y permite instalar las dependencias via API
@@ -57,7 +60,7 @@ except Exception as e:
     _logging.warning(f"NLP modules not loaded: {type(e).__name__}: {e}")
     _logging.info("Server will start in limited mode. Install dependencies via /api/models/download")
     MODULES_ERROR = str(e)
-    NA_VERSION = "0.1.6"  # Fallback version
+    NA_VERSION = "0.1.7"  # Fallback version
 
 # Configuración de logging
 import sys
@@ -321,6 +324,7 @@ async def models_status():
                 "dependencies_needed": True,
                 "dependencies_status": deps_status,
                 "all_installed": all(deps_status.values()),
+                "installing": INSTALLING_DEPENDENCIES,
             }
         )
     
@@ -389,17 +393,23 @@ async def install_dependencies():
     """
     Instala las dependencias Python necesarias (numpy, spacy, sentence-transformers, etc.).
     
-    Este endpoint debe ser llamado en el primer inicio si las dependencias no están instaladas.
-    Usa pip para instalar los paquetes necesarios.
+    Este endpoint instala las dependencias y luego intenta recargar los módulos.
+    NO requiere reinicio manual de la aplicación.
     
     Returns:
         ApiResponse indicando que la instalación ha comenzado
     """
     import subprocess
     import sys
-    import threading
+    import importlib
     
     def install_task():
+        global MODULES_LOADED, MODULES_ERROR, INSTALLING_DEPENDENCIES
+        global project_manager, entity_repository, alert_repository
+        global chapter_repository, section_repository, get_config, Database
+        
+        INSTALLING_DEPENDENCIES = True
+        
         try:
             logger.info("Starting dependencies installation...")
             
@@ -414,30 +424,65 @@ async def install_dependencies():
                 "scikit-learn>=1.3.0",
             ]
             
-            # Instalar usando pip
+            # Instalar usando pip con --user para evitar problemas de permisos
             for dep in dependencies:
                 logger.info(f"Installing {dep}...")
-                subprocess.check_call(
-                    [sys.executable, "-m", "pip", "install", "--no-cache-dir", dep],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.PIPE
+                result = subprocess.run(
+                    [sys.executable, "-m", "pip", "install", "--user", "--no-cache-dir", dep],
+                    capture_output=True,
+                    text=True
                 )
+                if result.returncode != 0:
+                    logger.error(f"Failed to install {dep}: {result.stderr}")
+                    raise Exception(f"Failed to install {dep}")
                 logger.info(f"✓ {dep} installed")
             
             logger.info("All dependencies installed successfully!")
-            logger.info("Please restart the application to load the new dependencies.")
+            logger.info("Attempting to load narrative_assistant modules...")
+            
+            # Intentar recargar los módulos
+            try:
+                from narrative_assistant.persistence.project import ProjectManager
+                from narrative_assistant.persistence.database import get_database, Database as DB
+                from narrative_assistant.persistence.chapter import ChapterRepository, SectionRepository
+                from narrative_assistant.entities.repository import EntityRepository
+                from narrative_assistant.alerts.repository import AlertRepository
+                from narrative_assistant.core.config import get_config as get_cfg
+                from narrative_assistant import __version__
+                
+                # Actualizar variables globales
+                project_manager = ProjectManager()
+                entity_repository = EntityRepository()
+                alert_repository = AlertRepository()
+                chapter_repository = ChapterRepository()
+                section_repository = SectionRepository()
+                get_config = get_cfg
+                Database = DB
+                MODULES_LOADED = True
+                MODULES_ERROR = None
+                INSTALLING_DEPENDENCIES = False
+                
+                logger.info("✓ Modules loaded successfully! Backend is now fully functional.")
+                
+            except Exception as load_error:
+                logger.error(f"Failed to load modules after installation: {load_error}")
+                logger.info("You may need to restart the application.")
+                raise
             
         except Exception as e:
             logger.error(f"Error installing dependencies: {e}", exc_info=True)
+            INSTALLING_DEPENDENCIES = False
+            MODULES_ERROR = str(e)
     
     # Ejecutar en segundo plano
+    import threading
     thread = threading.Thread(target=install_task, daemon=True)
     thread.start()
     
     return ApiResponse(
         success=True,
-        message="Dependencies installation started. This may take several minutes. Check logs for progress.",
-        data={"restart_required": True}
+        message="Dependencies installation started. This may take several minutes. Check /api/models/status for progress.",
+        data={"installing": True}
     )
 
 
