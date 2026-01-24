@@ -57,10 +57,29 @@ except Exception as e:
     Database = None  # type: ignore
 
 # Configuración de logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
+import sys
+from pathlib import Path
+
+# Si estamos en un ejecutable empaquetado, usar un archivo de log
+if getattr(sys, 'frozen', False):
+    log_dir = Path.home() / "AppData" / "Local" / "Narrative Assistant" / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_file = log_dir / "narrative-assistant-server.log"
+    
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        handlers=[
+            logging.FileHandler(log_file, encoding='utf-8'),
+            logging.StreamHandler(sys.stdout) if sys.stdout else logging.NullHandler()
+        ]
+    )
+else:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    )
+
 logger = logging.getLogger(__name__)
 
 # Crear app FastAPI
@@ -9662,15 +9681,83 @@ async def get_glossary_summary(project_id: str) -> ApiResponse:
 # ============================================================================
 
 if __name__ == "__main__":
+    import sys
     import uvicorn
+    import traceback
+    
+    # Fix para PyInstaller: DEBE ir ANTES de cualquier otra cosa
+    # Asegurar que stdout/stderr/stdin existen y tienen isatty()
+    if sys.stdout is None:
+        sys.stdout = open('nul', 'w') if sys.platform == 'win32' else open('/dev/null', 'w')
+    if sys.stderr is None:
+        sys.stderr = open('nul', 'w') if sys.platform == 'win32' else open('/dev/null', 'w')
+    if sys.stdin is None:
+        sys.stdin = open('nul', 'r') if sys.platform == 'win32' else open('/dev/null', 'r')
+    
+    if not hasattr(sys.stdout, 'isatty'):
+        sys.stdout.isatty = lambda: False
+    if not hasattr(sys.stderr, 'isatty'):
+        sys.stderr.isatty = lambda: False
+    if not hasattr(sys.stdin, 'isatty'):
+        sys.stdin.isatty = lambda: False
+    
+    try:
+        logger.info(f"Starting Narrative Assistant API Server v{NA_VERSION}")
+        logger.info("Server will be available at http://localhost:8008")
 
-    logger.info(f"Starting Narrative Assistant API Server v{NA_VERSION}")
-    logger.info("Server will be available at http://localhost:8008")
-
-    uvicorn.run(
-        "main:app",
-        host="127.0.0.1",
-        port=8008,
-        reload=True,  # Solo para desarrollo
-        log_level="info",
-    )
+        # Detectar si estamos en un ejecutable empaquetado
+        is_frozen = getattr(sys, 'frozen', False)
+        
+        if is_frozen:
+            # Modo empaquetado: deshabilitar reload y usar configuración simplificada
+            uvicorn.run(
+                app,  # Usar la instancia directa, no el string
+                host="127.0.0.1",
+                port=8008,
+                reload=False,
+                log_level="info",
+                access_log=True,
+            )
+        else:
+            # Modo desarrollo: mantener reload
+            uvicorn.run(
+                "main:app",
+                host="127.0.0.1",
+                port=8008,
+                reload=True,
+                log_level="info",
+            )
+    except Exception as e:
+        # En modo empaquetado, mostrar el error
+        error_msg = f"\n\n===== ERROR FATAL =====\n"
+        error_msg += f"Error type: {type(e).__name__}\n"
+        error_msg += f"Error message: {e}\n"
+        error_msg += f"\nTraceback:\n"
+        
+        print(error_msg, file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
+        
+        # Escribir a archivo de log
+        try:
+            from pathlib import Path
+            log_dir = Path.home() / "AppData" / "Local" / "Narrative Assistant" / "logs"
+            log_dir.mkdir(parents=True, exist_ok=True)
+            error_file = log_dir / "startup_error.log"
+            
+            with open(error_file, 'w', encoding='utf-8') as f:
+                f.write(error_msg)
+                traceback.print_exc(file=f)
+            
+            print(f"\nError guardado en: {error_file}", file=sys.stderr)
+        except:
+            pass
+        
+        # Esperar solo si hay stdin disponible
+        if sys.stdin and hasattr(sys.stdin, 'read'):
+            try:
+                print("\nPresiona Enter para cerrar...", file=sys.stderr)
+                input()
+            except:
+                pass
+        
+        sys.exit(1)
