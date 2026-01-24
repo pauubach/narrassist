@@ -142,7 +142,7 @@ def build_sidecar(project_root: Path, debug: bool = False, target: str | None = 
         # SQLite
         "--hidden-import", "sqlite3",
         # Excluir modulos pesados que NO necesitamos en el sidecar
-        # Los modelos NLP se cargan dinámicamente cuando se necesitan
+        # Solo excluimos los que realmente no se usan
         "--exclude-module", "torch",
         "--exclude-module", "torchvision",
         "--exclude-module", "torchaudio",
@@ -151,22 +151,7 @@ def build_sidecar(project_root: Path, debug: bool = False, target: str | None = 
         "--exclude-module", "tensorboard",
         "--exclude-module", "tensorflow",
         "--exclude-module", "keras",
-        "--exclude-module", "spacy",
-        "--exclude-module", "thinc",
-        "--exclude-module", "sentence_transformers",
-        "--exclude-module", "transformers",
-        "--exclude-module", "huggingface_hub",
-        "--exclude-module", "tokenizers",
-        "--exclude-module", "safetensors",
-        "--exclude-module", "scipy",
-        "--exclude-module", "sklearn",
-        "--exclude-module", "scikit-learn",
-        "--exclude-module", "numpy",  # Se incluirá solo si es necesario
-        "--exclude-module", "pandas",
-        "--exclude-module", "matplotlib",
-        "--exclude-module", "PIL",
-        "--exclude-module", "cv2",
-        "--exclude-module", "opencv",
+        # Mantenemos spacy, numpy, sentence_transformers, etc. porque se usan
         "--exclude-module", "tkinter",
         "--exclude-module", "notebook",
         "--exclude-module", "jupyter",
@@ -174,8 +159,10 @@ def build_sidecar(project_root: Path, debug: bool = False, target: str | None = 
         "--exclude-module", "pytest",
         "--exclude-module", "test",
         "--exclude-module", "tests",
-        "--exclude-module", "sympy",
-        "--exclude-module", "networkx",
+        "--exclude-module", "matplotlib",
+        "--exclude-module", "PIL",
+        "--exclude-module", "cv2",
+        "--exclude-module", "opencv",
         # Consola oculta en Windows release
         *(["--noconsole"] if system == "windows" and not debug else []),
         # Debug
@@ -190,8 +177,8 @@ def build_sidecar(project_root: Path, debug: bool = False, target: str | None = 
     print(f"Construyendo sidecar para {target_triple}...")
     print(f"Comando: {' '.join(pyinstaller_args[:15])}...")
     print("")
-    print("NOTA: Excluyendo dependencias NLP pesadas (torch, spacy, transformers)")
-    print("      Los modelos se descargaran al primer inicio de la aplicacion.")
+    print("NOTA: Incluyendo spacy, numpy, sentence_transformers y dependencias NLP necesarias")
+    print("      Excluyendo solo torch, tensorflow y modulos no usados.")
     print("")
 
     result = subprocess.run(pyinstaller_args, cwd=project_root)
