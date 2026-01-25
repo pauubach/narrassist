@@ -20,6 +20,27 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+# Try to add user site-packages to sys.path before importing anything else
+# This helps when running from PyInstaller bundle
+try:
+    import sys
+    import site
+    user_site = site.getusersitepackages()
+    if user_site not in sys.path:
+        sys.path.insert(0, user_site)
+    
+    # Also try to add Anaconda/Conda site-packages if available
+    import shutil
+    python_exe = shutil.which("python3") or shutil.which("python")
+    if python_exe and ("anaconda" in python_exe.lower() or "conda" in python_exe.lower()):
+        import os
+        conda_base = os.path.dirname(os.path.dirname(python_exe))
+        conda_site = os.path.join(conda_base, "Lib", "site-packages")
+        if os.path.exists(conda_site) and conda_site not in sys.path:
+            sys.path.insert(0, conda_site)
+except Exception:
+    pass  # Silently ignore if this fails
+
 # Track installation status
 INSTALLING_DEPENDENCIES = False
 
@@ -60,7 +81,7 @@ except Exception as e:
     _logging.warning(f"NLP modules not loaded: {type(e).__name__}: {e}")
     _logging.info("Server will start in limited mode. Install dependencies via /api/models/download")
     MODULES_ERROR = str(e)
-    NA_VERSION = "0.2.1"  # Fallback version
+    NA_VERSION = "0.2.2"  # Fallback version
 
 # Configuración de logging
 import sys
@@ -460,6 +481,25 @@ async def install_dependencies():
             
             logger.info("All dependencies installed successfully!")
             logger.info("Attempting to load narrative_assistant modules...")
+            
+            # Añadir site-packages del usuario a sys.path para que Python pueda encontrar los módulos
+            import site
+            import sys
+            user_site = site.getusersitepackages()
+            if user_site not in sys.path:
+                sys.path.insert(0, user_site)
+                logger.info(f"Added {user_site} to sys.path")
+            
+            # También añadir site-packages de Anaconda si existe
+            python_exe = find_python_executable()
+            if "anaconda" in python_exe.lower() or "conda" in python_exe.lower():
+                import os
+                # Extraer ruta base de Anaconda
+                conda_base = os.path.dirname(os.path.dirname(python_exe))
+                conda_site = os.path.join(conda_base, "Lib", "site-packages")
+                if os.path.exists(conda_site) and conda_site not in sys.path:
+                    sys.path.insert(0, conda_site)
+                    logger.info(f"Added Anaconda site-packages: {conda_site}")
             
             # Intentar recargar los módulos
             try:
