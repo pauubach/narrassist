@@ -1,7 +1,7 @@
 # Estado del Proyecto - Narrative Assistant
 
-> **Última actualización**: 2026-01-19 (Audit completo - MVP listo)
-> **Versión**: 1.0.0-rc1 (Release Candidate - P0/P1/P2 completados)
+> **Última actualización**: 2026-01-26
+> **Versión tauri.conf.json**: 0.2.7 (ver CHANGELOG abajo)
 
 ---
 
@@ -871,3 +871,95 @@ El proyecto está funcionalmente completo para un MVP:
 - ✅ Tauri empaquetado (icons, menu, sidecar)
 - ✅ Sistema de licencias
 - ✅ Análisis NLP + LLM local
+
+---
+
+## CHANGELOG Reciente
+
+### v0.2.7 (2026-01-26)
+- Limpieza de código duplicado y preparación release
+
+### v0.2.6 (2026-01-25)
+- Fix: Template vacío durante instalación de dependencias
+- Fix: Ocultar ventana de consola Python en Windows
+
+### v0.2.5 (2026-01-25)
+- Fix: Template para fase 'installing-deps' en ModelSetupDialog
+
+### v0.2.4 (2026-01-25)
+- Feat: Detección de Python con verificación de versión (Python 3.10+)
+- Feat: Endpoint `/api/system/python-status`
+- Feat: UI para estado "Python no encontrado"
+- Inclusión de info Python en `/api/models/status`
+
+### v0.2.0-v0.2.3 (2026-01-24/25)
+- Fix: Setup sys.path antes de imports para PyInstaller
+- Fix: Cargar site-packages de usuario/Anaconda al inicio
+- Fix: Instalación de dependencias con PyInstaller
+- Fix: Verificar backend_loaded antes de descargar modelos
+
+### v0.1.6-v0.1.9 (2026-01-23/24)
+- Feat: Lazy loading de dependencias NLP
+- Fix: NSIS hooks para cerrar procesos antes de instalar
+- Fix: Tutorial solo se muestra cuando modelos están listos
+
+---
+
+## Estado de Detectores Editoriales
+
+### Detectores Implementados: 13
+
+| # | Detector | Módulo | Estado |
+|---|----------|--------|--------|
+| 1 | Typography | `corrections/detectors/typography.py` | ✅ Funcional |
+| 2 | Repetition | `corrections/detectors/repetition.py` | ✅ Funcional |
+| 3 | Agreement | `corrections/detectors/agreement.py` | ✅ Funcional |
+| 4 | Terminology | `corrections/detectors/terminology.py` | ✅ Funcional |
+| 5 | Regional | `corrections/detectors/regional.py` | ✅ Funcional |
+| 6 | Field Terminology | `corrections/detectors/field_terminology.py` | ✅ Funcional |
+| 7 | Clarity | `corrections/detectors/clarity.py` | ✅ Funcional |
+| 8 | Grammar | `corrections/detectors/grammar.py` | ✅ Funcional |
+| 9 | Anglicisms | `corrections/detectors/anglicisms.py` | ✅ Funcional |
+| 10 | Crutch Words | `corrections/detectors/crutch_words.py` | ✅ Funcional |
+| 11 | Glossary | `corrections/detectors/glossary.py` | ✅ Funcional |
+| 12 | **Anacoluto** | `corrections/detectors/anacoluto.py` | ⚠️ Parcial |
+| 13 | **POV** | `corrections/detectors/pov.py` | ⚠️ Parcial |
+
+### Detalle Detectores Nuevos
+
+#### AnacolutoDetector (⚠️ Parcial)
+
+| Feature | Config | Estado |
+|---------|--------|--------|
+| `check_nominativus_pendens` | ✅ | ✅ Implementado |
+| `check_broken_construction` | ✅ | ✅ Implementado (requiere spaCy) |
+| `check_incomplete_clause` | ✅ | ⚠️ Simplista - no considera límites de cláusula |
+| `check_subject_shift` | ✅ | ❌ **NO implementado** |
+| `check_dangling_modifier` | ✅ | ⚠️ Solo detecta gerundios al inicio |
+
+#### POVDetector (⚠️ Parcial)
+
+| Feature | Config | Estado |
+|---------|--------|--------|
+| `check_person_shift` | ✅ | ⚠️ Funciona pero regex muy amplios (falsos positivos) |
+| `check_tu_usted_mix` | ✅ | ✅ Implementado |
+| `check_focalizer_shift` | ✅ | ❌ **Stub** - método vacío con `pass` |
+| `check_inconsistent_omniscience` | ✅ | ❌ **NO implementado** |
+
+### Typography: Lo que FALTA
+
+| Detección | Descripción | Estado |
+|-----------|-------------|--------|
+| Comillas antes/después del punto | RAE: punto va después de comilla de cierre | ❌ No detectado |
+| Secuencias inválidas | `,.` `!?` `??` `..` (excepto `...`) | ❌ No detectado |
+| Pares de signos sin cerrar | `(texto` `«texto` sin cierre | ❌ No detectado |
+| Orden punto/comilla según norma | Reglas RAE específicas | ❌ No detectado |
+
+### Lo que SÍ detecta Typography
+
+- ✅ Guiones incorrectos (diálogos, rangos)
+- ✅ Comillas mezcladas (estilos diferentes)
+- ✅ Puntos suspensivos mal formados (2 o 4+ puntos)
+- ✅ Espacios antes de puntuación
+- ✅ Falta espacio después de puntuación
+- ✅ Espacios múltiples

@@ -1,7 +1,7 @@
 # Roadmap v2.0 - Narrative Assistant
 
-> **Última actualización**: 2026-01-23
-> **Versión actual**: 1.1.0
+> **Última actualización**: 2026-01-26
+> **Versión tauri.conf.json**: 0.2.7
 
 ---
 
@@ -14,25 +14,41 @@
 | **Backend Core** | 103 archivos Python, ~49,000 LoC |
 | **Frontend** | 53 componentes Vue, ~30,000 LoC |
 | **API Server** | 39 endpoints FastAPI |
-| **Detectores Editoriales** | 10 detectores implementados |
+| **Detectores Editoriales** | 13 detectores implementados |
 | **Exportación** | DOCX, PDF, JSON, Track Changes |
 | **Sistema de Licencias** | Implementado |
-| **Tauri Desktop** | Empaquetado listo |
+| **Tauri Desktop** | Empaquetado listo (sidecar + instalador) |
 
-### Detectores Actuales
+### Detectores Actuales (13 total)
 
-1. ✅ Tipografía (guiones, comillas, espaciado)
-2. ✅ Repeticiones léxicas
-3. ✅ Concordancia género/número
-4. ✅ Terminología inconsistente
-5. ✅ Vocabulario regional (es_ES, es_MX)
-6. ✅ Terminología de campo
-7. ✅ Claridad/Estilo (oraciones largas)
-8. ✅ Gramática (leísmo, dequeísmo)
-9. ✅ Anglicismos
-10. ✅ Muletillas del autor
-11. ✅ Detector de legibilidad (Flesch-Szigriszt)
-12. ✅ Detector de fillers/muletillas
+1. ✅ **Tipografía** - guiones, comillas, espaciado
+2. ✅ **Repeticiones** - léxicas, inicio de oración, cacofonías
+3. ✅ **Concordancia** - género/número
+4. ✅ **Terminología** - inconsistencias terminológicas
+5. ✅ **Regional** - vocabulario es_ES, es_MX, es_AR
+6. ✅ **Campo** - terminología especializada
+7. ✅ **Claridad** - oraciones largas, subordinadas
+8. ✅ **Gramática** - leísmo, dequeísmo, queísmo
+9. ✅ **Anglicismos** - extranjerismos innecesarios
+10. ✅ **Muletillas** - sobreuso de palabras (z-score)
+11. ✅ **Glosario** - términos del proyecto
+12. ⚠️ **Anacolutos** - rupturas sintácticas (parcialmente implementado)
+13. ⚠️ **POV** - cambios de punto de vista (parcialmente implementado)
+
+### Detectores Parciales - Pendiente Completar
+
+| Detector | Implementado | Pendiente |
+|----------|--------------|-----------|
+| **Anacolutos** | nominativus pendens, broken construction, dangling modifier | `subject_shift` (NO implementado) |
+| **POV** | person shift, tú/usted mix | `focalizer_shift` (stub), `inconsistent_omniscience` (NO implementado) |
+
+### Typography - Pendiente Añadir
+
+| Detección | Estado |
+|-----------|--------|
+| Comillas antes/después del punto según RAE | ❌ |
+| Secuencias de puntuación inválidas (`,.` `!?` `??`) | ❌ |
+| Pares de signos sin cerrar (`(texto` `«texto`) | ❌ |
 
 ---
 
@@ -115,11 +131,11 @@
 
 ### P2 - Detectores Adicionales
 
-| Detector | Descripción | Complejidad |
-|----------|-------------|-------------|
-| **Anacolutos** | Oraciones con construcción sintáctica rota | Alta (LLM) |
-| **Cambios de POV** | Detectar cambios involuntarios de punto de vista | Alta (LLM) |
-| **Inconsistencias factuales** | Contradicciones en hechos narrados | Muy Alta (LLM) |
+| Detector | Descripción | Estado |
+|----------|-------------|--------|
+| **Anacolutos** | Oraciones con construcción sintáctica rota | ⚠️ Parcial - falta `subject_shift` |
+| **Cambios de POV** | Detectar cambios involuntarios de punto de vista | ⚠️ Parcial - falta `focalizer_shift`, `inconsistent_omniscience` |
+| **Inconsistencias factuales** | Contradicciones en hechos narrados | ❌ No implementado (requiere LLM) |
 
 ### P3 - Infraestructura
 
