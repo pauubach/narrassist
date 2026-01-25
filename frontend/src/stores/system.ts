@@ -21,6 +21,11 @@ export interface ModelsStatus {
   dependencies_status?: Record<string, boolean>
   all_installed?: boolean
   installing?: boolean
+  // Python status fields
+  python_available?: boolean
+  python_version?: string | null
+  python_path?: string | null
+  python_error?: string | null
 }
 
 export const useSystemStore = defineStore('system', () => {
@@ -38,6 +43,11 @@ export const useSystemStore = defineStore('system', () => {
   const dependenciesInstalling = computed(() => modelsStatus.value?.installing ?? false)
   const dependenciesNeeded = computed(() => modelsStatus.value?.dependencies_needed ?? false)
   const backendLoaded = computed(() => modelsStatus.value?.backend_loaded ?? false)
+
+  // Python availability
+  const pythonAvailable = computed(() => modelsStatus.value?.python_available ?? true)
+  const pythonVersion = computed(() => modelsStatus.value?.python_version ?? null)
+  const pythonError = computed(() => modelsStatus.value?.python_error ?? null)
 
   async function checkBackendStatus() {
     try {
@@ -186,6 +196,9 @@ export const useSystemStore = defineStore('system', () => {
     dependenciesInstalling,
     dependenciesNeeded,
     backendLoaded,
+    pythonAvailable,
+    pythonVersion,
+    pythonError,
 
     // Actions
     checkBackendStatus,

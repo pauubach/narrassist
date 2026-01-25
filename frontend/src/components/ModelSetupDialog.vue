@@ -9,13 +9,21 @@ const systemStore = useSystemStore()
 const visible = ref(false)
 const downloadProgress = ref(0)
 const currentModel = ref('')
-const downloadPhase = ref<'checking' | 'installing-deps' | 'downloading' | 'completed' | 'error'>('checking')
+const downloadPhase = ref<'checking' | 'installing-deps' | 'downloading' | 'completed' | 'error' | 'python-missing'>('checking')
 
 // Check models on mount - should be installed during installation
 // If not, download automatically (transparent to user)
 onMounted(async () => {
   downloadPhase.value = 'checking'
   await systemStore.checkModelsStatus()
+
+  // First check if Python is available
+  if (!systemStore.pythonAvailable) {
+    // Python not installed or wrong version - show helpful message
+    visible.value = true
+    downloadPhase.value = 'python-missing'
+    return
+  }
 
   if (systemStore.dependenciesNeeded || !systemStore.backendLoaded) {
     // Dependencies missing or backend not loaded - install them first
@@ -139,6 +147,26 @@ function retryDownload() {
   systemStore.modelsError = null
   startAutomaticDownload()
 }
+
+async function recheckPython() {
+  downloadPhase.value = 'checking'
+  await systemStore.checkModelsStatus()
+
+  if (!systemStore.pythonAvailable) {
+    downloadPhase.value = 'python-missing'
+  } else if (systemStore.dependenciesNeeded || !systemStore.backendLoaded) {
+    downloadPhase.value = 'installing-deps'
+    startDependenciesInstallation()
+  } else if (systemStore.modelsReady) {
+    downloadPhase.value = 'completed'
+    setTimeout(() => {
+      visible.value = false
+    }, 2000)
+  } else {
+    downloadPhase.value = 'downloading'
+    startAutomaticDownload()
+  }
+}
 </script>
 
 <template>
@@ -204,6 +232,42 @@ function retryDownload() {
           <i class="pi pi-check-circle complete-icon"></i>
           <h3>Listo para usar</h3>
           <p>Narrative Assistant esta preparado.</p>
+        </div>
+      </template>
+
+      <!-- Python missing state -->
+      <template v-else-if="downloadPhase === 'python-missing'">
+        <div class="python-missing-state">
+          <i class="pi pi-exclamation-circle python-icon"></i>
+          <h3>Python 3.10+ requerido</h3>
+          <p class="python-message">
+            Narrative Assistant necesita Python 3.10 o superior para funcionar correctamente.
+          </p>
+          <p v-if="systemStore.pythonError" class="error-detail">
+            {{ systemStore.pythonError }}
+          </p>
+          <div class="python-instructions">
+            <p><strong>Para instalar Python:</strong></p>
+            <ol>
+              <li>Descarga Python desde <a href="https://www.python.org/downloads/" target="_blank" class="python-link">python.org/downloads</a></li>
+              <li>Ejecuta el instalador y <strong>marca "Add Python to PATH"</strong></li>
+              <li>Reinicia Narrative Assistant</li>
+            </ol>
+          </div>
+          <div class="python-actions">
+            <a
+              href="https://www.python.org/downloads/"
+              target="_blank"
+              class="download-python-button"
+            >
+              <i class="pi pi-external-link"></i>
+              Descargar Python
+            </a>
+            <button class="retry-button secondary" @click="recheckPython">
+              <i class="pi pi-refresh"></i>
+              Verificar de nuevo
+            </button>
+          </div>
         </div>
       </template>
 
@@ -413,6 +477,113 @@ function retryDownload() {
   background: var(--p-primary-600);
 }
 
+.retry-button.secondary {
+  background: var(--p-surface-200);
+  color: var(--p-text-color);
+}
+
+.retry-button.secondary:hover {
+  background: var(--p-surface-300);
+}
+
+/* Python missing state */
+.python-missing-state {
+  text-align: center;
+  padding: 1.5rem;
+}
+
+.python-icon {
+  font-size: 3.5rem;
+  color: var(--p-orange-500);
+  margin-bottom: 1rem;
+}
+
+.python-missing-state h3 {
+  margin: 0 0 0.75rem 0;
+  color: var(--p-orange-700);
+  font-size: 1.25rem;
+}
+
+.python-message {
+  color: var(--p-text-color);
+  margin: 0 0 0.75rem 0;
+  font-size: 0.95rem;
+}
+
+.error-detail {
+  background: var(--p-orange-50);
+  color: var(--p-orange-700);
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  margin: 0.75rem 0;
+  font-size: 0.85rem;
+  font-family: monospace;
+}
+
+.python-instructions {
+  text-align: left;
+  background: var(--p-surface-100);
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  margin: 1rem 0;
+}
+
+.python-instructions p {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.9rem;
+}
+
+.python-instructions ol {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-size: 0.875rem;
+  color: var(--p-text-muted-color);
+}
+
+.python-instructions li {
+  margin-bottom: 0.5rem;
+}
+
+.python-instructions li:last-child {
+  margin-bottom: 0;
+}
+
+.python-link {
+  color: var(--p-primary-color);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.python-link:hover {
+  text-decoration: underline;
+}
+
+.python-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  margin-top: 1rem;
+}
+
+.download-python-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  background: var(--p-primary-color);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.download-python-button:hover {
+  background: var(--p-primary-600);
+}
+
 /* Dark mode */
 .dark .models-list {
   background: var(--p-surface-800);
@@ -433,5 +604,26 @@ function retryDownload() {
 .dark .error-message {
   background: var(--p-red-900);
   color: var(--p-red-300);
+}
+
+.dark .python-missing-state h3 {
+  color: var(--p-orange-400);
+}
+
+.dark .error-detail {
+  background: var(--p-orange-900);
+  color: var(--p-orange-300);
+}
+
+.dark .python-instructions {
+  background: var(--p-surface-800);
+}
+
+.dark .retry-button.secondary {
+  background: var(--p-surface-700);
+}
+
+.dark .retry-button.secondary:hover {
+  background: var(--p-surface-600);
 }
 </style>

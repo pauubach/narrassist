@@ -148,6 +148,171 @@ app.add_middleware(
 # Helpers
 # ============================================================================
 
+# Minimum required Python version (major, minor)
+MIN_PYTHON_VERSION = (3, 10)
+
+def find_python_executable() -> tuple[str | None, str | None, str | None]:
+    """
+    Encuentra el ejecutable de Python del sistema con version 3.10+.
+
+    Returns:
+        Tuple de (python_path, version_string, error_message)
+        - Si se encuentra Python valido: (path, version, None)
+        - Si no se encuentra: (None, None, error_message)
+    """
+    import subprocess
+    import re
+
+    def check_python_version(python_cmd: str) -> tuple[str | None, str | None]:
+        """Verifica si un ejecutable de Python tiene la version requerida."""
+        try:
+            result = subprocess.run(
+                [python_cmd, "--version"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if result.returncode == 0:
+                # Parse version from "Python 3.11.5" or similar
+                version_output = result.stdout.strip() or result.stderr.strip()
+                match = re.search(r'Python (\d+)\.(\d+)\.?(\d*)', version_output)
+                if match:
+                    major, minor = int(match.group(1)), int(match.group(2))
+                    version_str = f"{major}.{minor}"
+                    if match.group(3):
+                        version_str += f".{match.group(3)}"
+
+                    if (major, minor) >= MIN_PYTHON_VERSION:
+                        return python_cmd, version_str
+                    else:
+                        logger.debug(f"Python at {python_cmd} is version {version_str}, need {MIN_PYTHON_VERSION[0]}.{MIN_PYTHON_VERSION[1]}+")
+        except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
+            logger.debug(f"Could not check Python at {python_cmd}: {e}")
+        return None, None
+
+    # List of Python commands/paths to try
+    python_candidates = []
+
+    # 1. Try python3 first (Linux/macOS preferred)
+    if python3_path := shutil.which("python3"):
+        python_candidates.append(python3_path)
+
+    # 2. Try python (could be Python 3 on many systems)
+    if python_path := shutil.which("python"):
+        python_candidates.append(python_path)
+
+    # 3. Windows: Try py launcher with version flags
+    if sys.platform == 'win32':
+        if py_path := shutil.which("py"):
+            python_candidates.append(py_path)
+            # Also try specific versions via py launcher
+            for minor in range(14, 9, -1):  # Try 3.14 down to 3.10
+                python_candidates.append(f"py -3.{minor}")
+
+        # 4. Windows: Check common installation paths
+        common_paths = [
+            Path(os.environ.get('LOCALAPPDATA', '')) / 'Programs' / 'Python',
+            Path('C:/Python'),
+            Path('C:/Program Files/Python'),
+            Path(os.environ.get('USERPROFILE', '')) / 'AppData' / 'Local' / 'Programs' / 'Python',
+        ]
+
+        for base_path in common_paths:
+            if base_path.exists():
+                # Look for Python3XX directories
+                for subdir in sorted(base_path.iterdir(), reverse=True):
+                    if subdir.is_dir() and subdir.name.startswith('Python3'):
+                        python_exe = subdir / 'python.exe'
+                        if python_exe.exists():
+                            python_candidates.append(str(python_exe))
+
+    # 5. Check Anaconda/Miniconda paths
+    conda_base_paths = []
+    if sys.platform == 'win32':
+        conda_base_paths = [
+            Path(os.environ.get('USERPROFILE', '')) / 'anaconda3',
+            Path(os.environ.get('USERPROFILE', '')) / 'miniconda3',
+            Path(os.environ.get('LOCALAPPDATA', '')) / 'anaconda3',
+            Path(os.environ.get('LOCALAPPDATA', '')) / 'miniconda3',
+            Path('C:/ProgramData/anaconda3'),
+            Path('C:/ProgramData/miniconda3'),
+        ]
+    else:
+        conda_base_paths = [
+            Path.home() / 'anaconda3',
+            Path.home() / 'miniconda3',
+            Path('/opt/anaconda3'),
+            Path('/opt/miniconda3'),
+        ]
+
+    for conda_path in conda_base_paths:
+        if sys.platform == 'win32':
+            python_exe = conda_path / 'python.exe'
+        else:
+            python_exe = conda_path / 'bin' / 'python'
+        if python_exe.exists():
+            python_candidates.append(str(python_exe))
+
+    # Try each candidate
+    for candidate in python_candidates:
+        # Handle "py -3.X" format
+        if candidate.startswith("py "):
+            try:
+                parts = candidate.split()
+                result = subprocess.run(
+                    parts + ["--version"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                if result.returncode == 0:
+                    version_output = result.stdout.strip() or result.stderr.strip()
+                    match = re.search(r'Python (\d+)\.(\d+)\.?(\d*)', version_output)
+                    if match:
+                        major, minor = int(match.group(1)), int(match.group(2))
+                        if (major, minor) >= MIN_PYTHON_VERSION:
+                            version_str = f"{major}.{minor}"
+                            if match.group(3):
+                                version_str += f".{match.group(3)}"
+                            return candidate, version_str, None
+            except Exception:
+                continue
+        else:
+            path, version = check_python_version(candidate)
+            if path:
+                return path, version, None
+
+    # No suitable Python found
+    return None, None, f"Python {MIN_PYTHON_VERSION[0]}.{MIN_PYTHON_VERSION[1]}+ no encontrado. Por favor instala Python desde python.org"
+
+
+# Cache for Python status (to avoid repeated checks)
+_python_status_cache: dict | None = None
+
+def get_python_status() -> dict:
+    """
+    Obtiene el estado de Python del sistema.
+
+    Returns:
+        Dict con: python_available, python_version, python_path, error
+    """
+    global _python_status_cache
+
+    if _python_status_cache is not None:
+        return _python_status_cache
+
+    python_path, python_version, error = find_python_executable()
+
+    _python_status_cache = {
+        "python_available": python_path is not None,
+        "python_version": python_version,
+        "python_path": python_path,
+        "error": error
+    }
+
+    return _python_status_cache
+
+
 def convert_numpy_types(obj: Any) -> Any:
     """
     Convierte recursivamente tipos numpy a tipos Python nativos para serialización JSON.
@@ -322,6 +487,21 @@ async def system_info():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/system/python-status")
+async def python_status():
+    """
+    Verifica el estado de Python en el sistema.
+
+    Returns:
+        ApiResponse con información de Python disponible
+    """
+    status = get_python_status()
+    return ApiResponse(
+        success=True,
+        data=status
+    )
+
+
 @app.get("/api/models/status")
 async def models_status():
     """
@@ -330,25 +510,35 @@ async def models_status():
     Returns:
         ApiResponse con estado de cada modelo (instalado, tamaño, ruta)
     """
+    # Obtener estado de Python del sistema
+    python_info = get_python_status()
+
     # Si los módulos no están cargados, retornar estado de dependencias
     if not MODULES_LOADED:
-        import sys
         import importlib.util
-        
+
         deps_status = {
             "numpy": importlib.util.find_spec("numpy") is not None,
             "spacy": importlib.util.find_spec("spacy") is not None,
             "sentence_transformers": importlib.util.find_spec("sentence_transformers") is not None,
         }
-        
+
+        # Si Python no está disponible, las dependencias no se pueden instalar
+        dependencies_needed = True
+        python_error = python_info["error"] if not python_info["python_available"] else None
+
         return ApiResponse(
             success=True,
             data={
                 "backend_loaded": False,
-                "dependencies_needed": True,
+                "dependencies_needed": dependencies_needed,
                 "dependencies_status": deps_status,
                 "all_installed": all(deps_status.values()),
                 "installing": INSTALLING_DEPENDENCIES,
+                "python_available": python_info["python_available"],
+                "python_version": python_info["python_version"],
+                "python_path": python_info["python_path"],
+                "python_error": python_error,
             }
         )
     
@@ -416,47 +606,35 @@ class DownloadModelsRequest(BaseModel):
 async def install_dependencies():
     """
     Instala las dependencias Python necesarias (numpy, spacy, sentence-transformers, etc.).
-    
+
     Este endpoint instala las dependencias y luego intenta recargar los módulos.
     NO requiere reinicio manual de la aplicación.
-    
+
     Returns:
         ApiResponse indicando que la instalación ha comenzado
     """
     import subprocess
-    import sys
     import importlib
-    import shutil
-    
-    def find_python_executable():
-        """Encuentra el ejecutable de Python correcto (no el .exe de PyInstaller)"""
-        # Si estamos en PyInstaller, sys.executable apunta al .exe empaquetado
-        # Necesitamos encontrar el Python del sistema
-        
-        # Intentar python3 primero (Linux/macOS)
-        python_cmd = shutil.which("python3")
-        if python_cmd:
-            return python_cmd
-        
-        # Intentar python (Windows/Linux)
-        python_cmd = shutil.which("python")
-        if python_cmd:
-            return python_cmd
-        
-        # Fallback: usar sys.executable (puede ser el .exe de PyInstaller)
-        logger.warning(f"Could not find system Python, using sys.executable: {sys.executable}")
-        return sys.executable
-    
+
+    # Verificar que Python está disponible antes de intentar instalar
+    python_info = get_python_status()
+    if not python_info["python_available"]:
+        raise HTTPException(
+            status_code=400,
+            detail=python_info["error"] or f"Python {MIN_PYTHON_VERSION[0]}.{MIN_PYTHON_VERSION[1]}+ no encontrado. Por favor instala Python desde python.org"
+        )
+
     def install_task():
         global MODULES_LOADED, MODULES_ERROR, INSTALLING_DEPENDENCIES
         global project_manager, entity_repository, alert_repository
         global chapter_repository, section_repository, get_config, Database
-        
+
         INSTALLING_DEPENDENCIES = True
-        
+
         try:
-            python_exe = find_python_executable()
-            logger.info(f"Starting dependencies installation using: {python_exe}")
+            # Usar el path de Python ya verificado
+            python_exe = python_info["python_path"]
+            logger.info(f"Starting dependencies installation using: {python_exe} (version {python_info['python_version']})")
             
             # Lista de dependencias necesarias
             dependencies = [
@@ -494,7 +672,6 @@ async def install_dependencies():
                 logger.info(f"Added {user_site} to sys.path")
             
             # También añadir site-packages de Anaconda si existe
-            python_exe = find_python_executable()
             if "anaconda" in python_exe.lower() or "conda" in python_exe.lower():
                 import os
                 # Extraer ruta base de Anaconda
