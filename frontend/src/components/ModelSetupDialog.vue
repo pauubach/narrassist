@@ -188,6 +188,36 @@ async function recheckPython() {
         </div>
       </template>
 
+      <!-- Installing dependencies state -->
+      <template v-else-if="downloadPhase === 'installing-deps'">
+        <div class="download-progress">
+          <div class="download-header">
+            <i class="pi pi-cog pi-spin download-icon"></i>
+            <div>
+              <h3>Instalando componentes</h3>
+              <p class="subtitle">Configurando dependencias de Python</p>
+            </div>
+          </div>
+
+          <div class="progress-section">
+            <div class="progress-info">
+              <span class="current-model">{{ currentModel || 'Instalando numpy, spaCy, transformers...' }}</span>
+              <span class="progress-percent">{{ Math.round(downloadProgress) }}%</span>
+            </div>
+            <ProgressBar
+              :value="downloadProgress"
+              :showValue="false"
+              class="progress-bar"
+            />
+          </div>
+
+          <p class="download-note">
+            <i class="pi pi-info-circle"></i>
+            Esta instalación solo se realiza una vez. Puede tardar unos minutos.
+          </p>
+        </div>
+      </template>
+
       <!-- Downloading state (automatic) -->
       <template v-else-if="downloadPhase === 'downloading'">
         <div class="download-progress">
