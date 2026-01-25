@@ -9,6 +9,30 @@ Puerto: 8008
 CORS: Habilitado para localhost:5173 (Vite dev server) y tauri://localhost
 """
 
+# CRITICAL: Add user site-packages to sys.path BEFORE any imports
+# This must be the FIRST thing that runs to allow PyInstaller bundle to find system packages
+import sys
+import site
+import os
+import shutil
+
+try:
+    # Add user site-packages
+    user_site = site.getusersitepackages()
+    if user_site not in sys.path:
+        sys.path.insert(0, user_site)
+    
+    # Also try to add Anaconda/Conda site-packages if available
+    python_exe = shutil.which("python3") or shutil.which("python")
+    if python_exe and ("anaconda" in python_exe.lower() or "conda" in python_exe.lower()):
+        conda_base = os.path.dirname(os.path.dirname(python_exe))
+        conda_site = os.path.join(conda_base, "Lib", "site-packages")
+        if os.path.exists(conda_site) and conda_site not in sys.path:
+            sys.path.insert(0, conda_site)
+except Exception:
+    pass  # Silently ignore if this fails
+
+# Now import everything else
 import json
 import logging
 from datetime import datetime
@@ -19,27 +43,6 @@ from fastapi import FastAPI, HTTPException, UploadFile, File, Body, Request, Que
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
-
-# Try to add user site-packages to sys.path before importing anything else
-# This helps when running from PyInstaller bundle
-try:
-    import sys
-    import site
-    user_site = site.getusersitepackages()
-    if user_site not in sys.path:
-        sys.path.insert(0, user_site)
-    
-    # Also try to add Anaconda/Conda site-packages if available
-    import shutil
-    python_exe = shutil.which("python3") or shutil.which("python")
-    if python_exe and ("anaconda" in python_exe.lower() or "conda" in python_exe.lower()):
-        import os
-        conda_base = os.path.dirname(os.path.dirname(python_exe))
-        conda_site = os.path.join(conda_base, "Lib", "site-packages")
-        if os.path.exists(conda_site) and conda_site not in sys.path:
-            sys.path.insert(0, conda_site)
-except Exception:
-    pass  # Silently ignore if this fails
 
 # Track installation status
 INSTALLING_DEPENDENCIES = False
@@ -81,7 +84,7 @@ except Exception as e:
     _logging.warning(f"NLP modules not loaded: {type(e).__name__}: {e}")
     _logging.info("Server will start in limited mode. Install dependencies via /api/models/download")
     MODULES_ERROR = str(e)
-    NA_VERSION = "0.2.2"  # Fallback version
+    NA_VERSION = "0.2.3"  # Fallback version
 
 # Configuración de logging
 import sys
