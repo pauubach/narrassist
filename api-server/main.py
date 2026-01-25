@@ -84,7 +84,7 @@ except Exception as e:
     _logging.warning(f"NLP modules not loaded: {type(e).__name__}: {e}")
     _logging.info("Server will start in limited mode. Install dependencies via /api/models/download")
     MODULES_ERROR = str(e)
-    NA_VERSION = "0.2.5"  # Fallback version
+    NA_VERSION = "0.2.6"  # Fallback version
 
 # Configuración de logging
 import sys
