@@ -84,7 +84,7 @@ except Exception as e:
     _logging.warning(f"NLP modules not loaded: {type(e).__name__}: {e}")
     _logging.info("Server will start in limited mode. Install dependencies via /api/models/download")
     MODULES_ERROR = str(e)
-    NA_VERSION = "0.2.6"  # Fallback version
+    NA_VERSION = "0.2.7"  # Fallback version
 
 # Configuración de logging
 import sys
@@ -668,24 +668,6 @@ async def install_dependencies():
             
             logger.info("All dependencies installed successfully!")
             logger.info("Attempting to load narrative_assistant modules...")
-            
-            # Añadir site-packages del usuario a sys.path para que Python pueda encontrar los módulos
-            import site
-            import sys
-            user_site = site.getusersitepackages()
-            if user_site not in sys.path:
-                sys.path.insert(0, user_site)
-                logger.info(f"Added {user_site} to sys.path")
-            
-            # También añadir site-packages de Anaconda si existe
-            if "anaconda" in python_exe.lower() or "conda" in python_exe.lower():
-                import os
-                # Extraer ruta base de Anaconda
-                conda_base = os.path.dirname(os.path.dirname(python_exe))
-                conda_site = os.path.join(conda_base, "Lib", "site-packages")
-                if os.path.exists(conda_site) and conda_site not in sys.path:
-                    sys.path.insert(0, conda_site)
-                    logger.info(f"Added Anaconda site-packages: {conda_site}")
             
             # Intentar recargar los módulos
             try:
