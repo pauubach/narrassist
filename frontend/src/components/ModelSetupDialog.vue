@@ -131,12 +131,16 @@ watch(() => systemStore.dependenciesInstalling, (installing) => {
     // Dependencies installed, check if backend is ready
     setTimeout(async () => {
       await systemStore.checkModelsStatus()
-      if (!systemStore.dependenciesNeeded) {
-        // Dependencies OK, now download models
+      if (!systemStore.dependenciesNeeded && systemStore.backendLoaded) {
+        // Dependencies OK AND backend loaded, now download models
         downloadPhase.value = 'downloading'
         startAutomaticDownload()
       } else if (systemStore.modelsError) {
         downloadPhase.value = 'error'
+      } else if (systemStore.dependenciesNeeded || !systemStore.backendLoaded) {
+        // Still not ready, show error
+        downloadPhase.value = 'error'
+        systemStore.modelsError = 'Failed to load backend after installing dependencies. Try restarting the application.'
       }
     }, 2000)
   }
