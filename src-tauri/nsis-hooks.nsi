@@ -5,7 +5,20 @@
 
 ; Hook: Called before installation starts
 !macro NSIS_HOOK_PREINSTALL
-    ; Simple pre-install check - no disk space validation to avoid NSIS issues
+    ; Cerrar procesos de Narrative Assistant antes de instalar
+    DetailPrint "Cerrando procesos existentes..."
+    
+    ; Intentar cerrar la aplicación principal
+    nsExec::Exec 'taskkill /F /IM "Narrative Assistant.exe" /T'
+    Pop $0
+    
+    ; Cerrar el servidor backend
+    nsExec::Exec 'taskkill /F /IM "narrative-assistant-server.exe" /T'
+    Pop $0
+    
+    ; Esperar un momento para que los procesos se cierren
+    Sleep 1000
+    
     DetailPrint "Preparando instalacion..."
 !macroend
 
