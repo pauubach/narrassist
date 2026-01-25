@@ -60,7 +60,7 @@ except Exception as e:
     _logging.warning(f"NLP modules not loaded: {type(e).__name__}: {e}")
     _logging.info("Server will start in limited mode. Install dependencies via /api/models/download")
     MODULES_ERROR = str(e)
-    NA_VERSION = "0.2.0"  # Fallback version
+    NA_VERSION = "0.2.1"  # Fallback version
 
 # Configuración de logging
 import sys
@@ -402,6 +402,26 @@ async def install_dependencies():
     import subprocess
     import sys
     import importlib
+    import shutil
+    
+    def find_python_executable():
+        """Encuentra el ejecutable de Python correcto (no el .exe de PyInstaller)"""
+        # Si estamos en PyInstaller, sys.executable apunta al .exe empaquetado
+        # Necesitamos encontrar el Python del sistema
+        
+        # Intentar python3 primero (Linux/macOS)
+        python_cmd = shutil.which("python3")
+        if python_cmd:
+            return python_cmd
+        
+        # Intentar python (Windows/Linux)
+        python_cmd = shutil.which("python")
+        if python_cmd:
+            return python_cmd
+        
+        # Fallback: usar sys.executable (puede ser el .exe de PyInstaller)
+        logger.warning(f"Could not find system Python, using sys.executable: {sys.executable}")
+        return sys.executable
     
     def install_task():
         global MODULES_LOADED, MODULES_ERROR, INSTALLING_DEPENDENCIES
@@ -411,7 +431,8 @@ async def install_dependencies():
         INSTALLING_DEPENDENCIES = True
         
         try:
-            logger.info("Starting dependencies installation...")
+            python_exe = find_python_executable()
+            logger.info(f"Starting dependencies installation using: {python_exe}")
             
             # Lista de dependencias necesarias
             dependencies = [
@@ -428,13 +449,13 @@ async def install_dependencies():
             for dep in dependencies:
                 logger.info(f"Installing {dep}...")
                 result = subprocess.run(
-                    [sys.executable, "-m", "pip", "install", "--user", "--no-cache-dir", dep],
+                    [python_exe, "-m", "pip", "install", "--user", "--no-cache-dir", dep],
                     capture_output=True,
                     text=True
                 )
                 if result.returncode != 0:
                     logger.error(f"Failed to install {dep}: {result.stderr}")
-                    raise Exception(f"Failed to install {dep}")
+                    raise Exception(f"Failed to install {dep}: {result.stderr}")
                 logger.info(f"✓ {dep} installed")
             
             logger.info("All dependencies installed successfully!")
