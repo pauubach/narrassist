@@ -647,13 +647,19 @@ async def install_dependencies():
                 "scikit-learn>=1.3.0",
             ]
             
+            # Configurar subprocess para no mostrar ventana en Windows
+            creation_flags = 0
+            if sys.platform == 'win32':
+                creation_flags = subprocess.CREATE_NO_WINDOW
+
             # Instalar usando pip con --user para evitar problemas de permisos
             for dep in dependencies:
                 logger.info(f"Installing {dep}...")
                 result = subprocess.run(
                     [python_exe, "-m", "pip", "install", "--user", "--no-cache-dir", dep],
                     capture_output=True,
-                    text=True
+                    text=True,
+                    creationflags=creation_flags
                 )
                 if result.returncode != 0:
                     logger.error(f"Failed to install {dep}: {result.stderr}")
