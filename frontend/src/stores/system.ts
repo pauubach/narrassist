@@ -38,7 +38,6 @@ export const useSystemStore = defineStore('system', () => {
   const dependenciesInstalling = computed(() => modelsStatus.value?.installing ?? false)
   const dependenciesNeeded = computed(() => modelsStatus.value?.dependencies_needed ?? false)
   const backendLoaded = computed(() => modelsStatus.value?.backend_loaded ?? false)
-  const backendLoaded = computed(() => modelsStatus.value?.backend_loaded ?? false)
 
   async function checkBackendStatus() {
     try {
