@@ -37,6 +37,8 @@ export const useSystemStore = defineStore('system', () => {
   const modelsReady = computed(() => modelsStatus.value?.all_required_installed ?? false)
   const dependenciesInstalling = computed(() => modelsStatus.value?.installing ?? false)
   const dependenciesNeeded = computed(() => modelsStatus.value?.dependencies_needed ?? false)
+  const backendLoaded = computed(() => modelsStatus.value?.backend_loaded ?? false)
+  const backendLoaded = computed(() => modelsStatus.value?.backend_loaded ?? false)
 
   async function checkBackendStatus() {
     try {
@@ -99,7 +101,13 @@ export const useSystemStore = defineStore('system', () => {
           modelsError.value = data.error || 'Error starting download'
         }
       } else {
-        modelsError.value = 'Failed to start model download'
+        // Try to get error detail from response
+        try {
+          const errorData = await response.json()
+          modelsError.value = errorData.detail || `Failed to start model download (${response.status})`
+        } catch {
+          modelsError.value = `Failed to start model download (${response.status})`
+        }
       }
     } catch (error) {
       modelsError.value = error instanceof Error ? error.message : 'Network error'
@@ -178,6 +186,7 @@ export const useSystemStore = defineStore('system', () => {
     modelsReady,
     dependenciesInstalling,
     dependenciesNeeded,
+    backendLoaded,
 
     // Actions
     checkBackendStatus,

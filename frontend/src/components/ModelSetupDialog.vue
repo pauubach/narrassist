@@ -17,8 +17,8 @@ onMounted(async () => {
   downloadPhase.value = 'checking'
   await systemStore.checkModelsStatus()
 
-  if (systemStore.dependenciesNeeded) {
-    // Dependencies missing - install them first
+  if (systemStore.dependenciesNeeded || !systemStore.backendLoaded) {
+    // Dependencies missing or backend not loaded - install them first
     visible.value = true
     downloadPhase.value = 'installing-deps'
     startDependenciesInstallation()
@@ -26,7 +26,7 @@ onMounted(async () => {
     // Models already installed (normal case after installation)
     downloadPhase.value = 'completed'
   } else {
-    // Dependencies OK but models missing - download automatically
+    // Dependencies OK AND backend loaded but models missing - download automatically
     // This happens if installer couldn't download (no internet, etc.)
     visible.value = true
     downloadPhase.value = 'downloading'

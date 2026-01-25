@@ -60,7 +60,7 @@ except Exception as e:
     _logging.warning(f"NLP modules not loaded: {type(e).__name__}: {e}")
     _logging.info("Server will start in limited mode. Install dependencies via /api/models/download")
     MODULES_ERROR = str(e)
-    NA_VERSION = "0.1.9"  # Fallback version
+    NA_VERSION = "0.2.0"  # Fallback version
 
 # Configuración de logging
 import sys
@@ -500,6 +500,13 @@ async def download_models(request: DownloadModelsRequest):
     Returns:
         ApiResponse indicando que la descarga ha comenzado
     """
+    # Si las dependencias no están instaladas, retornar error específico
+    if not MODULES_LOADED:
+        raise HTTPException(
+            status_code=400,
+            detail="Dependencies not installed. Please install dependencies first via /api/dependencies/install"
+        )
+    
     try:
         from narrative_assistant.core.model_manager import get_model_manager, ModelType
         import threading
@@ -527,8 +534,12 @@ async def download_models(request: DownloadModelsRequest):
             data={"models": request.models},
         )
 
-    except ImportError:
-        raise HTTPException(status_code=500, detail="Model manager not available")
+    except ImportError as e:
+        logger.error(f"Import error in download_models: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Model manager not available: {str(e)}"
+        )
     except Exception as e:
         logger.error(f"Error starting model download: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
