@@ -16,21 +16,49 @@ import site
 import os
 import shutil
 
+# Setup logging early for debugging
+import logging
+_early_logger = logging.getLogger(__name__)
+_early_logger.setLevel(logging.INFO)
+
 try:
+    _early_logger.info(f"=== Initial sys.path setup ===")
+    _early_logger.info(f"Python executable: {sys.executable}")
+    _early_logger.info(f"sys.path before modifications: {sys.path[:3]}...")  # First 3 entries
+    
     # Add user site-packages
     user_site = site.getusersitepackages()
+    _early_logger.info(f"User site-packages: {user_site}")
     if user_site not in sys.path:
         sys.path.insert(0, user_site)
+        _early_logger.info(f"✓ Added user site-packages to sys.path")
     
     # Also try to add Anaconda/Conda site-packages if available
     python_exe = shutil.which("python3") or shutil.which("python")
+    _early_logger.info(f"System python command: {python_exe}")
     if python_exe and ("anaconda" in python_exe.lower() or "conda" in python_exe.lower()):
         conda_base = os.path.dirname(os.path.dirname(python_exe))
         conda_site = os.path.join(conda_base, "Lib", "site-packages")
+        _early_logger.info(f"Detected Anaconda/Conda at: {conda_base}")
+        _early_logger.info(f"Conda site-packages: {conda_site}")
         if os.path.exists(conda_site) and conda_site not in sys.path:
             sys.path.insert(0, conda_site)
-except Exception:
-    pass  # Silently ignore if this fails
+            _early_logger.info(f"✓ Added Anaconda site-packages to sys.path")
+        else:
+            _early_logger.info(f"Conda site already in sys.path or doesn't exist")
+    
+    _early_logger.info(f"sys.path after modifications: {sys.path[:3]}...")  # First 3 entries
+    
+    # Try to detect if numpy is now available
+    import importlib.util
+    numpy_spec = importlib.util.find_spec("numpy")
+    _early_logger.info(f"numpy detection after sys.path setup: {numpy_spec is not None}")
+    if numpy_spec:
+        _early_logger.info(f"numpy found at: {numpy_spec.origin}")
+    
+except Exception as e:
+    _early_logger.error(f"Error during sys.path setup: {e}", exc_info=True)
+    pass  # Continue even if this fails
 
 # Now import everything else
 import json
@@ -84,7 +112,7 @@ except Exception as e:
     _logging.warning(f"NLP modules not loaded: {type(e).__name__}: {e}")
     _logging.info("Server will start in limited mode. Install dependencies via /api/models/download")
     MODULES_ERROR = str(e)
-    NA_VERSION = "0.2.7"  # Fallback version
+    NA_VERSION = "0.2.8"  # Fallback version
 
 # Configuración de logging
 import sys
@@ -517,11 +545,20 @@ async def models_status():
     if not MODULES_LOADED:
         import importlib.util
 
-        deps_status = {
-            "numpy": importlib.util.find_spec("numpy") is not None,
-            "spacy": importlib.util.find_spec("spacy") is not None,
-            "sentence_transformers": importlib.util.find_spec("sentence_transformers") is not None,
-        }
+        # Log sys.path para debugging
+        logger.info(f"=== Checking dependencies ===")
+        logger.info(f"MODULES_LOADED: {MODULES_LOADED}")
+        logger.info(f"sys.path has {len(sys.path)} entries")
+        logger.info(f"First 5 sys.path entries: {sys.path[:5]}")
+
+        deps_status = {}
+        for dep in ["numpy", "spacy", "sentence_transformers"]:
+            spec = importlib.util.find_spec(dep)
+            deps_status[dep] = spec is not None
+            if spec:
+                logger.info(f"✓ {dep} found at: {spec.origin}")
+            else:
+                logger.warning(f"✗ {dep} NOT found")
 
         # Si Python no está disponible, las dependencias no se pueden instalar
         dependencies_needed = True
