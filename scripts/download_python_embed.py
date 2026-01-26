@@ -92,7 +92,7 @@ def download_macos_framework(target_dir: Path):
         print(f"[ERROR] Error descargando: {e}")
         return False
     
-    # Extraer Python.framework del .pkg
+    # Extraer Python.framework del .pkg usando installer
     print(f"Extrayendo Python.framework...")
     
     try:
@@ -100,30 +100,31 @@ def download_macos_framework(target_dir: Path):
         temp_dir = target_dir / "temp_extract"
         temp_dir.mkdir(exist_ok=True)
         
-        # Expandir .pkg
+        # Usar xar para expandir el .pkg (alternativa a pkgutil)
+        print("Extrayendo .pkg con xar...")
         subprocess.run([
-            "pkgutil", "--expand",
+            "xar", "-xf",
             str(pkg_path),
-            str(temp_dir)
+            "-C", str(temp_dir)
         ], check=True)
         
-        # Extraer el payload que contiene Python.framework
-        payload = temp_dir / "Python_Framework.pkg" / "Payload"
-        if not payload.exists():
-            # Buscar el payload correcto
-            payloads = list(temp_dir.glob("**/Payload"))
-            if payloads:
-                payload = payloads[0]
+        # Buscar y extraer el Payload que contiene Python.framework
+        payloads = list(temp_dir.glob("**/Payload"))
+        if not payloads:
+            # Intentar con nombre alternativo
+            payloads = list(temp_dir.glob("**/*.pkg/Payload"))
         
-        if payload.exists():
+        framework_extracted = False
+        for payload in payloads:
+            print(f"Extrayendo payload: {payload}")
             # Extraer con cpio
-            subprocess.run(
-                f"cd {temp_dir} && cat */Payload | gunzip -dc | cpio -i",
+            result = subprocess.run(
+                f"cd {temp_dir} && cat {payload.relative_to(temp_dir)} | gunzip -dc | cpio -i 2>/dev/null",
                 shell=True,
-                check=True
+                capture_output=True
             )
             
-            # Mover Python.framework a target_dir
+            # Buscar Python.framework
             framework_src = temp_dir / "Library" / "Frameworks" / "Python.framework"
             if framework_src.exists():
                 framework_dst = target_dir / "Python.framework"
@@ -131,28 +132,29 @@ def download_macos_framework(target_dir: Path):
                     shutil.rmtree(framework_dst)
                 shutil.move(str(framework_src), str(framework_dst))
                 print(f"[OK] Python.framework extraido")
-                
-                # Limpiar
-                shutil.rmtree(temp_dir)
-                pkg_path.unlink()
-                
-                # Crear symlink a python3
-                python_bin = framework_dst / "Versions" / "Current" / "bin" / "python3"
-                python_link = target_dir / "python3"
-                if python_bin.exists():
-                    if python_link.exists():
-                        python_link.unlink()
-                    python_link.symlink_to(python_bin)
-                    print(f"[OK] Python macOS listo: {python_link}")
-                    return True
-                else:
-                    print(f"[ERROR] No se encontro python3 en framework")
-                    return False
+                framework_extracted = True
+                break
+        
+        if framework_extracted:
+            # Limpiar
+            shutil.rmtree(temp_dir)
+            pkg_path.unlink()
+            
+            # Crear symlink a python3
+            framework_dst = target_dir / "Python.framework"
+            python_bin = framework_dst / "Versions" / "Current" / "bin" / "python3"
+            python_link = target_dir / "python3"
+            if python_bin.exists():
+                if python_link.exists():
+                    python_link.unlink()
+                python_link.symlink_to(python_bin)
+                print(f"[OK] Python macOS listo: {python_link}")
+                return True
             else:
-                print(f"[ERROR] No se encontro Python.framework en payload")
+                print(f"[ERROR] No se encontro python3 en framework")
                 return False
         else:
-            print(f"[ERROR] No se encontro Payload en .pkg")
+            print(f"[ERROR] No se encontro Python.framework en ningún payload")
             return False
             
     except Exception as e:
@@ -206,15 +208,17 @@ def main():
         if system == "Windows":
             print("\nProximos pasos:")
             print("1. cd src-tauri/binaries/python-embed")
-            print("2. .\\python.exe -m ensurepip")
-            print("3. .\\python.exe -m pip install --upgrade pip setuptools wheel")
-            print("4. .\\python.exe -m pip install -r ../backend/requirements.txt")
+            print("2. curl -o get-pip.py https://bootstrap.pypa.io/get-pip.py")
+            print("3. .\\python.exe get-pip.py")
+            print("4. .\\python.exe -m pip install --upgrade pip setuptools wheel")
+            print("5. .\\python.exe -m pip install -r ../backend/requirements.txt")
         elif system == "Darwin":
             print("\nProximos pasos:")
             print("1. cd src-tauri/binaries/python-embed")
-            print("2. ./python3 -m ensurepip")
-            print("3. ./python3 -m pip install --upgrade pip setuptools wheel")
-            print("4. ./python3 -m pip install -r ../backend/requirements.txt")
+            print("2. curl -o get-pip.py https://bootstrap.pypa.io/get-pip.py")
+            print("3. ./python3 get-pip.py")
+            print("4. ./python3 -m pip install --upgrade pip setuptools wheel")
+            print("5. ./python3 -m pip install -r ../backend/requirements.txt")
         
         return 0
     else:

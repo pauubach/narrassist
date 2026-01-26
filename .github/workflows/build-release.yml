@@ -24,14 +24,21 @@ jobs:
       - name: Download Python Embebido
         run: python scripts/download_python_embed.py
       
-      - name: Install pip in embedded Python
+      - name: Install pip in embedded Python (get-pip.py)
         working-directory: src-tauri/binaries/python-embed
         run: |
-          .\python.exe -m ensurepip
+          curl -o get-pip.py https://bootstrap.pypa.io/get-pip.py
+          .\python.exe get-pip.py
           .\python.exe -m pip install --upgrade pip setuptools wheel
+          Remove-Item get-pip.py
       
       - name: Build Backend Bundle
         run: python scripts/build_backend_bundle.py
+      
+      - name: Prepare launcher for Windows
+        run: |
+          # Tauri busca archivos con sufijo de arquitectura en Windows tambien
+          Copy-Item src-tauri/binaries/start-backend.bat src-tauri/binaries/start-backend-x86_64-pc-windows-msvc.exe
       
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -80,8 +87,10 @@ jobs:
       - name: Install pip in embedded Python
         working-directory: src-tauri/binaries/python-embed
         run: |
-          ./python3 -m ensurepip
+          curl -o get-pip.py https://bootstrap.pypa.io/get-pip.py
+          ./python3 get-pip.py
           ./python3 -m pip install --upgrade pip setuptools wheel
+          rm get-pip.py
       
       - name: Build Backend Bundle
         run: python3 scripts/build_backend_bundle.py
