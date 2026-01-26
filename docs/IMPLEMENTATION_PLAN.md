@@ -113,11 +113,20 @@ def _extract_knowledge_facts(self, text, characters, mode=None):
 | **VoiceProfile.vue** | CharacterSheet | ✅ Integrado |
 | **CharacterKnowledgeAnalysis.vue** | CharacterSheet | ✅ Integrado |
 | **RegisterAnalysisTab.vue** | StyleTab | ✅ Integrado |
-| **DialogueAttributionPanel.vue** | Panel independiente | ✅ Creado |
+| **DialogueAttributionPanel.vue** | DocumentViewer Sidebar | ✅ Integrado |
+
+#### Componentes Compartidos Creados
+
+| Componente | Ubicación | Descripción |
+|------------|-----------|-------------|
+| **ConfidenceBadge.vue** | `shared/` | 3 variantes (badge, bar, dot), 3 tamaños, colores por nivel |
+| **MethodVotingBar.vue** | `shared/` | Visualización de votación multi-método, modo compacto |
 
 #### Extensiones Realizadas
 
-- ✅ **BehaviorExpectations.vue** → Añadida sección "Métricas de Voz" con datos del store
+- ✅ **BehaviorExpectations.vue** → Añadida sección "Métricas de Voz" + usa ConfidenceBadge y MethodVotingBar
+- ✅ **CharacterKnowledgeAnalysis.vue** → Usa ConfidenceBadge para confianza de hechos
+- ✅ **DocumentViewer.vue** → Toggle en toolbar para DialogueAttributionPanel en Sidebar
 
 #### Store Creado
 
@@ -178,27 +187,39 @@ def _extract_knowledge_facts(self, text, characters, mode=None):
 
 ---
 
-## Fase 1: Componentes Compartidos (2-3 días)
+## Fase 1: Componentes Compartidos ✅ COMPLETADO
 
 > **Objetivo**: Crear componentes reutilizables antes de features específicas
+> **Actualizado**: 2026-01-26
 
-### 1.1 ConfidenceBadge.vue
+### 1.1 ConfidenceBadge.vue ✅
+
+**Archivo**: `frontend/src/components/shared/ConfidenceBadge.vue`
 
 ```typescript
 interface Props {
   value: number          // 0-1
   variant: 'badge' | 'bar' | 'dot'
   size?: 'sm' | 'md' | 'lg'
+  showIcon?: boolean
+  showLabel?: boolean
+  showValue?: boolean
+  label?: string
+  inline?: boolean
 }
 ```
 
 Colores: verde (>0.7), amarillo (0.5-0.7), rojo (<0.5)
 
-### 1.2 ChapterTimeline.vue
+**Usado en**: CharacterKnowledgeAnalysis.vue, BehaviorExpectations.vue
+
+### 1.2 ChapterTimeline.vue ⚠️ Pendiente
 
 Adaptar de `components/timeline/VisTimeline.vue` existente.
 
-### 1.3 MethodVotingBar.vue
+### 1.3 MethodVotingBar.vue ✅
+
+**Archivo**: `frontend/src/components/shared/MethodVotingBar.vue`
 
 ```typescript
 interface Props {
@@ -207,22 +228,28 @@ interface Props {
 }
 ```
 
+**Usado en**: BehaviorExpectations.vue (expectativas con votación multi-método)
+
 ---
 
 ## Fase 2: Quick Wins - UI para Backend Existente (5-6 días)
 
 > **Objetivo**: Crear UIs para módulos backend ya completos
+> **Actualizado**: 2026-01-26
 
-### 2.1 Voice Profiles en BehaviorExpectations.vue (2-3 días)
+### 2.1 Voice Profiles en BehaviorExpectations.vue ✅ COMPLETADO
 
-**Extender** sección "Speech Patterns" con:
-- Métricas cuantitativas (longitud, TTR, formalidad, muletillas)
-- Palabras características (chips)
-- Botón "Comparar con otro personaje"
+**Extendido** con sección "Métricas de Voz":
+- ✅ Métricas cuantitativas (longitud, TTR, formalidad, muletillas)
+- ✅ Palabras características (chips)
+- ✅ Muletillas frecuentes (chips)
+- ⚠️ Botón "Comparar con otro personaje" (pendiente)
 
-### 2.2 Coreference Voting en EntityInspector.vue (2 días)
+### 2.2 Coreference Voting en EntityInspector.vue ⚠️ BLOQUEADO
 
-**Añadir** sección "Fusión Automática":
+**Requiere**: Endpoint `/api/projects/{id}/entities/{entityId}/coreference` (no implementado)
+
+**Planificado**:
 - "3/4 métodos coinciden" + ConfidenceBadge
 - [Ver detalles] → Abre modal con votación detallada
 
@@ -261,11 +288,19 @@ interface Props {
 - Tab "Overview" (datos estáticos)
 - Tab "Analysis" (lazy loaded: BehaviorExpectations, Emotional, Knowledge)
 
-### 3.5 Speaker Attribution en DocumentViewer.vue (3-4 días)
+### 3.5 Speaker Attribution en DocumentViewer.vue ✅ PARCIAL
 
-**Toggle** en toolbar para highlighting de diálogos:
-- Color según confianza (verde/amarillo/rojo)
-- Tooltip con hablante atribuido
+> **Actualizado**: 2026-01-26
+
+**Implementado**:
+- ✅ Toggle en toolbar para panel de diálogos
+- ✅ Sidebar con DialogueAttributionPanel
+- ✅ Lista de atribuciones por capítulo con confianza
+
+**Pendiente**:
+- ⚠️ Highlighting en el texto del documento
+- ⚠️ Click en atribución → scroll al diálogo en DocumentViewer
+- ⚠️ Tooltip con hablante atribuido al hover
 
 ---
 
@@ -358,8 +393,8 @@ Extender ExportDialog con formato "Informe Editorial":
 |------|------|-----------|-----------|--------|
 | 0: Estabilización | 3-4 | 3-4 | 🎯 Crítica | ✅ 100% |
 | 0.5: Multi-Método | 4-5 | 7-9 | 🎯 Crítica | Pendiente |
-| 1: Shared Components | 2-3 | 9-12 | 🎯 Crítica | Pendiente |
-| 2: Quick Wins | 5-6 | 14-18 | 🎯 Crítica | Pendiente |
+| 1: Shared Components | 2-3 | 9-12 | 🎯 Crítica | ✅ 90% |
+| 2: Quick Wins | 5-6 | 14-18 | 🎯 Crítica | 🔄 En progreso |
 | 3: Extender Tabs | 19-23 | 33-41 | ✅ Alta | 🔄 En progreso |
 | 4: Editoriales | 21-26 | 54-67 | ✅ Alta | Pendiente |
 | 5: Roadmap | 37-47 | 91-114 | ⚠️ Media | Pendiente |
@@ -367,7 +402,9 @@ Extender ExportDialog con formato "Informe Editorial":
 | 7: Infraestructura | 24-31 | 145-183 | ⚠️ Media | Pendiente |
 
 **Progreso Fase 0**: Voice Profiles ✅, Register Analysis ✅, Speaker Attribution ✅, Character Knowledge ✅
-**Progreso Fase 0.6**: Store ✅, VoiceProfile.vue ✅, CharacterKnowledgeAnalysis.vue ✅, RegisterAnalysisTab.vue ✅
+**Progreso Fase 0.6**: Store ✅, VoiceProfile.vue ✅, CharacterKnowledgeAnalysis.vue ✅, RegisterAnalysisTab.vue ✅, DialogueAttributionPanel ✅
+**Progreso Fase 1**: ConfidenceBadge.vue ✅, MethodVotingBar.vue ✅, ChapterTimeline.vue ⚠️
+**Progreso Fase 2**: BehaviorExpectations + Voice Metrics ✅, Coreference Voting ⚠️ (falta endpoint)
 
 **MVP mejorado (Fases 0-3)**: ~33-41 días (~1.5-2 meses)
 **Producto completo (Fases 0-7)**: ~145-183 días (~6-9 meses)

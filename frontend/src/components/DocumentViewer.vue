@@ -340,7 +340,7 @@ const contentStyle = computed(() => ({
 const chaptersForPanel = computed(() => {
   return chapters.value.map(ch => ({
     id: ch.id,
-    number: ch.number,
+    number: ch.chapterNumber,
     title: ch.title
   }))
 })
