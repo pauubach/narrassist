@@ -99,7 +99,10 @@ python scripts/build_backend_bundle.py
 
 **Script**: `src-tauri/binaries/start-backend.bat` (Windows)
 
-**Código**:
+## Launcher Scripts
+
+### Windows: start-backend.bat
+
 ```batch
 @echo off
 setlocal
@@ -116,11 +119,45 @@ set "PYTHONPATH=%BACKEND_DIR%;%BACKEND_DIR%\api-server;%PYTHONPATH%"
 endlocal
 ```
 
-**Funcionalidad**:
-- Cambia al directorio del backend
-- Establece PYTHONPATH correctamente
-- Ejecuta main.py con Python embebido
-- No usa launcher intermedio (exec directo)
+### macOS/Linux: start-backend.sh
+
+```bash
+#!/bin/bash
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PYTHON_EMBED="$SCRIPT_DIR/python-embed"
+BACKEND_DIR="$SCRIPT_DIR/backend"
+MAIN_PY="$BACKEND_DIR/api-server/main.py"
+
+# Detectar Python según plataforma
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    # macOS: Python.framework o python3 link
+    if [ -f "$PYTHON_EMBED/python3" ]; then
+        PYTHON_CMD="$PYTHON_EMBED/python3"
+    elif [ -f "$PYTHON_EMBED/Python.framework/Versions/Current/bin/python3" ]; then
+        PYTHON_CMD="$PYTHON_EMBED/Python.framework/Versions/Current/bin/python3"
+    fi
+elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    # Linux: python3 portable o sistema
+    if [ -f "$PYTHON_EMBED/python3" ]; then
+        PYTHON_CMD="$PYTHON_EMBED/python3"
+    else
+        PYTHON_CMD="python3"
+    fi
+fi
+
+cd "$BACKEND_DIR/api-server"
+export PYTHONPATH="$BACKEND_DIR:$BACKEND_DIR/api-server:$PYTHONPATH"
+
+exec "$PYTHON_CMD" "$MAIN_PY"
+```
+
+**Características comunes**:
+- Detección automática de Python embebido
+- PYTHONPATH configurado correctamente
+- Cambia al directorio del backend antes de ejecutar
+- Usa `exec` (Unix) para reemplazar el proceso shell
 
 ---
 
@@ -132,19 +169,25 @@ endlocal
 {
   "bundle": {
     "externalBin": [
-      "binaries/start-backend.bat"
+      "binaries/start-backend"
     ],
     "resources": [
       "binaries/python-embed/**",
-      "binaries/backend/**"
+      "binaries/backend/**",
+      "binaries/start-backend.sh"
     ]
   }
 }
 ```
 
-**Comportamiento**:
-- `externalBin`: Tauri ejecuta start-backend.bat al iniciar app
-- `resources`: Incluye Python embebido + backend en instalador
+**Comportamiento multi-plataforma**:
+- `externalBin`: Tauri añade automáticamente la extensión correcta
+  - Windows: `start-backend.bat`
+  - macOS/Linux: `start-backend.sh` (con permisos de ejecución)
+- `resources`: Se incluyen todos los archivos necesarios
+  - `python-embed/**`: Python embebido completo (Windows) o Framework (macOS)
+  - `backend/**`: Scripts Python del backend
+  - `start-backend.sh`: Launcher Unix (necesario explícito para permisos)
 - Backend se ejecuta como proceso separado
 - Comunicación: HTTP localhost:8008
 
@@ -154,25 +197,63 @@ endlocal
 
 ### Desarrollo Local
 
+**Windows**:
 ```bash
 # 1. Download Python embebido (una vez)
 python scripts/download_python_embed.py
 
-# 2. Build backend bundle
+# 2. Instalar pip
+cd src-tauri/binaries/python-embed
+.\python.exe -m ensurepip
+.\python.exe -m pip install --upgrade pip
+
+# 3. Instalar dependencias backend
+.\python.exe -m pip install -r ../backend/requirements.txt
+
+# 4. Build backend bundle
+cd ../../..
 python scripts/build_backend_bundle.py
 
-# 3. Ejecutar app Tauri
+# 5. Ejecutar app Tauri
+npm run tauri dev
+```
+
+**macOS**:
+```bash
+# 1. Download Python framework (una vez)
+python3 scripts/download_python_embed.py
+
+# 2. Instalar pip
+cd src-tauri/binaries/python-embed
+./python3 -m ensurepip
+./python3 -m pip install --upgrade pip
+
+# 3. Instalar dependencias backend
+./python3 -m pip install -r ../backend/requirements.txt
+
+# 4. Build backend bundle
+cd ../../..
+python3 scripts/build_backend_bundle.py
+
+# 5. Ejecutar app Tauri
 npm run tauri dev
 ```
 
 ### Build de Producción
 
-**Script automático**:
+**Script automático (Windows y macOS)**:
 ```bash
 python scripts/build_app_with_python_embed.py
 ```
 
-**Pasos manuales**:
+Este script detecta automáticamente la plataforma y:
+1. Descarga Python embebido/framework si no existe
+2. Instala pip si es necesario
+3. Build backend bundle
+4. Build frontend
+5. Build Tauri instalador
+
+**Pasos manuales** (si necesario):
 ```bash
 # 1. Python embebido (si no existe)
 python scripts/download_python_embed.py
@@ -190,10 +271,10 @@ cd ..
 npm run tauri build
 ```
 
-**Salida**:
-- Windows: `src-tauri/target/release/bundle/nsis/Narrative Assistant_0.3.0_x64-setup.exe`
-- macOS: `src-tauri/target/release/bundle/dmg/Narrative Assistant_0.3.0_x64.dmg`
-- Linux: `src-tauri/target/release/bundle/deb/narrative-assistant_0.3.0_amd64.deb`
+**Salida por plataforma**:
+- **Windows**: `src-tauri/target/release/bundle/nsis/Narrative Assistant_0.3.0_x64-setup.exe`
+- **macOS**: `src-tauri/target/release/bundle/dmg/Narrative Assistant_0.3.0_x64.dmg`
+- **Linux**: `src-tauri/target/release/bundle/deb/narrative-assistant_0.3.0_amd64.deb`
 
 ---
 
@@ -262,23 +343,36 @@ else:
 
 ## Compatibilidad Multi-Plataforma
 
-### Windows ✅
+### Windows ✅ Funcional
 
 - **Python**: [python-3.12.7-embed-amd64.zip](https://www.python.org/ftp/python/3.12.7/python-3.12.7-embed-amd64.zip)
 - **Launcher**: `start-backend.bat`
 - **Tamaño**: ~20MB
+- **Ejecutable**: `python-embed/python.exe`
 
-### macOS 🚧
+**Estado**: Totalmente funcional, backend arranca correctamente.
 
-- **Python**: [Python-3.12.7-macos.pkg](https://www.python.org/ftp/python/3.12.7/python-3.12.7-macos11.pkg) o Python Framework
-- **Launcher**: `start-backend.sh`
-- **Instalación**: extraer framework de .pkg, incluir en bundle
+### macOS ✅ Implementado
 
-### Linux 🚧
+- **Python**: [python-3.12.7-macos11.pkg](https://www.python.org/ftp/python/3.12.7/python-3.12.7-macos11.pkg)
+- **Formato**: Python.framework extraído del .pkg
+- **Launcher**: `start-backend.sh` (bash script)
+- **Tamaño**: ~30-40MB (framework completo)
+- **Ejecutable**: `python-embed/python3` o `Python.framework/Versions/Current/bin/python3`
+
+**Proceso**:
+1. Script descarga .pkg oficial
+2. Extrae Python.framework usando pkgutil + cpio
+3. Crea symlink python3 para acceso fácil
+4. Launcher bash detecta y usa el framework
+
+**Estado**: Implementado, pendiente de testing en macOS real.
+
+### Linux 🚧 Planificado
 
 - **Approach 1**: Python portable (pyenv portable, AppImage Python)
 - **Approach 2**: Depender de Python sistema (añadir a dependencies en .deb/.rpm)
-- **Launcher**: `start-backend.sh`
+- **Launcher**: `start-backend.sh` (mismo que macOS)
 
 ---
 
@@ -409,18 +503,23 @@ uvicorn.run(
 
 ### v0.3.0 (Actual)
 - ✅ Windows con Python embebido funcional
+- ✅ Script de descarga multi-plataforma
+- ✅ Launcher scripts (Windows + Unix)
+- ✅ Build script detecta plataforma automáticamente
 - ✅ Lazy loading de dependencias NLP
-- ✅ Script de build automatizado
+- ✅ Documentación completa
 
 ### v0.3.1 (Próximo)
-- 🚧 macOS con Python Framework
-- 🚧 Linux con Python portable
-- 🚧 GitHub Actions para builds multi-plataforma
+- 🧪 Testing en macOS real con Python.framework
+- 🧪 Verificar permisos de ejecución en start-backend.sh
+- 🧪 Testing en Linux (considerar approach portable vs sistema)
+- 📝 CI/CD GitHub Actions para builds multi-plataforma
 
 ### v0.4.0 (Futuro)
 - 📅 Instalador con dependencias pre-instaladas (opcional)
 - 📅 Auto-updater para backend bundle
 - 📅 Firma de código (Windows + macOS)
+- 📅 Linux: AppImage con Python portable integrado
 
 ---
 

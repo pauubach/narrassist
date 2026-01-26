@@ -1,7 +1,7 @@
 # Narrative Assistant - Documentación
 
-**Última actualización**: 2026-01-23
-**Estado**: MVP completo, v1.0.1
+**Última actualización**: 2026-01-26
+**Estado**: MVP completo, v0.2.9
 
 ---
 
@@ -10,7 +10,9 @@
 | Documento | Descripción |
 |-----------|-------------|
 | **[PROJECT_STATUS.md](PROJECT_STATUS.md)** | Estado actual del proyecto, inventario de módulos |
-| **[ROADMAP_V2.md](ROADMAP_V2.md)** | Plan de futuras funcionalidades |
+| **[ROADMAP.md](ROADMAP.md)** | Trabajo pendiente y objetivos futuros |
+| **[CHANGELOG.md](CHANGELOG.md)** | Historial de cambios por versión |
+| **[IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md)** | Plan de implementación detallado por fases |
 | **[CLAUDE.md](../CLAUDE.md)** | Instrucciones para Claude Code |
 
 ---
@@ -20,7 +22,9 @@
 ```
 docs/
 ├── PROJECT_STATUS.md          # ★ Estado actual del proyecto
-├── ROADMAP_V2.md              # ★ Plan de futuro
+├── ROADMAP.md                 # ★ Trabajo futuro
+├── CHANGELOG.md               # ★ Historial de versiones
+├── IMPLEMENTATION_PLAN.md     # ★ Plan de implementación por fases
 ├── README.md                  # Este archivo
 │
 ├── 00-overview/               # Visión general del proyecto
@@ -40,6 +44,7 @@ docs/
 │   ├── database-schema.md     # Schema SQLite
 │   ├── document-processing.md # Pipeline de procesamiento
 │   ├── SECURITY.md            # Seguridad y aislamiento
+│   ├── LICENSING.md           # Sistema de licencias
 │   └── ...                    # Otros docs de arquitectura
 │
 ├── 04-references/             # Referencias
@@ -54,7 +59,8 @@ docs/
 ├── COREFERENCE_RESOLUTION.md  # Sistema de correferencias
 │
 └── _archive/                  # Documentos históricos (no mantener)
-    ├── steps/                 # Especificaciones de implementación originales
+    ├── planning/              # Planes de implementación archivados
+    ├── steps/                 # Especificaciones originales
     ├── research/              # Investigación
     └── obsolete/              # Docs supersedidos
 ```
@@ -70,9 +76,10 @@ docs/
 4. [PROJECT_STATUS.md](PROJECT_STATUS.md) - Estado actual
 
 ### Para implementar features
-1. [ROADMAP_V2.md](ROADMAP_V2.md) - Ver qué falta por hacer
-2. [02-architecture/database-schema.md](02-architecture/database-schema.md) - Schema BD
-3. [api-reference/](api-reference/) - APIs disponibles
+1. [ROADMAP.md](ROADMAP.md) - Ver qué falta por hacer
+2. [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) - Plan detallado por fases
+3. [02-architecture/database-schema.md](02-architecture/database-schema.md) - Schema BD
+4. [api-reference/](api-reference/) - APIs disponibles
 
 ### Para entender el NLP
 1. [COREFERENCE_RESOLUTION.md](COREFERENCE_RESOLUTION.md) - Sistema de correferencias
@@ -81,12 +88,13 @@ docs/
 
 ---
 
-## Estadísticas del Proyecto
+## Estadísticas del Proyecto (v0.2.9)
 
 - **Backend**: 103 archivos Python, ~49,000 LoC
-- **Frontend**: 53 componentes Vue, 7 stores Pinia, ~30,000 LoC
-- **API**: 39 endpoints FastAPI
+- **Frontend**: 54 componentes Vue, 7 stores Pinia, ~30,000 LoC
+- **API**: 48+ endpoints FastAPI
 - **Tests**: 612+ passing
+- **Detectores**: 14 detectores editoriales
 - **Total**: ~79,000 LoC
 
 ---
@@ -94,16 +102,19 @@ docs/
 ## Archivo
 
 Los documentos en `_archive/` son históricos y no se mantienen activamente:
-- `steps/` - Especificaciones originales de implementación (el código es ahora la fuente de verdad)
+- `planning/` - Planes de implementación anteriores (UI_IMPLEMENTATION_PLAN, ROADMAP_V2)
+- `steps/` - Especificaciones originales de implementación
 - `research/` - Documentos de investigación
-- `obsolete/` - Documentos supersedidos por versiones más recientes
+- `obsolete/` - Documentos supersedidos
 
 ---
 
 ## Enlaces Rápidos
 
 - [Estado del Proyecto](PROJECT_STATUS.md)
-- [Roadmap](ROADMAP_V2.md)
+- [Roadmap](ROADMAP.md)
+- [Changelog](CHANGELOG.md)
+- [Plan de Implementación](IMPLEMENTATION_PLAN.md)
 - [Instrucciones para Claude](../CLAUDE.md)
 - [Endpoints HTTP](api-reference/http-endpoints.md)
 - [Schema de BD](02-architecture/database-schema.md)

@@ -1,7 +1,9 @@
 # Estado del Proyecto - Narrative Assistant
 
 > **Última actualización**: 2026-01-26
-> **Versión tauri.conf.json**: 0.2.9 (ver CHANGELOG abajo)
+> **Versión tauri.conf.json**: 0.2.9
+> **Changelog**: Ver [CHANGELOG.md](CHANGELOG.md)
+> **Roadmap**: Ver [ROADMAP.md](ROADMAP.md)
 
 ---
 
@@ -611,6 +613,123 @@ cargo tauri build --target x86_64-pc-windows-msvc
 
 ---
 
+## 🔍 Análisis de Completitud de Módulos Backend (2026-01-26)
+
+> **Verificación exhaustiva**: Exploración del código fuente para determinar qué está realmente implementado vs qué falta completar.
+
+### Resumen de Estado
+
+| Módulo | Completitud | Prioridad | Impacto en UI |
+|--------|-------------|-----------|---------------|
+| **Coreference Resolver** | 85% | Media | Exponer votación en API |
+| **Register Analysis** | 75% | Media | Añadir análisis por capítulo |
+| **Voice Profiles** | 70% | Alta | Devolver todas las métricas |
+| **Speaker Attribution** | 80% | Media | Integrar voice matching |
+| **Pacing Analysis** | 80% | Baja | Añadir curva de tensión |
+| **Character Knowledge** | 60% | 🎯 **CRÍTICA** | Core `_extract_knowledge_facts()` vacío |
+
+### Detalle por Módulo
+
+#### Coreference Resolver (85%)
+
+**✅ Implementado:**
+- Sistema de votación con 4 métodos: LLM (35%), embeddings (30%), morpho (20%), heuristics (15%)
+- `resolve_coreferences_voting()` funcional
+- Cadenas de correferencia y menciones no resueltas
+
+**❌ Falta:**
+- API endpoint para exponer scores individuales por método
+- Razonamiento textual de cada método
+- Persistencia de decisiones del usuario
+
+**Archivo**: `src/narrative_assistant/nlp/coreference_resolver.py`
+
+#### Register Analysis (75%)
+
+**✅ Implementado:**
+- `RegisterChangeDetector` con `detect_changes()`
+- Clasificación: formal, neutral, coloquial, poético, técnico
+- Análisis por fragmento
+
+**❌ Falta:**
+- Análisis por capítulo (solo fragmentos sueltos)
+- Estadísticas agregadas (distribución de registros)
+- Severidad de cambios (alta/media/baja)
+
+**Archivo**: `src/narrative_assistant/voice/register.py`
+
+#### Voice Profiles (70%)
+
+**✅ Implementado:**
+- `VoiceMetrics` dataclass con 17 métricas
+- `VoiceAnalyzer.analyze_voice()` calcula todas las métricas
+- `VoiceProfiler` para comparación entre personajes
+
+**❌ Falta:**
+- API no devuelve todas las métricas calculadas
+- `characteristic_words` y `top_fillers` no se retornan
+- Endpoint de comparación directa entre 2 personajes
+
+**Archivo**: `src/narrative_assistant/voice/profiles.py`
+
+#### Speaker Attribution (80%)
+
+**✅ Implementado:**
+- 5 métodos de atribución (verb, proximity, context, name, coreference)
+- 4 niveles de confianza (high, medium, low, unknown)
+- `DialogueAttributor.attribute_dialogues()`
+
+**❌ Falta:**
+- Voice matching débil (no usa `VoiceAnalyzer` para comparar estilo)
+- No hay feedback loop de correcciones del usuario
+- API endpoint faltante
+
+**Archivo**: `src/narrative_assistant/voice/speaker_attribution.py`
+
+#### Pacing Analysis (80%)
+
+**✅ Implementado:**
+- `PacingAnalyzer` con 10 tipos de problemas
+- 11 métricas por capítulo
+- Detección de capítulos "muertos"
+
+**❌ Falta:**
+- Curva de tensión narrativa (`tension_curve`)
+- Comparación con benchmarks de género
+- Sugerencias específicas de corrección
+
+**Archivo**: `src/narrative_assistant/analysis/pacing.py`
+
+#### Character Knowledge (60%) 🚨 CRÍTICO
+
+**✅ Implementado:**
+- `CharacterKnowledgeTracker` estructura básica
+- Detección de asimetrías
+- `track_knowledge_flow()` funcional
+
+**❌ FALTA (CRÍTICO):**
+- `_extract_knowledge_facts()` **devuelve lista vacía** - core no implementado
+- No extrae hechos del texto narrativo
+- No distingue opiniones vs hechos
+- No detecta cuándo un personaje aprende algo nuevo
+
+**Archivo**: `src/narrative_assistant/analysis/character_knowledge.py`
+
+### Esfuerzo para 100% Completitud
+
+| Módulo | Días | Notas |
+|--------|------|-------|
+| Character Knowledge (core) | 5-7 | **BLOQUEANTE para UI Knowledge** |
+| Voice Profiles completo | 3-4 | Extender API |
+| Register por capítulo | 2-3 | Nueva función |
+| Speaker Attribution + voice | 2-3 | Integrar VoiceAnalyzer |
+| Coreference razonamiento | 1-2 | Extender método existente |
+| Pacing tension curve | 2-3 | Nueva métrica |
+
+**Total**: 15-22 días adicionales para completar módulos existentes
+
+---
+
 ## Instalador y Distribución 📦
 
 ### Estado: ✅ LISTO PARA RELEASE (excepto code signing)
@@ -875,58 +994,6 @@ El proyecto está funcionalmente completo para un MVP:
 - ✅ Tauri empaquetado (icons, menu, sidecar)
 - ✅ Sistema de licencias
 - ✅ Análisis NLP + LLM local
-
----
-
-## CHANGELOG Reciente
-
-### v0.2.9 (2026-01-26)
-- Feat: **Informe de revisión detallado** (PDF/DOCX con estadísticas por categoría)
-  - `exporters/review_report_exporter.py`: ReviewReportExporter, ReviewReportOptions, ReviewReportData
-  - API: `/api/projects/{id}/export/review-report` (GET)
-  - API: `/api/projects/{id}/export/review-report/preview` (GET)
-- Feat: **Diccionario local multi-fuente** (100% offline)
-  - `dictionaries/`: models, sources, manager
-  - Fuentes: Wiktionary español, sinónimos/antónimos, diccionario custom
-  - Links externos: RAE DLE, María Moliner, Oxford, WordReference
-  - API: `/api/dictionary/lookup/{word}`, `/api/dictionary/synonyms/{word}`, etc.
-- Feat: **UI Arco emocional completa**
-  - `EmotionalAnalysis.vue`: Timeline visual, estados emocionales, incoherencias
-  - API: `/api/projects/{id}/characters/{name}/emotional-profile`
-
-### v0.2.8 (2026-01-26)
-- Feat: Detector de variantes ortográficas RAE (14º detector)
-- Feat: Soporte para galicismos en detector de extranjerismos (80+ términos franceses)
-- Feat: Typography detector completo (secuencias inválidas, pares sin cerrar, orden comilla/punto)
-- Feat: Anacoluto detector completo (subject_shift implementado)
-- Feat: POV detector completo (focalizer_shift, inconsistent_omniscience)
-
-### v0.2.7 (2026-01-26)
-- Limpieza de código duplicado y preparación release
-
-### v0.2.6 (2026-01-25)
-- Fix: Template vacío durante instalación de dependencias
-- Fix: Ocultar ventana de consola Python en Windows
-
-### v0.2.5 (2026-01-25)
-- Fix: Template para fase 'installing-deps' en ModelSetupDialog
-
-### v0.2.4 (2026-01-25)
-- Feat: Detección de Python con verificación de versión (Python 3.10+)
-- Feat: Endpoint `/api/system/python-status`
-- Feat: UI para estado "Python no encontrado"
-- Inclusión de info Python en `/api/models/status`
-
-### v0.2.0-v0.2.3 (2026-01-24/25)
-- Fix: Setup sys.path antes de imports para PyInstaller
-- Fix: Cargar site-packages de usuario/Anaconda al inicio
-- Fix: Instalación de dependencias con PyInstaller
-- Fix: Verificar backend_loaded antes de descargar modelos
-
-### v0.1.6-v0.1.9 (2026-01-23/24)
-- Feat: Lazy loading de dependencias NLP
-- Fix: NSIS hooks para cerrar procesos antes de instalar
-- Fix: Tutorial solo se muestra cuando modelos están listos
 
 ---
 

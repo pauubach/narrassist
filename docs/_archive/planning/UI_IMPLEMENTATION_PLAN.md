@@ -205,6 +205,145 @@
 
 ---
 
+## 🔧 Configuración Multi-Método Adaptativa
+
+> **Principio**: Todos los procesos con múltiples métodos (LLM vs reglas vs híbrido) deben ser configurables en Settings, con default adaptativo según hardware.
+
+### Estado Actual de Configuración
+
+| Proceso | Backend | Settings UI | Hardware Default |
+|---------|---------|-------------|------------------|
+| **Coreference** | ✅ 4 métodos + pesos | ✅ Configurable | ✅ GPU→all, CPU→sin LLM |
+| **Grammar** | ✅ 3 métodos (spacy, languagetool, llm) | ✅ Configurable | ⚠️ Parcial |
+| **NER** | ✅ spaCy + gazetteer | ✅ Configurable | ⚠️ Parcial |
+| **Spelling/Ortografía** | ✅ 6 voters + LLM arbitrator | ❌ **NO EXPUESTO** | ❌ Hardcodeado |
+| **Attribute Extraction** | ✅ 3 capas (regex, dep, llm) | ❌ **NO EXPUESTO** | ❌ Hardcodeado |
+| **Character Knowledge** | ⚠️ 60% (core vacío) | ❌ **NO EXISTE** | ❌ No implementado |
+
+### Trabajo Necesario
+
+#### 1. Exponer Spelling en API y Settings (2 días)
+
+**Backend** (`api-server/main.py` - endpoint `/api/system/capabilities`):
+```python
+"spelling": {
+    "patterns": {"name": "Patrones de error", "weight": 0.25, "precision": 0.873, ...},
+    "languagetool": {"name": "LanguageTool", "weight": 0.20, "recall": 0.798, ...},
+    "symspell": {"name": "SymSpell", "weight": 0.18, "precision": 0.742, ...},
+    "hunspell": {"name": "Hunspell", "weight": 0.15, ...},
+    "pyspellchecker": {"name": "PySpellChecker", "weight": 0.12, ...},
+    "beto": {"name": "BETO ML", "weight": 0.10, "requires_gpu": True, ...},
+    "llm_arbitrator": {"name": "LLM Arbitrador", "requires_gpu": True, ...}
+}
+```
+
+**Frontend** (`SettingsView.vue`):
+- Añadir sección "Corrección Ortográfica" con toggle para cada voter
+- Mostrar precisión/recall de cada método
+- Indicador de uso de GPU
+
+#### 2. Exponer Attribute Extraction en API y Settings (1.5 días)
+
+**Backend**:
+```python
+"extraction": {
+    "regex": {"name": "Patrones Regex", "layer": "syntactic", "precision": 0.95, ...},
+    "dependency": {"name": "Análisis Sintáctico", "layer": "syntactic", "precision": 0.85, ...},
+    "embeddings": {"name": "Similitud Semántica", "layer": "semantic", "requires_gpu": True, ...},
+    "llm": {"name": "LLM Extractor", "layer": "semantic", "requires_gpu": True, ...}
+}
+```
+
+**Frontend**:
+- Sección "Extracción de Atributos" con capas visuales
+- Toggle por método con indicador de capa
+
+#### 3. Character Knowledge con 3 Opciones (5-7 días)
+
+**Implementar `_extract_knowledge_facts()` con 3 modos**:
+
+| Modo | Descripción | Velocidad | Precisión |
+|------|-------------|-----------|-----------|
+| **Rules** | Patrones regex + spaCy dependency | Rápido | ~70% |
+| **LLM** | Ollama (qwen2.5/mistral) | Lento | ~90% |
+| **Hybrid** | Rules primero, LLM para ambiguos | Medio | ~85% |
+
+**Backend** (`analysis/character_knowledge.py`):
+```python
+class KnowledgeExtractionMode(Enum):
+    RULES = "rules"           # Solo patrones + dependency
+    LLM = "llm"               # Solo Ollama
+    HYBRID = "hybrid"         # Rules + LLM fallback
+
+def _extract_knowledge_facts(
+    self,
+    text: str,
+    characters: List[str],
+    mode: KnowledgeExtractionMode = None  # None = auto según hardware
+) -> List[KnowledgeFact]:
+    if mode is None:
+        mode = self._auto_select_mode()  # GPU → HYBRID, CPU → RULES
+    ...
+```
+
+**API** (`/api/system/capabilities`):
+```python
+"knowledge": {
+    "rules": {"name": "Patrones y Reglas", "speed": "fast", "precision": 0.70, ...},
+    "llm": {"name": "LLM Extractor", "speed": "slow", "precision": 0.90, "requires_gpu": True, ...},
+    "hybrid": {"name": "Híbrido (Recomendado)", "speed": "medium", "precision": 0.85, ...}
+}
+```
+
+**Frontend**:
+- Sección "Tracking de Conocimiento" con 3 opciones
+- Default: Hybrid si GPU, Rules si CPU
+
+#### 4. Frontend: Usar Hardware Defaults del Backend (1 día)
+
+**Problema actual**: Frontend usa defaults hardcodeados:
+```javascript
+// Actual - hardcodeado
+enabledNLPMethods: {
+    coreference: ['embeddings', 'morpho', 'heuristics'],
+    grammar: ['spacy_rules']
+}
+```
+
+**Solución**: Usar `recommended_config` del backend:
+```javascript
+// Nuevo - adaptativo
+async function loadDefaultsFromHardware() {
+    const { data } = await fetch('/api/system/capabilities')
+    const { recommended_config, nlp_methods } = data
+
+    // Usar defaults del backend basados en hardware
+    settings.enabledNLPMethods = {
+        coreference: Object.keys(nlp_methods.coreference)
+            .filter(k => nlp_methods.coreference[k].default_enabled),
+        spelling: Object.keys(nlp_methods.spelling)
+            .filter(k => nlp_methods.spelling[k].default_enabled),
+        extraction: Object.keys(nlp_methods.extraction)
+            .filter(k => nlp_methods.extraction[k].default_enabled),
+        knowledge: recommended_config.has_gpu ? 'hybrid' : 'rules'
+    }
+}
+```
+
+### Resumen de Esfuerzo Adicional
+
+| Tarea | Días |
+|-------|------|
+| Exponer Spelling en API + Settings | 2 |
+| Exponer Extraction en API + Settings | 1.5 |
+| Character Knowledge con 3 modos | 5-7 |
+| Frontend hardware-adaptive defaults | 1 |
+| **Total** | **9.5-11.5 días** |
+
+> ⚠️ Este trabajo se suma al esfuerzo de completar módulos (12-16 días) y debe hacerse **antes** de crear las UIs correspondientes.
+
+---
+
 ## Fase 1: Quick Wins (Extender Componentes Existentes)
 
 ### 1.1 Voice Profiles → Extender BehaviorExpectations.vue
@@ -1110,16 +1249,24 @@ Estructura:
 | Fase 6 (Deuda Técnica) | 30-38 | 139.5-176.5 | ✅ Alta |
 | Fase 7 (Infraestructura) | 24-31 | 163.5-207.5 | ⚠️ Media |
 
-**Total estimado**: **164-208 días** (~33-42 semanas, ~8-10 meses)
+**Total estimado**: **174-220 días** (~35-44 semanas, ~9-11 meses)
 
-> ⚠️ **Incluye 12-16 días de mejoras a módulos existentes** (ver sección "Análisis de Completitud")
-> - Character Knowledge core: 5-7 días (CRÍTICO)
-> - Voice Profiles completo: 3-4 días
-> - Register por capítulo: 2-3 días
-> - Speaker Attribution voice matching: 2-3 días
+> ⚠️ **Trabajo prerequisito antes de UI** (ver secciones anteriores):
+>
+> | Categoría | Días | Descripción |
+> |-----------|------|-------------|
+> | Mejoras módulos existentes | 12-16 | Knowledge core, Voice, Register, etc. |
+> | Configuración multi-método | 9.5-11.5 | Spelling, Extraction, Knowledge en Settings |
+> | **Subtotal prerequisitos** | **21.5-27.5** | Antes de empezar fases UI |
+>
+> **Desglose Character Knowledge**:
+> - Implementar `_extract_knowledge_facts()` con 3 modos: 5-7 días
+> - Modo RULES: patrones + spaCy dependency
+> - Modo LLM: Ollama (qwen2.5/mistral)
+> - Modo HYBRID: Rules + LLM fallback (default si GPU)
 
 > **Nota**: Fases 6 y 7 pueden ejecutarse en paralelo con otras fases.
-> **Recomendación**: Priorizar Fases 0-4 para MVP completo (~64-79 días, ~3-4 meses)
+> **Recomendación**: Priorizar prerequisitos + Fases 0-2 para MVP completo (~50-65 días, ~2.5-3.5 meses)
 
 ---
 
@@ -1347,3 +1494,4 @@ src/narrative_assistant/
 
 *Documento creado: 2026-01-26*
 *Actualizado: 2026-01-26 (plan completo con todas las features)*
+*Análisis de completitud añadido: 2026-01-26*

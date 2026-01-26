@@ -134,15 +134,21 @@
 
 ### P1 - Backend sin UI adecuada
 
-| Feature | Módulo Backend | UI Necesaria |
-|---------|----------------|--------------|
-| **Knowledge Tracking** | `character_knowledge.py` ✅ | Panel "Qué sabe cada personaje" |
-| **Voice Profiles** | `voice/profiles.py` ✅ | Vista de perfiles de voz |
-| **Register Analysis** | `voice/register.py` ✅ | Indicador de registro lingüístico |
-| **Speaker Attribution** | `voice/speaker_attribution.py` ✅ | Atribución visual en diálogos |
-| **Sentiment Analysis** | `nlp/sentiment.py` ✅ | ✅ EmotionalAnalysis.vue (v0.2.9) |
-| **Emotional Coherence** | `emotional_coherence.py` ✅ | ✅ Arco emocional visual (v0.2.9) |
-| **Interaction Patterns** | `interactions/` ✅ | Panel de patrones de interacción |
+> ⚠️ **Análisis de completitud (2026-01-26)**: Varios módulos tienen implementación parcial. Ver [UI_IMPLEMENTATION_PLAN.md](UI_IMPLEMENTATION_PLAN.md).
+
+| Feature | Módulo Backend | UI Necesaria | Completitud |
+|---------|----------------|--------------|-------------|
+| **Knowledge Tracking** | `character_knowledge.py` | Panel "Qué sabe cada personaje" | ⚠️ **60%** |
+| **Voice Profiles** | `voice/profiles.py` | Vista de perfiles de voz | ⚠️ **70%** |
+| **Register Analysis** | `voice/register.py` | Indicador de registro lingüístico | ⚠️ **75%** |
+| **Speaker Attribution** | `voice/speaker_attribution.py` | Atribución visual en diálogos | ⚠️ **80%** |
+| **Coreference Voting** | `coreference_resolver.py` | Votación en EntityInspector | ⚠️ **85%** |
+| **Pacing Analysis** | `analysis/pacing.py` | Panel de ritmo | ⚠️ **80%** |
+| **Sentiment Analysis** | `nlp/sentiment.py` ✅ | ✅ EmotionalAnalysis.vue (v0.2.9) | ✅ **100%** |
+| **Emotional Coherence** | `emotional_coherence.py` ✅ | ✅ Arco emocional visual (v0.2.9) | ✅ **100%** |
+| **Interaction Patterns** | `interactions/` ✅ | Panel de patrones de interacción | ✅ **95%** |
+
+**Esfuerzo para completar módulos existentes**: 15-22 días (crítico: Knowledge 5-7 días)
 
 ### P2 - Detectores Adicionales
 
@@ -221,6 +227,14 @@
 | Categorías de alerta | 14 | 16 | 20 |
 | Endpoints API | 48+ | 55 | 70 |
 | Componentes Vue | 54+ | 60 | 75 |
+| **Completitud módulos core** | **60-85%** | **90%** | **100%** |
+
+> ⚠️ **Añadido 2026-01-26**: Nueva métrica de completitud. Módulos críticos:
+> - Character Knowledge: 60% (core `_extract_knowledge_facts()` vacío)
+> - Voice Profiles: 70% (métricas no expuestas en API)
+> - Register Analysis: 75% (falta análisis por capítulo)
+>
+> **Esfuerzo para 100%**: 15-22 días adicionales. Ver [UI_IMPLEMENTATION_PLAN.md](UI_IMPLEMENTATION_PLAN.md).
 
 ---
 
@@ -279,3 +293,4 @@
 ---
 
 *Documento actualizado: 2026-01-26*
+*Análisis de completitud añadido: 2026-01-26*

@@ -1,33 +1,37 @@
 #!/usr/bin/env python3
 """
-Script para descargar Python embebido para Windows
+Script para descargar Python embebido/portable para Windows y macOS
 Se usará como backend ejecutable sin PyInstaller
 """
 import urllib.request
 import zipfile
+import tarfile
+import subprocess
+import shutil
 import os
 import sys
+import platform
 from pathlib import Path
 
 PYTHON_VERSION = "3.12.7"
-PYTHON_EMBED_URL = f"https://www.python.org/ftp/python/{PYTHON_VERSION}/python-{PYTHON_VERSION}-embed-amd64.zip"
 
-def download_python_embed(target_dir: Path):
-    """
-    Descarga Python embebido para Windows y lo extrae
-    
-    Args:
-        target_dir: Directorio donde extraer Python embebido
-    """
-    target_dir.mkdir(parents=True, exist_ok=True)
+# URLs por plataforma
+PYTHON_URLS = {
+    "Windows": f"https://www.python.org/ftp/python/{PYTHON_VERSION}/python-{PYTHON_VERSION}-embed-amd64.zip",
+    "Darwin": f"https://www.python.org/ftp/python/{PYTHON_VERSION}/python-{PYTHON_VERSION}-macos11.pkg",
+}
+
+def download_windows_embed(target_dir: Path):
+    """Descarga Python embebido para Windows"""
+    url = PYTHON_URLS["Windows"]
     zip_path = target_dir / f"python-{PYTHON_VERSION}-embed.zip"
     
-    print(f"Descargando Python {PYTHON_VERSION} embebido...")
-    print(f"URL: {PYTHON_EMBED_URL}")
+    print(f"Descargando Python {PYTHON_VERSION} embebido para Windows...")
+    print(f"URL: {url}")
     
     # Descargar
     try:
-        urllib.request.urlretrieve(PYTHON_EMBED_URL, zip_path)
+        urllib.request.urlretrieve(url, zip_path)
         print(f"✓ Descargado: {zip_path}")
     except Exception as e:
         print(f"✗ Error descargando: {e}")
@@ -43,59 +47,180 @@ def download_python_embed(target_dir: Path):
         # Eliminar zip
         zip_path.unlink()
         
-        # Crear archivo _pth para configurar paths
+        # Configurar archivo _pth para habilitar site-packages
         python_major_minor = PYTHON_VERSION.rsplit('.', 1)[0].replace('.', '')
-        pth_file = target_dir / f"python{python_major_minor}._pth"
-        if not pth_file.exists():
-            # Buscar el archivo .pth existente
-            pth_files = list(target_dir.glob("python*._pth"))
-            if pth_files:
-                pth_file = pth_files[0]
-                print(f"Encontrado archivo PTH: {pth_file.name}")
-                
-                # Modificar para incluir site-packages
-                content = pth_file.read_text()
+        pth_files = list(target_dir.glob("python*._pth"))
+        if pth_files:
+            pth_file = pth_files[0]
+            print(f"Configurando {pth_file.name}...")
+            
+            content = pth_file.read_text()
+            if "import site" not in content:
+                # Uncomment or add "import site"
+                content = content.replace("# import site", "import site")
                 if "import site" not in content:
                     content += "\nimport site\n"
-                    pth_file.write_text(content)
-                    print("✓ Configurado import site")
+                pth_file.write_text(content)
+                print("✓ Habilitado import site para pip")
         
-        # Verificar que python.exe existe
+        # Verificar python.exe
         python_exe = target_dir / "python.exe"
         if python_exe.exists():
-            print(f"✓ Python embebido listo: {python_exe}")
+            print(f"✓ Python Windows embebido listo: {python_exe}")
             return True
         else:
-            print(f"✗ No se encontró python.exe en {target_dir}")
+            print(f"✗ No se encontró python.exe")
             return False
             
     except Exception as e:
         print(f"✗ Error extrayendo: {e}")
         return False
 
+def download_macos_framework(target_dir: Path):
+    """Descarga e instala Python Framework para macOS"""
+    url = PYTHON_URLS["Darwin"]
+    pkg_path = target_dir / f"python-{PYTHON_VERSION}-macos.pkg"
+    
+    print(f"Descargando Python {PYTHON_VERSION} para macOS...")
+    print(f"URL: {url}")
+    
+    # Descargar
+    try:
+        urllib.request.urlretrieve(url, pkg_path)
+        print(f"✓ Descargado: {pkg_path}")
+    except Exception as e:
+        print(f"✗ Error descargando: {e}")
+        return False
+    
+    # Extraer Python.framework del .pkg
+    print(f"Extrayendo Python.framework...")
+    
+    try:
+        # Crear directorio temporal para extraer
+        temp_dir = target_dir / "temp_extract"
+        temp_dir.mkdir(exist_ok=True)
+        
+        # Expandir .pkg
+        subprocess.run([
+            "pkgutil", "--expand",
+            str(pkg_path),
+            str(temp_dir)
+        ], check=True)
+        
+        # Extraer el payload que contiene Python.framework
+        payload = temp_dir / "Python_Framework.pkg" / "Payload"
+        if not payload.exists():
+            # Buscar el payload correcto
+            payloads = list(temp_dir.glob("**/Payload"))
+            if payloads:
+                payload = payloads[0]
+        
+        if payload.exists():
+            # Extraer con cpio
+            subprocess.run(
+                f"cd {temp_dir} && cat */Payload | gunzip -dc | cpio -i",
+                shell=True,
+                check=True
+            )
+            
+            # Mover Python.framework a target_dir
+            framework_src = temp_dir / "Library" / "Frameworks" / "Python.framework"
+            if framework_src.exists():
+                framework_dst = target_dir / "Python.framework"
+                if framework_dst.exists():
+                    shutil.rmtree(framework_dst)
+                shutil.move(str(framework_src), str(framework_dst))
+                print(f"✓ Python.framework extraído")
+                
+                # Limpiar
+                shutil.rmtree(temp_dir)
+                pkg_path.unlink()
+                
+                # Crear symlink a python3
+                python_bin = framework_dst / "Versions" / "Current" / "bin" / "python3"
+                python_link = target_dir / "python3"
+                if python_bin.exists():
+                    if python_link.exists():
+                        python_link.unlink()
+                    python_link.symlink_to(python_bin)
+                    print(f"✓ Python macOS listo: {python_link}")
+                    return True
+                else:
+                    print(f"✗ No se encontró python3 en framework")
+                    return False
+            else:
+                print(f"✗ No se encontró Python.framework en payload")
+                return False
+        else:
+            print(f"✗ No se encontró Payload en .pkg")
+            return False
+            
+    except Exception as e:
+        print(f"✗ Error extrayendo framework: {e}")
+        print(f"  Nota: En macOS, puede ser necesario instalar manualmente:")
+        print(f"  1. Instalar Python oficial desde python.org")
+        print(f"  2. Copiar /Library/Frameworks/Python.framework a src-tauri/binaries/python-embed/")
+        return False
+
+def download_python_embed(target_dir: Path):
+    """
+    Descarga Python embebido para la plataforma actual
+    
+    Args:
+        target_dir: Directorio donde extraer Python embebido
+    """
+    system = platform.system()
+    
+    if system not in PYTHON_URLS:
+        print(f"✗ Sistema operativo no soportado: {system}")
+        print(f"  Soportados: {', '.join(PYTHON_URLS.keys())}")
+        print(f"\n  Para Linux, considere usar Python del sistema")
+        return False
+    
+    target_dir.mkdir(parents=True, exist_ok=True)
+    
+    print(f"\n{'='*80}")
+    print(f"Descargando Python {PYTHON_VERSION} para {system}")
+    print(f"Destino: {target_dir}")
+    print(f"{'='*80}\n")
+    
+    if system == "Windows":
+        return download_windows_embed(target_dir)
+    elif system == "Darwin":
+        return download_macos_framework(target_dir)
+
 def main():
     """Main entry point"""
     repo_root = Path(__file__).parent.parent
     target_dir = repo_root / "src-tauri" / "binaries" / "python-embed"
     
-    print("=" * 80)
-    print("Descargando Python Embebido para Windows")
-    print("=" * 80)
-    print(f"Versión: {PYTHON_VERSION}")
-    print(f"Destino: {target_dir}")
-    print()
+    success = download_python_embed(target_dir)
     
-    if download_python_embed(target_dir):
-        print()
-        print("=" * 80)
+    if success:
+        print(f"\n{'='*80}")
         print("✓ Python embebido descargado exitosamente")
-        print("=" * 80)
+        print(f"{'='*80}")
+        
+        # Instrucciones post-instalación
+        system = platform.system()
+        if system == "Windows":
+            print("\nPróximos pasos:")
+            print("1. cd src-tauri/binaries/python-embed")
+            print("2. .\\python.exe -m ensurepip")
+            print("3. .\\python.exe -m pip install --upgrade pip setuptools wheel")
+            print("4. .\\python.exe -m pip install -r ../backend/requirements.txt")
+        elif system == "Darwin":
+            print("\nPróximos pasos:")
+            print("1. cd src-tauri/binaries/python-embed")
+            print("2. ./python3 -m ensurepip")
+            print("3. ./python3 -m pip install --upgrade pip setuptools wheel")
+            print("4. ./python3 -m pip install -r ../backend/requirements.txt")
+        
         return 0
     else:
-        print()
-        print("=" * 80)
+        print(f"\n{'='*80}")
         print("✗ Error descargando Python embebido")
-        print("=" * 80)
+        print(f"{'='*80}")
         return 1
 
 if __name__ == "__main__":
