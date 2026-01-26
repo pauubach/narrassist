@@ -1,9 +1,7 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -142,78 +140,9 @@ jobs:
           name: macos-installer
           path: src-tauri/target/release/bundle/dmg/*.dmg
 
-  build-linux:
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Cache Rust
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
-
-      - name: Install Tauri CLI
-        run: cargo install tauri-cli --version "^2.0"
-
-      - name: Install frontend dependencies
-        working-directory: frontend
-        run: npm ci
-
-      - name: Build frontend
-        working-directory: frontend
-        run: npm run build
-
-      - name: Install Python dependencies
-        run: |
-          pip install -e ".[build]"
-          pip install -r api-server/requirements.txt
-
-      - name: Build sidecar
-        run: python scripts/build_sidecar.py --clean
-
-      - name: Verify sidecar was built
-        run: |
-          echo "Checking binaries directory..."
-          ls -la src-tauri/binaries/
-          echo "Expected file for Linux: narrative-assistant-server-x86_64-unknown-linux-gnu"
-
-      - name: Prepare resources
-        run: |
-          mkdir -p src-tauri/resources
-          cp scripts/install_models.py src-tauri/resources/
-
-      - name: Build Tauri
-        run: cargo tauri build
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-installer
-          path: src-tauri/target/release/bundle/deb/*.deb
-
   # Crear release con todos los artefactos
   create-release:
-    needs: [build-windows, build-macos, build-linux]
+    needs: [build-windows, build-macos]
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
@@ -232,6 +161,5 @@ jobs:
           files: |
             artifacts/windows-installer/*
             artifacts/macos-installer/*
-            artifacts/linux-installer/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

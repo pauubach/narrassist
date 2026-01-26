@@ -35,17 +35,30 @@ jobs:
       - name: Build Backend Bundle
         run: python scripts/build_backend_bundle.py
       
-      - name: Debug - List binaries directory
+      - name: Validate binaries and python embed (Windows)
+        shell: pwsh
         run: |
-          echo "=== Contenido de src-tauri/binaries ==="
-          dir src-tauri\binaries
-          echo "=== Contenido de python-embed ==="
-          dir src-tauri\binaries\python-embed
-      
-      - name: Prepare launcher for Windows
-        run: |
-          # Tauri busca archivos con sufijo de arquitectura en Windows tambien
-          Copy-Item src-tauri/binaries/start-backend.bat src-tauri/binaries/start-backend-x86_64-pc-windows-msvc.exe
+          Write-Host "=== Contenido de src-tauri/binaries ==="
+          Get-ChildItem -Path src-tauri/binaries -Recurse
+
+          $pythonEmbed = "src-tauri/binaries/python-embed/python.exe"
+          if (!(Test-Path $pythonEmbed)) {
+            Write-Host "Contenido de src-tauri/binaries/python-embed:" 
+            if (Test-Path "src-tauri/binaries/python-embed") {
+              Get-ChildItem -Path src-tauri/binaries/python-embed
+            }
+            throw "python-embed no se encontro en $pythonEmbed"
+          }
+
+          if (!(Test-Path "src-tauri/binaries/backend")) {
+            throw "backend bundle no existe"
+          }
+
+          if (!(Test-Path "src-tauri/binaries/start-backend-x86_64-pc-windows-msvc.exe")) {
+            throw "launcher start-backend-x86_64-pc-windows-msvc.exe no existe"
+          }
+
+          Write-Host "Validaciones OK"
       
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -100,13 +113,31 @@ jobs:
       
       - name: Build Backend Bundle
         run: python3 scripts/build_backend_bundle.py
-      
-      - name: Debug - List binaries directory
+
+      - name: Validate binaries and python embed (macOS)
         run: |
+          set -euo pipefail
           echo "=== Contenido de src-tauri/binaries ==="
           ls -la src-tauri/binaries/
           echo "=== Contenido de python-embed ==="
-          ls -la src-tauri/binaries/python-embed/
+          ls -la src-tauri/binaries/python-embed/ || true
+
+          if [ ! -d "src-tauri/binaries/python-embed" ]; then
+            echo "Directorio python-embed inexistente" >&2
+            exit 1
+          fi
+
+          if [ ! -d "src-tauri/binaries/python-embed/Python.framework" ] && [ ! -f "src-tauri/binaries/python-embed/python3" ]; then
+            echo "Python.framework o symlink python3 no encontrado" >&2
+            find src-tauri/binaries/python-embed -maxdepth 3 -print
+            exit 1
+          fi
+
+          if [ ! -e "src-tauri/binaries/start-backend-aarch64-apple-darwin" ] || [ ! -e "src-tauri/binaries/start-backend-x86_64-apple-darwin" ]; then
+            echo "Launchers de macOS no presentes" >&2
+            exit 1
+          fi
+      
       
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -126,15 +157,13 @@ jobs:
       
       - name: Install Tauri CLI
         run: cargo install tauri-cli --version "^2.0.0"
-      
-      - name: Prepare launcher scripts for macOS
+
+      - name: Ensure launcher permissions
         run: |
           chmod +x src-tauri/binaries/start-backend.sh
-          # Tauri busca archivos con sufijo de arquitectura
-          cp src-tauri/binaries/start-backend.sh src-tauri/binaries/start-backend-aarch64-apple-darwin
-          cp src-tauri/binaries/start-backend.sh src-tauri/binaries/start-backend-x86_64-apple-darwin
           chmod +x src-tauri/binaries/start-backend-aarch64-apple-darwin
           chmod +x src-tauri/binaries/start-backend-x86_64-apple-darwin
+      
       
       - name: Build Tauri (macOS)
         run: cargo tauri build --target aarch64-apple-darwin
