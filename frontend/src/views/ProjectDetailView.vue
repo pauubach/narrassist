@@ -22,6 +22,10 @@
             <h1>{{ project.name }}</h1>
             <span class="doc-name" v-if="originalDocumentName">{{ originalDocumentName }}</span>
           </div>
+          <DocumentTypeChip
+            :project-id="project.id"
+            @type-changed="onDocumentTypeChanged"
+          />
         </div>
         <div class="header-actions">
           <Button
@@ -364,6 +368,7 @@ import { AnalysisRequired } from '@/components/analysis'
 import { TimelineView } from '@/components/timeline'
 import { ChaptersPanel, AlertsPanel, CharactersPanel, AssistantPanel } from '@/components/sidebar'
 import { ProjectSummary, EntityInspector, AlertInspector } from '@/components/inspector'
+import DocumentTypeChip from '@/components/DocumentTypeChip.vue'
 import type { SidebarTab } from '@/stores/workspace'
 import type { Entity, Alert, Chapter, AlertSource } from '@/types'
 import { transformEntities, transformAlerts, transformChapters } from '@/types/transformers'
@@ -1098,6 +1103,13 @@ const onAnalysisCompleted = async () => {
     await loadAlerts(project.value.id)
   }
   // Timeline y Style cargan sus propios datos
+}
+
+const onDocumentTypeChanged = async (type: string, subtype: string | null) => {
+  // Recargar el proyecto para obtener el nuevo perfil de features
+  if (project.value) {
+    await projectsStore.fetchProject(project.value.id)
+  }
 }
 
 const startReanalysis = async () => {

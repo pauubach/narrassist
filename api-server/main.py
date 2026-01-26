@@ -13,6 +13,7 @@ CORS: Habilitado para localhost:5173 (Vite dev server) y tauri://localhost
 # This must be the FIRST thing that runs to allow PyInstaller bundle to find system packages
 import os
 import sys
+from pathlib import Path
 
 # CRITICAL: Write early debug info FIRST
 def _write_debug(msg):
@@ -45,9 +46,17 @@ _write_debug(f"sys.executable: {sys.executable}")
 _write_debug(f"sys.frozen: {getattr(sys, 'frozen', False)}")
 _write_debug(f"sys.path initial (first 3): {sys.path[:3]}")
 
+API_SERVER_DIR = Path(__file__).resolve().parent
+BACKEND_ROOT_DIR = API_SERVER_DIR.parent
+
+for extra_path in (BACKEND_ROOT_DIR, API_SERVER_DIR):
+    path_str = str(extra_path)
+    if path_str not in sys.path:
+        sys.path.insert(0, path_str)
+        _write_debug(f"Added backend path to sys.path: {path_str}")
+
 import site
 import shutil
-from pathlib import Path
 
 # Setup logging IMMEDIATELY for early debugging
 import logging
@@ -8236,6 +8245,191 @@ async def get_character_emotional_profile(project_id: int, character_name: str):
 
 
 # ============================================================================
+# Vital Status Analysis Endpoints (Deceased Character Detection)
+# ============================================================================
+
+@app.get("/api/projects/{project_id}/vital-status", response_model=ApiResponse)
+async def get_vital_status_analysis(project_id: int):
+    """
+    Obtiene el análisis de estado vital de personajes.
+
+    Detecta:
+    - Eventos de muerte de personajes
+    - Reapariciones de personajes fallecidos
+    - Inconsistencias narrativas (muerto que actúa)
+
+    Returns:
+        Reporte con eventos de muerte y posibles inconsistencias
+    """
+    try:
+        from narrative_assistant.analysis.vital_status import (
+            VitalStatusAnalyzer,
+            analyze_vital_status,
+        )
+
+        # Obtener capítulos
+        chapters = chapter_repository.get_by_project(project_id)
+        if not chapters:
+            return ApiResponse(
+                success=True,
+                data={
+                    "project_id": project_id,
+                    "death_events": [],
+                    "post_mortem_appearances": [],
+                    "inconsistencies_count": 0,
+                    "entities_status": {},
+                }
+            )
+
+        # Obtener entidades (personajes, animales, criaturas)
+        entities_result = entity_repository.get_by_project(project_id)
+        if entities_result.is_failure:
+            return ApiResponse(success=False, error=str(entities_result.error))
+
+        entities = [
+            e.to_dict() for e in entities_result.value
+            if e.entity_type.value in ["character", "animal", "creature"]
+        ]
+
+        # Preparar datos de capítulos
+        chapters_data = [
+            {
+                "number": ch.chapter_number,
+                "content": ch.content,
+                "start_char": ch.start_char,
+            }
+            for ch in chapters
+        ]
+
+        # Analizar
+        result = analyze_vital_status(
+            project_id=project_id,
+            chapters=chapters_data,
+            entities=entities,
+        )
+
+        if result.is_failure:
+            return ApiResponse(success=False, error=str(result.error))
+
+        report = result.value
+
+        return ApiResponse(
+            success=True,
+            data=report.to_dict()
+        )
+
+    except ImportError as e:
+        logger.error(f"Module import error: {e}")
+        return ApiResponse(
+            success=False,
+            error="Módulo de análisis de estado vital no disponible"
+        )
+    except Exception as e:
+        logger.error(f"Error in vital status analysis: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.post("/api/projects/{project_id}/vital-status/generate-alerts", response_model=ApiResponse)
+async def generate_vital_status_alerts(project_id: int):
+    """
+    Genera alertas a partir del análisis de estado vital.
+
+    Crea alertas para cada reaparición de personaje fallecido
+    que no sea una referencia válida (flashback, recuerdo, etc.).
+    """
+    try:
+        from narrative_assistant.analysis.vital_status import analyze_vital_status
+        from narrative_assistant.alerts import get_alert_engine
+
+        # Obtener capítulos
+        chapters = chapter_repository.get_by_project(project_id)
+        if not chapters:
+            return ApiResponse(
+                success=True,
+                data={"alerts_created": 0, "message": "No hay capítulos para analizar"}
+            )
+
+        # Obtener entidades
+        entities_result = entity_repository.get_by_project(project_id)
+        if entities_result.is_failure:
+            return ApiResponse(success=False, error=str(entities_result.error))
+
+        entities = [
+            e.to_dict() for e in entities_result.value
+            if e.entity_type.value in ["character", "animal", "creature"]
+        ]
+
+        # Preparar datos de capítulos
+        chapters_data = [
+            {
+                "number": ch.chapter_number,
+                "content": ch.content,
+                "start_char": ch.start_char,
+            }
+            for ch in chapters
+        ]
+
+        # Analizar
+        result = analyze_vital_status(
+            project_id=project_id,
+            chapters=chapters_data,
+            entities=entities,
+        )
+
+        if result.is_failure:
+            return ApiResponse(success=False, error=str(result.error))
+
+        report = result.value
+
+        # Generar alertas para inconsistencias
+        engine = get_alert_engine()
+        alerts_created = 0
+
+        for appearance in report.inconsistencies:
+            # Buscar el evento de muerte correspondiente
+            death_event = next(
+                (e for e in report.death_events if e.entity_id == appearance.entity_id),
+                None
+            )
+
+            alert_result = engine.create_from_deceased_reappearance(
+                project_id=project_id,
+                entity_id=appearance.entity_id,
+                entity_name=appearance.entity_name,
+                death_chapter=appearance.death_chapter,
+                appearance_chapter=appearance.appearance_chapter,
+                appearance_start_char=appearance.appearance_start_char,
+                appearance_end_char=appearance.appearance_end_char,
+                appearance_excerpt=appearance.appearance_excerpt,
+                appearance_type=appearance.appearance_type,
+                death_excerpt=death_event.excerpt if death_event else "",
+                confidence=appearance.confidence,
+            )
+
+            if alert_result.is_success:
+                alerts_created += 1
+
+        return ApiResponse(
+            success=True,
+            data={
+                "alerts_created": alerts_created,
+                "death_events_found": len(report.death_events),
+                "inconsistencies_found": len(report.inconsistencies),
+            }
+        )
+
+    except ImportError as e:
+        logger.error(f"Module import error: {e}")
+        return ApiResponse(
+            success=False,
+            error="Módulo de análisis de estado vital no disponible"
+        )
+    except Exception as e:
+        logger.error(f"Error generating vital status alerts: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+# ============================================================================
 # Endpoints - Document Export (DOCX/PDF)
 # ============================================================================
 
@@ -11639,6 +11833,1457 @@ async def get_dialogue_attributions(project_id: int, chapter_num: int):
         raise
     except Exception as e:
         logger.error(f"Error attributing speakers: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+# ============================================================================
+# Focalization - Declaración y Detección de Violaciones
+# ============================================================================
+
+@app.get("/api/projects/{project_id}/focalization", response_model=ApiResponse)
+async def get_project_focalizations(project_id: int):
+    """Obtiene todas las declaraciones de focalización de un proyecto."""
+    try:
+        from narrative_assistant.focalization import (
+            FocalizationDeclarationService,
+            SQLiteFocalizationRepository,
+        )
+
+        if not project_manager:
+            return ApiResponse(success=False, error="Project manager not initialized")
+
+        result = project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail=f"Proyecto {project_id} no encontrado")
+
+        repo = SQLiteFocalizationRepository()
+        service = FocalizationDeclarationService(repository=repo)
+        declarations = service.get_all_declarations(project_id)
+
+        return ApiResponse(
+            success=True,
+            data={
+                "project_id": project_id,
+                "declarations": [d.to_dict() for d in declarations],
+                "total": len(declarations),
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting focalizations: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.post("/api/projects/{project_id}/focalization", response_model=ApiResponse)
+async def create_focalization(project_id: int, data: dict):
+    """Crea una nueva declaración de focalización para un capítulo/escena."""
+    try:
+        from narrative_assistant.focalization import (
+            FocalizationType,
+            FocalizationDeclarationService,
+            SQLiteFocalizationRepository,
+        )
+
+        if not project_manager:
+            return ApiResponse(success=False, error="Project manager not initialized")
+
+        result = project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail=f"Proyecto {project_id} no encontrado")
+
+        chapter = data.get("chapter")
+        if not chapter:
+            return ApiResponse(success=False, error="Se requiere número de capítulo")
+
+        foc_type_str = data.get("focalization_type", "zero")
+        try:
+            foc_type = FocalizationType(foc_type_str)
+        except ValueError:
+            return ApiResponse(success=False, error=f"Tipo de focalización inválido: {foc_type_str}")
+
+        repo = SQLiteFocalizationRepository()
+        service = FocalizationDeclarationService(repository=repo)
+        declaration = service.declare_focalization(
+            project_id=project_id,
+            chapter=chapter,
+            focalization_type=foc_type,
+            focalizer_ids=data.get("focalizer_ids", []),
+            scene=data.get("scene"),
+            notes=data.get("notes", ""),
+        )
+
+        return ApiResponse(success=True, data=declaration.to_dict())
+    except ValueError as e:
+        return ApiResponse(success=False, error=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating focalization: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.put("/api/projects/{project_id}/focalization/{declaration_id}", response_model=ApiResponse)
+async def update_focalization(project_id: int, declaration_id: int, data: dict):
+    """Actualiza una declaración de focalización existente."""
+    try:
+        from narrative_assistant.focalization import (
+            FocalizationType,
+            FocalizationDeclarationService,
+            SQLiteFocalizationRepository,
+        )
+
+        if not project_manager:
+            return ApiResponse(success=False, error="Project manager not initialized")
+
+        result = project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail=f"Proyecto {project_id} no encontrado")
+
+        foc_type = None
+        if "focalization_type" in data:
+            try:
+                foc_type = FocalizationType(data["focalization_type"])
+            except ValueError:
+                return ApiResponse(success=False, error=f"Tipo inválido: {data['focalization_type']}")
+
+        repo = SQLiteFocalizationRepository()
+        service = FocalizationDeclarationService(repository=repo)
+        declaration = service.update_focalization(
+            declaration_id=declaration_id,
+            focalization_type=foc_type,
+            focalizer_ids=data.get("focalizer_ids"),
+            notes=data.get("notes"),
+        )
+
+        return ApiResponse(success=True, data=declaration.to_dict())
+    except ValueError as e:
+        return ApiResponse(success=False, error=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating focalization: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.delete("/api/projects/{project_id}/focalization/{declaration_id}", response_model=ApiResponse)
+async def delete_focalization(project_id: int, declaration_id: int):
+    """Elimina una declaración de focalización."""
+    try:
+        from narrative_assistant.focalization import (
+            FocalizationDeclarationService,
+            SQLiteFocalizationRepository,
+        )
+
+        if not project_manager:
+            return ApiResponse(success=False, error="Project manager not initialized")
+
+        result = project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail=f"Proyecto {project_id} no encontrado")
+
+        repo = SQLiteFocalizationRepository()
+        service = FocalizationDeclarationService(repository=repo)
+        deleted = service.delete_focalization(declaration_id)
+
+        if deleted:
+            return ApiResponse(success=True, message="Declaración eliminada")
+        return ApiResponse(success=False, error="Declaración no encontrada")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting focalization: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.get("/api/projects/{project_id}/focalization/violations", response_model=ApiResponse)
+async def detect_focalization_violations(project_id: int):
+    """Detecta violaciones de focalización en todo el proyecto."""
+    try:
+        from narrative_assistant.focalization import (
+            FocalizationDeclarationService,
+            FocalizationViolationDetector,
+            SQLiteFocalizationRepository,
+        )
+        from narrative_assistant.persistence.chapter import get_chapter_repository
+        from narrative_assistant.entities.repository import get_entity_repository
+
+        if not project_manager:
+            return ApiResponse(success=False, error="Project manager not initialized")
+
+        result = project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail=f"Proyecto {project_id} no encontrado")
+
+        chapter_repo = get_chapter_repository()
+        chapters = chapter_repo.get_by_project(project_id)
+
+        if not chapters:
+            return ApiResponse(success=True, data={"violations": [], "stats": {"total": 0}})
+
+        entity_repo = get_entity_repository()
+        entities = entity_repo.get_entities_by_project(project_id, active_only=True)
+        characters = [e for e in entities if e.entity_type == "PER"]
+
+        repo = SQLiteFocalizationRepository()
+        service = FocalizationDeclarationService(repository=repo)
+        detector = FocalizationViolationDetector(service, characters)
+
+        all_violations = []
+        by_chapter = {}
+
+        for chapter in chapters:
+            violations = detector.detect_violations(
+                project_id=project_id,
+                text=chapter.content,
+                chapter=chapter.chapter_number,
+            )
+            by_chapter[chapter.chapter_number] = {
+                "chapter_number": chapter.chapter_number,
+                "chapter_title": chapter.title or f"Capítulo {chapter.chapter_number}",
+                "violations_count": len(violations),
+                "violations": [v.to_dict() for v in violations],
+            }
+            all_violations.extend([v.to_dict() for v in violations])
+
+        stats = {
+            "total": len(all_violations),
+            "by_type": {},
+            "by_severity": {},
+            "chapters_with_violations": sum(1 for ch in by_chapter.values() if ch["violations_count"] > 0),
+        }
+        for v in all_violations:
+            stats["by_type"][v["violation_type"]] = stats["by_type"].get(v["violation_type"], 0) + 1
+            stats["by_severity"][v["severity"]] = stats["by_severity"].get(v["severity"], 0) + 1
+
+        return ApiResponse(success=True, data={"violations": all_violations, "by_chapter": by_chapter, "stats": stats})
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error detecting focalization violations: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.get("/api/projects/{project_id}/chapters/{chapter_number}/focalization/suggest", response_model=ApiResponse)
+async def suggest_chapter_focalization(project_id: int, chapter_number: int):
+    """Sugiere la focalización más probable para un capítulo."""
+    try:
+        from narrative_assistant.focalization import FocalizationDeclarationService, SQLiteFocalizationRepository
+        from narrative_assistant.persistence.chapter import get_chapter_repository
+        from narrative_assistant.entities.repository import get_entity_repository
+
+        if not project_manager:
+            return ApiResponse(success=False, error="Project manager not initialized")
+
+        result = project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail=f"Proyecto {project_id} no encontrado")
+
+        chapter_repo = get_chapter_repository()
+        chapters = chapter_repo.get_by_project(project_id)
+        chapter = next((c for c in chapters if c.chapter_number == chapter_number), None)
+
+        if not chapter:
+            raise HTTPException(status_code=404, detail=f"Capítulo {chapter_number} no encontrado")
+
+        entity_repo = get_entity_repository()
+        entities = entity_repo.get_entities_by_project(project_id, active_only=True)
+        characters = [e for e in entities if e.entity_type == "PER"]
+
+        repo = SQLiteFocalizationRepository()
+        service = FocalizationDeclarationService(repository=repo)
+        suggestion = service.suggest_focalization(project_id, chapter_number, chapter.content, characters)
+
+        focalizer_names = []
+        for fid in suggestion.get("suggested_focalizers", []):
+            entity = next((e for e in characters if e.id == fid), None)
+            if entity:
+                focalizer_names.append({"id": fid, "name": entity.canonical_name or entity.name})
+
+        return ApiResponse(
+            success=True,
+            data={
+                "chapter_number": chapter_number,
+                "chapter_title": chapter.title or f"Capítulo {chapter_number}",
+                "suggested_type": suggestion["suggested_type"].value if suggestion["suggested_type"] else None,
+                "suggested_focalizers": focalizer_names,
+                "confidence": suggestion["confidence"],
+                "evidence": suggestion["evidence"],
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error suggesting focalization: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+# ============================================================================
+# Scenes - Gestión de Escenas y Etiquetado
+# ============================================================================
+
+@app.get("/api/projects/{project_id}/scenes", response_model=ApiResponse)
+async def get_project_scenes(project_id: int):
+    """
+    Obtiene todas las escenas de un proyecto con sus etiquetas.
+
+    Incluye metadata para determinar si mostrar la UI de escenas.
+    """
+    try:
+        from narrative_assistant.scenes import SceneService
+
+        if not project_manager:
+            return ApiResponse(success=False, error="Project manager not initialized")
+
+        result = project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail=f"Proyecto {project_id} no encontrado")
+
+        service = SceneService()
+        scenes = service.get_scenes(project_id)
+        stats = service.get_stats(project_id)
+
+        return ApiResponse(
+            success=True,
+            data={
+                "project_id": project_id,
+                "has_scenes": stats.has_scenes,
+                "total_scenes": stats.total_scenes,
+                "stats": {
+                    "chapters_with_scenes": stats.chapters_with_scenes,
+                    "tagged_scenes": stats.tagged_scenes,
+                    "untagged_scenes": stats.untagged_scenes,
+                    "scenes_by_type": stats.scenes_by_type,
+                    "scenes_by_tone": stats.scenes_by_tone,
+                    "custom_tags_used": stats.custom_tags_used,
+                },
+                "scenes": [
+                    {
+                        "id": s.scene.id,
+                        "chapter_id": s.scene.chapter_id,
+                        "chapter_number": s.chapter_number,
+                        "chapter_title": s.chapter_title,
+                        "scene_number": s.scene.scene_number,
+                        "start_char": s.scene.start_char,
+                        "end_char": s.scene.end_char,
+                        "word_count": s.scene.word_count,
+                        "separator_type": s.scene.separator_type,
+                        "excerpt": s.excerpt,
+                        "tags": {
+                            "scene_type": s.tags.scene_type.value if s.tags and s.tags.scene_type else None,
+                            "tone": s.tags.tone.value if s.tags and s.tags.tone else None,
+                            "location_entity_id": s.tags.location_entity_id if s.tags else None,
+                            "location_name": s.location_name,
+                            "participant_ids": s.tags.participant_ids if s.tags else [],
+                            "participant_names": s.participant_names,
+                            "summary": s.tags.summary if s.tags else None,
+                            "notes": s.tags.notes if s.tags else None,
+                        } if s.tags else None,
+                        "custom_tags": [
+                            {"name": ct.tag_name, "color": ct.tag_color}
+                            for ct in s.custom_tags
+                        ],
+                    }
+                    for s in scenes
+                ],
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting scenes: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.get("/api/projects/{project_id}/scenes/stats", response_model=ApiResponse)
+async def get_scenes_stats(project_id: int):
+    """
+    Obtiene solo las estadísticas de escenas (lightweight).
+
+    Útil para determinar si mostrar el tab de escenas en la UI.
+    """
+    try:
+        from narrative_assistant.scenes import SceneService
+
+        if not project_manager:
+            return ApiResponse(success=False, error="Project manager not initialized")
+
+        result = project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail=f"Proyecto {project_id} no encontrado")
+
+        service = SceneService()
+        stats = service.get_stats(project_id)
+
+        return ApiResponse(
+            success=True,
+            data={
+                "project_id": project_id,
+                "has_scenes": stats.has_scenes,
+                "total_scenes": stats.total_scenes,
+                "chapters_with_scenes": stats.chapters_with_scenes,
+                "tagged_scenes": stats.tagged_scenes,
+                "untagged_scenes": stats.untagged_scenes,
+                "scenes_by_type": stats.scenes_by_type,
+                "scenes_by_tone": stats.scenes_by_tone,
+                "custom_tags_used": stats.custom_tags_used,
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting scene stats: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.get("/api/projects/{project_id}/chapters/{chapter_number}/scenes", response_model=ApiResponse)
+async def get_chapter_scenes(project_id: int, chapter_number: int):
+    """Obtiene las escenas de un capítulo específico."""
+    try:
+        from narrative_assistant.scenes import SceneService
+
+        if not project_manager:
+            return ApiResponse(success=False, error="Project manager not initialized")
+
+        result = project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail=f"Proyecto {project_id} no encontrado")
+
+        service = SceneService()
+        scenes = service.get_scenes_by_chapter(project_id, chapter_number)
+
+        return ApiResponse(
+            success=True,
+            data={
+                "project_id": project_id,
+                "chapter_number": chapter_number,
+                "scenes": [
+                    {
+                        "id": s.scene.id,
+                        "scene_number": s.scene.scene_number,
+                        "start_char": s.scene.start_char,
+                        "end_char": s.scene.end_char,
+                        "word_count": s.scene.word_count,
+                        "excerpt": s.excerpt,
+                        "tags": {
+                            "scene_type": s.tags.scene_type.value if s.tags and s.tags.scene_type else None,
+                            "tone": s.tags.tone.value if s.tags and s.tags.tone else None,
+                            "location_name": s.location_name,
+                            "participant_names": s.participant_names,
+                            "summary": s.tags.summary if s.tags else None,
+                        } if s.tags else None,
+                        "custom_tags": [ct.tag_name for ct in s.custom_tags],
+                    }
+                    for s in scenes
+                ],
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting chapter scenes: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.put("/api/projects/{project_id}/scenes/{scene_id}/tags", response_model=ApiResponse)
+async def tag_scene(project_id: int, scene_id: int, data: dict):
+    """
+    Asigna etiquetas predefinidas a una escena.
+
+    Body:
+        - scene_type: tipo de escena (action, dialogue, exposition, etc.)
+        - tone: tono emocional (tense, calm, happy, etc.)
+        - location_entity_id: ID de la entidad de ubicación
+        - participant_ids: lista de IDs de entidades participantes
+        - summary: resumen breve
+        - notes: notas del usuario
+    """
+    try:
+        from narrative_assistant.scenes import SceneService, SceneType, SceneTone
+
+        if not project_manager:
+            return ApiResponse(success=False, error="Project manager not initialized")
+
+        result = project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail=f"Proyecto {project_id} no encontrado")
+
+        service = SceneService()
+
+        # Parse scene_type
+        scene_type = None
+        if data.get("scene_type"):
+            try:
+                scene_type = SceneType(data["scene_type"])
+            except ValueError:
+                return ApiResponse(success=False, error=f"Tipo de escena inválido: {data['scene_type']}")
+
+        # Parse tone
+        tone = None
+        if data.get("tone"):
+            try:
+                tone = SceneTone(data["tone"])
+            except ValueError:
+                return ApiResponse(success=False, error=f"Tono inválido: {data['tone']}")
+
+        success = service.tag_scene(
+            scene_id=scene_id,
+            scene_type=scene_type,
+            tone=tone,
+            location_entity_id=data.get("location_entity_id"),
+            participant_ids=data.get("participant_ids", []),
+            summary=data.get("summary"),
+            notes=data.get("notes"),
+        )
+
+        if success:
+            return ApiResponse(success=True, message="Escena etiquetada correctamente")
+        return ApiResponse(success=False, error="Escena no encontrada")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error tagging scene: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.post("/api/projects/{project_id}/scenes/{scene_id}/custom-tags", response_model=ApiResponse)
+async def add_custom_tag(project_id: int, scene_id: int, data: dict):
+    """
+    Añade una etiqueta personalizada a una escena.
+
+    Body:
+        - tag_name: nombre de la etiqueta
+        - tag_color: color hex opcional (#FF5733)
+    """
+    try:
+        from narrative_assistant.scenes import SceneService
+
+        if not project_manager:
+            return ApiResponse(success=False, error="Project manager not initialized")
+
+        result = project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail=f"Proyecto {project_id} no encontrado")
+
+        tag_name = data.get("tag_name", "").strip()
+        if not tag_name:
+            return ApiResponse(success=False, error="Se requiere nombre de etiqueta")
+
+        service = SceneService()
+        success = service.add_custom_tag(
+            scene_id=scene_id,
+            tag_name=tag_name,
+            tag_color=data.get("tag_color"),
+        )
+
+        if success:
+            return ApiResponse(success=True, message=f"Etiqueta '{tag_name}' añadida")
+        return ApiResponse(success=False, error="Escena no encontrada")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error adding custom tag: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.delete("/api/projects/{project_id}/scenes/{scene_id}/custom-tags/{tag_name}", response_model=ApiResponse)
+async def remove_custom_tag(project_id: int, scene_id: int, tag_name: str):
+    """Elimina una etiqueta personalizada de una escena."""
+    try:
+        from narrative_assistant.scenes import SceneService
+
+        if not project_manager:
+            return ApiResponse(success=False, error="Project manager not initialized")
+
+        result = project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail=f"Proyecto {project_id} no encontrado")
+
+        service = SceneService()
+        success = service.remove_custom_tag(scene_id, tag_name)
+
+        if success:
+            return ApiResponse(success=True, message=f"Etiqueta '{tag_name}' eliminada")
+        return ApiResponse(success=False, error="Etiqueta no encontrada")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error removing custom tag: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.get("/api/projects/{project_id}/scenes/tag-catalog", response_model=ApiResponse)
+async def get_tag_catalog(project_id: int):
+    """Obtiene el catálogo de etiquetas personalizadas disponibles en el proyecto."""
+    try:
+        from narrative_assistant.scenes import SceneService
+
+        if not project_manager:
+            return ApiResponse(success=False, error="Project manager not initialized")
+
+        result = project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail=f"Proyecto {project_id} no encontrado")
+
+        service = SceneService()
+        catalog = service.get_tag_catalog(project_id)
+
+        return ApiResponse(
+            success=True,
+            data={
+                "project_id": project_id,
+                "tags": catalog,
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting tag catalog: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.get("/api/projects/{project_id}/scenes/filter", response_model=ApiResponse)
+async def filter_scenes(
+    project_id: int,
+    scene_type: Optional[str] = None,
+    tone: Optional[str] = None,
+    custom_tag: Optional[str] = None,
+    location_id: Optional[int] = None,
+    participant_id: Optional[int] = None,
+):
+    """
+    Filtra escenas por criterios.
+
+    Query params:
+        - scene_type: filtrar por tipo (action, dialogue, etc.)
+        - tone: filtrar por tono (tense, calm, etc.)
+        - custom_tag: filtrar por etiqueta personalizada
+        - location_id: filtrar por ubicación
+        - participant_id: filtrar por participante
+    """
+    try:
+        from narrative_assistant.scenes import SceneService, SceneType, SceneTone
+
+        if not project_manager:
+            return ApiResponse(success=False, error="Project manager not initialized")
+
+        result = project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail=f"Proyecto {project_id} no encontrado")
+
+        # Parse filters
+        parsed_type = None
+        if scene_type:
+            try:
+                parsed_type = SceneType(scene_type)
+            except ValueError:
+                return ApiResponse(success=False, error=f"Tipo de escena inválido: {scene_type}")
+
+        parsed_tone = None
+        if tone:
+            try:
+                parsed_tone = SceneTone(tone)
+            except ValueError:
+                return ApiResponse(success=False, error=f"Tono inválido: {tone}")
+
+        service = SceneService()
+        scenes = service.filter_scenes(
+            project_id=project_id,
+            scene_type=parsed_type,
+            tone=parsed_tone,
+            custom_tag=custom_tag,
+            location_id=location_id,
+            participant_id=participant_id,
+        )
+
+        return ApiResponse(
+            success=True,
+            data={
+                "project_id": project_id,
+                "filters": {
+                    "scene_type": scene_type,
+                    "tone": tone,
+                    "custom_tag": custom_tag,
+                    "location_id": location_id,
+                    "participant_id": participant_id,
+                },
+                "count": len(scenes),
+                "scenes": [
+                    {
+                        "id": s.scene.id,
+                        "chapter_number": s.chapter_number,
+                        "scene_number": s.scene.scene_number,
+                        "excerpt": s.excerpt,
+                        "tags": {
+                            "scene_type": s.tags.scene_type.value if s.tags and s.tags.scene_type else None,
+                            "tone": s.tags.tone.value if s.tags and s.tags.tone else None,
+                        } if s.tags else None,
+                    }
+                    for s in scenes
+                ],
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error filtering scenes: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+# ============================================================================
+# Endpoints - Feature Profiles y Tipos de Documento
+# ============================================================================
+
+@app.get("/api/document-types", response_model=ApiResponse)
+async def get_document_types():
+    """
+    Lista todos los tipos de documento disponibles.
+
+    Returns:
+        ApiResponse con lista de tipos y sus subtipos
+    """
+    try:
+        from narrative_assistant.feature_profile import FeatureProfileService
+
+        service = FeatureProfileService()
+        types = service.get_document_types()
+
+        return ApiResponse(success=True, data=types)
+    except Exception as e:
+        logger.error(f"Error getting document types: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.get("/api/projects/{project_id}/document-type", response_model=ApiResponse)
+async def get_project_document_type(project_id: int):
+    """
+    Obtiene el tipo de documento actual de un proyecto.
+
+    Returns:
+        ApiResponse con tipo, subtipo, confirmación y detección
+    """
+    try:
+        from narrative_assistant.feature_profile import FeatureProfileService
+
+        service = FeatureProfileService()
+        doc_type = service.get_project_document_type(project_id)
+
+        if not doc_type:
+            raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+
+        return ApiResponse(success=True, data=doc_type)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting document type for project {project_id}: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.put("/api/projects/{project_id}/document-type", response_model=ApiResponse)
+async def set_project_document_type(
+    project_id: int,
+    document_type: str = Body(..., embed=True),
+    document_subtype: Optional[str] = Body(None, embed=True),
+):
+    """
+    Establece el tipo de documento de un proyecto.
+
+    Args:
+        project_id: ID del proyecto
+        document_type: Código del tipo (FIC, MEM, etc.)
+        document_subtype: Código del subtipo (opcional)
+
+    Returns:
+        ApiResponse con el perfil actualizado
+    """
+    try:
+        from narrative_assistant.feature_profile import FeatureProfileService
+
+        service = FeatureProfileService()
+        success = service.set_project_document_type(
+            project_id=project_id,
+            document_type=document_type,
+            document_subtype=document_subtype,
+            confirmed=True,
+        )
+
+        if not success:
+            return ApiResponse(
+                success=False,
+                error=f"Tipo de documento inválido: {document_type}"
+            )
+
+        # Retornar el perfil actualizado
+        doc_type = service.get_project_document_type(project_id)
+        profile = service.get_project_profile(project_id)
+
+        return ApiResponse(
+            success=True,
+            data={
+                "document_type": doc_type,
+                "feature_profile": profile.to_dict() if profile else None,
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error setting document type for project {project_id}: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.get("/api/projects/{project_id}/feature-profile", response_model=ApiResponse)
+async def get_project_feature_profile(project_id: int):
+    """
+    Obtiene el perfil de features para un proyecto.
+
+    Retorna qué features están habilitadas, opcionales o deshabilitadas
+    según el tipo de documento del proyecto.
+
+    Returns:
+        ApiResponse con el perfil de features
+    """
+    try:
+        from narrative_assistant.feature_profile import FeatureProfileService
+
+        service = FeatureProfileService()
+        profile = service.get_project_profile(project_id)
+
+        if not profile:
+            raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+
+        return ApiResponse(success=True, data=profile.to_dict())
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting feature profile for project {project_id}: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.get("/api/projects/{project_id}/feature-availability/{feature}", response_model=ApiResponse)
+async def get_feature_availability(project_id: int, feature: str):
+    """
+    Comprueba la disponibilidad de una feature específica.
+
+    Args:
+        project_id: ID del proyecto
+        feature: Nombre de la feature (characters, timeline, scenes, etc.)
+
+    Returns:
+        ApiResponse con el nivel de disponibilidad (enabled, optional, disabled)
+    """
+    try:
+        from narrative_assistant.feature_profile import FeatureProfileService
+
+        service = FeatureProfileService()
+        availability = service.get_feature_availability(project_id, feature)
+
+        return ApiResponse(
+            success=True,
+            data={
+                "feature": feature,
+                "availability": availability,
+                "is_enabled": availability == "enabled",
+                "is_available": availability in ("enabled", "optional"),
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error checking feature availability: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.post("/api/projects/{project_id}/detect-document-type", response_model=ApiResponse)
+async def detect_document_type(project_id: int):
+    """
+    Detecta automáticamente el tipo de documento basándose en el contenido.
+
+    No cambia el tipo actual, solo registra la sugerencia.
+
+    Returns:
+        ApiResponse con el tipo detectado y si hay discrepancia
+    """
+    try:
+        from narrative_assistant.feature_profile import FeatureProfileService
+
+        service = FeatureProfileService()
+
+        # Detectar tipo
+        detected = service.detect_document_type(project_id)
+        if not detected:
+            raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+
+        # Guardar detección
+        service.set_detected_document_type(project_id, detected)
+
+        # Obtener información actual para comparar
+        current = service.get_project_document_type(project_id)
+
+        return ApiResponse(
+            success=True,
+            data={
+                "detected_type": detected,
+                "detected_type_info": service.get_document_type_info(detected),
+                "current_type": current["type"] if current else None,
+                "has_mismatch": current and current["type"] != detected,
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error detecting document type: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+# ============================================================================
+# Style Analysis Endpoints
+# ============================================================================
+
+@app.get("/api/projects/{project_id}/sticky-sentences", response_model=ApiResponse)
+async def get_sticky_sentences(
+    project_id: int,
+    threshold: float = Query(0.40, ge=0.0, le=1.0, description="Umbral de glue words (0.0-1.0)")
+):
+    """
+    Analiza oraciones pesadas (sticky sentences) en el proyecto.
+
+    Las oraciones pesadas son aquellas con alto porcentaje de palabras funcionales
+    (artículos, preposiciones, conjunciones) que dificultan la lectura.
+    """
+    try:
+        from narrative_assistant.nlp.style.sticky_sentences import get_sticky_sentence_detector
+        from narrative_assistant.persistence import ProjectManager
+
+        pm = ProjectManager()
+        project = pm.get_project(project_id)
+        if not project:
+            raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+
+        # Obtener texto de todos los capítulos
+        chapters_data = []
+        chapters = pm.get_chapters(project_id)
+
+        detector = get_sticky_sentence_detector()
+        global_sticky = []
+        global_total_sentences = 0
+        global_total_glue = 0
+        by_severity = {"critical": 0, "high": 0, "medium": 0}
+
+        for chapter in chapters:
+            chapter_text = chapter.content or ""
+            if not chapter_text.strip():
+                continue
+
+            result = detector.analyze(chapter_text, threshold=threshold)
+            if result.is_failure:
+                continue
+
+            report = result.value
+            chapter_sticky = []
+            chapter_dist = {"clean": 0, "borderline": 0, "sticky": 0}
+            chapter_severity = {"critical": 0, "high": 0, "medium": 0}
+
+            for sent in report.sticky_sentences:
+                severity = "medium"
+                if sent.glue_percentage >= 0.55:
+                    severity = "critical"
+                    by_severity["critical"] += 1
+                    chapter_severity["critical"] += 1
+                elif sent.glue_percentage >= 0.50:
+                    severity = "high"
+                    by_severity["high"] += 1
+                    chapter_severity["high"] += 1
+                else:
+                    by_severity["medium"] += 1
+                    chapter_severity["medium"] += 1
+
+                chapter_sticky.append({
+                    "text": sent.text,
+                    "glue_percentage": round(sent.glue_percentage * 100, 1),
+                    "glue_percentage_display": f"{round(sent.glue_percentage * 100)}%",
+                    "glue_words": sent.glue_word_count,
+                    "total_words": sent.total_words,
+                    "glue_word_list": sent.glue_words[:10],  # Limit to 10
+                    "severity": severity,
+                    "recommendation": _get_sticky_recommendation(sent.glue_percentage),
+                })
+
+            # Distribución de oraciones
+            for _ in range(report.total_sentences - len(report.sticky_sentences)):
+                chapter_dist["clean"] += 1
+            for sent in report.sticky_sentences:
+                if sent.glue_percentage >= threshold and sent.glue_percentage < threshold + 0.05:
+                    chapter_dist["borderline"] += 1
+                else:
+                    chapter_dist["sticky"] += 1
+
+            global_sticky.extend(chapter_sticky)
+            global_total_sentences += report.total_sentences
+            global_total_glue += sum(s["glue_percentage"] for s in chapter_sticky)
+
+            chapters_data.append({
+                "chapter_number": chapter.number,
+                "chapter_title": chapter.title or f"Capítulo {chapter.number}",
+                "sticky_sentences": chapter_sticky,
+                "sticky_count": len(chapter_sticky),
+                "total_sentences": report.total_sentences,
+                "avg_glue_percentage": round(report.avg_glue_percentage * 100, 1) if report.avg_glue_percentage else 0,
+                "distribution": chapter_dist,
+                "by_severity": chapter_severity,
+            })
+
+        # Calcular estadísticas globales
+        avg_glue = (global_total_glue / len(global_sticky)) if global_sticky else 0
+
+        recommendations = []
+        if by_severity["critical"] > 0:
+            recommendations.append(f"Hay {by_severity['critical']} oraciones críticas (>55% glue words). Prioriza su revisión.")
+        if len(global_sticky) > global_total_sentences * 0.2:
+            recommendations.append("Más del 20% de las oraciones son pesadas. Considera simplificar el estilo.")
+
+        return ApiResponse(
+            success=True,
+            data={
+                "global_stats": {
+                    "total_sticky_sentences": len(global_sticky),
+                    "total_sentences": global_total_sentences,
+                    "avg_glue_percentage": round(avg_glue, 1),
+                    "by_severity": by_severity,
+                },
+                "chapters": chapters_data,
+                "recommendations": recommendations,
+                "threshold_used": threshold,
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error analyzing sticky sentences: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+def _get_sticky_recommendation(glue_percentage: float) -> str:
+    """Genera recomendación según el porcentaje de glue words."""
+    if glue_percentage >= 0.55:
+        return "Esta oración es muy difícil de leer. Divídela en dos o elimina palabras innecesarias."
+    elif glue_percentage >= 0.50:
+        return "Oración pesada. Considera simplificar la estructura o usar verbos más directos."
+    else:
+        return "Revisa si puedes eliminar algún artículo, preposición o conjunción innecesaria."
+
+
+@app.get("/api/projects/{project_id}/echo-report", response_model=ApiResponse)
+async def get_echo_report(
+    project_id: int,
+    min_distance: int = Query(50, ge=10, le=500, description="Distancia mínima entre repeticiones"),
+    include_semantic: bool = Query(False, description="Incluir repeticiones semánticas")
+):
+    """
+    Analiza repeticiones (ecos) de palabras en el proyecto.
+
+    Detecta palabras repetidas en proximidad que afectan la fluidez del texto.
+    """
+    try:
+        from narrative_assistant.nlp.style.repetition_detector import get_repetition_detector
+        from narrative_assistant.persistence import ProjectManager
+
+        pm = ProjectManager()
+        project = pm.get_project(project_id)
+        if not project:
+            raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+
+        detector = get_repetition_detector()
+        chapters = pm.get_chapters(project_id)
+
+        chapters_data = []
+        global_repetitions = []
+        global_word_counts = {}
+        global_total_words = 0
+        by_severity = {"high": 0, "medium": 0, "low": 0}
+
+        for chapter in chapters:
+            chapter_text = chapter.content or ""
+            if not chapter_text.strip():
+                continue
+
+            # Análisis léxico
+            result = detector.detect_lexical(chapter_text, min_distance=min_distance)
+            if result.is_failure:
+                continue
+
+            report = result.value
+            chapter_reps = []
+            chapter_severity = {"high": 0, "medium": 0, "low": 0}
+
+            for rep in report.repetitions:
+                severity = "medium"
+                if rep.min_distance < min_distance // 2:
+                    severity = "high"
+                    by_severity["high"] += 1
+                    chapter_severity["high"] += 1
+                else:
+                    by_severity["medium"] += 1
+                    chapter_severity["medium"] += 1
+
+                # Agregar al conteo global
+                word = rep.word.lower()
+                global_word_counts[word] = global_word_counts.get(word, 0) + rep.count
+
+                chapter_reps.append({
+                    "word": rep.word,
+                    "count": rep.count,
+                    "min_distance": rep.min_distance,
+                    "type": "lexical",
+                    "severity": severity,
+                    "occurrences": [
+                        {"text": occ.context, "position": occ.position}
+                        for occ in rep.occurrences[:5]
+                    ],
+                })
+
+            # Análisis semántico si se solicita
+            if include_semantic:
+                sem_result = detector.detect_semantic(chapter_text, min_distance=min_distance * 2)
+                if sem_result.is_success:
+                    for rep in sem_result.value.repetitions:
+                        chapter_reps.append({
+                            "word": rep.word,
+                            "count": rep.count,
+                            "min_distance": rep.min_distance,
+                            "type": "semantic",
+                            "severity": "low",
+                            "occurrences": [
+                                {"text": occ.context, "position": occ.position}
+                                for occ in rep.occurrences[:5]
+                            ],
+                        })
+                        by_severity["low"] += 1
+                        chapter_severity["low"] += 1
+
+            global_repetitions.extend(chapter_reps)
+            global_total_words += report.total_words
+
+            chapters_data.append({
+                "chapter_number": chapter.number,
+                "chapter_title": chapter.title or f"Capítulo {chapter.number}",
+                "repetitions": chapter_reps,
+                "repetition_count": len(chapter_reps),
+                "total_words": report.total_words,
+                "by_severity": chapter_severity,
+            })
+
+        # Top palabras repetidas
+        top_words = sorted(global_word_counts.items(), key=lambda x: x[1], reverse=True)[:20]
+
+        recommendations = []
+        if by_severity["high"] > 5:
+            recommendations.append(f"Hay {by_severity['high']} repeticiones muy cercanas. Usa sinónimos o reestructura las oraciones.")
+        if len(global_repetitions) > 50:
+            recommendations.append("Texto con muchas repeticiones. Considera revisar el vocabulario.")
+
+        return ApiResponse(
+            success=True,
+            data={
+                "global_stats": {
+                    "total_repetitions": len(global_repetitions),
+                    "total_words": global_total_words,
+                    "by_severity": by_severity,
+                    "top_repeated_words": [{"word": w, "count": c} for w, c in top_words],
+                },
+                "chapters": chapters_data,
+                "recommendations": recommendations,
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error analyzing echo report: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.get("/api/projects/{project_id}/sentence-variation", response_model=ApiResponse)
+async def get_sentence_variation(project_id: int):
+    """
+    Analiza la variación en la longitud de las oraciones.
+
+    Proporciona métricas de legibilidad y distribución de oraciones.
+    """
+    try:
+        from narrative_assistant.nlp.style.readability import get_readability_analyzer
+        from narrative_assistant.persistence import ProjectManager
+
+        pm = ProjectManager()
+        project = pm.get_project(project_id)
+        if not project:
+            raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+
+        analyzer = get_readability_analyzer()
+        chapters = pm.get_chapters(project_id)
+
+        chapters_data = []
+        global_stats = {
+            "total_sentences": 0,
+            "total_words": 0,
+            "flesch_scores": [],
+        }
+        global_distribution = {"short": 0, "medium": 0, "long": 0, "very_long": 0}
+
+        for chapter in chapters:
+            chapter_text = chapter.content or ""
+            if not chapter_text.strip():
+                continue
+
+            result = analyzer.analyze(chapter_text)
+            if result.is_failure:
+                continue
+
+            report = result.value
+
+            chapters_data.append({
+                "chapter_number": chapter.number,
+                "chapter_title": chapter.title or f"Capítulo {chapter.number}",
+                "flesch_szigriszt": round(report.flesch_szigriszt, 1),
+                "level": report.level.value,
+                "level_description": report.level_description,
+                "statistics": {
+                    "total_sentences": report.total_sentences,
+                    "total_words": report.total_words,
+                    "avg_words_per_sentence": round(report.avg_words_per_sentence, 1),
+                    "avg_syllables_per_word": round(report.avg_syllables_per_word, 2),
+                },
+                "distribution": {
+                    "short": report.short_sentences,
+                    "medium": report.medium_sentences,
+                    "long": report.long_sentences,
+                    "very_long": report.very_long_sentences,
+                },
+                "target_audience": report.target_audience,
+            })
+
+            global_stats["total_sentences"] += report.total_sentences
+            global_stats["total_words"] += report.total_words
+            global_stats["flesch_scores"].append(report.flesch_szigriszt)
+            global_distribution["short"] += report.short_sentences
+            global_distribution["medium"] += report.medium_sentences
+            global_distribution["long"] += report.long_sentences
+            global_distribution["very_long"] += report.very_long_sentences
+
+        # Calcular promedios globales
+        avg_flesch = sum(global_stats["flesch_scores"]) / len(global_stats["flesch_scores"]) if global_stats["flesch_scores"] else 0
+        avg_wps = global_stats["total_words"] / global_stats["total_sentences"] if global_stats["total_sentences"] else 0
+
+        recommendations = []
+        if global_distribution["very_long"] > global_stats["total_sentences"] * 0.15:
+            recommendations.append("Muchas oraciones muy largas (>35 palabras). Considera dividirlas.")
+        if global_distribution["short"] > global_stats["total_sentences"] * 0.6:
+            recommendations.append("Texto con predominio de oraciones cortas. Varía la longitud para mejor ritmo.")
+        if avg_flesch < 40:
+            recommendations.append("El texto es difícil de leer. Simplifica el vocabulario y la estructura.")
+
+        return ApiResponse(
+            success=True,
+            data={
+                "global_stats": {
+                    "total_sentences": global_stats["total_sentences"],
+                    "total_words": global_stats["total_words"],
+                    "avg_words_per_sentence": round(avg_wps, 1),
+                    "avg_flesch_szigriszt": round(avg_flesch, 1),
+                },
+                "distribution": global_distribution,
+                "chapters": chapters_data,
+                "recommendations": recommendations,
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error analyzing sentence variation: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.get("/api/projects/{project_id}/pacing-analysis", response_model=ApiResponse)
+async def get_pacing_analysis(project_id: int):
+    """
+    Analiza el ritmo narrativo del proyecto.
+
+    Detecta variaciones en el pacing a través de capítulos/escenas.
+    """
+    try:
+        from narrative_assistant.analysis.pacing import get_pacing_analyzer
+        from narrative_assistant.persistence import ProjectManager
+
+        pm = ProjectManager()
+        project = pm.get_project(project_id)
+        if not project:
+            raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+
+        analyzer = get_pacing_analyzer()
+        chapters = pm.get_chapters(project_id)
+
+        chapters_data = []
+
+        for chapter in chapters:
+            chapter_text = chapter.content or ""
+            if not chapter_text.strip():
+                continue
+
+            result = analyzer.analyze(chapter_text)
+            if result.is_failure:
+                continue
+
+            report = result.value
+
+            chapters_data.append({
+                "chapter_number": chapter.number,
+                "chapter_title": chapter.title or f"Capítulo {chapter.number}",
+                "pacing_score": round(report.overall_pacing, 2),
+                "pacing_label": _get_pacing_label(report.overall_pacing),
+                "metrics": {
+                    "dialogue_ratio": round(report.dialogue_ratio, 3),
+                    "action_ratio": round(report.action_ratio, 3),
+                    "description_ratio": round(report.description_ratio, 3),
+                    "avg_sentence_length": round(report.avg_sentence_length, 1),
+                },
+                "segments": [
+                    {
+                        "type": seg.segment_type.value,
+                        "start": seg.start_position,
+                        "end": seg.end_position,
+                        "pacing": round(seg.pacing_score, 2),
+                    }
+                    for seg in report.segments[:20]  # Limit segments
+                ],
+            })
+
+        # Calcular variación de pacing
+        pacing_scores = [ch["pacing_score"] for ch in chapters_data]
+        pacing_variation = max(pacing_scores) - min(pacing_scores) if pacing_scores else 0
+
+        recommendations = []
+        if pacing_variation < 0.2:
+            recommendations.append("El ritmo es muy uniforme. Considera variar entre escenas de acción y reflexión.")
+        if all(ch["pacing_score"] < 0.4 for ch in chapters_data):
+            recommendations.append("El ritmo general es lento. Añade más diálogo o escenas de acción.")
+        if all(ch["pacing_score"] > 0.7 for ch in chapters_data):
+            recommendations.append("El ritmo es muy acelerado. Incluye momentos de pausa para el lector.")
+
+        return ApiResponse(
+            success=True,
+            data={
+                "global_stats": {
+                    "avg_pacing": round(sum(pacing_scores) / len(pacing_scores), 2) if pacing_scores else 0,
+                    "pacing_variation": round(pacing_variation, 2),
+                    "chapter_count": len(chapters_data),
+                },
+                "chapters": chapters_data,
+                "recommendations": recommendations,
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error analyzing pacing: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+def _get_pacing_label(score: float) -> str:
+    """Obtiene etiqueta de pacing según puntuación."""
+    if score >= 0.7:
+        return "fast"
+    elif score >= 0.4:
+        return "moderate"
+    else:
+        return "slow"
+
+
+@app.get("/api/projects/{project_id}/age-readability", response_model=ApiResponse)
+async def get_age_readability(
+    project_id: int,
+    target_age_group: Optional[str] = Query(None, description="Grupo de edad objetivo (board_book, picture_book, early_reader, chapter_book, middle_grade, young_adult)")
+):
+    """
+    Analiza la legibilidad orientada a grupos de edad infantil/juvenil.
+
+    Proporciona métricas específicas para literatura infantil como:
+    - Proporción de palabras de alta frecuencia (sight words)
+    - Complejidad del vocabulario
+    - Estimación de edad lectora
+    """
+    try:
+        from narrative_assistant.nlp.style.readability import get_readability_analyzer, AgeGroup
+        from narrative_assistant.persistence import ProjectManager
+
+        pm = ProjectManager()
+        project = pm.get_project(project_id)
+        if not project:
+            raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+
+        analyzer = get_readability_analyzer()
+        chapters = pm.get_chapters(project_id)
+
+        # Parsear grupo de edad objetivo
+        target_group = None
+        if target_age_group:
+            try:
+                target_group = AgeGroup(target_age_group)
+            except ValueError:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Grupo de edad inválido: {target_age_group}. Valores válidos: board_book, picture_book, early_reader, chapter_book, middle_grade, young_adult"
+                )
+
+        # Combinar todo el texto para análisis global
+        full_text = "\n\n".join(ch.content or "" for ch in chapters if ch.content)
+
+        if not full_text.strip():
+            return ApiResponse(
+                success=True,
+                data={
+                    "message": "No hay contenido para analizar",
+                    "estimated_age_group": None,
+                }
+            )
+
+        result = analyzer.analyze_for_age(full_text, target_age_group=target_group)
+
+        if result.is_failure:
+            return ApiResponse(success=False, error=str(result.error))
+
+        report = result.value
+
+        # Análisis por capítulo
+        chapters_data = []
+        for chapter in chapters:
+            chapter_text = chapter.content or ""
+            if not chapter_text.strip():
+                continue
+
+            ch_result = analyzer.analyze_for_age(chapter_text, target_age_group=target_group)
+            if ch_result.is_success:
+                ch_report = ch_result.value
+                chapters_data.append({
+                    "chapter_number": chapter.number,
+                    "chapter_title": chapter.title or f"Capítulo {chapter.number}",
+                    "estimated_age_group": ch_report.estimated_age_group.value,
+                    "estimated_age_range": ch_report.estimated_age_range,
+                    "appropriateness_score": round(ch_report.appropriateness_score, 1),
+                    "is_appropriate": ch_report.is_appropriate,
+                    "metrics": {
+                        "avg_words_per_sentence": round(ch_report.avg_words_per_sentence, 1),
+                        "avg_syllables_per_word": round(ch_report.avg_syllables_per_word, 2),
+                        "sight_word_ratio": round(ch_report.sight_word_ratio * 100, 1),
+                    },
+                })
+
+        return ApiResponse(
+            success=True,
+            data={
+                **report.to_dict(),
+                "chapters": chapters_data,
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error analyzing age readability: {e}", exc_info=True)
         return ApiResponse(success=False, error=str(e))
 
 

@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 _database_lock = threading.Lock()
 
 # Versión del schema actual
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 9
 
 # SQL de creación de tablas
 SCHEMA_SQL = """
@@ -42,7 +42,13 @@ CREATE TABLE IF NOT EXISTS projects (
     last_opened_at TEXT,
     analysis_status TEXT DEFAULT 'pending',
     analysis_progress REAL DEFAULT 0.0,
-    settings_json TEXT
+    settings_json TEXT,
+
+    -- Tipo de documento (versión 9)
+    document_type TEXT DEFAULT 'FIC',       -- FIC, MEM, BIO, CEL, DIV, ENS, AUT, TEC, PRA, GRA, INF, DRA
+    document_subtype TEXT,                  -- Subtipo específico según la categoría
+    document_type_confirmed INTEGER DEFAULT 0,  -- 1 si el usuario ha confirmado el tipo
+    detected_document_type TEXT             -- Tipo detectado por el sistema (puede diferir del actual)
 );
 
 -- Índice para búsqueda por fingerprint
@@ -608,8 +614,92 @@ CREATE TABLE IF NOT EXISTS project_entity_overrides (
 CREATE INDEX IF NOT EXISTS idx_project_overrides_project ON project_entity_overrides(project_id);
 CREATE INDEX IF NOT EXISTS idx_project_overrides_action ON project_entity_overrides(action);
 
+-- ===================================================================
+-- NUEVAS TABLAS: Sistema de etiquetado de escenas (versión 8)
+-- ===================================================================
+
+-- Escenas detectadas y persistidas
+CREATE TABLE IF NOT EXISTS scenes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    chapter_id INTEGER NOT NULL,
+    scene_number INTEGER NOT NULL,         -- 1-indexed within chapter
+    start_char INTEGER NOT NULL,
+    end_char INTEGER NOT NULL,
+    separator_type TEXT,                   -- asterisk, dash, hash, blank_lines, none
+    word_count INTEGER DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE CASCADE,
+    UNIQUE (project_id, chapter_id, scene_number)
+);
+
+CREATE INDEX IF NOT EXISTS idx_scenes_project ON scenes(project_id);
+CREATE INDEX IF NOT EXISTS idx_scenes_chapter ON scenes(chapter_id);
+
+-- Etiquetas predefinidas de escenas (una fila por escena)
+CREATE TABLE IF NOT EXISTS scene_tags (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    scene_id INTEGER NOT NULL,
+
+    -- Tipo de escena (predefinido)
+    scene_type TEXT,                       -- action, dialogue, exposition, introspection, flashback, dream, transition
+
+    -- Tono emocional (predefinido)
+    tone TEXT,                             -- tense, calm, happy, sad, romantic, mysterious, ominous, hopeful, nostalgic, neutral
+
+    -- Ubicación (enlazado a entidad tipo location)
+    location_entity_id INTEGER,
+
+    -- Personajes presentes en la escena (JSON array de entity IDs)
+    participant_ids TEXT DEFAULT '[]',
+
+    -- Resumen y notas del usuario
+    summary TEXT,
+    notes TEXT,
+
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (scene_id) REFERENCES scenes(id) ON DELETE CASCADE,
+    FOREIGN KEY (location_entity_id) REFERENCES entities(id) ON DELETE SET NULL,
+    UNIQUE (scene_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_scene_tags_scene ON scene_tags(scene_id);
+CREATE INDEX IF NOT EXISTS idx_scene_tags_type ON scene_tags(scene_type);
+CREATE INDEX IF NOT EXISTS idx_scene_tags_tone ON scene_tags(tone);
+CREATE INDEX IF NOT EXISTS idx_scene_tags_location ON scene_tags(location_entity_id);
+
+-- Etiquetas personalizadas del usuario (múltiples por escena)
+CREATE TABLE IF NOT EXISTS scene_custom_tags (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    scene_id INTEGER NOT NULL,
+    tag_name TEXT NOT NULL,                -- Nombre de la etiqueta definida por el usuario
+    tag_color TEXT,                        -- Color hex opcional (#FF5733)
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (scene_id) REFERENCES scenes(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_custom_tags_scene ON scene_custom_tags(scene_id);
+CREATE INDEX IF NOT EXISTS idx_custom_tags_name ON scene_custom_tags(tag_name);
+
+-- Catálogo de etiquetas personalizadas por proyecto (para reutilización)
+CREATE TABLE IF NOT EXISTS project_custom_tag_catalog (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    tag_name TEXT NOT NULL,
+    tag_color TEXT,                        -- Color por defecto para esta etiqueta
+    usage_count INTEGER DEFAULT 0,         -- Número de veces usada
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    UNIQUE (project_id, tag_name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_tag_catalog_project ON project_custom_tag_catalog(project_id);
+
 -- Insertar versión del schema
-INSERT OR REPLACE INTO schema_info (key, value) VALUES ('version', '7');
+INSERT OR REPLACE INTO schema_info (key, value) VALUES ('version', '9');
 """
 
 
