@@ -12,51 +12,147 @@ CORS: Habilitado para localhost:5173 (Vite dev server) y tauri://localhost
 # CRITICAL: Add user site-packages to sys.path BEFORE any imports
 # This must be the FIRST thing that runs to allow PyInstaller bundle to find system packages
 import sys
+
+# CRITICAL: Write early debug info FIRST
+def _write_debug(msg):
+    """Write debug message to file"""
+    try:
+        import os
+        from datetime import datetime
+        # Use environment variable directly - more reliable
+        localappdata = os.environ.get('LOCALAPPDATA', os.environ.get('TEMP', ''))
+        if localappdata:
+            debug_file = os.path.join(localappdata, "Narrative Assistant", "early-debug.txt")
+            os.makedirs(os.path.dirname(debug_file), exist_ok=True)
+            with open(debug_file, 'a', encoding='utf-8') as f:
+                f.write(f"{datetime.now().isoformat()} - {msg}\n")
+                f.flush()
+    except Exception as e:
+        # Last resort: write to temp
+        try:
+            import tempfile
+            temp_file = os.path.join(tempfile.gettempdir(), "narrative-debug.txt")
+            with open(temp_file, 'a', encoding='utf-8') as f:
+                f.write(f"{msg} (fallback - error: {e})\n")
+                f.flush()
+        except:
+            pass
+
+_write_debug("="*80)
+_write_debug("BACKEND STARTING")
+_write_debug(f"sys.executable: {sys.executable}")
+_write_debug(f"sys.frozen: {getattr(sys, 'frozen', False)}")
+_write_debug(f"sys.path initial (first 3): {sys.path[:3]}")
+
 import site
 import os
 import shutil
+from pathlib import Path
 
-# Setup logging early for debugging
+# Setup logging IMMEDIATELY for early debugging
 import logging
+
+# Configure logging FIRST before using any loggers
+def _setup_early_logging():
+    """Setup logging as early as possible"""
+    try:
+        if sys.platform == 'win32':
+            log_dir = Path.home() / "AppData" / "Local" / "Narrative Assistant"
+        elif sys.platform == 'darwin':
+            log_dir = Path.home() / "Library" / "Logs" / "Narrative Assistant"
+        else:
+            log_dir = Path.home() / ".local" / "share" / "narrative-assistant"
+        
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_file = log_dir / "backend-debug.log"
+        
+        logging.basicConfig(
+            level=logging.DEBUG,  # DEBUG para ver todo
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            handlers=[
+                logging.FileHandler(str(log_file), encoding='utf-8', mode='w')  # mode='w' para limpiar cada vez
+            ],
+            force=True
+        )
+        print(f"LOGGING TO: {log_file}", flush=True)  # Print para debug
+        return log_file
+    except Exception as e:
+        print(f"ERROR SETTING UP LOGGING: {e}", flush=True)
+        # Fallback básico
+        logging.basicConfig(level=logging.DEBUG, force=True)
+        return None
+
+_log_file = _setup_early_logging()
 _early_logger = logging.getLogger(__name__)
-_early_logger.setLevel(logging.INFO)
+_early_logger.info("="*80)
+_early_logger.info("BACKEND STARTING - v0.2.8 DEBUG")
+_early_logger.info(f"Python executable: {sys.executable}")
+_early_logger.info(f"Frozen: {getattr(sys, 'frozen', False)}")
+if _log_file:
+    _early_logger.info(f"Log file: {_log_file}")
+_early_logger.info("="*80)
 
 try:
+    _write_debug("=== sys.path setup starting ===")
     _early_logger.info(f"=== Initial sys.path setup ===")
     _early_logger.info(f"Python executable: {sys.executable}")
     _early_logger.info(f"sys.path before modifications: {sys.path[:3]}...")  # First 3 entries
     
     # Add user site-packages
     user_site = site.getusersitepackages()
+    _write_debug(f"User site: {user_site}")
     _early_logger.info(f"User site-packages: {user_site}")
     if user_site not in sys.path:
         sys.path.insert(0, user_site)
+        _write_debug("Added user site to sys.path")
         _early_logger.info(f"✓ Added user site-packages to sys.path")
     
-    # Also try to add Anaconda/Conda site-packages if available
-    python_exe = shutil.which("python3") or shutil.which("python")
-    _early_logger.info(f"System python command: {python_exe}")
-    if python_exe and ("anaconda" in python_exe.lower() or "conda" in python_exe.lower()):
-        conda_base = os.path.dirname(os.path.dirname(python_exe))
-        conda_site = os.path.join(conda_base, "Lib", "site-packages")
-        _early_logger.info(f"Detected Anaconda/Conda at: {conda_base}")
-        _early_logger.info(f"Conda site-packages: {conda_site}")
-        if os.path.exists(conda_site) and conda_site not in sys.path:
-            sys.path.insert(0, conda_site)
-            _early_logger.info(f"✓ Added Anaconda site-packages to sys.path")
-        else:
-            _early_logger.info(f"Conda site already in sys.path or doesn't exist")
+    # Try to find Anaconda/Conda installation
+    # 1. Check common Anaconda locations
+    conda_candidates = [
+        os.path.join(os.environ.get('USERPROFILE', ''), 'anaconda3'),
+        os.path.join(os.environ.get('USERPROFILE', ''), 'miniconda3'),
+        'C:\\ProgramData\\Anaconda3',
+        'C:\\ProgramData\\Miniconda3',
+    ]
     
+    # 2. Also check PATH (but skip Windows Store aliases)
+    python_exe = shutil.which("python3") or shutil.which("python")
+    if python_exe and 'WindowsApps' not in python_exe:
+        conda_candidates.insert(0, os.path.dirname(os.path.dirname(python_exe)))
+    
+    _write_debug(f"Checking conda candidates: {conda_candidates[:3]}")
+    
+    for conda_base in conda_candidates:
+        conda_site = os.path.join(conda_base, "Lib", "site-packages")
+        _write_debug(f"Checking: {conda_site}, exists: {os.path.exists(conda_site)}")
+        if os.path.exists(conda_site):
+            _write_debug(f"Found Anaconda at: {conda_base}")
+            _early_logger.info(f"Detected Anaconda/Conda at: {conda_base}")
+            _early_logger.info(f"Conda site-packages: {conda_site}")
+            if conda_site not in sys.path:
+                sys.path.insert(0, conda_site)
+                _write_debug("Added conda site to sys.path")
+                _early_logger.info(f"✓ Added Anaconda site-packages to sys.path")
+            break
+    else:
+        _write_debug("No Anaconda installation found")
+        _early_logger.info("No Anaconda/Conda installation detected")
+    
+    _write_debug(f"sys.path after (first 3): {sys.path[:3]}")
     _early_logger.info(f"sys.path after modifications: {sys.path[:3]}...")  # First 3 entries
     
     # Try to detect if numpy is now available
     import importlib.util
     numpy_spec = importlib.util.find_spec("numpy")
+    _write_debug(f"numpy found: {numpy_spec is not None}")
     _early_logger.info(f"numpy detection after sys.path setup: {numpy_spec is not None}")
     if numpy_spec:
+        _write_debug(f"numpy at: {numpy_spec.origin}")
         _early_logger.info(f"numpy found at: {numpy_spec.origin}")
     
 except Exception as e:
+    _write_debug(f"ERROR in sys.path setup: {e}")
     _early_logger.error(f"Error during sys.path setup: {e}", exc_info=True)
     pass  # Continue even if this fails
 
@@ -114,43 +210,9 @@ except Exception as e:
     MODULES_ERROR = str(e)
     NA_VERSION = "0.2.8"  # Fallback version
 
-# Configuración de logging
-import sys
-from pathlib import Path
-
-def get_log_directory():
-    """Get platform-specific log directory for Narrative Assistant"""
-    if sys.platform == 'win32':
-        # Windows: %LOCALAPPDATA%\Narrative Assistant\logs
-        return Path.home() / "AppData" / "Local" / "Narrative Assistant" / "logs"
-    elif sys.platform == 'darwin':
-        # macOS: ~/Library/Logs/Narrative Assistant
-        return Path.home() / "Library" / "Logs" / "Narrative Assistant"
-    else:
-        # Linux: ~/.local/share/narrative-assistant/logs
-        return Path.home() / ".local" / "share" / "narrative-assistant" / "logs"
-
-# Si estamos en un ejecutable empaquetado, usar un archivo de log
-if getattr(sys, 'frozen', False):
-    log_dir = get_log_directory()
-    log_dir.mkdir(parents=True, exist_ok=True)
-    log_file = log_dir / "narrative-assistant-server.log"
-    
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        handlers=[
-            logging.FileHandler(log_file, encoding='utf-8'),
-            logging.StreamHandler(sys.stdout) if sys.stdout else logging.NullHandler()
-        ]
-    )
-else:
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    )
-
+# Logging already configured at the top of the file in _setup_early_logging()
 logger = logging.getLogger(__name__)
+logger.info(f"Server starting - NA_VERSION: {NA_VERSION}, MODULES_LOADED: {MODULES_LOADED}")
 
 # Crear app FastAPI
 app = FastAPI(
@@ -8116,6 +8178,268 @@ async def export_corrected_document(
         return ApiResponse(success=False, error=str(e))
 
 
+@app.get("/api/projects/{project_id}/export/review-report")
+async def export_review_report(
+    project_id: int,
+    format: str = "docx",
+    min_confidence: float = 0.0,
+    include_context: bool = True,
+    include_suggestions: bool = True,
+    max_issues_per_category: int = 50,
+):
+    """
+    Exporta un informe de revisión editorial a DOCX o PDF.
+
+    Genera un informe detallado con estadísticas de los problemas
+    detectados por los 14 detectores de corrección.
+
+    Incluye:
+    - Resumen ejecutivo con totales por categoría
+    - Distribución por confianza
+    - Desglose por capítulo
+    - Listado detallado de observaciones
+    - Recomendaciones de estilo
+
+    Args:
+        project_id: ID del proyecto
+        format: Formato de exportación ('docx' o 'pdf')
+        min_confidence: Confianza mínima para incluir (0.0-1.0)
+        include_context: Incluir contexto de cada observación
+        include_suggestions: Incluir sugerencias de corrección
+        max_issues_per_category: Máximo de observaciones por categoría
+
+    Returns:
+        Archivo DOCX o PDF para descarga
+    """
+    from fastapi.responses import Response
+
+    try:
+        if not project_manager:
+            return ApiResponse(success=False, error="Project manager not initialized")
+
+        # Validar formato
+        format = format.lower()
+        if format not in ("docx", "pdf"):
+            return ApiResponse(success=False, error="Formato inválido. Use 'docx' o 'pdf'")
+
+        # Obtener proyecto
+        result = project_manager.get(project_id)
+        if result.is_failure:
+            return ApiResponse(success=False, error=str(result.error))
+
+        project = result.value
+
+        # Importar módulos necesarios
+        try:
+            from narrative_assistant.exporters.review_report_exporter import (
+                ReviewReportExporter,
+                ReviewReportOptions,
+            )
+            from narrative_assistant.corrections.base import CorrectionIssue
+        except ImportError as e:
+            logger.error(f"Review report exporter not available: {e}")
+            return ApiResponse(
+                success=False,
+                error="Módulo de informes de revisión no disponible"
+            )
+
+        # Obtener alertas del proyecto que son de tipo correction
+        correction_categories = {
+            "typography", "repetition", "agreement", "punctuation",
+            "terminology", "regional", "clarity", "grammar",
+            "anglicisms", "crutch_words", "glossary", "anacoluto",
+            "pov", "orthography"
+        }
+
+        # Convertir alertas a CorrectionIssue
+        issues = []
+        if alert_repository:
+            alerts = alert_repository.get_by_project(project_id)
+            for alert in alerts:
+                category = alert.category.value.lower() if hasattr(alert.category, 'value') else str(alert.category).lower()
+                if category in correction_categories:
+                    issues.append(CorrectionIssue(
+                        category=category,
+                        issue_type=alert.alert_type or "unknown",
+                        start_char=0,
+                        end_char=0,
+                        text=alert.excerpt or "",
+                        explanation=alert.explanation or alert.description or "",
+                        suggestion=alert.suggestion,
+                        confidence=alert.confidence or 0.5,
+                        context=alert.excerpt or "",
+                        chapter_index=alert.chapter,
+                        rule_id=None,
+                    ))
+
+        if not issues:
+            return ApiResponse(
+                success=False,
+                error="No hay observaciones de corrección para generar el informe. Ejecute primero el análisis del documento."
+            )
+
+        # Configurar opciones
+        options = ReviewReportOptions(
+            document_title=project.name,
+            min_confidence=min_confidence,
+            include_context=include_context,
+            include_suggestions=include_suggestions,
+            max_issues_per_category=max_issues_per_category,
+        )
+
+        # Crear exportador
+        exporter = ReviewReportExporter()
+
+        # Exportar según formato
+        if format == "docx":
+            result = exporter.export_to_docx(issues, options)
+            content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            extension = "docx"
+        else:
+            result = exporter.export_to_pdf(issues, options)
+            content_type = "application/pdf"
+            extension = "pdf"
+
+        if result.is_failure:
+            return ApiResponse(success=False, error=str(result.error))
+
+        # Generar nombre de archivo
+        safe_name = "".join(
+            c if c.isalnum() or c in (' ', '-', '_') else '_'
+            for c in project.name
+        ).strip().replace(' ', '_').lower()
+
+        filename = f"informe_revision_{safe_name}.{extension}"
+
+        # Devolver archivo para descarga
+        return Response(
+            content=result.value,
+            media_type=content_type,
+            headers={
+                "Content-Disposition": f"attachment; filename=\"{filename}\""
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Error exporting review report for project {project_id}: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.get("/api/projects/{project_id}/export/review-report/preview", response_model=ApiResponse)
+async def preview_review_report(project_id: int):
+    """
+    Previsualiza los datos que se incluirán en el informe de revisión.
+
+    Útil para mostrar al usuario estadísticas antes de generar el documento.
+
+    Args:
+        project_id: ID del proyecto
+
+    Returns:
+        ApiResponse con preview de las estadísticas del informe
+    """
+    try:
+        if not project_manager:
+            return ApiResponse(success=False, error="Project manager not initialized")
+
+        # Obtener proyecto
+        result = project_manager.get(project_id)
+        if result.is_failure:
+            return ApiResponse(success=False, error=str(result.error))
+
+        project = result.value
+
+        # Importar módulos
+        try:
+            from narrative_assistant.exporters.review_report_exporter import (
+                ReviewReportExporter,
+                ReviewReportOptions,
+            )
+            from narrative_assistant.corrections.base import CorrectionIssue
+        except ImportError as e:
+            return ApiResponse(success=False, error="Módulo de informes no disponible")
+
+        # Obtener alertas de corrección
+        correction_categories = {
+            "typography", "repetition", "agreement", "punctuation",
+            "terminology", "regional", "clarity", "grammar",
+            "anglicisms", "crutch_words", "glossary", "anacoluto",
+            "pov", "orthography"
+        }
+
+        issues = []
+        if alert_repository:
+            alerts = alert_repository.get_by_project(project_id)
+            for alert in alerts:
+                category = alert.category.value.lower() if hasattr(alert.category, 'value') else str(alert.category).lower()
+                if category in correction_categories:
+                    issues.append(CorrectionIssue(
+                        category=category,
+                        issue_type=alert.alert_type or "unknown",
+                        start_char=0,
+                        end_char=0,
+                        text=alert.excerpt or "",
+                        explanation=alert.explanation or alert.description or "",
+                        suggestion=alert.suggestion,
+                        confidence=alert.confidence or 0.5,
+                        context=alert.excerpt or "",
+                        chapter_index=alert.chapter,
+                    ))
+
+        if not issues:
+            return ApiResponse(
+                success=True,
+                data={
+                    "document_title": project.name,
+                    "total_issues": 0,
+                    "categories": [],
+                    "by_confidence": {"high": 0, "medium": 0, "low": 0},
+                    "by_chapter": {},
+                    "can_export": False,
+                    "message": "No hay observaciones de corrección. Ejecute primero el análisis."
+                }
+            )
+
+        # Preparar datos del informe
+        exporter = ReviewReportExporter()
+        options = ReviewReportOptions(document_title=project.name)
+        data = exporter.prepare_report_data(issues, options)
+
+        # Convertir a diccionario serializable
+        categories_preview = [
+            {
+                "category": cat.category,
+                "display_name": cat.display_name,
+                "total": cat.total,
+                "high_confidence": cat.high_confidence,
+                "medium_confidence": cat.medium_confidence,
+                "low_confidence": cat.low_confidence,
+                "types": dict(cat.by_type),
+            }
+            for cat in data.categories
+        ]
+
+        return ApiResponse(
+            success=True,
+            data={
+                "document_title": data.document_title,
+                "total_issues": data.total_issues,
+                "categories": categories_preview,
+                "by_confidence": data.total_by_confidence,
+                "by_chapter": data.by_chapter,
+                "top_issues": [
+                    {"category": cat, "type": typ, "count": cnt}
+                    for cat, typ, cnt in data.top_issues_by_type
+                ],
+                "can_export": data.total_issues > 0,
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Error previewing review report for project {project_id}: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
 # ============================================================================
 # Licensing Endpoints
 # ============================================================================
@@ -10091,6 +10415,338 @@ async def get_glossary_summary(project_id: str) -> ApiResponse:
         raise
     except Exception as e:
         logger.error(f"Error getting glossary summary: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+# ============================================================================
+# Dictionary Endpoints (Diccionarios Offline)
+# ============================================================================
+
+@app.get("/api/dictionary/lookup/{word}", response_model=ApiResponse)
+async def dictionary_lookup(word: str):
+    """
+    Busca una palabra en los diccionarios locales.
+
+    Consulta múltiples fuentes (Wiktionary, sinónimos, personalizado)
+    y devuelve información combinada.
+
+    Args:
+        word: Palabra a buscar
+
+    Returns:
+        ApiResponse con la entrada del diccionario
+    """
+    try:
+        from narrative_assistant.dictionaries import get_dictionary_manager
+
+        manager = get_dictionary_manager()
+        result = manager.lookup(word)
+
+        if result.is_failure:
+            return ApiResponse(
+                success=True,
+                data={
+                    "found": False,
+                    "word": word,
+                    "message": str(result.error.user_message) if result.error else "No encontrado",
+                    "external_links": manager.get_all_external_links(word),
+                }
+            )
+
+        entry = result.value
+        return ApiResponse(
+            success=True,
+            data={
+                "found": True,
+                "entry": entry.to_dict(),
+                "external_links": manager.get_all_external_links(word),
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Error looking up word '{word}': {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.get("/api/dictionary/synonyms/{word}", response_model=ApiResponse)
+async def get_synonyms(word: str):
+    """
+    Obtiene sinónimos de una palabra.
+
+    Args:
+        word: Palabra a buscar
+
+    Returns:
+        ApiResponse con lista de sinónimos
+    """
+    try:
+        from narrative_assistant.dictionaries import get_dictionary_manager
+
+        manager = get_dictionary_manager()
+        synonyms = manager.get_synonyms(word)
+        antonyms = manager.get_antonyms(word)
+
+        return ApiResponse(
+            success=True,
+            data={
+                "word": word,
+                "synonyms": synonyms,
+                "antonyms": antonyms,
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Error getting synonyms for '{word}': {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.get("/api/dictionary/search", response_model=ApiResponse)
+async def dictionary_search(prefix: str, limit: int = 20):
+    """
+    Busca palabras que empiecen con un prefijo.
+
+    Útil para autocompletado.
+
+    Args:
+        prefix: Prefijo a buscar
+        limit: Máximo de resultados (default: 20)
+
+    Returns:
+        ApiResponse con lista de palabras
+    """
+    try:
+        from narrative_assistant.dictionaries import get_dictionary_manager
+
+        manager = get_dictionary_manager()
+        words = manager.search_prefix(prefix, limit)
+
+        return ApiResponse(
+            success=True,
+            data={
+                "prefix": prefix,
+                "words": words,
+                "count": len(words),
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Error searching prefix '{prefix}': {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.get("/api/dictionary/status", response_model=ApiResponse)
+async def dictionary_status():
+    """
+    Obtiene el estado de los diccionarios.
+
+    Returns:
+        ApiResponse con información de cada fuente de diccionario
+    """
+    try:
+        from narrative_assistant.dictionaries import get_dictionary_manager
+
+        manager = get_dictionary_manager()
+        status = manager.get_status()
+
+        return ApiResponse(
+            success=True,
+            data={
+                "sources": status,
+                "data_dir": str(manager.data_dir),
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Error getting dictionary status: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.post("/api/dictionary/initialize", response_model=ApiResponse)
+async def initialize_dictionaries():
+    """
+    Inicializa los diccionarios si no existen.
+
+    Crea las bases de datos con datos básicos.
+    En el futuro, esto podría descargar datos completos.
+
+    Returns:
+        ApiResponse indicando éxito
+    """
+    try:
+        from narrative_assistant.dictionaries import get_dictionary_manager
+
+        manager = get_dictionary_manager()
+        result = manager.ensure_dictionaries()
+
+        if result.is_failure:
+            return ApiResponse(success=False, error=str(result.error))
+
+        return ApiResponse(
+            success=True,
+            data={
+                "message": "Diccionarios inicializados correctamente",
+                "status": manager.get_status(),
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Error initializing dictionaries: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+class CustomWordRequest(BaseModel):
+    """Request para añadir palabra personalizada."""
+    word: str = Field(..., description="Palabra a añadir")
+    definition: str = Field(..., description="Definición")
+    category: Optional[str] = Field(None, description="Categoría gramatical")
+    synonyms: Optional[list[str]] = Field(None, description="Sinónimos")
+    antonyms: Optional[list[str]] = Field(None, description="Antónimos")
+
+
+@app.post("/api/dictionary/custom", response_model=ApiResponse)
+async def add_custom_word(request: CustomWordRequest):
+    """
+    Añade una palabra al diccionario personalizado.
+
+    Args:
+        request: Datos de la palabra
+
+    Returns:
+        ApiResponse indicando éxito
+    """
+    try:
+        from narrative_assistant.dictionaries import get_dictionary_manager
+
+        manager = get_dictionary_manager()
+        result = manager.add_custom_word(
+            word=request.word,
+            definition=request.definition,
+            category=request.category,
+            synonyms=request.synonyms,
+            antonyms=request.antonyms,
+        )
+
+        if result.is_failure:
+            return ApiResponse(success=False, error=str(result.error))
+
+        return ApiResponse(
+            success=True,
+            data={
+                "message": f"Palabra '{request.word}' añadida correctamente",
+                "word": request.word,
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Error adding custom word: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.delete("/api/dictionary/custom/{word}", response_model=ApiResponse)
+async def remove_custom_word(word: str):
+    """
+    Elimina una palabra del diccionario personalizado.
+
+    Args:
+        word: Palabra a eliminar
+
+    Returns:
+        ApiResponse indicando éxito
+    """
+    try:
+        from narrative_assistant.dictionaries import get_dictionary_manager
+
+        manager = get_dictionary_manager()
+        result = manager.remove_custom_word(word)
+
+        if result.is_failure:
+            return ApiResponse(success=False, error=str(result.error))
+
+        removed = result.value
+        if removed:
+            return ApiResponse(
+                success=True,
+                data={"message": f"Palabra '{word}' eliminada", "removed": True}
+            )
+        else:
+            return ApiResponse(
+                success=True,
+                data={"message": f"Palabra '{word}' no existía", "removed": False}
+            )
+
+    except Exception as e:
+        logger.error(f"Error removing custom word: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.get("/api/dictionary/custom", response_model=ApiResponse)
+async def list_custom_words():
+    """
+    Lista todas las palabras del diccionario personalizado.
+
+    Returns:
+        ApiResponse con lista de palabras
+    """
+    try:
+        from narrative_assistant.dictionaries import get_dictionary_manager
+
+        manager = get_dictionary_manager()
+        words = manager.list_custom_words()
+
+        return ApiResponse(
+            success=True,
+            data={
+                "words": words,
+                "count": len(words),
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Error listing custom words: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.get("/api/dictionary/external-links/{word}", response_model=ApiResponse)
+async def get_external_dictionary_links(word: str):
+    """
+    Obtiene enlaces a diccionarios externos para una palabra.
+
+    Args:
+        word: Palabra a buscar
+
+    Returns:
+        ApiResponse con enlaces a diccionarios externos
+    """
+    try:
+        from narrative_assistant.dictionaries import get_dictionary_manager
+        from narrative_assistant.dictionaries.models import EXTERNAL_DICTIONARIES
+
+        manager = get_dictionary_manager()
+        links = manager.get_all_external_links(word)
+
+        # Añadir información adicional de cada diccionario
+        detailed_links = []
+        for name, url in links.items():
+            ext_dict = EXTERNAL_DICTIONARIES.get(name)
+            if ext_dict:
+                detailed_links.append({
+                    "name": ext_dict.name,
+                    "id": name,
+                    "url": url,
+                    "description": ext_dict.description,
+                    "requires_license": ext_dict.requires_license,
+                })
+
+        return ApiResponse(
+            success=True,
+            data={
+                "word": word,
+                "links": detailed_links,
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Error getting external links for '{word}': {e}", exc_info=True)
         return ApiResponse(success=False, error=str(e))
 
 

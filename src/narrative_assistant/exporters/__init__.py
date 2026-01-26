@@ -33,6 +33,13 @@ from .corrected_document_exporter import (
     TrackChangeOptions,
     export_with_track_changes,
 )
+from .review_report_exporter import (
+    ReviewReportExporter,
+    ReviewReportOptions,
+    ReviewReportData,
+    CategoryStats,
+    export_review_report,
+)
 
 __all__ = [
     # Character sheets
@@ -57,4 +64,10 @@ __all__ = [
     "CorrectedDocumentExporter",
     "TrackChangeOptions",
     "export_with_track_changes",
+    # Review report exporter
+    "ReviewReportExporter",
+    "ReviewReportOptions",
+    "ReviewReportData",
+    "CategoryStats",
+    "export_review_report",
 ]

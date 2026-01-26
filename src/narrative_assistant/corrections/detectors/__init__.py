@@ -18,6 +18,7 @@ from .crutch_words import CrutchWordsDetector
 from .glossary import GlossaryDetector
 from .anacoluto import AnacolutoDetector
 from .pov import POVDetector
+from .orthographic_variants import OrthographicVariantsDetector
 
 __all__ = [
     "TypographyDetector",
@@ -33,4 +34,5 @@ __all__ = [
     "GlossaryDetector",
     "AnacolutoDetector",
     "POVDetector",
+    "OrthographicVariantsDetector",
 ]

@@ -1,11 +1,15 @@
 """
-Detector de anglicismos.
+Detector de extranjerismos (anglicismos y galicismos).
 
-Identifica palabras en inglés innecesarias que tienen equivalentes
+Identifica palabras extranjeras innecesarias que tienen equivalentes
 en español, con contexto para evitar falsos positivos en:
 - Términos técnicos aceptados
 - Préstamos ya adaptados por la RAE
 - Nombres propios
+
+Soporta:
+- Anglicismos (inglés)
+- Galicismos (francés)
 """
 
 import re
@@ -152,22 +156,165 @@ FALSE_POSITIVES = {
 }
 
 
+# ============================================================================
+# GALICISMOS (préstamos del francés)
+# ============================================================================
+
+# Galicismos crudos (sin adaptación, tienen equivalente español claro)
+GALICISMS_RAW = {
+    # Gastronomía
+    "chef": ("cocinero", "jefe de cocina"),
+    "gourmet": ("gastrónomo", "sibarita"),
+    "restaurant": ("restaurante",),  # versión no adaptada
+    "menu": ("menú", "carta"),  # sin acento
+    "buffet": ("bufé",),
+    "croissant": ("cruasán", "medialuna"),
+    "brioche": ("bollo", "pan dulce"),
+    "pâté": ("paté",),
+    "soufflé": ("suflé",),
+    "mousse": ("espuma", "crema batida"),
+    "consommé": ("consomé",),
+    "sauté": ("salteado",),
+    "julienne": ("juliana",),
+    "entrée": ("entrante", "primer plato"),
+    "dessert": ("postre",),
+    "sommelier": ("sumiller",),
+    "maître": ("jefe de sala", "metre"),
+
+    # Moda y estética
+    "chic": ("elegante", "sofisticado"),
+    "glamour": ("encanto", "atractivo"),
+    "boutique": ("tienda", "tienda de moda"),
+    "prêt-à-porter": ("confección", "ropa lista para usar"),
+    "haute couture": ("alta costura",),
+    "lingerie": ("lencería", "ropa interior"),
+    "maquillage": ("maquillaje",),
+    "coiffure": ("peinado",),
+    "décolleté": ("escote",),
+    "silhouette": ("silueta",),
+    "parure": ("aderezo", "juego de joyas"),
+    "bijou": ("joya", "alhaja"),
+
+    # Arte y cultura
+    "atelier": ("taller", "estudio"),
+    "soirée": ("velada", "fiesta nocturna"),
+    "matinée": ("matiné", "función de tarde"),
+    "vernissage": ("inauguración", "apertura de exposición"),
+    "avant-garde": ("vanguardia",),
+    "oeuvre": ("obra",),
+    "chef-d'oeuvre": ("obra maestra",),
+    "genre": ("género",),
+    "cliché": ("tópico", "lugar común"),
+    "naïf": ("ingenuo", "naíf"),
+    "blasé": ("hastiado", "desencantado"),
+    "ennui": ("tedio", "hastío", "aburrimiento"),
+
+    # Sociedad y comportamiento
+    "savoir-faire": ("saber hacer", "habilidad"),
+    "savoir-vivre": ("saber vivir", "buenas maneras"),
+    "faux pas": ("metedura de pata", "error social"),
+    "vis-à-vis": ("cara a cara", "frente a frente"),
+    "tête-à-tête": ("conversación privada", "encuentro íntimo"),
+    "rendez-vous": ("cita", "encuentro"),
+    "coup de grâce": ("golpe de gracia",),
+    "coup d'état": ("golpe de Estado",),
+    "fait accompli": ("hecho consumado",),
+    "laissez-faire": ("liberalismo económico", "dejar hacer"),
+    "noblesse oblige": ("la nobleza obliga",),
+    "raison d'être": ("razón de ser",),
+    "joie de vivre": ("alegría de vivir",),
+    "bon vivant": ("vividor", "sibarita"),
+    "enfant terrible": ("niño terrible",),
+
+    # Decoración e interiorismo
+    "boudoir": ("tocador", "gabinete íntimo"),
+    "chaise longue": ("diván", "tumbona"),
+    "bidet": ("bidé",),
+    "armoire": ("armario",),
+    "toilette": ("tocador", "aseo"),
+    "parquet": ("parqué", "entarimado"),
+    "plafond": ("techo", "límite"),
+
+    # Otros
+    "ambiance": ("ambiente", "atmósfera"),
+    "cachet": ("caché", "distinción"),
+    "debut": ("debut", "estreno"),
+    "detour": ("rodeo", "desvío"),
+    "ensemble": ("conjunto",),
+    "fiancé": ("prometido", "novio"),
+    "fiancée": ("prometida", "novia"),
+    "massage": ("masaje",),
+    "ménage à trois": ("trío amoroso",),
+    "penchant": ("inclinación", "tendencia"),
+    "protégé": ("protegido", "pupilo"),
+    "rapport": ("relación", "conexión"),
+    "recherché": ("rebuscado", "exquisito"),
+    "renaissance": ("renacimiento",),
+    "résumé": ("currículum", "resumen"),
+    "risqué": ("atrevido", "arriesgado"),
+    "rôle": ("papel", "rol"),
+    "rouge": ("colorete", "carmín"),
+    "sabotage": ("sabotaje",),
+    "touché": ("tocado",),
+    "vogue": ("moda", "boga"),
+}
+
+# Galicismos aceptados o muy usados (no alertar)
+GALICISMS_ACCEPTED = {
+    "hotel", "restaurante", "menú", "café", "ballet",
+    "debut", "fiesta", "gala", "garage", "garaje",
+    "bulevar", "jardín", "chófer", "chofer",
+    "carné", "carnet", "comité", "corsé",
+    "dossier", "élite", "equipaje", "etiqueta",
+    "pantalón", "paté", "suflé", "consomé",
+    "bidé", "parqué", "rol", "matiné",
+}
+
+# Patrones morfológicos de galicismos
+GALICISM_PATTERNS = [
+    # Terminaciones francesas comunes
+    (r"\b\w+age\b", "Posible galicismo con terminación -age"),
+    (r"\b\w+eur\b", "Posible galicismo con terminación -eur"),
+    (r"\b\w+euse\b", "Posible galicismo con terminación -euse"),
+    (r"\b\w+ette\b", "Posible galicismo con terminación -ette"),
+    (r"\b\w+oir\b", "Posible galicismo con terminación -oir"),
+]
+
+# Falsos positivos para galicismos
+GALICISM_FALSE_POSITIVES = {
+    # Palabras españolas comunes
+    "equipaje", "personaje", "paisaje", "viaje", "linaje",
+    "coraje", "mensaje", "lenguaje", "homenaje", "pasaje",
+    "arbitraje", "hospedaje", "aterrizaje", "embalaje",
+    "coqueta", "silueta", "maleta", "carreta", "paleta",
+    "jinete", "banquete", "paquete", "raqueta", "cohete",
+}
+
+
 class AnglicismsDetector(BaseDetector):
     """
-    Detector de anglicismos innecesarios.
+    Detector de extranjerismos (anglicismos y galicismos).
 
-    Detecta palabras en inglés que tienen equivalentes en español,
+    Detecta palabras en inglés y francés que tienen equivalentes en español,
     diferenciando entre:
-    - Anglicismos crudos evitables
+    - Extranjerismos crudos evitables
     - Préstamos aceptados por la RAE
     - Términos técnicos necesarios
+
+    Soporta:
+    - Anglicismos (inglés): habilitado por defecto
+    - Galicismos (francés): configurable via check_galicisms
     """
 
     def __init__(self, config: Optional["AnglicismsConfig"] = None):
         self.config = config or AnglicismsConfig()
-        self._compiled_patterns = [
+        self._compiled_anglicism_patterns = [
             (re.compile(pattern, re.IGNORECASE), desc)
             for pattern, desc in ANGLICISM_PATTERNS
+        ]
+        self._compiled_galicism_patterns = [
+            (re.compile(pattern, re.IGNORECASE), desc)
+            for pattern, desc in GALICISM_PATTERNS
         ]
 
     @property
@@ -186,7 +333,7 @@ class AnglicismsDetector(BaseDetector):
         **kwargs,
     ) -> list[CorrectionIssue]:
         """
-        Detecta anglicismos en el texto.
+        Detecta extranjerismos en el texto (anglicismos y galicismos).
 
         Args:
             text: Texto a analizar
@@ -204,9 +351,15 @@ class AnglicismsDetector(BaseDetector):
         # Detectar anglicismos del diccionario
         issues.extend(self._detect_dictionary_anglicisms(text, chapter_index))
 
-        # Detectar patrones morfológicos (si está habilitado)
+        # Detectar patrones morfológicos de anglicismos (si está habilitado)
         if self.config.check_morphological:
             issues.extend(self._detect_pattern_anglicisms(text, chapter_index))
+
+        # Detectar galicismos (si está habilitado)
+        if getattr(self.config, "check_galicisms", False):
+            issues.extend(self._detect_dictionary_galicisms(text, chapter_index))
+            if self.config.check_morphological:
+                issues.extend(self._detect_pattern_galicisms(text, chapter_index))
 
         return issues
 
@@ -272,7 +425,7 @@ class AnglicismsDetector(BaseDetector):
         """Detecta anglicismos por patrones morfológicos."""
         issues = []
 
-        for pattern, description in self._compiled_patterns:
+        for pattern, description in self._compiled_anglicism_patterns:
             for match in pattern.finditer(text):
                 word = match.group().lower()
 
@@ -328,6 +481,136 @@ class AnglicismsDetector(BaseDetector):
             return True
 
         # Verificar si es parte de nombre propio (ej: "John Smith")
+        if start > 0 and text[start - 1] not in " \n\t.!?¿¡":
+            return True
+
+        return False
+
+    # ========================================================================
+    # GALICISMOS
+    # ========================================================================
+
+    def _detect_dictionary_galicisms(
+        self, text: str, chapter_index: Optional[int]
+    ) -> list[CorrectionIssue]:
+        """Detecta galicismos del diccionario."""
+        issues = []
+
+        for galicism, alternatives in GALICISMS_RAW.items():
+            # Buscar el galicismo (case insensitive, palabra completa)
+            pattern = re.compile(r"\b" + re.escape(galicism) + r"\b", re.IGNORECASE)
+
+            for match in pattern.finditer(text):
+                # Verificar contexto para falsos positivos
+                if self._is_galicism_false_positive(text, match.start(), match.end()):
+                    continue
+
+                original_text = match.group()
+                start = match.start()
+                end = match.end()
+
+                # Crear sugerencia con alternativas
+                if len(alternatives) == 1:
+                    suggestion = alternatives[0]
+                    explanation = (
+                        f'"{original_text}" es un galicismo. '
+                        f'Considere usar "{suggestion}" en español.'
+                    )
+                else:
+                    suggestion = alternatives[0]
+                    explanation = (
+                        f'"{original_text}" es un galicismo. '
+                        f"Alternativas en español: {', '.join(alternatives)}."
+                    )
+
+                issues.append(
+                    CorrectionIssue(
+                        category=self.category.value,
+                        issue_type="raw_galicism",
+                        start_char=start,
+                        end_char=end,
+                        text=original_text,
+                        explanation=explanation,
+                        suggestion=suggestion,
+                        confidence=self.config.base_confidence,
+                        context=self._extract_context(text, start, end),
+                        chapter_index=chapter_index,
+                        rule_id=f"galicism_{galicism}",
+                        extra_data={
+                            "galicism": galicism,
+                            "alternatives": alternatives,
+                            "language": "french",
+                        },
+                    )
+                )
+
+        return issues
+
+    def _detect_pattern_galicisms(
+        self, text: str, chapter_index: Optional[int]
+    ) -> list[CorrectionIssue]:
+        """Detecta galicismos por patrones morfológicos."""
+        issues = []
+
+        for pattern, description in self._compiled_galicism_patterns:
+            for match in pattern.finditer(text):
+                word = match.group().lower()
+
+                # Filtrar falsos positivos
+                if word in GALICISM_FALSE_POSITIVES:
+                    continue
+                if word in GALICISMS_ACCEPTED:
+                    continue
+                if word in GALICISMS_RAW:
+                    continue  # Ya detectado arriba
+
+                # Verificar que no es nombre propio
+                if match.start() > 0 and text[match.start()].isupper():
+                    prev_char = text[match.start() - 1]
+                    if prev_char not in ".!?¿¡":
+                        continue
+
+                issues.append(
+                    CorrectionIssue(
+                        category=self.category.value,
+                        issue_type="morphological_galicism",
+                        start_char=match.start(),
+                        end_char=match.end(),
+                        text=match.group(),
+                        explanation=description,
+                        suggestion=None,
+                        confidence=self.config.base_confidence * 0.6,  # Menor confianza
+                        context=self._extract_context(text, match.start(), match.end()),
+                        chapter_index=chapter_index,
+                        rule_id="pattern_galicism",
+                        extra_data={
+                            "pattern_type": description,
+                            "language": "french",
+                        },
+                    )
+                )
+
+        return issues
+
+    def _is_galicism_false_positive(self, text: str, start: int, end: int) -> bool:
+        """Verifica si es un falso positivo para galicismos."""
+        word = text[start:end].lower()
+
+        # Palabras aceptadas
+        if word in GALICISMS_ACCEPTED:
+            return True
+        if word in GALICISM_FALSE_POSITIVES:
+            return True
+
+        # Verificar si está entre comillas
+        before = text[max(0, start - 10):start]
+        after = text[end:min(len(text), end + 10)]
+        if '"' in before and '"' in after:
+            return True
+        if "«" in before and "»" in after:
+            return True
+
+        # Verificar si es parte de nombre propio
         if start > 0 and text[start - 1] not in " \n\t.!?¿¡":
             return True
 

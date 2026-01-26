@@ -1,7 +1,7 @@
 # Estado del Proyecto - Narrative Assistant
 
 > **Última actualización**: 2026-01-26
-> **Versión tauri.conf.json**: 0.2.7 (ver CHANGELOG abajo)
+> **Versión tauri.conf.json**: 0.2.9 (ver CHANGELOG abajo)
 
 ---
 
@@ -17,7 +17,10 @@
 | **LLM Local** | Ollama (llama3.2, mistral, qwen2.5) - 100% offline |
 | **Frontend** | Vue 3.4, TypeScript 5.3, PrimeVue, Pinia, Vite |
 | **Desktop** | Tauri 2.0, Rust |
-| **API Bridge** | FastAPI, Uvicorn (33 endpoints) |
+| **API Bridge** | FastAPI, Uvicorn (48+ endpoints) |
+| **Diccionario Local** | Wiktionary, sinónimos, custom (v0.2.9) |
+| **Arco Emocional** | UI visual completa (v0.2.9) |
+| **Review Reports** | PDF/DOCX con estadísticas (v0.2.9) |
 
 ---
 
@@ -186,11 +189,11 @@
 
 ## Inventario de Módulos Backend
 
-### Módulos Principales (17)
+### Módulos Principales (18)
 
 | # | Módulo | Archivos | Descripción |
 |---|--------|----------|-------------|
-| 1 | `core/` | 4 | Infraestructura: config, device, errors, result |
+| 1 | `core/` | 5 | Infraestructura: config, device, errors, result, model_manager |
 | 2 | `persistence/` | 6 | BD: database, project, session, history, fingerprint, chapter |
 | 3 | `parsers/` | 5 | Documentos: base, docx, txt, structure, sanitization |
 | 4 | `entities/` | 4 | Entidades: models, repository, fusion, semantic_fusion |
@@ -204,7 +207,8 @@
 | 12 | `alerts/` | 3 | Alertas: models, engine, repository |
 | 13 | `llm/` | 2 | LLM local: client, expectation_inference |
 | 14 | `pipelines/` | 3 | Orquestación: analysis, unified, export |
-| 15 | `exporters/` | 2 | Reportes: character_sheets, style_guide |
+| 15 | `exporters/` | 4 | Reportes: character_sheets, style_guide, document_exporter, review_report_exporter |
+| 18 | `dictionaries/` | 4 | Diccionario local: models, sources, manager (v0.2.9) |
 | 16 | `cli.py` | 1 | Interfaz de línea de comandos |
 | 17 | `api-server/` | 1 | FastAPI bridge (main.py - 3300+ líneas) |
 
@@ -231,7 +235,7 @@
 - `AlertsView.vue` - Lista alertas
 - `SettingsView.vue` - Configuración
 
-### Componentes (53 total)
+### Componentes (54 total)
 
 | Categoría | Cantidad | Componentes |
 |-----------|----------|-------------|
@@ -304,8 +308,8 @@
 - **Endpoints API**: 33
 
 ### API Server
-- **Líneas de código**: 3,500+ LoC
-- **Endpoints**: 33 (GET, POST, PUT, DELETE)
+- **Líneas de código**: 4,000+ LoC
+- **Endpoints**: 48+ (GET, POST, PUT, DELETE)
 - **Integración backend**: Completa (imports de 20+ módulos)
 
 ---
@@ -589,7 +593,7 @@ cargo tauri build --target x86_64-pc-windows-msvc
 | Register Analysis | `voice/register.py` | Registro lingüístico invisible |
 | Speaker Attribution | `voice/speaker_attribution.py` | Atribución diálogos invisible |
 | Focalization | `focalization/` | Solo alertas genéricas |
-| Emotional Coherence | `analysis/emotional_coherence.py` | Invisible |
+| ~~Emotional Coherence~~ | `analysis/emotional_coherence.py` | ✅ **EmotionalAnalysis.vue (v0.2.9)** |
 | Style Guide Export | `exporters/style_guide.py` | **Stub en frontend** |
 | Interaction Patterns | `interactions/` | Invisible |
 | Spelling/Grammar Highlight | `nlp/orthography/`, `nlp/grammar/` | Solo lista, no marcados en texto |
@@ -876,6 +880,27 @@ El proyecto está funcionalmente completo para un MVP:
 
 ## CHANGELOG Reciente
 
+### v0.2.9 (2026-01-26)
+- Feat: **Informe de revisión detallado** (PDF/DOCX con estadísticas por categoría)
+  - `exporters/review_report_exporter.py`: ReviewReportExporter, ReviewReportOptions, ReviewReportData
+  - API: `/api/projects/{id}/export/review-report` (GET)
+  - API: `/api/projects/{id}/export/review-report/preview` (GET)
+- Feat: **Diccionario local multi-fuente** (100% offline)
+  - `dictionaries/`: models, sources, manager
+  - Fuentes: Wiktionary español, sinónimos/antónimos, diccionario custom
+  - Links externos: RAE DLE, María Moliner, Oxford, WordReference
+  - API: `/api/dictionary/lookup/{word}`, `/api/dictionary/synonyms/{word}`, etc.
+- Feat: **UI Arco emocional completa**
+  - `EmotionalAnalysis.vue`: Timeline visual, estados emocionales, incoherencias
+  - API: `/api/projects/{id}/characters/{name}/emotional-profile`
+
+### v0.2.8 (2026-01-26)
+- Feat: Detector de variantes ortográficas RAE (14º detector)
+- Feat: Soporte para galicismos en detector de extranjerismos (80+ términos franceses)
+- Feat: Typography detector completo (secuencias inválidas, pares sin cerrar, orden comilla/punto)
+- Feat: Anacoluto detector completo (subject_shift implementado)
+- Feat: POV detector completo (focalizer_shift, inconsistent_omniscience)
+
 ### v0.2.7 (2026-01-26)
 - Limpieza de código duplicado y preparación release
 
@@ -907,7 +932,7 @@ El proyecto está funcionalmente completo para un MVP:
 
 ## Estado de Detectores Editoriales
 
-### Detectores Implementados: 13
+### Detectores Implementados: 14
 
 | # | Detector | Módulo | Estado |
 |---|----------|--------|--------|
@@ -919,11 +944,12 @@ El proyecto está funcionalmente completo para un MVP:
 | 6 | Field Terminology | `corrections/detectors/field_terminology.py` | ✅ Funcional |
 | 7 | Clarity | `corrections/detectors/clarity.py` | ✅ Funcional |
 | 8 | Grammar | `corrections/detectors/grammar.py` | ✅ Funcional |
-| 9 | Anglicisms | `corrections/detectors/anglicisms.py` | ✅ Funcional |
+| 9 | **Anglicisms + Galicisms** | `corrections/detectors/anglicisms.py` | ✅ Completo |
 | 10 | Crutch Words | `corrections/detectors/crutch_words.py` | ✅ Funcional |
 | 11 | Glossary | `corrections/detectors/glossary.py` | ✅ Funcional |
 | 12 | **Anacoluto** | `corrections/detectors/anacoluto.py` | ✅ Completo |
 | 13 | **POV** | `corrections/detectors/pov.py` | ✅ Completo |
+| 14 | **Orthographic Variants** | `corrections/detectors/orthographic_variants.py` | ✅ **NUEVO** |
 
 ### Detalle Detectores Avanzados
 
@@ -957,6 +983,29 @@ El proyecto está funcionalmente completo para un MVP:
 | Espacios antes de puntuación | "hola ." | ✅ |
 | Falta espacio después | "hola.mundo" | ✅ |
 | Espacios múltiples | "hola  mundo" | ✅ |
-| **Secuencias inválidas** | `,.` `!?` `??` `..` | ✅ **NUEVO** |
-| **Pares sin cerrar** | `(texto` `«texto` sin cierre | ✅ **NUEVO** |
-| **Orden comilla/punto RAE** | Punto después de comilla de cierre | ✅ **NUEVO** |
+| **Secuencias inválidas** | `,.` `!?` `??` `..` | ✅ |
+| **Pares sin cerrar** | `(texto` `«texto` sin cierre | ✅ |
+| **Orden comilla/punto RAE** | Punto después de comilla de cierre | ✅ |
+
+#### Anglicisms + Galicisms Detector (✅ Completo - v0.2.8)
+
+| Feature | Config | Estado |
+|---------|--------|--------|
+| `check_dictionary` | ✅ | ✅ Detecta 100+ anglicismos con alternativas |
+| `check_morphological` | ✅ | ✅ Detecta patrones (-ing, -ness, -ment) |
+| `check_galicisms` | ✅ | ✅ **NUEVO** - Detecta 80+ galicismos (francés) |
+
+Galicismos detectados: gastronomía (chef, gourmet), moda (chic, boutique), arte (atelier, vernissage), sociedad (savoir-faire, rendez-vous) y más.
+
+#### Orthographic Variants Detector (✅ Completo - v0.2.8)
+
+| Feature | Config | Estado |
+|---------|--------|--------|
+| `check_consonant_groups` | ✅ | ✅ Grupos ps-, obs-, subs- (sicología→psicología) |
+| `check_h_variants` | ✅ | ✅ Variantes con h (armonía/harmonía) |
+| `check_bv_confusion` | ⚠️ | ✅ Confusiones b/v (informativo) |
+| `check_lly_confusion` | ⚠️ | ✅ Confusiones ll/y (informativo) |
+| `check_accent_variants` | ⚠️ | ✅ Variantes acentuales (periodo/período) |
+| `check_loanword_adaptation` | ⚠️ | ✅ Extranjerismos no adaptados (ballet→balé) |
+
+Detecta variantes no preferidas por la RAE y sugiere la forma recomendada. Opciones sensibles (b/v, ll/y) desactivadas por defecto para evitar falsos positivos.

@@ -143,3 +143,4 @@ class CorrectionCategory(Enum):
     GLOSSARY = "glossary"  # Glosario del proyecto
     ANACOLUTO = "anacoluto"  # Anacolutos (rupturas sintácticas)
     POV = "pov"  # Punto de vista narrativo
+    ORTHOGRAPHY = "orthography"  # Variantes ortográficas RAE

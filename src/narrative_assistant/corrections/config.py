@@ -294,7 +294,7 @@ class GrammarConfig:
 
 @dataclass
 class AnglicismsConfig:
-    """Configuración del detector de anglicismos."""
+    """Configuración del detector de extranjerismos (anglicismos y galicismos)."""
 
     enabled: bool = True
 
@@ -303,6 +303,9 @@ class AnglicismsConfig:
 
     # Detectar por patrones morfológicos (-ing, -ness, etc.)
     check_morphological: bool = False  # Por defecto desactivado (muchos falsos positivos)
+
+    # Detectar galicismos (préstamos del francés)
+    check_galicisms: bool = False  # Por defecto desactivado
 
     # Confianza base para detecciones
     base_confidence: float = 0.85
@@ -420,6 +423,34 @@ class POVConfig:
 
 
 @dataclass
+class OrthographicVariantsConfig:
+    """Configuración del detector de variantes ortográficas RAE."""
+
+    enabled: bool = True
+
+    # Detectar simplificación de grupos consonánticos (ps-, obs-, subs-)
+    check_consonant_groups: bool = True
+
+    # Detectar variantes con h (ej: armonía/harmonía)
+    check_h_variants: bool = True
+
+    # Detectar confusiones b/v (informativo, muchas son homófonos válidos)
+    check_bv_confusion: bool = False  # Desactivado por defecto (muchos falsos positivos)
+
+    # Detectar confusiones ll/y (informativo, muchas son homófonos válidos)
+    check_lly_confusion: bool = False  # Desactivado por defecto (muchos falsos positivos)
+
+    # Detectar variantes de acentuación (período/periodo)
+    check_accent_variants: bool = False  # Desactivado por defecto (contexto necesario)
+
+    # Detectar extranjerismos no adaptados (ballet → balé)
+    check_loanword_adaptation: bool = False  # Informativo, muy subjetivo
+
+    # Confianza base
+    base_confidence: float = 0.85
+
+
+@dataclass
 class CorrectionConfig:
     """
     Configuración global de correcciones.
@@ -444,6 +475,7 @@ class CorrectionConfig:
     glossary: GlossaryConfig = field(default_factory=GlossaryConfig)
     anacoluto: AnacolutoConfig = field(default_factory=AnacolutoConfig)
     pov: POVConfig = field(default_factory=POVConfig)
+    orthographic_variants: OrthographicVariantsConfig = field(default_factory=OrthographicVariantsConfig)
 
     # Configuración global
     # Máximo de issues por categoría (para no abrumar)

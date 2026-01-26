@@ -1,7 +1,7 @@
 # Roadmap v2.0 - Narrative Assistant
 
 > **Última actualización**: 2026-01-26
-> **Versión tauri.conf.json**: 0.2.7
+> **Versión tauri.conf.json**: 0.2.9
 
 ---
 
@@ -13,15 +13,17 @@
 |------|--------|
 | **Backend Core** | 103 archivos Python, ~49,000 LoC |
 | **Frontend** | 53 componentes Vue, ~30,000 LoC |
-| **API Server** | 39 endpoints FastAPI |
-| **Detectores Editoriales** | 13 detectores implementados |
-| **Exportación** | DOCX, PDF, JSON, Track Changes |
+| **API Server** | 48+ endpoints FastAPI |
+| **Detectores Editoriales** | 14 detectores implementados |
+| **Exportación** | DOCX, PDF, JSON, Track Changes, Review Reports |
+| **Diccionario Local** | Wiktionary, sinónimos, custom (v0.2.9) |
+| **Arco Emocional** | UI visual completa (v0.2.9) |
 | **Sistema de Licencias** | Implementado |
 | **Tauri Desktop** | Empaquetado listo (sidecar + instalador) |
 
-### Detectores Actuales (13 total)
+### Detectores Actuales (14 total)
 
-1. ✅ **Tipografía** - guiones, comillas, espaciado
+1. ✅ **Tipografía** - guiones, comillas, espaciado, secuencias, pares
 2. ✅ **Repeticiones** - léxicas, inicio de oración, cacofonías
 3. ✅ **Concordancia** - género/número
 4. ✅ **Terminología** - inconsistencias terminológicas
@@ -29,11 +31,12 @@
 6. ✅ **Campo** - terminología especializada
 7. ✅ **Claridad** - oraciones largas, subordinadas
 8. ✅ **Gramática** - leísmo, dequeísmo, queísmo
-9. ✅ **Anglicismos** - extranjerismos innecesarios
+9. ✅ **Extranjerismos** - anglicismos + galicismos (v0.2.8)
 10. ✅ **Muletillas** - sobreuso de palabras (z-score)
 11. ✅ **Glosario** - términos del proyecto
 12. ✅ **Anacolutos** - rupturas sintácticas (completo)
 13. ✅ **POV** - cambios de punto de vista (completo)
+14. ✅ **Variantes ortográficas** - grafías RAE (v0.2.8)
 
 ### Typography - Detecciones Completas (v0.2.8)
 
@@ -70,23 +73,23 @@
 
 ### P1 - Alta Prioridad
 
-| Funcionalidad | Descripción | Complejidad |
-|---------------|-------------|-------------|
-| **Expansión de gazetteer** | Ampliar de ~5,000 a 50,000+ nombres propios (personas, lugares, organizaciones) | Media |
-| **Acceso a diccionarios RAE** | Integrar API del DLE para consultas de definiciones | Media |
-| **Variantes ortográficas RAE** | Detectar cuando se usa variante no preferida (ej: "sicología" vs "psicología") | Fácil |
-| **Informe de revisión detallado** | Generar informe PDF/DOCX con estadísticas de errores por categoría | Fácil |
-| **Secuencias de puntuación inválidas** | Detectar ",." o "!?" mal usados | Fácil |
+| Funcionalidad | Descripción | Complejidad | Estado |
+|---------------|-------------|-------------|--------|
+| **Expansión de gazetteer** | Ampliar de ~5,000 a 50,000+ nombres propios (personas, lugares, organizaciones) | Media | ❌ Pendiente |
+| **Diccionario local** | Definiciones offline (Wiktionary/sinónimos) + links externos RAE/Moliner | Media | ✅ v0.2.9 |
+| **Variantes ortográficas RAE** | Detectar cuando se usa variante no preferida (ej: "sicología" vs "psicología") | Fácil | ✅ v0.2.8 |
+| **Informe de revisión detallado** | Generar informe PDF/DOCX con estadísticas de errores por categoría | Fácil | ✅ v0.2.9 |
+| **Secuencias de puntuación inválidas** | Detectar ",." o "!?" mal usados | Fácil | ✅ v0.2.8 |
 
 ### P2 - Prioridad Media
 
-| Funcionalidad | Descripción | Complejidad |
-|---------------|-------------|-------------|
-| **Conjugador verbal integrado** | Herramienta para consultar conjugaciones sin salir de la app | Media |
-| **Diccionario inverso** | Buscar palabras por terminación (útil para rimas, cacofonías) | Media |
-| **Pares de signos** | Verificar apertura/cierre de comillas, paréntesis, corchetes | Fácil |
-| **Explicaciones didácticas** | Añadir bibliografía RAE/Martínez de Sousa a cada corrección | Media |
-| **Detección de galicismos** | Expandir detector de extranjerismos a francés, italiano | Media |
+| Funcionalidad | Descripción | Complejidad | Estado |
+|---------------|-------------|-------------|--------|
+| **Conjugador verbal integrado** | Herramienta para consultar conjugaciones sin salir de la app | Media | ❌ Pendiente |
+| **Diccionario inverso** | Buscar palabras por terminación (útil para rimas, cacofonías) | Media | ❌ Pendiente |
+| **Pares de signos** | Verificar apertura/cierre de comillas, paréntesis, corchetes | Fácil | ✅ v0.2.8 |
+| **Explicaciones didácticas** | Añadir bibliografía RAE/Martínez de Sousa a cada corrección | Media | ❌ Pendiente |
+| **Detección de galicismos** | Expandir detector de extranjerismos a francés, italiano | Media | ✅ v0.2.8 |
 
 ### P3 - Prioridad Baja
 
@@ -112,11 +115,11 @@
 
 ### P2 - Prioridad Media
 
-| Funcionalidad | Descripción | Complejidad |
-|---------------|-------------|-------------|
-| **UI Arco emocional** | Gráfico de arco emocional del libro (backend ya implementado: `sentiment.py`, `emotional_coherence.py`) | Fácil |
-| **Ontología expandida (200+ clases)** | Clasificar entidades en subcategorías más precisas | Alta |
-| **Detección de fechas y cantidades** | Extraer y normalizar fechas, números, monedas | Media |
+| Funcionalidad | Descripción | Complejidad | Estado |
+|---------------|-------------|-------------|--------|
+| **UI Arco emocional** | Gráfico de arco emocional del libro + API endpoint | Fácil | ✅ v0.2.9 |
+| **Ontología expandida (200+ clases)** | Clasificar entidades en subcategorías más precisas | Alta | ❌ Pendiente |
+| **Detección de fechas y cantidades** | Extraer y normalizar fechas, números, monedas | Media | ❌ Pendiente |
 
 ### P3 - Prioridad Baja
 
@@ -137,8 +140,8 @@
 | **Voice Profiles** | `voice/profiles.py` ✅ | Vista de perfiles de voz |
 | **Register Analysis** | `voice/register.py` ✅ | Indicador de registro lingüístico |
 | **Speaker Attribution** | `voice/speaker_attribution.py` ✅ | Atribución visual en diálogos |
-| **Sentiment Analysis** | `nlp/sentiment.py` ✅ | UI de análisis de sentimiento |
-| **Emotional Coherence** | `emotional_coherence.py` ✅ | Arco emocional visual |
+| **Sentiment Analysis** | `nlp/sentiment.py` ✅ | ✅ EmotionalAnalysis.vue (v0.2.9) |
+| **Emotional Coherence** | `emotional_coherence.py` ✅ | ✅ Arco emocional visual (v0.2.9) |
 | **Interaction Patterns** | `interactions/` ✅ | Panel de patrones de interacción |
 
 ### P2 - Detectores Adicionales
@@ -165,23 +168,24 @@
 
 ### Fase 1: Quick Wins (2 semanas)
 
-| # | Tarea | Tiempo | Origen |
-|---|-------|--------|--------|
-| 1 | Secuencias de puntuación inválidas | 1d | Stilus |
-| 2 | Pares de signos (comillas, paréntesis) | 1d | Stilus |
-| 3 | Variantes ortográficas RAE | 2d | Stilus |
-| 4 | Informe de revisión detallado | 2d | Stilus |
-| 5 | UI para Knowledge Tracking | 3d | Pendiente |
+| # | Tarea | Tiempo | Origen | Estado |
+|---|-------|--------|--------|--------|
+| 1 | Secuencias de puntuación inválidas | 1d | Stilus | ✅ v0.2.8 |
+| 2 | Pares de signos (comillas, paréntesis) | 1d | Stilus | ✅ v0.2.8 |
+| 3 | Variantes ortográficas RAE | 2d | Stilus | ✅ v0.2.8 |
+| 4 | Detección de galicismos | 1d | Stilus | ✅ v0.2.8 |
+| 5 | Informe de revisión detallado | 2d | Stilus | ✅ v0.2.9 |
+| 6 | UI para Knowledge Tracking | 3d | Pendiente | ❌ Pendiente |
 
 ### Fase 2: Valor Diferencial (4 semanas)
 
-| # | Tarea | Tiempo | Origen |
-|---|-------|--------|--------|
-| 6 | Resumen automático por capítulo | 5d | MeaningCloud |
-| 7 | Arco emocional visual | 5d | MeaningCloud |
-| 8 | Expansión gazetteer (+45,000 nombres) | 5d | Stilus |
-| 9 | Integración API DLE (RAE) | 3d | Stilus |
-| 10 | UI para Voice Profiles | 3d | Pendiente |
+| # | Tarea | Tiempo | Origen | Estado |
+|---|-------|--------|--------|--------|
+| 6 | Resumen automático por capítulo | 5d | MeaningCloud | ❌ Pendiente |
+| 7 | Arco emocional visual | 5d | MeaningCloud | ✅ v0.2.9 |
+| 8 | Expansión gazetteer (+45,000 nombres) | 5d | Stilus | ❌ Pendiente |
+| 9 | Diccionario local multi-fuente | 3d | Stilus | ✅ v0.2.9 |
+| 10 | UI para Voice Profiles | 3d | Pendiente | ❌ Pendiente |
 
 ### Fase 3: Profesional (6 semanas)
 
@@ -208,22 +212,50 @@
 
 ## Métricas de Éxito
 
-| Métrica | Actual | Objetivo Fase 2 | Objetivo Fase 4 |
-|---------|--------|-----------------|-----------------|
-| Tipos de corrección | 12 | 18 | 25 |
+| Métrica | Actual (v0.2.9) | Objetivo Fase 2 | Objetivo Fase 4 |
+|---------|-----------------|-----------------|-----------------|
+| Tipos de corrección | 14 | 18 | 25 |
 | Entidades en gazetteer | ~5,000 | 50,000 | 100,000 |
 | Precisión gramática | ~80% | 85% | 90% |
 | Tiempo análisis 100 págs | ~30s | ~25s | ~20s |
-| Categorías de alerta | 13 | 16 | 20 |
+| Categorías de alerta | 14 | 16 | 20 |
+| Endpoints API | 48+ | 55 | 70 |
+| Componentes Vue | 54+ | 60 | 75 |
 
 ---
 
 ## Decisiones Técnicas
 
-### Integración RAE
-- Usar API oficial del DLE si está disponible
-- Alternativa: scraping con cache local (respetando términos de uso)
-- Cache de consultas para modo offline
+### Integración Diccionario (100% Offline) ✅ v0.2.9
+- **Decisión**: Diccionario local descargable (NO consultas online)
+- **Fuentes implementadas**:
+  - Wiktionary español (SQLite)
+  - Diccionario de sinónimos/antónimos (SQLite)
+  - Diccionario personalizado del usuario (JSON)
+- **Links externos** (para consulta manual): RAE DLE, María Moliner, Oxford, WordReference
+- Cache en `~/.narrative_assistant/dictionaries/`
+- **API endpoints**: `/api/dictionary/lookup/{word}`, `/api/dictionary/synonyms/{word}`, etc.
+- Alineado con política de privacidad: manuscritos NUNCA salen de la máquina
+
+### Informe de Revisión Detallado ✅ v0.2.9
+- **Formatos**: PDF (reportlab) y DOCX (python-docx)
+- **Estadísticas incluidas**:
+  - Errores por categoría (gráfico de barras)
+  - Distribución por capítulo
+  - Distribución por confianza
+  - Top errores más frecuentes
+- **Recomendaciones automáticas** según patrones detectados
+- **API endpoints**: `/api/projects/{id}/export/review-report`
+
+### Arco Emocional Visual ✅ v0.2.9
+- **Backend**: `nlp/sentiment.py` + `analysis/emotional_coherence.py`
+- **Frontend**: `EmotionalAnalysis.vue` con timeline visual
+- **Características**:
+  - Evolución emocional por capítulo
+  - Estados emocionales declarados
+  - Detección de incoherencias emocionales
+  - Sugerencias de corrección
+- **API endpoint**: `/api/projects/{id}/characters/{name}/emotional-profile`
 
 ### Resumen con LLM
 - Usar Ollama local (qwen2.5 o mistral)
@@ -246,4 +278,4 @@
 
 ---
 
-*Documento generado: 2026-01-23*
+*Documento actualizado: 2026-01-26*
