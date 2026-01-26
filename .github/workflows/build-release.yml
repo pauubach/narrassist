@@ -29,7 +29,7 @@ jobs:
         run: |
           curl -o get-pip.py https://bootstrap.pypa.io/get-pip.py
           .\python.exe get-pip.py
-          .\Scripts\pip.exe install --upgrade pip setuptools wheel
+          .\python.exe -m pip install --upgrade pip setuptools wheel
           Remove-Item get-pip.py
       
       - name: Build Backend Bundle

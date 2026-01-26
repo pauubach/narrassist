@@ -96,11 +96,47 @@ def _extract_knowledge_facts(self, text, characters, mode=None):
 | `/api/projects/{id}/voice-profiles` | ✅ | Perfiles de voz completos |
 | `/api/projects/{id}/register-analysis` | ✅ | Análisis de registro con cambios |
 | `/api/projects/{id}/chapters/{num}/dialogue-attributions` | ✅ | Atribución de diálogos |
+| `/api/projects/{id}/characters/{charId}/knowledge` | ✅ | Conocimiento del personaje (RULES/LLM/HYBRID) |
 | `/api/projects/{id}/entities/{entityId}/coreference` | ⚠️ Pendiente | Votación correferencia |
 | `/api/projects/{id}/focalization` | ⚠️ Pendiente | Estado focalización |
 | `/api/projects/{id}/focalization/declare` | ⚠️ Pendiente | Declarar POV |
-| `/api/projects/{id}/characters/{charId}/knowledge` | ⚠️ Pendiente | Red de conocimiento |
 | `/api/projects/{id}/interactions` | ⚠️ Pendiente | Patrones interacción |
+
+### 0.6 Integración Frontend (Recomendaciones de Expertos)
+
+> **Actualizado**: 2026-01-26 tras revisión de arquitectura Vue
+
+#### Componentes a Crear/Extender
+
+| Componente | Ubicación | Propósito |
+|------------|-----------|-----------|
+| **VoiceProfile.vue** | CharacterSheet | Métricas de voz del personaje |
+| **CharacterKnowledgeAnalysis.vue** | CharacterSheet | Lo que sabe el personaje |
+| **RegisterAnalysisTab.vue** | StyleTab (nuevo tab) | Análisis registro narrativo |
+| **DialogueAttributionView.vue** | TextTab (opcional) | Atribución de hablantes |
+
+#### Store a Crear
+
+Crear `frontend/src/stores/voiceAndStyle.ts`:
+- `fetchVoiceProfiles(projectId)`
+- `fetchRegisterAnalysis(projectId, minSeverity)`
+- `fetchDialogueAttributions(projectId, chapterNum)`
+- `fetchCharacterKnowledge(projectId, characterId, mode)`
+
+#### Patrón a Seguir
+
+```typescript
+// Composables para UI logic
+// frontend/src/composables/useVoiceAnalysis.ts
+export function useVoiceAnalysis(projectId: number, characterId: number) {
+  const store = useVoiceAndStyleStore()
+  // ...
+}
+```
+
+Integrar en:
+1. **CharacterSheet.vue** → añadir secciones VoiceProfile y CharacterKnowledge
+2. **StyleTab.vue** → añadir TabPanel "Registro Narrativo"
 
 ---
 

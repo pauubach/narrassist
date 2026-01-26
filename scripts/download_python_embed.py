@@ -47,21 +47,27 @@ def download_windows_embed(target_dir: Path):
         # Eliminar zip
         zip_path.unlink()
         
-        # Configurar archivo _pth para habilitar site-packages
+        # Configurar archivo _pth para habilitar site-packages y Scripts
         python_major_minor = PYTHON_VERSION.rsplit('.', 1)[0].replace('.', '')
         pth_files = list(target_dir.glob("python*._pth"))
         if pth_files:
             pth_file = pth_files[0]
             print(f"Configurando {pth_file.name}...")
             
-            content = pth_file.read_text()
-            if "import site" not in content:
-                # Uncomment or add "import site"
-                content = content.replace("# import site", "import site")
-                if "import site" not in content:
-                    content += "\nimport site\n"
-                pth_file.write_text(content)
-                print("[OK] Habilitado import site para pip")
+            # Crear contenido limpio con todas las rutas necesarias
+            content_lines = [
+                f"python{python_major_minor}.zip",
+                ".",
+                "DLLs",
+                "Lib",
+                "Lib/site-packages",
+                "Scripts",  # Necesario para que encuentre pip
+                "",
+                "# Habilitar site-packages y pip",
+                "import site"
+            ]
+            pth_file.write_text("\n".join(content_lines))
+            print("[OK] Configurado _pth con Scripts y site-packages")
         
         # Verificar python.exe
         python_exe = target_dir / "python.exe"
@@ -137,13 +143,31 @@ def download_macos_framework(target_dir: Path):
             
             # Extraer con cpio en su propio directorio
             result = subprocess.run(
-                f"cd '{payload_extract_dir}' && cat '{payload}' | gunzip -dc | cpio -id 2>/dev/null",
+                f"cd '{payload_extract_dir}' && cat '{payload}' | gunzip -dc | cpio -id 2>&1",
                 shell=True,
                 capture_output=True,
                 text=True
             )
             
-            # Buscar Python.framework en múltiples ubicaciones posibles
+            # Debug: listar contenido extraido
+            print(f"  Contenido extraido en {payload_extract_dir}:")
+            for item in payload_extract_dir.rglob("*"):
+                if "Python" in item.name or "framework" in item.name.lower():
+                    print(f"    - {item.relative_to(payload_extract_dir)}")
+            
+            # Buscar Python.framework recursivamente en todo el directorio
+            frameworks_found = list(payload_extract_dir.rglob("Python.framework"))
+            if frameworks_found:
+                framework_src = frameworks_found[0]
+                framework_dst = target_dir / "Python.framework"
+                if framework_dst.exists():
+                    shutil.rmtree(framework_dst)
+                shutil.move(str(framework_src), str(framework_dst))
+                print(f"[OK] Python.framework extraido desde {framework_src}")
+                framework_extracted = True
+                break
+            
+            # Buscar en ubicaciones específicas si rglob no encuentra nada
             possible_locations = [
                 payload_extract_dir / "Library" / "Frameworks" / "Python.framework",
                 payload_extract_dir / "Python.framework",
