@@ -11,6 +11,7 @@ CORS: Habilitado para localhost:5173 (Vite dev server) y tauri://localhost
 
 # CRITICAL: Add user site-packages to sys.path BEFORE any imports
 # This must be the FIRST thing that runs to allow PyInstaller bundle to find system packages
+import os
 import sys
 
 # CRITICAL: Write early debug info FIRST
@@ -45,12 +46,14 @@ _write_debug(f"sys.frozen: {getattr(sys, 'frozen', False)}")
 _write_debug(f"sys.path initial (first 3): {sys.path[:3]}")
 
 import site
-import os
 import shutil
 from pathlib import Path
 
 # Setup logging IMMEDIATELY for early debugging
 import logging
+
+BACKEND_VERSION = "0.3.1"
+IS_EMBEDDED_RUNTIME = os.environ.get("NA_EMBEDDED") == "1" or "python-embed" in (sys.executable or "").lower()
 
 # Configure logging FIRST before using any loggers
 def _setup_early_logging():
@@ -85,7 +88,7 @@ def _setup_early_logging():
 _log_file = _setup_early_logging()
 _early_logger = logging.getLogger(__name__)
 _early_logger.info("="*80)
-_early_logger.info("BACKEND STARTING - v0.2.8 DEBUG")
+_early_logger.info(f"BACKEND STARTING - v{BACKEND_VERSION} DEBUG")
 _early_logger.info(f"Python executable: {sys.executable}")
 _early_logger.info(f"Frozen: {getattr(sys, 'frozen', False)}")
 if _log_file:
@@ -108,7 +111,7 @@ try:
         _early_logger.info(f"✓ Added user site-packages to sys.path")
     
     # Detect if we're using embedded Python (check if python-embed is in executable path)
-    using_embedded_python = 'python-embed' in sys.executable.lower()
+    using_embedded_python = IS_EMBEDDED_RUNTIME
     
     if using_embedded_python:
         _write_debug("Detected embedded Python - skipping Anaconda detection")
@@ -187,7 +190,7 @@ alert_repository = None
 chapter_repository = None
 section_repository = None
 get_config = None
-NA_VERSION = "unknown"
+NA_VERSION = BACKEND_VERSION
 Database = None
 MODULES_LOADED = False
 MODULES_ERROR = None
@@ -222,7 +225,7 @@ if not getattr(sys, 'frozen', False):
         _logging.warning(f"NLP modules not loaded: {type(e).__name__}: {e}")
         _logging.info("Server will start in limited mode. Install dependencies via /api/models/download")
         MODULES_ERROR = str(e)
-        NA_VERSION = "0.2.9"
+        NA_VERSION = BACKEND_VERSION
 else:
     # Frozen (production) - load on demand only
     # Note: In PyInstaller frozen mode, we cannot load narrative_assistant modules
@@ -231,7 +234,7 @@ else:
     # but backend will run in limited mode (no NLP features in frozen bundle)
     _write_debug("Frozen mode: backend will run in API-only mode")
     _write_debug("NLP dependencies should be installed by user but backend operates in limited mode")
-    NA_VERSION = "0.2.9"
+    NA_VERSION = BACKEND_VERSION
 
 # Logging already configured at the top of the file in _setup_early_logging()
 logger = logging.getLogger(__name__)
@@ -355,6 +358,11 @@ def find_python_executable() -> tuple[str | None, str | None, str | None]:
         - Si se encuentra Python valido: (path, version, None)
         - Si no se encuentra: (None, None, error_message)
     """
+    if IS_EMBEDDED_RUNTIME:
+        version_info = sys.version_info
+        version_str = f"{version_info.major}.{version_info.minor}.{version_info.micro}"
+        return sys.executable, version_str, None
+
     import subprocess
     import re
 

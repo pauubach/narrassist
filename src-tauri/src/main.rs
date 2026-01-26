@@ -3,13 +3,15 @@
 
 mod menu;
 
+use std::io::{BufRead, BufReader};
+use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex};
+use std::thread;
 use tauri::{AppHandle, Emitter, Manager, State};
-use tauri_plugin_shell::process::CommandChild;
 
 /// Estado compartido del servidor backend
 struct BackendServer {
-    child: Arc<Mutex<Option<CommandChild>>>,
+    child: Arc<Mutex<Option<Child>>>,
 }
 
 impl BackendServer {
@@ -52,55 +54,31 @@ async fn start_backend_server(
     // En modo desarrollo, indicar que se debe iniciar manualmente
     #[cfg(debug_assertions)]
     {
-        println!("[Setup] Development mode: start backend manually with 'python api-server/main.py'");
+        println!(
+            "[Setup] Development mode: start backend manually with 'python api-server/main.py'"
+        );
         return Ok("Development mode: start backend manually".to_string());
     }
 
     // En modo release, usar el sidecar
     #[cfg(not(debug_assertions))]
     {
-        use tauri_plugin_shell::ShellExt;
+        let mut child = spawn_embedded_backend(&_app)?;
 
-        // Obtener el comando del sidecar
-        let sidecar_command = _app
-            .shell()
-            .sidecar("narrative-assistant-server")
-            .map_err(|e| format!("Failed to get sidecar command: {}", e))?;
+        if let Some(stdout) = child.stdout.take() {
+            spawn_output_logger(stdout, "stdout");
+        }
 
-        // Ejecutar el sidecar
-        let (mut rx, child) = sidecar_command
-            .spawn()
-            .map_err(|e| format!("Failed to spawn sidecar: {}", e))?;
+        if let Some(stderr) = child.stderr.take() {
+            spawn_output_logger(stderr, "stderr");
+        }
 
-        // Guardar el proceso hijo
         {
             let mut child_lock = server_state.child.lock().unwrap();
             *child_lock = Some(child);
         }
 
-        // Spawn una tarea para leer la salida del servidor
-        tauri::async_runtime::spawn(async move {
-            while let Some(event) = rx.recv().await {
-                match event {
-                    tauri_plugin_shell::process::CommandEvent::Stdout(line) => {
-                        println!("[Backend] {}", String::from_utf8_lossy(&line));
-                    }
-                    tauri_plugin_shell::process::CommandEvent::Stderr(line) => {
-                        eprintln!("[Backend] {}", String::from_utf8_lossy(&line));
-                    }
-                    tauri_plugin_shell::process::CommandEvent::Error(error) => {
-                        eprintln!("[Backend Error] {}", error);
-                    }
-                    tauri_plugin_shell::process::CommandEvent::Terminated(payload) => {
-                        println!("[Backend] Process terminated with code: {:?}", payload.code);
-                        break;
-                    }
-                    _ => {}
-                }
-            }
-        });
-
-        // Esperar un poco para que el servidor inicie
+        // Esperar un momento para que el servidor arranque
         tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
 
         Ok("Backend server started successfully".to_string())
@@ -112,12 +90,11 @@ async fn start_backend_server(
 async fn stop_backend_server(server_state: State<'_, BackendServer>) -> Result<String, String> {
     let mut child_lock = server_state.child.lock().unwrap();
 
-    if let Some(child) = child_lock.take() {
-        // CommandChild.kill() toma ownership y devuelve Result<(), Error>
+    if let Some(mut child) = child_lock.take() {
         child
             .kill()
             .map_err(|e| format!("Failed to kill backend server: {}", e))?;
-
+        let _ = child.wait();
         Ok("Backend server stopped successfully".to_string())
     } else {
         Ok("Backend server was not running".to_string())
@@ -142,7 +119,6 @@ async fn check_backend_health() -> Result<bool, String> {
 
 fn main() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_shell::init())
         .manage(BackendServer::new())
         .invoke_handler(tauri::generate_handler![
             start_backend_server,
@@ -168,18 +144,24 @@ fn main() {
                     Ok(msg) => {
                         println!("[Setup] {}", msg);
                         // Emitir evento al frontend indicando que el backend está listo
-                        let _ = app_handle.emit("backend-status", serde_json::json!({
-                            "status": "running",
-                            "message": msg
-                        }));
-                    },
+                        let _ = app_handle.emit(
+                            "backend-status",
+                            serde_json::json!({
+                                "status": "running",
+                                "message": msg
+                            }),
+                        );
+                    }
                     Err(e) => {
                         eprintln!("[Setup Error] Failed to start backend: {}", e);
                         // Emitir evento de error al frontend
-                        let _ = app_handle.emit("backend-status", serde_json::json!({
-                            "status": "error",
-                            "message": format!("Error iniciando servidor: {}", e)
-                        }));
+                        let _ = app_handle.emit(
+                            "backend-status",
+                            serde_json::json!({
+                                "status": "error",
+                                "message": format!("Error iniciando servidor: {}", e)
+                            }),
+                        );
                     }
                 }
             });
@@ -200,4 +182,102 @@ fn main() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(not(debug_assertions))]
+fn spawn_embedded_backend(app: &AppHandle) -> Result<Child, String> {
+    let path_resolver = app.path();
+
+    let resource_dir = path_resolver
+        .resource_dir()
+        .map_err(|e| format!("No se encontro el directorio de recursos: {}", e))?;
+
+    let backend_root = resource_dir.join("binaries").join("backend");
+
+    let backend_api_dir = backend_root.join("api-server");
+    let main_py = backend_api_dir.join("main.py");
+    if !main_py.exists() {
+        return Err(format!(
+            "Archivo main.py no encontrado en {}",
+            main_py.display()
+        ));
+    }
+
+    let python_dir = resource_dir.join("binaries").join("python-embed");
+
+    let python_path = if cfg!(target_os = "windows") {
+        python_dir.join("python.exe")
+    } else {
+        // En macOS el script crea un symlink python3
+        let candidate = python_dir.join("python3");
+        if candidate.exists() {
+            candidate
+        } else {
+            python_dir.join("bin/python3")
+        }
+    };
+
+    if !python_path.exists() {
+        return Err(format!(
+            "Python embebido no encontrado en {}",
+            python_path.display()
+        ));
+    }
+
+    let path_separator = if cfg!(target_os = "windows") {
+        ";"
+    } else {
+        ":"
+    };
+    let mut python_path_env = format!(
+        "{}{}{}",
+        backend_root.display(),
+        path_separator,
+        backend_api_dir.display()
+    );
+
+    if let Ok(existing) = std::env::var("PYTHONPATH") {
+        if !existing.is_empty() {
+            python_path_env.push_str(path_separator);
+            python_path_env.push_str(&existing);
+        }
+    }
+
+    let mut command = Command::new(&python_path);
+    command
+        .arg(&main_py)
+        .current_dir(&backend_api_dir)
+        .env("PYTHONPATH", python_path_env)
+        .env("PYTHONHOME", &python_dir)
+        .env("NA_EMBEDDED", "1")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    command
+        .spawn()
+        .map_err(|e| format!("Failed to spawn backend process: {}", e))
+}
+
+fn spawn_output_logger<T>(reader: T, label: &'static str)
+where
+    T: std::io::Read + Send + 'static,
+{
+    thread::spawn(move || {
+        let buf_reader = BufReader::new(reader);
+        for line in buf_reader.lines() {
+            match line {
+                Ok(content) => {
+                    if label == "stderr" {
+                        eprintln!("[Backend {}] {}", label, content);
+                    } else {
+                        println!("[Backend {}] {}", label, content);
+                    }
+                }
+                Err(err) => {
+                    eprintln!("[Backend {}] Error leyendo salida: {}", label, err);
+                    break;
+                }
+            }
+        }
+    });
 }

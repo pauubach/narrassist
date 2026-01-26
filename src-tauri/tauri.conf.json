@@ -12,9 +12,6 @@
   "bundle": {
     "active": true,
     "targets": ["nsis", "dmg"],
-    "externalBin": [
-      "binaries/start-backend"
-    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -23,13 +20,8 @@
       "icons/icon.ico"
     ],
     "resources": [
-      "binaries/python-embed/**",
-      "binaries/backend/**",
-      "binaries/start-backend.bat",
-      "binaries/start-backend.sh",
-      "binaries/start-backend-x86_64-pc-windows-msvc.exe",
-      "binaries/start-backend-aarch64-apple-darwin",
-      "binaries/start-backend-x86_64-apple-darwin"
+      "binaries/python-embed",
+      "binaries/backend"
     ],
     "windows": {
       "certificateThumbprint": null,
@@ -50,12 +42,7 @@
       }
     },
     "longDescription": "Herramienta de asistencia a correctores literarios profesionales para detectar inconsistencias en manuscritos de ficción.",
-    "shortDescription": "Asistente de corrección narrativa",
-    "linux": {
-      "deb": {
-        "depends": ["python3", "python3-pip"]
-      }
-    }
+    "shortDescription": "Asistente de corrección narrativa"
   },
   "app": {
     "windows": [
@@ -71,11 +58,6 @@
     ],
     "security": {
       "csp": "default-src 'self'; connect-src 'self' http://localhost:8008; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'"
-    }
-  },
-  "plugins": {
-    "shell": {
-      "open": true
     }
   }
 }

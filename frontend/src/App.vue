@@ -4,8 +4,13 @@
     <a href="#main-content" class="skip-link">
       Saltar al contenido principal
     </a>
-    <MenuBar />
-    <main id="main-content" class="app-content" role="main" aria-label="Contenido principal">
+    <MenuBar v-if="hasMenuBar" />
+    <main
+      id="main-content"
+      :class="['app-content', { 'app-content--with-menubar': hasMenuBar }]"
+      role="main"
+      aria-label="Contenido principal"
+    >
       <Toast position="top-right" aria-live="polite" />
       <RouterView />
     </main>
@@ -32,7 +37,7 @@
 
 <script setup lang="ts">
 import { RouterView } from 'vue-router'
-import { onMounted, ref, watch } from 'vue'
+import { onMounted, ref, watch, computed } from 'vue'
 import Toast from 'primevue/toast'
 import { useAppStore } from '@/stores/app'
 import { useThemeStore } from '@/stores/theme'
@@ -52,6 +57,9 @@ const showShortcutsHelp = ref(false)
 const showAbout = ref(false)
 const showTutorial = ref(false)
 const showUserGuide = ref(false)
+const isTauri = ref(false)
+
+const hasMenuBar = computed(() => !isTauri.value)
 
 // Activar atajos de teclado globales
 useKeyboardShortcuts()
@@ -100,6 +108,8 @@ const openTutorial = () => {
 }
 
 onMounted(() => {
+  isTauri.value = typeof window !== 'undefined' && '__TAURI__' in window
+
   console.log('Narrative Assistant UI - v0.4.0')
   console.log('Vue 3.5 + PrimeVue 4')
   console.log(`Tema: ${appStore.theme} | Modo oscuro: ${appStore.isDark}`)
@@ -182,10 +192,13 @@ onMounted(() => {
 
 .app-content {
   flex: 1;
-  margin-top: 32px; /* Height of MenuBar */
   overflow: hidden;
   display: flex;
   flex-direction: column;
   background-color: var(--p-surface-ground);
+}
+
+.app-content--with-menubar {
+  margin-top: 32px;
 }
 </style>
