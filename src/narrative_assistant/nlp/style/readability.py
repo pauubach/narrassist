@@ -6,11 +6,14 @@ Implementa métricas de legibilidad adaptadas al español:
 - Escala INFLESZ (interpretación española)
 - Índice Fernández-Huerta
 - Estadísticas básicas (oraciones, palabras, sílabas)
+- Métricas de legibilidad por edad para literatura infantil/juvenil
 
 Referencias:
 - Szigriszt Pazos, F. (1993). Sistemas predictivos de legibilidad del mensaje escrito.
 - Fernández Huerta, J. (1959). Medidas sencillas de lecturabilidad.
 - Barrio-Cantalejo, I.M. et al. (2008). Validación de la Escala INFLESZ.
+- Fry, E. (1968). A readability formula that saves time.
+- Dale, E. & Chall, J.S. (1948). A formula for predicting readability.
 """
 
 import logging
@@ -65,6 +68,103 @@ class ReadabilityLevel(Enum):
     FAIRLY_DIFFICULT = "fairly_difficult"  # Algo difícil (26-39)
     DIFFICULT = "difficult"            # Difícil (11-25)
     VERY_DIFFICULT = "very_difficult"  # Muy difícil (0-10)
+
+
+class AgeGroup(Enum):
+    """Grupos de edad para literatura infantil/juvenil."""
+    BOARD_BOOK = "board_book"          # INF_BB: 0-3 años
+    PICTURE_BOOK = "picture_book"      # INF_PB: 3-5 años
+    EARLY_READER = "early_reader"      # INF_ER: 5-8 años
+    CHAPTER_BOOK = "chapter_book"      # INF_CB: 6-10 años
+    MIDDLE_GRADE = "middle_grade"      # INF_MG: 8-12 años
+    YOUNG_ADULT = "young_adult"        # INF_YA: 12+ años
+    ADULT = "adult"                    # Adulto
+
+
+# Palabras de alta frecuencia en español para primeros lectores
+# Basado en listas de vocabulario básico español
+SPANISH_SIGHT_WORDS = {
+    # Artículos
+    "el", "la", "los", "las", "un", "una", "unos", "unas",
+    # Pronombres
+    "yo", "tú", "él", "ella", "nosotros", "ellos", "ellas", "me", "te", "se", "nos",
+    # Verbos básicos
+    "es", "está", "son", "hay", "tiene", "va", "ve", "come", "bebe", "duerme",
+    "juega", "corre", "salta", "lee", "escribe", "habla", "quiere", "puede",
+    "hace", "dice", "sabe", "viene", "sale", "entra", "mira", "oye",
+    # Conectores simples
+    "y", "o", "pero", "que", "si", "no", "sí", "con", "sin", "para",
+    # Preposiciones
+    "de", "a", "en", "por", "sobre", "bajo", "entre", "hasta", "desde",
+    # Adverbios básicos
+    "muy", "más", "menos", "bien", "mal", "aquí", "allí", "ahora", "hoy",
+    "ya", "también", "siempre", "nunca", "después", "antes",
+    # Adjetivos básicos
+    "grande", "pequeño", "bueno", "malo", "bonito", "feo", "nuevo", "viejo",
+    "alto", "bajo", "largo", "corto", "gordo", "flaco", "feliz", "triste",
+    # Sustantivos básicos
+    "casa", "mamá", "papá", "niño", "niña", "perro", "gato", "agua",
+    "sol", "luna", "día", "noche", "amigo", "escuela", "libro",
+    # Números
+    "uno", "dos", "tres", "cuatro", "cinco", "seis", "siete", "ocho", "nueve", "diez",
+    # Colores
+    "rojo", "azul", "verde", "amarillo", "blanco", "negro", "rosa",
+    # Preguntas
+    "qué", "quién", "cómo", "dónde", "cuándo", "por qué", "cuánto",
+}
+
+
+# Umbrales por grupo de edad
+AGE_GROUP_THRESHOLDS = {
+    AgeGroup.BOARD_BOOK: {
+        "max_words": 300,
+        "max_words_per_sentence": 5,
+        "max_syllables_per_word": 2.0,
+        "min_sight_word_ratio": 0.7,
+        "age_range": "0-3 años",
+        "grade": "Pre-escolar",
+    },
+    AgeGroup.PICTURE_BOOK: {
+        "max_words": 1000,
+        "max_words_per_sentence": 8,
+        "max_syllables_per_word": 2.2,
+        "min_sight_word_ratio": 0.5,
+        "age_range": "3-5 años",
+        "grade": "Educación Infantil",
+    },
+    AgeGroup.EARLY_READER: {
+        "max_words": 5000,
+        "max_words_per_sentence": 12,
+        "max_syllables_per_word": 2.4,
+        "min_sight_word_ratio": 0.4,
+        "age_range": "5-8 años",
+        "grade": "1º-2º Primaria",
+    },
+    AgeGroup.CHAPTER_BOOK: {
+        "max_words": 15000,
+        "max_words_per_sentence": 15,
+        "max_syllables_per_word": 2.6,
+        "min_sight_word_ratio": 0.3,
+        "age_range": "6-10 años",
+        "grade": "2º-4º Primaria",
+    },
+    AgeGroup.MIDDLE_GRADE: {
+        "max_words": 50000,
+        "max_words_per_sentence": 20,
+        "max_syllables_per_word": 2.8,
+        "min_sight_word_ratio": 0.2,
+        "age_range": "8-12 años",
+        "grade": "4º-6º Primaria",
+    },
+    AgeGroup.YOUNG_ADULT: {
+        "max_words": 80000,
+        "max_words_per_sentence": 25,
+        "max_syllables_per_word": 3.0,
+        "min_sight_word_ratio": 0.1,
+        "age_range": "12+ años",
+        "grade": "ESO",
+    },
+}
 
 
 @dataclass
@@ -153,6 +253,89 @@ class ReadabilityReport:
             "recommendations": self.recommendations,
             "target_audience": self.target_audience,
         }
+
+
+@dataclass
+class AgeReadabilityReport:
+    """Reporte de legibilidad adaptado a grupos de edad infantil/juvenil."""
+
+    # Grupo de edad estimado
+    estimated_age_group: AgeGroup = AgeGroup.ADULT
+    estimated_age_range: str = ""
+    estimated_grade_level: str = ""
+
+    # Métricas base (del análisis general)
+    flesch_szigriszt: float = 0.0
+    total_words: int = 0
+    total_sentences: int = 0
+    avg_words_per_sentence: float = 0.0
+    avg_syllables_per_word: float = 0.0
+
+    # Métricas específicas de edad
+    sight_word_count: int = 0
+    sight_word_ratio: float = 0.0
+    unique_words: int = 0
+    vocabulary_diversity: float = 0.0  # unique_words / total_words
+    simple_words_ratio: float = 0.0    # Palabras de 1-2 sílabas
+    complex_words_ratio: float = 0.0   # Palabras de 4+ sílabas
+
+    # Repetición (importante para primeros lectores)
+    repetition_score: float = 0.0      # Mayor = más repetición (bueno para niños pequeños)
+    most_repeated_words: list[tuple[str, int]] = field(default_factory=list)
+
+    # Evaluación de adecuación
+    is_appropriate: bool = True
+    appropriateness_score: float = 100.0  # 0-100
+    issues: list[str] = field(default_factory=list)
+    recommendations: list[str] = field(default_factory=list)
+
+    # Comparación con grupo objetivo (si se especifica)
+    target_age_group: Optional[AgeGroup] = None
+    target_comparison: dict = field(default_factory=dict)
+
+    def to_dict(self) -> dict:
+        """Convertir a diccionario."""
+        result = {
+            "estimated_age_group": self.estimated_age_group.value,
+            "estimated_age_range": self.estimated_age_range,
+            "estimated_grade_level": self.estimated_grade_level,
+            "metrics": {
+                "flesch_szigriszt": round(self.flesch_szigriszt, 2),
+                "total_words": self.total_words,
+                "total_sentences": self.total_sentences,
+                "avg_words_per_sentence": round(self.avg_words_per_sentence, 2),
+                "avg_syllables_per_word": round(self.avg_syllables_per_word, 2),
+            },
+            "vocabulary": {
+                "sight_word_count": self.sight_word_count,
+                "sight_word_ratio": round(self.sight_word_ratio, 3),
+                "unique_words": self.unique_words,
+                "vocabulary_diversity": round(self.vocabulary_diversity, 3),
+                "simple_words_ratio": round(self.simple_words_ratio, 3),
+                "complex_words_ratio": round(self.complex_words_ratio, 3),
+            },
+            "repetition": {
+                "score": round(self.repetition_score, 2),
+                "most_repeated": [
+                    {"word": w, "count": c}
+                    for w, c in self.most_repeated_words[:10]
+                ],
+            },
+            "evaluation": {
+                "is_appropriate": self.is_appropriate,
+                "appropriateness_score": round(self.appropriateness_score, 1),
+                "issues": self.issues,
+                "recommendations": self.recommendations,
+            },
+        }
+
+        if self.target_age_group:
+            result["target_comparison"] = {
+                "target_age_group": self.target_age_group.value,
+                **self.target_comparison,
+            }
+
+        return result
 
 
 # =============================================================================
@@ -491,3 +674,321 @@ class ReadabilityAnalyzer:
             if result.is_success:
                 results[title] = result.value
         return results
+
+    def analyze_for_age(
+        self,
+        text: str,
+        target_age_group: Optional[AgeGroup] = None,
+    ) -> Result[AgeReadabilityReport]:
+        """
+        Analizar legibilidad orientada a grupos de edad infantil/juvenil.
+
+        Proporciona métricas específicas para literatura infantil como:
+        - Proporción de palabras de alta frecuencia (sight words)
+        - Complejidad del vocabulario
+        - Patrones de repetición
+        - Estimación de edad lectora
+
+        Args:
+            text: Texto a analizar
+            target_age_group: Grupo de edad objetivo (opcional, para comparación)
+
+        Returns:
+            Result con AgeReadabilityReport
+        """
+        if not text or not text.strip():
+            return Result.success(AgeReadabilityReport())
+
+        try:
+            # Primero, análisis base de legibilidad
+            base_result = self.analyze(text)
+            if base_result.is_failure:
+                return Result.failure(base_result.error)
+
+            base_report = base_result.value
+
+            # Extraer palabras
+            words = re.findall(r'\b[a-záéíóúüñA-ZÁÉÍÓÚÜÑ]+\b', text.lower())
+            total_words = len(words)
+
+            if total_words == 0:
+                return Result.success(AgeReadabilityReport())
+
+            # Contar sight words
+            sight_word_count = sum(1 for w in words if w in SPANISH_SIGHT_WORDS)
+            sight_word_ratio = sight_word_count / total_words
+
+            # Vocabulario único y diversidad
+            word_counts = {}
+            for w in words:
+                word_counts[w] = word_counts.get(w, 0) + 1
+
+            unique_words = len(word_counts)
+            vocabulary_diversity = unique_words / total_words
+
+            # Clasificar por complejidad silábica
+            simple_words = 0  # 1-2 sílabas
+            complex_words = 0  # 4+ sílabas
+
+            for word in words:
+                syllables = count_syllables_spanish(word)
+                if syllables <= 2:
+                    simple_words += 1
+                elif syllables >= 4:
+                    complex_words += 1
+
+            simple_words_ratio = simple_words / total_words
+            complex_words_ratio = complex_words / total_words
+
+            # Calcular score de repetición (mayor = más repetición)
+            # Útil para libros infantiles donde la repetición es deseable
+            if unique_words > 0:
+                repetition_score = (total_words - unique_words) / total_words * 100
+            else:
+                repetition_score = 0
+
+            # Palabras más repetidas (excluyendo sight words básicas)
+            content_word_counts = {
+                w: c for w, c in word_counts.items()
+                if c > 1 and len(w) > 2
+            }
+            most_repeated = sorted(
+                content_word_counts.items(),
+                key=lambda x: x[1],
+                reverse=True
+            )[:15]
+
+            # Estimar grupo de edad
+            estimated_age_group = self._estimate_age_group(
+                flesch_score=base_report.flesch_szigriszt,
+                avg_words_per_sentence=base_report.avg_words_per_sentence,
+                avg_syllables_per_word=base_report.avg_syllables_per_word,
+                sight_word_ratio=sight_word_ratio,
+                total_words=total_words,
+            )
+
+            thresholds = AGE_GROUP_THRESHOLDS.get(estimated_age_group, {})
+            estimated_age_range = thresholds.get("age_range", "Adulto")
+            estimated_grade_level = thresholds.get("grade", "")
+
+            # Evaluar adecuación al grupo objetivo
+            issues = []
+            recommendations = []
+            appropriateness_score = 100.0
+            target_comparison = {}
+
+            if target_age_group:
+                target_thresholds = AGE_GROUP_THRESHOLDS.get(target_age_group, {})
+
+                # Comparar con umbrales del grupo objetivo
+                if target_thresholds:
+                    max_wps = target_thresholds.get("max_words_per_sentence", 25)
+                    max_spw = target_thresholds.get("max_syllables_per_word", 3.0)
+                    min_sight = target_thresholds.get("min_sight_word_ratio", 0.0)
+
+                    # Evaluar longitud de oraciones
+                    if base_report.avg_words_per_sentence > max_wps:
+                        diff = base_report.avg_words_per_sentence - max_wps
+                        issues.append(
+                            f"Oraciones demasiado largas para {target_thresholds.get('age_range', '')} "
+                            f"(promedio {base_report.avg_words_per_sentence:.1f}, máximo recomendado {max_wps})"
+                        )
+                        appropriateness_score -= min(30, diff * 3)
+                        recommendations.append(
+                            f"Reducir la longitud de las oraciones a máximo {max_wps} palabras."
+                        )
+
+                    # Evaluar complejidad de palabras
+                    if base_report.avg_syllables_per_word > max_spw:
+                        diff = base_report.avg_syllables_per_word - max_spw
+                        issues.append(
+                            f"Vocabulario complejo para {target_thresholds.get('age_range', '')} "
+                            f"(promedio {base_report.avg_syllables_per_word:.2f} sílabas/palabra)"
+                        )
+                        appropriateness_score -= min(30, diff * 15)
+                        recommendations.append(
+                            "Usar palabras más cortas y sencillas."
+                        )
+
+                    # Evaluar sight words
+                    if sight_word_ratio < min_sight:
+                        diff = min_sight - sight_word_ratio
+                        issues.append(
+                            f"Pocas palabras de alta frecuencia para primeros lectores "
+                            f"({sight_word_ratio:.1%}, mínimo recomendado {min_sight:.1%})"
+                        )
+                        appropriateness_score -= min(20, diff * 100)
+                        recommendations.append(
+                            "Incluir más palabras de uso frecuente (el, la, es, tiene, etc.)."
+                        )
+
+                    # Palabras complejas
+                    if target_age_group in (AgeGroup.BOARD_BOOK, AgeGroup.PICTURE_BOOK):
+                        if complex_words_ratio > 0.05:
+                            issues.append(
+                                f"Demasiadas palabras complejas ({complex_words_ratio:.1%} con 4+ sílabas)"
+                            )
+                            appropriateness_score -= 20
+                            recommendations.append(
+                                "Evitar palabras de 4 o más sílabas."
+                            )
+
+                    target_comparison = {
+                        "target_max_words_per_sentence": max_wps,
+                        "actual_words_per_sentence": round(base_report.avg_words_per_sentence, 2),
+                        "target_max_syllables": max_spw,
+                        "actual_syllables": round(base_report.avg_syllables_per_word, 2),
+                        "target_min_sight_ratio": min_sight,
+                        "actual_sight_ratio": round(sight_word_ratio, 3),
+                    }
+
+            appropriateness_score = max(0, appropriateness_score)
+            is_appropriate = appropriateness_score >= 70 and len(issues) == 0
+
+            report = AgeReadabilityReport(
+                estimated_age_group=estimated_age_group,
+                estimated_age_range=estimated_age_range,
+                estimated_grade_level=estimated_grade_level,
+                flesch_szigriszt=base_report.flesch_szigriszt,
+                total_words=total_words,
+                total_sentences=base_report.total_sentences,
+                avg_words_per_sentence=base_report.avg_words_per_sentence,
+                avg_syllables_per_word=base_report.avg_syllables_per_word,
+                sight_word_count=sight_word_count,
+                sight_word_ratio=sight_word_ratio,
+                unique_words=unique_words,
+                vocabulary_diversity=vocabulary_diversity,
+                simple_words_ratio=simple_words_ratio,
+                complex_words_ratio=complex_words_ratio,
+                repetition_score=repetition_score,
+                most_repeated_words=most_repeated,
+                is_appropriate=is_appropriate,
+                appropriateness_score=appropriateness_score,
+                issues=issues,
+                recommendations=recommendations,
+                target_age_group=target_age_group,
+                target_comparison=target_comparison,
+            )
+
+            return Result.success(report)
+
+        except Exception as e:
+            logger.error(f"Error en análisis de legibilidad por edad: {e}", exc_info=True)
+            error = NLPError(
+                message=f"Error en análisis de legibilidad por edad: {e}",
+                severity=ErrorSeverity.MEDIUM,
+            )
+            return Result.failure(error)
+
+    def _estimate_age_group(
+        self,
+        flesch_score: float,
+        avg_words_per_sentence: float,
+        avg_syllables_per_word: float,
+        sight_word_ratio: float,
+        total_words: int,
+    ) -> AgeGroup:
+        """
+        Estimar grupo de edad basado en métricas de legibilidad.
+
+        Combina múltiples factores para una estimación más precisa.
+        """
+        # Puntajes por cada métrica
+        scores = {
+            AgeGroup.BOARD_BOOK: 0,
+            AgeGroup.PICTURE_BOOK: 0,
+            AgeGroup.EARLY_READER: 0,
+            AgeGroup.CHAPTER_BOOK: 0,
+            AgeGroup.MIDDLE_GRADE: 0,
+            AgeGroup.YOUNG_ADULT: 0,
+            AgeGroup.ADULT: 0,
+        }
+
+        # Factor: longitud total del texto
+        if total_words < 300:
+            scores[AgeGroup.BOARD_BOOK] += 3
+        elif total_words < 1000:
+            scores[AgeGroup.PICTURE_BOOK] += 2
+            scores[AgeGroup.BOARD_BOOK] += 1
+        elif total_words < 5000:
+            scores[AgeGroup.EARLY_READER] += 2
+            scores[AgeGroup.PICTURE_BOOK] += 1
+        elif total_words < 15000:
+            scores[AgeGroup.CHAPTER_BOOK] += 2
+            scores[AgeGroup.EARLY_READER] += 1
+        elif total_words < 50000:
+            scores[AgeGroup.MIDDLE_GRADE] += 2
+            scores[AgeGroup.CHAPTER_BOOK] += 1
+        elif total_words < 80000:
+            scores[AgeGroup.YOUNG_ADULT] += 2
+            scores[AgeGroup.MIDDLE_GRADE] += 1
+        else:
+            scores[AgeGroup.ADULT] += 2
+            scores[AgeGroup.YOUNG_ADULT] += 1
+
+        # Factor: palabras por oración
+        if avg_words_per_sentence <= 5:
+            scores[AgeGroup.BOARD_BOOK] += 3
+        elif avg_words_per_sentence <= 8:
+            scores[AgeGroup.PICTURE_BOOK] += 2
+            scores[AgeGroup.BOARD_BOOK] += 1
+        elif avg_words_per_sentence <= 12:
+            scores[AgeGroup.EARLY_READER] += 2
+        elif avg_words_per_sentence <= 15:
+            scores[AgeGroup.CHAPTER_BOOK] += 2
+        elif avg_words_per_sentence <= 20:
+            scores[AgeGroup.MIDDLE_GRADE] += 2
+        elif avg_words_per_sentence <= 25:
+            scores[AgeGroup.YOUNG_ADULT] += 2
+        else:
+            scores[AgeGroup.ADULT] += 2
+
+        # Factor: sílabas por palabra
+        if avg_syllables_per_word <= 2.0:
+            scores[AgeGroup.BOARD_BOOK] += 2
+            scores[AgeGroup.PICTURE_BOOK] += 1
+        elif avg_syllables_per_word <= 2.2:
+            scores[AgeGroup.PICTURE_BOOK] += 2
+            scores[AgeGroup.EARLY_READER] += 1
+        elif avg_syllables_per_word <= 2.4:
+            scores[AgeGroup.EARLY_READER] += 2
+        elif avg_syllables_per_word <= 2.6:
+            scores[AgeGroup.CHAPTER_BOOK] += 2
+        elif avg_syllables_per_word <= 2.8:
+            scores[AgeGroup.MIDDLE_GRADE] += 2
+        elif avg_syllables_per_word <= 3.0:
+            scores[AgeGroup.YOUNG_ADULT] += 2
+        else:
+            scores[AgeGroup.ADULT] += 2
+
+        # Factor: proporción de sight words
+        if sight_word_ratio >= 0.7:
+            scores[AgeGroup.BOARD_BOOK] += 2
+        elif sight_word_ratio >= 0.5:
+            scores[AgeGroup.PICTURE_BOOK] += 2
+        elif sight_word_ratio >= 0.4:
+            scores[AgeGroup.EARLY_READER] += 1
+        elif sight_word_ratio >= 0.3:
+            scores[AgeGroup.CHAPTER_BOOK] += 1
+
+        # Factor: Flesch score
+        if flesch_score >= 90:
+            scores[AgeGroup.BOARD_BOOK] += 2
+            scores[AgeGroup.PICTURE_BOOK] += 1
+        elif flesch_score >= 80:
+            scores[AgeGroup.PICTURE_BOOK] += 2
+            scores[AgeGroup.EARLY_READER] += 1
+        elif flesch_score >= 70:
+            scores[AgeGroup.EARLY_READER] += 2
+            scores[AgeGroup.CHAPTER_BOOK] += 1
+        elif flesch_score >= 60:
+            scores[AgeGroup.CHAPTER_BOOK] += 2
+        elif flesch_score >= 50:
+            scores[AgeGroup.MIDDLE_GRADE] += 2
+        elif flesch_score >= 40:
+            scores[AgeGroup.YOUNG_ADULT] += 2
+        else:
+            scores[AgeGroup.ADULT] += 2
+
+        # Retornar el grupo con mayor puntuación
+        return max(scores.items(), key=lambda x: x[1])[0]
