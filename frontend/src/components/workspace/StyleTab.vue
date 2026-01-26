@@ -21,6 +21,7 @@ import TabPanel from 'primevue/tabpanel'
 import { useToast } from 'primevue/usetoast'
 import { useWorkspaceStore } from '@/stores/workspace'
 import CorrectionConfigPanel from './CorrectionConfigPanel.vue'
+import RegisterAnalysisTab from './RegisterAnalysisTab.vue'
 
 const props = defineProps<{
   projectId: number
@@ -223,8 +224,20 @@ function insertExample() {
         </div>
       </TabPanel>
 
-      <!-- Tab 2: Reglas Editoriales -->
+      <!-- Tab 2: Registro Narrativo -->
       <TabPanel value="1">
+        <template #header>
+          <i class="pi pi-sliders-v"></i>
+          <span>Registro narrativo</span>
+        </template>
+
+        <div class="tab-content">
+          <RegisterAnalysisTab :project-id="projectId" />
+        </div>
+      </TabPanel>
+
+      <!-- Tab 3: Reglas Editoriales -->
+      <TabPanel value="2">
         <template #header>
           <i class="pi pi-file-edit"></i>
           <span>Reglas editoriales</span>

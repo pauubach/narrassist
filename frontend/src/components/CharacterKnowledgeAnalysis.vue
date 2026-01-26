@@ -58,7 +58,7 @@
       <!-- Tab View for knowledge direction -->
       <TabView>
         <!-- What this character knows -->
-        <TabPanel>
+        <TabPanel value="0">
           <template #header>
             <i class="pi pi-eye"></i>
             <span>Lo que sabe ({{ knowledge.knowsAboutOthers.length }})</span>
@@ -105,7 +105,7 @@
         </TabPanel>
 
         <!-- What others know about this character -->
-        <TabPanel>
+        <TabPanel value="1">
           <template #header>
             <i class="pi pi-users"></i>
             <span>Lo que otros saben ({{ knowledge.othersKnowAbout.length }})</span>

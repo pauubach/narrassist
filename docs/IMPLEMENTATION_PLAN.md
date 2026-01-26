@@ -102,41 +102,39 @@ def _extract_knowledge_facts(self, text, characters, mode=None):
 | `/api/projects/{id}/focalization/declare` | ⚠️ Pendiente | Declarar POV |
 | `/api/projects/{id}/interactions` | ⚠️ Pendiente | Patrones interacción |
 
-### 0.6 Integración Frontend (Recomendaciones de Expertos)
+### 0.6 Integración Frontend ✅ COMPLETADO
 
-> **Actualizado**: 2026-01-26 tras revisión de arquitectura Vue
+> **Actualizado**: 2026-01-26
 
-#### Componentes a Crear/Extender
+#### Componentes Creados
 
-| Componente | Ubicación | Propósito |
-|------------|-----------|-----------|
-| **VoiceProfile.vue** | CharacterSheet | Métricas de voz del personaje |
-| **CharacterKnowledgeAnalysis.vue** | CharacterSheet | Lo que sabe el personaje |
-| **RegisterAnalysisTab.vue** | StyleTab (nuevo tab) | Análisis registro narrativo |
-| **DialogueAttributionView.vue** | TextTab (opcional) | Atribución de hablantes |
+| Componente | Ubicación | Estado |
+|------------|-----------|--------|
+| **VoiceProfile.vue** | CharacterSheet | ✅ Integrado |
+| **CharacterKnowledgeAnalysis.vue** | CharacterSheet | ✅ Integrado |
+| **RegisterAnalysisTab.vue** | StyleTab | ✅ Integrado |
+| **DialogueAttributionView.vue** | TextTab | ⚠️ Pendiente |
 
-#### Store a Crear
+#### Store Creado
 
-Crear `frontend/src/stores/voiceAndStyle.ts`:
-- `fetchVoiceProfiles(projectId)`
-- `fetchRegisterAnalysis(projectId, minSeverity)`
-- `fetchDialogueAttributions(projectId, chapterNum)`
-- `fetchCharacterKnowledge(projectId, characterId, mode)`
+✅ `frontend/src/stores/voiceAndStyle.ts`:
+- `fetchVoiceProfiles(projectId)` ✅
+- `fetchRegisterAnalysis(projectId, minSeverity)` ✅
+- `fetchDialogueAttributions(projectId, chapterNum)` ✅
+- `fetchCharacterKnowledge(projectId, characterId, mode)` ✅
 
-#### Patrón a Seguir
+#### Tipos Creados
 
-```typescript
-// Composables para UI logic
-// frontend/src/composables/useVoiceAnalysis.ts
-export function useVoiceAnalysis(projectId: number, characterId: number) {
-  const store = useVoiceAndStyleStore()
-  // ...
-}
-```
+✅ `frontend/src/types/domain/voice.ts`:
+- VoiceProfile, VoiceMetrics
+- RegisterAnalysis, RegisterChange, RegisterSummary
+- DialogueAttribution, DialogueAttributionStats
+- KnowledgeFact, KnowledgeType
 
-Integrar en:
-1. **CharacterSheet.vue** → añadir secciones VoiceProfile y CharacterKnowledge
-2. **StyleTab.vue** → añadir TabPanel "Registro Narrativo"
+#### Integraciones Realizadas
+
+1. ✅ **CharacterSheet.vue** → secciones VoiceProfile y CharacterKnowledge
+2. ✅ **StyleTab.vue** → TabPanel "Registro Narrativo"
 
 ---
 
@@ -354,17 +352,18 @@ Extender ExportDialog con formato "Informe Editorial":
 
 | Fase | Días | Acumulado | Prioridad | Estado |
 |------|------|-----------|-----------|--------|
-| 0: Estabilización | 3-4 | 3-4 | 🎯 Crítica | 75% ✅ |
+| 0: Estabilización | 3-4 | 3-4 | 🎯 Crítica | ✅ 100% |
 | 0.5: Multi-Método | 4-5 | 7-9 | 🎯 Crítica | Pendiente |
 | 1: Shared Components | 2-3 | 9-12 | 🎯 Crítica | Pendiente |
 | 2: Quick Wins | 5-6 | 14-18 | 🎯 Crítica | Pendiente |
-| 3: Extender Tabs | 19-23 | 33-41 | ✅ Alta | Pendiente |
+| 3: Extender Tabs | 19-23 | 33-41 | ✅ Alta | 🔄 En progreso |
 | 4: Editoriales | 21-26 | 54-67 | ✅ Alta | Pendiente |
 | 5: Roadmap | 37-47 | 91-114 | ⚠️ Media | Pendiente |
 | 6: Deuda Técnica | 30-38 | 121-152 | ⚠️ Media | Pendiente |
 | 7: Infraestructura | 24-31 | 145-183 | ⚠️ Media | Pendiente |
 
-**Progreso Fase 0**: Voice Profiles ✅, Register Analysis ✅, Speaker Attribution ✅, Character Knowledge ⚠️
+**Progreso Fase 0**: Voice Profiles ✅, Register Analysis ✅, Speaker Attribution ✅, Character Knowledge ✅
+**Progreso Fase 0.6**: Store ✅, VoiceProfile.vue ✅, CharacterKnowledgeAnalysis.vue ✅, RegisterAnalysisTab.vue ✅
 
 **MVP mejorado (Fases 0-3)**: ~33-41 días (~1.5-2 meses)
 **Producto completo (Fases 0-7)**: ~145-183 días (~6-9 meses)
@@ -375,7 +374,7 @@ Extender ExportDialog con formato "Informe Editorial":
 
 ### Fases 0-2 (MVP Backend-UI)
 
-- [ ] Character Knowledge extrae hechos correctamente
+- [x] Character Knowledge extrae hechos correctamente (RULES/LLM/HYBRID)
 - [x] Usuario puede ver métricas de voz completas (`/api/projects/{id}/voice-profiles`)
 - [ ] Usuario puede ver por qué se fusionaron entidades
 - [ ] Todos los métodos NLP configurables en Settings
@@ -385,8 +384,8 @@ Extender ExportDialog con formato "Informe Editorial":
 - [x] Usuario puede analizar registro narrativo (`/api/projects/{id}/register-analysis`)
 - [ ] Usuario puede declarar y verificar focalización
 - [ ] Usuario puede ver patrones de interacción
-- [ ] Usuario puede ver qué sabe cada personaje
-- [ ] Usuario puede ver quién habla cada diálogo
+- [x] Usuario puede ver qué sabe cada personaje (CharacterKnowledgeAnalysis.vue)
+- [ ] Usuario puede ver quién habla cada diálogo (DialogueAttributionView pendiente)
 
 ### Fases 4-5 (Features Avanzadas)
 

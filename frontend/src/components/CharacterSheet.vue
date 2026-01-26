@@ -230,6 +230,28 @@
           :character-name="character.name"
         />
       </div>
+
+      <Divider />
+
+      <!-- Perfil de Voz -->
+      <div class="sheet-section">
+        <VoiceProfile
+          :project-id="projectId"
+          :character-id="character.id"
+          :character-name="character.name"
+        />
+      </div>
+
+      <Divider />
+
+      <!-- Conocimiento del Personaje -->
+      <div class="sheet-section">
+        <CharacterKnowledgeAnalysis
+          :project-id="projectId"
+          :character-id="character.id"
+          :character-name="character.name"
+        />
+      </div>
     </template>
   </div>
 </template>
@@ -243,6 +265,8 @@ import Divider from 'primevue/divider'
 import Timeline from 'primevue/timeline'
 import BehaviorExpectations from '@/components/BehaviorExpectations.vue'
 import EmotionalAnalysis from '@/components/EmotionalAnalysis.vue'
+import VoiceProfile from '@/components/VoiceProfile.vue'
+import CharacterKnowledgeAnalysis from '@/components/CharacterKnowledgeAnalysis.vue'
 import type { Entity, CharacterAttribute, CharacterRelationship } from '@/types'
 import { useAlertUtils } from '@/composables/useAlertUtils'
 

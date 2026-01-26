@@ -85,6 +85,7 @@ export interface RegisterSummary {
   dialogueSegments: number
   distribution: Record<string, number>
   dominantRegister: string
+  consistency?: number
 }
 
 export interface RegisterAnalysisResponse {
