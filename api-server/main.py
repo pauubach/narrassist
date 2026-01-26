@@ -267,27 +267,60 @@ def load_narrative_assistant_modules():
     try:
         _write_debug("Attempting to load narrative_assistant modules...")
         
-        from narrative_assistant.persistence.project import ProjectManager
-        from narrative_assistant.persistence.database import get_database, Database as DB
-        from narrative_assistant.persistence.chapter import ChapterRepository, SectionRepository
-        from narrative_assistant.entities.repository import EntityRepository
-        from narrative_assistant.alerts.repository import AlertRepository
-        from narrative_assistant.core.config import get_config as get_cfg
-        from narrative_assistant import __version__
+        # Si estamos en modo frozen, limpiar sys.path temporalmente de directorios _MEI
+        # para evitar el error "import numpy from its source directory"
+        removed_paths = []
+        if getattr(sys, 'frozen', False):
+            import os
+            original_cwd = os.getcwd()
+            # Cambiar a un directorio seguro (temp)
+            temp_dir = os.environ.get("TEMP", os.path.expanduser("~"))
+            if os.path.exists(temp_dir):
+                os.chdir(temp_dir)
+                _write_debug(f"Changed working directory from {original_cwd} to {temp_dir} for import")
+            
+            # Remover temporalmente _MEI paths
+            for path in list(sys.path):
+                if "_MEI" in path:
+                    sys.path.remove(path)
+                    removed_paths.append(path)
+            if removed_paths:
+                _write_debug(f"Temporarily removed {len(removed_paths)} _MEI paths from sys.path")
+                _write_debug(f"sys.path now starts with: {sys.path[:3]}")
         
-        # Inicializar managers
-        project_manager = ProjectManager()
-        entity_repository = EntityRepository()
-        alert_repository = AlertRepository()
-        chapter_repository = ChapterRepository()
-        section_repository = SectionRepository()
-        get_config = get_cfg
-        Database = DB
-        MODULES_LOADED = True
-        MODULES_ERROR = None
-        
-        _write_debug("✓ Modules loaded successfully!")
-        logger.info("✓ narrative_assistant modules loaded successfully")
+        try:
+            from narrative_assistant.persistence.project import ProjectManager
+            from narrative_assistant.persistence.database import get_database, Database as DB
+            from narrative_assistant.persistence.chapter import ChapterRepository, SectionRepository
+            from narrative_assistant.entities.repository import EntityRepository
+            from narrative_assistant.alerts.repository import AlertRepository
+            from narrative_assistant.core.config import get_config as get_cfg
+            from narrative_assistant import __version__
+            
+            # Inicializar managers
+            project_manager = ProjectManager()
+            entity_repository = EntityRepository()
+            alert_repository = AlertRepository()
+            chapter_repository = ChapterRepository()
+            section_repository = SectionRepository()
+            get_config = get_cfg
+            Database = DB
+            MODULES_LOADED = True
+            MODULES_ERROR = None
+            
+            _write_debug("✓ Modules loaded successfully!")
+            logger.info("✓ narrative_assistant modules loaded successfully")
+        finally:
+            # Restaurar sys.path
+            if removed_paths:
+                sys.path.extend(removed_paths)
+                _write_debug(f"Restored {len(removed_paths)} _MEI paths to sys.path")
+            # Restaurar directorio de trabajo
+            if getattr(sys, 'frozen', False):
+                import os
+                os.chdir(original_cwd)
+                _write_debug(f"Restored working directory to {original_cwd}")
+
         return True
         
     except Exception as e:
@@ -684,17 +717,13 @@ async def models_status():
 
         all_deps_installed = all(deps_status.values())
         
-        # Si todas las dependencias están instaladas, intentar cargar los módulos
-        if all_deps_installed and python_info["python_available"]:
-            logger.info("All dependencies detected - attempting to load narrative_assistant modules...")
-            _write_debug("All dependencies detected - attempting to load narrative_assistant modules...")
-            if load_narrative_assistant_modules():
-                logger.info("Successfully loaded narrative_assistant modules!")
-                _write_debug("Successfully loaded narrative_assistant modules!")
-                # MODULES_LOADED is now True, fall through to normal flow below
-            else:
-                logger.warning("Failed to load narrative_assistant modules despite dependencies being present")
-                _write_debug("Failed to load narrative_assistant modules despite dependencies being present")
+        # EN MODO FROZEN: No auto-cargar módulos, requiere reinicio
+        # (evita problemas de import con PyInstaller + numpy)
+        needs_restart = False
+        if all_deps_installed and getattr(sys, 'frozen', False):
+            logger.info("All dependencies detected in frozen mode - restart required to load backend")
+            _write_debug("All dependencies detected in frozen mode - restart required to load backend")
+            needs_restart = True
 
         # Si después de intentar cargar, aún no están cargados, retornar estado de dependencias
         if not MODULES_LOADED:
@@ -709,6 +738,7 @@ async def models_status():
                     "dependencies_needed": dependencies_needed,
                     "dependencies_status": deps_status,
                     "all_installed": all_deps_installed,
+                    "needs_restart": needs_restart,
                     "installing": INSTALLING_DEPENDENCIES,
                     "python_available": python_info["python_available"],
                     "python_version": python_info["python_version"],
