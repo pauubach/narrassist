@@ -186,6 +186,23 @@ MODULES_LOADED = False
 MODULES_ERROR = None
 
 try:
+    # CRITICAL: Change to a safe directory before importing to avoid numpy source directory error
+    import os
+    original_cwd = os.getcwd()
+    if getattr(sys, 'frozen', False):
+        # When frozen, change to temp dir to avoid import conflicts
+        safe_dir = os.path.expanduser("~")
+        os.chdir(safe_dir)
+        _write_debug(f"Changed to safe dir: {safe_dir}")
+    
+    # First test: can we import numpy directly?
+    try:
+        import numpy as np
+        _write_debug(f"Direct numpy import OK, version: {np.__version__}")
+    except Exception as e:
+        _write_debug(f"Direct numpy import FAILED: {e}")
+        raise
+    
     from narrative_assistant.persistence.project import ProjectManager
     from narrative_assistant.persistence.database import get_database, Database
     from narrative_assistant.persistence.chapter import ChapterRepository, SectionRepository
@@ -202,6 +219,12 @@ try:
     chapter_repository = ChapterRepository()
     section_repository = SectionRepository()
     MODULES_LOADED = True
+    
+    # Restore original directory
+    if getattr(sys, 'frozen', False):
+        os.chdir(original_cwd)
+        _write_debug(f"Restored original dir: {original_cwd}")
+        
 except Exception as e:
     import logging as _logging
     _logging.basicConfig(level=_logging.INFO)
