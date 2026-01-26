@@ -10891,12 +10891,12 @@ if __name__ == "__main__":
                 access_log=True,
             )
         else:
-            # Modo desarrollo: mantener reload
+            # Modo desarrollo: también usar instancia directa para compatibilidad con Python embebido
             uvicorn.run(
-                "main:app",
+                app,  # Usar instancia directa, no "main:app" string
                 host="127.0.0.1",
                 port=8008,
-                reload=False,  # Disabled for embedded Python compatibility
+                reload=False,  # Disabled for embedded Python and auto-reload compatibility
                 log_level="info",
             )
     except Exception as e:
