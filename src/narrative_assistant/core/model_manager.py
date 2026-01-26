@@ -198,6 +198,7 @@ class ModelManager:
 
         # Posibles ubicaciones de modelos bundled
         possible_paths = [
+            exe_dir / "models",  # Development mode (project root)
             exe_dir / "resources" / "models",
             exe_dir / "_internal" / "resources" / "models",  # PyInstaller
             exe_dir.parent / "Resources" / "models",  # macOS .app
