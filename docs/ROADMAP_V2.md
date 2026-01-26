@@ -32,23 +32,35 @@
 9. ✅ **Anglicismos** - extranjerismos innecesarios
 10. ✅ **Muletillas** - sobreuso de palabras (z-score)
 11. ✅ **Glosario** - términos del proyecto
-12. ⚠️ **Anacolutos** - rupturas sintácticas (parcialmente implementado)
-13. ⚠️ **POV** - cambios de punto de vista (parcialmente implementado)
+12. ✅ **Anacolutos** - rupturas sintácticas (completo)
+13. ✅ **POV** - cambios de punto de vista (completo)
 
-### Detectores Parciales - Pendiente Completar
-
-| Detector | Implementado | Pendiente |
-|----------|--------------|-----------|
-| **Anacolutos** | nominativus pendens, broken construction, dangling modifier | `subject_shift` (NO implementado) |
-| **POV** | person shift, tú/usted mix | `focalizer_shift` (stub), `inconsistent_omniscience` (NO implementado) |
-
-### Typography - Pendiente Añadir
+### Typography - Detecciones Completas (v0.2.8)
 
 | Detección | Estado |
 |-----------|--------|
-| Comillas antes/después del punto según RAE | ❌ |
-| Secuencias de puntuación inválidas (`,.` `!?` `??`) | ❌ |
-| Pares de signos sin cerrar (`(texto` `«texto`) | ❌ |
+| Comillas antes/después del punto según RAE | ✅ Implementado |
+| Secuencias de puntuación inválidas (`,.` `!?` `??`) | ✅ Implementado |
+| Pares de signos sin cerrar (`(texto` `«texto`) | ✅ Implementado |
+
+### Anacolutos - Detecciones Completas (v0.2.8)
+
+| Detección | Estado |
+|-----------|--------|
+| Nominativus pendens | ✅ |
+| Broken construction | ✅ |
+| Incomplete clause | ✅ |
+| Subject shift | ✅ Implementado |
+| Dangling modifier | ✅ |
+
+### POV - Detecciones Completas (v0.2.8)
+
+| Detección | Estado |
+|-----------|--------|
+| Person shift | ✅ (regex mejorados) |
+| Tú/usted mix | ✅ |
+| Focalizer shift | ✅ Implementado |
+| Inconsistent omniscience | ✅ Implementado |
 
 ---
 
@@ -133,9 +145,9 @@
 
 | Detector | Descripción | Estado |
 |----------|-------------|--------|
-| **Anacolutos** | Oraciones con construcción sintáctica rota | ⚠️ Parcial - falta `subject_shift` |
-| **Cambios de POV** | Detectar cambios involuntarios de punto de vista | ⚠️ Parcial - falta `focalizer_shift`, `inconsistent_omniscience` |
-| **Inconsistencias factuales** | Contradicciones en hechos narrados | ❌ No implementado (requiere LLM) |
+| **Anacolutos** | Oraciones con construcción sintáctica rota | ✅ Completo (v0.2.8) |
+| **Cambios de POV** | Detectar cambios involuntarios de punto de vista | ✅ Completo (v0.2.8) |
+| **Inconsistencias factuales** | Contradicciones en hechos narrados | ❌ Pendiente (requiere LLM) |
 
 ### P3 - Infraestructura
 

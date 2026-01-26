@@ -162,6 +162,16 @@ class TypographyConfig:
     # Detectar espacios múltiples
     check_multiple_spaces: bool = True
 
+    # Detectar secuencias de puntuación inválidas (,. !? ??)
+    check_invalid_sequences: bool = True
+
+    # Detectar pares de signos sin cerrar («, (, [)
+    check_unclosed_pairs: bool = True
+
+    # Detectar orden incorrecto de comilla y punto según RAE
+    # RAE: el punto va DESPUÉS de la comilla de cierre
+    check_quote_period_order: bool = True
+
 
 @dataclass
 class RepetitionConfig:

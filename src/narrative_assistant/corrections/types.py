@@ -20,6 +20,9 @@ class TypographyIssueType(Enum):
     SPACING_BEFORE_PUNCT = "spacing_before_punct"  # Espacio antes de puntuación
     SPACING_AFTER_PUNCT = "spacing_after_punct"  # Falta espacio después de puntuación
     MULTIPLE_SPACES = "multiple_spaces"  # Espacios múltiples
+    INVALID_PUNCT_SEQUENCE = "invalid_punct_sequence"  # Secuencia de puntuación inválida (,. !? ??)
+    UNCLOSED_PAIR = "unclosed_pair"  # Par de signos sin cerrar (« ( [ sin cierre)
+    QUOTE_PERIOD_ORDER = "quote_period_order"  # Orden incorrecto de comilla y punto según RAE
 
 
 class RepetitionIssueType(Enum):

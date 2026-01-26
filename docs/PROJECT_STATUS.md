@@ -911,7 +911,7 @@ El proyecto está funcionalmente completo para un MVP:
 
 | # | Detector | Módulo | Estado |
 |---|----------|--------|--------|
-| 1 | Typography | `corrections/detectors/typography.py` | ✅ Funcional |
+| 1 | Typography | `corrections/detectors/typography.py` | ✅ Completo |
 | 2 | Repetition | `corrections/detectors/repetition.py` | ✅ Funcional |
 | 3 | Agreement | `corrections/detectors/agreement.py` | ✅ Funcional |
 | 4 | Terminology | `corrections/detectors/terminology.py` | ✅ Funcional |
@@ -922,44 +922,41 @@ El proyecto está funcionalmente completo para un MVP:
 | 9 | Anglicisms | `corrections/detectors/anglicisms.py` | ✅ Funcional |
 | 10 | Crutch Words | `corrections/detectors/crutch_words.py` | ✅ Funcional |
 | 11 | Glossary | `corrections/detectors/glossary.py` | ✅ Funcional |
-| 12 | **Anacoluto** | `corrections/detectors/anacoluto.py` | ⚠️ Parcial |
-| 13 | **POV** | `corrections/detectors/pov.py` | ⚠️ Parcial |
+| 12 | **Anacoluto** | `corrections/detectors/anacoluto.py` | ✅ Completo |
+| 13 | **POV** | `corrections/detectors/pov.py` | ✅ Completo |
 
-### Detalle Detectores Nuevos
+### Detalle Detectores Avanzados
 
-#### AnacolutoDetector (⚠️ Parcial)
+#### AnacolutoDetector (✅ Completo)
 
 | Feature | Config | Estado |
 |---------|--------|--------|
 | `check_nominativus_pendens` | ✅ | ✅ Implementado |
 | `check_broken_construction` | ✅ | ✅ Implementado (requiere spaCy) |
-| `check_incomplete_clause` | ✅ | ⚠️ Simplista - no considera límites de cláusula |
-| `check_subject_shift` | ✅ | ❌ **NO implementado** |
-| `check_dangling_modifier` | ✅ | ⚠️ Solo detecta gerundios al inicio |
+| `check_incomplete_clause` | ✅ | ✅ Implementado (heurística simple) |
+| `check_subject_shift` | ✅ | ✅ **NUEVO** - Detecta cambios de sujeto confusos |
+| `check_dangling_modifier` | ✅ | ✅ Detecta gerundios iniciales sin referente claro |
 
-#### POVDetector (⚠️ Parcial)
+#### POVDetector (✅ Completo)
 
 | Feature | Config | Estado |
 |---------|--------|--------|
-| `check_person_shift` | ✅ | ⚠️ Funciona pero regex muy amplios (falsos positivos) |
+| `check_person_shift` | ✅ | ✅ Mejorado con regex precisos |
 | `check_tu_usted_mix` | ✅ | ✅ Implementado |
-| `check_focalizer_shift` | ✅ | ❌ **Stub** - método vacío con `pass` |
-| `check_inconsistent_omniscience` | ✅ | ❌ **NO implementado** |
+| `check_focalizer_shift` | ✅ | ✅ **NUEVO** - Detecta cambios de focalizador |
+| `check_inconsistent_omniscience` | ✅ | ✅ **NUEVO** - Detecta mezcla limitado/omnisciente |
 
-### Typography: Lo que FALTA
+### Typography: Detecciones Implementadas
 
 | Detección | Descripción | Estado |
 |-----------|-------------|--------|
-| Comillas antes/después del punto | RAE: punto va después de comilla de cierre | ❌ No detectado |
-| Secuencias inválidas | `,.` `!?` `??` `..` (excepto `...`) | ❌ No detectado |
-| Pares de signos sin cerrar | `(texto` `«texto` sin cierre | ❌ No detectado |
-| Orden punto/comilla según norma | Reglas RAE específicas | ❌ No detectado |
-
-### Lo que SÍ detecta Typography
-
-- ✅ Guiones incorrectos (diálogos, rangos)
-- ✅ Comillas mezcladas (estilos diferentes)
-- ✅ Puntos suspensivos mal formados (2 o 4+ puntos)
-- ✅ Espacios antes de puntuación
-- ✅ Falta espacio después de puntuación
-- ✅ Espacios múltiples
+| Guiones diálogos | Raya/semiraya/guion incorrecto | ✅ |
+| Guiones rangos | 1990-2000 con semiraya | ✅ |
+| Comillas mezcladas | Estilos diferentes en el documento | ✅ |
+| Puntos suspensivos | 2 o 4+ puntos | ✅ |
+| Espacios antes de puntuación | "hola ." | ✅ |
+| Falta espacio después | "hola.mundo" | ✅ |
+| Espacios múltiples | "hola  mundo" | ✅ |
+| **Secuencias inválidas** | `,.` `!?` `??` `..` | ✅ **NUEVO** |
+| **Pares sin cerrar** | `(texto` `«texto` sin cierre | ✅ **NUEVO** |
+| **Orden comilla/punto RAE** | Punto después de comilla de cierre | ✅ **NUEVO** |

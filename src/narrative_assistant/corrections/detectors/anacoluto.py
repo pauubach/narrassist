@@ -139,6 +139,13 @@ class AnacolutoDetector(BaseDetector):
                     if issue:
                         issues.append(issue)
 
+                if self.config.check_subject_shift:
+                    issue = self._check_subject_shift(
+                        sentence_text, start, end, chapter_index, text, nlp
+                    )
+                    if issue:
+                        issues.append(issue)
+
         return issues
 
     def _split_sentences(self, text: str) -> list[tuple[str, int, int]]:
@@ -390,4 +397,118 @@ class AnacolutoDetector(BaseDetector):
                                     "subject": main_subject.text,
                                 },
                             )
+        return None
+
+    def _check_subject_shift(
+        self,
+        sentence: str,
+        start: int,
+        end: int,
+        chapter_index: Optional[int],
+        full_text: str,
+        nlp,
+    ) -> Optional[CorrectionIssue]:
+        """
+        Detecta cambios problemáticos de sujeto dentro de una oración.
+
+        Un cambio de sujeto problemático ocurre cuando:
+        - El sujeto cambia a mitad de oración sin conector apropiado
+        - Hay ambigüedad sobre quién realiza la acción
+        - Se mezclan sujetos de forma confusa
+
+        Ejemplo problemático: "Juan salió corriendo y tropezó María"
+        (¿Quién tropezó? Ambiguo porque falta "y" o cambio de sujeto explícito)
+        """
+        doc = nlp(sentence)
+
+        # Encontrar todos los sujetos (nsubj, nsubj:pass)
+        subjects = []
+        for token in doc:
+            if token.dep_ in ["nsubj", "nsubj:pass"]:
+                subjects.append({
+                    "token": token,
+                    "text": token.text,
+                    "pos": token.i,
+                    "head_verb": token.head,
+                })
+
+        # Si hay menos de 2 sujetos, no hay cambio
+        if len(subjects) < 2:
+            return None
+
+        # Analizar si los cambios de sujeto son problemáticos
+        for i in range(1, len(subjects)):
+            prev_subj = subjects[i - 1]
+            curr_subj = subjects[i]
+
+            # Ignorar si son el mismo sujeto (correferencia obvia)
+            if prev_subj["text"].lower() == curr_subj["text"].lower():
+                continue
+
+            # Ignorar si uno es pronombre que podría referirse al otro
+            pronouns = {"él", "ella", "ellos", "ellas", "este", "esta", "ese", "esa"}
+            if curr_subj["text"].lower() in pronouns:
+                continue
+
+            # Verificar si hay conector entre los sujetos
+            tokens_between = [
+                t for t in doc
+                if prev_subj["pos"] < t.i < curr_subj["pos"]
+            ]
+
+            # Conectores que hacen válido un cambio de sujeto
+            valid_connectors = {
+                "y", "pero", "aunque", "mientras", "cuando", "porque",
+                "sin embargo", "no obstante", "además", "también",
+                "por su parte", "en cambio", "mientras tanto",
+            }
+
+            has_valid_connector = any(
+                t.text.lower() in valid_connectors or
+                t.dep_ == "cc"  # Conjunción coordinante
+                for t in tokens_between
+            )
+
+            # Si no hay conector válido y los verbos están cerca, es problemático
+            if not has_valid_connector:
+                # Verificar que los verbos de ambos sujetos estén en la misma cláusula
+                prev_verb = prev_subj["head_verb"]
+                curr_verb = curr_subj["head_verb"]
+
+                # Si los verbos son diferentes y no hay subordinación clara
+                if prev_verb != curr_verb:
+                    # Verificar si hay puntuación de separación
+                    text_between = sentence[
+                        prev_subj["token"].idx + len(prev_subj["text"]):
+                        curr_subj["token"].idx
+                    ]
+
+                    # Si no hay coma ni punto y coma, es más problemático
+                    if "," not in text_between and ";" not in text_between:
+                        return CorrectionIssue(
+                            category=self.category.value,
+                            issue_type=AnacolutoIssueType.SUBJECT_SHIFT.value,
+                            start_char=start,
+                            end_char=end,
+                            text=sentence[:100] + "..." if len(sentence) > 100 else sentence,
+                            explanation=(
+                                f"Cambio de sujeto potencialmente confuso: "
+                                f"'{prev_subj['text']}' → '{curr_subj['text']}' "
+                                f"sin conector o puntuación clara. "
+                                f"El lector puede perder el hilo de quién realiza cada acción."
+                            ),
+                            suggestion=(
+                                "Añada un conector ('y', 'mientras', 'por su parte') "
+                                "o separe las oraciones con puntuación."
+                            ),
+                            confidence=self.config.base_confidence,
+                            context=self._extract_context(full_text, start, end),
+                            chapter_index=chapter_index,
+                            rule_id="ANACOLUTO_SUBJECT_SHIFT",
+                            extra_data={
+                                "previous_subject": prev_subj["text"],
+                                "current_subject": curr_subj["text"],
+                            },
+                        )
+
         return None

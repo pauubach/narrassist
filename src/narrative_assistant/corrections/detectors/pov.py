@@ -25,32 +25,48 @@ class POVDetector(BaseDetector):
     cambios no intencionales en la perspectiva narrativa.
     """
 
-    # Pronombres y verbos de primera persona
-    FIRST_PERSON_SINGULAR = re.compile(
-        r'\b(yo|me|mí|conmigo)\b|'
-        r'\b\w+(o|é|í)\b',  # Verbos: hablo, miré, sentí
+    # Pronombres de primera persona singular (solo pronombres, no verbos genéricos)
+    FIRST_PERSON_SINGULAR_PRONOUNS = re.compile(
+        r'\b(yo|me|mí|conmigo)\b',
         re.IGNORECASE
     )
 
     # Formas verbales específicas de primera persona singular
+    # Lista explícita para evitar falsos positivos
     FIRST_PERSON_VERBS = re.compile(
         r'\b(soy|estoy|tengo|hago|voy|digo|sé|veo|quiero|puedo|debo|'
         r'pensé|sentí|miré|caminé|dije|vi|hice|fui|tuve|pude|quise|supe|'
-        r'pienso|siento|miro|camino|hablo|escribo|leo|como|vivo|trabajo)\b',
+        r'pienso|siento|miro|camino|hablo|escribo|leo|vivo|trabajo|'
+        r'creí|sabía|recordé|noté|comprendí|percibí|imaginé|'
+        r'creo|noto|comprendo|percibo|imagino|recuerdo)\b',
         re.IGNORECASE
     )
 
     # Pronombres de primera persona plural
-    FIRST_PERSON_PLURAL = re.compile(
-        r'\b(nosotros|nosotras|nos)\b|'
-        r'\b\w+mos\b',  # Verbos: hablamos, miramos
+    FIRST_PERSON_PLURAL_PRONOUNS = re.compile(
+        r'\b(nosotros|nosotras|nos)\b',
         re.IGNORECASE
     )
 
-    # Pronombres de segunda persona (tú)
-    SECOND_PERSON_TU = re.compile(
-        r'\b(tú|te|ti|contigo)\b|'
-        r'\b\w+(as|es|ás|és)\b',  # Verbos: hablas, miras, podrás
+    # Verbos de primera persona plural (lista explícita)
+    FIRST_PERSON_PLURAL_VERBS = re.compile(
+        r'\b(somos|estamos|tenemos|hacemos|vamos|decimos|sabemos|vemos|'
+        r'queremos|podemos|debemos|pensamos|sentimos|miramos|caminamos|'
+        r'dijimos|vimos|hicimos|fuimos|tuvimos|pudimos|quisimos|supimos)\b',
+        re.IGNORECASE
+    )
+
+    # Pronombres de segunda persona (tú) - solo pronombres
+    SECOND_PERSON_TU_PRONOUNS = re.compile(
+        r'\b(tú|te|ti|contigo)\b',
+        re.IGNORECASE
+    )
+
+    # Verbos de segunda persona singular (tú) - lista explícita
+    SECOND_PERSON_TU_VERBS = re.compile(
+        r'\b(eres|estás|tienes|haces|vas|dices|sabes|ves|quieres|puedes|debes|'
+        r'piensas|sientes|miras|caminas|dijiste|viste|hiciste|fuiste|'
+        r'tuviste|pudiste|quisiste|supiste|pensaste|sentiste|miraste)\b',
         re.IGNORECASE
     )
 
@@ -146,6 +162,12 @@ class POVDetector(BaseDetector):
                 self._check_focalizer_shifts(paragraph_povs, chapter_index, text)
             )
 
+        # Detectar omnisciencia inconsistente
+        if self.config.check_inconsistent_omniscience:
+            issues.extend(
+                self._check_inconsistent_omniscience(paragraph_povs, chapter_index, text)
+            )
+
         return issues
 
     def _split_paragraphs(self, text: str) -> list[tuple[str, int, int]]:
@@ -179,10 +201,19 @@ class POVDetector(BaseDetector):
         Returns:
             dict con conteos de cada persona gramatical y POV dominante
         """
-        # Contar ocurrencias de cada tipo
-        first_sing = len(self.FIRST_PERSON_VERBS.findall(text))
-        first_plur = len(self.FIRST_PERSON_PLURAL.findall(text))
-        second_tu = len(self.SECOND_PERSON_TU.findall(text))
+        # Contar ocurrencias de cada tipo (pronombres + verbos)
+        first_sing = (
+            len(self.FIRST_PERSON_SINGULAR_PRONOUNS.findall(text)) +
+            len(self.FIRST_PERSON_VERBS.findall(text))
+        )
+        first_plur = (
+            len(self.FIRST_PERSON_PLURAL_PRONOUNS.findall(text)) +
+            len(self.FIRST_PERSON_PLURAL_VERBS.findall(text))
+        )
+        second_tu = (
+            len(self.SECOND_PERSON_TU_PRONOUNS.findall(text)) +
+            len(self.SECOND_PERSON_TU_VERBS.findall(text))
+        )
         second_usted = len(self.SECOND_PERSON_USTED.findall(text))
         third = len(self.THIRD_PERSON.findall(text))
 
@@ -355,6 +386,9 @@ class POVDetector(BaseDetector):
 
         El focalizador es el personaje desde cuya perspectiva percibimos
         los eventos (quién piensa, siente, ve).
+
+        Heurística: busca párrafos en tercera persona con verbos de percepción
+        donde el sujeto de esos verbos cambia sin transición clara.
         """
         issues = []
 
@@ -367,25 +401,81 @@ class POVDetector(BaseDetector):
         if len(third_person_paragraphs) < 2:
             return []
 
-        # Agrupar párrafos consecutivos y buscar cambios bruscos
-        # de verbos de percepción con diferentes sujetos
-        # Esta es una heurística simplificada; una implementación completa
-        # requeriría resolución de correferencias
-        prev_para = None
-        for para in third_person_paragraphs:
-            if prev_para:
-                # Verificar si hay un cambio significativo en patrones de percepción
-                prev_verbs = set(v.lower() for v in prev_para["pov"]["perception_verbs"])
-                curr_verbs = set(v.lower() for v in para["pov"]["perception_verbs"])
+        # Patrones para extraer sujeto del verbo de percepción
+        # "María pensó", "él sintió", "la mujer recordó"
+        subject_pattern = re.compile(
+            r'([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+|[Éé]l|[Ee]lla)\s+'
+            r'(pensó|pensaba|sentía|creía|creyó|imaginó|imaginaba|'
+            r'sabía|supo|recordó|recordaba|veía|vio|oyó|oía|notó|notaba|'
+            r'comprendió|comprendía|percibió|percibía)',
+            re.IGNORECASE
+        )
 
-                # Si ambos tienen muchos verbos de percepción y son diferentes
-                if len(prev_verbs) >= 2 and len(curr_verbs) >= 2:
-                    # Heurística: si hay verbos en ambos pero el texto no parece continuar
-                    # el mismo hilo, puede ser un cambio de focalizador
-                    # Esto es muy simplificado; en producción se usaría LLM
-                    pass  # Por ahora no generamos alertas aquí sin LLM
+        prev_para = None
+        prev_subjects = set()
+
+        for para in third_person_paragraphs:
+            # Extraer sujetos de verbos de percepción en este párrafo
+            current_subjects = set()
+            for match in subject_pattern.finditer(para["text"]):
+                subject = match.group(1).lower()
+                # Normalizar pronombres
+                if subject in ("él", "ella"):
+                    subject = "pronombre_3p"
+                current_subjects.add(subject)
+
+            if prev_para and prev_subjects and current_subjects:
+                # Verificar si los sujetos cambiaron
+                # Excluir pronombres de la comparación (podrían referirse al mismo personaje)
+                prev_named = {s for s in prev_subjects if s != "pronombre_3p"}
+                curr_named = {s for s in current_subjects if s != "pronombre_3p"}
+
+                # Si hay nombres propios diferentes sin transición
+                if prev_named and curr_named and prev_named != curr_named:
+                    # Buscar si hay algún indicador de transición
+                    para_start_lower = para["text"][:50].lower()
+                    transition_markers = [
+                        "mientras tanto", "por su parte", "en cambio",
+                        "por otro lado", "sin embargo", "entretanto",
+                        "al mismo tiempo", "simultáneamente",
+                    ]
+
+                    has_transition = any(
+                        marker in para_start_lower
+                        for marker in transition_markers
+                    )
+
+                    if not has_transition:
+                        issues.append(
+                            CorrectionIssue(
+                                category=self.category.value,
+                                issue_type=POVIssueType.FOCALIZER_SHIFT.value,
+                                start_char=para["start"],
+                                end_char=para["end"],
+                                text=para["text"][:100] + "..." if len(para["text"]) > 100 else para["text"],
+                                explanation=(
+                                    f"Posible cambio de focalizador: el párrafo anterior "
+                                    f"muestra percepciones de {', '.join(prev_named)}, "
+                                    f"pero este muestra percepciones de {', '.join(curr_named)}. "
+                                    f"Verifique si el cambio de perspectiva es intencional."
+                                ),
+                                suggestion=(
+                                    "Si el cambio es intencional, considere añadir un marcador de transición "
+                                    "('Mientras tanto', 'Por su parte') o una separación de escena."
+                                ),
+                                confidence=0.65,  # Baja porque es heurística
+                                context=self._extract_context(full_text, para["start"], para["end"]),
+                                chapter_index=chapter_index,
+                                rule_id="POV_FOCALIZER_SHIFT",
+                                extra_data={
+                                    "previous_focalizers": list(prev_named),
+                                    "current_focalizers": list(curr_named),
+                                },
+                            )
+                        )
 
             prev_para = para
+            prev_subjects = current_subjects
 
         return issues
 
@@ -399,3 +489,100 @@ class POVDetector(BaseDetector):
             "third": "tercera persona (él/ella)",
         }
         return names.get(pov, pov)
+
+    def _check_inconsistent_omniscience(
+        self,
+        paragraphs: list[dict],
+        chapter_index: Optional[int],
+        full_text: str,
+    ) -> list[CorrectionIssue]:
+        """
+        Detecta omnisciencia inconsistente en narrativa de tercera persona.
+
+        Un narrador omnisciente puede acceder a los pensamientos de todos los
+        personajes. Pero si el texto alterna entre focalización limitada
+        (solo un personaje) y omnisciencia, esto puede confundir al lector.
+
+        Heurística: detecta cuando un texto en tercera persona limitada
+        de repente muestra pensamientos de múltiples personajes en el mismo
+        párrafo o sección.
+        """
+        issues = []
+
+        # Solo aplicar a tercera persona
+        third_person_paragraphs = [
+            p for p in paragraphs
+            if p["pov"]["dominant"] == "third"
+        ]
+
+        if len(third_person_paragraphs) < 3:
+            return []
+
+        # Patrones para detectar acceso a pensamientos internos
+        internal_thoughts_pattern = re.compile(
+            r'([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+|[Éé]l|[Ee]lla)\s+'
+            r'(pensó|pensaba|sintió|sentía|se preguntó|se preguntaba|'
+            r'sabía que|no sabía|temía|esperaba|deseaba|creía|imaginó|'
+            r'recordó|comprendió|se dio cuenta)',
+            re.IGNORECASE
+        )
+
+        # Analizar patrones de focalización
+        para_focalizations = []
+        for para in third_person_paragraphs:
+            focalizers = set()
+            for match in internal_thoughts_pattern.finditer(para["text"]):
+                subject = match.group(1).lower()
+                if subject not in ("él", "ella"):  # Solo nombres propios
+                    focalizers.add(subject)
+            para_focalizations.append({
+                "para": para,
+                "focalizers": focalizers,
+                "count": len(focalizers),
+            })
+
+        # Detectar inconsistencias: si la mayoría de párrafos tienen 0-1 focalizadores
+        # pero algunos tienen 2+, puede indicar inconsistencia
+        counts = [p["count"] for p in para_focalizations]
+        limited_paras = sum(1 for c in counts if c <= 1)
+        omniscient_paras = sum(1 for c in counts if c >= 2)
+
+        # Si hay una mezcla clara (mayoría limitado, algunos omniscientes)
+        if limited_paras >= 3 and omniscient_paras >= 1:
+            # El texto parece mayormente limitado pero hay saltos a omnisciencia
+            for pf in para_focalizations:
+                if pf["count"] >= 2:
+                    para = pf["para"]
+                    focalizers = pf["focalizers"]
+
+                    issues.append(
+                        CorrectionIssue(
+                            category=self.category.value,
+                            issue_type=POVIssueType.INCONSISTENT_OMNISCIENCE.value,
+                            start_char=para["start"],
+                            end_char=para["end"],
+                            text=para["text"][:100] + "..." if len(para["text"]) > 100 else para["text"],
+                            explanation=(
+                                f"Posible inconsistencia en la omnisciencia del narrador: "
+                                f"este párrafo muestra pensamientos internos de múltiples "
+                                f"personajes ({', '.join(focalizers)}), pero el texto parece "
+                                f"usar mayormente focalización limitada. Esto puede confundir al lector."
+                            ),
+                            suggestion=(
+                                "Mantenga consistencia en el acceso a pensamientos: "
+                                "use omnisciencia total o focalización limitada, pero evite mezclarlos "
+                                "sin una estrategia clara."
+                            ),
+                            confidence=0.6,  # Baja porque requiere análisis narratológico profundo
+                            context=self._extract_context(full_text, para["start"], para["end"]),
+                            chapter_index=chapter_index,
+                            rule_id="POV_INCONSISTENT_OMNISCIENCE",
+                            extra_data={
+                                "focalizers_in_paragraph": list(focalizers),
+                                "limited_paragraphs": limited_paras,
+                                "omniscient_paragraphs": omniscient_paras,
+                            },
+                        )
+                    )
+
+        return issues

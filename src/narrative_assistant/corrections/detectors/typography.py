@@ -6,6 +6,9 @@ Detecta:
 - Comillas inconsistentes
 - Puntos suspensivos mal formados
 - Problemas de espaciado
+- Secuencias de puntuación inválidas (,. !? ??)
+- Pares de signos sin cerrar (« ( [)
+- Orden incorrecto de comilla y punto según RAE
 """
 
 import re
@@ -77,6 +80,38 @@ class TypographyDetector(BaseDetector):
         self._no_space_after_punct = re.compile(r"([.,;:!?])[A-Za-záéíóúüñÁÉÍÓÚÜÑ]")
         self._multiple_spaces = re.compile(r"  +")
 
+        # Secuencias de puntuación inválidas
+        # Detecta: ,. ,; ,: ;. :. !? ?! ?? !! (pero NO ...)
+        self._invalid_sequences = re.compile(
+            r',\.|,;|,:|;\.|:\.|'  # Coma/punto y coma/dos puntos seguidos de otro signo
+            r'[!?]{2,}|'  # Signos de exclamación/interrogación repetidos
+            r'(?<!\.)\.\.(?!\.)'  # Exactamente dos puntos (no ...)
+        )
+
+        # Pares de signos - apertura y cierre
+        self._paired_signs = {
+            '«': '»',  # Comillas angulares
+            '»': '«',  # Inverso (para detectar cierre sin apertura)
+            '"': '"',  # Comillas inglesas apertura
+            '"': '"',  # Comillas inglesas cierre
+            '(': ')',
+            ')': '(',
+            '[': ']',
+            ']': '[',
+            '¿': '?',
+            '¡': '!',
+        }
+
+        # Comillas de apertura y sus cierres correspondientes
+        self._opening_quotes = {'«': '»', '"': '"'}
+        self._closing_quotes = {'»': '«', '"': '"'}
+
+        # Patrón para detectar comilla seguida de punto (orden incorrecto según RAE)
+        # RAE: el punto va DESPUÉS de la comilla de cierre
+        # Incorrecto: "texto." o «texto.»
+        # Correcto: "texto". o «texto».
+        self._quote_then_period = re.compile(r'[.]\s*[»""]|[»""]\s*[.]')
+
     @property
     def category(self) -> CorrectionCategory:
         return CorrectionCategory.TYPOGRAPHY
@@ -121,6 +156,18 @@ class TypographyDetector(BaseDetector):
         # Detectar espacios múltiples
         if self.config.check_multiple_spaces:
             issues.extend(self._check_multiple_spaces(text, chapter_index))
+
+        # Detectar secuencias de puntuación inválidas
+        if self.config.check_invalid_sequences:
+            issues.extend(self._check_invalid_sequences(text, chapter_index))
+
+        # Detectar pares de signos sin cerrar
+        if self.config.check_unclosed_pairs:
+            issues.extend(self._check_unclosed_pairs(text, chapter_index))
+
+        # Detectar orden incorrecto de comilla y punto
+        if self.config.check_quote_period_order:
+            issues.extend(self._check_quote_period_order(text, chapter_index))
 
         return issues
 
@@ -398,6 +445,192 @@ class TypographyDetector(BaseDetector):
                     context=self._extract_context(text, start, end),
                     chapter_index=chapter_index,
                     rule_id="TYPO_MULTI_SPACE",
+                )
+            )
+
+        return issues
+
+    def _check_invalid_sequences(
+        self, text: str, chapter_index: Optional[int]
+    ) -> list[CorrectionIssue]:
+        """Verifica secuencias de puntuación inválidas."""
+        issues = []
+
+        for match in self._invalid_sequences.finditer(text):
+            start = match.start()
+            end = match.end()
+            found = match.group()
+
+            # Determinar explicación según el tipo de secuencia
+            if found in (',.',):
+                explanation = "Secuencia ',.' inválida: la coma ya implica pausa, el punto es redundante"
+                suggestion = "."
+            elif found in (',;', ',:', ';.', ':.'):
+                explanation = f"Secuencia '{found}' inválida: signos de puntuación incompatibles juntos"
+                suggestion = found[-1]  # Mantener el último
+            elif '?' in found or '!' in found:
+                if found == '?!' or found == '!?':
+                    explanation = "Secuencia '?!' o '!?': en español se prefiere un solo signo"
+                    suggestion = '?' if found[0] == '?' else '!'
+                else:
+                    explanation = f"Secuencia '{found}': signos repetidos innecesariamente"
+                    suggestion = found[0]
+            elif found == '..':
+                explanation = "Dos puntos seguidos: usa tres puntos (...) o uno solo (.)"
+                suggestion = "..."
+            else:
+                explanation = f"Secuencia de puntuación inválida: '{found}'"
+                suggestion = None
+
+            issues.append(
+                CorrectionIssue(
+                    category=CorrectionCategory.PUNCTUATION.value,
+                    issue_type=TypographyIssueType.INVALID_PUNCT_SEQUENCE.value,
+                    start_char=start,
+                    end_char=end,
+                    text=found,
+                    explanation=explanation,
+                    suggestion=suggestion,
+                    confidence=0.9,
+                    context=self._extract_context(text, start, end),
+                    chapter_index=chapter_index,
+                    rule_id="PUNCT_INVALID_SEQ",
+                )
+            )
+
+        return issues
+
+    def _check_unclosed_pairs(
+        self, text: str, chapter_index: Optional[int]
+    ) -> list[CorrectionIssue]:
+        """Verifica pares de signos sin cerrar."""
+        issues = []
+
+        # Rastrear signos de apertura y sus posiciones
+        # Stack para cada tipo de signo
+        stacks = {
+            '«': [],  # Posiciones de « sin cerrar
+            '"': [],  # Posiciones de " sin cerrar
+            '(': [],  # Posiciones de ( sin cerrar
+            '[': [],  # Posiciones de [ sin cerrar
+            '¿': [],  # Posiciones de ¿ sin cerrar
+            '¡': [],  # Posiciones de ¡ sin cerrar
+        }
+
+        closers = {
+            '»': '«',
+            '"': '"',
+            ')': '(',
+            ']': '[',
+            '?': '¿',
+            '!': '¡',
+        }
+
+        for i, char in enumerate(text):
+            # Si es un signo de apertura, añadir al stack
+            if char in stacks:
+                stacks[char].append(i)
+            # Si es un signo de cierre, emparejar con apertura
+            elif char in closers:
+                opener = closers[char]
+                if stacks[opener]:
+                    stacks[opener].pop()  # Emparejado, eliminar del stack
+                else:
+                    # Cierre sin apertura
+                    issues.append(
+                        CorrectionIssue(
+                            category=self.category.value,
+                            issue_type=TypographyIssueType.UNCLOSED_PAIR.value,
+                            start_char=i,
+                            end_char=i + 1,
+                            text=char,
+                            explanation=f"Signo de cierre '{char}' sin apertura '{opener}' correspondiente",
+                            suggestion=None,
+                            confidence=0.85,
+                            context=self._extract_context(text, i, i + 1),
+                            chapter_index=chapter_index,
+                            rule_id="TYPO_UNCLOSED_PAIR",
+                            extra_data={"sign_type": "closer_without_opener"},
+                        )
+                    )
+
+        # Verificar signos de apertura sin cerrar
+        for opener, positions in stacks.items():
+            closer = self._paired_signs.get(opener, '')
+            for pos in positions:
+                issues.append(
+                    CorrectionIssue(
+                        category=self.category.value,
+                        issue_type=TypographyIssueType.UNCLOSED_PAIR.value,
+                        start_char=pos,
+                        end_char=pos + 1,
+                        text=opener,
+                        explanation=f"Signo de apertura '{opener}' sin cierre '{closer}' correspondiente",
+                        suggestion=None,
+                        confidence=0.85,
+                        context=self._extract_context(text, pos, pos + 1),
+                        chapter_index=chapter_index,
+                        rule_id="TYPO_UNCLOSED_PAIR",
+                        extra_data={"sign_type": "opener_without_closer"},
+                    )
+                )
+
+        return issues
+
+    def _check_quote_period_order(
+        self, text: str, chapter_index: Optional[int]
+    ) -> list[CorrectionIssue]:
+        """
+        Verifica el orden de comilla y punto según la RAE.
+
+        Según la RAE, cuando una cita o texto entrecomillado termina en punto,
+        el punto va DESPUÉS de la comilla de cierre, no antes.
+
+        Incorrecto: «Hola.» o "Hola."
+        Correcto: «Hola». o "Hola".
+
+        Excepción: Si el texto entrecomillado es una oración completa independiente
+        que empieza con mayúscula, el punto puede ir dentro.
+        """
+        issues = []
+
+        # Buscar patrones de punto dentro de comillas al final
+        # Patrón: texto + punto + comilla de cierre
+        pattern_period_inside = re.compile(r'\.([»""])')
+
+        for match in pattern_period_inside.finditer(text):
+            start = match.start()
+            end = match.end()
+
+            # Obtener contexto para verificar si es oración independiente
+            context_start = max(0, start - 50)
+            context = text[context_start:start]
+
+            # Si la comilla de apertura está seguida de mayúscula al inicio,
+            # podría ser una cita independiente (permitido)
+            # Pero para simplificar, siempre alertamos y dejamos que el corrector decida
+            closing_quote = match.group(1)
+
+            issues.append(
+                CorrectionIssue(
+                    category=CorrectionCategory.PUNCTUATION.value,
+                    issue_type=TypographyIssueType.QUOTE_PERIOD_ORDER.value,
+                    start_char=start,
+                    end_char=end,
+                    text=match.group(),
+                    explanation=(
+                        f"Según la RAE, el punto va después de la comilla de cierre, "
+                        f"no antes. Debería ser '{closing_quote}.' en lugar de '.{closing_quote}'"
+                    ),
+                    suggestion=f"{closing_quote}.",
+                    confidence=0.75,  # Reducida porque hay excepciones
+                    context=self._extract_context(text, start, end),
+                    chapter_index=chapter_index,
+                    rule_id="PUNCT_QUOTE_PERIOD",
+                    extra_data={
+                        "quote_type": closing_quote,
+                        "note": "La RAE permite el punto dentro si es cita independiente",
+                    },
                 )
             )
 
