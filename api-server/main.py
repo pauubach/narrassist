@@ -185,53 +185,41 @@ Database = None
 MODULES_LOADED = False
 MODULES_ERROR = None
 
-try:
-    # CRITICAL: Change to a safe directory before importing to avoid numpy source directory error
-    import os
-    original_cwd = os.getcwd()
-    if getattr(sys, 'frozen', False):
-        # When frozen, change to temp dir to avoid import conflicts
-        safe_dir = os.path.expanduser("~")
-        os.chdir(safe_dir)
-        _write_debug(f"Changed to safe dir: {safe_dir}")
-    
-    # First test: can we import numpy directly?
+# Strategy: When frozen (PyInstaller), DON'T load narrative_assistant on startup
+# Only load it on-demand after dependencies are installed
+# This avoids numpy import conflicts in PyInstaller bundle
+if not getattr(sys, 'frozen', False):
+    # Not frozen (development mode) - load normally
     try:
-        import numpy as np
-        _write_debug(f"Direct numpy import OK, version: {np.__version__}")
-    except Exception as e:
-        _write_debug(f"Direct numpy import FAILED: {e}")
-        raise
-    
-    from narrative_assistant.persistence.project import ProjectManager
-    from narrative_assistant.persistence.database import get_database, Database
-    from narrative_assistant.persistence.chapter import ChapterRepository, SectionRepository
-    from narrative_assistant.entities.repository import EntityRepository
-    from narrative_assistant.alerts.repository import AlertRepository, AlertStatus, AlertSeverity
-    from narrative_assistant.core.config import get_config
-    from narrative_assistant.core.result import Result
-    from narrative_assistant import __version__ as NA_VERSION
+        from narrative_assistant.persistence.project import ProjectManager
+        from narrative_assistant.persistence.database import get_database, Database
+        from narrative_assistant.persistence.chapter import ChapterRepository, SectionRepository
+        from narrative_assistant.entities.repository import EntityRepository
+        from narrative_assistant.alerts.repository import AlertRepository, AlertStatus, AlertSeverity
+        from narrative_assistant.core.config import get_config
+        from narrative_assistant.core.result import Result
+        from narrative_assistant import __version__ as NA_VERSION
 
-    # Inicializar managers
-    project_manager = ProjectManager()
-    entity_repository = EntityRepository()
-    alert_repository = AlertRepository()
-    chapter_repository = ChapterRepository()
-    section_repository = SectionRepository()
-    MODULES_LOADED = True
-    
-    # Restore original directory
-    if getattr(sys, 'frozen', False):
-        os.chdir(original_cwd)
-        _write_debug(f"Restored original dir: {original_cwd}")
+        # Inicializar managers
+        project_manager = ProjectManager()
+        entity_repository = EntityRepository()
+        alert_repository = AlertRepository()
+        chapter_repository = ChapterRepository()
+        section_repository = SectionRepository()
+        MODULES_LOADED = True
+        _write_debug("Modules loaded successfully (development mode)")
         
-except Exception as e:
-    import logging as _logging
-    _logging.basicConfig(level=_logging.INFO)
-    _logging.warning(f"NLP modules not loaded: {type(e).__name__}: {e}")
-    _logging.info("Server will start in limited mode. Install dependencies via /api/models/download")
-    MODULES_ERROR = str(e)
-    NA_VERSION = "0.2.8"  # Fallback version
+    except Exception as e:
+        import logging as _logging
+        _logging.basicConfig(level=_logging.INFO)
+        _logging.warning(f"NLP modules not loaded: {type(e).__name__}: {e}")
+        _logging.info("Server will start in limited mode. Install dependencies via /api/models/download")
+        MODULES_ERROR = str(e)
+        NA_VERSION = "0.2.9"
+else:
+    # Frozen (production) - load on demand only
+    _write_debug("Frozen mode: modules will load on-demand after dependency installation")
+    NA_VERSION = "0.2.9"
 
 # Logging already configured at the top of the file in _setup_early_logging()
 logger = logging.getLogger(__name__)
@@ -260,6 +248,55 @@ app.add_middleware(
 # ============================================================================
 # Helpers
 # ============================================================================
+
+def load_narrative_assistant_modules():
+    """
+    Load narrative_assistant modules on-demand.
+    This is called after dependencies are installed in frozen mode.
+    
+    Returns:
+        bool: True if modules loaded successfully, False otherwise
+    """
+    global MODULES_LOADED, MODULES_ERROR
+    global project_manager, entity_repository, alert_repository
+    global chapter_repository, section_repository, get_config, Database
+    
+    if MODULES_LOADED:
+        return True
+    
+    try:
+        _write_debug("Attempting to load narrative_assistant modules...")
+        
+        from narrative_assistant.persistence.project import ProjectManager
+        from narrative_assistant.persistence.database import get_database, Database as DB
+        from narrative_assistant.persistence.chapter import ChapterRepository, SectionRepository
+        from narrative_assistant.entities.repository import EntityRepository
+        from narrative_assistant.alerts.repository import AlertRepository
+        from narrative_assistant.core.config import get_config as get_cfg
+        from narrative_assistant import __version__
+        
+        # Inicializar managers
+        project_manager = ProjectManager()
+        entity_repository = EntityRepository()
+        alert_repository = AlertRepository()
+        chapter_repository = ChapterRepository()
+        section_repository = SectionRepository()
+        get_config = get_cfg
+        Database = DB
+        MODULES_LOADED = True
+        MODULES_ERROR = None
+        
+        _write_debug("✓ Modules loaded successfully!")
+        logger.info("✓ narrative_assistant modules loaded successfully")
+        return True
+        
+    except Exception as e:
+        error_msg = f"Failed to load narrative_assistant modules: {type(e).__name__}: {e}"
+        _write_debug(error_msg)
+        logger.error(error_msg, exc_info=True)
+        MODULES_ERROR = str(e)
+        return False
+
 
 # Minimum required Python version (major, minor)
 MIN_PYTHON_VERSION = (3, 10)
@@ -645,24 +682,40 @@ async def models_status():
             else:
                 logger.warning(f"✗ {dep} NOT found")
 
-        # Si Python no está disponible, las dependencias no se pueden instalar
-        dependencies_needed = True
-        python_error = python_info["error"] if not python_info["python_available"] else None
+        all_deps_installed = all(deps_status.values())
+        
+        # Si todas las dependencias están instaladas, intentar cargar los módulos
+        if all_deps_installed and python_info["python_available"]:
+            logger.info("All dependencies detected - attempting to load narrative_assistant modules...")
+            _write_debug("All dependencies detected - attempting to load narrative_assistant modules...")
+            if load_narrative_assistant_modules():
+                logger.info("Successfully loaded narrative_assistant modules!")
+                _write_debug("Successfully loaded narrative_assistant modules!")
+                # MODULES_LOADED is now True, fall through to normal flow below
+            else:
+                logger.warning("Failed to load narrative_assistant modules despite dependencies being present")
+                _write_debug("Failed to load narrative_assistant modules despite dependencies being present")
 
-        return ApiResponse(
-            success=True,
-            data={
-                "backend_loaded": False,
-                "dependencies_needed": dependencies_needed,
-                "dependencies_status": deps_status,
-                "all_installed": all(deps_status.values()),
-                "installing": INSTALLING_DEPENDENCIES,
-                "python_available": python_info["python_available"],
-                "python_version": python_info["python_version"],
-                "python_path": python_info["python_path"],
-                "python_error": python_error,
-            }
-        )
+        # Si después de intentar cargar, aún no están cargados, retornar estado de dependencias
+        if not MODULES_LOADED:
+            # Si Python no está disponible, las dependencias no se pueden instalar
+            dependencies_needed = True
+            python_error = python_info["error"] if not python_info["python_available"] else None
+
+            return ApiResponse(
+                success=True,
+                data={
+                    "backend_loaded": False,
+                    "dependencies_needed": dependencies_needed,
+                    "dependencies_status": deps_status,
+                    "all_installed": all_deps_installed,
+                    "installing": INSTALLING_DEPENDENCIES,
+                    "python_available": python_info["python_available"],
+                    "python_version": python_info["python_version"],
+                    "python_path": python_info["python_path"],
+                    "python_error": python_error,
+                }
+            )
     
     try:
         from narrative_assistant.core.model_manager import get_model_manager
@@ -791,34 +844,14 @@ async def install_dependencies():
             logger.info("All dependencies installed successfully!")
             logger.info("Attempting to load narrative_assistant modules...")
             
-            # Intentar recargar los módulos
-            try:
-                from narrative_assistant.persistence.project import ProjectManager
-                from narrative_assistant.persistence.database import get_database, Database as DB
-                from narrative_assistant.persistence.chapter import ChapterRepository, SectionRepository
-                from narrative_assistant.entities.repository import EntityRepository
-                from narrative_assistant.alerts.repository import AlertRepository
-                from narrative_assistant.core.config import get_config as get_cfg
-                from narrative_assistant import __version__
-                
-                # Actualizar variables globales
-                project_manager = ProjectManager()
-                entity_repository = EntityRepository()
-                alert_repository = AlertRepository()
-                chapter_repository = ChapterRepository()
-                section_repository = SectionRepository()
-                get_config = get_cfg
-                Database = DB
-                MODULES_LOADED = True
-                MODULES_ERROR = None
+            # Usar la función helper para cargar los módulos
+            if load_narrative_assistant_modules():
                 INSTALLING_DEPENDENCIES = False
-                
                 logger.info("✓ Modules loaded successfully! Backend is now fully functional.")
-                
-            except Exception as load_error:
-                logger.error(f"Failed to load modules after installation: {load_error}")
+            else:
+                logger.error("Failed to load modules after installation")
                 logger.info("You may need to restart the application.")
-                raise
+                raise Exception("Failed to load narrative_assistant modules after installation")
             
         except Exception as e:
             logger.error(f"Error installing dependencies: {e}", exc_info=True)
