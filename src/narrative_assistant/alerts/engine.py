@@ -1155,6 +1155,90 @@ class AlertEngine:
             },
         )
 
+    def create_from_deceased_reappearance(
+        self,
+        project_id: int,
+        entity_id: int,
+        entity_name: str,
+        death_chapter: int,
+        appearance_chapter: int,
+        appearance_start_char: int,
+        appearance_end_char: int,
+        appearance_excerpt: str,
+        appearance_type: str,
+        death_excerpt: str = "",
+        confidence: float = 0.85,
+        extra_data: Optional[dict[str, Any]] = None,
+    ) -> Result[Alert]:
+        """
+        Crea alerta cuando un personaje fallecido reaparece como vivo.
+
+        Esta es una inconsistencia narrativa grave: el personaje muere en
+        un capítulo y aparece actuando/hablando en un capítulo posterior.
+
+        Args:
+            project_id: ID del proyecto
+            entity_id: ID del personaje
+            entity_name: Nombre del personaje
+            death_chapter: Capítulo donde muere
+            appearance_chapter: Capítulo donde reaparece
+            appearance_start_char: Posición inicio de la reaparición
+            appearance_end_char: Posición fin de la reaparición
+            appearance_excerpt: Texto de la reaparición
+            appearance_type: Tipo de reaparición (dialogue, action)
+            death_excerpt: Texto donde se menciona la muerte
+            confidence: Confianza de la detección
+            extra_data: Datos adicionales
+
+        Returns:
+            Result con la alerta creada
+        """
+        severity = AlertSeverity.CRITICAL if confidence >= 0.8 else AlertSeverity.WARNING
+
+        # Descripción según tipo de aparición
+        if appearance_type == "dialogue":
+            action_desc = "habla"
+        else:
+            action_desc = "actúa"
+
+        return self.create_alert(
+            project_id=project_id,
+            category=AlertCategory.CONSISTENCY,
+            severity=severity,
+            alert_type="deceased_reappearance",
+            title=f"Personaje fallecido reaparece: {entity_name}",
+            description=(
+                f"{entity_name} muere en capítulo {death_chapter} "
+                f"pero {action_desc} en capítulo {appearance_chapter}"
+            ),
+            explanation=(
+                f"El personaje '{entity_name}' fue declarado muerto en el capítulo {death_chapter}. "
+                f"Sin embargo, aparece realizando acciones en el capítulo {appearance_chapter}, "
+                f"lo cual es una inconsistencia narrativa a menos que sea un flashback, "
+                f"recuerdo o aparición sobrenatural."
+            ),
+            suggestion=(
+                f"Verificar si '{entity_name}' realmente muere en el capítulo {death_chapter}. "
+                f"Si la reaparición es intencional (flashback, fantasma, recuerdo), "
+                f"considerar añadir contexto narrativo que lo aclare."
+            ),
+            chapter=appearance_chapter,
+            start_char=appearance_start_char,
+            end_char=appearance_end_char,
+            excerpt=appearance_excerpt[:300] if appearance_excerpt else "",
+            entity_ids=[entity_id],
+            confidence=confidence,
+            source_module="vital_status_analyzer",
+            extra_data={
+                "entity_name": entity_name,
+                "death_chapter": death_chapter,
+                "appearance_chapter": appearance_chapter,
+                "appearance_type": appearance_type,
+                "death_excerpt": death_excerpt[:200] if death_excerpt else "",
+                **(extra_data or {}),
+            },
+        )
+
 
 def get_alert_engine() -> AlertEngine:
     """

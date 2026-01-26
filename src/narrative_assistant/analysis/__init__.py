@@ -65,6 +65,19 @@ from .emotional_coherence import (
     reset_emotional_coherence_checker,
 )
 
+from .vital_status import (
+    # Tipos
+    VitalStatus,
+    # Dataclasses
+    DeathEvent,
+    PostMortemAppearance,
+    VitalStatusReport,
+    # Clase principal
+    VitalStatusAnalyzer,
+    # Funciones de conveniencia
+    analyze_vital_status,
+)
+
 __all__ = [
     # Tipos - Consistency
     "AttributeInconsistency",
@@ -109,4 +122,14 @@ __all__ = [
     # Funciones - Emotional Coherence
     "get_emotional_coherence_checker",
     "reset_emotional_coherence_checker",
+    # Tipos - Vital Status
+    "VitalStatus",
+    # Dataclasses - Vital Status
+    "DeathEvent",
+    "PostMortemAppearance",
+    "VitalStatusReport",
+    # Clase - Vital Status
+    "VitalStatusAnalyzer",
+    # Funciones - Vital Status
+    "analyze_vital_status",
 ]
