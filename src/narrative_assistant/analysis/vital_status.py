@@ -17,7 +17,7 @@ from enum import Enum
 from typing import Optional
 
 from ..core.result import Result
-from ..core.errors import AnalysisError
+from ..core.errors import NLPError
 
 logger = logging.getLogger(__name__)
 
@@ -144,10 +144,11 @@ class VitalStatusAnalyzer:
 
     # Patrones para muerte causada (alguien mata al personaje)
     DEATH_CAUSED_PATTERNS = [
-        r"(?:mató|asesinó|ejecutó)\s+a\s+(?P<name>\w+)",
+        r"(?:mató|mataron|asesinó|asesinaron|ejecutó|ejecutaron)\s+a\s+(?P<name>\w+)",
+        r"(?:lo|la|le)\s+(?:mató|mataron|asesinó|asesinaron)\s+a\s+(?P<name>\w+)",
         r"(?P<name>\w+)\s+(?:fue\s+asesinado|fue\s+ejecutado|fue\s+matado)",
         r"(?:la\s+muerte|el\s+asesinato)\s+de\s+(?P<name>\w+)",
-        r"(?:disparó|apuñaló|envenenó|ahorcó|degolló)\s+a\s+(?P<name>\w+)",
+        r"(?:disparó|dispararon|apuñaló|apuñalaron|envenenó|envenenaron|ahorcó|ahorcaron|degolló|degollaron)\s+a\s+(?P<name>\w+)",
     ]
 
     # Patrones para muerte reportada (se informa de la muerte)
@@ -229,6 +230,8 @@ class VitalStatusAnalyzer:
             Lista de eventos de muerte detectados
         """
         events = []
+        # Track entities already found in this chapter to avoid duplicates
+        found_in_chapter: set[int] = set()
 
         # Patrones y sus tipos
         pattern_groups = [
@@ -245,6 +248,10 @@ class VitalStatusAnalyzer:
                     entity_id = self.get_entity_id(name)
 
                     if not entity_id:
+                        continue
+
+                    # No duplicar si ya encontramos muerte para esta entidad en este capítulo
+                    if entity_id in found_in_chapter:
                         continue
 
                     # No duplicar si ya tenemos muerte para esta entidad en cap anterior
@@ -279,6 +286,7 @@ class VitalStatusAnalyzer:
 
                     events.append(event)
                     self._death_events[entity_id] = event
+                    found_in_chapter.add(entity_id)
 
                     logger.info(
                         f"Death event detected: {event.entity_name} in chapter {chapter} "
@@ -496,4 +504,4 @@ def analyze_vital_status(
 
     except Exception as e:
         logger.error(f"Error analyzing vital status: {e}")
-        return Result.failure(AnalysisError(f"Error analyzing vital status: {e}"))
+        return Result.failure(NLPError(f"Error analyzing vital status: {e}"))
