@@ -167,6 +167,20 @@ def download_macos_framework(target_dir: Path):
                 framework_extracted = True
                 break
             
+            # Si cpio extrajo el contenido sin el directorio Python.framework,
+            # buscar directorio Versions/ que indica contenido del framework
+            versions_dir = payload_extract_dir / "Versions"
+            if versions_dir.exists() and versions_dir.is_dir():
+                print(f"  Encontrado Versions/ - creando estructura Python.framework")
+                framework_dst = target_dir / "Python.framework"
+                if framework_dst.exists():
+                    shutil.rmtree(framework_dst)
+                # Mover todo el contenido extraido como Python.framework
+                shutil.move(str(payload_extract_dir), str(framework_dst))
+                print(f"[OK] Python.framework creado desde contenido extraido")
+                framework_extracted = True
+                break
+            
             # Buscar en ubicaciones específicas si rglob no encuentra nada
             possible_locations = [
                 payload_extract_dir / "Library" / "Frameworks" / "Python.framework",

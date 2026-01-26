@@ -23,6 +23,7 @@ export * from './domain/theme'
 export * from './domain/timeline'
 export * from './domain/chat'
 export * from './domain/corrections'
+export * from './domain/voice'
 
 // =============================================================================
 // API Types (namespace para claridad)

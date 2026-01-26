@@ -63,7 +63,7 @@ if __name__ == "__main__":
     import main
 '''
     launcher_script.write_text(launcher_content, encoding='utf-8')
-    print(f"✓ Creado launcher: {launcher_script.name}")
+    print(f"[OK] Creado launcher: {launcher_script.name}")
     
     # Crear requirements.txt
     requirements = target_dir / "requirements.txt"
@@ -81,7 +81,7 @@ olefile==0.47
 charset-normalizer==3.4.0
 """
     requirements.write_text(requirements_content, encoding='utf-8')
-    print(f"✓ Creado requirements.txt")
+    print(f"[OK] Creado requirements.txt")
     
     # Calcular tamaño
     total_size = sum(f.stat().st_size for f in target_dir.rglob('*') if f.is_file())
@@ -89,7 +89,7 @@ charset-normalizer==3.4.0
     
     print()
     print("=" * 80)
-    print(f"✓ Backend bundle creado exitosamente")
+    print(f"[OK] Backend bundle creado exitosamente")
     print(f"  Tamaño: {size_mb:.1f} MB")
     print(f"  Ubicación: {target_dir}")
     print("=" * 80)
