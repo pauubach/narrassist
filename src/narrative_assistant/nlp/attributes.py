@@ -1328,6 +1328,23 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                 if confidence < self.min_confidence:
                     continue
 
+                # Validar que entity_name no sea un color, adjetivo o palabra inválida
+                invalid_entity_names = {
+                    'negro', 'rubio', 'castaño', 'moreno', 'blanco', 'gris', 'canoso',
+                    'alto', 'bajo', 'largo', 'corto', 'azules', 'verdes', 'marrones',
+                    'delgado', 'fornido', 'sorprendido', 'confundido', 'extraño',
+                }
+                if entity_name and entity_name.lower() in invalid_entity_names:
+                    continue
+
+                # Filtrar valores que son estados emocionales (no atributos físicos)
+                emotional_states = {
+                    'sorprendido', 'confundido', 'extrañado', 'asustado', 'feliz',
+                    'triste', 'enfadado', 'nervioso', 'preocupado', 'emocionado',
+                }
+                if value and value.lower() in emotional_states:
+                    continue
+
                 attr = ExtractedAttribute(
                     entity_name=entity_name,
                     category=category,
@@ -1375,7 +1392,16 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                     logger.debug(f"Atributo ignorado (sin entidad/valor): {attr}")
                     continue
 
-                # Filtrar entidades inválidas (pronombres, adverbios, etc.)
+                # Filtrar valores que son estados emocionales (no atributos físicos)
+                emotional_states = {
+                    'sorprendido', 'confundido', 'extrañado', 'asustado', 'feliz',
+                    'triste', 'enfadado', 'nervioso', 'preocupado', 'emocionado',
+                }
+                if attr.value.lower() in emotional_states:
+                    logger.debug(f"Atributo ignorado (estado emocional): {attr.value}")
+                    continue
+
+                # Filtrar entidades inválidas (pronombres, adverbios, colores, etc.)
                 # Incluir versiones con y sin tilde para ser robusto
                 invalid_entities = {
                     "también", "tambien", "este", "esta", "esto", "ese", "esa", "eso",
@@ -1384,6 +1410,9 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                     "todos", "todas", "otro", "otra", "otros", "otras", "mismo",
                     "misma", "mismos", "mismas", "ambos", "ambas", "varios", "varias",
                     "quien", "quién", "cual", "cuál", "cuales", "cuáles",
+                    # Colores y adjetivos que no son entidades
+                    "negro", "rubio", "castaño", "moreno", "blanco", "gris", "canoso",
+                    "alto", "bajo", "largo", "corto", "azules", "verdes", "marrones",
                 }
                 if attr.entity_name.lower() in invalid_entities:
                     logger.debug(f"Atributo ignorado (entidad inválida): {attr.entity_name}")
@@ -1633,41 +1662,105 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
         entity_mentions: Optional[list[tuple[str, int, int]]],
         full_text: str,
     ) -> Optional[str]:
-        """Encuentra entidad en una oración, incluyendo resolución de pronombres."""
+        """
+        Encuentra entidad SUJETO en una oración, incluyendo resolución de pronombres.
+        
+        IMPORTANTE: Distingue entre sujeto y objeto/complemento.
+        - "Sus ojos azules miraban a María" → sujeto implícito (no María)
+        - "María tenía ojos azules" → sujeto = María
+        """
         if not entity_mentions:
             return None
 
+        import re as regex_module
+        
         sentence_lower = sentence.lower()
         sentence_start = full_text.find(sentence)
 
-        # Buscar entidades que aparezcan en la oración
+        # Buscar entidades que aparezcan en la oración como SUJETO (no objeto)
+        # Patrones que indican que la entidad es OBJETO (no sujeto):
+        # - "a [Nombre]" (complemento directo/indirecto)
+        # - "de [Nombre]" (posesivo/genitivo, a menos que sea inicio de oración)
+        # - "con [Nombre]" (compañía)
+        # - "para [Nombre]" (destinatario)
+        # - "por [Nombre]" (agente en pasiva, pero también puede ser causa)
+        
+        object_patterns = [
+            r'\ba\s+{}\b',      # "a María", "a Juan"
+            r'\bcon\s+{}\b',    # "con María"
+            r'\bpara\s+{}\b',   # "para Juan"
+            r'\bhacia\s+{}\b',  # "hacia María"
+            r'\bsobre\s+{}\b',  # "sobre Juan"
+        ]
+        
+        subject_candidates = []
+        object_entities = set()
+        
         for name, start, end in entity_mentions:
-            if name.lower() in sentence_lower:
-                return name
-            # También verificar por posición
-            if sentence_start >= 0:
-                if start >= sentence_start and end <= sentence_start + len(sentence):
-                    return name
+            name_lower = name.lower()
+            if name_lower not in sentence_lower:
+                continue
+            
+            # Verificar si aparece como objeto
+            is_object = False
+            for pattern_template in object_patterns:
+                pattern = pattern_template.format(regex_module.escape(name_lower))
+                if regex_module.search(pattern, sentence_lower):
+                    is_object = True
+                    object_entities.add(name)
+                    break
+            
+            if not is_object:
+                # Calcular posición en la oración (priorizar inicio = más probable sujeto)
+                pos_in_sentence = sentence_lower.find(name_lower)
+                subject_candidates.append((name, pos_in_sentence))
+        
+        if subject_candidates:
+            # Priorizar el que aparece primero (más probable sujeto)
+            subject_candidates.sort(key=lambda x: x[1])
+            return subject_candidates[0][0]
 
-        # Si no se encontró entidad directamente, buscar pronombres y resolver
-        import re as regex_module
-        pronouns_pattern = r'\b(él|ella|este|esta|aquel|aquella|también)\b'
+        # Si no se encontró sujeto directo, buscar pronombres y resolver
+        pronouns_pattern = r'\b(él|ella|sus?|este|esta|aquel|aquella)\b'
         has_pronoun = regex_module.search(pronouns_pattern, sentence_lower)
 
         if has_pronoun and sentence_start > 0:
             # Buscar la entidad mencionada más recientemente antes de esta oración
-            text_before = full_text[:sentence_start]
-
-            # Ordenar menciones por posición (de más reciente a más antigua)
+            # PERO excluir entidades que aparecen como objeto en esta oración
             mentions_before = [
                 (name, start, end)
                 for name, start, end in entity_mentions
-                if end <= sentence_start
+                if end <= sentence_start and name not in object_entities
             ]
 
             if mentions_before:
                 # Tomar la más cercana (última mencionada antes de la oración)
                 mentions_before.sort(key=lambda x: x[1], reverse=True)
+                
+                # Aplicar concordancia de género si es posible
+                pronoun_match = regex_module.search(pronouns_pattern, sentence_lower)
+                if pronoun_match:
+                    pronoun = pronoun_match.group(1).lower()
+                    is_feminine = pronoun in ('ella', 'esta', 'aquella')
+                    is_masculine = pronoun in ('él', 'este', 'aquel')
+                    
+                    if is_feminine or is_masculine:
+                        # Filtrar por género
+                        gendered = []
+                        for name, start, end in mentions_before:
+                            name_lower = name.lower().split()[0]
+                            # Heurística simple: nombres terminados en 'a' suelen ser femeninos
+                            name_is_feminine = name_lower.endswith('a') and name_lower not in ('jesús', 'elías', 'josué')
+                            
+                            if is_feminine and name_is_feminine:
+                                gendered.append((name, start, end))
+                            elif is_masculine and not name_is_feminine:
+                                gendered.append((name, start, end))
+                        
+                        if gendered:
+                            return gendered[0][0]
+                
+                # Fallback: retornar el más cercano
                 return mentions_before[0][0]
 
         return None
@@ -1815,7 +1908,8 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
             return value_lower in COLORS
 
         if key == AttributeKey.HAIR_COLOR:
-            return value_lower in COLORS or value_lower in HAIR_TYPES
+            # Solo colores válidos, NO tipos de cabello (largo/corto son hair_type)
+            return value_lower in COLORS
 
         if key == AttributeKey.BUILD:
             return value_lower in BUILD_TYPES

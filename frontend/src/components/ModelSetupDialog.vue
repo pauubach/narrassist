@@ -15,7 +15,32 @@ const downloadPhase = ref<'checking' | 'installing-deps' | 'downloading' | 'comp
 // If not, download automatically (transparent to user)
 onMounted(async () => {
   downloadPhase.value = 'checking'
-  await systemStore.checkModelsStatus()
+  
+  // Retry a few times as backend may still be loading modules
+  let retries = 0
+  const maxRetries = 3
+  const retryDelay = 1500 // ms
+  
+  while (retries < maxRetries) {
+    await systemStore.checkModelsStatus()
+    
+    // If models are ready, we're done - no dialog needed
+    if (systemStore.modelsReady) {
+      downloadPhase.value = 'completed'
+      return
+    }
+    
+    // If backend is loaded, stop retrying (we have a real answer)
+    if (systemStore.backendLoaded) {
+      break
+    }
+    
+    // Backend not loaded yet, wait and retry
+    retries++
+    if (retries < maxRetries) {
+      await new Promise(resolve => setTimeout(resolve, retryDelay))
+    }
+  }
 
   // First check if Python is available
   if (!systemStore.pythonAvailable) {
@@ -25,14 +50,17 @@ onMounted(async () => {
     return
   }
 
+  // Double-check: if models are ready after retries, don't show dialog
+  if (systemStore.modelsReady) {
+    downloadPhase.value = 'completed'
+    return
+  }
+
   if (systemStore.dependenciesNeeded || !systemStore.backendLoaded) {
     // Dependencies missing or backend not loaded - install them first
     visible.value = true
     downloadPhase.value = 'installing-deps'
     startDependenciesInstallation()
-  } else if (systemStore.modelsReady) {
-    // Models already installed (normal case after installation)
-    downloadPhase.value = 'completed'
   } else {
     // Dependencies OK AND backend loaded but models missing - download automatically
     // This happens if installer couldn't download (no internet, etc.)
