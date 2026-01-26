@@ -10,7 +10,7 @@
  * Las reglas son por proyecto y tienen persistencia.
  */
 
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import Textarea from 'primevue/textarea'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
@@ -20,8 +20,17 @@ import TabView from 'primevue/tabview'
 import TabPanel from 'primevue/tabpanel'
 import { useToast } from 'primevue/usetoast'
 import { useWorkspaceStore } from '@/stores/workspace'
+import { useFeatureProfile } from '@/composables/useFeatureProfile'
 import CorrectionConfigPanel from './CorrectionConfigPanel.vue'
 import RegisterAnalysisTab from './RegisterAnalysisTab.vue'
+import FocalizationTab from './FocalizationTab.vue'
+import SceneTaggingTab from './SceneTaggingTab.vue'
+import StickySentencesTab from './StickySentencesTab.vue'
+import EchoReportTab from './EchoReportTab.vue'
+import SentenceVariationTab from './SentenceVariationTab.vue'
+import PacingAnalysisTab from './PacingAnalysisTab.vue'
+import EmotionalAnalysisTab from './EmotionalAnalysisTab.vue'
+import AgeReadabilityTab from './AgeReadabilityTab.vue'
 
 const props = defineProps<{
   projectId: number
@@ -30,6 +39,9 @@ const props = defineProps<{
 }>()
 
 const workspaceStore = useWorkspaceStore()
+
+// Feature profile based on document type
+const { isFeatureAvailable } = useFeatureProfile(computed(() => props.projectId))
 
 // Active tab index
 const activeTab = ref(0)
@@ -52,10 +64,29 @@ const saving = ref(false)
 const hasChanges = ref(false)
 const lastSaved = ref<string | null>(null)
 
-// Cargar reglas al montar
+// Feature availability (based on document type)
+const hasScenes = ref(false)
+
+// Cargar reglas y features disponibles al montar
 onMounted(() => {
   loadRules()
+  loadFeatureAvailability()
 })
+
+async function loadFeatureAvailability() {
+  try {
+    // Check if project has scenes
+    const response = await fetch(
+      `http://localhost:8008/api/projects/${props.projectId}/scenes/stats`
+    )
+    const data = await response.json()
+    if (data.success) {
+      hasScenes.value = data.data.has_scenes || false
+    }
+  } catch (error) {
+    console.error('Error loading feature availability:', error)
+  }
+}
 
 // Detectar cambios
 watch(rulesText, () => {
@@ -69,6 +100,7 @@ watch(rulesEnabled, () => {
 // Recargar si cambia el proyecto
 watch(() => props.projectId, () => {
   loadRules()
+  loadFeatureAvailability()
 })
 
 async function loadRules() {
@@ -377,6 +409,102 @@ Ejemplos:
               </Card>
             </div>
           </div>
+        </div>
+      </TabPanel>
+
+      <!-- Tab 4: Focalización -->
+      <TabPanel value="3">
+        <template #header>
+          <i class="pi pi-eye"></i>
+          <span>Focalización</span>
+        </template>
+
+        <div class="tab-content">
+          <FocalizationTab :project-id="projectId" />
+        </div>
+      </TabPanel>
+
+      <!-- Tab 5: Escenas (condicional - solo si hay escenas y feature disponible) -->
+      <TabPanel v-if="hasScenes && isFeatureAvailable('scenes')" value="4">
+        <template #header>
+          <i class="pi pi-images"></i>
+          <span>Escenas</span>
+        </template>
+
+        <div class="tab-content">
+          <SceneTaggingTab :project-id="projectId" />
+        </div>
+      </TabPanel>
+
+      <!-- Tab 6: Sticky Sentences -->
+      <TabPanel v-if="isFeatureAvailable('sticky_sentences')" value="5">
+        <template #header>
+          <i class="pi pi-align-left"></i>
+          <span>Oraciones pesadas</span>
+        </template>
+
+        <div class="tab-content">
+          <StickySentencesTab :project-id="projectId" />
+        </div>
+      </TabPanel>
+
+      <!-- Tab 7: Echo/Repetitions -->
+      <TabPanel v-if="isFeatureAvailable('echo_repetitions')" value="6">
+        <template #header>
+          <i class="pi pi-replay"></i>
+          <span>Repeticiones</span>
+        </template>
+
+        <div class="tab-content">
+          <EchoReportTab :project-id="projectId" />
+        </div>
+      </TabPanel>
+
+      <!-- Tab 8: Sentence Variation -->
+      <TabPanel v-if="isFeatureAvailable('sentence_variation')" value="7">
+        <template #header>
+          <i class="pi pi-chart-bar"></i>
+          <span>Variación</span>
+        </template>
+
+        <div class="tab-content">
+          <SentenceVariationTab :project-id="projectId" />
+        </div>
+      </TabPanel>
+
+      <!-- Tab 9: Pacing Analysis -->
+      <TabPanel v-if="isFeatureAvailable('pacing')" value="8">
+        <template #header>
+          <i class="pi pi-forward"></i>
+          <span>Ritmo</span>
+        </template>
+
+        <div class="tab-content">
+          <PacingAnalysisTab :project-id="projectId" />
+        </div>
+      </TabPanel>
+
+      <!-- Tab 10: Emotional Analysis -->
+      <TabPanel v-if="isFeatureAvailable('emotional_analysis')" value="9">
+        <template #header>
+          <i class="pi pi-heart"></i>
+          <span>Emociones</span>
+        </template>
+
+        <div class="tab-content">
+          <EmotionalAnalysisTab :project-id="projectId" />
+        </div>
+      </TabPanel>
+
+      <!-- Tab 11: Age Readability (only for children's books) -->
+      <TabPanel v-if="isFeatureAvailable('age_readability')" value="10">
+        <template #header>
+          <i class="pi pi-users"></i>
+          <span>Edad lectora</span>
+        </template>
+
+        <div class="tab-content">
+          <AgeReadabilityTab :project-id="projectId" />
         </div>
       </TabPanel>
     </TabView>

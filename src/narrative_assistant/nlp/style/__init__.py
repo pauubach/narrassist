@@ -80,6 +80,11 @@ from .readability import (
     get_readability_analyzer,
     reset_readability_analyzer,
     count_syllables_spanish,
+    # Age-specific readability
+    AgeGroup,
+    AgeReadabilityReport,
+    AGE_GROUP_THRESHOLDS,
+    SPANISH_SIGHT_WORDS,
 )
 
 __all__ = [
@@ -129,4 +134,9 @@ __all__ = [
     "get_readability_analyzer",
     "reset_readability_analyzer",
     "count_syllables_spanish",
+    # Legibilidad por edad
+    "AgeGroup",
+    "AgeReadabilityReport",
+    "AGE_GROUP_THRESHOLDS",
+    "SPANISH_SIGHT_WORDS",
 ]
