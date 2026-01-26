@@ -1,7 +1,7 @@
 # Estado del Proyecto - Narrative Assistant
 
 > **Última actualización**: 2026-01-26
-> **Versión tauri.conf.json**: 0.2.9
+> **Versión**: 0.3.0
 > **Changelog**: Ver [CHANGELOG.md](CHANGELOG.md)
 > **Roadmap**: Ver [ROADMAP.md](ROADMAP.md)
 

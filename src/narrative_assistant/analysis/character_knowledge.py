@@ -80,6 +80,13 @@ class IntentionType(Enum):
     UNKNOWN = "unknown"
 
 
+class KnowledgeExtractionMode(Enum):
+    """Modo de extracción de conocimiento."""
+    RULES = "rules"      # Patrones regex + spaCy dependency (rápido, ~70% precisión)
+    LLM = "llm"          # Ollama local (lento, ~90% precisión)
+    HYBRID = "hybrid"    # Rules primero, LLM para casos ambiguos
+
+
 @dataclass
 class DirectedMention:
     """
@@ -479,16 +486,25 @@ class CharacterKnowledgeAnalyzer:
         text: str,
         chapter: int,
         start_char: int,
+        extraction_mode: Optional[KnowledgeExtractionMode] = None,
     ) -> tuple[list[DirectedMention], list[KnowledgeFact], list[Opinion]]:
         """
         Analiza narración para detectar pensamientos, conocimiento y opiniones.
+
+        Args:
+            text: Texto de narración a analizar
+            chapter: Número de capítulo
+            start_char: Posición inicial en el documento
+            extraction_mode: Modo de extracción de conocimiento (None = auto)
 
         Returns:
             Tupla de (menciones, hechos de conocimiento, opiniones)
         """
         mentions = []
-        knowledge = []
         opinions = []
+
+        # Extraer hechos de conocimiento
+        knowledge = self.extract_knowledge_facts(text, chapter, start_char, extraction_mode)
 
         # Buscar patrones de pensamiento
         for pattern in self.THOUGHT_PATTERNS:
@@ -829,3 +845,283 @@ class CharacterKnowledgeAnalyzer:
             "opinions_of_others": [o.to_dict() for o in opinions_of_others],
             "intentions_of": [i.to_dict() for i in intentions_of],
         }
+
+    # =========================================================================
+    # Knowledge Fact Extraction
+    # =========================================================================
+
+    # Patrones para detectar conocimiento de hechos
+    KNOWLEDGE_PATTERNS = [
+        # "A sabía que B era/tenía X"
+        (r"(?P<knower>\w+)\s+(?:sabía|conocía|descubrió|averiguó|se enteró)\s+(?:de\s+)?que\s+(?P<known>\w+)\s+(?:era|tenía|estaba|había)\s+(?P<fact>.+?)(?:\.|,|;|$)",
+         KnowledgeType.ATTRIBUTE, "learned"),
+        # "A recordaba que B X"
+        (r"(?P<knower>\w+)\s+(?:recordaba|recordó)\s+(?:de\s+)?que\s+(?P<known>\w+)\s+(?P<fact>.+?)(?:\.|,|;|$)",
+         KnowledgeType.HISTORY, "remembered"),
+        # "A se dio cuenta de que B X"
+        (r"(?P<knower>\w+)\s+se\s+dio\s+cuenta\s+de\s+que\s+(?P<known>\w+)\s+(?P<fact>.+?)(?:\.|,|;|$)",
+         KnowledgeType.ATTRIBUTE, "observed"),
+        # "A notó que B X"
+        (r"(?P<knower>\w+)\s+(?:notó|observó|advirtió)\s+que\s+(?P<known>\w+)\s+(?P<fact>.+?)(?:\.|,|;|$)",
+         KnowledgeType.ATTRIBUTE, "observed"),
+        # "para A, B era X" (conocimiento implícito)
+        (r"para\s+(?P<knower>\w+),?\s+(?P<known>\w+)\s+era\s+(?P<fact>.+?)(?:\.|,|;|$)",
+         KnowledgeType.ATTRIBUTE, "assumed"),
+        # "A ignoraba/desconocía que B X" (conocimiento negado)
+        (r"(?P<knower>\w+)\s+(?:ignoraba|desconocía|no\s+sabía)\s+que\s+(?P<known>\w+)\s+(?P<fact>.+?)(?:\.|,|;|$)",
+         KnowledgeType.ATTRIBUTE, "unknown"),
+    ]
+
+    # Patrones para detectar que A sabe dónde está B
+    LOCATION_PATTERNS = [
+        (r"(?P<knower>\w+)\s+(?:sabía|conocía)\s+(?:dónde|donde)\s+(?:estaba|vivía|se encontraba)\s+(?P<known>\w+)",
+         KnowledgeType.LOCATION, "told"),
+        (r"(?P<knower>\w+)\s+(?:encontró|localizó|halló)\s+a\s+(?P<known>\w+)\s+en\s+(?P<location>.+?)(?:\.|,|;|$)",
+         KnowledgeType.LOCATION, "observed"),
+    ]
+
+    # Patrones para detectar secretos
+    SECRET_PATTERNS = [
+        (r"(?P<knower>\w+)\s+(?:sabía|conocía|guardaba)\s+el\s+secreto\s+de\s+(?P<known>\w+)",
+         KnowledgeType.SECRET, "told"),
+        (r"(?P<known>\w+)\s+le\s+(?:confesó|reveló|contó)\s+(?:su\s+secreto\s+)?a\s+(?P<knower>\w+)",
+         KnowledgeType.SECRET, "told"),
+    ]
+
+    def _auto_select_mode(self) -> KnowledgeExtractionMode:
+        """
+        Selecciona automáticamente el modo de extracción según hardware.
+
+        Returns:
+            HYBRID si hay GPU/LLM disponible, RULES si solo CPU.
+        """
+        try:
+            from ..core.device import get_device_detector, DeviceType
+            from ..llm.client import get_client
+
+            # Verificar si hay LLM disponible
+            client = get_client()
+            if client and client.is_available():
+                detector = get_device_detector()
+                device_info = detector.get_info()
+                # Si hay GPU, usar HYBRID para mejor calidad
+                if device_info.get("cuda_available") or device_info.get("mps_available"):
+                    return KnowledgeExtractionMode.HYBRID
+                # Si hay LLM pero no GPU, RULES es más rápido
+                return KnowledgeExtractionMode.RULES
+        except Exception as e:
+            logger.debug(f"Error checking device/LLM availability: {e}")
+
+        return KnowledgeExtractionMode.RULES
+
+    def extract_knowledge_facts(
+        self,
+        text: str,
+        chapter: int,
+        start_char: int = 0,
+        mode: Optional[KnowledgeExtractionMode] = None,
+    ) -> list[KnowledgeFact]:
+        """
+        Extrae hechos de conocimiento del texto.
+
+        Args:
+            text: Texto a analizar
+            chapter: Número de capítulo
+            start_char: Posición inicial en el documento
+            mode: Modo de extracción (None = auto-detectar)
+
+        Returns:
+            Lista de hechos de conocimiento extraídos
+        """
+        if mode is None:
+            mode = self._auto_select_mode()
+
+        logger.debug(f"Extracting knowledge facts with mode: {mode.value}")
+
+        if mode == KnowledgeExtractionMode.RULES:
+            facts = self._extract_knowledge_facts_rules(text, chapter, start_char)
+        elif mode == KnowledgeExtractionMode.LLM:
+            facts = self._extract_knowledge_facts_llm(text, chapter, start_char)
+        else:  # HYBRID
+            # Primero reglas, después LLM para enriquecer
+            facts = self._extract_knowledge_facts_rules(text, chapter, start_char)
+            if len(facts) < 2:  # Si encontramos poco, usar LLM
+                llm_facts = self._extract_knowledge_facts_llm(text, chapter, start_char)
+                # Fusionar evitando duplicados
+                existing_keys = {(f.knower_entity_id, f.known_entity_id, f.fact_value) for f in facts}
+                for f in llm_facts:
+                    key = (f.knower_entity_id, f.known_entity_id, f.fact_value)
+                    if key not in existing_keys:
+                        facts.append(f)
+                        existing_keys.add(key)
+
+        # Almacenar internamente
+        self._knowledge.extend(facts)
+
+        return facts
+
+    def _extract_knowledge_facts_rules(
+        self,
+        text: str,
+        chapter: int,
+        start_char: int,
+    ) -> list[KnowledgeFact]:
+        """
+        Extrae hechos usando patrones regex.
+
+        Rápido pero con precisión limitada (~70%).
+        """
+        facts = []
+
+        all_patterns = (
+            self.KNOWLEDGE_PATTERNS +
+            self.LOCATION_PATTERNS +
+            self.SECRET_PATTERNS
+        )
+
+        for pattern, knowledge_type, learned_how in all_patterns:
+            for match in re.finditer(pattern, text, re.IGNORECASE):
+                groups = match.groupdict()
+
+                knower_name = groups.get('knower', '').lower()
+                known_name = groups.get('known', '').lower()
+                fact_text = groups.get('fact', '') or groups.get('location', '')
+
+                knower_id = self._name_to_id.get(knower_name)
+                known_id = self._name_to_id.get(known_name)
+
+                if not knower_id or not known_id:
+                    continue
+
+                # Limpiar el hecho
+                fact_value = fact_text.strip()
+                if len(fact_value) > 100:
+                    fact_value = fact_value[:100] + "..."
+
+                # Determinar si es conocimiento negado
+                is_negated = learned_how == "unknown"
+
+                fact = KnowledgeFact(
+                    project_id=self.project_id,
+                    knower_entity_id=knower_id,
+                    known_entity_id=known_id,
+                    knower_name=self._entity_names.get(knower_id, knower_name),
+                    known_name=self._entity_names.get(known_id, known_name),
+                    knowledge_type=knowledge_type,
+                    fact_description=match.group(0)[:200],
+                    fact_value=fact_value if not is_negated else f"[NO SABE] {fact_value}",
+                    source_chapter=chapter,
+                    learned_how=learned_how,
+                    is_accurate=None,  # No podemos verificar sin más contexto
+                    confidence=0.65 if not is_negated else 0.7,
+                    created_at=datetime.now(),
+                )
+
+                facts.append(fact)
+
+        return facts
+
+    def _extract_knowledge_facts_llm(
+        self,
+        text: str,
+        chapter: int,
+        start_char: int,
+    ) -> list[KnowledgeFact]:
+        """
+        Extrae hechos usando LLM local (Ollama).
+
+        Más lento pero mayor precisión (~90%).
+        """
+        facts = []
+
+        try:
+            from ..llm.client import get_client
+
+            client = get_client()
+            if not client or not client.is_available():
+                logger.debug("LLM not available, skipping LLM extraction")
+                return facts
+
+            # Construir lista de personajes para el prompt
+            character_names = list(self._entity_names.values())
+            if not character_names:
+                return facts
+
+            prompt = f"""Analiza el siguiente texto narrativo y extrae qué personajes saben sobre otros personajes.
+
+Personajes conocidos: {', '.join(character_names)}
+
+Texto:
+{text[:2000]}
+
+Para cada hecho de conocimiento detectado, responde en formato JSON:
+[
+  {{"knower": "nombre", "known": "nombre", "fact": "descripción del hecho", "type": "attribute|location|secret|identity|history", "how": "told|observed|deduced"}}
+]
+
+Solo incluye hechos explícitos donde un personaje claramente sabe algo sobre otro.
+Responde solo con el JSON, sin explicaciones."""
+
+            response = client.generate(prompt, max_tokens=1024, temperature=0.1)
+
+            if not response:
+                return facts
+
+            # Parsear respuesta JSON
+            import json
+            try:
+                # Buscar JSON en la respuesta
+                json_match = re.search(r'\[.*\]', response, re.DOTALL)
+                if json_match:
+                    extracted = json.loads(json_match.group())
+                    for item in extracted:
+                        knower_name = item.get('knower', '').lower()
+                        known_name = item.get('known', '').lower()
+
+                        knower_id = self._name_to_id.get(knower_name)
+                        known_id = self._name_to_id.get(known_name)
+
+                        if not knower_id or not known_id:
+                            continue
+
+                        # Mapear tipo
+                        type_map = {
+                            'attribute': KnowledgeType.ATTRIBUTE,
+                            'location': KnowledgeType.LOCATION,
+                            'secret': KnowledgeType.SECRET,
+                            'identity': KnowledgeType.IDENTITY,
+                            'history': KnowledgeType.HISTORY,
+                        }
+                        knowledge_type = type_map.get(
+                            item.get('type', '').lower(),
+                            KnowledgeType.ATTRIBUTE
+                        )
+
+                        fact = KnowledgeFact(
+                            project_id=self.project_id,
+                            knower_entity_id=knower_id,
+                            known_entity_id=known_id,
+                            knower_name=self._entity_names.get(knower_id, knower_name),
+                            known_name=self._entity_names.get(known_id, known_name),
+                            knowledge_type=knowledge_type,
+                            fact_description=item.get('fact', '')[:200],
+                            fact_value=item.get('fact', '')[:100],
+                            source_chapter=chapter,
+                            learned_how=item.get('how', 'deduced'),
+                            confidence=0.85,  # Mayor confianza con LLM
+                            created_at=datetime.now(),
+                        )
+
+                        facts.append(fact)
+
+            except json.JSONDecodeError as e:
+                logger.debug(f"Failed to parse LLM response as JSON: {e}")
+
+        except Exception as e:
+            logger.warning(f"Error in LLM knowledge extraction: {e}")
+
+        return facts
+
+    def get_all_knowledge(self) -> list[KnowledgeFact]:
+        """Retorna todos los hechos de conocimiento extraídos."""
+        return self._knowledge

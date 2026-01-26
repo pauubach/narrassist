@@ -105,8 +105,14 @@ jobs:
       - name: Install Tauri dependencies
         run: npm install
       
-      - name: Make start-backend.sh executable
-        run: chmod +x src-tauri/binaries/start-backend.sh
+      - name: Prepare launcher scripts for macOS
+        run: |
+          chmod +x src-tauri/binaries/start-backend.sh
+          # Tauri busca archivos con sufijo de arquitectura
+          cp src-tauri/binaries/start-backend.sh src-tauri/binaries/start-backend-aarch64-apple-darwin
+          cp src-tauri/binaries/start-backend.sh src-tauri/binaries/start-backend-x86_64-apple-darwin
+          chmod +x src-tauri/binaries/start-backend-aarch64-apple-darwin
+          chmod +x src-tauri/binaries/start-backend-x86_64-apple-darwin
       
       - name: Build Tauri (macOS)
         working-directory: src-tauri

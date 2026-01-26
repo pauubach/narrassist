@@ -25,7 +25,9 @@
     "resources": [
       "binaries/python-embed/**",
       "binaries/backend/**",
-      "binaries/start-backend.sh"
+      "binaries/start-backend.sh",
+      "binaries/start-backend-aarch64-apple-darwin",
+      "binaries/start-backend-x86_64-apple-darwin"
     ],
     "windows": {
       "certificateThumbprint": null,

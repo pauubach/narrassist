@@ -19,13 +19,22 @@ Este documento unifica las recomendaciones de múltiples expertos para la implem
 
 ---
 
-## Fase 0: Estabilización de Fundamentos (10-14 días)
+## Fase 0: Estabilización de Fundamentos
 
 > **Objetivo**: Completar módulos backend parcialmente implementados antes de crear UIs
+> **Actualizado**: 2026-01-26
 
-### 0.1 Completar Character Knowledge (5-7 días) 🚨 CRÍTICO
+### 0.1 Completar Character Knowledge (3-4 días) 🚨 CRÍTICO
 
-**Estado actual**: 60% - Core `_extract_knowledge_facts()` está vacío
+**Estado actual**: 85% - Funcional pero sin método estructurado `_extract_knowledge_facts()`
+
+El módulo tiene implementado:
+- ✅ `DirectedMention`, `KnowledgeFact`, `Opinion`, `Intention` (dataclasses)
+- ✅ `analyze_dialogue()` - Detecta menciones en diálogos con sentimiento
+- ✅ `analyze_narration()` - Patrones regex para pensamiento/conocimiento/opiniones
+- ✅ `analyze_intentions()` - Detecta intenciones de personajes
+- ✅ `get_asymmetry_report()` - Reporte comparativo entre personajes
+- ⚠️ Falta: Método estructurado para extraer `KnowledgeFact` con modos (RULES/LLM/HYBRID)
 
 **Implementar**:
 ```python
@@ -42,38 +51,56 @@ def _extract_knowledge_facts(self, text, characters, mode=None):
 
 **Archivo**: `src/narrative_assistant/analysis/character_knowledge.py`
 
-### 0.2 Completar Voice Profiles (2-3 días)
+### 0.2 Voice Profiles ✅ COMPLETADO
 
-**Estado actual**: 70% - API no devuelve todas las métricas
+**Estado**: 100% - Backend completo + endpoint API creado
 
-**Implementar**:
-- Extender API para devolver `characteristic_words`, `top_fillers`, `punctuation_patterns`
-- Añadir endpoint de comparación: `GET /api/projects/{id}/characters/compare/{char1}/{char2}`
+- ✅ `VoiceMetrics` - 12 métricas cuantitativas
+- ✅ `VoiceProfile` - Perfil completo con `to_dict()`
+- ✅ `VoiceProfileBuilder` - Construcción de perfiles
+- ✅ `characteristic_words` - TF-IDF implementado
+- ✅ `top_fillers` - Lista de muletillas con frecuencia
+- ✅ `speech_patterns` - Patrones de inicio/fin/expresiones
+- ✅ **Endpoint**: `GET /api/projects/{id}/voice-profiles`
 
 **Archivo**: `src/narrative_assistant/voice/profiles.py`
 
-### 0.3 Completar Register Analysis (1-2 días)
+### 0.3 Register Analysis ✅ COMPLETADO
 
-**Estado actual**: 75% - Solo analiza fragmentos sueltos
+**Estado**: 100% - Backend completo + endpoint API creado
 
-**Implementar**:
-- `analyze_register_by_chapter()` con distribución + severidad de cambios
-- Estadísticas agregadas (% formal, neutral, coloquial por manuscrito)
+- ✅ `RegisterType` enum (5 tipos de registro)
+- ✅ `RegisterAnalyzer` - Analiza segmentos individuales
+- ✅ `RegisterChangeDetector` - Detecta cambios con severidad
+- ✅ `get_summary()` - Estadísticas agregadas
+- ✅ `get_register_distribution()` - Distribución por tipo
+- ✅ **Endpoint**: `GET /api/projects/{id}/register-analysis`
 
 **Archivo**: `src/narrative_assistant/voice/register.py`
 
-### 0.4 Crear Endpoints API Faltantes (2-3 días)
+### 0.4 Speaker Attribution ✅ COMPLETADO
 
-| Endpoint | Método | Propósito |
-|----------|--------|-----------|
-| `/api/projects/{id}/characters/{charId}/voice-profile` | GET | Perfil de voz completo |
-| `/api/projects/{id}/entities/{entityId}/coreference` | GET | Votación correferencia |
-| `/api/projects/{id}/register-analysis` | GET | Análisis de registro |
-| `/api/projects/{id}/focalization` | GET | Estado focalización |
-| `/api/projects/{id}/focalization/declare` | POST | Declarar POV |
-| `/api/projects/{id}/characters/{charId}/knowledge` | GET | Red de conocimiento |
-| `/api/projects/{id}/chapters/{num}/dialogue-attributions` | GET | Atribución diálogos |
-| `/api/projects/{id}/interactions` | GET | Patrones interacción |
+**Estado**: 100% - Backend completo + endpoint API creado
+
+- ✅ `SpeakerAttributor` - 5 métodos de atribución
+- ✅ Detección explícita, alternancia, perfil de voz, proximidad
+- ✅ `get_attribution_stats()` - Estadísticas de atribución
+- ✅ **Endpoint**: `GET /api/projects/{id}/chapters/{num}/dialogue-attributions`
+
+**Archivo**: `src/narrative_assistant/voice/speaker_attribution.py`
+
+### 0.5 Endpoints API - Estado
+
+| Endpoint | Estado | Notas |
+|----------|--------|-------|
+| `/api/projects/{id}/voice-profiles` | ✅ | Perfiles de voz completos |
+| `/api/projects/{id}/register-analysis` | ✅ | Análisis de registro con cambios |
+| `/api/projects/{id}/chapters/{num}/dialogue-attributions` | ✅ | Atribución de diálogos |
+| `/api/projects/{id}/entities/{entityId}/coreference` | ⚠️ Pendiente | Votación correferencia |
+| `/api/projects/{id}/focalization` | ⚠️ Pendiente | Estado focalización |
+| `/api/projects/{id}/focalization/declare` | ⚠️ Pendiente | Declarar POV |
+| `/api/projects/{id}/characters/{charId}/knowledge` | ⚠️ Pendiente | Red de conocimiento |
+| `/api/projects/{id}/interactions` | ⚠️ Pendiente | Patrones interacción |
 
 ---
 
@@ -289,20 +316,22 @@ Extender ExportDialog con formato "Informe Editorial":
 
 ## Resumen de Tiempos
 
-| Fase | Días | Acumulado | Prioridad |
-|------|------|-----------|-----------|
-| 0: Estabilización | 10-14 | 10-14 | 🎯 Crítica |
-| 0.5: Multi-Método | 4-5 | 14-19 | 🎯 Crítica |
-| 1: Shared Components | 2-3 | 16-22 | 🎯 Crítica |
-| 2: Quick Wins | 5-6 | 21-28 | 🎯 Crítica |
-| 3: Extender Tabs | 19-23 | 40-51 | ✅ Alta |
-| 4: Editoriales | 21-26 | 61-77 | ✅ Alta |
-| 5: Roadmap | 37-47 | 98-124 | ⚠️ Media |
-| 6: Deuda Técnica | 30-38 | 128-162 | ⚠️ Media |
-| 7: Infraestructura | 24-31 | 152-193 | ⚠️ Media |
+| Fase | Días | Acumulado | Prioridad | Estado |
+|------|------|-----------|-----------|--------|
+| 0: Estabilización | 3-4 | 3-4 | 🎯 Crítica | 75% ✅ |
+| 0.5: Multi-Método | 4-5 | 7-9 | 🎯 Crítica | Pendiente |
+| 1: Shared Components | 2-3 | 9-12 | 🎯 Crítica | Pendiente |
+| 2: Quick Wins | 5-6 | 14-18 | 🎯 Crítica | Pendiente |
+| 3: Extender Tabs | 19-23 | 33-41 | ✅ Alta | Pendiente |
+| 4: Editoriales | 21-26 | 54-67 | ✅ Alta | Pendiente |
+| 5: Roadmap | 37-47 | 91-114 | ⚠️ Media | Pendiente |
+| 6: Deuda Técnica | 30-38 | 121-152 | ⚠️ Media | Pendiente |
+| 7: Infraestructura | 24-31 | 145-183 | ⚠️ Media | Pendiente |
 
-**MVP mejorado (Fases 0-3)**: ~40-51 días (~2-2.5 meses)
-**Producto completo (Fases 0-7)**: ~152-193 días (~7-10 meses)
+**Progreso Fase 0**: Voice Profiles ✅, Register Analysis ✅, Speaker Attribution ✅, Character Knowledge ⚠️
+
+**MVP mejorado (Fases 0-3)**: ~33-41 días (~1.5-2 meses)
+**Producto completo (Fases 0-7)**: ~145-183 días (~6-9 meses)
 
 ---
 
@@ -311,13 +340,13 @@ Extender ExportDialog con formato "Informe Editorial":
 ### Fases 0-2 (MVP Backend-UI)
 
 - [ ] Character Knowledge extrae hechos correctamente
-- [ ] Usuario puede ver métricas de voz completas
+- [x] Usuario puede ver métricas de voz completas (`/api/projects/{id}/voice-profiles`)
 - [ ] Usuario puede ver por qué se fusionaron entidades
 - [ ] Todos los métodos NLP configurables en Settings
 
 ### Fase 3 (Tabs Extendidas)
 
-- [ ] Usuario puede analizar registro narrativo
+- [x] Usuario puede analizar registro narrativo (`/api/projects/{id}/register-analysis`)
 - [ ] Usuario puede declarar y verificar focalización
 - [ ] Usuario puede ver patrones de interacción
 - [ ] Usuario puede ver qué sabe cada personaje

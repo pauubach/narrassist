@@ -1635,7 +1635,9 @@ async def get_analysis_status(project_id: int):
             "emotional": False,  # Por implementar
             "sentiment": False,  # Por implementar
             "focalization": False,  # Por implementar
-            "voice_profiles": False,  # Por implementar
+            "voice_profiles": has_entities and has_chapters,  # Perfiles de voz disponibles
+            "register_analysis": has_chapters,  # Análisis de registro disponible
+            "speaker_attribution": has_entities and has_chapters,  # Atribución de hablantes
         }
 
         return ApiResponse(
@@ -6960,6 +6962,128 @@ async def get_knowledge_asymmetry(project_id: int, entity_a_id: int, entity_b_id
         return ApiResponse(success=False, error=str(e))
 
 
+@app.get("/api/projects/{project_id}/characters/{entity_id}/knowledge", response_model=ApiResponse)
+async def get_character_knowledge(
+    project_id: int,
+    entity_id: int,
+    mode: str = Query("auto", description="Modo: auto, rules, llm, hybrid")
+):
+    """
+    Obtiene el conocimiento que un personaje tiene sobre otros.
+
+    Analiza el texto para detectar qué sabe el personaje sobre otros personajes:
+    - Atributos físicos/psicológicos
+    - Ubicación
+    - Secretos
+    - Historia pasada
+
+    Args:
+        project_id: ID del proyecto
+        entity_id: ID del personaje
+        mode: Modo de extracción (auto, rules, llm, hybrid)
+
+    Returns:
+        ApiResponse con hechos de conocimiento del personaje
+    """
+    try:
+        from narrative_assistant.analysis.character_knowledge import (
+            CharacterKnowledgeAnalyzer,
+            KnowledgeExtractionMode,
+        )
+        from narrative_assistant.entities.repository import get_entity_repository
+        from narrative_assistant.persistence.chapter import get_chapter_repository
+
+        # Verificar proyecto
+        if not project_manager:
+            return ApiResponse(success=False, error="Project manager not initialized")
+
+        result = project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail=f"Proyecto {project_id} no encontrado")
+
+        # Obtener entidad
+        entity_repo = get_entity_repository()
+        entity = entity_repo.get_entity(entity_id)
+        if not entity:
+            raise HTTPException(status_code=404, detail=f"Personaje {entity_id} no encontrado")
+
+        # Determinar modo
+        mode_map = {
+            "auto": None,
+            "rules": KnowledgeExtractionMode.RULES,
+            "llm": KnowledgeExtractionMode.LLM,
+            "hybrid": KnowledgeExtractionMode.HYBRID,
+        }
+        extraction_mode = mode_map.get(mode.lower())
+
+        # Obtener capítulos
+        chapter_repo = get_chapter_repository()
+        chapters = chapter_repo.get_by_project(project_id)
+
+        if not chapters:
+            return ApiResponse(
+                success=True,
+                data={
+                    "entity_id": entity_id,
+                    "entity_name": entity.canonical_name,
+                    "knowledge_facts": [],
+                    "message": "No hay capítulos para analizar"
+                }
+            )
+
+        # Analizar conocimiento
+        analyzer = CharacterKnowledgeAnalyzer(project_id=project_id)
+
+        # Registrar todas las entidades del proyecto
+        all_entities = entity_repo.get_entities_by_project(project_id, active_only=True)
+        for e in all_entities:
+            analyzer.register_entity(e.id, e.canonical_name, e.aliases)
+
+        # Analizar capítulos
+        for chapter in chapters:
+            analyzer.analyze_narration(
+                chapter.content,
+                chapter.chapter_number,
+                chapter.start_char,
+                extraction_mode=extraction_mode
+            )
+
+        # Filtrar hechos donde este personaje es el "knower"
+        all_knowledge = analyzer.get_all_knowledge()
+        character_knowledge = [
+            k for k in all_knowledge
+            if k.knower_entity_id == entity_id
+        ]
+
+        # También obtener qué otros saben de este personaje
+        knowledge_about = [
+            k for k in all_knowledge
+            if k.known_entity_id == entity_id
+        ]
+
+        return ApiResponse(
+            success=True,
+            data={
+                "entity_id": entity_id,
+                "entity_name": entity.canonical_name,
+                "knows_about_others": [k.to_dict() for k in character_knowledge],
+                "others_know_about": [k.to_dict() for k in knowledge_about],
+                "stats": {
+                    "facts_known": len(character_knowledge),
+                    "facts_about": len(knowledge_about),
+                    "chapters_analyzed": len(chapters),
+                    "extraction_mode": mode,
+                }
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting character knowledge: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
 @app.post("/api/projects/{project_id}/relationships", response_model=ApiResponse)
 async def create_relationship(project_id: int, request: Request):
     """
@@ -10845,6 +10969,412 @@ async def get_external_dictionary_links(word: str):
 
     except Exception as e:
         logger.error(f"Error getting external links for '{word}': {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+# ============================================================================
+# Voice Analysis Endpoints
+# ============================================================================
+
+@app.get("/api/projects/{project_id}/voice-profiles", response_model=ApiResponse)
+async def get_voice_profiles(project_id: int):
+    """
+    Obtiene perfiles de voz de los personajes del proyecto.
+
+    Construye perfiles estilísticos basados en los diálogos de cada personaje,
+    incluyendo métricas como longitud de intervención, riqueza léxica (TTR),
+    formalidad, muletillas y patrones de puntuación.
+
+    Returns:
+        ApiResponse con perfiles de voz por personaje
+    """
+    try:
+        from narrative_assistant.voice.profiles import VoiceProfileBuilder
+        from narrative_assistant.nlp.dialogue import detect_dialogues
+        from narrative_assistant.entities.repository import get_entity_repository
+        from narrative_assistant.persistence.chapter import get_chapter_repository
+
+        # Verificar proyecto
+        if not project_manager:
+            return ApiResponse(success=False, error="Project manager not initialized")
+
+        result = project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail=f"Proyecto {project_id} no encontrado")
+
+        # Obtener entidades (solo personajes)
+        entity_repo = get_entity_repository()
+        entities = entity_repo.get_entities_by_project(project_id, active_only=True)
+        characters = [e for e in entities if e.entity_type == "PER"]
+
+        if not characters:
+            return ApiResponse(
+                success=True,
+                data={
+                    "project_id": project_id,
+                    "profiles": [],
+                    "message": "No hay personajes para analizar"
+                }
+            )
+
+        # Obtener capítulos y extraer diálogos
+        chapter_repo = get_chapter_repository()
+        chapters = chapter_repo.get_by_project(project_id)
+
+        dialogues = []
+        for chapter in chapters:
+            dialogue_result = detect_dialogues(chapter.content)
+            if dialogue_result.is_success:
+                for d in dialogue_result.value.dialogues:
+                    dialogues.append({
+                        "text": d.text,
+                        "speaker_id": d.speaker_id,
+                        "speaker_hint": d.speaker_hint,
+                        "chapter": chapter.chapter_number,
+                        "position": d.start_char,
+                    })
+
+        if not dialogues:
+            return ApiResponse(
+                success=True,
+                data={
+                    "project_id": project_id,
+                    "profiles": [],
+                    "message": "No se encontraron diálogos para analizar"
+                }
+            )
+
+        # Construir perfiles de voz
+        entity_data = [
+            {"id": e.id, "name": e.canonical_name, "aliases": e.aliases}
+            for e in characters
+        ]
+
+        builder = VoiceProfileBuilder()
+        profiles = builder.build_profiles(dialogues, entity_data)
+
+        # Serializar perfiles
+        profiles_data = []
+        for profile in profiles:
+            profile_dict = profile.to_dict()
+            profiles_data.append(profile_dict)
+
+        return ApiResponse(
+            success=True,
+            data={
+                "project_id": project_id,
+                "profiles": profiles_data,
+                "stats": {
+                    "characters_analyzed": len(profiles_data),
+                    "total_dialogues": len(dialogues),
+                    "chapters_analyzed": len(chapters),
+                }
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Error getting voice profiles: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.get("/api/projects/{project_id}/register-analysis", response_model=ApiResponse)
+async def get_register_analysis(
+    project_id: int,
+    min_severity: str = Query("medium", description="Severidad mínima: low, medium, high")
+):
+    """
+    Analiza el registro narrativo del proyecto.
+
+    Detecta cambios de registro narrativo (formal/informal, técnico/coloquial)
+    que pueden indicar inconsistencias en la voz del narrador o entre escenas.
+
+    Returns:
+        ApiResponse con análisis de registro y cambios detectados
+    """
+    try:
+        from narrative_assistant.voice.register import (
+            RegisterChangeDetector,
+            RegisterAnalyzer,
+        )
+        from narrative_assistant.nlp.dialogue import detect_dialogues
+        from narrative_assistant.persistence.chapter import get_chapter_repository
+
+        # Verificar proyecto
+        if not project_manager:
+            return ApiResponse(success=False, error="Project manager not initialized")
+
+        result = project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail=f"Proyecto {project_id} no encontrado")
+
+        # Obtener capítulos
+        chapter_repo = get_chapter_repository()
+        chapters = chapter_repo.get_by_project(project_id)
+
+        if not chapters:
+            return ApiResponse(
+                success=True,
+                data={
+                    "project_id": project_id,
+                    "analyses": [],
+                    "changes": [],
+                    "summary": {},
+                    "message": "No hay capítulos para analizar"
+                }
+            )
+
+        # Construir segmentos: (texto, capítulo, posición, es_diálogo)
+        segments = []
+        for chapter in chapters:
+            # Detectar diálogos para separar narración de diálogo
+            dialogue_result = detect_dialogues(chapter.content)
+            dialogue_ranges = []
+            if dialogue_result.is_success:
+                dialogue_ranges = [
+                    (d.start_char, d.end_char)
+                    for d in dialogue_result.value.dialogues
+                ]
+
+            # Dividir contenido en párrafos
+            paragraphs = chapter.content.split('\n\n')
+            position = 0
+
+            for para in paragraphs:
+                if para.strip():
+                    # Determinar si es diálogo
+                    is_dialogue = any(
+                        start <= position <= end
+                        for start, end in dialogue_ranges
+                    )
+                    segments.append((
+                        para.strip(),
+                        chapter.chapter_number,
+                        position,
+                        is_dialogue
+                    ))
+                position += len(para) + 2  # +2 por '\n\n'
+
+        if not segments:
+            return ApiResponse(
+                success=True,
+                data={
+                    "project_id": project_id,
+                    "analyses": [],
+                    "changes": [],
+                    "summary": {},
+                    "message": "No hay segmentos para analizar"
+                }
+            )
+
+        # Analizar registro
+        detector = RegisterChangeDetector()
+        analyses = detector.analyze_document(segments)
+        changes = detector.detect_changes(min_severity)
+        summary = detector.get_summary()
+
+        # Serializar resultados
+        analyses_data = [
+            {
+                "segment_index": i,
+                "chapter": segments[i][1],
+                "is_dialogue": segments[i][3],
+                "primary_register": a.primary_register.value,
+                "register_scores": {k.value: v for k, v in a.register_scores.items()},
+                "confidence": a.confidence,
+                "formal_indicators": list(a.formal_indicators)[:5],
+                "colloquial_indicators": list(a.colloquial_indicators)[:5],
+            }
+            for i, a in enumerate(analyses)
+        ]
+
+        changes_data = [
+            {
+                "from_segment": c.from_segment_index,
+                "to_segment": c.to_segment_index,
+                "from_register": c.from_register.value,
+                "to_register": c.to_register.value,
+                "severity": c.severity,
+                "explanation": c.explanation,
+                "chapter": segments[c.to_segment_index][1] if c.to_segment_index < len(segments) else None,
+            }
+            for c in changes
+        ]
+
+        return ApiResponse(
+            success=True,
+            data={
+                "project_id": project_id,
+                "analyses": analyses_data,
+                "changes": changes_data,
+                "summary": summary,
+                "stats": {
+                    "segments_analyzed": len(analyses),
+                    "changes_detected": len(changes),
+                    "chapters_analyzed": len(chapters),
+                }
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Error analyzing register: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.get("/api/projects/{project_id}/chapters/{chapter_num}/dialogue-attributions", response_model=ApiResponse)
+async def get_dialogue_attributions(project_id: int, chapter_num: int):
+    """
+    Obtiene atribución de hablantes para los diálogos de un capítulo.
+
+    Utiliza múltiples estrategias para identificar quién habla cada diálogo:
+    - Detección explícita (verbo de habla + nombre)
+    - Alternancia (patrón A-B-A-B)
+    - Perfil de voz (comparación estilística)
+    - Proximidad (entidad mencionada cerca)
+
+    Returns:
+        ApiResponse con atribuciones de diálogos y estadísticas
+    """
+    try:
+        from narrative_assistant.voice.speaker_attribution import SpeakerAttributor
+        from narrative_assistant.voice.profiles import VoiceProfileBuilder
+        from narrative_assistant.nlp.dialogue import detect_dialogues
+        from narrative_assistant.entities.repository import get_entity_repository
+        from narrative_assistant.persistence.chapter import get_chapter_repository
+
+        # Verificar proyecto
+        if not project_manager:
+            return ApiResponse(success=False, error="Project manager not initialized")
+
+        result = project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail=f"Proyecto {project_id} no encontrado")
+
+        # Obtener capítulo específico
+        chapter_repo = get_chapter_repository()
+        chapters = chapter_repo.get_by_project(project_id)
+        chapter = next((c for c in chapters if c.chapter_number == chapter_num), None)
+
+        if not chapter:
+            raise HTTPException(status_code=404, detail=f"Capítulo {chapter_num} no encontrado")
+
+        # Obtener entidades (personajes)
+        entity_repo = get_entity_repository()
+        entities = entity_repo.get_entities_by_project(project_id, active_only=True)
+        characters = [e for e in entities if e.entity_type == "PER"]
+
+        # Obtener menciones de entidades en el capítulo
+        entity_mentions = []
+        for entity in characters:
+            mentions = entity_repo.get_mentions_by_entity(entity.id)
+            for m in mentions:
+                if m.chapter_id == chapter.id:
+                    entity_mentions.append((entity.id, m.start_char, m.end_char))
+
+        # Detectar diálogos
+        dialogue_result = detect_dialogues(chapter.content)
+        if dialogue_result.is_failure:
+            return ApiResponse(
+                success=True,
+                data={
+                    "project_id": project_id,
+                    "chapter_num": chapter_num,
+                    "attributions": [],
+                    "stats": {},
+                    "message": "No se pudieron detectar diálogos"
+                }
+            )
+
+        dialogues = dialogue_result.value.dialogues
+        if not dialogues:
+            return ApiResponse(
+                success=True,
+                data={
+                    "project_id": project_id,
+                    "chapter_num": chapter_num,
+                    "attributions": [],
+                    "stats": {},
+                    "message": "No hay diálogos en este capítulo"
+                }
+            )
+
+        # Preparar datos de entidades para el atribuidor
+        entity_data = [
+            type('Entity', (), {
+                'id': e.id,
+                'canonical_name': e.canonical_name,
+                'aliases': e.aliases or []
+            })()
+            for e in characters
+        ]
+
+        # Construir perfiles de voz (opcional, mejora precisión)
+        voice_profiles = None
+        try:
+            # Obtener todos los diálogos del proyecto para perfiles
+            all_dialogues = []
+            for ch in chapters:
+                ch_dialogue_result = detect_dialogues(ch.content)
+                if ch_dialogue_result.is_success:
+                    for d in ch_dialogue_result.value.dialogues:
+                        all_dialogues.append({
+                            "text": d.text,
+                            "speaker_id": d.speaker_id,
+                            "chapter": ch.chapter_number,
+                            "position": d.start_char,
+                        })
+
+            if all_dialogues:
+                entity_dict_data = [
+                    {"id": e.id, "name": e.canonical_name, "aliases": e.aliases}
+                    for e in characters
+                ]
+                builder = VoiceProfileBuilder()
+                profiles = builder.build_profiles(all_dialogues, entity_dict_data)
+                voice_profiles = {p.entity_id: p for p in profiles}
+        except Exception as e:
+            logger.warning(f"Could not build voice profiles: {e}")
+
+        # Atribuir hablantes
+        attributor = SpeakerAttributor(entity_data, voice_profiles)
+        attributions = attributor.attribute_dialogues(
+            dialogues, entity_mentions, chapter.content
+        )
+        stats = attributor.get_attribution_stats(attributions)
+
+        # Serializar atribuciones
+        attributions_data = [
+            {
+                "dialogue_index": i,
+                "text": dialogues[i].text[:100] + "..." if len(dialogues[i].text) > 100 else dialogues[i].text,
+                "start_char": dialogues[i].start_char,
+                "end_char": dialogues[i].end_char,
+                "speaker_id": attr.speaker_id,
+                "speaker_name": attr.speaker_name,
+                "confidence": attr.confidence.value,
+                "method": attr.attribution_method.value,
+                "speech_verb": attr.speech_verb,
+                "alternatives": [
+                    {"id": alt[0], "name": alt[1], "score": alt[2]}
+                    for alt in (attr.alternative_speakers or [])[:3]
+                ],
+            }
+            for i, attr in enumerate(attributions)
+        ]
+
+        return ApiResponse(
+            success=True,
+            data={
+                "project_id": project_id,
+                "chapter_num": chapter_num,
+                "attributions": attributions_data,
+                "stats": stats,
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error attributing speakers: {e}", exc_info=True)
         return ApiResponse(success=False, error=str(e))
 
 
