@@ -92,7 +92,7 @@ def download_macos_framework(target_dir: Path):
         print(f"[ERROR] Error descargando: {e}")
         return False
     
-    # Extraer Python.framework del .pkg usando installer
+    # Extraer Python.framework del .pkg usando método alternativo
     print(f"Extrayendo Python.framework...")
     
     try:
@@ -100,13 +100,27 @@ def download_macos_framework(target_dir: Path):
         temp_dir = target_dir / "temp_extract"
         temp_dir.mkdir(exist_ok=True)
         
-        # Usar xar para expandir el .pkg (alternativa a pkgutil)
-        print("Extrayendo .pkg con xar...")
-        subprocess.run([
-            "xar", "-xf",
-            str(pkg_path),
-            "-C", str(temp_dir)
-        ], check=True)
+        # Método simplificado: usar tar/cpio directamente sin pkgutil
+        # Los .pkg de Python son archivos xar que contienen cpio.gz
+        print("Extrayendo .pkg directamente...")
+        
+        # Expandir el .pkg con xar (preinstalado en macOS)
+        try:
+            subprocess.run([
+                "xar", "-xf", str(pkg_path),
+                "-C", str(temp_dir)
+            ], check=True, capture_output=True, text=True)
+            print("[OK] .pkg expandido con xar")
+        except subprocess.CalledProcessError as e:
+            print(f"[WARN] xar falló: {e.stderr}")
+            # Fallback: intentar con pkgutil si xar no funciona
+            print("Intentando con pkgutil como fallback...")
+            subprocess.run([
+                "pkgutil", "--expand-full",
+                str(pkg_path),
+                str(temp_dir)
+            ], check=True)
+            print("[OK] .pkg expandido con pkgutil")
         
         # Buscar y extraer el Payload que contiene Python.framework
         payloads = list(temp_dir.glob("**/Payload"))
