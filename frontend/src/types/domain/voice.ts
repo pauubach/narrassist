@@ -128,6 +128,7 @@ export interface DialogueAttribution {
     name: string
     score: number
   }>
+  chapterNumber?: number  // Added for navigation from panel
 }
 
 export interface DialogueAttributionStats {

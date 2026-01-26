@@ -82,6 +82,19 @@
         </div>
       </div>
 
+      <!-- Chapter Timeline Overview -->
+      <div v-if="timelineChapters.length > 0" class="timeline-section">
+        <h4><i class="pi pi-map"></i> Vista por Capítulos</h4>
+        <ChapterTimeline
+          :chapters="timelineChapters"
+          :highlights="timelineHighlights"
+          :selected-chapter="selectedChapter"
+          :show-legend="true"
+          :legend="timelineLegend"
+          @select="onChapterSelect"
+        />
+      </div>
+
       <!-- Register Distribution -->
       <div class="distribution-section">
         <h4><i class="pi pi-chart-bar"></i> Distribución de Registros</h4>
@@ -237,6 +250,7 @@ import Accordion from 'primevue/accordion'
 import AccordionPanel from 'primevue/accordionpanel'
 import AccordionHeader from 'primevue/accordionheader'
 import AccordionContent from 'primevue/accordioncontent'
+import { ChapterTimeline } from '@/components/shared'
 import { useVoiceAndStyleStore } from '@/stores/voiceAndStyle'
 import type { RegisterAnalysis, RegisterChange, RegisterSummary } from '@/types'
 
@@ -294,6 +308,73 @@ const registerDistribution = computed(() => {
 
   return distribution
 })
+
+// Build chapters for timeline
+const timelineChapters = computed(() => {
+  return analysesByChapter.value.map(ch => ({
+    id: ch.chapterNum,
+    number: ch.chapterNum,
+    title: `Capítulo ${ch.chapterNum}`
+  }))
+})
+
+// Build highlights based on register changes per chapter
+const timelineHighlights = computed(() => {
+  const changesByChapter: Record<number, { count: number; maxSeverity: string }> = {}
+
+  for (const change of changes.value) {
+    if (change.chapter) {
+      if (!changesByChapter[change.chapter]) {
+        changesByChapter[change.chapter] = { count: 0, maxSeverity: 'low' }
+      }
+      changesByChapter[change.chapter].count++
+      // Track highest severity
+      const severityOrder = ['low', 'medium', 'high', 'critical']
+      const current = severityOrder.indexOf(changesByChapter[change.chapter].maxSeverity)
+      const incoming = severityOrder.indexOf(change.severity)
+      if (incoming > current) {
+        changesByChapter[change.chapter].maxSeverity = change.severity
+      }
+    }
+  }
+
+  const highlights = []
+  for (const [chapter, data] of Object.entries(changesByChapter)) {
+    const severityColors: Record<string, string> = {
+      critical: '#ef4444',  // red
+      high: '#f97316',      // orange
+      medium: '#eab308',    // yellow
+      low: '#6b7280'        // gray
+    }
+    highlights.push({
+      chapter: parseInt(chapter),
+      color: severityColors[data.maxSeverity] || '#6b7280',
+      intensity: Math.min(1, 0.3 + data.count * 0.2),
+      label: `${data.count} cambio${data.count !== 1 ? 's' : ''} (${getSeverityLabel(data.maxSeverity)})`
+    })
+  }
+
+  return highlights
+})
+
+const timelineLegend = [
+  { label: 'Crítico', color: '#ef4444' },
+  { label: 'Alto', color: '#f97316' },
+  { label: 'Medio', color: '#eab308' },
+  { label: 'Bajo', color: '#6b7280' }
+]
+
+// Selected chapter for navigation
+const selectedChapter = ref<number | undefined>(undefined)
+
+const onChapterSelect = (chapterNumber: number) => {
+  selectedChapter.value = chapterNumber
+  // Scroll to chapter section in accordion (if visible)
+  const accordionEl = document.querySelector(`[data-p-index="${chapterNumber - 1}"]`)
+  if (accordionEl) {
+    accordionEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
+}
 
 // Group analyses by chapter
 const analysesByChapter = computed(() => {
@@ -752,5 +833,23 @@ watch(() => props.projectId, (newId) => {
   font-size: 0.875rem;
   color: var(--text-color-secondary);
   font-style: italic;
+}
+
+/* Timeline Section */
+.timeline-section {
+  padding: 1rem;
+  background: var(--surface-card);
+  border-radius: 8px;
+  border: 1px solid var(--surface-200);
+}
+
+.timeline-section h4 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 1rem 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-color);
 }
 </style>

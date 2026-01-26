@@ -112,7 +112,7 @@
               >
                 <template #value="slotProps">
                   <div v-if="slotProps.value" class="preset-selected">
-                    <span class="preset-name">{{ PRESETS[slotProps.value as ThemePreset]?.name }}</span>
+                    <span class="preset-name">{{ getPresetName(slotProps.value) }}</span>
                   </div>
                   <span v-else>Selecciona un tema</span>
                 </template>
@@ -176,7 +176,7 @@
               >
                 <template #value="slotProps">
                   <span v-if="slotProps.value" :class="`font-${slotProps.value}`">
-                    {{ FONT_FAMILIES[slotProps.value as FontFamily]?.label }}
+                    {{ getFontFamilyLabel(slotProps.value) }}
                   </span>
                 </template>
                 <template #optiongroup="slotProps">
@@ -214,7 +214,7 @@
               >
                 <template #value="slotProps">
                   <span v-if="slotProps.value" :class="`font-${slotProps.value}`">
-                    {{ FONT_FAMILIES[slotProps.value as FontFamily]?.label }}
+                    {{ getFontFamilyLabel(slotProps.value) }}
                   </span>
                 </template>
                 <template #optiongroup="slotProps">
@@ -633,12 +633,12 @@
                 v-for="(method, key) in getNLPMethodsForCategory('coreference')"
                 :key="key"
                 class="method-card"
-                :class="{ disabled: !method.available, enabled: isMethodEnabled('coreference', key as string) }"
+                :class="{ disabled: !method.available, enabled: isMethodEnabled('coreference', String(key)) }"
               >
                 <div class="method-header">
                   <InputSwitch
-                    :modelValue="isMethodEnabled('coreference', key as string)"
-                    @update:modelValue="toggleMethod('coreference', key as string, $event)"
+                    :modelValue="isMethodEnabled('coreference', String(key))"
+                    @update:modelValue="toggleMethod('coreference', String(key), $event)"
                     :disabled="!method.available"
                   />
                   <span class="method-name">{{ method.name }}</span>
@@ -665,12 +665,12 @@
                 v-for="(method, key) in getNLPMethodsForCategory('ner')"
                 :key="key"
                 class="method-card"
-                :class="{ disabled: !method.available, enabled: isMethodEnabled('ner', key as string) }"
+                :class="{ disabled: !method.available, enabled: isMethodEnabled('ner', String(key)) }"
               >
                 <div class="method-header">
                   <InputSwitch
-                    :modelValue="isMethodEnabled('ner', key as string)"
-                    @update:modelValue="toggleMethod('ner', key as string, $event)"
+                    :modelValue="isMethodEnabled('ner', String(key))"
+                    @update:modelValue="toggleMethod('ner', String(key), $event)"
                     :disabled="!method.available"
                   />
                   <span class="method-name">{{ method.name }}</span>
@@ -694,12 +694,12 @@
                 v-for="(method, key) in getNLPMethodsForCategory('grammar')"
                 :key="key"
                 class="method-card"
-                :class="{ disabled: !method.available, enabled: isMethodEnabled('grammar', key as string) }"
+                :class="{ disabled: !method.available, enabled: isMethodEnabled('grammar', String(key)) }"
               >
                 <div class="method-header">
                   <InputSwitch
-                    :modelValue="isMethodEnabled('grammar', key as string)"
-                    @update:modelValue="toggleMethod('grammar', key as string, $event)"
+                    :modelValue="isMethodEnabled('grammar', String(key))"
+                    @update:modelValue="toggleMethod('grammar', String(key), $event)"
                     :disabled="!method.available"
                   />
                   <span class="method-name">{{ method.name }}</span>
@@ -708,6 +708,73 @@
                   <Tag v-if="!method.available" value="No disponible" severity="danger" class="method-tag" />
                 </div>
                 <p class="method-description">{{ method.description }}</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 6. Ortografía (Votación Multi-Método) -->
+          <div class="nlp-category">
+            <div class="category-header">
+              <h4><i class="pi pi-spell-check"></i> Corrección ortográfica</h4>
+              <span class="category-desc">Sistema de votación con múltiples correctores para máxima precisión</span>
+            </div>
+            <div class="methods-grid">
+              <div
+                v-for="(method, key) in getNLPMethodsForCategory('spelling')"
+                :key="key"
+                class="method-card"
+                :class="{ disabled: !method.available, enabled: isMethodEnabled('spelling', String(key)) }"
+              >
+                <div class="method-header">
+                  <InputSwitch
+                    :modelValue="isMethodEnabled('spelling', String(key))"
+                    @update:modelValue="toggleMethod('spelling', String(key), $event)"
+                    :disabled="!method.available"
+                  />
+                  <span class="method-name">{{ method.name }}</span>
+                  <Tag v-if="method.recommended_gpu && !method.requires_gpu" value="GPU recomendada" severity="info" class="method-tag" />
+                  <Tag v-if="method.requires_gpu" value="Requiere GPU" severity="warning" class="method-tag" />
+                  <Tag v-if="!method.available" value="No disponible" severity="danger" class="method-tag" />
+                </div>
+                <p class="method-description">{{ method.description }}</p>
+                <div v-if="method.weight" class="method-weight">
+                  Peso en votación: {{ (method.weight * 100).toFixed(0) }}%
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 7. Conocimiento de Personajes -->
+          <div class="nlp-category">
+            <div class="category-header">
+              <h4><i class="pi pi-book"></i> Conocimiento de personajes</h4>
+              <span class="category-desc">Extrae qué sabe cada personaje sobre otros y sobre eventos</span>
+            </div>
+            <div class="knowledge-mode-selector">
+              <div
+                v-for="(method, key) in getNLPMethodsForCategory('character_knowledge')"
+                :key="key"
+                class="knowledge-mode-card"
+                :class="{
+                  disabled: !method.available,
+                  selected: settings.characterKnowledgeMode === key
+                }"
+                @click="method.available && setCharacterKnowledgeMode(String(key))"
+              >
+                <div class="mode-radio">
+                  <RadioButton
+                    :modelValue="settings.characterKnowledgeMode"
+                    :value="key"
+                    :disabled="!method.available"
+                    @update:modelValue="setCharacterKnowledgeMode($event)"
+                  />
+                </div>
+                <div class="mode-content">
+                  <span class="mode-name">{{ method.name }}</span>
+                  <p class="mode-description">{{ method.description }}</p>
+                  <Tag v-if="method.recommended_gpu" value="GPU recomendada" severity="info" class="method-tag" />
+                  <Tag v-if="!method.available" value="No disponible" severity="danger" class="method-tag" />
+                </div>
               </div>
             </div>
           </div>
@@ -1220,6 +1287,7 @@ import MultiSelect from 'primevue/multiselect'
 import Badge from 'primevue/badge'
 import Tag from 'primevue/tag'
 import Checkbox from 'primevue/checkbox'
+import RadioButton from 'primevue/radiobutton'
 import ProgressSpinner from 'primevue/progressspinner'
 import { useToast } from 'primevue/usetoast'
 import {
@@ -1333,6 +1401,15 @@ const groupedFontOptions = computed(() => {
   return Object.values(categories).filter(cat => cat.items.length > 0)
 })
 
+// Helper functions for template lookups (avoiding type assertions)
+const getPresetName = (value: string): string => {
+  return PRESETS[value as ThemePreset]?.name ?? value
+}
+
+const getFontFamilyLabel = (value: string): string => {
+  return FONT_FAMILIES[value as FontFamily]?.label ?? value
+}
+
 // Métodos de inferencia LLM disponibles (solo los avanzados, los básicos siempre están activos)
 const inferenceMethodOptions = [
   {
@@ -1404,6 +1481,8 @@ interface SystemCapabilities {
     coreference: Record<string, NLPMethod>
     ner: Record<string, NLPMethod>
     grammar: Record<string, NLPMethod>
+    spelling?: Record<string, NLPMethod>
+    character_knowledge?: Record<string, NLPMethod>
   }
   recommended_config: {
     device_preference: string
@@ -1417,6 +1496,8 @@ interface EnabledMethods {
   coreference: string[]
   ner: string[]
   grammar: string[]
+  spelling: string[]
+  character_knowledge: string[]
 }
 
 interface Settings {
@@ -1440,6 +1521,8 @@ interface Settings {
   prioritizeSpeed: boolean
   // Métodos NLP granulares
   enabledNLPMethods: EnabledMethods
+  // Conocimiento de personajes
+  characterKnowledgeMode: string
 }
 
 const settings = ref<Settings>({
@@ -1465,8 +1548,12 @@ const settings = ref<Settings>({
   enabledNLPMethods: {
     coreference: ['embeddings', 'morpho', 'heuristics'],
     ner: ['spacy', 'gazetteer'],
-    grammar: ['spacy_rules']
-  }
+    grammar: ['spacy_rules'],
+    spelling: ['patterns', 'symspell', 'hunspell', 'languagetool', 'pyspellchecker'],
+    character_knowledge: ['rules']
+  },
+  // Conocimiento de personajes
+  characterKnowledgeMode: 'rules'
 })
 
 // Capacidades del sistema
@@ -2080,7 +2167,9 @@ const applyDefaultsFromCapabilities = (capabilities: SystemCapabilities) => {
   const enabledMethods: EnabledMethods = {
     coreference: [],
     ner: [],
-    grammar: []
+    grammar: [],
+    spelling: [],
+    character_knowledge: []
   }
 
   // Aplicar defaults basados en lo que está disponible y recomendado
@@ -2099,12 +2188,28 @@ const applyDefaultsFromCapabilities = (capabilities: SystemCapabilities) => {
       enabledMethods.grammar.push(key)
     }
   }
+  if (methods.spelling) {
+    for (const [key, method] of Object.entries(methods.spelling)) {
+      if (method.available && method.default_enabled) {
+        enabledMethods.spelling.push(key)
+      }
+    }
+  }
+  if (methods.character_knowledge) {
+    for (const [key, method] of Object.entries(methods.character_knowledge)) {
+      if (method.available && method.default_enabled) {
+        enabledMethods.character_knowledge.push(key)
+      }
+    }
+  }
 
   settings.value.enabledNLPMethods = enabledMethods
   saveSettings()
 }
 
-const getNLPMethodsForCategory = (category: 'coreference' | 'ner' | 'grammar'): Record<string, NLPMethod> => {
+type NLPCategory = 'coreference' | 'ner' | 'grammar' | 'spelling' | 'character_knowledge'
+
+const getNLPMethodsForCategory = (category: NLPCategory): Record<string, NLPMethod> => {
   if (!systemCapabilities.value) {
     // Devolver métodos por defecto mientras carga (LLM no disponible hasta verificar)
     const defaults: Record<string, Record<string, NLPMethod>> = {
@@ -2119,19 +2224,37 @@ const getNLPMethodsForCategory = (category: 'coreference' | 'ner' | 'grammar'): 
       },
       grammar: {
         spacy_rules: { name: 'Corrector básico', description: 'Cargando...', available: true, default_enabled: true, requires_gpu: false, recommended_gpu: false }
+      },
+      spelling: {
+        patterns: { name: 'Patrones', description: 'Reglas y patrones comunes', available: true, default_enabled: true, requires_gpu: false, recommended_gpu: false },
+        symspell: { name: 'SymSpell', description: 'Corrector rápido por distancia', available: true, default_enabled: true, requires_gpu: false, recommended_gpu: false },
+        hunspell: { name: 'Hunspell', description: 'Diccionario de LibreOffice', available: true, default_enabled: true, requires_gpu: false, recommended_gpu: false },
+        languagetool: { name: 'LanguageTool', description: 'Gramática y ortografía avanzada', available: true, default_enabled: false, requires_gpu: false, recommended_gpu: false },
+        pyspellchecker: { name: 'PySpellChecker', description: 'Corrector por frecuencia', available: true, default_enabled: false, requires_gpu: false, recommended_gpu: false },
+        beto: { name: 'BETO ML', description: 'Modelo neuronal español', available: false, default_enabled: false, requires_gpu: true, recommended_gpu: true }
+      },
+      character_knowledge: {
+        rules: { name: 'Reglas', description: 'Inferencia basada en reglas narrativas', available: true, default_enabled: true, requires_gpu: false, recommended_gpu: false },
+        llm: { name: 'LLM', description: 'Análisis semántico con modelo de lenguaje', available: false, default_enabled: false, requires_gpu: false, recommended_gpu: true },
+        hybrid: { name: 'Híbrido', description: 'Combina reglas con verificación LLM', available: false, default_enabled: false, requires_gpu: false, recommended_gpu: true }
       }
     }
-    return defaults[category]
+    return defaults[category] || {}
   }
-  return systemCapabilities.value.nlp_methods[category]
+  return systemCapabilities.value.nlp_methods[category] || {}
 }
 
-const isMethodEnabled = (category: 'coreference' | 'ner' | 'grammar', methodKey: string): boolean => {
-  return settings.value.enabledNLPMethods[category].includes(methodKey)
-}
-
-const toggleMethod = (category: 'coreference' | 'ner' | 'grammar', methodKey: string, enabled: boolean) => {
+const isMethodEnabled = (category: NLPCategory, methodKey: string): boolean => {
   const methods = settings.value.enabledNLPMethods[category]
+  return methods ? methods.includes(methodKey) : false
+}
+
+const toggleMethod = (category: NLPCategory, methodKey: string, enabled: boolean) => {
+  let methods = settings.value.enabledNLPMethods[category]
+  if (!methods) {
+    settings.value.enabledNLPMethods[category] = []
+    methods = settings.value.enabledNLPMethods[category]
+  }
   if (enabled && !methods.includes(methodKey)) {
     methods.push(methodKey)
   } else if (!enabled) {
@@ -2140,6 +2263,11 @@ const toggleMethod = (category: 'coreference' | 'ner' | 'grammar', methodKey: st
       methods.splice(index, 1)
     }
   }
+  saveSettings()
+}
+
+const setCharacterKnowledgeMode = (mode: string) => {
+  settings.value.characterKnowledgeMode = mode
   saveSettings()
 }
 
@@ -2392,8 +2520,11 @@ const resetSettings = () => {
     enabledNLPMethods: {
       coreference: ['embeddings', 'morpho', 'heuristics'],
       ner: ['spacy', 'gazetteer'],
-      grammar: ['spacy_rules']
-    }
+      grammar: ['spacy_rules'],
+      spelling: ['patterns', 'symspell', 'hunspell'],
+      character_knowledge: ['rules']
+    },
+    characterKnowledgeMode: 'rules'
   }
 
   // Si hay capacidades del sistema, aplicar defaults basados en hardware
@@ -3905,5 +4036,77 @@ const handleScroll = () => {
 
 .text-red-500 {
   color: var(--p-red-500);
+}
+
+/* Character Knowledge Mode Selector */
+.knowledge-mode-selector {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.knowledge-mode-card {
+  flex: 1;
+  min-width: 200px;
+  padding: 1rem;
+  border: 2px solid var(--p-content-border-color);
+  border-radius: var(--p-border-radius);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: var(--p-surface-ground);
+}
+
+.knowledge-mode-card:hover:not(.disabled) {
+  border-color: var(--p-primary-color);
+  background: var(--p-surface-hover);
+}
+
+.knowledge-mode-card.selected {
+  border-color: var(--p-primary-color);
+  background: var(--p-primary-50);
+}
+
+.knowledge-mode-card.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.knowledge-mode-card .mode-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.knowledge-mode-card .mode-header i {
+  font-size: 1.25rem;
+  color: var(--p-primary-color);
+}
+
+.knowledge-mode-card .mode-name {
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.knowledge-mode-card .mode-description {
+  font-size: 0.85rem;
+  color: var(--p-text-secondary-color);
+  line-height: 1.4;
+}
+
+.knowledge-mode-card .mode-radio {
+  flex-shrink: 0;
+}
+
+.knowledge-mode-card .mode-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.knowledge-mode-card .method-tag {
+  margin-top: 0.5rem;
+  width: fit-content;
 }
 </style>

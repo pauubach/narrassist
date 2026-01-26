@@ -69,7 +69,7 @@
         :key="idx"
         class="attribution-item"
         :class="getConfidenceClass(attr.confidence)"
-        @click="$emit('select-dialogue', attr)"
+        @click="selectedChapter !== null && $emit('select-dialogue', { ...attr, chapterNumber: selectedChapter })"
       >
         <div class="dialogue-header">
           <div class="speaker-info">

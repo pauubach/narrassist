@@ -153,6 +153,17 @@
             />
           </div>
         </div>
+
+        <!-- Compare Button -->
+        <div v-if="availableForComparison.length > 0" class="voice-comparison-btn">
+          <Button
+            label="Comparar con otro personaje"
+            icon="pi pi-users"
+            text
+            size="small"
+            @click="openComparison"
+          />
+        </div>
       </div>
       <div v-else-if="!voiceProfile && profile" class="profile-section">
         <h4><i class="pi pi-chart-bar"></i> Métricas de Voz</h4>
@@ -360,6 +371,175 @@
         />
       </template>
     </Dialog>
+
+    <!-- Voice Profile Comparison Dialog -->
+    <Dialog
+      :visible="showComparisonDialog"
+      @update:visible="showComparisonDialog = $event"
+      modal
+      header="Comparar Perfiles de Voz"
+      :style="{ width: '700px' }"
+      class="voice-comparison-dialog"
+    >
+      <!-- Character Selector -->
+      <div class="comparison-selector">
+        <label>Comparar con:</label>
+        <Dropdown
+          v-model="compareCharacterId"
+          :options="availableForComparison"
+          optionLabel="name"
+          optionValue="id"
+          placeholder="Selecciona un personaje"
+          class="w-full"
+        />
+      </div>
+
+      <!-- Comparison Table -->
+      <div v-if="voiceProfile && comparisonVoiceProfile" class="comparison-content">
+        <table class="comparison-table">
+          <thead>
+            <tr>
+              <th>Métrica</th>
+              <th>{{ characterName || 'Actual' }}</th>
+              <th>{{ comparisonVoiceProfile.entityName }}</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Palabras/Intervención</td>
+              <td>{{ formatVoiceMetric(voiceProfile.metrics.avgInterventionLength) }}</td>
+              <td>{{ formatVoiceMetric(comparisonVoiceProfile.metrics.avgInterventionLength) }}</td>
+              <td>
+                <i
+                  :class="getComparisonIcon(getMetricComparison(
+                    voiceProfile.metrics.avgInterventionLength,
+                    comparisonVoiceProfile.metrics.avgInterventionLength
+                  ))"
+                ></i>
+              </td>
+            </tr>
+            <tr>
+              <td>Diversidad léxica (TTR)</td>
+              <td>{{ formatVoicePercent(voiceProfile.metrics.typeTokenRatio) }}</td>
+              <td>{{ formatVoicePercent(comparisonVoiceProfile.metrics.typeTokenRatio) }}</td>
+              <td>
+                <i
+                  :class="getComparisonIcon(getMetricComparison(
+                    voiceProfile.metrics.typeTokenRatio,
+                    comparisonVoiceProfile.metrics.typeTokenRatio
+                  ))"
+                ></i>
+              </td>
+            </tr>
+            <tr>
+              <td>Formalidad</td>
+              <td>{{ formatVoicePercent(voiceProfile.metrics.formalityScore) }}</td>
+              <td>{{ formatVoicePercent(comparisonVoiceProfile.metrics.formalityScore) }}</td>
+              <td>
+                <i
+                  :class="getComparisonIcon(getMetricComparison(
+                    voiceProfile.metrics.formalityScore,
+                    comparisonVoiceProfile.metrics.formalityScore
+                  ))"
+                ></i>
+              </td>
+            </tr>
+            <tr>
+              <td>Muletillas</td>
+              <td>{{ formatVoicePercent(voiceProfile.metrics.fillerRatio) }}</td>
+              <td>{{ formatVoicePercent(comparisonVoiceProfile.metrics.fillerRatio) }}</td>
+              <td>
+                <i
+                  :class="getComparisonIcon(getMetricComparison(
+                    voiceProfile.metrics.fillerRatio,
+                    comparisonVoiceProfile.metrics.fillerRatio
+                  ))"
+                ></i>
+              </td>
+            </tr>
+            <tr>
+              <td>Exclamaciones</td>
+              <td>{{ formatVoicePercent(voiceProfile.metrics.exclamationRatio) }}</td>
+              <td>{{ formatVoicePercent(comparisonVoiceProfile.metrics.exclamationRatio) }}</td>
+              <td>
+                <i
+                  :class="getComparisonIcon(getMetricComparison(
+                    voiceProfile.metrics.exclamationRatio,
+                    comparisonVoiceProfile.metrics.exclamationRatio
+                  ))"
+                ></i>
+              </td>
+            </tr>
+            <tr>
+              <td>Preguntas</td>
+              <td>{{ formatVoicePercent(voiceProfile.metrics.questionRatio) }}</td>
+              <td>{{ formatVoicePercent(comparisonVoiceProfile.metrics.questionRatio) }}</td>
+              <td>
+                <i
+                  :class="getComparisonIcon(getMetricComparison(
+                    voiceProfile.metrics.questionRatio,
+                    comparisonVoiceProfile.metrics.questionRatio
+                  ))"
+                ></i>
+              </td>
+            </tr>
+            <tr>
+              <td>Total intervenciones</td>
+              <td>{{ voiceProfile.metrics.totalInterventions }}</td>
+              <td>{{ comparisonVoiceProfile.metrics.totalInterventions }}</td>
+              <td>
+                <i
+                  :class="getComparisonIcon(getMetricComparison(
+                    voiceProfile.metrics.totalInterventions,
+                    comparisonVoiceProfile.metrics.totalInterventions
+                  ))"
+                ></i>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- Characteristic Words Comparison -->
+        <div class="comparison-words">
+          <div class="words-column">
+            <h5>Palabras de {{ characterName || 'Actual' }}</h5>
+            <div class="words-chips">
+              <Chip
+                v-for="(item, idx) in voiceProfile.characteristicWords.slice(0, 6)"
+                :key="idx"
+                :label="item.word"
+              />
+            </div>
+          </div>
+          <div class="words-column">
+            <h5>Palabras de {{ comparisonVoiceProfile.entityName }}</h5>
+            <div class="words-chips">
+              <Chip
+                v-for="(item, idx) in comparisonVoiceProfile.characteristicWords.slice(0, 6)"
+                :key="idx"
+                :label="item.word"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- No comparison selected -->
+      <div v-else-if="!compareCharacterId" class="comparison-empty">
+        <p>Selecciona un personaje para comparar sus métricas de voz.</p>
+      </div>
+
+      <!-- Loading comparison profile -->
+      <div v-else class="comparison-loading">
+        <ProgressSpinner style="width: 30px; height: 30px" />
+        <p>Cargando perfil de voz...</p>
+      </div>
+
+      <template #footer>
+        <Button label="Cerrar" @click="showComparisonDialog = false" />
+      </template>
+    </Dialog>
   </div>
 </template>
 
@@ -412,6 +592,7 @@ const props = defineProps<{
   projectId: number
   characterId: number
   characterName?: string
+  allCharacters?: Array<{ id: number; name: string }>  // For comparison dropdown
 }>()
 
 const emit = defineEmits<{
@@ -482,6 +663,47 @@ const expectationTypes = [
   { label: 'Temporal', value: 'temporal' },
   { label: 'Contextual', value: 'contextual' }
 ]
+
+// Voice Profile Comparison
+const showComparisonDialog = ref(false)
+const compareCharacterId = ref<number | null>(null)
+
+// Characters available for comparison (excluding current)
+const availableForComparison = computed(() => {
+  if (!props.allCharacters) return []
+  return props.allCharacters.filter(c => c.id !== props.characterId)
+})
+
+// Get comparison voice profile
+const comparisonVoiceProfile = computed<VoiceProfile | null>(() => {
+  if (!compareCharacterId.value) return null
+  const profiles = voiceStore.getVoiceProfiles(props.projectId)
+  return profiles.find(p => p.entityId === compareCharacterId.value) || null
+})
+
+// Open comparison dialog
+const openComparison = () => {
+  compareCharacterId.value = null
+  showComparisonDialog.value = true
+}
+
+// Compare metrics between two profiles
+const getMetricComparison = (current: number, other: number): 'higher' | 'lower' | 'similar' => {
+  const diff = current - other
+  const threshold = Math.max(Math.abs(current), Math.abs(other)) * 0.1 // 10% threshold
+  if (diff > threshold) return 'higher'
+  if (diff < -threshold) return 'lower'
+  return 'similar'
+}
+
+// Get icon class for comparison
+const getComparisonIcon = (comparison: 'higher' | 'lower' | 'similar'): string => {
+  switch (comparison) {
+    case 'higher': return 'pi pi-arrow-up comparison-higher'
+    case 'lower': return 'pi pi-arrow-down comparison-lower'
+    default: return 'pi pi-minus comparison-similar'
+  }
+}
 
 // Check LLM availability on mount
 onMounted(async () => {
@@ -1132,5 +1354,101 @@ const deleteExpectation = (index: number) => {
   display: flex;
   justify-content: center;
   padding: 0.5rem;
+}
+
+/* Voice Comparison Button */
+.voice-comparison-btn {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--surface-200);
+  display: flex;
+  justify-content: center;
+}
+
+/* Voice Comparison Dialog */
+.comparison-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.comparison-selector label {
+  font-weight: 500;
+  color: var(--text-color);
+}
+
+.comparison-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.comparison-table th,
+.comparison-table td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--surface-200);
+}
+
+.comparison-table th {
+  background: var(--surface-50);
+  font-weight: 600;
+  color: var(--text-color-secondary);
+}
+
+.comparison-table th:first-child {
+  width: 40%;
+}
+
+.comparison-table th:last-child {
+  width: 40px;
+  text-align: center;
+}
+
+.comparison-table td:last-child {
+  text-align: center;
+}
+
+.comparison-higher {
+  color: var(--green-500);
+}
+
+.comparison-lower {
+  color: var(--red-500);
+}
+
+.comparison-similar {
+  color: var(--text-color-secondary);
+}
+
+.comparison-words {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.words-column h5 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-color-secondary);
+}
+
+.comparison-empty,
+.comparison-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  color: var(--text-color-secondary);
+  text-align: center;
 }
 </style>

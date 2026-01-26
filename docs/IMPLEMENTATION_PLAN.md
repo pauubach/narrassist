@@ -213,9 +213,32 @@ Colores: verde (>0.7), amarillo (0.5-0.7), rojo (<0.5)
 
 **Usado en**: CharacterKnowledgeAnalysis.vue, BehaviorExpectations.vue
 
-### 1.2 ChapterTimeline.vue ⚠️ Pendiente
+### 1.2 ChapterTimeline.vue ✅ COMPLETADO
 
-Adaptar de `components/timeline/VisTimeline.vue` existente.
+**Archivo**: `frontend/src/components/shared/ChapterTimeline.vue`
+
+```typescript
+interface Props {
+  chapters: Chapter[]
+  highlights?: Array<{ chapter: number, color: string, intensity: number, label?: string }>
+  selectedChapter?: number
+  title?: string
+  showHeader?: boolean
+  showCount?: boolean
+  showLegend?: boolean
+  legend?: Array<{ label: string, color: string }>
+  compact?: boolean
+  vertical?: boolean
+}
+```
+
+**Características**:
+- Vista horizontal (default) o vertical
+- Modo compacto para espacios reducidos
+- Highlights por capítulo con intensidad variable
+- Selección de capítulo con emit
+- Tooltips con título de capítulo
+- Leyenda opcional
 
 ### 1.3 MethodVotingBar.vue ✅
 
@@ -243,9 +266,9 @@ interface Props {
 - ✅ Métricas cuantitativas (longitud, TTR, formalidad, muletillas)
 - ✅ Palabras características (chips)
 - ✅ Muletillas frecuentes (chips)
-- ⚠️ Botón "Comparar con otro personaje" (pendiente)
+- ✅ Botón "Comparar con otro personaje" con diálogo de comparación
 
-### 2.2 Coreference Voting en EntityInspector.vue ⚠️ BLOQUEADO
+### 2.2 Coreference Voting en EntityInspector.vue ✅ COMPLETADO
 
 **Requiere**: Endpoint `/api/projects/{id}/entities/{entityId}/coreference` (no implementado)
 
@@ -403,8 +426,8 @@ Extender ExportDialog con formato "Informe Editorial":
 
 **Progreso Fase 0**: Voice Profiles ✅, Register Analysis ✅, Speaker Attribution ✅, Character Knowledge ✅
 **Progreso Fase 0.6**: Store ✅, VoiceProfile.vue ✅, CharacterKnowledgeAnalysis.vue ✅, RegisterAnalysisTab.vue ✅, DialogueAttributionPanel ✅
-**Progreso Fase 1**: ConfidenceBadge.vue ✅, MethodVotingBar.vue ✅, ChapterTimeline.vue ⚠️
-**Progreso Fase 2**: BehaviorExpectations + Voice Metrics ✅, Coreference Voting ⚠️ (falta endpoint)
+**Progreso Fase 1**: ConfidenceBadge.vue ✅, MethodVotingBar.vue ✅, ChapterTimeline.vue ✅
+**Progreso Fase 2**: BehaviorExpectations + Voice Metrics ✅, Coreference Voting ✅
 
 **MVP mejorado (Fases 0-3)**: ~33-41 días (~1.5-2 meses)
 **Producto completo (Fases 0-7)**: ~145-183 días (~6-9 meses)

@@ -1160,6 +1160,96 @@ async def system_capabilities():
                     "recommended_gpu": True,
                 },
             },
+            "spelling": {
+                "patterns": {
+                    "name": "Patrones",
+                    "description": "Reglas y patrones comunes de errores ortográficos",
+                    "weight": 0.26,
+                    "available": True,
+                    "default_enabled": True,
+                    "requires_gpu": False,
+                    "recommended_gpu": False,
+                },
+                "languagetool": {
+                    "name": "LanguageTool",
+                    "description": "Servidor de ortografía avanzado (requiere Java)",
+                    "weight": 0.24,
+                    "available": lt_available,
+                    "default_enabled": lt_available,
+                    "requires_gpu": False,
+                    "recommended_gpu": False,
+                },
+                "symspell": {
+                    "name": "SymSpell",
+                    "description": "Algoritmo de alta velocidad para corrección",
+                    "weight": 0.16,
+                    "available": True,
+                    "default_enabled": True,
+                    "requires_gpu": False,
+                    "recommended_gpu": False,
+                },
+                "hunspell": {
+                    "name": "Hunspell",
+                    "description": "Diccionario profesional de español",
+                    "weight": 0.14,
+                    "available": True,
+                    "default_enabled": True,
+                    "requires_gpu": False,
+                    "recommended_gpu": False,
+                },
+                "pyspellchecker": {
+                    "name": "PySpellChecker",
+                    "description": "Corrector Python con diccionario incluido",
+                    "weight": 0.08,
+                    "available": True,
+                    "default_enabled": True,
+                    "requires_gpu": False,
+                    "recommended_gpu": False,
+                },
+                "beto": {
+                    "name": "BETO ML",
+                    "description": "Modelo BERT en español para detección contextual",
+                    "weight": 0.12,
+                    "available": has_gpu,
+                    "default_enabled": has_gpu,
+                    "requires_gpu": True,
+                    "recommended_gpu": True,
+                },
+                "llm_arbitrator": {
+                    "name": "LLM Arbitrador",
+                    "description": "Resuelve conflictos entre correctores con IA",
+                    "available": ollama_available,
+                    "default_enabled": ollama_available and has_gpu,
+                    "requires_gpu": False,
+                    "recommended_gpu": True,
+                },
+            },
+            "character_knowledge": {
+                "rules": {
+                    "name": "Reglas",
+                    "description": "Extracción basada en patrones y heurísticas",
+                    "available": True,
+                    "default_enabled": True,
+                    "requires_gpu": False,
+                    "recommended_gpu": False,
+                },
+                "llm": {
+                    "name": "LLM",
+                    "description": "Extracción inteligente con comprensión contextual",
+                    "available": ollama_available,
+                    "default_enabled": ollama_available and has_gpu,
+                    "requires_gpu": False,
+                    "recommended_gpu": True,
+                },
+                "hybrid": {
+                    "name": "Híbrido",
+                    "description": "Combina reglas y LLM para mejor cobertura",
+                    "available": ollama_available,
+                    "default_enabled": False,
+                    "requires_gpu": False,
+                    "recommended_gpu": True,
+                },
+            },
         }
 
         # Modelos Ollama recomendados según hardware
@@ -3041,6 +3131,167 @@ async def get_entity_mentions(project_id: int, entity_id: int):
     except Exception as e:
         logger.error(f"Error getting mentions for entity {entity_id}: {e}", exc_info=True)
         return ApiResponse(success=False, error=str(e))
+
+
+@app.get("/api/projects/{project_id}/entities/{entity_id}/coreference", response_model=ApiResponse)
+async def get_entity_coreference_info(project_id: int, entity_id: int):
+    """
+    Obtiene información de correferencia para una entidad.
+
+    Retorna datos sobre cómo se resolvieron las menciones de la entidad,
+    incluyendo la contribución de cada método de detección.
+
+    Args:
+        project_id: ID del proyecto
+        entity_id: ID de la entidad
+
+    Returns:
+        ApiResponse con información de correferencia:
+        - methodContributions: Contribución de cada método
+        - mentionsByType: Menciones agrupadas por tipo
+        - overallConfidence: Confianza promedio
+        - totalMentions: Total de menciones
+    """
+    try:
+        entity_repo = entity_repository
+
+        # Verificar que la entidad existe y pertenece al proyecto
+        entity = entity_repo.get_entity(entity_id)
+        if not entity or entity.project_id != project_id:
+            return ApiResponse(success=False, error="Entidad no encontrada")
+
+        # Obtener menciones de la entidad
+        mentions = entity_repo.get_mentions_by_entity(entity_id)
+
+        if not mentions:
+            return ApiResponse(success=True, data={
+                "entityId": entity_id,
+                "entityName": entity.canonical_name,
+                "methodContributions": [],
+                "mentionsByType": {},
+                "overallConfidence": 0.0,
+                "totalMentions": 0,
+            })
+
+        # Agrupar menciones por fuente/método de detección
+        method_counts: dict[str, int] = {}
+        type_mentions: dict[str, list] = {}
+        total_confidence = 0.0
+        confidence_count = 0
+
+        # Mapeo de fuentes del backend a nombres legibles
+        source_labels = {
+            "ner": "NER (spaCy)",
+            "spacy": "NER (spaCy)",
+            "embeddings": "Embeddings",
+            "llm": "LLM (Ollama)",
+            "morpho": "Morfosintáctico",
+            "heuristics": "Heurísticas",
+            "coreference": "Correferencia",
+            "coref": "Correferencia",
+            "manual": "Manual",
+            "fusion": "Fusión",
+            "pronoun": "Pronombre resuelto",
+        }
+
+        for mention in mentions:
+            source = mention.source or "unknown"
+            source_lower = source.lower()
+
+            # Contar por método
+            method_counts[source_lower] = method_counts.get(source_lower, 0) + 1
+
+            # Agrupar por tipo de mención (basado en el texto)
+            surface = mention.surface_form or ""
+            mention_type = _classify_mention_type(surface)
+
+            if mention_type not in type_mentions:
+                type_mentions[mention_type] = []
+            type_mentions[mention_type].append({
+                "text": surface,
+                "confidence": mention.confidence,
+                "source": source,
+            })
+
+            # Sumar confianza para promedio
+            if mention.confidence is not None:
+                total_confidence += mention.confidence
+                confidence_count += 1
+
+        # Calcular contribuciones con formato para MethodVotingBar
+        total_mentions = len(mentions)
+        method_contributions = []
+
+        for source, count in sorted(method_counts.items(), key=lambda x: -x[1]):
+            percentage = (count / total_mentions * 100) if total_mentions > 0 else 0
+            method_contributions.append({
+                "name": source_labels.get(source, source.capitalize()),
+                "method": source,
+                "count": count,
+                "score": percentage / 100,  # Normalizado 0-1 para MethodVotingBar
+                "agreed": percentage >= 20,  # Consideramos "de acuerdo" si aporta >= 20%
+            })
+
+        # Calcular confianza promedio
+        overall_confidence = (total_confidence / confidence_count) if confidence_count > 0 else 0.0
+
+        return ApiResponse(success=True, data={
+            "entityId": entity_id,
+            "entityName": entity.canonical_name,
+            "methodContributions": method_contributions,
+            "mentionsByType": type_mentions,
+            "overallConfidence": overall_confidence,
+            "totalMentions": total_mentions,
+        })
+
+    except Exception as e:
+        logger.error(f"Error getting coreference info for entity {entity_id}: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+def _classify_mention_type(surface_form: str) -> str:
+    """
+    Clasifica el tipo de mención basándose en el texto.
+
+    Args:
+        surface_form: Texto de la mención
+
+    Returns:
+        Tipo de mención: 'proper_noun', 'pronoun', 'definite_np', etc.
+    """
+    text_lower = surface_form.lower().strip()
+
+    # Pronombres personales
+    pronouns = {
+        "él", "ella", "ellos", "ellas", "yo", "tú", "nosotros", "nosotras",
+        "lo", "la", "los", "las", "le", "les", "se",
+        "me", "te", "nos", "os",
+    }
+    if text_lower in pronouns:
+        return "pronoun"
+
+    # Demostrativos
+    demonstratives = {
+        "este", "esta", "esto", "estos", "estas",
+        "ese", "esa", "eso", "esos", "esas",
+        "aquel", "aquella", "aquello", "aquellos", "aquellas",
+    }
+    if text_lower in demonstratives:
+        return "demonstrative"
+
+    # Posesivos (cuando son el sujeto completo)
+    possessives = {"su", "sus", "suyo", "suya", "suyos", "suyas"}
+    if text_lower in possessives:
+        return "possessive"
+
+    # Sintagma nominal definido (empieza con artículo + sustantivo)
+    articles = {"el", "la", "los", "las"}
+    words = text_lower.split()
+    if len(words) >= 2 and words[0] in articles:
+        return "definite_np"
+
+    # Por defecto, nombre propio
+    return "proper_noun"
 
 
 # ============================================================================

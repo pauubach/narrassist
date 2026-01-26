@@ -274,10 +274,25 @@ interface Annotation {
   suggestion?: string
   excerpt?: string
 }
+
+// Atribución de diálogos
+interface DialogueAttr {
+  text: string
+  speakerName: string | null
+  speakerId: number | null
+  confidence: 'high' | 'medium' | 'low' | 'unknown'
+  method: string
+  startChar: number
+  endChar: number
+  chapterNumber: number
+}
+
 const chapterAnnotations = ref<Map<number, Annotation[]>>(new Map())
+const chapterDialogues = ref<Map<number, DialogueAttr[]>>(new Map())  // Cache de diálogos por capítulo
 const showSpellingErrors = ref(true)  // Toggle para mostrar/ocultar errores de ortografia
 const showGrammarErrors = ref(true)   // Toggle para mostrar/ocultar errores de gramatica
 const showDialoguePanel = ref(false)  // Toggle para panel de atribución de diálogos
+const showDialogueHighlights = ref(true)  // Mostrar highlights de diálogos cuando el panel está abierto
 
 // Computed para mantener compatibilidad con showAnnotations
 const showAnnotations = computed(() => showSpellingErrors.value || showGrammarErrors.value)
@@ -346,9 +361,44 @@ const chaptersForPanel = computed(() => {
 })
 
 // Handler for dialogue selection from panel
-const onDialogueSelected = (attribution: { startChar: number; endChar: number; text: string }) => {
-  // TODO: Scroll to and highlight the dialogue in the document
-  console.log('Dialogue selected:', attribution)
+const onDialogueSelected = (attribution: { startChar: number; endChar: number; text: string; chapterNumber?: number }) => {
+  // Encontrar el capítulo que contiene este diálogo
+  let targetChapter: Chapter | undefined
+
+  if (attribution.chapterNumber) {
+    targetChapter = chapters.value.find(ch => ch.chapterNumber === attribution.chapterNumber)
+  }
+
+  if (!targetChapter) {
+    // Fallback: buscar en todos los capítulos basándose en la posición
+    // Asumimos que startChar es relativo al capítulo
+    console.warn('No chapter number in attribution, cannot scroll precisely')
+    return
+  }
+
+  // Usar scrollToMention para ir al diálogo
+  scrollToMention({
+    chapterId: targetChapter.id,
+    position: attribution.startChar,
+    text: attribution.text
+  })
+}
+
+// Cargar atribuciones de diálogo para un capítulo
+const loadChapterDialogues = async (chapterNumber: number) => {
+  if (chapterDialogues.value.has(chapterNumber)) return
+
+  try {
+    const API_BASE = 'http://localhost:8008'
+    const response = await fetch(`${API_BASE}/api/projects/${props.projectId}/chapters/${chapterNumber}/dialogue-attributions`)
+    const data = await response.json()
+
+    if (data.success && data.data?.attributions) {
+      chapterDialogues.value.set(chapterNumber, data.data.attributions)
+    }
+  } catch (err) {
+    console.error(`Error loading dialogue attributions for chapter ${chapterNumber}:`, err)
+  }
 }
 
 // Función para establecer referencia a elementos de capítulo
@@ -547,8 +597,14 @@ const getHighlightedContent = (chapter: Chapter): string => {
   // Cargar anotaciones de gramática/ortografía para este capítulo (async)
   loadChapterAnnotations(chapter.chapterNumber)
 
+  // Cargar atribuciones de diálogo si el panel está abierto
+  if (showDialoguePanel.value) {
+    loadChapterDialogues(chapter.chapterNumber)
+  }
+
   // Primero remover el título si está duplicado al inicio del contenido
   const contentWithoutTitle = removeLeadingTitle(chapter.content, chapter.title)
+  const titleOffset = getTitleOffset(chapter.content, chapter.title)
   let content = escapeHtml(contentWithoutTitle)
 
   // Aplicar anotaciones de gramática/ortografía
@@ -590,6 +646,45 @@ const getHighlightedContent = (chapter: Chapter): string => {
             `</span>` +
             after
         }
+      }
+    })
+  }
+
+  // Aplicar highlighting de diálogos si el panel está abierto
+  if (showDialoguePanel.value && showDialogueHighlights.value) {
+    const dialogues = chapterDialogues.value.get(chapter.chapterNumber) || []
+
+    // Ordenar por posición descendente para no afectar índices
+    const sortedDialogues = [...dialogues]
+      .filter(d => d.text && d.startChar !== undefined)
+      .sort((a, b) => b.startChar - a.startChar)
+
+    sortedDialogues.forEach(dialogue => {
+      // Ajustar posición por el título removido
+      const adjustedStart = dialogue.startChar - titleOffset
+      if (adjustedStart < 0) return
+
+      // Buscar el texto del diálogo en el contenido
+      const dialogueText = escapeHtml(dialogue.text)
+      const dialogueIndex = content.indexOf(dialogueText)
+
+      if (dialogueIndex !== -1) {
+        const confidenceClass = `dialogue-confidence-${dialogue.confidence}`
+        const speakerName = dialogue.speakerName || 'Desconocido'
+        const methodLabel = getDialogueMethodLabel(dialogue.method)
+        const tooltip = `${speakerName} (${methodLabel})`
+
+        const before = content.substring(0, dialogueIndex)
+        const after = content.substring(dialogueIndex + dialogueText.length)
+
+        content = before +
+          `<span class="dialogue-highlight ${confidenceClass}" ` +
+          `data-speaker-id="${dialogue.speakerId || ''}" ` +
+          `data-speaker-name="${escapeHtml(speakerName)}" ` +
+          `title="${escapeHtml(tooltip)}">` +
+          dialogueText +
+          `</span>` +
+          after
       }
     })
   }
@@ -727,6 +822,18 @@ const escapeHtml = (text: string): string => {
   const div = document.createElement('div')
   div.textContent = text
   return div.innerHTML
+}
+
+// Etiqueta legible para métodos de atribución de diálogo
+const getDialogueMethodLabel = (method: string): string => {
+  const labels: Record<string, string> = {
+    explicit_verb: 'Verbo explícito',
+    alternation: 'Alternancia',
+    voice_profile: 'Perfil de voz',
+    proximity: 'Proximidad',
+    none: 'Sin método'
+  }
+  return labels[method] || method
 }
 
 const escapeRegex = (text: string | undefined | null): string => {
@@ -1567,6 +1674,44 @@ defineExpose({
 .dialogue-toggle-active {
   color: var(--purple-500) !important;
   border-color: var(--purple-500) !important;
+}
+
+/* Highlight de diálogos por confianza */
+.chapter-text :deep(.dialogue-highlight) {
+  position: relative;
+  cursor: pointer;
+  border-radius: 2px;
+  padding: 0 2px;
+  margin: 0 -2px;
+  transition: background-color 0.2s, box-shadow 0.2s;
+}
+
+.chapter-text :deep(.dialogue-highlight:hover) {
+  box-shadow: 0 0 0 2px currentColor;
+}
+
+.chapter-text :deep(.dialogue-highlight.dialogue-confidence-high) {
+  background: rgba(34, 197, 94, 0.15);
+  border-bottom: 2px solid var(--green-500);
+  color: inherit;
+}
+
+.chapter-text :deep(.dialogue-highlight.dialogue-confidence-medium) {
+  background: rgba(251, 191, 36, 0.15);
+  border-bottom: 2px solid var(--yellow-500);
+  color: inherit;
+}
+
+.chapter-text :deep(.dialogue-highlight.dialogue-confidence-low) {
+  background: rgba(239, 68, 68, 0.15);
+  border-bottom: 2px solid var(--red-500);
+  color: inherit;
+}
+
+.chapter-text :deep(.dialogue-highlight.dialogue-confidence-unknown) {
+  background: rgba(156, 163, 175, 0.15);
+  border-bottom: 2px dashed var(--gray-400);
+  color: inherit;
 }
 
 /* Icono personalizado para ortografia */

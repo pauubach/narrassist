@@ -60,8 +60,7 @@ jobs:
         run: cargo install tauri-cli --version "^2.0.0"
       
       - name: Build Tauri (Windows)
-        working-directory: src-tauri
-        run: cargo tauri build
+        run: cargo tauri build --target x86_64-pc-windows-msvc
       
       - name: Upload Windows Installer
         uses: actions/upload-artifact@v4
@@ -124,8 +123,7 @@ jobs:
           chmod +x src-tauri/binaries/start-backend-x86_64-apple-darwin
       
       - name: Build Tauri (macOS)
-        working-directory: src-tauri
-        run: cargo tauri build
+        run: cargo tauri build --target universal-apple-darwin
       
       - name: Upload macOS DMG
         uses: actions/upload-artifact@v4

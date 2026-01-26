@@ -1,13 +1,38 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import Button from 'primevue/button'
 import DsBadge from '@/components/ds/DsBadge.vue'
+import MethodVotingBar from '@/components/shared/MethodVotingBar.vue'
+import ConfidenceBadge from '@/components/shared/ConfidenceBadge.vue'
 import type { Entity } from '@/types'
 import { useEntityUtils } from '@/composables/useEntityUtils'
 import { useMentionNavigation } from '@/composables/useMentionNavigation'
 import { useAlertUtils } from '@/composables/useAlertUtils'
+import { apiUrl } from '@/config/api'
 
 const { formatChapterLabel } = useAlertUtils()
+
+// Coreference info state
+interface MethodContribution {
+  name: string
+  method: string
+  count: number
+  score: number
+  agreed: boolean
+}
+
+interface CoreferenceInfo {
+  entityId: number
+  entityName: string
+  methodContributions: MethodContribution[]
+  mentionsByType: Record<string, Array<{ text: string; confidence: number; source: string }>>
+  overallConfidence: number
+  totalMentions: number
+}
+
+const corefInfo = ref<CoreferenceInfo | null>(null)
+const corefLoading = ref(false)
+const corefError = ref<string | null>(null)
 
 /**
  * EntityInspector - Panel de detalles de entidad para el inspector.
@@ -57,18 +82,61 @@ const isMerged = computed(() =>
   props.entity.mergedFromIds && props.entity.mergedFromIds.length > 0
 )
 
-/** Auto-cargar menciones cuando cambia la entidad */
+/** Auto-cargar menciones y coreference info cuando cambia la entidad */
 watch(
   () => props.entity.id,
   async (newId) => {
     if (newId && props.entity.mentionCount && props.entity.mentionCount > 0) {
       await mentionNav.loadMentions(newId)
+      await loadCoreferenceInfo(newId)
     } else {
       mentionNav.clear()
+      corefInfo.value = null
     }
   },
   { immediate: true }
 )
+
+/** Cargar información de correferencia */
+async function loadCoreferenceInfo(entityId: number) {
+  corefLoading.value = true
+  corefError.value = null
+
+  try {
+    const response = await fetch(
+      apiUrl(`/api/projects/${props.projectId}/entities/${entityId}/coreference`)
+    )
+    const result = await response.json()
+
+    if (result.success && result.data) {
+      corefInfo.value = result.data
+    } else {
+      corefError.value = result.error || 'Error al cargar correferencias'
+    }
+  } catch (err) {
+    corefError.value = err instanceof Error ? err.message : 'Error desconocido'
+  } finally {
+    corefLoading.value = false
+  }
+}
+
+/** Tiene información de correferencia válida para mostrar */
+const hasCoreferenceInfo = computed(() => {
+  return corefInfo.value && corefInfo.value.methodContributions.length > 0
+})
+
+/** Etiquetas para tipos de mención */
+const MENTION_TYPE_LABELS: Record<string, string> = {
+  proper_noun: 'Nombre',
+  pronoun: 'Pronombre',
+  definite_np: 'SN definido',
+  demonstrative: 'Demostrativo',
+  possessive: 'Posesivo',
+}
+
+function getMentionTypeLabel(type: string): string {
+  return MENTION_TYPE_LABELS[type] || type
+}
 </script>
 
 <template>
@@ -140,6 +208,42 @@ watch(
       <div v-if="entity.description" class="info-section">
         <div class="section-label">Descripción</div>
         <p class="description">{{ entity.description }}</p>
+      </div>
+
+      <!-- Información de Correferencia -->
+      <div v-if="hasCoreferenceInfo" class="info-section coref-section">
+        <div class="section-label">
+          <i class="pi pi-sitemap"></i>
+          Detección de menciones
+        </div>
+        <div class="coref-confidence">
+          <span class="confidence-label">Confianza promedio:</span>
+          <ConfidenceBadge
+            :value="corefInfo!.overallConfidence"
+            variant="badge"
+            size="sm"
+          />
+        </div>
+        <MethodVotingBar
+          :methods="corefInfo!.methodContributions"
+          :compact="false"
+        />
+        <div class="mention-types">
+          <span
+            v-for="(mentions, type) in corefInfo!.mentionsByType"
+            :key="type"
+            class="mention-type-tag"
+            v-tooltip.top="`${mentions.length} menciones de tipo ${type}`"
+          >
+            {{ getMentionTypeLabel(type) }}: {{ mentions.length }}
+          </span>
+        </div>
+      </div>
+
+      <!-- Loading coreference -->
+      <div v-else-if="corefLoading" class="info-section coref-loading">
+        <i class="pi pi-spin pi-spinner"></i>
+        <span>Cargando información...</span>
       </div>
     </div>
 
@@ -458,5 +562,63 @@ watch(
 /* Dark mode */
 .dark .nav-context {
   background: var(--ds-surface-section);
+}
+
+/* Coreference section */
+.coref-section {
+  background: var(--ds-surface-ground);
+  padding: var(--ds-space-3);
+  border-radius: var(--ds-radius-md);
+  margin: 0 calc(-1 * var(--ds-space-4));
+  padding-left: var(--ds-space-4);
+  padding-right: var(--ds-space-4);
+}
+
+.coref-section .section-label {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  margin-bottom: var(--ds-space-3);
+}
+
+.coref-section .section-label i {
+  color: var(--ds-color-primary);
+}
+
+.coref-confidence {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  margin-bottom: var(--ds-space-3);
+}
+
+.confidence-label {
+  font-size: var(--ds-font-size-sm);
+  color: var(--ds-color-text-secondary);
+}
+
+.mention-types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ds-space-2);
+  margin-top: var(--ds-space-3);
+  padding-top: var(--ds-space-3);
+  border-top: 1px solid var(--ds-surface-border);
+}
+
+.mention-type-tag {
+  font-size: var(--ds-font-size-xs);
+  padding: var(--ds-space-1) var(--ds-space-2);
+  background: var(--ds-surface-card);
+  border-radius: var(--ds-radius-sm);
+  color: var(--ds-color-text-secondary);
+}
+
+.coref-loading {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  color: var(--ds-color-text-secondary);
+  font-size: var(--ds-font-size-sm);
 }
 </style>
