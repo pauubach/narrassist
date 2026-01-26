@@ -107,37 +107,44 @@ try:
         _write_debug("Added user site to sys.path")
         _early_logger.info(f"✓ Added user site-packages to sys.path")
     
-    # Try to find Anaconda/Conda installation
-    # 1. Check common Anaconda locations
-    conda_candidates = [
-        os.path.join(os.environ.get('USERPROFILE', ''), 'anaconda3'),
-        os.path.join(os.environ.get('USERPROFILE', ''), 'miniconda3'),
-        'C:\\ProgramData\\Anaconda3',
-        'C:\\ProgramData\\Miniconda3',
-    ]
+    # Detect if we're using embedded Python (check if python-embed is in executable path)
+    using_embedded_python = 'python-embed' in sys.executable.lower()
     
-    # 2. Also check PATH (but skip Windows Store aliases)
-    python_exe = shutil.which("python3") or shutil.which("python")
-    if python_exe and 'WindowsApps' not in python_exe:
-        conda_candidates.insert(0, os.path.dirname(os.path.dirname(python_exe)))
-    
-    _write_debug(f"Checking conda candidates: {conda_candidates[:3]}")
-    
-    for conda_base in conda_candidates:
-        conda_site = os.path.join(conda_base, "Lib", "site-packages")
-        _write_debug(f"Checking: {conda_site}, exists: {os.path.exists(conda_site)}")
-        if os.path.exists(conda_site):
-            _write_debug(f"Found Anaconda at: {conda_base}")
-            _early_logger.info(f"Detected Anaconda/Conda at: {conda_base}")
-            _early_logger.info(f"Conda site-packages: {conda_site}")
-            if conda_site not in sys.path:
-                sys.path.insert(0, conda_site)
-                _write_debug("Added conda site to sys.path")
-                _early_logger.info(f"✓ Added Anaconda site-packages to sys.path")
-            break
+    if using_embedded_python:
+        _write_debug("Detected embedded Python - skipping Anaconda detection")
+        _early_logger.info("Using embedded Python - Anaconda detection skipped")
     else:
-        _write_debug("No Anaconda installation found")
-        _early_logger.info("No Anaconda/Conda installation detected")
+        # Try to find Anaconda/Conda installation only if NOT using embedded Python
+        # 1. Check common Anaconda locations
+        conda_candidates = [
+            os.path.join(os.environ.get('USERPROFILE', ''), 'anaconda3'),
+            os.path.join(os.environ.get('USERPROFILE', ''), 'miniconda3'),
+            'C:\\ProgramData\\Anaconda3',
+            'C:\\ProgramData\\Miniconda3',
+        ]
+        
+        # 2. Also check PATH (but skip Windows Store aliases)
+        python_exe = shutil.which("python3") or shutil.which("python")
+        if python_exe and 'WindowsApps' not in python_exe:
+            conda_candidates.insert(0, os.path.dirname(os.path.dirname(python_exe)))
+        
+        _write_debug(f"Checking conda candidates: {conda_candidates[:3]}")
+        
+        for conda_base in conda_candidates:
+            conda_site = os.path.join(conda_base, "Lib", "site-packages")
+            _write_debug(f"Checking: {conda_site}, exists: {os.path.exists(conda_site)}")
+            if os.path.exists(conda_site):
+                _write_debug(f"Found Anaconda at: {conda_base}")
+                _early_logger.info(f"Detected Anaconda/Conda at: {conda_base}")
+                _early_logger.info(f"Conda site-packages: {conda_site}")
+                if conda_site not in sys.path:
+                    sys.path.insert(0, conda_site)
+                    _write_debug("Added conda site to sys.path")
+                    _early_logger.info(f"✓ Added Anaconda site-packages to sys.path")
+                break
+        else:
+            _write_debug("No Anaconda installation found")
+            _early_logger.info("No Anaconda/Conda installation detected")
     
     _write_debug(f"sys.path after (first 3): {sys.path[:3]}")
     _early_logger.info(f"sys.path after modifications: {sys.path[:3]}...")  # First 3 entries
@@ -218,7 +225,12 @@ if not getattr(sys, 'frozen', False):
         NA_VERSION = "0.2.9"
 else:
     # Frozen (production) - load on demand only
-    _write_debug("Frozen mode: modules will load on-demand after dependency installation")
+    # Note: In PyInstaller frozen mode, we cannot load narrative_assistant modules
+    # that depend on external numpy/scipy/etc due to import conflicts.
+    # Solution: User must install full dependencies and they will be available
+    # but backend will run in limited mode (no NLP features in frozen bundle)
+    _write_debug("Frozen mode: backend will run in API-only mode")
+    _write_debug("NLP dependencies should be installed by user but backend operates in limited mode")
     NA_VERSION = "0.2.9"
 
 # Logging already configured at the top of the file in _setup_early_logging()
@@ -10884,7 +10896,7 @@ if __name__ == "__main__":
                 "main:app",
                 host="127.0.0.1",
                 port=8008,
-                reload=True,
+                reload=False,  # Disabled for embedded Python compatibility
                 log_level="info",
             )
     except Exception as e:
