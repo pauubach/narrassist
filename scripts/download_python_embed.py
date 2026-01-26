@@ -32,9 +32,9 @@ def download_windows_embed(target_dir: Path):
     # Descargar
     try:
         urllib.request.urlretrieve(url, zip_path)
-        print(f"✓ Descargado: {zip_path}")
+        print(f"[OK] Descargado: {zip_path}")
     except Exception as e:
-        print(f"✗ Error descargando: {e}")
+        print(f"[ERROR] Error descargando: {e}")
         return False
     
     # Extraer
@@ -42,7 +42,7 @@ def download_windows_embed(target_dir: Path):
     try:
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             zip_ref.extractall(target_dir)
-        print(f"✓ Extraído exitosamente")
+        print(f"[OK] Extraido exitosamente")
         
         # Eliminar zip
         zip_path.unlink()
@@ -61,19 +61,19 @@ def download_windows_embed(target_dir: Path):
                 if "import site" not in content:
                     content += "\nimport site\n"
                 pth_file.write_text(content)
-                print("✓ Habilitado import site para pip")
+                print("[OK] Habilitado import site para pip")
         
         # Verificar python.exe
         python_exe = target_dir / "python.exe"
         if python_exe.exists():
-            print(f"✓ Python Windows embebido listo: {python_exe}")
+            print(f"[OK] Python Windows embebido listo: {python_exe}")
             return True
         else:
-            print(f"✗ No se encontró python.exe")
+            print(f"[ERROR] No se encontro python.exe")
             return False
             
     except Exception as e:
-        print(f"✗ Error extrayendo: {e}")
+        print(f"[ERROR] Error extrayendo: {e}")
         return False
 
 def download_macos_framework(target_dir: Path):
@@ -87,9 +87,9 @@ def download_macos_framework(target_dir: Path):
     # Descargar
     try:
         urllib.request.urlretrieve(url, pkg_path)
-        print(f"✓ Descargado: {pkg_path}")
+        print(f"[OK] Descargado: {pkg_path}")
     except Exception as e:
-        print(f"✗ Error descargando: {e}")
+        print(f"[ERROR] Error descargando: {e}")
         return False
     
     # Extraer Python.framework del .pkg
@@ -130,7 +130,7 @@ def download_macos_framework(target_dir: Path):
                 if framework_dst.exists():
                     shutil.rmtree(framework_dst)
                 shutil.move(str(framework_src), str(framework_dst))
-                print(f"✓ Python.framework extraído")
+                print(f"[OK] Python.framework extraido")
                 
                 # Limpiar
                 shutil.rmtree(temp_dir)
@@ -143,20 +143,20 @@ def download_macos_framework(target_dir: Path):
                     if python_link.exists():
                         python_link.unlink()
                     python_link.symlink_to(python_bin)
-                    print(f"✓ Python macOS listo: {python_link}")
+                    print(f"[OK] Python macOS listo: {python_link}")
                     return True
                 else:
-                    print(f"✗ No se encontró python3 en framework")
+                    print(f"[ERROR] No se encontro python3 en framework")
                     return False
             else:
-                print(f"✗ No se encontró Python.framework en payload")
+                print(f"[ERROR] No se encontro Python.framework en payload")
                 return False
         else:
-            print(f"✗ No se encontró Payload en .pkg")
+            print(f"[ERROR] No se encontro Payload en .pkg")
             return False
             
     except Exception as e:
-        print(f"✗ Error extrayendo framework: {e}")
+        print(f"[ERROR] Error extrayendo framework: {e}")
         print(f"  Nota: En macOS, puede ser necesario instalar manualmente:")
         print(f"  1. Instalar Python oficial desde python.org")
         print(f"  2. Copiar /Library/Frameworks/Python.framework a src-tauri/binaries/python-embed/")
@@ -172,7 +172,7 @@ def download_python_embed(target_dir: Path):
     system = platform.system()
     
     if system not in PYTHON_URLS:
-        print(f"✗ Sistema operativo no soportado: {system}")
+        print(f"[ERROR] Sistema operativo no soportado: {system}")
         print(f"  Soportados: {', '.join(PYTHON_URLS.keys())}")
         print(f"\n  Para Linux, considere usar Python del sistema")
         return False
@@ -198,19 +198,19 @@ def main():
     
     if success:
         print(f"\n{'='*80}")
-        print("✓ Python embebido descargado exitosamente")
+        print("[OK] Python embebido descargado exitosamente")
         print(f"{'='*80}")
         
         # Instrucciones post-instalación
         system = platform.system()
         if system == "Windows":
-            print("\nPróximos pasos:")
+            print("\nProximos pasos:")
             print("1. cd src-tauri/binaries/python-embed")
             print("2. .\\python.exe -m ensurepip")
             print("3. .\\python.exe -m pip install --upgrade pip setuptools wheel")
             print("4. .\\python.exe -m pip install -r ../backend/requirements.txt")
         elif system == "Darwin":
-            print("\nPróximos pasos:")
+            print("\nProximos pasos:")
             print("1. cd src-tauri/binaries/python-embed")
             print("2. ./python3 -m ensurepip")
             print("3. ./python3 -m pip install --upgrade pip setuptools wheel")
@@ -219,7 +219,7 @@ def main():
         return 0
     else:
         print(f"\n{'='*80}")
-        print("✗ Error descargando Python embebido")
+        print("[ERROR] Error descargando Python embebido")
         print(f"{'='*80}")
         return 1
 
