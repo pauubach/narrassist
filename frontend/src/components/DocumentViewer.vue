@@ -79,6 +79,20 @@
             <i class="pi pi-language"></i>
           </template>
         </Button>
+        <!-- Toggle atribución de diálogos -->
+        <Button
+          :text="!showDialoguePanel"
+          :outlined="showDialoguePanel"
+          rounded
+          size="small"
+          @click="showDialoguePanel = !showDialoguePanel"
+          v-tooltip.bottom="showDialoguePanel ? 'Ocultar atribución de diálogos' : 'Mostrar atribución de diálogos'"
+          :class="{ 'dialogue-toggle-active': showDialoguePanel }"
+        >
+          <template #icon>
+            <i class="pi pi-comments"></i>
+          </template>
+        </Button>
         <span class="toolbar-divider"></span>
         <Button
           icon="pi pi-download"
@@ -138,6 +152,22 @@
         </div>
       </div>
     </div>
+
+    <!-- Sidebar para atribución de diálogos -->
+    <Sidebar
+      :visible="showDialoguePanel"
+      @update:visible="showDialoguePanel = $event"
+      position="right"
+      :style="{ width: '400px' }"
+      header="Atribución de Diálogos"
+    >
+      <DialogueAttributionPanel
+        v-if="showDialoguePanel"
+        :project-id="projectId"
+        :chapters="chaptersForPanel"
+        @select-dialogue="onDialogueSelected"
+      />
+    </Sidebar>
   </div>
 </template>
 
@@ -145,11 +175,13 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick, watchEffect } from 'vue'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
+import Sidebar from 'primevue/sidebar'
 import ProgressSpinner from 'primevue/progressspinner'
 import { useToast } from 'primevue/usetoast'
 import type { Chapter } from '@/types'
 import type { ApiChapter } from '@/types/api/projects'
 import { transformChapters } from '@/types/transformers/projects'
+import DialogueAttributionPanel from '@/components/DialogueAttributionPanel.vue'
 
 const toast = useToast()
 
@@ -245,6 +277,7 @@ interface Annotation {
 const chapterAnnotations = ref<Map<number, Annotation[]>>(new Map())
 const showSpellingErrors = ref(true)  // Toggle para mostrar/ocultar errores de ortografia
 const showGrammarErrors = ref(true)   // Toggle para mostrar/ocultar errores de gramatica
+const showDialoguePanel = ref(false)  // Toggle para panel de atribución de diálogos
 
 // Computed para mantener compatibilidad con showAnnotations
 const showAnnotations = computed(() => showSpellingErrors.value || showGrammarErrors.value)
@@ -302,6 +335,21 @@ const contentStyle = computed(() => ({
   fontSize: fontSizeMap[fontSize.value] || '1rem',
   lineHeight: lineHeight.value
 }))
+
+// Chapters formatted for DialogueAttributionPanel
+const chaptersForPanel = computed(() => {
+  return chapters.value.map(ch => ({
+    id: ch.id,
+    number: ch.number,
+    title: ch.title
+  }))
+})
+
+// Handler for dialogue selection from panel
+const onDialogueSelected = (attribution: { startChar: number; endChar: number; text: string }) => {
+  // TODO: Scroll to and highlight the dialogue in the document
+  console.log('Dialogue selected:', attribution)
+}
 
 // Función para establecer referencia a elementos de capítulo
 const setChapterRef = (el: Element | ComponentPublicInstance | null, chapterId: number) => {
@@ -1513,6 +1561,12 @@ defineExpose({
 .grammar-toggle-active {
   color: var(--blue-500) !important;
   border-color: var(--blue-500) !important;
+}
+
+/* Toggle de atribución de diálogos activo */
+.dialogue-toggle-active {
+  color: var(--purple-500) !important;
+  border-color: var(--purple-500) !important;
 }
 
 /* Icono personalizado para ortografia */

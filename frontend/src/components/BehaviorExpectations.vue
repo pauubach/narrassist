@@ -93,6 +93,81 @@
         <p v-else class="empty-text">No se detectaron objetivos</p>
       </div>
 
+      <!-- Speech Patterns (from LLM) -->
+      <div v-if="profile.speech_patterns && profile.speech_patterns.length > 0" class="profile-section">
+        <h4><i class="pi pi-comments"></i> Patrones de Habla (LLM)</h4>
+        <div class="trait-list">
+          <Tag
+            v-for="(pattern, idx) in profile.speech_patterns"
+            :key="idx"
+            severity="secondary"
+            class="trait-tag"
+          >
+            {{ pattern }}
+          </Tag>
+        </div>
+      </div>
+
+      <!-- Voice Metrics (from statistical analysis) -->
+      <div v-if="voiceProfile" class="profile-section voice-metrics-section">
+        <h4><i class="pi pi-chart-bar"></i> Métricas de Voz</h4>
+        <div class="voice-metrics-grid">
+          <div class="voice-metric">
+            <span class="metric-value">{{ formatVoiceMetric(voiceProfile.metrics.avgInterventionLength) }}</span>
+            <span class="metric-label">Palabras/Intervención</span>
+          </div>
+          <div class="voice-metric">
+            <span class="metric-value">{{ formatVoicePercent(voiceProfile.metrics.typeTokenRatio) }}</span>
+            <span class="metric-label">Diversidad léxica</span>
+          </div>
+          <div class="voice-metric">
+            <span class="metric-value">{{ getFormalityLabel(voiceProfile.metrics.formalityScore) }}</span>
+            <span class="metric-label">Formalidad</span>
+          </div>
+          <div class="voice-metric">
+            <span class="metric-value">{{ formatVoicePercent(voiceProfile.metrics.fillerRatio) }}</span>
+            <span class="metric-label">Muletillas</span>
+          </div>
+        </div>
+
+        <!-- Characteristic Words -->
+        <div v-if="voiceProfile.characteristicWords.length > 0" class="voice-subsection">
+          <span class="subsection-label">Palabras características:</span>
+          <div class="words-chips">
+            <Chip
+              v-for="(item, idx) in voiceProfile.characteristicWords.slice(0, 8)"
+              :key="idx"
+              :label="item.word"
+            />
+          </div>
+        </div>
+
+        <!-- Top Fillers -->
+        <div v-if="voiceProfile.topFillers.length > 0" class="voice-subsection">
+          <span class="subsection-label">Muletillas frecuentes:</span>
+          <div class="fillers-chips">
+            <Chip
+              v-for="(filler, idx) in voiceProfile.topFillers.slice(0, 5)"
+              :key="idx"
+              :label="`&quot;${filler.word}&quot; (${filler.count}x)`"
+            />
+          </div>
+        </div>
+      </div>
+      <div v-else-if="!voiceProfile && profile" class="profile-section">
+        <h4><i class="pi pi-chart-bar"></i> Métricas de Voz</h4>
+        <div class="voice-loading">
+          <Button
+            label="Cargar métricas"
+            icon="pi pi-download"
+            text
+            size="small"
+            @click="loadVoiceProfile"
+            :loading="voiceStore.loading"
+          />
+        </div>
+      </div>
+
       <!-- Behavioral Expectations -->
       <div class="profile-section">
         <div class="section-header">
@@ -117,7 +192,15 @@
               <Tag :severity="getExpectationTypeSeverity(exp.expectation_type)" size="small">
                 {{ getExpectationTypeLabel(exp.expectation_type) }}
               </Tag>
-              <span class="confidence">{{ (exp.confidence * 100).toFixed(0) }}% confianza</span>
+              <ConfidenceBadge
+                :value="exp.confidence"
+                variant="badge"
+                size="sm"
+                :show-icon="false"
+                show-label
+                label="confianza"
+                inline
+              />
               <div class="expectation-actions">
                 <Button
                   icon="pi pi-pencil"
@@ -145,18 +228,11 @@
             <div v-if="exp.source_chapters.length > 0" class="expectation-sources">
               <small>Capítulos: {{ exp.source_chapters.join(', ') }}</small>
             </div>
-            <div v-if="exp.votes && Object.keys(exp.votes).length > 0" class="expectation-votes">
-              <small><strong>Métodos:</strong>
-                <Tag
-                  v-for="(score, method) in exp.votes"
-                  :key="String(method)"
-                  :severity="getMethodSeverity(String(method))"
-                  size="small"
-                  class="method-tag"
-                >
-                  {{ getMethodLabel(String(method)) }}: {{ (Number(score) * 100).toFixed(0) }}%
-                </Tag>
-              </small>
+            <div v-if="exp.votes && Object.keys(exp.votes).length > 1" class="expectation-votes">
+              <MethodVotingBar
+                :methods="formatVotesForBar(exp.votes)"
+                compact
+              />
             </div>
           </div>
         </div>
@@ -288,14 +364,19 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
+import Chip from 'primevue/chip'
 import Dialog from 'primevue/dialog'
 import Dropdown from 'primevue/dropdown'
 import Textarea from 'primevue/textarea'
 import Slider from 'primevue/slider'
 import ProgressSpinner from 'primevue/progressspinner'
+import ConfidenceBadge from '@/components/shared/ConfidenceBadge.vue'
+import MethodVotingBar from '@/components/shared/MethodVotingBar.vue'
+import { useVoiceAndStyleStore } from '@/stores/voiceAndStyle'
+import type { VoiceProfile } from '@/types'
 
 interface BehaviorProfile {
   character_id: number
@@ -330,12 +411,44 @@ interface Violation {
 const props = defineProps<{
   projectId: number
   characterId: number
+  characterName?: string
 }>()
 
 const emit = defineEmits<{
   profileLoaded: [profile: BehaviorProfile]
   violationsFound: [violations: Violation[]]
 }>()
+
+// Voice profile store
+const voiceStore = useVoiceAndStyleStore()
+
+// Get voice profile from store
+const voiceProfile = computed<VoiceProfile | null>(() => {
+  const profiles = voiceStore.getVoiceProfiles(props.projectId)
+  return profiles.find(p => p.entityId === props.characterId) || null
+})
+
+// Load voice profiles if not loaded
+const loadVoiceProfile = async () => {
+  if (!voiceStore.voiceProfiles[props.projectId]) {
+    await voiceStore.fetchVoiceProfiles(props.projectId)
+  }
+}
+
+// Format helpers for voice metrics
+const formatVoiceMetric = (value: number, decimals: number = 1): string => {
+  return value.toFixed(decimals)
+}
+
+const formatVoicePercent = (value: number): string => {
+  return `${(value * 100).toFixed(0)}%`
+}
+
+const getFormalityLabel = (score: number): string => {
+  if (score >= 0.7) return 'Formal'
+  if (score >= 0.4) return 'Neutro'
+  return 'Coloquial'
+}
 
 // State
 const checking = ref(true)
@@ -373,6 +486,8 @@ const expectationTypes = [
 // Check LLM availability on mount
 onMounted(async () => {
   await checkLLMStatus()
+  // Also load voice profiles in background
+  loadVoiceProfile()
 })
 
 const checkLLMStatus = async () => {
@@ -506,6 +621,16 @@ const getMethodSeverity = (method: string): string => {
     'embeddings': 'contrast'
   }
   return severities[method] || 'secondary'
+}
+
+// Format votes for MethodVotingBar component
+const formatVotesForBar = (votes: Record<string, number>) => {
+  const maxScore = Math.max(...Object.values(votes))
+  return Object.entries(votes).map(([method, score]) => ({
+    name: method,
+    score: Number(score),
+    agreed: Number(score) >= maxScore * 0.8 // Consider agreed if within 80% of max
+  }))
 }
 
 // Funciones de edición de expectativas
@@ -730,10 +855,6 @@ const deleteExpectation = (index: number) => {
   margin-bottom: 0.5rem;
 }
 
-.confidence {
-  font-size: 0.75rem;
-  color: var(--text-color-secondary);
-}
 
 .expectation-description {
   margin: 0.5rem 0;
@@ -885,20 +1006,9 @@ const deleteExpectation = (index: number) => {
 }
 
 .expectation-votes {
-  margin-top: 0.5rem;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.expectation-votes small {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.25rem;
-  color: var(--text-color-secondary);
-  font-size: 0.75rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--surface-200);
 }
 
 .basic-mode-text code {
@@ -957,5 +1067,70 @@ const deleteExpectation = (index: number) => {
 
 .w-full {
   width: 100%;
+}
+
+/* Voice Metrics Section */
+.voice-metrics-section {
+  background: var(--surface-50);
+  padding: 1rem;
+  border-radius: 6px;
+}
+
+.voice-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.voice-metric {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.5rem;
+  background: var(--surface-0);
+  border-radius: 4px;
+  text-align: center;
+}
+
+.voice-metric .metric-value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--primary-color);
+}
+
+.voice-metric .metric-label {
+  font-size: 0.7rem;
+  color: var(--text-color-secondary);
+  margin-top: 0.125rem;
+}
+
+.voice-subsection {
+  margin-top: 0.75rem;
+}
+
+.subsection-label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-color-secondary);
+  margin-bottom: 0.5rem;
+}
+
+.words-chips,
+.fillers-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.words-chips :deep(.p-chip),
+.fillers-chips :deep(.p-chip) {
+  font-size: 0.75rem;
+}
+
+.voice-loading {
+  display: flex;
+  justify-content: center;
+  padding: 0.5rem;
 }
 </style>

@@ -80,7 +80,12 @@
                   <Tag :severity="getTypeSeverity(fact.knowledgeType)" size="small">
                     {{ getTypeLabel(fact.knowledgeType) }}
                   </Tag>
-                  <span class="fact-confidence">{{ formatConfidence(fact.confidence) }}</span>
+                  <ConfidenceBadge
+                    :value="fact.confidence"
+                    variant="dot"
+                    size="sm"
+                    inline
+                  />
                 </div>
               </div>
               <p class="fact-description">{{ fact.factDescription }}</p>
@@ -128,7 +133,12 @@
                   <Tag :severity="getTypeSeverity(fact.knowledgeType)" size="small">
                     {{ getTypeLabel(fact.knowledgeType) }}
                   </Tag>
-                  <span class="fact-confidence">{{ formatConfidence(fact.confidence) }}</span>
+                  <ConfidenceBadge
+                    :value="fact.confidence"
+                    variant="dot"
+                    size="sm"
+                    inline
+                  />
                 </div>
               </div>
               <p class="fact-description">{{ fact.factDescription }}</p>
@@ -194,6 +204,7 @@ import Dropdown from 'primevue/dropdown'
 import TabView from 'primevue/tabview'
 import TabPanel from 'primevue/tabpanel'
 import ProgressSpinner from 'primevue/progressspinner'
+import ConfidenceBadge from '@/components/shared/ConfidenceBadge.vue'
 import { useVoiceAndStyleStore } from '@/stores/voiceAndStyle'
 import type { KnowledgeFact } from '@/types'
 
@@ -284,10 +295,6 @@ const getTypeLabel = (type: string): string => {
     event: 'Evento'
   }
   return labels[type] || type
-}
-
-const formatConfidence = (value: number): string => {
-  return `${(value * 100).toFixed(0)}%`
 }
 
 const getFactClass = (fact: KnowledgeFact): string => {
@@ -465,11 +472,6 @@ watch(
   display: flex;
   align-items: center;
   gap: 0.5rem;
-}
-
-.fact-confidence {
-  font-size: 0.75rem;
-  color: var(--text-color-secondary);
 }
 
 .fact-description {

@@ -113,7 +113,11 @@ def _extract_knowledge_facts(self, text, characters, mode=None):
 | **VoiceProfile.vue** | CharacterSheet | ✅ Integrado |
 | **CharacterKnowledgeAnalysis.vue** | CharacterSheet | ✅ Integrado |
 | **RegisterAnalysisTab.vue** | StyleTab | ✅ Integrado |
-| **DialogueAttributionView.vue** | TextTab | ⚠️ Pendiente |
+| **DialogueAttributionPanel.vue** | Panel independiente | ✅ Creado |
+
+#### Extensiones Realizadas
+
+- ✅ **BehaviorExpectations.vue** → Añadida sección "Métricas de Voz" con datos del store
 
 #### Store Creado
 
@@ -385,7 +389,7 @@ Extender ExportDialog con formato "Informe Editorial":
 - [ ] Usuario puede declarar y verificar focalización
 - [ ] Usuario puede ver patrones de interacción
 - [x] Usuario puede ver qué sabe cada personaje (CharacterKnowledgeAnalysis.vue)
-- [ ] Usuario puede ver quién habla cada diálogo (DialogueAttributionView pendiente)
+- [x] Usuario puede ver quién habla cada diálogo (DialogueAttributionPanel.vue)
 
 ### Fases 4-5 (Features Avanzadas)
 
