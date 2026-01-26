@@ -11,7 +11,11 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": {
+      "windows": ["nsis"],
+      "macOS": ["dmg"],
+      "linux": []
+    },
     "externalBin": [
       "binaries/start-backend"
     ],

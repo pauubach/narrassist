@@ -263,7 +263,93 @@
 
 ---
 
-## 7. Fuentes
+## 7. Ideas de Software Clásico/Legacy
+
+### 7.1 WordPerfect - Reveal Codes
+
+**Concepto Original**: WordPerfect tenía una función "Reveal Codes" (Alt+F3) que mostraba todo el formateo subyacente del documento como códigos visibles. Los usuarios podían ver y editar directamente los códigos de formato.
+
+**Aplicación Moderna**:
+| Función | Descripción | Prioridad |
+|---------|-------------|-----------|
+| **Show Markup Mode** | Mostrar todas las anotaciones, correcciones y metadatos en una capa visible | ⭐⭐⭐ Alta |
+| **Annotation Transparency** | Ver qué análisis generó cada sugerencia (qué voter, con qué confianza) | ⭐⭐⭐ Alta |
+| **Debug View** | Para usuarios avanzados: ver tokens NLP, entidades detectadas, correferencias | ⭐⭐ Media |
+
+### 7.2 Dramatica - Motor de Historia
+
+**Concepto Original**: Dramatica (1994) creó una teoría narrativa con 64 "story points" organizados en 4 cuadrantes (Character, Plot, Theme, Genre). Su motor patentado detectaba inconsistencias estructurales.
+
+**Aplicación Moderna**:
+| Función | Descripción | Prioridad |
+|---------|-------------|-----------|
+| **Story Completeness Checker** | Verificar que la estructura narrativa tiene todos los elementos esenciales | ⭐⭐⭐ Alta |
+| **Character Archetype Detector** | Identificar arquetipos (Protagonist, Antagonist, Guardian, Contagonist, etc.) | ⭐⭐ Media |
+| **Theme Consistency** | Detectar si el tema se mantiene coherente a lo largo de la obra | ⭐⭐ Media |
+| **4-Quad Analysis** | Analizar balance entre Character/Plot/Theme/Genre | ⭐ Baja |
+
+### 7.3 StyleWriter - Índices de Claridad
+
+**Concepto Original**: StyleWriter (1990s) introdujo métricas como el "Clarity Index" y "Bog Index" para medir la legibilidad profesional más allá del simple Flesch-Kincaid.
+
+**Aplicación Moderna**:
+| Función | Descripción | Prioridad |
+|---------|-------------|-----------|
+| **Clarity Index Español** | Índice de claridad adaptado para español (no traducción de inglés) | ⭐⭐⭐ Alta |
+| **Bog Score** | Detectar "pantanos" de texto denso que ralentizan la lectura | ⭐⭐⭐ Alta |
+| **Sentence Energy** | Medir la "energía" de cada oración (verbos activos, construcciones directas) | ⭐⭐ Media |
+| **Jargon Detector** | Identificar jerga innecesaria por contexto | ⭐⭐ Media |
+
+### 7.4 yWriter - Organización por Escenas
+
+**Concepto Original**: yWriter (2003, gratuito) organizaba novelas en capítulos y escenas con metadatos por escena: POV, personajes presentes, ubicación, notas.
+
+**Aplicación Moderna**:
+| Función | Descripción | Prioridad |
+|---------|-------------|-----------|
+| **Scene-Level Metadata** | POV, personajes, ubicación, tiempo por cada escena | ⭐⭐⭐ Alta |
+| **POV Consistency Checker** | Alertar cambios de POV no intencionales dentro de escena | ⭐⭐⭐ Alta |
+| **Automatic Snapshots** | Backup automático por sesión de trabajo (no solo manual) | ⭐⭐ Media |
+| **Scene Cards View** | Vista de tarjetas para reorganizar escenas visualmente | ⭐⭐ Media |
+
+### 7.5 Final Draft - Navegación y Etiquetado
+
+**Concepto Original**: Final Draft (guiones) tiene Navigator 2.0 para etiquetar escenas, generar informes de desglose, y navegar por elementos específicos.
+
+**Aplicación Moderna**:
+| Función | Descripción | Prioridad |
+|---------|-------------|-----------|
+| **Scene Tagging** | Etiquetar escenas con categorías personalizadas (acción, diálogo, flashback) | ⭐⭐⭐ Alta |
+| **Breakdown Reports** | Informes de presencia de personajes, ubicaciones, objetos por capítulo | ⭐⭐⭐ Alta |
+| **Smart Navigation** | Saltar a "siguiente escena con X personaje" o "escenas en Y ubicación" | ⭐⭐ Media |
+| **Color-Coded Revisions** | Diferentes colores para diferentes revisiones/versiones | ⭐⭐ Media |
+
+### 7.6 StoryWeaver - Desarrollo Paso a Paso
+
+**Concepto Original**: StoryWeaver usaba 200+ "Story Cards" para guiar al escritor a través de las etapas de desarrollo de la historia.
+
+**Aplicación Moderna**:
+| Función | Descripción | Prioridad |
+|---------|-------------|-----------|
+| **Development Stages** | Workflow guiado: Idea → Outline → Draft → Revision | ⭐⭐ Media |
+| **Prompt Cards** | Preguntas guía para desarrollar personajes, conflictos, escenas | ⭐⭐ Media |
+| **Progress Tracking** | Qué elementos de la historia están "completos" vs "por desarrollar" | ⭐⭐ Media |
+
+### 7.7 Resumen de Ideas Legacy Priorizadas
+
+| Idea | Origen | Mejora con IA/NLP | Prioridad |
+|------|--------|-------------------|-----------|
+| POV Consistency Checker | yWriter | Detección automática de cambios de POV con NLP | ⭐⭐⭐ |
+| Scene Tagging | Final Draft | Auto-clasificación de escenas con LLM | ⭐⭐⭐ |
+| Show Markup/Debug View | WordPerfect | Transparencia en sistema de votación | ⭐⭐⭐ |
+| Clarity Index Español | StyleWriter | Métricas nativas español, no traducidas | ⭐⭐⭐ |
+| Breakdown Reports | Final Draft | Generación automática con NER | ⭐⭐⭐ |
+| Story Completeness | Dramatica | Verificación estructural con LLM | ⭐⭐ |
+| Scene-Level Metadata | yWriter | Extracción automática de POV, personajes, ubicación | ⭐⭐ |
+
+---
+
+## 8. Fuentes
 
 ### Mercado
 - [GM Insights - AI Writing Assistant Market](https://www.gminsights.com/industry-analysis/ai-writing-assistant-software-market)

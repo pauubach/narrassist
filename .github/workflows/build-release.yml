@@ -35,6 +35,13 @@ jobs:
       - name: Build Backend Bundle
         run: python scripts/build_backend_bundle.py
       
+      - name: Debug - List binaries directory
+        run: |
+          echo "=== Contenido de src-tauri/binaries ==="
+          dir src-tauri\binaries
+          echo "=== Contenido de python-embed ==="
+          dir src-tauri\binaries\python-embed
+      
       - name: Prepare launcher for Windows
         run: |
           # Tauri busca archivos con sufijo de arquitectura en Windows tambien
@@ -94,6 +101,13 @@ jobs:
       - name: Build Backend Bundle
         run: python3 scripts/build_backend_bundle.py
       
+      - name: Debug - List binaries directory
+        run: |
+          echo "=== Contenido de src-tauri/binaries ==="
+          ls -la src-tauri/binaries/
+          echo "=== Contenido de python-embed ==="
+          ls -la src-tauri/binaries/python-embed/
+      
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -123,7 +137,7 @@ jobs:
           chmod +x src-tauri/binaries/start-backend-x86_64-apple-darwin
       
       - name: Build Tauri (macOS)
-        run: cargo tauri build --target universal-apple-darwin
+        run: cargo tauri build --target aarch64-apple-darwin
       
       - name: Upload macOS DMG
         uses: actions/upload-artifact@v4
