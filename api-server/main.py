@@ -7064,6 +7064,7 @@ async def get_character_knowledge(
         return ApiResponse(
             success=True,
             data={
+                "project_id": project_id,
                 "entity_id": entity_id,
                 "entity_name": entity.canonical_name,
                 "knows_about_others": [k.to_dict() for k in character_knowledge],
@@ -11072,6 +11073,8 @@ async def get_voice_profiles(project_id: int):
             }
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting voice profiles: {e}", exc_info=True)
         return ApiResponse(success=False, error=str(e))
@@ -11215,6 +11218,8 @@ async def get_register_analysis(
             }
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error analyzing register: {e}", exc_info=True)
         return ApiResponse(success=False, error=str(e))

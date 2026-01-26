@@ -131,22 +131,36 @@ def download_macos_framework(target_dir: Path):
         framework_extracted = False
         for payload in payloads:
             print(f"Extrayendo payload: {payload}")
-            # Extraer con cpio
+            # Crear directorio específico para este payload
+            payload_extract_dir = temp_dir / f"extract_{payload.parent.name}"
+            payload_extract_dir.mkdir(exist_ok=True)
+            
+            # Extraer con cpio en su propio directorio
             result = subprocess.run(
-                f"cd {temp_dir} && cat {payload.relative_to(temp_dir)} | gunzip -dc | cpio -i 2>/dev/null",
+                f"cd '{payload_extract_dir}' && cat '{payload}' | gunzip -dc | cpio -id 2>/dev/null",
                 shell=True,
-                capture_output=True
+                capture_output=True,
+                text=True
             )
             
-            # Buscar Python.framework
-            framework_src = temp_dir / "Library" / "Frameworks" / "Python.framework"
-            if framework_src.exists():
-                framework_dst = target_dir / "Python.framework"
-                if framework_dst.exists():
-                    shutil.rmtree(framework_dst)
-                shutil.move(str(framework_src), str(framework_dst))
-                print(f"[OK] Python.framework extraido")
-                framework_extracted = True
+            # Buscar Python.framework en múltiples ubicaciones posibles
+            possible_locations = [
+                payload_extract_dir / "Library" / "Frameworks" / "Python.framework",
+                payload_extract_dir / "Python.framework",
+                temp_dir / "Library" / "Frameworks" / "Python.framework"
+            ]
+            
+            for framework_src in possible_locations:
+                if framework_src.exists():
+                    framework_dst = target_dir / "Python.framework"
+                    if framework_dst.exists():
+                        shutil.rmtree(framework_dst)
+                    shutil.move(str(framework_src), str(framework_dst))
+                    print(f"[OK] Python.framework extraido desde {framework_src}")
+                    framework_extracted = True
+                    break
+            
+            if framework_extracted:
                 break
         
         if framework_extracted:
