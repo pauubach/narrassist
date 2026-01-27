@@ -57,8 +57,18 @@ const showShortcutsHelp = ref(false)
 const showAbout = ref(false)
 const showTutorial = ref(false)
 const showUserGuide = ref(false)
-const isTauri = ref(false)
 
+// Detect Tauri environment - check immediately and also on mount
+// __TAURI__ is injected by Tauri's webview, check multiple ways
+const isTauri = ref(
+  typeof window !== 'undefined' && (
+    '__TAURI__' in window ||
+    '__TAURI_INTERNALS__' in window ||
+    window.navigator.userAgent.includes('Tauri')
+  )
+)
+
+// Hide web MenuBar when running in Tauri desktop app (which has native menu)
 const hasMenuBar = computed(() => !isTauri.value)
 
 // Activar atajos de teclado globales
@@ -108,11 +118,15 @@ const openTutorial = () => {
 }
 
 onMounted(() => {
-  isTauri.value = typeof window !== 'undefined' && '__TAURI__' in window
+  // Re-check Tauri in case it wasn't ready at component creation
+  if (typeof window !== 'undefined') {
+    isTauri.value = '__TAURI__' in window || '__TAURI_INTERNALS__' in window
+  }
 
   console.log('Narrative Assistant UI - v0.4.0')
   console.log('Vue 3.5 + PrimeVue 4')
   console.log(`Tema: ${appStore.theme} | Modo oscuro: ${appStore.isDark}`)
+  console.log(`Entorno Tauri: ${isTauri.value}`)
 
   // Esperar a que los modelos estén listos antes de mostrar el tutorial
   const tryShowTutorial = () => {
