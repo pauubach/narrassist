@@ -338,6 +338,34 @@ Si se implementa detección de rimas para literatura infantil (INF), se debe des
 
 ---
 
+## RECIENTES MEJORAS (27 Enero 2026)
+
+### Pipeline de Análisis Integrado
+
+**Resuelto**: Los módulos de análisis `vital_status`, `character_location` y `chapter_summary` ahora se ejecutan **automáticamente** durante el análisis de documentos (FASE 5 - Consistencia).
+
+**Antes**: Estos análisis solo estaban disponibles como endpoints on-demand, requiriendo que el usuario los solicitara manualmente.
+
+**Ahora**: Se ejecutan automáticamente en sub-fases:
+- Sub-fase 5.1: Estado vital (muertes y reapariciones)
+- Sub-fase 5.2: Ubicaciones de personajes (inconsistencias de ubicación)
+- Sub-fase 5.3: Resumen por capítulo (modo básico sin LLM)
+
+Las alertas generadas (personajes fallecidos que reaparecen, inconsistencias de ubicación) se crean automáticamente en FASE 7.
+
+### Bug de Atributos Corregido
+
+**Resuelto**: El bug donde "ojos verdes" se asignaba incorrectamente a Juan en lugar de María.
+
+**Causa raíz**: El sistema de correferencias no diferenciaba correctamente los posesivos ("Sus ojos verdes") del sujeto de la oración.
+
+**Solución** (commit `4032ce6`):
+1. Separación de `SPANISH_POSSESSIVES` de `SPANISH_PRONOUNS`
+2. Método `_find_most_recent_subject_candidate()` para posesivos
+3. Bonus de scoring basado en distancia de oración
+
+---
+
 ## GAPS IDENTIFICADOS Y PENDIENTES (Auditoría 27 Enero 2026)
 
 ### Problema Crítico: Arquitectura de UI
