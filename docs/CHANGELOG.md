@@ -6,6 +6,34 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
+## [0.3.1] - 2026-01-27
+
+### Fixed
+- **Mejoras significativas en extracción de atributos** (bug "ojos verdes")
+  - Detección de negaciones mejorada (NEGATION_INDICATORS, CONTRASTIVE_PATTERNS)
+  - Filtrado de atributos temporales/condicionales (TEMPORAL_PAST_INDICATORS, CONDITIONAL_INDICATORS)
+  - Resolución de sujeto elíptico con penalización de objeto
+  - Detección de cláusulas relativas (_is_inside_relative_clause)
+  - Validación expandida de nombres de entidad (incluye verbos y palabras comunes)
+  - Corrección de carga de menciones para usar todas las menciones de la BD
+
+### Added
+- **Tests de regresión para bug de atributos** (`tests/regression/test_ojos_verdes_bug.py`)
+  - 8 tests cubriendo: posesivos, artículos vs pronombres, sujeto elíptico, negación, patrones contrastivos, temporales, cláusulas relativas
+- **Framework de tests adversariales** (`tests/adversarial/test_attribute_adversarial.py`)
+  - 60 casos de prueba en 20 categorías lingüísticas
+  - Sistema GAN-style para mejora iterativa del algoritmo
+- **Tests unitarios de correferencias** (`tests/unit/test_coreference.py`)
+  - Tests para resolución de pronombres posesivos
+
+### Changed
+- **Frontend**: Mejoras en ChapterInspector y EntityInspector
+  - Resúmenes automáticos de capítulo
+  - Conteo de menciones de personajes
+  - Eventos clave e interacciones
+
+---
+
 ## [0.3.0] - 2026-01-26
 
 ### Added

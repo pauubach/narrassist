@@ -353,16 +353,30 @@ Si se implementa detección de rimas para literatura infantil (INF), se debe des
 
 Las alertas generadas (personajes fallecidos que reaparecen, inconsistencias de ubicación) se crean automáticamente en FASE 7.
 
-### Bug de Atributos Corregido
+### Bug de Atributos Corregido (Actualizado 27 Enero 2026)
 
 **Resuelto**: El bug donde "ojos verdes" se asignaba incorrectamente a Juan en lugar de María.
 
-**Causa raíz**: El sistema de correferencias no diferenciaba correctamente los posesivos ("Sus ojos verdes") del sujeto de la oración.
+**Causa raíz**: Múltiples fallos en el algoritmo de extracción de atributos:
+1. El sistema no diferenciaba artículos ("la cafetería") de pronombres objeto ("la vio")
+2. No detectaba correctamente sujetos elípticos en español (pro-drop)
+3. No penalizaba entidades dentro de cláusulas relativas
+4. Capturaba palabras comunes como nombres de entidad debido a re.IGNORECASE
 
-**Solución** (commit `4032ce6`):
+**Solución** (commits `c5660f8`, `4032ce6`, `5f1ea74`):
 1. Separación de `SPANISH_POSSESSIVES` de `SPANISH_PRONOUNS`
 2. Método `_find_most_recent_subject_candidate()` para posesivos
 3. Bonus de scoring basado en distancia de oración
+4. **Nuevas mejoras (27 Enero 2026)**:
+   - Patrones de negación expandidos (NEGATION_INDICATORS, CONTRASTIVE_PATTERNS)
+   - Filtrado de atributos temporales/condicionales
+   - Detección de cláusulas relativas (`_is_inside_relative_clause`)
+   - Penalización de objetos en resolución de sujeto elíptico
+   - Validación de nombres de entidad expandida (excluye verbos y palabras comunes)
+   - Carga de menciones corregida para usar todas las menciones de la BD
+
+**Tests de regresión**: `tests/regression/test_ojos_verdes_bug.py` (8 tests passing)
+**Tests adversariales**: `tests/adversarial/test_attribute_adversarial.py` (60 casos en 20 categorías)
 
 ---
 
