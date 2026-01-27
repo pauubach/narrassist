@@ -37,8 +37,9 @@ La mayoría de "Quick Wins" y "Diferenciadores" **ya están implementados en el 
 
 | Feature | Backend | Frontend | Endpoint | Estado |
 |---------|---------|----------|----------|--------|
-| **Deceased Character Alert** | ✅ `analysis/vital_status.py` | ✅ API endpoints | `/api/projects/{id}/vital-status` | **COMPLETO** - Detecta muertes y reapariciones |
-| **Character Location** | ⚠️ Parcial (`KnowledgeType.LOCATION`) | ❌ | N/A | **Solo tracking de conocimiento, no ubicación real** |
+| **Deceased Character Alert** | ✅ `analysis/vital_status.py` | ✅ `VitalStatusTab.vue` | `/api/projects/{id}/vital-status` | **COMPLETO** - Detecta muertes y reapariciones con panel de visualización |
+| **Character Location** | ✅ `analysis/character_location.py` | ✅ `CharacterLocationTab.vue` | `/api/projects/{id}/character-locations` | **COMPLETO** - Tracking de ubicaciones y detección de inconsistencias |
+| **Chapter Progress Summary** | ✅ `analysis/chapter_summary.py` | ✅ `ChapterProgressTab.vue` + `ChapterInspector.vue` | `/api/projects/{id}/chapter-progress` | **COMPLETO** - Resumen por capítulo con eventos, personajes, arcos narrativos |
 | **Scene Tagging** | ✅ `scenes/service.py` | ✅ `SceneTaggingTab.vue` | `/api/projects/{id}/scenes` | **COMPLETO** |
 | **Knowledge Graph** | ✅ `relationships/analyzer.py` | ✅ `RelationshipGraph.vue` (vis-network) | `/api/projects/{id}/relationships` | **COMPLETO** - Grafo interactivo con filtros, layouts y clustering |
 
@@ -162,6 +163,17 @@ La mayoría de "Quick Wins" y "Diferenciadores" **ya están implementados en el 
    - Creado `FocalizationTab.vue` en workspace/StyleTab (Tab 4: Focalización)
    - Endpoints: `/api/projects/{id}/focalization` (CRUD), `/api/projects/{id}/focalization/violations`
 
+5. **Vital Status UI**
+   - Backend: ✅ `analysis/vital_status.py` con 57 tests
+   - API: ✅ Endpoints `/api/projects/{id}/vital-status`, `/api/projects/{id}/vital-status/events`, `/api/projects/{id}/vital-status/post-mortem`
+   - Frontend: ⚠️ Falta `VitalStatusPanel.vue` en AlertsTab
+   - **Acción**: Crear panel que muestre eventos de muerte y alertas de reapariciones
+
+6. **Character Location Tracking**
+   - Backend: ⚠️ Solo `KnowledgeType.LOCATION` en character_knowledge.py
+   - **Acción**: Implementar tracking real de ubicaciones con cambios de escena
+   - Ver sección "Próximos Pasos" para detalles de implementación
+
 ### Prioridad Baja (Nice to have)
 
 5. ~~**Scene Tagging**~~ ✅ RESUELTO
@@ -177,6 +189,34 @@ La mayoría de "Quick Wins" y "Diferenciadores" **ya están implementados en el 
    - Soporte para clustering automático
    - Múltiples layouts (force-directed, hierarchical, etc.)
    - Panel de detalle de entidad seleccionada
+
+---
+
+## Cobertura de Tests
+
+### Tests Unitarios Añadidos (Enero 2026)
+
+| Módulo | Archivo de Test | Tests | Estado |
+|--------|-----------------|-------|--------|
+| `analysis/vital_status.py` | `tests/unit/test_vital_status.py` | 57 | ✅ Passing |
+| `nlp/style/sticky_sentences.py` | `tests/unit/test_sticky_sentences.py` | 55 | ✅ Passing |
+| `nlp/style/readability.py` | `tests/unit/test_readability.py` | 52 | ✅ Passing |
+| `analysis/pacing.py` | `tests/unit/test_pacing.py` | 42 | ✅ Passing |
+| `feature_profile/models.py` | `tests/unit/test_feature_profile.py` | 44 | ✅ Passing |
+| `analysis/chapter_summary.py` | `tests/unit/test_chapter_summary.py` | 39 | ✅ Passing |
+| `analysis/character_location.py` | `tests/unit/test_character_location.py` | 42 | ✅ Passing |
+
+**Total**: 331 tests unitarios para módulos de análisis de estilo, vital status, pacing, feature profiles, chapter summary y character location.
+
+### Áreas Cubiertas
+
+- **VitalStatus**: Detección de muertes, apariciones post-mortem, flashbacks, referencias válidas
+- **StickySentences**: Detección de glue words, cálculo de stickiness, severidad, reportes
+- **Readability**: Flesch-Szigriszt, Fernández-Huerta, INFLESZ, legibilidad por edad (infantil)
+- **Pacing**: Análisis de ritmo, detección de capítulos cortos/largos, balance de diálogo, bloques densos
+- **FeatureProfile**: Perfiles por tipo de documento, ajustes por subtipo, validación de features
+- **ChapterSummary**: Dataclasses (NarrativeEvent, CharacterPresence, ChekhovElement, CharacterArc, etc.), enums (AnalysisMode, EventType), patrones de revelación/muerte/decisión
+- **CharacterLocation**: LocationEvent, LocationInconsistency, CharacterLocationAnalyzer, patrones de llegada/salida/presencia/transición
 
 ---
 
@@ -214,6 +254,8 @@ def analyze(self, text: str) -> Result[ReadabilityReport]
 
 ## Próximos Pasos Recomendados
 
+### Completados ✅
+
 1. ~~**Inmediato**: Integrar `EmotionalAnalysis.vue` en workspace~~ ✅ HECHO
 2. ~~**Corto plazo**: UI de focalización declarativa~~ ✅ HECHO
 3. ~~**Medio plazo**: Scene tagging con modelo de datos~~ ✅ HECHO
@@ -224,6 +266,43 @@ def analyze(self, text: str) -> Result[ReadabilityReport]
    - Frontend: `DocumentTypeChip.vue`, `useFeatureProfile.ts`
    - 13 tipos de documento con subtipos (ver `docs/research/DOCUMENT_TYPE_FEATURES.md`)
 5. ~~**Largo plazo**: Knowledge graph visual (vis.js)~~ ✅ Ya implementado en `RelationshipGraph.vue`
+6. ~~**Tests**: Cobertura de módulos de análisis~~ ✅ HECHO (164 tests)
+
+### Completados (Enero 2026)
+
+7. ~~**Vital Status UI**~~ ✅ HECHO
+   - Creado `VitalStatusTab.vue` en StyleTab (Tab 12)
+   - Muestra lista de eventos de muerte con contexto
+   - Destaca alertas de apariciones post-mortem
+   - Indica si son flashbacks válidos o errores
+
+8. ~~**Character Location Tracking**~~ ✅ HECHO
+   - Creado `analysis/character_location.py` con CharacterLocationAnalyzer
+   - Detecta cambios de ubicación (llegadas, salidas, presencias, transiciones)
+   - Modelo de datos LocationEvent, LocationInconsistency
+   - Detecta inconsistencias (personaje en dos lugares en el mismo capítulo)
+   - API: `/api/projects/{id}/character-locations`
+   - Frontend: `CharacterLocationTab.vue` en StyleTab (Tab 13)
+
+9. ~~**Chapter Progress Summary**~~ ✅ HECHO
+   - Creado `analysis/chapter_summary.py` con tres modos (BASIC, STANDARD, DEEP)
+   - Extracción de eventos clave con patrones + LLM
+   - Detección de arcos narrativos y Chekhov's guns
+   - API: `/api/projects/{id}/chapter-progress`
+   - Frontend: `ChapterProgressTab.vue` (Tab 14) + `ChapterInspector.vue` contextual en panel derecho
+   - El inspector derecho muestra automáticamente el resumen del capítulo visible durante el scroll
+
+10. ~~**Mejoras de UX en Inspector Contextual**~~ ✅ HECHO
+    - Mini-timeline de apariciones por capítulo en EntityInspector
+    - Alertas relacionadas con la entidad seleccionada
+    - Sección dedicada para inconsistencias de atributos
+    - TextSelectionInspector para mostrar info del texto seleccionado (palabras, caracteres, entidades mencionadas)
+
+### Completados (Tests)
+
+11. ~~**Tests unitarios para módulos nuevos**~~ ✅ HECHO
+    - `tests/unit/test_chapter_summary.py` - 39 tests para dataclasses, enums, patrones
+    - `tests/unit/test_character_location.py` - 42 tests para analyzer, dataclasses, patrones
 
 ---
 
@@ -240,6 +319,9 @@ def analyze(self, text: str) -> Result[ReadabilityReport]
 9. **Ritmo** - PacingAnalysisTab (condicional: `isFeatureAvailable('pacing')`)
 10. **Emociones** - EmotionalAnalysisTab (condicional: `isFeatureAvailable('emotional_analysis')`)
 11. **Edad lectora** - AgeReadabilityTab (condicional: `isFeatureAvailable('age_readability')`, solo INF)
+12. **Estado vital** - VitalStatusTab (condicional: `isFeatureAvailable('vital_status')`)
+13. **Ubicaciones** - CharacterLocationTab (condicional: `isFeatureAvailable('character_location')`)
+14. **Avance narrativo** - ChapterProgressTab (condicional: `isFeatureAvailable('chapter_progress')`)
 
 ---
 
@@ -256,6 +338,169 @@ Si se implementa detección de rimas para literatura infantil (INF), se debe des
 
 ---
 
+## GAPS IDENTIFICADOS Y PENDIENTES (Auditoría 27 Enero 2026)
+
+### Problema Crítico: Arquitectura de UI
+
+> **Ver documento completo**: [UI_REDESIGN_PROPOSAL.md](UI_REDESIGN_PROPOSAL.md)
+
+**Diagnóstico**: StyleTab contiene 14 subtabs mezclando configuración, análisis de estilo, análisis narrativo y organización. Esto viola principios básicos de UX y dificulta la navegación.
+
+**Propuesta aprobada**: Reorganizar en tabs por intención del usuario:
+- Consistencia (entidades, timeline, ubicaciones, estado vital)
+- Análisis (sticky, repeticiones, variación, legibilidad)
+- Narrativa (ritmo, emociones, focalización, registro, avance, escenas)
+- Configuración (detectores, reglas)
+
+**Esfuerzo**: ~3 días de implementación
+
+---
+
+### Features del Competitive Analysis NO Implementadas
+
+#### Prioridad Alta (Diferenciadores competitivos)
+
+| Feature | Origen | Complejidad | Impacto | Tiempo Est. |
+|---------|--------|-------------|---------|-------------|
+| **Dialogue Tags Detector** | ProWritingAid | 🟢 Baja | Alto | 4h |
+| **Sensory Report (5 sentidos)** | ProWritingAid | 🟡 Media | Alto | 2 días |
+| **Benchmarking por género** | AutoCrit | 🔴 Alta | Muy alto | 5+ días |
+| **Story Bible/Wiki navegable** | Sudowrite | 🟡 Media | Alto | 3 días |
+| **Export Scrivener (.scriv)** | Atticus | 🟡 Media | Alto | 2 días |
+| **Scene Cards View** | yWriter | 🟡 Media | Medio | 2 días |
+
+#### Prioridad Media
+
+| Feature | Origen | Complejidad | Impacto | Tiempo Est. |
+|---------|--------|-------------|---------|-------------|
+| **Continue Writing (LLM)** | ProWritingAid | 🟡 Media | Medio | 2 días |
+| **Add Sensory Detail (LLM)** | ProWritingAid | 🟡 Media | Medio | 1 día |
+| **Plantillas estructuras** | Plottr | 🟢 Baja | Medio | 1 día |
+| **Story Completeness Checker** | Dramatica | 🔴 Alta | Alto | 5 días |
+| **Character Archetype Detector** | Dramatica | 🟡 Media | Medio | 2 días |
+| **Color-Coded Revisions** | Final Draft | 🟡 Media | Medio | 2 días |
+
+#### Prioridad Baja (Nice to have)
+
+| Feature | Origen | Complejidad | Tiempo Est. |
+|---------|--------|-------------|-------------|
+| Change POV (1ª↔3ª persona) | ProWritingAid | 🔴 Alta | 3 días |
+| Sentence Energy | StyleWriter | 🟡 Media | 2 días |
+| Development Stages Workflow | StoryWeaver | 🟡 Media | 3 días |
+| Percentiles por género | AutoCrit | 🔴 Alta | 5 días |
+| Brainstorm infinito | Sudowrite | 🟡 Media | 2 días |
+
+---
+
+### Módulos Backend Incompletos
+
+| Módulo | Completitud | Gap Crítico | Esfuerzo |
+|--------|-------------|-------------|----------|
+| **Character Knowledge** | 60% | `_extract_knowledge_facts()` VACÍO | 5-7 días |
+| **Voice Profiles** | 70% | API no devuelve todas métricas | 3-4 días |
+| **Register Analysis** | 75% | Sin análisis por capítulo | 2-3 días |
+| **Speaker Attribution** | 80% | Voice matching débil | 2-3 días |
+| **Pacing Analysis** | 80% | Sin curva de tensión | 2-3 días |
+| **Coreference Resolver** | 85% | Sin razonamiento expuesto | 1-2 días |
+
+**Total**: 15-22 días para completar módulos existentes
+
+---
+
+### Alertas Pendientes de Conectar
+
+| Métrica actual | Posible alerta | Complejidad |
+|----------------|----------------|-------------|
+| Sticky Sentences | "Más del 60% de oraciones son pesadas" | 🟢 Baja |
+| Sentence Variation | "Desviación estándar <3 (monótono)" | 🟢 Baja |
+| Pacing Analysis | "10+ páginas sin diálogo" | 🟢 Baja |
+| Age Readability | "Texto muy complejo para edad objetivo" | 🟡 Media |
+
+---
+
+### Infraestructura Pendiente
+
+| Tarea | Prioridad | Esfuerzo | Bloqueante |
+|-------|-----------|----------|------------|
+| **Code signing Windows** | Alta | $300/año + 2h | Para distribución |
+| **Code signing macOS** | Alta | $99/año + 2h | Para distribución |
+| **CI/CD Pipeline** | Media | 4-5 días | No |
+| **i18n (inglés + catalán)** | Baja | 8-10 días | No |
+| **Landing page** | Media | 5-6 días | No |
+| **Auto-updater** | Baja | 3-4 días | No |
+
+---
+
+### Tests Pendientes
+
+| Área | Estado | Prioridad |
+|------|--------|-----------|
+| Fixtures faltantes | 14+ tests skipped | Media |
+| Tests E2E adicionales | Solo 12 specs | Media |
+| Coverage general | ~10% → objetivo 50% | Baja |
+
+---
+
+## ORDEN DE IMPLEMENTACIÓN RECOMENDADO
+
+### Sprint 1: Quick Wins de Alto Impacto (1 semana)
+
+1. **Rediseño UI (3 días)** - Reorganizar tabs según propuesta
+2. **Dialogue Tags Detector (4h)** - Fácil, alto impacto
+3. **Alertas desde métricas (4h)** - Sticky, Variation, Pacing
+
+### Sprint 2: Diferenciadores (2 semanas)
+
+4. **Character Knowledge core (5-7 días)** - CRÍTICO, desbloquea feature completa
+5. **Story Bible/Wiki view (3 días)** - Diferenciador competitivo
+6. **Voice Profiles completo (3-4 días)** - Extender API
+
+### Sprint 3: Valor Añadido (2 semanas)
+
+7. **Sensory Report (2 días)** - Análisis 5 sentidos
+8. **Export Scrivener (2 días)** - Alta demanda del mercado
+9. **Scene Cards View (2 días)** - Mejora UX organización
+
+### Sprint 4: Pulido (1 semana)
+
+10. **Register por capítulo (2-3 días)**
+11. **Pacing tension curve (2-3 días)**
+12. **Speaker Attribution mejorado (2-3 días)**
+
+### Backlog (Por priorizar)
+
+- Benchmarking por género (requiere corpus)
+- Plantillas estructuras narrativas
+- Story Completeness Checker
+- Continue Writing / Add Sensory (LLM)
+- Code signing y distribución
+
+---
+
+## Resumen de Esfuerzo Total
+
+| Categoría | Items | Días |
+|-----------|-------|------|
+| UI Redesign | 1 | 3 |
+| Features nuevas (alta prioridad) | 6 | 12 |
+| Módulos incompletos | 6 | 18 |
+| Infraestructura | 4 | 15 |
+| **TOTAL** | | **~48 días** |
+
+---
+
+## Referencias Documentación
+
+| Documento | Contenido |
+|-----------|-----------|
+| [UI_REDESIGN_PROPOSAL.md](UI_REDESIGN_PROPOSAL.md) | Propuesta reorganización de tabs |
+| [COMPETITIVE_ANALYSIS_2025.md](COMPETITIVE_ANALYSIS_2025.md) | Análisis de competidores |
+| [ALERTS_INTEGRATION_MAP.md](ALERTS_INTEGRATION_MAP.md) | Mapa de alertas |
+| [AGE_READABILITY_IMPROVEMENTS.md](AGE_READABILITY_IMPROVEMENTS.md) | Mejoras edad lectora |
+| [PROJECT_STATUS.md](../PROJECT_STATUS.md) | Estado técnico detallado |
+
+---
+
 *Documento generado: Enero 2026*
 *Última auditoría de código: 26 Enero 2026*
-*Última actualización: 26 Enero 2026 - Documentadas mejoras de age_readability*
+*Última actualización: 27 Enero 2026 - Auditoría completa de gaps, propuesta UI, orden de implementación*
