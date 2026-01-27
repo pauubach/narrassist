@@ -2260,7 +2260,16 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
         # Ej: "Juan la saludó, sorprendido por su cabello" -> "su" se refiere a "la" (María), no a Juan
         # Buscar tanto en contexto anterior como en el inicio del match (context_forward)
         has_possessive = bool(regex_module.search(r'\b(su|sus)\b', immediate_context + " " + context_forward, regex_module.IGNORECASE))
-        has_object_pronoun = bool(regex_module.search(r'\b(la|lo|le)\b', immediate_context, regex_module.IGNORECASE))
+
+        # IMPORTANTE: Detectar "la/lo/le" como pronombre OBJETO, no como artículo
+        # "la" como artículo: "la cafetería", "la mesa", "la atención"
+        # "la" como pronombre objeto: "la saludó", "la vio", "la llevó"
+        # El pronombre objeto va ANTES de un verbo, el artículo va ANTES de un sustantivo
+        # Patrón: "la/lo/le" seguido de verbo en 3ª persona indica pronombre objeto
+        has_object_pronoun = bool(regex_module.search(
+            r'\b(la|lo|le)\s+(?:saludó|vio|miró|abrazó|besó|llamó|llevó|trajo|cogió|tomó|dejó|encontró|conoció|reconoció|observó|siguió|esperó|ayudó)',
+            immediate_context, regex_module.IGNORECASE
+        ))
 
         # Detectar pronombres de sujeto explícitos (Él/Ella) o indicadores de género (hombre/mujer)
         # Esto tiene MÁXIMA prioridad porque indica claramente el género del referente
@@ -2352,12 +2361,16 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
 
         # Caso 0: Pronombre posesivo refiriéndose al objeto
         # Patrón: "Juan la saludó... su cabello" -> "su" se refiere a "la" (María), no a Juan
+        # IMPORTANTE: Solo aplica cuando "la/lo" es PRONOMBRE OBJETO (antes de verbo), NO artículo
         if has_possessive and has_object_pronoun and person_candidates:
-            # Buscar "la" o "lo" seguido eventualmente de "su/sus"
-            # El objeto suele estar antes que el posesivo en español
-            # IMPORTANTE: Buscar en immediate_context + forward para capturar "su" que está en la posición actual
+            # Buscar "la/lo" + verbo seguido eventualmente de "su/sus"
+            # El patrón debe ser más específico para evitar falsos positivos con artículos
             search_text = immediate_context + " " + context_forward
-            obj_pronoun_match = regex_module.search(r'\b(la|lo)\b.*?\b(su|sus)\b', search_text, regex_module.IGNORECASE | regex_module.DOTALL)
+            # Patrón mejorado: pronombre objeto + verbo ... posesivo
+            obj_pronoun_match = regex_module.search(
+                r'\b(la|lo)\s+(?:saludó|vio|miró|abrazó|besó|llamó|llevó).*?\b(su|sus)\b',
+                search_text, regex_module.IGNORECASE | regex_module.DOTALL
+            )
 
             if obj_pronoun_match:
                 obj_pronoun = obj_pronoun_match.group(1).lower()
