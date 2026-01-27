@@ -2871,6 +2871,24 @@ const handleScroll = () => {
   border-bottom: none;
 }
 
+/* Layout de columna para items con contenido ancho */
+.setting-item.column {
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.setting-item.column .setting-info {
+  padding-right: 0;
+  max-width: 100%;
+}
+
+.setting-item.column .setting-control,
+.setting-item.column .system-patterns-list,
+.setting-item.column .correction-config-summary,
+.setting-item.column .user-rejections-list {
+  width: 100%;
+}
+
 .setting-info {
   flex: 1;
   padding-right: 2rem;

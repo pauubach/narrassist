@@ -121,10 +121,11 @@
               <span class="tab">Alertas</span>
               <span class="tab">Timeline</span>
               <span class="tab">Estilo</span>
+              <span class="tab">Glosario</span>
               <span class="tab">Resumen</span>
             </div>
             <div class="panel-desc">
-              7 pestañas para explorar diferentes aspectos de tu manuscrito
+              Pestañas adaptadas al tipo de documento para explorar tu manuscrito
             </div>
           </div>
 
