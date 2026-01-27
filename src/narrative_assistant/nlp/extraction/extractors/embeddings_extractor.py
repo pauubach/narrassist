@@ -251,16 +251,173 @@ class EmbeddingsExtractor(BaseExtractor):
                     if similarity >= self.similarity_threshold:
                         # Verificar que el valor aparece en la oración
                         if value.lower() in sentence.lower():
-                            attributes.append(self._create_attribute(
-                                entity_name=entity_name,
-                                attr_type=attr_type,
-                                value=value,
-                                confidence=float(similarity) * 0.8,  # Reducir un poco
-                                source_text=sentence,
-                                chapter=chapter,
-                            ))
+                            # Verificar que la entidad es el sujeto, no el objeto
+                            if self._is_entity_subject(sentence, entity_name, value):
+                                # Validar que el tipo de atributo coincide con la parte del cuerpo
+                                if self._validate_body_part_context(attr_type, sentence):
+                                    attributes.append(self._create_attribute(
+                                        entity_name=entity_name,
+                                        attr_type=attr_type,
+                                        value=value,
+                                        confidence=float(similarity) * 0.8,  # Reducir un poco
+                                        source_text=sentence,
+                                        chapter=chapter,
+                                    ))
 
         return attributes
+
+    def _is_entity_subject(
+        self,
+        sentence: str,
+        entity_name: str,
+        attribute_value: str,
+    ) -> bool:
+        """
+        Verifica si la entidad es el sujeto de la oración (no el objeto).
+
+        Detecta casos como "Sus ojos azules miraban a María" donde María
+        es el objeto, no el sujeto de "ojos azules".
+
+        Args:
+            sentence: Oración a analizar
+            entity_name: Nombre de la entidad
+            attribute_value: Valor del atributo encontrado
+
+        Returns:
+            True si la entidad parece ser el sujeto
+        """
+        import re
+
+        sentence_lower = sentence.lower()
+        entity_lower = entity_name.lower()
+        value_lower = attribute_value.lower()
+
+        # Buscar posiciones
+        entity_match = re.search(rf'\b{re.escape(entity_lower)}\b', sentence_lower)
+        value_match = re.search(rf'\b{re.escape(value_lower)}\b', sentence_lower)
+
+        if not entity_match or not value_match:
+            return False
+
+        entity_pos = entity_match.start()
+        value_pos = value_match.start()
+
+        # Si la entidad está ANTES del atributo, probablemente es el sujeto
+        if entity_pos < value_pos:
+            return True
+
+        # Si la entidad está DESPUÉS del atributo, verificar si es objeto
+        # Patrones que indican que la entidad es objeto (no sujeto)
+        object_prepositions = ['a ', 'hacia ', 'para ', 'contra ', 'sobre ', 'con ']
+
+        # Buscar si hay una preposición justo antes de la entidad
+        text_before_entity = sentence_lower[:entity_pos].rstrip()
+        for prep in object_prepositions:
+            if text_before_entity.endswith(prep.strip()):
+                # La entidad es precedida por preposición -> es objeto
+                logger.debug(
+                    f"Entidad '{entity_name}' es objeto en: {sentence[:60]}..."
+                )
+                return False
+
+        # Verificar patrones como "miraban a X", "observaba a X"
+        verbs_with_object = [
+            'miraba', 'miraban', 'observaba', 'observaban',
+            'veía', 'veían', 'contemplaba', 'contemplaban',
+        ]
+        for verb in verbs_with_object:
+            pattern = rf'{verb}\s+(a\s+)?{re.escape(entity_lower)}'
+            if re.search(pattern, sentence_lower):
+                logger.debug(
+                    f"Entidad '{entity_name}' es objeto de '{verb}' en: {sentence[:60]}..."
+                )
+                return False
+
+        # Por defecto, asumir que es sujeto
+        return True
+
+    def _validate_body_part_context(
+        self,
+        attr_type: AttributeType,
+        sentence: str,
+    ) -> bool:
+        """
+        Valida que el tipo de atributo coincida con la parte del cuerpo en la oración.
+
+        Evita clasificar "azules" como hair_color cuando la oración dice "ojos azules".
+
+        Args:
+            attr_type: Tipo de atributo (EYE_COLOR, HAIR_COLOR, etc.)
+            sentence: Oración fuente
+
+        Returns:
+            True si el tipo de atributo es compatible con las partes del cuerpo mencionadas
+        """
+        sentence_lower = sentence.lower()
+
+        # Indicadores de partes del cuerpo por tipo de atributo
+        eye_indicators = {
+            "ojo", "ojos", "mirada", "pupila", "pupilas",
+            "iris", "párpado", "párpados"
+        }
+
+        hair_indicators = {
+            "pelo", "cabello", "cabellera", "melena",
+            "trenza", "trenzas", "rizos", "mechón", "mechones",
+            "flequillo", "coleta", "moño"
+        }
+
+        skin_indicators = {
+            "piel", "tez", "cutis", "rostro", "cara",
+            "mejillas", "mejilla", "frente"
+        }
+
+        # Verificar presencia de indicadores
+        has_eye_indicator = any(ind in sentence_lower for ind in eye_indicators)
+        has_hair_indicator = any(ind in sentence_lower for ind in hair_indicators)
+        has_skin_indicator = any(ind in sentence_lower for ind in skin_indicators)
+
+        # Validar según tipo de atributo
+        if attr_type == AttributeType.EYE_COLOR:
+            # EYE_COLOR requiere indicador de ojos
+            if has_eye_indicator:
+                return True
+            # Rechazar si menciona pelo o piel pero no ojos
+            if has_hair_indicator or has_skin_indicator:
+                logger.debug(
+                    f"Rechazando EYE_COLOR: oración menciona pelo/piel pero no ojos"
+                )
+                return False
+            # Si no hay ningún indicador, permitir (puede ser contexto implícito)
+            return True
+
+        elif attr_type in (AttributeType.HAIR_COLOR, AttributeType.HAIR_TYPE):
+            # HAIR requiere indicador de pelo
+            if has_hair_indicator:
+                return True
+            # Rechazar si menciona ojos pero no pelo
+            if has_eye_indicator:
+                logger.debug(
+                    f"Rechazando {attr_type.value}: oración menciona ojos pero no pelo"
+                )
+                return False
+            # Si no hay ningún indicador, permitir
+            return True
+
+        elif attr_type == AttributeType.SKIN:
+            # SKIN requiere indicador de piel
+            if has_skin_indicator:
+                return True
+            # Rechazar si menciona otras partes específicamente
+            if has_eye_indicator or has_hair_indicator:
+                logger.debug(
+                    f"Rechazando SKIN: oración menciona ojos/pelo pero no piel"
+                )
+                return False
+            return True
+
+        # Para otros tipos (HEIGHT, BUILD, AGE), no requieren validación de body part
+        return True
 
     def _find_entity_sentences(
         self,

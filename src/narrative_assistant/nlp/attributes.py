@@ -295,6 +295,65 @@ PERSONALITY_TRAITS = {
     "ingenua", "astuto", "astuta", "torpe",
 }
 
+
+# =============================================================================
+# Helpers para entity_mentions
+# =============================================================================
+
+# Tipo para menciones de entidad: (name, start, end, entity_type)
+# entity_type puede ser: "PER", "LOC", "ORG", "MISC", None
+EntityMention = tuple[str, int, int, Optional[str]]
+
+
+def _normalize_entity_mentions(
+    entity_mentions: Optional[list[tuple]] | None,
+) -> list[EntityMention]:
+    """
+    Normaliza entity_mentions al formato de 4 elementos.
+
+    Soporta tanto el formato antiguo (3 elementos: name, start, end)
+    como el nuevo (4 elementos: name, start, end, entity_type).
+
+    Args:
+        entity_mentions: Lista de menciones en cualquier formato
+
+    Returns:
+        Lista de menciones normalizadas como (name, start, end, entity_type)
+    """
+    if not entity_mentions:
+        return []
+
+    normalized = []
+    for mention in entity_mentions:
+        if len(mention) == 3:
+            # Formato antiguo: (name, start, end) -> agregar None como entity_type
+            name, start, end = mention
+            normalized.append((name, start, end, None))
+        elif len(mention) >= 4:
+            # Formato nuevo: (name, start, end, entity_type)
+            name, start, end, entity_type = mention[:4]
+            normalized.append((name, start, end, entity_type))
+        else:
+            logger.warning(f"entity_mention con formato inválido: {mention}")
+            continue
+
+    return normalized
+
+
+def _is_person_entity(entity_type: Optional[str]) -> bool:
+    """Verifica si el tipo de entidad es una persona."""
+    if entity_type is None:
+        return True  # Si no hay tipo, asumir que puede ser persona
+    return entity_type.upper() in ("PER", "PERSON", "PERS")
+
+
+def _is_location_entity(entity_type: Optional[str]) -> bool:
+    """Verifica si el tipo de entidad es una ubicación."""
+    if entity_type is None:
+        return False  # Si no hay tipo, no asumir ubicación
+    return entity_type.upper() in ("LOC", "LOCATION", "GPE")
+
+
 # Patrones de extracción: (regex, key, categoría, confianza_base)
 # Los grupos de captura deben ser: (entidad, valor) o (valor, entidad)
 ATTRIBUTE_PATTERNS: list[tuple[str, AttributeKey, AttributeCategory, float, bool]] = [
@@ -987,10 +1046,15 @@ class AttributeExtractor:
         """
         attributes: list[ExtractedAttribute] = []
 
-        # Construir lista de entidades conocidas
+        # Construir lista de entidades conocidas (solo personas para atributos físicos)
         known_entities = []
         if entity_mentions:
-            known_entities = list(set(name for name, _, _ in entity_mentions))
+            normalized = _normalize_entity_mentions(entity_mentions)
+            # Filtrar solo personas para extracción de atributos físicos
+            known_entities = list(set(
+                name for name, _, _, entity_type in normalized
+                if entity_type is None or _is_person_entity(entity_type)
+            ))
 
         # Limitar texto para no sobrecargar el LLM
         text_sample = text[:3000] if len(text) > 3000 else text
@@ -1659,32 +1723,106 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
     def _find_entity_in_sentence(
         self,
         sentence: str,
-        entity_mentions: Optional[list[tuple[str, int, int]]],
+        entity_mentions: Optional[list[tuple]],
         full_text: str,
     ) -> Optional[str]:
         """
         Encuentra entidad SUJETO en una oración, incluyendo resolución de pronombres.
-        
+
         IMPORTANTE: Distingue entre sujeto y objeto/complemento.
         - "Sus ojos azules miraban a María" → sujeto implícito (no María)
         - "María tenía ojos azules" → sujeto = María
+        - "Los ojos de María brillaban" → María (genitivo posesivo)
+        - "María, que tenía ojos verdes, saludó" → María (cláusula relativa)
+        - "Juan fue admirado por María" → Juan (voz pasiva, sujeto paciente)
+
+        Args:
+            sentence: Oración a analizar
+            entity_mentions: Lista de (name, start, end, entity_type) o (name, start, end)
+            full_text: Texto completo para contexto
+
+        Returns:
+            Nombre de la entidad sujeto o None
         """
         if not entity_mentions:
             return None
 
         import re as regex_module
-        
+
+        # Normalizar menciones al formato de 4 elementos
+        normalized_mentions = _normalize_entity_mentions(entity_mentions)
+
+        # Filtrar solo personas (excluir LOC, ORG) para atributos físicos
+        person_mentions = [
+            (name, start, end, entity_type)
+            for name, start, end, entity_type in normalized_mentions
+            if entity_type is None or _is_person_entity(entity_type)
+        ]
+
+        if not person_mentions:
+            return None
+
         sentence_lower = sentence.lower()
         sentence_start = full_text.find(sentence)
 
-        # Buscar entidades que aparezcan en la oración como SUJETO (no objeto)
+        # =================================================================
+        # CASO 1: Genitivo posesivo - "los ojos DE María brillaban"
+        # El poseedor es quien tiene el atributo físico
+        # =================================================================
+        body_parts = (
+            'ojos', 'ojo', 'pelo', 'cabello', 'cara', 'rostro', 'manos', 'mano',
+            'piel', 'nariz', 'boca', 'labios', 'cejas', 'ceja', 'frente',
+            'mejillas', 'mejilla', 'barbilla', 'mentón', 'cuello', 'espalda',
+            'hombros', 'brazos', 'piernas', 'pies', 'dedos', 'uñas', 'dientes',
+            'sonrisa', 'mirada', 'expresión', 'gesto', 'voz', 'tono', 'altura',
+            'estatura', 'complexión', 'figura', 'silueta', 'cuerpo', 'aspecto'
+        )
+
+        for name, start, end, entity_type in person_mentions:
+            name_lower = name.lower()
+            # Patrón: [artículo] [parte_cuerpo] de [Nombre]
+            for part in body_parts:
+                pattern = rf'\b(?:el|la|los|las|su|sus)?\s*{part}\s+de\s+{regex_module.escape(name_lower)}\b'
+                if regex_module.search(pattern, sentence_lower):
+                    logger.debug(f"Genitivo posesivo detectado: '{part} de {name}'")
+                    return name
+
+        # =================================================================
+        # CASO 2: Cláusula relativa - "María, QUE TENÍA ojos verdes, saludó"
+        # El antecedente de la cláusula es el poseedor
+        # =================================================================
+        relative_verbs = r'(?:tenía|tiene|era|es|parecía|parece|llevaba|lleva|lucía|luce|mostraba|muestra)'
+
+        for name, start, end, entity_type in person_mentions:
+            name_lower = name.lower()
+            # Patrón: [Nombre], que [verbo_descriptivo] [atributo]
+            pattern = rf'{regex_module.escape(name_lower)}\s*,\s*(?:que|quien|la cual|el cual)\s+{relative_verbs}\s+'
+            if regex_module.search(pattern, sentence_lower):
+                logger.debug(f"Cláusula relativa detectada para '{name}'")
+                return name
+
+        # =================================================================
+        # CASO 3: Voz pasiva - "Juan FUE admirado POR María por sus ojos"
+        # En voz pasiva, el sujeto gramatical (paciente) es el poseedor
+        # "por [Nombre]" es el agente, NO el poseedor
+        # =================================================================
+        passive_pattern = r'(?:fue|era|había sido|ha sido|será|siendo)\s+\w+[oa]?(?:do|da|dos|das)?\s+por\s+'
+        if regex_module.search(passive_pattern, sentence_lower):
+            # En voz pasiva, buscar el sujeto al inicio de la oración
+            for name, start, end, entity_type in person_mentions:
+                name_lower = name.lower()
+                # Si el nombre está al inicio (antes del verbo pasivo), es el sujeto paciente
+                name_pos = sentence_lower.find(name_lower)
+                passive_match = regex_module.search(passive_pattern, sentence_lower)
+                if passive_match and name_pos >= 0 and name_pos < passive_match.start():
+                    logger.debug(f"Voz pasiva detectada: sujeto paciente = '{name}'")
+                    return name
+
+        # =================================================================
+        # CASO GENERAL: Buscar sujeto vs objeto
+        # =================================================================
+
         # Patrones que indican que la entidad es OBJETO (no sujeto):
-        # - "a [Nombre]" (complemento directo/indirecto)
-        # - "de [Nombre]" (posesivo/genitivo, a menos que sea inicio de oración)
-        # - "con [Nombre]" (compañía)
-        # - "para [Nombre]" (destinatario)
-        # - "por [Nombre]" (agente en pasiva, pero también puede ser causa)
-        
         object_patterns = [
             r'\ba\s+{}\b',      # "a María", "a Juan"
             r'\bcon\s+{}\b',    # "con María"
@@ -1692,15 +1830,15 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
             r'\bhacia\s+{}\b',  # "hacia María"
             r'\bsobre\s+{}\b',  # "sobre Juan"
         ]
-        
+
         subject_candidates = []
         object_entities = set()
-        
-        for name, start, end in entity_mentions:
+
+        for name, start, end, entity_type in person_mentions:
             name_lower = name.lower()
             if name_lower not in sentence_lower:
                 continue
-            
+
             # Verificar si aparece como objeto
             is_object = False
             for pattern_template in object_patterns:
@@ -1709,18 +1847,20 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                     is_object = True
                     object_entities.add(name)
                     break
-            
+
             if not is_object:
                 # Calcular posición en la oración (priorizar inicio = más probable sujeto)
                 pos_in_sentence = sentence_lower.find(name_lower)
                 subject_candidates.append((name, pos_in_sentence))
-        
+
         if subject_candidates:
             # Priorizar el que aparece primero (más probable sujeto)
             subject_candidates.sort(key=lambda x: x[1])
             return subject_candidates[0][0]
 
-        # Si no se encontró sujeto directo, buscar pronombres y resolver
+        # =================================================================
+        # FALLBACK: Resolución de pronombres
+        # =================================================================
         pronouns_pattern = r'\b(él|ella|sus?|este|esta|aquel|aquella)\b'
         has_pronoun = regex_module.search(pronouns_pattern, sentence_lower)
 
@@ -1729,21 +1869,21 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
             # PERO excluir entidades que aparecen como objeto en esta oración
             mentions_before = [
                 (name, start, end)
-                for name, start, end in entity_mentions
+                for name, start, end, entity_type in person_mentions
                 if end <= sentence_start and name not in object_entities
             ]
 
             if mentions_before:
                 # Tomar la más cercana (última mencionada antes de la oración)
                 mentions_before.sort(key=lambda x: x[1], reverse=True)
-                
+
                 # Aplicar concordancia de género si es posible
                 pronoun_match = regex_module.search(pronouns_pattern, sentence_lower)
                 if pronoun_match:
                     pronoun = pronoun_match.group(1).lower()
                     is_feminine = pronoun in ('ella', 'esta', 'aquella')
                     is_masculine = pronoun in ('él', 'este', 'aquel')
-                    
+
                     if is_feminine or is_masculine:
                         # Filtrar por género
                         gendered = []
@@ -1751,15 +1891,15 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                             name_lower = name.lower().split()[0]
                             # Heurística simple: nombres terminados en 'a' suelen ser femeninos
                             name_is_feminine = name_lower.endswith('a') and name_lower not in ('jesús', 'elías', 'josué')
-                            
+
                             if is_feminine and name_is_feminine:
                                 gendered.append((name, start, end))
                             elif is_masculine and not name_is_feminine:
                                 gendered.append((name, start, end))
-                        
+
                         if gendered:
                             return gendered[0][0]
-                
+
                 # Fallback: retornar el más cercano
                 return mentions_before[0][0]
 
@@ -1773,14 +1913,31 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
         """Extrae valor de atributo de una oración."""
         sentence_lower = sentence.lower()
 
+        # Indicadores de partes del cuerpo para validación
+        eye_indicators = {"ojo", "ojos", "mirada", "pupila", "iris"}
+        hair_indicators = {"pelo", "cabello", "cabellera", "melena", "trenza", "rizos", "mechón"}
+
+        has_eye = any(ind in sentence_lower for ind in eye_indicators)
+        has_hair = any(ind in sentence_lower for ind in hair_indicators)
+
         if key_str == "hair_color":
+            # IMPORTANTE: Solo extraer hair_color si hay indicador de pelo
+            # y NO hay indicador de ojos (para evitar "ojos azules" -> hair_color)
+            if has_eye and not has_hair:
+                return None  # Rechazar: es sobre ojos, no pelo
             for color in COLORS:
                 if color in sentence_lower:
-                    return color
+                    # Si hay indicador de pelo, aceptar
+                    # Si no hay ningún indicador, también aceptar (contexto implícito)
+                    if has_hair or not has_eye:
+                        return color
 
         elif key_str == "eye_color":
+            # eye_color requiere indicador de ojos
+            if not has_eye:
+                return None
             for color in COLORS:
-                if color in sentence_lower and "ojo" in sentence_lower:
+                if color in sentence_lower:
                     return color
 
         elif key_str == "build":
@@ -1941,7 +2098,7 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
         self,
         text: str,
         position: int,
-        entity_mentions: Optional[list[tuple[str, int, int]]],
+        entity_mentions: Optional[list[tuple]],
     ) -> Optional[str]:
         """
         Encuentra la entidad más cercana a una posición.
@@ -1949,11 +2106,22 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
         Útil para resolver "sus ojos" o pronombres como "ella".
         Resuelve correferencias usando contexto y prioriza entidades tipo PERSON.
         Maneja sujetos elípticos en español.
+
+        Args:
+            text: Texto completo
+            position: Posición del atributo a resolver
+            entity_mentions: Lista de (name, start, end, entity_type) o (name, start, end)
+
+        Returns:
+            Nombre de la entidad más probable o None
         """
         if not entity_mentions:
             return None
 
         import re as regex_module
+
+        # Normalizar menciones al formato de 4 elementos
+        normalized_mentions = _normalize_entity_mentions(entity_mentions)
 
         # Extraer contexto alrededor de la posición (400 chars antes para capturar oraciones previas)
         context_start = max(0, position - 400)
@@ -1964,31 +2132,40 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
 
         # Buscar todas las entidades antes de la posición con sus distancias
         candidates = []
-        for name, start, end in entity_mentions:
+        for name, start, end, entity_type in normalized_mentions:
             if end <= position:
                 distance = position - end
                 if distance < 400:  # Ventana amplia
-                    candidates.append((name, start, end, distance))
+                    candidates.append((name, start, end, distance, entity_type))
 
         if not candidates:
             return None
 
-        # Clasificar entidades por tipo
+        # Clasificar entidades por tipo usando entity_type real del NER
         person_candidates = []
         location_candidates = []
 
-        for name, start, end, distance in candidates:
-            name_words = name.split()
-            is_likely_person = (
-                len(name_words) <= 2 and
-                not any(word.lower() in ['parque', 'del', 'de', 'la', 'el', 'retiro', 'madrid'] for word in name_words) and
-                name[0].isupper()
-            )
-
-            if is_likely_person:
-                person_candidates.append((name, start, end, distance))
+        for name, start, end, distance, entity_type in candidates:
+            # Si tenemos entity_type del NER, usarlo directamente
+            if entity_type is not None:
+                if _is_person_entity(entity_type):
+                    person_candidates.append((name, start, end, distance))
+                elif _is_location_entity(entity_type):
+                    location_candidates.append((name, start, end, distance))
+                # ORG y otros tipos se ignoran para atributos físicos
             else:
-                location_candidates.append((name, start, end, distance))
+                # Fallback: heurística por nombre si no hay entity_type
+                name_words = name.split()
+                is_likely_person = (
+                    len(name_words) <= 2 and
+                    not any(word.lower() in ['parque', 'del', 'de', 'la', 'el', 'retiro', 'madrid'] for word in name_words) and
+                    name[0].isupper()
+                )
+
+                if is_likely_person:
+                    person_candidates.append((name, start, end, distance))
+                else:
+                    location_candidates.append((name, start, end, distance))
 
         # Buscar límites de oración (. ! ?) para entender contexto
         last_sentence_break = max(
@@ -1999,8 +2176,19 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
 
         # Buscar pronombres o verbos en 3ª persona que indican sujeto elíptico
         immediate_context = context[-50:] if len(context) > 50 else context
-        has_pronoun = bool(regex_module.search(r'\b(ella|él|su|sus|la|lo|le)\b', immediate_context, regex_module.IGNORECASE))
-        has_3rd_person_verb = bool(regex_module.search(r'\b(tenía|era|estaba|llevaba|parecía|mostraba)\b', immediate_context, regex_module.IGNORECASE))
+
+        # IMPORTANTE: Separar pronombres de sujeto de artículos/determinantes
+        # - Pronombres de sujeto: él, ella (indican sujeto explícito)
+        # - Posesivos: su, sus (pueden indicar el referente)
+        # - "la", "lo", "le" son MUY comunes como artículos, NO usar para has_pronoun
+        #   Ej: "llamaron la atención" - "la" es artículo, no pronombre
+        has_subject_pronoun = bool(regex_module.search(r'\b(ella|él)\b', immediate_context, regex_module.IGNORECASE))
+        has_pronoun = has_subject_pronoun  # Solo pronombres de sujeto reales
+
+        # IMPORTANTE: Buscar verbos en 3ª persona tanto en contexto anterior como en el inicio del match
+        # El patrón puede empezar con el verbo (ej: "Llevaba el cabello corto")
+        combined_context = immediate_context + " " + context_forward
+        has_3rd_person_verb = bool(regex_module.search(r'\b(tenía|era|estaba|llevaba|parecía|mostraba)\b', combined_context, regex_module.IGNORECASE))
 
         # Detectar pronombres posesivos que podrían referirse al objeto (no al sujeto)
         # Ej: "Juan la saludó, sorprendido por su cabello" -> "su" se refiere a "la" (María), no a Juan
@@ -2207,6 +2395,66 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
 
         return list(seen.values())
 
+    def _resolve_conflicts(
+        self, attributes: list[ExtractedAttribute]
+    ) -> list[ExtractedAttribute]:
+        """
+        Resuelve conflictos donde una entidad tiene múltiples valores para el mismo atributo.
+
+        Por ejemplo, si Juan tiene eye_color=verdes, eye_color=azules, eye_color=marrones,
+        solo mantiene el de mayor confianza.
+
+        Args:
+            attributes: Lista de atributos (posiblemente con conflictos)
+
+        Returns:
+            Lista de atributos sin conflictos (un valor por entidad+key)
+        """
+        # Atributos que pueden tener múltiples valores legítimos
+        MULTI_VALUE_KEYS = {
+            AttributeKey.PERSONALITY,      # Puede tener múltiples rasgos
+            AttributeKey.FEAR,             # Puede tener múltiples miedos
+            AttributeKey.DESIRE,           # Puede tener múltiples deseos
+            AttributeKey.DISTINCTIVE_FEATURE,  # Puede tener múltiples rasgos distintivos
+            AttributeKey.RELATIONSHIP,     # Múltiples relaciones
+            AttributeKey.OTHER,            # Categoría genérica
+        }
+
+        # Agrupar por (entidad, key) - sin el valor
+        grouped: dict[tuple, list[ExtractedAttribute]] = {}
+        for attr in attributes:
+            group_key = (attr.entity_name.lower(), attr.key)
+            if group_key not in grouped:
+                grouped[group_key] = []
+            grouped[group_key].append(attr)
+
+        resolved: list[ExtractedAttribute] = []
+
+        for (entity, key), attrs in grouped.items():
+            if len(attrs) == 1:
+                # Sin conflicto
+                resolved.append(attrs[0])
+            elif key in MULTI_VALUE_KEYS:
+                # Atributo que puede tener múltiples valores
+                resolved.extend(attrs)
+            else:
+                # Conflicto: múltiples valores para atributo que debería ser único
+                # Mantener solo el de mayor confianza
+                best = max(attrs, key=lambda a: a.confidence)
+                conflict_values = [a.value for a in attrs if a.value != best.value]
+                if conflict_values:
+                    logger.warning(
+                        f"Conflicto de atributos para {entity}.{key.value}: "
+                        f"manteniendo '{best.value}' (conf={best.confidence:.2f}), "
+                        f"descartando: {conflict_values}"
+                    )
+                resolved.append(best)
+
+        logger.debug(
+            f"Resolución de conflictos: {len(attributes)} -> {len(resolved)} atributos"
+        )
+        return resolved
+
     def _extract_by_dependency(
         self,
         text: str,
@@ -2241,11 +2489,14 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
         try:
             doc = nlp(text)
 
-            # Crear índice de menciones para búsqueda rápida
+            # Crear índice de menciones para búsqueda rápida (solo personas)
             mention_spans = {}
             if entity_mentions:
-                for name, start, end in entity_mentions:
-                    mention_spans[(start, end)] = name
+                normalized = _normalize_entity_mentions(entity_mentions)
+                for name, start, end, entity_type in normalized:
+                    # Solo incluir personas para atributos físicos
+                    if entity_type is None or _is_person_entity(entity_type):
+                        mention_spans[(start, end)] = name
 
             for sent in doc.sents:
                 # Buscar verbos copulativos y descriptivos

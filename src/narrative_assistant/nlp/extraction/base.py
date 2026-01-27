@@ -90,7 +90,9 @@ class ExtractionContext:
     Attributes:
         text: Texto a analizar
         entity_names: Nombres de entidades conocidas
-        entity_mentions: Lista de menciones con posiciones (name, start, end)
+        entity_mentions: Lista de menciones con posiciones y tipo
+                        (name, start, end, entity_type)
+                        entity_type: "PER", "LOC", "ORG", "MISC" o None
         chapter: Número de capítulo (opcional)
         previous_attributes: Atributos ya extraídos (para contexto)
         genre_hint: Pista de género literario
@@ -98,7 +100,8 @@ class ExtractionContext:
     """
     text: str
     entity_names: list[str]
-    entity_mentions: Optional[list[tuple[str, int, int]]] = None  # (name, start, end)
+    # (name, start, end, entity_type) - entity_type puede ser "PER", "LOC", "ORG", None
+    entity_mentions: Optional[list[tuple[str, int, int, Optional[str]]]] = None
     chapter: Optional[int] = None
     previous_attributes: Optional[list[ExtractedAttribute]] = None
     genre_hint: Optional[str] = None  # "fantasy", "sci-fi", "realistic"
