@@ -301,21 +301,13 @@
               </div>
 
               <div class="inspector-content">
-                <!-- Sin selección: resumen del proyecto -->
-                <ProjectSummary
-                  v-if="!selectionStore.hasSelection"
-                  :word-count="project.wordCount"
-                  :chapter-count="project.chapterCount"
-                  :entity-count="entitiesCount"
-                  :alert-count="alertsCount"
-                  @stat-click="handleStatClick"
-                />
-
-                <!-- Entidad seleccionada -->
+                <!-- Entidad seleccionada (prioridad más alta) -->
                 <EntityInspector
-                  v-else-if="selectedEntity"
+                  v-if="selectedEntity"
                   :entity="selectedEntity"
                   :project-id="project.id"
+                  :alerts="alerts"
+                  :chapter-count="chapters.length"
                   @view-details="onEntityEdit(selectedEntity)"
                   @go-to-mentions="handleGoToMentions(selectedEntity)"
                   @close="selectionStore.clearAll()"
@@ -330,6 +322,39 @@
                   @resolve="onAlertResolve(selectedAlert)"
                   @dismiss="onAlertDismiss(selectedAlert)"
                   @close="selectionStore.clearAll()"
+                />
+
+                <!-- Texto seleccionado -->
+                <TextSelectionInspector
+                  v-else-if="selectionStore.textSelection"
+                  :selection="selectionStore.textSelection"
+                  :entities="entities"
+                  @close="selectionStore.setTextSelection(null)"
+                  @select-entity="onEntityClick"
+                  @search-similar="onSearchSimilarText"
+                />
+
+                <!-- Capítulo visible en tab texto (contextual) -->
+                <ChapterInspector
+                  v-else-if="showChapterInspector && currentChapter"
+                  :chapter="currentChapter"
+                  :project-id="project.id"
+                  :entities="entities"
+                  :alerts="alerts"
+                  @back-to-document="onBackToDocumentSummary"
+                  @go-to-start="onGoToChapterStart"
+                  @view-alerts="onViewChapterAlerts"
+                  @select-entity="onEntityClick"
+                />
+
+                <!-- Sin selección ni capítulo visible: resumen del proyecto -->
+                <ProjectSummary
+                  v-else
+                  :word-count="project.wordCount"
+                  :chapter-count="project.chapterCount"
+                  :entity-count="entitiesCount"
+                  :alert-count="alertsCount"
+                  @stat-click="handleStatClick"
                 />
               </div>
             </div>
@@ -367,7 +392,7 @@ import { WorkspaceTabs, TextTab, AlertsTab, EntitiesTab, RelationsTab, StyleTab,
 import { AnalysisRequired } from '@/components/analysis'
 import { TimelineView } from '@/components/timeline'
 import { ChaptersPanel, AlertsPanel, CharactersPanel, AssistantPanel } from '@/components/sidebar'
-import { ProjectSummary, EntityInspector, AlertInspector } from '@/components/inspector'
+import { ProjectSummary, EntityInspector, AlertInspector, ChapterInspector, TextSelectionInspector } from '@/components/inspector'
 import DocumentTypeChip from '@/components/DocumentTypeChip.vue'
 import type { SidebarTab } from '@/stores/workspace'
 import type { Entity, Alert, Chapter, AlertSource } from '@/types'
@@ -655,10 +680,26 @@ const selectedAlert = computed(() => {
   return alerts.value.find(a => a.id === selectionStore.primary?.id) || null
 })
 
+// Capítulo actual para el inspector contextual
+const currentChapter = computed(() => {
+  if (!activeChapterId.value) return null
+  return chapters.value.find(c => c.id === activeChapterId.value) || null
+})
+
+// Determinar si mostrar ChapterInspector contextualmente
+// Se muestra cuando: estamos en tab texto, hay un capítulo visible, y no hay selección explícita
+const showChapterInspector = computed(() => {
+  return workspaceStore.activeTab === 'text' &&
+         currentChapter.value !== null &&
+         !selectionStore.hasSelection
+})
+
 // Título del inspector
 const inspectorTitle = computed(() => {
   if (selectedEntity.value) return 'Entidad'
   if (selectedAlert.value) return 'Alerta'
+  if (selectionStore.textSelection) return 'Selección'
+  if (showChapterInspector.value) return 'Capítulo'
   return 'Resumen'
 })
 
@@ -865,9 +906,18 @@ const onSectionSelect = (chapterId: number, _sectionId: number, startChar: numbe
   workspaceStore.navigateToTextPosition(startChar)
 }
 
+// Debounce para cambios de capítulo visible (evita actualizaciones rápidas durante scroll)
+let chapterVisibleTimeout: ReturnType<typeof setTimeout> | null = null
 const onChapterVisible = (chapterId: number) => {
-  activeChapterId.value = chapterId
-  workspaceStore.setCurrentChapter(chapterId)
+  // Clear pending timeout
+  if (chapterVisibleTimeout) {
+    clearTimeout(chapterVisibleTimeout)
+  }
+  // Debounce 400ms para evitar cambios rápidos durante scroll
+  chapterVisibleTimeout = setTimeout(() => {
+    activeChapterId.value = chapterId
+    workspaceStore.setCurrentChapter(chapterId)
+  }, 400)
 }
 
 const onEntityClick = (entityId: number) => {
@@ -995,6 +1045,39 @@ const handleStatClick = (stat: 'words' | 'chapters' | 'entities' | 'alerts') => 
 const handleGoToMentions = (entity: Entity) => {
   workspaceStore.navigateToEntityMentions(entity.id)
   highlightedEntityId.value = entity.id
+}
+
+// ChapterInspector handlers
+const onBackToDocumentSummary = () => {
+  // Clear the active chapter to show document summary
+  activeChapterId.value = null
+  workspaceStore.setCurrentChapter(null)
+}
+
+const onGoToChapterStart = () => {
+  // Scroll to the start of the current chapter
+  if (currentChapter.value) {
+    scrollToChapterId.value = currentChapter.value.id
+    setTimeout(() => { scrollToChapterId.value = null }, 500)
+  }
+}
+
+const onViewChapterAlerts = () => {
+  // Navigate to alerts tab - could filter by chapter if needed
+  if (currentChapter.value) {
+    workspaceStore.setActiveTab('alerts')
+    // The alerts tab will show all alerts, user can filter as needed
+  }
+}
+
+// TextSelectionInspector handlers
+const onSearchSimilarText = (text: string) => {
+  // Por ahora solo limpiamos la selección y mostramos un mensaje en consola
+  // En el futuro podría abrir el asistente LLM con el texto seleccionado
+  console.log('Search similar text:', text.substring(0, 50) + '...')
+  selectionStore.setTextSelection(null)
+  // Podría activar el sidebar del asistente con el texto como contexto
+  sidebarTab.value = 'assistant'
 }
 
 const handleExportStyleGuide = () => {

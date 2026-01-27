@@ -1,21 +1,65 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import Button from 'primevue/button'
+import Tag from 'primevue/tag'
+import Accordion from 'primevue/accordion'
+import AccordionPanel from 'primevue/accordionpanel'
+import AccordionHeader from 'primevue/accordionheader'
+import AccordionContent from 'primevue/accordioncontent'
+import ProgressSpinner from 'primevue/progressspinner'
 import type { Chapter, Entity, Alert } from '@/types'
 
 /**
  * ChapterInspector - Panel de detalles de capítulo para el inspector.
  *
  * Muestra información del capítulo actualmente visible:
+ * - Botón para volver al resumen del documento
  * - Título y número
- * - Conteo de palabras
- * - Personajes que aparecen
- * - Alertas del capítulo
+ * - Resumen automático del capítulo (si disponible)
+ * - Personajes presentes con conteo de menciones
+ * - Alertas del capítulo agrupadas por severidad
  */
+
+interface CharacterPresence {
+  entity_id: number
+  name: string
+  mention_count: number
+  is_first_appearance: boolean
+  is_return: boolean
+  chapters_absent: number
+}
+
+interface ChapterSummaryData {
+  chapter_number: number
+  chapter_title: string | null
+  word_count: number
+  characters_present: CharacterPresence[]
+  new_characters: string[]
+  returning_characters: string[]
+  key_events: Array<{
+    event_type: string
+    description: string
+    characters_involved: string[]
+  }>
+  llm_events: Array<{
+    event_type: string
+    description: string
+    characters_involved: string[]
+  }>
+  total_interactions: number
+  conflict_interactions: number
+  positive_interactions: number
+  dominant_tone: string
+  locations_mentioned: string[]
+  auto_summary: string
+  llm_summary: string | null
+}
 
 const props = defineProps<{
   /** Capítulo a mostrar */
   chapter: Chapter
+  /** ID del proyecto */
+  projectId: number
   /** Entidades del proyecto (para mostrar personajes del capítulo) */
   entities?: Entity[]
   /** Alertas del proyecto (para filtrar las del capítulo) */
@@ -23,13 +67,70 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
+  /** Volver al resumen del documento */
+  (e: 'back-to-document'): void
   /** Ir al inicio del capítulo */
   (e: 'go-to-start'): void
   /** Ver alertas del capítulo */
   (e: 'view-alerts'): void
   /** Seleccionar un personaje */
-  (e: 'select-entity', entity: Entity): void
+  (e: 'select-entity', entityId: number): void
 }>()
+
+// Chapter summary data
+const summaryLoading = ref(false)
+const summaryError = ref<string | null>(null)
+const chapterSummary = ref<ChapterSummaryData | null>(null)
+
+// Cache for chapter summaries
+const summaryCache = ref<Map<number, ChapterSummaryData>>(new Map())
+
+// Load chapter summary when chapter changes
+async function loadChapterSummary() {
+  if (!props.chapter) return
+
+  // Check cache first
+  const cached = summaryCache.value.get(props.chapter.chapterNumber)
+  if (cached) {
+    chapterSummary.value = cached
+    return
+  }
+
+  summaryLoading.value = true
+  summaryError.value = null
+
+  try {
+    const response = await fetch(
+      `/api/projects/${props.projectId}/chapter-progress?mode=basic`
+    )
+    const data = await response.json()
+
+    if (data.success && data.data.chapters) {
+      // Cache all chapters
+      for (const ch of data.data.chapters) {
+        summaryCache.value.set(ch.chapter_number, ch)
+      }
+      // Get the summary for this chapter
+      chapterSummary.value = summaryCache.value.get(props.chapter.chapterNumber) || null
+    }
+  } catch (err) {
+    console.error('Error loading chapter summary:', err)
+    summaryError.value = 'Error al cargar el resumen'
+  } finally {
+    summaryLoading.value = false
+  }
+}
+
+// Watch for chapter changes
+watch(
+  () => props.chapter?.id,
+  () => {
+    if (props.chapter) {
+      loadChapterSummary()
+    }
+  },
+  { immediate: true }
+)
 
 /** Alertas de este capítulo */
 const chapterAlerts = computed(() => {
@@ -49,12 +150,84 @@ const alertCounts = computed(() => {
 })
 
 const hasAlerts = computed(() => chapterAlerts.value.length > 0)
+
+/** Resumen a mostrar (preferir LLM si está disponible) */
+const displaySummary = computed(() => {
+  if (!chapterSummary.value) return null
+  return chapterSummary.value.llm_summary || chapterSummary.value.auto_summary
+})
+
+/** Personajes ordenados por menciones */
+const topCharacters = computed(() => {
+  if (!chapterSummary.value?.characters_present) return []
+  return [...chapterSummary.value.characters_present]
+    .sort((a, b) => b.mention_count - a.mention_count)
+    .slice(0, 8)
+})
+
+/** Eventos clave combinados */
+const keyEvents = computed(() => {
+  if (!chapterSummary.value) return []
+  const events = [
+    ...(chapterSummary.value.key_events || []),
+    ...(chapterSummary.value.llm_events || []),
+  ]
+  // Dedup by description
+  const seen = new Set<string>()
+  return events.filter(e => {
+    const key = e.description.toLowerCase().substring(0, 30)
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  }).slice(0, 5)
+})
+
+function getToneSeverity(tone: string): 'success' | 'info' | 'warn' | 'danger' | 'secondary' {
+  switch (tone) {
+    case 'positive': return 'success'
+    case 'tense': return 'warn'
+    case 'negative': return 'danger'
+    default: return 'secondary'
+  }
+}
+
+function getToneLabel(tone: string): string {
+  const labels: Record<string, string> = {
+    positive: 'Positivo',
+    tense: 'Tenso',
+    negative: 'Negativo',
+    neutral: 'Neutro',
+  }
+  return labels[tone] || tone
+}
+
+function getEventIcon(eventType: string): string {
+  const icons: Record<string, string> = {
+    first_appearance: 'pi-user-plus',
+    return: 'pi-replay',
+    death: 'pi-heart',
+    conflict: 'pi-bolt',
+    revelation: 'pi-eye',
+    decision: 'pi-check-circle',
+    transformation: 'pi-sync',
+  }
+  return icons[eventType] || 'pi-circle'
+}
 </script>
 
 <template>
   <div class="chapter-inspector">
-    <!-- Header -->
+    <!-- Header with back button -->
     <div class="inspector-header">
+      <Button
+        icon="pi pi-arrow-left"
+        text
+        rounded
+        size="small"
+        @click="emit('back-to-document')"
+        v-tooltip.bottom="'Volver al documento'"
+        class="back-button"
+      />
       <div class="chapter-badge">
         <i class="pi pi-book"></i>
         <span>Capítulo {{ chapter.chapterNumber }}</span>
@@ -66,55 +239,161 @@ const hasAlerts = computed(() => chapterAlerts.value.length > 0)
       <!-- Título -->
       <div class="chapter-title-section">
         <h3 class="chapter-title">{{ chapter.title || `Capítulo ${chapter.chapterNumber}` }}</h3>
+        <Tag
+          v-if="chapterSummary?.dominant_tone && chapterSummary.dominant_tone !== 'neutral'"
+          :severity="getToneSeverity(chapterSummary.dominant_tone)"
+          :value="getToneLabel(chapterSummary.dominant_tone)"
+          class="tone-tag"
+        />
       </div>
 
-      <!-- Estadísticas -->
-      <div class="info-section">
-        <div class="section-label">Estadísticas</div>
-        <div class="stats-grid">
-          <div class="stat-item">
-            <i class="pi pi-align-left"></i>
-            <span class="stat-value">{{ (chapter.wordCount || 0).toLocaleString() }}</span>
-            <span class="stat-label">palabras</span>
-          </div>
-          <!-- paragraphCount no está en el tipo Chapter, quitar esta sección -->
+      <!-- Loading state -->
+      <div v-if="summaryLoading" class="loading-section">
+        <ProgressSpinner style="width: 24px; height: 24px" />
+        <span>Cargando resumen...</span>
+      </div>
+
+      <!-- Summary section -->
+      <div v-else-if="displaySummary" class="summary-section">
+        <p class="summary-text">{{ displaySummary }}</p>
+      </div>
+
+      <!-- Estadísticas compactas -->
+      <div class="stats-row">
+        <div class="stat-chip">
+          <i class="pi pi-align-left"></i>
+          <span>{{ (chapter.wordCount || 0).toLocaleString() }}</span>
+        </div>
+        <div v-if="chapterSummary?.total_interactions" class="stat-chip">
+          <i class="pi pi-comments"></i>
+          <span>{{ chapterSummary.total_interactions }}</span>
+        </div>
+        <div v-if="chapterSummary?.locations_mentioned?.length" class="stat-chip">
+          <i class="pi pi-map-marker"></i>
+          <span>{{ chapterSummary.locations_mentioned.length }}</span>
         </div>
       </div>
 
-      <!-- Alertas del capítulo -->
-      <div v-if="hasAlerts" class="info-section">
-        <div class="section-label">
-          <i class="pi pi-exclamation-triangle"></i>
-          Alertas en este capítulo
-        </div>
-        <div class="alerts-summary">
-          <div v-if="alertCounts.critical > 0" class="alert-count alert-critical">
-            <span class="count">{{ alertCounts.critical }}</span>
-            <span class="label">críticas</span>
-          </div>
-          <div v-if="alertCounts.high > 0" class="alert-count alert-high">
-            <span class="count">{{ alertCounts.high }}</span>
-            <span class="label">altas</span>
-          </div>
-          <div v-if="alertCounts.medium > 0" class="alert-count alert-medium">
-            <span class="count">{{ alertCounts.medium }}</span>
-            <span class="label">medias</span>
-          </div>
-          <div v-if="alertCounts.low > 0" class="alert-count alert-low">
-            <span class="count">{{ alertCounts.low }}</span>
-            <span class="label">bajas</span>
-          </div>
-          <div v-if="alertCounts.info > 0" class="alert-count alert-info">
-            <span class="count">{{ alertCounts.info }}</span>
-            <span class="label">info</span>
-          </div>
-        </div>
-      </div>
+      <!-- Accordion sections -->
+      <Accordion :multiple="true" class="chapter-accordion">
+        <!-- Personajes -->
+        <AccordionPanel v-if="topCharacters.length > 0" value="characters">
+          <AccordionHeader>
+            <div class="accordion-header">
+              <i class="pi pi-users"></i>
+              <span>Personajes ({{ topCharacters.length }})</span>
+            </div>
+          </AccordionHeader>
+          <AccordionContent>
+            <div class="characters-list">
+              <div
+                v-for="char in topCharacters"
+                :key="char.entity_id"
+                class="character-item"
+                :class="{
+                  'is-new': char.is_first_appearance,
+                  'is-return': char.is_return,
+                }"
+                @click="emit('select-entity', char.entity_id)"
+              >
+                <span class="char-name">{{ char.name }}</span>
+                <div class="char-badges">
+                  <Tag
+                    v-if="char.is_first_appearance"
+                    severity="success"
+                    value="Nuevo"
+                    size="small"
+                  />
+                  <Tag
+                    v-if="char.is_return"
+                    severity="info"
+                    value="Regresa"
+                    size="small"
+                  />
+                  <span class="mention-count">{{ char.mention_count }}</span>
+                </div>
+              </div>
+            </div>
+          </AccordionContent>
+        </AccordionPanel>
 
-      <!-- Sin alertas -->
-      <div v-else class="info-section no-alerts">
+        <!-- Eventos clave -->
+        <AccordionPanel v-if="keyEvents.length > 0" value="events">
+          <AccordionHeader>
+            <div class="accordion-header">
+              <i class="pi pi-bolt"></i>
+              <span>Eventos ({{ keyEvents.length }})</span>
+            </div>
+          </AccordionHeader>
+          <AccordionContent>
+            <div class="events-list">
+              <div v-for="(event, idx) in keyEvents" :key="idx" class="event-item">
+                <i :class="`pi ${getEventIcon(event.event_type)}`"></i>
+                <span>{{ event.description }}</span>
+              </div>
+            </div>
+          </AccordionContent>
+        </AccordionPanel>
+
+        <!-- Alertas -->
+        <AccordionPanel v-if="hasAlerts" value="alerts">
+          <AccordionHeader>
+            <div class="accordion-header">
+              <i class="pi pi-exclamation-triangle"></i>
+              <span>Alertas ({{ chapterAlerts.length }})</span>
+            </div>
+          </AccordionHeader>
+          <AccordionContent>
+            <div class="alerts-summary">
+              <div v-if="alertCounts.critical > 0" class="alert-count alert-critical">
+                <span class="count">{{ alertCounts.critical }}</span>
+                <span class="label">críticas</span>
+              </div>
+              <div v-if="alertCounts.high > 0" class="alert-count alert-high">
+                <span class="count">{{ alertCounts.high }}</span>
+                <span class="label">altas</span>
+              </div>
+              <div v-if="alertCounts.medium > 0" class="alert-count alert-medium">
+                <span class="count">{{ alertCounts.medium }}</span>
+                <span class="label">medias</span>
+              </div>
+              <div v-if="alertCounts.low > 0" class="alert-count alert-low">
+                <span class="count">{{ alertCounts.low }}</span>
+                <span class="label">bajas</span>
+              </div>
+            </div>
+            <Button
+              label="Ver todas"
+              icon="pi pi-list"
+              size="small"
+              text
+              @click="emit('view-alerts')"
+              class="view-alerts-btn"
+            />
+          </AccordionContent>
+        </AccordionPanel>
+      </Accordion>
+
+      <!-- Sin alertas badge -->
+      <div v-if="!hasAlerts && !summaryLoading" class="no-alerts-badge">
         <i class="pi pi-check-circle"></i>
-        <span>Sin alertas en este capítulo</span>
+        <span>Sin alertas</span>
+      </div>
+
+      <!-- Ubicaciones -->
+      <div v-if="chapterSummary?.locations_mentioned?.length" class="locations-section">
+        <div class="section-label">
+          <i class="pi pi-map-marker"></i>
+          <span>Ubicaciones</span>
+        </div>
+        <div class="locations-list">
+          <Tag
+            v-for="loc in chapterSummary.locations_mentioned.slice(0, 5)"
+            :key="loc"
+            :value="loc"
+            severity="secondary"
+          />
+        </div>
       </div>
     </div>
 
@@ -126,13 +405,6 @@ const hasAlerts = computed(() => chapterAlerts.value.length > 0)
         size="small"
         outlined
         @click="emit('go-to-start')"
-      />
-      <Button
-        v-if="hasAlerts"
-        label="Ver alertas"
-        icon="pi pi-list"
-        size="small"
-        @click="emit('view-alerts')"
       />
     </div>
   </div>
@@ -148,9 +420,13 @@ const hasAlerts = computed(() => chapterAlerts.value.length > 0)
 .inspector-header {
   display: flex;
   align-items: center;
-  gap: var(--ds-space-3);
-  padding: var(--ds-space-4);
-  border-bottom: 1px solid var(--ds-surface-border);
+  gap: var(--ds-space-2);
+  padding: var(--ds-space-3) var(--ds-space-4);
+  border-bottom: 1px solid var(--surface-border);
+}
+
+.back-button {
+  flex-shrink: 0;
 }
 
 .chapter-badge {
@@ -158,11 +434,11 @@ const hasAlerts = computed(() => chapterAlerts.value.length > 0)
   align-items: center;
   gap: var(--ds-space-2);
   padding: var(--ds-space-1) var(--ds-space-3);
-  background: var(--ds-color-primary-soft);
-  color: var(--ds-color-primary);
-  border-radius: var(--ds-radius-full);
-  font-size: var(--ds-font-size-sm);
-  font-weight: var(--ds-font-weight-medium);
+  background: var(--primary-100);
+  color: var(--primary-700);
+  border-radius: var(--border-radius-xl);
+  font-size: 0.875rem;
+  font-weight: 500;
 }
 
 .chapter-badge i {
@@ -175,80 +451,174 @@ const hasAlerts = computed(() => chapterAlerts.value.length > 0)
   padding: var(--ds-space-4);
   display: flex;
   flex-direction: column;
-  gap: var(--ds-space-4);
+  gap: var(--ds-space-3);
 }
 
 .chapter-title-section {
-  padding-bottom: var(--ds-space-2);
-  border-bottom: 1px solid var(--ds-surface-border);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ds-space-2);
 }
 
 .chapter-title {
   margin: 0;
-  font-size: var(--ds-font-size-lg);
-  font-weight: var(--ds-font-weight-semibold);
-  color: var(--ds-color-text);
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-color);
   line-height: 1.4;
+  flex: 1;
 }
 
-.info-section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ds-space-2);
+.tone-tag {
+  flex-shrink: 0;
 }
 
-.section-label {
+.loading-section {
   display: flex;
   align-items: center;
   gap: var(--ds-space-2);
-  font-size: var(--ds-font-size-xs);
-  font-weight: var(--ds-font-weight-medium);
-  color: var(--ds-color-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.section-label i {
-  font-size: 0.875rem;
-}
-
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--ds-space-2);
-}
-
-.stat-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
   padding: var(--ds-space-3);
-  background: var(--ds-surface-ground);
-  border-radius: var(--ds-radius-md);
-  text-align: center;
+  color: var(--text-color-secondary);
+  font-size: 0.9rem;
 }
 
-.stat-item i {
-  font-size: 1rem;
-  color: var(--ds-color-text-secondary);
-  margin-bottom: var(--ds-space-1);
+.summary-section {
+  background: var(--surface-50);
+  padding: var(--ds-space-3);
+  border-radius: var(--border-radius);
+  border-left: 3px solid var(--primary-color);
 }
 
-.stat-item .stat-value {
-  font-size: var(--ds-font-size-lg);
-  font-weight: var(--ds-font-weight-bold);
-  color: var(--ds-color-text);
+.summary-text {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--text-color);
 }
 
-.stat-item .stat-label {
-  font-size: var(--ds-font-size-xs);
-  color: var(--ds-color-text-secondary);
+.stats-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ds-space-2);
+}
+
+.stat-chip {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-1);
+  padding: var(--ds-space-1) var(--ds-space-2);
+  background: var(--surface-100);
+  border-radius: var(--border-radius);
+  font-size: 0.85rem;
+  color: var(--text-color-secondary);
+}
+
+.stat-chip i {
+  font-size: 0.8rem;
+}
+
+.chapter-accordion {
+  margin-top: var(--ds-space-2);
+}
+
+.chapter-accordion :deep(.p-accordionpanel) {
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius);
+  margin-bottom: var(--ds-space-2);
+}
+
+.chapter-accordion :deep(.p-accordionheader) {
+  padding: var(--ds-space-2) var(--ds-space-3);
+}
+
+.chapter-accordion :deep(.p-accordioncontent-content) {
+  padding: var(--ds-space-3);
+}
+
+.accordion-header {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.accordion-header i {
+  color: var(--text-color-secondary);
+}
+
+.characters-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-2);
+}
+
+.character-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--ds-space-2);
+  background: var(--surface-50);
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.character-item:hover {
+  background: var(--surface-100);
+}
+
+.character-item.is-new {
+  border-left: 3px solid var(--green-500);
+}
+
+.character-item.is-return {
+  border-left: 3px solid var(--blue-500);
+}
+
+.char-name {
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+.char-badges {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+}
+
+.mention-count {
+  background: var(--surface-200);
+  padding: 0 var(--ds-space-2);
+  border-radius: var(--border-radius-xl);
+  font-size: 0.8rem;
+  color: var(--text-color-secondary);
+}
+
+.events-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-2);
+}
+
+.event-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ds-space-2);
+  font-size: 0.9rem;
+}
+
+.event-item i {
+  color: var(--text-color-secondary);
+  margin-top: 2px;
 }
 
 .alerts-summary {
   display: flex;
   flex-wrap: wrap;
   gap: var(--ds-space-2);
+  margin-bottom: var(--ds-space-2);
 }
 
 .alert-count {
@@ -256,62 +626,131 @@ const hasAlerts = computed(() => chapterAlerts.value.length > 0)
   align-items: center;
   gap: var(--ds-space-1);
   padding: var(--ds-space-1) var(--ds-space-2);
-  border-radius: var(--ds-radius-sm);
-  font-size: var(--ds-font-size-sm);
+  border-radius: var(--border-radius);
+  font-size: 0.85rem;
 }
 
 .alert-count .count {
-  font-weight: var(--ds-font-weight-bold);
+  font-weight: 600;
 }
 
 .alert-count .label {
-  font-size: var(--ds-font-size-xs);
+  font-size: 0.8rem;
 }
 
 .alert-critical {
-  background: var(--ds-color-error-soft);
-  color: var(--ds-color-error);
+  background: var(--red-100);
+  color: var(--red-700);
 }
 
 .alert-high {
-  background: var(--ds-color-warning-soft);
-  color: var(--ds-color-warning);
+  background: var(--orange-100);
+  color: var(--orange-700);
 }
 
 .alert-medium {
-  background: var(--ds-alert-medium-bg, #fff3e0);
-  color: var(--ds-alert-medium, #e65100);
+  background: var(--yellow-100);
+  color: var(--yellow-700);
 }
 
 .alert-low {
-  background: var(--ds-color-info-soft);
-  color: var(--ds-color-info);
+  background: var(--blue-100);
+  color: var(--blue-700);
 }
 
-.alert-info {
-  background: var(--ds-surface-hover);
-  color: var(--ds-color-text-secondary);
+.view-alerts-btn {
+  width: 100%;
 }
 
-.no-alerts {
+.no-alerts-badge {
   display: flex;
   align-items: center;
   gap: var(--ds-space-2);
-  padding: var(--ds-space-3);
-  background: var(--ds-color-success-soft);
-  border-radius: var(--ds-radius-md);
-  color: var(--ds-color-success);
+  padding: var(--ds-space-2) var(--ds-space-3);
+  background: var(--green-100);
+  border-radius: var(--border-radius);
+  color: var(--green-700);
+  font-size: 0.9rem;
 }
 
-.no-alerts i {
-  font-size: 1.25rem;
+.no-alerts-badge i {
+  font-size: 1rem;
+}
+
+.locations-section {
+  margin-top: var(--ds-space-2);
+}
+
+.section-label {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-color-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--ds-space-2);
+}
+
+.locations-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ds-space-1);
 }
 
 .inspector-actions {
   display: flex;
   flex-direction: column;
   gap: var(--ds-space-2);
-  padding: var(--ds-space-4);
-  border-top: 1px solid var(--ds-surface-border);
+  padding: var(--ds-space-3) var(--ds-space-4);
+  border-top: 1px solid var(--surface-border);
+}
+
+/* Dark mode */
+.dark .chapter-badge {
+  background: var(--primary-900);
+  color: var(--primary-200);
+}
+
+.dark .summary-section {
+  background: var(--surface-800);
+}
+
+.dark .stat-chip {
+  background: var(--surface-700);
+}
+
+.dark .character-item {
+  background: var(--surface-800);
+}
+
+.dark .character-item:hover {
+  background: var(--surface-700);
+}
+
+.dark .no-alerts-badge {
+  background: var(--green-900);
+  color: var(--green-200);
+}
+
+.dark .alert-critical {
+  background: var(--red-900);
+  color: var(--red-200);
+}
+
+.dark .alert-high {
+  background: var(--orange-900);
+  color: var(--orange-200);
+}
+
+.dark .alert-medium {
+  background: var(--yellow-900);
+  color: var(--yellow-200);
+}
+
+.dark .alert-low {
+  background: var(--blue-900);
+  color: var(--blue-200);
 }
 </style>

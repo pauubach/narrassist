@@ -31,6 +31,9 @@ import SentenceVariationTab from './SentenceVariationTab.vue'
 import PacingAnalysisTab from './PacingAnalysisTab.vue'
 import EmotionalAnalysisTab from './EmotionalAnalysisTab.vue'
 import AgeReadabilityTab from './AgeReadabilityTab.vue'
+import VitalStatusTab from './VitalStatusTab.vue'
+import CharacterLocationTab from './CharacterLocationTab.vue'
+import ChapterProgressTab from './ChapterProgressTab.vue'
 
 const props = defineProps<{
   projectId: number
@@ -505,6 +508,42 @@ Ejemplos:
 
         <div class="tab-content">
           <AgeReadabilityTab :project-id="projectId" />
+        </div>
+      </TabPanel>
+
+      <!-- Tab 12: Vital Status (character deaths and resurrections) -->
+      <TabPanel v-if="isFeatureAvailable('vital_status')" value="11">
+        <template #header>
+          <i class="pi pi-heart-fill"></i>
+          <span>Estado vital</span>
+        </template>
+
+        <div class="tab-content">
+          <VitalStatusTab :project-id="projectId" />
+        </div>
+      </TabPanel>
+
+      <!-- Tab 13: Character Location (tracking character movements) -->
+      <TabPanel v-if="isFeatureAvailable('character_location')" value="12">
+        <template #header>
+          <i class="pi pi-map-marker"></i>
+          <span>Ubicaciones</span>
+        </template>
+
+        <div class="tab-content">
+          <CharacterLocationTab :project-id="projectId" />
+        </div>
+      </TabPanel>
+
+      <!-- Tab 14: Chapter Progress Summary (narrative progress tracking) -->
+      <TabPanel v-if="isFeatureAvailable('chapter_progress')" value="13">
+        <template #header>
+          <i class="pi pi-chart-line"></i>
+          <span>Avance narrativo</span>
+        </template>
+
+        <div class="tab-content">
+          <ChapterProgressTab :project-id="projectId" />
         </div>
       </TabPanel>
     </TabView>

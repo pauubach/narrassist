@@ -1,16 +1,17 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import Button from 'primevue/button'
+import Tag from 'primevue/tag'
 import DsBadge from '@/components/ds/DsBadge.vue'
 import MethodVotingBar from '@/components/shared/MethodVotingBar.vue'
 import ConfidenceBadge from '@/components/shared/ConfidenceBadge.vue'
-import type { Entity } from '@/types'
+import type { Entity, Alert } from '@/types'
 import { useEntityUtils } from '@/composables/useEntityUtils'
 import { useMentionNavigation } from '@/composables/useMentionNavigation'
 import { useAlertUtils } from '@/composables/useAlertUtils'
 import { apiUrl } from '@/config/api'
 
-const { formatChapterLabel } = useAlertUtils()
+const { formatChapterLabel, getSeverityConfig } = useAlertUtils()
 
 // Coreference info state
 interface MethodContribution {
@@ -51,6 +52,10 @@ const props = defineProps<{
   entity: Entity
   /** ID del proyecto (para cargar menciones) */
   projectId: number
+  /** Alertas del proyecto (para filtrar las relacionadas) */
+  alerts?: Alert[]
+  /** Número total de capítulos (para mini-timeline) */
+  chapterCount?: number
 }>()
 
 const emit = defineEmits<{
@@ -137,6 +142,69 @@ const MENTION_TYPE_LABELS: Record<string, string> = {
 function getMentionTypeLabel(type: string): string {
   return MENTION_TYPE_LABELS[type] || type
 }
+
+// ============================================================================
+// Related Alerts
+// ============================================================================
+
+/** Alertas relacionadas con esta entidad */
+const relatedAlerts = computed(() => {
+  if (!props.alerts) return []
+  return props.alerts.filter(a =>
+    a.entityIds.includes(props.entity.id) && a.status === 'active'
+  ).slice(0, 5) // Limitar a 5 alertas
+})
+
+/** Alertas de inconsistencias de atributos */
+const attributeAlerts = computed(() => {
+  return relatedAlerts.value.filter(a => a.category === 'attribute')
+})
+
+/** Otras alertas (no de atributos) */
+const otherAlerts = computed(() => {
+  return relatedAlerts.value.filter(a => a.category !== 'attribute')
+})
+
+const hasRelatedAlerts = computed(() => relatedAlerts.value.length > 0)
+
+// ============================================================================
+// Mini Timeline
+// ============================================================================
+
+interface ChapterAppearance {
+  chapterNumber: number
+  mentionCount: number
+  percentage: number // Para la barra visual
+}
+
+/** Apariciones por capítulo para mini-timeline */
+const chapterAppearances = computed((): ChapterAppearance[] => {
+  const mentions = mentionNav.state.value.mentions
+  if (!mentions || mentions.length === 0) {
+    return []
+  }
+
+  // Agrupar menciones por capítulo
+  const byChapter = new Map<number, number>()
+  for (const mention of mentions) {
+    const chNum = mention.chapterNumber || 0
+    byChapter.set(chNum, (byChapter.get(chNum) || 0) + 1)
+  }
+
+  // Encontrar máximo para calcular porcentajes
+  const maxCount = Math.max(...byChapter.values())
+
+  // Convertir a array ordenado
+  return Array.from(byChapter.entries())
+    .map(([chapterNumber, mentionCount]) => ({
+      chapterNumber,
+      mentionCount,
+      percentage: maxCount > 0 ? (mentionCount / maxCount) * 100 : 0
+    }))
+    .sort((a, b) => a.chapterNumber - b.chapterNumber)
+})
+
+const hasChapterData = computed(() => chapterAppearances.value.length > 1)
 </script>
 
 <template>
@@ -244,6 +312,72 @@ function getMentionTypeLabel(type: string): string {
       <div v-else-if="corefLoading" class="info-section coref-loading">
         <i class="pi pi-spin pi-spinner"></i>
         <span>Cargando información...</span>
+      </div>
+
+      <!-- Mini Timeline de apariciones -->
+      <div v-if="hasChapterData" class="info-section timeline-section">
+        <div class="section-label">
+          <i class="pi pi-chart-bar"></i>
+          Apariciones por capítulo
+        </div>
+        <div class="mini-timeline">
+          <div
+            v-for="ch in chapterAppearances"
+            :key="ch.chapterNumber"
+            class="timeline-bar"
+            :title="`Cap. ${ch.chapterNumber}: ${ch.mentionCount} menciones`"
+          >
+            <div
+              class="bar-fill"
+              :style="{ height: `${Math.max(ch.percentage, 8)}%` }"
+            ></div>
+            <span class="bar-label">{{ ch.chapterNumber }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Alertas de inconsistencias de atributos -->
+      <div v-if="attributeAlerts.length > 0" class="info-section alerts-section">
+        <div class="section-label section-label-warning">
+          <i class="pi pi-exclamation-triangle"></i>
+          Inconsistencias de atributos
+        </div>
+        <div class="alert-list">
+          <div
+            v-for="alert in attributeAlerts"
+            :key="alert.id"
+            class="alert-item alert-attribute"
+          >
+            <Tag
+              :severity="getSeverityConfig(alert.severity).color"
+              :value="alert.extraData?.attributeKey || 'Atributo'"
+              size="small"
+            />
+            <span class="alert-desc">{{ alert.description }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Otras alertas relacionadas -->
+      <div v-if="otherAlerts.length > 0" class="info-section alerts-section">
+        <div class="section-label">
+          <i class="pi pi-bell"></i>
+          Alertas relacionadas
+        </div>
+        <div class="alert-list">
+          <div
+            v-for="alert in otherAlerts"
+            :key="alert.id"
+            class="alert-item"
+          >
+            <Tag
+              :severity="getSeverityConfig(alert.severity).color"
+              :value="getSeverityConfig(alert.severity).label"
+              size="small"
+            />
+            <span class="alert-desc">{{ alert.title }}</span>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -620,5 +754,102 @@ function getMentionTypeLabel(type: string): string {
   gap: var(--ds-space-2);
   color: var(--ds-color-text-secondary);
   font-size: var(--ds-font-size-sm);
+}
+
+/* Mini Timeline */
+.timeline-section .section-label {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  margin-bottom: var(--ds-space-3);
+}
+
+.timeline-section .section-label i {
+  color: var(--ds-color-primary);
+}
+
+.mini-timeline {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 60px;
+  padding: var(--ds-space-2);
+  background: var(--ds-surface-ground);
+  border-radius: var(--ds-radius-md);
+}
+
+.timeline-bar {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  min-width: 12px;
+  max-width: 24px;
+}
+
+.bar-fill {
+  width: 100%;
+  background: var(--ds-color-primary);
+  border-radius: 2px 2px 0 0;
+  transition: height 0.3s ease;
+  margin-top: auto;
+}
+
+.bar-label {
+  font-size: 0.625rem;
+  color: var(--ds-color-text-secondary);
+  margin-top: 2px;
+}
+
+/* Alerts section */
+.alerts-section .section-label {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  margin-bottom: var(--ds-space-2);
+}
+
+.alerts-section .section-label i {
+  color: var(--ds-color-text-secondary);
+}
+
+.section-label-warning i {
+  color: var(--orange-500) !important;
+}
+
+.alert-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-2);
+}
+
+.alert-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ds-space-2);
+  padding: var(--ds-space-2);
+  background: var(--ds-surface-ground);
+  border-radius: var(--ds-radius-sm);
+  font-size: var(--ds-font-size-sm);
+}
+
+.alert-item.alert-attribute {
+  border-left: 3px solid var(--orange-500);
+}
+
+.alert-desc {
+  flex: 1;
+  color: var(--ds-color-text);
+  line-height: 1.4;
+}
+
+/* Dark mode adjustments */
+.dark .bar-fill {
+  background: var(--ds-color-primary-soft);
+}
+
+.dark .alert-item {
+  background: var(--ds-surface-section);
 }
 </style>
