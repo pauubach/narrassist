@@ -74,7 +74,7 @@ def load_unseen_gold_standards():
     return UNSEEN_GOLD_STANDARDS
 
 
-def test_spacy_ner_on_file(text: str, gold_entities: list, test_name: str) -> NERTestResult:
+def evaluate_spacy_ner_on_file(text: str, gold_entities: list, test_name: str) -> NERTestResult:
     """Evaluar spaCy NER en un archivo específico."""
     result = NERTestResult(test_name=test_name, method="spacy")
 
@@ -166,7 +166,7 @@ def run_unseen_data_evaluation():
         print(f"  Menciones totales: {total_mentions}")
 
         # Evaluar
-        r = test_spacy_ner_on_file(text, gold.entities, name)
+        r = evaluate_spacy_ner_on_file(text, gold.entities, name)
         results.append(r)
 
         print(f"\n  Resultados:")

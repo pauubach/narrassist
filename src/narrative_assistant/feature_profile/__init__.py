@@ -7,20 +7,22 @@ según el tipo de manuscrito (novela, memoria, ensayo, etc.).
 
 from .models import (
     DocumentType,
-    DocumentSubtype,
     FeatureAvailability,
     FeatureProfile,
     DOCUMENT_TYPES,
     DOCUMENT_SUBTYPES,
+    PROFILE_CREATORS,
+    create_feature_profile,
 )
 from .service import FeatureProfileService
 
 __all__ = [
     "DocumentType",
-    "DocumentSubtype",
     "FeatureAvailability",
     "FeatureProfile",
     "FeatureProfileService",
     "DOCUMENT_TYPES",
     "DOCUMENT_SUBTYPES",
+    "PROFILE_CREATORS",
+    "create_feature_profile",
 ]

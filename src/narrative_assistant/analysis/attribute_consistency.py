@@ -35,6 +35,7 @@ ATTRIBUTE_KEY_INFO: dict[str, tuple[str, str]] = {
     "eye_color": ("color de ojos", "m"),
     "hair_color": ("color de cabello", "m"),
     "hair_type": ("tipo de cabello", "m"),
+    "hair_modification": ("modificación de cabello", "f"),  # teñido, natural, decolorado
     "age": ("edad", "f"),
     "height": ("altura", "f"),
     "build": ("complexión", "f"),
@@ -284,6 +285,16 @@ def is_temporal_attribute(attr_key: AttributeKey, value: str) -> bool:
 
         # Todo lo demás son peinados temporales
         # (trenza, coleta, recogido, suelto, moño, etc.)
+        return True
+
+    # HAIR_MODIFICATION: teñido puede cambiar libremente EXCEPTO a "natural"
+    # Consenso: teñido/decolorado/mechas son cambios válidos dentro de historia
+    # Solo es inconsistencia si dice que volvió a ser "natural" sin explicación
+    if attr_key == AttributeKey.HAIR_MODIFICATION:
+        # Si es "natural", es permanente (no debería cambiar a natural sin explicación)
+        if "natural" in value_lower:
+            return False
+        # teñido, decolorado, mechas, etc. son temporales (pueden cambiar)
         return True
 
     # Atributos que son inherentemente permanentes

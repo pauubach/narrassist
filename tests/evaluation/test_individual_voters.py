@@ -138,7 +138,7 @@ def extract_words(text: str) -> list[tuple[str, int, int]]:
     return words
 
 
-def test_pyspellchecker_voter(text: str, words: list, gold_errors: dict) -> VoterTestResult:
+def evaluate_pyspellchecker_voter(text: str, words: list, gold_errors: dict) -> VoterTestResult:
     """Evaluar PySpellChecker voter."""
     from narrative_assistant.nlp.orthography.voting_checker import PySpellCheckerVoter
 
@@ -174,7 +174,7 @@ def test_pyspellchecker_voter(text: str, words: list, gold_errors: dict) -> Vote
     return result
 
 
-def test_hunspell_voter(text: str, words: list, gold_errors: dict) -> VoterTestResult:
+def evaluate_hunspell_voter(text: str, words: list, gold_errors: dict) -> VoterTestResult:
     """Evaluar Hunspell (chunspell) voter."""
     from narrative_assistant.nlp.orthography.voting_checker import ChunspellVoter
 
@@ -210,7 +210,7 @@ def test_hunspell_voter(text: str, words: list, gold_errors: dict) -> VoterTestR
     return result
 
 
-def test_symspell_voter(text: str, words: list, gold_errors: dict) -> VoterTestResult:
+def evaluate_symspell_voter(text: str, words: list, gold_errors: dict) -> VoterTestResult:
     """Evaluar SymSpell voter."""
     from narrative_assistant.nlp.orthography.voting_checker import SymSpellVoter
 
@@ -246,7 +246,7 @@ def test_symspell_voter(text: str, words: list, gold_errors: dict) -> VoterTestR
     return result
 
 
-def test_pattern_voter(text: str, words: list, gold_errors: dict) -> VoterTestResult:
+def evaluate_pattern_voter(text: str, words: list, gold_errors: dict) -> VoterTestResult:
     """Evaluar Pattern voter."""
     from narrative_assistant.nlp.orthography.voting_checker import PatternVoter
 
@@ -282,7 +282,7 @@ def test_pattern_voter(text: str, words: list, gold_errors: dict) -> VoterTestRe
     return result
 
 
-def test_languagetool_voter(text: str, words: list, gold_errors: dict) -> VoterTestResult:
+def evaluate_languagetool_voter(text: str, words: list, gold_errors: dict) -> VoterTestResult:
     """Evaluar LanguageTool voter."""
     from narrative_assistant.nlp.orthography.voting_checker import LanguageToolVoter
 
@@ -324,7 +324,7 @@ def test_languagetool_voter(text: str, words: list, gold_errors: dict) -> VoterT
     return result
 
 
-def test_beto_voter(text: str, words: list, gold_errors: dict) -> VoterTestResult:
+def evaluate_beto_voter(text: str, words: list, gold_errors: dict) -> VoterTestResult:
     """Evaluar BETO voter (transformer español)."""
     from narrative_assistant.nlp.orthography.voting_checker import BETOVoter
 
@@ -400,7 +400,7 @@ def run_individual_voter_tests():
     print("\n" + "-" * 70)
     print("1. PySpellChecker")
     print("-" * 70)
-    r = test_pyspellchecker_voter(text, words, gold_errors)
+    r = evaluate_pyspellchecker_voter(text, words, gold_errors)
     results.append(r)
     print(r)
     if r.fp_words:
@@ -411,7 +411,7 @@ def run_individual_voter_tests():
     print("\n" + "-" * 70)
     print("2. Hunspell")
     print("-" * 70)
-    r = test_hunspell_voter(text, words, gold_errors)
+    r = evaluate_hunspell_voter(text, words, gold_errors)
     results.append(r)
     print(r)
     if r.fp_words:
@@ -422,7 +422,7 @@ def run_individual_voter_tests():
     print("\n" + "-" * 70)
     print("3. SymSpell")
     print("-" * 70)
-    r = test_symspell_voter(text, words, gold_errors)
+    r = evaluate_symspell_voter(text, words, gold_errors)
     results.append(r)
     print(r)
     if r.fp_words:
@@ -433,7 +433,7 @@ def run_individual_voter_tests():
     print("\n" + "-" * 70)
     print("4. Patterns")
     print("-" * 70)
-    r = test_pattern_voter(text, words, gold_errors)
+    r = evaluate_pattern_voter(text, words, gold_errors)
     results.append(r)
     print(r)
     if r.fp_words:
@@ -444,7 +444,7 @@ def run_individual_voter_tests():
     print("\n" + "-" * 70)
     print("5. LanguageTool")
     print("-" * 70)
-    r = test_languagetool_voter(text, words, gold_errors)
+    r = evaluate_languagetool_voter(text, words, gold_errors)
     results.append(r)
     print(r)
     if r.fp_words:
@@ -455,7 +455,7 @@ def run_individual_voter_tests():
     print("\n" + "-" * 70)
     print("6. BETO (Transformer)")
     print("-" * 70)
-    r = test_beto_voter(text, words, gold_errors)
+    r = evaluate_beto_voter(text, words, gold_errors)
     results.append(r)
     print(r)
     if r.fp_words:

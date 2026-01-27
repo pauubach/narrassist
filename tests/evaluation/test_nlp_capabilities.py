@@ -83,7 +83,7 @@ def load_ner_gold_standard():
     return entities
 
 
-def test_spacy_ner(text: str, gold_entities: dict) -> NERTestResult:
+def evaluate_spacy_ner(text: str, gold_entities: dict) -> NERTestResult:
     """Evaluar spaCy NER."""
     result = NERTestResult(method="spacy")
 
@@ -122,7 +122,7 @@ def test_spacy_ner(text: str, gold_entities: dict) -> NERTestResult:
     return result
 
 
-def test_transformers_ner(text: str, gold_entities: dict) -> NERTestResult:
+def evaluate_transformers_ner(text: str, gold_entities: dict) -> NERTestResult:
     """Evaluar NER con transformers (BETO NER)."""
     result = NERTestResult(method="transformers_ner")
 
@@ -195,7 +195,7 @@ def run_ner_evaluation():
     print("\n" + "-" * 70)
     print("1. spaCy NER (es_core_news_lg)")
     print("-" * 70)
-    r = test_spacy_ner(text, gold_entities)
+    r = evaluate_spacy_ner(text, gold_entities)
     results.append(r)
     print(f"  Precision: {r.precision:.1%}")
     print(f"  Recall:    {r.recall:.1%}")
@@ -208,7 +208,7 @@ def run_ner_evaluation():
     print("\n" + "-" * 70)
     print("2. Transformers NER (BETO)")
     print("-" * 70)
-    r = test_transformers_ner(text, gold_entities)
+    r = evaluate_transformers_ner(text, gold_entities)
     results.append(r)
     print(f"  Precision: {r.precision:.1%}")
     print(f"  Recall:    {r.recall:.1%}")
