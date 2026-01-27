@@ -90,6 +90,7 @@ DEFAULT_COREF_WEIGHTS = {
 }
 
 # Mapeo de pronombres españoles a género/número
+# IMPORTANTE: Los posesivos están en SPANISH_POSSESSIVES, no aquí
 SPANISH_PRONOUNS = {
     # =========================================================================
     # PRIMERA PERSONA (narrador)
@@ -99,22 +100,11 @@ SPANISH_PRONOUNS = {
     # Objeto directo/indirecto
     "me": (Gender.NEUTRAL, Number.SINGULAR),
     "mí": (Gender.NEUTRAL, Number.SINGULAR),
-    "mi": (Gender.NEUTRAL, Number.SINGULAR),  # posesivo átono
     "conmigo": (Gender.NEUTRAL, Number.SINGULAR),
     # Plural
     "nosotros": (Gender.MASCULINE, Number.PLURAL),
     "nosotras": (Gender.FEMININE, Number.PLURAL),
     "nos": (Gender.NEUTRAL, Number.PLURAL),
-    # Posesivos primera persona
-    "mío": (Gender.MASCULINE, Number.SINGULAR),
-    "mía": (Gender.FEMININE, Number.SINGULAR),
-    "míos": (Gender.MASCULINE, Number.PLURAL),
-    "mías": (Gender.FEMININE, Number.PLURAL),
-    "mis": (Gender.NEUTRAL, Number.PLURAL),  # átono plural
-    "nuestro": (Gender.MASCULINE, Number.SINGULAR),
-    "nuestra": (Gender.FEMININE, Number.SINGULAR),
-    "nuestros": (Gender.MASCULINE, Number.PLURAL),
-    "nuestras": (Gender.FEMININE, Number.PLURAL),
     # =========================================================================
     # SEGUNDA PERSONA (interlocutor)
     # =========================================================================
@@ -127,19 +117,6 @@ SPANISH_PRONOUNS = {
     "vosotros": (Gender.MASCULINE, Number.PLURAL),
     "vosotras": (Gender.FEMININE, Number.PLURAL),
     "os": (Gender.NEUTRAL, Number.PLURAL),
-    # Posesivos segunda persona
-    "tu": (Gender.NEUTRAL, Number.SINGULAR),  # átono
-    "tus": (Gender.NEUTRAL, Number.PLURAL),
-    "tuyo": (Gender.MASCULINE, Number.SINGULAR),
-    "tuya": (Gender.FEMININE, Number.SINGULAR),
-    "tuyos": (Gender.MASCULINE, Number.PLURAL),
-    "tuyas": (Gender.FEMININE, Number.PLURAL),
-    "vuestro": (Gender.MASCULINE, Number.SINGULAR),
-    "vuestra": (Gender.FEMININE, Number.SINGULAR),
-    "vuestros": (Gender.MASCULINE, Number.PLURAL),
-    "vuestras": (Gender.FEMININE, Number.PLURAL),
-    "su": (Gender.NEUTRAL, Number.SINGULAR),  # de usted/ustedes
-    "sus": (Gender.NEUTRAL, Number.PLURAL),
     # =========================================================================
     # TERCERA PERSONA
     # =========================================================================
@@ -181,6 +158,42 @@ SPANISH_DEMONSTRATIVES = {
     "aquella": (Gender.FEMININE, Number.SINGULAR),
     "aquellos": (Gender.MASCULINE, Number.PLURAL),
     "aquellas": (Gender.FEMININE, Number.PLURAL),
+}
+
+# Posesivos (separados de pronombres para clasificación correcta)
+# Los posesivos de tercera persona (su, sus) son NEUTRALES porque no indican
+# el género del poseedor, sino del objeto poseído.
+# IMPORTANTE: El género del poseedor se determina por el ANTECEDENTE, no por el posesivo.
+SPANISH_POSSESSIVES = {
+    # Primera persona
+    "mi": (Gender.NEUTRAL, Number.SINGULAR),     # átono
+    "mis": (Gender.NEUTRAL, Number.PLURAL),      # átono plural
+    "mío": (Gender.MASCULINE, Number.SINGULAR),  # tónico
+    "mía": (Gender.FEMININE, Number.SINGULAR),   # tónico
+    "míos": (Gender.MASCULINE, Number.PLURAL),   # tónico
+    "mías": (Gender.FEMININE, Number.PLURAL),    # tónico
+    "nuestro": (Gender.MASCULINE, Number.SINGULAR),
+    "nuestra": (Gender.FEMININE, Number.SINGULAR),
+    "nuestros": (Gender.MASCULINE, Number.PLURAL),
+    "nuestras": (Gender.FEMININE, Number.PLURAL),
+    # Segunda persona
+    "tu": (Gender.NEUTRAL, Number.SINGULAR),     # átono
+    "tus": (Gender.NEUTRAL, Number.PLURAL),      # átono plural
+    "tuyo": (Gender.MASCULINE, Number.SINGULAR), # tónico
+    "tuya": (Gender.FEMININE, Number.SINGULAR),  # tónico
+    "tuyos": (Gender.MASCULINE, Number.PLURAL),  # tónico
+    "tuyas": (Gender.FEMININE, Number.PLURAL),   # tónico
+    "vuestro": (Gender.MASCULINE, Number.SINGULAR),
+    "vuestra": (Gender.FEMININE, Number.SINGULAR),
+    "vuestros": (Gender.MASCULINE, Number.PLURAL),
+    "vuestras": (Gender.FEMININE, Number.PLURAL),
+    # Tercera persona (de él/ella/ellos/ellas/usted/ustedes)
+    "su": (Gender.NEUTRAL, Number.SINGULAR),     # átono (más común)
+    "sus": (Gender.NEUTRAL, Number.PLURAL),      # átono plural
+    "suyo": (Gender.MASCULINE, Number.SINGULAR), # tónico
+    "suya": (Gender.FEMININE, Number.SINGULAR),  # tónico
+    "suyos": (Gender.MASCULINE, Number.PLURAL),  # tónico
+    "suyas": (Gender.FEMININE, Number.PLURAL),   # tónico
 }
 
 # =============================================================================
@@ -786,6 +799,11 @@ class HeuristicsCorefMethod:
 
     Implementa reglas basadas en patrones típicos
     de la narrativa en español.
+
+    REGLA PRINCIPAL para posesivos (su, sus):
+    El posesivo típicamente refiere al SUJETO de la oración actual o anterior,
+    NO simplemente a la entidad más cercana. En "María apareció. Sus ojos verdes...",
+    "Sus" refiere a María porque María es el sujeto de la oración anterior.
     """
 
     def resolve(
@@ -799,6 +817,14 @@ class HeuristicsCorefMethod:
             return []
 
         results = []
+
+        # Para posesivos, calcular quién es el candidato más reciente en misma/anterior oración
+        # Este candidato recibe un bonus muy alto
+        most_recent_in_scope: Optional[Mention] = None
+        if anaphor.mention_type == MentionType.POSSESSIVE:
+            most_recent_in_scope = self._find_most_recent_subject_candidate(
+                anaphor, candidates
+            )
 
         for candidate in candidates:
             score = 0.0
@@ -831,11 +857,34 @@ class HeuristicsCorefMethod:
                 score += 0.2
                 reasons.append("pronombre personal → nombre propio")
 
-            # Posesivos típicamente refieren al sujeto activo
+            # Posesivos típicamente refieren al sujeto de la oración actual o anterior
+            # REGLA CRÍTICA: En español, "Sus ojos verdes" después de "María apareció"
+            # típicamente refiere a María (el sujeto de la oración anterior)
             if anaphor.mention_type == MentionType.POSSESSIVE:
                 if candidate.mention_type == MentionType.PROPER_NOUN:
+                    # Bonus base por ser nombre propio
                     score += 0.15
                     reasons.append("posesivo → nombre")
+
+                    # BONUS CRÍTICO: Si es el candidato más reciente en scope
+                    if candidate == most_recent_in_scope:
+                        score += 0.45
+                        reasons.append("sujeto más reciente")
+
+                    # BONUS por distancia de oración
+                    sentence_distance = abs(anaphor.sentence_idx - candidate.sentence_idx)
+                    if sentence_distance == 0:
+                        # Mismo oración: muy alta probabilidad
+                        score += 0.25
+                        reasons.append("misma oración")
+                    elif sentence_distance == 1:
+                        # Oración anterior: alta probabilidad (caso típico)
+                        score += 0.20
+                        reasons.append("oración anterior")
+                    elif sentence_distance == 2:
+                        # Dos oraciones atrás: probabilidad moderada
+                        score += 0.10
+                        reasons.append("2 oraciones atrás")
 
             # Mismo capítulo bonus
             if (anaphor.chapter_idx is not None and
@@ -851,6 +900,40 @@ class HeuristicsCorefMethod:
             results.append((candidate, score, reasoning))
 
         return sorted(results, key=lambda x: x[1], reverse=True)
+
+    def _find_most_recent_subject_candidate(
+        self,
+        anaphor: Mention,
+        candidates: list[Mention],
+    ) -> Optional[Mention]:
+        """
+        Encuentra el candidato más reciente que pueda ser el sujeto referido por el posesivo.
+
+        Para posesivos en español, el referente típico es:
+        1. El sujeto de la misma oración (si hay uno)
+        2. El sujeto de la oración inmediatamente anterior
+        3. La entidad más reciente mencionada (si no hay sujeto explícito)
+
+        El "sujeto" típicamente es un nombre propio que aparece ANTES del verbo
+        en la oración anterior.
+        """
+        # Filtrar candidatos que están en misma oración o la anterior
+        in_scope = []
+        for c in candidates:
+            if c.mention_type != MentionType.PROPER_NOUN:
+                continue
+            if c.start_char >= anaphor.start_char:
+                continue  # Solo candidatos anteriores
+            sentence_distance = anaphor.sentence_idx - c.sentence_idx
+            if 0 <= sentence_distance <= 1:  # Misma oración o la anterior
+                in_scope.append(c)
+
+        if not in_scope:
+            return None
+
+        # El candidato más reciente (por posición de carácter) es el más probable
+        # En "María apareció. Sus ojos...", María es el más reciente antes de "Sus"
+        return max(in_scope, key=lambda c: c.end_char)
 
 
 # =============================================================================
@@ -1143,6 +1226,23 @@ class CoreferenceVotingResolver:
                     chapter_idx=get_chapter_idx(token.idx),
                 ))
 
+            # Posesivos (su, sus, mi, mis, tu, tus, etc.)
+            # IMPORTANTE: Clasificados como POSSESSIVE, no PRONOUN
+            elif text_lower in SPANISH_POSSESSIVES:
+                gender, number = SPANISH_POSSESSIVES[text_lower]
+                mentions.append(Mention(
+                    text=token.text,
+                    start_char=token.idx,
+                    end_char=token.idx + len(token.text),
+                    mention_type=MentionType.POSSESSIVE,
+                    gender=gender,
+                    number=number,
+                    sentence_idx=get_sentence_idx(token),
+                    chapter_idx=get_chapter_idx(token.idx),
+                    context=self._get_context(text, None, window=50,
+                                             start=token.idx, end=token.idx + len(token.text)),
+                ))
+
         # Extraer sintagmas nominales definidos (DEFINITE_NP)
         # Patrones como "el padre", "la niña", "el conductor del autobús"
         definite_nps = self._extract_definite_nps(doc, text, get_sentence_idx, get_chapter_idx)
@@ -1170,6 +1270,19 @@ class CoreferenceVotingResolver:
                     start_char=match.start(),
                     end_char=match.end(),
                     mention_type=MentionType.PRONOUN,
+                    gender=gender,
+                    number=number,
+                ))
+
+        # Buscar posesivos con regex
+        for possessive, (gender, number) in SPANISH_POSSESSIVES.items():
+            pattern = rf'\b{re.escape(possessive)}\b'
+            for match in re.finditer(pattern, text, re.IGNORECASE):
+                mentions.append(Mention(
+                    text=match.group(),
+                    start_char=match.start(),
+                    end_char=match.end(),
+                    mention_type=MentionType.POSSESSIVE,
                     gender=gender,
                     number=number,
                 ))

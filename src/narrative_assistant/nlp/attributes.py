@@ -112,6 +112,7 @@ class AttributeKey(Enum):
     EYE_COLOR = "eye_color"
     HAIR_COLOR = "hair_color"
     HAIR_TYPE = "hair_type"
+    HAIR_MODIFICATION = "hair_modification"  # teñido, natural, decolorado, mechas
     AGE = "age"
     HEIGHT = "height"
     BUILD = "build"
@@ -267,6 +268,14 @@ COLORS = {
 HAIR_TYPES = {
     "liso", "rizado", "ondulado", "encrespado", "lacio", "fino", "grueso",
     "abundante", "escaso", "largo", "corto", "rapado", "calvo",
+}
+
+# Modificaciones de cabello (teñido, natural, etc.)
+# Consenso: teñido puede cambiar libremente, solo alerta si pasa a "natural"
+HAIR_MODIFICATIONS = {
+    "natural", "teñido", "teñida", "decolorado", "decolorada",
+    "mechas", "reflejos", "tinte", "de bote",  # coloquial: "rubia de bote"
+    "oxigenado", "oxigenada", "pintado", "pintada",
 }
 
 # Constitución física
@@ -507,6 +516,56 @@ ATTRIBUTE_PATTERNS: list[tuple[str, AttributeKey, AttributeCategory, float, bool
         AttributeKey.HAIR_COLOR,
         AttributeCategory.PHYSICAL,
         0.55,
+        False,
+    ),
+
+    # === MODIFICACIÓN DE CABELLO (teñido/natural) ===
+    # "era rubia de bote" / "rubia teñida"
+    (
+        r"(?:rubia?|morena?|pelirroja?)\s+(de\s+bote|teñid[oa])",
+        AttributeKey.HAIR_MODIFICATION,
+        AttributeCategory.PHYSICAL,
+        0.9,
+        False,
+    ),
+    # "el cabello teñido" / "pelo teñido" / "cabello decolorado"
+    (
+        r"(?:el\s+)?(?:pelo|cabello)\s+(teñido|teñida|decolorado|decolorada|natural|oxigenado|oxigenada)",
+        AttributeKey.HAIR_MODIFICATION,
+        AttributeCategory.PHYSICAL,
+        0.85,
+        False,
+    ),
+    # "tenía el pelo teñido" / "llevaba mechas"
+    (
+        r"(?:ten[íi]a|llevaba)\s+(?:el\s+)?(?:pelo|cabello)\s+(teñido|teñida|con\s+mechas|con\s+reflejos)",
+        AttributeKey.HAIR_MODIFICATION,
+        AttributeCategory.PHYSICAL,
+        0.85,
+        False,
+    ),
+    # "se había teñido" / "se tiñó el pelo"
+    (
+        r"se\s+(?:había\s+)?(?:teñido|decolorado|pintado|oxigenado)",
+        AttributeKey.HAIR_MODIFICATION,
+        AttributeCategory.PHYSICAL,
+        0.9,
+        False,
+    ),
+    # "con mechas" / "con reflejos" / "con tinte"
+    (
+        r"(?:pelo|cabello)\s+(?:con\s+)?(mechas|reflejos|tinte)",
+        AttributeKey.HAIR_MODIFICATION,
+        AttributeCategory.PHYSICAL,
+        0.8,
+        False,
+    ),
+    # "su color natural" / "pelo natural"
+    (
+        r"(?:su\s+)?(?:color\s+)?(?:de\s+pelo\s+)?natural",
+        AttributeKey.HAIR_MODIFICATION,
+        AttributeCategory.PHYSICAL,
+        0.75,
         False,
     ),
 
@@ -1069,7 +1128,8 @@ PERSONAJES: {', '.join(known_entities) if known_entities else 'Detectar'}
 REGLAS:
 - Una entrada por CADA mención (si un atributo aparece dos veces, dos entradas)
 - Ignora metáforas
-- Keys válidas: eye_color, hair_color, hair_type, age, height, build, profession
+- Keys válidas: eye_color, hair_color, hair_type, hair_modification, age, height, build, profession
+- hair_modification valores: natural, teñido, decolorado, mechas, reflejos (detectar "rubia de bote" = teñido)
 - IMPORTANTE: Si el atributo se refiere a un pronombre (Él, Ella, él, ella), resuelve el pronombre al nombre del personaje más cercano mencionado antes. Ejemplo: "Juan entró. Él era carpintero" -> entity="Juan", key="profession", value="carpintero"
 
 RESPONDE SOLO JSON (sin markdown, sin explicaciones):
@@ -1590,6 +1650,7 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
             "eye_color": AttributeKey.EYE_COLOR,
             "hair_color": AttributeKey.HAIR_COLOR,
             "hair_type": AttributeKey.HAIR_TYPE,
+            "hair_modification": AttributeKey.HAIR_MODIFICATION,
             "age": AttributeKey.AGE,
             "height": AttributeKey.HEIGHT,
             "build": AttributeKey.BUILD,
@@ -1681,6 +1742,7 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                     'eye color': 'eye_color',
                     'hair color': 'hair_color',
                     'hair type': 'hair_type',
+                    'hair modification': 'hair_modification',
                     'height': 'height',
                     'build': 'build',
                     'age': 'age',
@@ -1688,7 +1750,7 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                 }
                 key = key_mapping.get(key_raw, key_raw.replace(' ', '_'))
 
-                if key in ['eye_color', 'hair_color', 'hair_type', 'height', 'build', 'age', 'profession']:
+                if key in ['eye_color', 'hair_color', 'hair_type', 'hair_modification', 'height', 'build', 'age', 'profession']:
                     attributes.append({
                         'entity': current_entity,
                         'key': key,
@@ -2067,6 +2129,10 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
         if key == AttributeKey.HAIR_COLOR:
             # Solo colores válidos, NO tipos de cabello (largo/corto son hair_type)
             return value_lower in COLORS
+
+        if key == AttributeKey.HAIR_MODIFICATION:
+            # Modificaciones: teñido, natural, decolorado, mechas, etc.
+            return value_lower in HAIR_MODIFICATIONS or "teñid" in value_lower or "de bote" in value_lower
 
         if key == AttributeKey.BUILD:
             return value_lower in BUILD_TYPES
