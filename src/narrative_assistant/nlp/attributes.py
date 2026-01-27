@@ -866,7 +866,7 @@ METAPHOR_INDICATORS = [
     r"\baparentemente\b",
 ]
 
-# Indicadores de negación
+# Indicadores de negación simple
 NEGATION_INDICATORS = [
     r"\bno\b",
     r"\bnunca\b",
@@ -874,6 +874,43 @@ NEGATION_INDICATORS = [
     r"\bsin\b",
     r"\bcarec[íi]a\b",
     r"\bfaltaba\b",
+    r"\bningún\b",
+    r"\bninguna\b",
+    r"\bnada\s+de\b",
+    r"\bni\s+siquiera\b",
+]
+
+# Patrones contrastivos: "No es X, sino Y" - el primer valor está negado
+# Estos patrones indican que se debe extraer Y, no X
+CONTRASTIVE_PATTERNS = [
+    r"\bno\s+es\s+que\b.*?\bsino\b",  # "No es que X, sino Y"
+    r"\bno\s+(?:era|tenía|fue)\b.*?\bsino\b",  # "no era X, sino Y"
+    r"\b(?:era|tenía)\s+\w+,?\s+no\s+\w+\b",  # "era X, no Y" (X es verdadero)
+]
+
+# Indicadores de atributo temporal/pasado (no actual)
+TEMPORAL_PAST_INDICATORS = [
+    r"\bde\s+joven\b",
+    r"\bde\s+niñ[oa]\b",
+    r"\bde\s+pequeñ[oa]\b",
+    r"\bantes\s+de\b",
+    r"\bsolía\s+(?:ser|tener)\b",
+    r"\ben\s+(?:su\s+)?juventud\b",
+    r"\bcuando\s+era\s+(?:joven|niño|pequeño)\b",
+    r"\ben\s+(?:la|aquella)\s+época\b",
+    r"\bhace\s+(?:muchos\s+)?años\b",
+    r"\ben\s+el\s+pasado\b",
+]
+
+# Indicadores de atributo condicional/hipotético (no real)
+CONDITIONAL_INDICATORS = [
+    r"\bsi\s+(?:fuera|tuviera|hubiera)\b",
+    r"\bsería\b",
+    r"\bpodría\s+(?:ser|tener)\b",
+    r"\bimagina(?:ba)?\s+(?:que|a)\b",
+    r"\bsoñaba\s+con\s+(?:ser|tener)\b",
+    r"\bdesearía\b",
+    r"\bquisiera\b",
 ]
 
 
@@ -945,6 +982,21 @@ class AttributeExtractor:
 
         self._negation_patterns = [
             re.compile(p, re.IGNORECASE) for p in NEGATION_INDICATORS
+        ]
+
+        # Patrones contrastivos (No es X, sino Y)
+        self._contrastive_patterns = [
+            re.compile(p, re.IGNORECASE | re.DOTALL) for p in CONTRASTIVE_PATTERNS
+        ]
+
+        # Indicadores temporales (atributo pasado, no actual)
+        self._temporal_past_patterns = [
+            re.compile(p, re.IGNORECASE) for p in TEMPORAL_PAST_INDICATORS
+        ]
+
+        # Indicadores condicionales (atributo hipotético)
+        self._conditional_patterns = [
+            re.compile(p, re.IGNORECASE) for p in CONDITIONAL_INDICATORS
         ]
 
         # Verbos copulativos para atributos (español)
@@ -1424,6 +1476,21 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                 # Verificar negación
                 is_negated = self._is_negated(context, match.start() - context_start)
 
+                # Verificar si es atributo temporal (pasado, no actual)
+                is_temporal_past = self._is_temporal_past(context, match.start() - context_start)
+
+                # Verificar si es atributo condicional/hipotético
+                is_conditional = self._is_conditional(context, match.start() - context_start)
+
+                # Skip atributos claramente negados, temporales o condicionales
+                # Estos no representan el estado actual del personaje
+                if is_negated or is_conditional:
+                    logger.debug(
+                        f"Atributo ignorado ({'negado' if is_negated else 'condicional'}): "
+                        f"{match.group(0)[:40]}..."
+                    )
+                    continue
+
                 # Extraer grupos
                 groups = match.groups()
                 if len(groups) < 2:
@@ -1438,6 +1505,21 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                 else:
                     entity_name, value = groups[0], groups[1]
 
+                # Verificar patrón contrastivo "No es X, sino Y"
+                match_end_in_context = match.end() - context_start
+                is_contrastive, corrected_value = self._check_contrastive_correction(
+                    context, match_pos_in_context, match_end_in_context, value
+                )
+                if is_contrastive:
+                    if corrected_value:
+                        # Usar el valor corregido
+                        value = corrected_value
+                        logger.debug(f"Valor contrastivo corregido: {match.group(0)[:30]} → {value}")
+                    else:
+                        # Es contrastivo pero no pudimos extraer el valor correcto, ignorar
+                        logger.debug(f"Atributo contrastivo ignorado: {match.group(0)[:40]}")
+                        continue
+
                 # Validar valor
                 if not self._validate_value(key, value):
                     continue
@@ -1446,20 +1528,43 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                 confidence = base_conf
                 if is_metaphor:
                     confidence *= 0.5
-                if is_negated:
-                    confidence *= 0.9
+                if is_temporal_past:
+                    # Reducir confianza para atributos del pasado (pero no descartar)
+                    confidence *= 0.6
+                    logger.debug(f"Atributo temporal (pasado), reduciendo confianza: {match.group(0)[:30]}")
 
                 if confidence < self.min_confidence:
                     continue
 
-                # Validar que entity_name no sea un color, adjetivo o palabra inválida
+                # Validar que entity_name no sea un color, adjetivo, verbo o palabra inválida
+                # Esto evita falsos positivos cuando IGNORECASE hace que el patrón
+                # capture palabras comunes en minúscula como si fueran nombres propios
                 invalid_entity_names = {
+                    # Colores y adjetivos físicos
                     'negro', 'rubio', 'castaño', 'moreno', 'blanco', 'gris', 'canoso',
                     'alto', 'bajo', 'largo', 'corto', 'azules', 'verdes', 'marrones',
                     'delgado', 'fornido', 'sorprendido', 'confundido', 'extraño',
+                    # Verbos comunes (infinitivos y gerundios)
+                    'llorar', 'reír', 'sonreír', 'caminar', 'correr', 'hablar', 'mirar',
+                    'llorando', 'riendo', 'sonriendo', 'caminando', 'corriendo', 'mirando',
+                    # Sustantivos comunes
+                    'emoción', 'emocion', 'felicidad', 'tristeza', 'dolor', 'alegría', 'alegria',
+                    'miedo', 'rabia', 'enojo', 'cansancio', 'sueño', 'hambre',
+                    # Preposiciones y conjunciones
+                    'tanto', 'mucho', 'poco', 'algo', 'nada', 'todo', 'siempre', 'nunca',
                 }
                 if entity_name and entity_name.lower() in invalid_entity_names:
                     continue
+
+                # Validación adicional: nombres propios deben comenzar con mayúscula en el texto original
+                # Esto ayuda a filtrar palabras comunes capturadas por IGNORECASE
+                if entity_name and match.group(0):
+                    # Buscar el entity_name en el texto original del match
+                    original_text = match.group(0)
+                    # Si la entidad aparece en minúscula en el texto original, probablemente no es nombre propio
+                    if entity_name.lower() in original_text.lower() and entity_name not in original_text:
+                        # La entidad está en minúscula en el original - probable falso positivo
+                        continue
 
                 # Filtrar valores que son estados emocionales (no atributos físicos)
                 emotional_states = {
@@ -2107,13 +2212,172 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
         return False
 
     def _is_negated(self, context: str, match_pos: int) -> bool:
-        """Detecta si el atributo está negado."""
+        """
+        Detecta si el atributo está negado.
+
+        Maneja:
+        - Negación simple: "no era alto", "nunca tuvo pelo negro"
+        - Negación parcial: "no es que X, sino Y" (X está negado)
+
+        Args:
+            context: Contexto alrededor del match
+            match_pos: Posición del match en el contexto
+
+        Returns:
+            True si el atributo está negado
+        """
         # Solo buscar en el contexto antes del match
         before_context = context[:match_pos]
+
+        # Buscar negación simple cercana (últimos 30 caracteres)
         for pattern in self._negation_patterns:
-            # Buscar negación cercana (últimas 20 caracteres)
-            if pattern.search(before_context[-20:]):
+            if pattern.search(before_context[-30:]):
                 return True
+
+        return False
+
+    def _is_temporal_past(self, context: str, match_pos: int) -> bool:
+        """
+        Detecta si el atributo se refiere al pasado (no al estado actual).
+
+        Ejemplo: "De joven, Eva tenía pelo negro" → atributo pasado
+        """
+        before_context = context[:match_pos]
+
+        for pattern in self._temporal_past_patterns:
+            if pattern.search(before_context[-60:]):
+                return True
+
+        return False
+
+    def _is_conditional(self, context: str, match_pos: int) -> bool:
+        """
+        Detecta si el atributo es hipotético/condicional (no real).
+
+        Ejemplo: "Si Oscar se tiñera, sería pelirrojo" → no es pelirrojo realmente
+        """
+        before_context = context[:match_pos]
+
+        for pattern in self._conditional_patterns:
+            if pattern.search(before_context[-50:]):
+                return True
+
+        return False
+
+    def _check_contrastive_correction(
+        self, context: str, match_start: int, match_end: int, value: str
+    ) -> tuple[bool, Optional[str]]:
+        """
+        Detecta patrón contrastivo "No es X, sino Y" y extrae el valor correcto.
+
+        Ejemplo: "No es que Pedro tuviera ojos azules, sino grises"
+        → El valor "azules" está negado, "grises" es el correcto.
+
+        Args:
+            context: Contexto alrededor del match
+            match_start: Inicio del match en el contexto
+            match_end: Fin del match en el contexto
+            value: Valor extraído actual
+
+        Returns:
+            (is_contrastive, corrected_value) - Si es contrastivo y el valor corregido
+        """
+        # Buscar patrón "no es que... sino" o "no era/tenía... sino"
+        for pattern in self._contrastive_patterns:
+            match = pattern.search(context)
+            if match:
+                # Verificar si nuestro valor está ANTES del "sino"
+                sino_pos = context.lower().find("sino", match.start())
+                if sino_pos > 0 and match_start < sino_pos:
+                    # El valor actual está en la parte negada
+                    # Buscar el valor después del "sino"
+                    after_sino = context[sino_pos + 4:].strip()
+                    # Extraer la primera palabra después de "sino" como posible corrección
+                    import re
+                    color_match = re.search(r'\b([a-záéíóú]+)\b', after_sino)
+                    if color_match:
+                        corrected = color_match.group(1).lower()
+                        # Verificar que sea un color válido
+                        if corrected in COLORS:
+                            return True, corrected
+                    return True, None  # Es contrastivo pero no pudimos extraer corrección
+
+        return False, None
+
+    def _is_inside_relative_clause(
+        self, text: str, entity_start: int, entity_end: int, attribute_pos: int
+    ) -> bool:
+        """
+        Detecta si una entidad está dentro de una cláusula relativa.
+
+        En español, las cláusulas relativas comienzan con:
+        - "que" (pronombre relativo): "el hombre que vi"
+        - "quien/quienes": "la mujer a quien conocí"
+        - "cual/cuales": "el cual era..."
+        - "cuyo/cuya/cuyos/cuyas": "cuyo hermano..."
+        - "donde": "la casa donde vivía"
+
+        Ejemplo: "El hombre que María había visto tenía ojos azules."
+        → "María" está dentro de "que María había visto" (cláusula relativa)
+        → El atributo "ojos azules" pertenece a "El hombre", NO a María
+
+        Args:
+            text: Texto completo
+            entity_start: Posición inicial de la entidad
+            entity_end: Posición final de la entidad
+            attribute_pos: Posición del atributo
+
+        Returns:
+            True si la entidad está dentro de una cláusula relativa
+        """
+        import re as regex_module
+
+        # La entidad está ANTES del atributo (ya filtrado en el caller)
+        if entity_end > attribute_pos:
+            return False
+
+        # Buscar si hay un pronombre relativo ANTES de la entidad
+        # que indica que la entidad está dentro de una cláusula relativa
+        # Patrón: Antecedente + "que/quien/etc" + [Entidad] + verbo + ... + atributo
+
+        # Buscar el contexto antes de la entidad (buscando el pronombre relativo)
+        search_start = max(0, entity_start - 30)
+        before_entity = text[search_start:entity_start]
+
+        # Patrones de inicio de cláusula relativa en español
+        relative_patterns = [
+            r'\bque\s*$',           # "...que María"
+            r'\bquien(?:es)?\s*$',  # "...quien María"
+            r'\bel\s+cual\s*$',     # "el cual María"
+            r'\bla\s+cual\s*$',
+            r'\bcuy[oa]s?\s*$',     # "cuyo hermano"
+            r'\bdonde\s*$',         # "donde María"
+            r'\bcuando\s*$',        # "cuando María"
+        ]
+
+        for pattern in relative_patterns:
+            if regex_module.search(pattern, before_entity, regex_module.IGNORECASE):
+                # Hay un pronombre relativo justo antes de la entidad
+                # Verificar que el atributo NO está dentro de la misma cláusula
+                # (buscar verbos entre la entidad y el atributo que podrían cerrar la cláusula)
+
+                between = text[entity_end:attribute_pos]
+
+                # Si encontramos un verbo seguido de otro verbo principal, la cláusula terminó
+                # Patrones de cierre de cláusula: verbo en pasado + verbo en imperfecto
+                # Ej: "había visto" (cláusula) + "tenía" (principal)
+                clause_closure = regex_module.search(
+                    r'\b(?:había|hubo|hizo|fue|vio|conoció|dijo)\s+\w+\s+(?:tenía|era|estaba|llevaba|mostraba)\b',
+                    between, regex_module.IGNORECASE
+                )
+
+                if clause_closure:
+                    logger.debug(
+                        f"Entidad en cláusula relativa: '{text[entity_start:entity_end]}' "
+                        f"(patrón relativo antes, cierre de cláusula detectado)"
+                    )
+                    return True
+
         return False
 
     def _validate_value(self, key: AttributeKey, value: str) -> bool:
@@ -2208,16 +2472,27 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
             return None
 
         # Clasificar entidades por tipo usando entity_type real del NER
+        # También detectar si están dentro de cláusulas relativas
         person_candidates = []
         location_candidates = []
 
         for name, start, end, distance, entity_type in candidates:
+            # NUEVO: Detectar si la entidad está dentro de una cláusula relativa
+            # Esto es importante para casos como:
+            # "La mujer de ojos verdes que Juan conoció era María"
+            # → "Juan" está en la cláusula relativa, no es el dueño de "ojos verdes"
+            in_relative_clause = self._is_inside_relative_clause(text, start, end, position)
+
+            # Aplicar penalización por cláusula relativa
+            relative_clause_penalty = 300 if in_relative_clause else 0
+            adjusted_distance = distance + relative_clause_penalty
+
             # Si tenemos entity_type del NER, usarlo directamente
             if entity_type is not None:
                 if _is_person_entity(entity_type):
-                    person_candidates.append((name, start, end, distance))
+                    person_candidates.append((name, start, end, adjusted_distance))
                 elif _is_location_entity(entity_type):
-                    location_candidates.append((name, start, end, distance))
+                    location_candidates.append((name, start, end, adjusted_distance))
                 # ORG y otros tipos se ignoran para atributos físicos
             else:
                 # Fallback: heurística por nombre si no hay entity_type
@@ -2229,9 +2504,9 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                 )
 
                 if is_likely_person:
-                    person_candidates.append((name, start, end, distance))
+                    person_candidates.append((name, start, end, adjusted_distance))
                 else:
-                    location_candidates.append((name, start, end, distance))
+                    location_candidates.append((name, start, end, adjusted_distance))
 
         # Buscar límites de oración (. ! ?) para entender contexto
         last_sentence_break = max(
@@ -2422,6 +2697,7 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                     return person_candidates_sorted[0][0]
 
         # Caso 1: Sujeto elíptico (verbo en 3ª persona sin sujeto)
+        # En español, el sujeto elíptico típicamente refiere al sujeto de la oración anterior
         if has_3rd_person_verb and not has_pronoun and last_sentence_break > 0:
             # Buscar persona ANTES del último punto (oración anterior)
             before_sentence_break = context[:last_sentence_break]
@@ -2432,12 +2708,43 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                 if start < (context_start + last_sentence_break):
                     # Calcular distancia desde el punto
                     dist_from_break = (context_start + last_sentence_break) - end
-                    before_break_candidates.append((name, start, end, dist_from_break))
+
+                    # MEJORA: Identificar si es SUJETO u OBJETO en la oración anterior
+                    # Heurística: "a [Name]" indica objeto (acusativo en español)
+                    name_pos_in_context = start - context_start
+                    is_object = False
+
+                    if name_pos_in_context > 0:
+                        # Buscar "a " justo antes del nombre
+                        prefix = context[max(0, name_pos_in_context - 3):name_pos_in_context]
+                        if prefix.strip().endswith('a') or ' a ' in prefix:
+                            is_object = True
+
+                    # También verificar patrones de complemento indirecto
+                    # "le dijo a Juan" → Juan es objeto
+                    indirect_pattern = regex_module.search(
+                        rf'\b(le|les)\s+\w+\s+a\s+{regex_module.escape(name)}\b',
+                        before_sentence_break,
+                        regex_module.IGNORECASE
+                    )
+                    if indirect_pattern:
+                        is_object = True
+
+                    # Penalizar objetos (el sujeto elíptico suele referir al sujeto)
+                    object_penalty = 150 if is_object else 0
+                    adjusted_dist = dist_from_break + object_penalty
+
+                    before_break_candidates.append((name, start, end, dist_from_break, adjusted_dist, is_object))
 
             if before_break_candidates:
-                # Tomar la persona más cercana ANTES del punto
-                before_break_candidates.sort(key=lambda x: x[3])
-                return before_break_candidates[0][0]
+                # Ordenar por distancia ajustada (penalizando objetos)
+                before_break_candidates.sort(key=lambda x: x[4])
+                best = before_break_candidates[0]
+                logger.debug(
+                    f"Sujeto elíptico: seleccionando '{best[0]}' "
+                    f"(dist={best[3]}, ajustada={best[4]}, es_objeto={best[5]})"
+                )
+                return best[0]
 
         # Caso 2 y 3: Pronombre o búsqueda general
         if person_candidates:

@@ -6161,10 +6161,27 @@ JSON:"""
                     if character_entities:
                         # Extraer atributos del texto completo
                         # El extractor encontrará atributos para todas las entidades mencionadas
-                        entity_mentions = [
-                            (e.canonical_name, e.first_appearance_char or 0, (e.first_appearance_char or 0) + len(e.canonical_name))
-                            for e in character_entities
-                        ]
+
+                        # IMPORTANTE: Usar TODAS las menciones de cada entidad, no solo first_appearance_char
+                        # Esto es crítico porque las entidades pueden fusionarse (María = María Sánchez)
+                        # y necesitamos todas sus posiciones para asignar atributos correctamente
+                        entity_mentions = []
+                        for e in character_entities:
+                            if e.id:
+                                # Obtener todas las menciones de la BD
+                                db_mentions = entity_repo.get_mentions_by_entity(e.id)
+                                for m in db_mentions:
+                                    entity_mentions.append(
+                                        (e.canonical_name, m.start_char, m.end_char)
+                                    )
+                            # Fallback: si no hay menciones en BD, usar first_appearance_char
+                            if not any(name == e.canonical_name for name, _, _ in entity_mentions):
+                                entity_mentions.append(
+                                    (e.canonical_name, e.first_appearance_char or 0,
+                                     (e.first_appearance_char or 0) + len(e.canonical_name or ""))
+                                )
+
+                        logger.debug(f"Menciones de BD cargadas: {len(entity_mentions)} para {len(character_entities)} entidades")
 
                         # Añadir menciones de correferencia (pronombres) para cada entidad
                         # Esto permite detectar atributos en frases como "Mis estudios como lingüista"
