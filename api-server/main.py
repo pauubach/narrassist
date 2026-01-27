@@ -55,6 +55,8 @@ for extra_path in (BACKEND_ROOT_DIR, API_SERVER_DIR):
         sys.path.insert(0, path_str)
         _write_debug(f"Added backend path to sys.path: {path_str}")
 
+_write_debug(f"sys.path after backend insert (first 5): {sys.path[:5]}")
+
 import site
 import shutil
 
@@ -6375,6 +6377,123 @@ JSON:"""
                     if check_result.is_success:
                         inconsistencies = check_result.value or []
 
+                # ========== SUB-FASE 5.1: ESTADO VITAL ==========
+                # Detecta muertes de personajes y apariciones post-mortem
+                vital_status_report = None
+                location_report = None
+                chapter_progress_report = None
+
+                analysis_progress_storage[project_id]["current_action"] = "Verificando estado vital de personajes..."
+
+                try:
+                    from narrative_assistant.analysis.vital_status import analyze_vital_status
+
+                    # Preparar datos en el formato esperado
+                    chapters_for_analysis = [
+                        {
+                            "number": ch["chapter_number"],
+                            "content": ch["content"],
+                            "text": ch["content"],  # Alias
+                            "start_char": ch["start_char"],
+                        }
+                        for ch in chapters_data
+                    ]
+
+                    entities_for_analysis = [
+                        {
+                            "id": e.id,
+                            "canonical_name": e.canonical_name,
+                            "entity_type": e.entity_type.value if hasattr(e.entity_type, 'value') else str(e.entity_type),
+                            "aliases": e.aliases if hasattr(e, 'aliases') else [],
+                        }
+                        for e in entities
+                    ]
+
+                    vital_result = analyze_vital_status(
+                        project_id=project_id,
+                        chapters=chapters_for_analysis,
+                        entities=entities_for_analysis,
+                    )
+
+                    if vital_result.is_success:
+                        vital_status_report = vital_result.value
+                        logger.info(f"Vital status analysis: {len(vital_status_report.death_events)} deaths, "
+                                   f"{len(vital_status_report.post_mortem_appearances)} post-mortem appearances")
+
+                        # Añadir inconsistencias de estado vital a la lista
+                        for appearance in vital_status_report.post_mortem_appearances:
+                            if not appearance.is_valid:  # Solo apariciones problemáticas
+                                # Se agregarán alertas en FASE 7
+                                pass
+                    else:
+                        logger.warning(f"Vital status analysis failed: {vital_result.error}")
+
+                except ImportError as e:
+                    logger.warning(f"Vital status module not available: {e}")
+                except Exception as e:
+                    logger.warning(f"Error in vital status analysis: {e}", exc_info=True)
+
+                check_cancelled()
+
+                # ========== SUB-FASE 5.2: UBICACIONES DE PERSONAJES ==========
+                # Detecta inconsistencias de ubicación (personaje en dos lugares)
+                analysis_progress_storage[project_id]["current_action"] = "Verificando ubicaciones de personajes..."
+
+                try:
+                    from narrative_assistant.analysis.character_location import analyze_character_locations
+
+                    location_result = analyze_character_locations(
+                        project_id=project_id,
+                        chapters=chapters_for_analysis,
+                        entities=entities_for_analysis,
+                    )
+
+                    if location_result.is_success:
+                        location_report = location_result.value
+                        inconsistency_count = len(location_report.inconsistencies) if hasattr(location_report, 'inconsistencies') else 0
+                        logger.info(f"Character location analysis: {len(location_report.events)} events, "
+                                   f"{inconsistency_count} inconsistencies")
+                    else:
+                        logger.warning(f"Character location analysis failed: {location_result.error}")
+
+                except ImportError as e:
+                    logger.warning(f"Character location module not available: {e}")
+                except Exception as e:
+                    logger.warning(f"Error in character location analysis: {e}", exc_info=True)
+
+                check_cancelled()
+
+                # ========== SUB-FASE 5.3: RESUMEN POR CAPÍTULO ==========
+                # Genera resumen de avance narrativo (usa modo básico para no bloquear)
+                analysis_progress_storage[project_id]["current_action"] = "Generando resumen de avance narrativo..."
+
+                try:
+                    from narrative_assistant.analysis.chapter_summary import analyze_chapter_progress
+
+                    chapter_progress_report = analyze_chapter_progress(
+                        project_id=project_id,
+                        db_path=None,  # Usa la BD por defecto
+                        mode="basic",  # Modo rápido sin LLM para no bloquear
+                    )
+
+                    if chapter_progress_report:
+                        logger.info(f"Chapter progress analysis: {len(chapter_progress_report.chapters)} chapters analyzed")
+
+                except ImportError as e:
+                    logger.warning(f"Chapter summary module not available: {e}")
+                except Exception as e:
+                    logger.warning(f"Error in chapter progress analysis: {e}", exc_info=True)
+
+                check_cancelled()
+
+                # Guardar métricas de análisis adicionales
+                analysis_progress_storage[project_id]["metrics"]["vital_status_deaths"] = (
+                    len(vital_status_report.death_events) if vital_status_report else 0
+                )
+                analysis_progress_storage[project_id]["metrics"]["location_events"] = (
+                    len(location_report.events) if location_report else 0
+                )
+
                 phase_durations["consistency"] = time.time() - phase_start_times["consistency"]
                 analysis_progress_storage[project_id]["progress"] = cons_pct_end
                 update_time_remaining()
@@ -6555,6 +6674,53 @@ JSON:"""
                                 alerts_created += 1
                         except Exception as e:
                             logger.warning(f"Error creating correction alert: {e}")
+
+                # Alertas de estado vital (personajes fallecidos que reaparecen)
+                if vital_status_report and hasattr(vital_status_report, 'post_mortem_appearances'):
+                    for appearance in vital_status_report.post_mortem_appearances:
+                        if appearance.is_valid:
+                            continue  # Ignorar apariciones válidas (flashbacks, recuerdos)
+                        try:
+                            alert_result = alert_engine.create_from_deceased_reappearance(
+                                project_id=project_id,
+                                entity_id=appearance.entity_id,
+                                entity_name=appearance.entity_name,
+                                death_chapter=appearance.death_chapter,
+                                appearance_chapter=appearance.appearance_chapter,
+                                appearance_start_char=appearance.appearance_start_char,
+                                appearance_end_char=appearance.appearance_end_char,
+                                appearance_excerpt=appearance.appearance_excerpt,
+                                appearance_type=appearance.appearance_type,
+                                confidence=appearance.confidence,
+                            )
+                            if alert_result.is_success:
+                                alerts_created += 1
+                        except Exception as e:
+                            logger.warning(f"Error creating deceased reappearance alert: {e}")
+
+                # Alertas de inconsistencias de ubicación
+                if location_report and hasattr(location_report, 'inconsistencies'):
+                    for loc_inc in location_report.inconsistencies:
+                        try:
+                            # Usar create_alert genérico para ubicaciones
+                            from narrative_assistant.alerts.engine import AlertCategory, AlertSeverity
+                            alert_result = alert_engine.create_alert(
+                                project_id=project_id,
+                                category=AlertCategory.CONSISTENCY,
+                                severity=AlertSeverity.WARNING,
+                                alert_type="location_inconsistency",
+                                title=f"Inconsistencia de ubicación: {loc_inc.entity_name}",
+                                description=(
+                                    f"{loc_inc.entity_name} aparece en {loc_inc.location1_name} (cap {loc_inc.location1_chapter}) "
+                                    f"y en {loc_inc.location2_name} (cap {loc_inc.location2_chapter})"
+                                ),
+                                explanation=loc_inc.explanation,
+                                confidence=loc_inc.confidence,
+                            )
+                            if alert_result.is_success:
+                                alerts_created += 1
+                        except Exception as e:
+                            logger.warning(f"Error creating location inconsistency alert: {e}")
 
                 phase_durations["alerts"] = time.time() - phase_start_times["alerts"]
                 analysis_progress_storage[project_id]["progress"] = 100
@@ -8426,6 +8592,159 @@ async def generate_vital_status_alerts(project_id: int):
         )
     except Exception as e:
         logger.error(f"Error generating vital status alerts: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+# ============================================================================
+# Endpoints - Character Location Tracking
+# ============================================================================
+
+@app.get("/api/projects/{project_id}/character-locations", response_model=ApiResponse)
+async def get_character_locations(project_id: int):
+    """
+    Obtiene el análisis de ubicaciones de personajes.
+
+    Detecta:
+    - Movimientos de personajes entre ubicaciones
+    - Inconsistencias (personaje en dos lugares a la vez)
+    - Última ubicación conocida de cada personaje
+
+    Returns:
+        Reporte con eventos de ubicación e inconsistencias
+    """
+    try:
+        from narrative_assistant.analysis.character_location import (
+            analyze_character_locations,
+        )
+
+        # Obtener capítulos
+        chapters = chapter_repository.get_by_project(project_id)
+        if not chapters:
+            return ApiResponse(
+                success=True,
+                data={
+                    "project_id": project_id,
+                    "location_events": [],
+                    "inconsistencies": [],
+                    "inconsistencies_count": 0,
+                    "current_locations": {},
+                    "characters_tracked": 0,
+                    "locations_found": 0,
+                }
+            )
+
+        # Obtener entidades (personajes y ubicaciones)
+        entities_result = entity_repository.get_by_project(project_id)
+        if entities_result.is_failure:
+            return ApiResponse(success=False, error=str(entities_result.error))
+
+        entities = [
+            {
+                "id": e.id,
+                "name": e.canonical_name,
+                "entity_type": "PER" if e.entity_type.value in ["character", "animal", "creature"] else
+                              "LOC" if e.entity_type.value == "location" else
+                              e.entity_type.value,
+            }
+            for e in entities_result.value
+        ]
+
+        # Preparar datos de capítulos
+        chapters_data = [
+            {
+                "number": ch.chapter_number,
+                "title": ch.title or f"Capítulo {ch.chapter_number}",
+                "content": ch.content,
+            }
+            for ch in chapters
+        ]
+
+        # Analizar
+        result = analyze_character_locations(
+            project_id=project_id,
+            chapters=chapters_data,
+            entities=entities,
+        )
+
+        if result.is_failure:
+            return ApiResponse(success=False, error=str(result.error))
+
+        return ApiResponse(success=True, data=result.value.to_dict())
+
+    except ImportError as e:
+        logger.error(f"Module import error: {e}")
+        return ApiResponse(
+            success=False,
+            error="Módulo de análisis de ubicaciones no disponible"
+        )
+    except Exception as e:
+        logger.error(f"Error in character location analysis: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+# ============================================================================
+# Endpoints - Chapter Progress Summary
+# ============================================================================
+
+@app.get("/api/projects/{project_id}/chapter-progress", response_model=ApiResponse)
+async def get_chapter_progress(
+    project_id: int,
+    mode: str = "basic",  # basic, standard, deep
+    llm_model: str = "llama3.2",
+):
+    """
+    Obtiene el resumen de avance narrativo por capítulo.
+
+    Incluye:
+    - Personajes presentes y sus interacciones por capítulo
+    - Eventos significativos detectados (patrones + LLM)
+    - Arcos de personajes (trayectoria narrativa)
+    - Chekhov's Guns (objetos introducidos sin payoff)
+    - Tramas abandonadas (con análisis LLM)
+
+    Modos:
+    - basic: Solo patrones, sin LLM (rápido)
+    - standard: Análisis LLM con llama3.2
+    - deep: Análisis multi-modelo (más preciso, más lento)
+
+    Args:
+        project_id: ID del proyecto
+        mode: Modo de análisis (basic/standard/deep)
+        llm_model: Modelo LLM a usar (llama3.2, qwen2.5, mistral)
+
+    Returns:
+        ChapterProgressReport con resúmenes de todos los capítulos
+    """
+    try:
+        from narrative_assistant.analysis.chapter_summary import (
+            analyze_chapter_progress,
+        )
+
+        # Validar modo
+        valid_modes = ["basic", "standard", "deep"]
+        if mode not in valid_modes:
+            return ApiResponse(
+                success=False,
+                error=f"Modo inválido. Opciones: {', '.join(valid_modes)}"
+            )
+
+        # Analizar
+        report = analyze_chapter_progress(
+            project_id=project_id,
+            mode=mode,
+            llm_model=llm_model,
+        )
+
+        return ApiResponse(success=True, data=report.to_dict())
+
+    except ImportError as e:
+        logger.error(f"Module import error: {e}")
+        return ApiResponse(
+            success=False,
+            error="Módulo de resumen de capítulos no disponible"
+        )
+    except Exception as e:
+        logger.error(f"Error in chapter progress analysis: {e}", exc_info=True)
         return ApiResponse(success=False, error=str(e))
 
 
