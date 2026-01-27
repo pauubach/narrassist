@@ -192,7 +192,7 @@
 
       <!-- Chapters Accordion -->
       <Accordion v-if="report.chapters && report.chapters.length > 0" :multiple="true" class="chapters-accordion">
-        <AccordionPanel v-for="chapter in report.chapters" :key="chapter.chapter_number">
+        <AccordionPanel v-for="chapter in report.chapters" :key="chapter.chapter_number" :value="String(chapter.chapter_number)">
           <AccordionHeader>
             <div class="chapter-header">
               <span class="chapter-title">{{ chapter.chapter_title }}</span>

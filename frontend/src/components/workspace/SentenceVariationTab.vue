@@ -85,7 +85,7 @@
         <template #content>
           <div class="distribution-bars">
             <div class="dist-row" v-for="(count, category) in report.global_distribution" :key="category">
-              <span class="dist-label">{{ getCategoryLabel(category) }}</span>
+              <span class="dist-label">{{ getCategoryLabel(String(category)) }}</span>
               <div class="dist-bar-container">
                 <div
                   class="dist-bar"
@@ -118,7 +118,7 @@
 
       <!-- Chapters -->
       <Accordion :multiple="true" :activeIndex="[0]" class="chapters-accordion">
-        <AccordionPanel v-for="chapter in report.chapters" :key="chapter.chapter_number">
+        <AccordionPanel v-for="chapter in report.chapters" :key="chapter.chapter_number" :value="String(chapter.chapter_number)">
           <AccordionHeader>
             <div class="chapter-header">
               <span class="chapter-title">{{ chapter.chapter_title }}</span>

@@ -1,22 +1,19 @@
 <template>
   <div class="document-type-chip" v-if="documentType">
-    <Popover ref="popoverRef">
-      <template #default>
-        <button
-          class="chip-button"
-          :style="{ '--chip-color': documentType.type_color }"
-          @click="togglePopover"
-        >
-          <i :class="documentType.type_icon"></i>
-          <span class="chip-label">{{ documentType.type_name }}</span>
-          <span v-if="documentType.subtype_name" class="chip-subtype">
-            ({{ documentType.subtype_name }})
-          </span>
-          <i class="pi pi-chevron-down chip-arrow"></i>
-        </button>
-      </template>
+    <button
+      class="chip-button"
+      :style="{ '--chip-color': documentType.type_color }"
+      @click="togglePopover"
+    >
+      <i :class="documentType.type_icon"></i>
+      <span class="chip-label">{{ documentType.type_name }}</span>
+      <span v-if="documentType.subtype_name" class="chip-subtype">
+        ({{ documentType.subtype_name }})
+      </span>
+      <i class="pi pi-chevron-down chip-arrow"></i>
+    </button>
 
-      <template #content>
+    <OverlayPanel ref="popoverRef">
         <div class="type-selector-panel">
           <div class="panel-header">
             <span>Tipo de documento</span>
@@ -36,7 +33,7 @@
               label="Cambiar"
               size="small"
               text
-              @click="selectType(documentType.detected_type)"
+              @click="documentType.detected_type && selectType(documentType.detected_type)"
             />
           </div>
 
@@ -72,14 +69,13 @@
             />
           </div>
         </div>
-      </template>
-    </Popover>
+    </OverlayPanel>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import Popover from 'primevue/popover'
+import OverlayPanel from 'primevue/overlaypanel'
 import Dropdown from 'primevue/dropdown'
 import Button from 'primevue/button'
 
@@ -112,7 +108,7 @@ const emit = defineEmits<{
   (e: 'type-changed', type: string, subtype: string | null): void
 }>()
 
-const popoverRef = ref<InstanceType<typeof Popover> | null>(null)
+const popoverRef = ref<InstanceType<typeof OverlayPanel> | null>(null)
 const documentType = ref<DocumentType | null>(null)
 const documentTypes = ref<TypeInfo[]>([])
 const selectedSubtype = ref<string | null>(null)
@@ -180,7 +176,9 @@ const onSubtypeChange = async () => {
     const data = await response.json()
     if (data.success) {
       documentType.value = data.data.document_type
-      emit('type-changed', documentType.value.type, selectedSubtype.value)
+      if (documentType.value) {
+        emit('type-changed', documentType.value.type, selectedSubtype.value)
+      }
     }
   } catch (err) {
     console.error('Error updating document subtype:', err)

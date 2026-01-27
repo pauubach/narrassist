@@ -147,7 +147,7 @@
         </template>
         <template #content>
           <Accordion :multiple="true" class="violations-accordion">
-            <AccordionPanel v-for="(group, chapterNum) in violationsByChapter" :key="chapterNum">
+            <AccordionPanel v-for="(group, chapterNum) in violationsByChapter" :key="chapterNum" :value="String(chapterNum)">
               <AccordionHeader>
                 <div class="violation-chapter-header">
                   <span>Capítulo {{ chapterNum }}</span>

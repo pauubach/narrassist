@@ -88,8 +88,8 @@
 
       <!-- Scenes by Chapter -->
       <Accordion :multiple="true" class="scenes-accordion">
-        <AccordionPanel v-for="(chapterScenes, chapterNum) in scenesByChapter" :key="chapterNum">
-          <template #header>
+        <AccordionPanel v-for="(chapterScenes, chapterNum) in scenesByChapter" :key="chapterNum" :value="String(chapterNum)">
+          <AccordionHeader>
             <div class="chapter-header">
               <span class="chapter-title">
                 <i class="pi pi-book"></i>
@@ -100,8 +100,8 @@
               </span>
               <Tag severity="secondary" size="small">{{ chapterScenes.length }} escenas</Tag>
             </div>
-          </template>
-          <template #content>
+          </AccordionHeader>
+          <AccordionContent>
             <div class="scenes-list">
               <div
                 v-for="scene in chapterScenes"
@@ -180,7 +180,7 @@
                 </div>
               </div>
             </div>
-          </template>
+          </AccordionContent>
         </AccordionPanel>
       </Accordion>
 
@@ -338,6 +338,8 @@ import Card from 'primevue/card'
 import Tag from 'primevue/tag'
 import Accordion from 'primevue/accordion'
 import AccordionPanel from 'primevue/accordionpanel'
+import AccordionHeader from 'primevue/accordionheader'
+import AccordionContent from 'primevue/accordioncontent'
 import Dialog from 'primevue/dialog'
 import Dropdown from 'primevue/dropdown'
 import MultiSelect from 'primevue/multiselect'

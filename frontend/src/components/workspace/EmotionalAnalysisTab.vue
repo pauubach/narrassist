@@ -95,7 +95,7 @@
 
         <!-- Accordion by Character -->
         <Accordion :multiple="true" :activeIndex="[0]" class="characters-accordion">
-          <AccordionPanel v-for="group in filteredGroups" :key="group.character">
+          <AccordionPanel v-for="group in filteredGroups" :key="group.character" :value="group.character">
             <AccordionHeader>
               <div class="character-header">
                 <span class="character-name">

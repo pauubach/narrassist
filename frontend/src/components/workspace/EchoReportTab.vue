@@ -113,7 +113,7 @@
 
       <!-- Chapters Accordion -->
       <Accordion :multiple="true" :activeIndex="[0]" class="chapters-accordion">
-        <AccordionPanel v-for="chapter in filteredChapters" :key="chapter.chapter_number">
+        <AccordionPanel v-for="chapter in filteredChapters" :key="chapter.chapter_number" :value="String(chapter.chapter_number)">
           <AccordionHeader>
             <div class="chapter-header">
               <span class="chapter-title">
@@ -153,7 +153,7 @@
                     :key="occIdx"
                     class="occurrence"
                   >
-                    <span class="occ-position">#{{ occIdx + 1 }}</span>
+                    <span class="occ-position">#{{ Number(occIdx) + 1 }}</span>
                     <span class="occ-text" v-html="highlightWord(occ.sentence || occ.text, rep.word)"></span>
                   </div>
                   <span v-if="rep.occurrences.length > 5" class="more-occurrences">
