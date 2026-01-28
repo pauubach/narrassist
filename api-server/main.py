@@ -1754,9 +1754,22 @@ async def get_project(project_id: int):
                         key=lambda s: severity_priority.get(s, 0)
                     )
 
-        # Extraer document_type y recommended_analysis de settings
+        # Extraer document_type (preferir columna DB sobre settings JSON)
         project_settings = project.settings or {}
         document_type = project_settings.get("document_type", "unknown")
+
+        # La columna document_type de la BD es la fuente de verdad (actualizada por FeatureProfileService)
+        try:
+            with db.connection() as conn:
+                dt_row = conn.execute(
+                    "SELECT document_type FROM projects WHERE id = ?", (project_id,)
+                ).fetchone()
+                if dt_row and dt_row[0]:
+                    from narrative_assistant.feature_profile.models import _TYPE_CODE_TO_LONG
+                    document_type = _TYPE_CODE_TO_LONG.get(dt_row[0], document_type)
+        except Exception:
+            pass  # Fallback al valor de settings
+
         document_classification = project_settings.get("document_classification", None)
         recommended_analysis = project_settings.get("recommended_analysis", None)
 
@@ -8616,12 +8629,10 @@ async def get_vital_status_analysis(project_id: int):
             )
 
         # Obtener entidades (personajes, animales, criaturas)
-        entities_result = entity_repository.get_by_project(project_id)
-        if entities_result.is_failure:
-            return ApiResponse(success=False, error=str(entities_result.error))
+        all_entities = entity_repository.get_by_project(project_id)
 
         entities = [
-            e.to_dict() for e in entities_result.value
+            e.to_dict() for e in all_entities
             if e.entity_type.value in ["character", "animal", "creature"]
         ]
 
@@ -8684,12 +8695,10 @@ async def generate_vital_status_alerts(project_id: int):
             )
 
         # Obtener entidades
-        entities_result = entity_repository.get_by_project(project_id)
-        if entities_result.is_failure:
-            return ApiResponse(success=False, error=str(entities_result.error))
+        all_entities = entity_repository.get_by_project(project_id)
 
         entities = [
-            e.to_dict() for e in entities_result.value
+            e.to_dict() for e in all_entities
             if e.entity_type.value in ["character", "animal", "creature"]
         ]
 
@@ -8802,9 +8811,7 @@ async def get_character_locations(project_id: int):
             )
 
         # Obtener entidades (personajes y ubicaciones)
-        entities_result = entity_repository.get_by_project(project_id)
-        if entities_result.is_failure:
-            return ApiResponse(success=False, error=str(entities_result.error))
+        all_entities = entity_repository.get_by_project(project_id)
 
         entities = [
             {
@@ -8814,7 +8821,7 @@ async def get_character_locations(project_id: int):
                               "LOC" if e.entity_type.value == "location" else
                               e.entity_type.value,
             }
-            for e in entities_result.value
+            for e in all_entities
         ]
 
         # Preparar datos de capítulos
@@ -10689,56 +10696,18 @@ def _audience_label(audience) -> str:
     return labels.get(audience, audience.value)
 
 
-@app.get("/api/projects/{project_id}/correction-config", response_model=ApiResponse)
-async def get_project_correction_config(project_id: str) -> ApiResponse:
-    """
-    Obtiene la configuración de corrección para un proyecto.
-
-    Si el proyecto no tiene configuración personalizada, retorna la por defecto.
-    """
-    try:
-        result = project_manager.get(int(project_id))
-        if result.is_failure:
-            raise HTTPException(status_code=404, detail="Project not found")
-        project = result.value
-
-        from narrative_assistant.corrections.config import CorrectionConfig
-
-        # Cargar configuración desde settings del proyecto
-        logger.info(f"Loading correction config for project {project_id}: settings has {len(project.settings)} keys")
-        config_data = project.settings.get("correction_config")
-        has_custom = config_data is not None
-        logger.info(f"Has custom config: {has_custom}")
-
-        if config_data:
-            config = CorrectionConfig.from_dict(config_data)
-        else:
-            # Usar preset por defecto
-            config = CorrectionConfig.default()
-
-        # Obtener preset seleccionado
-        selected_preset = project.settings.get("correction_preset", "default")
-        logger.info(f"Loaded correction config with preset: {selected_preset}")
-
-        return ApiResponse(
-            success=True,
-            data={
-                "config": config.to_dict(),
-                "hasCustomConfig": has_custom,
-                "selectedPreset": selected_preset,
-            }
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error getting correction config: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+# DEPRECATED: Moved to new unified correction_config system (see line ~13274)
+# Old endpoint commented out - uses old corrections.config instead of new correction_config
+# @app.get("/api/projects/{project_id}/correction-config", response_model=ApiResponse)
+# async def get_project_correction_config_old(project_id: str) -> ApiResponse:
+#     """Old correction config endpoint - DEPRECATED"""
+#     pass
 
 
 class CorrectionConfigUpdate(BaseModel):
     """Modelo para actualizar configuración de corrección."""
-    config: dict
+    customizations: Optional[dict] = None  # Solo los parámetros personalizados
+    config: Optional[dict] = None  # Compat: config completa (legacy)
     selectedPreset: Optional[str] = None
 
 
@@ -10749,6 +10718,9 @@ async def update_project_correction_config(
 ) -> ApiResponse:
     """
     Actualiza la configuración de corrección de un proyecto.
+
+    El nuevo sistema guarda solo las personalizaciones (customizations),
+    no la configuración completa. La configuración base se hereda del tipo/subtipo.
     """
     try:
         result = project_manager.get(int(project_id))
@@ -10756,21 +10728,22 @@ async def update_project_correction_config(
             raise HTTPException(status_code=404, detail="Project not found")
         project = result.value
 
-        from narrative_assistant.corrections.config import CorrectionConfig
+        # Nuevo sistema: guardar solo customizations
+        if update.customizations is not None:
+            project.settings["correction_customizations"] = update.customizations
+            logger.info(f"Saving correction customizations for project {project_id}: {len(update.customizations)} categories")
+        # Legacy compat: guardar config completa
+        elif update.config is not None:
+            from narrative_assistant.corrections.config import CorrectionConfig
+            try:
+                config = CorrectionConfig.from_dict(update.config)
+                project.settings["correction_config"] = config.to_dict()
+            except Exception as e:
+                return ApiResponse(success=False, error=f"Configuración inválida: {str(e)}")
 
-        # Validar la configuración
-        try:
-            config = CorrectionConfig.from_dict(update.config)
-        except Exception as e:
-            return ApiResponse(
-                success=False,
-                error=f"Configuración inválida: {str(e)}"
-            )
+        if update.selectedPreset:
+            project.settings["correction_preset"] = update.selectedPreset
 
-        # Guardar configuración en settings del proyecto
-        project.settings["correction_config"] = config.to_dict()
-        project.settings["correction_preset"] = update.selectedPreset
-        logger.info(f"Saving correction config for project {project_id}: preset={update.selectedPreset}, settings has {len(project.settings)} keys")
         update_result = project_manager.update(project)
         if update_result.is_failure:
             logger.error(f"Failed to update project {project_id}: {update_result.errors}")
@@ -10778,10 +10751,16 @@ async def update_project_correction_config(
 
         logger.info(f"Successfully updated correction config for project {project_id}")
 
+        # Obtener configuración efectiva para retornar
+        from narrative_assistant.correction_config import get_config_for_project
+        type_code = getattr(project, 'document_type', 'FIC') or 'FIC'
+        subtype_code = getattr(project, 'document_subtype', None)
+        effective_config = get_config_for_project(type_code, subtype_code, update.customizations)
+
         return ApiResponse(
             success=True,
             data={
-                "config": config.to_dict(),
+                "config": effective_config,
                 "message": "Configuración guardada correctamente",
             }
         )
@@ -12132,13 +12111,14 @@ async def get_register_analysis(
 
         changes_data = [
             {
-                "from_segment": c.from_segment_index,
-                "to_segment": c.to_segment_index,
                 "from_register": c.from_register.value,
                 "to_register": c.to_register.value,
                 "severity": c.severity,
                 "explanation": c.explanation,
-                "chapter": segments[c.to_segment_index][1] if c.to_segment_index < len(segments) else None,
+                "chapter": c.chapter,
+                "position": c.position,
+                "context_before": c.context_before[:100] if c.context_before else "",
+                "context_after": c.context_after[:100] if c.context_after else "",
             }
             for c in changes
         ]
@@ -13221,6 +13201,326 @@ async def detect_document_type(project_id: int):
 
 
 # ============================================================================
+# Correction Config Endpoints - Sistema unificado tipo/subtipo con herencia
+# ============================================================================
+
+@app.get("/api/correction-config/types", response_model=ApiResponse)
+async def get_correction_types():
+    """
+    Lista todos los tipos de documento con sus subtipos.
+
+    Formato optimizado para el selector de dos columnas del frontend.
+
+    Returns:
+        ApiResponse con lista de tipos, cada uno con sus subtipos anidados
+    """
+    try:
+        from narrative_assistant.correction_config import get_types_with_subtypes
+
+        types = get_types_with_subtypes()
+        return ApiResponse(success=True, data=types)
+    except Exception as e:
+        logger.error(f"Error getting correction types: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.get("/api/correction-config/{type_code}", response_model=ApiResponse)
+async def get_correction_config_for_type(
+    type_code: str,
+    subtype_code: Optional[str] = Query(None, description="Código del subtipo")
+):
+    """
+    Obtiene la configuración de corrección para un tipo/subtipo.
+
+    Aplica herencia: tipo → subtipo.
+
+    Args:
+        type_code: Código del tipo (FIC, MEM, INF, etc.)
+        subtype_code: Código del subtipo opcional (INF_MID, FIC_LIT, etc.)
+
+    Returns:
+        ApiResponse con la configuración completa con información de herencia
+    """
+    try:
+        from narrative_assistant.correction_config import get_config_for_project
+
+        config = get_config_for_project(type_code, subtype_code)
+        return ApiResponse(success=True, data=config)
+    except Exception as e:
+        logger.error(f"Error getting correction config: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.get("/api/projects/{project_id}/correction-config", response_model=ApiResponse)
+async def get_project_correction_config(project_id: int):
+    """
+    Obtiene la configuración de corrección para un proyecto.
+
+    Usa el tipo y subtipo del proyecto para calcular la configuración
+    con herencia aplicada.
+
+    Returns:
+        ApiResponse con la configuración efectiva del proyecto
+    """
+    try:
+        from narrative_assistant.correction_config import get_config_for_project
+
+        # Usar el project_manager global en lugar de crear nueva instancia
+        result = project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+        project = result.value
+
+        # Obtener tipo y subtipo del proyecto
+        type_code = getattr(project, 'document_type', 'FIC') or 'FIC'
+        subtype_code = getattr(project, 'document_subtype', None)
+
+        # Cargar customizations del proyecto si existen
+        customizations = project.settings.get("correction_customizations")
+
+        # Obtener configuración con herencia aplicada + customizations
+        config = get_config_for_project(type_code, subtype_code, customizations)
+
+        return ApiResponse(success=True, data=config)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting project correction config: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.get("/api/correction-config/{type_code}/diff", response_model=ApiResponse)
+async def get_correction_config_diff(
+    type_code: str,
+    subtype_code: Optional[str] = Query(None, description="Código del subtipo")
+):
+    """
+    Obtiene las diferencias entre la configuración del tipo y subtipo.
+
+    Útil para mostrar en la UI qué parámetros han sido sobrescritos.
+
+    Returns:
+        ApiResponse con parámetros sobrescritos y sus valores
+    """
+    try:
+        from narrative_assistant.correction_config import get_config_diff
+
+        diff = get_config_diff(type_code, subtype_code)
+        return ApiResponse(success=True, data=diff)
+    except Exception as e:
+        logger.error(f"Error getting config diff: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+# ============================================================================
+# Correction Config Defaults Management
+# ============================================================================
+
+@app.get("/api/correction-config/defaults", response_model=ApiResponse)
+async def get_all_default_overrides():
+    """
+    Lista todos los overrides de configuración definidos por el usuario.
+
+    Estos son los cambios que el usuario ha hecho a los defaults de tipos/subtipos.
+    """
+    try:
+        from narrative_assistant.correction_config.defaults_repository import get_defaults_repository
+
+        repo = get_defaults_repository()
+        overrides = repo.get_all_overrides()
+
+        return ApiResponse(success=True, data={
+            "overrides": overrides,
+            "count": len(overrides)
+        })
+    except Exception as e:
+        logger.error(f"Error getting default overrides: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.get("/api/correction-config/defaults/{type_code}", response_model=ApiResponse)
+async def get_type_default_override(
+    type_code: str,
+    subtype_code: Optional[str] = Query(None, description="Código del subtipo")
+):
+    """
+    Obtiene el override de configuración para un tipo o subtipo específico.
+
+    Args:
+        type_code: Código del tipo (FIC, MEM, INF, etc.)
+        subtype_code: Código del subtipo (opcional)
+
+    Returns:
+        ApiResponse con el override y la configuración efectiva
+    """
+    try:
+        from narrative_assistant.correction_config.defaults_repository import get_defaults_repository
+        from narrative_assistant.correction_config import get_correction_config, TYPES_REGISTRY, SUBTYPES_REGISTRY
+
+        repo = get_defaults_repository()
+        override = repo.get_override(type_code, subtype_code)
+
+        # Obtener nombres del tipo y subtipo
+        type_info = TYPES_REGISTRY.get(type_code.upper(), {})
+        type_name = type_info.get("name", type_code)
+        subtype_name = None
+        if subtype_code:
+            subtype_info = SUBTYPES_REGISTRY.get(subtype_code.upper(), {})
+            subtype_name = subtype_info.get("name", subtype_code)
+
+        # Obtener también la configuración efectiva para preview
+        config = get_correction_config(type_code, subtype_code)
+
+        return ApiResponse(success=True, data={
+            "type_code": type_code,
+            "type_name": type_name,
+            "subtype_code": subtype_code,
+            "subtype_name": subtype_name,
+            "override": override,
+            "effective_config": config.to_dict()
+        })
+    except Exception as e:
+        logger.error(f"Error getting default override: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+class DefaultOverrideRequest(BaseModel):
+    """Request body para actualizar un override de defaults."""
+    overrides: dict
+
+
+@app.put("/api/correction-config/defaults/{type_code}", response_model=ApiResponse)
+async def set_type_default_override(
+    type_code: str,
+    request: DefaultOverrideRequest,
+    subtype_code: Optional[str] = Query(None, description="Código del subtipo")
+):
+    """
+    Crea o actualiza el override de configuración para un tipo o subtipo.
+
+    Args:
+        type_code: Código del tipo
+        subtype_code: Código del subtipo (opcional, query param)
+        request: Body con los overrides a aplicar
+
+    Returns:
+        ApiResponse con el resultado y la configuración efectiva actualizada
+    """
+    try:
+        from narrative_assistant.correction_config.defaults_repository import get_defaults_repository
+        from narrative_assistant.correction_config import get_correction_config
+
+        repo = get_defaults_repository()
+        success = repo.set_override(type_code, subtype_code, request.overrides)
+
+        if success:
+            # Obtener configuración actualizada
+            config = get_correction_config(type_code, subtype_code)
+            return ApiResponse(success=True, data={
+                "type_code": type_code,
+                "subtype_code": subtype_code,
+                "overrides": request.overrides,
+                "effective_config": config.to_dict()
+            })
+        else:
+            return ApiResponse(success=False, error="Error al guardar override")
+    except Exception as e:
+        logger.error(f"Error setting default override: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.delete("/api/correction-config/defaults/{type_code}", response_model=ApiResponse)
+async def delete_type_default_override(
+    type_code: str,
+    subtype_code: Optional[str] = Query(None, description="Código del subtipo")
+):
+    """
+    Elimina el override de un tipo/subtipo (reset a hardcoded defaults).
+
+    Args:
+        type_code: Código del tipo
+        subtype_code: Código del subtipo (opcional)
+    """
+    try:
+        from narrative_assistant.correction_config.defaults_repository import get_defaults_repository
+        from narrative_assistant.correction_config import get_correction_config
+
+        repo = get_defaults_repository()
+        deleted = repo.delete_override(type_code, subtype_code)
+
+        # Obtener configuración después del reset
+        config = get_correction_config(type_code, subtype_code)
+
+        return ApiResponse(success=True, data={
+            "deleted": deleted,
+            "type_code": type_code,
+            "subtype_code": subtype_code,
+            "effective_config": config.to_dict()
+        })
+    except Exception as e:
+        logger.error(f"Error deleting default override: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.delete("/api/correction-config/defaults", response_model=ApiResponse)
+async def delete_all_default_overrides():
+    """
+    Elimina TODOS los overrides de configuración (full reset).
+
+    Restaura todos los tipos y subtipos a sus valores hardcoded originales.
+    """
+    try:
+        from narrative_assistant.correction_config.defaults_repository import get_defaults_repository
+
+        repo = get_defaults_repository()
+        count = repo.delete_all_overrides()
+
+        return ApiResponse(success=True, data={
+            "deleted_count": count,
+            "message": f"Se eliminaron {count} overrides. Configuración restaurada."
+        })
+    except Exception as e:
+        logger.error(f"Error deleting all default overrides: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.get("/api/correction-config/defaults/status", response_model=ApiResponse)
+async def get_defaults_status():
+    """
+    Obtiene el estado de customización de todos los tipos.
+
+    Útil para mostrar badges en la UI indicando qué tipos tienen modificaciones.
+    """
+    try:
+        from narrative_assistant.correction_config.defaults_repository import get_defaults_repository
+        from narrative_assistant.correction_config import TYPES_REGISTRY
+
+        repo = get_defaults_repository()
+        all_overrides = repo.get_all_overrides()
+
+        # Agrupar por tipo
+        status = {}
+        for type_code in TYPES_REGISTRY.keys():
+            type_overrides = [o for o in all_overrides if o["type_code"] == type_code]
+            has_type_override = any(o["subtype_code"] is None for o in type_overrides)
+            subtype_overrides = [o["subtype_code"] for o in type_overrides if o["subtype_code"]]
+
+            status[type_code] = {
+                "has_type_override": has_type_override,
+                "subtype_overrides": subtype_overrides,
+                "total_overrides": len(type_overrides)
+            }
+
+        return ApiResponse(success=True, data={
+            "status": status,
+            "total_overrides": len(all_overrides)
+        })
+    except Exception as e:
+        logger.error(f"Error getting defaults status: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+# ============================================================================
 # Style Analysis Endpoints
 # ============================================================================
 
@@ -13237,16 +13537,15 @@ async def get_sticky_sentences(
     """
     try:
         from narrative_assistant.nlp.style.sticky_sentences import get_sticky_sentence_detector
-        from narrative_assistant.persistence import ProjectManager
 
-        pm = ProjectManager()
-        project = pm.get_project(project_id)
-        if not project:
+        result = project_manager.get(project_id)
+        if result.is_failure:
             raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+        project = result.value
 
         # Obtener texto de todos los capítulos
         chapters_data = []
-        chapters = pm.get_chapters(project_id)
+        chapters = chapter_repository.get_by_project(project_id)
 
         detector = get_sticky_sentence_detector()
         global_sticky = []
@@ -13286,9 +13585,9 @@ async def get_sticky_sentences(
                     "text": sent.text,
                     "glue_percentage": round(sent.glue_percentage * 100, 1),
                     "glue_percentage_display": f"{round(sent.glue_percentage * 100)}%",
-                    "glue_words": sent.glue_word_count,
+                    "glue_words": sent.glue_words,
                     "total_words": sent.total_words,
-                    "glue_word_list": sent.glue_words[:10],  # Limit to 10
+                    "glue_word_list": sent.glue_word_list[:10],  # Limit to 10
                     "severity": severity,
                     "recommendation": _get_sticky_recommendation(sent.glue_percentage),
                 })
@@ -13307,8 +13606,8 @@ async def get_sticky_sentences(
             global_total_glue += sum(s["glue_percentage"] for s in chapter_sticky)
 
             chapters_data.append({
-                "chapter_number": chapter.number,
-                "chapter_title": chapter.title or f"Capítulo {chapter.number}",
+                "chapter_number": chapter.chapter_number,
+                "chapter_title": chapter.title or f"Capítulo {chapter.chapter_number}",
                 "sticky_sentences": chapter_sticky,
                 "sticky_count": len(chapter_sticky),
                 "total_sentences": report.total_sentences,
@@ -13370,15 +13669,14 @@ async def get_echo_report(
     """
     try:
         from narrative_assistant.nlp.style.repetition_detector import get_repetition_detector
-        from narrative_assistant.persistence import ProjectManager
 
-        pm = ProjectManager()
-        project = pm.get_project(project_id)
-        if not project:
+        result = project_manager.get(project_id)
+        if result.is_failure:
             raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+        project = result.value
 
         detector = get_repetition_detector()
-        chapters = pm.get_chapters(project_id)
+        chapters = chapter_repository.get_by_project(project_id)
 
         chapters_data = []
         global_repetitions = []
@@ -13449,8 +13747,8 @@ async def get_echo_report(
             global_total_words += report.total_words
 
             chapters_data.append({
-                "chapter_number": chapter.number,
-                "chapter_title": chapter.title or f"Capítulo {chapter.number}",
+                "chapter_number": chapter.chapter_number,
+                "chapter_title": chapter.title or f"Capítulo {chapter.chapter_number}",
                 "repetitions": chapter_reps,
                 "repetition_count": len(chapter_reps),
                 "total_words": report.total_words,
@@ -13495,15 +13793,14 @@ async def get_sentence_variation(project_id: int):
     """
     try:
         from narrative_assistant.nlp.style.readability import get_readability_analyzer
-        from narrative_assistant.persistence import ProjectManager
 
-        pm = ProjectManager()
-        project = pm.get_project(project_id)
-        if not project:
+        result = project_manager.get(project_id)
+        if result.is_failure:
             raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+        project = result.value
 
         analyzer = get_readability_analyzer()
-        chapters = pm.get_chapters(project_id)
+        chapters = chapter_repository.get_by_project(project_id)
 
         chapters_data = []
         global_stats = {
@@ -13525,8 +13822,8 @@ async def get_sentence_variation(project_id: int):
             report = result.value
 
             chapters_data.append({
-                "chapter_number": chapter.number,
-                "chapter_title": chapter.title or f"Capítulo {chapter.number}",
+                "chapter_number": chapter.chapter_number,
+                "chapter_title": chapter.title or f"Capítulo {chapter.chapter_number}",
                 "flesch_szigriszt": round(report.flesch_szigriszt, 1),
                 "level": report.level.value,
                 "level_description": report.level_description,
@@ -13595,15 +13892,14 @@ async def get_pacing_analysis(project_id: int):
     """
     try:
         from narrative_assistant.analysis.pacing import get_pacing_analyzer
-        from narrative_assistant.persistence import ProjectManager
 
-        pm = ProjectManager()
-        project = pm.get_project(project_id)
-        if not project:
+        result = project_manager.get(project_id)
+        if result.is_failure:
             raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+        project = result.value
 
         analyzer = get_pacing_analyzer()
-        chapters = pm.get_chapters(project_id)
+        chapters = chapter_repository.get_by_project(project_id)
 
         chapters_data = []
 
@@ -13619,8 +13915,8 @@ async def get_pacing_analysis(project_id: int):
             report = result.value
 
             chapters_data.append({
-                "chapter_number": chapter.number,
-                "chapter_title": chapter.title or f"Capítulo {chapter.number}",
+                "chapter_number": chapter.chapter_number,
+                "chapter_title": chapter.title or f"Capítulo {chapter.chapter_number}",
                 "pacing_score": round(report.overall_pacing, 2),
                 "pacing_label": _get_pacing_label(report.overall_pacing),
                 "metrics": {
@@ -13696,15 +13992,14 @@ async def get_age_readability(
     """
     try:
         from narrative_assistant.nlp.style.readability import get_readability_analyzer, AgeGroup
-        from narrative_assistant.persistence import ProjectManager
 
-        pm = ProjectManager()
-        project = pm.get_project(project_id)
-        if not project:
+        result = project_manager.get(project_id)
+        if result.is_failure:
             raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+        project = result.value
 
         analyzer = get_readability_analyzer()
-        chapters = pm.get_chapters(project_id)
+        chapters = chapter_repository.get_by_project(project_id)
 
         # Parsear grupo de edad objetivo
         target_group = None
@@ -13747,8 +14042,8 @@ async def get_age_readability(
             if ch_result.is_success:
                 ch_report = ch_result.value
                 chapters_data.append({
-                    "chapter_number": chapter.number,
-                    "chapter_title": chapter.title or f"Capítulo {chapter.number}",
+                    "chapter_number": chapter.chapter_number,
+                    "chapter_title": chapter.title or f"Capítulo {chapter.chapter_number}",
                     "estimated_age_group": ch_report.estimated_age_group.value,
                     "estimated_age_range": ch_report.estimated_age_range,
                     "appropriateness_score": round(ch_report.appropriateness_score, 1),

@@ -13,7 +13,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
-import Dropdown from 'primevue/dropdown'
+import Select from 'primevue/select'
 import MultiSelect from 'primevue/multiselect'
 import ToggleSwitch from 'primevue/toggleswitch'
 import Slider from 'primevue/slider'
@@ -409,8 +409,8 @@ onBeforeUnmount(() => {
       v-if="showDetectionBanner && detectionResult"
       severity="info"
       :closable="true"
-      @close="dismissDetection"
       class="detection-banner"
+      @close="dismissDetection"
     >
       <div class="detection-content">
         <div class="detection-info">
@@ -473,14 +473,14 @@ onBeforeUnmount(() => {
             <ToggleSwitch v-model="config.typography.enabled" @change="scheduleAutoSave" />
           </div>
         </template>
-        <template #content v-if="config.typography.enabled">
+        <template v-if="config.typography.enabled" #content>
           <div class="config-row">
             <label>Guiones de diálogo</label>
             <SelectButton
               v-model="config.typography.dialogue_dash"
               :options="dashOptions"
-              optionLabel="label"
-              optionValue="value"
+              option-label="label"
+              option-value="value"
               @change="scheduleAutoSave"
             />
           </div>
@@ -489,8 +489,8 @@ onBeforeUnmount(() => {
             <SelectButton
               v-model="config.typography.quote_style"
               :options="quoteOptions"
-              optionLabel="label"
-              optionValue="value"
+              option-label="label"
+              option-value="value"
               @change="scheduleAutoSave"
             />
           </div>
@@ -505,14 +505,14 @@ onBeforeUnmount(() => {
             <ToggleSwitch v-model="config.repetition.enabled" @change="scheduleAutoSave" />
           </div>
         </template>
-        <template #content v-if="config.repetition.enabled">
+        <template v-if="config.repetition.enabled" #content>
           <div class="config-row">
             <label>Sensibilidad</label>
             <SelectButton
               v-model="config.repetition.sensitivity"
               :options="sensitivityOptions"
-              optionLabel="label"
-              optionValue="value"
+              option-label="label"
+              option-value="value"
               @change="scheduleAutoSave"
             />
           </div>
@@ -528,8 +528,8 @@ onBeforeUnmount(() => {
               :min="20"
               :max="200"
               :step="10"
-              @change="scheduleAutoSave"
               class="distance-slider"
+              @change="scheduleAutoSave"
             />
           </div>
           <div class="config-row inline">
@@ -547,14 +547,14 @@ onBeforeUnmount(() => {
             <ToggleSwitch v-model="config.regional.enabled" @change="scheduleAutoSave" />
           </div>
         </template>
-        <template #content v-if="config.regional.enabled">
+        <template v-if="config.regional.enabled" #content>
           <div class="config-row">
             <label>Variante del español</label>
-            <Dropdown
+            <Select
               v-model="config.regional.target_region"
               :options="regionOptions"
-              optionLabel="label"
-              optionValue="value"
+              option-label="label"
+              option-value="value"
               @change="scheduleAutoSave"
             />
           </div>
@@ -582,12 +582,12 @@ onBeforeUnmount(() => {
             <MultiSelect
               v-model="config.profile.secondary_fields"
               :options="fieldOptions"
-              optionLabel="label"
-              optionValue="value"
+              option-label="label"
+              option-value="value"
               placeholder="Seleccionar campos..."
               display="chip"
-              @change="scheduleAutoSave"
               class="field-multiselect"
+              @change="scheduleAutoSave"
             />
           </div>
         </template>
@@ -625,7 +625,6 @@ onBeforeUnmount(() => {
         </template>
       </Card>
     </div>
-
   </div>
 </template>
 
