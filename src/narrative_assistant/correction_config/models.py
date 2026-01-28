@@ -18,6 +18,77 @@ class InheritanceSource(str, Enum):
     CUSTOM = "custom"        # Personalizado por el usuario
 
 
+class DashType(str, Enum):
+    """Tipos de guiones/rayas para diálogos."""
+    EM_DASH = "em_dash"      # Raya española (—) U+2014
+    EN_DASH = "en_dash"      # Guión largo (–) U+2013
+    HYPHEN = "hyphen"        # Guión simple (-) U+002D
+    NONE = "none"            # No usar guiones para diálogo
+
+    @property
+    def char(self) -> str:
+        """Devuelve el carácter Unicode correspondiente."""
+        return {
+            DashType.EM_DASH: "—",
+            DashType.EN_DASH: "–",
+            DashType.HYPHEN: "-",
+            DashType.NONE: "",
+        }.get(self, "")
+
+    @property
+    def label(self) -> str:
+        """Etiqueta para mostrar en UI."""
+        return {
+            DashType.EM_DASH: "Raya española (—)",
+            DashType.EN_DASH: "Guión largo (–)",
+            DashType.HYPHEN: "Guión simple (-)",
+            DashType.NONE: "No usar guiones",
+        }.get(self, "")
+
+
+class QuoteType(str, Enum):
+    """Tipos de comillas para diálogos/pensamientos."""
+    ANGULAR = "angular"      # Comillas angulares/latinas («»)
+    DOUBLE = "double"        # Comillas inglesas dobles ("")
+    SINGLE = "single"        # Comillas simples ('')
+    NONE = "none"            # No usar comillas
+
+    @property
+    def chars(self) -> tuple[str, str]:
+        """Devuelve tupla (apertura, cierre)."""
+        return {
+            QuoteType.ANGULAR: ("«", "»"),
+            QuoteType.DOUBLE: (""", """),
+            QuoteType.SINGLE: ("'", "'"),
+            QuoteType.NONE: ("", ""),
+        }.get(self, ("", ""))
+
+    @property
+    def label(self) -> str:
+        """Etiqueta para mostrar en UI."""
+        return {
+            QuoteType.ANGULAR: "Comillas angulares («»)",
+            QuoteType.DOUBLE: "Comillas inglesas ("")",
+            QuoteType.SINGLE: "Comillas simples ('')",
+            QuoteType.NONE: "No usar comillas",
+        }.get(self, "")
+
+
+class MarkerDetectionMode(str, Enum):
+    """Modo de detección de marcadores."""
+    AUTO = "auto"            # Detectar automáticamente del documento
+    PRESET = "preset"        # Usar un preset predefinido
+    CUSTOM = "custom"        # Configuración manual del usuario
+
+
+class MarkerPreset(str, Enum):
+    """Presets de configuración de marcadores."""
+    SPANISH_TRADITIONAL = "spanish_traditional"  # Raya + angulares (RAE)
+    ANGLO_SAXON = "anglo_saxon"                  # Comillas dobles
+    SPANISH_QUOTES = "spanish_quotes"            # Comillas angulares (sin raya)
+    DETECT = "detect"                            # Detectar del documento
+
+
 @dataclass
 class ParameterValue:
     """
@@ -46,20 +117,39 @@ class DialogConfig:
     """
     Configuración de análisis de diálogos.
 
-    Incluye marcadores, análisis de verbos dicendi, etc.
+    Soporta configuración por función (diálogo hablado, pensamientos, citas)
+    con detección automática y presets predefinidos.
     """
-    # Marcadores de diálogo aceptados
-    # Spanish: raya (—), comillas angulares («»)
-    # English: quotes (""), em-dash
-    dialog_markers: list[str] = field(default_factory=lambda: ["—", "«", "»", '"', '"', '"'])
+    # ===== Modo de configuración =====
+    # Cómo se determinan los marcadores
+    detection_mode: MarkerDetectionMode = MarkerDetectionMode.PRESET
+    preset: MarkerPreset = MarkerPreset.SPANISH_TRADITIONAL
 
-    # Marcador preferido/estándar (None = no preferencia, acepta cualquiera)
-    # Valores posibles: "raya" (—), "comillas_angulares" («»), "comillas_inglesas" (""), None
-    preferred_marker: str | None = None
+    # ===== Marcadores por función =====
+    # Diálogo hablado (parlamentos de personajes)
+    spoken_dialogue_dash: DashType = DashType.EM_DASH
+    spoken_dialogue_quote: QuoteType = QuoteType.NONE  # Alternativa si no se usa guión
 
-    # ¿Alertar cuando se use un marcador diferente al preferido?
-    flag_inconsistent_markers: bool = False
+    # Pensamientos internos
+    thoughts_quote: QuoteType = QuoteType.ANGULAR
+    thoughts_use_italics: bool = True
 
+    # Diálogo dentro de diálogo (cita dentro de parlamento)
+    nested_dialogue_quote: QuoteType = QuoteType.DOUBLE
+
+    # Citas textuales
+    textual_quote: QuoteType = QuoteType.ANGULAR
+
+    # ===== Detección automática =====
+    # ¿Se detectó automáticamente?
+    auto_detected: bool = False
+    detection_confidence: float = 0.0
+
+    # ===== Consistencia =====
+    # ¿Alertar cuando se use un marcador diferente al configurado?
+    flag_inconsistent_markers: bool = True
+
+    # ===== Análisis de verbos dicendi =====
     # ¿Analizar variación de verbos dicendi? (dijo, exclamó, murmuró...)
     analyze_dialog_tags: bool = True
 
@@ -69,18 +159,69 @@ class DialogConfig:
     # ¿Alertar por tags repetidos consecutivos?
     flag_consecutive_same_tag: bool = True
 
+    # ===== General =====
     # ¿Habilitar análisis de diálogo?
     enabled: bool = True
 
+    # Legacy: mantener para compatibilidad (deprecated)
+    dialog_markers: list[str] = field(default_factory=lambda: ["—", "«", "»", '"', '"', '"'])
+    preferred_marker: str | None = None
+
+    def get_accepted_markers(self) -> list[str]:
+        """Obtiene lista de todos los marcadores aceptados según la configuración."""
+        markers = []
+
+        # Guiones
+        if self.spoken_dialogue_dash != DashType.NONE:
+            markers.append(self.spoken_dialogue_dash.char)
+
+        # Comillas para diálogo
+        if self.spoken_dialogue_quote != QuoteType.NONE:
+            open_q, close_q = self.spoken_dialogue_quote.chars
+            markers.extend([open_q, close_q])
+
+        # Comillas para pensamientos
+        if self.thoughts_quote != QuoteType.NONE:
+            open_q, close_q = self.thoughts_quote.chars
+            if open_q not in markers:
+                markers.extend([open_q, close_q])
+
+        # Comillas para nested
+        if self.nested_dialogue_quote != QuoteType.NONE:
+            open_q, close_q = self.nested_dialogue_quote.chars
+            if open_q not in markers:
+                markers.extend([open_q, close_q])
+
+        return markers
+
     def to_dict(self) -> dict:
         return {
-            "dialog_markers": self.dialog_markers,
-            "preferred_marker": self.preferred_marker,
+            # Modo y preset
+            "detection_mode": self.detection_mode.value,
+            "preset": self.preset.value,
+
+            # Marcadores por función
+            "spoken_dialogue_dash": self.spoken_dialogue_dash.value,
+            "spoken_dialogue_quote": self.spoken_dialogue_quote.value,
+            "thoughts_quote": self.thoughts_quote.value,
+            "thoughts_use_italics": self.thoughts_use_italics,
+            "nested_dialogue_quote": self.nested_dialogue_quote.value,
+            "textual_quote": self.textual_quote.value,
+
+            # Detección
+            "auto_detected": self.auto_detected,
+            "detection_confidence": self.detection_confidence,
+
+            # Consistencia y análisis
             "flag_inconsistent_markers": self.flag_inconsistent_markers,
             "analyze_dialog_tags": self.analyze_dialog_tags,
             "dialog_tag_variation_min": self.dialog_tag_variation_min,
             "flag_consecutive_same_tag": self.flag_consecutive_same_tag,
             "enabled": self.enabled,
+
+            # Legacy (deprecated pero mantenido para compatibilidad)
+            "dialog_markers": self.get_accepted_markers(),
+            "preferred_marker": self.preferred_marker,
         }
 
 

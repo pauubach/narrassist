@@ -95,49 +95,168 @@
                       </div>
                     </div>
 
+                    <!-- Preset de marcadores -->
                     <div v-if="localConfig.dialog.enabled" class="param-row">
                       <div class="param-info">
-                        <label>Marcadores de diálogo</label>
-                        <small>Caracteres reconocidos como inicio/fin de diálogo</small>
-                      </div>
-                      <div class="param-control wide">
-                        <InputText
-                          v-model="dialogMarkersText"
-                          placeholder="—, «, », comillas, etc."
-                          @change="markModified('dialog', 'dialog_markers')"
-                        />
-                        <InheritanceIndicator
-                          :is-custom="isCustom('dialog', 'dialog_markers')"
-                          @reset="resetParam('dialog', 'dialog_markers')"
-                        />
-                      </div>
-                    </div>
-
-                    <div v-if="localConfig.dialog.enabled" class="param-row">
-                      <div class="param-info">
-                        <label>Marcador preferido</label>
-                        <small>Tipo de marcador estándar para este documento</small>
+                        <label>Estilo de marcadores</label>
+                        <small>Configuración predefinida o personalizada</small>
                       </div>
                       <div class="param-control wide">
                         <Select
-                          v-model="localConfig.dialog.preferred_marker"
-                          :options="preferredMarkerOptions"
+                          v-model="localConfig.dialog.preset"
+                          :options="markerPresetOptions"
                           optionLabel="label"
                           optionValue="value"
-                          optionGroupLabel="label"
-                          optionGroupChildren="items"
-                          placeholder="Sin preferencia"
-                          showClear
-                          @change="markModified('dialog', 'preferred_marker')"
+                          placeholder="Seleccionar estilo"
+                          @change="onPresetChange"
                         />
                         <InheritanceIndicator
-                          :is-custom="isCustom('dialog', 'preferred_marker')"
-                          @reset="resetParam('dialog', 'preferred_marker')"
+                          :is-custom="isCustom('dialog', 'preset')"
+                          @reset="resetParam('dialog', 'preset')"
                         />
                       </div>
                     </div>
 
-                    <div v-if="localConfig.dialog.enabled && localConfig.dialog.preferred_marker" class="param-row">
+                    <!-- Detección automática info -->
+                    <div v-if="localConfig.dialog.enabled && localConfig.dialog.preset === 'detect'" class="param-row info-row">
+                      <div class="detection-info">
+                        <i class="pi pi-info-circle"></i>
+                        <span>La detección automática analizará el documento al importarlo y sugerirá la configuración más adecuada.</span>
+                      </div>
+                    </div>
+
+                    <!-- Vista previa del estilo -->
+                    <div v-if="localConfig.dialog.enabled && localConfig.dialog.preset !== 'detect'" class="param-row">
+                      <div class="style-preview">
+                        <div class="preview-label">Vista previa:</div>
+                        <div class="preview-text">
+                          <template v-if="localConfig.dialog.spoken_dialogue_dash !== 'none'">
+                            {{ getDashChar(localConfig.dialog.spoken_dialogue_dash) }}¿Lo recuerdas? {{ getDashChar(localConfig.dialog.spoken_dialogue_dash) }}preguntó{{ getDashChar(localConfig.dialog.spoken_dialogue_dash) }}. Él dijo: {{ getQuoteChars(localConfig.dialog.nested_dialogue_quote)[0] }}Nunca volveré{{ getQuoteChars(localConfig.dialog.nested_dialogue_quote)[1] }}.
+                          </template>
+                          <template v-else>
+                            {{ getQuoteChars(localConfig.dialog.spoken_dialogue_quote)[0] }}¿Lo recuerdas?{{ getQuoteChars(localConfig.dialog.spoken_dialogue_quote)[1] }} preguntó. {{ getQuoteChars(localConfig.dialog.spoken_dialogue_quote)[0] }}Él dijo: {{ getQuoteChars(localConfig.dialog.nested_dialogue_quote)[0] }}Nunca volveré{{ getQuoteChars(localConfig.dialog.nested_dialogue_quote)[1] }}.{{ getQuoteChars(localConfig.dialog.spoken_dialogue_quote)[1] }}
+                          </template>
+                          <br>
+                          <em v-if="localConfig.dialog.thoughts_use_italics">{{ getQuoteChars(localConfig.dialog.thoughts_quote)[0] }}Ojalá fuera verdad{{ getQuoteChars(localConfig.dialog.thoughts_quote)[1] }}</em>
+                          <template v-else>{{ getQuoteChars(localConfig.dialog.thoughts_quote)[0] }}Ojalá fuera verdad{{ getQuoteChars(localConfig.dialog.thoughts_quote)[1] }}</template>, pensó.
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Configuración avanzada (colapsable) -->
+                    <div v-if="localConfig.dialog.enabled && localConfig.dialog.preset !== 'detect'" class="advanced-section">
+                      <Button
+                        :label="showAdvancedMarkers ? 'Ocultar configuración avanzada' : 'Configuración avanzada'"
+                        :icon="showAdvancedMarkers ? 'pi pi-chevron-up' : 'pi pi-chevron-down'"
+                        text
+                        size="small"
+                        @click="showAdvancedMarkers = !showAdvancedMarkers"
+                      />
+
+                      <div v-if="showAdvancedMarkers" class="advanced-options">
+                        <!-- Diálogo hablado - Guión -->
+                        <div class="param-row">
+                          <div class="param-info">
+                            <label>Diálogo hablado (guión)</label>
+                            <small>Tipo de guión para parlamentos</small>
+                          </div>
+                          <div class="param-control wide">
+                            <Select
+                              v-model="localConfig.dialog.spoken_dialogue_dash"
+                              :options="dashTypeOptions"
+                              optionLabel="label"
+                              optionValue="value"
+                              @change="markModified('dialog', 'spoken_dialogue_dash')"
+                            />
+                          </div>
+                        </div>
+
+                        <!-- Diálogo hablado - Comillas (alternativa) -->
+                        <div v-if="localConfig.dialog.spoken_dialogue_dash === 'none'" class="param-row">
+                          <div class="param-info">
+                            <label>Diálogo hablado (comillas)</label>
+                            <small>Comillas para parlamentos sin guión</small>
+                          </div>
+                          <div class="param-control wide">
+                            <Select
+                              v-model="localConfig.dialog.spoken_dialogue_quote"
+                              :options="quoteTypeOptions"
+                              optionLabel="label"
+                              optionValue="value"
+                              @change="markModified('dialog', 'spoken_dialogue_quote')"
+                            />
+                          </div>
+                        </div>
+
+                        <!-- Pensamientos -->
+                        <div class="param-row">
+                          <div class="param-info">
+                            <label>Pensamientos</label>
+                            <small>Comillas para pensamientos internos</small>
+                          </div>
+                          <div class="param-control wide">
+                            <Select
+                              v-model="localConfig.dialog.thoughts_quote"
+                              :options="quoteTypeOptions"
+                              optionLabel="label"
+                              optionValue="value"
+                              @change="markModified('dialog', 'thoughts_quote')"
+                            />
+                          </div>
+                        </div>
+
+                        <!-- Pensamientos en cursiva -->
+                        <div class="param-row">
+                          <div class="param-info">
+                            <label>Cursiva en pensamientos</label>
+                            <small>Aplicar cursiva además de comillas</small>
+                          </div>
+                          <div class="param-control">
+                            <ToggleSwitch
+                              v-model="localConfig.dialog.thoughts_use_italics"
+                              @change="markModified('dialog', 'thoughts_use_italics')"
+                            />
+                          </div>
+                        </div>
+
+                        <!-- Diálogo anidado -->
+                        <div class="param-row">
+                          <div class="param-info">
+                            <label>Diálogo anidado</label>
+                            <small>Comillas para citas dentro de diálogo</small>
+                          </div>
+                          <div class="param-control wide">
+                            <Select
+                              v-model="localConfig.dialog.nested_dialogue_quote"
+                              :options="quoteTypeOptions"
+                              optionLabel="label"
+                              optionValue="value"
+                              @change="markModified('dialog', 'nested_dialogue_quote')"
+                            />
+                          </div>
+                        </div>
+
+                        <!-- Citas textuales -->
+                        <div class="param-row">
+                          <div class="param-info">
+                            <label>Citas textuales</label>
+                            <small>Comillas para citas literales</small>
+                          </div>
+                          <div class="param-control wide">
+                            <Select
+                              v-model="localConfig.dialog.textual_quote"
+                              :options="quoteTypeOptions"
+                              optionLabel="label"
+                              optionValue="value"
+                              @change="markModified('dialog', 'textual_quote')"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Alertar inconsistencias -->
+                    <div v-if="localConfig.dialog.enabled" class="param-row">
                       <div class="param-info">
                         <label>Alertar marcadores inconsistentes</label>
                         <small>Detectar cuando se use un marcador diferente al preferido</small>
@@ -723,6 +842,16 @@ interface CorrectionConfig {
   subtype_name: string | null
   dialog: {
     enabled: boolean
+    // New marker system
+    preset: string
+    detection_mode: string
+    spoken_dialogue_dash: string
+    spoken_dialogue_quote: string
+    thoughts_quote: string
+    thoughts_use_italics: boolean
+    nested_dialogue_quote: string
+    textual_quote: string
+    // Legacy fields (for backwards compatibility)
     dialog_markers: string[]
     preferred_marker: string | null
     flag_inconsistent_markers: boolean
@@ -797,7 +926,23 @@ const defaultLocalConfig: CorrectionConfig = {
   type_name: '',
   subtype_code: null,
   subtype_name: null,
-  dialog: { enabled: false, dialog_markers: [], preferred_marker: null, flag_inconsistent_markers: false, analyze_dialog_tags: false, dialog_tag_variation_min: 3, flag_consecutive_same_tag: false },
+  dialog: {
+    enabled: false,
+    preset: 'spanish_traditional',
+    detection_mode: 'preset',
+    spoken_dialogue_dash: 'em_dash',
+    spoken_dialogue_quote: 'none',
+    thoughts_quote: 'angular',
+    thoughts_use_italics: true,
+    nested_dialogue_quote: 'double',
+    textual_quote: 'angular',
+    dialog_markers: [],
+    preferred_marker: null,
+    flag_inconsistent_markers: true,
+    analyze_dialog_tags: false,
+    dialog_tag_variation_min: 3,
+    flag_consecutive_same_tag: false
+  },
   repetition: { enabled: false, tolerance: 'medium', proximity_window_chars: 200, min_word_length: 4, ignore_words: [], flag_lack_of_repetition: false },
   sentence: { enabled: false, max_length_words: null, recommended_length_words: null, analyze_complexity: false, passive_voice_tolerance_pct: 20, adverb_ly_tolerance_pct: 10 },
   style: { enabled: false, analyze_sentence_starts: false, analyze_sticky_sentences: false, sticky_threshold_pct: 40, analyze_register: false, analyze_emotions: false },
@@ -822,25 +967,95 @@ const toleranceOptions = [
   { value: 'low', label: 'Baja (2+ ocurrencias)' },
 ]
 
-// Opciones de marcadores de diálogo agrupadas por tipo
-const preferredMarkerOptions = [
-  {
-    label: 'Guiones y rayas',
-    items: [
-      { value: 'raya', label: 'Raya española (—)' },
-      { value: 'guion_largo', label: 'Guión largo (–)' },
-      { value: 'guion', label: 'Guión simple (-)' }
-    ]
-  },
-  {
-    label: 'Comillas',
-    items: [
-      { value: 'comillas_angulares', label: 'Comillas angulares/latinas («»)' },
-      { value: 'comillas_inglesas', label: 'Comillas inglesas ("")' },
-      { value: 'comillas_simples', label: "Comillas simples ('')" }
-    ]
-  }
+// Estado para opciones avanzadas de marcadores
+const showAdvancedMarkers = ref(false)
+
+// Opciones de presets de marcadores
+const markerPresetOptions = [
+  { value: 'spanish_traditional', label: 'Español tradicional (raya + comillas angulares)' },
+  { value: 'anglo_saxon', label: 'Anglosajón (comillas inglesas)' },
+  { value: 'spanish_quotes', label: 'Español con comillas (angulares para diálogo)' },
+  { value: 'detect', label: 'Detección automática' },
 ]
+
+// Opciones de tipos de guión
+const dashTypeOptions = [
+  { value: 'em_dash', label: 'Raya española (—)' },
+  { value: 'en_dash', label: 'Guión largo (–)' },
+  { value: 'hyphen', label: 'Guión simple (-)' },
+  { value: 'none', label: 'Sin guión (usar comillas)' },
+]
+
+// Opciones de tipos de comillas
+const quoteTypeOptions = [
+  { value: 'angular', label: 'Comillas angulares («»)' },
+  { value: 'double', label: 'Comillas inglesas ("")' },
+  { value: 'single', label: "Comillas simples ('')" },
+  { value: 'none', label: 'Sin comillas' },
+]
+
+// Helper para obtener el carácter de guión
+const getDashChar = (dashType: string): string => {
+  switch (dashType) {
+    case 'em_dash': return '—'
+    case 'en_dash': return '–'
+    case 'hyphen': return '-'
+    default: return ''
+  }
+}
+
+// Helper para obtener caracteres de comillas [apertura, cierre]
+const getQuoteChars = (quoteType: string): [string, string] => {
+  switch (quoteType) {
+    case 'angular': return ['«', '»']
+    case 'double': return ['"', '"']
+    case 'single': return ["'", "'"]
+    default: return ['', '']
+  }
+}
+
+// Configuraciones de presets
+const MARKER_PRESETS: Record<string, Record<string, string | boolean>> = {
+  spanish_traditional: {
+    spoken_dialogue_dash: 'em_dash',
+    spoken_dialogue_quote: 'none',
+    thoughts_quote: 'angular',
+    thoughts_use_italics: true,
+    nested_dialogue_quote: 'double',
+    textual_quote: 'angular',
+  },
+  anglo_saxon: {
+    spoken_dialogue_dash: 'none',
+    spoken_dialogue_quote: 'double',
+    thoughts_quote: 'single',
+    thoughts_use_italics: true,
+    nested_dialogue_quote: 'single',
+    textual_quote: 'double',
+  },
+  spanish_quotes: {
+    spoken_dialogue_dash: 'none',
+    spoken_dialogue_quote: 'angular',
+    thoughts_quote: 'double',
+    thoughts_use_italics: true,
+    nested_dialogue_quote: 'single',
+    textual_quote: 'angular',
+  },
+}
+
+// Handler para cambio de preset
+const onPresetChange = () => {
+  const preset = localConfig.value.dialog.preset
+  if (preset && preset !== 'detect' && MARKER_PRESETS[preset]) {
+    const presetConfig = MARKER_PRESETS[preset]
+    localConfig.value.dialog.spoken_dialogue_dash = presetConfig.spoken_dialogue_dash as string
+    localConfig.value.dialog.spoken_dialogue_quote = presetConfig.spoken_dialogue_quote as string
+    localConfig.value.dialog.thoughts_quote = presetConfig.thoughts_quote as string
+    localConfig.value.dialog.thoughts_use_italics = presetConfig.thoughts_use_italics as boolean
+    localConfig.value.dialog.nested_dialogue_quote = presetConfig.nested_dialogue_quote as string
+    localConfig.value.dialog.textual_quote = presetConfig.textual_quote as string
+  }
+  markModified('dialog', 'preset')
+}
 
 // Dialog markers as editable text
 const dialogMarkersText = computed({

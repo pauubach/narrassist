@@ -18,7 +18,67 @@ from .models import (
     StructureConfig,
     ReadabilityConfig,
     InheritanceSource,
+    DashType,
+    QuoteType,
+    MarkerDetectionMode,
+    MarkerPreset,
 )
+
+
+# =============================================================================
+# Presets de Marcadores de Diálogo
+# =============================================================================
+
+MARKER_PRESETS = {
+    MarkerPreset.SPANISH_TRADITIONAL: {
+        "detection_mode": MarkerDetectionMode.PRESET.value,
+        "preset": MarkerPreset.SPANISH_TRADITIONAL.value,
+        "spoken_dialogue_dash": DashType.EM_DASH.value,
+        "spoken_dialogue_quote": QuoteType.NONE.value,
+        "thoughts_quote": QuoteType.ANGULAR.value,
+        "thoughts_use_italics": True,
+        "nested_dialogue_quote": QuoteType.DOUBLE.value,
+        "textual_quote": QuoteType.ANGULAR.value,
+    },
+    MarkerPreset.ANGLO_SAXON: {
+        "detection_mode": MarkerDetectionMode.PRESET.value,
+        "preset": MarkerPreset.ANGLO_SAXON.value,
+        "spoken_dialogue_dash": DashType.NONE.value,
+        "spoken_dialogue_quote": QuoteType.DOUBLE.value,
+        "thoughts_quote": QuoteType.SINGLE.value,
+        "thoughts_use_italics": True,
+        "nested_dialogue_quote": QuoteType.SINGLE.value,
+        "textual_quote": QuoteType.DOUBLE.value,
+    },
+    MarkerPreset.SPANISH_QUOTES: {
+        "detection_mode": MarkerDetectionMode.PRESET.value,
+        "preset": MarkerPreset.SPANISH_QUOTES.value,
+        "spoken_dialogue_dash": DashType.NONE.value,
+        "spoken_dialogue_quote": QuoteType.ANGULAR.value,
+        "thoughts_quote": QuoteType.DOUBLE.value,
+        "thoughts_use_italics": True,
+        "nested_dialogue_quote": QuoteType.SINGLE.value,
+        "textual_quote": QuoteType.ANGULAR.value,
+    },
+    MarkerPreset.DETECT: {
+        "detection_mode": MarkerDetectionMode.AUTO.value,
+        "preset": MarkerPreset.DETECT.value,
+        # Defaults que se usarán si la detección falla
+        "spoken_dialogue_dash": DashType.EM_DASH.value,
+        "spoken_dialogue_quote": QuoteType.NONE.value,
+        "thoughts_quote": QuoteType.ANGULAR.value,
+        "thoughts_use_italics": True,
+        "nested_dialogue_quote": QuoteType.DOUBLE.value,
+        "textual_quote": QuoteType.ANGULAR.value,
+        # Alertar inconsistencias respecto a lo detectado
+        "flag_inconsistent_markers": True,
+    },
+}
+
+
+def get_preset_config(preset: MarkerPreset) -> dict:
+    """Obtiene la configuración de diálogo para un preset."""
+    return MARKER_PRESETS.get(preset, MARKER_PRESETS[MarkerPreset.SPANISH_TRADITIONAL])
 
 
 # =============================================================================
@@ -32,7 +92,12 @@ TYPES_REGISTRY = {
         "icon": "pi-book",
         "color": "#6366f1",
         "config": {
-            "dialog": {"enabled": True, "analyze_dialog_tags": True},
+            "dialog": {
+                "enabled": True,
+                "analyze_dialog_tags": True,
+                "flag_inconsistent_markers": True,
+                **MARKER_PRESETS[MarkerPreset.SPANISH_TRADITIONAL],
+            },
             "repetition": {"tolerance": "medium", "proximity_window_chars": 150},
             "sentence": {"max_length_words": None, "recommended_length_words": 25},
             "style": {"enabled": True},
