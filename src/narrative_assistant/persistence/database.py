@@ -723,6 +723,8 @@ class Database:
         """
         config = get_config()
         self.db_path = db_path or config.db_path
+        logger.info(f"Database.__init__: db_path param={db_path}, config.db_path={config.db_path}")
+        logger.info(f"Database.__init__: usando db_path={self.db_path}")
         self._is_memory = self.db_path == ":memory:" or (
             isinstance(self.db_path, str) and self.db_path.startswith(":")
         )
@@ -754,9 +756,77 @@ class Database:
 
     def _initialize_schema(self) -> None:
         """Crea tablas si no existen."""
-        with self.connection() as conn:
-            conn.executescript(SCHEMA_SQL)
-            logger.info(f"Schema inicializado en {self.db_path}")
+        logger.info(f"Inicializando schema en: {self.db_path}")
+        logger.info(f"db_path type: {type(self.db_path)}, is_memory: {self._is_memory}")
+        
+        # Verificar si el archivo existe y tiene contenido
+        if not self._is_memory and isinstance(self.db_path, Path):
+            if self.db_path.exists():
+                size = self.db_path.stat().st_size
+                logger.info(f"Archivo DB existente, tamaño: {size} bytes")
+            else:
+                logger.info("Archivo DB no existe, se creará nuevo")
+        
+        try:
+            with self.connection() as conn:
+                # Primero verificar qué tablas existen ANTES de ejecutar el schema
+                existing_tables = conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                ).fetchall()
+                existing_names = [t[0] for t in existing_tables]
+                logger.info(f"Tablas existentes ANTES de schema: {existing_names}")
+                
+                # Si 'projects' no existe, ejecutar el schema completo
+                if 'projects' not in existing_names:
+                    logger.info("Tabla 'projects' no existe, ejecutando SCHEMA_SQL completo")
+                    conn.executescript(SCHEMA_SQL)
+                    logger.info("SCHEMA_SQL ejecutado")
+                else:
+                    logger.info("Tabla 'projects' ya existe, no se ejecuta schema")
+                
+                # Verificar que las tablas se crearon
+                tables = conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                ).fetchall()
+                table_names = [t[0] for t in tables]
+                logger.info(f"Schema inicializado en {self.db_path}")
+                logger.info(f"Tablas DESPUÉS de schema: {table_names}")
+                
+                if 'projects' not in table_names:
+                    logger.error("ALERTA CRÍTICA: Tabla 'projects' NO fue creada después de ejecutar schema!")
+                    # Intentar crear solo la tabla projects
+                    logger.info("Intentando crear tabla projects manualmente...")
+                    try:
+                        conn.execute("""
+                            CREATE TABLE IF NOT EXISTS projects (
+                                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                name TEXT NOT NULL,
+                                description TEXT,
+                                document_path TEXT,
+                                document_fingerprint TEXT NOT NULL,
+                                document_format TEXT NOT NULL,
+                                word_count INTEGER,
+                                chapter_count INTEGER,
+                                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                                updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                                last_opened_at TEXT,
+                                analysis_status TEXT DEFAULT 'pending',
+                                analysis_progress REAL DEFAULT 0.0,
+                                settings_json TEXT,
+                                document_type TEXT DEFAULT 'FIC',
+                                document_subtype TEXT,
+                                document_type_confirmed INTEGER DEFAULT 0,
+                                detected_document_type TEXT
+                            )
+                        """)
+                        conn.commit()
+                        logger.info("Tabla projects creada manualmente con éxito")
+                    except Exception as manual_err:
+                        logger.error(f"Error creando tabla projects manualmente: {manual_err}")
+                        
+        except Exception as e:
+            logger.error(f"Error inicializando schema: {e}", exc_info=True)
+            raise
 
     def _create_connection(self) -> sqlite3.Connection:
         """Crea y configura una nueva conexión."""
@@ -875,11 +945,16 @@ _database: Optional[Database] = None
 def get_database(db_path: Optional[Path] = None) -> Database:
     """Obtiene instancia singleton de base de datos (thread-safe)."""
     global _database
+    logger.info(f"get_database llamado con db_path={db_path}")
     if _database is None or (db_path and db_path != _database.db_path):
         with _database_lock:
             # Double-checked locking
             if _database is None or (db_path and db_path != _database.db_path):
+                logger.info(f"Creando nueva instancia de Database con db_path={db_path}")
                 _database = Database(db_path)
+                logger.info(f"Database creada, db_path efectivo: {_database.db_path}")
+    else:
+        logger.info(f"Reutilizando instancia existente, db_path: {_database.db_path}")
     return _database
 
 

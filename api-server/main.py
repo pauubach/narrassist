@@ -324,7 +324,30 @@ def load_narrative_assistant_modules():
             from narrative_assistant import __version__
             
             # Inicializar managers
+            _write_debug("Creating ProjectManager...")
+            logger.info("Creating ProjectManager...")
             project_manager = ProjectManager()
+            _write_debug("ProjectManager created successfully")
+            logger.info("ProjectManager created successfully")
+            
+            # Verificar estado de la base de datos
+            try:
+                from narrative_assistant.persistence.database import get_database
+                db = get_database()
+                _write_debug(f"Database path: {db.db_path}")
+                logger.info(f"Database path: {db.db_path}")
+                # Verificar tablas
+                tables = db.fetchall("SELECT name FROM sqlite_master WHERE type='table'")
+                table_names = [t['name'] for t in tables]
+                _write_debug(f"Tables in database: {table_names}")
+                logger.info(f"Tables in database: {table_names}")
+                if 'projects' not in table_names:
+                    _write_debug("WARNING: 'projects' table NOT found!")
+                    logger.error("WARNING: 'projects' table NOT found!")
+            except Exception as db_check_err:
+                _write_debug(f"Error checking database: {db_check_err}")
+                logger.error(f"Error checking database: {db_check_err}", exc_info=True)
+            
             entity_repository = EntityRepository()
             alert_repository = AlertRepository()
             chapter_repository = ChapterRepository()
@@ -1522,7 +1545,22 @@ async def list_projects():
     """
     try:
         if not project_manager:
+            logger.error("list_projects: project_manager is None")
             return ApiResponse(success=False, error="Project manager not initialized")
+
+        # Log database info for debugging
+        try:
+            db = get_database()
+            logger.info(f"list_projects: Database path = {db.db_path}")
+            # Check if projects table exists
+            tables = db.fetchall("SELECT name FROM sqlite_master WHERE type='table'")
+            table_names = [t['name'] for t in tables]
+            logger.info(f"list_projects: Tables in DB = {table_names}")
+            if 'projects' not in table_names:
+                logger.error("list_projects: 'projects' table does NOT exist!")
+                return ApiResponse(success=False, error="Database not initialized properly - 'projects' table missing")
+        except Exception as db_err:
+            logger.error(f"list_projects: Error checking database: {db_err}", exc_info=True)
 
         projects = project_manager.list_all()
         db = get_database()

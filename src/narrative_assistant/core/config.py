@@ -18,6 +18,32 @@ logger = logging.getLogger(__name__)
 # Lock para thread-safety en singleton
 _config_lock = threading.Lock()
 
+
+def _get_default_data_dir() -> Path:
+    """
+    Determina el directorio de datos según el entorno.
+    
+    - Producción (NA_EMBEDDED=1): usa LOCALAPPDATA/Narrative Assistant (Windows)
+      o ~/.local/share/narrative-assistant (Linux/Mac)
+    - Desarrollo: usa ~/.narrative_assistant
+    """
+    is_embedded = os.environ.get("NA_EMBEDDED") == "1"
+    
+    if is_embedded:
+        # Modo producción - usar rutas estándar del sistema
+        if sys.platform == "win32":
+            localappdata = os.environ.get("LOCALAPPDATA", "")
+            if localappdata:
+                return Path(localappdata) / "Narrative Assistant" / "data"
+        elif sys.platform == "darwin":
+            return Path.home() / "Library" / "Application Support" / "Narrative Assistant"
+        else:
+            # Linux
+            xdg_data = os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local" / "share"))
+            return Path(xdg_data) / "narrative-assistant"
+    
+    # Modo desarrollo - ruta legacy
+    return Path.home() / ".narrative_assistant"
 DevicePreference = Literal["auto", "cuda", "mps", "cpu"]
 
 
@@ -196,10 +222,10 @@ class AppConfig:
 
     # Directorios
     data_dir: Path = field(
-        default_factory=lambda: Path.home() / ".narrative_assistant"
+        default_factory=_get_default_data_dir
     )
     cache_dir: Path = field(
-        default_factory=lambda: Path.home() / ".narrative_assistant" / "cache"
+        default_factory=lambda: _get_default_data_dir() / "cache"
     )
     models_dir: Optional[Path] = None  # Directorio de modelos locales
 
