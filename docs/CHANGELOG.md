@@ -6,6 +6,34 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
+## [0.3.11] - 2026-01-28
+
+### Added
+- **Sistema de configuración de corrección por tipo de documento**
+  - Tipos: FIC, MEM, INF, TEC, AYU, COC, REF con subtipos
+  - Herencia tipo → subtipo → proyecto con overrides personalizables
+  - Tabla `correction_config_overrides` en BD para persistencia
+- **Configuración de marcadores de diálogo per-función**
+  - Enums: `DashType`, `QuoteType`, `MarkerDetectionMode`, `MarkerPreset`
+  - Presets: español tradicional, anglosajón, comillas españolas, auto-detección
+  - Campos por función: diálogo hablado, pensamientos, diálogo anidado, citas textuales
+  - Preview visual de marcadores en modal de configuración
+- **Tests E2E adversariales (Playwright)** para configuración de corrección
+  - 35 tests: serialización, persistencia, adversarial (GAN), herencia, overrides, UI
+  - Cobertura: XSS, SQL injection, race conditions, tipos incorrectos, valores nulos
+
+### Changed
+- **Frontend migrado a PrimeVue 4** con componentes actualizados
+- **ESLint migrado a flat config** con dependencias actualizadas
+- **DialogConfig.to_dict()** usa `_get_value()` helper para manejar dualidad enum/string
+
+### Fixed
+- Persistencia de configuración de marcadores (servidor devolvía formato antiguo)
+- Tabla `correction_config_overrides` añadida a `ESSENTIAL_TABLES`
+- Timing de inicialización de modal de configuración
+
+---
+
 ## [0.3.1] - 2026-01-27
 
 ### Fixed
