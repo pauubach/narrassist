@@ -779,8 +779,10 @@ class Database:
                 # Si 'projects' no existe, ejecutar el schema completo
                 if 'projects' not in existing_names:
                     logger.info("Tabla 'projects' no existe, ejecutando SCHEMA_SQL completo")
+                    # executescript() hace commit automático, pero lo hacemos explícito
                     conn.executescript(SCHEMA_SQL)
-                    logger.info("SCHEMA_SQL ejecutado")
+                    conn.commit()  # Commit explícito para asegurar persistencia
+                    logger.info("SCHEMA_SQL ejecutado y commit realizado")
                 else:
                     logger.info("Tabla 'projects' ya existe, no se ejecuta schema")
                 
