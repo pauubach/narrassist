@@ -135,6 +135,9 @@ class EntityRepository:
         rows = self.db.fetchall(sql, tuple(params))
         return [Entity.from_row(row) for row in rows]
 
+    # Alias para compatibilidad
+    get_by_project = get_entities_by_project
+
     def update_entity(
         self,
         entity_id: int,

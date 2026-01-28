@@ -49,6 +49,10 @@ class Project:
     analysis_status: str = "pending"  # pending, analyzing, completed, error
     analysis_progress: float = 0.0
     settings: dict[str, Any] = field(default_factory=dict)
+    document_type: str = "FIC"  # Tipo de documento (FIC, MEM, etc.)
+    document_subtype: Optional[str] = None  # Subtipo específico
+    document_type_confirmed: bool = False  # Si el usuario confirmó el tipo
+    detected_document_type: Optional[str] = None  # Tipo detectado automáticamente
 
     def to_dict(self) -> dict:
         """Serializa a diccionario."""
@@ -64,6 +68,10 @@ class Project:
             "analysis_status": self.analysis_status,
             "analysis_progress": self.analysis_progress,
             "settings": self.settings,
+            "document_type": self.document_type,
+            "document_subtype": self.document_subtype,
+            "document_type_confirmed": self.document_type_confirmed,
+            "detected_document_type": self.detected_document_type,
         }
 
     @classmethod
@@ -91,6 +99,10 @@ class Project:
             analysis_status=row["analysis_status"] or "pending",
             analysis_progress=row["analysis_progress"] or 0.0,
             settings=settings,
+            document_type=row["document_type"] or "FIC",
+            document_subtype=row["document_subtype"],
+            document_type_confirmed=bool(row["document_type_confirmed"]) if row["document_type_confirmed"] else False,
+            detected_document_type=row["detected_document_type"],
         )
 
 
@@ -262,6 +274,10 @@ class ProjectManager:
                 chapter_count = ?,
                 word_count = ?,
                 settings_json = ?,
+                document_type = ?,
+                document_subtype = ?,
+                document_type_confirmed = ?,
+                detected_document_type = ?,
                 updated_at = datetime('now')
             WHERE id = ?
             """,
@@ -274,6 +290,10 @@ class ProjectManager:
                 project.chapter_count,
                 project.word_count,
                 json.dumps(project.settings) if project.settings else None,
+                project.document_type,
+                project.document_subtype,
+                1 if project.document_type_confirmed else 0,
+                project.detected_document_type,
                 project.id,
             ),
         )

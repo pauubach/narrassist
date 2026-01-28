@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 _database_lock = threading.Lock()
 
 # Versión del schema actual
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 
 # Tablas esenciales que deben existir para una BD válida
 # Solo incluir las tablas básicas definidas en SCHEMA_SQL
@@ -705,8 +705,21 @@ CREATE TABLE IF NOT EXISTS project_custom_tag_catalog (
 
 CREATE INDEX IF NOT EXISTS idx_tag_catalog_project ON project_custom_tag_catalog(project_id);
 
+-- Overrides de configuración de corrección por tipo/subtipo (versión 10)
+-- Permite al usuario personalizar los defaults de tipos/subtipos sin modificar código
+CREATE TABLE IF NOT EXISTS correction_config_overrides (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    type_code TEXT NOT NULL,              -- 'FIC', 'MEM', 'INF', etc.
+    subtype_code TEXT,                    -- NULL = override de tipo, valor = override de subtipo
+    overrides_json TEXT NOT NULL,         -- JSON con los parámetros modificados (solo delta)
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (type_code, subtype_code)      -- Una fila por combinación tipo/subtipo
+);
+
+CREATE INDEX IF NOT EXISTS idx_config_overrides_type ON correction_config_overrides(type_code);
+
 -- Insertar versión del schema
-INSERT OR REPLACE INTO schema_info (key, value) VALUES ('version', '9');
+INSERT OR REPLACE INTO schema_info (key, value) VALUES ('version', '10');
 """
 
 
