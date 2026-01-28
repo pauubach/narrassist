@@ -988,6 +988,7 @@ const dashTypeOptions = [
   { value: 'en_dash', label: 'Guión largo (–)' },
   { value: 'hyphen', label: 'Guión simple (-)' },
   { value: 'none', label: 'Sin guión (usar comillas)' },
+  { value: 'auto', label: 'Detectar automáticamente' },
 ]
 
 // Opciones de tipos de comillas
@@ -996,6 +997,7 @@ const quoteTypeOptions = [
   { value: 'double', label: 'Comillas inglesas ("")' },
   { value: 'single', label: "Comillas simples ('')" },
   { value: 'none', label: 'Sin comillas' },
+  { value: 'auto', label: 'Detectar automáticamente' },
 ]
 
 // Helper para obtener el carácter de guión

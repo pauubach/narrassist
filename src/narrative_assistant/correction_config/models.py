@@ -24,6 +24,7 @@ class DashType(str, Enum):
     EN_DASH = "en_dash"      # Guión largo (–) U+2013
     HYPHEN = "hyphen"        # Guión simple (-) U+002D
     NONE = "none"            # No usar guiones para diálogo
+    AUTO = "auto"            # Detectar automáticamente del documento
 
     @property
     def char(self) -> str:
@@ -33,6 +34,7 @@ class DashType(str, Enum):
             DashType.EN_DASH: "–",
             DashType.HYPHEN: "-",
             DashType.NONE: "",
+            DashType.AUTO: "",  # Se determina en tiempo de análisis
         }.get(self, "")
 
     @property
@@ -43,6 +45,7 @@ class DashType(str, Enum):
             DashType.EN_DASH: "Guión largo (–)",
             DashType.HYPHEN: "Guión simple (-)",
             DashType.NONE: "No usar guiones",
+            DashType.AUTO: "Detectar automáticamente",
         }.get(self, "")
 
 
@@ -52,6 +55,7 @@ class QuoteType(str, Enum):
     DOUBLE = "double"        # Comillas inglesas dobles ("")
     SINGLE = "single"        # Comillas simples ('')
     NONE = "none"            # No usar comillas
+    AUTO = "auto"            # Detectar automáticamente del documento
 
     @property
     def chars(self) -> tuple[str, str]:
@@ -61,6 +65,7 @@ class QuoteType(str, Enum):
             QuoteType.DOUBLE: (""", """),
             QuoteType.SINGLE: ("'", "'"),
             QuoteType.NONE: ("", ""),
+            QuoteType.AUTO: ("", ""),  # Se determina en tiempo de análisis
         }.get(self, ("", ""))
 
     @property
@@ -71,6 +76,7 @@ class QuoteType(str, Enum):
             QuoteType.DOUBLE: "Comillas inglesas ("")",
             QuoteType.SINGLE: "Comillas simples ('')",
             QuoteType.NONE: "No usar comillas",
+            QuoteType.AUTO: "Detectar automáticamente",
         }.get(self, "")
 
 
