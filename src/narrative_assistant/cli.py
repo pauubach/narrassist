@@ -41,7 +41,7 @@ def main() -> int:
     parser.add_argument(
         "--version",
         action="version",
-        version="%(prog)s 0.3.12",
+        version="%(prog)s 0.3.13",
     )
 
     parser.add_argument(
