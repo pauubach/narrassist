@@ -173,46 +173,77 @@ class DialogConfig:
     dialog_markers: list[str] = field(default_factory=lambda: ["—", "«", "»", '"', '"', '"'])
     preferred_marker: str | None = None
 
+    def _get_dash_char(self, dash) -> str:
+        """Helper para obtener carácter de guión (enum o string)."""
+        if hasattr(dash, 'char'):
+            return dash.char
+        # Es un string, convertir manualmente
+        return {"em_dash": "—", "en_dash": "–", "hyphen": "-"}.get(dash, "")
+
+    def _get_quote_chars(self, quote) -> tuple[str, str]:
+        """Helper para obtener comillas (enum o string)."""
+        if hasattr(quote, 'chars'):
+            return quote.chars
+        # Es un string, convertir manualmente
+        return {
+            "angular": ("«", "»"),
+            "double": (""", """),
+            "single": ("'", "'"),
+        }.get(quote, ("", ""))
+
     def get_accepted_markers(self) -> list[str]:
         """Obtiene lista de todos los marcadores aceptados según la configuración."""
         markers = []
 
         # Guiones
-        if self.spoken_dialogue_dash != DashType.NONE:
-            markers.append(self.spoken_dialogue_dash.char)
+        dash_val = self._get_value(self.spoken_dialogue_dash)
+        if dash_val not in ("none", "auto"):
+            char = self._get_dash_char(self.spoken_dialogue_dash)
+            if char:
+                markers.append(char)
 
         # Comillas para diálogo
-        if self.spoken_dialogue_quote != QuoteType.NONE:
-            open_q, close_q = self.spoken_dialogue_quote.chars
-            markers.extend([open_q, close_q])
+        quote_val = self._get_value(self.spoken_dialogue_quote)
+        if quote_val not in ("none", "auto"):
+            open_q, close_q = self._get_quote_chars(self.spoken_dialogue_quote)
+            if open_q:
+                markers.extend([open_q, close_q])
 
         # Comillas para pensamientos
-        if self.thoughts_quote != QuoteType.NONE:
-            open_q, close_q = self.thoughts_quote.chars
-            if open_q not in markers:
+        thought_val = self._get_value(self.thoughts_quote)
+        if thought_val not in ("none", "auto"):
+            open_q, close_q = self._get_quote_chars(self.thoughts_quote)
+            if open_q and open_q not in markers:
                 markers.extend([open_q, close_q])
 
         # Comillas para nested
-        if self.nested_dialogue_quote != QuoteType.NONE:
-            open_q, close_q = self.nested_dialogue_quote.chars
-            if open_q not in markers:
+        nested_val = self._get_value(self.nested_dialogue_quote)
+        if nested_val not in ("none", "auto"):
+            open_q, close_q = self._get_quote_chars(self.nested_dialogue_quote)
+            if open_q and open_q not in markers:
                 markers.extend([open_q, close_q])
 
         return markers
 
+    def _get_value(self, field) -> str:
+        """Helper para obtener valor de un campo que puede ser enum o string."""
+        if hasattr(field, 'value'):
+            return field.value
+        return field
+
     def to_dict(self) -> dict:
         return {
             # Modo y preset
-            "detection_mode": self.detection_mode.value,
-            "preset": self.preset.value,
+            "detection_mode": self._get_value(self.detection_mode),
+            "preset": self._get_value(self.preset),
 
             # Marcadores por función
-            "spoken_dialogue_dash": self.spoken_dialogue_dash.value,
-            "spoken_dialogue_quote": self.spoken_dialogue_quote.value,
-            "thoughts_quote": self.thoughts_quote.value,
+            "spoken_dialogue_dash": self._get_value(self.spoken_dialogue_dash),
+            "spoken_dialogue_quote": self._get_value(self.spoken_dialogue_quote),
+            "thoughts_quote": self._get_value(self.thoughts_quote),
             "thoughts_use_italics": self.thoughts_use_italics,
-            "nested_dialogue_quote": self.nested_dialogue_quote.value,
-            "textual_quote": self.textual_quote.value,
+            "nested_dialogue_quote": self._get_value(self.nested_dialogue_quote),
+            "textual_quote": self._get_value(self.textual_quote),
 
             # Detección
             "auto_detected": self.auto_detected,
