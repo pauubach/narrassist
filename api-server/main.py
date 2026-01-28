@@ -221,15 +221,34 @@ if not getattr(sys, 'frozen', False):
         from narrative_assistant.core.result import Result
         from narrative_assistant import __version__ as NA_VERSION
 
-        # Inicializar managers
-        project_manager = ProjectManager()
+        # Inicializar managers con auto-reparación de BD
+        try:
+            project_manager = ProjectManager()
+        except Exception as db_init_err:
+            import logging as _logging
+            _logging.warning(f"Database initialization failed: {db_init_err}")
+            _logging.info("Attempting automatic database repair...")
+            try:
+                from narrative_assistant.persistence import repair_database, reset_database
+                success, msg = repair_database()
+                if success:
+                    _logging.info(f"Database repaired: {msg}")
+                    reset_database()  # Reset singleton to reload
+                    project_manager = ProjectManager()
+                else:
+                    _logging.error(f"Repair failed: {msg}")
+                    raise db_init_err
+            except Exception as repair_err:
+                _logging.error(f"Auto-repair failed: {repair_err}")
+                raise db_init_err
+
         entity_repository = EntityRepository()
         alert_repository = AlertRepository()
         chapter_repository = ChapterRepository()
         section_repository = SectionRepository()
         MODULES_LOADED = True
         _write_debug("Modules loaded successfully (development mode)")
-        
+
     except Exception as e:
         import logging as _logging
         _logging.basicConfig(level=_logging.INFO)
@@ -323,13 +342,36 @@ def load_narrative_assistant_modules():
             from narrative_assistant.core.config import get_config as get_cfg
             from narrative_assistant import __version__
             
-            # Inicializar managers
+            # Inicializar managers con auto-reparación de BD
             _write_debug("Creating ProjectManager...")
             logger.info("Creating ProjectManager...")
-            project_manager = ProjectManager()
+            try:
+                project_manager = ProjectManager()
+            except Exception as db_init_err:
+                _write_debug(f"Database initialization failed: {db_init_err}")
+                logger.warning(f"Database initialization failed: {db_init_err}")
+                _write_debug("Attempting automatic database repair...")
+                logger.info("Attempting automatic database repair...")
+                try:
+                    from narrative_assistant.persistence import repair_database, reset_database
+                    success, msg = repair_database()
+                    if success:
+                        _write_debug(f"Database repaired: {msg}")
+                        logger.info(f"Database repaired: {msg}")
+                        reset_database()  # Reset singleton to reload
+                        project_manager = ProjectManager()
+                    else:
+                        _write_debug(f"Repair failed: {msg}")
+                        logger.error(f"Repair failed: {msg}")
+                        raise db_init_err
+                except Exception as repair_err:
+                    _write_debug(f"Auto-repair failed: {repair_err}")
+                    logger.error(f"Auto-repair failed: {repair_err}")
+                    raise db_init_err
+
             _write_debug("ProjectManager created successfully")
             logger.info("ProjectManager created successfully")
-            
+
             # Verificar estado de la base de datos
             try:
                 from narrative_assistant.persistence.database import get_database
@@ -347,7 +389,7 @@ def load_narrative_assistant_modules():
             except Exception as db_check_err:
                 _write_debug(f"Error checking database: {db_check_err}")
                 logger.error(f"Error checking database: {db_check_err}", exc_info=True)
-            
+
             entity_repository = EntityRepository()
             alert_repository = AlertRepository()
             chapter_repository = ChapterRepository()
