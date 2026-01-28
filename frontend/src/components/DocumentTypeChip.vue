@@ -39,9 +39,8 @@
 
           <!-- Type list -->
           <div class="types-list">
-            <template v-for="type in documentTypes">
+            <div v-for="type in documentTypes" :key="type.code" class="type-group">
               <button
-                :key="type.code"
                 class="type-option"
                 :class="{ selected: type.code === documentType.type }"
                 @click="selectType(type.code)"
@@ -56,7 +55,6 @@
               <!-- Subtype selector inline (below selected type) -->
               <div
                 v-if="type.code === documentType.type && type.subtypes && type.subtypes.length > 0"
-                :key="`${type.code}-subtypes`"
                 class="subtypes-inline"
               >
                 <Dropdown
@@ -69,7 +67,7 @@
                   @change="onSubtypeChange"
                 />
               </div>
-            </template>
+            </div>
           </div>
         </div>
     </OverlayPanel>
