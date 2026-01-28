@@ -28,6 +28,11 @@
 - Se va a eliminar funcionalidad existente (no código muerto)
 - Se necesita aclarar requisitos del usuario
 
+**Flujo de trabajo**:
+- Completar las tareas de forma secuencial, no dejar trabajo a medias
+- Si el usuario interrumpe con nuevas instrucciones, procesarlas en orden
+- Siempre commitear cambios completos antes de pasar a otra tarea
+
 ---
 
 ## Setup Rapido (Nueva Maquina)
