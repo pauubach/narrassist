@@ -156,6 +156,7 @@ class RelationshipRepository:
         """Crea las tablas si no existen."""
         with self.db.connection() as conn:
             conn.executescript(RELATIONSHIPS_SCHEMA)
+            conn.commit()  # Explicit commit to ensure visibility across connections
             logger.debug("Schema de relaciones inicializado")
 
     # ==================== Relationship Types ====================

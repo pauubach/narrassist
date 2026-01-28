@@ -181,6 +181,7 @@ class InteractionRepository:
         """Crea las tablas si no existen."""
         with self.db.connection() as conn:
             conn.executescript(INTERACTIONS_SCHEMA)
+            conn.commit()  # Explicit commit to ensure visibility across connections
             logger.debug("Schema de interacciones inicializado")
 
     # ==================== Interactions ====================
