@@ -126,20 +126,24 @@
                     </div>
 
                     <!-- Vista previa del estilo -->
-                    <div v-if="localConfig.dialog.enabled && localConfig.dialog.preset !== 'detect'" class="param-row">
-                      <div class="style-preview">
-                        <div class="preview-label">Vista previa:</div>
-                        <div class="preview-text">
+                    <div v-if="localConfig.dialog.enabled && localConfig.dialog.preset !== 'detect'" class="style-preview-container">
+                      <div class="preview-header">
+                        <i class="pi pi-eye"></i>
+                        <span>Vista previa</span>
+                      </div>
+                      <div class="preview-content">
+                        <p class="preview-line">
                           <template v-if="localConfig.dialog.spoken_dialogue_dash !== 'none'">
                             {{ getDashChar(localConfig.dialog.spoken_dialogue_dash) }}¿Lo recuerdas? {{ getDashChar(localConfig.dialog.spoken_dialogue_dash) }}preguntó{{ getDashChar(localConfig.dialog.spoken_dialogue_dash) }}. Él dijo: {{ getQuoteChars(localConfig.dialog.nested_dialogue_quote)[0] }}Nunca volveré{{ getQuoteChars(localConfig.dialog.nested_dialogue_quote)[1] }}.
                           </template>
                           <template v-else>
                             {{ getQuoteChars(localConfig.dialog.spoken_dialogue_quote)[0] }}¿Lo recuerdas?{{ getQuoteChars(localConfig.dialog.spoken_dialogue_quote)[1] }} preguntó. {{ getQuoteChars(localConfig.dialog.spoken_dialogue_quote)[0] }}Él dijo: {{ getQuoteChars(localConfig.dialog.nested_dialogue_quote)[0] }}Nunca volveré{{ getQuoteChars(localConfig.dialog.nested_dialogue_quote)[1] }}.{{ getQuoteChars(localConfig.dialog.spoken_dialogue_quote)[1] }}
                           </template>
-                          <br>
+                        </p>
+                        <p class="preview-line preview-thought">
                           <em v-if="localConfig.dialog.thoughts_use_italics">{{ getQuoteChars(localConfig.dialog.thoughts_quote)[0] }}Ojalá fuera verdad{{ getQuoteChars(localConfig.dialog.thoughts_quote)[1] }}</em>
                           <template v-else>{{ getQuoteChars(localConfig.dialog.thoughts_quote)[0] }}Ojalá fuera verdad{{ getQuoteChars(localConfig.dialog.thoughts_quote)[1] }}</template>, pensó.
-                        </div>
+                        </p>
                       </div>
                     </div>
 
@@ -1045,16 +1049,31 @@ const MARKER_PRESETS: Record<string, Record<string, string | boolean>> = {
 // Handler para cambio de preset
 const onPresetChange = () => {
   const preset = localConfig.value.dialog.preset
-  if (preset && preset !== 'detect' && MARKER_PRESETS[preset]) {
-    const presetConfig = MARKER_PRESETS[preset]
-    localConfig.value.dialog.spoken_dialogue_dash = presetConfig.spoken_dialogue_dash as string
-    localConfig.value.dialog.spoken_dialogue_quote = presetConfig.spoken_dialogue_quote as string
-    localConfig.value.dialog.thoughts_quote = presetConfig.thoughts_quote as string
-    localConfig.value.dialog.thoughts_use_italics = presetConfig.thoughts_use_italics as boolean
-    localConfig.value.dialog.nested_dialogue_quote = presetConfig.nested_dialogue_quote as string
-    localConfig.value.dialog.textual_quote = presetConfig.textual_quote as string
-  }
   markModified('dialog', 'preset')
+  markModified('dialog', 'detection_mode')
+
+  if (preset === 'detect') {
+    localConfig.value.dialog.detection_mode = 'auto'
+  } else {
+    localConfig.value.dialog.detection_mode = 'preset'
+    if (preset && MARKER_PRESETS[preset]) {
+      const presetConfig = MARKER_PRESETS[preset]
+      localConfig.value.dialog.spoken_dialogue_dash = presetConfig.spoken_dialogue_dash as string
+      localConfig.value.dialog.spoken_dialogue_quote = presetConfig.spoken_dialogue_quote as string
+      localConfig.value.dialog.thoughts_quote = presetConfig.thoughts_quote as string
+      localConfig.value.dialog.thoughts_use_italics = presetConfig.thoughts_use_italics as boolean
+      localConfig.value.dialog.nested_dialogue_quote = presetConfig.nested_dialogue_quote as string
+      localConfig.value.dialog.textual_quote = presetConfig.textual_quote as string
+
+      // Mark all individual fields as modified so they get saved
+      markModified('dialog', 'spoken_dialogue_dash')
+      markModified('dialog', 'spoken_dialogue_quote')
+      markModified('dialog', 'thoughts_quote')
+      markModified('dialog', 'thoughts_use_italics')
+      markModified('dialog', 'nested_dialogue_quote')
+      markModified('dialog', 'textual_quote')
+    }
+  }
 }
 
 // Dialog markers as editable text
@@ -1445,10 +1464,11 @@ watch(
 }
 
 .param-control.wide {
-  flex: 1;
-  max-width: 300px;
+  min-width: 220px;
+  max-width: 280px;
 }
 
+.param-control.wide :deep(.p-select),
 .param-control.wide :deep(.p-inputtext) {
   width: 100%;
 }
@@ -1595,10 +1615,112 @@ watch(
   padding: 1rem 0;
 }
 
+/* Style preview */
+.style-preview-container {
+  background: var(--surface-50);
+  border: 1px solid var(--surface-200);
+  border-radius: var(--border-radius);
+  padding: 0.75rem;
+  margin: 0.5rem 0;
+}
+
+.preview-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--text-color-secondary);
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.preview-header i {
+  font-size: 0.75rem;
+}
+
+.preview-content {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: var(--text-color);
+  padding: 0.5rem;
+  background: var(--surface-0);
+  border-radius: 4px;
+  border-left: 3px solid var(--primary-200);
+}
+
+.preview-line {
+  margin: 0 0 0.25rem 0;
+}
+
+.preview-thought {
+  margin-bottom: 0;
+}
+
+/* Detection info */
+.info-row {
+  background: transparent !important;
+  padding: 0.5rem 0.75rem !important;
+}
+
+.detection-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--text-color-secondary);
+  background: var(--blue-50);
+  padding: 0.75rem;
+  border-radius: var(--border-radius);
+  border-left: 3px solid var(--blue-400);
+}
+
+.detection-info i {
+  color: var(--blue-500);
+  margin-top: 0.125rem;
+}
+
+/* Advanced section */
+.advanced-section {
+  margin-top: 0.5rem;
+}
+
+.advanced-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background: var(--surface-50);
+  border-radius: var(--border-radius);
+  border: 1px dashed var(--surface-300);
+}
+
 /* Dark mode */
 :deep(.dark) .param-row,
 :deep(.dark) .rules-description,
 :deep(.dark) .rule-item {
   background: var(--surface-card);
+}
+
+:deep(.dark) .style-preview-container {
+  background: var(--surface-800);
+  border-color: var(--surface-700);
+}
+
+:deep(.dark) .preview-content {
+  background: var(--surface-900);
+  border-left-color: var(--primary-700);
+}
+
+:deep(.dark) .detection-info {
+  background: var(--blue-900);
+  border-left-color: var(--blue-600);
+}
+
+:deep(.dark) .advanced-options {
+  background: var(--surface-800);
+  border-color: var(--surface-600);
 }
 </style>
