@@ -16,8 +16,15 @@ export type DocumentType =
   | 'self_help'    // Autoayuda, desarrollo personal
   | 'technical'    // Manual técnico, documentación
   | 'memoir'       // Memorias, autobiografía
-  | 'cookbook'     // Recetas, gastronomía
-  | 'academic'     // Paper, texto académico
+  | 'biography'    // Biografías de terceros
+  | 'celebrity'    // Libros de famosos/influencers
+  | 'divulgation'  // Divulgación científica/histórica
+  | 'practical'    // Cocina, jardinería, DIY, guías
+  | 'children'     // Infantil/juvenil
+  | 'drama'        // Teatro, guiones cine/TV
+  | 'graphic'      // Novela gráfica, cómic, manga
+  | 'cookbook'     // (legacy) -> practical
+  | 'academic'     // (legacy) -> essay
   | 'unknown'      // No clasificado
 
 /** Clasificación del documento */
