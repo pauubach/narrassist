@@ -785,12 +785,27 @@ class Database:
                 size = self.db_path.stat().st_size
                 logger.info(f"Archivo DB existente, tamaño: {size} bytes")
 
-                # Verificar integridad de la BD existente
-                try:
-                    self._verify_and_repair_schema()
-                    return  # BD válida, no hacer nada más
-                except Exception as e:
-                    logger.warning(f"BD posiblemente corrupta: {e}. Intentando reparar...")
+                if size == 0:
+                    # Empty file (e.g., from a previous failed init) - delete and recreate
+                    logger.warning("DB file exists but is empty (0 bytes), deleting to recreate")
+                    self.db_path.unlink()
+                else:
+                    # Verificar integridad de la BD existente
+                    try:
+                        self._verify_and_repair_schema()
+                        return  # BD válida, no hacer nada más
+                    except Exception as e:
+                        logger.warning(f"BD posiblemente corrupta: {e}. Eliminando para recrear...")
+                        # Delete the corrupt file and all auxiliary files
+                        try:
+                            self.db_path.unlink()
+                            for suffix in ["-wal", "-shm", "-journal"]:
+                                aux_path = Path(str(self.db_path) + suffix)
+                                if aux_path.exists():
+                                    aux_path.unlink()
+                                    logger.info(f"Eliminado archivo auxiliar corrupto: {aux_path}")
+                        except Exception as del_err:
+                            logger.error(f"Error eliminando BD corrupta: {del_err}")
             else:
                 logger.info("Archivo DB no existe, se creará nuevo")
 

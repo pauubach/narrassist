@@ -63,7 +63,7 @@ import shutil
 # Setup logging IMMEDIATELY for early debugging
 import logging
 
-BACKEND_VERSION = "0.3.12"
+BACKEND_VERSION = "0.3.13"
 IS_EMBEDDED_RUNTIME = os.environ.get("NA_EMBEDDED") == "1" or "python-embed" in (sys.executable or "").lower()
 
 # Configure logging FIRST before using any loggers
@@ -212,65 +212,94 @@ Database = None
 MODULES_LOADED = False
 MODULES_ERROR = None
 
-# Strategy: When frozen (PyInstaller), DON'T load narrative_assistant on startup
-# Only load it on-demand after dependencies are installed
-# This avoids numpy import conflicts in PyInstaller bundle
-if not getattr(sys, 'frozen', False):
-    # Not frozen (development mode) - load normally
+# ==========================================================================
+# PHASED MODULE LOADING
+# Phase 1: DB/persistence modules (only need stdlib + sqlite3 - always available)
+# Phase 2: Entity/Alert repos (may trigger NLP imports via __init__.py)
+# ==========================================================================
+_write_debug("=== PHASE 1: Loading persistence modules ===")
+_DB_MODULES_LOADED = False
+try:
+    from narrative_assistant.persistence.project import ProjectManager
+    from narrative_assistant.persistence.database import get_database, Database
+    from narrative_assistant.persistence.chapter import ChapterRepository, SectionRepository
+    from narrative_assistant.core.config import get_config
+    from narrative_assistant.core.result import Result
+    from narrative_assistant import __version__ as NA_VERSION
+    _DB_MODULES_LOADED = True
+    _write_debug("Phase 1 OK: persistence modules loaded")
+    _early_logger.info("Phase 1 OK: persistence modules loaded")
+except Exception as e:
+    _write_debug(f"Phase 1 FAILED: {type(e).__name__}: {e}")
+    _early_logger.error(f"Phase 1 FAILED: {type(e).__name__}: {e}", exc_info=True)
+    MODULES_ERROR = f"Phase 1 (DB): {e}"
+    NA_VERSION = BACKEND_VERSION
+
+# Phase 1b: Initialize database and project manager (if phase 1 succeeded)
+if _DB_MODULES_LOADED:
+    _write_debug("=== PHASE 1b: Initializing database ===")
     try:
-        from narrative_assistant.persistence.project import ProjectManager
-        from narrative_assistant.persistence.database import get_database, Database
-        from narrative_assistant.persistence.chapter import ChapterRepository, SectionRepository
-        from narrative_assistant.entities.repository import EntityRepository
-        from narrative_assistant.alerts.repository import AlertRepository, AlertStatus, AlertSeverity
-        from narrative_assistant.core.config import get_config
-        from narrative_assistant.core.result import Result
-        from narrative_assistant import __version__ as NA_VERSION
-
-        # Inicializar managers con auto-reparación de BD
-        try:
-            project_manager = ProjectManager()
-        except Exception as db_init_err:
-            import logging as _logging
-            _logging.warning(f"Database initialization failed: {db_init_err}")
-            _logging.info("Attempting automatic database repair...")
-            try:
-                from narrative_assistant.persistence import repair_database, reset_database
-                success, msg = repair_database()
-                if success:
-                    _logging.info(f"Database repaired: {msg}")
-                    reset_database()  # Reset singleton to reload
-                    project_manager = ProjectManager()
-                else:
-                    _logging.error(f"Repair failed: {msg}")
-                    raise db_init_err
-            except Exception as repair_err:
-                _logging.error(f"Auto-repair failed: {repair_err}")
-                raise db_init_err
-
-        entity_repository = EntityRepository()
-        alert_repository = AlertRepository()
+        project_manager = ProjectManager()
         chapter_repository = ChapterRepository()
         section_repository = SectionRepository()
-        MODULES_LOADED = True
-        _write_debug("Modules loaded successfully (development mode)")
+        _write_debug("Phase 1b OK: DB managers initialized")
+        _early_logger.info("Phase 1b OK: DB managers initialized")
+    except Exception as db_init_err:
+        _write_debug(f"Phase 1b: DB init failed: {db_init_err}")
+        _early_logger.warning(f"Database initialization failed: {db_init_err}")
+        _early_logger.info("Attempting automatic database repair...")
+        try:
+            from narrative_assistant.persistence import repair_database, reset_database
+            from narrative_assistant.persistence.database import delete_and_recreate_database
+            success, msg = repair_database()
+            if success:
+                _write_debug(f"DB repaired: {msg}")
+                _early_logger.info(f"Database repaired: {msg}")
+                reset_database()
+                project_manager = ProjectManager()
+                chapter_repository = ChapterRepository()
+                section_repository = SectionRepository()
+            else:
+                _write_debug(f"Repair failed, nuclear option: delete and recreate")
+                _early_logger.warning(f"Repair failed: {msg}. Deleting and recreating DB...")
+                delete_and_recreate_database()
+                project_manager = ProjectManager()
+                chapter_repository = ChapterRepository()
+                section_repository = SectionRepository()
+        except Exception as repair_err:
+            _write_debug(f"Phase 1b: All repair attempts failed: {repair_err}")
+            _early_logger.error(f"All DB repair attempts failed: {repair_err}", exc_info=True)
+            MODULES_ERROR = f"DB init: {repair_err}"
 
+    # Phase 2: Entity/Alert repositories (may need NLP deps via package __init__.py)
+    _write_debug("=== PHASE 2: Loading entity/alert modules ===")
+    try:
+        from narrative_assistant.entities.repository import EntityRepository
+        entity_repository = EntityRepository()
+        _write_debug("Phase 2a OK: EntityRepository loaded")
+        _early_logger.info("Phase 2a OK: EntityRepository loaded")
     except Exception as e:
-        import logging as _logging
-        _logging.basicConfig(level=_logging.INFO)
-        _logging.warning(f"NLP modules not loaded: {type(e).__name__}: {e}")
-        _logging.info("Server will start in limited mode. Install dependencies via /api/models/download")
-        MODULES_ERROR = str(e)
-        NA_VERSION = BACKEND_VERSION
-else:
-    # Frozen (production) - load on demand only
-    # Note: In PyInstaller frozen mode, we cannot load narrative_assistant modules
-    # that depend on external numpy/scipy/etc due to import conflicts.
-    # Solution: User must install full dependencies and they will be available
-    # but backend will run in limited mode (no NLP features in frozen bundle)
-    _write_debug("Frozen mode: backend will run in API-only mode")
-    _write_debug("NLP dependencies should be installed by user but backend operates in limited mode")
-    NA_VERSION = BACKEND_VERSION
+        _write_debug(f"Phase 2a: EntityRepository not available: {type(e).__name__}: {e}")
+        _early_logger.warning(f"EntityRepository not available: {type(e).__name__}: {e}")
+
+    try:
+        from narrative_assistant.alerts.repository import AlertRepository, AlertStatus, AlertSeverity
+        alert_repository = AlertRepository()
+        _write_debug("Phase 2b OK: AlertRepository loaded")
+        _early_logger.info("Phase 2b OK: AlertRepository loaded")
+    except Exception as e:
+        _write_debug(f"Phase 2b: AlertRepository not available: {type(e).__name__}: {e}")
+        _early_logger.warning(f"AlertRepository not available: {type(e).__name__}: {e}")
+
+    # If at least project_manager is available, we're functional
+    if project_manager is not None:
+        MODULES_LOADED = True
+        MODULES_ERROR = None
+        _write_debug("=== MODULES LOADED SUCCESSFULLY ===")
+        _early_logger.info("Modules loaded successfully (project_manager available)")
+    else:
+        _write_debug("=== MODULES NOT LOADED: project_manager is None ===")
+        _early_logger.error("Modules not loaded: project_manager is None")
 
 # Logging already configured at the top of the file in _setup_early_logging()
 logger = logging.getLogger(__name__)
@@ -317,129 +346,123 @@ async def startup_load_modules():
 
 def load_narrative_assistant_modules():
     """
-    Load narrative_assistant modules on-demand.
-    This is called after dependencies are installed in frozen mode.
-    
+    Load narrative_assistant modules on-demand (phased).
+
+    Phase 1: DB/persistence modules (always available - stdlib only)
+    Phase 2: Entity/Alert repositories (may need NLP deps)
+
     Returns:
-        bool: True if modules loaded successfully, False otherwise
+        bool: True if at least Phase 1 loaded successfully
     """
     global MODULES_LOADED, MODULES_ERROR
     global project_manager, entity_repository, alert_repository
     global chapter_repository, section_repository, get_config, get_database, Database
-    
+
     if MODULES_LOADED:
         return True
-    
+
+    _write_debug("=== load_narrative_assistant_modules() called ===")
+    logger.info("=== load_narrative_assistant_modules() called ===")
+
+    # Phase 1: DB/persistence (always works - no NLP deps)
     try:
-        _write_debug("Attempting to load narrative_assistant modules...")
-        
-        # Si estamos en modo frozen, limpiar sys.path temporalmente de directorios _MEI
-        # para evitar el error "import numpy from its source directory"
-        removed_paths = []
-        if getattr(sys, 'frozen', False):
-            import os
-            original_cwd = os.getcwd()
-            # Cambiar a un directorio seguro (temp)
-            temp_dir = os.environ.get("TEMP", os.path.expanduser("~"))
-            if os.path.exists(temp_dir):
-                os.chdir(temp_dir)
-                _write_debug(f"Changed working directory from {original_cwd} to {temp_dir} for import")
-            
-            # Remover temporalmente _MEI paths
-            for path in list(sys.path):
-                if "_MEI" in path:
-                    sys.path.remove(path)
-                    removed_paths.append(path)
-            if removed_paths:
-                _write_debug(f"Temporarily removed {len(removed_paths)} _MEI paths from sys.path")
-                _write_debug(f"sys.path now starts with: {sys.path[:3]}")
-        
-        try:
-            from narrative_assistant.persistence.project import ProjectManager
-            from narrative_assistant.persistence.database import get_database as get_db, Database as DB
-            from narrative_assistant.persistence.chapter import ChapterRepository, SectionRepository
-            from narrative_assistant.entities.repository import EntityRepository
-            from narrative_assistant.alerts.repository import AlertRepository
-            from narrative_assistant.core.config import get_config as get_cfg
-            from narrative_assistant import __version__
-            
-            # Inicializar managers con auto-reparación de BD
-            _write_debug("Creating ProjectManager...")
-            logger.info("Creating ProjectManager...")
-            try:
-                project_manager = ProjectManager()
-            except Exception as db_init_err:
-                _write_debug(f"Database initialization failed: {db_init_err}")
-                logger.warning(f"Database initialization failed: {db_init_err}")
-                _write_debug("Attempting automatic database repair...")
-                logger.info("Attempting automatic database repair...")
-                try:
-                    from narrative_assistant.persistence import repair_database, reset_database
-                    success, msg = repair_database()
-                    if success:
-                        _write_debug(f"Database repaired: {msg}")
-                        logger.info(f"Database repaired: {msg}")
-                        reset_database()  # Reset singleton to reload
-                        project_manager = ProjectManager()
-                    else:
-                        _write_debug(f"Repair failed: {msg}")
-                        logger.error(f"Repair failed: {msg}")
-                        raise db_init_err
-                except Exception as repair_err:
-                    _write_debug(f"Auto-repair failed: {repair_err}")
-                    logger.error(f"Auto-repair failed: {repair_err}")
-                    raise db_init_err
-
-            _write_debug("ProjectManager created successfully")
-            logger.info("ProjectManager created successfully")
-
-            # Verificar estado de la base de datos
-            try:
-                db = get_db()
-                _write_debug(f"Database path: {db.db_path}")
-                logger.info(f"Database path: {db.db_path}")
-                # Verificar tablas
-                tables = db.fetchall("SELECT name FROM sqlite_master WHERE type='table'")
-                table_names = [t['name'] for t in tables]
-                _write_debug(f"Tables in database: {table_names}")
-                logger.info(f"Tables in database: {table_names}")
-                if 'projects' not in table_names:
-                    _write_debug("WARNING: 'projects' table NOT found!")
-                    logger.error("WARNING: 'projects' table NOT found!")
-            except Exception as db_check_err:
-                _write_debug(f"Error checking database: {db_check_err}")
-                logger.error(f"Error checking database: {db_check_err}", exc_info=True)
-
-            entity_repository = EntityRepository()
-            alert_repository = AlertRepository()
-            chapter_repository = ChapterRepository()
-            section_repository = SectionRepository()
-            get_config = get_cfg
-            get_database = get_db
-            Database = DB
-            MODULES_LOADED = True
-            MODULES_ERROR = None
-            
-            _write_debug("✓ Modules loaded successfully!")
-            logger.info("✓ narrative_assistant modules loaded successfully")
-        finally:
-            # Restaurar sys.path
-            if removed_paths:
-                sys.path.extend(removed_paths)
-                _write_debug(f"Restored {len(removed_paths)} _MEI paths to sys.path")
-            # Restaurar directorio de trabajo
-            if getattr(sys, 'frozen', False):
-                import os
-                os.chdir(original_cwd)
-                _write_debug(f"Restored working directory to {original_cwd}")
-
-        return True
-        
+        _write_debug("On-demand Phase 1: Loading persistence modules...")
+        from narrative_assistant.persistence.project import ProjectManager
+        from narrative_assistant.persistence.database import get_database as get_db, Database as DB
+        from narrative_assistant.persistence.chapter import ChapterRepository, SectionRepository
+        from narrative_assistant.core.config import get_config as get_cfg
+        from narrative_assistant import __version__
+        _write_debug("On-demand Phase 1 OK: persistence imports succeeded")
     except Exception as e:
-        error_msg = f"Failed to load narrative_assistant modules: {type(e).__name__}: {e}"
+        error_msg = f"Phase 1 FAILED (persistence): {type(e).__name__}: {e}"
         _write_debug(error_msg)
         logger.error(error_msg, exc_info=True)
         MODULES_ERROR = str(e)
+        return False
+
+    # Phase 1b: Initialize DB managers
+    try:
+        _write_debug("On-demand Phase 1b: Initializing DB managers...")
+        project_manager = ProjectManager()
+        chapter_repository = ChapterRepository()
+        section_repository = SectionRepository()
+        get_config = get_cfg
+        get_database = get_db
+        Database = DB
+
+        # Verify database state
+        db = get_db()
+        _write_debug(f"Database path: {db.db_path}")
+        logger.info(f"Database path: {db.db_path}")
+        tables = db.fetchall("SELECT name FROM sqlite_master WHERE type='table'")
+        table_names = [t['name'] for t in tables]
+        _write_debug(f"Tables in database: {table_names}")
+        logger.info(f"Tables in database: {table_names}")
+
+        if 'projects' not in table_names:
+            _write_debug("WARNING: 'projects' table NOT found after init!")
+            logger.error("WARNING: 'projects' table NOT found after init!")
+        else:
+            _write_debug("OK: 'projects' table exists")
+
+    except Exception as db_init_err:
+        _write_debug(f"Phase 1b: DB init failed: {db_init_err}")
+        logger.warning(f"Database initialization failed: {db_init_err}", exc_info=True)
+        try:
+            from narrative_assistant.persistence import repair_database, reset_database
+            from narrative_assistant.persistence.database import delete_and_recreate_database
+            _write_debug("Attempting repair...")
+            success, msg = repair_database()
+            if success:
+                _write_debug(f"DB repaired: {msg}")
+                reset_database()
+                project_manager = ProjectManager()
+                chapter_repository = ChapterRepository()
+                section_repository = SectionRepository()
+                get_config = get_cfg
+                get_database = get_db
+                Database = DB
+            else:
+                _write_debug(f"Repair failed: {msg}. Nuclear option: delete and recreate...")
+                delete_and_recreate_database()
+                project_manager = ProjectManager()
+                chapter_repository = ChapterRepository()
+                section_repository = SectionRepository()
+                get_config = get_cfg
+                get_database = get_db
+                Database = DB
+        except Exception as repair_err:
+            _write_debug(f"All repair attempts failed: {repair_err}")
+            logger.error(f"All DB repair attempts failed: {repair_err}", exc_info=True)
+            MODULES_ERROR = f"DB init: {repair_err}"
+            return False
+
+    # Phase 2: Entity/Alert repos (may fail without NLP deps - that's OK)
+    try:
+        from narrative_assistant.entities.repository import EntityRepository
+        entity_repository = EntityRepository()
+        _write_debug("Phase 2a OK: EntityRepository loaded")
+    except Exception as e:
+        _write_debug(f"Phase 2a: EntityRepository not available: {type(e).__name__}: {e}")
+        logger.warning(f"EntityRepository not available: {e}")
+
+    try:
+        from narrative_assistant.alerts.repository import AlertRepository
+        alert_repository = AlertRepository()
+        _write_debug("Phase 2b OK: AlertRepository loaded")
+    except Exception as e:
+        _write_debug(f"Phase 2b: AlertRepository not available: {type(e).__name__}: {e}")
+        logger.warning(f"AlertRepository not available: {e}")
+
+    # Success if project_manager is available
+    if project_manager is not None:
+        MODULES_LOADED = True
+        MODULES_ERROR = None
+        _write_debug("=== load_narrative_assistant_modules() SUCCESS ===")
+        logger.info("Modules loaded successfully (on-demand)")
+        return True
+    else:
+        _write_debug("=== load_narrative_assistant_modules() FAILED: project_manager is None ===")
         return False
 
 
@@ -785,6 +808,107 @@ async def system_info():
     except Exception as e:
         logger.error(f"Error getting system info: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/debug/diagnostic")
+async def debug_diagnostic():
+    """
+    Diagnóstico detallado del backend - para debugging de problemas.
+    Devuelve el estado completo del sistema, paths, DB, módulos.
+    """
+    import traceback
+
+    diag = {
+        "version": BACKEND_VERSION,
+        "python": {
+            "executable": sys.executable,
+            "version": sys.version,
+            "frozen": getattr(sys, 'frozen', False),
+            "is_embedded": IS_EMBEDDED_RUNTIME,
+            "platform": sys.platform,
+        },
+        "environment": {
+            "NA_EMBEDDED": os.environ.get("NA_EMBEDDED"),
+            "PYTHONPATH": os.environ.get("PYTHONPATH"),
+            "PYTHONHOME": os.environ.get("PYTHONHOME"),
+            "LOCALAPPDATA": os.environ.get("LOCALAPPDATA"),
+        },
+        "sys_path_first_10": sys.path[:10],
+        "modules": {
+            "loaded": MODULES_LOADED,
+            "error": MODULES_ERROR,
+            "project_manager": project_manager is not None,
+            "entity_repository": entity_repository is not None,
+            "alert_repository": alert_repository is not None,
+            "chapter_repository": chapter_repository is not None,
+            "get_database": get_database is not None,
+        },
+        "database": {},
+        "log_file": str(_log_file) if _log_file else None,
+    }
+
+    # Database diagnostics
+    try:
+        if get_database:
+            db = get_database()
+            diag["database"]["path"] = str(db.db_path)
+            diag["database"]["exists"] = db.db_path.exists() if hasattr(db.db_path, 'exists') else "N/A"
+            tables = db.fetchall("SELECT name FROM sqlite_master WHERE type='table'")
+            diag["database"]["tables"] = [t['name'] for t in tables]
+            diag["database"]["has_projects_table"] = 'projects' in diag["database"]["tables"]
+        else:
+            diag["database"]["error"] = "get_database is None"
+    except Exception as e:
+        diag["database"]["error"] = f"{type(e).__name__}: {e}"
+
+    # Check key packages availability
+    packages = ["numpy", "spacy", "sentence_transformers", "torch", "fastapi", "uvicorn", "sqlite3"]
+    diag["packages"] = {}
+    for pkg in packages:
+        try:
+            __import__(pkg)
+            diag["packages"][pkg] = "available"
+        except ImportError:
+            diag["packages"][pkg] = "NOT INSTALLED"
+
+    return ApiResponse(success=True, data=diag)
+
+
+@app.get("/api/debug/log")
+async def debug_log():
+    """
+    Devuelve el contenido del archivo de log del backend.
+    El usuario puede compartir esto para diagnosticar problemas.
+    """
+    log_content = ""
+    early_debug_content = ""
+
+    # Read backend-debug.log
+    if _log_file and Path(_log_file).exists():
+        try:
+            log_content = Path(_log_file).read_text(encoding='utf-8', errors='replace')
+            # Limit to last 500 lines
+            lines = log_content.split('\n')
+            if len(lines) > 500:
+                log_content = '\n'.join(lines[-500:])
+        except Exception as e:
+            log_content = f"Error reading log: {e}"
+
+    # Read early-debug.txt
+    localappdata = os.environ.get('LOCALAPPDATA', '')
+    if localappdata:
+        early_debug_path = Path(localappdata) / "Narrative Assistant" / "early-debug.txt"
+        if early_debug_path.exists():
+            try:
+                early_debug_content = early_debug_path.read_text(encoding='utf-8', errors='replace')
+            except Exception as e:
+                early_debug_content = f"Error reading early debug: {e}"
+
+    return ApiResponse(success=True, data={
+        "log_file": str(_log_file) if _log_file else None,
+        "log_content": log_content,
+        "early_debug_content": early_debug_content,
+    })
 
 
 @app.get("/api/system/python-status")

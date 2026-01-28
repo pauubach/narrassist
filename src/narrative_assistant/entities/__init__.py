@@ -26,13 +26,24 @@ from .fusion import (
     reset_fusion_service,
     run_automatic_fusion,
 )
-from .semantic_fusion import (
-    SemanticFusionService,
-    SemanticFusionResult,
-    get_semantic_fusion_service,
-    reset_semantic_fusion_service,
-    update_fusion_threshold,
-)
+
+# Semantic fusion depends on NLP libraries (numpy, sentence-transformers).
+# These are NOT available in embedded Python (production) until the user
+# installs the full NLP stack. Gracefully degrade if missing.
+try:
+    from .semantic_fusion import (
+        SemanticFusionService,
+        SemanticFusionResult,
+        get_semantic_fusion_service,
+        reset_semantic_fusion_service,
+        update_fusion_threshold,
+    )
+except ImportError:
+    SemanticFusionService = None
+    SemanticFusionResult = None
+    get_semantic_fusion_service = None
+    reset_semantic_fusion_service = None
+    update_fusion_threshold = None
 
 __all__ = [
     # Models

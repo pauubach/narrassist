@@ -9,6 +9,7 @@ Componentes:
   community detection, embeddings).
 """
 
+# attribute_consistency uses only stdlib + internal modules
 from .attribute_consistency import (
     # Tipos principales
     AttributeInconsistency,
@@ -23,60 +24,61 @@ from .attribute_consistency import (
     reset_lemma_cache,
 )
 
-from .relationship_clustering import (
-    # Tipos
-    RelationStrength,
-    RelationValence,
-    CoOccurrence,
-    InferredRelation,
-    CharacterCluster,
-    KnowledgeAsymmetry,
-    # Clase principal
-    RelationshipClusteringEngine,
-    # Funciones de conveniencia
-    extract_cooccurrences_from_chapters,
-)
+# Modules below depend on NLP libraries (numpy, spacy, sentence-transformers).
+# They are NOT available in embedded Python (production) until the user
+# installs the full NLP stack. Gracefully degrade if missing.
+try:
+    from .relationship_clustering import (
+        RelationStrength,
+        RelationValence,
+        CoOccurrence,
+        InferredRelation,
+        CharacterCluster,
+        KnowledgeAsymmetry,
+        RelationshipClusteringEngine,
+        extract_cooccurrences_from_chapters,
+    )
+except ImportError:
+    pass
 
-from .character_knowledge import (
-    # Tipos
-    MentionType,
-    KnowledgeType,
-    OpinionValence,
-    IntentionType,
-    # Dataclasses
-    DirectedMention,
-    KnowledgeFact,
-    Opinion,
-    Intention,
-    KnowledgeAsymmetryReport,
-    # Clase principal
-    CharacterKnowledgeAnalyzer,
-)
+try:
+    from .character_knowledge import (
+        MentionType,
+        KnowledgeType,
+        OpinionValence,
+        IntentionType,
+        DirectedMention,
+        KnowledgeFact,
+        Opinion,
+        Intention,
+        KnowledgeAsymmetryReport,
+        CharacterKnowledgeAnalyzer,
+    )
+except ImportError:
+    pass
 
-from .emotional_coherence import (
-    # Tipos
-    IncoherenceType,
-    # Dataclasses
-    EmotionalIncoherence,
-    # Clase principal
-    EmotionalCoherenceChecker,
-    # Funciones de conveniencia
-    get_emotional_coherence_checker,
-    reset_emotional_coherence_checker,
-)
+try:
+    from .emotional_coherence import (
+        IncoherenceType,
+        EmotionalIncoherence,
+        EmotionalCoherenceChecker,
+        get_emotional_coherence_checker,
+        reset_emotional_coherence_checker,
+    )
+except ImportError:
+    pass
 
-from .vital_status import (
-    # Tipos
-    VitalStatus,
-    # Dataclasses
-    DeathEvent,
-    PostMortemAppearance,
-    VitalStatusReport,
-    # Clase principal
-    VitalStatusAnalyzer,
-    # Funciones de conveniencia
-    analyze_vital_status,
-)
+try:
+    from .vital_status import (
+        VitalStatus,
+        DeathEvent,
+        PostMortemAppearance,
+        VitalStatusReport,
+        VitalStatusAnalyzer,
+        analyze_vital_status,
+    )
+except ImportError:
+    pass
 
 __all__ = [
     # Tipos - Consistency
