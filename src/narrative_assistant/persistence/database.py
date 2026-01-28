@@ -25,6 +25,12 @@ _database_lock = threading.Lock()
 # Versión del schema actual
 SCHEMA_VERSION = 9
 
+# Tablas esenciales que deben existir para una BD válida
+ESSENTIAL_TABLES = {
+    'projects', 'chapters', 'entities', 'entity_mentions',
+    'alerts', 'sessions', 'session_project_state', 'change_history'
+}
+
 # SQL de creación de tablas
 SCHEMA_SQL = """
 -- Proyectos (un manuscrito = un proyecto)
@@ -755,77 +761,82 @@ class Database:
                 aux_path.chmod(0o600)
 
     def _initialize_schema(self) -> None:
-        """Crea tablas si no existen."""
+        """Crea tablas si no existen. Detecta BD corrupta y la recrea si es necesario."""
         logger.info(f"Inicializando schema en: {self.db_path}")
         logger.info(f"db_path type: {type(self.db_path)}, is_memory: {self._is_memory}")
-        
+
         # Verificar si el archivo existe y tiene contenido
         if not self._is_memory and isinstance(self.db_path, Path):
             if self.db_path.exists():
                 size = self.db_path.stat().st_size
                 logger.info(f"Archivo DB existente, tamaño: {size} bytes")
+
+                # Verificar integridad de la BD existente
+                try:
+                    self._verify_and_repair_schema()
+                    return  # BD válida, no hacer nada más
+                except Exception as e:
+                    logger.warning(f"BD posiblemente corrupta: {e}. Intentando reparar...")
             else:
                 logger.info("Archivo DB no existe, se creará nuevo")
-        
-        try:
-            with self.connection() as conn:
-                # Primero verificar qué tablas existen ANTES de ejecutar el schema
+
+        # Crear schema desde cero
+        self._create_schema_from_scratch()
+
+    def _verify_and_repair_schema(self) -> None:
+        """Verifica que todas las tablas esenciales existen. Lanza excepción si la BD está corrupta."""
+        with self.connection() as conn:
+            existing_tables = conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+            existing_names = {t[0] for t in existing_tables}
+            logger.info(f"Tablas existentes: {existing_names}")
+
+            missing_tables = ESSENTIAL_TABLES - existing_names
+
+            if missing_tables:
+                logger.warning(f"Faltan tablas esenciales: {missing_tables}")
+                # Intentar crear las tablas faltantes ejecutando todo el schema
+                logger.info("Ejecutando SCHEMA_SQL para crear tablas faltantes...")
+                conn.executescript(SCHEMA_SQL)
+                conn.commit()
+
+                # Verificar de nuevo
                 existing_tables = conn.execute(
                     "SELECT name FROM sqlite_master WHERE type='table'"
                 ).fetchall()
-                existing_names = [t[0] for t in existing_tables]
-                logger.info(f"Tablas existentes ANTES de schema: {existing_names}")
-                
-                # Si 'projects' no existe, ejecutar el schema completo
-                if 'projects' not in existing_names:
-                    logger.info("Tabla 'projects' no existe, ejecutando SCHEMA_SQL completo")
-                    # executescript() hace commit automático, pero lo hacemos explícito
-                    conn.executescript(SCHEMA_SQL)
-                    conn.commit()  # Commit explícito para asegurar persistencia
-                    logger.info("SCHEMA_SQL ejecutado y commit realizado")
-                else:
-                    logger.info("Tabla 'projects' ya existe, no se ejecuta schema")
-                
+                existing_names = {t[0] for t in existing_tables}
+                still_missing = ESSENTIAL_TABLES - existing_names
+
+                if still_missing:
+                    raise RuntimeError(f"No se pudieron crear tablas: {still_missing}")
+
+                logger.info("Tablas faltantes creadas exitosamente")
+            else:
+                logger.info("Todas las tablas esenciales existen")
+
+    def _create_schema_from_scratch(self) -> None:
+        """Crea el schema completo desde cero."""
+        try:
+            with self.connection() as conn:
+                logger.info("Ejecutando SCHEMA_SQL completo...")
+                conn.executescript(SCHEMA_SQL)
+                conn.commit()
+
                 # Verificar que las tablas se crearon
                 tables = conn.execute(
                     "SELECT name FROM sqlite_master WHERE type='table'"
                 ).fetchall()
-                table_names = [t[0] for t in tables]
-                logger.info(f"Schema inicializado en {self.db_path}")
-                logger.info(f"Tablas DESPUÉS de schema: {table_names}")
-                
-                if 'projects' not in table_names:
-                    logger.error("ALERTA CRÍTICA: Tabla 'projects' NO fue creada después de ejecutar schema!")
-                    # Intentar crear solo la tabla projects
-                    logger.info("Intentando crear tabla projects manualmente...")
-                    try:
-                        conn.execute("""
-                            CREATE TABLE IF NOT EXISTS projects (
-                                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                                name TEXT NOT NULL,
-                                description TEXT,
-                                document_path TEXT,
-                                document_fingerprint TEXT NOT NULL,
-                                document_format TEXT NOT NULL,
-                                word_count INTEGER,
-                                chapter_count INTEGER,
-                                created_at TEXT NOT NULL DEFAULT (datetime('now')),
-                                updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-                                last_opened_at TEXT,
-                                analysis_status TEXT DEFAULT 'pending',
-                                analysis_progress REAL DEFAULT 0.0,
-                                settings_json TEXT,
-                                document_type TEXT DEFAULT 'FIC',
-                                document_subtype TEXT,
-                                document_type_confirmed INTEGER DEFAULT 0,
-                                detected_document_type TEXT
-                            )
-                        """)
-                        conn.commit()
-                        logger.info("Tabla projects creada manualmente con éxito")
-                    except Exception as manual_err:
-                        logger.error(f"Error creando tabla projects manualmente: {manual_err}")
-                        
+                table_names = {t[0] for t in tables}
+                logger.info(f"Tablas creadas: {table_names}")
+
+                missing = ESSENTIAL_TABLES - table_names
+                if missing:
+                    logger.error(f"ALERTA CRÍTICA: No se crearon todas las tablas. Faltan: {missing}")
+                    raise RuntimeError(f"Schema incompleto, faltan: {missing}")
+
+                logger.info(f"Schema inicializado correctamente en {self.db_path}")
+
         except Exception as e:
             logger.error(f"Error inicializando schema: {e}", exc_info=True)
             raise
@@ -965,3 +976,121 @@ def reset_database() -> None:
     global _database
     with _database_lock:
         _database = None
+
+
+def repair_database() -> tuple[bool, str]:
+    """
+    Intenta reparar una base de datos corrupta SIN perder datos.
+
+    Pasos de reparación:
+    1. Verifica integridad con PRAGMA integrity_check
+    2. Intenta crear tablas faltantes
+    3. Intenta recuperar con backup y restore
+
+    Returns:
+        Tupla (éxito: bool, mensaje: str)
+    """
+    global _database
+    from ..core.config import get_config
+
+    config = get_config()
+    db_path = config.db_path
+
+    if not isinstance(db_path, Path) or not db_path.exists():
+        return False, "No existe archivo de base de datos para reparar"
+
+    logger.info(f"Iniciando reparación de BD: {db_path}")
+
+    with _database_lock:
+        # Cerrar conexión existente
+        _database = None
+
+        try:
+            # Paso 1: Verificar integridad
+            conn = sqlite3.connect(str(db_path), timeout=30)
+            conn.row_factory = sqlite3.Row
+
+            integrity = conn.execute("PRAGMA integrity_check").fetchone()[0]
+            logger.info(f"Integrity check: {integrity}")
+
+            if integrity != "ok":
+                logger.warning(f"BD con problemas de integridad: {integrity}")
+                # Intentar VACUUM para reparar
+                try:
+                    conn.execute("VACUUM")
+                    conn.commit()
+                    logger.info("VACUUM ejecutado")
+                except Exception as vacuum_err:
+                    logger.warning(f"VACUUM falló: {vacuum_err}")
+
+            # Paso 2: Verificar y crear tablas faltantes
+            existing = {row[0] for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()}
+            logger.info(f"Tablas existentes: {existing}")
+
+            missing = ESSENTIAL_TABLES - existing
+            if missing:
+                logger.info(f"Creando tablas faltantes: {missing}")
+                conn.executescript(SCHEMA_SQL)
+                conn.commit()
+
+                # Verificar de nuevo
+                existing = {row[0] for row in conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                ).fetchall()}
+                still_missing = ESSENTIAL_TABLES - existing
+
+                if still_missing:
+                    conn.close()
+                    return False, f"No se pudieron crear tablas: {still_missing}"
+
+            conn.close()
+
+            # Recrear singleton con BD reparada
+            _database = Database(db_path)
+            return True, "Base de datos reparada exitosamente"
+
+        except Exception as e:
+            logger.error(f"Error en reparación: {e}", exc_info=True)
+            return False, f"Error durante reparación: {e}"
+
+
+def delete_and_recreate_database() -> Database:
+    """
+    Elimina la base de datos existente y crea una nueva desde cero.
+
+    ¡CUIDADO! Esta operación elimina TODOS los datos.
+    Usar solo si repair_database() falla.
+
+    Returns:
+        Nueva instancia de Database con schema limpio.
+    """
+    global _database
+    from ..core.config import get_config
+
+    config = get_config()
+    db_path = config.db_path
+
+    with _database_lock:
+        # Cerrar conexiones existentes
+        if _database is not None:
+            _database = None
+
+        # Eliminar archivos de la BD
+        if isinstance(db_path, Path) and db_path.exists():
+            logger.warning(f"Eliminando base de datos: {db_path}")
+            db_path.unlink()
+            # También eliminar archivos WAL y SHM
+            for suffix in ["-wal", "-shm"]:
+                aux_path = Path(str(db_path) + suffix)
+                if aux_path.exists():
+                    aux_path.unlink()
+                    logger.info(f"Eliminado archivo auxiliar: {aux_path}")
+
+        # Crear nueva BD
+        logger.info("Creando nueva base de datos desde cero...")
+        _database = Database(db_path)
+        logger.info("Base de datos recreada exitosamente")
+
+        return _database

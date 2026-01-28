@@ -2,7 +2,7 @@
 Persistence module - Base de datos, sesiones, historial y fingerprinting.
 """
 
-from .database import Database, get_database, reset_database
+from .database import Database, get_database, reset_database, repair_database, delete_and_recreate_database
 from .project import Project, ProjectManager
 from .document_fingerprint import DocumentFingerprint, FingerprintMatcher
 from .session import Session, SessionManager, AlertAction
@@ -30,6 +30,8 @@ __all__ = [
     "Database",
     "get_database",
     "reset_database",
+    "repair_database",
+    "delete_and_recreate_database",
     # Project
     "Project",
     "ProjectManager",

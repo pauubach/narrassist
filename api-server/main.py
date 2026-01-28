@@ -1342,6 +1342,60 @@ async def system_capabilities():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/api/system/database/repair", response_model=ApiResponse)
+async def repair_database_endpoint():
+    """
+    Intenta reparar la base de datos sin perder datos.
+
+    Pasos de reparación:
+    1. Verifica integridad con PRAGMA integrity_check
+    2. Ejecuta VACUUM si hay problemas
+    3. Crea tablas faltantes si es necesario
+
+    Returns:
+        ApiResponse con resultado de la reparación
+    """
+    try:
+        from narrative_assistant.persistence import repair_database
+
+        success, message = repair_database()
+
+        return ApiResponse(
+            success=success,
+            message=message,
+            data={"repaired": success}
+        )
+    except Exception as e:
+        logger.error(f"Error reparando base de datos: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/system/database/reset", response_model=ApiResponse)
+async def reset_database_endpoint():
+    """
+    Elimina y recrea la base de datos desde cero.
+
+    ¡CUIDADO! Esta operación elimina TODOS los datos.
+    Usar solo si repair no funciona.
+
+    Returns:
+        ApiResponse confirmando la operación
+    """
+    try:
+        from narrative_assistant.persistence import delete_and_recreate_database
+
+        delete_and_recreate_database()
+
+        return ApiResponse(
+            success=True,
+            message="Base de datos eliminada y recreada desde cero",
+            data={"reset": True}
+        )
+    except Exception as e:
+        logger.error(f"Error reseteando base de datos: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 def _check_languagetool_available() -> bool:
     """Verifica si LanguageTool está disponible, intentando iniciarlo si está instalado."""
     try:
