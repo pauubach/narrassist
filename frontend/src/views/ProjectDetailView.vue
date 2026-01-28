@@ -1284,6 +1284,11 @@ const startReanalysis = async () => {
   gap: 0.75rem;
 }
 
+.header-left > :deep(.document-type-chip) {
+  align-self: flex-end;
+  margin-left: 0.5rem;
+}
+
 .header-info h1 {
   font-size: 1.125rem;
   font-weight: 600;
