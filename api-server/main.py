@@ -5033,6 +5033,7 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
             "current_action": "Preparando documento",
             "phases": [
                 {"id": "parsing", "name": "Lectura del documento", "completed": False, "current": False},
+                {"id": "classification", "name": "Clasificando tipo de documento", "completed": False, "current": False},
                 {"id": "structure", "name": "Identificando capítulos", "completed": False, "current": False},
                 {"id": "ner", "name": "Buscando personajes y lugares", "completed": False, "current": False},
                 {"id": "fusion", "name": "Unificando personajes", "completed": False, "current": False},
@@ -5068,16 +5069,17 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
             #   - Grammar: ~8% (spaCy + reglas)
             #   - Resto: ~10%
             phase_weights = {
-                "parsing": 0.01,      # ~1% - instantáneo
-                "structure": 0.02,    # ~2% - instantáneo
-                "ner": 0.45,          # ~45% - LLM + spaCy
-                "fusion": 0.22,       # ~22% - incluye correferencias con LLM
-                "attributes": 0.12,   # ~12% - LLM
-                "consistency": 0.04,  # ~4%
-                "grammar": 0.08,      # ~8% - análisis gramatical y ortográfico
-                "alerts": 0.06,       # ~6% - generación de alertas
+                "parsing": 0.01,         # ~1% - instantáneo
+                "classification": 0.02,  # ~2% - clasificación tipo documento
+                "structure": 0.02,       # ~2% - instantáneo
+                "ner": 0.44,             # ~44% - LLM + spaCy
+                "fusion": 0.21,          # ~21% - incluye correferencias con LLM
+                "attributes": 0.12,      # ~12% - LLM
+                "consistency": 0.04,     # ~4%
+                "grammar": 0.08,         # ~8% - análisis gramatical y ortográfico
+                "alerts": 0.06,          # ~6% - generación de alertas
             }
-            phase_order = ["parsing", "structure", "ner", "fusion", "attributes", "consistency", "grammar", "alerts"]
+            phase_order = ["parsing", "classification", "structure", "ner", "fusion", "attributes", "consistency", "grammar", "alerts"]
             current_phase_key = "parsing"
             phase_start_times: dict[str, float] = {}
             phase_durations: dict[str, float] = {}  # Tiempos reales medidos
@@ -5272,12 +5274,18 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
 
                 logger.info(f"Parsing complete: {word_count} words")
 
-                # ========== CLASIFICACIÓN DE DOCUMENTO ==========
-                # Detectar el tipo de documento para ajustar análisis
+                # ========== FASE 2: CLASIFICACIÓN DE DOCUMENTO ==========
+                current_phase_key = "classification"
+                phase_start_times["classification"] = time.time()
+                cls_pct_start, cls_pct_end = get_phase_progress_range("classification")
+                phases[1]["current"] = True
+                analysis_progress_storage[project_id]["progress"] = cls_pct_start
+                analysis_progress_storage[project_id]["current_phase"] = "Clasificando tipo de documento..."
+
                 from narrative_assistant.parsers.document_classifier import classify_document, DocumentType
 
                 doc_title = project.name if project else None
-                classification = classify_document(full_text[:10000], title=doc_title)
+                classification = classify_document(full_text, title=doc_title)  # Usa muestreo múltiple
                 document_type = classification.document_type.value
                 analysis_settings = classification.recommended_settings
 
@@ -5312,11 +5320,20 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                 except Exception as e:
                     logger.warning(f"Could not save document type to project: {e}")
 
-                # ========== FASE 2: ESTRUCTURA ==========
+                # Completar fase de clasificación
+                analysis_progress_storage[project_id]["progress"] = cls_pct_end
+                phase_durations["classification"] = time.time() - phase_start_times["classification"]
+                phases[1]["completed"] = True
+                phases[1]["current"] = False
+                phases[1]["duration"] = round(phase_durations["classification"], 1)
+                update_time_remaining()
+                check_cancelled()
+
+                # ========== FASE 3: ESTRUCTURA ==========
                 current_phase_key = "structure"
                 phase_start_times["structure"] = time.time()
                 pct_start, pct_end = get_phase_progress_range("structure")
-                phases[1]["current"] = True
+                phases[2]["current"] = True
                 analysis_progress_storage[project_id]["progress"] = pct_start
                 analysis_progress_storage[project_id]["current_phase"] = "Identificando la estructura del documento..."
 
@@ -5386,19 +5403,19 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                 analysis_progress_storage[project_id]["progress"] = pct_end
                 analysis_progress_storage[project_id]["metrics"]["chapters_found"] = chapters_count
                 phase_durations["structure"] = time.time() - phase_start_times["structure"]
-                phases[1]["completed"] = True
-                phases[1]["current"] = False
-                phases[1]["duration"] = round(phase_durations["structure"], 1)
+                phases[2]["completed"] = True
+                phases[2]["current"] = False
+                phases[2]["duration"] = round(phase_durations["structure"], 1)
                 update_time_remaining()
 
                 logger.info(f"Structure detection complete: {chapters_count} chapters")
                 check_cancelled()  # Verificar cancelación
 
-                # ========== FASE 3: NER ==========
+                # ========== FASE 4: NER ==========
                 current_phase_key = "ner"
                 phase_start_times["ner"] = time.time()
                 ner_pct_start, ner_pct_end = get_phase_progress_range("ner")
-                phases[2]["current"] = True
+                phases[3]["current"] = True
                 analysis_progress_storage[project_id]["progress"] = ner_pct_start
                 analysis_progress_storage[project_id]["current_phase"] = "Buscando personajes, lugares y otros elementos..."
 
@@ -5621,9 +5638,9 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                 analysis_progress_storage[project_id]["progress"] = ner_pct_end
                 # No actualizar entities_found aquí - se actualiza después de fusión
                 phase_durations["ner"] = time.time() - phase_start_times["ner"]
-                phases[2]["completed"] = True
-                phases[2]["current"] = False
-                phases[2]["duration"] = round(phase_durations["ner"], 1)
+                phases[3]["completed"] = True
+                phases[3]["current"] = False
+                phases[3]["duration"] = round(phase_durations["ner"], 1)
                 update_time_remaining()
 
                 logger.info(f"NER complete: {len(entities)} entities")
@@ -5718,7 +5735,7 @@ JSON:"""
                 current_phase_key = "fusion"
                 phase_start_times["fusion"] = time.time()
                 fusion_pct_start, fusion_pct_end = get_phase_progress_range("fusion")
-                phases[3]["current"] = True  # Marcar fase fusion como activa en UI
+                phases[4]["current"] = True  # Marcar fase fusion como activa en UI
                 analysis_progress_storage[project_id]["progress"] = fusion_pct_start
                 analysis_progress_storage[project_id]["current_phase"] = "Unificando personajes mencionados de diferentes formas..."
                 analysis_progress_storage[project_id]["current_action"] = "Preparando unificación..."
@@ -6027,9 +6044,9 @@ JSON:"""
                     analysis_progress_storage[project_id]["metrics"]["entities_found"] = len(entities)
                     analysis_progress_storage[project_id]["current_action"] = f"Encontrados {len(entities)} personajes y elementos únicos"
                     # Marcar fase fusion como completada en UI
-                    phases[3]["completed"] = True
-                    phases[3]["current"] = False
-                    phases[3]["duration"] = round(phase_durations["fusion"], 1)
+                    phases[4]["completed"] = True
+                    phases[4]["current"] = False
+                    phases[4]["duration"] = round(phase_durations["fusion"], 1)
                     update_time_remaining()
 
                     logger.info(
@@ -6157,16 +6174,16 @@ JSON:"""
                     logger.warning(f"Error en fusión de entidades (continuando sin fusión): {e}")
                     phase_durations["fusion"] = time.time() - phase_start_times.get("fusion", time.time())
                     # Marcar fusion como completada aunque haya fallado (para continuar UI)
-                    phases[3]["completed"] = True
-                    phases[3]["current"] = False
-                    phases[3]["duration"] = round(phase_durations["fusion"], 1)
+                    phases[4]["completed"] = True
+                    phases[4]["current"] = False
+                    phases[4]["duration"] = round(phase_durations["fusion"], 1)
                 check_cancelled()  # Verificar cancelación
 
-                # ========== FASE 4: ATRIBUTOS ==========
+                # ========== FASE 5: ATRIBUTOS ==========
                 current_phase_key = "attributes"
                 phase_start_times["attributes"] = time.time()
                 attr_pct_start, attr_pct_end = get_phase_progress_range("attributes")
-                phases[4]["current"] = True  # Index 4 after adding fusion at index 3
+                phases[5]["current"] = True  # Index 5 after adding classification at index 1
                 analysis_progress_storage[project_id]["progress"] = attr_pct_start
                 analysis_progress_storage[project_id]["current_phase"] = "Analizando características de los personajes..."
 
@@ -6410,18 +6427,18 @@ JSON:"""
                 analysis_progress_storage[project_id]["progress"] = attr_pct_end
                 update_time_remaining()
                 analysis_progress_storage[project_id]["metrics"]["attributes_extracted"] = len(attributes)
-                phases[4]["completed"] = True
-                phases[4]["current"] = False
-                phases[4]["duration"] = round(phase_durations["attributes"], 1)
+                phases[5]["completed"] = True
+                phases[5]["current"] = False
+                phases[5]["duration"] = round(phase_durations["attributes"], 1)
 
                 logger.info(f"Attribute extraction complete: {len(attributes)} attributes")
                 check_cancelled()  # Verificar cancelación
 
-                # ========== FASE 5: CONSISTENCIA ==========
+                # ========== FASE 6: CONSISTENCIA ==========
                 current_phase_key = "consistency"
                 phase_start_times["consistency"] = time.time()
                 cons_pct_start, cons_pct_end = get_phase_progress_range("consistency")
-                phases[5]["current"] = True
+                phases[6]["current"] = True
                 analysis_progress_storage[project_id]["progress"] = cons_pct_start
                 analysis_progress_storage[project_id]["current_phase"] = "Verificando la coherencia del relato..."
 
@@ -6553,18 +6570,18 @@ JSON:"""
                 analysis_progress_storage[project_id]["progress"] = cons_pct_end
                 update_time_remaining()
                 analysis_progress_storage[project_id]["metrics"]["inconsistencies_found"] = len(inconsistencies)
-                phases[5]["completed"] = True
-                phases[5]["current"] = False
-                phases[5]["duration"] = round(phase_durations["consistency"], 1)
+                phases[6]["completed"] = True
+                phases[6]["current"] = False
+                phases[6]["duration"] = round(phase_durations["consistency"], 1)
 
                 logger.info(f"Consistency analysis complete: {len(inconsistencies)} inconsistencies")
                 check_cancelled()  # Verificar cancelación
 
-                # ========== FASE 6: ANÁLISIS GRAMATICAL ==========
+                # ========== FASE 7: ANÁLISIS GRAMATICAL ==========
                 current_phase_key = "grammar"
                 phase_start_times["grammar"] = time.time()
                 grammar_pct_start, grammar_pct_end = get_phase_progress_range("grammar")
-                phases[6]["current"] = True
+                phases[7]["current"] = True
                 analysis_progress_storage[project_id]["progress"] = grammar_pct_start
                 analysis_progress_storage[project_id]["current_phase"] = "Revisando la redacción..."
 
@@ -6637,19 +6654,19 @@ JSON:"""
                 analysis_progress_storage[project_id]["progress"] = grammar_pct_end
                 analysis_progress_storage[project_id]["metrics"]["grammar_issues_found"] = len(grammar_issues)
                 analysis_progress_storage[project_id]["metrics"]["correction_suggestions"] = len(correction_issues)
-                phases[6]["completed"] = True
-                phases[6]["current"] = False
-                phases[6]["duration"] = round(phase_durations["grammar"], 1)
+                phases[7]["completed"] = True
+                phases[7]["current"] = False
+                phases[7]["duration"] = round(phase_durations["grammar"], 1)
                 update_time_remaining()
 
                 logger.info(f"Grammar analysis complete: {len(grammar_issues)} grammar issues, {len(correction_issues)} correction suggestions")
                 check_cancelled()  # Verificar cancelación
 
-                # ========== FASE 7: ALERTAS ==========
+                # ========== FASE 8: ALERTAS ==========
                 current_phase_key = "alerts"
                 phase_start_times["alerts"] = time.time()
                 alerts_pct_start, alerts_pct_end = get_phase_progress_range("alerts")
-                phases[7]["current"] = True
+                phases[8]["current"] = True
                 analysis_progress_storage[project_id]["progress"] = alerts_pct_start
                 analysis_progress_storage[project_id]["current_phase"] = "Preparando observaciones y sugerencias..."
 
@@ -6780,9 +6797,9 @@ JSON:"""
                 phase_durations["alerts"] = time.time() - phase_start_times["alerts"]
                 analysis_progress_storage[project_id]["progress"] = 100
                 analysis_progress_storage[project_id]["metrics"]["alerts_generated"] = alerts_created
-                phases[7]["completed"] = True
-                phases[7]["current"] = False
-                phases[7]["duration"] = round(phase_durations["alerts"], 1)
+                phases[8]["completed"] = True
+                phases[8]["current"] = False
+                phases[8]["duration"] = round(phase_durations["alerts"], 1)
 
                 # ========== COMPLETADO ==========
                 analysis_progress_storage[project_id]["status"] = "completed"
