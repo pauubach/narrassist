@@ -34,7 +34,12 @@ jobs:
       
       - name: Build Backend Bundle
         run: python scripts/build_backend_bundle.py
-      
+
+      - name: Install base dependencies in embedded Python
+        run: |
+          src-tauri\binaries\python-embed\python.exe -m pip install -r src-tauri\binaries\backend\requirements.txt --no-warn-script-location
+        shell: cmd
+
       - name: Validate binaries and python embed (Windows)
         shell: pwsh
         run: |
@@ -113,6 +118,11 @@ jobs:
       
       - name: Build Backend Bundle
         run: python3 scripts/build_backend_bundle.py
+
+      - name: Install base dependencies in embedded Python
+        run: |
+          ./python3 -m pip install -r ../backend/requirements.txt --no-warn-script-location
+        working-directory: src-tauri/binaries/python-embed
 
       - name: Validate binaries and python embed (macOS)
         run: |

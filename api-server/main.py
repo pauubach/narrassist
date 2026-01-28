@@ -63,7 +63,7 @@ import shutil
 # Setup logging IMMEDIATELY for early debugging
 import logging
 
-BACKEND_VERSION = "0.3.1"
+BACKEND_VERSION = "0.3.11"
 IS_EMBEDDED_RUNTIME = os.environ.get("NA_EMBEDDED") == "1" or "python-embed" in (sys.executable or "").lower()
 
 # Configure logging FIRST before using any loggers
@@ -112,22 +112,27 @@ try:
     _early_logger.info(f"Python executable: {sys.executable}")
     _early_logger.info(f"sys.path before modifications: {sys.path[:3]}...")  # First 3 entries
     
-    # Add user site-packages
-    user_site = site.getusersitepackages()
-    _write_debug(f"User site: {user_site}")
-    _early_logger.info(f"User site-packages: {user_site}")
-    if user_site not in sys.path:
-        sys.path.insert(0, user_site)
-        _write_debug("Added user site to sys.path")
-        _early_logger.info(f"✓ Added user site-packages to sys.path")
-    
     # Detect if we're using embedded Python (check if python-embed is in executable path)
     using_embedded_python = IS_EMBEDDED_RUNTIME
-    
+
     if using_embedded_python:
-        _write_debug("Detected embedded Python - skipping Anaconda detection")
-        _early_logger.info("Using embedded Python - Anaconda detection skipped")
+        # Embedded Python: site-packages are in the bundle, skip external detection
+        _write_debug("Embedded Python - skipping user site-packages and Anaconda detection")
+        _early_logger.info("Using embedded Python - external path detection skipped")
     else:
+        # Development mode: add user site-packages and detect Anaconda
+        try:
+            user_site = site.getusersitepackages()
+            _write_debug(f"User site: {user_site}")
+            _early_logger.info(f"User site-packages: {user_site}")
+            if user_site and os.path.exists(user_site) and user_site not in sys.path:
+                # Use append (not insert) to keep backend paths at higher priority
+                sys.path.append(user_site)
+                _write_debug("Added user site to sys.path")
+                _early_logger.info(f"✓ Added user site-packages to sys.path")
+        except Exception as site_err:
+            _write_debug(f"Could not get user site-packages: {site_err}")
+            _early_logger.warning(f"Could not get user site-packages: {site_err}")
         # Try to find Anaconda/Conda installation only if NOT using embedded Python
         # 1. Check common Anaconda locations
         conda_candidates = [
@@ -201,6 +206,7 @@ alert_repository = None
 chapter_repository = None
 section_repository = None
 get_config = None
+get_database = None
 NA_VERSION = BACKEND_VERSION
 Database = None
 MODULES_LOADED = False
@@ -291,6 +297,21 @@ app.add_middleware(
 )
 
 # ============================================================================
+# Startup: auto-load modules when server starts
+# ============================================================================
+
+@app.on_event("startup")
+async def startup_load_modules():
+    """Try to load narrative_assistant modules on server startup."""
+    if not MODULES_LOADED:
+        logger.info("Startup: attempting to load narrative_assistant modules...")
+        load_narrative_assistant_modules()
+        if MODULES_LOADED:
+            logger.info("Startup: modules loaded successfully")
+        else:
+            logger.warning(f"Startup: modules not loaded - {MODULES_ERROR}")
+
+# ============================================================================
 # Helpers
 # ============================================================================
 
@@ -304,7 +325,7 @@ def load_narrative_assistant_modules():
     """
     global MODULES_LOADED, MODULES_ERROR
     global project_manager, entity_repository, alert_repository
-    global chapter_repository, section_repository, get_config, Database
+    global chapter_repository, section_repository, get_config, get_database, Database
     
     if MODULES_LOADED:
         return True
@@ -335,7 +356,7 @@ def load_narrative_assistant_modules():
         
         try:
             from narrative_assistant.persistence.project import ProjectManager
-            from narrative_assistant.persistence.database import get_database, Database as DB
+            from narrative_assistant.persistence.database import get_database as get_db, Database as DB
             from narrative_assistant.persistence.chapter import ChapterRepository, SectionRepository
             from narrative_assistant.entities.repository import EntityRepository
             from narrative_assistant.alerts.repository import AlertRepository
@@ -374,8 +395,7 @@ def load_narrative_assistant_modules():
 
             # Verificar estado de la base de datos
             try:
-                from narrative_assistant.persistence.database import get_database
-                db = get_database()
+                db = get_db()
                 _write_debug(f"Database path: {db.db_path}")
                 logger.info(f"Database path: {db.db_path}")
                 # Verificar tablas
@@ -395,6 +415,7 @@ def load_narrative_assistant_modules():
             chapter_repository = ChapterRepository()
             section_repository = SectionRepository()
             get_config = get_cfg
+            get_database = get_db
             Database = DB
             MODULES_LOADED = True
             MODULES_ERROR = None
@@ -953,11 +974,21 @@ async def install_dependencies():
             if sys.platform == 'win32':
                 creation_flags = subprocess.CREATE_NO_WINDOW
 
-            # Instalar usando pip con --user para evitar problemas de permisos
+            # Determinar argumentos de instalación según el entorno
+            pip_install_args = ["--no-cache-dir"]
+            if IS_EMBEDDED_RUNTIME:
+                # En Python embebido, --user no funciona (ENABLE_USER_SITE=False).
+                # Instalar directamente en el site-packages del Python embebido.
+                embed_site_packages = os.path.join(os.path.dirname(python_exe), "Lib", "site-packages")
+                pip_install_args.extend(["--target", embed_site_packages])
+                logger.info(f"Installing to embedded site-packages: {embed_site_packages}")
+            else:
+                pip_install_args.append("--user")
+
             for dep in dependencies:
                 logger.info(f"Installing {dep}...")
                 result = subprocess.run(
-                    [python_exe, "-m", "pip", "install", "--user", "--no-cache-dir", dep],
+                    [python_exe, "-m", "pip", "install"] + pip_install_args + [dep],
                     capture_output=True,
                     text=True,
                     creationflags=creation_flags
@@ -1641,20 +1672,35 @@ async def list_projects():
     """
     try:
         if not project_manager:
-            logger.error("list_projects: project_manager is None")
-            return ApiResponse(success=False, error="Project manager not initialized")
+            # Try to load modules on-demand if not yet loaded
+            if not MODULES_LOADED:
+                logger.info("list_projects: Attempting on-demand module loading...")
+                load_narrative_assistant_modules()
+            if not project_manager:
+                logger.error("list_projects: project_manager is None")
+                return ApiResponse(success=False, error="Project manager not initialized")
 
-        # Log database info for debugging
+        # Verify database is accessible
+        if not get_database:
+            logger.error("list_projects: get_database is None")
+            return ApiResponse(success=False, error="Database module not loaded")
+
         try:
             db = get_database()
-            logger.info(f"list_projects: Database path = {db.db_path}")
-            # Check if projects table exists
+            # Verify essential tables exist (auto-repair if needed)
             tables = db.fetchall("SELECT name FROM sqlite_master WHERE type='table'")
             table_names = [t['name'] for t in tables]
-            logger.info(f"list_projects: Tables in DB = {table_names}")
             if 'projects' not in table_names:
-                logger.error("list_projects: 'projects' table does NOT exist!")
-                return ApiResponse(success=False, error="Database not initialized properly - 'projects' table missing")
+                logger.warning("list_projects: 'projects' table missing, attempting schema repair...")
+                try:
+                    from narrative_assistant.persistence.database import SCHEMA_SQL
+                    with db.connection() as conn:
+                        conn.executescript(SCHEMA_SQL)
+                        conn.commit()
+                    logger.info("list_projects: Schema repaired successfully")
+                except Exception as repair_err:
+                    logger.error(f"list_projects: Schema repair failed: {repair_err}")
+                    return ApiResponse(success=False, error="Database not initialized properly - 'projects' table missing")
         except Exception as db_err:
             logger.error(f"list_projects: Error checking database: {db_err}", exc_info=True)
 
@@ -14132,7 +14178,12 @@ if __name__ == "__main__":
         
         # Escribir a archivo de log
         try:
-            log_dir = get_log_directory()
+            if sys.platform == 'win32':
+                log_dir = Path.home() / "AppData" / "Local" / "Narrative Assistant"
+            elif sys.platform == 'darwin':
+                log_dir = Path.home() / "Library" / "Logs" / "Narrative Assistant"
+            else:
+                log_dir = Path.home() / ".local" / "share" / "narrative-assistant"
             log_dir.mkdir(parents=True, exist_ok=True)
             error_file = log_dir / "startup_error.log"
             

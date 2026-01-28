@@ -23,38 +23,47 @@ Var CleanInstall
     Sleep 1000
     
     ; Verificar si existe una instalación previa con datos
-    IfFileExists "$PROFILE\.narrative_assistant\narrative_assistant.db" 0 +6
+    ; Comprobar ruta de producción (LOCALAPPDATA) y ruta de desarrollo (~/.narrative_assistant)
+    IfFileExists "$LOCALAPPDATA\Narrative Assistant\data\narrative_assistant.db" 0 check_dev_path
+        Goto ask_clean
+    check_dev_path:
+    IfFileExists "$PROFILE\.narrative_assistant\narrative_assistant.db" 0 done_clean
+
+    ask_clean:
         MessageBox MB_YESNO|MB_ICONQUESTION \
             "Se ha detectado una instalación anterior con datos de proyectos.$\n$\n\
             ¿Desea eliminar todos los datos anteriores y comenzar con una instalación limpia?$\n$\n\
             Seleccione 'Sí' para una instalación limpia (se perderán proyectos anteriores).$\n\
             Seleccione 'No' para conservar sus proyectos existentes." \
             IDYES clean_install IDNO keep_data
-    
+
     clean_install:
         StrCpy $CleanInstall "1"
         DetailPrint "Se realizará una instalación limpia..."
-        
-        ; Eliminar base de datos
+
+        ; Eliminar base de datos (ruta de producción)
+        Delete "$LOCALAPPDATA\Narrative Assistant\data\narrative_assistant.db"
+        Delete "$LOCALAPPDATA\Narrative Assistant\data\narrative_assistant.db-shm"
+        Delete "$LOCALAPPDATA\Narrative Assistant\data\narrative_assistant.db-wal"
+        RMDir /r "$LOCALAPPDATA\Narrative Assistant\data\documents"
+        RMDir /r "$LOCALAPPDATA\Narrative Assistant\data\cache"
+
+        ; Eliminar base de datos (ruta de desarrollo legacy)
         Delete "$PROFILE\.narrative_assistant\narrative_assistant.db"
         Delete "$PROFILE\.narrative_assistant\narrative_assistant.db-shm"
         Delete "$PROFILE\.narrative_assistant\narrative_assistant.db-wal"
-        
-        ; Eliminar documentos copiados (no los originales del usuario)
         RMDir /r "$PROFILE\.narrative_assistant\documents"
-        
-        ; Eliminar caché
         RMDir /r "$PROFILE\.narrative_assistant\cache"
-        
+
         ; Mantener modelos descargados (son grandes y no cambian)
         DetailPrint "Conservando modelos NLP descargados..."
-        
+
         Goto done_clean
-    
+
     keep_data:
         StrCpy $CleanInstall "0"
         DetailPrint "Conservando datos existentes..."
-    
+
     done_clean:
     DetailPrint "Preparando instalacion..."
 !macroend

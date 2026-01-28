@@ -20,8 +20,8 @@
       "icons/icon.ico"
     ],
     "resources": [
-      "binaries/python-embed",
-      "binaries/backend"
+      "binaries/python-embed/",
+      "binaries/backend/"
     ],
     "windows": {
       "certificateThumbprint": null,
