@@ -88,13 +88,13 @@
           <SelectButton
             v-model="typeFilter"
             :options="typeOptions"
-            optionLabel="label"
-            optionValue="value"
+            option-label="label"
+            option-value="value"
           />
         </div>
 
         <!-- Accordion by Character -->
-        <Accordion :multiple="true" :activeIndex="[0]" class="characters-accordion">
+        <Accordion :multiple="true" :active-index="[0]" class="characters-accordion">
           <AccordionPanel v-for="group in filteredGroups" :key="group.character" :value="group.character">
             <AccordionHeader>
               <div class="character-header">
@@ -119,25 +119,25 @@
                   <div class="inc-header">
                     <Tag :severity="getTypeSeverity(inc.incoherence_type)" :value="getTypeLabel(inc.incoherence_type)" />
                     <span class="inc-confidence">{{ formatPercent(inc.confidence) }} confianza</span>
-                    <span class="inc-chapter" v-if="inc.chapter_id">
+                    <span v-if="inc.chapter_id" class="inc-chapter">
                       Cap. {{ inc.chapter_id }}
                     </span>
                   </div>
 
                   <p class="inc-explanation">{{ inc.explanation }}</p>
 
-                  <div class="inc-details" v-if="inc.declared_emotion || inc.actual_behavior">
-                    <div class="detail-row" v-if="inc.declared_emotion">
+                  <div v-if="inc.declared_emotion || inc.actual_behavior" class="inc-details">
+                    <div v-if="inc.declared_emotion" class="detail-row">
                       <span class="detail-label">Declarado:</span>
                       <Tag severity="info" size="small">{{ inc.declared_emotion }}</Tag>
                     </div>
-                    <div class="detail-row" v-if="inc.actual_behavior">
+                    <div v-if="inc.actual_behavior" class="detail-row">
                       <span class="detail-label">Comportamiento:</span>
                       <span class="detail-value">{{ inc.actual_behavior }}</span>
                     </div>
                   </div>
 
-                  <div class="inc-excerpt" v-if="inc.behavior_text || inc.declared_text">
+                  <div v-if="inc.behavior_text || inc.declared_text" class="inc-excerpt">
                     <div v-if="inc.declared_text" class="excerpt-block">
                       <small class="excerpt-label">Texto declarado:</small>
                       <small class="excerpt-text">"{{ truncate(inc.declared_text, 100) }}"</small>
@@ -148,7 +148,7 @@
                     </div>
                   </div>
 
-                  <div class="inc-suggestion" v-if="inc.suggestion">
+                  <div v-if="inc.suggestion" class="inc-suggestion">
                     <i class="pi pi-lightbulb"></i>
                     <small>{{ inc.suggestion }}</small>
                   </div>

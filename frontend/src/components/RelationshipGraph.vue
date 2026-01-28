@@ -20,49 +20,49 @@
       </div>
       <div class="toolbar-right">
         <Button
+          v-tooltip.bottom="'Alejar'"
           icon="pi pi-search-minus"
           text
           rounded
           @click="zoomOut"
-          v-tooltip.bottom="'Alejar'"
         />
         <Button
+          v-tooltip.bottom="'Acercar'"
           icon="pi pi-search-plus"
           text
           rounded
           @click="zoomIn"
-          v-tooltip.bottom="'Acercar'"
         />
         <Button
+          v-tooltip.bottom="'Restablecer vista'"
           icon="pi pi-refresh"
           text
           rounded
           @click="resetView"
-          v-tooltip.bottom="'Restablecer vista'"
         />
-        <Dropdown
+        <Select
           v-model="graphStore.layoutType"
           :options="layoutOptions"
-          optionLabel="label"
-          optionValue="value"
+          option-label="label"
+          option-value="value"
           placeholder="Layout"
           class="layout-dropdown"
           @change="updateLayout"
         />
         <Button
+          v-tooltip.bottom="'Filtros'"
           icon="pi pi-filter"
           text
           rounded
           :severity="graphStore.hasActiveFilters ? 'warn' : undefined"
           @click="showFilters = !showFilters"
-          v-tooltip.bottom="'Filtros'"
         />
         <Button
+          v-tooltip.bottom="'Configuracion'"
           icon="pi pi-cog"
           text
           rounded
           @click="showSettings = !showSettings"
-          v-tooltip.bottom="'Configuracion'"
         />
       </div>
     </div>
@@ -87,10 +87,10 @@
           <MultiSelect
             v-model="graphStore.filters.relationshipTypes"
             :options="graphStore.relationshipTypeOptions"
-            optionLabel="label"
-            optionValue="value"
+            option-label="label"
+            option-value="value"
             placeholder="Todos los tipos"
-            :maxSelectedLabels="2"
+            :max-selected-labels="2"
             display="chip"
             class="filter-select"
           >
@@ -110,10 +110,10 @@
           <MultiSelect
             v-model="graphStore.filters.strengthLevels"
             :options="graphStore.strengthOptions"
-            optionLabel="label"
-            optionValue="value"
+            option-label="label"
+            option-value="value"
             placeholder="Todas las fuerzas"
-            :maxSelectedLabels="2"
+            :max-selected-labels="2"
             display="chip"
             class="filter-select"
           >
@@ -135,10 +135,10 @@
           <MultiSelect
             v-model="graphStore.filters.valences"
             :options="graphStore.valenceOptions"
-            optionLabel="label"
-            optionValue="value"
+            option-label="label"
+            option-value="value"
             placeholder="Todas las valencias"
-            :maxSelectedLabels="3"
+            :max-selected-labels="3"
             display="chip"
             class="filter-select"
           >
@@ -161,7 +161,7 @@
             <Checkbox
               v-model="graphStore.filters.showOnlyConfirmed"
               :binary="true"
-              inputId="showOnlyConfirmed"
+              input-id="showOnlyConfirmed"
             />
             <label for="showOnlyConfirmed">Solo relaciones confirmadas</label>
           </div>
@@ -180,7 +180,7 @@
       </div>
       <div class="setting-group">
         <label>Mostrar clusters</label>
-        <InputSwitch v-model="graphStore.filters.showClusters" />
+        <ToggleSwitch v-model="graphStore.filters.showClusters" />
       </div>
     </div>
 
@@ -285,9 +285,9 @@
             <div
               v-for="cluster in clusters.slice(0, 5)"
               :key="cluster.id"
+              v-tooltip.top="'Clic para renombrar'"
               class="legend-item legend-item-clickable"
               @click="openClusterRenameDialog(cluster)"
-              v-tooltip.top="'Clic para renombrar'"
             >
               <span class="legend-dot" :style="{ background: cluster.color }"></span>
               <span>{{ cluster.label || `Grupo ${cluster.id}` }}</span>
@@ -301,11 +301,11 @@
     <!-- Cluster Rename Dialog -->
     <Dialog
       :visible="showClusterRenameDialog"
-      @update:visible="showClusterRenameDialog = $event"
       :header="`Renombrar cluster: ${editingCluster?.label || ''}`"
       :modal="true"
       :closable="true"
       :style="{ width: '400px' }"
+      @update:visible="showClusterRenameDialog = $event"
     >
       <div class="cluster-rename-form">
         <div class="form-field">
@@ -386,10 +386,10 @@ import { Network, DataSet } from 'vis-network/standalone'
 import type { Options, Node, Edge } from 'vis-network/standalone'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
-import Dropdown from 'primevue/dropdown'
+import Select from 'primevue/select'
 import Checkbox from 'primevue/checkbox'
 import Slider from 'primevue/slider'
-import InputSwitch from 'primevue/inputswitch'
+import ToggleSwitch from 'primevue/toggleswitch'
 import ProgressSpinner from 'primevue/progressspinner'
 import Divider from 'primevue/divider'
 import MultiSelect from 'primevue/multiselect'

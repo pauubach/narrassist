@@ -70,13 +70,14 @@ export interface RegisterAnalysis {
 }
 
 export interface RegisterChange {
-  fromSegment: number
-  toSegment: number
   fromRegister: RegisterType
   toRegister: RegisterType
   severity: ChangeSeverity
   explanation: string
   chapter: number | null
+  position: number
+  contextBefore: string
+  contextAfter: string
 }
 
 export interface RegisterSummary {

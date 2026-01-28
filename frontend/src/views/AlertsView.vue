@@ -4,11 +4,11 @@
     <div class="view-header">
       <div class="header-left">
         <Button
+          v-tooltip.right="'Volver al proyecto'"
           icon="pi pi-arrow-left"
           text
           rounded
           @click="goBack"
-          v-tooltip.right="'Volver al proyecto'"
         />
         <div class="header-info">
           <h1>Alertas</h1>
@@ -25,8 +25,8 @@
         <Button
           label="Resolver todas"
           icon="pi pi-check-circle"
-          @click="resolveAll"
           :disabled="openAlertsCount === 0"
+          @click="resolveAll"
         />
       </div>
     </div>
@@ -86,8 +86,8 @@
       />
     </div>
 
-    <!-- Sidebar con detalles de alerta -->
-    <Sidebar
+    <!-- Drawer con detalles de alerta -->
+    <Drawer
       v-model:visible="showAlertDetails"
       position="right"
       :style="{ width: '600px' }"
@@ -218,8 +218,8 @@
               label="Marcar como resuelta"
               icon="pi pi-check"
               severity="success"
-              @click="onResolveAlert(selectedAlert)"
               class="w-full"
+              @click="onResolveAlert(selectedAlert)"
             />
             <Button
               v-if="isAlertOpenStatus(selectedAlert.status)"
@@ -227,21 +227,21 @@
               icon="pi pi-times"
               severity="secondary"
               outlined
-              @click="onDismissAlert(selectedAlert)"
               class="w-full"
+              @click="onDismissAlert(selectedAlert)"
             />
             <Button
               v-if="!isAlertOpenStatus(selectedAlert.status)"
               label="Reabrir alerta"
               icon="pi pi-replay"
               outlined
-              @click="onReopenAlert(selectedAlert)"
               class="w-full"
+              @click="onReopenAlert(selectedAlert)"
             />
           </div>
         </div>
       </div>
-    </Sidebar>
+    </Drawer>
 
     <!-- Diálogo de confirmación: Resolver todas -->
     <Dialog
@@ -282,7 +282,7 @@ import { useProjectsStore } from '@/stores/projects'
 import Button from 'primevue/button'
 import ProgressSpinner from 'primevue/progressspinner'
 import Message from 'primevue/message'
-import Sidebar from 'primevue/sidebar'
+import Drawer from 'primevue/drawer'
 import Dialog from 'primevue/dialog'
 import Tag from 'primevue/tag'
 import Chip from 'primevue/chip'
@@ -659,7 +659,7 @@ onMounted(async () => {
   gap: 1rem;
 }
 
-/* Sidebar de detalles */
+/* Drawer de detalles */
 .sidebar-header h3 {
   margin: 0;
   font-size: 1.25rem;

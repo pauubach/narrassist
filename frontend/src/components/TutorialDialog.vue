@@ -4,9 +4,9 @@
     modal
     :closable="true"
     :draggable="false"
-    :blockScroll="true"
+    :block-scroll="true"
     class="tutorial-dialog"
-    :showHeader="currentStep > 0"
+    :show-header="currentStep > 0"
     :header="stepTitles[currentStep]"
     :style="{ width: dialogWidth }"
   >
@@ -256,8 +256,8 @@
     <!-- Footer con navegación -->
     <template #footer>
       <div class="tutorial-footer">
-        <div class="dont-show-again" v-if="currentStep === 0">
-          <Checkbox v-model="dontShowAgain" inputId="dontShowAgain" binary />
+        <div v-if="currentStep === 0" class="dont-show-again">
+          <Checkbox v-model="dontShowAgain" input-id="dontShowAgain" binary />
           <label for="dontShowAgain">No mostrar de nuevo</label>
         </div>
         <div v-else class="step-indicator">
@@ -281,7 +281,7 @@
             v-else
             label="Empezar a usar"
             icon="pi pi-arrow-right"
-            iconPos="right"
+            icon-pos="right"
             @click="finish"
           />
         </div>

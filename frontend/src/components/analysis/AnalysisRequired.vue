@@ -120,8 +120,8 @@ async function runAnalysis() {
           <Button
             :label="runButtonLabel"
             icon="pi pi-play"
-            @click="runAnalysis"
             class="run-button"
+            @click="runAnalysis"
           />
         </div>
       </div>

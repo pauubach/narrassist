@@ -8,30 +8,30 @@
       <div class="header-actions">
         <Button
           v-if="showMergeHistory"
+          v-tooltip.bottom="'Historial de fusiones'"
           icon="pi pi-history"
           text
           rounded
           size="small"
           @click="showMergeHistoryDialog = true"
-          v-tooltip.bottom="'Historial de fusiones'"
         />
         <Button
           v-if="showRefresh"
+          v-tooltip.bottom="'Recargar'"
           icon="pi pi-refresh"
           text
           rounded
           size="small"
           @click="$emit('refresh')"
-          v-tooltip.bottom="'Recargar'"
         />
         <Button
           v-if="showExpandButton"
+          v-tooltip.bottom="expanded ? 'Contraer' : 'Expandir'"
           :icon="expanded ? 'pi pi-minus' : 'pi pi-plus'"
           text
           rounded
           size="small"
           @click="toggleExpanded"
-          v-tooltip.bottom="expanded ? 'Contraer' : 'Expandir'"
         />
       </div>
     </div>
@@ -68,11 +68,11 @@
       </div>
 
       <!-- Ordenamiento -->
-      <Dropdown
+      <Select
         v-model="sortBy"
         :options="sortOptions"
-        optionLabel="label"
-        optionValue="value"
+        option-label="label"
+        option-value="value"
         placeholder="Ordenar por"
         class="sort-dropdown"
       />
@@ -103,7 +103,7 @@
     <VirtualScroller
       v-else-if="shouldVirtualize"
       :items="filteredEntities"
-      :itemSize="compact ? 56 : 80"
+      :item-size="compact ? 56 : 80"
       class="entities-container entities-virtual"
       :class="{ 'compact': compact }"
     >
@@ -129,8 +129,8 @@
                 <span class="entity-name">{{ entity.name }}</span>
                 <i
                   v-if="entity.mergedFromIds && entity.mergedFromIds.length > 0"
-                  class="pi pi-link merged-icon"
                   v-tooltip.top="'Entidad fusionada'"
+                  class="pi pi-link merged-icon"
                 ></i>
               </div>
               <div v-if="entity.aliases && entity.aliases.length > 0" class="entity-aliases">
@@ -150,14 +150,14 @@
               {{ getImportanceLabel(entity.importance) }}
             </Tag>
             <div class="entity-stats">
-              <span class="stat-item" v-tooltip.top="'Apariciones'">
+              <span v-tooltip.top="'Apariciones'" class="stat-item">
                 <i class="pi pi-hashtag"></i>
                 {{ entity.mentionCount || 0 }}
               </span>
               <span
                 v-if="entity.firstMentionChapter"
-                class="stat-item"
                 v-tooltip.top="'Primera aparición'"
+                class="stat-item"
               >
                 <i class="pi pi-book"></i>
                 Cap. {{ entity.firstMentionChapter }}
@@ -168,28 +168,28 @@
           <!-- Acciones -->
           <div v-if="showActions" class="entity-actions">
             <Button
+              v-tooltip.left="'Ver detalles'"
               icon="pi pi-eye"
               text
               rounded
               size="small"
               @click.stop="$emit('view', entity)"
-              v-tooltip.left="'Ver detalles'"
             />
             <Button
+              v-tooltip.left="'Editar'"
               icon="pi pi-pencil"
               text
               rounded
               size="small"
               @click.stop="$emit('edit', entity)"
-              v-tooltip.left="'Editar'"
             />
             <Button
+              v-tooltip.left="'Más acciones'"
               icon="pi pi-ellipsis-v"
               text
               rounded
               size="small"
               @click.stop="showEntityMenu($event, entity)"
-              v-tooltip.left="'Más acciones'"
             />
           </div>
         </div>
@@ -218,8 +218,8 @@
               <span class="entity-name">{{ entity.name }}</span>
               <i
                 v-if="entity.mergedFromIds && entity.mergedFromIds.length > 0"
-                class="pi pi-link merged-icon"
                 v-tooltip.top="'Entidad fusionada'"
+                class="pi pi-link merged-icon"
               ></i>
             </div>
             <div v-if="entity.aliases && entity.aliases.length > 0" class="entity-aliases">
@@ -239,14 +239,14 @@
             {{ getImportanceLabel(entity.importance) }}
           </Tag>
           <div class="entity-stats">
-            <span class="stat-item" v-tooltip.top="'Apariciones'">
+            <span v-tooltip.top="'Apariciones'" class="stat-item">
               <i class="pi pi-hashtag"></i>
               {{ entity.mentionCount || 0 }}
             </span>
             <span
               v-if="entity.firstMentionChapter"
-              class="stat-item"
               v-tooltip.top="'Primera aparición'"
+              class="stat-item"
             >
               <i class="pi pi-book"></i>
               Cap. {{ entity.firstMentionChapter }}
@@ -257,28 +257,28 @@
         <!-- Acciones -->
         <div v-if="showActions" class="entity-actions">
           <Button
+            v-tooltip.left="'Ver detalles'"
             icon="pi pi-eye"
             text
             rounded
             size="small"
             @click.stop="$emit('view', entity)"
-            v-tooltip.left="'Ver detalles'"
           />
           <Button
+            v-tooltip.left="'Editar'"
             icon="pi pi-pencil"
             text
             rounded
             size="small"
             @click.stop="$emit('edit', entity)"
-            v-tooltip.left="'Editar'"
           />
           <Button
+            v-tooltip.left="'Más acciones'"
             icon="pi pi-ellipsis-v"
             text
             rounded
             size="small"
             @click.stop="showEntityMenu($event, entity)"
-            v-tooltip.left="'Más acciones'"
           />
         </div>
       </div>
@@ -288,7 +288,7 @@
     <div v-if="showPagination && totalPages > 1" class="pagination">
       <Paginator
         :rows="itemsPerPage"
-        :totalRecords="filteredEntities.length"
+        :total-records="filteredEntities.length"
         @page="onPageChange"
       />
     </div>
@@ -335,14 +335,14 @@
           </div>
           <Button
             v-if="!merge.undone"
+            v-tooltip.left="'Deshacer fusión'"
             icon="pi pi-undo"
             text
             rounded
             size="small"
             severity="warning"
-            @click="undoMerge(merge.id)"
             :loading="undoingMerge === merge.id"
-            v-tooltip.left="'Deshacer fusión'"
+            @click="undoMerge(merge.id)"
           />
         </div>
       </div>
@@ -358,7 +358,7 @@
 import { ref, computed, watch } from 'vue'
 import Button from 'primevue/button'
 import DsInput from '@/components/ds/DsInput.vue'
-import Dropdown from 'primevue/dropdown'
+import Select from 'primevue/select'
 import Badge from 'primevue/badge'
 import Tag from 'primevue/tag'
 import ProgressSpinner from 'primevue/progressspinner'

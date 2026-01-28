@@ -104,12 +104,12 @@ function getEntityIcon(type: string): string {
         <span v-if="selection.chapter" class="header-chapter">{{ selection.chapter }}</span>
       </div>
       <Button
+        v-tooltip.bottom="'Cerrar'"
         icon="pi pi-times"
         text
         rounded
         size="small"
         @click="emit('close')"
-        v-tooltip.bottom="'Cerrar'"
       />
     </div>
 

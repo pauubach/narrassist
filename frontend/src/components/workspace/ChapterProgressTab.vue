@@ -26,21 +26,21 @@
           <template #content>
             <div class="mode-selector">
               <label>Modo de análisis:</label>
-              <Dropdown
+              <Select
                 v-model="selectedMode"
                 :options="analysisModesOptions"
-                optionLabel="label"
-                optionValue="value"
+                option-label="label"
+                option-value="value"
                 class="mode-dropdown"
                 @change="loadReport"
               />
               <Button
+                v-tooltip.top="'Recargar análisis'"
                 icon="pi pi-refresh"
                 :loading="loading"
                 text
                 rounded
                 @click="loadReport"
-                v-tooltip.top="'Recargar análisis'"
               />
             </div>
             <small class="mode-description">{{ modeDescription }}</small>
@@ -62,7 +62,7 @@
                 <span class="stat-value">{{ report.active_characters }}</span>
                 <span class="stat-label">Activos</span>
               </div>
-              <div class="stat-item" v-if="report.chekhov_elements?.length">
+              <div v-if="report.chekhov_elements?.length" class="stat-item">
                 <span class="stat-value warning">{{ report.chekhov_elements.length }}</span>
                 <span class="stat-label">Objetos sin resolver</span>
               </div>
@@ -163,8 +163,8 @@
                       >
                         <span class="char-name">{{ char.name }}</span>
                         <span class="char-mentions">{{ char.mention_count }}</span>
-                        <i v-if="char.is_first_appearance" class="pi pi-star" v-tooltip.top="'Primera aparición'"></i>
-                        <i v-if="char.is_return" class="pi pi-replay" v-tooltip.top="`Regresa después de ${char.chapters_absent} capítulos`"></i>
+                        <i v-if="char.is_first_appearance" v-tooltip.top="'Primera aparición'" class="pi pi-star"></i>
+                        <i v-if="char.is_return" v-tooltip.top="`Regresa después de ${char.chapters_absent} capítulos`" class="pi pi-replay"></i>
                       </div>
                     </div>
                   </div>
@@ -264,7 +264,7 @@
               </div>
 
               <div class="arc-details">
-                <div class="arc-states" v-if="arc.start_state || arc.end_state">
+                <div v-if="arc.start_state || arc.end_state" class="arc-states">
                   <div v-if="arc.start_state" class="state start">
                     <label>Estado inicial:</label>
                     <span>{{ arc.start_state }}</span>
@@ -295,7 +295,7 @@
 
                 <div v-if="arc.completeness > 0" class="arc-completeness">
                   <label>Completitud del arco:</label>
-                  <ProgressBar :value="arc.completeness * 100" :showValue="true" />
+                  <ProgressBar :value="arc.completeness * 100" :show-value="true" />
                 </div>
               </div>
             </div>
@@ -355,7 +355,7 @@
         </TabPanel>
 
         <!-- Abandoned Threads Tab -->
-        <TabPanel value="3" v-if="report.abandoned_threads?.length">
+        <TabPanel v-if="report.abandoned_threads?.length" value="3">
           <template #header>
             <i class="pi pi-exclamation-circle"></i>
             <span>Tramas abandonadas</span>
@@ -407,7 +407,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
-import Dropdown from 'primevue/dropdown'
+import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import Badge from 'primevue/badge'
 import Message from 'primevue/message'

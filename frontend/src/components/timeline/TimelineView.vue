@@ -27,49 +27,49 @@
         <SelectButton
           v-model="viewMode"
           :options="viewModeOptions"
-          optionLabel="label"
-          optionValue="value"
+          option-label="label"
+          option-value="value"
           class="view-mode-toggle"
-          :allowEmpty="false"
+          :allow-empty="false"
         >
           <template #option="{ option }">
-            <i :class="option.icon" v-tooltip.bottom="option.tooltip"></i>
+            <i v-tooltip.bottom="option.tooltip" :class="option.icon"></i>
           </template>
         </SelectButton>
 
-        <Dropdown
+        <Select
           v-if="viewMode === 'list'"
           v-model="sortOrder"
           :options="sortOptions"
-          optionLabel="label"
-          optionValue="value"
+          option-label="label"
+          option-value="value"
           placeholder="Ordenar por"
           class="sort-dropdown"
         />
-        <Dropdown
+        <Select
           v-if="viewMode === 'list'"
           v-model="filterNarrativeOrder"
           :options="narrativeOrderOptions"
-          optionLabel="label"
-          optionValue="value"
+          option-label="label"
+          option-value="value"
           placeholder="Filtrar tipo"
           class="filter-dropdown"
-          showClear
+          show-clear
         />
         <Button
+          v-tooltip.bottom="'Recargar timeline'"
           icon="pi pi-refresh"
           text
           rounded
-          @click="loadTimeline"
-          v-tooltip.bottom="'Recargar timeline'"
           :loading="loading"
+          @click="loadTimeline"
         />
         <Button
+          v-tooltip.bottom="'Exportar timeline'"
           icon="pi pi-download"
           text
           rounded
           @click="exportTimeline"
-          v-tooltip.bottom="'Exportar timeline'"
         />
       </div>
     </div>
@@ -168,43 +168,43 @@
         <!-- Toggle de agrupación -->
         <div class="group-toggle">
           <label class="toggle-label">
-            <input type="checkbox" v-model="groupByChapter" />
+            <input v-model="groupByChapter" type="checkbox" />
             <span>Agrupar por capítulo</span>
           </label>
         </div>
 
         <!-- Lista de eventos agrupados por capítulo -->
         <div v-if="groupByChapter" class="events-list grouped">
-        <div
-          v-for="group in groupedEvents"
-          :key="group.chapter"
-          class="chapter-group"
-        >
           <div
-            class="chapter-header"
-            @click="toggleGroupExpansion(group.chapter)"
+            v-for="group in groupedEvents"
+            :key="group.chapter"
+            class="chapter-group"
           >
-            <i :class="group.isExpanded ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"></i>
-            <span class="chapter-title">{{ group.title }}</span>
-            <Tag severity="secondary" class="event-count">
-              {{ group.events.length }} evento{{ group.events.length !== 1 ? 's' : '' }}
-            </Tag>
-          </div>
-          <div v-if="group.isExpanded" class="chapter-events">
-            <TimelineEventVue
-              v-for="(event, index) in group.events"
-              :key="event.id"
-              :event="event"
-              :entity-names="getEntityNames(event.entityIds)"
-              :is-selected="selectedEvent?.id === event.id"
-              :is-hovered="hoveredEvent?.id === event.id"
-              :show-connector="index < group.events.length - 1"
-              @click="handleEventClick"
-              @hover="handleEventHover"
-            />
+            <div
+              class="chapter-header"
+              @click="toggleGroupExpansion(group.chapter)"
+            >
+              <i :class="group.isExpanded ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"></i>
+              <span class="chapter-title">{{ group.title }}</span>
+              <Tag severity="secondary" class="event-count">
+                {{ group.events.length }} evento{{ group.events.length !== 1 ? 's' : '' }}
+              </Tag>
+            </div>
+            <div v-if="group.isExpanded" class="chapter-events">
+              <TimelineEventVue
+                v-for="(event, index) in group.events"
+                :key="event.id"
+                :event="event"
+                :entity-names="getEntityNames(event.entityIds)"
+                :is-selected="selectedEvent?.id === event.id"
+                :is-hovered="hoveredEvent?.id === event.id"
+                :show-connector="index < group.events.length - 1"
+                @click="handleEventClick"
+                @hover="handleEventHover"
+              />
+            </div>
           </div>
         </div>
-      </div>
 
         <!-- Lista de eventos sin agrupar -->
         <div v-else class="events-list">
@@ -351,7 +351,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
-import Dropdown from 'primevue/dropdown'
+import Select from 'primevue/select'
 import SelectButton from 'primevue/selectbutton'
 import ProgressSpinner from 'primevue/progressspinner'
 import Dialog from 'primevue/dialog'

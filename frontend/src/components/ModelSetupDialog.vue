@@ -238,7 +238,7 @@ async function recheckPython() {
             </div>
             <ProgressBar
               :value="downloadProgress"
-              :showValue="false"
+              :show-value="false"
               class="progress-bar"
             />
           </div>
@@ -268,7 +268,7 @@ async function recheckPython() {
             </div>
             <ProgressBar
               :value="downloadProgress"
-              :showValue="false"
+              :show-value="false"
               class="progress-bar"
             />
           </div>

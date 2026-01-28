@@ -16,8 +16,8 @@
           label="Detectar violaciones"
           icon="pi pi-search"
           :loading="detectingViolations"
-          @click="detectViolations"
           :disabled="declarations.length === 0"
+          @click="detectViolations"
         />
       </div>
     </div>
@@ -31,7 +31,7 @@
     <!-- Content -->
     <div v-else class="content-container">
       <!-- Stats Summary -->
-      <div class="stats-cards" v-if="declarations.length > 0 || violations.length > 0">
+      <div v-if="declarations.length > 0 || violations.length > 0" class="stats-cards">
         <Card class="stat-card">
           <template #content>
             <div class="stat-content">
@@ -71,8 +71,8 @@
               icon="pi pi-lightbulb"
               text
               size="small"
-              @click="suggestAllUndeclared"
               :loading="suggesting"
+              @click="suggestAllUndeclared"
             />
           </div>
         </template>
@@ -89,48 +89,48 @@
                 <span class="chapter-title">{{ chapter.title }}</span>
               </div>
 
-              <div class="chapter-declaration" v-if="chapter.declaration">
+              <div v-if="chapter.declaration" class="chapter-declaration">
                 <Tag :severity="getFocalizationSeverity(chapter.declaration.focalization_type)">
                   {{ getFocalizationLabel(chapter.declaration.focalization_type) }}
                 </Tag>
-                <span class="focalizers" v-if="chapter.declaration.focalizer_ids?.length">
+                <span v-if="chapter.declaration.focalizer_ids?.length" class="focalizers">
                   {{ getFocalizerNames(chapter.declaration.focalizer_ids) }}
                 </span>
                 <Tag v-if="chapter.violationsCount > 0" severity="danger" size="small">
                   {{ chapter.violationsCount }} violaciones
                 </Tag>
               </div>
-              <div class="chapter-declaration" v-else>
+              <div v-else class="chapter-declaration">
                 <Tag severity="secondary">Sin declarar</Tag>
               </div>
 
               <div class="chapter-actions">
                 <Button
                   v-if="!chapter.declaration"
+                  v-tooltip.top="'Sugerir'"
                   icon="pi pi-lightbulb"
                   text
                   rounded
                   size="small"
-                  v-tooltip.top="'Sugerir'"
-                  @click="suggestFocalization(chapter.number)"
                   :loading="suggestingChapter === chapter.number"
+                  @click="suggestFocalization(chapter.number)"
                 />
                 <Button
+                  v-tooltip.top="chapter.declaration ? 'Editar' : 'Declarar'"
                   :icon="chapter.declaration ? 'pi pi-pencil' : 'pi pi-plus'"
                   text
                   rounded
                   size="small"
-                  v-tooltip.top="chapter.declaration ? 'Editar' : 'Declarar'"
                   @click="openDeclarationDialog(chapter)"
                 />
                 <Button
                   v-if="chapter.declaration"
+                  v-tooltip.top="'Eliminar'"
                   icon="pi pi-trash"
                   text
                   rounded
                   size="small"
                   severity="danger"
-                  v-tooltip.top="'Eliminar'"
                   @click="deleteDeclaration(chapter.declaration.id)"
                 />
               </div>
@@ -159,13 +159,13 @@
                   <div v-for="(v, idx) in group" :key="idx" class="violation-item" :class="'severity-' + v.severity">
                     <div class="violation-header">
                       <Tag :severity="getViolationSeverity(v.severity)">{{ getViolationTypeLabel(v.violation_type) }}</Tag>
-                      <span class="violation-entity" v-if="v.entity_name">{{ v.entity_name }}</span>
+                      <span v-if="v.entity_name" class="violation-entity">{{ v.entity_name }}</span>
                     </div>
                     <p class="violation-explanation">{{ v.explanation }}</p>
-                    <div class="violation-excerpt" v-if="v.text_excerpt">
+                    <div v-if="v.text_excerpt" class="violation-excerpt">
                       <small>"{{ v.text_excerpt }}"</small>
                     </div>
-                    <div class="violation-suggestion" v-if="v.suggestion">
+                    <div v-if="v.suggestion" class="violation-suggestion">
                       <i class="pi pi-lightbulb"></i>
                       <small>{{ v.suggestion }}</small>
                     </div>
@@ -202,22 +202,22 @@
           <Select
             v-model="dialogData.focalization_type"
             :options="focalizationTypes"
-            optionLabel="label"
-            optionValue="value"
+            option-label="label"
+            option-value="value"
             placeholder="Seleccionar tipo"
             fluid
           />
         </div>
 
-        <div class="field" v-if="needsFocalizers">
+        <div v-if="needsFocalizers" class="field">
           <label>Focalizador(es)</label>
           <MultiSelect
             v-model="dialogData.focalizer_ids"
             :options="characters"
-            optionLabel="name"
-            optionValue="id"
+            option-label="name"
+            option-value="id"
             placeholder="Seleccionar personajes"
-            :maxSelectedLabels="3"
+            :max-selected-labels="3"
             fluid
           />
         </div>
@@ -253,8 +253,8 @@
         <Button
           :label="editingDeclaration ? 'Guardar' : 'Crear'"
           icon="pi pi-check"
-          @click="saveDeclaration"
           :loading="saving"
+          @click="saveDeclaration"
         />
       </template>
     </Dialog>

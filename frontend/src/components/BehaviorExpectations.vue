@@ -21,13 +21,13 @@
         />
         <Button
           v-if="profile"
+          v-tooltip.bottom="'Re-analizar'"
           icon="pi pi-refresh"
           text
           rounded
           size="small"
           :loading="analyzing"
           @click="analyzeCharacter"
-          v-tooltip.bottom="'Re-analizar'"
         />
       </div>
     </div>
@@ -173,8 +173,8 @@
             icon="pi pi-download"
             text
             size="small"
-            @click="loadVoiceProfile"
             :loading="voiceStore.loading"
+            @click="loadVoiceProfile"
           />
         </div>
       </div>
@@ -184,12 +184,12 @@
         <div class="section-header">
           <h4><i class="pi pi-eye"></i> Expectativas Comportamentales</h4>
           <Button
+            v-tooltip.left="'Añadir expectativa manual'"
             icon="pi pi-plus"
             text
             rounded
             size="small"
             @click="openAddExpectation"
-            v-tooltip.left="'Añadir expectativa manual'"
           />
         </div>
         <div v-if="profile.expectations.length > 0" class="expectations-list">
@@ -214,21 +214,21 @@
               />
               <div class="expectation-actions">
                 <Button
+                  v-tooltip.top="'Editar'"
                   icon="pi pi-pencil"
                   text
                   rounded
                   size="small"
                   @click="openEditExpectation(idx)"
-                  v-tooltip.top="'Editar'"
                 />
                 <Button
+                  v-tooltip.top="'Eliminar'"
                   icon="pi pi-trash"
                   text
                   rounded
                   size="small"
                   severity="danger"
                   @click="deleteExpectation(idx)"
-                  v-tooltip.top="'Eliminar'"
                 />
               </div>
             </div>
@@ -317,19 +317,19 @@
     <!-- Diálogo de edición de expectativa -->
     <Dialog
       :visible="showExpectationDialog"
-      @update:visible="showExpectationDialog = $event"
       modal
       :header="editingExpectationIndex === -1 ? 'Añadir Expectativa' : 'Editar Expectativa'"
       :style="{ width: '500px' }"
+      @update:visible="showExpectationDialog = $event"
     >
       <div class="expectation-form">
         <div class="form-field">
           <label>Tipo de expectativa</label>
-          <Dropdown
+          <Select
             v-model="editingExpectation.expectation_type"
             :options="expectationTypes"
-            optionLabel="label"
-            optionValue="value"
+            option-label="label"
+            option-value="value"
             placeholder="Selecciona un tipo"
             class="w-full"
           />
@@ -366,8 +366,8 @@
         <Button
           :label="editingExpectationIndex === -1 ? 'Añadir' : 'Guardar'"
           icon="pi pi-check"
-          @click="saveExpectation"
           :disabled="!editingExpectation.description.trim()"
+          @click="saveExpectation"
         />
       </template>
     </Dialog>
@@ -375,20 +375,20 @@
     <!-- Voice Profile Comparison Dialog -->
     <Dialog
       :visible="showComparisonDialog"
-      @update:visible="showComparisonDialog = $event"
       modal
       header="Comparar Perfiles de Voz"
       :style="{ width: '700px' }"
       class="voice-comparison-dialog"
+      @update:visible="showComparisonDialog = $event"
     >
       <!-- Character Selector -->
       <div class="comparison-selector">
         <label>Comparar con:</label>
-        <Dropdown
+        <Select
           v-model="compareCharacterId"
           :options="availableForComparison"
-          optionLabel="name"
-          optionValue="id"
+          option-label="name"
+          option-value="id"
           placeholder="Selecciona un personaje"
           class="w-full"
         />
@@ -549,7 +549,7 @@ import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import Chip from 'primevue/chip'
 import Dialog from 'primevue/dialog'
-import Dropdown from 'primevue/dropdown'
+import Select from 'primevue/select'
 import Textarea from 'primevue/textarea'
 import Slider from 'primevue/slider'
 import ProgressSpinner from 'primevue/progressspinner'

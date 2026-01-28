@@ -84,7 +84,7 @@
         </template>
         <template #content>
           <div class="distribution-bars">
-            <div class="dist-row" v-for="(count, category) in report.global_distribution" :key="category">
+            <div v-for="(count, category) in report.global_distribution" :key="category" class="dist-row">
               <span class="dist-label">{{ getCategoryLabel(String(category)) }}</span>
               <div class="dist-bar-container">
                 <div
@@ -110,14 +110,14 @@
             <div v-for="(issue, idx) in report.all_issues" :key="idx" class="issue-item">
               <Tag :severity="getIssueSeverity(issue.type)" :value="getIssueLabel(issue.type)" />
               <span class="issue-message">{{ issue.message }}</span>
-              <span class="issue-chapter" v-if="issue.chapter">Cap. {{ issue.chapter }}</span>
+              <span v-if="issue.chapter" class="issue-chapter">Cap. {{ issue.chapter }}</span>
             </div>
           </div>
         </template>
       </Card>
 
       <!-- Chapters -->
-      <Accordion :multiple="true" :activeIndex="[0]" class="chapters-accordion">
+      <Accordion :multiple="true" :active-index="[0]" class="chapters-accordion">
         <AccordionPanel v-for="chapter in report.chapters" :key="chapter.chapter_number" :value="String(chapter.chapter_number)">
           <AccordionHeader>
             <div class="chapter-header">
@@ -145,8 +145,8 @@
                 <div
                   v-for="(sent, idx) in chapter.sentences"
                   :key="idx"
-                  class="sentence-bar-wrapper"
                   v-tooltip.top="getSentenceTooltip(sent)"
+                  class="sentence-bar-wrapper"
                 >
                   <div
                     class="sentence-bar"

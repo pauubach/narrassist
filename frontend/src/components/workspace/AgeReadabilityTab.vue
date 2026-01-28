@@ -14,11 +14,11 @@
       <div class="header-controls">
         <div class="target-control">
           <label>Edad objetivo:</label>
-          <Dropdown
+          <Select
             v-model="targetAgeGroup"
             :options="ageGroupOptions"
-            optionLabel="label"
-            optionValue="value"
+            option-label="label"
+            option-value="value"
             placeholder="Seleccionar edad"
             class="age-dropdown"
           />
@@ -232,7 +232,7 @@ import { ref, onMounted, watch } from 'vue'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
 import Tag from 'primevue/tag'
-import Dropdown from 'primevue/dropdown'
+import Select from 'primevue/select'
 import Accordion from 'primevue/accordion'
 import AccordionPanel from 'primevue/accordionpanel'
 import AccordionHeader from 'primevue/accordionheader'

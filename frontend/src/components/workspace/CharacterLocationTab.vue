@@ -116,7 +116,7 @@
                 </div>
               </div>
               <p class="inc-explanation">{{ inc.explanation }}</p>
-              <div class="inc-excerpt" v-if="inc.location2_excerpt">
+              <div v-if="inc.location2_excerpt" class="inc-excerpt">
                 "{{ truncate(inc.location2_excerpt, 100) }}"
               </div>
             </div>

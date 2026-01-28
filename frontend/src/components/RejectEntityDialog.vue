@@ -104,8 +104,10 @@ function selectScope(value: string) {
       <Message v-if="isFrequentEntity" severity="warn" :closable="false" class="mb-3">
         <div class="frequent-warning">
           <strong>Esta entidad aparece {{ mentionCount }} veces</strong>
-          <p>Rechazar una entidad frecuente podría indicar un problema con la detección.
-             ¿Estás seguro de que no es un personaje o elemento relevante?</p>
+          <p>
+            Rechazar una entidad frecuente podría indicar un problema con la detección.
+            ¿Estás seguro de que no es un personaje o elemento relevante?
+          </p>
         </div>
       </Message>
 
@@ -127,7 +129,7 @@ function selectScope(value: string) {
           >
             <RadioButton
               v-model="selectedScope"
-              :inputId="`scope-${option.value}`"
+              :input-id="`scope-${option.value}`"
               :value="option.value"
               class="scope-radio"
             />

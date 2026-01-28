@@ -4,12 +4,12 @@
     <div class="tree-header">
       <h3>Estructura</h3>
       <Button
+        v-tooltip.bottom="'Recargar'"
         icon="pi pi-refresh"
         text
         rounded
         size="small"
         @click="$emit('refresh')"
-        v-tooltip.bottom="'Recargar'"
       />
     </div>
 
@@ -33,7 +33,7 @@
             <span class="chapter-title">{{ chapter.title }}</span>
           </div>
           <div class="chapter-meta">
-            <span class="chapter-words" v-tooltip.left="'Palabras'">
+            <span v-tooltip.left="'Palabras'" class="chapter-words">
               {{ chapter.wordCount.toLocaleString() }}
             </span>
           </div>
@@ -89,16 +89,16 @@
         <div class="chapter-stats">
           <div
             v-if="chapter.entitiesCount"
-            class="stat-item"
             v-tooltip.bottom="'Entidades mencionadas'"
+            class="stat-item"
           >
             <i class="pi pi-users"></i>
             <span>{{ chapter.entitiesCount }}</span>
           </div>
           <div
             v-if="chapter.alertsCount"
-            class="stat-item stat-alerts"
             v-tooltip.bottom="'Alertas detectadas'"
+            class="stat-item stat-alerts"
           >
             <i class="pi pi-exclamation-triangle"></i>
             <span>{{ chapter.alertsCount }}</span>
@@ -113,7 +113,6 @@
       <p>No hay capítulos</p>
       <small>El análisis aún no ha detectado la estructura del documento</small>
     </div>
-
   </div>
 </template>
 

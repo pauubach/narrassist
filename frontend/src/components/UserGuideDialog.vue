@@ -1,12 +1,12 @@
 <template>
   <Dialog
     :visible="visible"
-    @update:visible="$emit('update:visible', $event)"
     modal
     :style="{ width: '800px', maxHeight: '85vh' }"
-    :dismissableMask="true"
+    :dismissable-mask="true"
     :draggable="false"
     class="user-guide-dialog"
+    @update:visible="$emit('update:visible', $event)"
   >
     <template #header>
       <div class="guide-header">
@@ -32,7 +32,7 @@
       </nav>
 
       <!-- Contenido -->
-      <div class="guide-body" ref="guideBody">
+      <div ref="guideBody" class="guide-body">
         <!-- Introducción -->
         <section id="introduccion" class="guide-section">
           <h2><i class="pi pi-home"></i> ¿Qué es Narrative Assistant?</h2>
@@ -390,8 +390,8 @@
       <Button
         label="Cerrar"
         icon="pi pi-times"
-        @click="$emit('update:visible', false)"
         text
+        @click="$emit('update:visible', false)"
       />
     </template>
   </Dialog>

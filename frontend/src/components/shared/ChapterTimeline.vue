@@ -7,10 +7,11 @@
     </div>
 
     <!-- Timeline track -->
-    <div class="timeline-track" ref="trackRef">
+    <div ref="trackRef" class="timeline-track">
       <div
         v-for="chapter in chaptersWithHighlights"
         :key="chapter.number"
+        v-tooltip.top="getTooltip(chapter)"
         :class="[
           'chapter-block',
           {
@@ -22,7 +23,6 @@
         @click="$emit('select', chapter.number)"
         @mouseenter="hoveredChapter = chapter.number"
         @mouseleave="hoveredChapter = null"
-        v-tooltip.top="getTooltip(chapter)"
       >
         <span v-if="!compact" class="chapter-label">{{ chapter.number }}</span>
         <div

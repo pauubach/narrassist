@@ -86,12 +86,12 @@ function close() {
 <template>
   <Dialog
     :visible="visible"
-    @update:visible="emit('update:visible', $event)"
     modal
     :closable="true"
     :draggable="false"
     :style="{ width: '600px', maxWidth: '95vw' }"
     class="entity-modal"
+    @update:visible="emit('update:visible', $event)"
   >
     <template #header>
       <div class="modal-header">

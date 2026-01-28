@@ -9,11 +9,11 @@
         </Tag>
       </div>
       <div class="header-actions">
-        <Dropdown
+        <Select
           v-model="selectedSeverity"
           :options="severityOptions"
-          optionLabel="label"
-          optionValue="value"
+          option-label="label"
+          option-value="value"
           placeholder="Severidad mínima"
           class="severity-selector"
           size="small"
@@ -110,7 +110,7 @@
             </div>
             <ProgressBar
               :value="value * 100"
-              :showValue="false"
+              :show-value="false"
               :class="getRegisterClass(String(register))"
             />
           </div>
@@ -155,7 +155,7 @@
             <div class="change-location">
               <small>
                 <i class="pi pi-map-marker"></i>
-                Segmento {{ change.fromSegment }} → {{ change.toSegment }}
+                Capítulo {{ change.chapter }}, posición {{ change.position }}
               </small>
             </div>
           </div>
@@ -242,7 +242,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import Card from 'primevue/card'
-import Dropdown from 'primevue/dropdown'
+import Select from 'primevue/select'
 import ProgressBar from 'primevue/progressbar'
 import ProgressSpinner from 'primevue/progressspinner'
 import Message from 'primevue/message'

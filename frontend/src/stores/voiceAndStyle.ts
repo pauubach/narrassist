@@ -63,13 +63,14 @@ interface ApiRegisterAnalysis {
 }
 
 interface ApiRegisterChange {
-  from_segment: number
-  to_segment: number
   from_register: string
   to_register: string
   severity: string
   explanation: string
   chapter: number | null
+  position: number
+  context_before: string
+  context_after: string
 }
 
 interface ApiDialogueAttribution {
@@ -144,13 +145,14 @@ function transformRegisterAnalysis(api: ApiRegisterAnalysis): RegisterAnalysis {
 
 function transformRegisterChange(api: ApiRegisterChange): RegisterChange {
   return {
-    fromSegment: api.from_segment,
-    toSegment: api.to_segment,
     fromRegister: api.from_register as any,
     toRegister: api.to_register as any,
     severity: api.severity as any,
     explanation: api.explanation,
     chapter: api.chapter,
+    position: api.position,
+    contextBefore: api.context_before || '',
+    contextAfter: api.context_after || '',
   }
 }
 

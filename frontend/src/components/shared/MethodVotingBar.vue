@@ -33,8 +33,8 @@
         </div>
         <i
           v-if="method.agreed"
-          class="pi pi-check agreed-icon"
           v-tooltip.top="'Coincide con el consenso'"
+          class="pi pi-check agreed-icon"
         ></i>
       </div>
     </div>

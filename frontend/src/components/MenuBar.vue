@@ -3,8 +3,8 @@
     <div class="menubar-items">
       <button
         v-for="(menu, index) in menus"
-        :key="menu.label"
         :id="`menu-trigger-${index}`"
+        :key="menu.label"
         class="menubar-item"
         role="menuitem"
         :aria-haspopup="true"

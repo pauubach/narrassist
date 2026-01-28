@@ -215,13 +215,13 @@ function getActionSeverity(action: string): 'success' | 'warn' | 'info' | 'secon
           <span class="progress-numbers">
             {{ progress.current }} de {{ progress.total }}
           </span>
-          <span class="progress-pending" v-if="progress.pending !== progress.total">
+          <span v-if="progress.pending !== progress.total" class="progress-pending">
             ({{ progress.pending }} pendientes)
           </span>
         </div>
         <ProgressBar
           :value="progress.percentage"
-          :showValue="false"
+          :show-value="false"
           class="progress-bar"
           aria-label="Progreso de revisión"
         />
@@ -232,25 +232,25 @@ function getActionSeverity(action: string): 'success' | 'warn' | 'info' | 'secon
           <label for="show-resolved">Mostrar resueltas</label>
           <ToggleSwitch
             id="show-resolved"
-            :modelValue="showResolved"
-            @update:modelValue="emit('update:showResolved', $event)"
+            :model-value="showResolved"
+            @update:model-value="emit('update:showResolved', $event)"
           />
         </div>
         <Button
+          v-tooltip.bottom="'Salir (Esc)'"
           icon="pi pi-times"
           text
           rounded
           severity="secondary"
-          @click="emit('exit')"
-          v-tooltip.bottom="'Salir (Esc)'"
           aria-label="Salir del modo secuencial"
           class="close-button"
+          @click="emit('exit')"
         />
       </div>
     </header>
 
     <!-- Main Content -->
-    <main class="sequential-content" v-if="currentAlert">
+    <main v-if="currentAlert" class="sequential-content">
       <!-- Alert Card -->
       <section class="alert-section" aria-label="Detalle de la alerta">
         <!-- Status Banner for resolved/dismissed -->
@@ -313,13 +313,13 @@ function getActionSeverity(action: string): 'success' | 'warn' | 'info' | 'secon
               <Button
                 v-for="(source, index) in alertSources"
                 :key="index"
+                v-tooltip.bottom="getSourceLocation(source)"
                 icon="pi pi-external-link"
                 :label="getSourceLabel(source)"
                 text
                 size="small"
-                @click="emit('navigate-to-text', source)"
-                v-tooltip.bottom="getSourceLocation(source)"
                 class="source-nav-btn"
+                @click="emit('navigate-to-text', source)"
               />
             </div>
             <!-- Botón único si no hay múltiples sources -->
@@ -355,14 +355,14 @@ function getActionSeverity(action: string): 'success' | 'warn' | 'info' | 'secon
       <section class="action-section" aria-label="Acciones">
         <div class="primary-actions">
           <Button
+            v-tooltip.bottom="'Aceptar corrección (A)'"
             label="Aceptar"
             icon="pi pi-check"
             severity="success"
             :disabled="updating || isResolved"
             :loading="updating"
-            @click="emit('resolve')"
-            v-tooltip.bottom="'Aceptar corrección (A)'"
             class="action-btn"
+            @click="emit('resolve')"
           >
             <template #default>
               <span class="btn-content">
@@ -374,13 +374,13 @@ function getActionSeverity(action: string): 'success' | 'warn' | 'info' | 'secon
           </Button>
 
           <Button
+            v-tooltip.bottom="'Descartar alerta (D)'"
             label="Descartar"
             icon="pi pi-times"
             severity="warn"
             :disabled="updating || isDismissed"
-            @click="emit('dismiss')"
-            v-tooltip.bottom="'Descartar alerta (D)'"
             class="action-btn"
+            @click="emit('dismiss')"
           >
             <template #default>
               <span class="btn-content">
@@ -392,14 +392,14 @@ function getActionSeverity(action: string): 'success' | 'warn' | 'info' | 'secon
           </Button>
 
           <Button
+            v-tooltip.bottom="'Saltar sin acción (S)'"
             label="Saltar"
             icon="pi pi-forward"
             severity="secondary"
             outlined
             :disabled="updating"
-            @click="emit('skip')"
-            v-tooltip.bottom="'Saltar sin acción (S)'"
             class="action-btn"
+            @click="emit('skip')"
           >
             <template #default>
               <span class="btn-content">
@@ -411,14 +411,14 @@ function getActionSeverity(action: string): 'success' | 'warn' | 'info' | 'secon
           </Button>
 
           <Button
+            v-tooltip.bottom="'Marcar para revisar después (F)'"
             label="Marcar"
             icon="pi pi-flag"
             severity="info"
             outlined
             :disabled="updating"
-            @click="emit('flag')"
-            v-tooltip.bottom="'Marcar para revisar después (F)'"
             class="action-btn"
+            @click="emit('flag')"
           >
             <template #default>
               <span class="btn-content">
@@ -433,36 +433,36 @@ function getActionSeverity(action: string): 'success' | 'warn' | 'info' | 'secon
         <!-- Navigation -->
         <div class="navigation-actions">
           <Button
+            v-tooltip.bottom="'Anterior (←)'"
             icon="pi pi-chevron-left"
             label="Anterior"
             severity="secondary"
             text
             :disabled="!hasPrevious"
             @click="emit('previous')"
-            v-tooltip.bottom="'Anterior (←)'"
           />
           <Button
+            v-tooltip.bottom="'Siguiente (→)'"
             icon="pi pi-chevron-right"
-            iconPos="right"
+            icon-pos="right"
             label="Siguiente"
             severity="secondary"
             text
             :disabled="!hasNext"
             @click="emit('next')"
-            v-tooltip.bottom="'Siguiente (→)'"
           />
         </div>
 
         <!-- Undo -->
-        <div class="undo-action" v-if="canUndo">
+        <div v-if="canUndo" class="undo-action">
           <Button
+            v-tooltip.bottom="'Deshacer última acción (Ctrl+Z)'"
             icon="pi pi-replay"
             label="Deshacer"
             severity="secondary"
             text
             size="small"
             @click="emit('undo')"
-            v-tooltip.bottom="'Deshacer última acción (Ctrl+Z)'"
           />
         </div>
       </section>

@@ -37,7 +37,7 @@
             :class="{ 'selected': isSelected(entity.id) }"
             @click="toggleEntity(entity)"
           >
-            <Checkbox :modelValue="isSelected(entity.id)" :binary="true" />
+            <Checkbox :model-value="isSelected(entity.id)" :binary="true" />
             <div class="entity-icon-wrapper">
               <i :class="getEntityIcon(entity.type)"></i>
             </div>
@@ -226,7 +226,7 @@
                     </div>
                     <ProgressBar
                       :value="(pair.similarity || pair.combined_score || 0) * 100"
-                      :showValue="false"
+                      :show-value="false"
                       :style="{ height: '8px' }"
                       :class="getProgressBarClass(pair.similarity || pair.combined_score || 0)"
                     />
@@ -391,17 +391,17 @@
             v-if="step < 3"
             label="Siguiente"
             icon="pi pi-arrow-right"
-            iconPos="right"
-            @click="nextStep"
+            icon-pos="right"
             :disabled="!canProceed"
+            @click="nextStep"
           />
           <Button
             v-else
             label="Fusionar"
             icon="pi pi-check"
             severity="danger"
-            @click="confirmMerge"
             :loading="merging"
+            @click="confirmMerge"
           />
         </div>
       </div>

@@ -14,9 +14,9 @@
           </Tag>
           <Tag
             v-if="isMerged"
+            v-tooltip.bottom="'Esta entidad es resultado de una fusion'"
             severity="info"
             class="merged-tag"
-            v-tooltip.bottom="'Esta entidad es resultado de una fusion'"
           >
             <i class="pi pi-link"></i>
             Fusionada
@@ -26,19 +26,19 @@
       <div v-if="editable" class="header-actions">
         <Button
           v-if="isMerged"
+          v-tooltip.left="'Deshacer fusion'"
           icon="pi pi-replay"
           rounded
           text
           severity="warning"
           @click="$emit('undo-merge')"
-          v-tooltip.left="'Deshacer fusion'"
         />
         <Button
+          v-tooltip.left="'Editar'"
           icon="pi pi-pencil"
           rounded
           text
           @click="$emit('edit', character)"
-          v-tooltip.left="'Editar'"
         />
       </div>
     </div>
@@ -103,12 +103,12 @@
           <h3>{{ section.label }}</h3>
           <Button
             v-if="editable"
+            v-tooltip.top="'Añadir atributo'"
             icon="pi pi-plus"
             text
             rounded
             size="small"
             @click="showAddAttributeDialog(section.categories[0])"
-            v-tooltip.top="'Añadir atributo'"
           />
         </div>
         <div v-if="getAttributesBySection(sectionIdx).length > 0" class="attributes-list">
@@ -148,12 +148,12 @@
           <h3>Relaciones</h3>
           <Button
             v-if="editable"
+            v-tooltip.top="'Añadir relación'"
             icon="pi pi-plus"
             text
             rounded
             size="small"
             @click="showAddRelationshipDialog"
-            v-tooltip.top="'Añadir relación'"
           />
         </div>
         <div v-if="relationships.length > 0" class="relationships-list">

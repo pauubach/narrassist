@@ -3,18 +3,18 @@
     <!-- Top Actions Bar -->
     <div class="top-actions">
       <Button
+        v-tooltip.bottom="'Cambiar tema'"
         :icon="appStore.isDark ? 'pi pi-sun' : 'pi pi-moon'"
-        @click="appStore.toggleTheme"
         text
         rounded
-        v-tooltip.bottom="'Cambiar tema'"
+        @click="appStore.toggleTheme"
       />
       <Button
+        v-tooltip.bottom="'Configuración'"
         icon="pi pi-cog"
-        @click="goToSettings"
         text
         rounded
-        v-tooltip.bottom="'Configuración'"
+        @click="goToSettings"
       />
     </div>
 
@@ -58,14 +58,14 @@
             icon="pi pi-refresh"
             severity="warning"
             size="small"
-            @click="retryConnection"
             :loading="isRetrying"
+            @click="retryConnection"
           />
         </div>
       </div>
 
       <div class="actions">
-        <Button label="Ver Proyectos" icon="pi pi-folder" @click="goToProjects" size="large" />
+        <Button label="Ver Proyectos" icon="pi pi-folder" size="large" @click="goToProjects" />
         <Button label="Nuevo Proyecto" icon="pi pi-plus" severity="secondary" size="large" outlined />
       </div>
     </div>

@@ -220,10 +220,10 @@ const hasChapterData = computed(() => chapterAppearances.value.length > 1)
           <DsBadge :entity-type="entity.type" size="sm">{{ entityTypeLabel }}</DsBadge>
           <DsBadge
             v-if="isMerged"
+            v-tooltip.bottom="'Esta entidad es resultado de una fusion'"
             color="info"
             size="sm"
             icon="pi pi-link"
-            v-tooltip.bottom="'Esta entidad es resultado de una fusion'"
           >
             Fusionada
           </DsBadge>
@@ -300,8 +300,8 @@ const hasChapterData = computed(() => chapterAppearances.value.length > 1)
           <span
             v-for="(mentions, type) in corefInfo!.mentionsByType"
             :key="type"
-            class="mention-type-tag"
             v-tooltip.top="`${mentions.length} menciones de tipo ${type}`"
+            class="mention-type-tag"
           >
             {{ getMentionTypeLabel(type) }}: {{ mentions.length }}
           </span>
@@ -388,23 +388,23 @@ const hasChapterData = computed(() => chapterAppearances.value.length > 1)
       </div>
       <div class="nav-controls">
         <Button
+          v-tooltip.bottom="'Anterior'"
           icon="pi pi-chevron-left"
           text
           rounded
           size="small"
           :disabled="!mentionNav.canGoPrevious.value"
           @click="mentionNav.goToPrevious()"
-          v-tooltip.bottom="'Anterior'"
         />
         <span class="nav-counter">{{ mentionNav.navigationLabel.value }}</span>
         <Button
+          v-tooltip.bottom="'Siguiente'"
           icon="pi pi-chevron-right"
           text
           rounded
           size="small"
           :disabled="!mentionNav.canGoNext.value"
           @click="mentionNav.goToNext()"
-          v-tooltip.bottom="'Siguiente'"
         />
       </div>
       <div v-if="mentionNav.currentMention.value" class="nav-context">
@@ -429,13 +429,13 @@ const hasChapterData = computed(() => chapterAppearances.value.length > 1)
       />
       <Button
         v-if="isMerged"
+        v-tooltip.bottom="'Restaurar las entidades originales'"
         label="Deshacer fusion"
         icon="pi pi-replay"
         size="small"
         outlined
         severity="warning"
         @click="emit('undo-merge')"
-        v-tooltip.bottom="'Restaurar las entidades originales'"
       />
     </div>
   </div>

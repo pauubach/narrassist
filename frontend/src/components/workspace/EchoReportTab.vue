@@ -17,7 +17,7 @@
           <InputNumber v-model="minDistance" :min="10" :max="200" :step="10" suffix=" palabras" />
         </div>
         <div class="semantic-control">
-          <Checkbox v-model="includeSemantic" binary inputId="semantic" />
+          <Checkbox v-model="includeSemantic" binary input-id="semantic" />
           <label for="semantic">Semánticas</label>
         </div>
         <Button
@@ -108,11 +108,11 @@
       <!-- Severity Filter -->
       <div class="filter-section">
         <span class="filter-label">Mostrar:</span>
-        <SelectButton v-model="severityFilter" :options="severityOptions" optionLabel="label" optionValue="value" />
+        <SelectButton v-model="severityFilter" :options="severityOptions" option-label="label" option-value="value" />
       </div>
 
       <!-- Chapters Accordion -->
-      <Accordion :multiple="true" :activeIndex="[0]" class="chapters-accordion">
+      <Accordion :multiple="true" :active-index="[0]" class="chapters-accordion">
         <AccordionPanel v-for="chapter in filteredChapters" :key="chapter.chapter_number" :value="String(chapter.chapter_number)">
           <AccordionHeader>
             <div class="chapter-header">

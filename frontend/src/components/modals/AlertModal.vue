@@ -107,12 +107,12 @@ function formatDate(date: Date): string {
 <template>
   <Dialog
     :visible="visible"
-    @update:visible="emit('update:visible', $event)"
     modal
     :closable="true"
     :draggable="false"
     :style="{ width: '650px', maxWidth: '95vw' }"
     class="alert-modal"
+    @update:visible="emit('update:visible', $event)"
   >
     <template #header>
       <div class="modal-header">
@@ -229,7 +229,7 @@ function formatDate(date: Date): string {
           text
           @click="emit('goToLocation')"
         />
-        <div class="action-buttons" v-if="isActive">
+        <div v-if="isActive" class="action-buttons">
           <Button
             label="Descartar"
             icon="pi pi-times"

@@ -4,8 +4,8 @@
       <Button
         icon="pi pi-arrow-left"
         text
-        @click="goBack"
         label="Volver"
+        @click="goBack"
       />
       <h1>Configuración</h1>
     </div>
@@ -15,49 +15,43 @@
       <nav class="settings-sidebar">
         <ul class="nav-menu">
           <li>
-            <a href="#apariencia" @click.prevent="scrollToSection('apariencia')" :class="{ active: activeSection === 'apariencia' }">
+            <a href="#apariencia" :class="{ active: activeSection === 'apariencia' }" @click.prevent="scrollToSection('apariencia')">
               <i class="pi pi-palette"></i>
               <span>Apariencia</span>
             </a>
           </li>
           <li>
-            <a href="#analisis" @click.prevent="scrollToSection('analisis')" :class="{ active: activeSection === 'analisis' }">
+            <a href="#analisis" :class="{ active: activeSection === 'analisis' }" @click.prevent="scrollToSection('analisis')">
               <i class="pi pi-cog"></i>
               <span>Análisis</span>
             </a>
           </li>
           <li>
-            <a href="#metodos-nlp" @click.prevent="scrollToSection('metodos-nlp')" :class="{ active: activeSection === 'metodos-nlp' }">
+            <a href="#metodos-nlp" :class="{ active: activeSection === 'metodos-nlp' }" @click.prevent="scrollToSection('metodos-nlp')">
               <i class="pi pi-sliders-h"></i>
               <span>Métodos de Análisis</span>
             </a>
           </li>
           <li>
-            <a href="#notificaciones" @click.prevent="scrollToSection('notificaciones')" :class="{ active: activeSection === 'notificaciones' }">
+            <a href="#notificaciones" :class="{ active: activeSection === 'notificaciones' }" @click.prevent="scrollToSection('notificaciones')">
               <i class="pi pi-bell"></i>
               <span>Notificaciones</span>
             </a>
           </li>
           <li>
-            <a href="#privacidad" @click.prevent="scrollToSection('privacidad')" :class="{ active: activeSection === 'privacidad' }">
+            <a href="#privacidad" :class="{ active: activeSection === 'privacidad' }" @click.prevent="scrollToSection('privacidad')">
               <i class="pi pi-shield"></i>
               <span>Privacidad</span>
             </a>
           </li>
           <li>
-            <a href="#filtros-entidades" @click.prevent="scrollToSection('filtros-entidades')" :class="{ active: activeSection === 'filtros-entidades' }">
-              <i class="pi pi-filter"></i>
-              <span>Filtros de Entidades</span>
-            </a>
-          </li>
-          <li>
-            <a href="#correcciones" @click.prevent="scrollToSection('correcciones')" :class="{ active: activeSection === 'correcciones' }">
+            <a href="#correcciones" :class="{ active: activeSection === 'correcciones' }" @click.prevent="scrollToSection('correcciones')">
               <i class="pi pi-pencil"></i>
               <span>Correcciones</span>
             </a>
           </li>
           <li>
-            <a href="#mantenimiento" @click.prevent="scrollToSection('mantenimiento')" :class="{ active: activeSection === 'mantenimiento' }">
+            <a href="#mantenimiento" :class="{ active: activeSection === 'mantenimiento' }" @click.prevent="scrollToSection('mantenimiento')">
               <i class="pi pi-wrench"></i>
               <span>Mantenimiento</span>
             </a>
@@ -66,710 +60,703 @@
       </nav>
 
       <!-- Content Area -->
-      <div class="settings-content" ref="contentArea" @scroll="handleScroll">
-      <!-- Apariencia -->
-      <Card id="apariencia">
-        <template #title>
-          <div class="section-title">
-            <i class="pi pi-palette"></i>
-            <span>Apariencia</span>
-          </div>
-        </template>
-        <template #content>
-          <!-- Modo claro/oscuro/auto -->
-          <div class="setting-item">
-            <div class="setting-info">
-              <label class="setting-label">Modo de apariencia</label>
-              <p class="setting-description">Elige entre modo claro, oscuro o automático según el sistema</p>
+      <div ref="contentArea" class="settings-content" @scroll="handleScroll">
+        <!-- Apariencia -->
+        <Card id="apariencia">
+          <template #title>
+            <div class="section-title">
+              <i class="pi pi-palette"></i>
+              <span>Apariencia</span>
             </div>
-            <div class="setting-control">
-              <SelectButton
-                :modelValue="themeStore.config.mode"
-                @update:modelValue="(val) => themeStore.setMode(val)"
-                :options="modeOptions"
-                optionLabel="label"
-                optionValue="value"
-              />
-            </div>
-          </div>
-
-          <!-- Estilo visual (preset) -->
-          <div class="setting-item">
-            <div class="setting-info">
-              <label class="setting-label">Estilo visual</label>
-              <p class="setting-description">Selecciona el estilo base de la interfaz. Los temas de escritura están optimizados para largas sesiones de lectura.</p>
-            </div>
-            <div class="setting-control wide">
-              <Dropdown
-                :modelValue="themeStore.config.preset"
-                @update:modelValue="onPresetChange"
-                :options="groupedPresetOptions"
-                optionLabel="label"
-                optionValue="value"
-                optionGroupLabel="label"
-                optionGroupChildren="items"
-                class="preset-dropdown"
-              >
-                <template #value="slotProps">
-                  <div v-if="slotProps.value" class="preset-selected">
-                    <span class="preset-name">{{ getPresetName(slotProps.value) }}</span>
-                  </div>
-                  <span v-else>Selecciona un tema</span>
-                </template>
-                <template #optiongroup="slotProps">
-                  <div class="preset-group-header">
-                    <i :class="getCategoryIcon(slotProps.option.label)"></i>
-                    <span>{{ slotProps.option.label }}</span>
-                  </div>
-                </template>
-                <template #option="slotProps">
-                  <div class="preset-option">
-                    <div class="preset-info">
-                      <span class="preset-name">{{ slotProps.option.label }}</span>
-                      <span class="preset-desc">{{ slotProps.option.description }}</span>
-                    </div>
-                  </div>
-                </template>
-              </Dropdown>
-            </div>
-          </div>
-
-          <!-- Color primario -->
-          <div class="setting-item">
-            <div class="setting-info">
-              <label class="setting-label">Color primario</label>
-              <p class="setting-description">Color de acento para botones, enlaces y elementos destacados</p>
-            </div>
-            <div class="setting-control wide">
-              <div class="color-palette">
-                <button
-                  v-for="color in PRIMARY_COLORS"
-                  :key="color.name"
-                  class="color-swatch"
-                  :class="{ active: themeStore.config.primaryColor === color.value }"
-                  :style="{ backgroundColor: color.value }"
-                  :title="color.label"
-                  @click="themeStore.setPrimaryColor(color.value)"
-                >
-                  <i v-if="themeStore.config.primaryColor === color.value" class="pi pi-check"></i>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <!-- Fuente de interfaz -->
-          <div class="setting-item">
-            <div class="setting-info">
-              <label class="setting-label">Fuente de interfaz</label>
-              <p class="setting-description">Tipografía para menús, botones y controles</p>
-            </div>
-            <div class="setting-control wide">
-              <Dropdown
-                :modelValue="themeStore.config.fontFamily"
-                @update:modelValue="onFontFamilyChange"
-                :options="groupedFontOptions"
-                optionLabel="label"
-                optionValue="value"
-                optionGroupLabel="label"
-                optionGroupChildren="items"
-                class="font-dropdown"
-              >
-                <template #value="slotProps">
-                  <span v-if="slotProps.value" :class="`font-${slotProps.value}`">
-                    {{ getFontFamilyLabel(slotProps.value) }}
-                  </span>
-                </template>
-                <template #optiongroup="slotProps">
-                  <div class="font-group-header">
-                    <i :class="slotProps.option.label === 'Generales' ? 'pi pi-desktop' : 'pi pi-book'"></i>
-                    <span>{{ slotProps.option.label }}</span>
-                  </div>
-                </template>
-                <template #option="slotProps">
-                  <div class="font-option" :class="`font-${slotProps.option.value}`">
-                    <span class="font-name">{{ slotProps.option.label }}</span>
-                    <span class="font-desc">{{ slotProps.option.description }}</span>
-                  </div>
-                </template>
-              </Dropdown>
-            </div>
-          </div>
-
-          <!-- Fuente de lectura -->
-          <div class="setting-item">
-            <div class="setting-info">
-              <label class="setting-label">Fuente de lectura</label>
-              <p class="setting-description">Tipografía para visualizar el manuscrito</p>
-            </div>
-            <div class="setting-control wide">
-              <Dropdown
-                :modelValue="themeStore.config.fontFamilyReading"
-                @update:modelValue="onFontFamilyReadingChange"
-                :options="groupedFontOptions"
-                optionLabel="label"
-                optionValue="value"
-                optionGroupLabel="label"
-                optionGroupChildren="items"
-                class="font-dropdown"
-              >
-                <template #value="slotProps">
-                  <span v-if="slotProps.value" :class="`font-${slotProps.value}`">
-                    {{ getFontFamilyLabel(slotProps.value) }}
-                  </span>
-                </template>
-                <template #optiongroup="slotProps">
-                  <div class="font-group-header">
-                    <i :class="slotProps.option.label === 'Generales' ? 'pi pi-desktop' : 'pi pi-book'"></i>
-                    <span>{{ slotProps.option.label }}</span>
-                  </div>
-                </template>
-                <template #option="slotProps">
-                  <div class="font-option" :class="`font-${slotProps.option.value}`">
-                    <span class="font-name">{{ slotProps.option.label }}</span>
-                    <span class="font-desc">{{ slotProps.option.description }}</span>
-                  </div>
-                </template>
-              </Dropdown>
-            </div>
-          </div>
-
-          <!-- Tamaño de fuente -->
-          <div class="setting-item">
-            <div class="setting-info">
-              <label class="setting-label">Tamaño de fuente</label>
-              <p class="setting-description">Tamaño base del texto en toda la aplicación</p>
-            </div>
-            <div class="setting-control">
-              <SelectButton
-                :modelValue="themeStore.config.fontSize"
-                @update:modelValue="(val) => themeStore.setFontSize(val)"
-                :options="fontSizeOptions"
-                optionLabel="label"
-                optionValue="value"
-              />
-            </div>
-          </div>
-
-          <!-- Interlineado -->
-          <div class="setting-item">
-            <div class="setting-info">
-              <label class="setting-label">Interlineado</label>
-              <p class="setting-description">Espaciado entre líneas del texto</p>
-            </div>
-            <div class="setting-control">
-              <Dropdown
-                :modelValue="themeStore.config.lineHeight"
-                @update:modelValue="onLineHeightChange"
-                :options="lineHeightOptions"
-                optionLabel="label"
-                optionValue="value"
-              />
-            </div>
-          </div>
-
-          <!-- Radio de bordes -->
-          <div class="setting-item">
-            <div class="setting-info">
-              <label class="setting-label">Bordes redondeados</label>
-              <p class="setting-description">Nivel de redondeo en botones y tarjetas</p>
-            </div>
-            <div class="setting-control">
-              <SelectButton
-                :modelValue="themeStore.config.radius"
-                @update:modelValue="(val) => themeStore.setRadius(val)"
-                :options="radiusOptions"
-                optionLabel="label"
-                optionValue="value"
-              />
-            </div>
-          </div>
-
-          <!-- Densidad de UI -->
-          <div class="setting-item">
-            <div class="setting-info">
-              <label class="setting-label">Densidad de la interfaz</label>
-              <p class="setting-description">Espaciado entre elementos de la interfaz</p>
-            </div>
-            <div class="setting-control">
-              <SelectButton
-                :modelValue="themeStore.config.compactness"
-                @update:modelValue="(val) => themeStore.setCompactness(val)"
-                :options="compactnessOptions"
-                optionLabel="label"
-                optionValue="value"
-              />
-            </div>
-          </div>
-
-          <!-- Reducir animaciones -->
-          <div class="setting-item">
-            <div class="setting-info">
-              <label class="setting-label">Reducir animaciones</label>
-              <p class="setting-description">Minimiza las animaciones y transiciones para mejorar la accesibilidad</p>
-            </div>
-            <div class="setting-control">
-              <InputSwitch
-                :modelValue="themeStore.config.reducedMotion"
-                @update:modelValue="onReducedMotionChange"
-              />
-            </div>
-          </div>
-
-          <!-- Botón de restablecer apariencia -->
-          <div class="setting-item">
-            <div class="setting-info">
-              <label class="setting-label">Restablecer apariencia</label>
-              <p class="setting-description">Volver a los valores por defecto de apariencia</p>
-            </div>
-            <div class="setting-control">
-              <Button
-                label="Restablecer"
-                icon="pi pi-refresh"
-                severity="secondary"
-                outlined
-                size="small"
-                @click="themeStore.resetToDefaults()"
-              />
-            </div>
-          </div>
-        </template>
-      </Card>
-
-      <!-- Análisis -->
-      <Card id="analisis">
-        <template #title>
-          <div class="section-title">
-            <i class="pi pi-cog"></i>
-            <span>Análisis</span>
-          </div>
-        </template>
-        <template #content>
-          <!-- Sensibilidad del análisis - Control unificado -->
-          <div class="sensitivity-section">
-            <div class="sensitivity-header">
-              <label class="setting-label">¿Cuántas sugerencias quieres ver?</label>
-              <p class="setting-description">
-                Ajusta cuánto debería avisarte el asistente
-              </p>
-            </div>
-
-            <!-- Presets como botones -->
-            <div class="sensitivity-presets">
-              <button
-                v-for="preset in sensitivityPresets"
-                :key="preset.value"
-                class="preset-button"
-                :class="{ active: settings.sensitivityPreset === preset.value }"
-                @click="selectSensitivityPreset(preset.value)"
-              >
-                <i :class="preset.icon"></i>
-                <div class="preset-content">
-                  <span class="preset-title">{{ preset.label }}</span>
-                  <span class="preset-desc">{{ preset.description }}</span>
-                </div>
-                <i v-if="preset.recommended" class="pi pi-star-fill recommended-star" title="Recomendado"></i>
-              </button>
-            </div>
-
-            <!-- Slider de ajuste fino (siempre visible pero con etiqueta contextual) -->
-            <div class="sensitivity-slider">
-              <div class="slider-header">
-                <span class="slider-label">Ajuste fino</span>
-                <span class="slider-value">{{ sensitivityLabel }}</span>
-              </div>
-              <Slider
-                v-model="settings.sensitivity"
-                :min="0"
-                :max="100"
-                :step="5"
-                @change="onSensitivityChange"
-              />
-              <div class="slider-hints">
-                <span>Menos avisos</span>
-                <span>Más avisos</span>
-              </div>
-            </div>
-
-            <!-- Panel avanzado colapsable -->
-            <div class="advanced-panel">
-              <button
-                class="advanced-toggle"
-                @click="showAdvancedSensitivity = !showAdvancedSensitivity"
-              >
-                <i :class="showAdvancedSensitivity ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"></i>
-                <span>Opciones avanzadas</span>
-              </button>
-
-              <div v-if="showAdvancedSensitivity" class="advanced-content">
-                <p class="advanced-note">
-                  Estos valores se calculan automáticamente según la sensibilidad elegida.
-                  Solo modifícalos si necesitas control preciso.
-                </p>
-
-                <div class="advanced-slider">
-                  <div class="advanced-slider-header">
-                    <label>Certeza para mostrar alertas</label>
-                    <span>{{ settings.minConfidence }}%</span>
-                  </div>
-                  <p class="slider-help">Qué tan seguro debe estar el sistema para mostrarte una alerta. Más bajo = más alertas (algunas pueden ser falsas).</p>
-                  <Slider
-                    v-model="settings.minConfidence"
-                    :min="20"
-                    :max="95"
-                    :step="5"
-                    @change="onAdvancedSliderChange"
-                  />
-                </div>
-
-                <div class="advanced-slider">
-                  <div class="advanced-slider-header">
-                    <label>Certeza para detectar personajes</label>
-                    <span>{{ settings.inferenceMinConfidence }}%</span>
-                  </div>
-                  <p class="slider-help">Qué tan seguro debe estar para identificar que dos menciones son el mismo personaje.</p>
-                  <Slider
-                    v-model="settings.inferenceMinConfidence"
-                    :min="20"
-                    :max="90"
-                    :step="5"
-                    @change="onAdvancedSliderChange"
-                  />
-                </div>
-
-                <div class="advanced-slider">
-                  <div class="advanced-slider-header">
-                    <label>Acuerdo entre métodos</label>
-                    <span>{{ settings.inferenceMinConsensus }}%</span>
-                  </div>
-                  <p class="slider-help">Cuántos métodos deben coincidir para aceptar una detección. Más alto = más fiable pero puede perder algunas.</p>
-                  <Slider
-                    v-model="settings.inferenceMinConsensus"
-                    :min="30"
-                    :max="100"
-                    :step="10"
-                    @change="onAdvancedSliderChange"
-                  />
-                </div>
-
-                <Button
-                  label="Restaurar valores calculados"
-                  icon="pi pi-refresh"
-                  severity="secondary"
-                  text
-                  size="small"
-                  @click="recalculateFromSensitivity"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div class="setting-item">
-            <div class="setting-info">
-              <label class="setting-label">Análisis automático</label>
-              <p class="setting-description">Iniciar análisis automáticamente al crear proyecto</p>
-            </div>
-            <div class="setting-control">
-              <InputSwitch
-                v-model="settings.autoAnalysis"
-                @change="onSettingChange"
-              />
-            </div>
-          </div>
-
-          <div class="setting-item">
-            <div class="setting-info">
-              <label class="setting-label">Mostrar resultados parciales</label>
-              <p class="setting-description">Mostrar resultados disponibles mientras el análisis continúa</p>
-            </div>
-            <div class="setting-control">
-              <InputSwitch
-                v-model="settings.showPartialResults"
-                @change="onSettingChange"
-              />
-            </div>
-          </div>
-        </template>
-      </Card>
-
-      <!-- Métodos de Análisis -->
-      <Card id="metodos-nlp">
-        <template #title>
-          <div class="section-title">
-            <i class="pi pi-sliders-h"></i>
-            <span>Métodos de Análisis</span>
-            <Tag v-if="loadingCapabilities" value="Cargando..." severity="info" />
-          </div>
-        </template>
-        <template #content>
-          <!-- 1. Hardware Info Banner (CPU/GPU) -->
-          <Message v-if="systemCapabilities" :severity="systemCapabilities.hardware.has_gpu ? 'success' : 'info'" :closable="false" class="hardware-banner">
-            <div class="hardware-info">
-              <i :class="systemCapabilities.hardware.has_gpu ? 'pi pi-bolt' : 'pi pi-desktop'"></i>
-              <div>
-                <strong>{{ systemCapabilities.hardware.has_gpu ? 'GPU detectada' : 'Modo CPU' }}</strong>
-                <span v-if="systemCapabilities.hardware.gpu">
-                  - {{ systemCapabilities.hardware.gpu.name }}
-                  <template v-if="systemCapabilities.hardware.gpu.memory_gb">
-                    ({{ systemCapabilities.hardware.gpu.memory_gb.toFixed(1) }} GB)
-                  </template>
-                </span>
-                <span v-else>
-                  - {{ systemCapabilities.hardware.cpu.name }}
-                </span>
-              </div>
-            </div>
-          </Message>
-
-          <!-- 2. Analizador Semántico (Ollama + modelos) -->
-          <div class="nlp-category">
-            <div class="category-header">
-              <h4><i class="pi pi-microchip-ai"></i> Analizador Semántico</h4>
-              <span class="category-desc">Motor de análisis avanzado del significado y contexto</span>
-            </div>
-
-            <!-- Estado del analizador compacto cuando está listo -->
-            <div v-if="systemCapabilities && ollamaState === 'ready'" class="ollama-ready-bar">
-              <div class="ollama-ready-info">
-                <i class="pi pi-check-circle"></i>
-                <span>Analizador listo · {{ systemCapabilities.ollama.models.length }} modelo(s)</span>
-              </div>
-            </div>
-
-            <!-- Banner de acción cuando el analizador NO está listo -->
-            <div v-if="systemCapabilities && ollamaState !== 'ready'" class="ollama-action-card" :class="'ollama-state-' + ollamaState">
-              <div class="ollama-action-content">
-                <i :class="[
-                  ollamaState === 'no_models' ? 'pi pi-info-circle' : 'pi pi-exclamation-triangle'
-                ]"></i>
-                <div class="ollama-action-text">
-                  <strong>{{
-                    ollamaState === 'not_installed' ? 'Analizador no disponible' :
-                    ollamaState === 'not_running' ? 'Analizador no iniciado' :
-                    'Sin modelos de análisis'
-                  }}</strong>
-                  <span>{{ ollamaStatusMessage }}</span>
-                </div>
-                <Button
-                  :label="ollamaActionConfig.label"
-                  :icon="ollamaActionConfig.icon"
-                  :severity="ollamaActionConfig.severity"
-                  size="small"
-                  :loading="ollamaStarting || modelDownloading"
-                  @click="ollamaActionConfig.action"
-                />
-              </div>
-            </div>
-
-            <!-- Selector de modelos -->
-            <div class="setting-item" :class="{ 'setting-disabled': ollamaState !== 'ready' }">
+          </template>
+          <template #content>
+            <!-- Modo claro/oscuro/auto -->
+            <div class="setting-item">
               <div class="setting-info">
-                <label class="setting-label">Modelos de análisis</label>
-                <p class="setting-description">
-                  Selecciona qué modelos usar para el análisis semántico.
-                </p>
+                <label class="setting-label">Modo de apariencia</label>
+                <p class="setting-description">Elige entre modo claro, oscuro o automático según el sistema</p>
+              </div>
+              <div class="setting-control">
+                <SelectButton
+                  :model-value="themeStore.config.mode"
+                  :options="modeOptions"
+                  option-label="label"
+                  option-value="value"
+                  @update:model-value="(val) => themeStore.setMode(val)"
+                />
+              </div>
+            </div>
+
+            <!-- Estilo visual (preset) -->
+            <div class="setting-item">
+              <div class="setting-info">
+                <label class="setting-label">Estilo visual</label>
+                <p class="setting-description">Selecciona el estilo base de la interfaz. Los temas de escritura están optimizados para largas sesiones de lectura.</p>
               </div>
               <div class="setting-control wide">
-                <MultiSelect
-                  v-model="settings.enabledInferenceMethods"
-                  :options="availableLLMOptions"
-                  optionLabel="label"
-                  optionValue="value"
-                  placeholder="Seleccionar modelos"
-                  display="chip"
-                  :showToggleAll="false"
-                  :disabled="ollamaState !== 'ready'"
-                  @change="onSettingChange"
+                <Select
+                  :model-value="themeStore.config.preset"
+                  :options="groupedPresetOptions"
+                  option-label="label"
+                  option-value="value"
+                  option-group-label="label"
+                  option-group-children="items"
+                  class="preset-dropdown"
+                  @update:model-value="onPresetChange"
                 >
+                  <template #value="slotProps">
+                    <div v-if="slotProps.value" class="preset-selected">
+                      <span class="preset-name">{{ getPresetName(slotProps.value) }}</span>
+                    </div>
+                    <span v-else>Selecciona un tema</span>
+                  </template>
+                  <template #optiongroup="slotProps">
+                    <div class="preset-group-header">
+                      <i :class="getCategoryIcon(slotProps.option.label)"></i>
+                      <span>{{ slotProps.option.label }}</span>
+                    </div>
+                  </template>
                   <template #option="slotProps">
-                    <div class="method-option">
-                      <div class="method-info">
-                        <span class="method-name">{{ slotProps.option.label }}</span>
-                        <span class="method-desc">{{ slotProps.option.description }}</span>
-                      </div>
-                      <div class="method-badges">
-                        <Badge
-                          :value="getSpeedLabel(slotProps.option.speed)"
-                          :severity="getSpeedSeverity(slotProps.option.speed)"
-                          class="speed-badge"
-                        />
-                        <Tag
-                          v-if="!slotProps.option.installed"
-                          value="No instalado"
-                          severity="warning"
-                          class="method-tag"
-                        />
+                    <div class="preset-option">
+                      <div class="preset-info">
+                        <span class="preset-name">{{ slotProps.option.label }}</span>
+                        <span class="preset-desc">{{ slotProps.option.description }}</span>
                       </div>
                     </div>
                   </template>
-                </MultiSelect>
+                </Select>
+              </div>
+            </div>
+
+            <!-- Color primario -->
+            <div class="setting-item">
+              <div class="setting-info">
+                <label class="setting-label">Color primario</label>
+                <p class="setting-description">Color de acento para botones, enlaces y elementos destacados</p>
+              </div>
+              <div class="setting-control wide">
+                <div class="color-palette">
+                  <button
+                    v-for="color in PRIMARY_COLORS"
+                    :key="color.name"
+                    class="color-swatch"
+                    :class="{ active: themeStore.config.primaryColor === color.value }"
+                    :style="{ backgroundColor: color.value }"
+                    :title="color.label"
+                    @click="themeStore.setPrimaryColor(color.value)"
+                  >
+                    <i v-if="themeStore.config.primaryColor === color.value" class="pi pi-check"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Fuente de interfaz -->
+            <div class="setting-item">
+              <div class="setting-info">
+                <label class="setting-label">Fuente de interfaz</label>
+                <p class="setting-description">Tipografía para menús, botones y controles</p>
+              </div>
+              <div class="setting-control wide">
+                <Select
+                  :model-value="themeStore.config.fontFamily"
+                  :options="groupedFontOptions"
+                  option-label="label"
+                  option-value="value"
+                  option-group-label="label"
+                  option-group-children="items"
+                  class="font-dropdown"
+                  @update:model-value="onFontFamilyChange"
+                >
+                  <template #value="slotProps">
+                    <span v-if="slotProps.value" :class="`font-${slotProps.value}`">
+                      {{ getFontFamilyLabel(slotProps.value) }}
+                    </span>
+                  </template>
+                  <template #optiongroup="slotProps">
+                    <div class="font-group-header">
+                      <i :class="slotProps.option.label === 'Generales' ? 'pi pi-desktop' : 'pi pi-book'"></i>
+                      <span>{{ slotProps.option.label }}</span>
+                    </div>
+                  </template>
+                  <template #option="slotProps">
+                    <div class="font-option" :class="`font-${slotProps.option.value}`">
+                      <span class="font-name">{{ slotProps.option.label }}</span>
+                      <span class="font-desc">{{ slotProps.option.description }}</span>
+                    </div>
+                  </template>
+                </Select>
+              </div>
+            </div>
+
+            <!-- Fuente de lectura -->
+            <div class="setting-item">
+              <div class="setting-info">
+                <label class="setting-label">Fuente de lectura</label>
+                <p class="setting-description">Tipografía para visualizar el manuscrito</p>
+              </div>
+              <div class="setting-control wide">
+                <Select
+                  :model-value="themeStore.config.fontFamilyReading"
+                  :options="groupedFontOptions"
+                  option-label="label"
+                  option-value="value"
+                  option-group-label="label"
+                  option-group-children="items"
+                  class="font-dropdown"
+                  @update:model-value="onFontFamilyReadingChange"
+                >
+                  <template #value="slotProps">
+                    <span v-if="slotProps.value" :class="`font-${slotProps.value}`">
+                      {{ getFontFamilyLabel(slotProps.value) }}
+                    </span>
+                  </template>
+                  <template #optiongroup="slotProps">
+                    <div class="font-group-header">
+                      <i :class="slotProps.option.label === 'Generales' ? 'pi pi-desktop' : 'pi pi-book'"></i>
+                      <span>{{ slotProps.option.label }}</span>
+                    </div>
+                  </template>
+                  <template #option="slotProps">
+                    <div class="font-option" :class="`font-${slotProps.option.value}`">
+                      <span class="font-name">{{ slotProps.option.label }}</span>
+                      <span class="font-desc">{{ slotProps.option.description }}</span>
+                    </div>
+                  </template>
+                </Select>
+              </div>
+            </div>
+
+            <!-- Tamaño de fuente -->
+            <div class="setting-item">
+              <div class="setting-info">
+                <label class="setting-label">Tamaño de fuente</label>
+                <p class="setting-description">Tamaño base del texto en toda la aplicación</p>
+              </div>
+              <div class="setting-control">
+                <SelectButton
+                  :model-value="themeStore.config.fontSize"
+                  :options="fontSizeOptions"
+                  option-label="label"
+                  option-value="value"
+                  @update:model-value="(val) => themeStore.setFontSize(val)"
+                />
+              </div>
+            </div>
+
+            <!-- Interlineado -->
+            <div class="setting-item">
+              <div class="setting-info">
+                <label class="setting-label">Interlineado</label>
+                <p class="setting-description">Espaciado entre líneas del texto</p>
+              </div>
+              <div class="setting-control">
+                <Select
+                  :model-value="themeStore.config.lineHeight"
+                  :options="lineHeightOptions"
+                  option-label="label"
+                  option-value="value"
+                  @update:model-value="onLineHeightChange"
+                />
+              </div>
+            </div>
+
+            <!-- Radio de bordes -->
+            <div class="setting-item">
+              <div class="setting-info">
+                <label class="setting-label">Bordes redondeados</label>
+                <p class="setting-description">Nivel de redondeo en botones y tarjetas</p>
+              </div>
+              <div class="setting-control">
+                <SelectButton
+                  :model-value="themeStore.config.radius"
+                  :options="radiusOptions"
+                  option-label="label"
+                  option-value="value"
+                  @update:model-value="(val) => themeStore.setRadius(val)"
+                />
+              </div>
+            </div>
+
+            <!-- Densidad de UI -->
+            <div class="setting-item">
+              <div class="setting-info">
+                <label class="setting-label">Densidad de la interfaz</label>
+                <p class="setting-description">Espaciado entre elementos de la interfaz</p>
+              </div>
+              <div class="setting-control">
+                <SelectButton
+                  :model-value="themeStore.config.compactness"
+                  :options="compactnessOptions"
+                  option-label="label"
+                  option-value="value"
+                  @update:model-value="(val) => themeStore.setCompactness(val)"
+                />
+              </div>
+            </div>
+
+            <!-- Reducir animaciones -->
+            <div class="setting-item">
+              <div class="setting-info">
+                <label class="setting-label">Reducir animaciones</label>
+                <p class="setting-description">Minimiza las animaciones y transiciones para mejorar la accesibilidad</p>
+              </div>
+              <div class="setting-control">
+                <ToggleSwitch
+                  :model-value="themeStore.config.reducedMotion"
+                  @update:model-value="onReducedMotionChange"
+                />
+              </div>
+            </div>
+
+            <!-- Botón de restablecer apariencia -->
+            <div class="setting-item">
+              <div class="setting-info">
+                <label class="setting-label">Restablecer apariencia</label>
+                <p class="setting-description">Volver a los valores por defecto de apariencia</p>
+              </div>
+              <div class="setting-control">
+                <Button
+                  label="Restablecer"
+                  icon="pi pi-refresh"
+                  severity="secondary"
+                  outlined
+                  size="small"
+                  @click="themeStore.resetToDefaults()"
+                />
+              </div>
+            </div>
+          </template>
+        </Card>
+
+        <!-- Análisis -->
+        <Card id="analisis">
+          <template #title>
+            <div class="section-title">
+              <i class="pi pi-cog"></i>
+              <span>Análisis</span>
+            </div>
+          </template>
+          <template #content>
+            <!-- Sensibilidad del análisis - Control unificado -->
+            <div class="sensitivity-section">
+              <div class="sensitivity-header">
+                <label class="setting-label">¿Cuántas sugerencias quieres ver?</label>
+                <p class="setting-description">
+                  Ajusta cuánto debería avisarte el asistente
+                </p>
+              </div>
+
+              <!-- Presets como botones -->
+              <div class="sensitivity-presets">
+                <button
+                  v-for="preset in sensitivityPresets"
+                  :key="preset.value"
+                  class="preset-button"
+                  :class="{ active: settings.sensitivityPreset === preset.value }"
+                  @click="selectSensitivityPreset(preset.value)"
+                >
+                  <i :class="preset.icon"></i>
+                  <div class="preset-content">
+                    <span class="preset-title">{{ preset.label }}</span>
+                    <span class="preset-desc">{{ preset.description }}</span>
+                  </div>
+                  <i v-if="preset.recommended" class="pi pi-star-fill recommended-star" title="Recomendado"></i>
+                </button>
+              </div>
+
+              <!-- Slider de ajuste fino (siempre visible pero con etiqueta contextual) -->
+              <div class="sensitivity-slider">
+                <div class="slider-header">
+                  <span class="slider-label">Ajuste fino</span>
+                  <span class="slider-value">{{ sensitivityLabel }}</span>
+                </div>
+                <Slider
+                  v-model="settings.sensitivity"
+                  :min="0"
+                  :max="100"
+                  :step="5"
+                  @change="onSensitivityChange"
+                />
+                <div class="slider-hints">
+                  <span>Menos avisos</span>
+                  <span>Más avisos</span>
+                </div>
+              </div>
+
+              <!-- Panel avanzado colapsable -->
+              <div class="advanced-panel">
+                <button
+                  class="advanced-toggle"
+                  @click="showAdvancedSensitivity = !showAdvancedSensitivity"
+                >
+                  <i :class="showAdvancedSensitivity ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"></i>
+                  <span>Opciones avanzadas</span>
+                </button>
+
+                <div v-if="showAdvancedSensitivity" class="advanced-content">
+                  <p class="advanced-note">
+                    Estos valores se calculan automáticamente según la sensibilidad elegida.
+                    Solo modifícalos si necesitas control preciso.
+                  </p>
+
+                  <div class="advanced-slider">
+                    <div class="advanced-slider-header">
+                      <label>Certeza para mostrar alertas</label>
+                      <span>{{ settings.minConfidence }}%</span>
+                    </div>
+                    <p class="slider-help">Qué tan seguro debe estar el sistema para mostrarte una alerta. Más bajo = más alertas (algunas pueden ser falsas).</p>
+                    <Slider
+                      v-model="settings.minConfidence"
+                      :min="20"
+                      :max="95"
+                      :step="5"
+                      @change="onAdvancedSliderChange"
+                    />
+                  </div>
+
+                  <div class="advanced-slider">
+                    <div class="advanced-slider-header">
+                      <label>Certeza para detectar personajes</label>
+                      <span>{{ settings.inferenceMinConfidence }}%</span>
+                    </div>
+                    <p class="slider-help">Qué tan seguro debe estar para identificar que dos menciones son el mismo personaje.</p>
+                    <Slider
+                      v-model="settings.inferenceMinConfidence"
+                      :min="20"
+                      :max="90"
+                      :step="5"
+                      @change="onAdvancedSliderChange"
+                    />
+                  </div>
+
+                  <div class="advanced-slider">
+                    <div class="advanced-slider-header">
+                      <label>Acuerdo entre métodos</label>
+                      <span>{{ settings.inferenceMinConsensus }}%</span>
+                    </div>
+                    <p class="slider-help">Cuántos métodos deben coincidir para aceptar una detección. Más alto = más fiable pero puede perder algunas.</p>
+                    <Slider
+                      v-model="settings.inferenceMinConsensus"
+                      :min="30"
+                      :max="100"
+                      :step="10"
+                      @change="onAdvancedSliderChange"
+                    />
+                  </div>
+
+                  <Button
+                    label="Restaurar valores calculados"
+                    icon="pi pi-refresh"
+                    severity="secondary"
+                    text
+                    size="small"
+                    @click="recalculateFromSensitivity"
+                  />
+                </div>
               </div>
             </div>
 
             <div class="setting-item">
               <div class="setting-info">
-                <label class="setting-label">Priorizar velocidad</label>
-                <p class="setting-description">
-                  Usar configuración optimizada para respuestas rápidas sobre calidad
-                </p>
+                <label class="setting-label">Análisis automático</label>
+                <p class="setting-description">Iniciar análisis automáticamente al crear proyecto</p>
               </div>
               <div class="setting-control">
-                <InputSwitch
-                  v-model="settings.prioritizeSpeed"
-                  :disabled="ollamaState !== 'ready'"
+                <ToggleSwitch
+                  v-model="settings.autoAnalysis"
                   @change="onSettingChange"
                 />
               </div>
             </div>
-          </div>
 
-          <!-- 3. Correferencia -->
-          <div class="nlp-category">
-            <div class="category-header">
-              <h4><i class="pi pi-link"></i> Seguimiento de referencias</h4>
-              <span class="category-desc">Detecta cuándo "él", "la detective" o "María" se refieren al mismo personaje</span>
+            <div class="setting-item">
+              <div class="setting-info">
+                <label class="setting-label">Mostrar resultados parciales</label>
+                <p class="setting-description">Mostrar resultados disponibles mientras el análisis continúa</p>
+              </div>
+              <div class="setting-control">
+                <ToggleSwitch
+                  v-model="settings.showPartialResults"
+                  @change="onSettingChange"
+                />
+              </div>
             </div>
-            <div class="methods-grid">
-              <div
-                v-for="(method, key) in getNLPMethodsForCategory('coreference')"
-                :key="key"
-                class="method-card"
-                :class="{ disabled: !method.available, enabled: isMethodEnabled('coreference', String(key)) }"
-              >
-                <div class="method-header">
-                  <InputSwitch
-                    :modelValue="isMethodEnabled('coreference', String(key))"
-                    @update:modelValue="toggleMethod('coreference', String(key), $event)"
-                    :disabled="!method.available"
-                  />
-                  <span class="method-name">{{ method.name }}</span>
-                  <Tag v-if="method.recommended_gpu && !method.requires_gpu" value="GPU recomendada" severity="info" class="method-tag" />
-                  <Tag v-if="method.requires_gpu" value="Requiere GPU" severity="warning" class="method-tag" />
-                  <Tag v-if="!method.available" value="No disponible" severity="danger" class="method-tag" />
+          </template>
+        </Card>
+
+        <!-- Métodos de Análisis -->
+        <Card id="metodos-nlp">
+          <template #title>
+            <div class="section-title">
+              <i class="pi pi-sliders-h"></i>
+              <span>Métodos de Análisis</span>
+              <Tag v-if="loadingCapabilities" value="Cargando..." severity="info" />
+            </div>
+          </template>
+          <template #content>
+            <!-- 1. Hardware Info Banner (CPU/GPU) -->
+            <Message v-if="systemCapabilities" :severity="systemCapabilities.hardware.has_gpu ? 'success' : 'info'" :closable="false" class="hardware-banner">
+              <div class="hardware-info">
+                <i :class="systemCapabilities.hardware.has_gpu ? 'pi pi-bolt' : 'pi pi-desktop'"></i>
+                <div>
+                  <strong>{{ systemCapabilities.hardware.has_gpu ? 'GPU detectada' : 'Modo CPU' }}</strong>
+                  <span v-if="systemCapabilities.hardware.gpu">
+                    - {{ systemCapabilities.hardware.gpu.name }}
+                    <template v-if="systemCapabilities.hardware.gpu.memory_gb">
+                      ({{ systemCapabilities.hardware.gpu.memory_gb.toFixed(1) }} GB)
+                    </template>
+                  </span>
+                  <span v-else>
+                    - {{ systemCapabilities.hardware.cpu.name }}
+                  </span>
                 </div>
-                <p class="method-description">{{ method.description }}</p>
-                <div v-if="method.weight" class="method-weight">
-                  Peso en votación: {{ (method.weight * 100).toFixed(0) }}%
+              </div>
+            </Message>
+
+            <!-- 2. Analizador Semántico (Ollama + modelos) -->
+            <div class="nlp-category">
+              <div class="category-header">
+                <h4><i class="pi pi-microchip-ai"></i> Analizador Semántico</h4>
+                <span class="category-desc">Motor de análisis avanzado del significado y contexto</span>
+              </div>
+
+              <!-- Estado del analizador compacto cuando está listo -->
+              <div v-if="systemCapabilities && ollamaState === 'ready'" class="ollama-ready-bar">
+                <div class="ollama-ready-info">
+                  <i class="pi pi-check-circle"></i>
+                  <span>Analizador listo · {{ systemCapabilities.ollama.models.length }} modelo(s)</span>
+                </div>
+              </div>
+
+              <!-- Banner de acción cuando el analizador NO está listo -->
+              <div v-if="systemCapabilities && ollamaState !== 'ready'" class="ollama-action-card" :class="'ollama-state-' + ollamaState">
+                <div class="ollama-action-content">
+                  <i
+                    :class="[
+                      ollamaState === 'no_models' ? 'pi pi-info-circle' : 'pi pi-exclamation-triangle'
+                    ]"
+                  ></i>
+                  <div class="ollama-action-text">
+                    <strong>{{
+                      ollamaState === 'not_installed' ? 'Analizador no disponible' :
+                      ollamaState === 'not_running' ? 'Analizador no iniciado' :
+                      'Sin modelos de análisis'
+                    }}</strong>
+                    <span>{{ ollamaStatusMessage }}</span>
+                  </div>
+                  <Button
+                    :label="ollamaActionConfig.label"
+                    :icon="ollamaActionConfig.icon"
+                    :severity="ollamaActionConfig.severity"
+                    size="small"
+                    :loading="ollamaStarting || modelDownloading"
+                    @click="ollamaActionConfig.action"
+                  />
+                </div>
+              </div>
+
+              <!-- Selector de modelos -->
+              <div class="setting-item" :class="{ 'setting-disabled': ollamaState !== 'ready' }">
+                <div class="setting-info">
+                  <label class="setting-label">Modelos de análisis</label>
+                  <p class="setting-description">
+                    Selecciona qué modelos usar para el análisis semántico.
+                  </p>
+                </div>
+                <div class="setting-control wide">
+                  <MultiSelect
+                    v-model="settings.enabledInferenceMethods"
+                    :options="availableLLMOptions"
+                    option-label="label"
+                    option-value="value"
+                    placeholder="Seleccionar modelos"
+                    display="chip"
+                    :show-toggle-all="false"
+                    :disabled="ollamaState !== 'ready'"
+                    @change="onSettingChange"
+                  >
+                    <template #option="slotProps">
+                      <div class="method-option">
+                        <div class="method-info">
+                          <span class="method-name">{{ slotProps.option.label }}</span>
+                          <span class="method-desc">{{ slotProps.option.description }}</span>
+                        </div>
+                        <div class="method-badges">
+                          <Badge
+                            :value="getSpeedLabel(slotProps.option.speed)"
+                            :severity="getSpeedSeverity(slotProps.option.speed)"
+                            class="speed-badge"
+                          />
+                          <Tag
+                            v-if="!slotProps.option.installed"
+                            value="No instalado"
+                            severity="warning"
+                            class="method-tag"
+                          />
+                        </div>
+                      </div>
+                    </template>
+                  </MultiSelect>
+                </div>
+              </div>
+
+              <div class="setting-item">
+                <div class="setting-info">
+                  <label class="setting-label">Priorizar velocidad</label>
+                  <p class="setting-description">
+                    Usar configuración optimizada para respuestas rápidas sobre calidad
+                  </p>
+                </div>
+                <div class="setting-control">
+                  <ToggleSwitch
+                    v-model="settings.prioritizeSpeed"
+                    :disabled="ollamaState !== 'ready'"
+                    @change="onSettingChange"
+                  />
                 </div>
               </div>
             </div>
-          </div>
 
-          <!-- 4. NER -->
-          <div class="nlp-category">
-            <div class="category-header">
-              <h4><i class="pi pi-user"></i> Detección de personajes y lugares</h4>
-              <span class="category-desc">Identifica automáticamente nombres de personas, lugares y organizaciones</span>
-            </div>
-            <div class="methods-grid">
-              <div
-                v-for="(method, key) in getNLPMethodsForCategory('ner')"
-                :key="key"
-                class="method-card"
-                :class="{ disabled: !method.available, enabled: isMethodEnabled('ner', String(key)) }"
-              >
-                <div class="method-header">
-                  <InputSwitch
-                    :modelValue="isMethodEnabled('ner', String(key))"
-                    @update:modelValue="toggleMethod('ner', String(key), $event)"
-                    :disabled="!method.available"
-                  />
-                  <span class="method-name">{{ method.name }}</span>
-                  <Tag v-if="method.recommended_gpu && !method.requires_gpu" value="GPU recomendada" severity="info" class="method-tag" />
-                  <Tag v-if="method.requires_gpu" value="Requiere GPU" severity="warning" class="method-tag" />
-                  <Tag v-if="!method.available" value="No disponible" severity="danger" class="method-tag" />
-                </div>
-                <p class="method-description">{{ method.description }}</p>
+            <!-- 3. Correferencia -->
+            <div class="nlp-category">
+              <div class="category-header">
+                <h4><i class="pi pi-link"></i> Seguimiento de referencias</h4>
+                <span class="category-desc">Detecta cuándo "él", "la detective" o "María" se refieren al mismo personaje</span>
               </div>
-            </div>
-          </div>
-
-          <!-- 5. Gramática -->
-          <div class="nlp-category">
-            <div class="category-header">
-              <h4><i class="pi pi-check-circle"></i> Corrección gramatical</h4>
-              <span class="category-desc">Detecta errores de concordancia, puntuación y otros problemas gramaticales</span>
-            </div>
-            <div class="methods-grid">
-              <div
-                v-for="(method, key) in getNLPMethodsForCategory('grammar')"
-                :key="key"
-                class="method-card"
-                :class="{ disabled: !method.available, enabled: isMethodEnabled('grammar', String(key)) }"
-              >
-                <div class="method-header">
-                  <InputSwitch
-                    :modelValue="isMethodEnabled('grammar', String(key))"
-                    @update:modelValue="toggleMethod('grammar', String(key), $event)"
-                    :disabled="!method.available"
-                  />
-                  <span class="method-name">{{ method.name }}</span>
-                  <Tag v-if="method.recommended_gpu && !method.requires_gpu" value="GPU recomendada" severity="info" class="method-tag" />
-                  <Tag v-if="method.requires_gpu" value="Requiere GPU" severity="warning" class="method-tag" />
-                  <Tag v-if="!method.available" value="No disponible" severity="danger" class="method-tag" />
-                </div>
-                <p class="method-description">{{ method.description }}</p>
-              </div>
-            </div>
-          </div>
-
-          <!-- 6. Ortografía (Votación Multi-Método) -->
-          <div class="nlp-category">
-            <div class="category-header">
-              <h4><i class="pi pi-spell-check"></i> Corrección ortográfica</h4>
-              <span class="category-desc">Sistema de votación con múltiples correctores para máxima precisión</span>
-            </div>
-            <div class="methods-grid">
-              <div
-                v-for="(method, key) in getNLPMethodsForCategory('spelling')"
-                :key="key"
-                class="method-card"
-                :class="{ disabled: !method.available, enabled: isMethodEnabled('spelling', String(key)) }"
-              >
-                <div class="method-header">
-                  <InputSwitch
-                    :modelValue="isMethodEnabled('spelling', String(key))"
-                    @update:modelValue="toggleMethod('spelling', String(key), $event)"
-                    :disabled="!method.available"
-                  />
-                  <span class="method-name">{{ method.name }}</span>
-                  <Tag v-if="method.recommended_gpu && !method.requires_gpu" value="GPU recomendada" severity="info" class="method-tag" />
-                  <Tag v-if="method.requires_gpu" value="Requiere GPU" severity="warning" class="method-tag" />
-                  <Tag v-if="!method.available" value="No disponible" severity="danger" class="method-tag" />
-                </div>
-                <p class="method-description">{{ method.description }}</p>
-                <div v-if="method.weight" class="method-weight">
-                  Peso en votación: {{ (method.weight * 100).toFixed(0) }}%
+              <div class="methods-grid">
+                <div
+                  v-for="(method, key) in getNLPMethodsForCategory('coreference')"
+                  :key="key"
+                  class="method-card"
+                  :class="{ disabled: !method.available, enabled: isMethodEnabled('coreference', String(key)) }"
+                >
+                  <div class="method-header">
+                    <ToggleSwitch
+                      :model-value="isMethodEnabled('coreference', String(key))"
+                      :disabled="!method.available"
+                      @update:model-value="toggleMethod('coreference', String(key), $event)"
+                    />
+                    <span class="method-name">{{ method.name }}</span>
+                    <Tag v-if="method.recommended_gpu && !method.requires_gpu" value="GPU recomendada" severity="info" class="method-tag" />
+                    <Tag v-if="method.requires_gpu" value="Requiere GPU" severity="warning" class="method-tag" />
+                    <Tag v-if="!method.available" value="No disponible" severity="danger" class="method-tag" />
+                  </div>
+                  <p class="method-description">{{ method.description }}</p>
+                  <div v-if="method.weight" class="method-weight">
+                    Peso en votación: {{ (method.weight * 100).toFixed(0) }}%
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <!-- 7. Conocimiento de Personajes -->
-          <div class="nlp-category">
-            <div class="category-header">
-              <h4><i class="pi pi-book"></i> Conocimiento de personajes</h4>
-              <span class="category-desc">Extrae qué sabe cada personaje sobre otros y sobre eventos</span>
-            </div>
-            <div class="knowledge-mode-selector">
-              <div
-                v-for="(method, key) in getNLPMethodsForCategory('character_knowledge')"
-                :key="key"
-                class="knowledge-mode-card"
-                :class="{
-                  disabled: !method.available,
-                  selected: settings.characterKnowledgeMode === key
-                }"
-                @click="method.available && setCharacterKnowledgeMode(String(key))"
-              >
-                <div class="mode-radio">
-                  <RadioButton
-                    :modelValue="settings.characterKnowledgeMode"
-                    :value="key"
-                    :disabled="!method.available"
-                    @update:modelValue="setCharacterKnowledgeMode($event)"
-                  />
+            <!-- 4. NER -->
+            <div class="nlp-category">
+              <div class="category-header">
+                <h4><i class="pi pi-user"></i> Detección de personajes y lugares</h4>
+                <span class="category-desc">Identifica automáticamente nombres de personas, lugares y organizaciones</span>
+              </div>
+              <div class="methods-grid">
+                <div
+                  v-for="(method, key) in getNLPMethodsForCategory('ner')"
+                  :key="key"
+                  class="method-card"
+                  :class="{ disabled: !method.available, enabled: isMethodEnabled('ner', String(key)) }"
+                >
+                  <div class="method-header">
+                    <ToggleSwitch
+                      :model-value="isMethodEnabled('ner', String(key))"
+                      :disabled="!method.available"
+                      @update:model-value="toggleMethod('ner', String(key), $event)"
+                    />
+                    <span class="method-name">{{ method.name }}</span>
+                    <Tag v-if="method.recommended_gpu && !method.requires_gpu" value="GPU recomendada" severity="info" class="method-tag" />
+                    <Tag v-if="method.requires_gpu" value="Requiere GPU" severity="warning" class="method-tag" />
+                    <Tag v-if="!method.available" value="No disponible" severity="danger" class="method-tag" />
+                  </div>
+                  <p class="method-description">{{ method.description }}</p>
                 </div>
-                <div class="mode-content">
+              </div>
+            </div>
+
+            <!-- 5. Gramática -->
+            <div class="nlp-category">
+              <div class="category-header">
+                <h4><i class="pi pi-check-circle"></i> Corrección gramatical</h4>
+                <span class="category-desc">Detecta errores de concordancia, puntuación y otros problemas gramaticales</span>
+              </div>
+              <div class="methods-grid">
+                <div
+                  v-for="(method, key) in getNLPMethodsForCategory('grammar')"
+                  :key="key"
+                  class="method-card"
+                  :class="{ disabled: !method.available, enabled: isMethodEnabled('grammar', String(key)) }"
+                >
+                  <div class="method-header">
+                    <ToggleSwitch
+                      :model-value="isMethodEnabled('grammar', String(key))"
+                      :disabled="!method.available"
+                      @update:model-value="toggleMethod('grammar', String(key), $event)"
+                    />
+                    <span class="method-name">{{ method.name }}</span>
+                    <Tag v-if="method.recommended_gpu && !method.requires_gpu" value="GPU recomendada" severity="info" class="method-tag" />
+                    <Tag v-if="method.requires_gpu" value="Requiere GPU" severity="warning" class="method-tag" />
+                    <Tag v-if="!method.available" value="No disponible" severity="danger" class="method-tag" />
+                  </div>
+                  <p class="method-description">{{ method.description }}</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- 6. Ortografía (Votación Multi-Método) -->
+            <div class="nlp-category">
+              <div class="category-header">
+                <h4><i class="pi pi-spell-check"></i> Corrección ortográfica</h4>
+                <span class="category-desc">Sistema de votación con múltiples correctores para máxima precisión</span>
+              </div>
+              <div class="methods-grid">
+                <div
+                  v-for="(method, key) in getNLPMethodsForCategory('spelling')"
+                  :key="key"
+                  class="method-card"
+                  :class="{ disabled: !method.available, enabled: isMethodEnabled('spelling', String(key)) }"
+                >
+                  <div class="method-header">
+                    <ToggleSwitch
+                      :model-value="isMethodEnabled('spelling', String(key))"
+                      :disabled="!method.available"
+                      @update:model-value="toggleMethod('spelling', String(key), $event)"
+                    />
+                    <span class="method-name">{{ method.name }}</span>
+                    <Tag v-if="method.recommended_gpu && !method.requires_gpu" value="GPU recomendada" severity="info" class="method-tag" />
+                    <Tag v-if="method.requires_gpu" value="Requiere GPU" severity="warning" class="method-tag" />
+                    <Tag v-if="!method.available" value="No disponible" severity="danger" class="method-tag" />
+                  </div>
+                  <p class="method-description">{{ method.description }}</p>
+                  <div v-if="method.weight" class="method-weight">
+                    Peso en votación: {{ (method.weight * 100).toFixed(0) }}%
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 7. Conocimiento de Personajes -->
+            <div class="nlp-category">
+              <div class="category-header">
+                <h4><i class="pi pi-book"></i> Conocimiento de personajes</h4>
+                <span class="category-desc">Extrae qué sabe cada personaje sobre otros y sobre eventos</span>
+              </div>
+              <div class="knowledge-mode-selector">
+                <div
+                  v-for="(method, key) in getNLPMethodsForCategory('character_knowledge')"
+                  :key="key"
+                  class="knowledge-mode-card"
+                  :class="{
+                    disabled: !method.available,
+                    selected: settings.characterKnowledgeMode === key
+                  }"
+                  @click="method.available && setCharacterKnowledgeMode(String(key))"
+                >
                   <span class="mode-name">{{ method.name }}</span>
                   <p class="mode-description">{{ method.description }}</p>
                   <Tag v-if="method.recommended_gpu" value="GPU recomendada" severity="info" class="method-tag" />
@@ -777,432 +764,328 @@
                 </div>
               </div>
             </div>
-          </div>
 
-          <!-- Botón para aplicar configuración recomendada -->
-          <div class="setting-item">
-            <div class="setting-info">
-              <label class="setting-label">Configuración recomendada</label>
-              <p class="setting-description">Aplicar configuración óptima según tu hardware detectado</p>
-            </div>
-            <div class="setting-control">
-              <Button
-                label="Aplicar recomendada"
-                icon="pi pi-sparkles"
-                severity="secondary"
-                outlined
-                size="small"
-                @click="applyRecommendedConfig"
-                :disabled="!systemCapabilities"
-              />
-            </div>
-          </div>
-        </template>
-      </Card>
-
-      <!-- Notificaciones -->
-      <Card id="notificaciones">
-        <template #title>
-          <div class="section-title">
-            <i class="pi pi-bell"></i>
-            <span>Notificaciones</span>
-          </div>
-        </template>
-        <template #content>
-          <div class="setting-item">
-            <div class="setting-info">
-              <label class="setting-label">Notificaciones de análisis</label>
-              <p class="setting-description">Notificar cuando el análisis se complete</p>
-            </div>
-            <div class="setting-control">
-              <InputSwitch
-                v-model="settings.notifyAnalysisComplete"
-                @change="onSettingChange"
-              />
-            </div>
-          </div>
-
-          <div class="setting-item">
-            <div class="setting-info">
-              <label class="setting-label">Sonidos</label>
-              <p class="setting-description">Reproducir sonidos para eventos importantes</p>
-            </div>
-            <div class="setting-control">
-              <InputSwitch
-                v-model="settings.soundEnabled"
-                @change="onSettingChange"
-              />
-            </div>
-          </div>
-        </template>
-      </Card>
-
-      <!-- Privacidad y Datos -->
-      <Card id="privacidad">
-        <template #title>
-          <div class="section-title">
-            <i class="pi pi-shield"></i>
-            <span>Privacidad y Datos</span>
-          </div>
-        </template>
-        <template #content>
-          <div class="setting-item">
-            <div class="setting-info">
-              <label class="setting-label">Ubicación de datos</label>
-              <p class="setting-description">
-                Los proyectos se guardan en: <code>{{ dataLocation }}</code>
-              </p>
-            </div>
-            <div class="setting-control">
-              <Button
-                label="Cambiar ubicación"
-                icon="pi pi-folder-open"
-                outlined
-                @click="changeDataLocation"
-              />
-            </div>
-          </div>
-
-          <Message severity="info" :closable="false" class="info-message">
-            <span class="message-content">
-              <strong>Modo 100% offline:</strong> Tus manuscritos nunca salen de tu máquina.
-              Esta aplicación no envía datos a internet excepto para verificación de licencia.
-            </span>
-          </Message>
-        </template>
-      </Card>
-
-      <!-- Filtros de Entidades -->
-      <Card id="filtros-entidades">
-        <template #title>
-          <div class="section-title">
-            <i class="pi pi-filter"></i>
-            <span>Filtros de Entidades</span>
-          </div>
-        </template>
-        <template #content>
-          <p class="section-description mb-4">
-            Gestiona qué expresiones se filtran automáticamente durante la detección de entidades.
-            Esto ayuda a reducir falsos positivos como marcadores temporales o palabras comunes.
-          </p>
-
-          <!-- Estadísticas -->
-          <div class="filter-stats mb-4" v-if="filterStats">
-            <div class="stat-item">
-              <span class="stat-value">{{ filterStats.system_patterns_active }}</span>
-              <span class="stat-label">Patrones activos</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-value">{{ filterStats.user_rejections }}</span>
-              <span class="stat-label">Rechazos globales</span>
-            </div>
-          </div>
-
-          <!-- Patrones del sistema -->
-          <div class="setting-item column">
-            <div class="setting-info">
-              <label class="setting-label">Patrones del sistema</label>
-              <p class="setting-description">
-                Patrones predefinidos para filtrar expresiones comunes.
-                Puedes activar o desactivar cada patrón según tus necesidades.
-              </p>
-            </div>
-            <div class="system-patterns-list" v-if="systemPatterns.length">
-              <div
-                v-for="category in groupedSystemPatterns"
-                :key="category.name"
-                class="pattern-category"
-              >
-                <h4 class="category-title">{{ getCategoryLabel(category.name) }}</h4>
-                <div class="patterns-grid">
-                  <div
-                    v-for="pattern in category.patterns"
-                    :key="pattern.id"
-                    class="pattern-item"
-                    :class="{ inactive: !pattern.isActive }"
-                  >
-                    <Checkbox
-                      :modelValue="pattern.isActive"
-                      @update:modelValue="toggleSystemPattern(pattern.id, $event)"
-                      :inputId="`pattern-${pattern.id}`"
-                      binary
-                    />
-                    <label :for="`pattern-${pattern.id}`" class="pattern-label">
-                      <code class="pattern-text">{{ pattern.pattern }}</code>
-                      <span class="pattern-desc" v-if="pattern.description">{{ pattern.description }}</span>
-                    </label>
-                  </div>
-                </div>
+            <!-- Botón para aplicar configuración recomendada -->
+            <div class="setting-item">
+              <div class="setting-info">
+                <label class="setting-label">Configuración recomendada</label>
+                <p class="setting-description">Aplicar configuración óptima según tu hardware detectado</p>
               </div>
-            </div>
-            <div v-else class="loading-patterns">
-              <ProgressSpinner style="width: 24px; height: 24px" />
-              <span>Cargando patrones...</span>
-            </div>
-          </div>
-
-          <!-- Rechazos globales del usuario -->
-          <div class="setting-item column mt-4">
-            <div class="setting-info">
-              <label class="setting-label">Rechazos globales</label>
-              <p class="setting-description">
-                Entidades que has rechazado y que no aparecerán en ninguno de tus proyectos.
-                Puedes restaurarlas si te equivocaste.
-              </p>
-            </div>
-            <div class="user-rejections-list" v-if="userRejections.length">
-              <div
-                v-for="rejection in userRejections"
-                :key="rejection.id"
-                class="rejection-item"
-              >
-                <div class="rejection-info">
-                  <span class="rejection-name">{{ rejection.entityName }}</span>
-                  <Tag v-if="rejection.entityType" :value="rejection.entityType" severity="secondary" class="ml-2" />
-                  <span class="rejection-reason" v-if="rejection.reason">— {{ rejection.reason }}</span>
-                </div>
+              <div class="setting-control">
                 <Button
-                  icon="pi pi-undo"
-                  text
-                  rounded
+                  label="Aplicar recomendada"
+                  icon="pi pi-sparkles"
                   severity="secondary"
-                  @click="removeUserRejection(rejection)"
-                  v-tooltip.top="'Restaurar entidad'"
+                  outlined
+                  size="small"
+                  :disabled="!systemCapabilities"
+                  @click="applyRecommendedConfig"
                 />
               </div>
             </div>
-            <div v-else class="empty-rejections">
-              <i class="pi pi-check-circle"></i>
-              <span>No tienes entidades rechazadas globalmente</span>
-            </div>
-          </div>
-        </template>
-      </Card>
+          </template>
+        </Card>
 
-      <!-- Correcciones -->
-      <Card id="correcciones">
-        <template #title>
-          <div class="section-title">
-            <i class="pi pi-pencil"></i>
-            <span>Correcciones Editoriales</span>
-          </div>
-        </template>
-        <template #content>
-          <!-- Nota informativa -->
-          <Message severity="info" :closable="false" class="mb-4">
-            <template #default>
-              <div class="correction-info-message">
-                <p>
-                  La configuración de correcciones se aplica por proyecto. Aquí puedes seleccionar un preset base
-                  que se aplicará a nuevos proyectos. Para ajustar la configuración de un proyecto específico,
-                  accede a sus ajustes desde el panel del proyecto.
+        <!-- Notificaciones -->
+        <Card id="notificaciones">
+          <template #title>
+            <div class="section-title">
+              <i class="pi pi-bell"></i>
+              <span>Notificaciones</span>
+            </div>
+          </template>
+          <template #content>
+            <div class="setting-item">
+              <div class="setting-info">
+                <label class="setting-label">Notificaciones de análisis</label>
+                <p class="setting-description">Notificar cuando el análisis se complete</p>
+              </div>
+              <div class="setting-control">
+                <ToggleSwitch
+                  v-model="settings.notifyAnalysisComplete"
+                  @change="onSettingChange"
+                />
+              </div>
+            </div>
+
+            <div class="setting-item">
+              <div class="setting-info">
+                <label class="setting-label">Sonidos</label>
+                <p class="setting-description">Reproducir sonidos para eventos importantes</p>
+              </div>
+              <div class="setting-control">
+                <ToggleSwitch
+                  v-model="settings.soundEnabled"
+                  @change="onSettingChange"
+                />
+              </div>
+            </div>
+          </template>
+        </Card>
+
+        <!-- Privacidad y Datos -->
+        <Card id="privacidad">
+          <template #title>
+            <div class="section-title">
+              <i class="pi pi-shield"></i>
+              <span>Privacidad y Datos</span>
+            </div>
+          </template>
+          <template #content>
+            <div class="setting-item">
+              <div class="setting-info">
+                <label class="setting-label">Ubicación de datos</label>
+                <p class="setting-description">
+                  Los proyectos se guardan en: <code>{{ dataLocation }}</code>
                 </p>
               </div>
-            </template>
-          </Message>
-
-          <!-- Preset para nuevos proyectos -->
-          <div class="setting-item">
-            <div class="setting-info">
-              <label class="setting-label">Preset por defecto</label>
-              <p class="setting-description">
-                Configuración base que se aplicará a nuevos proyectos. Puedes personalizarla después.
-              </p>
+              <div class="setting-control">
+                <Button
+                  label="Cambiar ubicación"
+                  icon="pi pi-folder-open"
+                  outlined
+                  @click="changeDataLocation"
+                />
+              </div>
             </div>
-            <div class="setting-control wide">
-              <Dropdown
-                v-model="defaultCorrectionPreset"
-                :options="correctionPresetOptions"
-                optionLabel="name"
-                optionValue="id"
-                placeholder="Selecciona un preset"
-                class="w-full"
-                @change="onDefaultPresetChange"
-              >
-                <template #option="slotProps">
-                  <div class="preset-dropdown-option">
-                    <span class="preset-name">{{ slotProps.option.name }}</span>
-                    <span class="preset-description">{{ slotProps.option.description }}</span>
-                  </div>
-                </template>
-              </Dropdown>
+
+            <Message severity="info" :closable="false" class="info-message">
+              <span class="message-content">
+                <strong>Modo 100% offline:</strong> Tus manuscritos nunca salen de tu máquina.
+                Esta aplicación no envía datos a internet excepto para verificación de licencia.
+              </span>
+            </Message>
+          </template>
+        </Card>
+
+        <!-- Correcciones -->
+        <Card id="correcciones">
+          <template #title>
+            <div class="section-title">
+              <i class="pi pi-pencil"></i>
+              <span>Correcciones Editoriales</span>
             </div>
-          </div>
+          </template>
+          <template #content>
+            <!-- Nota informativa -->
+            <Message severity="info" :closable="false" class="mb-4">
+              <template #default>
+                <div class="correction-info-message">
+                  <p>
+                    La configuración de correcciones se aplica por proyecto. Aquí puedes seleccionar un preset base
+                    que se aplicará a nuevos proyectos. Para ajustar la configuración de un proyecto específico,
+                    accede a sus ajustes desde el panel del proyecto.
+                  </p>
+                </div>
+              </template>
+            </Message>
 
-          <!-- Resumen de configuración actual -->
-          <div class="setting-item column" v-if="defaultCorrectionConfig">
-            <div class="setting-info">
-              <label class="setting-label">Resumen de configuración</label>
-              <p class="setting-description">
-                Vista previa de la configuración del preset seleccionado
-              </p>
+            <!-- Preset para nuevos proyectos -->
+            <div class="setting-item">
+              <div class="setting-info">
+                <label class="setting-label">Preset por defecto</label>
+                <p class="setting-description">
+                  Configuración base que se aplicará a nuevos proyectos. Puedes personalizarla después.
+                </p>
+              </div>
+              <div class="setting-control wide">
+                <Select
+                  v-model="defaultCorrectionPreset"
+                  :options="correctionPresetOptions"
+                  option-label="name"
+                  option-value="id"
+                  placeholder="Selecciona un preset"
+                  class="w-full"
+                  @change="onDefaultPresetChange"
+                >
+                  <template #option="slotProps">
+                    <div class="preset-dropdown-option">
+                      <span class="preset-name">{{ slotProps.option.name }}</span>
+                      <span class="preset-description">{{ slotProps.option.description }}</span>
+                    </div>
+                  </template>
+                </Select>
+              </div>
             </div>
-            <div class="correction-config-summary">
-              <div class="config-grid">
-                <!-- Perfil de documento -->
-                <div class="config-section">
-                  <h4><i class="pi pi-file"></i> Perfil de documento</h4>
-                  <div class="config-items">
-                    <div class="config-item">
-                      <span class="config-label">Tipo:</span>
-                      <Tag :value="getFieldLabel(defaultCorrectionConfig.profile?.document_field)" severity="info" />
-                    </div>
-                    <div class="config-item">
-                      <span class="config-label">Registro:</span>
-                      <Tag :value="getRegisterLabel(defaultCorrectionConfig.profile?.register)" severity="secondary" />
-                    </div>
-                    <div class="config-item">
-                      <span class="config-label">Audiencia:</span>
-                      <span>{{ getAudienceLabel(defaultCorrectionConfig.profile?.audience) }}</span>
+
+            <!-- Resumen de configuración actual -->
+            <div v-if="defaultCorrectionConfig" class="setting-item column">
+              <div class="setting-info">
+                <label class="setting-label">Resumen de configuración</label>
+                <p class="setting-description">
+                  Vista previa de la configuración del preset seleccionado
+                </p>
+              </div>
+              <div class="correction-config-summary">
+                <div class="config-grid">
+                  <!-- Perfil de documento -->
+                  <div class="config-section">
+                    <h4><i class="pi pi-file"></i> Perfil de documento</h4>
+                    <div class="config-items">
+                      <div class="config-item">
+                        <span class="config-label">Tipo:</span>
+                        <Tag :value="getFieldLabel(defaultCorrectionConfig.profile?.document_field)" severity="info" />
+                      </div>
+                      <div class="config-item">
+                        <span class="config-label">Registro:</span>
+                        <Tag :value="getRegisterLabel(defaultCorrectionConfig.profile?.register)" severity="secondary" />
+                      </div>
+                      <div class="config-item">
+                        <span class="config-label">Audiencia:</span>
+                        <span>{{ getAudienceLabel(defaultCorrectionConfig.profile?.audience) }}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <!-- Tipografía -->
-                <div class="config-section">
-                  <h4><i class="pi pi-align-left"></i> Tipografía</h4>
-                  <div class="config-items">
-                    <div class="config-item">
-                      <span class="config-label">Habilitado:</span>
-                      <i :class="defaultCorrectionConfig.typography?.enabled ? 'pi pi-check text-green-500' : 'pi pi-times text-red-500'"></i>
-                    </div>
-                    <div class="config-item">
-                      <span class="config-label">Guiones:</span>
-                      <span>{{ getDashLabel(defaultCorrectionConfig.typography?.dialogue_dash) }}</span>
-                    </div>
-                    <div class="config-item">
-                      <span class="config-label">Comillas:</span>
-                      <span>{{ getQuoteLabel(defaultCorrectionConfig.typography?.quote_style) }}</span>
+                  <!-- Tipografía -->
+                  <div class="config-section">
+                    <h4><i class="pi pi-align-left"></i> Tipografía</h4>
+                    <div class="config-items">
+                      <div class="config-item">
+                        <span class="config-label">Habilitado:</span>
+                        <i :class="defaultCorrectionConfig.typography?.enabled ? 'pi pi-check text-green-500' : 'pi pi-times text-red-500'"></i>
+                      </div>
+                      <div class="config-item">
+                        <span class="config-label">Guiones:</span>
+                        <span>{{ getDashLabel(defaultCorrectionConfig.typography?.dialogue_dash) }}</span>
+                      </div>
+                      <div class="config-item">
+                        <span class="config-label">Comillas:</span>
+                        <span>{{ getQuoteLabel(defaultCorrectionConfig.typography?.quote_style) }}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <!-- Repeticiones -->
-                <div class="config-section">
-                  <h4><i class="pi pi-copy"></i> Repeticiones</h4>
-                  <div class="config-items">
-                    <div class="config-item">
-                      <span class="config-label">Habilitado:</span>
-                      <i :class="defaultCorrectionConfig.repetition?.enabled ? 'pi pi-check text-green-500' : 'pi pi-times text-red-500'"></i>
-                    </div>
-                    <div class="config-item">
-                      <span class="config-label">Distancia mín:</span>
-                      <span>{{ defaultCorrectionConfig.repetition?.min_distance }} palabras</span>
-                    </div>
-                    <div class="config-item">
-                      <span class="config-label">Sensibilidad:</span>
-                      <Tag :value="getSensitivityLabel(defaultCorrectionConfig.repetition?.sensitivity)" :severity="getSensitivitySeverity(defaultCorrectionConfig.repetition?.sensitivity)" />
+                  <!-- Repeticiones -->
+                  <div class="config-section">
+                    <h4><i class="pi pi-copy"></i> Repeticiones</h4>
+                    <div class="config-items">
+                      <div class="config-item">
+                        <span class="config-label">Habilitado:</span>
+                        <i :class="defaultCorrectionConfig.repetition?.enabled ? 'pi pi-check text-green-500' : 'pi pi-times text-red-500'"></i>
+                      </div>
+                      <div class="config-item">
+                        <span class="config-label">Distancia mín:</span>
+                        <span>{{ defaultCorrectionConfig.repetition?.min_distance }} palabras</span>
+                      </div>
+                      <div class="config-item">
+                        <span class="config-label">Sensibilidad:</span>
+                        <Tag :value="getSensitivityLabel(defaultCorrectionConfig.repetition?.sensitivity)" :severity="getSensitivitySeverity(defaultCorrectionConfig.repetition?.sensitivity)" />
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <!-- Regional -->
-                <div class="config-section">
-                  <h4><i class="pi pi-globe"></i> Vocabulario regional</h4>
-                  <div class="config-items">
-                    <div class="config-item">
-                      <span class="config-label">Habilitado:</span>
-                      <i :class="defaultCorrectionConfig.regional?.enabled ? 'pi pi-check text-green-500' : 'pi pi-times text-red-500'"></i>
-                    </div>
-                    <div class="config-item">
-                      <span class="config-label">Región:</span>
-                      <span>{{ getRegionLabel(defaultCorrectionConfig.regional?.target_region) }}</span>
+                  <!-- Regional -->
+                  <div class="config-section">
+                    <h4><i class="pi pi-globe"></i> Vocabulario regional</h4>
+                    <div class="config-items">
+                      <div class="config-item">
+                        <span class="config-label">Habilitado:</span>
+                        <i :class="defaultCorrectionConfig.regional?.enabled ? 'pi pi-check text-green-500' : 'pi pi-times text-red-500'"></i>
+                      </div>
+                      <div class="config-item">
+                        <span class="config-label">Región:</span>
+                        <span>{{ getRegionLabel(defaultCorrectionConfig.regional?.target_region) }}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <!-- Variante regional por defecto -->
-          <div class="setting-item">
-            <div class="setting-info">
-              <label class="setting-label">Variante regional preferida</label>
-              <p class="setting-description">
-                Variante del español para nuevos proyectos
-              </p>
+            <!-- Variante regional por defecto -->
+            <div class="setting-item">
+              <div class="setting-info">
+                <label class="setting-label">Variante regional preferida</label>
+                <p class="setting-description">
+                  Variante del español para nuevos proyectos
+                </p>
+              </div>
+              <div class="setting-control">
+                <Select
+                  v-model="defaultRegion"
+                  :options="regionOptions"
+                  option-label="label"
+                  option-value="value"
+                  placeholder="Selecciona región"
+                  @change="onDefaultRegionChange"
+                />
+              </div>
             </div>
-            <div class="setting-control">
-              <Dropdown
-                v-model="defaultRegion"
-                :options="regionOptions"
-                optionLabel="label"
-                optionValue="value"
-                placeholder="Selecciona región"
-                @change="onDefaultRegionChange"
-              />
-            </div>
-          </div>
 
-          <!-- Revisión con LLM -->
-          <div class="setting-item">
-            <div class="setting-info">
-              <label class="setting-label">Revisión con LLM</label>
-              <p class="setting-description">
-                Usar inteligencia artificial local para filtrar falsos positivos en las alertas de corrección.
-                Requiere Ollama instalado.
-              </p>
+            <!-- Revisión con LLM -->
+            <div class="setting-item">
+              <div class="setting-info">
+                <label class="setting-label">Revisión con LLM</label>
+                <p class="setting-description">
+                  Usar inteligencia artificial local para filtrar falsos positivos en las alertas de corrección.
+                  Requiere Ollama instalado.
+                </p>
+              </div>
+              <div class="setting-control">
+                <ToggleSwitch v-model="useLLMReview" @change="onLLMReviewChange" />
+              </div>
             </div>
-            <div class="setting-control">
-              <ToggleSwitch v-model="useLLMReview" @change="onLLMReviewChange" />
-            </div>
-          </div>
-        </template>
-      </Card>
 
-      <!-- Acciones -->
-      <Card id="mantenimiento">
-        <template #title>
-          <div class="section-title">
-            <i class="pi pi-wrench"></i>
-            <span>Mantenimiento</span>
-          </div>
-        </template>
-        <template #content>
-          <div class="setting-item">
-            <div class="setting-info">
-              <label class="setting-label">Limpiar caché</label>
-              <p class="setting-description">Eliminar archivos temporales y caché de modelos</p>
-            </div>
-            <div class="setting-control">
-              <Button
-                label="Limpiar caché"
-                icon="pi pi-trash"
-                severity="secondary"
-                outlined
-                @click="clearCache"
-              />
-            </div>
-          </div>
+            <Divider />
 
-          <div class="setting-item">
-            <div class="setting-info">
-              <label class="setting-label">Restablecer configuración</label>
-              <p class="setting-description">Volver a la configuración por defecto</p>
-            </div>
-            <div class="setting-control">
-              <Button
-                label="Restablecer"
-                icon="pi pi-refresh"
-                severity="danger"
-                outlined
-                @click="confirmReset"
-              />
-            </div>
-          </div>
-        </template>
-      </Card>
+            <!-- Personalización de defaults por tipo -->
+            <CorrectionDefaultsManager ref="defaultsManager" />
+          </template>
+        </Card>
 
+        <!-- Acciones -->
+        <Card id="mantenimiento">
+          <template #title>
+            <div class="section-title">
+              <i class="pi pi-wrench"></i>
+              <span>Mantenimiento</span>
+            </div>
+          </template>
+          <template #content>
+            <div class="setting-item">
+              <div class="setting-info">
+                <label class="setting-label">Limpiar caché</label>
+                <p class="setting-description">Eliminar archivos temporales y caché de modelos</p>
+              </div>
+              <div class="setting-control">
+                <Button
+                  label="Limpiar caché"
+                  icon="pi pi-trash"
+                  severity="secondary"
+                  outlined
+                  @click="clearCache"
+                />
+              </div>
+            </div>
+
+            <div class="setting-item">
+              <div class="setting-info">
+                <label class="setting-label">Restablecer configuración</label>
+                <p class="setting-description">Volver a la configuración por defecto</p>
+              </div>
+              <div class="setting-control">
+                <Button
+                  label="Restablecer"
+                  icon="pi pi-refresh"
+                  severity="danger"
+                  outlined
+                  @click="confirmReset"
+                />
+              </div>
+            </div>
+          </template>
+        </Card>
       </div>
     </div>
 
     <!-- Confirm Reset Dialog -->
     <Dialog
       :visible="showResetDialog"
-      @update:visible="showResetDialog = $event"
       modal
       header="Confirmar restablecimiento"
       :style="{ width: '450px' }"
+      @update:visible="showResetDialog = $event"
     >
       <p>
         ¿Estás seguro de que deseas restablecer toda la configuración a los valores por defecto?
@@ -1217,10 +1100,10 @@
     <!-- Change Data Location Dialog -->
     <Dialog
       :visible="showDataLocationDialog"
-      @update:visible="showDataLocationDialog = $event"
       modal
       header="Cambiar ubicación de datos"
       :style="{ width: '550px' }"
+      @update:visible="showDataLocationDialog = $event"
     >
       <div class="data-location-dialog">
         <p class="dialog-description">
@@ -1237,7 +1120,7 @@
         </div>
 
         <div class="migrate-option">
-          <InputSwitch v-model="migrateData" />
+          <ToggleSwitch v-model="migrateData" />
           <div class="migrate-info">
             <label>Migrar datos existentes</label>
             <span class="migrate-description">
@@ -1255,14 +1138,14 @@
         <Button
           label="Cancelar"
           severity="secondary"
-          @click="showDataLocationDialog = false"
           :disabled="changingLocation"
+          @click="showDataLocationDialog = false"
         />
         <Button
           label="Cambiar ubicación"
           icon="pi pi-check"
-          @click="confirmChangeDataLocation"
           :loading="changingLocation"
+          @click="confirmChangeDataLocation"
         />
       </template>
     </Dialog>
@@ -1276,9 +1159,9 @@ import { apiUrl } from '@/config/api'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
 import SelectButton from 'primevue/selectbutton'
-import Dropdown from 'primevue/dropdown'
+import Select from 'primevue/select'
 import Slider from 'primevue/slider'
-import InputSwitch from 'primevue/inputswitch'
+import ToggleSwitch from 'primevue/toggleswitch'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
@@ -1287,9 +1170,10 @@ import MultiSelect from 'primevue/multiselect'
 import Badge from 'primevue/badge'
 import Tag from 'primevue/tag'
 import Checkbox from 'primevue/checkbox'
-import RadioButton from 'primevue/radiobutton'
 import ProgressSpinner from 'primevue/progressspinner'
+import Divider from 'primevue/divider'
 import { useToast } from 'primevue/usetoast'
+import CorrectionDefaultsManager from '@/components/settings/CorrectionDefaultsManager.vue'
 import {
   useThemeStore,
   PRIMARY_COLORS,
@@ -2083,7 +1967,6 @@ onMounted(async () => {
   loadSettings()
   await loadSystemCapabilities()
   await loadCurrentDataLocation()
-  await loadFilterData()
   await loadCorrectionPresets()
 })
 
@@ -2699,7 +2582,7 @@ const scrollToSection = (sectionId: string) => {
 const handleScroll = () => {
   if (!contentArea.value) return
 
-  const sections = ['apariencia', 'analisis', 'metodos-nlp', 'notificaciones', 'privacidad', 'filtros-entidades', 'correcciones', 'mantenimiento', 'acerca-de']
+  const sections = ['apariencia', 'analisis', 'metodos-nlp', 'notificaciones', 'privacidad', 'correcciones', 'mantenimiento', 'acerca-de']
   const scrollPosition = contentArea.value.scrollTop + 100
 
   for (const sectionId of sections) {
@@ -4089,18 +3972,6 @@ const handleScroll = () => {
   cursor: not-allowed;
 }
 
-.knowledge-mode-card .mode-header {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 0.5rem;
-}
-
-.knowledge-mode-card .mode-header i {
-  font-size: 1.25rem;
-  color: var(--p-primary-color);
-}
-
 .knowledge-mode-card .mode-name {
   font-weight: 600;
   font-size: 1rem;
@@ -4112,16 +3983,6 @@ const handleScroll = () => {
   line-height: 1.4;
 }
 
-.knowledge-mode-card .mode-radio {
-  flex-shrink: 0;
-}
-
-.knowledge-mode-card .mode-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
 
 .knowledge-mode-card .method-tag {
   margin-top: 0.5rem;

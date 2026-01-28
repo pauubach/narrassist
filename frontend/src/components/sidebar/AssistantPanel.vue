@@ -57,14 +57,14 @@ function handleKeydown(e: KeyboardEvent) {
         Asistente
       </span>
       <Button
+        v-tooltip.left="'Limpiar historial'"
         icon="pi pi-trash"
         text
         rounded
         size="small"
-        @click="clearHistory"
-        v-tooltip.left="'Limpiar historial'"
         :disabled="messages.length === 0"
         class="clear-btn"
+        @click="clearHistory"
       />
     </div>
 
@@ -109,16 +109,16 @@ function handleKeydown(e: KeyboardEvent) {
       <InputText
         v-model="inputText"
         placeholder="Escribe tu pregunta..."
-        @keydown="handleKeydown"
         :disabled="isLoading"
         class="chat-input"
+        @keydown="handleKeydown"
       />
       <Button
         icon="pi pi-send"
-        @click="handleSend"
         :disabled="!inputText.trim() || isLoading"
         :loading="isLoading"
         class="send-btn"
+        @click="handleSend"
       />
     </div>
 

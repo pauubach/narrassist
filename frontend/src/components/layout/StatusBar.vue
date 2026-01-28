@@ -200,19 +200,19 @@ function toggleDetails() {
   <div class="status-bar">
     <!-- Sección izquierda: Estadísticas del documento -->
     <div class="status-section status-stats">
-      <span class="stat-item" v-if="wordCount > 0">
+      <span v-if="wordCount > 0" class="stat-item">
         <i class="pi pi-file-edit"></i>
         {{ formatNumber(wordCount) }} palabras
       </span>
-      <span class="stat-item" v-if="chapterCount > 0">
+      <span v-if="chapterCount > 0" class="stat-item">
         <i class="pi pi-book"></i>
         {{ chapterCount }} capítulos
       </span>
-      <span class="stat-item" v-if="entityCount > 0">
+      <span v-if="entityCount > 0" class="stat-item">
         <i class="pi pi-th-large"></i>
         {{ entityCount }} entidades
       </span>
-      <span class="stat-item stat-alerts" v-if="alertCount > 0">
+      <span v-if="alertCount > 0" class="stat-item stat-alerts">
         <i class="pi pi-exclamation-triangle"></i>
         {{ alertCount }} alertas
       </span>
@@ -239,7 +239,7 @@ function toggleDetails() {
       <span class="progress-step">{{ currentStepLabel }}</span>
       <ProgressBar
         :value="progress"
-        :showValue="false"
+        :show-value="false"
         class="progress-bar"
       />
       <span class="progress-percent">{{ progress }}%</span>

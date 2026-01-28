@@ -208,7 +208,6 @@ const originalDocumentName = computed(() => {
               <span class="info-value">{{ formatDate(project.lastModified) }}</span>
             </div>
           </div>
-
         </template>
       </Card>
 
@@ -364,8 +363,8 @@ const originalDocumentName = computed(() => {
             :title="errorTrend.direction === 'improving'
               ? 'Menos alertas en la segunda mitad del documento'
               : errorTrend.direction === 'worsening'
-              ? 'Más alertas en la segunda mitad del documento'
-              : 'Distribución uniforme de alertas'"
+                ? 'Más alertas en la segunda mitad del documento'
+                : 'Distribución uniforme de alertas'"
           >
             <i :class="errorTrend.direction === 'improving' ? 'pi pi-arrow-down' : errorTrend.direction === 'worsening' ? 'pi pi-arrow-up' : 'pi pi-minus'"></i>
             {{ errorTrend.direction === 'improving' ? 'Menos al final' : errorTrend.direction === 'worsening' ? 'Más al final' : 'Uniforme' }}
@@ -484,11 +483,11 @@ const originalDocumentName = computed(() => {
             />
             <Button
               v-if="isWordDocument"
+              v-tooltip.top="'Exporta el documento Word con las correcciones como revisiones (Track Changes)'"
               label="Documento con Correcciones"
               icon="pi pi-file-edit"
               outlined
               severity="help"
-              v-tooltip.top="'Exporta el documento Word con las correcciones como revisiones (Track Changes)'"
               @click="emit('export-corrected')"
             />
             <Button

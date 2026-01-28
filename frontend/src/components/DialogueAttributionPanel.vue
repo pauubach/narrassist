@@ -7,24 +7,24 @@
         <h3>Atribución de Diálogos</h3>
       </div>
       <div class="header-actions">
-        <Dropdown
+        <Select
           v-model="selectedChapter"
           :options="chapterOptions"
-          optionLabel="label"
-          optionValue="value"
+          option-label="label"
+          option-value="value"
           placeholder="Capítulo"
           class="chapter-selector"
           size="small"
           @change="loadAttributions"
         />
         <Button
+          v-tooltip.bottom="'Actualizar'"
           icon="pi pi-refresh"
           text
           rounded
           size="small"
           :loading="loading"
           @click="loadAttributions"
-          v-tooltip.bottom="'Actualizar'"
         />
       </div>
     </div>
@@ -129,7 +129,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import Chip from 'primevue/chip'
-import Dropdown from 'primevue/dropdown'
+import Select from 'primevue/select'
 import ProgressSpinner from 'primevue/progressspinner'
 import { useVoiceAndStyleStore } from '@/stores/voiceAndStyle'
 import type { DialogueAttribution, DialogueAttributionStats } from '@/types'

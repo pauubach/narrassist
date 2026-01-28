@@ -4,12 +4,12 @@ import { apiUrl } from '@/config/api'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import DsInput from '@/components/ds/DsInput.vue'
-import Dropdown from 'primevue/dropdown'
+import Select from 'primevue/select'
 import Dialog from 'primevue/dialog'
 import SelectButton from 'primevue/selectbutton'
 import Chips from 'primevue/chips'
 import Tag from 'primevue/tag'
-import Sidebar from 'primevue/sidebar'
+import Drawer from 'primevue/drawer'
 import DsBadge from '@/components/ds/DsBadge.vue'
 import DsEmptyState from '@/components/ds/DsEmptyState.vue'
 import MergeEntitiesDialog from '@/components/MergeEntitiesDialog.vue'
@@ -672,20 +672,20 @@ function navigateToAttributeSource(attr: EntityAttribute) {
             />
             <Button
               v-if="searchQuery || selectedType || selectedImportance"
+              v-tooltip="'Limpiar'"
               icon="pi pi-times"
               text
               rounded
               size="small"
               @click="clearFilters"
-              v-tooltip="'Limpiar'"
             />
           </div>
           <div class="toolbar-row">
-            <Dropdown
+            <Select
               v-model="selectedType"
               :options="typeOptions"
-              optionLabel="label"
-              optionValue="value"
+              option-label="label"
+              option-value="value"
               placeholder="Filtrar por tipo"
               class="type-filter-full"
             />
@@ -733,7 +733,7 @@ function navigateToAttributeSource(attr: EntityAttribute) {
                 <span v-if="entity.mentionCount" class="mention-count-compact">{{ entity.mentionCount }}</span>
               </span>
             </div>
-            <Tag v-if="entity.mergedFromIds && entity.mergedFromIds.length > 0" severity="info" class="merged-dot" v-tooltip="'Fusionada'">
+            <Tag v-if="entity.mergedFromIds && entity.mergedFromIds.length > 0" v-tooltip="'Fusionada'" severity="info" class="merged-dot">
               <i class="pi pi-link"></i>
             </Tag>
           </div>
@@ -865,12 +865,12 @@ function navigateToAttributeSource(attr: EntityAttribute) {
                   <span v-if="attr.chapter" class="attribute-chapter">Cap. {{ attr.chapter }}</span>
                   <Button
                     v-if="attr.spanStart !== undefined && attr.spanStart !== null"
+                    v-tooltip="'Ver en el texto'"
                     icon="pi pi-search"
                     text
                     rounded
                     size="small"
                     class="attribute-nav-btn"
-                    v-tooltip="'Ver en el texto'"
                     @click.stop="navigateToAttributeSource(attr)"
                   />
                 </div>
@@ -927,25 +927,25 @@ function navigateToAttributeSource(attr: EntityAttribute) {
       <!-- Acciones globales flotantes -->
       <div class="floating-actions">
         <Button
+          v-tooltip.left="'Historial de fusiones'"
           icon="pi pi-history"
           text
           rounded
           @click="showMergeHistory = true"
-          v-tooltip.left="'Historial de fusiones'"
         />
         <Button
+          v-tooltip.left="'Exportar entidades'"
           icon="pi pi-download"
           text
           rounded
           @click="exportEntities"
-          v-tooltip.left="'Exportar entidades'"
         />
         <Button
+          v-tooltip.left="'Actualizar'"
           icon="pi pi-refresh"
           text
           rounded
           @click="emit('refresh')"
-          v-tooltip.left="'Actualizar'"
         />
       </div>
     </div>
@@ -965,11 +965,11 @@ function navigateToAttributeSource(attr: EntityAttribute) {
 
         <div class="field">
           <label>Tipo de entidad</label>
-          <Dropdown
+          <Select
             v-model="editingEntity.type"
             :options="entityTypeOptions"
-            optionLabel="label"
-            optionValue="value"
+            option-label="label"
+            option-value="value"
             class="w-full"
           />
         </div>
@@ -979,8 +979,8 @@ function navigateToAttributeSource(attr: EntityAttribute) {
           <SelectButton
             v-model="editingEntity.importance"
             :options="importanceEditOptions"
-            optionLabel="label"
-            optionValue="value"
+            option-label="label"
+            option-value="value"
           />
         </div>
 
@@ -1031,7 +1031,7 @@ function navigateToAttributeSource(attr: EntityAttribute) {
     />
 
     <!-- Panel de historial de fusiones -->
-    <Sidebar
+    <Drawer
       v-model:visible="showMergeHistory"
       position="right"
       :style="{ width: '400px' }"
@@ -1042,7 +1042,7 @@ function navigateToAttributeSource(attr: EntityAttribute) {
         :project-id="projectId"
         @undo="onUndoMergeFromHistory"
       />
-    </Sidebar>
+    </Drawer>
   </div>
 </template>
 

@@ -2,7 +2,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
-import Dropdown from 'primevue/dropdown'
+import Select from 'primevue/select'
 import MultiSelect from 'primevue/multiselect'
 import Dialog from 'primevue/dialog'
 import DsBadge from '@/components/ds/DsBadge.vue'
@@ -320,38 +320,38 @@ function handleNavigateFromSequential(source?: AlertSource) {
         <MultiSelect
           v-model="selectedSeverities"
           :options="severityOptions"
-          optionLabel="label"
-          optionValue="value"
+          option-label="label"
+          option-value="value"
           placeholder="Severidad"
           class="severity-filter"
-          :maxSelectedLabels="2"
+          :max-selected-labels="2"
         />
 
         <MultiSelect
           v-if="categoryOptions.length > 0"
           v-model="selectedCategories"
           :options="categoryOptions"
-          optionLabel="label"
-          optionValue="value"
+          option-label="label"
+          option-value="value"
           placeholder="Categoría"
           class="category-filter"
-          :maxSelectedLabels="2"
+          :max-selected-labels="2"
         />
 
-        <Dropdown
+        <Select
           v-model="selectedChapter"
           :options="chapterOptions"
-          optionLabel="label"
-          optionValue="value"
+          option-label="label"
+          option-value="value"
           placeholder="Capítulo"
           class="chapter-filter"
         />
 
-        <Dropdown
+        <Select
           v-model="minConfidence"
           :options="confidenceOptions"
-          optionLabel="label"
-          optionValue="value"
+          option-label="label"
+          option-value="value"
           placeholder="Confianza"
           class="confidence-filter"
         />
@@ -361,8 +361,8 @@ function handleNavigateFromSequential(source?: AlertSource) {
         <MultiSelect
           v-model="selectedStatuses"
           :options="statusOptions"
-          optionLabel="label"
-          optionValue="value"
+          option-label="label"
+          option-value="value"
           placeholder="Estado"
           class="status-filter"
         />
@@ -386,48 +386,48 @@ function handleNavigateFromSequential(source?: AlertSource) {
         </span>
 
         <Button
+          v-tooltip="'Configurar detectores'"
           icon="pi pi-sliders-h"
           text
           rounded
           @click="emit('open-correction-config')"
-          v-tooltip="'Configurar detectores'"
         />
 
         <Button
+          v-tooltip="'Actualizar'"
           icon="pi pi-refresh"
           text
           rounded
           @click="emit('refresh')"
-          v-tooltip="'Actualizar'"
         />
 
         <Button
+          v-tooltip="'Exportar alertas'"
           icon="pi pi-download"
           text
           rounded
-          @click="exportAlerts"
-          v-tooltip="'Exportar alertas'"
           :disabled="alerts.length === 0"
+          @click="exportAlerts"
         />
 
         <Button
+          v-tooltip="'Resolver todas las activas'"
           icon="pi pi-check-circle"
           text
           rounded
           severity="success"
-          @click="handleResolveAll"
-          v-tooltip="'Resolver todas las activas'"
           :disabled="stats.active === 0"
+          @click="handleResolveAll"
         />
 
         <Button
+          v-tooltip="'Revisar alertas una por una'"
           icon="pi pi-list-check"
           label="Modo secuencial"
           severity="info"
           size="small"
-          @click="sequentialMode.enter({ statuses: ['active'] })"
-          v-tooltip="'Revisar alertas una por una'"
           :disabled="stats.active === 0"
+          @click="sequentialMode.enter({ statuses: ['active'] })"
         />
       </div>
     </div>
@@ -494,30 +494,30 @@ function handleNavigateFromSequential(source?: AlertSource) {
 
           <div class="alert-actions">
             <Button
+              v-tooltip="'Ver en texto'"
               icon="pi pi-eye"
               text
               rounded
               size="small"
               @click.stop="emit('alert-navigate', alert)"
-              v-tooltip="'Ver en texto'"
             />
             <Button
+              v-tooltip="'Resolver'"
               icon="pi pi-check"
               text
               rounded
               size="small"
               severity="success"
               @click.stop="emit('alert-resolve', alert)"
-              v-tooltip="'Resolver'"
             />
             <Button
+              v-tooltip="'Descartar'"
               icon="pi pi-times"
               text
               rounded
               size="small"
               severity="secondary"
               @click.stop="emit('alert-dismiss', alert)"
-              v-tooltip="'Descartar'"
             />
           </div>
         </div>
@@ -526,10 +526,10 @@ function handleNavigateFromSequential(source?: AlertSource) {
     <!-- Diálogo de confirmación para resolver todas -->
     <Dialog
       :visible="showResolveAllDialog"
-      @update:visible="showResolveAllDialog = $event"
       header="Resolver todas las alertas"
       :modal="true"
       :style="{ width: '400px' }"
+      @update:visible="showResolveAllDialog = $event"
     >
       <p>
         ¿Estás seguro de que deseas marcar como resueltas todas las
@@ -547,13 +547,13 @@ function handleNavigateFromSequential(source?: AlertSource) {
     <!-- Modo de corrección secuencial -->
     <Dialog
       :visible="sequentialMode.active.value"
-      @update:visible="!$event && sequentialMode.exit()"
       :modal="true"
       :closable="false"
-      :showHeader="false"
+      :show-header="false"
       :style="{ width: '95vw', maxWidth: '1000px', height: '90vh' }"
-      :contentStyle="{ padding: 0, height: '100%', display: 'flex', flexDirection: 'column' }"
+      :content-style="{ padding: 0, height: '100%', display: 'flex', flexDirection: 'column' }"
       :pt="{ root: { class: 'sequential-dialog' } }"
+      @update:visible="!$event && sequentialMode.exit()"
     >
       <SequentialCorrectionMode
         :current-alert="sequentialMode.currentAlert.value"

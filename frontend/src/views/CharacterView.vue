@@ -4,11 +4,11 @@
     <div class="view-header">
       <div class="header-left">
         <Button
+          v-tooltip.right="'Volver'"
           icon="pi pi-arrow-left"
           text
           rounded
           @click="goBack"
-          v-tooltip.right="'Volver'"
         />
         <div class="header-info">
           <h1>{{ entityTypeTitle }}</h1>
@@ -77,8 +77,8 @@
           <SelectButton
             v-model="editingCharacter.importance"
             :options="importanceOptions"
-            optionLabel="label"
-            optionValue="value"
+            option-label="label"
+            option-value="value"
           />
         </div>
 
@@ -117,11 +117,11 @@
       <div class="edit-dialog">
         <div class="field">
           <label>Categoría</label>
-          <Dropdown
+          <Select
             v-model="newAttribute.category"
             :options="attributeCategories"
-            optionLabel="label"
-            optionValue="value"
+            option-label="label"
+            option-value="value"
             class="w-full"
             disabled
           />
@@ -180,11 +180,11 @@
       <div class="edit-dialog">
         <div class="field">
           <label>Personaje relacionado *</label>
-          <Dropdown
+          <Select
             v-model="newRelationship.relatedEntityId"
             :options="availableCharacters"
-            optionLabel="name"
-            optionValue="id"
+            option-label="name"
+            option-value="id"
             placeholder="Seleccionar personaje"
             class="w-full"
             filter
@@ -193,11 +193,11 @@
 
         <div class="field">
           <label>Tipo de relación *</label>
-          <Dropdown
+          <Select
             v-model="newRelationship.relationshipType"
             :options="relationshipTypes"
-            optionLabel="label"
-            optionValue="value"
+            option-label="label"
+            option-value="value"
             placeholder="Seleccionar tipo"
             class="w-full"
           />
@@ -251,7 +251,7 @@ import Message from 'primevue/message'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
-import Dropdown from 'primevue/dropdown'
+import Select from 'primevue/select'
 import SelectButton from 'primevue/selectbutton'
 import Chips from 'primevue/chips'
 import Textarea from 'primevue/textarea'

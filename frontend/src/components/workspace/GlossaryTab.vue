@@ -17,7 +17,7 @@ import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import DsInput from '@/components/ds/DsInput.vue'
 import Textarea from 'primevue/textarea'
-import Dropdown from 'primevue/dropdown'
+import Select from 'primevue/select'
 import Dialog from 'primevue/dialog'
 import Chips from 'primevue/chips'
 import Checkbox from 'primevue/checkbox'
@@ -379,11 +379,11 @@ async function exportForPublication() {
         class="glossary-tab__search"
       />
 
-      <Dropdown
+      <Select
         v-model="selectedCategory"
         :options="categoryOptions"
-        optionLabel="label"
-        optionValue="value"
+        option-label="label"
+        option-value="value"
         placeholder="Categoría"
         class="glossary-tab__category-filter"
       />
@@ -417,10 +417,10 @@ async function exportForPublication() {
         v-else
         :value="filteredEntries"
         :loading="loading"
-        dataKey="id"
-        stripedRows
+        data-key="id"
+        striped-rows
         scrollable
-        scrollHeight="calc(100vh - 300px)"
+        scroll-height="calc(100vh - 300px)"
         class="glossary-tab__table"
       >
         <Column field="term" header="Término" sortable style="min-width: 150px">
@@ -529,7 +529,7 @@ async function exportForPublication() {
       modal
       :style="{ width: '600px' }"
       :closable="!saving"
-      :closeOnEscape="!saving"
+      :close-on-escape="!saving"
     >
       <div v-if="editingEntry" class="glossary-dialog">
         <!-- Término -->
@@ -571,12 +571,12 @@ async function exportForPublication() {
         <!-- Categoría -->
         <div class="glossary-dialog__field">
           <label for="category">Categoría</label>
-          <Dropdown
+          <Select
             id="category"
             v-model="editingEntry.category"
             :options="categoryOptions.filter(o => o.value)"
-            optionLabel="label"
-            optionValue="value"
+            option-label="label"
+            option-value="value"
             placeholder="Seleccionar categoría"
             class="w-full"
           />

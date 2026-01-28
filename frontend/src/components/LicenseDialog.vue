@@ -4,7 +4,7 @@
     modal
     :closable="canClose"
     :draggable="false"
-    :blockScroll="true"
+    :block-scroll="true"
     class="license-dialog"
     :header="dialogTitle"
     :style="{ width: '500px' }"
@@ -37,8 +37,8 @@
           icon="pi pi-check"
           :loading="licenseStore.loading"
           :disabled="!licenseKey.trim()"
-          @click="handleActivate"
           class="activate-button"
+          @click="handleActivate"
         />
       </div>
 
@@ -155,8 +155,8 @@
         text
         size="small"
         label="Volver"
-        @click="currentView = 'status'"
         class="back-button"
+        @click="currentView = 'status'"
       />
 
       <h4>Dispositivos registrados</h4>
@@ -193,10 +193,10 @@
         </div>
       </div>
 
-      <p class="devices-hint" v-if="licenseStore.devicesRemaining > 0">
+      <p v-if="licenseStore.devicesRemaining > 0" class="devices-hint">
         Puedes registrar {{ licenseStore.devicesRemaining }} dispositivo(s) mas.
       </p>
-      <p class="devices-hint devices-full" v-else>
+      <p v-else class="devices-hint devices-full">
         Has alcanzado el limite de dispositivos. Desactiva uno para usar otro.
       </p>
     </div>
@@ -208,8 +208,8 @@
         text
         size="small"
         label="Volver"
-        @click="currentView = 'status'"
         class="back-button"
+        @click="currentView = 'status'"
       />
 
       <h4>Uso del Periodo Actual</h4>
@@ -237,7 +237,7 @@
           </div>
         </div>
 
-        <div class="usage-remaining" v-if="!licenseStore.usage.unlimited">
+        <div v-if="!licenseStore.usage.unlimited" class="usage-remaining">
           <template v-if="licenseStore.usage.manuscripts_remaining > 0">
             <i class="pi pi-check-circle success-icon"></i>
             <span>Te quedan <strong>{{ licenseStore.usage.manuscripts_remaining }}</strong> manuscritos este periodo</span>
@@ -248,7 +248,7 @@
           </template>
         </div>
 
-        <div class="usage-remaining" v-else>
+        <div v-else class="usage-remaining">
           <i class="pi pi-infinity success-icon"></i>
           <span>Manuscritos ilimitados con tu plan</span>
         </div>
@@ -265,7 +265,7 @@
     </div>
 
     <!-- Footer -->
-    <template #footer v-if="currentView === 'status'">
+    <template v-if="currentView === 'status'" #footer>
       <div class="dialog-footer">
         <Button label="Cerrar" @click="close" />
       </div>

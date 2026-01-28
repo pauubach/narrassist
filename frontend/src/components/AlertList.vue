@@ -9,12 +9,12 @@
       <div class="header-actions">
         <Button
           v-if="showRefresh"
+          v-tooltip.bottom="'Recargar'"
           icon="pi pi-refresh"
           text
           rounded
           size="small"
           @click="$emit('refresh')"
-          v-tooltip.bottom="'Recargar'"
         />
       </div>
     </div>
@@ -55,8 +55,8 @@
         <SelectButton
           v-model="selectedCategory"
           :options="categoryOptions"
-          optionLabel="label"
-          optionValue="value"
+          option-label="label"
+          option-value="value"
         />
       </div>
 
@@ -65,8 +65,8 @@
         <SelectButton
           v-model="selectedStatus"
           :options="statusOptions"
-          optionLabel="label"
-          optionValue="value"
+          option-label="label"
+          option-value="value"
         />
       </div>
     </div>
@@ -96,7 +96,7 @@
     <VirtualScroller
       v-else-if="shouldVirtualize"
       :items="filteredAlerts"
-      :itemSize="compact ? 120 : 180"
+      :item-size="compact ? 120 : 180"
       class="alerts-container alerts-virtual"
       :class="{ 'compact': compact }"
     >
@@ -294,7 +294,7 @@
     <div v-if="showPagination && totalPages > 1" class="pagination">
       <Paginator
         :rows="itemsPerPage"
-        :totalRecords="filteredAlerts.length"
+        :total-records="filteredAlerts.length"
         @page="onPageChange"
       />
     </div>

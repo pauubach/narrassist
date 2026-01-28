@@ -132,8 +132,8 @@
             <SelectButton
               v-model="severityFilter"
               :options="severityOptions"
-              optionLabel="label"
-              optionValue="value"
+              option-label="label"
+              option-value="value"
             />
           </div>
 
@@ -147,13 +147,13 @@
               <div class="issue-header">
                 <Tag :severity="getSeverityColor(issue.severity)" :value="getSeverityLabel(issue.severity)" />
                 <Tag severity="secondary" :value="getIssueTypeLabel(issue.issue_type)" />
-                <span class="issue-chapter" v-if="issue.title">
+                <span v-if="issue.title" class="issue-chapter">
                   {{ issue.title }}
                 </span>
               </div>
               <p class="issue-description">{{ issue.description }}</p>
-              <p class="issue-explanation" v-if="issue.explanation">{{ issue.explanation }}</p>
-              <p class="issue-suggestion" v-if="issue.suggestion">
+              <p v-if="issue.explanation" class="issue-explanation">{{ issue.explanation }}</p>
+              <p v-if="issue.suggestion" class="issue-suggestion">
                 <i class="pi pi-lightbulb"></i> {{ issue.suggestion }}
               </p>
             </div>

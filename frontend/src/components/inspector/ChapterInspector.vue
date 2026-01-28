@@ -220,13 +220,13 @@ function getEventIcon(eventType: string): string {
     <!-- Header with back button -->
     <div class="inspector-header">
       <Button
+        v-tooltip.bottom="'Volver al documento'"
         icon="pi pi-arrow-left"
         text
         rounded
         size="small"
-        @click="emit('back-to-document')"
-        v-tooltip.bottom="'Volver al documento'"
         class="back-button"
+        @click="emit('back-to-document')"
       />
       <div class="chapter-badge">
         <i class="pi pi-book"></i>
@@ -367,8 +367,8 @@ function getEventIcon(eventType: string): string {
               icon="pi pi-list"
               size="small"
               text
-              @click="emit('view-alerts')"
               class="view-alerts-btn"
+              @click="emit('view-alerts')"
             />
           </AccordionContent>
         </AccordionPanel>

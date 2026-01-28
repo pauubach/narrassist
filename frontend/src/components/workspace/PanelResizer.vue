@@ -86,7 +86,7 @@ function handleKeyDown(event: KeyboardEvent) {
   width: 8px;
   cursor: col-resize;
   flex-shrink: 0;
-  z-index: var(--ds-z-fixed);
+  z-index: 2;
 }
 
 .panel-resizer::before {

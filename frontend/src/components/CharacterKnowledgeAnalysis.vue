@@ -10,11 +10,11 @@
         </Tag>
       </div>
       <div class="header-actions">
-        <Dropdown
+        <Select
           v-model="selectedMode"
           :options="modeOptions"
-          optionLabel="label"
-          optionValue="value"
+          option-label="label"
+          option-value="value"
           placeholder="Modo"
           class="mode-selector"
           size="small"
@@ -29,13 +29,13 @@
         />
         <Button
           v-if="knowledge"
+          v-tooltip.bottom="'Actualizar'"
           icon="pi pi-refresh"
           text
           rounded
           size="small"
           :loading="loading"
           @click="loadKnowledge"
-          v-tooltip.bottom="'Actualizar'"
         />
       </div>
     </div>
@@ -200,7 +200,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
-import Dropdown from 'primevue/dropdown'
+import Select from 'primevue/select'
 import TabView from 'primevue/tabview'
 import TabPanel from 'primevue/tabpanel'
 import ProgressSpinner from 'primevue/progressspinner'

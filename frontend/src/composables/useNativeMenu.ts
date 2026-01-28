@@ -134,7 +134,7 @@ export function useNativeMenu(handlers: MenuEventHandlers = {}) {
 
   onMounted(async () => {
     // Solo configurar listener si estamos en Tauri
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const win = window as any
     if (typeof window !== 'undefined' && '__TAURI__' in window) {
       try {

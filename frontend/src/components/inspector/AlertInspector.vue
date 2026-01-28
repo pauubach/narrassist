@@ -191,13 +191,13 @@ function getSourceLocation(source: AlertSource): string {
           <Button
             v-for="(source, index) in alertSources"
             :key="index"
+            v-tooltip.top="getSourceLocation(source)"
             :label="getSourceLabel(source)"
             icon="pi pi-arrow-right"
             size="small"
             outlined
-            @click="emit('navigate', source)"
-            v-tooltip.top="getSourceLocation(source)"
             class="source-btn"
+            @click="emit('navigate', source)"
           />
         </div>
       </div>

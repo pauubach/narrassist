@@ -20,13 +20,13 @@
         />
         <Button
           v-if="profile"
+          v-tooltip.bottom="'Actualizar'"
           icon="pi pi-refresh"
           text
           rounded
           size="small"
           :loading="loading"
           @click="loadProfile"
-          v-tooltip.bottom="'Actualizar'"
         />
       </div>
     </div>
@@ -77,7 +77,7 @@
             <span class="metric-name">Exclamaciones</span>
             <ProgressBar
               :value="profile.metrics.exclamationRatio * 100"
-              :showValue="false"
+              :show-value="false"
               style="height: 8px; width: 100px"
             />
             <span class="metric-percent">{{ formatPercent(profile.metrics.exclamationRatio) }}</span>
@@ -86,7 +86,7 @@
             <span class="metric-name">Muletillas</span>
             <ProgressBar
               :value="profile.metrics.fillerRatio * 100"
-              :showValue="false"
+              :show-value="false"
               style="height: 8px; width: 100px"
             />
             <span class="metric-percent">{{ formatPercent(profile.metrics.fillerRatio) }}</span>

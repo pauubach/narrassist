@@ -6,13 +6,13 @@
         Historial de Fusiones
       </h3>
       <Button
+        v-tooltip.left="'Actualizar'"
         icon="pi pi-refresh"
         text
         rounded
         size="small"
-        @click="loadHistory"
         :loading="loading"
-        v-tooltip.left="'Actualizar'"
+        @click="loadHistory"
       />
     </div>
 

@@ -17,13 +17,13 @@
         />
         <Button
           v-if="profile"
+          v-tooltip.bottom="'Re-analizar'"
           icon="pi pi-refresh"
           text
           rounded
           size="small"
           :loading="loading"
           @click="analyzeEmotions"
-          v-tooltip.bottom="'Re-analizar'"
         />
       </div>
     </div>
@@ -65,15 +65,15 @@
       </div>
 
       <!-- Emotional Evolution Timeline -->
-      <div class="profile-section" v-if="profile.evolution && profile.evolution.length > 0">
+      <div v-if="profile.evolution && profile.evolution.length > 0" class="profile-section">
         <h4><i class="pi pi-chart-line"></i> Evolución Emocional</h4>
         <div class="evolution-timeline">
           <div
             v-for="evo in profile.evolution"
             :key="evo.chapter"
+            v-tooltip.top="getEvolutionTooltip(evo)"
             class="evolution-point"
             :class="{ 'has-incoherence': evo.has_incoherences }"
-            v-tooltip.top="getEvolutionTooltip(evo)"
           >
             <div class="point-marker">
               <span class="chapter-num">{{ evo.chapter }}</span>
@@ -88,7 +88,7 @@
       </div>
 
       <!-- Emotional States -->
-      <div class="profile-section" v-if="profile.emotional_states && profile.emotional_states.length > 0">
+      <div v-if="profile.emotional_states && profile.emotional_states.length > 0" class="profile-section">
         <h4>
           <i class="pi pi-list"></i>
           Estados Emocionales
@@ -119,7 +119,7 @@
       </div>
 
       <!-- Incoherences -->
-      <div class="profile-section incoherences-section" v-if="profile.incoherences && profile.incoherences.length > 0">
+      <div v-if="profile.incoherences && profile.incoherences.length > 0" class="profile-section incoherences-section">
         <h4>
           <i class="pi pi-exclamation-triangle"></i>
           Incoherencias Detectadas

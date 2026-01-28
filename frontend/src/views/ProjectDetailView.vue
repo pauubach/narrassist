@@ -21,22 +21,23 @@
           <div class="header-info">
             <h1>{{ project.name }}</h1>
             <div class="header-meta">
-              <span class="doc-name" v-if="originalDocumentName">{{ originalDocumentName }}</span>
+              <span v-if="originalDocumentName" class="doc-name">{{ originalDocumentName }}</span>
               <DocumentTypeChip
                 :project-id="project.id"
                 @type-changed="onDocumentTypeChanged"
+                @open-correction-settings="correctionConfigModalRef?.show()"
               />
             </div>
           </div>
         </div>
         <div class="header-actions">
           <Button
+            v-tooltip.bottom="'Exportar Guía de Estilo'"
             icon="pi pi-book"
             outlined
-            @click="quickExportStyleGuide"
             :loading="exportingStyleGuide"
-            v-tooltip.bottom="'Exportar Guía de Estilo'"
             class="style-guide-btn"
+            @click="quickExportStyleGuide"
           />
           <Button label="Exportar" icon="pi pi-download" outlined @click="showExportDialog = true" />
           <Button
@@ -51,18 +52,24 @@
       <!-- Export Dialog -->
       <ExportDialog
         :visible="showExportDialog"
-        @update:visible="showExportDialog = $event"
         :project-id="project.id"
         :project-name="project.name"
+        @update:visible="showExportDialog = $event"
+      />
+
+      <!-- Correction Config Modal -->
+      <CorrectionConfigModal
+        ref="correctionConfigModalRef"
+        :project-id="project.id"
       />
 
       <!-- Analyze/Reanalyze Confirmation Dialog -->
       <Dialog
         :visible="showReanalyzeDialog"
-        @update:visible="showReanalyzeDialog = $event"
         :header="hasBeenAnalyzed ? 'Re-analizar documento' : 'Analizar documento'"
         :modal="true"
         :style="{ width: '450px' }"
+        @update:visible="showReanalyzeDialog = $event"
       >
         <p class="reanalyze-info">
           <i class="pi pi-info-circle"></i>
@@ -106,8 +113,8 @@
                   :key="tab"
                   class="sidebar-tab-btn"
                   :class="{ active: sidebarTab === tab }"
-                  @click="sidebarTab = tab"
                   :title="getSidebarTabTitle(tab)"
+                  @click="sidebarTab = tab"
                 >
                   <i :class="getSidebarTabIcon(tab)"></i>
                   <span v-if="tab === 'alerts' && alertsCount > 0" class="sidebar-badge">
@@ -229,7 +236,7 @@
             @alert-resolve="onAlertResolve"
             @alert-dismiss="onAlertDismiss"
             @refresh="loadAlerts(project.id)"
-            @open-correction-config="workspaceStore.openCorrectionConfig()"
+            @open-correction-config="correctionConfigModalRef?.show()"
           />
 
           <!-- Tab Timeline -->
@@ -292,13 +299,13 @@
               <div class="inspector-header">
                 <span class="inspector-title">{{ inspectorTitle }}</span>
                 <Button
+                  v-if="selectionStore.hasSelection"
+                  v-tooltip="'Cerrar'"
                   icon="pi pi-times"
                   text
                   rounded
                   size="small"
                   @click="selectionStore.clearAll()"
-                  v-if="selectionStore.hasSelection"
-                  v-tooltip="'Cerrar'"
                 />
               </div>
 
@@ -396,6 +403,7 @@ import { TimelineView } from '@/components/timeline'
 import { ChaptersPanel, AlertsPanel, CharactersPanel, AssistantPanel } from '@/components/sidebar'
 import { ProjectSummary, EntityInspector, AlertInspector, ChapterInspector, TextSelectionInspector } from '@/components/inspector'
 import DocumentTypeChip from '@/components/DocumentTypeChip.vue'
+import CorrectionConfigModal from '@/components/workspace/CorrectionConfigModal.vue'
 import type { SidebarTab } from '@/stores/workspace'
 import type { Entity, Alert, Chapter, AlertSource } from '@/types'
 import { transformEntities, transformAlerts, transformChapters } from '@/types/transformers'
@@ -415,6 +423,7 @@ const loading = ref(true)
 const error = ref('')
 const showExportDialog = ref(false)
 const showReanalyzeDialog = ref(false)
+const correctionConfigModalRef = ref<InstanceType<typeof CorrectionConfigModal> | null>(null)
 const reanalyzing = ref(false)
 const exportingStyleGuide = ref(false)
 const entities = ref<Entity[]>([])

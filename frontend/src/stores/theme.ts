@@ -67,7 +67,7 @@ export interface PresetInfo {
   name: string
   description: string
   category: 'general' | 'writing'
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   value: any // Los presets de PrimeVue tienen tipos complejos
 }
 

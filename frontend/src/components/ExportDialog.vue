@@ -26,35 +26,35 @@
             <span class="sections-label">Secciones a incluir:</span>
             <div class="sections-grid">
               <div class="checkbox-item">
-                <Checkbox v-model="documentOptions.includeCharacters" :binary="true" inputId="docCharacters" />
+                <Checkbox v-model="documentOptions.includeCharacters" :binary="true" input-id="docCharacters" />
                 <label for="docCharacters">
                   <i class="pi pi-users"></i>
                   Personajes
                 </label>
               </div>
               <div class="checkbox-item">
-                <Checkbox v-model="documentOptions.includeAlerts" :binary="true" inputId="docAlerts" />
+                <Checkbox v-model="documentOptions.includeAlerts" :binary="true" input-id="docAlerts" />
                 <label for="docAlerts">
                   <i class="pi pi-exclamation-triangle"></i>
                   Alertas
                 </label>
               </div>
               <div class="checkbox-item">
-                <Checkbox v-model="documentOptions.includeTimeline" :binary="true" inputId="docTimeline" />
+                <Checkbox v-model="documentOptions.includeTimeline" :binary="true" input-id="docTimeline" />
                 <label for="docTimeline">
                   <i class="pi pi-clock"></i>
                   Timeline
                 </label>
               </div>
               <div class="checkbox-item">
-                <Checkbox v-model="documentOptions.includeRelationships" :binary="true" inputId="docRelationships" />
+                <Checkbox v-model="documentOptions.includeRelationships" :binary="true" input-id="docRelationships" />
                 <label for="docRelationships">
                   <i class="pi pi-sitemap"></i>
                   Relaciones
                 </label>
               </div>
               <div class="checkbox-item">
-                <Checkbox v-model="documentOptions.includeStyleGuide" :binary="true" inputId="docStyleGuide" />
+                <Checkbox v-model="documentOptions.includeStyleGuide" :binary="true" input-id="docStyleGuide" />
                 <label for="docStyleGuide">
                   <i class="pi pi-book"></i>
                   Guia de estilo
@@ -66,11 +66,11 @@
           <!-- Opciones de filtrado -->
           <div class="filter-options">
             <div class="checkbox-item">
-              <Checkbox v-model="documentOptions.onlyMainCharacters" :binary="true" inputId="docOnlyMain" />
+              <Checkbox v-model="documentOptions.onlyMainCharacters" :binary="true" input-id="docOnlyMain" />
               <label for="docOnlyMain">Solo personajes principales</label>
             </div>
             <div class="checkbox-item">
-              <Checkbox v-model="documentOptions.onlyOpenAlerts" :binary="true" inputId="docOnlyOpen" />
+              <Checkbox v-model="documentOptions.onlyOpenAlerts" :binary="true" input-id="docOnlyOpen" />
               <label for="docOnlyOpen">Solo alertas abiertas</label>
             </div>
           </div>
@@ -84,18 +84,26 @@
             <div class="preview-row">
               <span class="preview-label">Contenido:</span>
               <div class="preview-content-tags">
-                <Tag v-if="documentPreview.sections?.characters?.count > 0"
-                     :value="documentPreview.sections.characters.count + ' personajes'"
-                     severity="secondary" />
-                <Tag v-if="documentPreview.sections?.alerts?.count > 0"
-                     :value="documentPreview.sections.alerts.count + ' alertas'"
-                     severity="secondary" />
-                <Tag v-if="documentPreview.sections?.timeline?.event_count > 0"
-                     :value="documentPreview.sections.timeline.event_count + ' eventos'"
-                     severity="secondary" />
-                <Tag v-if="documentPreview.sections?.relationships?.count > 0"
-                     :value="documentPreview.sections.relationships.count + ' relaciones'"
-                     severity="secondary" />
+                <Tag
+                  v-if="documentPreview.sections?.characters?.count > 0"
+                  :value="documentPreview.sections.characters.count + ' personajes'"
+                  severity="secondary"
+                />
+                <Tag
+                  v-if="documentPreview.sections?.alerts?.count > 0"
+                  :value="documentPreview.sections.alerts.count + ' alertas'"
+                  severity="secondary"
+                />
+                <Tag
+                  v-if="documentPreview.sections?.timeline?.event_count > 0"
+                  :value="documentPreview.sections.timeline.event_count + ' eventos'"
+                  severity="secondary"
+                />
+                <Tag
+                  v-if="documentPreview.sections?.relationships?.count > 0"
+                  :value="documentPreview.sections.relationships.count + ' relaciones'"
+                  severity="secondary"
+                />
               </div>
             </div>
           </div>
@@ -107,15 +115,15 @@
                 label="DOCX (Word)"
                 icon="pi pi-file-word"
                 :outlined="documentFormat !== 'docx'"
-                @click="documentFormat = 'docx'"
                 size="small"
+                @click="documentFormat = 'docx'"
               />
               <Button
                 label="PDF"
                 icon="pi pi-file-pdf"
                 :outlined="documentFormat !== 'pdf'"
-                @click="documentFormat = 'pdf'"
                 size="small"
+                @click="documentFormat = 'pdf'"
               />
             </div>
           </div>
@@ -125,16 +133,16 @@
               label="Vista previa"
               icon="pi pi-eye"
               severity="secondary"
-              @click="loadDocumentPreview"
               :loading="loadingDocPreview"
               size="small"
+              @click="loadDocumentPreview"
             />
             <Button
               label="Exportar documento"
               icon="pi pi-download"
-              @click="exportDocument"
               :loading="loadingDocument"
               class="flex-grow-1"
+              @click="exportDocument"
             />
           </div>
         </template>
@@ -159,14 +167,14 @@
               <Button
                 label="Markdown"
                 :outlined="reportFormat !== 'markdown'"
-                @click="reportFormat = 'markdown'"
                 size="small"
+                @click="reportFormat = 'markdown'"
               />
               <Button
                 label="JSON"
                 :outlined="reportFormat !== 'json'"
-                @click="reportFormat = 'json'"
                 size="small"
+                @click="reportFormat = 'json'"
               />
             </div>
           </div>
@@ -174,9 +182,9 @@
           <Button
             label="Exportar informe"
             icon="pi pi-download"
-            @click="exportReport"
             :loading="loadingReport"
             class="export-button"
+            @click="exportReport"
           />
         </template>
       </Card>
@@ -196,15 +204,15 @@
 
           <div class="export-checkboxes">
             <div class="checkbox-item">
-              <Checkbox v-model="characterOptions.onlyMain" :binary="true" inputId="onlyMain" />
+              <Checkbox v-model="characterOptions.onlyMain" :binary="true" input-id="onlyMain" />
               <label for="onlyMain">Solo personajes principales</label>
             </div>
             <div class="checkbox-item">
-              <Checkbox v-model="characterOptions.includeAttributes" :binary="true" inputId="includeAttr" />
+              <Checkbox v-model="characterOptions.includeAttributes" :binary="true" input-id="includeAttr" />
               <label for="includeAttr">Incluir atributos</label>
             </div>
             <div class="checkbox-item">
-              <Checkbox v-model="characterOptions.includeMentions" :binary="true" inputId="includeMent" />
+              <Checkbox v-model="characterOptions.includeMentions" :binary="true" input-id="includeMent" />
               <label for="includeMent">Incluir apariciones destacadas</label>
             </div>
           </div>
@@ -215,14 +223,14 @@
               <Button
                 label="Markdown"
                 :outlined="characterFormat !== 'markdown'"
-                @click="characterFormat = 'markdown'"
                 size="small"
+                @click="characterFormat = 'markdown'"
               />
               <Button
                 label="JSON"
                 :outlined="characterFormat !== 'json'"
-                @click="characterFormat = 'json'"
                 size="small"
+                @click="characterFormat = 'json'"
               />
             </div>
           </div>
@@ -230,9 +238,9 @@
           <Button
             label="Exportar fichas"
             icon="pi pi-download"
-            @click="exportCharacterSheets"
             :loading="loadingCharacters"
             class="export-button"
+            @click="exportCharacterSheets"
           />
         </template>
       </Card>
@@ -245,24 +253,24 @@
             <span>Guía de Estilo</span>
             <Button
               v-if="!showStylePreview"
+              v-tooltip="'Ver preview'"
               icon="pi pi-eye"
               text
               rounded
               size="small"
-              @click="loadStylePreview"
               :loading="loadingPreview"
-              v-tooltip="'Ver preview'"
               class="preview-btn"
+              @click="loadStylePreview"
             />
             <Button
               v-else
+              v-tooltip="'Ocultar preview'"
               icon="pi pi-eye-slash"
               text
               rounded
               size="small"
-              @click="showStylePreview = false"
-              v-tooltip="'Ocultar preview'"
               class="preview-btn"
+              @click="showStylePreview = false"
             />
           </div>
         </template>
@@ -291,7 +299,7 @@
                 <i class="pi pi-building"></i>
                 <span>{{ stylePreview.organizations_count }} organizaciones</span>
               </div>
-              <div class="preview-stat" v-if="stylePreview.total_spelling_variants > 0">
+              <div v-if="stylePreview.total_spelling_variants > 0" class="preview-stat">
                 <i class="pi pi-pencil"></i>
                 <span>{{ stylePreview.total_spelling_variants }} variantes de grafía</span>
               </div>
@@ -330,20 +338,20 @@
               <Button
                 label="Markdown"
                 :outlined="styleFormat !== 'markdown'"
-                @click="styleFormat = 'markdown'"
                 size="small"
+                @click="styleFormat = 'markdown'"
               />
               <Button
                 label="JSON"
                 :outlined="styleFormat !== 'json'"
-                @click="styleFormat = 'json'"
                 size="small"
+                @click="styleFormat = 'json'"
               />
               <Button
                 label="PDF"
                 :outlined="styleFormat !== 'pdf'"
-                @click="styleFormat = 'pdf'"
                 size="small"
+                @click="styleFormat = 'pdf'"
               />
             </div>
           </div>
@@ -351,9 +359,9 @@
           <Button
             label="Exportar guía de estilo"
             icon="pi pi-download"
-            @click="exportStyleGuide"
             :loading="loadingStyle"
             class="export-button"
+            @click="exportStyleGuide"
           />
         </template>
       </Card>
@@ -373,11 +381,11 @@
 
           <div class="export-checkboxes">
             <div class="checkbox-item">
-              <Checkbox v-model="alertOptions.includePending" :binary="true" inputId="pendingAlerts" />
+              <Checkbox v-model="alertOptions.includePending" :binary="true" input-id="pendingAlerts" />
               <label for="pendingAlerts">Incluir pendientes</label>
             </div>
             <div class="checkbox-item">
-              <Checkbox v-model="alertOptions.includeResolved" :binary="true" inputId="resolvedAlerts" />
+              <Checkbox v-model="alertOptions.includeResolved" :binary="true" input-id="resolvedAlerts" />
               <label for="resolvedAlerts">Incluir resueltas</label>
             </div>
           </div>
@@ -388,14 +396,14 @@
               <Button
                 label="JSON"
                 :outlined="alertFormat !== 'json'"
-                @click="alertFormat = 'json'"
                 size="small"
+                @click="alertFormat = 'json'"
               />
               <Button
                 label="CSV"
                 :outlined="alertFormat !== 'csv'"
-                @click="alertFormat = 'csv'"
                 size="small"
+                @click="alertFormat = 'csv'"
               />
             </div>
           </div>
@@ -403,9 +411,9 @@
           <Button
             label="Exportar alertas"
             icon="pi pi-download"
-            @click="exportAlerts"
             :loading="loadingAlerts"
             class="export-button"
+            @click="exportAlerts"
           />
         </template>
       </Card>

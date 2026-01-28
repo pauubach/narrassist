@@ -80,9 +80,9 @@
         label="Deshacer Fusion"
         icon="pi pi-replay"
         severity="warning"
-        @click="confirmUndo"
         :loading="undoing"
         :disabled="!mergeHistory"
+        @click="confirmUndo"
       />
     </template>
   </Dialog>

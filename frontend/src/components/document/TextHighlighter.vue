@@ -427,7 +427,7 @@ function handleMouseUp() {
           <span class="popup-type" :class="activeErrorPopup.alert.category">
             {{ activeErrorPopup.alert.category === 'grammar' ? 'Error de gramatica' : 'Error de ortografia' }}
           </span>
-          <button class="popup-close" @click="closeErrorPopup" aria-label="Cerrar">
+          <button class="popup-close" aria-label="Cerrar" @click="closeErrorPopup">
             <i class="pi pi-times"></i>
           </button>
         </div>

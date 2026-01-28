@@ -12,20 +12,20 @@
           clearable
           class="search-input"
         />
-        <Dropdown
+        <Select
           v-model="sortBy"
           :options="sortOptions"
-          optionLabel="label"
-          optionValue="value"
+          option-label="label"
+          option-value="value"
           placeholder="Ordenar por"
           class="sort-dropdown"
-          appendTo="self"
+          append-to="self"
         />
         <Button
           label="Nuevo Proyecto"
           icon="pi pi-plus"
-          @click="showCreateDialog = true"
           severity="success"
+          @click="showCreateDialog = true"
         />
       </div>
     </div>
@@ -43,8 +43,8 @@
         <Button
           label="Reintentar"
           icon="pi pi-refresh"
-          @click="loadProjects"
           text
+          @click="loadProjects"
         />
       </Message>
 
@@ -56,14 +56,13 @@
         <Button
           label="Crear Primer Proyecto"
           icon="pi pi-plus"
-          @click="showCreateDialog = true"
           size="large"
+          @click="showCreateDialog = true"
         />
       </div>
 
       <!-- Estado: Lista de proyectos -->
       <div v-else class="projects-list">
-
         <!-- Grid de proyectos -->
         <div class="projects-grid">
           <Card
@@ -124,7 +123,7 @@
               <ProgressBar
                 v-if="(project.analysisProgress ?? 0) < 100"
                 :value="project.analysisProgress ?? 0"
-                :showValue="false"
+                :show-value="false"
                 class="mt-3"
               />
             </template>
@@ -182,11 +181,11 @@
           <FileUpload
             mode="basic"
             accept=".docx,.doc,.txt,.md,.pdf,.epub"
-            :maxFileSize="50000000"
+            :max-file-size="50000000"
             :auto="false"
-            chooseLabel="Seleccionar archivo"
-            @select="onFileSelect"
+            choose-label="Seleccionar archivo"
             :class="{ 'p-invalid': !newProject.file && showValidation }"
+            @select="onFileSelect"
           />
           <small class="p-text-secondary">
             Formatos soportados: DOCX, DOC, TXT, MD, PDF, EPUB (máx. 50 MB)
@@ -220,14 +219,14 @@
         <Button
           label="Cancelar"
           icon="pi pi-times"
-          @click="closeCreateDialog"
           text
+          @click="closeCreateDialog"
         />
         <Button
           label="Crear y Analizar"
           icon="pi pi-check"
-          @click="createProject"
           :loading="creatingProject"
+          @click="createProject"
         />
       </template>
     </Dialog>
@@ -249,7 +248,7 @@ import InputText from 'primevue/inputtext'
 import Textarea from 'primevue/textarea'
 import DsInput from '@/components/ds/DsInput.vue'
 import FileUpload from 'primevue/fileupload'
-import Dropdown from 'primevue/dropdown'
+import Select from 'primevue/select'
 import ProgressBar from 'primevue/progressbar'
 import ProgressSpinner from 'primevue/progressspinner'
 import Message from 'primevue/message'

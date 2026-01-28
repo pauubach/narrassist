@@ -3,37 +3,37 @@
     <!-- Toolbar -->
     <div class="vis-toolbar">
       <div class="toolbar-left">
-        <Dropdown
+        <Select
           v-model="groupBy"
           :options="groupByOptions"
-          optionLabel="label"
-          optionValue="value"
+          option-label="label"
+          option-value="value"
           placeholder="Agrupar por"
           class="group-dropdown"
         />
         <Button
+          v-tooltip.bottom="'Acercar'"
           icon="pi pi-search-plus"
           text
           rounded
           size="small"
           @click="zoomIn"
-          v-tooltip.bottom="'Acercar'"
         />
         <Button
+          v-tooltip.bottom="'Alejar'"
           icon="pi pi-search-minus"
           text
           rounded
           size="small"
           @click="zoomOut"
-          v-tooltip.bottom="'Alejar'"
         />
         <Button
+          v-tooltip.bottom="'Ver todo'"
           icon="pi pi-arrows-h"
           text
           rounded
           size="small"
           @click="fitAll"
-          v-tooltip.bottom="'Ver todo'"
         />
       </div>
       <div class="toolbar-right">
@@ -85,7 +85,7 @@ import { Timeline } from 'vis-timeline/standalone'
 import { DataSet } from 'vis-data/standalone'
 import type { TimelineOptions, DataItem, DataGroup } from 'vis-timeline'
 import Button from 'primevue/button'
-import Dropdown from 'primevue/dropdown'
+import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import type { TimelineEvent as DomainTimelineEvent, NarrativeOrder } from '@/types'
 

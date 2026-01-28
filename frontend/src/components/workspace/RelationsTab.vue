@@ -63,7 +63,7 @@ function handleEntitySelect(entityId: number) {
     <RelationshipGraph
       :project-id="projectId"
       :data="relationships"
-      @entitySelect="handleEntitySelect"
+      @entity-select="handleEntitySelect"
     />
   </div>
 </template>

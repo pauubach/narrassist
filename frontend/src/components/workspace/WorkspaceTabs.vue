@@ -59,9 +59,9 @@ const allTabs: TabConfig[] = [
   { id: 'text', label: 'Texto', icon: 'pi pi-file-edit', configKey: 'text' },
   { id: 'entities', label: 'Entidades', icon: 'pi pi-users', configKey: 'entities' },
   { id: 'relationships', label: 'Relaciones', icon: 'pi pi-share-alt', configKey: 'relations' },
-  { id: 'alerts', label: 'Alertas', icon: 'pi pi-exclamation-triangle', configKey: 'alerts' },
-  { id: 'timeline', label: 'Timeline', icon: 'pi pi-clock', configKey: 'timeline' },
-  { id: 'style', label: 'Estilo', icon: 'pi pi-pencil', configKey: 'style' },
+  { id: 'alerts', label: 'Revisión', icon: 'pi pi-search', configKey: 'alerts' },
+  { id: 'timeline', label: 'Cronología', icon: 'pi pi-clock', configKey: 'timeline' },
+  { id: 'style', label: 'Escritura', icon: 'pi pi-pencil', configKey: 'style' },
   { id: 'glossary', label: 'Glosario', icon: 'pi pi-book', configKey: 'text' },
   { id: 'summary', label: 'Resumen', icon: 'pi pi-chart-bar', configKey: 'text' },
 ]

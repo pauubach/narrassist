@@ -12,22 +12,22 @@
         </p>
       </div>
       <div class="header-controls">
-        <Dropdown
+        <Select
           v-model="filterType"
           :options="sceneTypeOptions"
-          optionLabel="label"
-          optionValue="value"
+          option-label="label"
+          option-value="value"
           placeholder="Filtrar por tipo"
-          showClear
+          show-clear
           class="filter-dropdown"
         />
-        <Dropdown
+        <Select
           v-model="filterTone"
           :options="toneOptions"
-          optionLabel="label"
-          optionValue="value"
+          option-label="label"
+          option-value="value"
           placeholder="Filtrar por tono"
-          showClear
+          show-clear
           class="filter-dropdown"
         />
       </div>
@@ -94,7 +94,7 @@
               <span class="chapter-title">
                 <i class="pi pi-book"></i>
                 Capítulo {{ chapterNum }}
-                <span class="chapter-subtitle" v-if="chapterScenes[0]?.chapter_title">
+                <span v-if="chapterScenes[0]?.chapter_title" class="chapter-subtitle">
                   - {{ chapterScenes[0].chapter_title }}
                 </span>
               </span>
@@ -162,19 +162,19 @@
 
                 <div class="scene-actions">
                   <Button
+                    v-tooltip.top="'Etiquetar'"
                     icon="pi pi-tag"
                     text
                     rounded
                     size="small"
-                    v-tooltip.top="'Etiquetar'"
                     @click="openTagDialog(scene)"
                   />
                   <Button
+                    v-tooltip.top="'Añadir etiqueta personalizada'"
                     icon="pi pi-plus"
                     text
                     rounded
                     size="small"
-                    v-tooltip.top="'Añadir etiqueta personalizada'"
                     @click="openCustomTagDialog(scene)"
                   />
                 </div>
@@ -217,39 +217,39 @@
       <div class="tag-form">
         <div class="form-field">
           <label>Tipo de escena</label>
-          <Dropdown
+          <Select
             v-model="tagForm.scene_type"
             :options="sceneTypeOptions"
-            optionLabel="label"
-            optionValue="value"
+            option-label="label"
+            option-value="value"
             placeholder="Seleccionar tipo"
-            showClear
+            show-clear
             class="w-full"
           />
         </div>
 
         <div class="form-field">
           <label>Tono emocional</label>
-          <Dropdown
+          <Select
             v-model="tagForm.tone"
             :options="toneOptions"
-            optionLabel="label"
-            optionValue="value"
+            option-label="label"
+            option-value="value"
             placeholder="Seleccionar tono"
-            showClear
+            show-clear
             class="w-full"
           />
         </div>
 
         <div class="form-field">
           <label>Ubicación</label>
-          <Dropdown
+          <Select
             v-model="tagForm.location_entity_id"
             :options="locationEntities"
-            optionLabel="name"
-            optionValue="id"
+            option-label="name"
+            option-value="id"
             placeholder="Seleccionar ubicación"
-            showClear
+            show-clear
             class="w-full"
           />
         </div>
@@ -259,8 +259,8 @@
           <MultiSelect
             v-model="tagForm.participant_ids"
             :options="characterEntities"
-            optionLabel="name"
-            optionValue="id"
+            option-label="name"
+            option-value="id"
             placeholder="Seleccionar personajes"
             class="w-full"
           />
@@ -289,7 +289,7 @@
 
       <template #footer>
         <Button label="Cancelar" text @click="showTagDialog = false" />
-        <Button label="Guardar" icon="pi pi-check" @click="saveSceneTags" :loading="saving" />
+        <Button label="Guardar" icon="pi pi-check" :loading="saving" @click="saveSceneTags" />
       </template>
     </Dialog>
 
@@ -306,9 +306,9 @@
           <AutoComplete
             v-model="customTagForm.name"
             :suggestions="tagSuggestions"
-            @complete="searchTags"
             placeholder="Ej: importante, revisar, clave..."
             class="w-full"
+            @complete="searchTags"
           />
         </div>
         <div class="form-field">
@@ -322,9 +322,9 @@
         <Button
           label="Añadir"
           icon="pi pi-plus"
-          @click="saveCustomTag"
           :loading="saving"
           :disabled="!customTagForm.name?.trim()"
+          @click="saveCustomTag"
         />
       </template>
     </Dialog>
@@ -341,7 +341,7 @@ import AccordionPanel from 'primevue/accordionpanel'
 import AccordionHeader from 'primevue/accordionheader'
 import AccordionContent from 'primevue/accordioncontent'
 import Dialog from 'primevue/dialog'
-import Dropdown from 'primevue/dropdown'
+import Select from 'primevue/select'
 import MultiSelect from 'primevue/multiselect'
 import Textarea from 'primevue/textarea'
 import AutoComplete from 'primevue/autocomplete'

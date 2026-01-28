@@ -1,12 +1,12 @@
 <template>
-  <div class="document-viewer" ref="viewerContainer">
+  <div ref="viewerContainer" class="document-viewer">
     <!-- Diálogo de exportación -->
     <Dialog
       :visible="showExportDialog"
-      @update:visible="showExportDialog = $event"
       modal
       header="Exportar Documento"
       :style="{ width: '400px' }"
+      @update:visible="showExportDialog = $event"
     >
       <div class="export-options">
         <p>Selecciona el formato de exportación:</p>
@@ -51,14 +51,14 @@
       <div class="toolbar-right">
         <!-- Toggle errores de ortografia -->
         <Button
+          v-tooltip.bottom="showSpellingErrors ? 'Ocultar errores de ortografia' : 'Mostrar errores de ortografia'"
           :icon="showSpellingErrors ? 'pi pi-check-square' : 'pi pi-stop'"
           :text="!showSpellingErrors"
           :outlined="showSpellingErrors"
           rounded
           size="small"
-          @click="showSpellingErrors = !showSpellingErrors"
-          v-tooltip.bottom="showSpellingErrors ? 'Ocultar errores de ortografia' : 'Mostrar errores de ortografia'"
           :class="{ 'spelling-toggle-active': showSpellingErrors }"
+          @click="showSpellingErrors = !showSpellingErrors"
         >
           <template #icon>
             <span class="toggle-icon spelling-icon">Aa</span>
@@ -66,14 +66,14 @@
         </Button>
         <!-- Toggle errores de gramatica -->
         <Button
+          v-tooltip.bottom="showGrammarErrors ? 'Ocultar errores de gramatica' : 'Mostrar errores de gramatica'"
           :icon="showGrammarErrors ? 'pi pi-check-square' : 'pi pi-stop'"
           :text="!showGrammarErrors"
           :outlined="showGrammarErrors"
           rounded
           size="small"
-          @click="showGrammarErrors = !showGrammarErrors"
-          v-tooltip.bottom="showGrammarErrors ? 'Ocultar errores de gramatica' : 'Mostrar errores de gramatica'"
           :class="{ 'grammar-toggle-active': showGrammarErrors }"
+          @click="showGrammarErrors = !showGrammarErrors"
         >
           <template #icon>
             <i class="pi pi-language"></i>
@@ -81,13 +81,13 @@
         </Button>
         <!-- Toggle atribución de diálogos -->
         <Button
+          v-tooltip.bottom="showDialoguePanel ? 'Ocultar atribución de diálogos' : 'Mostrar atribución de diálogos'"
           :text="!showDialoguePanel"
           :outlined="showDialoguePanel"
           rounded
           size="small"
-          @click="showDialoguePanel = !showDialoguePanel"
-          v-tooltip.bottom="showDialoguePanel ? 'Ocultar atribución de diálogos' : 'Mostrar atribución de diálogos'"
           :class="{ 'dialogue-toggle-active': showDialoguePanel }"
+          @click="showDialoguePanel = !showDialoguePanel"
         >
           <template #icon>
             <i class="pi pi-comments"></i>
@@ -95,11 +95,11 @@
         </Button>
         <span class="toolbar-divider"></span>
         <Button
+          v-tooltip.bottom="'Exportar'"
           icon="pi pi-download"
           text
           rounded
           @click="exportDocument"
-          v-tooltip.bottom="'Exportar'"
         />
       </div>
     </div>
@@ -153,13 +153,13 @@
       </div>
     </div>
 
-    <!-- Sidebar para atribución de diálogos -->
-    <Sidebar
+    <!-- Drawer para atribución de diálogos -->
+    <Drawer
       :visible="showDialoguePanel"
-      @update:visible="showDialoguePanel = $event"
       position="right"
       :style="{ width: '400px' }"
       header="Atribución de Diálogos"
+      @update:visible="showDialoguePanel = $event"
     >
       <DialogueAttributionPanel
         v-if="showDialoguePanel"
@@ -167,7 +167,7 @@
         :chapters="chaptersForPanel"
         @select-dialogue="onDialogueSelected"
       />
-    </Sidebar>
+    </Drawer>
   </div>
 </template>
 
@@ -175,7 +175,7 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick, watchEffect } from 'vue'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
-import Sidebar from 'primevue/sidebar'
+import Drawer from 'primevue/drawer'
 import ProgressSpinner from 'primevue/progressspinner'
 import { useToast } from 'primevue/usetoast'
 import type { Chapter } from '@/types'
