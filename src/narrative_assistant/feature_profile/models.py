@@ -23,6 +23,72 @@ class DocumentType(str, Enum):
     DRAMA = "DRA"             # Teatro/guion
 
 
+# Mapeo bidireccional entre códigos cortos (BD) y largos (clasificador/frontend)
+_TYPE_CODE_TO_LONG = {
+    "FIC": "fiction",
+    "MEM": "memoir",
+    "BIO": "biography",
+    "CEL": "celebrity",
+    "DIV": "divulgation",
+    "ENS": "essay",
+    "AUT": "self_help",
+    "TEC": "technical",
+    "PRA": "practical",
+    "GRA": "graphic",
+    "INF": "children",
+    "DRA": "drama",
+}
+_TYPE_LONG_TO_CODE = {v: k for k, v in _TYPE_CODE_TO_LONG.items()}
+
+
+def normalize_document_type(type_str: str) -> str:
+    """
+    Normaliza un código de tipo de documento al formato corto (FIC, MEM, etc.)
+
+    Acepta tanto códigos cortos como largos:
+    - "FIC" -> "FIC"
+    - "fiction" -> "FIC"
+    - "FICTION" -> "FIC"
+
+    Args:
+        type_str: Código de tipo en cualquier formato
+
+    Returns:
+        Código corto normalizado o el original si no se reconoce
+    """
+    if not type_str:
+        return "FIC"  # Default
+
+    upper = type_str.upper()
+    lower = type_str.lower()
+
+    # Ya es código corto
+    if upper in _TYPE_CODE_TO_LONG:
+        return upper
+
+    # Es código largo
+    if lower in _TYPE_LONG_TO_CODE:
+        return _TYPE_LONG_TO_CODE[lower]
+
+    # Intentar por nombre del enum
+    try:
+        return DocumentType[upper].value
+    except KeyError:
+        pass
+
+    return type_str  # No reconocido, devolver original
+
+
+def type_code_to_long(code: str) -> str:
+    """Convierte código corto (FIC) a largo (fiction)."""
+    return _TYPE_CODE_TO_LONG.get(code.upper(), code.lower())
+
+
+def type_long_to_code(long_name: str) -> str:
+    """Convierte código largo (fiction) a corto (FIC)."""
+    return _TYPE_LONG_TO_CODE.get(long_name.lower(), long_name.upper())
+
+
 class FeatureAvailability(str, Enum):
     """Niveles de disponibilidad de una feature."""
     ENABLED = "enabled"       # Activa por defecto
