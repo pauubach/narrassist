@@ -121,8 +121,11 @@
               <span class="attribute-name">{{ getAttributeLabel(attr.name) }}</span>
               <span class="attribute-value">{{ attr.value }}</span>
             </div>
-            <div v-if="attr.firstMentionChapter" class="attribute-meta">
-              <small>Primera aparición: {{ formatChapterLabel(attr.firstMentionChapter) }}</small>
+            <div v-if="getChaptersLabel(attr)" class="attribute-meta">
+              <small>
+                <i class="pi pi-book"></i>
+                {{ getChaptersLabel(attr) }}
+              </small>
             </div>
             <Button
               v-if="editable"
@@ -292,6 +295,19 @@ function getAttributeLabel(key: string): string {
 }
 
 const { formatChapterLabel } = useAlertUtils()
+
+function getChaptersLabel(attr: CharacterAttribute): string | null {
+  if (attr.chapters && attr.chapters.length > 0) {
+    const labels = attr.chapters
+      .map((ch: number) => formatChapterLabel(ch))
+      .filter((label: string | null): label is string => label !== null)
+    return labels.length > 0 ? labels.join(', ') : null
+  }
+  if (attr.firstMentionChapter) {
+    return formatChapterLabel(attr.firstMentionChapter)
+  }
+  return null
+}
 
 interface TimelineEvent {
   chapter: number

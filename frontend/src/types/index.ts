@@ -59,6 +59,7 @@ export interface CharacterAttribute {
   name: string
   value: string
   firstMentionChapter?: number
+  chapters?: number[]
   confidence?: number
 }
 

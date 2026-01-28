@@ -549,6 +549,43 @@ class EntityRepository:
                 "chapter": row["chapter_number"],
             })
 
+        # Enriquecer cada atributo con la lista de capítulos donde aparece
+        # (desde attribute_evidences, no solo desde source_mention)
+        if result:
+            attr_ids = [a["id"] for a in result]
+            placeholders = ",".join("?" * len(attr_ids))
+            evidence_rows = self.db.fetchall(
+                f"""
+                SELECT attribute_id, chapter
+                FROM attribute_evidences
+                WHERE attribute_id IN ({placeholders})
+                  AND chapter IS NOT NULL
+                ORDER BY attribute_id, chapter
+                """,
+                tuple(attr_ids),
+            )
+
+            # Agrupar capítulos por attribute_id
+            chapters_by_attr: dict[int, list[int]] = {}
+            for ev_row in evidence_rows:
+                attr_id = ev_row["attribute_id"]
+                ch = ev_row["chapter"]
+                if attr_id not in chapters_by_attr:
+                    chapters_by_attr[attr_id] = []
+                if ch not in chapters_by_attr[attr_id]:
+                    chapters_by_attr[attr_id].append(ch)
+
+            for attr in result:
+                evidence_chapters = chapters_by_attr.get(attr["id"], [])
+                # Usar evidencias si existen, sino el capítulo de source_mention
+                if evidence_chapters:
+                    attr["chapters"] = sorted(evidence_chapters)
+                elif attr["chapter"] is not None:
+                    attr["chapters"] = [attr["chapter"]]
+                else:
+                    attr["chapters"] = []
+                attr["firstMentionChapter"] = attr["chapters"][0] if attr["chapters"] else attr["chapter"]
+
         return result
 
     def update_attribute(
