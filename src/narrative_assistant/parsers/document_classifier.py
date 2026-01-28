@@ -207,6 +207,10 @@ class DocumentClassifier:
         "autobiographical": 1.5,
     }
 
+    # Configuración de muestreo múltiple
+    SAMPLE_POSITIONS = [0.10, 0.50, 0.90]  # 10%, 50%, 90% del documento
+    SAMPLE_SIZE = 5000  # Caracteres por muestra
+
     def classify(
         self,
         text: str,
@@ -216,26 +220,35 @@ class DocumentClassifier:
         """
         Clasifica un documento basándose en su contenido.
 
+        Usa muestreo múltiple (10%, 50%, 90% del documento) para evitar
+        sesgos por preámbulos, índices o secciones no representativas.
+
         Args:
-            text: Texto del documento (primeros ~10000 caracteres son suficientes)
+            text: Texto del documento completo
             title: Título del documento (opcional, ayuda en clasificación)
             metadata: Metadatos adicionales (opcional)
 
         Returns:
             DocumentClassification con tipo, confianza e indicadores
         """
-        # Usar solo una muestra del texto para eficiencia
-        sample = text[:10000] if len(text) > 10000 else text
-        sample_lower = sample.lower()
+        # Obtener muestras del documento en múltiples posiciones
+        samples = self._get_samples(text)
+        combined_sample = "\n".join(samples)
+        sample_lower = combined_sample.lower()
+
+        logger.debug(
+            f"Clasificando documento: {len(text)} chars, "
+            f"{len(samples)} muestras de ~{len(combined_sample)} chars total"
+        )
 
         # Calcular puntuación para cada tipo
         scores = {
-            DocumentType.FICTION: self._score_fiction(sample, sample_lower),
-            DocumentType.SELF_HELP: self._score_self_help(sample, sample_lower),
-            DocumentType.ESSAY: self._score_essay(sample, sample_lower),
-            DocumentType.TECHNICAL: self._score_technical(sample, sample_lower),
-            DocumentType.COOKBOOK: self._score_cookbook(sample, sample_lower),
-            DocumentType.MEMOIR: self._score_memoir(sample, sample_lower),
+            DocumentType.FICTION: self._score_fiction(combined_sample, sample_lower),
+            DocumentType.SELF_HELP: self._score_self_help(combined_sample, sample_lower),
+            DocumentType.ESSAY: self._score_essay(combined_sample, sample_lower),
+            DocumentType.TECHNICAL: self._score_technical(combined_sample, sample_lower),
+            DocumentType.COOKBOOK: self._score_cookbook(combined_sample, sample_lower),
+            DocumentType.MEMOIR: self._score_memoir(combined_sample, sample_lower),
         }
 
         # Añadir pistas del título si existe
@@ -265,6 +278,44 @@ class DocumentClassifier:
             indicators=indicators[:5],  # Top 5 indicadores
             recommended_settings=self._get_settings_for_type(best_type),
         )
+
+    def _get_samples(self, text: str) -> list[str]:
+        """
+        Extrae muestras del documento en múltiples posiciones.
+
+        Para documentos cortos (<15000 chars), usa el texto completo.
+        Para documentos largos, extrae muestras en 10%, 50% y 90% del texto.
+
+        Args:
+            text: Texto completo del documento
+
+        Returns:
+            Lista de muestras de texto
+        """
+        text_len = len(text)
+
+        # Si el documento es corto, usar todo
+        if text_len <= self.SAMPLE_SIZE * 3:
+            return [text]
+
+        samples = []
+        for position in self.SAMPLE_POSITIONS:
+            start = int(text_len * position)
+            # Ajustar para no cortar palabras (buscar espacio cercano)
+            if start > 0:
+                # Buscar inicio de palabra/oración
+                space_pos = text.find(" ", start)
+                if space_pos != -1 and space_pos - start < 100:
+                    start = space_pos + 1
+
+            end = min(start + self.SAMPLE_SIZE, text_len)
+            sample = text[start:end]
+
+            # Evitar muestras duplicadas si el documento es pequeño
+            if sample and sample not in samples:
+                samples.append(sample)
+
+        return samples if samples else [text[:self.SAMPLE_SIZE]]
 
     def _count_matches(
         self,
