@@ -29,7 +29,7 @@ SCHEMA_VERSION = 10
 # Solo incluir las tablas básicas definidas en SCHEMA_SQL
 ESSENTIAL_TABLES = {
     'projects', 'chapters', 'entities', 'entity_mentions',
-    'alerts', 'sessions'
+    'alerts', 'sessions', 'correction_config_overrides'
 }
 
 # SQL de creación de tablas

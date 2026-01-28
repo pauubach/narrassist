@@ -940,6 +940,7 @@ const resetAll = () => {
 
 const loadConfig = async () => {
   loading.value = true
+
   try {
     let url: string
     if (props.editingDefaults && props.defaultsTypeCode) {
@@ -955,6 +956,7 @@ const loadConfig = async () => {
 
     const response = await fetch(apiUrl(url))
     const data = await response.json()
+
     if (data.success) {
       // En modo defaults, usar effective_config
       const configData = props.editingDefaults ? data.data.effective_config : data.data
@@ -1112,6 +1114,8 @@ const show = async () => {
   mainTabIndex.value = '0'
   paramTabIndex.value = '0'
   // Wait for Vue to update props before loading config
+  // Use double nextTick to ensure reactivity is fully processed
+  await nextTick()
   await nextTick()
   loadConfig()
 }
