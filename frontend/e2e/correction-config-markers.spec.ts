@@ -248,6 +248,32 @@ test.describe('Correction Config API - Persistence', () => {
     expect(config.dialog.detection_mode).toBe('auto')
   })
 
+  test('save auto value for all marker fields and verify persistence', async ({ request }) => {
+    if (!projectId) return
+
+    // Simulate: user selects anglo_saxon preset then changes individual fields to 'auto'
+    await saveProjectConfig(request, projectId, {
+      dialog: {
+        preset: 'anglo_saxon',
+        detection_mode: 'preset',
+        spoken_dialogue_dash: 'auto',
+        spoken_dialogue_quote: 'auto',
+        thoughts_quote: 'auto',
+        nested_dialogue_quote: 'auto',
+        textual_quote: 'auto',
+      },
+    })
+
+    // Verify ALL auto values persist correctly (not reverted to preset defaults)
+    const config = await getProjectConfig(request, projectId)
+    expect(config.dialog.preset).toBe('anglo_saxon')
+    expect(config.dialog.spoken_dialogue_dash).toBe('auto')
+    expect(config.dialog.spoken_dialogue_quote).toBe('auto')
+    expect(config.dialog.thoughts_quote).toBe('auto')
+    expect(config.dialog.nested_dialogue_quote).toBe('auto')
+    expect(config.dialog.textual_quote).toBe('auto')
+  })
+
   test('overwrite saved config with new values', async ({ request }) => {
     if (!projectId) return
 

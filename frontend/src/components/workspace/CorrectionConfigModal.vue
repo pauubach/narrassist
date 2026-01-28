@@ -1048,8 +1048,11 @@ const MARKER_PRESETS: Record<string, Record<string, string | boolean>> = {
   },
 }
 
-// Handler para cambio de preset
+// Handler para cambio de preset (solo por interacción del usuario)
 const onPresetChange = () => {
+  // Skip if triggered during config load (PrimeVue Select may fire @change on model update)
+  if (loading.value) return
+
   const preset = localConfig.value.dialog.preset
   markModified('dialog', 'preset')
   markModified('dialog', 'detection_mode')
@@ -1233,6 +1236,12 @@ const loadConfig = async () => {
         }
       }
     }
+
+    // Wait for Vue reactivity + PrimeVue component updates to process
+    // before clearing loading flag. This prevents Select @change from
+    // triggering onPresetChange and overwriting loaded field values.
+    await nextTick()
+    await nextTick()
   } catch (err) {
     console.error('Error loading correction config:', err)
     toast.add({
