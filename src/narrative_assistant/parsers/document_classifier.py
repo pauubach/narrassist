@@ -58,9 +58,10 @@ class DocumentClassification:
 FICTION_INDICATORS = {
     # Patrones de diálogo
     "dialog_markers": [
-        r'[—–-]\s*[A-ZÁÉÍÓÚÑ]',  # Guión largo seguido de mayúscula (diálogo)
+        r'--\s*[A-ZÁÉÍÓÚÑ¡¿]',  # Doble guión (clásico español: La Regenta, etc.)
+        r'[—–]\s*[A-ZÁÉÍÓÚÑ¡¿]',  # Guión largo/medio seguido de mayúscula o ¡¿
         r'"[^"]+"\s*[,\.]?\s*(dijo|preguntó|respondió|exclamó|murmuró|susurró)',
-        r'«[^»]+»',  # Comillas latinas
+        r'«[^»]+»',  # Comillas latinas (angulares)
     ],
     # Descripciones narrativas
     "narrative_descriptions": [
