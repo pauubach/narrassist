@@ -26,9 +26,10 @@ _database_lock = threading.Lock()
 SCHEMA_VERSION = 9
 
 # Tablas esenciales que deben existir para una BD válida
+# Solo incluir las tablas básicas definidas en SCHEMA_SQL
 ESSENTIAL_TABLES = {
     'projects', 'chapters', 'entities', 'entity_mentions',
-    'alerts', 'sessions', 'session_project_state', 'change_history'
+    'alerts', 'sessions'
 }
 
 # SQL de creación de tablas
