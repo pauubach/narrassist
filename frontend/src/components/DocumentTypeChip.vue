@@ -5,7 +5,7 @@
       :style="{ '--chip-color': documentType.type_color }"
       @click="togglePopover"
     >
-      <i :class="documentType.type_icon"></i>
+      <i :class="['pi', documentType.type_icon]"></i>
       <span class="chip-label">{{ documentType.type_name }}</span>
       <span v-if="documentType.subtype_name" class="chip-subtype">
         ({{ documentType.subtype_name }})
@@ -17,8 +17,8 @@
         <div class="type-selector-panel">
           <div class="panel-header">
             <span>Tipo de documento</span>
-            <small v-if="!documentType.confirmed" class="not-confirmed">
-              Sin confirmar
+            <small v-if="!documentType.confirmed" class="suggested-badge">
+              Sugerido
             </small>
           </div>
 
@@ -39,34 +39,37 @@
 
           <!-- Type list -->
           <div class="types-list">
-            <button
-              v-for="type in documentTypes"
-              :key="type.code"
-              class="type-option"
-              :class="{ selected: type.code === documentType.type }"
-              @click="selectType(type.code)"
-            >
-              <i :class="type.icon" :style="{ color: type.color }"></i>
-              <div class="type-info">
-                <span class="type-name">{{ type.name }}</span>
-                <span class="type-desc">{{ type.description }}</span>
+            <template v-for="type in documentTypes">
+              <button
+                :key="type.code"
+                class="type-option"
+                :class="{ selected: type.code === documentType.type }"
+                @click="selectType(type.code)"
+              >
+                <i :class="['pi', type.icon]" :style="{ color: type.color }"></i>
+                <div class="type-info">
+                  <span class="type-name">{{ type.name }}</span>
+                  <span class="type-desc">{{ type.description }}</span>
+                </div>
+                <i v-if="type.code === documentType.type" class="pi pi-check"></i>
+              </button>
+              <!-- Subtype selector inline (below selected type) -->
+              <div
+                v-if="type.code === documentType.type && type.subtypes && type.subtypes.length > 0"
+                :key="`${type.code}-subtypes`"
+                class="subtypes-inline"
+              >
+                <Dropdown
+                  v-model="selectedSubtype"
+                  :options="type.subtypes"
+                  optionLabel="name"
+                  optionValue="code"
+                  placeholder="Seleccionar subtipo"
+                  class="subtypes-dropdown"
+                  @change="onSubtypeChange"
+                />
               </div>
-              <i v-if="type.code === documentType.type" class="pi pi-check"></i>
-            </button>
-          </div>
-
-          <!-- Subtype selector (if type has subtypes) -->
-          <div v-if="selectedTypeSubtypes.length > 0" class="subtypes-section">
-            <div class="subtypes-header">Subtipo</div>
-            <Dropdown
-              v-model="selectedSubtype"
-              :options="selectedTypeSubtypes"
-              optionLabel="name"
-              optionValue="code"
-              placeholder="Seleccionar subtipo"
-              class="subtypes-dropdown"
-              @change="onSubtypeChange"
-            />
+            </template>
           </div>
         </div>
     </OverlayPanel>
@@ -74,7 +77,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import OverlayPanel from 'primevue/overlaypanel'
 import Dropdown from 'primevue/dropdown'
 import Button from 'primevue/button'
@@ -113,13 +116,6 @@ const documentType = ref<DocumentType | null>(null)
 const documentTypes = ref<TypeInfo[]>([])
 const selectedSubtype = ref<string | null>(null)
 const loading = ref(false)
-
-// Get subtypes for currently selected type
-const selectedTypeSubtypes = computed(() => {
-  if (!documentType.value) return []
-  const type = documentTypes.value.find(t => t.code === documentType.value?.type)
-  return type?.subtypes || []
-})
 
 const togglePopover = (event: Event) => {
   popoverRef.value?.toggle(event)
@@ -289,9 +285,10 @@ onMounted(() => {
   font-size: 0.875rem;
 }
 
-.not-confirmed {
+.suggested-badge {
   font-weight: 400;
-  color: var(--orange-500);
+  color: var(--text-color-secondary);
+  font-style: italic;
 }
 
 .mismatch-warning {
@@ -366,17 +363,10 @@ onMounted(() => {
   margin-top: 0.25rem;
 }
 
-.subtypes-section {
-  padding: 0.75rem 1rem;
-  border-top: 1px solid var(--surface-border);
-}
-
-.subtypes-header {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--text-color-secondary);
+.subtypes-inline {
+  margin-left: 2.125rem; /* Align with type name (icon width + gap) */
   margin-bottom: 0.5rem;
-  text-transform: uppercase;
+  padding: 0.25rem 0.75rem 0.5rem;
 }
 
 .subtypes-dropdown {

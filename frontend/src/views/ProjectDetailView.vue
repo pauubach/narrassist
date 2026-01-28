@@ -20,12 +20,14 @@
           <Button icon="pi pi-arrow-left" text rounded @click="goBack" />
           <div class="header-info">
             <h1>{{ project.name }}</h1>
-            <span class="doc-name" v-if="originalDocumentName">{{ originalDocumentName }}</span>
+            <div class="header-meta">
+              <span class="doc-name" v-if="originalDocumentName">{{ originalDocumentName }}</span>
+              <DocumentTypeChip
+                :project-id="project.id"
+                @type-changed="onDocumentTypeChanged"
+              />
+            </div>
           </div>
-          <DocumentTypeChip
-            :project-id="project.id"
-            @type-changed="onDocumentTypeChanged"
-          />
         </div>
         <div class="header-actions">
           <Button
@@ -1287,6 +1289,13 @@ const startReanalysis = async () => {
   font-weight: 600;
   margin: 0;
   color: var(--text-color);
+}
+
+.header-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
 }
 
 .doc-name {
