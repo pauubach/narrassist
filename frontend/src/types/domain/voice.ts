@@ -12,11 +12,19 @@
 export interface VoiceMetrics {
   avgInterventionLength: number
   stdInterventionLength: number
+  minInterventionLength: number
+  maxInterventionLength: number
   typeTokenRatio: number
+  hapaxLegomenaRatio: number
   formalityScore: number
+  formalMarkerCount: number
+  informalMarkerCount: number
   fillerRatio: number
   exclamationRatio: number
   questionRatio: number
+  ellipsisRatio: number
+  avgSentenceLength: number
+  subordinateClauseRatio: number
   totalInterventions: number
   totalWords: number
 }

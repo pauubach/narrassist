@@ -37,7 +37,7 @@ def _write_debug(msg):
             with open(temp_file, 'a', encoding='utf-8') as f:
                 f.write(f"{msg} (fallback - error: {e})\n")
                 f.flush()
-        except:
+        except Exception:
             pass
 
 _write_debug("="*80)
@@ -63,7 +63,7 @@ import shutil
 # Setup logging IMMEDIATELY for early debugging
 import logging
 
-BACKEND_VERSION = "0.3.18"
+BACKEND_VERSION = "0.3.19"
 IS_EMBEDDED_RUNTIME = os.environ.get("NA_EMBEDDED") == "1" or "python-embed" in (sys.executable or "").lower()
 
 # Configure logging FIRST before using any loggers
@@ -5345,13 +5345,13 @@ async def get_project_timeline(project_id: int, force_refresh: bool = False):
 
 
 @app.get("/api/projects/{project_id}/temporal-markers", response_model=ApiResponse)
-async def get_temporal_markers(project_id: int, chapter: Optional[int] = None):
+async def get_temporal_markers(project_id: int, chapter_number: Optional[int] = Query(None, description="Filtrar por número de capítulo")):
     """
     Obtiene los marcadores temporales detectados en el proyecto.
 
     Args:
         project_id: ID del proyecto
-        chapter: Filtrar por número de capítulo (opcional)
+        chapter_number: Filtrar por número de capítulo (opcional)
 
     Returns:
         ApiResponse con lista de marcadores temporales
@@ -5363,8 +5363,8 @@ async def get_temporal_markers(project_id: int, chapter: Optional[int] = None):
         # Obtener capítulos
         chapters = chapter_repository.get_by_project(project_id)
 
-        if chapter is not None:
-            chapters = [ch for ch in chapters if ch.chapter_number == chapter]
+        if chapter_number is not None:
+            chapters = [ch for ch in chapters if ch.chapter_number == chapter_number]
 
         if not chapters:
             return ApiResponse(
@@ -12720,13 +12720,31 @@ async def get_register_analysis(
                 "distribution": cs["registers"],
             })
 
+        # Compute aggregated stats
+        total_segs = summary.get("total_segments", 0)
+        distribution = summary.get("distribution", {})
+        dominant = summary.get("dominant_register")
+        if total_segs > 0 and dominant:
+            consistency_pct = round(distribution.get(dominant, 0) / total_segs * 100, 1)
+            distribution_pct = {
+                reg: round(count / total_segs * 100, 1)
+                for reg, count in distribution.items()
+            }
+        else:
+            consistency_pct = 100.0
+            distribution_pct = {}
+
         return ApiResponse(
             success=True,
             data={
                 "project_id": project_id,
                 "analyses": analyses_data,
                 "changes": changes_data,
-                "summary": summary,
+                "summary": {
+                    **summary,
+                    "consistency_pct": consistency_pct,
+                    "distribution_pct": distribution_pct,
+                },
                 "per_chapter": per_chapter,
                 "stats": {
                     "segments_analyzed": len(analyses),
@@ -12743,10 +12761,10 @@ async def get_register_analysis(
         return ApiResponse(success=False, error=str(e))
 
 
-@app.get("/api/projects/{project_id}/chapters/{chapter_num}/register-analysis", response_model=ApiResponse)
+@app.get("/api/projects/{project_id}/chapters/{chapter_number}/register-analysis", response_model=ApiResponse)
 async def get_chapter_register_analysis(
     project_id: int,
-    chapter_num: int,
+    chapter_number: int,
     min_severity: str = Query("low", description="Severidad mínima: low, medium, high")
 ):
     """
@@ -12775,10 +12793,10 @@ async def get_chapter_register_analysis(
 
         chapter_repo = get_chapter_repository()
         chapters = chapter_repo.get_by_project(project_id)
-        chapter = next((c for c in chapters if c.chapter_number == chapter_num), None)
+        chapter = next((c for c in chapters if c.chapter_number == chapter_number), None)
 
         if not chapter:
-            raise HTTPException(status_code=404, detail=f"Capítulo {chapter_num} no encontrado")
+            raise HTTPException(status_code=404, detail=f"Capítulo {chapter_number} no encontrado")
 
         # Detect dialogues
         dialogue_result = detect_dialogues(chapter.content)
@@ -12813,7 +12831,7 @@ async def get_chapter_register_analysis(
                 success=True,
                 data={
                     "project_id": project_id,
-                    "chapter_number": chapter_num,
+                    "chapter_number": chapter_number,
                     "analyses": [],
                     "changes": [],
                     "summary": {},
@@ -12877,7 +12895,7 @@ async def get_chapter_register_analysis(
             success=True,
             data={
                 "project_id": project_id,
-                "chapter_number": chapter_num,
+                "chapter_number": chapter_number,
                 "chapter_title": getattr(chapter, 'title', '') or '',
                 "analyses": analyses_data,
                 "changes": changes_data,
@@ -12899,8 +12917,8 @@ async def get_chapter_register_analysis(
         return ApiResponse(success=False, error=str(e))
 
 
-@app.get("/api/projects/{project_id}/chapters/{chapter_num}/dialogue-attributions", response_model=ApiResponse)
-async def get_dialogue_attributions(project_id: int, chapter_num: int):
+@app.get("/api/projects/{project_id}/chapters/{chapter_number}/dialogue-attributions", response_model=ApiResponse)
+async def get_dialogue_attributions(project_id: int, chapter_number: int):
     """
     Obtiene atribución de hablantes para los diálogos de un capítulo.
 
@@ -12931,10 +12949,10 @@ async def get_dialogue_attributions(project_id: int, chapter_num: int):
         # Obtener capítulo específico
         chapter_repo = get_chapter_repository()
         chapters = chapter_repo.get_by_project(project_id)
-        chapter = next((c for c in chapters if c.chapter_number == chapter_num), None)
+        chapter = next((c for c in chapters if c.chapter_number == chapter_number), None)
 
         if not chapter:
-            raise HTTPException(status_code=404, detail=f"Capítulo {chapter_num} no encontrado")
+            raise HTTPException(status_code=404, detail=f"Capítulo {chapter_number} no encontrado")
 
         # Obtener entidades (personajes)
         entity_repo = get_entity_repository()
@@ -12956,7 +12974,7 @@ async def get_dialogue_attributions(project_id: int, chapter_num: int):
                 success=True,
                 data={
                     "project_id": project_id,
-                    "chapter_num": chapter_num,
+                    "chapter_number": chapter_number,
                     "attributions": [],
                     "stats": {},
                     "message": "No se pudieron detectar diálogos"
@@ -12969,7 +12987,7 @@ async def get_dialogue_attributions(project_id: int, chapter_num: int):
                 success=True,
                 data={
                     "project_id": project_id,
-                    "chapter_num": chapter_num,
+                    "chapter_number": chapter_number,
                     "attributions": [],
                     "stats": {},
                     "message": "No hay diálogos en este capítulo"
@@ -13044,7 +13062,7 @@ async def get_dialogue_attributions(project_id: int, chapter_num: int):
             success=True,
             data={
                 "project_id": project_id,
-                "chapter_num": chapter_num,
+                "chapter_number": chapter_number,
                 "attributions": attributions_data,
                 "stats": stats,
             }
@@ -15194,15 +15212,15 @@ if __name__ == "__main__":
                 traceback.print_exc(file=f)
             
             print(f"\nError guardado en: {error_file}", file=sys.stderr)
-        except:
+        except Exception:
             pass
-        
+
         # Esperar solo si hay stdin disponible
         if sys.stdin and hasattr(sys.stdin, 'read'):
             try:
                 print("\nPresiona Enter para cerrar...", file=sys.stderr)
                 input()
-            except:
+            except Exception:
                 pass
         
         sys.exit(1)

@@ -21,14 +21,14 @@ Este documento define las funcionalidades **pendientes de implementar**. Para el
 
 | Feature | Backend | Completitud | Estado |
 |---------|---------|-------------|--------|
-| **Knowledge Tracking** | `character_knowledge.py` | 60% | Core `_extract_knowledge_facts()` vacío |
-| **Voice Profiles** | `voice/profiles.py` | 70% | API no devuelve todas las métricas |
+| ~~Knowledge Tracking~~ | `character_knowledge.py` | 85% | ✅ Extracción rules + LLM funcional (v0.3.19) |
+| ~~Voice Profiles~~ | `voice/profiles.py` | 85% | ✅ API expone 18 métricas (v0.3.19) |
 | ~~Register Analysis~~ | `voice/register.py` | 90% | ✅ Per-chapter (v0.3.14) + alertas (v0.3.17) |
 | ~~Speaker Attribution~~ | `voice/speaker_attribution.py` | 85% | ✅ Bug fix (v0.3.13) |
 | ~~Coreference Voting~~ | `coreference_resolver.py` | 95% | ✅ Razonamiento en API (v0.3.14) |
 | ~~Pacing Analysis~~ | `analysis/pacing.py` | 90% | ✅ Curva de tensión (v0.3.13) |
 
-**Esfuerzo restante**: Knowledge Tracking (módulo crítico) + Voice Profiles (API)
+**Esfuerzo restante**: Mejoras menores (benchmarks Knowledge, comparación Voice Profiles)
 
 #### Funcionalidades Nuevas
 
@@ -83,7 +83,7 @@ Este documento define las funcionalidades **pendientes de implementar**. Para el
 | Componentes Vue | 89 | 95+ | 110+ |
 | Tests | 966+ | 1,200+ | 2,000+ |
 | Idiomas UI | 1 (ES) | 1 (ES) | 3 (ES, EN, CA) |
-| Completitud módulos | 70-95% | 95% | 100% |
+| Completitud módulos | 85-95% | 95% | 100% |
 
 ---
 

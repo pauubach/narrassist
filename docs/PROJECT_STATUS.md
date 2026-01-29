@@ -606,8 +606,8 @@ cargo tauri build --target x86_64-pc-windows-msvc
 | Feature Backend | Módulo | Impacto |
 |-----------------|--------|---------|
 | ~~Correferencia Voting~~ | `nlp/coreference_resolver.py` | ✅ **Razonamiento expuesto en API (v0.3.14)** |
-| Knowledge Tracking | `analysis/character_knowledge.py` | Qué sabe cada personaje invisible (core vacío) |
-| Voice Profiles | `voice/profiles.py` | Análisis voz narrativa parcialmente expuesto |
+| ~~Knowledge Tracking~~ | `analysis/character_knowledge.py` | ✅ **Extracción rule-based + LLM funcional (v0.3.19)** |
+| ~~Voice Profiles~~ | `voice/profiles.py` | ✅ **18 métricas expuestas en API (v0.3.19)** |
 | ~~Voice Deviations~~ | `voice/deviations.py` | ✅ **Endpoint implementado (main.py:12408-12564)** |
 | ~~Register Analysis~~ | `voice/register.py` | ✅ **Análisis por capítulo (v0.3.14)** |
 | ~~Speaker Attribution~~ | `voice/speaker_attribution.py` | ✅ **Bug corregido (v0.3.13)** |
@@ -640,10 +640,10 @@ cargo tauri build --target x86_64-pc-windows-msvc
 |--------|-------------|-----------|--------|
 | **Coreference Resolver** | 95% | ✅ | Votación expuesta en API con razonamiento |
 | **Register Analysis** | 90% | ✅ | Análisis por capítulo implementado |
-| **Voice Profiles** | 70% | Media | Devolver todas las métricas |
+| **Voice Profiles** | 85% | ✅ | API expone 18 métricas completas (v0.3.19) |
 | **Speaker Attribution** | 85% | ✅ | Bug corregido en v0.3.13 |
 | **Pacing Analysis** | 90% | ✅ | Curva de tensión implementada |
-| **Character Knowledge** | 60% | 🎯 **CRÍTICA** | Core `_extract_knowledge_facts()` vacío |
+| **Character Knowledge** | 85% | ✅ | Extracción rules + LLM + hybrid funcional |
 | **Sticky Sentences** | 95% | ✅ | Integrado en pipeline unificado |
 
 ### Detalle por Módulo
@@ -676,16 +676,17 @@ cargo tauri build --target x86_64-pc-windows-msvc
 
 **Archivo**: `src/narrative_assistant/voice/register.py`
 
-#### Voice Profiles (70%)
+#### Voice Profiles (85%) ✅
 
 **✅ Implementado:**
-- `VoiceMetrics` dataclass con 17 métricas
+- `VoiceMetrics` dataclass con 18 métricas
 - `VoiceAnalyzer.analyze_voice()` calcula todas las métricas
 - `VoiceProfiler` para comparación entre personajes
+- `to_dict()` expone las 18 métricas completas (v0.3.19)
+- `characteristic_words` y `top_fillers` retornados en API
+- Frontend types y transformers sincronizados
 
 **❌ Falta:**
-- API no devuelve todas las métricas calculadas
-- `characteristic_words` y `top_fillers` no se retornan
 - Endpoint de comparación directa entre 2 personajes
 
 **Archivo**: `src/narrative_assistant/voice/profiles.py`
@@ -719,18 +720,22 @@ cargo tauri build --target x86_64-pc-windows-msvc
 
 **Archivo**: `src/narrative_assistant/analysis/pacing.py`
 
-#### Character Knowledge (60%) 🚨 CRÍTICO
+#### Character Knowledge (85%) ✅
 
 **✅ Implementado:**
-- `CharacterKnowledgeTracker` estructura básica
-- Detección de asimetrías
+- `CharacterKnowledgeAnalyzer` completo (1,128 líneas)
+- 5 enums: `MentionType`, `KnowledgeType`, `OpinionValence`, `IntentionType`, `KnowledgeExtractionMode`
+- 5 dataclasses: `DirectedMention`, `KnowledgeFact`, `Opinion`, `Intention`, `KnowledgeAsymmetryReport`
+- `extract_knowledge_facts()` con 3 modos: `RULES`, `LLM`, `HYBRID`
+- `_extract_knowledge_facts_rules()` - extracción regex (~70% accuracy)
+- `_extract_knowledge_facts_llm()` - extracción con Ollama (~90% accuracy)
+- Detección de asimetrías de conocimiento
 - `track_knowledge_flow()` funcional
+- API endpoint operativo (`/characters/{entity_id}/knowledge`)
 
-**❌ FALTA (CRÍTICO):**
-- `_extract_knowledge_facts()` **devuelve lista vacía** - core no implementado
-- No extrae hechos del texto narrativo
-- No distingue opiniones vs hechos
-- No detecta cuándo un personaje aprende algo nuevo
+**❌ Pendiente (menor):**
+- Benchmarks de precisión formales
+- Detección temporal: cuándo un personaje aprende algo nuevo
 
 **Archivo**: `src/narrative_assistant/analysis/character_knowledge.py`
 
@@ -738,14 +743,14 @@ cargo tauri build --target x86_64-pc-windows-msvc
 
 | Módulo | Estado | Notas |
 |--------|--------|-------|
-| Character Knowledge (core) | 60% | **BLOQUEANTE para UI Knowledge** - `_extract_knowledge_facts()` vacío |
-| Voice Profiles completo | 70% | Extender API con todas las métricas |
+| Character Knowledge | 85% | Extracción rules + LLM funcional. Falta: benchmarks formales |
+| Voice Profiles | 85% | ✅ API expone 18 métricas completas (v0.3.19) |
 | Register agregado | 90% | Solo falta distribución global |
 | Speaker Attribution + voice | 85% | ✅ Bug fix v0.3.13. Falta: voice matching con VoiceAnalyzer |
 | Coreference razonamiento | 95% | ✅ Completado v0.3.14. Falta: persistencia de correcciones manuales |
 | Pacing tension curve | 90% | ✅ Completado v0.3.13. Falta: benchmarks de género |
 
-**Total restante**: Character Knowledge (módulo crítico) + mejoras menores en Voice Profiles
+**Total restante**: Mejoras menores en Knowledge (benchmarks) + Register (distribución global)
 
 ---
 

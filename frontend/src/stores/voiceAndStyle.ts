@@ -33,11 +33,19 @@ interface ApiVoiceProfile {
   metrics: {
     avg_intervention_length: number
     std_intervention_length: number
+    min_intervention_length: number
+    max_intervention_length: number
     type_token_ratio: number
+    hapax_legomena_ratio: number
     formality_score: number
+    formal_marker_count: number
+    informal_marker_count: number
     filler_ratio: number
     exclamation_ratio: number
     question_ratio: number
+    ellipsis_ratio: number
+    avg_sentence_length: number
+    subordinate_clause_ratio: number
     total_interventions: number
     total_words: number
   }
@@ -111,11 +119,19 @@ function transformVoiceProfile(api: ApiVoiceProfile): VoiceProfile {
     metrics: {
       avgInterventionLength: api.metrics.avg_intervention_length,
       stdInterventionLength: api.metrics.std_intervention_length,
+      minInterventionLength: api.metrics.min_intervention_length,
+      maxInterventionLength: api.metrics.max_intervention_length,
       typeTokenRatio: api.metrics.type_token_ratio,
+      hapaxLegomenaRatio: api.metrics.hapax_legomena_ratio,
       formalityScore: api.metrics.formality_score,
+      formalMarkerCount: api.metrics.formal_marker_count,
+      informalMarkerCount: api.metrics.informal_marker_count,
       fillerRatio: api.metrics.filler_ratio,
       exclamationRatio: api.metrics.exclamation_ratio,
       questionRatio: api.metrics.question_ratio,
+      ellipsisRatio: api.metrics.ellipsis_ratio,
+      avgSentenceLength: api.metrics.avg_sentence_length,
+      subordinateClauseRatio: api.metrics.subordinate_clause_ratio,
       totalInterventions: api.metrics.total_interventions,
       totalWords: api.metrics.total_words,
     },
@@ -350,7 +366,7 @@ export const useVoiceAndStyleStore = defineStore('voiceAndStyle', () => {
 
       const data: ApiResponse<{
         project_id: number
-        chapter_num: number
+        chapter_number: number
         attributions: ApiDialogueAttribution[]
         stats: any
       }> = await response.json()
