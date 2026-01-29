@@ -186,6 +186,85 @@ class SensoryReport:
         }
 
 
+SENSE_LABELS: dict[SensoryType, str] = {
+    SensoryType.SIGHT: "vista",
+    SensoryType.HEARING: "oído",
+    SensoryType.TOUCH: "tacto",
+    SensoryType.SMELL: "olfato",
+    SensoryType.TASTE: "gusto",
+}
+
+
+def generate_sensory_suggestions(report: "SensoryReport") -> list[dict]:
+    """
+    Genera sugerencias de enriquecimiento sensorial a partir del análisis.
+
+    No genera texto — señala carencias y propone direcciones al corrector.
+    """
+    suggestions: list[dict] = []
+
+    # Sugerencia por densidad global baja
+    if report.overall_density_level in (SensoryDensity.SPARSE, SensoryDensity.ABSENT):
+        suggestions.append({
+            "type": "density",
+            "priority": "high" if report.overall_density_level == SensoryDensity.ABSENT else "medium",
+            "message": f"El manuscrito tiene una densidad sensorial {report.overall_density_level.value} "
+                       f"({report.overall_density:.1f} detalles/1000 palabras). "
+                       f"Considere señalar al autor las escenas clave donde añadir detalles sensoriales "
+                       f"para mejorar la inmersión del lector.",
+        })
+
+    # Sugerencia por desequilibrio sensorial
+    if report.balance_score < 0.4 and report.dominant_sense and report.weakest_sense:
+        dom = SENSE_LABELS.get(report.dominant_sense, report.dominant_sense.value)
+        weak = SENSE_LABELS.get(report.weakest_sense, report.weakest_sense.value)
+        suggestions.append({
+            "type": "balance",
+            "priority": "medium",
+            "message": f"Fuerte dependencia del sentido de la {dom}. "
+                       f"El {weak} está infrautilizado. Sugerir al autor diversificar "
+                       f"los sentidos usados en las descripciones para una experiencia más rica.",
+        })
+
+    # Sugerencia por capítulos sin detalles sensoriales
+    if report.sparse_chapters:
+        ch_list = ", ".join(str(c) for c in report.sparse_chapters[:5])
+        extra = f" (y {len(report.sparse_chapters) - 5} más)" if len(report.sparse_chapters) > 5 else ""
+        suggestions.append({
+            "type": "sparse_chapters",
+            "priority": "medium",
+            "message": f"Los capítulos {ch_list}{extra} tienen escasa presencia sensorial. "
+                       f"Son candidatos prioritarios para enriquecimiento.",
+        })
+
+    # Sugerencia por sentidos completamente ausentes
+    for sense_type in SensoryType:
+        count = report.by_sense.get(sense_type, 0)
+        if count == 0 and report.total_details > 0:
+            label = SENSE_LABELS.get(sense_type, sense_type.value)
+            suggestions.append({
+                "type": "missing_sense",
+                "priority": "low",
+                "sense": sense_type.value,
+                "message": f"El sentido del {label} está completamente ausente en el manuscrito. "
+                           f"Según el tipo de historia, podría ser apropiado incluir alguna referencia.",
+            })
+
+    # Sugerencia por capítulos con un solo sentido
+    for cs in report.chapter_stats:
+        if cs.details_count > 0 and len(cs.missing_senses) >= 4:
+            dom_label = SENSE_LABELS.get(cs.dominant_sense, "") if cs.dominant_sense else ""
+            suggestions.append({
+                "type": "mono_sense_chapter",
+                "priority": "low",
+                "chapter": cs.chapter,
+                "message": f"El capítulo {cs.chapter} usa casi exclusivamente el {dom_label}. "
+                           f"Variar los sentidos podría mejorar la escena.",
+            })
+
+    return suggestions
+
+
 # =============================================================================
 # Vocabulario sensorial en español
 # =============================================================================

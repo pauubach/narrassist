@@ -349,6 +349,26 @@ def get_genre_benchmarks(genre_code: str) -> Optional[GenreBenchmarks]:
     return GENRE_BENCHMARKS.get(genre_code)
 
 
+def compute_percentile_rank(value: float, range_min: float, range_max: float) -> int:
+    """
+    Calcula el percentil aproximado de un valor dentro de un rango de referencia.
+
+    El rango (min, max) se interpreta como P10-P90 del género.
+    Valores fuera del rango se extrapolan hasta P0/P100.
+
+    Returns:
+        Percentil estimado (0-100).
+    """
+    if range_max <= range_min:
+        return 50
+    # El rango min..max cubre P10..P90 (80% de la distribución)
+    # Normalizamos: 0.0 = range_min (P10), 1.0 = range_max (P90)
+    normalized = (value - range_min) / (range_max - range_min)
+    # Mapear [0, 1] -> [10, 90], con extrapolación fuera
+    percentile = 10 + normalized * 80
+    return max(0, min(100, round(percentile)))
+
+
 def compare_with_benchmarks(
     metrics: dict,
     genre_code: str,
@@ -479,6 +499,28 @@ def compare_with_benchmarks(
                        f"(esperados: {', '.join(benchmarks.expected_arc_types)})",
         })
 
+    # Calcular percentiles para todas las métricas numéricas
+    percentiles: dict[str, int] = {}
+    if avg_words > 0:
+        percentiles["avg_chapter_words"] = compute_percentile_rank(
+            avg_words, benchmarks.min_chapter_words, benchmarks.max_chapter_words
+        )
+    if dialogue_ratio >= 0:
+        low, high = benchmarks.dialogue_ratio_range
+        percentiles["dialogue_ratio"] = compute_percentile_rank(dialogue_ratio, low, high)
+    if avg_sent_len > 0:
+        low, high = benchmarks.avg_sentence_length_range
+        percentiles["avg_sentence_length"] = compute_percentile_rank(avg_sent_len, low, high)
+    if avg_tension is not None:
+        low, high = benchmarks.avg_tension
+        percentiles["avg_tension"] = compute_percentile_rank(avg_tension, low, high)
+
+    # Añadir percentil a cada desviación numérica
+    for dev in deviations:
+        metric = dev.get("metric", "")
+        if metric in percentiles:
+            dev["percentile_rank"] = percentiles[metric]
+
     # Generar sugerencias accionables a partir de las desviaciones
     suggestions = _generate_pacing_suggestions(deviations, benchmarks, arc_type, arc_match)
 
@@ -490,6 +532,7 @@ def compare_with_benchmarks(
         "arc_type_expected": benchmarks.expected_arc_types,
         "arc_type_actual": arc_type,
         "suggestions": suggestions,
+        "percentiles": percentiles,
     }
 
 

@@ -180,6 +180,70 @@
         </template>
       </Card>
 
+      <!-- Genre Comparison -->
+      <Card v-if="genreComparison" class="genre-card">
+        <template #title>
+          <i class="pi pi-chart-line"></i>
+          Comparación con {{ genreComparison.genre.genre_label }}
+        </template>
+        <template #content>
+          <!-- Percentile gauges -->
+          <div v-if="genreComparison.percentiles" class="percentile-grid">
+            <div
+              v-for="(pct, metric) in genreComparison.percentiles"
+              :key="metric"
+              class="percentile-item"
+            >
+              <span class="percentile-label">{{ getMetricLabel(String(metric)) }}</span>
+              <div class="percentile-bar-bg">
+                <div class="percentile-bar-fill" :style="{ width: pct + '%' }" :class="getPercentileClass(pct)"></div>
+                <div class="percentile-marker" :style="{ left: pct + '%' }">
+                  <span class="percentile-value">P{{ pct }}</span>
+                </div>
+              </div>
+              <div class="percentile-range">
+                <span>P0</span>
+                <span>P50</span>
+                <span>P100</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Deviations -->
+          <div v-if="genreComparison.deviations?.length > 0" class="genre-deviations">
+            <div v-for="(dev, idx) in genreComparison.deviations" :key="idx" class="deviation-item">
+              <Tag :severity="dev.status === 'below' ? 'warning' : dev.status === 'above' ? 'danger' : 'info'" :value="dev.status === 'below' ? 'Bajo' : dev.status === 'above' ? 'Alto' : 'Diferente'" />
+              <span class="deviation-msg">{{ dev.message }}</span>
+            </div>
+          </div>
+          <Message v-else severity="success" :closable="false">
+            Todas las métricas están dentro del rango esperado para este género.
+          </Message>
+
+          <!-- Suggestions -->
+          <div v-if="genreComparison.suggestions?.length > 0" class="genre-suggestions">
+            <div v-for="(sug, idx) in genreComparison.suggestions" :key="idx" class="suggestion-item">
+              <Tag :severity="sug.priority === 'high' ? 'danger' : sug.priority === 'medium' ? 'warning' : 'info'" :value="sug.priority" />
+              <span>{{ sug.suggestion }}</span>
+            </div>
+          </div>
+        </template>
+      </Card>
+
+      <!-- Genre Comparison Button (when not loaded yet) -->
+      <div v-else-if="report && !genreLoading" class="genre-compare-prompt">
+        <Button
+          label="Comparar con género"
+          icon="pi pi-chart-line"
+          outlined
+          @click="loadGenreComparison"
+        />
+      </div>
+      <div v-else-if="genreLoading" class="loading-state" style="padding: 1rem;">
+        <ProgressSpinner style="width: 30px; height: 30px;" />
+        <span>Comparando con género...</span>
+      </div>
+
       <!-- Selected Chapter Detail -->
       <Card v-if="selectedChapter" class="detail-card">
         <template #title>
@@ -250,6 +314,8 @@ const report = ref<any>(null)
 const severityFilter = ref('all')
 const selectedChapter = ref<any>(null)
 const maxWords = ref(0)
+const genreComparison = ref<any>(null)
+const genreLoading = ref(false)
 
 const severityOptions = [
   { label: 'Todas', value: 'all' },
@@ -306,6 +372,46 @@ async function analyze() {
   } finally {
     loading.value = false
   }
+}
+
+// Genre comparison
+async function loadGenreComparison() {
+  genreLoading.value = true
+  try {
+    // Fetch document type to get genre code
+    const typeRes = await fetch(`http://localhost:8008/api/projects/${props.projectId}/document-type`)
+    const typeData = await typeRes.json()
+    const genreCode = typeData.success ? (typeData.data?.document_type || 'FIC') : 'FIC'
+
+    const response = await fetch(
+      `http://localhost:8008/api/projects/${props.projectId}/pacing-analysis/genre-comparison?genre_code=${genreCode}`
+    )
+    const data = await response.json()
+    if (data.success) {
+      genreComparison.value = data.data.comparison
+    }
+  } catch (error) {
+    console.error('Error loading genre comparison:', error)
+  } finally {
+    genreLoading.value = false
+  }
+}
+
+const metricLabels: Record<string, string> = {
+  avg_chapter_words: 'Palabras / capítulo',
+  dialogue_ratio: 'Ratio de diálogo',
+  avg_sentence_length: 'Long. oración',
+  avg_tension: 'Tensión media',
+}
+
+function getMetricLabel(metric: string): string {
+  return metricLabels[metric] || metric
+}
+
+function getPercentileClass(pct: number): string {
+  if (pct < 10 || pct > 90) return 'pct-extreme'
+  if (pct < 25 || pct > 75) return 'pct-moderate'
+  return 'pct-normal'
 }
 
 // Helper functions
@@ -738,6 +844,112 @@ function selectChapter(chapter: any) {
 
   .detail-metrics {
     grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Genre comparison */
+.genre-card {
+  border-left: 3px solid var(--primary-color);
+}
+
+.genre-compare-prompt {
+  display: flex;
+  justify-content: center;
+  padding: 0.5rem 0;
+}
+
+.percentile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.percentile-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.percentile-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-color-secondary);
+}
+
+.percentile-bar-bg {
+  position: relative;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--surface-200);
+}
+
+.percentile-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+
+.percentile-bar-fill.pct-normal { background: var(--green-400); }
+.percentile-bar-fill.pct-moderate { background: var(--orange-400); }
+.percentile-bar-fill.pct-extreme { background: var(--red-400); }
+
+.percentile-marker {
+  position: absolute;
+  top: -18px;
+  transform: translateX(-50%);
+}
+
+.percentile-value {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-color);
+}
+
+.percentile-range {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.65rem;
+  color: var(--text-color-secondary);
+}
+
+.genre-deviations {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.deviation-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.deviation-msg {
+  color: var(--text-color-secondary);
+}
+
+.genre-suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--surface-border);
+}
+
+.suggestion-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 768px) {
+  .percentile-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

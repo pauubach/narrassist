@@ -418,6 +418,51 @@
         </template>
       </Card>
 
+      <!-- Documento con Correcciones (Track Changes) -->
+      <Card class="export-option">
+        <template #title>
+          <div class="export-title">
+            <i class="pi pi-file-edit"></i>
+            <span>Documento con Correcciones</span>
+          </div>
+        </template>
+        <template #content>
+          <p class="export-description">
+            Exporta el manuscrito Word con las correcciones aplicadas como revisiones (Track Changes) o directamente.
+          </p>
+
+          <div class="corrected-options">
+            <span class="sections-label">Categorías a incluir:</span>
+            <div class="sections-grid">
+              <div v-for="cat in correctionCategories" :key="cat.value" class="checkbox-item">
+                <Checkbox v-model="correctedOptions.categories" :value="cat.value" :input-id="'corr-' + cat.value" />
+                <label :for="'corr-' + cat.value">{{ cat.label }}</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="confidence-slider">
+            <label>Confianza mínima: <strong>{{ correctedOptions.minConfidence }}%</strong></label>
+            <Slider v-model="correctedOptions.minConfidence" :min="10" :max="100" :step="5" />
+          </div>
+
+          <div class="export-checkboxes">
+            <div class="checkbox-item">
+              <Checkbox v-model="correctedOptions.asTrackChanges" :binary="true" input-id="corrTrackChanges" />
+              <label for="corrTrackChanges">Como revisiones (Track Changes)</label>
+            </div>
+          </div>
+
+          <Button
+            label="Exportar documento corregido"
+            icon="pi pi-download"
+            :loading="loadingCorrected"
+            class="export-button"
+            @click="exportCorrected"
+          />
+        </template>
+      </Card>
+
       <!-- Scrivener Export Card -->
       <Card class="export-card">
         <template #title>
@@ -464,6 +509,7 @@ import Dialog from 'primevue/dialog'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox'
+import Slider from 'primevue/slider'
 import Tag from 'primevue/tag'
 import { useToast } from 'primevue/usetoast'
 
@@ -487,6 +533,7 @@ const loadingCharacters = ref(false)
 const loadingStyle = ref(false)
 const loadingAlerts = ref(false)
 const loadingPreview = ref(false)
+const loadingCorrected = ref(false)
 const loadingScrivener = ref(false)
 
 // Formatos seleccionados
@@ -501,6 +548,23 @@ const scrivenerOptions = ref({
   includeCharacterNotes: true,
   includeAlertsAsNotes: true,
   includeEntityKeywords: true,
+})
+
+// Opciones de documento corregido
+const correctionCategories = [
+  { value: 'typography', label: 'Tipografía' },
+  { value: 'grammar', label: 'Gramática' },
+  { value: 'agreement', label: 'Concordancia' },
+  { value: 'repetition', label: 'Repeticiones' },
+  { value: 'terminology', label: 'Terminología' },
+  { value: 'clarity', label: 'Claridad' },
+  { value: 'regional', label: 'Regionalismos' },
+]
+
+const correctedOptions = ref({
+  categories: ['typography', 'grammar', 'agreement', 'repetition', 'terminology', 'clarity', 'regional'],
+  minConfidence: 50,
+  asTrackChanges: true,
 })
 
 // Opciones de documento completo
@@ -955,6 +1019,55 @@ const exportAlerts = async () => {
   }
 }
 
+async function exportCorrected() {
+  loadingCorrected.value = true
+  try {
+    const params = new URLSearchParams({
+      min_confidence: (correctedOptions.value.minConfidence / 100).toString(),
+      as_track_changes: correctedOptions.value.asTrackChanges.toString(),
+    })
+    if (correctedOptions.value.categories.length < correctionCategories.length) {
+      params.set('categories', correctedOptions.value.categories.join(','))
+    }
+
+    const response = await fetch(
+      `http://localhost:8008/api/projects/${props.projectId}/export/corrected?${params}`
+    )
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.error || `HTTP ${response.status}`)
+    }
+
+    const blob = await response.blob()
+    const contentDisposition = response.headers.get('Content-Disposition')
+    let filename = `${props.projectName}_corregido.docx`
+    if (contentDisposition) {
+      const match = contentDisposition.match(/filename="?([^"]+)"?/)
+      if (match) filename = match[1]
+    }
+
+    downloadBlob(blob, filename)
+
+    toast.add({
+      severity: 'success',
+      summary: 'Exportación exitosa',
+      detail: `Descargado: ${filename}`,
+      life: 3000,
+    })
+  } catch (error) {
+    console.error('Error exporting corrected document:', error)
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: error instanceof Error ? error.message : 'No se pudo exportar el documento corregido',
+      life: 5000,
+    })
+  } finally {
+    loadingCorrected.value = false
+  }
+}
+
 async function exportScrivener() {
   loadingScrivener.value = true
   try {
@@ -1068,6 +1181,21 @@ async function exportScrivener() {
 
 .export-button {
   width: 100%;
+}
+
+/* Corrected document options */
+.corrected-options {
+  margin-bottom: 1rem;
+}
+
+.confidence-slider {
+  margin-bottom: 1rem;
+}
+
+.confidence-slider label {
+  display: block;
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
 }
 
 /* Style Guide Preview */

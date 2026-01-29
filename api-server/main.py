@@ -15993,6 +15993,7 @@ async def get_sensory_report(
     try:
         from narrative_assistant.nlp.style.sensory_report import (
             get_sensory_analyzer,
+            generate_sensory_suggestions,
             SENSE_NAMES,
         )
         from narrative_assistant.persistence.chapter import get_chapter_repository
@@ -16046,6 +16047,9 @@ async def get_sensory_report(
 
         # Añadir nombres en español
         data["sense_names"] = {s.value: name for s, name in SENSE_NAMES.items()}
+
+        # Añadir sugerencias de enriquecimiento
+        data["suggestions"] = generate_sensory_suggestions(report)
 
         return ApiResponse(success=True, data=data)
 

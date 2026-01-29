@@ -103,6 +103,29 @@
         </template>
       </Card>
 
+      <!-- Sugerencias de enriquecimiento -->
+      <Card v-if="report.suggestions?.length" class="suggestions-card">
+        <template #title>
+          <i class="pi pi-lightbulb"></i>
+          Sugerencias de enriquecimiento ({{ report.suggestions.length }})
+        </template>
+        <template #content>
+          <div class="suggestions-list">
+            <div
+              v-for="(sug, idx) in report.suggestions"
+              :key="idx"
+              class="suggestion-item"
+            >
+              <Tag
+                :severity="sug.priority === 'high' ? 'danger' : sug.priority === 'medium' ? 'warning' : 'info'"
+                :value="sug.priority === 'high' ? 'Alta' : sug.priority === 'medium' ? 'Media' : 'Baja'"
+              />
+              <span class="suggestion-text">{{ sug.message }}</span>
+            </div>
+          </div>
+        </template>
+      </Card>
+
       <!-- Por capítulo -->
       <Card v-if="report.chapter_stats?.length" class="chapters-card">
         <template #title>Densidad por capítulo</template>
@@ -448,4 +471,10 @@ async function analyze() {
 .detail-context { font-size: 0.85rem; font-style: italic; color: var(--text-color-secondary); }
 .detail-keyword { font-size: 0.8rem; margin-top: 0.25rem; }
 .pagination-row { display: flex; justify-content: center; align-items: center; gap: 1rem; margin-top: 0.5rem; }
+
+/* Suggestions */
+.suggestions-card { border-left: 3px solid var(--orange-400); }
+.suggestions-list { display: flex; flex-direction: column; gap: 0.75rem; }
+.suggestion-item { display: flex; align-items: flex-start; gap: 0.5rem; }
+.suggestion-text { font-size: 0.85rem; color: var(--text-color-secondary); line-height: 1.4; }
 </style>

@@ -203,26 +203,43 @@ Todas las features del Competitive Analysis clasificadas como "Quick Wins", "Dif
 
 > Las 3 features con backend+API completado (Sensory Report, Story Bible, Scrivener Export) ya tienen frontend completo desde la Sesión 4.
 
-### Backlog Estratégico
+### Sprint A: Quick Wins (1 día)
 
-| Feature | Estado | Esfuerzo |
-|---------|--------|----------|
-| **Plantillas estructuras narrativas** (Hero's Journey, Three-Act...) | ❌ No implementado | 1 día |
-| **Story Completeness Checker** (Dramatica) | ❌ No implementado | 5 días |
-| **Character Archetype Detector** (Jung/Campbell) | ❌ No implementado (10% - solo embeddings) | 2 días |
-| **Color-Coded Revisions UI** | ⚠️ Backend export existe (`corrected_document_exporter.py`), sin endpoint ni UI | 2 días |
-| **Continue Writing (LLM)** | ❌ No implementado | 2 días |
-| **Add Sensory Detail (LLM)** | ❌ No implementado | 1 día |
+| Feature | Tipo | Estado | Esfuerzo |
+|---------|------|--------|----------|
+| **Color-Coded Revisions UI** | ENHANCE | ⚠️ Backend+endpoint+botón existen, falta UI config en ExportDialog | 4h |
+| **Percentiles por Género** | ENHANCE | ⚠️ Benchmarks min/max existen, añadir percentiles P10-P90 | 4h |
+| **Sensory Report Suggestions** | ENHANCE | ⚠️ SensoryReportTab existe, añadir sugerencias de enriquecimiento | 2-3h |
 
-### Prioridad Baja: Nice to Have
+### Sprint B: Sentence Energy (1-2 días)
 
-| Feature | Esfuerzo |
-|---------|----------|
-| Change POV (1a↔3a persona) | 3 días |
-| Sentence Energy (StyleWriter) | 2 días |
-| Development Stages Workflow | 3 días |
-| Percentiles por género (corpus-based) | 5 días |
-| Brainstorm infinito | 2 días |
+| Feature | Tipo | Estado | Esfuerzo |
+|---------|------|--------|----------|
+| **Sentence Energy** (voz pasiva, verbos débiles, energía) | BUILD | ❌ No implementado | 1-2 días |
+
+### Sprint C: Estructura Narrativa (3-4 días)
+
+| Feature | Tipo | Estado | Esfuerzo |
+|---------|------|--------|----------|
+| **Plantillas estructuras narrativas** (Hero's Journey, Three-Act, Save the Cat...) | BUILD | ❌ No implementado | 1.5 días |
+| **Narrative Health Check** (Completitud narrativa simplificada, 10-12 dimensiones) | BUILD | ❌ No implementado | 1.5-2 días |
+
+### Sprint D: Arquetipos (2 días)
+
+| Feature | Tipo | Estado | Esfuerzo |
+|---------|------|--------|----------|
+| **Character Archetype Detector** (Jung/Campbell) | BUILD | ⚠️ 10% (embeddings) | 2 días |
+
+### Ideas Futuras (v2.0+ — Para escritores, fuera de scope actual)
+
+> Decisión del debate multi-experto (Sesión 5): estas features implican *generación* de texto, no *diagnóstico*. Un corrector propone y señala, pero no genera. Se documentan aquí como ideas a evaluar cuando el producto amplíe su público objetivo a escritores.
+
+| Feature | Por qué se aplaza | Podría reenfocarse como... |
+|---------|-------------------|---------------------------|
+| **Continue Writing (LLM)** | Corrector no genera texto por el autor | "Sugerir dirección narrativa" — señalar posibles continuaciones sin escribirlas |
+| **Change POV (1a↔3a)** | Transformación NLP compleja, no corrección | "Detector de inconsistencia de POV" — ya implementado como corrección |
+| **Development Stages Workflow** | Gestión de proceso, no análisis | "Checklist de fases editoriales" — guía de proceso del corrector |
+| **Brainstorm Infinito** | Ideación creativa, feature de escritor | "Sugerir alternativas" — ante un problema detectado, proponer direcciones |
 
 ### Infraestructura
 
@@ -250,11 +267,13 @@ Todas las features del Competitive Analysis clasificadas como "Quick Wins", "Dif
 | Categoría | Items | Días |
 |-----------|-------|------|
 | ~~Frontend para features con backend listo~~ | ~~3~~ | ~~2-3~~ ✅ HECHO |
-| Backlog estratégico | 6 | 13 |
-| Nice to have | 5 | 15 |
+| Sprint A: Quick Wins (enhance) | 3 | 1 |
+| Sprint B: Sentence Energy | 1 | 1-2 |
+| Sprint C: Estructura Narrativa | 2 | 3-4 |
+| Sprint D: Arquetipos | 1 | 2 |
 | Infraestructura | 6 | 25 |
-| **TOTAL PENDIENTE (backlog + infra)** | **12** | **~38 días** |
-| **TOTAL PENDIENTE (solo backlog)** | **6** | **~13 días** |
+| **TOTAL PENDIENTE (features)** | **7** | **~7-9 días** |
+| **TOTAL PENDIENTE (features + infra)** | **13** | **~32-34 días** |
 
 ---
 

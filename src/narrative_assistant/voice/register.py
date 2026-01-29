@@ -906,9 +906,33 @@ def compare_register_with_benchmarks(
                        f"máximo {benchmarks.max_high_severity_changes} para {benchmarks.genre_label})",
         })
 
+    # Calcular percentiles para métricas numéricas con rango
+    from narrative_assistant.analysis.pacing import compute_percentile_rank
+
+    percentiles: Dict[str, int] = {}
+    if total_segments > 0 and dominant_register:
+        dominant_count = distribution.get(dominant_register, 0)
+        consistency_pct = (dominant_count / total_segments) * 100
+        low, high = benchmarks.consistency_range
+        percentiles["consistency"] = compute_percentile_rank(consistency_pct, low, high)
+
+        for reg_type, (exp_low, exp_high) in benchmarks.register_distribution.items():
+            reg_count = distribution.get(reg_type, 0)
+            reg_ratio = reg_count / total_segments if total_segments > 0 else 0
+            percentiles[f"distribution_{reg_type}"] = compute_percentile_rank(
+                reg_ratio, exp_low, exp_high
+            )
+
+    # Añadir percentil a cada desviación numérica
+    for dev in deviations:
+        metric = dev.get("metric", "")
+        if metric in percentiles:
+            dev["percentile_rank"] = percentiles[metric]
+
     return {
         "genre": benchmarks.to_dict(),
         "deviations": deviations,
         "deviation_count": len(deviations),
         "dominant_register_match": dominant_register == benchmarks.expected_primary if dominant_register else None,
+        "percentiles": percentiles,
     }
