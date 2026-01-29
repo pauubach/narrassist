@@ -42,6 +42,7 @@ import Toast from 'primevue/toast'
 import { useAppStore } from '@/stores/app'
 import { useThemeStore } from '@/stores/theme'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
+import { useNativeMenu } from './composables/useNativeMenu'
 import KeyboardShortcutsDialog from '@/components/KeyboardShortcutsDialog.vue'
 import AboutDialog from '@/components/AboutDialog.vue'
 import TutorialDialog from '@/components/TutorialDialog.vue'
@@ -73,6 +74,12 @@ const hasMenuBar = computed(() => !isTauri.value)
 
 // Activar atajos de teclado globales
 useKeyboardShortcuts()
+
+// Activar manejo de menú nativo de Tauri
+useNativeMenu({
+  onTutorial: () => { showTutorial.value = true },
+  onKeyboardShortcuts: () => { showShortcutsHelp.value = true },
+})
 
 // Verificar si se debe mostrar el tutorial al inicio
 const checkTutorialStatus = () => {

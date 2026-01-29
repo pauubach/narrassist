@@ -293,6 +293,7 @@ import type { Alert } from '@/types'
 import { transformAlerts, normalizeAlertSeverity, normalizeAlertStatus } from '@/types/transformers'
 import { useToast } from 'primevue/usetoast'
 import { useAlertUtils } from '@/composables/useAlertUtils'
+import { apiUrl } from '@/config/api'
 
 const { getSeverityConfig, getCategoryConfig, getStatusConfig } = useAlertUtils()
 
@@ -346,7 +347,7 @@ const loadAlerts = async () => {
   error.value = ''
 
   try {
-    const response = await fetch(`/api/projects/${projectId.value}/alerts`)
+    const response = await fetch(apiUrl(`/api/projects/${projectId.value}/alerts`))
     const data = await response.json()
 
     if (data.success) {
@@ -386,7 +387,7 @@ const onViewContext = (alert: Alert) => {
 
 const onResolveAlert = async (alert: Alert) => {
   try {
-    const response = await fetch(`/api/projects/${projectId.value}/alerts/${alert.id}/resolve`, {
+    const response = await fetch(apiUrl(`/api/projects/${projectId.value}/alerts/${alert.id}/resolve`), {
       method: 'POST'
     })
 
@@ -403,7 +404,7 @@ const onResolveAlert = async (alert: Alert) => {
 
 const onDismissAlert = async (alert: Alert) => {
   try {
-    const response = await fetch(`/api/projects/${projectId.value}/alerts/${alert.id}/dismiss`, {
+    const response = await fetch(apiUrl(`/api/projects/${projectId.value}/alerts/${alert.id}/dismiss`), {
       method: 'POST'
     })
 
@@ -420,7 +421,7 @@ const onDismissAlert = async (alert: Alert) => {
 
 const onReopenAlert = async (alert: Alert) => {
   try {
-    const response = await fetch(`/api/projects/${projectId.value}/alerts/${alert.id}/reopen`, {
+    const response = await fetch(apiUrl(`/api/projects/${projectId.value}/alerts/${alert.id}/reopen`), {
       method: 'POST'
     })
 
@@ -440,7 +441,7 @@ const resolveAll = () => {
 
 const confirmResolveAll = async () => {
   try {
-    const response = await fetch(`/api/projects/${projectId.value}/alerts/resolve-all`, {
+    const response = await fetch(apiUrl(`/api/projects/${projectId.value}/alerts/resolve-all`), {
       method: 'POST'
     })
 

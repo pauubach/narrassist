@@ -201,6 +201,7 @@ import AccordionContent from 'primevue/accordioncontent'
 import ProgressSpinner from 'primevue/progressspinner'
 import Message from 'primevue/message'
 import { useToast } from 'primevue/usetoast'
+import { apiUrl } from '@/config/api'
 
 const props = defineProps<{
   projectId: number
@@ -256,7 +257,7 @@ async function analyze() {
       include_semantic: includeSemantic.value.toString(),
     })
     const response = await fetch(
-      `http://localhost:8008/api/projects/${props.projectId}/echo-report?${params}`
+      apiUrl(`/api/projects/${props.projectId}/echo-report?${params}`)
     )
     const data = await response.json()
 
@@ -302,10 +303,19 @@ function getTypeLabel(type: string): string {
   }
 }
 
+function escapeHtml(str: string): string {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;')
+}
+
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 function highlightWord(text: string, word: string): string {
   if (!text || !word) return text
-  const regex = new RegExp(`(${word})`, 'gi')
-  return text.replace(regex, '<mark>$1</mark>')
+  const escaped = escapeHtml(text)
+  const regex = new RegExp(`(${escapeRegex(escapeHtml(word))})`, 'gi')
+  return escaped.replace(regex, '<mark>$1</mark>')
 }
 </script>
 

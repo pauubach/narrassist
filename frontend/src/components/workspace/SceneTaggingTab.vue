@@ -378,6 +378,7 @@ import ColorPicker from 'primevue/colorpicker'
 import ProgressSpinner from 'primevue/progressspinner'
 import { useToast } from 'primevue/usetoast'
 import SceneCardsView from './SceneCardsView.vue'
+import { apiUrl } from '@/config/api'
 
 const props = defineProps<{
   projectId: number
@@ -496,7 +497,7 @@ async function loadScenes() {
   loading.value = true
   try {
     const response = await fetch(
-      `http://localhost:8008/api/projects/${props.projectId}/scenes`
+      apiUrl(`/api/projects/${props.projectId}/scenes`)
     )
     const data = await response.json()
 
@@ -521,7 +522,7 @@ async function loadScenes() {
 async function loadEntities() {
   try {
     const response = await fetch(
-      `http://localhost:8008/api/projects/${props.projectId}/entities`
+      apiUrl(`/api/projects/${props.projectId}/entities`)
     )
     const data = await response.json()
 
@@ -554,7 +555,7 @@ async function saveSceneTags() {
   saving.value = true
   try {
     const response = await fetch(
-      `http://localhost:8008/api/projects/${props.projectId}/scenes/${selectedScene.value.id}/tags`,
+      apiUrl(`/api/projects/${props.projectId}/scenes/${selectedScene.value.id}/tags`),
       {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -600,7 +601,7 @@ async function saveCustomTag() {
   saving.value = true
   try {
     const response = await fetch(
-      `http://localhost:8008/api/projects/${props.projectId}/scenes/${selectedScene.value.id}/custom-tags`,
+      apiUrl(`/api/projects/${props.projectId}/scenes/${selectedScene.value.id}/custom-tags`),
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -640,7 +641,7 @@ async function saveCustomTag() {
 async function removeCustomTag(sceneId: number, tagName: string) {
   try {
     const response = await fetch(
-      `http://localhost:8008/api/projects/${props.projectId}/scenes/${sceneId}/custom-tags/${encodeURIComponent(tagName)}`,
+      apiUrl(`/api/projects/${props.projectId}/scenes/${sceneId}/custom-tags/${encodeURIComponent(tagName)}`),
       { method: 'DELETE' }
     )
     const data = await response.json()

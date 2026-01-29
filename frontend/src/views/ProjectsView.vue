@@ -257,6 +257,7 @@ import Badge from 'primevue/badge'
 import { useToast } from 'primevue/usetoast'
 import type { Project } from '@/types'
 import { transformProjects, transformProject } from '@/types/transformers'
+import { apiUrl } from '@/config/api'
 
 const router = useRouter()
 const toast = useToast()
@@ -442,7 +443,7 @@ const deleteProject = async (projectId: number) => {
 
   try {
     // Llamar al endpoint DELETE
-    const response = await fetch(`http://localhost:8008/api/projects/${projectId}`, {
+    const response = await fetch(apiUrl(`/api/projects/${projectId}`), {
       method: 'DELETE'
     })
 

@@ -11,6 +11,7 @@ import Card from 'primevue/card'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import ProgressSpinner from 'primevue/progressspinner'
+import { apiUrl } from '@/config/api'
 
 const props = defineProps<{
   projectId: number
@@ -55,7 +56,7 @@ async function analyze() {
   loading.value = true
   try {
     const response = await fetch(
-      `http://localhost:8008/api/projects/${props.projectId}/character-archetypes`
+      apiUrl(`/api/projects/${props.projectId}/character-archetypes`)
     )
     const data = await response.json()
     if (data.success) {

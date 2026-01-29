@@ -1,7 +1,8 @@
 """
-Gestor de LanguageTool - Inicio y detención automática del servidor.
+Gestor de LanguageTool - Inicio, detención e instalación automática.
 
 Este módulo gestiona el ciclo de vida del servidor LanguageTool:
+- Instalación automática de Java + LanguageTool desde la UI
 - Inicio automático cuando se activa en Settings
 - Detención al cerrar la aplicación o desactivar
 - Verificación de estado y reconexión
@@ -11,11 +12,16 @@ El servidor se inicia como subproceso y consume ~500MB RAM.
 
 import logging
 import os
+import shutil
+import stat
 import subprocess
 import threading
 import time
+import urllib.request
+import zipfile
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional, Tuple
 import platform
 
 logger = logging.getLogger(__name__)
@@ -317,3 +323,487 @@ def stop_languagetool() -> bool:
 def is_languagetool_installed() -> bool:
     """Verificar si LanguageTool está instalado."""
     return get_languagetool_manager().is_installed
+
+
+# =============================================================================
+# Instalador de LanguageTool + Java
+# =============================================================================
+
+# Configuración de instalación
+LT_VERSION = "6.4"
+LT_URLS = [
+    f"https://github.com/languagetool-org/languagetool/releases/download/v{LT_VERSION}/LanguageTool-{LT_VERSION}.zip",
+    f"https://languagetool.org/download/LanguageTool-{LT_VERSION}.zip",
+    f"https://www.languagetool.org/download/LanguageTool-{LT_VERSION}.zip",
+]
+
+JAVA_VERSION = "21"
+JAVA_URLS = {
+    "Windows": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.2%2B13/OpenJDK21U-jre_x64_windows_hotspot_21.0.2_13.zip",
+    "Linux": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.2%2B13/OpenJDK21U-jre_x64_linux_hotspot_21.0.2_13.tar.gz",
+    "Darwin": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.2%2B13/OpenJDK21U-jre_x64_mac_hotspot_21.0.2_13.tar.gz",
+}
+
+
+@dataclass
+class InstallProgress:
+    """Progreso de la instalación de LanguageTool."""
+
+    phase: str = "pending"
+    phase_label: str = ""
+    percentage: float = 0.0
+    detail: str = ""
+    error: Optional[str] = None
+
+
+class LanguageToolInstaller:
+    """
+    Instalador de LanguageTool + Java portable.
+
+    Reutiliza la lógica de scripts/setup_languagetool.py con progress callbacks
+    para integración con la UI.
+    """
+
+    def __init__(
+        self,
+        progress_callback: Optional[Callable[[InstallProgress], None]] = None,
+    ):
+        self._callback = progress_callback
+        self._progress = InstallProgress()
+
+        # Rutas - reutilizar la lógica del manager
+        mgr = get_languagetool_manager()
+        self._project_root = mgr._project_root
+        self._tools_dir = self._project_root / "tools" if self._project_root else None
+        self._lt_dir = self._project_root / "tools" / "languagetool" if self._project_root else None
+        self._java_dir = self._project_root / "tools" / "java" if self._project_root else None
+
+    def _report(
+        self,
+        phase: str,
+        label: str,
+        percentage: float,
+        detail: str = "",
+    ) -> None:
+        """Reportar progreso al callback."""
+        self._progress = InstallProgress(
+            phase=phase,
+            phase_label=label,
+            percentage=percentage,
+            detail=detail,
+        )
+        if self._callback:
+            self._callback(self._progress)
+        logger.info(f"LT Install [{percentage:.0f}%] {label}: {detail}")
+
+    def _report_error(self, error: str) -> None:
+        """Reportar error."""
+        self._progress = InstallProgress(
+            phase="error",
+            phase_label="Error",
+            percentage=self._progress.percentage,
+            error=error,
+        )
+        if self._callback:
+            self._callback(self._progress)
+        logger.error(f"LT Install error: {error}")
+
+    def install(self) -> Tuple[bool, str]:
+        """
+        Ejecutar instalación completa. Bloqueante — llamar desde hilo background.
+
+        Returns:
+            Tupla (éxito, mensaje)
+        """
+        if not self._project_root or not self._tools_dir:
+            msg = "No se pudo encontrar la raíz del proyecto"
+            self._report_error(msg)
+            return False, msg
+
+        try:
+            # Fase 1: Verificar Java (0-5%)
+            self._report("checking_java", "Verificando Java", 0, "Buscando Java en el sistema...")
+
+            has_system_java = self._check_system_java()
+            has_local_java = self._check_local_java()
+
+            if has_system_java or has_local_java:
+                self._report("checking_java", "Verificando Java", 5, "Java encontrado")
+            else:
+                # Fase 2: Instalar Java (5-40%)
+                self._report("installing_java", "Instalando Java", 5, "Descargando OpenJDK Temurin...")
+                success = self._install_java()
+                if not success:
+                    msg = "Error instalando Java"
+                    self._report_error(msg)
+                    return False, msg
+
+            # Fase 3: Descargar LanguageTool (40-75%)
+            self._report("downloading_lt", "Descargando LanguageTool", 40, f"LanguageTool {LT_VERSION}...")
+            zip_path = self._download_languagetool()
+            if zip_path is None:
+                msg = "Error descargando LanguageTool"
+                self._report_error(msg)
+                return False, msg
+
+            # Fase 4: Extraer (75-85%)
+            self._report("extracting_lt", "Extrayendo LanguageTool", 75, "Descomprimiendo archivos...")
+            success = self._extract_languagetool(zip_path)
+            if not success:
+                msg = "Error extrayendo LanguageTool"
+                self._report_error(msg)
+                return False, msg
+
+            # Fase 5: Crear scripts de inicio (85-90%)
+            self._report("creating_scripts", "Configurando scripts", 85, "Creando scripts de inicio...")
+            self._create_start_scripts()
+
+            # Fase 6: Verificar (90-95%)
+            self._report("verifying", "Verificando instalación", 90, "Comprobando archivos...")
+            jar_file = self._lt_dir / "languagetool-server.jar"
+            if not jar_file.exists():
+                msg = "No se encontró languagetool-server.jar después de la instalación"
+                self._report_error(msg)
+                return False, msg
+
+            # Fase 7: Iniciar servidor (95-100%)
+            self._report("starting", "Iniciando servidor", 95, "Arrancando LanguageTool...")
+            mgr = get_languagetool_manager()
+            # Refrescar rutas del manager por si acaba de instalarse
+            mgr._lt_dir = self._lt_dir
+            mgr._java_dir = self._java_dir
+            started = mgr.start(wait=True)
+
+            self._report(
+                "completed",
+                "Instalación completada",
+                100,
+                "LanguageTool instalado y activo" if started else "Instalado (servidor no iniciado)",
+            )
+
+            return True, "LanguageTool instalado correctamente"
+
+        except Exception as e:
+            msg = f"Error durante la instalación: {e}"
+            self._report_error(msg)
+            logger.exception("Error instalando LanguageTool")
+            return False, msg
+
+    # -------------------------------------------------------------------------
+    # Métodos privados de instalación (adaptados de setup_languagetool.py)
+    # -------------------------------------------------------------------------
+
+    def _check_system_java(self) -> bool:
+        """Verificar si Java está en el sistema."""
+        try:
+            result = subprocess.run(
+                ["java", "-version"],
+                capture_output=True,
+                timeout=10,
+            )
+            return result.returncode == 0
+        except Exception:
+            return False
+
+    def _check_local_java(self) -> bool:
+        """Verificar si Java está instalado localmente en tools/java."""
+        if not self._java_dir:
+            return False
+        system = platform.system()
+        java_exe = self._java_dir / "bin" / ("java.exe" if system == "Windows" else "java")
+        if not java_exe.exists():
+            return False
+        try:
+            result = subprocess.run(
+                [str(java_exe), "-version"],
+                capture_output=True,
+                timeout=10,
+            )
+            return result.returncode == 0
+        except Exception:
+            return False
+
+    def _download_file(
+        self,
+        url: str,
+        dest: Path,
+        phase: str,
+        label: str,
+        pct_start: float,
+        pct_end: float,
+    ) -> bool:
+        """Descargar archivo con progreso reportado al callback."""
+        try:
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "Accept": "application/octet-stream,*/*",
+            }
+            req = urllib.request.Request(url, headers=headers)
+
+            with urllib.request.urlopen(req, timeout=300) as response:
+                total_size = int(response.headers.get("Content-Length", 0))
+                block_size = 8192
+                downloaded = 0
+
+                with open(dest, "wb") as f:
+                    while True:
+                        chunk = response.read(block_size)
+                        if not chunk:
+                            break
+                        f.write(chunk)
+                        downloaded += len(chunk)
+
+                        if total_size > 0:
+                            frac = downloaded / total_size
+                            pct = pct_start + frac * (pct_end - pct_start)
+                            mb_dl = downloaded / (1024 * 1024)
+                            mb_total = total_size / (1024 * 1024)
+                            self._report(
+                                phase, label, pct,
+                                f"{mb_dl:.0f}/{mb_total:.0f} MB",
+                            )
+
+            return True
+
+        except Exception as e:
+            logger.warning(f"Error descargando {url}: {e}")
+            if dest.exists():
+                dest.unlink()
+            return False
+
+    def _install_java(self) -> bool:
+        """Descargar e instalar Java portable."""
+        system = platform.system()
+        if system not in JAVA_URLS:
+            logger.error(f"Sistema no soportado para Java: {system}")
+            return False
+
+        java_url = JAVA_URLS[system]
+        self._tools_dir.mkdir(parents=True, exist_ok=True)
+
+        archive_name = f"java-{JAVA_VERSION}.zip" if system == "Windows" else f"java-{JAVA_VERSION}.tar.gz"
+        archive_path = self._tools_dir / archive_name
+
+        # Descargar (5-30%)
+        if not archive_path.exists():
+            success = self._download_file(
+                java_url, archive_path,
+                "installing_java", "Descargando Java",
+                5, 30,
+            )
+            if not success:
+                return False
+        else:
+            self._report("installing_java", "Instalando Java", 30, "Archivo Java ya descargado")
+
+        # Extraer (30-40%)
+        self._report("installing_java", "Instalando Java", 30, "Extrayendo Java...")
+
+        if self._java_dir and self._java_dir.exists():
+            shutil.rmtree(self._java_dir, onerror=self._remove_readonly)
+
+        try:
+            if system == "Windows":
+                with zipfile.ZipFile(archive_path, "r") as zf:
+                    zf.extractall(self._tools_dir)
+            else:
+                import tarfile
+                with tarfile.open(archive_path, "r:gz") as tf:
+                    tf.extractall(self._tools_dir)
+
+            # Encontrar directorio extraído
+            extracted_dirs = [
+                d for d in self._tools_dir.iterdir()
+                if d.is_dir() and d.name.startswith("jdk-")
+            ]
+            if not extracted_dirs:
+                logger.error("No se encontró directorio Java extraído")
+                return False
+
+            extracted_dir = extracted_dirs[0]
+
+            # macOS: contenido en Contents/Home
+            if system == "Darwin":
+                contents_home = extracted_dir / "Contents" / "Home"
+                if contents_home.exists():
+                    shutil.move(str(contents_home), str(self._java_dir))
+                    shutil.rmtree(extracted_dir)
+                else:
+                    extracted_dir.rename(self._java_dir)
+            else:
+                extracted_dir.rename(self._java_dir)
+
+            # Hacer ejecutable en Unix
+            if system != "Windows":
+                java_exe = self._java_dir / "bin" / "java"
+                if java_exe.exists():
+                    java_exe.chmod(0o755)
+
+            self._report("installing_java", "Instalando Java", 40, "Java instalado")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error extrayendo Java: {e}")
+            return False
+
+    def _download_languagetool(self) -> Optional[Path]:
+        """Descargar LanguageTool probando múltiples mirrors."""
+        self._tools_dir.mkdir(parents=True, exist_ok=True)
+        zip_path = self._tools_dir / f"LanguageTool-{LT_VERSION}.zip"
+
+        if zip_path.exists():
+            self._report("downloading_lt", "Descargando LanguageTool", 75, "Archivo ya descargado")
+            return zip_path
+
+        for i, url in enumerate(LT_URLS):
+            self._report(
+                "downloading_lt", "Descargando LanguageTool",
+                40 + i * 2,
+                f"Intentando mirror {i + 1}/{len(LT_URLS)}...",
+            )
+            success = self._download_file(
+                url, zip_path,
+                "downloading_lt", "Descargando LanguageTool",
+                42 + i * 2, 75,
+            )
+            if success:
+                return zip_path
+            # Eliminar archivo parcial
+            if zip_path.exists():
+                zip_path.unlink()
+
+        return None
+
+    def _extract_languagetool(self, zip_path: Path) -> bool:
+        """Extraer LanguageTool del zip."""
+        try:
+            # Limpiar instalación anterior
+            if self._lt_dir and self._lt_dir.exists():
+                shutil.rmtree(self._lt_dir, onerror=self._remove_readonly)
+
+            extract_dir = self._tools_dir / f"LanguageTool-{LT_VERSION}"
+            if extract_dir.exists():
+                shutil.rmtree(extract_dir, onerror=self._remove_readonly)
+
+            with zipfile.ZipFile(zip_path, "r") as zf:
+                zf.extractall(self._tools_dir)
+
+            # Buscar directorio extraído
+            if not extract_dir.exists():
+                for d in self._tools_dir.iterdir():
+                    if d.is_dir() and d.name.startswith("LanguageTool"):
+                        extract_dir = d
+                        break
+
+            if extract_dir.exists():
+                shutil.move(str(extract_dir), str(self._lt_dir))
+                return True
+            else:
+                logger.error("No se encontró directorio LanguageTool extraído")
+                return False
+
+        except Exception as e:
+            logger.error(f"Error extrayendo LanguageTool: {e}")
+            return False
+
+    def _create_start_scripts(self) -> None:
+        """Crear scripts de inicio."""
+        if not self._lt_dir:
+            return
+
+        system = platform.system()
+        has_system_java = self._check_system_java()
+
+        # Windows batch
+        if system == "Windows":
+            java_cmd = "java" if has_system_java else "%~dp0..\\java\\bin\\java.exe"
+        else:
+            java_cmd = "java" if has_system_java else '"$(dirname "$0")/../java/bin/java"'
+
+        if system == "Windows":
+            bat = self._lt_dir / "start_lt.bat"
+            bat.write_text(
+                f'@echo off\ncd /d "%~dp0"\n"{java_cmd}" -Xmx512m -cp languagetool-server.jar '
+                f'org.languagetool.server.HTTPServer --port {DEFAULT_PORT} --allow-origin "*"\n',
+                encoding="utf-8",
+            )
+
+        sh = self._lt_dir / "start_lt.sh"
+        sh_java = "java" if has_system_java else '"$(dirname "$0")/../java/bin/java"'
+        sh.write_text(
+            f'#!/bin/bash\ncd "$(dirname "$0")"\n{sh_java} -Xmx512m -cp languagetool-server.jar '
+            f'org.languagetool.server.HTTPServer --port {DEFAULT_PORT} --allow-origin "*"\n',
+            encoding="utf-8",
+        )
+        try:
+            sh.chmod(0o755)
+        except Exception:
+            pass
+
+    @staticmethod
+    def _remove_readonly(func, path, _excinfo) -> None:
+        """Callback para shutil.rmtree: quitar readonly en Windows."""
+        os.chmod(path, stat.S_IWRITE)
+        func(path)
+
+
+# Estado global de instalación (thread-safe)
+_install_progress: Optional[InstallProgress] = None
+_installing: bool = False
+_install_lock = threading.Lock()
+
+
+def get_install_progress() -> Optional[InstallProgress]:
+    """Obtener progreso actual de la instalación."""
+    return _install_progress
+
+
+def is_lt_installing() -> bool:
+    """Verificar si hay una instalación en curso."""
+    return _installing
+
+
+def start_lt_installation(
+    callback: Optional[Callable[[InstallProgress], None]] = None,
+) -> Tuple[bool, str]:
+    """
+    Iniciar instalación de LanguageTool en background.
+
+    Args:
+        callback: Función opcional para recibir progreso
+
+    Returns:
+        Tupla (éxito al iniciar, mensaje)
+    """
+    global _installing, _install_progress
+
+    with _install_lock:
+        if _installing:
+            return False, "Ya hay una instalación en curso"
+        _installing = True
+        _install_progress = InstallProgress(phase="starting", phase_label="Iniciando...", percentage=0)
+
+    def _progress_cb(progress: InstallProgress) -> None:
+        global _install_progress
+        _install_progress = progress
+        if callback:
+            callback(progress)
+
+    def _run() -> None:
+        global _installing
+        try:
+            installer = LanguageToolInstaller(progress_callback=_progress_cb)
+            installer.install()
+        except Exception as e:
+            logger.exception("Error en hilo de instalación de LanguageTool")
+            _progress_cb(InstallProgress(
+                phase="error",
+                phase_label="Error",
+                error=str(e),
+            ))
+        finally:
+            _installing = False
+
+    thread = threading.Thread(target=_run, daemon=True, name="lt-installer")
+    thread.start()
+    return True, "Instalación iniciada"

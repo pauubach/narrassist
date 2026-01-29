@@ -9,6 +9,7 @@
  */
 
 import { ref, computed, onUnmounted, watch } from 'vue'
+import { API_BASE } from '@/config/api'
 import { useNotifications } from './useNotifications'
 
 export interface AnalysisPhase {
@@ -43,7 +44,7 @@ export interface UseAnalysisStreamOptions {
 }
 
 const defaultOptions: UseAnalysisStreamOptions = {
-  baseUrl: 'http://localhost:8008',
+  baseUrl: API_BASE,
   autoReconnect: true,
   maxRetries: 3,
   retryDelay: 1000,

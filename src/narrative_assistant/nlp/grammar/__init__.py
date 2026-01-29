@@ -72,6 +72,12 @@ from .languagetool_manager import (
     ensure_languagetool_running,
     stop_languagetool,
     is_languagetool_installed,
+    # Instalador
+    InstallProgress,
+    LanguageToolInstaller,
+    get_install_progress,
+    is_lt_installing,
+    start_lt_installation,
 )
 
 __all__ = [
@@ -111,4 +117,10 @@ __all__ = [
     "ensure_languagetool_running",
     "stop_languagetool",
     "is_languagetool_installed",
+    # LanguageTool Installer (instalación desde UI)
+    "InstallProgress",
+    "LanguageToolInstaller",
+    "get_install_progress",
+    "is_lt_installing",
+    "start_lt_installation",
 ]

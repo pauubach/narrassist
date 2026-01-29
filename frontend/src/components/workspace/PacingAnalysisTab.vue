@@ -301,6 +301,7 @@ import SelectButton from 'primevue/selectbutton'
 import ProgressSpinner from 'primevue/progressspinner'
 import Message from 'primevue/message'
 import { useToast } from 'primevue/usetoast'
+import { apiUrl } from '@/config/api'
 
 const props = defineProps<{
   projectId: number
@@ -348,7 +349,7 @@ async function analyze() {
   selectedChapter.value = null
   try {
     const response = await fetch(
-      `http://localhost:8008/api/projects/${props.projectId}/pacing-analysis`
+      apiUrl(`/api/projects/${props.projectId}/pacing-analysis`)
     )
     const data = await response.json()
 
@@ -379,12 +380,12 @@ async function loadGenreComparison() {
   genreLoading.value = true
   try {
     // Fetch document type to get genre code
-    const typeRes = await fetch(`http://localhost:8008/api/projects/${props.projectId}/document-type`)
+    const typeRes = await fetch(apiUrl(`/api/projects/${props.projectId}/document-type`))
     const typeData = await typeRes.json()
     const genreCode = typeData.success ? (typeData.data?.document_type || 'FIC') : 'FIC'
 
     const response = await fetch(
-      `http://localhost:8008/api/projects/${props.projectId}/pacing-analysis/genre-comparison?genre_code=${genreCode}`
+      apiUrl(`/api/projects/${props.projectId}/pacing-analysis/genre-comparison?genre_code=${genreCode}`)
     )
     const data = await response.json()
     if (data.success) {

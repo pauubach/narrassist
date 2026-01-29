@@ -96,6 +96,7 @@ import Message from 'primevue/message'
 import { useToast } from 'primevue/usetoast'
 import type { Entity, MergeHistoryEntry } from '@/types'
 import { transformMergeHistoryEntry } from '@/types/transformers'
+import { apiUrl } from '@/config/api'
 
 const toast = useToast()
 
@@ -131,7 +132,7 @@ const loadMergeHistory = async () => {
   loading.value = true
   try {
     // Obtener el historial de fusiones del proyecto
-    const response = await fetch(`/api/projects/${props.projectId}/entities/merge-history`)
+    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/entities/merge-history`))
     const data = await response.json()
 
     if (data.success && data.data.merges) {

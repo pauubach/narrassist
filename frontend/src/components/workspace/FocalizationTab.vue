@@ -278,6 +278,7 @@ import AccordionContent from 'primevue/accordioncontent'
 import ProgressSpinner from 'primevue/progressspinner'
 import Message from 'primevue/message'
 import { useToast } from 'primevue/usetoast'
+import { apiUrl } from '@/config/api'
 
 interface Declaration {
   id: number
@@ -410,7 +411,7 @@ async function loadData() {
 
 async function loadDeclarations() {
   try {
-    const res = await fetch(`http://localhost:8008/api/projects/${props.projectId}/focalization`)
+    const res = await fetch(apiUrl(`/api/projects/${props.projectId}/focalization`))
     const data = await res.json()
     if (data.success) {
       declarations.value = data.data.declarations || []
@@ -422,7 +423,7 @@ async function loadDeclarations() {
 
 async function loadChapters() {
   try {
-    const res = await fetch(`http://localhost:8008/api/projects/${props.projectId}/chapters`)
+    const res = await fetch(apiUrl(`/api/projects/${props.projectId}/chapters`))
     const data = await res.json()
     if (data.success) {
       chapters.value = (data.data || []).map((c: any) => ({
@@ -437,7 +438,7 @@ async function loadChapters() {
 
 async function loadCharacters() {
   try {
-    const res = await fetch(`http://localhost:8008/api/projects/${props.projectId}/entities`)
+    const res = await fetch(apiUrl(`/api/projects/${props.projectId}/entities`))
     const data = await res.json()
     if (data.success) {
       characters.value = (data.data || [])
@@ -452,7 +453,7 @@ async function loadCharacters() {
 async function detectViolations() {
   detectingViolations.value = true
   try {
-    const res = await fetch(`http://localhost:8008/api/projects/${props.projectId}/focalization/violations`)
+    const res = await fetch(apiUrl(`/api/projects/${props.projectId}/focalization/violations`))
     const data = await res.json()
     if (data.success) {
       violations.value = data.data.violations || []
@@ -476,7 +477,7 @@ async function suggestFocalization(chapterNum: number) {
   suggestingChapter.value = chapterNum
   try {
     const res = await fetch(
-      `http://localhost:8008/api/projects/${props.projectId}/chapters/${chapterNum}/focalization/suggest`
+      apiUrl(`/api/projects/${props.projectId}/chapters/${chapterNum}/focalization/suggest`)
     )
     const data = await res.json()
     if (data.success) {
@@ -532,8 +533,8 @@ async function saveDeclaration() {
   saving.value = true
   try {
     const url = editingDeclaration.value
-      ? `http://localhost:8008/api/projects/${props.projectId}/focalization/${editingDeclaration.value.id}`
-      : `http://localhost:8008/api/projects/${props.projectId}/focalization`
+      ? apiUrl(`/api/projects/${props.projectId}/focalization/${editingDeclaration.value.id}`)
+      : apiUrl(`/api/projects/${props.projectId}/focalization`)
 
     const res = await fetch(url, {
       method: editingDeclaration.value ? 'PUT' : 'POST',
@@ -559,7 +560,7 @@ async function saveDeclaration() {
 
 async function deleteDeclaration(id: number) {
   try {
-    const res = await fetch(`http://localhost:8008/api/projects/${props.projectId}/focalization/${id}`, {
+    const res = await fetch(apiUrl(`/api/projects/${props.projectId}/focalization/${id}`), {
       method: 'DELETE',
     })
     const data = await res.json()

@@ -557,6 +557,7 @@ import ConfidenceBadge from '@/components/shared/ConfidenceBadge.vue'
 import MethodVotingBar from '@/components/shared/MethodVotingBar.vue'
 import { useVoiceAndStyleStore } from '@/stores/voiceAndStyle'
 import type { VoiceProfile } from '@/types'
+import { apiUrl } from '@/config/api'
 
 interface BehaviorProfile {
   character_id: number
@@ -715,7 +716,7 @@ onMounted(async () => {
 const checkLLMStatus = async () => {
   checking.value = true
   try {
-    const response = await fetch('http://localhost:8008/api/llm/status')
+    const response = await fetch(apiUrl('/api/llm/status'))
     const data = await response.json()
     if (data.success) {
       llmAvailable.value = data.data?.available || false

@@ -415,6 +415,7 @@ import type { SidebarTab } from '@/stores/workspace'
 import type { Entity, Alert, Chapter, AlertSource } from '@/types'
 import { transformEntities, transformAlerts, transformChapters } from '@/types/transformers'
 import { useAlertUtils } from '@/composables/useAlertUtils'
+import { apiUrl } from '@/config/api'
 
 const route = useRoute()
 const router = useRouter()
@@ -849,7 +850,7 @@ onUnmounted(() => {
 
 const loadEntities = async (projectId: number) => {
   try {
-    const response = await fetch(`/api/projects/${projectId}/entities`)
+    const response = await fetch(apiUrl(`/api/projects/${projectId}/entities`))
     const data = await response.json()
     if (data.success) {
       entities.value = transformEntities(data.data || [])
@@ -861,7 +862,7 @@ const loadEntities = async (projectId: number) => {
 
 const loadAlerts = async (projectId: number) => {
   try {
-    const response = await fetch(`/api/projects/${projectId}/alerts?status=open`)
+    const response = await fetch(apiUrl(`/api/projects/${projectId}/alerts?status=open`))
     const data = await response.json()
     if (data.success) {
       alerts.value = transformAlerts(data.data || [])
@@ -873,7 +874,7 @@ const loadAlerts = async (projectId: number) => {
 
 const loadChapters = async (projectId: number) => {
   try {
-    const response = await fetch(`/api/projects/${projectId}/chapters`)
+    const response = await fetch(apiUrl(`/api/projects/${projectId}/chapters`))
     const data = await response.json()
     if (data.success) {
       chapters.value = transformChapters(data.data || [])
@@ -898,7 +899,7 @@ const loadChapters = async (projectId: number) => {
 
 const loadRelationships = async (projectId: number) => {
   try {
-    const response = await fetch(`/api/projects/${projectId}/relationships`)
+    const response = await fetch(apiUrl(`/api/projects/${projectId}/relationships`))
     const data = await response.json()
     if (data.success) {
       relationships.value = data.data
@@ -1011,7 +1012,7 @@ const onAlertNavigate = (alert: Alert, source?: AlertSource) => {
 const onAlertResolve = async (alert: Alert) => {
   try {
     const projectId = project.value!.id
-    const response = await fetch(`/api/projects/${projectId}/alerts/${alert.id}/resolve`, { method: 'POST' })
+    const response = await fetch(apiUrl(`/api/projects/${projectId}/alerts/${alert.id}/resolve`), { method: 'POST' })
     if (response.ok) {
       await loadAlerts(projectId)
       selectionStore.clearAll()
@@ -1024,7 +1025,7 @@ const onAlertResolve = async (alert: Alert) => {
 const onAlertDismiss = async (alert: Alert) => {
   try {
     const projectId = project.value!.id
-    const response = await fetch(`/api/projects/${projectId}/alerts/${alert.id}/dismiss`, { method: 'POST' })
+    const response = await fetch(apiUrl(`/api/projects/${projectId}/alerts/${alert.id}/dismiss`), { method: 'POST' })
     if (response.ok) {
       await loadAlerts(projectId)
       selectionStore.clearAll()
@@ -1152,7 +1153,7 @@ const quickExportStyleGuide = async () => {
 
   try {
     // Exportar directamente en formato Markdown (el más común para correctores)
-    const response = await fetch(`/api/projects/${project.value.id}/style-guide?format=markdown`)
+    const response = await fetch(apiUrl(`/api/projects/${project.value.id}/style-guide?format=markdown`))
 
     if (!response.ok) {
       throw new Error('Error al exportar guía de estilo')
@@ -1228,7 +1229,7 @@ const startReanalysis = async () => {
   analysisStore.setAnalyzing(project.value.id, true)
 
   try {
-    const response = await fetch(`/api/projects/${project.value.id}/reanalyze`, { method: 'POST' })
+    const response = await fetch(apiUrl(`/api/projects/${project.value.id}/reanalyze`), { method: 'POST' })
     const data = await response.json()
 
     if (data.success) {

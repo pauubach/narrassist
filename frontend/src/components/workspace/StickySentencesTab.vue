@@ -203,6 +203,7 @@ import AccordionContent from 'primevue/accordioncontent'
 import ProgressSpinner from 'primevue/progressspinner'
 import Message from 'primevue/message'
 import { useToast } from 'primevue/usetoast'
+import { apiUrl } from '@/config/api'
 
 const props = defineProps<{
   projectId: number
@@ -255,7 +256,7 @@ async function analyze() {
   try {
     const thresholdDecimal = threshold.value / 100
     const response = await fetch(
-      `http://localhost:8008/api/projects/${props.projectId}/sticky-sentences?threshold=${thresholdDecimal}`
+      apiUrl(`/api/projects/${props.projectId}/sticky-sentences?threshold=${thresholdDecimal}`)
     )
     const data = await response.json()
 

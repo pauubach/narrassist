@@ -422,6 +422,7 @@ import Message from 'primevue/message'
 import Divider from 'primevue/divider'
 import ProgressBar from 'primevue/progressbar'
 import type { Entity } from '@/types'
+import { apiUrl } from '@/config/api'
 
 // Interfaces para similitud por nombre
 interface NameSimilarity {
@@ -658,7 +659,7 @@ const loadSimilarity = async () => {
 
   loadingSimilarity.value = true
   try {
-    const response = await fetch(`/api/projects/${props.projectId}/entities/similarity`, {
+    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/entities/similarity`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ entity_ids: Array.from(selectedEntityIds.value) })
@@ -680,7 +681,7 @@ const loadPreviewMerge = async () => {
 
   loadingPreview.value = true
   try {
-    const response = await fetch(`/api/projects/${props.projectId}/entities/preview-merge`, {
+    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/entities/preview-merge`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ entity_ids: Array.from(selectedEntityIds.value) })

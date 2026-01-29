@@ -176,6 +176,7 @@ import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import Message from 'primevue/message'
 import ProgressSpinner from 'primevue/progressspinner'
+import { apiUrl } from '@/config/api'
 
 interface EmotionalState {
   emotion: string
@@ -242,7 +243,7 @@ const analyzeEmotions = async () => {
 
   try {
     const response = await fetch(
-      `http://localhost:8008/api/projects/${props.projectId}/characters/${encodeURIComponent(props.characterName)}/emotional-profile`
+      apiUrl(`/api/projects/${props.projectId}/characters/${encodeURIComponent(props.characterName)}/emotional-profile`)
     )
 
     if (!response.ok) {

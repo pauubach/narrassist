@@ -1165,14 +1165,12 @@ async def install_dependencies():
             logger.info(f"Starting dependencies installation using: {python_exe} (version {python_info['python_version']})")
             
             # Lista de dependencias necesarias
+            # sentence-transformers ya trae torch, transformers y scikit-learn como dependencias
+            # No instalar paquetes redundantes - reduce el tiempo de instalación significativamente
             dependencies = [
                 "numpy>=1.24.0",
                 "spacy>=3.7.0",
                 "sentence-transformers>=2.2.0",
-                "transformers>=4.30.0",
-                "torch>=2.0.0",
-                "pandas>=2.0.0",
-                "scikit-learn>=1.3.0",
             ]
             
             # Configurar subprocess para no mostrar ventana en Windows
@@ -1181,7 +1179,7 @@ async def install_dependencies():
                 creation_flags = subprocess.CREATE_NO_WINDOW
 
             # Determinar argumentos de instalación según el entorno
-            pip_install_args = ["--no-cache-dir"]
+            pip_install_args = []
             if IS_EMBEDDED_RUNTIME:
                 # En Python embebido, --user no funciona (ENABLE_USER_SITE=False).
                 # Instalar directamente en el site-packages del Python embebido.

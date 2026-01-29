@@ -135,6 +135,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import Popover from 'primevue/popover'
 import Button from 'primevue/button'
+import { apiUrl } from '@/config/api'
 
 interface DocumentType {
   type: string
@@ -225,7 +226,7 @@ const selectType = async (typeCode: string) => {
 
   loading.value = true
   try {
-    const response = await fetch(`/api/projects/${props.projectId}/document-type`, {
+    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/document-type`), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -255,7 +256,7 @@ const selectSubtype = async (subtypeCode: string | null) => {
   selectedSubtype.value = subtypeCode
   loading.value = true
   try {
-    const response = await fetch(`/api/projects/${props.projectId}/document-type`, {
+    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/document-type`), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -285,7 +286,7 @@ const openCorrectionSettings = () => {
 
 const loadDocumentType = async () => {
   try {
-    const response = await fetch(`/api/projects/${props.projectId}/document-type`)
+    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/document-type`))
     const data = await response.json()
     if (data.success) {
       documentType.value = data.data
@@ -299,7 +300,7 @@ const loadDocumentType = async () => {
 const loadDocumentTypes = async () => {
   try {
     // Use new correction config API
-    const response = await fetch('/api/correction-config/types')
+    const response = await fetch(apiUrl('/api/correction-config/types'))
     const data = await response.json()
     if (data.success) {
       documentTypes.value = data.data
@@ -307,7 +308,7 @@ const loadDocumentTypes = async () => {
   } catch (err) {
     // Fallback to old API
     try {
-      const response = await fetch('/api/document-types')
+      const response = await fetch(apiUrl('/api/document-types'))
       const data = await response.json()
       if (data.success) {
         documentTypes.value = data.data

@@ -27,6 +27,7 @@ import ConfirmDialog from 'primevue/confirmdialog'
 import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
 import DsEmptyState from '@/components/ds/DsEmptyState.vue'
+import { apiUrl } from '@/config/api'
 
 interface GlossaryEntry {
   id: number
@@ -145,7 +146,7 @@ async function loadEntries() {
   loading.value = true
   try {
     const response = await fetch(
-      `http://localhost:8008/api/projects/${props.projectId}/glossary`
+      apiUrl(`/api/projects/${props.projectId}/glossary`)
     )
     const data = await response.json()
 
@@ -203,8 +204,8 @@ async function saveEntry() {
   try {
     const isNew = !editingEntry.value.id
     const url = isNew
-      ? `http://localhost:8008/api/projects/${props.projectId}/glossary`
-      : `http://localhost:8008/api/projects/${props.projectId}/glossary/${editingEntry.value.id}`
+      ? apiUrl(`/api/projects/${props.projectId}/glossary`)
+      : apiUrl(`/api/projects/${props.projectId}/glossary/${editingEntry.value.id}`)
 
     const response = await fetch(url, {
       method: isNew ? 'POST' : 'PUT',
@@ -253,7 +254,7 @@ function confirmDelete(entry: GlossaryEntry) {
 async function deleteEntry(entry: GlossaryEntry) {
   try {
     const response = await fetch(
-      `http://localhost:8008/api/projects/${props.projectId}/glossary/${entry.id}`,
+      apiUrl(`/api/projects/${props.projectId}/glossary/${entry.id}`),
       { method: 'DELETE' }
     )
     const data = await response.json()
@@ -294,7 +295,7 @@ function getCategoryTagSeverity(category: string): 'success' | 'info' | 'warn' |
 async function exportForPublication() {
   try {
     const response = await fetch(
-      `http://localhost:8008/api/projects/${props.projectId}/glossary/export/publication`
+      apiUrl(`/api/projects/${props.projectId}/glossary/export/publication`)
     )
     const data = await response.json()
 

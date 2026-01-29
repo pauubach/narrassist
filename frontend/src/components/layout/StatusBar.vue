@@ -471,16 +471,14 @@ function toggleDetails() {
   left: 50%;
   transform: translateX(-50%);
   width: 380px;
-  /* Fondo explícito para ambos temas */
-  background-color: var(--p-surface-ground, var(--surface-ground, #1e1e1e));
-  border: 1px solid var(--p-surface-border, var(--surface-border, #3f3f46));
+  background-color: var(--p-surface-ground, var(--surface-ground, #ffffff));
+  border: 1px solid var(--p-surface-border, var(--surface-border, #e2e8f0));
   border-radius: 8px;
-  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.12);
   padding: 1rem;
   margin-bottom: 0.5rem;
   z-index: 1000;
-  /* Asegurar que el texto sea visible */
-  color: var(--p-text-color, var(--text-color, #e4e4e7));
+  color: var(--p-text-color, var(--text-color, #1e293b));
 }
 
 .details-header {
@@ -535,7 +533,7 @@ function toggleDetails() {
 .step-percent {
   font-size: 0.6875rem;
   font-weight: 600;
-  color: var(--p-primary-color, #60a5fa) !important;
+  color: var(--p-primary-color, #2563eb);
 }
 
 .step-duration {
@@ -546,14 +544,14 @@ function toggleDetails() {
 .step-progress-bar {
   height: 4px;
   margin-top: 0.35rem;
-  background: var(--p-surface-300, rgba(59, 130, 246, 0.3)) !important;
+  background: var(--p-surface-300, #e2e8f0);
   border-radius: 2px;
   overflow: hidden;
 }
 
 .step-progress-fill {
   height: 100%;
-  background: var(--p-primary-500, #3b82f6) !important;
+  background: var(--p-primary-500, #3b82f6);
   border-radius: 2px;
   transition: width 0.3s ease;
 }
@@ -565,11 +563,11 @@ function toggleDetails() {
   gap: 0.5rem;
   padding: 0.5rem 0.75rem;
   margin-bottom: 0.75rem;
-  background: rgba(59, 130, 246, 0.25) !important;
-  border: 1px solid rgba(96, 165, 250, 0.5);
+  background: var(--p-primary-50, rgba(59, 130, 246, 0.1));
+  border: 1px solid var(--p-primary-200, rgba(59, 130, 246, 0.3));
   border-radius: 6px;
   font-size: 0.8125rem;
-  color: #93c5fd !important; /* Azul claro brillante - siempre visible */
+  color: var(--p-primary-700, #1d4ed8);
 }
 
 .activity-indicator {
@@ -583,7 +581,7 @@ function toggleDetails() {
 .activity-dot {
   width: 8px;
   height: 8px;
-  background: #16a34a !important; /* green-600 - visible en fondo verde claro */
+  background: var(--p-green-500, #16a34a);
   border-radius: 50%;
   animation: pulse 2s ease-in-out infinite;
 }
@@ -615,21 +613,20 @@ function toggleDetails() {
 }
 
 .step-active {
-  /* Fondo azul que funciona en tema oscuro y claro */
-  background: var(--p-primary-100, rgba(59, 130, 246, 0.2)) !important;
-  color: var(--p-primary-color, #60a5fa) !important;
+  background: var(--p-primary-50, rgba(59, 130, 246, 0.08));
+  color: var(--p-primary-700, #1d4ed8);
   border-left: 3px solid var(--p-primary-500, #3b82f6);
   border-radius: 6px;
   padding-left: calc(0.5rem + 3px);
 }
 
 .step-active .step-icon i {
-  color: var(--p-primary-400, #60a5fa) !important;
+  color: var(--p-primary-500, #3b82f6);
 }
 
 .step-active .step-name {
   font-weight: 600;
-  color: var(--p-primary-color, #93c5fd) !important;
+  color: var(--p-primary-700, #1d4ed8);
 }
 
 .step-pending {
@@ -647,13 +644,12 @@ function toggleDetails() {
   gap: 0.5rem;
   margin: 1rem 0 0 0;
   padding: 0.75rem;
-  /* Fondo que funciona en tema oscuro */
-  background-color: var(--p-green-100, rgba(34, 197, 94, 0.15)) !important;
-  border: 1px solid var(--p-green-500, #22c55e);
+  background-color: var(--p-green-50, rgba(34, 197, 94, 0.08));
+  border: 1px solid var(--p-green-300, #86efac);
   border-radius: 6px;
   font-size: 0.8125rem;
   font-weight: 500;
-  color: var(--p-green-400, #4ade80) !important;
+  color: var(--p-green-700, #15803d);
 }
 
 /* Transitions */
@@ -680,6 +676,8 @@ function toggleDetails() {
 .dark .details-panel {
   background-color: var(--p-surface-800, #1e293b);
   border-color: var(--p-surface-600, #475569);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+  color: var(--p-text-color, #e4e4e7);
 }
 
 /* Dark mode: Asegurar texto legible en details-panel */
@@ -718,6 +716,7 @@ function toggleDetails() {
 
 .dark .current-action {
   background: rgba(59, 130, 246, 0.2);
+  border-color: rgba(96, 165, 250, 0.4);
   color: var(--primary-300, #93c5fd);
 }
 
@@ -743,7 +742,7 @@ function toggleDetails() {
 }
 
 .dark .details-note {
-  background: rgba(34, 197, 94, 0.15);
+  background: rgba(34, 197, 94, 0.12);
   border-color: var(--green-700, #15803d);
   color: var(--green-300, #86efac);
 }

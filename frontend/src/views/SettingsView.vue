@@ -685,6 +685,38 @@
                 <h4><i class="pi pi-check-circle"></i> Corrección gramatical</h4>
                 <span class="category-desc">Detecta errores de concordancia, puntuación y otros problemas gramaticales</span>
               </div>
+
+              <!-- LanguageTool status bar -->
+              <div v-if="ltState === 'running'" class="ollama-ready-bar" style="margin-bottom: 0.75rem;">
+                <div class="ollama-ready-info">
+                  <i class="pi pi-check-circle"></i>
+                  <span>Corrector avanzado activo (LanguageTool · +2000 reglas)</span>
+                </div>
+              </div>
+              <div v-else-if="ltState !== 'running'" class="ollama-action-card" :class="'ollama-state-' + (ltState === 'not_installed' ? 'not_installed' : ltState === 'installing' ? 'no_models' : 'not_running')" style="margin-bottom: 0.75rem;">
+                <div class="ollama-action-content">
+                  <i :class="ltState === 'installing' ? 'pi pi-spin pi-spinner' : 'pi pi-exclamation-triangle'"></i>
+                  <div class="ollama-action-text">
+                    <strong>{{
+                      ltState === 'not_installed' ? 'Corrector avanzado no disponible' :
+                      ltState === 'installing' ? 'Instalando corrector avanzado' :
+                      'Corrector avanzado no iniciado'
+                    }}</strong>
+                    <span>{{ ltStatusMessage }}</span>
+                  </div>
+                  <Button
+                    v-if="ltState !== 'installing'"
+                    :label="ltActionConfig.label"
+                    :icon="ltActionConfig.icon"
+                    :severity="ltActionConfig.severity"
+                    size="small"
+                    :loading="ltInstalling || ltStarting"
+                    @click="ltActionConfig.action"
+                  />
+                  <ProgressSpinner v-else style="width: 28px; height: 28px;" />
+                </div>
+              </div>
+
               <div class="methods-grid">
                 <div
                   v-for="(method, key) in getNLPMethodsForCategory('grammar')"
@@ -1361,6 +1393,12 @@ interface SystemCapabilities {
     models: Array<{ name: string; size: number; modified: string }>
     recommended_models: string[]
   }
+  languagetool?: {
+    installed: boolean
+    running: boolean
+    installing: boolean
+    java_available: boolean
+  }
   nlp_methods: {
     coreference: Record<string, NLPMethod>
     ner: Record<string, NLPMethod>
@@ -1489,7 +1527,7 @@ const regionOptions = computed(() => correctionOptions.value?.regions || [
 // Cargar presets de correcciones
 async function loadCorrectionPresets() {
   try {
-    const response = await fetch('/api/correction-presets')
+    const response = await fetch(apiUrl('/api/correction-presets'))
     const data = await response.json()
 
     if (data.success && data.data) {
@@ -1721,7 +1759,7 @@ async function loadFilterData() {
 // Toggle patrón del sistema
 async function toggleSystemPattern(patternId: number, isActive: boolean) {
   try {
-    const response = await fetch(`/api/entity-filters/system-patterns/${patternId}`, {
+    const response = await fetch(apiUrl(`/api/entity-filters/system-patterns/${patternId}`), {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ is_active: isActive })
@@ -1750,7 +1788,7 @@ async function toggleSystemPattern(patternId: number, isActive: boolean) {
 // Eliminar rechazo global del usuario
 async function removeUserRejection(rejection: UserRejection) {
   try {
-    const response = await fetch(`/api/entity-filters/user-rejections/${rejection.id}`, {
+    const response = await fetch(apiUrl(`/api/entity-filters/user-rejections/${rejection.id}`), {
       method: 'DELETE'
     })
 
@@ -1919,10 +1957,10 @@ const ollamaState = computed<OllamaState>(() => {
 const ollamaActionConfig = computed(() => {
   const configs: Record<OllamaState, { label: string; icon: string; severity: string; action: () => void }> = {
     not_installed: {
-      label: 'Configurar analizador',
+      label: 'Instalar analizador',
       icon: 'pi pi-download',
       severity: 'warning',
-      action: openOllamaDownload
+      action: installOllamaFromSettings
     },
     not_running: {
       label: 'Iniciar analizador',
@@ -1956,6 +1994,149 @@ const ollamaStatusMessage = computed(() => {
   return messages[ollamaState.value]
 })
 
+// LanguageTool state (mismo patrón que Ollama)
+type LTState = 'not_installed' | 'installing' | 'installed_not_running' | 'running'
+
+const ltInstalling = ref(false)
+const ltStarting = ref(false)
+let ltPollTimer: ReturnType<typeof setInterval> | null = null
+
+const ltState = computed<LTState>(() => {
+  const lt = systemCapabilities.value?.languagetool
+  if (!lt) return 'not_installed'
+  if (lt.installing || ltInstalling.value) return 'installing'
+  if (!lt.installed) return 'not_installed'
+  if (!lt.running) return 'installed_not_running'
+  return 'running'
+})
+
+const ltActionConfig = computed(() => {
+  const configs: Record<LTState, { label: string; icon: string; severity: string; action: () => void }> = {
+    not_installed: {
+      label: 'Instalar',
+      icon: 'pi pi-download',
+      severity: 'warning',
+      action: installLanguageTool
+    },
+    installing: {
+      label: 'Instalando...',
+      icon: 'pi pi-spin pi-spinner',
+      severity: 'info',
+      action: () => {}
+    },
+    installed_not_running: {
+      label: 'Iniciar',
+      icon: 'pi pi-play',
+      severity: 'warning',
+      action: startLanguageTool
+    },
+    running: {
+      label: 'Activo',
+      icon: 'pi pi-check',
+      severity: 'success',
+      action: () => {}
+    }
+  }
+  return configs[ltState.value]
+})
+
+const ltStatusMessage = computed(() => {
+  const messages: Record<LTState, string> = {
+    not_installed: 'Instala LanguageTool para +2000 reglas de gramática y ortografía',
+    installing: 'Descargando Java y LanguageTool...',
+    installed_not_running: 'LanguageTool instalado pero no activo',
+    running: 'Corrector avanzado activo'
+  }
+  return messages[ltState.value]
+})
+
+const installLanguageTool = async () => {
+  ltInstalling.value = true
+  try {
+    const response = await fetch(apiUrl('/api/languagetool/install'), { method: 'POST' })
+    const result = await response.json()
+    if (result.success) {
+      toast.add({ severity: 'info', summary: 'Instalando LanguageTool', detail: 'Descargando Java y LanguageTool...', life: 5000 })
+      startLTPoll()
+    } else {
+      toast.add({ severity: 'error', summary: 'Error', detail: result.error, life: 5000 })
+      ltInstalling.value = false
+    }
+  } catch (error) {
+    toast.add({ severity: 'error', summary: 'Error de conexión', detail: 'No se pudo conectar con el servidor', life: 3000 })
+    ltInstalling.value = false
+  }
+}
+
+const startLTPoll = () => {
+  if (ltPollTimer) return
+  ltPollTimer = setInterval(async () => {
+    try {
+      const response = await fetch(apiUrl('/api/languagetool/status'))
+      const result = await response.json()
+      if (result.success) {
+        const data = result.data
+        if (data.status !== 'installing') {
+          clearInterval(ltPollTimer!)
+          ltPollTimer = null
+          ltInstalling.value = false
+          await loadSystemCapabilities()
+          if (data.status === 'running') {
+            toast.add({ severity: 'success', summary: 'LanguageTool instalado', detail: 'Corrector avanzado disponible', life: 3000 })
+          } else if (data.is_installed) {
+            toast.add({ severity: 'success', summary: 'LanguageTool instalado', detail: 'Puedes iniciarlo desde aquí', life: 3000 })
+          }
+        }
+      }
+    } catch {
+      // Ignorar errores de polling
+    }
+  }, 2000)
+}
+
+const startLanguageTool = async () => {
+  ltStarting.value = true
+  try {
+    const response = await fetch(apiUrl('/api/languagetool/start'), { method: 'POST' })
+    const result = await response.json()
+    if (result.success) {
+      await loadSystemCapabilities()
+      toast.add({ severity: 'success', summary: 'LanguageTool iniciado', detail: 'Corrector avanzado disponible', life: 3000 })
+    } else {
+      toast.add({ severity: 'error', summary: 'Error', detail: result.error, life: 5000 })
+    }
+  } catch {
+    toast.add({ severity: 'error', summary: 'Error de conexión', detail: 'No se pudo conectar con el servidor', life: 3000 })
+  } finally {
+    ltStarting.value = false
+  }
+}
+
+// Ollama install vía API (con fallback a browser)
+const installOllamaFromSettings = async () => {
+  ollamaStarting.value = true
+  try {
+    const response = await fetch(apiUrl('/api/ollama/install'), { method: 'POST' })
+    const result = await response.json()
+    if (result.success) {
+      toast.add({ severity: 'info', summary: 'Instalando Ollama', detail: 'Descargando e instalando...', life: 5000 })
+      await new Promise(resolve => setTimeout(resolve, 5000))
+      await loadSystemCapabilities()
+      if (systemCapabilities.value?.ollama?.installed) {
+        toast.add({ severity: 'success', summary: 'Ollama instalado', detail: 'Ahora puedes iniciar el analizador', life: 3000 })
+      }
+    } else {
+      // Fallback: abrir navegador
+      openOllamaDownload()
+    }
+  } catch {
+    // Fallback: abrir navegador
+    openOllamaDownload()
+  } finally {
+    ollamaStarting.value = false
+  }
+}
+
 // Debounce timer para sliders
 let saveDebounceTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -1973,6 +2154,10 @@ onMounted(async () => {
 onUnmounted(() => {
   if (saveDebounceTimer) {
     clearTimeout(saveDebounceTimer)
+  }
+  if (ltPollTimer) {
+    clearInterval(ltPollTimer)
+    ltPollTimer = null
   }
 })
 
@@ -2021,7 +2206,7 @@ const loadSettings = () => {
 const loadSystemCapabilities = async (): Promise<boolean> => {
   loadingCapabilities.value = true
   try {
-    const response = await fetch('http://localhost:8008/api/system/capabilities')
+    const response = await fetch(apiUrl('/api/system/capabilities'))
     if (response.ok) {
       const result = await response.json()
       if (result.success && result.data) {
@@ -2268,7 +2453,7 @@ const changeDataLocation = () => {
 
 const loadCurrentDataLocation = async () => {
   try {
-    const response = await fetch('http://localhost:8008/api/maintenance/data-location')
+    const response = await fetch(apiUrl('/api/maintenance/data-location'))
     if (response.ok) {
       const result = await response.json()
       if (result.success && result.data) {
@@ -2295,7 +2480,7 @@ const confirmChangeDataLocation = async () => {
   changingLocation.value = true
 
   try {
-    const response = await fetch('http://localhost:8008/api/maintenance/data-location', {
+    const response = await fetch(apiUrl('/api/maintenance/data-location'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -2352,7 +2537,7 @@ const confirmChangeDataLocation = async () => {
 
 const clearCache = async () => {
   try {
-    const response = await fetch('http://localhost:8008/api/maintenance/clear-cache', {
+    const response = await fetch(apiUrl('/api/maintenance/clear-cache'), {
       method: 'POST'
     })
 
@@ -2437,7 +2622,7 @@ const openDocumentation = () => {
 const startOllama = async () => {
   ollamaStarting.value = true
   try {
-    const response = await fetch('http://localhost:8008/api/ollama/start', {
+    const response = await fetch(apiUrl('/api/ollama/start'), {
       method: 'POST'
     })
     const result = await response.json()
@@ -2518,7 +2703,7 @@ const downloadDefaultModel = async () => {
   })
 
   try {
-    const response = await fetch('http://localhost:8008/api/ollama/pull/llama3.2', {
+    const response = await fetch(apiUrl('/api/ollama/pull/llama3.2'), {
       method: 'POST'
     })
     const result = await response.json()

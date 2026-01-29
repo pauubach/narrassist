@@ -259,6 +259,7 @@ import CharacterSheet from '@/components/CharacterSheet.vue'
 import UndoMergeDialog from '@/components/UndoMergeDialog.vue'
 import type { Entity, CharacterAttribute, CharacterRelationship } from '@/types'
 import { transformEntity, transformEntities } from '@/types/transformers'
+import { apiUrl } from '@/config/api'
 
 const route = useRoute()
 const router = useRouter()
@@ -336,7 +337,7 @@ const loadCharacter = async () => {
 
   try {
     // Cargar personaje
-    const charResponse = await fetch(`/api/projects/${projectId.value}/entities/${characterId.value}`)
+    const charResponse = await fetch(apiUrl(`/api/projects/${projectId.value}/entities/${characterId.value}`))
     const charData = await charResponse.json()
 
     if (charData.success) {
@@ -344,21 +345,21 @@ const loadCharacter = async () => {
       character.value = transformEntity(charData.data)
 
       // Cargar atributos
-      const attrsResponse = await fetch(`/api/projects/${projectId.value}/entities/${characterId.value}/attributes`)
+      const attrsResponse = await fetch(apiUrl(`/api/projects/${projectId.value}/entities/${characterId.value}/attributes`))
       const attrsData = await attrsResponse.json()
       if (attrsData.success) {
         attributes.value = attrsData.data || []
       }
 
       // Cargar relaciones
-      const relsResponse = await fetch(`/api/projects/${projectId.value}/entities/${characterId.value}/relationships`)
+      const relsResponse = await fetch(apiUrl(`/api/projects/${projectId.value}/entities/${characterId.value}/relationships`))
       const relsData = await relsResponse.json()
       if (relsData.success) {
         relationships.value = relsData.data || []
       }
 
       // Cargar personajes disponibles (para relaciones)
-      const entitiesResponse = await fetch(`/api/projects/${projectId.value}/entities`)
+      const entitiesResponse = await fetch(apiUrl(`/api/projects/${projectId.value}/entities`))
       const entitiesData = await entitiesResponse.json()
       if (entitiesData.success) {
         // Transform and filter for characters
@@ -369,7 +370,7 @@ const loadCharacter = async () => {
       }
 
       // Cargar timeline del personaje
-      const timelineResponse = await fetch(`/api/projects/${projectId.value}/entities/${characterId.value}/timeline`)
+      const timelineResponse = await fetch(apiUrl(`/api/projects/${projectId.value}/entities/${characterId.value}/timeline`))
       const timelineData = await timelineResponse.json()
       if (timelineData.success) {
         timeline.value = timelineData.data || []
@@ -406,7 +407,7 @@ const saveCharacter = async () => {
   }
 
   try {
-    const response = await fetch(`/api/projects/${projectId.value}/entities/${characterId.value}`, {
+    const response = await fetch(apiUrl(`/api/projects/${projectId.value}/entities/${characterId.value}`), {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -454,7 +455,7 @@ const saveAttribute = async () => {
   }
 
   try {
-    const response = await fetch(`/api/projects/${projectId.value}/entities/${characterId.value}/attributes`, {
+    const response = await fetch(apiUrl(`/api/projects/${projectId.value}/entities/${characterId.value}/attributes`), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -498,7 +499,7 @@ const onDeleteAttribute = async (attributeId: number | undefined) => {
   }
 
   try {
-    const response = await fetch(`/api/projects/${projectId.value}/entities/${characterId.value}/attributes/${attributeId}`, {
+    const response = await fetch(apiUrl(`/api/projects/${projectId.value}/entities/${characterId.value}/attributes/${attributeId}`), {
       method: 'DELETE',
     })
 
@@ -534,7 +535,7 @@ const saveRelationship = async () => {
   }
 
   try {
-    const response = await fetch(`/api/projects/${projectId.value}/relationships`, {
+    const response = await fetch(apiUrl(`/api/projects/${projectId.value}/relationships`), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -571,7 +572,7 @@ const onDeleteRelationship = async (relationshipId: number | string | undefined)
   if (!confirm('¿Eliminar esta relación?')) return
 
   try {
-    const response = await fetch(`/api/projects/${projectId.value}/relationships/${relationshipId}`, {
+    const response = await fetch(apiUrl(`/api/projects/${projectId.value}/relationships/${relationshipId}`), {
       method: 'DELETE',
     })
 

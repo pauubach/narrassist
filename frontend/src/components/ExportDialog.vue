@@ -512,6 +512,7 @@ import Checkbox from 'primevue/checkbox'
 import Slider from 'primevue/slider'
 import Tag from 'primevue/tag'
 import { useToast } from 'primevue/usetoast'
+import { apiUrl } from '@/config/api'
 
 const props = defineProps<{
   visible: boolean
@@ -675,7 +676,7 @@ const loadDocumentPreview = async () => {
       only_open_alerts: documentOptions.value.onlyOpenAlerts.toString()
     })
 
-    const response = await fetch(`http://localhost:8008/api/projects/${props.projectId}/export/document/preview?${params}`)
+    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/export/document/preview?${params}`))
 
     if (!response.ok) {
       throw new Error('Error al cargar preview')
@@ -715,7 +716,7 @@ const exportDocument = async () => {
       only_open_alerts: documentOptions.value.onlyOpenAlerts.toString()
     })
 
-    const response = await fetch(`http://localhost:8008/api/projects/${props.projectId}/export/document?${params}`)
+    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/export/document?${params}`))
 
     if (!response.ok) {
       // Intentar leer el error como JSON
@@ -760,7 +761,7 @@ const exportDocument = async () => {
 const exportReport = async () => {
   loadingReport.value = true
   try {
-    const response = await fetch(`http://localhost:8008/api/projects/${props.projectId}/export/report?format=${reportFormat.value}`)
+    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/export/report?format=${reportFormat.value}`))
 
     if (!response.ok) {
       throw new Error('Error al exportar informe')
@@ -811,7 +812,7 @@ const exportCharacterSheets = async () => {
       include_mentions: characterOptions.value.includeMentions.toString()
     })
 
-    const response = await fetch(`http://localhost:8008/api/projects/${props.projectId}/export/characters?${params}`)
+    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/export/characters?${params}`))
 
     if (!response.ok) {
       throw new Error('Error al exportar fichas')
@@ -855,7 +856,7 @@ const exportCharacterSheets = async () => {
 const loadStylePreview = async () => {
   loadingPreview.value = true
   try {
-    const response = await fetch(`http://localhost:8008/api/projects/${props.projectId}/style-guide?preview=true`)
+    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/style-guide?preview=true`))
 
     if (!response.ok) {
       throw new Error('Error al cargar preview')
@@ -885,7 +886,7 @@ const loadStylePreview = async () => {
 const exportStyleGuide = async () => {
   loadingStyle.value = true
   try {
-    const response = await fetch(`http://localhost:8008/api/projects/${props.projectId}/style-guide?format=${styleFormat.value}`)
+    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/style-guide?format=${styleFormat.value}`))
 
     if (!response.ok) {
       throw new Error('Error al exportar guía de estilo')
@@ -978,7 +979,7 @@ const exportAlerts = async () => {
       include_resolved: alertOptions.value.includeResolved.toString()
     })
 
-    const response = await fetch(`http://localhost:8008/api/projects/${props.projectId}/export/alerts?${params}`)
+    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/export/alerts?${params}`))
 
     if (!response.ok) {
       throw new Error('Error al exportar alertas')
@@ -1031,7 +1032,7 @@ async function exportCorrected() {
     }
 
     const response = await fetch(
-      `http://localhost:8008/api/projects/${props.projectId}/export/corrected?${params}`
+      apiUrl(`/api/projects/${props.projectId}/export/corrected?${params}`)
     )
 
     if (!response.ok) {
@@ -1078,7 +1079,7 @@ async function exportScrivener() {
     })
 
     const response = await fetch(
-      `http://localhost:8008/api/projects/${props.projectId}/export/scrivener?${params}`
+      apiUrl(`/api/projects/${props.projectId}/export/scrivener?${params}`)
     )
 
     if (!response.ok) {

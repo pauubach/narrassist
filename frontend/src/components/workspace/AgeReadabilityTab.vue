@@ -239,6 +239,7 @@ import AccordionHeader from 'primevue/accordionheader'
 import AccordionContent from 'primevue/accordioncontent'
 import ProgressSpinner from 'primevue/progressspinner'
 import { useToast } from 'primevue/usetoast'
+import { apiUrl } from '@/config/api'
 
 const props = defineProps<{
   projectId: number
@@ -275,7 +276,7 @@ watch(() => props.projectId, () => {
 async function analyze() {
   loading.value = true
   try {
-    let url = `http://localhost:8008/api/projects/${props.projectId}/age-readability`
+    let url = apiUrl(`/api/projects/${props.projectId}/age-readability`)
     if (targetAgeGroup.value) {
       url += `?target_age_group=${targetAgeGroup.value}`
     }

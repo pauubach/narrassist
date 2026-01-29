@@ -253,6 +253,14 @@ fn spawn_embedded_backend(app: &AppHandle) -> Result<Child, String> {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
+    // En Windows, evitar que se muestre una ventana de consola para Python
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+
     command
         .spawn()
         .map_err(|e| format!("Failed to spawn backend process: {}", e))

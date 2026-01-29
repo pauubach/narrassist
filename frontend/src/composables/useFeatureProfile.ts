@@ -6,6 +6,7 @@
  */
 
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import { apiUrl } from '@/config/api'
 
 export type FeatureAvailability = 'enabled' | 'optional' | 'disabled'
 
@@ -39,6 +40,9 @@ export interface FeatureProfile {
     narrative_templates: FeatureAvailability
     narrative_health: FeatureAvailability
     character_archetypes: FeatureAvailability
+    vital_status: FeatureAvailability
+    character_location: FeatureAvailability
+    chapter_progress: FeatureAvailability
     // Consistencia
     attribute_consistency: FeatureAvailability
     world_consistency: FeatureAvailability
@@ -63,6 +67,15 @@ const featureToTabMap: Record<string, string> = {
   echo_repetitions: 'style',
   sentence_variation: 'style',
   emotional_analysis: 'style',
+  age_readability: 'style',
+  sensory_report: 'style',
+  sentence_energy: 'style',
+  narrative_templates: 'style',
+  narrative_health: 'style',
+  character_archetypes: 'style',
+  vital_status: 'alerts',
+  character_location: 'entities',
+  chapter_progress: 'summary',
   attribute_consistency: 'alerts',
   world_consistency: 'alerts',
   glossary: 'glossary',
@@ -73,10 +86,10 @@ const featureToTabMap: Record<string, string> = {
 // Mapeo inverso: qué features determinan la visibilidad de cada tab
 const tabToFeaturesMap: Record<string, string[]> = {
   text: [], // Siempre visible
-  entities: ['characters'],
+  entities: ['characters', 'character_location'],
   relationships: ['relationships'],
   timeline: ['timeline'],
-  alerts: ['attribute_consistency', 'world_consistency'],
+  alerts: ['attribute_consistency', 'world_consistency', 'vital_status'],
   style: [
     'scenes', 'pov_focalization', 'pacing', 'register_analysis',
     'voice_profiles', 'sticky_sentences', 'echo_repetitions',
@@ -85,7 +98,7 @@ const tabToFeaturesMap: Record<string, string[]> = {
     'narrative_templates', 'narrative_health', 'character_archetypes'
   ],
   glossary: ['glossary', 'terminology'],
-  summary: [], // Siempre visible
+  summary: ['chapter_progress'], // chapter_progress + siempre visible como fallback
 }
 
 /**
@@ -126,7 +139,7 @@ export function useFeatureProfile(
     error.value = null
 
     try {
-      const response = await fetch(`/api/projects/${id}/feature-profile`)
+      const response = await fetch(apiUrl(`/api/projects/${id}/feature-profile`))
       const data = await response.json()
 
       if (data.success) {

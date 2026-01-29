@@ -182,6 +182,7 @@ import type { Chapter } from '@/types'
 import type { ApiChapter } from '@/types/api/projects'
 import { transformChapters } from '@/types/transformers/projects'
 import DialogueAttributionPanel from '@/components/DialogueAttributionPanel.vue'
+import { apiUrl } from '@/config/api'
 
 const toast = useToast()
 
@@ -389,8 +390,7 @@ const loadChapterDialogues = async (chapterNumber: number) => {
   if (chapterDialogues.value.has(chapterNumber)) return
 
   try {
-    const API_BASE = 'http://localhost:8008'
-    const response = await fetch(`${API_BASE}/api/projects/${props.projectId}/chapters/${chapterNumber}/dialogue-attributions`)
+    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/chapters/${chapterNumber}/dialogue-attributions`))
     const data = await response.json()
 
     if (data.success && data.data?.attributions) {
@@ -466,14 +466,12 @@ const loadDocument = async () => {
   chapterRefs.clear()
 
   try {
-    const API_BASE = 'http://localhost:8008'
-
     // Si hay capítulos externos, usarlos directamente
     if (props.externalChapters && props.externalChapters.length > 0) {
       chapters.value = props.externalChapters
     } else {
       // Cargar capítulos del API
-      const chaptersResponse = await fetch(`${API_BASE}/api/projects/${props.projectId}/chapters`)
+      const chaptersResponse = await fetch(apiUrl(`/api/projects/${props.projectId}/chapters`))
       const chaptersData = await chaptersResponse.json()
 
       if (!chaptersData.success) {
@@ -491,7 +489,7 @@ const loadDocument = async () => {
     }
 
     // Cargar entidades
-    const entitiesResponse = await fetch(`${API_BASE}/api/projects/${props.projectId}/entities`)
+    const entitiesResponse = await fetch(apiUrl(`/api/projects/${props.projectId}/entities`))
     const entitiesData = await entitiesResponse.json()
 
     if (entitiesData.success) {
@@ -516,8 +514,7 @@ const loadChapterAnnotations = async (chapterNumber: number) => {
   if (chapterAnnotations.value.has(chapterNumber)) return
 
   try {
-    const API_BASE = 'http://localhost:8008'
-    const response = await fetch(`${API_BASE}/api/projects/${props.projectId}/chapters/${chapterNumber}/annotations`)
+    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/chapters/${chapterNumber}/annotations`))
     const data = await response.json()
 
     if (data.success && data.data?.annotations) {
@@ -1264,7 +1261,7 @@ const doExport = async () => {
       })
 
       const response = await fetch(
-        `http://localhost:8008/api/projects/${props.projectId}/export/document?${params}`
+        apiUrl(`/api/projects/${props.projectId}/export/document?${params}`)
       )
 
       if (!response.ok) {

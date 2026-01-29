@@ -67,7 +67,7 @@ watch(() => systemStore.modelsReady, (ready) => {
 // Simulate realistic progress while downloading
 let progressInterval: ReturnType<typeof setInterval> | null = null
 
-function startProgressSimulation() {
+function startProgressSimulation(phase: 'deps' | 'models' = 'models') {
   downloadProgress.value = 0
 
   progressInterval = setInterval(() => {
@@ -75,10 +75,20 @@ function startProgressSimulation() {
       const increment = Math.random() * 2 + 0.5
       downloadProgress.value = Math.min(95, downloadProgress.value + increment)
 
-      if (downloadProgress.value < 50) {
-        currentModel.value = 'spaCy (modelo de lenguaje)'
+      if (phase === 'deps') {
+        if (downloadProgress.value < 30) {
+          currentModel.value = 'Instalando numpy...'
+        } else if (downloadProgress.value < 60) {
+          currentModel.value = 'Instalando spaCy...'
+        } else {
+          currentModel.value = 'Instalando sentence-transformers...'
+        }
       } else {
-        currentModel.value = 'Embeddings (análisis semántico)'
+        if (downloadProgress.value < 50) {
+          currentModel.value = 'spaCy (modelo de lenguaje)'
+        } else {
+          currentModel.value = 'Embeddings (análisis semántico)'
+        }
       }
     }
   }, 500)
@@ -132,14 +142,15 @@ async function startAutomaticDownload() {
 async function startDependenciesInstallation() {
   downloadProgress.value = 0
   currentModel.value = 'Instalando dependencias de Python...'
-  startProgressSimulation()
+  startProgressSimulation('deps')
   await systemStore.installDependencies()
 }
 
 // Watch for dependencies installation
 watch(() => systemStore.dependenciesInstalling, (installing) => {
   if (!installing && downloadPhase.value === 'installing-deps') {
-    // Dependencies installed, check if backend is ready
+    // Dependencies installed, stop dep progress and check if backend is ready
+    stopProgressSimulation()
     setTimeout(async () => {
       await systemStore.checkModelsStatus()
       if (!systemStore.dependenciesNeeded && systemStore.backendLoaded) {

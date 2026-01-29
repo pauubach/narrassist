@@ -5,9 +5,10 @@
  */
 
 import { ref, watch, onMounted } from 'vue'
+import { API_BASE } from '@/config/api'
 import type { ChatMessage, ChatRequest, ChatResponse } from '@/types'
 
-const API_BASE = 'http://localhost:8008'
+
 
 export function useChat(projectId: number) {
   const messages = ref<ChatMessage[]>([])

@@ -2,6 +2,7 @@
  * Store para gestion de licencias
  */
 import { defineStore } from 'pinia'
+import { API_BASE } from '@/config/api'
 import { ref, computed } from 'vue'
 
 // Tipos de licencia
@@ -39,7 +40,7 @@ export interface UsageInfo {
   unlimited: boolean
 }
 
-const API_BASE = 'http://localhost:8008'
+
 
 export const useLicenseStore = defineStore('license', () => {
   // Estado

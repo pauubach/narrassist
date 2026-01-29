@@ -216,6 +216,7 @@ import AccordionHeader from 'primevue/accordionheader'
 import AccordionContent from 'primevue/accordioncontent'
 import ProgressSpinner from 'primevue/progressspinner'
 import { useToast } from 'primevue/usetoast'
+import { apiUrl } from '@/config/api'
 
 const props = defineProps<{
   projectId: number
@@ -242,7 +243,7 @@ async function analyze() {
   loading.value = true
   try {
     const response = await fetch(
-      `http://localhost:8008/api/projects/${props.projectId}/sentence-variation`
+      apiUrl(`/api/projects/${props.projectId}/sentence-variation`)
     )
     const data = await response.json()
 

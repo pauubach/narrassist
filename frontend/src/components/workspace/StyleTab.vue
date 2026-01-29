@@ -30,6 +30,7 @@ import SentenceEnergyTab from './SentenceEnergyTab.vue'
 import NarrativeTemplatesTab from './NarrativeTemplatesTab.vue'
 import NarrativeHealthTab from './NarrativeHealthTab.vue'
 import CharacterArchetypesTab from './CharacterArchetypesTab.vue'
+import { apiUrl } from '@/config/api'
 
 type CategoryId = 'narrative' | 'style' | 'consistency'
 
@@ -155,7 +156,7 @@ watch(() => props.projectId, () => {
 async function loadFeatureAvailability() {
   try {
     const response = await fetch(
-      `http://localhost:8008/api/projects/${props.projectId}/scenes/stats`
+      apiUrl(`/api/projects/${props.projectId}/scenes/stats`)
     )
     const data = await response.json()
     if (data.success) {

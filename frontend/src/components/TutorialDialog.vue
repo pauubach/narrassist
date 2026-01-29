@@ -193,7 +193,7 @@
 
           <!-- Ollama status -->
           <div v-if="systemCapabilities.ollama" class="ollama-status">
-            <h4>Modelos LLM (Ollama)</h4>
+            <h4>Analizador Semántico (Ollama)</h4>
             <div v-if="systemCapabilities.ollama.available" class="ollama-available">
               <Tag value="Disponible" severity="success" />
               <p v-if="systemCapabilities.ollama.models.length > 0">
@@ -203,9 +203,69 @@
                 Instala modelos con: <code>ollama pull llama3.2</code>
               </p>
             </div>
+            <div v-else-if="systemCapabilities.ollama.installed" class="ollama-unavailable">
+              <Tag value="No iniciado" severity="warning" />
+              <Button
+                label="Iniciar Ollama"
+                icon="pi pi-play"
+                size="small"
+                severity="warning"
+                :loading="ollamaStarting"
+                @click="startOllama"
+                class="ml-2"
+              />
+            </div>
             <div v-else class="ollama-unavailable">
-              <Tag value="No disponible" severity="warning" />
-              <p>Instala Ollama para análisis avanzado con IA</p>
+              <Tag value="No instalado" severity="warning" />
+              <Button
+                label="Instalar Ollama"
+                icon="pi pi-download"
+                size="small"
+                severity="warning"
+                :loading="ollamaInstalling"
+                @click="installOllama"
+                class="ml-2"
+              />
+              <p>Análisis avanzado con IA local</p>
+            </div>
+          </div>
+
+          <!-- LanguageTool status -->
+          <div class="ollama-status">
+            <h4>Corrector Avanzado (LanguageTool)</h4>
+            <div v-if="systemCapabilities.languagetool?.running" class="ollama-available">
+              <Tag value="Activo" severity="success" />
+              <p>+2000 reglas de gramática y ortografía</p>
+            </div>
+            <div v-else-if="systemCapabilities.languagetool?.installed" class="ollama-unavailable">
+              <Tag value="No iniciado" severity="warning" />
+              <Button
+                label="Iniciar"
+                icon="pi pi-play"
+                size="small"
+                severity="warning"
+                :loading="ltStarting"
+                @click="startLanguageTool"
+                class="ml-2"
+              />
+            </div>
+            <div v-else-if="systemCapabilities.languagetool?.installing || ltInstalling" class="ollama-unavailable">
+              <Tag value="Instalando..." severity="info" />
+              <ProgressSpinner style="width: 20px; height: 20px; margin-left: 0.5rem;" />
+              <p>Descargando Java y LanguageTool...</p>
+            </div>
+            <div v-else class="ollama-unavailable">
+              <Tag value="No instalado" severity="info" />
+              <Button
+                label="Instalar"
+                icon="pi pi-download"
+                size="small"
+                severity="info"
+                :loading="ltInstalling"
+                @click="installLanguageTool"
+                class="ml-2"
+              />
+              <p>Opcional: corrector gramatical avanzado (~300 MB)</p>
             </div>
           </div>
         </div>
@@ -242,11 +302,11 @@
           <div class="config-tips">
             <p>
               <i class="pi pi-cog"></i>
-              Personaliza los métodos en <strong>Configuración > Métodos NLP</strong>
+              <span>Personaliza los métodos en <strong>Configuración > Métodos NLP</strong></span>
             </p>
             <p>
               <i class="pi pi-question-circle"></i>
-              Accede a este tutorial en <strong>Ayuda > Tutorial de Bienvenida</strong>
+              <span>Accede a este tutorial en <strong>Ayuda > Tutorial de Bienvenida</strong></span>
             </p>
           </div>
         </Message>
@@ -298,6 +358,7 @@ import Tag from 'primevue/tag'
 import Message from 'primevue/message'
 import Checkbox from 'primevue/checkbox'
 import ProgressSpinner from 'primevue/progressspinner'
+import { apiUrl } from '@/config/api'
 
 interface NLPMethod {
   name: string
@@ -319,9 +380,16 @@ interface SystemCapabilities {
     cpu: { name: string }
   }
   ollama: {
+    installed: boolean
     available: boolean
     models: Array<{ name: string; size: number; modified: string }>
     recommended_models: string[]
+  }
+  languagetool?: {
+    installed: boolean
+    running: boolean
+    installing: boolean
+    java_available: boolean
   }
   nlp_methods: {
     coreference: Record<string, NLPMethod>
@@ -415,7 +483,7 @@ onMounted(async () => {
 const loadCapabilities = async () => {
   loadingCapabilities.value = true
   try {
-    const response = await fetch('http://localhost:8008/api/system/capabilities')
+    const response = await fetch(apiUrl('/api/system/capabilities'))
     if (response.ok) {
       const result = await response.json()
       if (result.success && result.data) {
@@ -428,6 +496,99 @@ const loadCapabilities = async () => {
     loadingCapabilities.value = false
   }
 }
+
+// Estado de instalación interactiva en el tutorial
+const ollamaInstalling = ref(false)
+const ollamaStarting = ref(false)
+const ltInstalling = ref(false)
+const ltStarting = ref(false)
+let ollamaPollTimer: ReturnType<typeof setInterval> | null = null
+let ltPollTimer: ReturnType<typeof setInterval> | null = null
+
+const installOllama = async () => {
+  ollamaInstalling.value = true
+  try {
+    const resp = await fetch(apiUrl('/api/ollama/install'), { method: 'POST' })
+    const result = await resp.json()
+    if (result.success) {
+      ollamaPollTimer = setInterval(async () => {
+        try {
+          const statusResp = await fetch(apiUrl('/api/ollama/status'))
+          const statusResult = await statusResp.json()
+          if (statusResult.data?.is_installed) {
+            clearInterval(ollamaPollTimer!)
+            ollamaPollTimer = null
+            ollamaInstalling.value = false
+            await loadCapabilities()
+          }
+        } catch { /* ignore */ }
+      }, 3000)
+    } else {
+      // Fallback: abrir navegador
+      window.open('https://ollama.com/download', '_blank')
+      ollamaInstalling.value = false
+    }
+  } catch {
+    window.open('https://ollama.com/download', '_blank')
+    ollamaInstalling.value = false
+  }
+}
+
+const startOllama = async () => {
+  ollamaStarting.value = true
+  try {
+    await fetch(apiUrl('/api/ollama/start'), { method: 'POST' })
+    await new Promise(r => setTimeout(r, 2000))
+    await loadCapabilities()
+  } finally {
+    ollamaStarting.value = false
+  }
+}
+
+const installLanguageTool = async () => {
+  ltInstalling.value = true
+  try {
+    const resp = await fetch(apiUrl('/api/languagetool/install'), { method: 'POST' })
+    const result = await resp.json()
+    if (result.success) {
+      ltPollTimer = setInterval(async () => {
+        try {
+          const statusResp = await fetch(apiUrl('/api/languagetool/status'))
+          const statusResult = await statusResp.json()
+          if (statusResult.data?.status !== 'installing') {
+            clearInterval(ltPollTimer!)
+            ltPollTimer = null
+            ltInstalling.value = false
+            await loadCapabilities()
+          }
+        } catch { /* ignore */ }
+      }, 2000)
+    } else {
+      ltInstalling.value = false
+    }
+  } catch {
+    ltInstalling.value = false
+  }
+}
+
+const startLanguageTool = async () => {
+  ltStarting.value = true
+  try {
+    await fetch(apiUrl('/api/languagetool/start'), { method: 'POST' })
+    await new Promise(r => setTimeout(r, 2000))
+    await loadCapabilities()
+  } finally {
+    ltStarting.value = false
+  }
+}
+
+// Limpiar timers al cerrar diálogo
+watch(() => props.visible, (newValue) => {
+  if (!newValue) {
+    if (ollamaPollTimer) { clearInterval(ollamaPollTimer); ollamaPollTimer = null }
+    if (ltPollTimer) { clearInterval(ltPollTimer); ltPollTimer = null }
+  }
+})
 
 const nextStep = async () => {
   if (currentStep.value === 0 && !systemCapabilities.value) {
@@ -972,13 +1133,15 @@ const finish = () => {
 .config-tips p {
   margin: 0;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.5rem;
 }
 
 .config-tips i {
   color: var(--p-primary-color);
   width: 1rem;
+  flex-shrink: 0;
+  margin-top: 0.15rem;
 }
 
 /* Footer */
