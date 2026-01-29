@@ -105,9 +105,9 @@
           </div>
 
           <!-- Detail tabs -->
-          <TabView v-model:activeIndex="detailTab" class="detail-tabs">
+          <TabView class="detail-tabs">
             <!-- Info -->
-            <TabPanel header="Info">
+            <TabPanel value="0" header="Info">
               <div class="info-section">
                 <div v-if="selected.aliases?.length" class="info-block">
                   <label>Aliases:</label>
@@ -135,7 +135,7 @@
             </TabPanel>
 
             <!-- Attributes -->
-            <TabPanel header="Atributos">
+            <TabPanel value="1" header="Atributos">
               <div v-if="!Object.keys(selected.attributes || {}).length" class="empty-section">
                 Sin atributos extraídos.
               </div>
@@ -156,7 +156,7 @@
             </TabPanel>
 
             <!-- Relationships -->
-            <TabPanel header="Relaciones">
+            <TabPanel value="2" header="Relaciones">
               <div v-if="!selected.relationships?.length" class="empty-section">
                 Sin relaciones detectadas.
               </div>
@@ -182,10 +182,10 @@
             </TabPanel>
 
             <!-- Voice -->
-            <TabPanel v-if="selected.voice_profile" header="Voz">
+            <TabPanel v-if="selected.voice_profile" value="3" header="Voz">
               <div class="voice-section">
                 <div v-for="(val, key) in selected.voice_profile" :key="key" class="voice-metric">
-                  <span class="voice-key">{{ formatMetricKey(key as string) }}:</span>
+                  <span class="voice-key">{{ formatMetricKey(String(key)) }}:</span>
                   <span class="voice-value">
                     {{ typeof val === 'number' ? val.toFixed(2) : val }}
                   </span>
@@ -194,7 +194,7 @@
             </TabPanel>
 
             <!-- Knowledge -->
-            <TabPanel v-if="selected.knowledge_summary" header="Conocimiento">
+            <TabPanel v-if="selected.knowledge_summary" value="4" header="Conocimiento">
               <div class="knowledge-section">
                 <pre class="knowledge-content">{{ JSON.stringify(selected.knowledge_summary, null, 2) }}</pre>
               </div>
@@ -207,8 +207,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
-import Card from 'primevue/card'
+import { ref, computed } from 'vue'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import InputText from 'primevue/inputtext'
@@ -253,8 +252,6 @@ const bible = ref<StoryBible | null>(null)
 const selectedId = ref<number | null>(null)
 const filterType = ref<string | null>(null)
 const searchQuery = ref('')
-const detailTab = ref(0)
-
 const entityTypes = [
   { value: 'character', label: 'Personajes', icon: 'pi pi-user' },
   { value: 'location', label: 'Lugares', icon: 'pi pi-map-marker' },
@@ -301,9 +298,6 @@ const selected = computed(() => {
   return bible.value.entries.find(e => e.entity_id === selectedId.value) || null
 })
 
-// Reset detail tab when selection changes
-watch(selectedId, () => { detailTab.value = 0 })
-
 function typeIcon(entityType: string): string {
   const upper = entityType.toUpperCase()
   if (['CHARACTER', 'PERSON', 'PER'].includes(upper)) return 'pi pi-user'
@@ -349,7 +343,7 @@ function navigateToEntity(entityId: number) {
 async function loadBible() {
   loading.value = true
   try {
-    const res = await fetch(`${apiUrl}/api/projects/${props.projectId}/story-bible`)
+    const res = await fetch(apiUrl(`/api/projects/${props.projectId}/story-bible`))
     const json = await res.json()
     if (json.success) {
       bible.value = json.data

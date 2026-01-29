@@ -312,7 +312,7 @@ const paginatedDetails = computed(() => {
 async function analyze() {
   loading.value = true
   try {
-    const res = await fetch(`${apiUrl}/api/projects/${props.projectId}/sensory-report`)
+    const res = await fetch(apiUrl(`/api/projects/${props.projectId}/sensory-report`))
     const json = await res.json()
     if (json.success) {
       report.value = json.data
