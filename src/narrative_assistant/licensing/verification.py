@@ -267,6 +267,15 @@ class LicenseVerifier:
             initialize_licensing_schema(self._db)
         return self._db
 
+    @staticmethod
+    def _get_app_version() -> str:
+        """Obtiene la versión actual de la aplicación."""
+        try:
+            from .. import __version__
+            return __version__
+        except Exception:
+            return "unknown"
+
     def _get_current_fingerprint(self) -> str:
         """Obtiene el fingerprint del dispositivo actual."""
         if self._current_fingerprint is None:
@@ -377,7 +386,7 @@ class LicenseVerifier:
             url = urljoin(self._license_server, f"/verify/{license_obj.license_key}")
             data = json.dumps({
                 "device_fingerprint": fingerprint,
-                "app_version": "1.0.0",  # TODO: obtener version real
+                "app_version": self._get_app_version(),
             }).encode("utf-8")
 
             request = urllib.request.Request(

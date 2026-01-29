@@ -408,7 +408,7 @@ class DocxParser(DocumentParser):
             try:
                 if run.font.strike or run.font.double_strike:
                     return True
-            except:
+            except (AttributeError, TypeError):
                 pass
         return False
 

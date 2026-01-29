@@ -14278,7 +14278,8 @@ async def get_defaults_status():
 @app.get("/api/projects/{project_id}/sticky-sentences", response_model=ApiResponse)
 async def get_sticky_sentences(
     project_id: int,
-    threshold: float = Query(0.40, ge=0.0, le=1.0, description="Umbral de glue words (0.0-1.0)")
+    threshold: float = Query(0.40, ge=0.0, le=1.0, description="Umbral de glue words (0.0-1.0)"),
+    chapter_number: Optional[int] = Query(None, description="Filtrar por número de capítulo"),
 ):
     """
     Analiza oraciones pesadas (sticky sentences) en el proyecto.
@@ -14305,6 +14306,10 @@ async def get_sticky_sentences(
         by_severity = {"critical": 0, "high": 0, "medium": 0}
 
         for chapter in chapters:
+            # Filtrar por capítulo si se especifica
+            if chapter_number is not None and chapter.chapter_number != chapter_number:
+                continue
+
             chapter_text = chapter.content or ""
             if not chapter_text.strip():
                 continue

@@ -92,6 +92,7 @@ class UnifiedConfig:
     run_semantic_repetitions: bool = False  # Costoso
     run_coherence: bool = True  # Detectar saltos de coherencia narrativa
     run_register_analysis: bool = False  # Detectar cambios de registro (formal/coloquial)
+    run_sticky_sentences: bool = True  # Detectar oraciones pesadas (exceso de glue words)
 
     # Análisis avanzado
     run_temporal: bool = False  # Experimental
@@ -225,6 +226,7 @@ class UnifiedConfig:
             run_lexical_repetitions=False,
             run_semantic_repetitions=False,
             run_coherence=False,
+            run_sticky_sentences=False,
             run_temporal=False,
             run_focalization=False,
             run_voice_deviations=False,
@@ -374,6 +376,7 @@ class AnalysisContext:
     semantic_repetitions: list = field(default_factory=list)
     coherence_breaks: list = field(default_factory=list)  # Saltos de coherencia
     register_changes: list = field(default_factory=list)  # Cambios de registro narrativo
+    sticky_sentences: list = field(default_factory=list)  # Oraciones pesadas (sticky sentences)
 
     # Marcadores temporales y focalización
     temporal_markers: list = field(default_factory=list)
@@ -1823,6 +1826,9 @@ class UnifiedAnalysisPipeline:
         if self.config.run_pacing:
             tasks.append(("pacing", self._run_pacing_analysis))
 
+        if self.config.run_sticky_sentences:
+            tasks.append(("sticky", self._run_sticky_sentences))
+
         # Ejecutar en paralelo si está configurado
         if self.config.parallel_extraction and len(tasks) > 1:
             self._run_parallel_tasks(tasks, context)
@@ -2076,6 +2082,30 @@ class UnifiedAnalysisPipeline:
             logger.debug(f"Pacing analyzer not available: {e}")
         except Exception as e:
             logger.warning(f"Pacing analysis failed: {e}")
+
+    def _run_sticky_sentences(self, context: AnalysisContext) -> None:
+        """Detectar oraciones pesadas (sticky sentences)."""
+        try:
+            from ..nlp.style.sticky_sentences import get_sticky_sentence_detector
+
+            detector = get_sticky_sentence_detector()
+
+            all_sticky = []
+            for ch in context.chapters:
+                ch_num = ch.chapter_number if hasattr(ch, 'chapter_number') else 0
+                ch_content = ch.content if hasattr(ch, 'content') else str(ch)
+                result = detector.analyze(ch_content, chapter=ch_num)
+                if result.is_success:
+                    all_sticky.extend(result.value.sticky_sentences)
+
+            context.sticky_sentences = all_sticky
+            context.stats["sticky_sentences"] = len(all_sticky)
+            logger.info(f"Sticky sentences: {len(all_sticky)} detected")
+
+        except ImportError as e:
+            logger.debug(f"Sticky sentence detector not available: {e}")
+        except Exception as e:
+            logger.warning(f"Sticky sentence analysis failed: {e}")
 
     # =========================================================================
     # FASE 6: CONSISTENCIA Y ALERTAS
@@ -2469,24 +2499,27 @@ class UnifiedAnalysisPipeline:
                 if result.is_success:
                     context.alerts.append(result.value)
 
-            # Alertas de repeticiones léxicas
+            # Alertas de repeticiones léxicas (word echo)
             for rep in context.lexical_repetitions:
                 word = rep.word if hasattr(rep, 'word') else str(rep)
-                count = rep.count if hasattr(rep, 'count') else 'múltiples'
-                result = engine.create_alert(
+                occurrences = []
+                if hasattr(rep, 'occurrences'):
+                    for occ in rep.occurrences:
+                        if hasattr(occ, 'start_char'):
+                            occurrences.append({
+                                "start_char": occ.start_char,
+                                "end_char": occ.end_char,
+                                "context": occ.context[:100] if hasattr(occ, 'context') and occ.context else "",
+                            })
+                        elif isinstance(occ, dict):
+                            occurrences.append(occ)
+
+                result = engine.create_from_word_echo(
                     project_id=context.project_id,
-                    alert_type="style_repetition",
-                    category=AlertCategory.STYLE,
-                    severity=AlertSeverity.HINT,
-                    title=f"Repetición léxica: '{word}'",
-                    description=f"La palabra '{word}' se repite {count} veces en proximidad",
-                    explanation=f"Se detectó repetición léxica de la palabra '{word}' ({count} ocurrencias). Las repeticiones léxicas pueden afectar la fluidez del texto.",
-                    extra_data={
-                        "word": word,
-                        "count": rep.count if hasattr(rep, 'count') else 0,
-                        "occurrences": rep.occurrences if hasattr(rep, 'occurrences') else [],
-                        "repetition_type": "lexical",
-                    },
+                    word=word,
+                    occurrences=occurrences,
+                    min_distance=self.config.repetition_min_distance,
+                    chapter=rep.chapter if hasattr(rep, 'chapter') else None,
                     confidence=rep.confidence if hasattr(rep, 'confidence') else 0.7,
                 )
                 if result.is_success:
@@ -2593,6 +2626,44 @@ class UnifiedAnalysisPipeline:
                             actual_value=issue.get("actual_value", 0.0),
                             expected_range=tuple(issue.get("expected_range", (0.0, 0.0))),
                             comparison_value=issue.get("comparison_value"),
+                        )
+                        if result.is_success:
+                            context.alerts.append(result.value)
+
+            # Alertas de oraciones pesadas (sticky sentences)
+            for sent in context.sticky_sentences:
+                severity_val = sent.severity.value if hasattr(sent.severity, 'value') else str(sent.severity)
+                # Solo alertar a partir de severidad medium
+                if severity_val in ("medium", "high", "critical"):
+                    result = engine.create_from_sticky_sentence(
+                        project_id=context.project_id,
+                        sentence=sent.text[:200] if len(sent.text) > 200 else sent.text,
+                        glue_percentage=sent.glue_percentage,
+                        chapter=sent.chapter if hasattr(sent, 'chapter') else None,
+                        start_char=sent.start_char if hasattr(sent, 'start_char') else None,
+                        end_char=sent.end_char if hasattr(sent, 'end_char') else None,
+                        severity_level=severity_val,
+                        confidence=0.75,
+                    )
+                    if result.is_success:
+                        context.alerts.append(result.value)
+
+            # Alertas de cambios de registro narrativo
+            for change in context.register_changes:
+                if isinstance(change, dict):
+                    severity = change.get("severity", "medium")
+                    if severity in ("medium", "high", "critical"):
+                        result = engine.create_from_register_change(
+                            project_id=context.project_id,
+                            from_register=change.get("from_register", "unknown"),
+                            to_register=change.get("to_register", "unknown"),
+                            severity_level=severity,
+                            chapter=change.get("chapter", 0),
+                            position=change.get("position", 0),
+                            context_before=change.get("context_before", "")[:200],
+                            context_after=change.get("context_after", "")[:200],
+                            explanation=change.get("explanation", "Cambio de registro detectado"),
+                            confidence=change.get("confidence", 0.7),
                         )
                         if result.is_success:
                             context.alerts.append(result.value)
