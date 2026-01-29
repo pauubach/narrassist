@@ -1,7 +1,7 @@
 # Estado del Proyecto - Narrative Assistant
 
 > **Última actualización**: 2026-01-29
-> **Versión**: 0.3.20
+> **Versión**: 0.3.21
 > **Changelog**: Ver [CHANGELOG.md](CHANGELOG.md)
 > **Roadmap**: Ver [ROADMAP.md](ROADMAP.md)
 
@@ -638,17 +638,17 @@ cargo tauri build --target x86_64-pc-windows-msvc
 
 | Módulo | Completitud | Prioridad | Estado |
 |--------|-------------|-----------|--------|
-| **Coreference Resolver** | 95% | ✅ | Votación expuesta en API con razonamiento |
+| **Coreference Resolver** | 98% | ✅ | Votación + correcciones manuales persistidas (v0.3.21) |
 | **Register Analysis** | 95% | ✅ | Stats agregadas + per-chapter (v0.3.20) |
-| **Voice Profiles** | 90% | ✅ | 18 métricas + comparación entre personajes (v0.3.20) |
-| **Speaker Attribution** | 90% | ✅ | Voice matching mejorado + alternativas (v0.3.20) |
-| **Pacing Analysis** | 90% | ✅ | Curva de tensión implementada |
+| **Voice Profiles** | 95% | ✅ | 18 métricas + comparación + caché en BD (v0.3.21) |
+| **Speaker Attribution** | 95% | ✅ | Voice matching + correcciones usuario (v0.3.21) |
+| **Pacing Analysis** | 95% | ✅ | Curva de tensión + benchmarks por género (v0.3.21) |
 | **Character Knowledge** | 85% | ✅ | Extracción rules + LLM + hybrid funcional |
 | **Sticky Sentences** | 95% | ✅ | Integrado en pipeline unificado |
 
 ### Detalle por Módulo
 
-#### Coreference Resolver (95%) ✅
+#### Coreference Resolver (98%) ✅
 
 **✅ Implementado:**
 - Sistema de votación con 4 métodos: LLM (35%), embeddings (30%), morpho (20%), heuristics (15%)
@@ -656,9 +656,10 @@ cargo tauri build --target x86_64-pc-windows-msvc
 - Cadenas de correferencia y menciones no resueltas
 - **Razonamiento expuesto en API** (v0.3.14): scores individuales por método
 - **Endpoint API** con detalle de votación
+- **Correcciones manuales persistidas** (v0.3.21): tabla `coreference_corrections` + API CRUD
 
-**❌ Falta:**
-- Persistencia de decisiones del usuario (correcciones manuales)
+**❌ Falta (menor):**
+- Re-aplicar correcciones durante re-análisis automático
 
 **Archivo**: `src/narrative_assistant/nlp/coreference_resolver.py`
 
@@ -677,7 +678,7 @@ cargo tauri build --target x86_64-pc-windows-msvc
 
 **Archivo**: `src/narrative_assistant/voice/register.py`
 
-#### Voice Profiles (90%) ✅
+#### Voice Profiles (95%) ✅
 
 **✅ Implementado:**
 - `VoiceMetrics` dataclass con 18 métricas
@@ -687,13 +688,11 @@ cargo tauri build --target x86_64-pc-windows-msvc
 - `characteristic_words` y `top_fillers` retornados en API
 - Frontend types y transformers sincronizados
 - **Endpoint de comparación** `/voice-profiles/compare` (v0.3.20)
-
-**❌ Falta (menor):**
-- Persistencia de perfiles en BD (actualmente se calculan on-the-fly)
+- **Caché en BD** (v0.3.21): perfiles persistidos en `voice_profiles`, param `force_refresh`
 
 **Archivo**: `src/narrative_assistant/voice/profiles.py`
 
-#### Speaker Attribution (90%) ✅
+#### Speaker Attribution (95%) ✅
 
 **✅ Implementado:**
 - 5 métodos de atribución: explicit_verb, alternation, voice_profile, proximity, none
@@ -702,13 +701,11 @@ cargo tauri build --target x86_64-pc-windows-msvc
 - **Voice matching mejorado** (v0.3.20): scoring multi-métrica (formalidad, longitud, puntuación, muletillas, vocabulario)
 - **Alternativas rankeadas** (v0.3.20): `alternative_speakers` poblado con candidatos y scores
 - API endpoint operativo con voice profiles integrados
-
-**❌ Falta (menor):**
-- Feedback loop de correcciones del usuario
+- **Correcciones del usuario** (v0.3.21): tabla `speaker_corrections` + API CRUD
 
 **Archivo**: `src/narrative_assistant/voice/speaker_attribution.py`
 
-#### Pacing Analysis (90%) ✅
+#### Pacing Analysis (95%) ✅
 
 **✅ Implementado:**
 - `PacingAnalyzer` con 10 tipos de problemas
@@ -716,10 +713,10 @@ cargo tauri build --target x86_64-pc-windows-msvc
 - Detección de capítulos "muertos"
 - **Curva de tensión narrativa** implementada (v0.3.13, pacing.py:676-811)
 - **Alertas de pacing** conectadas al pipeline
+- **Benchmarks por género** (v0.3.21): 12 géneros con rangos de referencia + API de comparación
 
-**❌ Falta:**
-- Comparación con benchmarks de género
-- Sugerencias específicas de corrección
+**❌ Falta (menor):**
+- Sugerencias específicas de corrección basadas en benchmark
 
 **Archivo**: `src/narrative_assistant/analysis/pacing.py`
 
@@ -747,13 +744,13 @@ cargo tauri build --target x86_64-pc-windows-msvc
 | Módulo | Estado | Notas |
 |--------|--------|-------|
 | Character Knowledge | 85% | Extracción rules + LLM funcional. Falta: benchmarks formales |
-| Voice Profiles | 90% | ✅ 18 métricas + comparación (v0.3.20). Falta: persistencia en BD |
-| Register agregado | 95% | ✅ Stats agregadas (v0.3.20). Falta: benchmarks por género |
-| Speaker Attribution | 90% | ✅ Voice matching mejorado + alternativas (v0.3.20). Falta: feedback loop |
-| Coreference razonamiento | 95% | ✅ Completado v0.3.14. Falta: persistencia de correcciones manuales |
-| Pacing tension curve | 90% | ✅ Completado v0.3.13. Falta: benchmarks de género |
+| Voice Profiles | 95% | ✅ Caché en BD (v0.3.21) |
+| Register agregado | 95% | ✅ Stats agregadas (v0.3.20) |
+| Speaker Attribution | 95% | ✅ Correcciones usuario (v0.3.21) |
+| Coreference razonamiento | 98% | ✅ Correcciones manuales persistidas (v0.3.21) |
+| Pacing tension curve | 95% | ✅ Benchmarks por género (v0.3.21) |
 
-**Total restante**: Mejoras menores (benchmarks, feedback loops, persistencia de perfiles)
+**Total restante**: Mejoras menores (benchmarks Knowledge, sugerencias pacing)
 
 ---
 

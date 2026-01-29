@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 _database_lock = threading.Lock()
 
 # Versión del schema actual
-SCHEMA_VERSION = 10
+SCHEMA_VERSION = 11
 
 # Tablas esenciales que deben existir para una BD válida
 # Solo incluir las tablas básicas definidas en SCHEMA_SQL
@@ -719,8 +719,49 @@ CREATE TABLE IF NOT EXISTS correction_config_overrides (
 
 CREATE INDEX IF NOT EXISTS idx_config_overrides_type ON correction_config_overrides(type_code);
 
+-- Correcciones manuales de correferencias (versión 11)
+CREATE TABLE IF NOT EXISTS coreference_corrections (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    mention_start_char INTEGER NOT NULL,
+    mention_end_char INTEGER NOT NULL,
+    mention_text TEXT NOT NULL,
+    chapter_number INTEGER,
+    original_entity_id INTEGER,          -- Asignación automática original (NULL si sin asignar)
+    corrected_entity_id INTEGER,         -- Asignación manual del usuario (NULL = desvincular)
+    correction_type TEXT NOT NULL DEFAULT 'reassign',  -- reassign, unlink, confirm
+    notes TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    FOREIGN KEY (original_entity_id) REFERENCES entities(id) ON DELETE SET NULL,
+    FOREIGN KEY (corrected_entity_id) REFERENCES entities(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_coref_corrections_project ON coreference_corrections(project_id);
+CREATE INDEX IF NOT EXISTS idx_coref_corrections_mention ON coreference_corrections(project_id, mention_start_char, mention_end_char);
+
+-- Correcciones manuales de atribución de diálogos (versión 11)
+CREATE TABLE IF NOT EXISTS speaker_corrections (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    chapter_number INTEGER NOT NULL,
+    dialogue_start_char INTEGER NOT NULL,
+    dialogue_end_char INTEGER NOT NULL,
+    dialogue_text TEXT NOT NULL,
+    original_speaker_id INTEGER,          -- Hablante asignado automáticamente (NULL si no asignado)
+    corrected_speaker_id INTEGER,         -- Hablante correcto según el usuario
+    notes TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    FOREIGN KEY (original_speaker_id) REFERENCES entities(id) ON DELETE SET NULL,
+    FOREIGN KEY (corrected_speaker_id) REFERENCES entities(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_speaker_corrections_project ON speaker_corrections(project_id);
+CREATE INDEX IF NOT EXISTS idx_speaker_corrections_chapter ON speaker_corrections(project_id, chapter_number);
+
 -- Insertar versión del schema
-INSERT OR REPLACE INTO schema_info (key, value) VALUES ('version', '10');
+INSERT OR REPLACE INTO schema_info (key, value) VALUES ('version', '11');
 """
 
 

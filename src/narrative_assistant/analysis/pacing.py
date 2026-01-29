@@ -151,6 +151,333 @@ ACTION_VERBS = {
 }
 
 
+@dataclass
+class GenreBenchmarks:
+    """Benchmarks de referencia para un género literario."""
+    genre_code: str
+    genre_label: str
+    min_chapter_words: int
+    max_chapter_words: int
+    dialogue_ratio_range: tuple[float, float]
+    avg_sentence_length_range: tuple[float, float]
+    avg_tension: tuple[float, float]  # Rango típico de tensión media
+    expected_arc_types: list[str]  # Tipos de arco típicos del género
+    chapter_variance_threshold: float
+    dense_block_threshold: int
+    notes: str = ""
+
+    def to_dict(self) -> dict:
+        return {
+            "genre_code": self.genre_code,
+            "genre_label": self.genre_label,
+            "min_chapter_words": self.min_chapter_words,
+            "max_chapter_words": self.max_chapter_words,
+            "dialogue_ratio_range": list(self.dialogue_ratio_range),
+            "avg_sentence_length_range": list(self.avg_sentence_length_range),
+            "avg_tension": list(self.avg_tension),
+            "expected_arc_types": self.expected_arc_types,
+            "chapter_variance_threshold": self.chapter_variance_threshold,
+            "dense_block_threshold": self.dense_block_threshold,
+            "notes": self.notes,
+        }
+
+
+# Benchmarks de referencia por género literario
+# Basados en análisis de convenciones editoriales y guías de estilo
+GENRE_BENCHMARKS: dict[str, GenreBenchmarks] = {
+    "FIC": GenreBenchmarks(
+        genre_code="FIC",
+        genre_label="Ficción narrativa",
+        min_chapter_words=800,
+        max_chapter_words=8000,
+        dialogue_ratio_range=(0.20, 0.55),
+        avg_sentence_length_range=(12.0, 22.0),
+        avg_tension=(0.35, 0.65),
+        expected_arc_types=["mountain", "wave", "rising"],
+        chapter_variance_threshold=2.0,
+        dense_block_threshold=500,
+        notes="Equilibrio entre narración y diálogo. Arco clásico esperado.",
+    ),
+    "MEM": GenreBenchmarks(
+        genre_code="MEM",
+        genre_label="Memorias / Autobiografía",
+        min_chapter_words=1000,
+        max_chapter_words=10000,
+        dialogue_ratio_range=(0.05, 0.35),
+        avg_sentence_length_range=(15.0, 28.0),
+        avg_tension=(0.20, 0.50),
+        expected_arc_types=["wave", "rising", "mountain"],
+        chapter_variance_threshold=2.5,
+        dense_block_threshold=700,
+        notes="Predomina la narración reflexiva. Capítulos más largos.",
+    ),
+    "BIO": GenreBenchmarks(
+        genre_code="BIO",
+        genre_label="Biografía",
+        min_chapter_words=1500,
+        max_chapter_words=12000,
+        dialogue_ratio_range=(0.05, 0.30),
+        avg_sentence_length_range=(16.0, 28.0),
+        avg_tension=(0.20, 0.45),
+        expected_arc_types=["rising", "mountain", "wave"],
+        chapter_variance_threshold=2.5,
+        dense_block_threshold=800,
+        notes="Narración expositiva predominante con citas ocasionales.",
+    ),
+    "CEL": GenreBenchmarks(
+        genre_code="CEL",
+        genre_label="Libro de famosos / Influencer",
+        min_chapter_words=500,
+        max_chapter_words=5000,
+        dialogue_ratio_range=(0.10, 0.40),
+        avg_sentence_length_range=(10.0, 20.0),
+        avg_tension=(0.30, 0.55),
+        expected_arc_types=["wave", "mountain"],
+        chapter_variance_threshold=2.0,
+        dense_block_threshold=400,
+        notes="Capítulos cortos y dinámicos. Lenguaje accesible.",
+    ),
+    "DIV": GenreBenchmarks(
+        genre_code="DIV",
+        genre_label="Divulgación",
+        min_chapter_words=1500,
+        max_chapter_words=12000,
+        dialogue_ratio_range=(0.0, 0.15),
+        avg_sentence_length_range=(18.0, 30.0),
+        avg_tension=(0.15, 0.40),
+        expected_arc_types=["rising", "flat", "wave"],
+        chapter_variance_threshold=2.0,
+        dense_block_threshold=1000,
+        notes="Prosa expositiva densa. Poco o nulo diálogo.",
+    ),
+    "ENS": GenreBenchmarks(
+        genre_code="ENS",
+        genre_label="Ensayo",
+        min_chapter_words=1500,
+        max_chapter_words=15000,
+        dialogue_ratio_range=(0.0, 0.10),
+        avg_sentence_length_range=(20.0, 35.0),
+        avg_tension=(0.15, 0.35),
+        expected_arc_types=["rising", "mountain", "flat"],
+        chapter_variance_threshold=3.0,
+        dense_block_threshold=1200,
+        notes="Prosa académica con oraciones largas. Alta densidad léxica.",
+    ),
+    "AUT": GenreBenchmarks(
+        genre_code="AUT",
+        genre_label="Autoayuda",
+        min_chapter_words=800,
+        max_chapter_words=6000,
+        dialogue_ratio_range=(0.05, 0.25),
+        avg_sentence_length_range=(10.0, 20.0),
+        avg_tension=(0.25, 0.50),
+        expected_arc_types=["rising", "mountain", "wave"],
+        chapter_variance_threshold=1.8,
+        dense_block_threshold=500,
+        notes="Capítulos regulares, lenguaje directo. Incluye ejercicios y anécdotas.",
+    ),
+    "TEC": GenreBenchmarks(
+        genre_code="TEC",
+        genre_label="Manual técnico",
+        min_chapter_words=500,
+        max_chapter_words=8000,
+        dialogue_ratio_range=(0.0, 0.05),
+        avg_sentence_length_range=(14.0, 25.0),
+        avg_tension=(0.10, 0.25),
+        expected_arc_types=["flat", "rising"],
+        chapter_variance_threshold=3.0,
+        dense_block_threshold=1500,
+        notes="Prosa técnica sin diálogo. Ritmo uniforme.",
+    ),
+    "PRA": GenreBenchmarks(
+        genre_code="PRA",
+        genre_label="Libro práctico (cocina, DIY)",
+        min_chapter_words=300,
+        max_chapter_words=4000,
+        dialogue_ratio_range=(0.0, 0.10),
+        avg_sentence_length_range=(8.0, 18.0),
+        avg_tension=(0.15, 0.35),
+        expected_arc_types=["flat", "wave"],
+        chapter_variance_threshold=3.0,
+        dense_block_threshold=600,
+        notes="Secciones cortas con instrucciones. Oraciones concisas.",
+    ),
+    "INF": GenreBenchmarks(
+        genre_code="INF",
+        genre_label="Infantil / Juvenil",
+        min_chapter_words=200,
+        max_chapter_words=3000,
+        dialogue_ratio_range=(0.25, 0.65),
+        avg_sentence_length_range=(8.0, 16.0),
+        avg_tension=(0.35, 0.70),
+        expected_arc_types=["mountain", "wave"],
+        chapter_variance_threshold=2.0,
+        dense_block_threshold=300,
+        notes="Capítulos cortos, mucho diálogo, oraciones simples.",
+    ),
+    "DRA": GenreBenchmarks(
+        genre_code="DRA",
+        genre_label="Teatro / Guion",
+        min_chapter_words=200,
+        max_chapter_words=5000,
+        dialogue_ratio_range=(0.60, 0.95),
+        avg_sentence_length_range=(6.0, 15.0),
+        avg_tension=(0.40, 0.75),
+        expected_arc_types=["mountain", "rising", "wave"],
+        chapter_variance_threshold=2.5,
+        dense_block_threshold=200,
+        notes="Dominado por diálogo. Acotaciones breves.",
+    ),
+    "GRA": GenreBenchmarks(
+        genre_code="GRA",
+        genre_label="Novela gráfica / Cómic",
+        min_chapter_words=100,
+        max_chapter_words=2000,
+        dialogue_ratio_range=(0.30, 0.80),
+        avg_sentence_length_range=(5.0, 12.0),
+        avg_tension=(0.40, 0.70),
+        expected_arc_types=["mountain", "wave"],
+        chapter_variance_threshold=2.0,
+        dense_block_threshold=200,
+        notes="Texto breve. Alta proporción de diálogo en bocadillos.",
+    ),
+}
+
+
+def get_genre_benchmarks(genre_code: str) -> Optional[GenreBenchmarks]:
+    """Obtiene los benchmarks para un género dado."""
+    return GENRE_BENCHMARKS.get(genre_code)
+
+
+def compare_with_benchmarks(
+    metrics: dict,
+    genre_code: str,
+) -> Optional[dict]:
+    """
+    Compara las métricas de un documento contra los benchmarks de su género.
+
+    Args:
+        metrics: Diccionario con métricas globales del documento
+        genre_code: Código del género (FIC, MEM, TEC, etc.)
+
+    Returns:
+        Diccionario con comparación o None si el género no tiene benchmarks
+    """
+    benchmarks = GENRE_BENCHMARKS.get(genre_code)
+    if not benchmarks:
+        return None
+
+    deviations = []
+
+    # Comparar longitud de capítulos
+    avg_words = metrics.get("avg_chapter_words", 0)
+    if avg_words > 0:
+        if avg_words < benchmarks.min_chapter_words:
+            deviations.append({
+                "metric": "avg_chapter_words",
+                "label": "Longitud media de capítulo",
+                "actual": round(avg_words),
+                "expected_range": [benchmarks.min_chapter_words, benchmarks.max_chapter_words],
+                "status": "below",
+                "message": f"Los capítulos son cortos para {benchmarks.genre_label} "
+                           f"(media {round(avg_words)} vs mínimo {benchmarks.min_chapter_words})",
+            })
+        elif avg_words > benchmarks.max_chapter_words:
+            deviations.append({
+                "metric": "avg_chapter_words",
+                "label": "Longitud media de capítulo",
+                "actual": round(avg_words),
+                "expected_range": [benchmarks.min_chapter_words, benchmarks.max_chapter_words],
+                "status": "above",
+                "message": f"Los capítulos son largos para {benchmarks.genre_label} "
+                           f"(media {round(avg_words)} vs máximo {benchmarks.max_chapter_words})",
+            })
+
+    # Comparar ratio de diálogo
+    dialogue_ratio = metrics.get("dialogue_ratio", -1)
+    if dialogue_ratio >= 0:
+        low, high = benchmarks.dialogue_ratio_range
+        if dialogue_ratio < low:
+            deviations.append({
+                "metric": "dialogue_ratio",
+                "label": "Ratio de diálogo",
+                "actual": round(dialogue_ratio, 3),
+                "expected_range": [low, high],
+                "status": "below",
+                "message": f"Poco diálogo para {benchmarks.genre_label} "
+                           f"({round(dialogue_ratio * 100, 1)}% vs {round(low * 100)}%-{round(high * 100)}%)",
+            })
+        elif dialogue_ratio > high:
+            deviations.append({
+                "metric": "dialogue_ratio",
+                "label": "Ratio de diálogo",
+                "actual": round(dialogue_ratio, 3),
+                "expected_range": [low, high],
+                "status": "above",
+                "message": f"Mucho diálogo para {benchmarks.genre_label} "
+                           f"({round(dialogue_ratio * 100, 1)}% vs {round(low * 100)}%-{round(high * 100)}%)",
+            })
+
+    # Comparar longitud de oraciones
+    avg_sent_len = metrics.get("avg_sentence_length", 0)
+    if avg_sent_len > 0:
+        low, high = benchmarks.avg_sentence_length_range
+        if avg_sent_len < low:
+            deviations.append({
+                "metric": "avg_sentence_length",
+                "label": "Longitud media de oración",
+                "actual": round(avg_sent_len, 1),
+                "expected_range": [low, high],
+                "status": "below",
+                "message": f"Oraciones cortas para {benchmarks.genre_label} "
+                           f"({round(avg_sent_len, 1)} vs {low}-{high} palabras)",
+            })
+        elif avg_sent_len > high:
+            deviations.append({
+                "metric": "avg_sentence_length",
+                "label": "Longitud media de oración",
+                "actual": round(avg_sent_len, 1),
+                "expected_range": [low, high],
+                "status": "above",
+                "message": f"Oraciones largas para {benchmarks.genre_label} "
+                           f"({round(avg_sent_len, 1)} vs {low}-{high} palabras)",
+            })
+
+    # Comparar tensión media
+    avg_tension = metrics.get("avg_tension")
+    if avg_tension is not None:
+        low, high = benchmarks.avg_tension
+        tension_status = "within"
+        if avg_tension < low:
+            tension_status = "below"
+        elif avg_tension > high:
+            tension_status = "above"
+        if tension_status != "within":
+            deviations.append({
+                "metric": "avg_tension",
+                "label": "Tensión narrativa media",
+                "actual": round(avg_tension, 3),
+                "expected_range": [low, high],
+                "status": tension_status,
+                "message": f"Tensión {'baja' if tension_status == 'below' else 'alta'} "
+                           f"para {benchmarks.genre_label} "
+                           f"({round(avg_tension, 2)} vs {low}-{high})",
+            })
+
+    # Comparar arco narrativo
+    arc_type = metrics.get("tension_arc_type", "")
+    arc_match = arc_type in benchmarks.expected_arc_types if arc_type else None
+
+    return {
+        "genre": benchmarks.to_dict(),
+        "deviations": deviations,
+        "deviation_count": len(deviations),
+        "arc_type_match": arc_match,
+        "arc_type_expected": benchmarks.expected_arc_types,
+        "arc_type_actual": arc_type,
+    }
+
+
 class PacingAnalyzer:
     """
     Analizador de ritmo narrativo.

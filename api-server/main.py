@@ -63,7 +63,7 @@ import shutil
 # Setup logging IMMEDIATELY for early debugging
 import logging
 
-BACKEND_VERSION = "0.3.20"
+BACKEND_VERSION = "0.3.21"
 IS_EMBEDDED_RUNTIME = os.environ.get("NA_EMBEDDED") == "1" or "python-embed" in (sys.executable or "").lower()
 
 # Configure logging FIRST before using any loggers
@@ -3802,6 +3802,192 @@ def _classify_mention_type(surface_form: str) -> str:
 
     # Por defecto, nombre propio
     return "proper_noun"
+
+
+# ============================================================================
+# Endpoints - Correcciones Manuales de Correferencias
+# ============================================================================
+
+@app.get("/api/projects/{project_id}/coreference-corrections", response_model=ApiResponse)
+async def list_coreference_corrections(project_id: int):
+    """Lista todas las correcciones manuales de correferencias de un proyecto."""
+    try:
+        db = get_database()
+        with db.connect() as conn:
+            rows = conn.execute(
+                """SELECT cc.id, cc.mention_start_char, cc.mention_end_char,
+                          cc.mention_text, cc.chapter_number,
+                          cc.original_entity_id, cc.corrected_entity_id,
+                          cc.correction_type, cc.notes, cc.created_at,
+                          e_orig.canonical_name AS original_entity_name,
+                          e_corr.canonical_name AS corrected_entity_name
+                   FROM coreference_corrections cc
+                   LEFT JOIN entities e_orig ON cc.original_entity_id = e_orig.id
+                   LEFT JOIN entities e_corr ON cc.corrected_entity_id = e_corr.id
+                   WHERE cc.project_id = ?
+                   ORDER BY cc.created_at DESC""",
+                (project_id,)
+            ).fetchall()
+
+        corrections = []
+        for row in rows:
+            corrections.append({
+                "id": row[0],
+                "mentionStartChar": row[1],
+                "mentionEndChar": row[2],
+                "mentionText": row[3],
+                "chapterNumber": row[4],
+                "originalEntityId": row[5],
+                "correctedEntityId": row[6],
+                "correctionType": row[7],
+                "notes": row[8],
+                "createdAt": row[9],
+                "originalEntityName": row[10],
+                "correctedEntityName": row[11],
+            })
+
+        return ApiResponse(success=True, data={
+            "projectId": project_id,
+            "corrections": corrections,
+            "totalCorrections": len(corrections),
+        })
+    except Exception as e:
+        logger.error(f"Error listing coreference corrections: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.post("/api/projects/{project_id}/coreference-corrections", response_model=ApiResponse)
+async def create_coreference_correction(project_id: int, request: Request):
+    """
+    Crea una corrección manual de correferencia.
+
+    Body JSON:
+    - mention_start_char: Posición inicio de la mención
+    - mention_end_char: Posición fin de la mención
+    - mention_text: Texto de la mención
+    - chapter_number: Número de capítulo (opcional)
+    - original_entity_id: Entidad asignada automáticamente (nullable)
+    - corrected_entity_id: Entidad correcta según el usuario (nullable = desvincular)
+    - correction_type: "reassign" | "unlink" | "confirm"
+    - notes: Notas del corrector (opcional)
+    """
+    try:
+        body = await request.json()
+
+        mention_start = body.get("mention_start_char")
+        mention_end = body.get("mention_end_char")
+        mention_text = body.get("mention_text", "")
+        chapter_number = body.get("chapter_number")
+        original_entity_id = body.get("original_entity_id")
+        corrected_entity_id = body.get("corrected_entity_id")
+        correction_type = body.get("correction_type", "reassign")
+        notes = body.get("notes")
+
+        if mention_start is None or mention_end is None:
+            return ApiResponse(success=False, error="mention_start_char y mention_end_char son obligatorios")
+
+        if correction_type not in ("reassign", "unlink", "confirm"):
+            return ApiResponse(success=False, error="correction_type debe ser 'reassign', 'unlink' o 'confirm'")
+
+        db = get_database()
+        with db.connect() as conn:
+            # Verificar si ya existe corrección para esta mención
+            existing = conn.execute(
+                """SELECT id FROM coreference_corrections
+                   WHERE project_id = ? AND mention_start_char = ? AND mention_end_char = ?""",
+                (project_id, mention_start, mention_end)
+            ).fetchone()
+
+            if existing:
+                # Actualizar corrección existente
+                conn.execute(
+                    """UPDATE coreference_corrections
+                       SET corrected_entity_id = ?, correction_type = ?, notes = ?,
+                           created_at = datetime('now')
+                       WHERE id = ?""",
+                    (corrected_entity_id, correction_type, notes, existing[0])
+                )
+                correction_id = existing[0]
+            else:
+                # Crear nueva corrección
+                cursor = conn.execute(
+                    """INSERT INTO coreference_corrections
+                       (project_id, mention_start_char, mention_end_char, mention_text,
+                        chapter_number, original_entity_id, corrected_entity_id,
+                        correction_type, notes)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (project_id, mention_start, mention_end, mention_text,
+                     chapter_number, original_entity_id, corrected_entity_id,
+                     correction_type, notes)
+                )
+                correction_id = cursor.lastrowid
+
+            # Aplicar corrección: actualizar entity_mentions
+            if correction_type == "reassign" and corrected_entity_id is not None:
+                conn.execute(
+                    """UPDATE entity_mentions
+                       SET entity_id = ?
+                       WHERE entity_id = ? AND start_char = ? AND end_char = ?""",
+                    (corrected_entity_id, original_entity_id, mention_start, mention_end)
+                )
+            elif correction_type == "unlink" and original_entity_id is not None:
+                conn.execute(
+                    """DELETE FROM entity_mentions
+                       WHERE entity_id = ? AND start_char = ? AND end_char = ?""",
+                    (original_entity_id, mention_start, mention_end)
+                )
+
+            conn.commit()
+
+        return ApiResponse(success=True, data={
+            "correctionId": correction_id,
+            "correctionType": correction_type,
+            "applied": True,
+        })
+    except Exception as e:
+        logger.error(f"Error creating coreference correction: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.delete("/api/projects/{project_id}/coreference-corrections/{correction_id}", response_model=ApiResponse)
+async def delete_coreference_correction(project_id: int, correction_id: int):
+    """Elimina una corrección manual de correferencia."""
+    try:
+        db = get_database()
+        with db.connect() as conn:
+            # Obtener la corrección antes de eliminar
+            row = conn.execute(
+                """SELECT original_entity_id, corrected_entity_id, mention_start_char,
+                          mention_end_char, correction_type
+                   FROM coreference_corrections
+                   WHERE id = ? AND project_id = ?""",
+                (correction_id, project_id)
+            ).fetchone()
+
+            if not row:
+                return ApiResponse(success=False, error="Corrección no encontrada")
+
+            original_id, corrected_id, start_char, end_char, corr_type = row
+
+            # Revertir: si fue reassign, restaurar entity_id original
+            if corr_type == "reassign" and original_id is not None and corrected_id is not None:
+                conn.execute(
+                    """UPDATE entity_mentions
+                       SET entity_id = ?
+                       WHERE entity_id = ? AND start_char = ? AND end_char = ?""",
+                    (original_id, corrected_id, start_char, end_char)
+                )
+
+            conn.execute(
+                "DELETE FROM coreference_corrections WHERE id = ? AND project_id = ?",
+                (correction_id, project_id)
+            )
+            conn.commit()
+
+        return ApiResponse(success=True, data={"deleted": True, "reverted": True})
+    except Exception as e:
+        logger.error(f"Error deleting coreference correction: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
 
 
 # ============================================================================
@@ -12303,7 +12489,10 @@ async def get_external_dictionary_links(word: str):
 # ============================================================================
 
 @app.get("/api/projects/{project_id}/voice-profiles", response_model=ApiResponse)
-async def get_voice_profiles(project_id: int):
+async def get_voice_profiles(
+    project_id: int,
+    force_refresh: bool = Query(False, description="Forzar recálculo ignorando caché")
+):
     """
     Obtiene perfiles de voz de los personajes del proyecto.
 
@@ -12311,10 +12500,15 @@ async def get_voice_profiles(project_id: int):
     incluyendo métricas como longitud de intervención, riqueza léxica (TTR),
     formalidad, muletillas y patrones de puntuación.
 
+    Los perfiles se cachean en BD tras el primer cálculo. Use force_refresh=true
+    para recalcular.
+
     Returns:
         ApiResponse con perfiles de voz por personaje
     """
     try:
+        import json as json_mod
+
         from narrative_assistant.voice.profiles import VoiceProfileBuilder
         from narrative_assistant.nlp.dialogue import detect_dialogues
         from narrative_assistant.entities.repository import get_entity_repository
@@ -12327,6 +12521,46 @@ async def get_voice_profiles(project_id: int):
         result = project_manager.get(project_id)
         if result.is_failure:
             raise HTTPException(status_code=404, detail=f"Proyecto {project_id} no encontrado")
+
+        # Intentar devolver caché si no se fuerza recálculo
+        if not force_refresh and get_database:
+            try:
+                db = get_database()
+                with db.connect() as conn:
+                    cached_rows = conn.execute(
+                        """SELECT entity_id, characteristic_words
+                           FROM voice_profiles
+                           WHERE project_id = ?""",
+                        (project_id,)
+                    ).fetchall()
+
+                if cached_rows:
+                    cached_profiles = []
+                    for row in cached_rows:
+                        try:
+                            profile_data = json_mod.loads(row[1]) if row[1] else None
+                            if profile_data and isinstance(profile_data, dict) and "metrics" in profile_data:
+                                cached_profiles.append(profile_data)
+                        except (json_mod.JSONDecodeError, TypeError):
+                            pass
+
+                    if cached_profiles:
+                        logger.debug(f"Returning {len(cached_profiles)} cached voice profiles for project {project_id}")
+                        return ApiResponse(
+                            success=True,
+                            data={
+                                "project_id": project_id,
+                                "profiles": cached_profiles,
+                                "stats": {
+                                    "characters_analyzed": len(cached_profiles),
+                                    "total_dialogues": 0,
+                                    "chapters_analyzed": 0,
+                                },
+                                "cached": True,
+                            }
+                        )
+            except Exception as cache_err:
+                logger.debug(f"Cache miss for voice profiles: {cache_err}")
 
         # Obtener entidades (solo personajes)
         entity_repo = get_entity_repository()
@@ -12385,6 +12619,42 @@ async def get_voice_profiles(project_id: int):
             profile_dict = profile.to_dict()
             profiles_data.append(profile_dict)
 
+        # Cachear perfiles en BD
+        if get_database and profiles_data:
+            try:
+                db = get_database()
+                with db.connect() as conn:
+                    # Limpiar caché anterior del proyecto
+                    conn.execute("DELETE FROM voice_profiles WHERE project_id = ?", (project_id,))
+
+                    for profile_dict in profiles_data:
+                        entity_id = profile_dict.get("entity_id")
+                        metrics = profile_dict.get("metrics", {})
+                        conn.execute(
+                            """INSERT OR REPLACE INTO voice_profiles
+                               (project_id, entity_id, avg_sentence_length,
+                                vocabulary_richness, formality_score, dialogue_count,
+                                characteristic_words, filler_words,
+                                exclamation_ratio, question_ratio, updated_at)
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))""",
+                            (
+                                project_id,
+                                entity_id,
+                                metrics.get("avg_sentence_length", 0),
+                                metrics.get("type_token_ratio", 0),
+                                metrics.get("formality_score", 0),
+                                metrics.get("total_interventions", 0),
+                                json_mod.dumps(profile_dict),  # Full profile in characteristic_words column
+                                json_mod.dumps(metrics.get("top_fillers", [])),
+                                metrics.get("exclamation_ratio", 0),
+                                metrics.get("question_ratio", 0),
+                            )
+                        )
+                    conn.commit()
+                    logger.debug(f"Cached {len(profiles_data)} voice profiles for project {project_id}")
+            except Exception as cache_err:
+                logger.warning(f"Failed to cache voice profiles: {cache_err}")
+
         return ApiResponse(
             success=True,
             data={
@@ -12394,7 +12664,8 @@ async def get_voice_profiles(project_id: int):
                     "characters_analyzed": len(profiles_data),
                     "total_dialogues": len(dialogues),
                     "chapters_analyzed": len(chapters),
-                }
+                },
+                "cached": False,
             }
         )
 
@@ -13267,6 +13538,168 @@ async def get_dialogue_attributions(project_id: int, chapter_number: int):
         raise
     except Exception as e:
         logger.error(f"Error attributing speakers: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+# ============================================================================
+# Speaker Attribution - Correcciones del Usuario
+# ============================================================================
+
+@app.get("/api/projects/{project_id}/speaker-corrections", response_model=ApiResponse)
+async def list_speaker_corrections(
+    project_id: int,
+    chapter_number: Optional[int] = Query(None, description="Filtrar por capítulo")
+):
+    """Lista correcciones manuales de atribución de hablantes."""
+    try:
+        db = get_database()
+        with db.connect() as conn:
+            if chapter_number is not None:
+                rows = conn.execute(
+                    """SELECT sc.id, sc.chapter_number, sc.dialogue_start_char,
+                              sc.dialogue_end_char, sc.dialogue_text,
+                              sc.original_speaker_id, sc.corrected_speaker_id,
+                              sc.notes, sc.created_at,
+                              e_orig.canonical_name AS original_speaker_name,
+                              e_corr.canonical_name AS corrected_speaker_name
+                       FROM speaker_corrections sc
+                       LEFT JOIN entities e_orig ON sc.original_speaker_id = e_orig.id
+                       LEFT JOIN entities e_corr ON sc.corrected_speaker_id = e_corr.id
+                       WHERE sc.project_id = ? AND sc.chapter_number = ?
+                       ORDER BY sc.dialogue_start_char""",
+                    (project_id, chapter_number)
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    """SELECT sc.id, sc.chapter_number, sc.dialogue_start_char,
+                              sc.dialogue_end_char, sc.dialogue_text,
+                              sc.original_speaker_id, sc.corrected_speaker_id,
+                              sc.notes, sc.created_at,
+                              e_orig.canonical_name AS original_speaker_name,
+                              e_corr.canonical_name AS corrected_speaker_name
+                       FROM speaker_corrections sc
+                       LEFT JOIN entities e_orig ON sc.original_speaker_id = e_orig.id
+                       LEFT JOIN entities e_corr ON sc.corrected_speaker_id = e_corr.id
+                       WHERE sc.project_id = ?
+                       ORDER BY sc.chapter_number, sc.dialogue_start_char""",
+                    (project_id,)
+                ).fetchall()
+
+        corrections = []
+        for row in rows:
+            corrections.append({
+                "id": row[0],
+                "chapterNumber": row[1],
+                "dialogueStartChar": row[2],
+                "dialogueEndChar": row[3],
+                "dialogueText": row[4],
+                "originalSpeakerId": row[5],
+                "correctedSpeakerId": row[6],
+                "notes": row[7],
+                "createdAt": row[8],
+                "originalSpeakerName": row[9],
+                "correctedSpeakerName": row[10],
+            })
+
+        return ApiResponse(success=True, data={
+            "projectId": project_id,
+            "corrections": corrections,
+            "totalCorrections": len(corrections),
+        })
+    except Exception as e:
+        logger.error(f"Error listing speaker corrections: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.post("/api/projects/{project_id}/speaker-corrections", response_model=ApiResponse)
+async def create_speaker_correction(project_id: int, request: Request):
+    """
+    Crea una corrección manual de atribución de hablante.
+
+    Body JSON:
+    - chapter_number: Número de capítulo
+    - dialogue_start_char: Posición inicio del diálogo
+    - dialogue_end_char: Posición fin del diálogo
+    - dialogue_text: Texto del diálogo
+    - original_speaker_id: Hablante asignado automáticamente (nullable)
+    - corrected_speaker_id: Hablante correcto según el usuario
+    - notes: Notas del corrector (opcional)
+    """
+    try:
+        body = await request.json()
+
+        chapter_num = body.get("chapter_number")
+        dialogue_start = body.get("dialogue_start_char")
+        dialogue_end = body.get("dialogue_end_char")
+        dialogue_text = body.get("dialogue_text", "")
+        original_speaker_id = body.get("original_speaker_id")
+        corrected_speaker_id = body.get("corrected_speaker_id")
+        notes = body.get("notes")
+
+        if chapter_num is None or dialogue_start is None or dialogue_end is None:
+            return ApiResponse(
+                success=False,
+                error="chapter_number, dialogue_start_char y dialogue_end_char son obligatorios"
+            )
+
+        db = get_database()
+        with db.connect() as conn:
+            # Verificar si ya existe corrección para este diálogo
+            existing = conn.execute(
+                """SELECT id FROM speaker_corrections
+                   WHERE project_id = ? AND chapter_number = ?
+                   AND dialogue_start_char = ? AND dialogue_end_char = ?""",
+                (project_id, chapter_num, dialogue_start, dialogue_end)
+            ).fetchone()
+
+            if existing:
+                conn.execute(
+                    """UPDATE speaker_corrections
+                       SET corrected_speaker_id = ?, notes = ?, created_at = datetime('now')
+                       WHERE id = ?""",
+                    (corrected_speaker_id, notes, existing[0])
+                )
+                correction_id = existing[0]
+            else:
+                cursor = conn.execute(
+                    """INSERT INTO speaker_corrections
+                       (project_id, chapter_number, dialogue_start_char, dialogue_end_char,
+                        dialogue_text, original_speaker_id, corrected_speaker_id, notes)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (project_id, chapter_num, dialogue_start, dialogue_end,
+                     dialogue_text, original_speaker_id, corrected_speaker_id, notes)
+                )
+                correction_id = cursor.lastrowid
+
+            conn.commit()
+
+        return ApiResponse(success=True, data={
+            "correctionId": correction_id,
+            "applied": True,
+        })
+    except Exception as e:
+        logger.error(f"Error creating speaker correction: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.delete("/api/projects/{project_id}/speaker-corrections/{correction_id}", response_model=ApiResponse)
+async def delete_speaker_correction(project_id: int, correction_id: int):
+    """Elimina una corrección manual de atribución de hablante."""
+    try:
+        db = get_database()
+        with db.connect() as conn:
+            result = conn.execute(
+                "DELETE FROM speaker_corrections WHERE id = ? AND project_id = ?",
+                (correction_id, project_id)
+            )
+            conn.commit()
+
+            if result.rowcount == 0:
+                return ApiResponse(success=False, error="Corrección no encontrada")
+
+        return ApiResponse(success=True, data={"deleted": True})
+    except Exception as e:
+        logger.error(f"Error deleting speaker correction: {e}", exc_info=True)
         return ApiResponse(success=False, error=str(e))
 
 
@@ -15050,6 +15483,145 @@ async def get_tension_curve(
         raise
     except Exception as e:
         logger.error(f"Error computing tension curve: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.get("/api/pacing/genre-benchmarks", response_model=ApiResponse)
+async def get_genre_benchmarks(
+    genre_code: Optional[str] = Query(None, description="Código de género (FIC, MEM, TEC, etc.). Si no se indica, devuelve todos.")
+):
+    """
+    Devuelve benchmarks de referencia de pacing por género literario.
+
+    Incluye rangos esperados de longitud de capítulo, ratio de diálogo,
+    longitud de oraciones, tensión narrativa y tipos de arco.
+    """
+    try:
+        from narrative_assistant.analysis.pacing import GENRE_BENCHMARKS, get_genre_benchmarks
+
+        if genre_code:
+            benchmarks = get_genre_benchmarks(genre_code.upper())
+            if not benchmarks:
+                available = list(GENRE_BENCHMARKS.keys())
+                return ApiResponse(
+                    success=False,
+                    error=f"Género '{genre_code}' no encontrado. Disponibles: {', '.join(available)}"
+                )
+            return ApiResponse(
+                success=True,
+                data={"benchmarks": benchmarks.to_dict()}
+            )
+
+        return ApiResponse(
+            success=True,
+            data={
+                "benchmarks": {
+                    code: b.to_dict() for code, b in GENRE_BENCHMARKS.items()
+                },
+                "genre_count": len(GENRE_BENCHMARKS),
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error getting genre benchmarks: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.get("/api/projects/{project_id}/pacing-analysis/genre-comparison", response_model=ApiResponse)
+async def get_pacing_genre_comparison(
+    project_id: int,
+    genre_code: str = Query(..., description="Código de género para comparar (FIC, MEM, TEC, etc.)")
+):
+    """
+    Compara las métricas de pacing del proyecto contra benchmarks del género.
+
+    Devuelve desviaciones respecto a lo esperado para el tipo de documento.
+    """
+    try:
+        import re
+
+        from narrative_assistant.analysis.pacing import (
+            compare_with_benchmarks, compute_tension_curve, get_pacing_analyzer,
+        )
+
+        result = project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+
+        chapters = chapter_repository.get_by_project(project_id)
+        if not chapters:
+            return ApiResponse(success=True, data={"comparison": None, "message": "No hay capítulos"})
+
+        chapters_data = [
+            {
+                "number": ch.chapter_number,
+                "title": ch.title or f"Capítulo {ch.chapter_number}",
+                "content": ch.content or "",
+            }
+            for ch in chapters
+            if ch.content and ch.content.strip()
+        ]
+
+        # Calcular métricas globales
+        total_words = 0
+        total_sentences = 0
+        total_dialogue_words = 0
+        total_doc_words = 0
+        chapter_word_counts = []
+
+        analyzer = get_pacing_analyzer()
+        for ch in chapters_data:
+            content = ch["content"]
+            words = content.split()
+            word_count = len(words)
+            total_words += word_count
+            chapter_word_counts.append(word_count)
+
+            sentences = [s.strip() for s in re.split(r'[.!?]+', content) if s.strip()]
+            total_sentences += len(sentences)
+
+            for line in content.split("\n"):
+                line = line.strip()
+                if line.startswith(("—", "–", "-", "«", '"')):
+                    total_dialogue_words += len(line.split())
+                total_doc_words += len(line.split())
+
+        avg_chapter_words = total_words / len(chapters_data) if chapters_data else 0
+        avg_sentence_length = total_words / total_sentences if total_sentences > 0 else 0
+        dialogue_ratio = total_dialogue_words / total_doc_words if total_doc_words > 0 else 0
+
+        # Calcular tensión
+        full_text = "\n\n".join(ch["content"] for ch in chapters_data)
+        curve = compute_tension_curve(chapters_data, full_text)
+
+        metrics = {
+            "avg_chapter_words": avg_chapter_words,
+            "dialogue_ratio": dialogue_ratio,
+            "avg_sentence_length": avg_sentence_length,
+            "avg_tension": curve.avg_tension,
+            "tension_arc_type": curve.tension_arc_type,
+        }
+
+        comparison = compare_with_benchmarks(metrics, genre_code.upper())
+        if comparison is None:
+            from narrative_assistant.analysis.pacing import GENRE_BENCHMARKS
+            available = list(GENRE_BENCHMARKS.keys())
+            return ApiResponse(
+                success=False,
+                error=f"Género '{genre_code}' no encontrado. Disponibles: {', '.join(available)}"
+            )
+
+        return ApiResponse(
+            success=True,
+            data={
+                "project_id": project_id,
+                "metrics": {k: round(v, 3) if isinstance(v, float) else v for k, v in metrics.items()},
+                "comparison": comparison,
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error comparing pacing with genre: {e}", exc_info=True)
         return ApiResponse(success=False, error=str(e))
 
 

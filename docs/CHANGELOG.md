@@ -6,6 +6,85 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
+## [0.3.21] - 2026-01-29
+
+### Added
+- **Benchmarks de pacing por género literario** (12 géneros)
+  - `GenreBenchmarks` dataclass con rangos de referencia por tipo de documento
+  - Géneros: FIC, MEM, BIO, CEL, DIV, ENS, AUT, TEC, PRA, INF, DRA, GRA
+  - Rangos para: longitud de capítulo, ratio diálogo, longitud oraciones, tensión, arcos
+  - `GET /api/pacing/genre-benchmarks` para consultar benchmarks
+  - `GET /api/projects/{id}/pacing-analysis/genre-comparison` para comparar vs género
+- **Correcciones manuales de correferencias** (persistencia en BD)
+  - Tabla `coreference_corrections` con audit trail completo
+  - `GET/POST/DELETE /api/projects/{id}/coreference-corrections`
+  - Aplicación automática: reassign, unlink, confirm
+  - Reversión al eliminar corrección
+- **Correcciones manuales de atribución de hablantes**
+  - Tabla `speaker_corrections` con tracking por capítulo
+  - `GET/POST/DELETE /api/projects/{id}/speaker-corrections`
+  - Filtrado por capítulo
+- **Caché de perfiles de voz en BD**
+  - Perfiles calculados se persisten en tabla `voice_profiles`
+  - Parámetro `force_refresh` para recalcular
+  - Reducción significativa de tiempo en consultas repetidas
+
+### Changed
+- **Schema BD**: Versión 10 → 11 (2 tablas nuevas: `coreference_corrections`, `speaker_corrections`)
+
+---
+
+## [0.3.20] - 2026-01-29
+
+### Added
+- **Endpoint de comparación de perfiles de voz** (`/voice-profiles/compare`)
+  - Comparación side-by-side de métricas entre dos personajes con deltas
+  - Índice de similitud global (normalizado 0-1)
+  - Análisis de vocabulario compartido y exclusivo
+- **Voice matching multi-métrica** en `speaker_attribution.py`
+  - Reemplazo de matching superficial por scoring ponderado con 5 dimensiones:
+    - Formalidad vía usted/tú (20%), longitud de intervención con z-score (20%),
+      patrones de puntuación (15%), muletillas (20%), vocabulario TF-IDF (25%)
+  - Alternativas rankeadas: `alternative_speakers` poblado con candidatos y scores
+
+### Fixed
+- **Tipo de `alternative_speakers`**: `List[Tuple[int, float]]` → `List[Tuple[int, str, float]]` (id, nombre, score)
+- **Documentación PROJECT_STATUS.md**: Corregidas inconsistencias en sección P2 backend
+
+---
+
+## [0.3.19] - 2026-01-29
+
+### Added
+- **18 métricas de voz expuestas en API** (antes solo 10)
+  - `to_dict()` en `VoiceMetrics` serializa todas las métricas
+  - Frontend types y store transformers sincronizados
+- **Estadísticas agregadas de registro** en endpoint project-wide
+  - `consistency_pct`: porcentaje de segmentos en el registro dominante
+  - `distribution_pct`: distribución porcentual por tipo de registro
+
+### Fixed
+- **Naming consistency API**: `chapter_num` → `chapter_number` en 2 path params (register, dialogue-attributions)
+- **Query param renombrado**: `chapter` → `chapter_number` en temporal-markers
+- **3 bare `except:` clauses** → `except Exception:` en `main.py`
+- **Documentación**: Character Knowledge corregido de 60% a 85% en PROJECT_STATUS.md
+
+---
+
+## [0.3.18] - 2026-01-29
+
+### Added
+- **Análisis habilitados en perfil estándar**: `register_analysis`, `pacing`, `sticky_sentences`
+  activados por defecto en `unified_analysis.py`
+- **Filtrado por capítulo** en 5 endpoints:
+  - `echo-report`, `sentence-variation`, `pacing-analysis`, `register-analysis`, `tension-curve`
+  - Parámetro `chapter_number` para obtener resultados de un solo capítulo
+
+### Changed
+- **Documentación actualizada**: CHANGELOG, PROJECT_STATUS y ROADMAP sincronizados con estado real
+
+---
+
 ## [0.3.17] - 2026-01-29
 
 ### Added
@@ -361,4 +440,4 @@ Las versiones 0.0.x fueron desarrollo interno sin changelog formal.
 
 ---
 
-*Documento actualizado: 2026-01-29*
+*Documento actualizado: 2026-01-29 (v0.3.20)*
