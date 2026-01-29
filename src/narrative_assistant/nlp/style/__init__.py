@@ -72,6 +72,18 @@ from .filler_detector import (
     reset_filler_detector,
 )
 
+from .sensory_report import (
+    SensoryType,
+    SensoryDensity,
+    SensoryDetail,
+    ChapterSensoryStats,
+    SensoryReport,
+    SensoryAnalyzer,
+    get_sensory_analyzer,
+    reset_sensory_analyzer,
+    SENSE_NAMES,
+)
+
 from .readability import (
     ReadabilityLevel,
     ReadabilityReport,
@@ -139,4 +151,14 @@ __all__ = [
     "AgeReadabilityReport",
     "AGE_GROUP_THRESHOLDS",
     "SPANISH_SIGHT_WORDS",
+    # Reporte sensorial
+    "SensoryType",
+    "SensoryDensity",
+    "SensoryDetail",
+    "ChapterSensoryStats",
+    "SensoryReport",
+    "SensoryAnalyzer",
+    "get_sensory_analyzer",
+    "reset_sensory_analyzer",
+    "SENSE_NAMES",
 ]

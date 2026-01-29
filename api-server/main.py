@@ -2065,6 +2065,8 @@ async def get_analysis_status(project_id: int):
             "voice_deviations": has_entities and has_chapters,  # Desviaciones de voz
             "register_analysis": has_chapters,  # Análisis de registro disponible
             "tension_curve": has_chapters,  # Curva de tensión narrativa
+            "sensory_report": has_chapters,  # Reporte sensorial (5 sentidos)
+            "story_bible": has_entities,  # Story Bible / Wiki de entidades
             "speaker_attribution": has_entities and has_chapters,  # Atribución de hablantes
         }
 
@@ -9830,6 +9832,68 @@ async def preview_review_report(project_id: int):
         return ApiResponse(success=False, error=str(e))
 
 
+@app.get("/api/projects/{project_id}/export/scrivener")
+async def export_scrivener(
+    project_id: int,
+    include_character_notes: bool = Query(True, description="Incluir fichas de personaje"),
+    include_alerts_as_notes: bool = Query(True, description="Incluir alertas como notas"),
+    include_entity_keywords: bool = Query(True, description="Incluir entidades como keywords"),
+):
+    """
+    Exporta el proyecto a formato Scrivener (.scriv).
+
+    Genera un archivo ZIP que contiene un paquete .scriv compatible
+    con Scrivener 3, incluyendo:
+    - Estructura de carpetas con capítulos
+    - Contenido RTF de cada capítulo
+    - Fichas de personaje en carpeta de investigación
+    - Alertas como notas de documento
+    - Entidades como keywords de Scrivener
+    """
+    from fastapi.responses import Response
+
+    try:
+        from narrative_assistant.exporters.scrivener_exporter import (
+            export_to_scrivener,
+            ScrivenerExportOptions,
+        )
+
+        result = project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+
+        project = result.value
+
+        options = ScrivenerExportOptions(
+            include_character_notes=include_character_notes,
+            include_alerts_as_notes=include_alerts_as_notes,
+            include_entity_keywords=include_entity_keywords,
+        )
+
+        export_result = export_to_scrivener(project_id, options)
+
+        if export_result.is_failure:
+            return ApiResponse(success=False, error=str(export_result.error))
+
+        safe_name = "".join(
+            c for c in project.name if c.isalnum() or c in " -_."
+        ).strip() or "Proyecto"
+
+        return Response(
+            content=export_result.value,
+            media_type="application/zip",
+            headers={
+                "Content-Disposition": f'attachment; filename="{safe_name}.scriv.zip"'
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error exporting to Scrivener: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
 # ============================================================================
 # Licensing Endpoints
 # ============================================================================
@@ -14440,6 +14504,191 @@ async def get_tension_curve(project_id: int):
         raise
     except Exception as e:
         logger.error(f"Error computing tension curve: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.get("/api/projects/{project_id}/story-bible", response_model=ApiResponse)
+async def get_story_bible(
+    project_id: int,
+    entity_type: Optional[str] = Query(None, description="Filtrar por tipo: character, location, organization, object"),
+    include_voice: bool = Query(True, description="Incluir perfiles de voz"),
+    include_emotions: bool = Query(True, description="Incluir arcos emocionales"),
+    include_knowledge: bool = Query(True, description="Incluir conocimiento inter-personaje"),
+    include_vital: bool = Query(True, description="Incluir estado vital"),
+):
+    """
+    Story Bible: Vista wiki consolidada de todas las entidades del proyecto.
+
+    Agrega datos de múltiples fuentes para cada entidad:
+    - Datos básicos, aliases, importancia
+    - Atributos extraídos (físicos, psicológicos, etc.)
+    - Relaciones con otras entidades
+    - Timeline de apariciones por capítulo
+    - Estado vital (vivo/muerto)
+    - Perfil de voz (personajes)
+    """
+    try:
+        from narrative_assistant.analysis.story_bible import StoryBibleBuilder
+
+        result = project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+
+        builder = StoryBibleBuilder(project_id=project_id)
+        bible = builder.build(
+            include_voice=include_voice,
+            include_emotions=include_emotions,
+            include_knowledge=include_knowledge,
+            include_vital=include_vital,
+        )
+
+        bible.project_name = result.value.name
+
+        data = bible.to_dict()
+
+        # Filtrar por tipo si se especifica
+        if entity_type:
+            type_map = {
+                "character": ("CHARACTER", "PERSON", "PER"),
+                "location": ("LOCATION", "LOC", "GPE", "PLACE"),
+                "organization": ("ORGANIZATION", "ORG"),
+                "object": ("OBJECT", "MISC"),
+            }
+            allowed = type_map.get(entity_type.lower(), ())
+            if allowed:
+                data["entries"] = [
+                    e for e in data["entries"]
+                    if e.get("entity_type", "").upper() in allowed
+                ]
+
+        return ApiResponse(success=True, data=data)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error building story bible: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.get("/api/projects/{project_id}/story-bible/{entity_id}", response_model=ApiResponse)
+async def get_story_bible_entry(
+    project_id: int,
+    entity_id: int,
+    include_voice: bool = Query(True),
+    include_emotions: bool = Query(True),
+    include_knowledge: bool = Query(True),
+    include_vital: bool = Query(True),
+):
+    """
+    Story Bible: Ficha detallada de una entidad específica.
+
+    Retorna toda la información agregada sobre la entidad.
+    """
+    try:
+        from narrative_assistant.analysis.story_bible import StoryBibleBuilder
+
+        result = project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+
+        builder = StoryBibleBuilder(project_id=project_id)
+        bible = builder.build(
+            entity_id=entity_id,
+            include_voice=include_voice,
+            include_emotions=include_emotions,
+            include_knowledge=include_knowledge,
+            include_vital=include_vital,
+        )
+
+        if not bible.entries:
+            raise HTTPException(status_code=404, detail=f"Entidad {entity_id} no encontrada")
+
+        return ApiResponse(success=True, data=bible.entries[0].to_dict())
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error building story bible entry: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.get("/api/projects/{project_id}/sensory-report", response_model=ApiResponse)
+async def get_sensory_report(
+    project_id: int,
+    chapter_number: Optional[int] = Query(None, description="Filtrar por capítulo"),
+):
+    """
+    Analiza la presencia de detalles sensoriales (5 sentidos) en el texto.
+
+    Genera un reporte de distribución y densidad sensorial:
+    - Vista, Oído, Tacto, Olfato, Gusto
+    - Densidad por capítulo
+    - Capítulos pobres/ricos en detalles sensoriales
+    - Balance entre sentidos
+    """
+    try:
+        from narrative_assistant.nlp.style.sensory_report import (
+            get_sensory_analyzer,
+            SENSE_NAMES,
+        )
+        from narrative_assistant.persistence.chapter import get_chapter_repository
+
+        result = project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+
+        chapter_repo = get_chapter_repository()
+        chapters = chapter_repo.get_by_project(project_id)
+
+        if not chapters:
+            return ApiResponse(
+                success=True,
+                data={
+                    "total_details": 0,
+                    "message": "No hay capítulos para analizar",
+                }
+            )
+
+        # Filtrar por capítulo si se especifica
+        if chapter_number is not None:
+            chapters = [ch for ch in chapters if ch.chapter_number == chapter_number]
+            if not chapters:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Capítulo {chapter_number} no encontrado"
+                )
+
+        # Preparar datos de capítulos
+        full_text = "\n\n".join(ch.content for ch in chapters if ch.content)
+        chapters_data = [
+            {
+                "number": ch.chapter_number,
+                "title": getattr(ch, "title", f"Capítulo {ch.chapter_number}"),
+                "start_char": ch.start_char,
+                "end_char": ch.end_char,
+                "content": ch.content or "",
+            }
+            for ch in chapters
+        ]
+
+        analyzer = get_sensory_analyzer()
+        analysis_result = analyzer.analyze(full_text, chapters=chapters_data)
+
+        if analysis_result.is_failure:
+            return ApiResponse(success=False, error=str(analysis_result.error))
+
+        report = analysis_result.value
+        data = report.to_dict()
+
+        # Añadir nombres en español
+        data["sense_names"] = {s.value: name for s, name in SENSE_NAMES.items()}
+
+        return ApiResponse(success=True, data=data)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating sensory report: {e}", exc_info=True)
         return ApiResponse(success=False, error=str(e))
 
 

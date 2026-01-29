@@ -64,17 +64,17 @@ La mayoría de "Quick Wins" y "Diferenciadores" **ya están implementados en el 
 | `/api/projects/{id}/focalization` | Declaraciones de focalización (CRUD) |
 | `/api/projects/{id}/focalization/violations` | Detección de violaciones de focalización |
 | `/api/projects/{id}/scenes` | Escenas con etiquetas (listado y stats) |
-| `/api/projects/{id}/scenes/{id}/tags` | Etiquetado predefinido de escenas |
+| `/api/projects/{id}/scenes/{id}/tags` | Etiquetado predefinido de escenas (PUT) |
 | `/api/projects/{id}/scenes/{id}/custom-tags` | Etiquetas personalizadas de escenas |
 | `/api/document-types` | Catálogo de tipos de documento |
 | `/api/projects/{id}/document-type` | Tipo de documento del proyecto (GET/PUT) |
 | `/api/projects/{id}/feature-profile` | Perfil de features según tipo de documento |
 | `/api/projects/{id}/emotional-analysis` | Análisis emocional del proyecto |
-| `/api/projects/{id}/sticky-sentences` | Detección de oraciones pesadas |
-| `/api/projects/{id}/echo-report` | Detección de repeticiones/ecos |
-| `/api/projects/{id}/sentence-variation` | Variación de longitud de oraciones |
-| `/api/projects/{id}/pacing-analysis` | Análisis de ritmo narrativo |
 | `/api/projects/{id}/age-readability` | Legibilidad por edad (infantil/juvenil) |
+| `/api/projects/{id}/vital-status` | Estado vital de personajes |
+| `/api/projects/{id}/vital-status/generate-alerts` | Generar alertas de estado vital (POST) |
+| `/api/projects/{id}/character-locations` | Ubicaciones de personajes |
+| `/api/projects/{id}/chapter-progress` | Progreso por capítulo |
 
 ### Backend Implementado, Frontend Faltante o Parcial
 
@@ -85,7 +85,7 @@ La mayoría de "Quick Wins" y "Diferenciadores" **ya están implementados en el 
 | `/api/projects/{id}/characters/{name}/emotional-profile` | Perfil emocional personaje | Usado en CharacterView pero no en workspace |
 | `/api/projects/{id}/chapters/{n}/dialogue-attributions` | Atribución de hablantes | Store implementado, UI parcial |
 
-> **Nota**: `/api/projects/{id}/emotional-analysis` ahora está integrado en `EmotionalAnalysisTab.vue` dentro de StyleTab (Tab 10)
+> **Nota**: `/api/projects/{id}/emotional-analysis` integrado en `EmotionalAnalysisTab.vue` dentro de StyleTab
 
 ---
 
@@ -153,26 +153,30 @@ La mayoría de "Quick Wins" y "Diferenciadores" **ya están implementados en el 
 
 ### Prioridad Media (Mejoras)
 
-3. **Análisis por Capítulo en UI**
-   - Endpoints existen (`/chapters/{n}/sticky-sentences`, `/chapters/{n}/echo-report`, `/chapters/{n}/pacing-analysis`)
-   - Los componentes muestran datos globales, pero el backend soporta por capítulo
-   - **Acción**: Los tabs ya tienen acordeón por capítulo; mejora menor
+3. **Análisis por Capítulo en UI** ⚠️ PARCIALMENTE RESUELTO (Auditoría 29 Ene)
+   - Endpoints existen (`/chapters/{n}/sticky-sentences`, `/chapters/{n}/echo-report`)
+   - **Hallazgo**: Todos los tabs ya muestran datos organizados por capítulo en Accordion panels (client-side)
+   - `AlertsTab` tiene dropdown explícito de filtro por capítulo
+   - `PacingAnalysisTab` permite click en capítulo para seleccionar
+   - `RegisterAnalysisTab` tiene ChapterTimeline interactivo
+   - **Gap real**: No hay filtrado API-level (se descarga todo y se filtra en frontend) → decisión de diseño, no bug
+   - **Acción**: Mejora menor de UX (añadir dropdown de capítulo a Sticky/Echo/Variation)
 
 4. ~~**Focalization UI**~~ ✅ RESUELTO
    - ~~Backend completo (`violations.py`, `declaration.py`)~~
    - Creado `FocalizationTab.vue` en workspace/StyleTab (Tab 4: Focalización)
    - Endpoints: `/api/projects/{id}/focalization` (CRUD), `/api/projects/{id}/focalization/violations`
 
-5. **Vital Status UI**
+5. ~~**Vital Status UI**~~ ✅ RESUELTO
    - Backend: ✅ `analysis/vital_status.py` con 57 tests
-   - API: ✅ Endpoints `/api/projects/{id}/vital-status`, `/api/projects/{id}/vital-status/events`, `/api/projects/{id}/vital-status/post-mortem`
-   - Frontend: ⚠️ Falta `VitalStatusPanel.vue` en AlertsTab
-   - **Acción**: Crear panel que muestre eventos de muerte y alertas de reapariciones
+   - API: ✅ Endpoints `/api/projects/{id}/vital-status` (GET), `/api/projects/{id}/vital-status/generate-alerts` (POST)
+   - Frontend: ✅ `VitalStatusTab.vue` en StyleTab (sub-tab "Estado vital")
+   - ~~NOTA: Los endpoints `/vital-status/events` y `/vital-status/post-mortem` documentados anteriormente NO existen~~
 
-6. **Character Location Tracking**
-   - Backend: ⚠️ Solo `KnowledgeType.LOCATION` en character_knowledge.py
-   - **Acción**: Implementar tracking real de ubicaciones con cambios de escena
-   - Ver sección "Próximos Pasos" para detalles de implementación
+6. ~~**Character Location Tracking**~~ ✅ RESUELTO
+   - Backend: ✅ `analysis/character_location.py` con CharacterLocationAnalyzer (42 tests)
+   - API: ✅ `/api/projects/{id}/character-locations`
+   - Frontend: ✅ `CharacterLocationTab.vue` en StyleTab (sub-tab "Ubicaciones")
 
 ### Prioridad Baja (Nice to have)
 
@@ -200,13 +204,13 @@ La mayoría de "Quick Wins" y "Diferenciadores" **ya están implementados en el 
 |--------|-----------------|-------|--------|
 | `analysis/vital_status.py` | `tests/unit/test_vital_status.py` | 57 | ✅ Passing |
 | `nlp/style/sticky_sentences.py` | `tests/unit/test_sticky_sentences.py` | 55 | ✅ Passing |
-| `nlp/style/readability.py` | `tests/unit/test_readability.py` | 52 | ✅ Passing |
+| `nlp/style/readability.py` | `tests/unit/test_readability.py` | 53 | ✅ Passing |
 | `analysis/pacing.py` | `tests/unit/test_pacing.py` | 42 | ✅ Passing |
 | `feature_profile/models.py` | `tests/unit/test_feature_profile.py` | 44 | ✅ Passing |
 | `analysis/chapter_summary.py` | `tests/unit/test_chapter_summary.py` | 39 | ✅ Passing |
 | `analysis/character_location.py` | `tests/unit/test_character_location.py` | 42 | ✅ Passing |
 
-**Total**: 331 tests unitarios para módulos de análisis de estilo, vital status, pacing, feature profiles, chapter summary y character location.
+**Total**: 332 tests unitarios para módulos de análisis de estilo, vital status, pacing, feature profiles, chapter summary y character location.
 
 ### Áreas Cubiertas
 
@@ -306,22 +310,32 @@ def analyze(self, text: str) -> Result[ReadabilityReport]
 
 ---
 
-## Tabs Implementados en StyleTab.vue
+## Sub-tabs en StyleTab.vue (12 sub-tabs)
 
-1. **Detectores** - CorrectionConfigPanel (configuración de correctores)
-2. **Registro narrativo** - RegisterAnalysisTab (análisis de registro)
-3. **Reglas editoriales** - Editor de reglas personalizadas
-4. **Focalización** - FocalizationTab (declaración y violaciones de focalización)
-5. **Escenas** - SceneTaggingTab (condicional: `hasScenes && isFeatureAvailable('scenes')`)
-6. **Oraciones pesadas** - StickySentencesTab (condicional: `isFeatureAvailable('sticky_sentences')`)
-7. **Repeticiones** - EchoReportTab (condicional: `isFeatureAvailable('echo_repetitions')`)
-8. **Variación** - SentenceVariationTab (condicional: `isFeatureAvailable('sentence_variation')`)
-9. **Ritmo** - PacingAnalysisTab (condicional: `isFeatureAvailable('pacing')`)
-10. **Emociones** - EmotionalAnalysisTab (condicional: `isFeatureAvailable('emotional_analysis')`)
-11. **Edad lectora** - AgeReadabilityTab (condicional: `isFeatureAvailable('age_readability')`, solo INF)
-12. **Estado vital** - VitalStatusTab (condicional: `isFeatureAvailable('vital_status')`)
-13. **Ubicaciones** - CharacterLocationTab (condicional: `isFeatureAvailable('character_location')`)
-14. **Avance narrativo** - ChapterProgressTab (condicional: `isFeatureAvailable('chapter_progress')`)
+> **Nota**: CorrectionConfigPanel y Reglas Editoriales se movieron a `CorrectionConfigModal.vue`,
+> accesible desde ProjectDetailView. Ya no son sub-tabs de StyleTab.
+
+| # | ID | Label | Componente | Condicional |
+|---|-----|-------|-----------|-------------|
+| 1 | `register` | Registro | RegisterAnalysisTab | Siempre visible |
+| 2 | `focalization` | Focalización | FocalizationTab | Siempre visible |
+| 3 | `scenes` | Escenas | SceneTaggingTab | `hasScenes && isFeatureAvailable('scenes')` |
+| 4 | `sticky` | Densidad | StickySentencesTab | `isFeatureAvailable('sticky_sentences')` |
+| 5 | `echo` | Ecos | EchoReportTab | `isFeatureAvailable('echo_repetitions')` |
+| 6 | `variation` | Variación | SentenceVariationTab | `isFeatureAvailable('sentence_variation')` |
+| 7 | `pacing` | Ritmo | PacingAnalysisTab | `isFeatureAvailable('pacing')` |
+| 8 | `emotions` | Emociones | EmotionalAnalysisTab | `isFeatureAvailable('emotional_analysis')` |
+| 9 | `readability` | Legibilidad | AgeReadabilityTab | `isFeatureAvailable('age_readability')` |
+| 10 | `vital` | Estado vital | VitalStatusTab | `isFeatureAvailable('vital_status')` |
+| 11 | `locations` | Ubicaciones | CharacterLocationTab | `isFeatureAvailable('character_location')` |
+| 12 | `progress` | Progreso | ChapterProgressTab | `isFeatureAvailable('chapter_progress')` |
+
+### Accesibles fuera de StyleTab
+
+| Componente | Ubicación | Acceso |
+|-----------|-----------|--------|
+| CorrectionConfigModal | ProjectDetailView | Modal, botón en toolbar |
+| Editorial Rules | Dentro de CorrectionConfigModal | Sección `editorial_rules` |
 
 ---
 
@@ -376,7 +390,7 @@ Las alertas generadas (personajes fallecidos que reaparecen, inconsistencias de 
    - Carga de menciones corregida para usar todas las menciones de la BD
 
 **Tests de regresión**: `tests/regression/test_ojos_verdes_bug.py` (8 tests passing)
-**Tests adversariales**: `tests/adversarial/test_attribute_adversarial.py` (60 casos en 20 categorías)
+**Tests adversariales**: `tests/adversarial/test_attribute_adversarial.py` (21 test functions)
 
 ---
 
@@ -386,7 +400,7 @@ Las alertas generadas (personajes fallecidos que reaparecen, inconsistencias de 
 
 > **Ver documento completo**: [UI_REDESIGN_PROPOSAL.md](UI_REDESIGN_PROPOSAL.md)
 
-**Diagnóstico**: StyleTab contiene 14 subtabs mezclando configuración, análisis de estilo, análisis narrativo y organización. Esto viola principios básicos de UX y dificulta la navegación.
+**Diagnóstico**: StyleTab contiene 12 subtabs de análisis (config/reglas se movieron a CorrectionConfigModal). Sigue siendo mucha información en un solo tab.
 
 **Propuesta aprobada**: Reorganizar en tabs por intención del usuario:
 - Consistencia (entidades, timeline, ubicaciones, estado vital)
@@ -404,12 +418,14 @@ Las alertas generadas (personajes fallecidos que reaparecen, inconsistencias de 
 
 | Feature | Origen | Complejidad | Impacto | Tiempo Est. |
 |---------|--------|-------------|---------|-------------|
-| **Dialogue Tags Detector** | ProWritingAid | 🟢 Baja | Alto | 4h |
-| **Sensory Report (5 sentidos)** | ProWritingAid | 🟡 Media | Alto | 2 días |
+| ~~**Dialogue Tags Detector**~~ | ProWritingAid | — | — | — |
+| ~~**Sensory Report (5 sentidos)**~~ | ProWritingAid | 🟡 Media | Alto | ✅ HECHO |
 | **Benchmarking por género** | AutoCrit | 🔴 Alta | Muy alto | 5+ días |
-| **Story Bible/Wiki navegable** | Sudowrite | 🟡 Media | Alto | 3 días |
-| **Export Scrivener (.scriv)** | Atticus | 🟡 Media | Alto | 2 días |
+| ~~**Story Bible/Wiki navegable**~~ | Sudowrite | 🟡 Media | Alto | ✅ HECHO |
+| ~~**Export Scrivener (.scriv)**~~ | Atticus | 🟡 Media | Alto | ✅ HECHO |
 | **Scene Cards View** | yWriter | 🟡 Media | Medio | 2 días |
+
+> **Dialogue Tags Detector**: ✅ YA IMPLEMENTADO en `nlp/dialogue.py` (49 speech verbs, 6 regex patterns, 4 formatos de diálogo) y `voice/speaker_attribution.py` (60+ verbos conjugados, 5 estrategias de atribución: explícita, alternancia, perfil de voz, proximidad, fallback). Frontend: `DialogueAttributionPanel.vue` (492 líneas).
 
 #### Prioridad Media
 
@@ -436,16 +452,16 @@ Las alertas generadas (personajes fallecidos que reaparecen, inconsistencias de 
 
 ### Módulos Backend Incompletos
 
-| Módulo | Completitud | Gap Crítico | Esfuerzo |
+| Módulo | Completitud | Gap Real (Auditoría 29 Ene) | Esfuerzo |
 |--------|-------------|-------------|----------|
-| **Character Knowledge** | 60% | `_extract_knowledge_facts()` VACÍO | 5-7 días |
-| **Voice Profiles** | 70% | API no devuelve todas métricas | 3-4 días |
+| ~~**Character Knowledge**~~ | **90%** | ✅ RECLASIFICADO: Backend completo, API endpoints, frontend CharacterKnowledgeAnalysis.vue, store integrado. Gap: solo falta pulido UI | 1 día |
+| ~~**Voice Profiles**~~ | **95%** | ✅ RECLASIFICADO: Endpoint `/voice-deviations` añadido (29 Ene). Backend + API + frontend completos | — |
 | **Register Analysis** | 75% | Sin análisis por capítulo | 2-3 días |
-| **Speaker Attribution** | 80% | Voice matching débil | 2-3 días |
-| **Pacing Analysis** | 80% | Sin curva de tensión | 2-3 días |
+| ~~**Speaker Attribution**~~ | **95%** | ✅ RECLASIFICADO: Pipeline `unified_analysis.py` corregido (29 Ene). Usa API correcta de SpeakerAttributor | — |
+| ~~**Pacing Analysis**~~ | **95%** | ✅ Curva de tensión implementada (29 Ene): `compute_tension_curve()`, endpoint `/tension-curve`, clasificación de arco narrativo | — |
 | **Coreference Resolver** | 85% | Sin razonamiento expuesto | 1-2 días |
 
-**Total**: 15-22 días para completar módulos existentes
+**Total**: ~4-6 días para completar módulos restantes (reducido significativamente)
 
 ---
 
@@ -487,27 +503,23 @@ Las alertas generadas (personajes fallecidos que reaparecen, inconsistencias de 
 
 ### Sprint 1: Quick Wins de Alto Impacto (1 semana)
 
-1. **Rediseño UI (3 días)** - Reorganizar tabs según propuesta
-2. **Dialogue Tags Detector (4h)** - Fácil, alto impacto
-3. **Alertas desde métricas (4h)** - Sticky, Variation, Pacing
+1. ~~**Rediseño UI (3 días)**~~ → POSPUESTO: Evaluación multi-stakeholder recomienda "dos filas con categorías" (6h) en vez de rediseño completo. Implementar tras completar features.
+2. ~~**Dialogue Tags Detector (4h)**~~ → ✅ YA IMPLEMENTADO
+3. ~~**Alertas desde métricas (4h)**~~ → ✅ HECHO (29 Ene): 4 métodos `create_from_*` en AlertEngine (pacing, sticky, style_variation, word_echo)
+4. ~~**Exponer Voice Deviations via API (4h)**~~ → ✅ HECHO (29 Ene): Endpoint `/voice-deviations`
+5. ~~**Speaker Attribution pipeline fix (1 día)**~~ → ✅ HECHO (29 Ene): Reescrito `_attribute_dialogues()` con API correcta
+6. ~~**Pacing tension curve (2-3 días)**~~ → ✅ HECHO (29 Ene): `compute_tension_curve()`, endpoint `/tension-curve`
+7. ~~**Sensory Report (2 días)**~~ → ✅ HECHO (29 Ene): `sensory_report.py`, endpoint `/sensory-report`
+8. ~~**Story Bible/Wiki view (3 días)**~~ → ✅ HECHO (29 Ene): `story_bible.py`, endpoints `/story-bible` y `/story-bible/{id}`
+9. ~~**Export Scrivener (2 días)**~~ → ✅ HECHO (29 Ene): `scrivener_exporter.py`, endpoint `/export/scrivener`
+10. ~~**Chapter filtering entities/mentions**~~ → ✅ HECHO (29 Ene): Parámetro `chapter_number` en endpoints de entidades y menciones
 
-### Sprint 2: Diferenciadores (2 semanas)
+### Sprint Restante: Features Pendientes
 
-4. **Character Knowledge core (5-7 días)** - CRÍTICO, desbloquea feature completa
-5. **Story Bible/Wiki view (3 días)** - Diferenciador competitivo
-6. **Voice Profiles completo (3-4 días)** - Extender API
-
-### Sprint 3: Valor Añadido (2 semanas)
-
-7. **Sensory Report (2 días)** - Análisis 5 sentidos
-8. **Export Scrivener (2 días)** - Alta demanda del mercado
-9. **Scene Cards View (2 días)** - Mejora UX organización
-
-### Sprint 4: Pulido (1 semana)
-
-10. **Register por capítulo (2-3 días)**
-11. **Pacing tension curve (2-3 días)**
-12. **Speaker Attribution mejorado (2-3 días)**
+11. **Scene Cards View (2 días)** - Mejora UX organización
+12. **Register por capítulo (2-3 días)** - Análisis más granular
+13. **UI categorías en StyleTab (6h)** - Dos filas con categorías (Narrativa/Estilo/Consistencia)
+14. **Coreference reasoning expuesto (1-2 días)** - Mostrar cadena de razonamiento
 
 ### Backlog (Por priorizar)
 
@@ -515,19 +527,22 @@ Las alertas generadas (personajes fallecidos que reaparecen, inconsistencias de 
 - Plantillas estructuras narrativas
 - Story Completeness Checker
 - Continue Writing / Add Sensory (LLM)
+- Character Archetype Detector
 - Code signing y distribución
 
 ---
 
-## Resumen de Esfuerzo Total
+## Resumen de Esfuerzo Total (Revisado 29 Ene - Sesión 2)
 
-| Categoría | Items | Días |
-|-----------|-------|------|
-| UI Redesign | 1 | 3 |
-| Features nuevas (alta prioridad) | 6 | 12 |
-| Módulos incompletos | 6 | 18 |
-| Infraestructura | 4 | 15 |
-| **TOTAL** | | **~48 días** |
+| Categoría | Items | Días | Nota |
+|-----------|-------|------|------|
+| ~~Sprint 1 Quick Wins~~ | ~~6~~ | ~~0~~ | ✅ TODO COMPLETADO |
+| ~~Sprint 2 Diferenciadores~~ | ~~3~~ | ~~0~~ | ✅ TODO COMPLETADO |
+| ~~Sprint 3 Valor Añadido (parcial)~~ | ~~2~~ | ~~0~~ | ✅ Sensory + Scrivener COMPLETADOS |
+| Sprint restante | 4 | 7-9 | Scene Cards, Register/cap, UI cats, Coref reasoning |
+| Backlog estratégico | 6 | 18+ | Benchmarking, Plantillas, Completeness, etc. |
+| Infraestructura | 4 | 15 | Code signing, CI/CD, Landing, i18n |
+| **TOTAL PENDIENTE** | | **~22-27 días** | Reducido de 40 tras implementaciones |
 
 ---
 
@@ -545,4 +560,6 @@ Las alertas generadas (personajes fallecidos que reaparecen, inconsistencias de 
 
 *Documento generado: Enero 2026*
 *Última auditoría de código: 26 Enero 2026*
-*Última actualización: 27 Enero 2026 - Auditoría completa de gaps, propuesta UI, orden de implementación*
+*Actualización: 27 Enero 2026 - Auditoría completa de gaps, propuesta UI, orden de implementación*
+*Verificación: 29 Enero 2026 - Cruce contra código real: 12 sub-tabs (no 14), endpoints corregidos, test counts actualizados, Character Knowledge NO está vacío*
+*Auditoría profunda: 29 Enero 2026 - Revisión de "gaps" contra funcionalidades existentes: Dialogue Tags YA implementado (nlp/dialogue.py + voice/speaker_attribution.py), Voice Profiles al 90% (no 70%), Speaker Attribution al 85% (no 80%), per-chapter UI parcialmente resuelto via Accordion. Esfuerzo total reducido de 48 a ~40 días*

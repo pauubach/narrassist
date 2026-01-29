@@ -40,6 +40,14 @@ from .review_report_exporter import (
     CategoryStats,
     export_review_report,
 )
+from .scrivener_exporter import (
+    ScrivenerExporter,
+    ScrivenerExportOptions,
+    ScrivenerExportData,
+    ScrivenerChapter,
+    ScrivenerCharacter,
+    export_to_scrivener,
+)
 
 __all__ = [
     # Character sheets
@@ -70,4 +78,11 @@ __all__ = [
     "ReviewReportData",
     "CategoryStats",
     "export_review_report",
+    # Scrivener exporter
+    "ScrivenerExporter",
+    "ScrivenerExportOptions",
+    "ScrivenerExportData",
+    "ScrivenerChapter",
+    "ScrivenerCharacter",
+    "export_to_scrivener",
 ]
