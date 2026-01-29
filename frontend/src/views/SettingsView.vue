@@ -693,7 +693,7 @@
                   <span>Corrector avanzado activo (LanguageTool · +2000 reglas)</span>
                 </div>
               </div>
-              <div v-else-if="ltState !== 'running'" class="ollama-action-card" :class="'ollama-state-' + (ltState === 'not_installed' ? 'not_installed' : ltState === 'installing' ? 'no_models' : 'not_running')" style="margin-bottom: 0.75rem;">
+              <div v-else class="ollama-action-card" :class="'ollama-state-' + (ltState === 'not_installed' ? 'not_installed' : ltState === 'installing' ? 'no_models' : 'not_running')" style="margin-bottom: 0.75rem;">
                 <div class="ollama-action-content">
                   <i :class="ltState === 'installing' ? 'pi pi-spin pi-spinner' : 'pi pi-exclamation-triangle'"></i>
                   <div class="ollama-action-text">
