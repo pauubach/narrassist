@@ -1,6 +1,6 @@
 [package]
 name = "narrative-assistant"
-version = "0.3.21"
+version = "0.3.22"
 description = "Asistente de corrección narrativa para editores profesionales"
 authors = ["TFM Team"]
 license = "MIT"

@@ -5857,6 +5857,9 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                         cursor = conn.execute("DELETE FROM chapters WHERE project_id = ?", (project_id,))
                         chapters_deleted = cursor.rowcount
 
+                        # Invalidar caché de perfiles de voz
+                        conn.execute("DELETE FROM voice_profiles WHERE project_id = ?", (project_id,))
+
                         conn.commit()
 
                     logger.info(f"Cleared: {entities_deleted} entities, {alerts_deleted} alerts, {chapters_deleted} chapters")
@@ -15622,6 +15625,148 @@ async def get_pacing_genre_comparison(
         raise
     except Exception as e:
         logger.error(f"Error comparing pacing with genre: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.get("/api/register/genre-benchmarks", response_model=ApiResponse)
+async def get_register_genre_benchmarks_endpoint(
+    genre_code: Optional[str] = Query(None, description="Código de género (FIC, MEM, TEC, etc.). Si no se indica, devuelve todos.")
+):
+    """
+    Devuelve benchmarks de referencia de registro por género literario.
+
+    Incluye registro dominante esperado, rangos de consistencia,
+    distribución esperada por tipo de registro y tolerancia a cambios bruscos.
+    """
+    try:
+        from narrative_assistant.voice.register import (
+            REGISTER_GENRE_BENCHMARKS, get_register_genre_benchmarks,
+        )
+
+        if genre_code:
+            benchmarks = get_register_genre_benchmarks(genre_code.upper())
+            if not benchmarks:
+                available = list(REGISTER_GENRE_BENCHMARKS.keys())
+                return ApiResponse(
+                    success=False,
+                    error=f"Género '{genre_code}' no encontrado. Disponibles: {', '.join(available)}"
+                )
+            return ApiResponse(
+                success=True,
+                data={"benchmarks": benchmarks.to_dict()}
+            )
+
+        return ApiResponse(
+            success=True,
+            data={
+                "benchmarks": {
+                    code: b.to_dict() for code, b in REGISTER_GENRE_BENCHMARKS.items()
+                },
+                "genre_count": len(REGISTER_GENRE_BENCHMARKS),
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error getting register genre benchmarks: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.get("/api/projects/{project_id}/register-analysis/genre-comparison", response_model=ApiResponse)
+async def get_register_genre_comparison(
+    project_id: int,
+    genre_code: str = Query(..., description="Código de género para comparar (FIC, MEM, TEC, etc.)"),
+    min_severity: str = Query("low", description="Severidad mínima para contar cambios: low, medium, high"),
+):
+    """
+    Compara las métricas de registro del proyecto contra benchmarks del género.
+
+    Devuelve desviaciones de consistencia, registro dominante y distribución
+    respecto a lo esperado para el tipo de documento.
+    """
+    try:
+        from narrative_assistant.voice.register import (
+            RegisterChangeDetector,
+            REGISTER_GENRE_BENCHMARKS,
+            compare_register_with_benchmarks,
+        )
+        from narrative_assistant.nlp.dialogue import detect_dialogues
+        from narrative_assistant.persistence.chapter import get_chapter_repository
+
+        if not project_manager:
+            return ApiResponse(success=False, error="Project manager not initialized")
+
+        result = project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+
+        chapter_repo = get_chapter_repository()
+        chapters = chapter_repo.get_by_project(project_id)
+
+        if not chapters:
+            return ApiResponse(success=True, data={"comparison": None, "message": "No hay capítulos"})
+
+        # Construir segmentos
+        segments = []
+        for chapter in chapters:
+            dialogue_result = detect_dialogues(chapter.content)
+            dialogue_ranges = []
+            if dialogue_result.is_success:
+                dialogue_ranges = [
+                    (d.start_char, d.end_char)
+                    for d in dialogue_result.value.dialogues
+                ]
+
+            paragraphs = chapter.content.split('\n\n')
+            position = 0
+            for para in paragraphs:
+                if para.strip():
+                    is_dialogue = any(
+                        start <= position <= end
+                        for start, end in dialogue_ranges
+                    )
+                    segments.append((
+                        para.strip(),
+                        chapter.chapter_number,
+                        position,
+                        is_dialogue
+                    ))
+                position += len(para) + 2
+
+        if not segments:
+            return ApiResponse(success=True, data={"comparison": None, "message": "No hay segmentos"})
+
+        # Analizar registro
+        detector = RegisterChangeDetector()
+        detector.analyze_document(segments)
+        changes = detector.detect_changes("low")
+        summary = detector.get_summary()
+
+        high_severity = sum(1 for c in changes if c.severity == "high")
+
+        comparison = compare_register_with_benchmarks(
+            summary, genre_code.upper(), len(changes), high_severity
+        )
+
+        if comparison is None:
+            available = list(REGISTER_GENRE_BENCHMARKS.keys())
+            return ApiResponse(
+                success=False,
+                error=f"Género '{genre_code}' no encontrado. Disponibles: {', '.join(available)}"
+            )
+
+        return ApiResponse(
+            success=True,
+            data={
+                "project_id": project_id,
+                "summary": summary,
+                "changes_count": len(changes),
+                "high_severity_count": high_severity,
+                "comparison": comparison,
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error comparing register with genre: {e}", exc_info=True)
         return ApiResponse(success=False, error=str(e))
 
 

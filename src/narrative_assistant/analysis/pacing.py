@@ -468,6 +468,20 @@ def compare_with_benchmarks(
     arc_type = metrics.get("tension_arc_type", "")
     arc_match = arc_type in benchmarks.expected_arc_types if arc_type else None
 
+    if arc_type and not arc_match:
+        deviations.append({
+            "metric": "tension_arc_type",
+            "label": "Tipo de arco narrativo",
+            "actual": arc_type,
+            "expected": benchmarks.expected_arc_types,
+            "status": "mismatch",
+            "message": f"El arco narrativo '{arc_type}' no es habitual en {benchmarks.genre_label} "
+                       f"(esperados: {', '.join(benchmarks.expected_arc_types)})",
+        })
+
+    # Generar sugerencias accionables a partir de las desviaciones
+    suggestions = _generate_pacing_suggestions(deviations, benchmarks, arc_type, arc_match)
+
     return {
         "genre": benchmarks.to_dict(),
         "deviations": deviations,
@@ -475,7 +489,119 @@ def compare_with_benchmarks(
         "arc_type_match": arc_match,
         "arc_type_expected": benchmarks.expected_arc_types,
         "arc_type_actual": arc_type,
+        "suggestions": suggestions,
     }
+
+
+def _generate_pacing_suggestions(
+    deviations: list[dict],
+    benchmarks: GenreBenchmarks,
+    arc_type: str,
+    arc_match: Optional[bool],
+) -> list[dict]:
+    """
+    Genera sugerencias de corrección basadas en las desviaciones detectadas.
+
+    Args:
+        deviations: Lista de desviaciones encontradas
+        benchmarks: Benchmarks del género
+        arc_type: Tipo de arco narrativo detectado
+        arc_match: Si el arco coincide con los esperados
+
+    Returns:
+        Lista de sugerencias con prioridad y texto
+    """
+    suggestions = []
+
+    for dev in deviations:
+        metric = dev["metric"]
+        status = dev["status"]
+
+        if metric == "avg_chapter_words":
+            if status == "below":
+                suggestions.append({
+                    "metric": metric,
+                    "priority": "medium",
+                    "suggestion": f"Los capítulos son más cortos de lo habitual en {benchmarks.genre_label}. "
+                                  f"Considere desarrollar más las escenas, añadir descripciones "
+                                  f"o contextualización para alcanzar al menos {benchmarks.min_chapter_words} palabras.",
+                })
+            else:
+                suggestions.append({
+                    "metric": metric,
+                    "priority": "medium",
+                    "suggestion": f"Los capítulos son más largos de lo habitual en {benchmarks.genre_label}. "
+                                  f"Considere dividir capítulos extensos en secciones o capítulos más cortos "
+                                  f"para mantener el ritmo del lector.",
+                })
+
+        elif metric == "dialogue_ratio":
+            if status == "below":
+                low_pct = round(benchmarks.dialogue_ratio_range[0] * 100)
+                suggestions.append({
+                    "metric": metric,
+                    "priority": "medium",
+                    "suggestion": f"El manuscrito tiene poco diálogo para {benchmarks.genre_label}. "
+                                  f"Convertir pasajes narrativos en escenas dialogadas puede "
+                                  f"dinamizar el ritmo. Referencia: al menos {low_pct}% de diálogo.",
+                })
+            else:
+                high_pct = round(benchmarks.dialogue_ratio_range[1] * 100)
+                suggestions.append({
+                    "metric": metric,
+                    "priority": "low",
+                    "suggestion": f"El manuscrito tiene mucho diálogo para {benchmarks.genre_label}. "
+                                  f"Intercalar más narración, descripción o reflexión entre diálogos "
+                                  f"puede equilibrar el ritmo. Referencia: máximo {high_pct}%.",
+                })
+
+        elif metric == "avg_sentence_length":
+            if status == "below":
+                suggestions.append({
+                    "metric": metric,
+                    "priority": "low",
+                    "suggestion": f"Las oraciones son cortas para {benchmarks.genre_label}. "
+                                  f"Combinar oraciones simples con coordinación o subordinación "
+                                  f"puede dar mayor fluidez y complejidad al texto.",
+                })
+            else:
+                suggestions.append({
+                    "metric": metric,
+                    "priority": "medium",
+                    "suggestion": f"Las oraciones son largas para {benchmarks.genre_label}. "
+                                  f"Dividir oraciones complejas en dos o tres más simples "
+                                  f"facilita la lectura y mejora la claridad.",
+                })
+
+        elif metric == "avg_tension":
+            if status == "below":
+                suggestions.append({
+                    "metric": metric,
+                    "priority": "high",
+                    "suggestion": f"La tensión narrativa es baja para {benchmarks.genre_label}. "
+                                  f"Introducir conflictos, preguntas sin respuesta o situaciones "
+                                  f"de urgencia puede aumentar el interés del lector.",
+                })
+            else:
+                suggestions.append({
+                    "metric": metric,
+                    "priority": "low",
+                    "suggestion": f"La tensión narrativa es alta para {benchmarks.genre_label}. "
+                                  f"Incluir momentos de calma, reflexión o descanso narrativo "
+                                  f"evita la fatiga del lector y da más impacto a los clímax.",
+                })
+
+        elif metric == "tension_arc_type":
+            expected = ", ".join(benchmarks.expected_arc_types)
+            suggestions.append({
+                "metric": metric,
+                "priority": "low",
+                "suggestion": f"El arco de tensión '{arc_type}' difiere de los habituales "
+                              f"en {benchmarks.genre_label} ({expected}). Esto no es necesariamente "
+                              f"un problema, pero revise que la estructura sirve a la intención narrativa.",
+            })
+
+    return suggestions
 
 
 class PacingAnalyzer:

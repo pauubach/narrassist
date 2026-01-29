@@ -6,6 +6,24 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
+## [0.3.22] - 2026-01-29
+
+### Added
+- **Benchmarks de registro por género literario** (12 géneros)
+  - `RegisterGenreBenchmarks` dataclass con registro esperado, consistencia, distribución
+  - Rangos para: registro dominante, consistencia (%), distribución por tipo, cambios bruscos
+  - `GET /api/register/genre-benchmarks` para consultar benchmarks
+  - `GET /api/projects/{id}/register-analysis/genre-comparison` para comparar vs género
+- **Sugerencias de pacing basadas en benchmarks de género**
+  - Cada desviación genera una sugerencia accionable con prioridad (high/medium/low)
+  - Sugerencias para: longitud de capítulo, ratio diálogo, longitud oraciones, tensión, arco
+  - Incluidas automáticamente en respuesta de `genre-comparison`
+- **Invalidación de caché de perfiles de voz al re-analizar**
+  - `DELETE FROM voice_profiles` al iniciar re-análisis de proyecto
+  - Garantiza que los perfiles se recalculen con datos actualizados
+
+---
+
 ## [0.3.21] - 2026-01-29
 
 ### Added

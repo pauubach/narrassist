@@ -1,7 +1,7 @@
 # Roadmap - Narrative Assistant
 
 > **Última actualización**: 2026-01-29
-> **Versión actual**: 0.3.21
+> **Versión actual**: 0.3.22
 > **Estado actual**: Ver [PROJECT_STATUS.md](PROJECT_STATUS.md)
 > **Historial de cambios**: Ver [CHANGELOG.md](CHANGELOG.md)
 
@@ -22,11 +22,11 @@ Este documento define las funcionalidades **pendientes de implementar**. Para el
 | Feature | Backend | Completitud | Estado |
 |---------|---------|-------------|--------|
 | ~~Knowledge Tracking~~ | `character_knowledge.py` | 85% | ✅ Extracción rules + LLM funcional (v0.3.19) |
-| ~~Voice Profiles~~ | `voice/profiles.py` | 85% | ✅ API expone 18 métricas (v0.3.19) |
-| ~~Register Analysis~~ | `voice/register.py` | 90% | ✅ Per-chapter (v0.3.14) + alertas (v0.3.17) |
+| ~~Voice Profiles~~ | `voice/profiles.py` | 98% | ✅ Caché + invalidación (v0.3.22) |
+| ~~Register Analysis~~ | `voice/register.py` | 98% | ✅ Benchmarks por género (v0.3.22) |
 | ~~Speaker Attribution~~ | `voice/speaker_attribution.py` | 85% | ✅ Bug fix (v0.3.13) |
 | ~~Coreference Voting~~ | `coreference_resolver.py` | 95% | ✅ Razonamiento en API (v0.3.14) |
-| ~~Pacing Analysis~~ | `analysis/pacing.py` | 90% | ✅ Curva de tensión (v0.3.13) |
+| ~~Pacing Analysis~~ | `analysis/pacing.py` | 98% | ✅ Sugerencias por género (v0.3.22) |
 
 **Esfuerzo restante**: Mejoras menores (benchmarks Knowledge, comparación Voice Profiles)
 
@@ -75,11 +75,11 @@ Este documento define las funcionalidades **pendientes de implementar**. Para el
 
 ## Métricas Objetivo
 
-| Métrica | Actual (v0.3.21) | Objetivo v0.4.0 | Objetivo v1.0.0 |
+| Métrica | Actual (v0.3.22) | Objetivo v0.4.0 | Objetivo v1.0.0 |
 |---------|-------------------|-----------------|-----------------|
 | Detectores | 14 | 18 | 25 |
 | Gazetteer | ~5,000 | 50,000 | 100,000 |
-| Endpoints API | 178 | 185+ | 200+ |
+| Endpoints API | 180 | 185+ | 200+ |
 | Componentes Vue | 89 | 95+ | 110+ |
 | Tests | 966+ | 1,200+ | 2,000+ |
 | Idiomas UI | 1 (ES) | 1 (ES) | 3 (ES, EN, CA) |

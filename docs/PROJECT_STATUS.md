@@ -1,7 +1,7 @@
 # Estado del Proyecto - Narrative Assistant
 
 > **Última actualización**: 2026-01-29
-> **Versión**: 0.3.21
+> **Versión**: 0.3.22
 > **Changelog**: Ver [CHANGELOG.md](CHANGELOG.md)
 > **Roadmap**: Ver [ROADMAP.md](ROADMAP.md)
 
@@ -639,10 +639,10 @@ cargo tauri build --target x86_64-pc-windows-msvc
 | Módulo | Completitud | Prioridad | Estado |
 |--------|-------------|-----------|--------|
 | **Coreference Resolver** | 98% | ✅ | Votación + correcciones manuales persistidas (v0.3.21) |
-| **Register Analysis** | 95% | ✅ | Stats agregadas + per-chapter (v0.3.20) |
-| **Voice Profiles** | 95% | ✅ | 18 métricas + comparación + caché en BD (v0.3.21) |
+| **Register Analysis** | 98% | ✅ | Benchmarks por género + comparación (v0.3.22) |
+| **Voice Profiles** | 98% | ✅ | 18 métricas + caché + invalidación auto (v0.3.22) |
 | **Speaker Attribution** | 95% | ✅ | Voice matching + correcciones usuario (v0.3.21) |
-| **Pacing Analysis** | 95% | ✅ | Curva de tensión + benchmarks por género (v0.3.21) |
+| **Pacing Analysis** | 98% | ✅ | Benchmarks + sugerencias accionables (v0.3.22) |
 | **Character Knowledge** | 85% | ✅ | Extracción rules + LLM + hybrid funcional |
 | **Sticky Sentences** | 95% | ✅ | Integrado en pipeline unificado |
 
@@ -663,7 +663,7 @@ cargo tauri build --target x86_64-pc-windows-msvc
 
 **Archivo**: `src/narrative_assistant/nlp/coreference_resolver.py`
 
-#### Register Analysis (95%) ✅
+#### Register Analysis (98%) ✅
 
 **✅ Implementado:**
 - `RegisterChangeDetector` con `detect_changes()`
@@ -672,13 +672,12 @@ cargo tauri build --target x86_64-pc-windows-msvc
 - **Análisis por capítulo** (v0.3.14)
 - **Alertas de cambio de registro** conectadas al pipeline (v0.3.17)
 - **Estadísticas agregadas** (v0.3.20): `consistency_pct`, `distribution_pct` globales
-
-**❌ Falta (menor):**
-- Benchmarks de consistencia por género literario
+- **Benchmarks por género** (v0.3.22): 12 géneros con registro esperado, consistencia, distribución
+- **API de comparación** (v0.3.22): `GET /api/register/genre-benchmarks` + `genre-comparison`
 
 **Archivo**: `src/narrative_assistant/voice/register.py`
 
-#### Voice Profiles (95%) ✅
+#### Voice Profiles (98%) ✅
 
 **✅ Implementado:**
 - `VoiceMetrics` dataclass con 18 métricas
@@ -689,6 +688,7 @@ cargo tauri build --target x86_64-pc-windows-msvc
 - Frontend types y transformers sincronizados
 - **Endpoint de comparación** `/voice-profiles/compare` (v0.3.20)
 - **Caché en BD** (v0.3.21): perfiles persistidos en `voice_profiles`, param `force_refresh`
+- **Invalidación automática** (v0.3.22): caché se limpia al re-analizar proyecto
 
 **Archivo**: `src/narrative_assistant/voice/profiles.py`
 
@@ -705,7 +705,7 @@ cargo tauri build --target x86_64-pc-windows-msvc
 
 **Archivo**: `src/narrative_assistant/voice/speaker_attribution.py`
 
-#### Pacing Analysis (95%) ✅
+#### Pacing Analysis (98%) ✅
 
 **✅ Implementado:**
 - `PacingAnalyzer` con 10 tipos de problemas
@@ -714,9 +714,7 @@ cargo tauri build --target x86_64-pc-windows-msvc
 - **Curva de tensión narrativa** implementada (v0.3.13, pacing.py:676-811)
 - **Alertas de pacing** conectadas al pipeline
 - **Benchmarks por género** (v0.3.21): 12 géneros con rangos de referencia + API de comparación
-
-**❌ Falta (menor):**
-- Sugerencias específicas de corrección basadas en benchmark
+- **Sugerencias accionables** (v0.3.22): cada desviación genera sugerencia con prioridad
 
 **Archivo**: `src/narrative_assistant/analysis/pacing.py`
 
@@ -744,13 +742,13 @@ cargo tauri build --target x86_64-pc-windows-msvc
 | Módulo | Estado | Notas |
 |--------|--------|-------|
 | Character Knowledge | 85% | Extracción rules + LLM funcional. Falta: benchmarks formales |
-| Voice Profiles | 95% | ✅ Caché en BD (v0.3.21) |
-| Register agregado | 95% | ✅ Stats agregadas (v0.3.20) |
+| Voice Profiles | 98% | ✅ Caché + invalidación auto (v0.3.22) |
+| Register agregado | 98% | ✅ Benchmarks por género (v0.3.22) |
 | Speaker Attribution | 95% | ✅ Correcciones usuario (v0.3.21) |
 | Coreference razonamiento | 98% | ✅ Correcciones manuales persistidas (v0.3.21) |
-| Pacing tension curve | 95% | ✅ Benchmarks por género (v0.3.21) |
+| Pacing tension curve | 98% | ✅ Sugerencias accionables (v0.3.22) |
 
-**Total restante**: Mejoras menores (benchmarks Knowledge, sugerencias pacing)
+**Total restante**: Mejoras menores (benchmarks Knowledge)
 
 ---
 

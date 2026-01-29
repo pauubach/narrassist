@@ -578,3 +578,337 @@ def analyze_register_changes(
     analyses = detector.analyze_document(segments)
     changes = detector.detect_changes(min_severity)
     return analyses, changes
+
+
+# =============================================================================
+# Benchmarks de registro por género
+# =============================================================================
+
+@dataclass
+class RegisterGenreBenchmarks:
+    """Benchmarks de referencia de registro para un género literario."""
+    genre_code: str
+    genre_label: str
+    expected_primary: str  # Registro dominante esperado
+    consistency_range: Tuple[float, float]  # Rango aceptable de consistencia (%)
+    register_distribution: Dict[str, Tuple[float, float]]  # Rango esperado por registro
+    max_high_severity_changes: int  # Máximo de cambios de alta severidad tolerables
+    notes: str = ""
+
+    def to_dict(self) -> Dict:
+        return {
+            "genre_code": self.genre_code,
+            "genre_label": self.genre_label,
+            "expected_primary": self.expected_primary,
+            "consistency_range": list(self.consistency_range),
+            "register_distribution": {
+                k: list(v) for k, v in self.register_distribution.items()
+            },
+            "max_high_severity_changes": self.max_high_severity_changes,
+            "notes": self.notes,
+        }
+
+
+# Benchmarks de registro por género literario
+# Basados en convenciones editoriales y guías de estilo
+REGISTER_GENRE_BENCHMARKS: Dict[str, RegisterGenreBenchmarks] = {
+    "FIC": RegisterGenreBenchmarks(
+        genre_code="FIC",
+        genre_label="Ficción narrativa",
+        expected_primary="neutral",
+        consistency_range=(55.0, 85.0),
+        register_distribution={
+            "formal_literary": (0.05, 0.35),
+            "neutral": (0.30, 0.65),
+            "colloquial": (0.05, 0.40),
+            "technical": (0.0, 0.10),
+            "poetic": (0.0, 0.20),
+        },
+        max_high_severity_changes=3,
+        notes="Registro variable según escena. Diálogos pueden ser coloquiales, narración neutral o literaria.",
+    ),
+    "MEM": RegisterGenreBenchmarks(
+        genre_code="MEM",
+        genre_label="Memorias / Autobiografía",
+        expected_primary="neutral",
+        consistency_range=(60.0, 90.0),
+        register_distribution={
+            "formal_literary": (0.10, 0.40),
+            "neutral": (0.35, 0.70),
+            "colloquial": (0.0, 0.25),
+            "technical": (0.0, 0.05),
+            "poetic": (0.0, 0.15),
+        },
+        max_high_severity_changes=2,
+        notes="Predomina un tono personal pero cuidado. Reflexiones más formales.",
+    ),
+    "BIO": RegisterGenreBenchmarks(
+        genre_code="BIO",
+        genre_label="Biografía",
+        expected_primary="formal_literary",
+        consistency_range=(65.0, 95.0),
+        register_distribution={
+            "formal_literary": (0.30, 0.65),
+            "neutral": (0.25, 0.55),
+            "colloquial": (0.0, 0.15),
+            "technical": (0.0, 0.10),
+            "poetic": (0.0, 0.10),
+        },
+        max_high_severity_changes=1,
+        notes="Tono formal y uniforme. Citas ocasionales pueden variar el registro.",
+    ),
+    "CEL": RegisterGenreBenchmarks(
+        genre_code="CEL",
+        genre_label="Libro de famosos / Influencer",
+        expected_primary="colloquial",
+        consistency_range=(50.0, 80.0),
+        register_distribution={
+            "formal_literary": (0.0, 0.15),
+            "neutral": (0.20, 0.50),
+            "colloquial": (0.25, 0.65),
+            "technical": (0.0, 0.05),
+            "poetic": (0.0, 0.10),
+        },
+        max_high_severity_changes=4,
+        notes="Registro informal y cercano. Mayor tolerancia a variaciones.",
+    ),
+    "DIV": RegisterGenreBenchmarks(
+        genre_code="DIV",
+        genre_label="Divulgación",
+        expected_primary="neutral",
+        consistency_range=(65.0, 90.0),
+        register_distribution={
+            "formal_literary": (0.10, 0.35),
+            "neutral": (0.40, 0.70),
+            "colloquial": (0.0, 0.15),
+            "technical": (0.05, 0.30),
+            "poetic": (0.0, 0.05),
+        },
+        max_high_severity_changes=2,
+        notes="Tono accesible pero riguroso. Terminología técnica moderada.",
+    ),
+    "ENS": RegisterGenreBenchmarks(
+        genre_code="ENS",
+        genre_label="Ensayo",
+        expected_primary="formal_literary",
+        consistency_range=(70.0, 95.0),
+        register_distribution={
+            "formal_literary": (0.35, 0.70),
+            "neutral": (0.20, 0.50),
+            "colloquial": (0.0, 0.10),
+            "technical": (0.0, 0.20),
+            "poetic": (0.0, 0.10),
+        },
+        max_high_severity_changes=1,
+        notes="Alta consistencia formal. Lenguaje académico y elaborado.",
+    ),
+    "AUT": RegisterGenreBenchmarks(
+        genre_code="AUT",
+        genre_label="Autoayuda",
+        expected_primary="neutral",
+        consistency_range=(55.0, 85.0),
+        register_distribution={
+            "formal_literary": (0.0, 0.20),
+            "neutral": (0.35, 0.65),
+            "colloquial": (0.10, 0.40),
+            "technical": (0.0, 0.10),
+            "poetic": (0.0, 0.10),
+        },
+        max_high_severity_changes=3,
+        notes="Registro directo y motivacional. Alterna neutral con toques cercanos.",
+    ),
+    "TEC": RegisterGenreBenchmarks(
+        genre_code="TEC",
+        genre_label="Manual técnico",
+        expected_primary="technical",
+        consistency_range=(75.0, 98.0),
+        register_distribution={
+            "formal_literary": (0.05, 0.25),
+            "neutral": (0.15, 0.45),
+            "colloquial": (0.0, 0.05),
+            "technical": (0.30, 0.70),
+            "poetic": (0.0, 0.02),
+        },
+        max_high_severity_changes=0,
+        notes="Altísima consistencia técnica. Sin variaciones coloquiales.",
+    ),
+    "PRA": RegisterGenreBenchmarks(
+        genre_code="PRA",
+        genre_label="Libro práctico (cocina, DIY)",
+        expected_primary="neutral",
+        consistency_range=(60.0, 90.0),
+        register_distribution={
+            "formal_literary": (0.0, 0.10),
+            "neutral": (0.40, 0.75),
+            "colloquial": (0.05, 0.30),
+            "technical": (0.05, 0.25),
+            "poetic": (0.0, 0.05),
+        },
+        max_high_severity_changes=2,
+        notes="Instrucciones claras. Puede incluir anécdotas más cercanas.",
+    ),
+    "INF": RegisterGenreBenchmarks(
+        genre_code="INF",
+        genre_label="Infantil / Juvenil",
+        expected_primary="colloquial",
+        consistency_range=(50.0, 80.0),
+        register_distribution={
+            "formal_literary": (0.0, 0.15),
+            "neutral": (0.20, 0.50),
+            "colloquial": (0.25, 0.65),
+            "technical": (0.0, 0.05),
+            "poetic": (0.0, 0.15),
+        },
+        max_high_severity_changes=4,
+        notes="Registro cercano y accesible. Diálogos dominan y pueden ser muy coloquiales.",
+    ),
+    "DRA": RegisterGenreBenchmarks(
+        genre_code="DRA",
+        genre_label="Teatro / Guion",
+        expected_primary="neutral",
+        consistency_range=(40.0, 75.0),
+        register_distribution={
+            "formal_literary": (0.05, 0.30),
+            "neutral": (0.20, 0.50),
+            "colloquial": (0.15, 0.55),
+            "technical": (0.0, 0.05),
+            "poetic": (0.0, 0.15),
+        },
+        max_high_severity_changes=5,
+        notes="Alta variación esperada: cada personaje puede tener registro propio.",
+    ),
+    "GRA": RegisterGenreBenchmarks(
+        genre_code="GRA",
+        genre_label="Novela gráfica / Cómic",
+        expected_primary="colloquial",
+        consistency_range=(40.0, 75.0),
+        register_distribution={
+            "formal_literary": (0.0, 0.15),
+            "neutral": (0.15, 0.45),
+            "colloquial": (0.30, 0.70),
+            "technical": (0.0, 0.10),
+            "poetic": (0.0, 0.10),
+        },
+        max_high_severity_changes=5,
+        notes="Texto breve y directo. Registro varía por personaje.",
+    ),
+}
+
+
+def get_register_genre_benchmarks(genre_code: str) -> Optional[RegisterGenreBenchmarks]:
+    """Obtiene los benchmarks de registro para un género dado."""
+    return REGISTER_GENRE_BENCHMARKS.get(genre_code)
+
+
+def compare_register_with_benchmarks(
+    summary: Dict,
+    genre_code: str,
+    changes_count: int = 0,
+    high_severity_count: int = 0,
+) -> Optional[Dict]:
+    """
+    Compara las métricas de registro de un documento contra los benchmarks del género.
+
+    Args:
+        summary: Diccionario con resumen del análisis de registro (del detector)
+        genre_code: Código del género (FIC, MEM, TEC, etc.)
+        changes_count: Número total de cambios de registro detectados
+        high_severity_count: Número de cambios de severidad alta
+
+    Returns:
+        Diccionario con comparación o None si el género no tiene benchmarks
+    """
+    benchmarks = REGISTER_GENRE_BENCHMARKS.get(genre_code)
+    if not benchmarks:
+        return None
+
+    deviations = []
+
+    # Obtener distribución y calcular consistencia
+    distribution = summary.get("distribution", {})
+    total_segments = summary.get("total_segments", 0)
+    dominant_register = summary.get("dominant_register")
+
+    if total_segments > 0 and dominant_register:
+        dominant_count = distribution.get(dominant_register, 0)
+        consistency_pct = (dominant_count / total_segments) * 100
+
+        # Comparar consistencia
+        low, high = benchmarks.consistency_range
+        if consistency_pct < low:
+            deviations.append({
+                "metric": "consistency",
+                "label": "Consistencia de registro",
+                "actual": round(consistency_pct, 1),
+                "expected_range": [low, high],
+                "status": "below",
+                "message": f"Registro poco consistente para {benchmarks.genre_label} "
+                           f"({round(consistency_pct, 1)}% vs mínimo {low}%)",
+            })
+        elif consistency_pct > high:
+            deviations.append({
+                "metric": "consistency",
+                "label": "Consistencia de registro",
+                "actual": round(consistency_pct, 1),
+                "expected_range": [low, high],
+                "status": "above",
+                "message": f"Registro excesivamente uniforme para {benchmarks.genre_label} "
+                           f"({round(consistency_pct, 1)}% vs máximo {high}%)",
+            })
+
+        # Comparar registro dominante esperado
+        if dominant_register != benchmarks.expected_primary:
+            deviations.append({
+                "metric": "dominant_register",
+                "label": "Registro dominante",
+                "actual": dominant_register,
+                "expected": benchmarks.expected_primary,
+                "status": "mismatch",
+                "message": f"El registro dominante es '{dominant_register}' pero se esperaba "
+                           f"'{benchmarks.expected_primary}' para {benchmarks.genre_label}",
+            })
+
+        # Comparar distribución por tipo de registro
+        for reg_type, (exp_low, exp_high) in benchmarks.register_distribution.items():
+            reg_count = distribution.get(reg_type, 0)
+            reg_ratio = reg_count / total_segments if total_segments > 0 else 0
+
+            if reg_ratio < exp_low and (exp_low - reg_ratio) > 0.05:
+                deviations.append({
+                    "metric": f"distribution_{reg_type}",
+                    "label": f"Proporción de registro {reg_type}",
+                    "actual": round(reg_ratio, 3),
+                    "expected_range": [exp_low, exp_high],
+                    "status": "below",
+                    "message": f"Poco uso de registro {reg_type} "
+                               f"({round(reg_ratio * 100, 1)}% vs {round(exp_low * 100)}-{round(exp_high * 100)}%)",
+                })
+            elif reg_ratio > exp_high and (reg_ratio - exp_high) > 0.05:
+                deviations.append({
+                    "metric": f"distribution_{reg_type}",
+                    "label": f"Proporción de registro {reg_type}",
+                    "actual": round(reg_ratio, 3),
+                    "expected_range": [exp_low, exp_high],
+                    "status": "above",
+                    "message": f"Exceso de registro {reg_type} "
+                               f"({round(reg_ratio * 100, 1)}% vs {round(exp_low * 100)}-{round(exp_high * 100)}%)",
+                })
+
+    # Comparar cambios de alta severidad
+    if high_severity_count > benchmarks.max_high_severity_changes:
+        deviations.append({
+            "metric": "high_severity_changes",
+            "label": "Cambios de registro bruscos",
+            "actual": high_severity_count,
+            "expected_max": benchmarks.max_high_severity_changes,
+            "status": "above",
+            "message": f"Demasiados cambios bruscos de registro ({high_severity_count} vs "
+                       f"máximo {benchmarks.max_high_severity_changes} para {benchmarks.genre_label})",
+        })
+
+    return {
+        "genre": benchmarks.to_dict(),
+        "deviations": deviations,
+        "deviation_count": len(deviations),
+        "dominant_register_match": dominant_register == benchmarks.expected_primary if dominant_register else None,
+    }
