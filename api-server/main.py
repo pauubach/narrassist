@@ -3582,6 +3582,9 @@ async def get_entity_coreference_info(project_id: int, entity_id: int):
             "pronoun": "Pronombre resuelto",
         }
 
+        # Lista de resoluciones con detalle de votación
+        voting_reasoning: list[dict] = []
+
         for mention in mentions:
             source = mention.source or "unknown"
             source_lower = source.lower()
@@ -3606,6 +3609,35 @@ async def get_entity_coreference_info(project_id: int, entity_id: int):
                 total_confidence += mention.confidence
                 confidence_count += 1
 
+            # Extraer detalle de votación de metadata (menciones con source='coref')
+            if source_lower == "coref" and mention.metadata:
+                try:
+                    import json
+                    meta = json.loads(mention.metadata) if isinstance(mention.metadata, str) else mention.metadata
+                    if meta and "method_votes" in meta:
+                        voting_reasoning.append({
+                            "mentionText": meta.get("anaphor_text", surface),
+                            "startChar": meta.get("anaphor_start", mention.start_char),
+                            "endChar": meta.get("anaphor_end", mention.end_char),
+                            "resolvedTo": meta.get("resolved_to", ""),
+                            "finalScore": meta.get("final_score", mention.confidence),
+                            "contextBefore": mention.context_before or "",
+                            "contextAfter": mention.context_after or "",
+                            "methodVotes": [
+                                {
+                                    "method": method_name,
+                                    "methodLabel": source_labels.get(method_name, method_name.capitalize()),
+                                    "score": vote_data.get("score", 0),
+                                    "weight": vote_data.get("weight", 0),
+                                    "weightedScore": vote_data.get("weighted_score", 0),
+                                    "reasoning": vote_data.get("reasoning", ""),
+                                }
+                                for method_name, vote_data in meta["method_votes"].items()
+                            ],
+                        })
+                except (json.JSONDecodeError, TypeError, KeyError):
+                    pass
+
         # Calcular contribuciones con formato para MethodVotingBar
         total_mentions = len(mentions)
         method_contributions = []
@@ -3628,6 +3660,7 @@ async def get_entity_coreference_info(project_id: int, entity_id: int):
             "entityName": entity.canonical_name,
             "methodContributions": method_contributions,
             "mentionsByType": type_mentions,
+            "votingReasoning": voting_reasoning,
             "overallConfidence": overall_confidence,
             "totalMentions": total_mentions,
         })
@@ -12566,6 +12599,35 @@ async def get_register_analysis(
             for c in changes
         ]
 
+        # Build per-chapter summaries
+        chapter_summaries = {}
+        for i, a in enumerate(analyses):
+            ch = segments[i][1]
+            if ch not in chapter_summaries:
+                chapter_summaries[ch] = {"registers": {}, "total": 0, "changes": 0}
+            reg = a.primary_register.value
+            chapter_summaries[ch]["registers"][reg] = chapter_summaries[ch]["registers"].get(reg, 0) + 1
+            chapter_summaries[ch]["total"] += 1
+
+        for c in changes:
+            ch = c.chapter
+            if ch in chapter_summaries:
+                chapter_summaries[ch]["changes"] += 1
+
+        per_chapter = []
+        for ch_num in sorted(chapter_summaries.keys()):
+            cs = chapter_summaries[ch_num]
+            dominant = max(cs["registers"], key=cs["registers"].get) if cs["registers"] else "neutral"
+            consistency = (cs["registers"].get(dominant, 0) / cs["total"] * 100) if cs["total"] > 0 else 100
+            per_chapter.append({
+                "chapter_number": ch_num,
+                "dominant_register": dominant,
+                "consistency_pct": round(consistency, 1),
+                "segment_count": cs["total"],
+                "change_count": cs["changes"],
+                "distribution": cs["registers"],
+            })
+
         return ApiResponse(
             success=True,
             data={
@@ -12573,6 +12635,7 @@ async def get_register_analysis(
                 "analyses": analyses_data,
                 "changes": changes_data,
                 "summary": summary,
+                "per_chapter": per_chapter,
                 "stats": {
                     "segments_analyzed": len(analyses),
                     "changes_detected": len(changes),
@@ -12585,6 +12648,162 @@ async def get_register_analysis(
         raise
     except Exception as e:
         logger.error(f"Error analyzing register: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.get("/api/projects/{project_id}/chapters/{chapter_num}/register-analysis", response_model=ApiResponse)
+async def get_chapter_register_analysis(
+    project_id: int,
+    chapter_num: int,
+    min_severity: str = Query("low", description="Severidad mínima: low, medium, high")
+):
+    """
+    Analiza el registro narrativo de un capítulo específico.
+
+    Devuelve análisis detallado con segmentos, cambios y resumen
+    para un solo capítulo.
+
+    Returns:
+        ApiResponse con análisis de registro del capítulo
+    """
+    try:
+        from narrative_assistant.voice.register import (
+            RegisterChangeDetector,
+            RegisterAnalyzer,
+        )
+        from narrative_assistant.nlp.dialogue import detect_dialogues
+        from narrative_assistant.persistence.chapter import get_chapter_repository
+
+        if not project_manager:
+            return ApiResponse(success=False, error="Project manager not initialized")
+
+        result = project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail=f"Proyecto {project_id} no encontrado")
+
+        chapter_repo = get_chapter_repository()
+        chapters = chapter_repo.get_by_project(project_id)
+        chapter = next((c for c in chapters if c.chapter_number == chapter_num), None)
+
+        if not chapter:
+            raise HTTPException(status_code=404, detail=f"Capítulo {chapter_num} no encontrado")
+
+        # Detect dialogues
+        dialogue_result = detect_dialogues(chapter.content)
+        dialogue_ranges = []
+        if dialogue_result.is_success:
+            dialogue_ranges = [
+                (d.start_char, d.end_char)
+                for d in dialogue_result.value.dialogues
+            ]
+
+        # Segment by paragraph
+        segments = []
+        paragraphs = chapter.content.split('\n\n')
+        position = 0
+
+        for para in paragraphs:
+            if para.strip():
+                is_dialogue = any(
+                    start <= position <= end
+                    for start, end in dialogue_ranges
+                )
+                segments.append((
+                    para.strip(),
+                    chapter.chapter_number,
+                    position,
+                    is_dialogue
+                ))
+            position += len(para) + 2
+
+        if not segments:
+            return ApiResponse(
+                success=True,
+                data={
+                    "project_id": project_id,
+                    "chapter_number": chapter_num,
+                    "analyses": [],
+                    "changes": [],
+                    "summary": {},
+                }
+            )
+
+        # Analyze
+        detector = RegisterChangeDetector()
+        analyses = detector.analyze_document(segments)
+        changes = detector.detect_changes(min_severity)
+        summary = detector.get_summary()
+
+        # Per-chapter register distribution
+        register_counts: dict[str, int] = {}
+        narrative_count = 0
+        dialogue_count = 0
+        for i, a in enumerate(analyses):
+            reg = a.primary_register.value
+            register_counts[reg] = register_counts.get(reg, 0) + 1
+            if segments[i][3]:
+                dialogue_count += 1
+            else:
+                narrative_count += 1
+
+        # Dominant register
+        dominant = max(register_counts, key=register_counts.get) if register_counts else "neutral"
+
+        # Consistency: % of segments with the dominant register
+        total_segs = len(analyses)
+        consistency = (register_counts.get(dominant, 0) / total_segs * 100) if total_segs > 0 else 100
+
+        analyses_data = [
+            {
+                "segment_index": i,
+                "chapter": segments[i][1],
+                "is_dialogue": segments[i][3],
+                "primary_register": a.primary_register.value,
+                "register_scores": {k.value: v for k, v in a.register_scores.items()},
+                "confidence": a.confidence,
+                "formal_indicators": list(a.formal_indicators)[:5],
+                "colloquial_indicators": list(a.colloquial_indicators)[:5],
+            }
+            for i, a in enumerate(analyses)
+        ]
+
+        changes_data = [
+            {
+                "from_register": c.from_register.value,
+                "to_register": c.to_register.value,
+                "severity": c.severity,
+                "explanation": c.explanation,
+                "chapter": c.chapter,
+                "position": c.position,
+                "context_before": c.context_before[:100] if c.context_before else "",
+                "context_after": c.context_after[:100] if c.context_after else "",
+            }
+            for c in changes
+        ]
+
+        return ApiResponse(
+            success=True,
+            data={
+                "project_id": project_id,
+                "chapter_number": chapter_num,
+                "chapter_title": getattr(chapter, 'title', '') or '',
+                "analyses": analyses_data,
+                "changes": changes_data,
+                "summary": {
+                    **summary,
+                    "dominant_register": dominant,
+                    "consistency_pct": round(consistency, 1),
+                    "register_distribution": register_counts,
+                    "narrative_segments": narrative_count,
+                    "dialogue_segments": dialogue_count,
+                },
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error analyzing chapter register: {e}", exc_info=True)
         return ApiResponse(success=False, error=str(e))
 
 

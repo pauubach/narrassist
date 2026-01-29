@@ -199,11 +199,19 @@ export const useVoiceAndStyleStore = defineStore('voiceAndStyle', () => {
   // Voice profiles: projectId -> profiles[]
   const voiceProfiles = ref<Record<number, VoiceProfile[]>>({})
 
-  // Register analysis: projectId -> { analyses, changes, summary }
+  // Register analysis: projectId -> { analyses, changes, summary, perChapter }
   const registerAnalyses = ref<Record<number, {
     analyses: RegisterAnalysis[]
     changes: RegisterChange[]
     summary: RegisterSummary | null
+    perChapter: Array<{
+      chapter_number: number
+      dominant_register: string
+      consistency_pct: number
+      segment_count: number
+      change_count: number
+      distribution: Record<string, number>
+    }>
   }>>({})
 
   // Dialogue attributions: "projectId-chapterNum" -> attributions[]
@@ -308,6 +316,7 @@ export const useVoiceAndStyleStore = defineStore('voiceAndStyle', () => {
           analyses: (data.data.analyses || []).map(transformRegisterAnalysis),
           changes: (data.data.changes || []).map(transformRegisterChange),
           summary: data.data.summary || null,
+          perChapter: data.data.per_chapter || [],
         }
         return true
       } else {

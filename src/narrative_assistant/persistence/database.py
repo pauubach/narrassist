@@ -132,6 +132,7 @@ CREATE TABLE IF NOT EXISTS entity_mentions (
     context_after TEXT,
     confidence REAL DEFAULT 1.0,
     source TEXT DEFAULT 'ner',  -- ner, coref, manual, gazetteer
+    metadata TEXT,  -- JSON con datos adicionales (voting_detail para coref)
     FOREIGN KEY (entity_id) REFERENCES entities(id) ON DELETE CASCADE,
     FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE SET NULL
 );
@@ -843,6 +844,25 @@ class Database:
                 logger.info("Tablas faltantes creadas exitosamente")
             else:
                 logger.info("Todas las tablas esenciales existen")
+
+            # Migraciones incrementales para columnas nuevas
+            self._apply_column_migrations(conn)
+
+    def _apply_column_migrations(self, conn) -> None:
+        """Aplica migraciones de columnas nuevas a tablas existentes."""
+        migrations = [
+            # (tabla, columna, definición SQL)
+            ("entity_mentions", "metadata", "TEXT"),
+        ]
+        for table, column, col_def in migrations:
+            try:
+                cols = conn.execute(f"PRAGMA table_info({table})").fetchall()
+                col_names = {c[1] for c in cols}
+                if column not in col_names:
+                    conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_def}")
+                    logger.info(f"Migración: añadida columna {table}.{column}")
+            except Exception as e:
+                logger.warning(f"Error en migración {table}.{column}: {e}")
 
     def _create_schema_from_scratch(self) -> None:
         """Crea el schema completo desde cero."""

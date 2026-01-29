@@ -116,11 +116,23 @@ class EntityMention:
     context_after: Optional[str] = None
     confidence: float = 1.0
     source: str = "ner"
+    metadata: Optional[str] = None  # JSON con datos adicionales (voting_detail para coref)
 
     @property
     def char_span(self) -> tuple[int, int]:
         """Retorna el span de caracteres."""
         return (self.start_char, self.end_char)
+
+    @property
+    def metadata_dict(self) -> Optional[dict]:
+        """Deserializa metadata JSON a diccionario."""
+        if not self.metadata:
+            return None
+        try:
+            import json
+            return json.loads(self.metadata)
+        except (json.JSONDecodeError, TypeError):
+            return None
 
     def to_dict(self) -> dict:
         """Convierte a diccionario para serialización."""
@@ -135,11 +147,18 @@ class EntityMention:
             "context_after": self.context_after,
             "confidence": self.confidence,
             "source": self.source,
+            "metadata": self.metadata,
         }
 
     @classmethod
     def from_row(cls, row) -> "EntityMention":
         """Crea instancia desde fila de SQLite."""
+        # Acceso seguro a 'metadata' (puede no existir en BD antiguas)
+        metadata = None
+        try:
+            metadata = row["metadata"]
+        except (IndexError, KeyError):
+            pass
         return cls(
             id=row["id"],
             entity_id=row["entity_id"],
@@ -151,6 +170,7 @@ class EntityMention:
             context_after=row["context_after"],
             confidence=row["confidence"],
             source=row["source"],
+            metadata=metadata,
         )
 
 

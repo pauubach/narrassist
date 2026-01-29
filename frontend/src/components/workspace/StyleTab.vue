@@ -2,8 +2,10 @@
 /**
  * StyleTab - Pestana de Escritura y Análisis
  *
- * Contiene todos los análisis de escritura: registro narrativo,
- * focalización, oraciones, repeticiones, ritmo, emociones, etc.
+ * Contiene todos los análisis de escritura organizados en categorías:
+ * - Narrativa: registro, focalización, escenas, ritmo, emociones, progreso
+ * - Estilo: densidad, ecos, variación, legibilidad
+ * - Consistencia: estado vital, ubicaciones
  *
  * Los sub-tabs se adaptan al tipo de documento.
  */
@@ -24,12 +26,21 @@ import VitalStatusTab from './VitalStatusTab.vue'
 import CharacterLocationTab from './CharacterLocationTab.vue'
 import ChapterProgressTab from './ChapterProgressTab.vue'
 
+type CategoryId = 'narrative' | 'style' | 'consistency'
+
 interface SubTab {
   id: string
   label: string
   icon: string
   component: string
   featureKey?: string
+  category: CategoryId
+}
+
+interface Category {
+  id: CategoryId
+  label: string
+  icon: string
 }
 
 const props = defineProps<{
@@ -41,24 +52,35 @@ const workspaceStore = useWorkspaceStore()
 const { isFeatureAvailable } = useFeatureProfile(computed(() => props.projectId))
 
 const activeTabId = ref('register')
+const activeCategoryId = ref<CategoryId>('narrative')
 
 // Feature availability
 const hasScenes = ref(false)
 
-// All possible sub-tabs
+// Categories
+const categories: Category[] = [
+  { id: 'narrative', label: 'Narrativa', icon: 'pi pi-book' },
+  { id: 'style', label: 'Estilo', icon: 'pi pi-pencil' },
+  { id: 'consistency', label: 'Consistencia', icon: 'pi pi-check-circle' },
+]
+
+// All possible sub-tabs with category assignments
 const allSubTabs: SubTab[] = [
-  { id: 'register', label: 'Registro', icon: 'pi pi-sliders-v', component: 'RegisterAnalysisTab' },
-  { id: 'focalization', label: 'Focalización', icon: 'pi pi-eye', component: 'FocalizationTab' },
-  { id: 'scenes', label: 'Escenas', icon: 'pi pi-images', component: 'SceneTaggingTab', featureKey: 'scenes' },
-  { id: 'sticky', label: 'Densidad', icon: 'pi pi-align-left', component: 'StickySentencesTab', featureKey: 'sticky_sentences' },
-  { id: 'echo', label: 'Ecos', icon: 'pi pi-replay', component: 'EchoReportTab', featureKey: 'echo_repetitions' },
-  { id: 'variation', label: 'Variación', icon: 'pi pi-chart-bar', component: 'SentenceVariationTab', featureKey: 'sentence_variation' },
-  { id: 'pacing', label: 'Ritmo', icon: 'pi pi-forward', component: 'PacingAnalysisTab', featureKey: 'pacing' },
-  { id: 'emotions', label: 'Emociones', icon: 'pi pi-heart', component: 'EmotionalAnalysisTab', featureKey: 'emotional_analysis' },
-  { id: 'readability', label: 'Legibilidad', icon: 'pi pi-users', component: 'AgeReadabilityTab', featureKey: 'age_readability' },
-  { id: 'vital', label: 'Estado vital', icon: 'pi pi-heart-fill', component: 'VitalStatusTab', featureKey: 'vital_status' },
-  { id: 'locations', label: 'Ubicaciones', icon: 'pi pi-map-marker', component: 'CharacterLocationTab', featureKey: 'character_location' },
-  { id: 'progress', label: 'Progreso', icon: 'pi pi-chart-line', component: 'ChapterProgressTab', featureKey: 'chapter_progress' },
+  // Narrativa
+  { id: 'register', label: 'Registro', icon: 'pi pi-sliders-v', component: 'RegisterAnalysisTab', category: 'narrative' },
+  { id: 'focalization', label: 'Focalización', icon: 'pi pi-eye', component: 'FocalizationTab', category: 'narrative' },
+  { id: 'scenes', label: 'Escenas', icon: 'pi pi-images', component: 'SceneTaggingTab', featureKey: 'scenes', category: 'narrative' },
+  { id: 'pacing', label: 'Ritmo', icon: 'pi pi-forward', component: 'PacingAnalysisTab', featureKey: 'pacing', category: 'narrative' },
+  { id: 'emotions', label: 'Emociones', icon: 'pi pi-heart', component: 'EmotionalAnalysisTab', featureKey: 'emotional_analysis', category: 'narrative' },
+  { id: 'progress', label: 'Progreso', icon: 'pi pi-chart-line', component: 'ChapterProgressTab', featureKey: 'chapter_progress', category: 'narrative' },
+  // Estilo
+  { id: 'sticky', label: 'Densidad', icon: 'pi pi-align-left', component: 'StickySentencesTab', featureKey: 'sticky_sentences', category: 'style' },
+  { id: 'echo', label: 'Ecos', icon: 'pi pi-replay', component: 'EchoReportTab', featureKey: 'echo_repetitions', category: 'style' },
+  { id: 'variation', label: 'Variación', icon: 'pi pi-chart-bar', component: 'SentenceVariationTab', featureKey: 'sentence_variation', category: 'style' },
+  { id: 'readability', label: 'Legibilidad', icon: 'pi pi-users', component: 'AgeReadabilityTab', featureKey: 'age_readability', category: 'style' },
+  // Consistencia
+  { id: 'vital', label: 'Estado vital', icon: 'pi pi-heart-fill', component: 'VitalStatusTab', featureKey: 'vital_status', category: 'consistency' },
+  { id: 'locations', label: 'Ubicaciones', icon: 'pi pi-map-marker', component: 'CharacterLocationTab', featureKey: 'character_location', category: 'consistency' },
 ]
 
 // Filtered sub-tabs based on feature availability
@@ -70,16 +92,43 @@ const visibleSubTabs = computed(() => {
   })
 })
 
+// Sub-tabs for the active category
+const categorySubTabs = computed(() => {
+  return visibleSubTabs.value.filter(tab => tab.category === activeCategoryId.value)
+})
+
+// Categories that have at least one visible tab
+const visibleCategories = computed(() => {
+  return categories.filter(cat =>
+    visibleSubTabs.value.some(tab => tab.category === cat.id)
+  )
+})
+
+// Count of visible tabs per category (for badge)
+function categoryTabCount(catId: CategoryId): number {
+  return visibleSubTabs.value.filter(tab => tab.category === catId).length
+}
+
 // Watch for external navigation requests
 watch(() => workspaceStore.styleTabSubtab, (newSubtab) => {
   if (newSubtab !== null) {
     const tab = visibleSubTabs.value[newSubtab]
     if (tab) {
+      activeCategoryId.value = tab.category
       activeTabId.value = tab.id
     }
     workspaceStore.clearStyleTabSubtab()
   }
 }, { immediate: true })
+
+function selectCategory(catId: CategoryId) {
+  activeCategoryId.value = catId
+  // Auto-select first tab in category if current tab isn't in it
+  const tabsInCat = visibleSubTabs.value.filter(t => t.category === catId)
+  if (tabsInCat.length > 0 && !tabsInCat.some(t => t.id === activeTabId.value)) {
+    activeTabId.value = tabsInCat[0].id
+  }
+}
 
 function selectSubTab(tabId: string) {
   activeTabId.value = tabId
@@ -110,11 +159,29 @@ async function loadFeatureAvailability() {
 
 <template>
   <div class="style-tab">
-    <!-- Sub-tabs bar (same style as workspace tabs) -->
+    <!-- Row 1: Category bar -->
+    <div class="category-bar" role="tablist" aria-label="Categorías de análisis">
+      <button
+        v-for="cat in visibleCategories"
+        :key="cat.id"
+        type="button"
+        role="tab"
+        class="category-tab"
+        :class="{ 'category-tab--active': activeCategoryId === cat.id }"
+        :aria-selected="activeCategoryId === cat.id"
+        @click="selectCategory(cat.id)"
+      >
+        <i :class="cat.icon" class="category-tab__icon" />
+        <span class="category-tab__label">{{ cat.label }}</span>
+        <span class="category-tab__count">{{ categoryTabCount(cat.id) }}</span>
+      </button>
+    </div>
+
+    <!-- Row 2: Sub-tabs within category -->
     <div class="subtabs-bar" role="tablist" aria-label="Análisis de escritura">
       <div class="subtabs-scroll">
         <button
-          v-for="tab in visibleSubTabs"
+          v-for="tab in categorySubTabs"
           :key="tab.id"
           type="button"
           role="tab"
@@ -155,7 +222,92 @@ async function loadFeatureAvailability() {
   overflow: hidden;
 }
 
-/* Sub-tabs bar: same visual style as workspace-tabs */
+/* Row 1: Category bar */
+.category-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: stretch;
+  gap: var(--ds-space-1, 0.25rem);
+  padding: 0 var(--ds-space-3, 0.75rem);
+  height: 36px;
+  background-color: var(--ds-surface-ground, var(--surface-ground));
+  border-bottom: 1px solid var(--ds-surface-border, var(--surface-border));
+}
+
+.category-tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ds-space-1-5, 0.375rem);
+  padding: 0 var(--ds-space-4, 1rem);
+  white-space: nowrap;
+  border: none;
+  background: transparent;
+  color: var(--ds-color-text-secondary, var(--text-color-secondary));
+  font-size: var(--ds-font-size-sm, 0.8125rem);
+  font-weight: var(--ds-font-weight-semibold, 600);
+  cursor: pointer;
+  position: relative;
+  transition: color 0.15s ease, background-color 0.15s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.category-tab:hover {
+  color: var(--ds-color-text, var(--text-color));
+  background-color: var(--ds-surface-hover, var(--surface-hover));
+}
+
+.category-tab:focus-visible {
+  outline: 2px solid var(--ds-color-primary, var(--primary-color));
+  outline-offset: -2px;
+  border-radius: var(--ds-radius-sm, 4px);
+}
+
+.category-tab--active {
+  color: var(--ds-color-primary, var(--primary-color));
+}
+
+.category-tab--active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: var(--ds-space-2, 0.5rem);
+  right: var(--ds-space-2, 0.5rem);
+  height: 2.5px;
+  background-color: var(--ds-color-primary, var(--primary-color));
+  border-radius: 2px 2px 0 0;
+}
+
+.category-tab__icon {
+  font-size: 0.8125rem;
+}
+
+.category-tab__label {
+  white-space: nowrap;
+}
+
+.category-tab__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background-color: var(--ds-surface-border, var(--surface-border));
+  color: var(--ds-color-text-secondary, var(--text-color-secondary));
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.category-tab--active .category-tab__count {
+  background-color: var(--ds-color-primary, var(--primary-color));
+  color: var(--ds-color-primary-contrast, white);
+}
+
+/* Row 2: Sub-tabs bar */
 .subtabs-bar {
   flex-shrink: 0;
   background-color: var(--ds-surface-card);
@@ -168,7 +320,7 @@ async function loadFeatureAvailability() {
   align-items: stretch;
   gap: var(--ds-space-1, 0.25rem);
   padding: 0 var(--ds-space-3, 0.75rem);
-  height: 40px;
+  height: 36px;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: thin;
@@ -247,8 +399,16 @@ async function loadFeatureAvailability() {
   padding: var(--ds-space-4, 1rem);
 }
 
-/* Responsive: hide labels when too narrow */
+/* Responsive: collapse to icons only */
 @media (max-width: 768px) {
+  .category-tab {
+    padding: 0 var(--ds-space-2, 0.5rem);
+  }
+
+  .category-tab__label {
+    display: none;
+  }
+
   .subtab {
     padding: 0 var(--ds-space-2, 0.5rem);
   }
@@ -257,7 +417,8 @@ async function loadFeatureAvailability() {
     display: none;
   }
 
-  .subtab__icon {
+  .subtab__icon,
+  .category-tab__icon {
     font-size: 1.125rem;
   }
 }

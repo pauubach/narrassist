@@ -410,6 +410,50 @@ class CoreferenceChain:
 
 
 @dataclass
+class MentionVotingDetail:
+    """
+    Detalle de la votación para una mención resuelta.
+
+    Attributes:
+        anaphor_text: Texto de la mención anafórica
+        anaphor_start: Posición inicial de la anáfora
+        anaphor_end: Posición final de la anáfora
+        resolved_to: Texto del antecedente ganador
+        final_score: Score ponderado final
+        method_votes: Votos de cada método {method: {score, reasoning}}
+    """
+    anaphor_text: str = ""
+    anaphor_start: int = 0
+    anaphor_end: int = 0
+    resolved_to: str = ""
+    final_score: float = 0.0
+    method_votes: dict[str, dict] = field(default_factory=dict)
+
+    def to_dict(self) -> dict:
+        """Serializa a diccionario para almacenamiento JSON."""
+        return {
+            "anaphor_text": self.anaphor_text,
+            "anaphor_start": self.anaphor_start,
+            "anaphor_end": self.anaphor_end,
+            "resolved_to": self.resolved_to,
+            "final_score": self.final_score,
+            "method_votes": self.method_votes,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "MentionVotingDetail":
+        """Deserializa desde diccionario."""
+        return cls(
+            anaphor_text=data.get("anaphor_text", ""),
+            anaphor_start=data.get("anaphor_start", 0),
+            anaphor_end=data.get("anaphor_end", 0),
+            resolved_to=data.get("resolved_to", ""),
+            final_score=data.get("final_score", 0.0),
+            method_votes=data.get("method_votes", {}),
+        )
+
+
+@dataclass
 class CorefResult:
     """
     Resultado de la resolución de correferencias.
@@ -418,11 +462,13 @@ class CorefResult:
         chains: Cadenas de correferencia detectadas
         unresolved: Menciones que no pudieron resolverse
         method_contributions: Contribución de cada método
+        voting_details: Detalle de votación por mención {(start, end): MentionVotingDetail}
         processing_time_ms: Tiempo de procesamiento
     """
     chains: list[CoreferenceChain] = field(default_factory=list)
     unresolved: list[Mention] = field(default_factory=list)
     method_contributions: dict[CorefMethod, int] = field(default_factory=dict)
+    voting_details: dict[tuple[int, int], MentionVotingDetail] = field(default_factory=dict)
     processing_time_ms: float = 0.0
 
     @property
@@ -1095,7 +1141,7 @@ class CoreferenceVotingResolver:
                     logger.debug(f"Error en método {method.value}: {e}")
 
             # Votación ponderada
-            best_candidate, final_score = self._weighted_vote(all_votes)
+            best_candidate, final_score, method_detail = self._weighted_vote(all_votes)
 
             if best_candidate and final_score >= self.config.min_confidence:
                 resolved_pairs.append((anaphor, best_candidate, final_score))
@@ -1104,6 +1150,17 @@ class CoreferenceVotingResolver:
                 for score, method, _ in all_votes.get(best_candidate, []):
                     result.method_contributions[method] = \
                         result.method_contributions.get(method, 0) + 1
+
+                # Almacenar detalle de votación para esta mención
+                result.voting_details[(anaphor.start_char, anaphor.end_char)] = \
+                    MentionVotingDetail(
+                        anaphor_text=anaphor.text,
+                        anaphor_start=anaphor.start_char,
+                        anaphor_end=anaphor.end_char,
+                        resolved_to=best_candidate.text,
+                        final_score=round(final_score, 3),
+                        method_votes=method_detail,
+                    )
             else:
                 result.unresolved.append(anaphor)
 
@@ -1117,6 +1174,24 @@ class CoreferenceVotingResolver:
                 # Marcar como contribución del narrador (usamos HEURISTICS como indicador)
                 result.method_contributions[CorefMethod.HEURISTICS] = \
                     result.method_contributions.get(CorefMethod.HEURISTICS, 0) + 1
+
+                # Detalle de votación para primera persona -> narrador
+                result.voting_details[(anaphor.start_char, anaphor.end_char)] = \
+                    MentionVotingDetail(
+                        anaphor_text=anaphor.text,
+                        anaphor_start=anaphor.start_char,
+                        anaphor_end=anaphor.end_char,
+                        resolved_to=antecedent.text,
+                        final_score=round(score, 3),
+                        method_votes={
+                            "heuristics": {
+                                "score": round(score, 3),
+                                "reasoning": f"Pronombre 1ª persona → narrador '{antecedent.text}'",
+                                "weight": 1.0,
+                                "weighted_score": round(score, 3),
+                            }
+                        },
+                    )
 
         # Construir cadenas de correferencia
         result.chains = self._build_chains(resolved_pairs, potential_antecedents)
@@ -1845,7 +1920,7 @@ EVIDENCIA: [frase donde se identifica, si existe]"""
     def _weighted_vote(
         self,
         votes: dict[Mention, list[tuple[float, CorefMethod, str]]],
-    ) -> tuple[Optional[Mention], float]:
+    ) -> tuple[Optional[Mention], float, dict[str, dict]]:
         """
         Realiza votación ponderada entre candidatos.
 
@@ -1853,10 +1928,11 @@ EVIDENCIA: [frase donde se identifica, si existe]"""
             votes: Diccionario de candidato -> lista de (score, método, razón)
 
         Returns:
-            (mejor_candidato, score_final)
+            (mejor_candidato, score_final, method_votes_detail)
+            method_votes_detail: {method_name: {score, reasoning, weight}} para el candidato ganador
         """
         if not votes:
-            return None, 0.0
+            return None, 0.0, {}
 
         candidate_scores: dict[Mention, float] = {}
 
@@ -1873,10 +1949,24 @@ EVIDENCIA: [frase donde se identifica, si existe]"""
                 candidate_scores[candidate] = weighted_sum / total_weight
 
         if not candidate_scores:
-            return None, 0.0
+            return None, 0.0, {}
 
         best = max(candidate_scores.items(), key=lambda x: x[1])
-        return best[0], best[1]
+        best_candidate = best[0]
+        best_score = best[1]
+
+        # Construir detalle de votos del candidato ganador
+        method_votes_detail: dict[str, dict] = {}
+        for score, method, reasoning in votes.get(best_candidate, []):
+            weight = self.config.method_weights.get(method, 0.1)
+            method_votes_detail[method.value] = {
+                "score": round(score, 3),
+                "reasoning": reasoning,
+                "weight": round(weight, 2),
+                "weighted_score": round(score * weight, 3),
+            }
+
+        return best_candidate, best_score, method_votes_detail
 
     def _build_chains(
         self,

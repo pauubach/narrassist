@@ -12,6 +12,26 @@
         </p>
       </div>
       <div class="header-controls">
+        <div class="view-toggle">
+          <Button
+            icon="pi pi-list"
+            :text="viewMode !== 'list'"
+            :outlined="viewMode === 'list'"
+            size="small"
+            severity="secondary"
+            v-tooltip.top="'Vista lista'"
+            @click="viewMode = 'list'"
+          />
+          <Button
+            icon="pi pi-th-large"
+            :text="viewMode !== 'cards'"
+            :outlined="viewMode === 'cards'"
+            size="small"
+            severity="secondary"
+            v-tooltip.top="'Vista tarjetas'"
+            @click="viewMode = 'cards'"
+          />
+        </div>
         <Select
           v-model="filterType"
           :options="sceneTypeOptions"
@@ -86,8 +106,17 @@
         </Card>
       </div>
 
-      <!-- Scenes by Chapter -->
-      <Accordion :multiple="true" class="scenes-accordion">
+      <!-- Cards View -->
+      <SceneCardsView
+        v-if="viewMode === 'cards'"
+        :scenes="filteredScenes"
+        :project-id="projectId"
+        @tag-scene="(id) => openTagDialog(scenes.find(s => s.id === id))"
+        @select-scene="(id) => openTagDialog(scenes.find(s => s.id === id))"
+      />
+
+      <!-- List View: Scenes by Chapter -->
+      <Accordion v-if="viewMode === 'list'" :multiple="true" class="scenes-accordion">
         <AccordionPanel v-for="(chapterScenes, chapterNum) in scenesByChapter" :key="chapterNum" :value="String(chapterNum)">
           <AccordionHeader>
             <div class="chapter-header">
@@ -348,12 +377,16 @@ import AutoComplete from 'primevue/autocomplete'
 import ColorPicker from 'primevue/colorpicker'
 import ProgressSpinner from 'primevue/progressspinner'
 import { useToast } from 'primevue/usetoast'
+import SceneCardsView from './SceneCardsView.vue'
 
 const props = defineProps<{
   projectId: number
 }>()
 
 const toast = useToast()
+
+// View mode
+const viewMode = ref<'list' | 'cards'>('list')
 
 // State
 const loading = ref(true)
@@ -731,6 +764,14 @@ watch(() => props.projectId, () => {
 .header-controls {
   display: flex;
   gap: var(--ds-space-2);
+}
+
+.view-toggle {
+  display: flex;
+  gap: 2px;
+  border: 1px solid var(--ds-surface-border, var(--surface-border));
+  border-radius: var(--ds-radius-md, 6px);
+  padding: 2px;
 }
 
 .filter-dropdown {

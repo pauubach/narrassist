@@ -166,9 +166,46 @@
         </Message>
       </div>
 
+      <!-- Per-Chapter Overview Grid -->
+      <div v-if="perChapter.length > 0" class="chapter-overview-section">
+        <h4><i class="pi pi-th-large"></i> Registro por Capítulo</h4>
+        <div class="chapter-overview-grid">
+          <div
+            v-for="ch in perChapter"
+            :key="ch.chapter_number"
+            class="chapter-overview-card"
+            :class="{
+              'low-consistency': ch.consistency_pct < 60,
+              'has-changes': ch.change_count > 0,
+            }"
+            @click="onChapterSelect(ch.chapter_number)"
+          >
+            <div class="overview-header">
+              <span class="overview-chapter-num">{{ ch.chapter_number }}</span>
+              <Tag
+                :severity="getRegisterSeverity(ch.dominant_register)"
+                size="small"
+              >
+                {{ getRegisterLabel(ch.dominant_register) }}
+              </Tag>
+            </div>
+            <div class="overview-stats">
+              <span class="overview-consistency" :class="getConsistencyClass(ch.consistency_pct)">
+                {{ ch.consistency_pct }}%
+              </span>
+              <span class="overview-segments">{{ ch.segment_count }} seg.</span>
+            </div>
+            <div v-if="ch.change_count > 0" class="overview-changes">
+              <i class="pi pi-exclamation-triangle"></i>
+              {{ ch.change_count }} cambio{{ ch.change_count !== 1 ? 's' : '' }}
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Analysis by Chapter -->
       <div v-if="analysesByChapter.length > 0" class="chapters-section">
-        <h4><i class="pi pi-book"></i> Análisis por Capítulo</h4>
+        <h4><i class="pi pi-book"></i> Detalle por Capítulo</h4>
         <Accordion :multiple="true">
           <AccordionPanel
             v-for="chapter in analysesByChapter"
@@ -185,6 +222,13 @@
                     size="small"
                   >
                     {{ getRegisterLabel(chapter.dominantRegister) }}
+                  </Tag>
+                  <Tag
+                    v-if="getChapterConsistency(chapter.chapterNum) !== null"
+                    :severity="(getChapterConsistency(chapter.chapterNum) ?? 100) < 60 ? 'warning' : 'success'"
+                    size="small"
+                  >
+                    {{ getChapterConsistency(chapter.chapterNum) }}%
                   </Tag>
                 </div>
               </div>
@@ -290,6 +334,23 @@ const summary = computed<RegisterSummary | null>(() => {
 })
 
 const totalSegments = computed(() => analyses.value.length)
+
+// Per-chapter summaries from backend
+const perChapter = computed(() => {
+  return analysis.value?.perChapter || []
+})
+
+// Get consistency for a specific chapter
+function getChapterConsistency(chapterNum: number): number | null {
+  const ch = perChapter.value.find(c => c.chapter_number === chapterNum)
+  return ch ? ch.consistency_pct : null
+}
+
+function getConsistencyClass(pct: number): string {
+  if (pct >= 80) return 'consistency-high'
+  if (pct >= 60) return 'consistency-medium'
+  return 'consistency-low'
+}
 
 // Calculate register distribution
 const registerDistribution = computed(() => {
@@ -772,6 +833,95 @@ watch(() => props.projectId, (newId) => {
 
 .no-changes-message i {
   margin-right: 0.5rem;
+}
+
+/* Chapter Overview Grid */
+.chapter-overview-section {
+  margin-top: 0.5rem;
+}
+
+.chapter-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.5rem;
+}
+
+.chapter-overview-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  padding: 0.625rem;
+  background: var(--surface-card);
+  border: 1px solid var(--surface-200);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.chapter-overview-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border-color: var(--primary-color);
+}
+
+.chapter-overview-card.low-consistency {
+  border-color: var(--orange-300);
+}
+
+.chapter-overview-card.has-changes {
+  border-left: 3px solid var(--orange-500);
+}
+
+.overview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.375rem;
+}
+
+.overview-chapter-num {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--text-color);
+}
+
+.overview-stats {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.overview-consistency {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.overview-consistency.consistency-high {
+  color: var(--green-600);
+}
+
+.overview-consistency.consistency-medium {
+  color: var(--yellow-600);
+}
+
+.overview-consistency.consistency-low {
+  color: var(--red-500);
+}
+
+.overview-segments {
+  font-size: 0.6875rem;
+  color: var(--text-color-secondary);
+}
+
+.overview-changes {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.6875rem;
+  color: var(--orange-600);
+}
+
+.overview-changes i {
+  font-size: 0.625rem;
 }
 
 /* Chapters Section */

@@ -22,11 +22,32 @@ interface MethodContribution {
   agreed: boolean
 }
 
+interface MethodVoteDetail {
+  method: string
+  methodLabel: string
+  score: number
+  weight: number
+  weightedScore: number
+  reasoning: string
+}
+
+interface VotingReasoning {
+  mentionText: string
+  startChar: number
+  endChar: number
+  resolvedTo: string
+  finalScore: number
+  contextBefore: string
+  contextAfter: string
+  methodVotes: MethodVoteDetail[]
+}
+
 interface CoreferenceInfo {
   entityId: number
   entityName: string
   methodContributions: MethodContribution[]
   mentionsByType: Record<string, Array<{ text: string; confidence: number; source: string }>>
+  votingReasoning: VotingReasoning[]
   overallConfidence: number
   totalMentions: number
 }
@@ -130,6 +151,14 @@ const hasCoreferenceInfo = computed(() => {
   return corefInfo.value && corefInfo.value.methodContributions.length > 0
 })
 
+/** Tiene razonamiento de votación disponible */
+const hasVotingReasoning = computed(() => {
+  return corefInfo.value?.votingReasoning && corefInfo.value.votingReasoning.length > 0
+})
+
+/** Toggle para mostrar/ocultar detalles de razonamiento */
+const showVotingDetails = ref(false)
+
 /** Etiquetas para tipos de mención */
 const MENTION_TYPE_LABELS: Record<string, string> = {
   proper_noun: 'Nombre',
@@ -141,6 +170,11 @@ const MENTION_TYPE_LABELS: Record<string, string> = {
 
 function getMentionTypeLabel(type: string): string {
   return MENTION_TYPE_LABELS[type] || type
+}
+
+/** Formatea score como porcentaje */
+function formatScore(score: number): string {
+  return `${Math.round(score * 100)}%`
 }
 
 // ============================================================================
@@ -305,6 +339,65 @@ const hasChapterData = computed(() => chapterAppearances.value.length > 1)
           >
             {{ getMentionTypeLabel(type) }}: {{ mentions.length }}
           </span>
+        </div>
+
+        <!-- Toggle para detalles de votación -->
+        <div v-if="hasVotingReasoning" class="voting-toggle">
+          <Button
+            :label="showVotingDetails ? 'Ocultar razonamiento' : `Ver razonamiento (${corefInfo!.votingReasoning.length})`"
+            :icon="showVotingDetails ? 'pi pi-chevron-up' : 'pi pi-chevron-down'"
+            severity="secondary"
+            text
+            size="small"
+            @click="showVotingDetails = !showVotingDetails"
+          />
+        </div>
+
+        <!-- Detalle de votación por mención -->
+        <div v-if="showVotingDetails && hasVotingReasoning" class="voting-reasoning-list">
+          <div
+            v-for="(vr, idx) in corefInfo!.votingReasoning"
+            :key="idx"
+            class="voting-reasoning-item"
+          >
+            <div class="vr-header">
+              <span class="vr-anaphor">&laquo;{{ vr.mentionText }}&raquo;</span>
+              <span class="vr-arrow">→</span>
+              <span class="vr-resolved">{{ vr.resolvedTo }}</span>
+              <Tag
+                :value="formatScore(vr.finalScore)"
+                :severity="vr.finalScore >= 0.8 ? 'success' : vr.finalScore >= 0.6 ? 'warn' : 'danger'"
+                class="vr-score-tag"
+              />
+            </div>
+            <div class="vr-context">
+              <span class="vr-ctx-text">...{{ vr.contextBefore }}<strong>{{ vr.mentionText }}</strong>{{ vr.contextAfter }}...</span>
+            </div>
+            <div class="vr-methods">
+              <div
+                v-for="vote in vr.methodVotes"
+                :key="vote.method"
+                class="vr-method-row"
+              >
+                <span class="vr-method-name">{{ vote.methodLabel }}</span>
+                <div class="vr-method-bar-container">
+                  <div
+                    class="vr-method-bar"
+                    :style="{ width: `${Math.round(vote.score * 100)}%` }"
+                    :class="{
+                      'bar-high': vote.score >= 0.7,
+                      'bar-medium': vote.score >= 0.4 && vote.score < 0.7,
+                      'bar-low': vote.score < 0.4,
+                    }"
+                  ></div>
+                </div>
+                <span class="vr-method-score">{{ formatScore(vote.score) }}</span>
+                <span class="vr-method-reasoning" :title="vote.reasoning">
+                  {{ vote.reasoning }}
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -754,6 +847,136 @@ const hasChapterData = computed(() => chapterAppearances.value.length > 1)
   gap: var(--ds-space-2);
   color: var(--ds-color-text-secondary);
   font-size: var(--ds-font-size-sm);
+}
+
+/* Voting Reasoning */
+.voting-toggle {
+  margin-top: var(--ds-space-3);
+  padding-top: var(--ds-space-2);
+  border-top: 1px solid var(--ds-surface-border);
+  text-align: center;
+}
+
+.voting-reasoning-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-3);
+  margin-top: var(--ds-space-3);
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.voting-reasoning-item {
+  background: var(--ds-surface-card);
+  border-radius: var(--ds-radius-md);
+  padding: var(--ds-space-3);
+  border: 1px solid var(--ds-surface-border);
+}
+
+.vr-header {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--ds-space-2);
+}
+
+.vr-anaphor {
+  font-weight: var(--ds-font-weight-semibold);
+  color: var(--ds-color-primary);
+  font-size: var(--ds-font-size-sm);
+}
+
+.vr-arrow {
+  color: var(--ds-color-text-secondary);
+  font-size: var(--ds-font-size-xs);
+}
+
+.vr-resolved {
+  font-weight: var(--ds-font-weight-semibold);
+  color: var(--ds-color-text);
+  font-size: var(--ds-font-size-sm);
+}
+
+.vr-score-tag {
+  margin-left: auto;
+}
+
+.vr-context {
+  margin-bottom: var(--ds-space-2);
+  padding: var(--ds-space-2);
+  background: var(--ds-surface-ground);
+  border-radius: var(--ds-radius-sm);
+  font-size: var(--ds-font-size-xs);
+  color: var(--ds-color-text-secondary);
+  line-height: 1.4;
+  max-height: 3em;
+  overflow: hidden;
+}
+
+.vr-ctx-text strong {
+  color: var(--ds-color-primary);
+  font-weight: var(--ds-font-weight-bold);
+}
+
+.vr-methods {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-1);
+}
+
+.vr-method-row {
+  display: grid;
+  grid-template-columns: 80px 60px 36px 1fr;
+  align-items: center;
+  gap: var(--ds-space-2);
+  font-size: var(--ds-font-size-xs);
+}
+
+.vr-method-name {
+  color: var(--ds-color-text-secondary);
+  font-weight: var(--ds-font-weight-medium);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vr-method-bar-container {
+  height: 6px;
+  background: var(--ds-surface-ground);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.vr-method-bar {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.vr-method-bar.bar-high {
+  background: var(--p-green-500, #22c55e);
+}
+
+.vr-method-bar.bar-medium {
+  background: var(--p-yellow-500, #eab308);
+}
+
+.vr-method-bar.bar-low {
+  background: var(--p-red-400, #f87171);
+}
+
+.vr-method-score {
+  color: var(--ds-color-text);
+  font-weight: var(--ds-font-weight-semibold);
+  text-align: right;
+}
+
+.vr-method-reasoning {
+  color: var(--ds-color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Mini Timeline */

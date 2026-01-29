@@ -271,8 +271,8 @@ class EntityRepository:
         sql = """
             INSERT OR IGNORE INTO entity_mentions (
                 entity_id, chapter_id, surface_form, start_char, end_char,
-                context_before, context_after, confidence, source
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                context_before, context_after, confidence, source, metadata
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
 
         with self.db.connection() as conn:
@@ -288,6 +288,7 @@ class EntityRepository:
                     mention.context_after,
                     mention.confidence,
                     mention.source,
+                    mention.metadata,
                 ),
             )
             return cursor.lastrowid
@@ -312,8 +313,8 @@ class EntityRepository:
         sql = """
             INSERT OR IGNORE INTO entity_mentions (
                 entity_id, chapter_id, surface_form, start_char, end_char,
-                context_before, context_after, confidence, source
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                context_before, context_after, confidence, source, metadata
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
 
         params = [
@@ -327,6 +328,7 @@ class EntityRepository:
                 m.context_after,
                 m.confidence,
                 m.source,
+                m.metadata,
             )
             for m in mentions
         ]

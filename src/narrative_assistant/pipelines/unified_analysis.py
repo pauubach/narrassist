@@ -357,6 +357,7 @@ class AnalysisContext:
     # Correferencias (FASE 3)
     coreference_chains: list = field(default_factory=list)
     mention_to_entity: dict = field(default_factory=dict)  # {mention_text: entity_name}
+    coref_voting_details: dict = field(default_factory=dict)  # {(start, end): MentionVotingDetail}
 
     # Atributos y relaciones (FASE 4)
     attributes: list = field(default_factory=list)
@@ -1050,6 +1051,7 @@ class UnifiedAnalysisPipeline:
             # 3.1 Correferencias
             if self.config.run_coreference and context.entities:
                 self._run_coreference(context)
+                self._persist_coref_voting_details(context)
 
             # 3.2 Fusión de entidades
             if self.config.run_entity_fusion and context.entities:
@@ -1103,8 +1105,80 @@ class UnifiedAnalysisPipeline:
 
                 context.stats["coreference_chains"] = len(result.chains)
 
+                # Almacenar detalles de votación para exposición en API
+                if hasattr(result, 'voting_details') and result.voting_details:
+                    context.coref_voting_details = result.voting_details
+
         except Exception as e:
             logger.warning(f"Coreference resolution failed: {e}")
+
+    def _persist_coref_voting_details(self, context: AnalysisContext) -> None:
+        """Persiste los detalles de votación de correferencia como menciones con metadata."""
+        if not context.coref_voting_details or not context.coreference_chains:
+            return
+
+        try:
+            import json
+            from ..entities.repository import get_entity_repository
+            from ..entities.models import EntityMention
+
+            entity_repo = get_entity_repository()
+
+            # Mapear nombres de entidad a entity_id
+            entity_name_to_id: dict[str, int] = {}
+            for entity in context.entities:
+                entity_name_to_id[entity.canonical_name.lower()] = entity.id
+                for alias in (entity.aliases or []):
+                    entity_name_to_id[alias.lower()] = entity.id
+
+            mentions_to_save = []
+            saved_count = 0
+
+            for (start, end), detail in context.coref_voting_details.items():
+                # Buscar entity_id del antecedente resuelto
+                resolved_lower = detail.resolved_to.lower()
+                entity_id = entity_name_to_id.get(resolved_lower)
+
+                if not entity_id:
+                    continue
+
+                # Buscar chapter_id
+                chapter_id = None
+                if context.chapters:
+                    for ch in context.chapters:
+                        ch_start = ch.get("start_char", 0)
+                        ch_end = ch.get("end_char", len(context.full_text))
+                        if ch_start <= start < ch_end:
+                            chapter_id = ch.get("db_id")
+                            break
+
+                # Extraer contexto
+                ctx_start = max(0, start - 50)
+                ctx_end = min(len(context.full_text), end + 50)
+
+                # Serializar voting detail como metadata
+                metadata_json = json.dumps(detail.to_dict(), ensure_ascii=False)
+
+                mention = EntityMention(
+                    entity_id=entity_id,
+                    chapter_id=chapter_id,
+                    surface_form=detail.anaphor_text,
+                    start_char=start,
+                    end_char=end,
+                    context_before=context.full_text[ctx_start:start],
+                    context_after=context.full_text[end:ctx_end],
+                    confidence=detail.final_score,
+                    source="coref",
+                    metadata=metadata_json,
+                )
+                mentions_to_save.append(mention)
+
+            if mentions_to_save:
+                saved_count = entity_repo.create_mentions_batch(mentions_to_save)
+                logger.info(f"Coref voting: {saved_count} mentions with voting metadata saved")
+
+        except Exception as e:
+            logger.warning(f"Failed to persist coref voting details: {e}")
 
     def _run_entity_fusion(self, context: AnalysisContext) -> None:
         """Ejecutar fusión de entidades similares."""
