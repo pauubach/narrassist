@@ -631,3 +631,230 @@ def get_pacing_analyzer(**kwargs) -> PacingAnalyzer:
             if _pacing_analyzer is None:
                 _pacing_analyzer = PacingAnalyzer(**kwargs)
     return _pacing_analyzer
+
+
+@dataclass
+class TensionPoint:
+    """Un punto en la curva de tensión narrativa."""
+    chapter: int
+    title: str
+    tension_score: float  # 0.0-1.0
+    components: dict  # Desglose de factores que contribuyen
+    word_count: int
+    position_ratio: float  # 0.0-1.0, posición relativa en el documento
+
+    def to_dict(self) -> dict:
+        return {
+            "chapter": self.chapter,
+            "title": self.title,
+            "tension_score": round(self.tension_score, 3),
+            "components": {k: round(v, 3) for k, v in self.components.items()},
+            "word_count": self.word_count,
+            "position_ratio": round(self.position_ratio, 3),
+        }
+
+
+@dataclass
+class TensionCurve:
+    """Curva de tensión narrativa completa."""
+    points: list[TensionPoint]
+    avg_tension: float = 0.0
+    max_tension: float = 0.0
+    min_tension: float = 0.0
+    tension_arc_type: str = ""  # rising, falling, mountain, valley, flat, wave
+
+    def to_dict(self) -> dict:
+        return {
+            "points": [p.to_dict() for p in self.points],
+            "avg_tension": round(self.avg_tension, 3),
+            "max_tension": round(self.max_tension, 3),
+            "min_tension": round(self.min_tension, 3),
+            "tension_arc_type": self.tension_arc_type,
+        }
+
+
+def compute_tension_curve(
+    chapters: list[dict],
+    full_text: str = "",
+) -> TensionCurve:
+    """
+    Calcula la curva de tensión narrativa del documento.
+
+    La tensión se estima a partir de señales textuales:
+    - Densidad de verbos de acción (más acción = más tensión)
+    - Longitud de oraciones (oraciones cortas = más tensión)
+    - Ratio de diálogo (diálogo intenso puede indicar conflicto)
+    - Signos de puntuación expresivos (!, ?) = más tensión
+    - Longitud de párrafos (párrafos cortos = ritmo más rápido)
+
+    Args:
+        chapters: Lista de capítulos con 'number', 'title', 'content'
+        full_text: Texto completo del documento (opcional)
+
+    Returns:
+        TensionCurve con puntos por capítulo y metadatos
+    """
+    if not chapters:
+        return TensionCurve(points=[])
+
+    analyzer = PacingAnalyzer()
+    points = []
+
+    # Calcular métricas por capítulo
+    all_metrics = []
+    for ch in chapters:
+        metrics = analyzer._compute_metrics(
+            text=ch.get("content", ""),
+            segment_id=ch.get("number", 0),
+            segment_type="chapter",
+            title=ch.get("title", ""),
+        )
+        all_metrics.append((ch, metrics))
+
+    # Calcular puntuación expresiva por capítulo
+    exclamation_ratios = []
+    question_ratios = []
+    for ch, metrics in all_metrics:
+        content = ch.get("content", "")
+        word_count = metrics.word_count or 1
+        exclamations = content.count("!") + content.count("¡")
+        questions = content.count("?") + content.count("¿")
+        exclamation_ratios.append(exclamations / word_count * 100)
+        question_ratios.append(questions / word_count * 100)
+
+    # Normalizar componentes respecto al documento
+    action_ratios = [m.action_verb_ratio for _, m in all_metrics]
+    sentence_lengths = [m.avg_sentence_length for _, m in all_metrics]
+    paragraph_lengths = [m.avg_paragraph_length for _, m in all_metrics]
+    dialogue_ratios = [m.dialogue_ratio for _, m in all_metrics]
+
+    def normalize(values: list[float]) -> list[float]:
+        """Normaliza valores al rango 0-1."""
+        if not values:
+            return values
+        min_v = min(values)
+        max_v = max(values)
+        if max_v == min_v:
+            return [0.5] * len(values)
+        return [(v - min_v) / (max_v - min_v) for v in values]
+
+    norm_action = normalize(action_ratios)
+    norm_sent_len = normalize(sentence_lengths)
+    norm_para_len = normalize(paragraph_lengths)
+    norm_dialogue = normalize(dialogue_ratios)
+    norm_exclamation = normalize(exclamation_ratios)
+    norm_question = normalize(question_ratios)
+
+    total_words = sum(m.word_count for _, m in all_metrics)
+    cumulative_words = 0
+
+    for i, (ch, metrics) in enumerate(all_metrics):
+        # Componentes de tensión (más alto = más tensión)
+        action_score = norm_action[i]                         # Más acción = más tensión
+        short_sentences = 1.0 - norm_sent_len[i]              # Oraciones cortas = más tensión
+        short_paragraphs = 1.0 - norm_para_len[i]             # Párrafos cortos = más ritmo
+        dialogue_intensity = norm_dialogue[i]                  # Más diálogo = más conflicto potencial
+        exclamation_score = norm_exclamation[i]                # Puntuación expresiva
+        question_score = norm_question[i]                      # Interrogación = incertidumbre
+
+        # Ponderación de componentes
+        weights = {
+            "action": 0.25,
+            "short_sentences": 0.20,
+            "short_paragraphs": 0.10,
+            "dialogue": 0.15,
+            "exclamation": 0.15,
+            "question": 0.15,
+        }
+
+        components = {
+            "action": action_score,
+            "short_sentences": short_sentences,
+            "short_paragraphs": short_paragraphs,
+            "dialogue": dialogue_intensity,
+            "exclamation": exclamation_score,
+            "question": question_score,
+        }
+
+        tension_score = sum(components[k] * weights[k] for k in weights)
+        # Clamp al rango 0-1
+        tension_score = max(0.0, min(1.0, tension_score))
+
+        # Posición relativa en el documento
+        cumulative_words += metrics.word_count
+        position_ratio = cumulative_words / total_words if total_words > 0 else 0.0
+
+        points.append(TensionPoint(
+            chapter=ch.get("number", i + 1),
+            title=ch.get("title", f"Capítulo {ch.get('number', i + 1)}"),
+            tension_score=tension_score,
+            components=components,
+            word_count=metrics.word_count,
+            position_ratio=position_ratio,
+        ))
+
+    # Calcular metadatos de la curva
+    tension_scores = [p.tension_score for p in points]
+    avg_tension = sum(tension_scores) / len(tension_scores) if tension_scores else 0.0
+    max_tension = max(tension_scores) if tension_scores else 0.0
+    min_tension = min(tension_scores) if tension_scores else 0.0
+
+    # Clasificar tipo de arco narrativo
+    arc_type = _classify_tension_arc(tension_scores)
+
+    return TensionCurve(
+        points=points,
+        avg_tension=avg_tension,
+        max_tension=max_tension,
+        min_tension=min_tension,
+        tension_arc_type=arc_type,
+    )
+
+
+def _classify_tension_arc(scores: list[float]) -> str:
+    """
+    Clasifica el tipo de arco de tensión narrativa.
+
+    Tipos:
+    - rising: Tensión creciente (inicio-climax)
+    - falling: Tensión decreciente (climax-resolución)
+    - mountain: Sube y baja (arco clásico)
+    - valley: Baja y sube (inversión)
+    - wave: Oscilación (múltiples picos)
+    - flat: Sin variación significativa
+    """
+    if len(scores) < 3:
+        return "flat"
+
+    n = len(scores)
+    first_third = sum(scores[:n // 3]) / max(n // 3, 1)
+    mid_third = sum(scores[n // 3: 2 * n // 3]) / max(n // 3, 1)
+    last_third = sum(scores[2 * n // 3:]) / max(n - 2 * (n // 3), 1)
+
+    # Detectar variación
+    variance = max(scores) - min(scores)
+    if variance < 0.15:
+        return "flat"
+
+    # Contar picos (cambios de dirección)
+    direction_changes = 0
+    for i in range(1, len(scores) - 1):
+        if (scores[i] > scores[i - 1] and scores[i] > scores[i + 1]) or \
+           (scores[i] < scores[i - 1] and scores[i] < scores[i + 1]):
+            direction_changes += 1
+
+    if direction_changes >= len(scores) // 3:
+        return "wave"
+
+    # Clasificar por tercios
+    threshold = 0.08
+    if first_third < mid_third - threshold and mid_third > last_third + threshold:
+        return "mountain"
+    elif first_third > mid_third + threshold and mid_third < last_third - threshold:
+        return "valley"
+    elif first_third < last_third - threshold:
+        return "rising"
+    elif first_third > last_third + threshold:
+        return "falling"
+
+    return "wave"

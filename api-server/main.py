@@ -2062,7 +2062,9 @@ async def get_analysis_status(project_id: int):
             "sentiment": False,  # Por implementar
             "focalization": False,  # Por implementar
             "voice_profiles": has_entities and has_chapters,  # Perfiles de voz disponibles
+            "voice_deviations": has_entities and has_chapters,  # Desviaciones de voz
             "register_analysis": has_chapters,  # Análisis de registro disponible
+            "tension_curve": has_chapters,  # Curva de tensión narrativa
             "speaker_attribution": has_entities and has_chapters,  # Atribución de hablantes
         }
 
@@ -2340,6 +2342,7 @@ async def list_entities(
     min_relevance: Optional[float] = None,
     min_mentions: Optional[int] = None,
     entity_type: Optional[str] = None,
+    chapter_number: Optional[int] = Query(None, description="Filtrar entidades que aparecen en este capítulo"),
 ):
     """
     Lista todas las entidades de un proyecto con filtros opcionales.
@@ -2354,6 +2357,7 @@ async def list_entities(
         min_relevance: Score mínimo de relevancia (0-1) para incluir entidad
         min_mentions: Número mínimo de menciones para incluir entidad
         entity_type: Filtrar por tipo (character, location, object, etc.)
+        chapter_number: Filtrar entidades que tienen menciones en este capítulo
 
     Returns:
         ApiResponse con lista de entidades
@@ -2383,6 +2387,25 @@ async def list_entities(
                     return ch.chapter_number
             return 1  # Default al capítulo 1 si no se encuentra
 
+        # Si se filtra por capítulo, obtener IDs de entidades con menciones en ese capítulo
+        chapter_entity_ids: Optional[set] = None
+        if chapter_number is not None:
+            chapter_entity_ids = set()
+            target_chapter = next(
+                (ch for ch in chapters if ch.chapter_number == chapter_number), None
+            )
+            if target_chapter:
+                for e in entities:
+                    mentions = entity_repo.get_mentions_by_entity(e.id)
+                    for m in mentions:
+                        if m.chapter_id == target_chapter.id:
+                            chapter_entity_ids.add(e.id)
+                            break
+                        # Fallback: comprobar por rango de posición
+                        if (target_chapter.start_char <= m.start_char < target_chapter.end_char):
+                            chapter_entity_ids.add(e.id)
+                            break
+
         # Calcular relevance_score para cada entidad
         # Fórmula: menciones / (palabras / 1000) normalizado
         # Una entidad mencionada 5 veces en 1000 palabras es muy relevante
@@ -2403,6 +2426,8 @@ async def list_entities(
             relevance_score = mentions_per_k / (mentions_per_k + 2) if mention_count > 0 else 0
 
             # Aplicar filtros
+            if chapter_entity_ids is not None and e.id not in chapter_entity_ids:
+                continue
             if min_relevance is not None and relevance_score < min_relevance:
                 continue
             if min_mentions is not None and mention_count < min_mentions:
@@ -3266,7 +3291,11 @@ async def get_entity_timeline(project_id: int, entity_id: int):
 # ============================================================================
 
 @app.get("/api/projects/{project_id}/entities/{entity_id}/mentions", response_model=ApiResponse)
-async def get_entity_mentions(project_id: int, entity_id: int):
+async def get_entity_mentions(
+    project_id: int,
+    entity_id: int,
+    chapter_number: Optional[int] = Query(None, description="Filtrar menciones por número de capítulo"),
+):
     """
     Obtiene todas las menciones de una entidad en el texto.
 
@@ -3291,10 +3320,31 @@ async def get_entity_mentions(project_id: int, entity_id: int):
         chapters = chapter_repository.get_by_project(project_id) if chapter_repository else []
         chapter_map = {ch.id: ch for ch in chapters}
 
+        # Si se filtra por capítulo, obtener el chapter_id correspondiente
+        target_chapter_id: Optional[int] = None
+        target_chapter_obj = None
+        if chapter_number is not None:
+            target_chapter_obj = next(
+                (ch for ch in chapters if ch.chapter_number == chapter_number), None
+            )
+            if target_chapter_obj:
+                target_chapter_id = target_chapter_obj.id
+
         # Serializar menciones con información de capítulo
         mentions_data = []
         for mention in mentions:
             ch_info = chapter_map.get(mention.chapter_id) if mention.chapter_id else None
+
+            # Filtrar por capítulo si se especificó
+            if chapter_number is not None:
+                mention_in_chapter = False
+                if target_chapter_id and mention.chapter_id == target_chapter_id:
+                    mention_in_chapter = True
+                elif target_chapter_obj and (target_chapter_obj.start_char <= mention.start_char < target_chapter_obj.end_char):
+                    mention_in_chapter = True
+                if not mention_in_chapter:
+                    continue
+
             mentions_data.append({
                 "id": mention.id,
                 "entityId": entity_id,
@@ -12169,6 +12219,165 @@ async def get_voice_profiles(project_id: int):
         return ApiResponse(success=False, error=str(e))
 
 
+@app.get("/api/projects/{project_id}/voice-deviations", response_model=ApiResponse)
+async def get_voice_deviations(
+    project_id: int,
+    min_severity: str = Query("low", description="Severidad mínima: low, medium, high"),
+    chapter_number: Optional[int] = Query(None, description="Filtrar por número de capítulo"),
+):
+    """
+    Detecta desviaciones en la voz de los personajes.
+
+    Compara los diálogos de cada personaje contra su perfil de voz establecido
+    y reporta desviaciones significativas (cambios de formalidad, longitud atípica,
+    vocabulario inusual, cambio en muletillas, etc.).
+
+    Returns:
+        ApiResponse con desviaciones detectadas por personaje
+    """
+    try:
+        from narrative_assistant.voice.profiles import VoiceProfileBuilder
+        from narrative_assistant.voice.deviations import VoiceDeviationDetector
+        from narrative_assistant.nlp.dialogue import detect_dialogues
+        from narrative_assistant.entities.repository import get_entity_repository
+        from narrative_assistant.persistence.chapter import get_chapter_repository
+
+        # Verificar proyecto
+        if not project_manager:
+            return ApiResponse(success=False, error="Project manager not initialized")
+
+        result = project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail=f"Proyecto {project_id} no encontrado")
+
+        # Obtener entidades (solo personajes)
+        entity_repo = get_entity_repository()
+        entities = entity_repo.get_entities_by_project(project_id, active_only=True)
+        characters = [e for e in entities if e.entity_type == "PER"]
+
+        if not characters:
+            return ApiResponse(
+                success=True,
+                data={
+                    "project_id": project_id,
+                    "deviations": [],
+                    "message": "No hay personajes para analizar"
+                }
+            )
+
+        # Obtener capítulos
+        chapter_repo = get_chapter_repository()
+        chapters = chapter_repo.get_by_project(project_id)
+
+        if chapter_number is not None:
+            chapters = [ch for ch in chapters if ch.chapter_number == chapter_number]
+
+        if not chapters:
+            return ApiResponse(
+                success=True,
+                data={
+                    "project_id": project_id,
+                    "deviations": [],
+                    "message": "No hay capítulos para analizar"
+                }
+            )
+
+        # Extraer diálogos de cada capítulo
+        dialogues = []
+        for chapter in chapters:
+            dialogue_result = detect_dialogues(chapter.content)
+            if dialogue_result.is_success:
+                for d in dialogue_result.value.dialogues:
+                    dialogues.append({
+                        "text": d.text,
+                        "speaker_id": d.speaker_id,
+                        "speaker_hint": d.speaker_hint,
+                        "chapter": chapter.chapter_number,
+                        "position": d.start_char,
+                    })
+
+        if not dialogues:
+            return ApiResponse(
+                success=True,
+                data={
+                    "project_id": project_id,
+                    "deviations": [],
+                    "message": "No se encontraron diálogos para analizar"
+                }
+            )
+
+        # Construir perfiles de voz
+        entity_data = [
+            {"id": e.id, "name": e.canonical_name, "aliases": e.aliases}
+            for e in characters
+        ]
+
+        builder = VoiceProfileBuilder()
+        profiles = builder.build_profiles(dialogues, entity_data)
+
+        if not profiles:
+            return ApiResponse(
+                success=True,
+                data={
+                    "project_id": project_id,
+                    "deviations": [],
+                    "message": "No se pudieron construir perfiles de voz"
+                }
+            )
+
+        # Detectar desviaciones
+        detector = VoiceDeviationDetector()
+        deviations = detector.detect_deviations(profiles, dialogues)
+
+        # Filtrar por severidad mínima
+        severity_order = {"low": 0, "medium": 1, "high": 2}
+        min_sev_value = severity_order.get(min_severity, 0)
+        filtered = [
+            dev for dev in deviations
+            if severity_order.get(dev.severity.value, 0) >= min_sev_value
+        ]
+
+        # Serializar
+        deviations_data = [dev.to_dict() for dev in filtered]
+
+        # Agrupar por personaje para resumen
+        by_character: dict = {}
+        for dev in filtered:
+            name = dev.entity_name
+            if name not in by_character:
+                by_character[name] = {"entity_id": dev.entity_id, "count": 0, "types": set()}
+            by_character[name]["count"] += 1
+            by_character[name]["types"].add(dev.deviation_type.value)
+
+        summary = {
+            name: {"entity_id": info["entity_id"], "count": info["count"], "types": list(info["types"])}
+            for name, info in by_character.items()
+        }
+
+        return ApiResponse(
+            success=True,
+            data={
+                "project_id": project_id,
+                "deviations": deviations_data,
+                "summary_by_character": summary,
+                "stats": {
+                    "total_deviations": len(filtered),
+                    "characters_with_deviations": len(by_character),
+                    "profiles_built": len(profiles),
+                    "dialogues_analyzed": len(dialogues),
+                    "chapters_analyzed": len(chapters),
+                    "min_severity_filter": min_severity,
+                }
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error detecting voice deviations: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
 @app.get("/api/projects/{project_id}/register-analysis", response_model=ApiResponse)
 async def get_register_analysis(
     project_id: int,
@@ -14145,6 +14354,93 @@ def _get_pacing_label(score: float) -> str:
         return "moderate"
     else:
         return "slow"
+
+
+@app.get("/api/projects/{project_id}/tension-curve", response_model=ApiResponse)
+async def get_tension_curve(project_id: int):
+    """
+    Calcula la curva de tensión narrativa del proyecto.
+
+    Estima la tensión en cada capítulo usando señales textuales:
+    - Densidad de verbos de acción
+    - Longitud de oraciones (cortas = más tensión)
+    - Ratio de diálogo (conflicto)
+    - Puntuación expresiva (!, ?)
+    - Ritmo de párrafos
+
+    Returns:
+        Curva de tensión con puntos por capítulo, tipo de arco narrativo
+        y datos para visualización en gráfico.
+    """
+    try:
+        from narrative_assistant.analysis.pacing import compute_tension_curve
+        from narrative_assistant.persistence.chapter import get_chapter_repository
+
+        if not project_manager:
+            return ApiResponse(success=False, error="Project manager not initialized")
+
+        result = project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail=f"Proyecto {project_id} no encontrado")
+
+        chapter_repo = get_chapter_repository()
+        chapters = chapter_repo.get_by_project(project_id)
+
+        if not chapters:
+            return ApiResponse(
+                success=True,
+                data={
+                    "project_id": project_id,
+                    "curve": {"points": [], "avg_tension": 0, "max_tension": 0, "min_tension": 0, "tension_arc_type": "flat"},
+                    "message": "No hay capítulos para analizar"
+                }
+            )
+
+        chapters_data = [
+            {
+                "number": ch.chapter_number,
+                "title": ch.title or f"Capítulo {ch.chapter_number}",
+                "content": ch.content or "",
+            }
+            for ch in chapters
+            if ch.content and ch.content.strip()
+        ]
+
+        full_text = "\n\n".join(ch.get("content", "") for ch in chapters_data)
+
+        curve = compute_tension_curve(chapters_data, full_text)
+
+        # Clasificar arco en español para frontend
+        arc_labels = {
+            "rising": "Ascendente (tensión creciente)",
+            "falling": "Descendente (tensión decreciente)",
+            "mountain": "Montaña (arco clásico: inicio-clímax-desenlace)",
+            "valley": "Valle (inversión: alta-baja-alta)",
+            "wave": "Ondulante (múltiples picos de tensión)",
+            "flat": "Plano (tensión uniforme)",
+        }
+
+        return ApiResponse(
+            success=True,
+            data={
+                "project_id": project_id,
+                "curve": curve.to_dict(),
+                "arc_label": arc_labels.get(curve.tension_arc_type, curve.tension_arc_type),
+                "stats": {
+                    "chapters_analyzed": len(chapters_data),
+                    "avg_tension": round(curve.avg_tension, 3),
+                    "max_tension": round(curve.max_tension, 3),
+                    "min_tension": round(curve.min_tension, 3),
+                    "tension_range": round(curve.max_tension - curve.min_tension, 3),
+                },
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error computing tension curve: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
 
 
 @app.get("/api/projects/{project_id}/age-readability", response_model=ApiResponse)

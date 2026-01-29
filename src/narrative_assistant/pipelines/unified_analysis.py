@@ -1145,78 +1145,65 @@ class UnifiedAnalysisPipeline:
         4. Proximidad (personaje mencionado cerca del diálogo)
         """
         try:
-            from ..voice.speaker_attribution import (
-                SpeakerAttributor,
-                SceneParticipants,
-            )
+            from types import SimpleNamespace
+            from ..voice.speaker_attribution import SpeakerAttributor
+            from ..entities.repository import get_entity_repository
 
-            # Crear lista de participantes conocidos
-            character_names = [
-                e.canonical_name for e in context.entities
+            # Filtrar entidades de tipo personaje
+            character_entities = [
+                e for e in context.entities
                 if hasattr(e, "entity_type") and str(e.entity_type).upper() in ("CHARACTER", "PERSON", "PER")
             ]
 
-            # Añadir aliases
-            for entity in context.entities:
-                if hasattr(entity, "aliases"):
-                    character_names.extend(entity.aliases)
+            if not character_entities:
+                logger.debug("No character entities found, skipping speaker attribution")
+                return
 
-            # Crear atribuidor
-            attributor = SpeakerAttributor(known_characters=character_names)
+            # Crear atribuidor con entidades completas (necesita .id, .canonical_name, .aliases)
+            attributor = SpeakerAttributor(entities=character_entities)
 
-            # Procesar diálogos por capítulo para mejor contexto
-            if context.chapters:
-                for ch in context.chapters:
-                    chapter_num = ch.get("number", 1)
-                    chapter_dialogues = [
-                        d for d in context.dialogues
-                        if d.get("chapter") == chapter_num
-                    ]
-
-                    if chapter_dialogues:
-                        # Preparar datos de escena
-                        scene = SceneParticipants(
-                            chapter=chapter_num,
-                            known_characters=character_names,
-                            context_text=ch.get("content", "")[:2000],  # Primeros 2000 chars
+            # Cargar menciones de entidades para resolución por proximidad
+            entity_mentions: list[tuple[int, int, int]] = []
+            try:
+                entity_repo = get_entity_repository()
+                for entity in character_entities:
+                    mentions = entity_repo.get_mentions_by_entity(entity.id)
+                    for mention in mentions:
+                        entity_mentions.append(
+                            (entity.id, mention.start_char, mention.end_char)
                         )
+            except Exception as e:
+                logger.debug(f"Could not load entity mentions: {e}")
 
-                        # Atribuir
-                        attributions = attributor.attribute_in_scene(
-                            dialogues=chapter_dialogues,
-                            scene=scene,
-                            narrative_text=ch.get("content", ""),
-                        )
+            # Convertir diálogos dict a objetos para compatibilidad con getattr()
+            dialogue_objects = []
+            for d in context.dialogues:
+                dialogue_objects.append(SimpleNamespace(
+                    text=d.get("text", ""),
+                    start_char=d.get("start_char", 0),
+                    end_char=d.get("end_char", 0),
+                    chapter=d.get("chapter", 1),
+                    speaker_hint=d.get("speaker_hint", ""),
+                ))
 
-                        # Actualizar diálogos con atribuciones
-                        for attr in attributions:
-                            for dialogue in context.dialogues:
-                                if dialogue.get("start_char") == attr.start_char:
-                                    dialogue["resolved_speaker"] = attr.speaker
-                                    dialogue["attribution_confidence"] = attr.confidence.value
-                                    dialogue["attribution_method"] = attr.method.value
-                                    break
-            else:
-                # Sin capítulos, atribuir todo junto
-                scene = SceneParticipants(
-                    chapter=1,
-                    known_characters=character_names,
-                    context_text=context.full_text[:2000],
-                )
+            # Atribuir diálogos
+            attributions = attributor.attribute_dialogues(
+                dialogues=dialogue_objects,
+                entity_mentions=entity_mentions if entity_mentions else None,
+                full_text=context.full_text,
+            )
 
-                attributions = attributor.attribute_in_scene(
-                    dialogues=context.dialogues,
-                    scene=scene,
-                    narrative_text=context.full_text,
-                )
-
-                for attr in attributions:
-                    for dialogue in context.dialogues:
-                        if dialogue.get("start_char") == attr.start_char:
-                            dialogue["resolved_speaker"] = attr.speaker
-                            dialogue["attribution_confidence"] = attr.confidence.value
-                            dialogue["attribution_method"] = attr.method.value
-                            break
+            # Mapear resultados de vuelta a los dicts de context.dialogues
+            attr_by_start = {a.start_char: a for a in attributions}
+            for dialogue in context.dialogues:
+                start = dialogue.get("start_char", -1)
+                attr = attr_by_start.get(start)
+                if attr and attr.speaker_name:
+                    dialogue["resolved_speaker"] = attr.speaker_name
+                    dialogue["attribution_confidence"] = attr.confidence.value
+                    dialogue["attribution_method"] = attr.attribution_method.value
+                    if attr.speaker_id is not None:
+                        dialogue["speaker_id"] = attr.speaker_id
 
             # Resolver con correferencias para los no atribuidos
             for dialogue in context.dialogues:
@@ -2514,6 +2501,27 @@ class UnifiedAnalysisPipeline:
                 )
                 if result.is_success:
                     context.alerts.append(result.value)
+
+            # Alertas de ritmo narrativo (pacing)
+            if context.pacing_analysis:
+                issues = context.pacing_analysis.get("issues", [])
+                for issue in issues:
+                    if isinstance(issue, dict):
+                        result = engine.create_from_pacing_issue(
+                            project_id=context.project_id,
+                            issue_type=issue.get("issue_type", "unknown"),
+                            severity_level=issue.get("severity", "info"),
+                            chapter=issue.get("segment_id"),
+                            segment_type=issue.get("segment_type", "chapter"),
+                            description=issue.get("description", ""),
+                            explanation=issue.get("explanation", ""),
+                            suggestion=issue.get("suggestion", ""),
+                            actual_value=issue.get("actual_value", 0.0),
+                            expected_range=tuple(issue.get("expected_range", (0.0, 0.0))),
+                            comparison_value=issue.get("comparison_value"),
+                        )
+                        if result.is_success:
+                            context.alerts.append(result.value)
 
             context.stats["alerts_created"] = len(context.alerts)
 

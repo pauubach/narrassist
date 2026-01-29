@@ -1239,6 +1239,246 @@ class AlertEngine:
             },
         )
 
+    # ==========================================================================
+    # Alertas de estilo
+    # ==========================================================================
+
+    def create_from_pacing_issue(
+        self,
+        project_id: int,
+        issue_type: str,
+        severity_level: str,
+        chapter: Optional[int],
+        segment_type: str,
+        description: str,
+        explanation: str,
+        suggestion: str = "",
+        actual_value: float = 0.0,
+        expected_range: tuple = (0.0, 0.0),
+        comparison_value: Optional[float] = None,
+        confidence: float = 0.8,
+    ) -> Result[Alert]:
+        """
+        Crea alerta desde problema de ritmo narrativo.
+
+        Args:
+            issue_type: Tipo de problema (chapter_too_short, dense_text_block, etc.)
+            severity_level: info, suggestion, warning, issue
+            chapter: Número de capítulo afectado
+            segment_type: chapter, scene, paragraph
+            description: Descripción del problema
+            explanation: Explicación detallada
+            suggestion: Sugerencia de corrección
+            actual_value: Valor detectado
+            expected_range: Rango esperado
+            comparison_value: Valor medio del documento
+        """
+        severity_map = {
+            "issue": AlertSeverity.WARNING,
+            "warning": AlertSeverity.WARNING,
+            "suggestion": AlertSeverity.INFO,
+            "info": AlertSeverity.HINT,
+        }
+        severity = severity_map.get(severity_level, AlertSeverity.INFO)
+
+        issue_titles = {
+            "chapter_too_short": "Capítulo muy corto",
+            "chapter_too_long": "Capítulo muy largo",
+            "unbalanced_chapters": "Capítulos desbalanceados",
+            "too_much_dialogue": "Exceso de diálogo",
+            "too_little_dialogue": "Poco diálogo",
+            "dense_text_block": "Bloque de texto denso",
+            "sparse_text_block": "Texto disperso",
+            "rhythm_shift": "Cambio de ritmo",
+            "scene_too_short": "Escena muy corta",
+            "scene_too_long": "Escena muy larga",
+        }
+        title = issue_titles.get(issue_type, f"Problema de ritmo: {issue_type}")
+        if chapter:
+            title = f"{title} (Cap. {chapter})"
+
+        return self.create_alert(
+            project_id=project_id,
+            category=AlertCategory.STRUCTURE,
+            severity=severity,
+            alert_type=f"pacing_{issue_type}",
+            title=title,
+            description=description,
+            explanation=explanation,
+            suggestion=suggestion or "Revisar el equilibrio del ritmo narrativo en este segmento",
+            chapter=chapter,
+            confidence=confidence,
+            source_module="pacing_analyzer",
+            extra_data={
+                "issue_type": issue_type,
+                "segment_type": segment_type,
+                "actual_value": actual_value,
+                "expected_range": list(expected_range),
+                "comparison_value": comparison_value,
+            },
+        )
+
+    def create_from_sticky_sentence(
+        self,
+        project_id: int,
+        sentence: str,
+        glue_percentage: float,
+        chapter: Optional[int] = None,
+        start_char: Optional[int] = None,
+        end_char: Optional[int] = None,
+        severity_level: str = "medium",
+        confidence: float = 0.75,
+    ) -> Result[Alert]:
+        """
+        Crea alerta desde frase pegajosa (alto porcentaje de palabras de relleno).
+
+        Args:
+            sentence: La frase detectada
+            glue_percentage: Porcentaje de palabras de relleno (0-100)
+            chapter: Capítulo donde aparece
+            start_char: Posición de inicio
+            end_char: Posición de fin
+            severity_level: critical, high, medium, low
+        """
+        severity_map = {
+            "critical": AlertSeverity.WARNING,
+            "high": AlertSeverity.WARNING,
+            "medium": AlertSeverity.INFO,
+            "low": AlertSeverity.HINT,
+        }
+        severity = severity_map.get(severity_level, AlertSeverity.INFO)
+
+        excerpt = sentence[:120] + "..." if len(sentence) > 120 else sentence
+
+        return self.create_alert(
+            project_id=project_id,
+            category=AlertCategory.STYLE,
+            severity=severity,
+            alert_type="sticky_sentence",
+            title="Frase pegajosa (exceso de palabras funcionales)",
+            description=f"Frase con {glue_percentage:.0f}% de palabras funcionales: \"{excerpt}\"",
+            explanation=(
+                f"Esta frase tiene un {glue_percentage:.0f}% de palabras funcionales "
+                f"(artículos, preposiciones, conjunciones), lo que dificulta la fluidez. "
+                f"Las frases con más del 40% de palabras funcionales suelen percibirse como pesadas."
+            ),
+            suggestion="Reformular para reducir las palabras de relleno y mejorar la claridad",
+            chapter=chapter,
+            start_char=start_char,
+            end_char=end_char,
+            excerpt=excerpt,
+            confidence=confidence,
+            source_module="sticky_sentences",
+            extra_data={
+                "glue_percentage": round(glue_percentage, 1),
+                "severity_level": severity_level,
+            },
+        )
+
+    def create_from_style_variation(
+        self,
+        project_id: int,
+        variation_type: str,
+        description: str,
+        explanation: str,
+        chapter: Optional[int] = None,
+        start_char: Optional[int] = None,
+        end_char: Optional[int] = None,
+        excerpt: str = "",
+        confidence: float = 0.7,
+        extra_data: Optional[dict] = None,
+    ) -> Result[Alert]:
+        """
+        Crea alerta desde variación estilística inesperada.
+
+        Args:
+            variation_type: tone_shift, formality_change, vocabulary_anomaly, register_inconsistency
+            description: Descripción de la variación
+            explanation: Explicación detallada
+        """
+        severity = self.calculate_severity_from_confidence(confidence)
+
+        type_titles = {
+            "tone_shift": "Cambio de tono narrativo",
+            "formality_change": "Cambio de formalidad",
+            "vocabulary_anomaly": "Vocabulario atípico",
+            "register_inconsistency": "Inconsistencia de registro",
+        }
+        title = type_titles.get(variation_type, f"Variación estilística: {variation_type}")
+
+        return self.create_alert(
+            project_id=project_id,
+            category=AlertCategory.STYLE,
+            severity=severity,
+            alert_type=f"style_variation_{variation_type}",
+            title=title,
+            description=description,
+            explanation=explanation,
+            suggestion="Verificar si la variación estilística es intencional",
+            chapter=chapter,
+            start_char=start_char,
+            end_char=end_char,
+            excerpt=excerpt[:200] if excerpt else "",
+            confidence=confidence,
+            source_module="style_analyzer",
+            extra_data={
+                "variation_type": variation_type,
+                **(extra_data or {}),
+            },
+        )
+
+    def create_from_word_echo(
+        self,
+        project_id: int,
+        word: str,
+        occurrences: list[dict],
+        min_distance: int,
+        chapter: Optional[int] = None,
+        confidence: float = 0.8,
+    ) -> Result[Alert]:
+        """
+        Crea alerta desde eco de palabra (repetición a corta distancia).
+
+        Args:
+            word: Palabra repetida
+            occurrences: Lista de ocurrencias [{position, context}, ...]
+            min_distance: Distancia mínima entre repeticiones (en palabras)
+            chapter: Capítulo donde se detecta
+        """
+        # Severidad basada en distancia: más cerca = más severo
+        if min_distance < 10:
+            severity = AlertSeverity.WARNING
+        elif min_distance < 30:
+            severity = AlertSeverity.INFO
+        else:
+            severity = AlertSeverity.HINT
+
+        count = len(occurrences)
+
+        return self.create_alert(
+            project_id=project_id,
+            category=AlertCategory.REPETITION,
+            severity=severity,
+            alert_type="word_echo",
+            title=f"Eco: \"{word}\" ({count}x en {min_distance} palabras)",
+            description=f"La palabra \"{word}\" aparece {count} veces con solo {min_distance} palabras de distancia",
+            explanation=(
+                f"Se detectó repetición cercana de \"{word}\". "
+                f"Las repeticiones a menos de 30 palabras de distancia pueden "
+                f"percibirse como descuido estilístico, salvo que sean intencionales."
+            ),
+            suggestion=f"Considerar sinónimos o reformulación para evitar la repetición de \"{word}\"",
+            chapter=chapter,
+            confidence=confidence,
+            source_module="repetition_detector",
+            extra_data={
+                "word": word,
+                "occurrences": occurrences[:10],  # Limitar a 10 para no sobrecargar
+                "min_distance": min_distance,
+                "count": count,
+            },
+        )
+
 
 def get_alert_engine() -> AlertEngine:
     """
