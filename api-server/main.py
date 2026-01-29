@@ -63,7 +63,7 @@ import shutil
 # Setup logging IMMEDIATELY for early debugging
 import logging
 
-BACKEND_VERSION = "0.3.13"
+BACKEND_VERSION = "0.3.14"
 IS_EMBEDDED_RUNTIME = os.environ.get("NA_EMBEDDED") == "1" or "python-embed" in (sys.executable or "").lower()
 
 # Configure logging FIRST before using any loggers
@@ -84,7 +84,7 @@ def _setup_early_logging():
             level=logging.DEBUG,  # DEBUG para ver todo
             format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
             handlers=[
-                logging.FileHandler(str(log_file), encoding='utf-8', mode='w')  # mode='w' para limpiar cada vez
+                logging.FileHandler(str(log_file), encoding='utf-8', mode='a')  # mode='a' para conservar historial
             ],
             force=True
         )
