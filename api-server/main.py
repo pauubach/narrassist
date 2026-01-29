@@ -244,6 +244,54 @@ if _DB_MODULES_LOADED:
         section_repository = SectionRepository()
         _write_debug("Phase 1b OK: DB managers initialized")
         _early_logger.info("Phase 1b OK: DB managers initialized")
+
+        # Post-init verification: confirm tables exist via direct sqlite3 connection
+        try:
+            db = get_database()
+            db_path = str(db.db_path)
+            _write_debug(f"Phase 1b VERIFY: db_path = {db_path}")
+            _early_logger.info(f"Phase 1b VERIFY: db_path = {db_path}")
+
+            # Check via Database wrapper
+            tables = db.fetchall("SELECT name FROM sqlite_master WHERE type='table'")
+            table_names = [t['name'] for t in tables]
+            _write_debug(f"Phase 1b VERIFY: tables via wrapper = {table_names}")
+            _early_logger.info(f"Phase 1b VERIFY: tables via wrapper = {table_names}")
+
+            # Also check via independent sqlite3 connection (bypasses any caching/WAL issues)
+            import sqlite3 as _sqlite3_verify
+            _verify_conn = _sqlite3_verify.connect(db_path)
+            try:
+                _verify_conn.execute("PRAGMA wal_checkpoint(FULL)")
+                _verify_tables = _verify_conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                ).fetchall()
+                _verify_names = [t[0] for t in _verify_tables]
+                _write_debug(f"Phase 1b VERIFY: tables via direct sqlite3 = {_verify_names}")
+                _early_logger.info(f"Phase 1b VERIFY: tables via direct sqlite3 = {_verify_names}")
+
+                if 'projects' not in _verify_names:
+                    _write_debug("Phase 1b VERIFY FAILED: 'projects' table NOT found via direct connection!")
+                    _early_logger.error("Phase 1b VERIFY FAILED: 'projects' table NOT found via direct connection!")
+                    # Force schema creation via direct connection
+                    _write_debug("Phase 1b: Force-creating schema via direct connection...")
+                    from narrative_assistant.persistence.database import SCHEMA_SQL as _FORCE_SCHEMA
+                    _verify_conn.executescript(_FORCE_SCHEMA)
+                    _verify_conn.execute("PRAGMA wal_checkpoint(FULL)")
+                    _post_tables = _verify_conn.execute(
+                        "SELECT name FROM sqlite_master WHERE type='table'"
+                    ).fetchall()
+                    _post_names = [t[0] for t in _post_tables]
+                    _write_debug(f"Phase 1b: After force-create: tables = {_post_names}")
+                    _early_logger.info(f"Phase 1b: After force-create: tables = {_post_names}")
+                else:
+                    _write_debug("Phase 1b VERIFY OK: 'projects' table confirmed via direct sqlite3")
+            finally:
+                _verify_conn.close()
+        except Exception as verify_err:
+            _write_debug(f"Phase 1b VERIFY error (non-fatal): {verify_err}")
+            _early_logger.warning(f"Phase 1b post-init verification error: {verify_err}", exc_info=True)
+
     except Exception as db_init_err:
         _write_debug(f"Phase 1b: DB init failed: {db_init_err}")
         _early_logger.warning(f"Database initialization failed: {db_init_err}")
@@ -1811,22 +1859,63 @@ async def list_projects():
 
         try:
             db = get_database()
+            db_path = str(db.db_path)
             # Verify essential tables exist (auto-repair if needed)
             tables = db.fetchall("SELECT name FROM sqlite_master WHERE type='table'")
             table_names = [t['name'] for t in tables]
+            logger.debug(f"list_projects: db_path={db_path}, tables={table_names}")
             if 'projects' not in table_names:
-                logger.warning("list_projects: 'projects' table missing, attempting schema repair...")
+                logger.warning(f"list_projects: 'projects' table missing! db_path={db_path}, tables_found={table_names}")
+                _write_debug(f"list_projects: 'projects' MISSING! db_path={db_path}, tables={table_names}")
+
+                # Log file info for diagnostics
+                try:
+                    from pathlib import Path as _P
+                    _db_file = _P(db_path)
+                    if _db_file.exists():
+                        _write_debug(f"list_projects: DB file exists, size={_db_file.stat().st_size} bytes")
+                        logger.warning(f"list_projects: DB file exists at {db_path}, size={_db_file.stat().st_size} bytes")
+                    else:
+                        _write_debug(f"list_projects: DB file DOES NOT EXIST at {db_path}")
+                        logger.error(f"list_projects: DB file DOES NOT EXIST at {db_path}")
+                except Exception:
+                    pass
+
+                # Also check via direct sqlite3 connection (bypass any caching)
+                try:
+                    import sqlite3 as _sq
+                    _direct = _sq.connect(db_path)
+                    _direct.execute("PRAGMA wal_checkpoint(FULL)")
+                    _direct_tables = _direct.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+                    _direct_names = [t[0] for t in _direct_tables]
+                    _write_debug(f"list_projects: direct sqlite3 tables={_direct_names}")
+                    logger.warning(f"list_projects: direct sqlite3 connection tables={_direct_names}")
+                    _direct.close()
+                except Exception as _dex:
+                    _write_debug(f"list_projects: direct sqlite3 check failed: {_dex}")
+
+                logger.warning("list_projects: attempting schema repair...")
                 try:
                     from narrative_assistant.persistence.database import SCHEMA_SQL
                     with db.connection() as conn:
                         conn.executescript(SCHEMA_SQL)
                         conn.commit()
-                    logger.info("list_projects: Schema repaired successfully")
+                    # Verify repair worked
+                    post_tables = db.fetchall("SELECT name FROM sqlite_master WHERE type='table'")
+                    post_names = [t['name'] for t in post_tables]
+                    _write_debug(f"list_projects: post-repair tables={post_names}")
+                    logger.info(f"list_projects: Schema repaired, tables now: {post_names}")
+                    if 'projects' not in post_names:
+                        logger.error(f"list_projects: Schema repair FAILED, still no 'projects' table")
+                        _write_debug(f"list_projects: repair FAILED, still no 'projects'")
+                        return ApiResponse(success=False, error="Database not initialized properly - 'projects' table missing")
                 except Exception as repair_err:
-                    logger.error(f"list_projects: Schema repair failed: {repair_err}")
+                    logger.error(f"list_projects: Schema repair failed: {repair_err}", exc_info=True)
+                    _write_debug(f"list_projects: Schema repair exception: {repair_err}")
                     return ApiResponse(success=False, error="Database not initialized properly - 'projects' table missing")
         except Exception as db_err:
             logger.error(f"list_projects: Error checking database: {db_err}", exc_info=True)
+            _write_debug(f"list_projects: DB check exception: {db_err}")
 
         projects = project_manager.list_all()
         db = get_database()

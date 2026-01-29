@@ -777,26 +777,30 @@ class Database:
 
     def _initialize_schema(self) -> None:
         """Crea tablas si no existen. Detecta BD corrupta y la recrea si es necesario."""
-        logger.info(f"Inicializando schema en: {self.db_path}")
-        logger.info(f"db_path type: {type(self.db_path)}, is_memory: {self._is_memory}")
+        logger.info(f"[DB_INIT] Inicializando schema en: {self.db_path}")
+        logger.info(f"[DB_INIT] db_path type: {type(self.db_path)}, is_memory: {self._is_memory}")
+        logger.info(f"[DB_INIT] db_path resolved: {self.db_path}")
 
         # Verificar si el archivo existe y tiene contenido
         if not self._is_memory and isinstance(self.db_path, Path):
+            logger.info(f"[DB_INIT] Parent dir exists: {self.db_path.parent.exists()}")
+            logger.info(f"[DB_INIT] Parent dir: {self.db_path.parent}")
             if self.db_path.exists():
                 size = self.db_path.stat().st_size
-                logger.info(f"Archivo DB existente, tamaño: {size} bytes")
+                logger.info(f"[DB_INIT] Archivo DB existente, tamaño: {size} bytes")
 
                 if size == 0:
                     # Empty file (e.g., from a previous failed init) - delete and recreate
-                    logger.warning("DB file exists but is empty (0 bytes), deleting to recreate")
+                    logger.warning("[DB_INIT] DB file exists but is empty (0 bytes), deleting to recreate")
                     self.db_path.unlink()
                 else:
                     # Verificar integridad de la BD existente
                     try:
                         self._verify_and_repair_schema()
+                        logger.info("[DB_INIT] Schema verificado OK, retornando")
                         return  # BD válida, no hacer nada más
                     except Exception as e:
-                        logger.warning(f"BD posiblemente corrupta: {e}. Eliminando para recrear...")
+                        logger.warning(f"[DB_INIT] BD posiblemente corrupta: {e}. Eliminando para recrear...")
                         # Delete the corrupt file and all auxiliary files
                         try:
                             self.db_path.unlink()
@@ -804,32 +808,44 @@ class Database:
                                 aux_path = Path(str(self.db_path) + suffix)
                                 if aux_path.exists():
                                     aux_path.unlink()
-                                    logger.info(f"Eliminado archivo auxiliar corrupto: {aux_path}")
+                                    logger.info(f"[DB_INIT] Eliminado archivo auxiliar corrupto: {aux_path}")
                         except Exception as del_err:
-                            logger.error(f"Error eliminando BD corrupta: {del_err}")
+                            logger.error(f"[DB_INIT] Error eliminando BD corrupta: {del_err}")
             else:
-                logger.info("Archivo DB no existe, se creará nuevo")
+                logger.info(f"[DB_INIT] Archivo DB no existe, se creará nuevo en: {self.db_path}")
 
         # Crear schema desde cero
+        logger.info("[DB_INIT] Llamando _create_schema_from_scratch()...")
         self._create_schema_from_scratch()
+        logger.info("[DB_INIT] _create_schema_from_scratch() completado")
 
     def _verify_and_repair_schema(self) -> None:
         """Verifica que todas las tablas esenciales existen. Lanza excepción si la BD está corrupta."""
+        logger.info("[VERIFY] Verificando schema de BD existente...")
         with self.connection() as conn:
+            # Primero verificar integridad
+            try:
+                integrity = conn.execute("PRAGMA integrity_check").fetchone()
+                logger.info(f"[VERIFY] Integrity check: {integrity[0] if integrity else 'N/A'}")
+            except Exception as e:
+                logger.warning(f"[VERIFY] Integrity check failed: {e}")
+
             existing_tables = conn.execute(
                 "SELECT name FROM sqlite_master WHERE type='table'"
             ).fetchall()
             existing_names = {t[0] for t in existing_tables}
-            logger.info(f"Tablas existentes: {existing_names}")
+            logger.info(f"[VERIFY] Tablas existentes ({len(existing_names)}): {existing_names}")
+            logger.info(f"[VERIFY] Tablas requeridas: {ESSENTIAL_TABLES}")
 
             missing_tables = ESSENTIAL_TABLES - existing_names
 
             if missing_tables:
-                logger.warning(f"Faltan tablas esenciales: {missing_tables}")
+                logger.warning(f"[VERIFY] Faltan tablas esenciales: {missing_tables}")
                 # Intentar crear las tablas faltantes ejecutando todo el schema
-                logger.info("Ejecutando SCHEMA_SQL para crear tablas faltantes...")
+                logger.info("[VERIFY] Ejecutando SCHEMA_SQL para crear tablas faltantes...")
                 conn.executescript(SCHEMA_SQL)
                 conn.commit()
+                logger.info("[VERIFY] SCHEMA_SQL ejecutado y commit hecho")
 
                 # Verificar de nuevo
                 existing_tables = conn.execute(
@@ -837,13 +853,15 @@ class Database:
                 ).fetchall()
                 existing_names = {t[0] for t in existing_tables}
                 still_missing = ESSENTIAL_TABLES - existing_names
+                logger.info(f"[VERIFY] Tablas tras reparación: {existing_names}")
 
                 if still_missing:
+                    logger.error(f"[VERIFY] FALLO: No se pudieron crear tablas: {still_missing}")
                     raise RuntimeError(f"No se pudieron crear tablas: {still_missing}")
 
-                logger.info("Tablas faltantes creadas exitosamente")
+                logger.info("[VERIFY] Tablas faltantes creadas exitosamente")
             else:
-                logger.info("Todas las tablas esenciales existen")
+                logger.info("[VERIFY] Todas las tablas esenciales existen")
 
             # Migraciones incrementales para columnas nuevas
             self._apply_column_migrations(conn)
@@ -867,27 +885,63 @@ class Database:
     def _create_schema_from_scratch(self) -> None:
         """Crea el schema completo desde cero."""
         try:
-            with self.connection() as conn:
-                logger.info("Ejecutando SCHEMA_SQL completo...")
-                conn.executescript(SCHEMA_SQL)
-                conn.commit()
+            logger.info(f"[SCHEMA] Creando schema desde cero en: {self.db_path}")
+            logger.info(f"[SCHEMA] SCHEMA_SQL length: {len(SCHEMA_SQL)} chars")
+            logger.info(f"[SCHEMA] ESSENTIAL_TABLES: {ESSENTIAL_TABLES}")
 
-                # Verificar que las tablas se crearon
+            with self.connection() as conn:
+                logger.info("[SCHEMA] Conexión abierta, ejecutando SCHEMA_SQL...")
+                conn.executescript(SCHEMA_SQL)
+                logger.info("[SCHEMA] executescript completado")
+                conn.commit()
+                logger.info("[SCHEMA] commit completado")
+
+                # Verificar que las tablas se crearon (misma conexión)
                 tables = conn.execute(
                     "SELECT name FROM sqlite_master WHERE type='table'"
                 ).fetchall()
                 table_names = {t[0] for t in tables}
-                logger.info(f"Tablas creadas: {table_names}")
+                logger.info(f"[SCHEMA] Tablas en misma conexión: {table_names}")
 
                 missing = ESSENTIAL_TABLES - table_names
                 if missing:
-                    logger.error(f"ALERTA CRÍTICA: No se crearon todas las tablas. Faltan: {missing}")
+                    logger.error(f"[SCHEMA] ALERTA CRÍTICA: Faltan tablas tras executescript: {missing}")
                     raise RuntimeError(f"Schema incompleto, faltan: {missing}")
 
-                logger.info(f"Schema inicializado correctamente en {self.db_path}")
+            # Verificación INDEPENDIENTE: abrir nueva conexión para confirmar persistencia
+            if not self._is_memory:
+                logger.info("[SCHEMA] Verificación independiente con nueva conexión...")
+                verify_conn = sqlite3.connect(str(self.db_path))
+                try:
+                    verify_tables = verify_conn.execute(
+                        "SELECT name FROM sqlite_master WHERE type='table'"
+                    ).fetchall()
+                    verify_names = {t[0] for t in verify_tables}
+                    logger.info(f"[SCHEMA] Tablas en conexión independiente: {verify_names}")
+                    verify_missing = ESSENTIAL_TABLES - verify_names
+                    if verify_missing:
+                        logger.error(f"[SCHEMA] FALLO PERSISTENCIA: tablas no persistidas a disco: {verify_missing}")
+                        # Forzar WAL checkpoint
+                        logger.info("[SCHEMA] Forzando WAL checkpoint...")
+                        verify_conn.execute("PRAGMA wal_checkpoint(FULL)")
+                        verify_tables2 = verify_conn.execute(
+                            "SELECT name FROM sqlite_master WHERE type='table'"
+                        ).fetchall()
+                        verify_names2 = {t[0] for t in verify_tables2}
+                        logger.info(f"[SCHEMA] Tablas post-checkpoint: {verify_names2}")
+                        if ESSENTIAL_TABLES - verify_names2:
+                            raise RuntimeError(f"Schema no persistido a disco: {ESSENTIAL_TABLES - verify_names2}")
+                finally:
+                    verify_conn.close()
+
+            logger.info(f"[SCHEMA] Schema inicializado y verificado en {self.db_path}")
+
+            # Log file size
+            if not self._is_memory and isinstance(self.db_path, Path) and self.db_path.exists():
+                logger.info(f"[SCHEMA] DB file size: {self.db_path.stat().st_size} bytes")
 
         except Exception as e:
-            logger.error(f"Error inicializando schema: {e}", exc_info=True)
+            logger.error(f"[SCHEMA] Error inicializando schema: {e}", exc_info=True)
             raise
 
     def _create_connection(self) -> sqlite3.Connection:
