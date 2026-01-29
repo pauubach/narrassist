@@ -266,6 +266,12 @@
             :project-id="project.id"
           />
 
+          <!-- Tab Story Bible -->
+          <StoryBibleTab
+            v-else-if="workspaceStore.activeTab === 'story-bible'"
+            :project-id="project.id"
+          />
+
           <!-- Tab Resumen -->
           <ResumenTab
             v-else-if="workspaceStore.activeTab === 'summary'"
@@ -397,7 +403,7 @@ import Message from 'primevue/message'
 import Dialog from 'primevue/dialog'
 import ExportDialog from '@/components/ExportDialog.vue'
 import StatusBar from '@/components/layout/StatusBar.vue'
-import { WorkspaceTabs, TextTab, AlertsTab, EntitiesTab, RelationsTab, StyleTab, GlossaryTab, ResumenTab, PanelResizer } from '@/components/workspace'
+import { WorkspaceTabs, TextTab, AlertsTab, EntitiesTab, RelationsTab, StyleTab, GlossaryTab, ResumenTab, StoryBibleTab, PanelResizer } from '@/components/workspace'
 import { AnalysisRequired } from '@/components/analysis'
 import { TimelineView } from '@/components/timeline'
 import { ChaptersPanel, AlertsPanel, CharactersPanel, AssistantPanel } from '@/components/sidebar'
@@ -477,8 +483,9 @@ const isAnalyzing = computed(() => {
   if (!project.value) return false
   const status = project.value.analysisStatus
   // Solo estados activos de análisis deshabilitan el botón
-  // Si el status es null, undefined, 'completed', 'error', etc. - permitir re-analizar
-  const activeStatuses = ['pending', 'in_progress', 'analyzing']
+  // 'pending' NO es un análisis activo: es el estado inicial de un proyecto recién creado
+  // Si el status es null, undefined, 'completed', 'error', 'pending' - permitir analizar
+  const activeStatuses = ['in_progress', 'analyzing']
   return status ? activeStatuses.includes(status) : false
 })
 
@@ -630,7 +637,8 @@ watch(isAnalyzing, (analyzing, oldAnalyzing) => {
 // También observar cambios en el proyecto para detectar análisis
 watch(() => project.value?.analysisStatus, (newStatus, oldStatus) => {
   console.log('[Analysis] project.analysisStatus changed:', oldStatus, '->', newStatus)
-  if (newStatus === 'pending' || newStatus === 'in_progress' || newStatus === 'analyzing') {
+  // 'pending' es el estado inicial (no analizado), NO un análisis en curso
+  if (newStatus === 'in_progress' || newStatus === 'analyzing') {
     if (!analysisPollingInterval) {
       console.log('[Analysis] Starting polling from status change')
       startAnalysisPolling()

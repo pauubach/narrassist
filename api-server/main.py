@@ -1985,12 +1985,14 @@ async def get_project(project_id: int):
 
         # Verificar si el estado "analyzing" está atascado (no hay análisis real en progreso)
         # Esto puede ocurrir si el servidor se reinició durante un análisis
-        if project.analysis_status in ['analyzing', 'in_progress', 'pending']:
+        # NOTA: 'pending' NO se incluye aquí porque es el estado inicial legítimo
+        # de un proyecto recién creado que aún no ha sido analizado.
+        if project.analysis_status in ['analyzing', 'in_progress']:
             # Si no hay análisis activo en memoria, el estado está atascado
             if project_id not in analysis_progress_storage:
-                logger.warning(f"Project {project_id} has stuck analysis_status='{project.analysis_status}', resetting to 'completed'")
-                project.analysis_status = 'completed'
-                project.analysis_progress = 1.0
+                logger.warning(f"Project {project_id} has stuck analysis_status='{project.analysis_status}', resetting to 'pending'")
+                project.analysis_status = 'pending'
+                project.analysis_progress = 0.0
                 try:
                     project_manager.update(project)
                 except Exception as e:
@@ -8230,6 +8232,105 @@ async def get_character_knowledge(
         raise
     except Exception as e:
         logger.error(f"Error getting character knowledge: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.get("/api/projects/{project_id}/knowledge/anachronisms", response_model=ApiResponse)
+async def get_knowledge_anachronisms(
+    project_id: int,
+    mode: str = Query("rules", description="Modo: rules, llm, hybrid"),
+):
+    """
+    Detecta anachronismos temporales de conocimiento entre personajes.
+
+    Un anachronismo ocurre cuando un personaje referencia conocimiento
+    en un capítulo anterior al capítulo donde lo adquiere.
+
+    Args:
+        project_id: ID del proyecto
+        mode: Modo de extracción (rules=rápido, llm=preciso, hybrid=mixto)
+
+    Returns:
+        ApiResponse con lista de anachronismos detectados
+    """
+    try:
+        from narrative_assistant.analysis.character_knowledge import (
+            CharacterKnowledgeAnalyzer,
+            KnowledgeExtractionMode,
+            detect_knowledge_anachronisms,
+        )
+        from narrative_assistant.entities.repository import get_entity_repository
+        from narrative_assistant.persistence.chapter import get_chapter_repository
+
+        # Verificar proyecto
+        if not project_manager:
+            return ApiResponse(success=False, error="Project manager not initialized")
+
+        result = project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail=f"Proyecto {project_id} no encontrado")
+
+        # Determinar modo
+        mode_map = {
+            "rules": KnowledgeExtractionMode.RULES,
+            "llm": KnowledgeExtractionMode.LLM,
+            "hybrid": KnowledgeExtractionMode.HYBRID,
+        }
+        extraction_mode = mode_map.get(mode.lower(), KnowledgeExtractionMode.RULES)
+
+        # Obtener entidades y capítulos
+        entity_repo = get_entity_repository()
+        chapter_repo = get_chapter_repository()
+        all_entities = entity_repo.get_entities_by_project(project_id, active_only=True)
+        chapters = chapter_repo.get_by_project(project_id)
+
+        if not chapters:
+            return ApiResponse(
+                success=True,
+                data={
+                    "project_id": project_id,
+                    "anachronisms": [],
+                    "stats": {"chapters_analyzed": 0, "entities_analyzed": 0,
+                              "facts_extracted": 0, "anachronisms_found": 0},
+                }
+            )
+
+        # Analizar conocimiento de todos los capítulos
+        analyzer = CharacterKnowledgeAnalyzer(project_id=project_id)
+        for e in all_entities:
+            analyzer.register_entity(e.id, e.canonical_name, e.aliases)
+
+        for chapter in chapters:
+            analyzer.extract_knowledge_facts(
+                chapter.content,
+                chapter.chapter_number,
+                chapter.start_char,
+                mode=extraction_mode,
+            )
+
+        # Detectar anachronismos
+        all_facts = analyzer.get_all_knowledge()
+        anachronisms = detect_knowledge_anachronisms(all_facts)
+
+        return ApiResponse(
+            success=True,
+            data={
+                "project_id": project_id,
+                "anachronisms": anachronisms,
+                "stats": {
+                    "chapters_analyzed": len(chapters),
+                    "entities_analyzed": len(all_entities),
+                    "facts_extracted": len(all_facts),
+                    "anachronisms_found": len(anachronisms),
+                    "extraction_mode": mode,
+                },
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error detecting knowledge anachronisms: {e}", exc_info=True)
         return ApiResponse(success=False, error=str(e))
 
 

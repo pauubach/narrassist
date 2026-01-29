@@ -1,5 +1,6 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
+import { apiUrl } from '@/config/api'
 
 export interface AnalysisProgress {
   project_id: number
@@ -176,7 +177,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
         formData.append('file', file)
       }
 
-      const response = await fetch(`/api/projects/${projectId}/analyze`, {
+      const response = await fetch(apiUrl(`/api/projects/${projectId}/analyze`), {
         method: 'POST',
         body: formData
       })
@@ -209,7 +210,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
 
   async function getProgress(projectId: number) {
     try {
-      const response = await fetch(`/api/projects/${projectId}/analysis/progress`)
+      const response = await fetch(apiUrl(`/api/projects/${projectId}/analysis/progress`))
 
       if (!response.ok) {
         throw new Error('Error obteniendo progreso')
@@ -288,7 +289,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
    */
   async function checkAnalysisStatus(projectId: number): Promise<boolean> {
     try {
-      const response = await fetch(`/api/projects/${projectId}/analysis/progress`)
+      const response = await fetch(apiUrl(`/api/projects/${projectId}/analysis/progress`))
       if (!response.ok) {
         // No hay análisis en curso, limpiar estado
         clearAnalysis()
@@ -324,7 +325,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
    */
   async function loadExecutedPhases(projectId: number): Promise<Partial<ExecutedPhases> | null> {
     try {
-      const response = await fetch(`/api/projects/${projectId}/analysis-status`)
+      const response = await fetch(apiUrl(`/api/projects/${projectId}/analysis-status`))
       if (!response.ok) {
         return null
       }
@@ -390,7 +391,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
     error.value = null
 
     try {
-      const response = await fetch(`/api/projects/${projectId}/analyze`, {
+      const response = await fetch(apiUrl(`/api/projects/${projectId}/analyze`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phases, force })

@@ -1,9 +1,28 @@
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { defineStore } from 'pinia'
 import type { Project, ApiResponse } from '@/types'
 import type { ApiProject } from '@/types/api'
 import { transformProject, transformProjects } from '@/types/transformers'
 import { apiUrl } from '@/config/api'
+import { useSystemStore } from '@/stores/system'
+
+/** Espera a que el backend esté listo antes de hacer llamadas API */
+async function ensureBackendReady(): Promise<void> {
+  const systemStore = useSystemStore()
+  if (systemStore.backendReady) return
+  // Esperar a que backendReady cambie a true (max 65s, el waitForBackend ya se ejecuta en ModelSetupDialog)
+  return new Promise((resolve) => {
+    if (systemStore.backendReady) { resolve(); return }
+    const unwatch = watch(() => systemStore.backendReady, (ready) => {
+      if (ready) {
+        unwatch()
+        resolve()
+      }
+    })
+    // Safety timeout: no bloquear indefinidamente
+    setTimeout(() => { unwatch(); resolve() }, 65000)
+  })
+}
 
 export const useProjectsStore = defineStore('projects', () => {
   // Estado - usando domain types (camelCase)
@@ -27,6 +46,8 @@ export const useProjectsStore = defineStore('projects', () => {
     error.value = null
 
     try {
+      // Esperar a que el backend este listo antes de hacer el fetch
+      await ensureBackendReady()
       const response = await fetch(apiUrl('/api/projects'))
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
@@ -52,6 +73,7 @@ export const useProjectsStore = defineStore('projects', () => {
     error.value = null
 
     try {
+      await ensureBackendReady()
       const response = await fetch(apiUrl(`/api/projects/${id}`))
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)

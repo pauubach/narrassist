@@ -6,65 +6,48 @@ import ProgressBar from 'primevue/progressbar'
 
 const systemStore = useSystemStore()
 
-const visible = ref(false)
+const visible = ref(true) // Siempre visible al inicio
 const downloadProgress = ref(0)
 const currentModel = ref('')
-const downloadPhase = ref<'checking' | 'installing-deps' | 'downloading' | 'completed' | 'error' | 'python-missing'>('checking')
+const downloadPhase = ref<'starting' | 'checking' | 'installing-deps' | 'downloading' | 'completed' | 'error' | 'python-missing' | 'backend-error'>('starting')
 
-// Check models on mount - should be installed during installation
-// If not, download automatically (transparent to user)
+// Fase de inicio: esperar a que el backend esté listo, luego verificar modelos
 onMounted(async () => {
-  downloadPhase.value = 'checking'
-  
-  // Retry a few times as backend may still be loading modules
-  let retries = 0
-  const maxRetries = 3
-  const retryDelay = 1500 // ms
-  
-  while (retries < maxRetries) {
-    await systemStore.checkModelsStatus()
-    
-    // If models are ready, we're done - no dialog needed
-    if (systemStore.modelsReady) {
-      downloadPhase.value = 'completed'
-      return
-    }
-    
-    // If backend is loaded, stop retrying (we have a real answer)
-    if (systemStore.backendLoaded) {
-      break
-    }
-    
-    // Backend not loaded yet, wait and retry
-    retries++
-    if (retries < maxRetries) {
-      await new Promise(resolve => setTimeout(resolve, retryDelay))
-    }
+  downloadPhase.value = 'starting'
+
+  // 1. Esperar a que el backend responda (health check con reintentos)
+  const backendOk = await systemStore.waitForBackend(60000) // 60s timeout
+
+  if (!backendOk) {
+    // Backend no respondio a tiempo
+    downloadPhase.value = 'backend-error'
+    return
   }
 
-  // First check if Python is available
+  // 2. Backend listo - verificar estado de modelos
+  downloadPhase.value = 'checking'
+  await systemStore.checkModelsStatus()
+
+  // Si los modelos estan listos, cerrar el dialogo rapidamente
+  if (systemStore.modelsReady) {
+    downloadPhase.value = 'completed'
+    setTimeout(() => {
+      visible.value = false
+    }, 800) // breve flash de "Listo"
+    return
+  }
+
+  // 3. Verificar que Python esta disponible
   if (!systemStore.pythonAvailable) {
-    // Python not installed or wrong version - show helpful message
-    visible.value = true
     downloadPhase.value = 'python-missing'
     return
   }
 
-  // Double-check: if models are ready after retries, don't show dialog
-  if (systemStore.modelsReady) {
-    downloadPhase.value = 'completed'
-    return
-  }
-
+  // 4. Instalar dependencias o descargar modelos
   if (systemStore.dependenciesNeeded || !systemStore.backendLoaded) {
-    // Dependencies missing or backend not loaded - install them first
-    visible.value = true
     downloadPhase.value = 'installing-deps'
     startDependenciesInstallation()
   } else {
-    // Dependencies OK AND backend loaded but models missing - download automatically
-    // This happens if installer couldn't download (no internet, etc.)
-    visible.value = true
     downloadPhase.value = 'downloading'
     startAutomaticDownload()
   }
@@ -180,6 +163,35 @@ function retryDownload() {
   startAutomaticDownload()
 }
 
+async function retryStartup() {
+  downloadPhase.value = 'starting'
+  const backendOk = await systemStore.waitForBackend(60000)
+  if (!backendOk) {
+    downloadPhase.value = 'backend-error'
+    return
+  }
+  // Backend listo, continuar con verificacion de modelos
+  downloadPhase.value = 'checking'
+  await systemStore.checkModelsStatus()
+
+  if (systemStore.modelsReady) {
+    downloadPhase.value = 'completed'
+    setTimeout(() => { visible.value = false }, 800)
+    return
+  }
+  if (!systemStore.pythonAvailable) {
+    downloadPhase.value = 'python-missing'
+    return
+  }
+  if (systemStore.dependenciesNeeded || !systemStore.backendLoaded) {
+    downloadPhase.value = 'installing-deps'
+    startDependenciesInstallation()
+  } else {
+    downloadPhase.value = 'downloading'
+    startAutomaticDownload()
+  }
+}
+
 async function recheckPython() {
   downloadPhase.value = 'checking'
   await systemStore.checkModelsStatus()
@@ -207,13 +219,38 @@ async function recheckPython() {
     :closable="false"
     :modal="true"
     :draggable="false"
-    header="Configuración inicial"
+    :header="downloadPhase === 'starting' ? 'Narrative Assistant' : 'Configuración inicial'"
     class="model-setup-dialog"
     :style="{ width: '500px' }"
   >
     <div class="dialog-content">
+      <!-- Starting state - waiting for backend -->
+      <template v-if="downloadPhase === 'starting'">
+        <div class="checking-state">
+          <i class="pi pi-spin pi-spinner checking-spinner"></i>
+          <h3 class="starting-title">Iniciándose...</h3>
+          <p class="starting-subtitle">Preparando el motor de análisis</p>
+        </div>
+      </template>
+
+      <!-- Backend error - timeout -->
+      <template v-else-if="downloadPhase === 'backend-error'">
+        <div class="error-state">
+          <i class="pi pi-exclamation-triangle error-icon"></i>
+          <h3>No se pudo conectar</h3>
+          <p class="error-message">{{ systemStore.backendStartupError || 'El servidor no respondió a tiempo.' }}</p>
+          <p class="error-hint">
+            Intenta cerrar y volver a abrir la aplicación. Si el problema persiste, verifica que no haya otra instancia ejecutándose.
+          </p>
+          <button class="retry-button" @click="retryStartup">
+            <i class="pi pi-refresh"></i>
+            Reintentar
+          </button>
+        </div>
+      </template>
+
       <!-- Checking state -->
-      <template v-if="downloadPhase === 'checking'">
+      <template v-else-if="downloadPhase === 'checking'">
         <div class="checking-state">
           <i class="pi pi-spin pi-spinner checking-spinner"></i>
           <p>Verificando configuración...</p>
@@ -366,6 +403,18 @@ async function recheckPython() {
   font-size: 2rem;
   color: var(--p-primary-color);
   margin-bottom: 1rem;
+}
+
+.starting-title {
+  margin: 0 0 0.25rem 0;
+  font-size: 1.25rem;
+  color: var(--p-text-color);
+}
+
+.starting-subtitle {
+  margin: 0;
+  color: var(--p-text-muted-color);
+  font-size: 0.875rem;
 }
 
 .download-progress {

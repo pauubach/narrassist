@@ -31,6 +31,12 @@ export interface ModelsStatus {
 export const useSystemStore = defineStore('system', () => {
   const backendConnected = ref(false)
   const backendVersion = ref('unknown')
+  /** true una vez que el backend responde al health check por primera vez */
+  const backendReady = ref(false)
+  /** true mientras se espera la primera respuesta del backend */
+  const backendStarting = ref(true)
+  /** Error de timeout si el backend no responde a tiempo */
+  const backendStartupError = ref<string | null>(null)
 
   // Model status
   const modelsStatus = ref<ModelsStatus | null>(null)
@@ -56,12 +62,55 @@ export const useSystemStore = defineStore('system', () => {
         const data = await response.json()
         backendConnected.value = data.status === 'ok'
         backendVersion.value = data.version || 'unknown'
+        if (!backendReady.value) {
+          backendReady.value = true
+          backendStarting.value = false
+          backendStartupError.value = null
+        }
       } else {
         backendConnected.value = false
       }
     } catch (error) {
       backendConnected.value = false
     }
+  }
+
+  /**
+   * Espera a que el backend responda al health check.
+   * Reintenta con backoff hasta que responde o se supera el timeout.
+   * @param timeoutMs - Tiempo máximo de espera (default: 60s)
+   * @returns true si el backend respondió, false si timeout
+   */
+  async function waitForBackend(timeoutMs = 60000): Promise<boolean> {
+    if (backendReady.value) return true
+
+    backendStarting.value = true
+    backendStartupError.value = null
+    const startTime = Date.now()
+    let delay = 500 // empezar con 500ms, incrementar hasta 2s
+
+    while (Date.now() - startTime < timeoutMs) {
+      try {
+        const response = await fetch(apiUrl('/api/health'))
+        if (response.ok) {
+          const data = await response.json()
+          backendConnected.value = data.status === 'ok'
+          backendVersion.value = data.version || 'unknown'
+          backendReady.value = true
+          backendStarting.value = false
+          return true
+        }
+      } catch {
+        // Backend no disponible todavia, reintentar
+      }
+      await new Promise(resolve => setTimeout(resolve, delay))
+      delay = Math.min(delay + 250, 2000) // incrementar hasta 2s max
+    }
+
+    // Timeout
+    backendStarting.value = false
+    backendStartupError.value = 'El servidor no respondio a tiempo. Intenta reiniciar la aplicacion.'
+    return false
   }
 
   async function checkModelsStatus(): Promise<ModelsStatus | null> {
@@ -152,8 +201,8 @@ export const useSystemStore = defineStore('system', () => {
     }
   }
 
-  // Check backend status on store creation
-  checkBackendStatus()
+  // No auto-check en creación del store.
+  // El ModelSetupDialog llama a waitForBackend() que hace el health check con reintentos.
 
   async function installDependencies(): Promise<boolean> {
     modelsError.value = null
@@ -186,6 +235,9 @@ export const useSystemStore = defineStore('system', () => {
     // State
     backendConnected,
     backendVersion,
+    backendReady,
+    backendStarting,
+    backendStartupError,
     modelsStatus,
     modelsLoading,
     modelsDownloading,
@@ -202,6 +254,7 @@ export const useSystemStore = defineStore('system', () => {
 
     // Actions
     checkBackendStatus,
+    waitForBackend,
     checkModelsStatus,
     downloadModels,
     installDependencies,
