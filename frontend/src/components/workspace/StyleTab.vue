@@ -25,6 +25,7 @@ import AgeReadabilityTab from './AgeReadabilityTab.vue'
 import VitalStatusTab from './VitalStatusTab.vue'
 import CharacterLocationTab from './CharacterLocationTab.vue'
 import ChapterProgressTab from './ChapterProgressTab.vue'
+import SensoryReportTab from './SensoryReportTab.vue'
 
 type CategoryId = 'narrative' | 'style' | 'consistency'
 
@@ -78,6 +79,7 @@ const allSubTabs: SubTab[] = [
   { id: 'echo', label: 'Ecos', icon: 'pi pi-replay', component: 'EchoReportTab', featureKey: 'echo_repetitions', category: 'style' },
   { id: 'variation', label: 'Variación', icon: 'pi pi-chart-bar', component: 'SentenceVariationTab', featureKey: 'sentence_variation', category: 'style' },
   { id: 'readability', label: 'Legibilidad', icon: 'pi pi-users', component: 'AgeReadabilityTab', featureKey: 'age_readability', category: 'style' },
+  { id: 'sensory', label: 'Sensorial', icon: 'pi pi-palette', component: 'SensoryReportTab', featureKey: 'sensory_report', category: 'style' },
   // Consistencia
   { id: 'vital', label: 'Estado vital', icon: 'pi pi-heart-fill', component: 'VitalStatusTab', featureKey: 'vital_status', category: 'consistency' },
   { id: 'locations', label: 'Ubicaciones', icon: 'pi pi-map-marker', component: 'CharacterLocationTab', featureKey: 'character_location', category: 'consistency' },
@@ -210,6 +212,7 @@ async function loadFeatureAvailability() {
       <VitalStatusTab v-if="activeTabId === 'vital'" :project-id="projectId" />
       <CharacterLocationTab v-if="activeTabId === 'locations'" :project-id="projectId" />
       <ChapterProgressTab v-if="activeTabId === 'progress'" :project-id="projectId" />
+      <SensoryReportTab v-if="activeTabId === 'sensory'" :project-id="projectId" />
     </div>
   </div>
 </template>

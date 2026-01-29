@@ -52,6 +52,7 @@ const tabConfigMapping: Record<WorkspaceTab, string> = {
   style: 'style',
   glossary: 'text', // Siempre visible
   summary: 'text', // Siempre visible
+  'story-bible': 'entities',
 }
 
 // Configuración base de todas las tabs
@@ -64,6 +65,7 @@ const allTabs: TabConfig[] = [
   { id: 'style', label: 'Escritura', icon: 'pi pi-pencil', configKey: 'style' },
   { id: 'glossary', label: 'Glosario', icon: 'pi pi-book', configKey: 'text' },
   { id: 'summary', label: 'Resumen', icon: 'pi pi-chart-bar', configKey: 'text' },
+  { id: 'story-bible', label: 'Story Bible', icon: 'pi pi-book', configKey: 'entities' },
 ]
 
 // Tabs filtradas según el tipo de documento

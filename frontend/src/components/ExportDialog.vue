@@ -417,6 +417,39 @@
           />
         </template>
       </Card>
+
+      <!-- Scrivener Export Card -->
+      <Card class="export-card">
+        <template #title>
+          <i class="pi pi-folder"></i> Exportar a Scrivener
+        </template>
+        <template #subtitle>
+          Genera un paquete .scriv compatible con Scrivener 3
+        </template>
+        <template #content>
+          <div class="scrivener-options">
+            <div class="option-row">
+              <Checkbox v-model="scrivenerOptions.includeCharacterNotes" binary input-id="scriv-chars" />
+              <label for="scriv-chars">Incluir fichas de personaje</label>
+            </div>
+            <div class="option-row">
+              <Checkbox v-model="scrivenerOptions.includeAlertsAsNotes" binary input-id="scriv-alerts" />
+              <label for="scriv-alerts">Incluir alertas como notas</label>
+            </div>
+            <div class="option-row">
+              <Checkbox v-model="scrivenerOptions.includeEntityKeywords" binary input-id="scriv-keywords" />
+              <label for="scriv-keywords">Incluir entidades como keywords</label>
+            </div>
+          </div>
+          <Button
+            label="Exportar .scriv"
+            icon="pi pi-download"
+            :loading="loadingScrivener"
+            class="export-button"
+            @click="exportScrivener"
+          />
+        </template>
+      </Card>
     </div>
 
     <template #footer>
@@ -454,6 +487,7 @@ const loadingCharacters = ref(false)
 const loadingStyle = ref(false)
 const loadingAlerts = ref(false)
 const loadingPreview = ref(false)
+const loadingScrivener = ref(false)
 
 // Formatos seleccionados
 const documentFormat = ref<'docx' | 'pdf'>('docx')
@@ -461,6 +495,13 @@ const reportFormat = ref<'markdown' | 'json'>('markdown')
 const characterFormat = ref<'markdown' | 'json'>('markdown')
 const styleFormat = ref<'markdown' | 'json' | 'pdf'>('markdown')
 const alertFormat = ref<'json' | 'csv'>('json')
+
+// Opciones de Scrivener
+const scrivenerOptions = ref({
+  includeCharacterNotes: true,
+  includeAlertsAsNotes: true,
+  includeEntityKeywords: true,
+})
 
 // Opciones de documento completo
 const documentOptions = ref({
@@ -911,6 +952,53 @@ const exportAlerts = async () => {
     })
   } finally {
     loadingAlerts.value = false
+  }
+}
+
+async function exportScrivener() {
+  loadingScrivener.value = true
+  try {
+    const params = new URLSearchParams({
+      include_character_notes: String(scrivenerOptions.value.includeCharacterNotes),
+      include_alerts_as_notes: String(scrivenerOptions.value.includeAlertsAsNotes),
+      include_entity_keywords: String(scrivenerOptions.value.includeEntityKeywords),
+    })
+
+    const response = await fetch(
+      `http://localhost:8008/api/projects/${props.projectId}/export/scrivener?${params}`
+    )
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`)
+    }
+
+    const blob = await response.blob()
+    const safeName = props.projectName.replace(/[^a-zA-Z0-9 _.-]/g, '').trim() || 'Proyecto'
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${safeName}.scriv.zip`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+
+    toast.add({
+      severity: 'success',
+      summary: 'Exportación exitosa',
+      detail: `Descargado: ${safeName}.scriv.zip`,
+      life: 3000,
+    })
+  } catch (error) {
+    console.error('Error exporting to Scrivener:', error)
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: 'No se pudo exportar a Scrivener',
+      life: 3000,
+    })
+  } finally {
+    loadingScrivener.value = false
   }
 }
 </script>

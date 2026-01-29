@@ -398,7 +398,7 @@ class CharacterKnowledgeAnalyzer:
         "recuperar", "robar", "tomar"
     }
 
-    def __init__(self, project_id: int):
+    def __init__(self, project_id: int = 0, entities: list[dict] = None):
         self.project_id = project_id
 
         # Datos extraídos
@@ -410,6 +410,15 @@ class CharacterKnowledgeAnalyzer:
         # Mapeo de nombres a IDs
         self._entity_names: dict[int, str] = {}
         self._name_to_id: dict[str, int] = {}
+
+        # Registrar entidades si se proporcionan
+        if entities:
+            for entity in entities:
+                self.register_entity(
+                    entity["id"],
+                    entity["name"],
+                    entity.get("aliases", []),
+                )
 
     def register_entity(self, entity_id: int, name: str, aliases: list[str] = None):
         """Registra una entidad para el análisis."""
@@ -852,40 +861,72 @@ class CharacterKnowledgeAnalyzer:
 
     # Patrones para detectar conocimiento de hechos
     KNOWLEDGE_PATTERNS = [
-        # "A sabía que B era/tenía X"
-        (r"(?P<knower>\w+)\s+(?:sabía|conocía|descubrió|averiguó|se enteró)\s+(?:de\s+)?que\s+(?P<known>\w+)\s+(?:era|tenía|estaba|había)\s+(?P<fact>.+?)(?:\.|,|;|$)",
-         KnowledgeType.ATTRIBUTE, "learned"),
-        # "A recordaba que B X"
+        # REFERENCIA: "A sabía/conocía que B era/tenía X" (ya lo sabía)
+        (r"(?P<knower>\w+)\s+(?:sabía|conocía)\s+(?:de\s+)?que\s+(?P<known>\w+)\s+(?:era|tenía|estaba|había)\s+(?P<fact>.+?)(?:\.|,|;|$)",
+         KnowledgeType.ATTRIBUTE, "knew"),
+        # ADQUISICIÓN: "A descubrió/averiguó/se enteró que B era/tenía X"
+        (r"(?P<knower>\w+)\s+(?:descubrió|averiguó|se\s+enteró)\s+(?:de\s+)?que\s+(?P<known>\w+)\s+(?:era|tenía|estaba|había)\s+(?P<fact>.+?)(?:\.|,|;|$)",
+         KnowledgeType.ATTRIBUTE, "discovered"),
+        # REFERENCIA: "A recordaba que B X"
         (r"(?P<knower>\w+)\s+(?:recordaba|recordó)\s+(?:de\s+)?que\s+(?P<known>\w+)\s+(?P<fact>.+?)(?:\.|,|;|$)",
          KnowledgeType.HISTORY, "remembered"),
-        # "A se dio cuenta de que B X"
+        # ADQUISICIÓN: "A se dio cuenta de que B X"
         (r"(?P<knower>\w+)\s+se\s+dio\s+cuenta\s+de\s+que\s+(?P<known>\w+)\s+(?P<fact>.+?)(?:\.|,|;|$)",
          KnowledgeType.ATTRIBUTE, "observed"),
-        # "A notó que B X"
+        # ADQUISICIÓN: "A notó/observó que B X"
         (r"(?P<knower>\w+)\s+(?:notó|observó|advirtió)\s+que\s+(?P<known>\w+)\s+(?P<fact>.+?)(?:\.|,|;|$)",
          KnowledgeType.ATTRIBUTE, "observed"),
-        # "para A, B era X" (conocimiento implícito)
+        # REFERENCIA: "para A, B era X" (conocimiento implícito/asumido)
         (r"para\s+(?P<knower>\w+),?\s+(?P<known>\w+)\s+era\s+(?P<fact>.+?)(?:\.|,|;|$)",
          KnowledgeType.ATTRIBUTE, "assumed"),
-        # "A ignoraba/desconocía que B X" (conocimiento negado)
+        # IGNORANCIA: "A ignoraba/desconocía que B X"
         (r"(?P<knower>\w+)\s+(?:ignoraba|desconocía|no\s+sabía)\s+que\s+(?P<known>\w+)\s+(?P<fact>.+?)(?:\.|,|;|$)",
          KnowledgeType.ATTRIBUTE, "unknown"),
     ]
 
     # Patrones para detectar que A sabe dónde está B
     LOCATION_PATTERNS = [
-        (r"(?P<knower>\w+)\s+(?:sabía|conocía)\s+(?:dónde|donde)\s+(?:estaba|vivía|se encontraba)\s+(?P<known>\w+)",
-         KnowledgeType.LOCATION, "told"),
+        # REFERENCIA: "A sabía dónde vivía B"
+        (r"(?P<knower>\w+)\s+(?:sabía|conocía)\s+(?P<fact>(?:dónde|donde)\s+(?:estaba|vivía|se encontraba))\s+(?P<known>\w+)",
+         KnowledgeType.LOCATION, "knew"),
+        # ADQUISICIÓN: "A encontró a B en LUGAR"
         (r"(?P<knower>\w+)\s+(?:encontró|localizó|halló)\s+a\s+(?P<known>\w+)\s+en\s+(?P<location>.+?)(?:\.|,|;|$)",
          KnowledgeType.LOCATION, "observed"),
     ]
 
     # Patrones para detectar secretos
     SECRET_PATTERNS = [
-        (r"(?P<knower>\w+)\s+(?:sabía|conocía|guardaba)\s+el\s+secreto\s+de\s+(?P<known>\w+)",
+        # REFERENCIA: "A guardaba/sabía el secreto de B"
+        (r"(?P<knower>\w+)\s+(?:sabía|conocía|guardaba)\s+el\s+(?P<fact>secreto)\s+de\s+(?P<known>\w+)",
+         KnowledgeType.SECRET, "knew"),
+        # ADQUISICIÓN: "B le confesó/reveló su secreto a A"
+        (r"(?P<known>\w+)\s+le\s+(?:confesó|reveló|contó)\s+(?:su\s+)?(?P<fact>secreto)\s+a\s+(?P<knower>\w+)",
          KnowledgeType.SECRET, "told"),
-        (r"(?P<known>\w+)\s+le\s+(?:confesó|reveló|contó)\s+(?:su\s+secreto\s+)?a\s+(?P<knower>\w+)",
-         KnowledgeType.SECRET, "told"),
+    ]
+
+    # Patrones para detectar revelaciones (alguien le dice/muestra algo a otro)
+    REVELATION_PATTERNS = [
+        # "... le contó/dijo/confesó/reveló a KNOWER que KNOWN era/tenía FACT" (3 entidades)
+        # e.g. "Ana le contó a Luis que Pedro era ladrón"
+        # e.g. "El médico le contó a Ana que Luis estaba enfermo"
+        (r"le\s+(?:contó|dijo|confesó|reveló)\s+a\s+(?P<knower>\w+)\s+que\s+(?P<known>\w+)\s+(?P<fact>(?:era|tenía|estaba|había)\s+.+?)(?:\.|,|;|$)",
+         KnowledgeType.ATTRIBUTE, "told"),
+        # "KNOWN le contó/dijo/confesó/reveló a KNOWER que era/tenía FACT" (2 entidades)
+        # e.g. "Pedro le confesó a María que era espía"
+        (r"(?P<known>\w+)\s+le\s+(?:contó|dijo|confesó|reveló)\s+a\s+(?P<knower>\w+)\s+que\s+(?P<fact>(?:era|tenía|estaba|había)\s+.+?)(?:\.|,|;|$)",
+         KnowledgeType.ATTRIBUTE, "told"),
+        # "KNOWN le mostró FACT a KNOWER"
+        # e.g. "Pedro le mostró la cicatriz de su mano a María por primera vez"
+        (r"(?P<known>\w+)\s+le\s+mostró\s+(?P<fact>.+?)\s+a\s+(?P<knower>\w+)",
+         KnowledgeType.ATTRIBUTE, "shown"),
+        # "KNOWN le dio su dirección/ubicación a KNOWER"
+        # e.g. "Elena le dio su dirección a Carlos por teléfono"
+        (r"(?P<known>\w+)\s+le\s+dio\s+su\s+(?P<fact>dirección|ubicación)\s+a\s+(?P<knower>\w+)",
+         KnowledgeType.LOCATION, "told"),
+        # "—FACT— dijo KNOWN a KNOWER" (revelación en diálogo directo)
+        # e.g. "—Soy médico —dijo Juan a María."
+        (r"—(?P<fact>.+?)\s*—\s*dijo\s+(?P<known>\w+)\s+a\s+(?P<knower>\w+)",
+         KnowledgeType.IDENTITY, "told"),
     ]
 
     def _auto_select_mode(self) -> KnowledgeExtractionMode:
@@ -976,7 +1017,8 @@ class CharacterKnowledgeAnalyzer:
         all_patterns = (
             self.KNOWLEDGE_PATTERNS +
             self.LOCATION_PATTERNS +
-            self.SECRET_PATTERNS
+            self.SECRET_PATTERNS +
+            self.REVELATION_PATTERNS
         )
 
         for pattern, knowledge_type, learned_how in all_patterns:
@@ -1125,3 +1167,188 @@ Responde solo con el JSON, sin explicaciones."""
     def get_all_knowledge(self) -> list[KnowledgeFact]:
         """Retorna todos los hechos de conocimiento extraídos."""
         return self._knowledge
+
+
+# =============================================================================
+# Detección de anachronismos temporales de conocimiento
+# =============================================================================
+
+# Clasificación semántica de learned_how
+_REFERENCE_MODES = {"knew", "remembered", "assumed", "learned"}
+_ACQUISITION_MODES = {"discovered", "told", "shown", "overheard", "observed"}
+_IGNORANCE_MODES = {"unknown"}
+
+
+def _extract_significant_words(text: str) -> set[str]:
+    """Extrae palabras significativas de un texto (≥3 caracteres, sin stopwords)."""
+    stopwords = {
+        "que", "una", "uno", "con", "por", "para", "del", "los", "las",
+        "les", "era", "tenía", "estaba", "había", "muy", "más", "como",
+        "pero", "sobre", "este", "esta", "ese", "esa", "sus", "sabe",
+        "desde", "aquella", "cada", "día", "noche",
+    }
+    words = set(re.findall(r'\b\w{3,}\b', text.lower()))
+    return words - stopwords
+
+
+def _facts_related(fact_a: KnowledgeFact, fact_b: KnowledgeFact) -> bool:
+    """
+    Determina si dos hechos tratan sobre el mismo tema.
+
+    Compara tipo de conocimiento y palabras clave del fact_value.
+    Para SECRET y LOCATION siempre se consideran relacionados si
+    comparten el mismo tipo.
+    """
+    same_type = fact_a.knowledge_type == fact_b.knowledge_type
+
+    # Secretos y ubicación: un hecho por par de entidades
+    if same_type and fact_a.knowledge_type in (KnowledgeType.SECRET, KnowledgeType.LOCATION):
+        return True
+
+    words_a = _extract_significant_words(fact_a.fact_value)
+    words_b = _extract_significant_words(fact_b.fact_value)
+
+    # Sin palabras significativas: considerar relacionados si mismo tipo
+    if not words_a or not words_b:
+        return same_type
+
+    overlap = words_a & words_b
+    if not overlap:
+        return False
+
+    # Verificar contradicciones: ambos lados tienen palabras únicas
+    # (e.g., "ojos azules" vs "ojos verdes" → contradicción, no anachronismo)
+    diff_a = words_a - words_b
+    diff_b = words_b - words_a
+    if diff_a and diff_b:
+        return False
+
+    return True
+
+
+def detect_knowledge_anachronisms(
+    facts: list[KnowledgeFact],
+) -> list[dict]:
+    """
+    Detecta anachronismos temporales de conocimiento.
+
+    Un anachronismo ocurre cuando un personaje referencia o demuestra
+    conocimiento en un capítulo anterior al capítulo donde lo adquiere.
+
+    Args:
+        facts: Lista de hechos de conocimiento extraídos de todo el manuscrito.
+
+    Returns:
+        Lista de dicts con información de cada anachronismo detectado:
+        - knower_name: nombre del personaje
+        - known_name: nombre de la entidad sobre la que sabe
+        - fact_value: descripción del hecho
+        - used_chapter: capítulo donde referencia el conocimiento
+        - learned_chapter: capítulo donde lo adquiere
+        - severity: "high" (>3 capítulos) o "medium"
+        - description: descripción legible del problema
+    """
+    # Agrupar hechos por (knower, known)
+    groups: dict[tuple[int, int], list[KnowledgeFact]] = defaultdict(list)
+    for fact in facts:
+        key = (fact.knower_entity_id, fact.known_entity_id)
+        groups[key].append(fact)
+
+    anachronisms = []
+
+    for (knower_id, known_id), group_facts in groups.items():
+        # Separar por rol semántico
+        references = [
+            f for f in group_facts if f.learned_how in _REFERENCE_MODES
+        ]
+        acquisitions = [
+            f for f in group_facts if f.learned_how in _ACQUISITION_MODES
+        ]
+        ignorances = [
+            f for f in group_facts if f.learned_how in _IGNORANCE_MODES
+        ]
+
+        # Caso 1: Referencia antes de adquisición explícita
+        for ref in references:
+            for acq in acquisitions:
+                if acq.source_chapter > ref.source_chapter and _facts_related(ref, acq):
+                    gap = acq.source_chapter - ref.source_chapter
+                    anachronisms.append({
+                        "knower_name": ref.knower_name,
+                        "known_name": ref.known_name,
+                        "fact_value": ref.fact_value,
+                        "fact_description": ref.fact_description,
+                        "used_chapter": ref.source_chapter,
+                        "learned_chapter": acq.source_chapter,
+                        "severity": "high" if gap > 3 else "medium",
+                        "description": (
+                            f"{ref.knower_name} referencia "
+                            f"'{ref.fact_value}' en capítulo {ref.source_chapter}, "
+                            f"pero lo aprende en capítulo {acq.source_chapter}"
+                        ),
+                    })
+
+        # Caso 2: Ignorancia → referencia sin adquisición intermedia
+        for ign in ignorances:
+            for ref in references:
+                if ref.source_chapter > ign.source_chapter and _facts_related(ign, ref):
+                    # Verificar si hay adquisición entre la ignorancia y la referencia
+                    has_acq_between = any(
+                        ign.source_chapter < acq.source_chapter <= ref.source_chapter
+                        and _facts_related(ign, acq)
+                        for acq in acquisitions
+                    )
+                    if not has_acq_between:
+                        anachronisms.append({
+                            "knower_name": ref.knower_name,
+                            "known_name": ref.known_name,
+                            "fact_value": ref.fact_value,
+                            "fact_description": ref.fact_description,
+                            "used_chapter": ref.source_chapter,
+                            "learned_chapter": None,
+                            "severity": "high",
+                            "description": (
+                                f"{ref.knower_name} no sabía "
+                                f"'{ign.fact_value}' en capítulo {ign.source_chapter}, "
+                                f"pero lo referencia en capítulo {ref.source_chapter} "
+                                f"sin evento de aprendizaje intermedio"
+                            ),
+                        })
+
+        # Caso 3: Adquisición temprana antes de revelación explícita
+        # (descubrió/observó en cap X, pero se lo cuentan en cap Y > X)
+        early_discoveries = [
+            f for f in group_facts if f.learned_how in ("discovered", "observed")
+        ]
+        explicit_tells = [
+            f for f in group_facts if f.learned_how in ("told", "shown")
+        ]
+        for disc in early_discoveries:
+            for tell in explicit_tells:
+                if tell.source_chapter > disc.source_chapter and _facts_related(disc, tell):
+                    gap = tell.source_chapter - disc.source_chapter
+                    anachronisms.append({
+                        "knower_name": disc.knower_name,
+                        "known_name": disc.known_name,
+                        "fact_value": disc.fact_value,
+                        "fact_description": disc.fact_description,
+                        "used_chapter": disc.source_chapter,
+                        "learned_chapter": tell.source_chapter,
+                        "severity": "medium" if gap <= 3 else "high",
+                        "description": (
+                            f"{disc.knower_name} descubre "
+                            f"'{disc.fact_value}' en capítulo {disc.source_chapter}, "
+                            f"pero se lo comunican en capítulo {tell.source_chapter}"
+                        ),
+                    })
+
+    # Deduplicar por (knower, fact_value, used_chapter, learned_chapter)
+    seen = set()
+    unique = []
+    for a in anachronisms:
+        key = (a["knower_name"], a["used_chapter"], a.get("learned_chapter"))
+        if key not in seen:
+            seen.add(key)
+            unique.append(a)
+
+    return unique
