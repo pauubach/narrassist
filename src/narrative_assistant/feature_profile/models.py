@@ -274,6 +274,8 @@ class FeatureProfile:
     sentence_variation: FeatureAvailability = FeatureAvailability.ENABLED
     emotional_analysis: FeatureAvailability = FeatureAvailability.ENABLED
     age_readability: FeatureAvailability = FeatureAvailability.DISABLED  # Solo para INF
+    sensory_report: FeatureAvailability = FeatureAvailability.ENABLED  # Reporte sensorial (5 sentidos)
+    sentence_energy: FeatureAvailability = FeatureAvailability.ENABLED  # Energía de oraciones
     vital_status: FeatureAvailability = FeatureAvailability.ENABLED  # Muertes y reapariciones
     character_location: FeatureAvailability = FeatureAvailability.ENABLED  # Seguimiento de ubicaciones
     chapter_progress: FeatureAvailability = FeatureAvailability.ENABLED  # Resumen de avance por capítulo
@@ -309,6 +311,8 @@ class FeatureProfile:
                 "sentence_variation": self.sentence_variation.value,
                 "emotional_analysis": self.emotional_analysis.value,
                 "age_readability": self.age_readability.value,
+                "sensory_report": self.sensory_report.value,
+                "sentence_energy": self.sentence_energy.value,
                 "vital_status": self.vital_status.value,
                 "character_location": self.character_location.value,
                 "chapter_progress": self.chapter_progress.value,

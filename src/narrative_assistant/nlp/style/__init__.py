@@ -84,6 +84,17 @@ from .sensory_report import (
     SENSE_NAMES,
 )
 
+from .sentence_energy import (
+    EnergyLevel,
+    EnergyIssueType,
+    EnergyIssue,
+    SentenceEnergy,
+    SentenceEnergyReport,
+    SentenceEnergyDetector,
+    get_sentence_energy_detector,
+    reset_sentence_energy_detector,
+)
+
 from .readability import (
     ReadabilityLevel,
     ReadabilityReport,
@@ -151,6 +162,15 @@ __all__ = [
     "AgeReadabilityReport",
     "AGE_GROUP_THRESHOLDS",
     "SPANISH_SIGHT_WORDS",
+    # Energía de oraciones
+    "EnergyLevel",
+    "EnergyIssueType",
+    "EnergyIssue",
+    "SentenceEnergy",
+    "SentenceEnergyReport",
+    "SentenceEnergyDetector",
+    "get_sentence_energy_detector",
+    "reset_sentence_energy_detector",
     # Reporte sensorial
     "SensoryType",
     "SensoryDensity",

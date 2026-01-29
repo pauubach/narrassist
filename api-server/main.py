@@ -2157,6 +2157,7 @@ async def get_analysis_status(project_id: int):
             "register_analysis": has_chapters,  # Análisis de registro disponible
             "tension_curve": has_chapters,  # Curva de tensión narrativa
             "sensory_report": has_chapters,  # Reporte sensorial (5 sentidos)
+            "sentence_energy": has_chapters,  # Energía de oraciones (voz, verbos, estructura)
             "story_bible": has_entities,  # Story Bible / Wiki de entidades
             "speaker_attribution": has_entities and has_chapters,  # Atribución de hablantes
         }
@@ -15163,6 +15164,133 @@ def _get_sticky_recommendation(glue_percentage: float) -> str:
         return "Oración pesada. Considera simplificar la estructura o usar verbos más directos."
     else:
         return "Revisa si puedes eliminar algún artículo, preposición o conjunción innecesaria."
+
+
+@app.get("/api/projects/{project_id}/sentence-energy", response_model=ApiResponse)
+async def get_sentence_energy(
+    project_id: int,
+    low_threshold: float = Query(40.0, ge=0.0, le=100.0, description="Umbral de baja energía (0-100)"),
+    chapter_number: Optional[int] = Query(None, description="Filtrar por número de capítulo"),
+):
+    """
+    Analiza la energía de las oraciones del proyecto.
+
+    Evalúa voz activa/pasiva, fuerza de verbos, estructura y nominalizaciones
+    para determinar el dinamismo de cada oración.
+    """
+    try:
+        from narrative_assistant.nlp.style.sentence_energy import get_sentence_energy_detector
+
+        result = project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+
+        chapters = chapter_repository.get_by_project(project_id)
+        detector = get_sentence_energy_detector()
+
+        chapters_data = []
+        global_all_energy = []
+        global_low_count = 0
+        global_passive_count = 0
+        global_weak_count = 0
+        global_nom_count = 0
+        global_total_sentences = 0
+        global_by_level = {}
+
+        for chapter in chapters:
+            if chapter_number is not None and chapter.chapter_number != chapter_number:
+                continue
+
+            chapter_text = chapter.content or ""
+            if not chapter_text.strip():
+                continue
+
+            result = detector.analyze(chapter_text, chapter=chapter.chapter_number)
+            if result.is_failure:
+                continue
+
+            report = result.value
+            global_total_sentences += report.total_sentences
+
+            # Recopilar oraciones de baja energía para este capítulo
+            chapter_low = []
+            for sent in report.low_energy_sentences:
+                chapter_low.append(sent.to_dict())
+
+            # Acumular estadísticas globales
+            for sent in report.sentences:
+                global_all_energy.append(sent.energy_score)
+
+            global_low_count += len(report.low_energy_sentences)
+            global_passive_count += report.passive_count
+            global_weak_count += report.weak_verb_count
+            global_nom_count += report.nominalization_count
+
+            for level_key, count in report.by_level.items():
+                global_by_level[level_key] = global_by_level.get(level_key, 0) + count
+
+            chapters_data.append({
+                "chapter_number": chapter.chapter_number,
+                "chapter_title": chapter.title or f"Capítulo {chapter.chapter_number}",
+                "total_sentences": report.total_sentences,
+                "avg_energy": round(report.avg_energy, 1),
+                "avg_voice_score": round(report.avg_voice_score, 1),
+                "avg_verb_strength": round(report.avg_verb_strength, 1),
+                "avg_structure_score": round(report.avg_structure_score, 1),
+                "by_level": report.by_level,
+                "issues": {
+                    "passive_count": report.passive_count,
+                    "weak_verb_count": report.weak_verb_count,
+                    "nominalization_count": report.nominalization_count,
+                },
+                "low_energy_sentences": chapter_low,
+                "low_energy_count": len(chapter_low),
+                "recommendations": report.recommendations,
+            })
+
+        # Estadísticas globales
+        avg_energy = sum(global_all_energy) / len(global_all_energy) if global_all_energy else 0
+        analyzed = len(global_all_energy)
+
+        global_recommendations = []
+        if avg_energy < 40 and analyzed > 0:
+            global_recommendations.append(
+                f"La energía media es baja ({avg_energy:.0f}/100). "
+                "El texto podría beneficiarse de más verbos de acción y voz activa."
+            )
+        if analyzed > 0 and global_passive_count / analyzed > 0.20:
+            global_recommendations.append(
+                f"El {global_passive_count / analyzed * 100:.0f}% de las oraciones usan voz pasiva."
+            )
+        if analyzed > 0 and global_weak_count / analyzed > 0.40:
+            global_recommendations.append(
+                f"Alto uso de verbos débiles ({global_weak_count} oraciones). "
+                "Sustituya ser/estar/tener/hacer por verbos más específicos."
+            )
+
+        return ApiResponse(
+            success=True,
+            data={
+                "global_stats": {
+                    "total_sentences": global_total_sentences,
+                    "analyzed_sentences": analyzed,
+                    "avg_energy": round(avg_energy, 1),
+                    "low_energy_count": global_low_count,
+                    "passive_count": global_passive_count,
+                    "weak_verb_count": global_weak_count,
+                    "nominalization_count": global_nom_count,
+                    "by_level": global_by_level,
+                },
+                "chapters": chapters_data,
+                "recommendations": global_recommendations,
+                "threshold_used": low_threshold,
+            }
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error analyzing sentence energy: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
 
 
 @app.get("/api/projects/{project_id}/echo-report", response_model=ApiResponse)

@@ -207,15 +207,15 @@ Todas las features del Competitive Analysis clasificadas como "Quick Wins", "Dif
 
 | Feature | Tipo | Estado | Esfuerzo |
 |---------|------|--------|----------|
-| **Color-Coded Revisions UI** | ENHANCE | ⚠️ Backend+endpoint+botón existen, falta UI config en ExportDialog | 4h |
-| **Percentiles por Género** | ENHANCE | ⚠️ Benchmarks min/max existen, añadir percentiles P10-P90 | 4h |
-| **Sensory Report Suggestions** | ENHANCE | ⚠️ SensoryReportTab existe, añadir sugerencias de enriquecimiento | 2-3h |
+| **Color-Coded Revisions UI** | ENHANCE | ✅ COMPLETO | Card en ExportDialog con categorías, confianza, track changes |
+| **Percentiles por Género** | ENHANCE | ✅ COMPLETO | Backend percentiles + UI gauges en PacingAnalysisTab |
+| **Sensory Report Suggestions** | ENHANCE | ✅ COMPLETO | Backend sugerencias + UI card en SensoryReportTab |
 
 ### Sprint B: Sentence Energy (1-2 días)
 
 | Feature | Tipo | Estado | Esfuerzo |
 |---------|------|--------|----------|
-| **Sentence Energy** (voz pasiva, verbos débiles, energía) | BUILD | ❌ No implementado | 1-2 días |
+| **Sentence Energy** (voz pasiva, verbos débiles, energía) | BUILD | ✅ COMPLETO | Backend + API + Tab |
 
 ### Sprint C: Estructura Narrativa (3-4 días)
 
@@ -267,13 +267,13 @@ Todas las features del Competitive Analysis clasificadas como "Quick Wins", "Dif
 | Categoría | Items | Días |
 |-----------|-------|------|
 | ~~Frontend para features con backend listo~~ | ~~3~~ | ~~2-3~~ ✅ HECHO |
-| Sprint A: Quick Wins (enhance) | 3 | 1 |
-| Sprint B: Sentence Energy | 1 | 1-2 |
+| ~~Sprint A: Quick Wins (enhance)~~ | ~~3~~ | ~~1~~ ✅ HECHO |
+| ~~Sprint B: Sentence Energy~~ | ~~1~~ | ~~1-2~~ ✅ HECHO |
 | Sprint C: Estructura Narrativa | 2 | 3-4 |
 | Sprint D: Arquetipos | 1 | 2 |
 | Infraestructura | 6 | 25 |
-| **TOTAL PENDIENTE (features)** | **7** | **~7-9 días** |
-| **TOTAL PENDIENTE (features + infra)** | **13** | **~32-34 días** |
+| **TOTAL PENDIENTE (features)** | **3** | **~5-6 días** |
+| **TOTAL PENDIENTE (features + infra)** | **9** | **~30-31 días** |
 
 ---
 
