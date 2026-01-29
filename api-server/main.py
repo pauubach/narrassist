@@ -116,8 +116,15 @@ try:
     using_embedded_python = IS_EMBEDDED_RUNTIME
 
     if using_embedded_python:
-        # Embedded Python: site-packages are in the bundle, skip external detection
-        _write_debug("Embedded Python - skipping user site-packages and Anaconda detection")
+        # Embedded Python: add Lib/site-packages for runtime-installed NLP deps
+        embed_dir = os.path.dirname(sys.executable)
+        embed_site = os.path.join(embed_dir, "Lib", "site-packages")
+        if embed_site not in sys.path:
+            sys.path.insert(0, embed_site)
+            _write_debug(f"Added embedded site-packages: {embed_site}")
+            _early_logger.info(f"✓ Added embedded site-packages to sys.path: {embed_site}")
+        else:
+            _write_debug(f"Embedded site-packages already in sys.path: {embed_site}")
         _early_logger.info("Using embedded Python - external path detection skipped")
     else:
         # Development mode: add user site-packages and detect Anaconda
@@ -1093,6 +1100,8 @@ async def models_status():
         return ApiResponse(
             success=True,
             data={
+                "backend_loaded": True,
+                "dependencies_needed": False,
                 "nlp_models": status,
                 "ollama": {
                     "installed": ollama_installed,
@@ -1196,8 +1205,17 @@ async def install_dependencies():
                 logger.info(f"✓ {dep} installed")
             
             logger.info("All dependencies installed successfully!")
+
+            # Ensure target dir is in sys.path for imports
+            if IS_EMBEDDED_RUNTIME and embed_site_packages not in sys.path:
+                sys.path.insert(0, embed_site_packages)
+                logger.info(f"Added {embed_site_packages} to sys.path")
+
+            # Invalidate import caches so newly installed packages are found
+            importlib.invalidate_caches()
+
             logger.info("Attempting to load narrative_assistant modules...")
-            
+
             # Usar la función helper para cargar los módulos
             if load_narrative_assistant_modules():
                 INSTALLING_DEPENDENCIES = False
@@ -1375,6 +1393,20 @@ async def system_capabilities():
 
         # Verificar LanguageTool (puede intentar iniciarlo si está instalado)
         lt_available = _check_languagetool_available()
+        lt_installed = False
+        lt_installing = False
+        lt_java_available = False
+        try:
+            from narrative_assistant.nlp.grammar.languagetool_manager import (
+                get_languagetool_manager as _get_lt_mgr,
+                is_lt_installing as _is_lt_installing,
+            )
+            _lt_mgr = _get_lt_mgr()
+            lt_installed = _lt_mgr.is_installed
+            lt_installing = _is_lt_installing()
+            lt_java_available = _lt_mgr._get_java_command() is not None
+        except Exception:
+            pass
 
         # Definir métodos NLP disponibles
         # Basado en hardware, definir defaults recomendados
@@ -1591,6 +1623,12 @@ async def system_capabilities():
                     "available": ollama_available,
                     "models": ollama_models,
                     "recommended_models": ollama_recommendations,
+                },
+                "languagetool": {
+                    "installed": lt_installed,
+                    "running": lt_available,
+                    "installing": lt_installing,
+                    "java_available": lt_java_available,
                 },
                 "nlp_methods": nlp_methods,
                 "recommended_config": {
@@ -8697,6 +8735,222 @@ async def pull_ollama_model(model_name: str):
 
     except Exception as e:
         logger.error(f"Error pulling model {model_name}: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+# =============================================================================
+# Ollama Install Endpoint
+# =============================================================================
+
+@app.post("/api/ollama/install", response_model=ApiResponse)
+async def install_ollama_endpoint():
+    """
+    Instala Ollama de forma silenciosa.
+
+    Returns:
+        ApiResponse con resultado de la instalación
+    """
+    try:
+        from narrative_assistant.llm.ollama_manager import get_ollama_manager
+
+        manager = get_ollama_manager()
+
+        if manager.is_installed:
+            return ApiResponse(
+                success=True,
+                data={"message": "Ollama ya está instalado", "status": "already_installed"}
+            )
+
+        import asyncio
+        success, msg = await asyncio.to_thread(manager.install_ollama, None, True)
+
+        if success:
+            return ApiResponse(
+                success=True,
+                data={"message": msg, "status": "installed"}
+            )
+        else:
+            return ApiResponse(
+                success=False,
+                error=msg,
+                data={"status": "error", "install_url": "https://ollama.com/download"}
+            )
+
+    except Exception as e:
+        logger.error(f"Error installing Ollama: {e}", exc_info=True)
+        return ApiResponse(
+            success=False,
+            error=str(e),
+            data={"status": "error", "install_url": "https://ollama.com/download"}
+        )
+
+
+# =============================================================================
+# LanguageTool Management Endpoints
+# =============================================================================
+
+@app.get("/api/languagetool/status", response_model=ApiResponse)
+async def get_languagetool_status():
+    """
+    Estado detallado de LanguageTool.
+
+    Returns:
+        ApiResponse con estado: not_installed, installing, installed_not_running, running
+    """
+    try:
+        from narrative_assistant.nlp.grammar.languagetool_manager import (
+            get_languagetool_manager,
+            is_lt_installing,
+            get_install_progress,
+        )
+
+        manager = get_languagetool_manager()
+        installing = is_lt_installing()
+        progress = get_install_progress()
+
+        if installing:
+            status = "installing"
+        elif not manager.is_installed:
+            status = "not_installed"
+        elif manager.is_running:
+            status = "running"
+        else:
+            status = "installed_not_running"
+
+        data = {
+            "status": status,
+            "is_installed": manager.is_installed,
+            "is_running": manager.is_running if not installing else False,
+            "is_installing": installing,
+            "java_available": manager._get_java_command() is not None,
+            "install_progress": None,
+        }
+
+        if progress and installing:
+            data["install_progress"] = {
+                "phase": progress.phase,
+                "phase_label": progress.phase_label,
+                "percentage": progress.percentage,
+                "detail": progress.detail,
+                "error": progress.error,
+            }
+
+        return ApiResponse(success=True, data=data)
+
+    except Exception as e:
+        logger.error(f"Error checking LanguageTool status: {e}", exc_info=True)
+        return ApiResponse(success=True, data={
+            "status": "not_installed",
+            "is_installed": False,
+            "is_running": False,
+            "is_installing": False,
+            "java_available": False,
+            "install_progress": None,
+        })
+
+
+@app.post("/api/languagetool/install", response_model=ApiResponse)
+async def install_languagetool_endpoint():
+    """
+    Inicia instalación de LanguageTool + Java en background.
+
+    Returns:
+        ApiResponse con estado de la operación
+    """
+    try:
+        from narrative_assistant.nlp.grammar.languagetool_manager import (
+            is_lt_installing,
+            start_lt_installation,
+        )
+
+        if is_lt_installing():
+            return ApiResponse(
+                success=False,
+                error="Ya hay una instalación en curso"
+            )
+
+        success, msg = start_lt_installation()
+        return ApiResponse(
+            success=success,
+            data={"message": msg} if success else None,
+            error=msg if not success else None,
+        )
+
+    except Exception as e:
+        logger.error(f"Error starting LanguageTool install: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.post("/api/languagetool/start", response_model=ApiResponse)
+async def start_languagetool_endpoint():
+    """
+    Inicia el servidor LanguageTool.
+
+    Returns:
+        ApiResponse con resultado
+    """
+    try:
+        from narrative_assistant.nlp.grammar.languagetool_manager import (
+            get_languagetool_manager,
+        )
+
+        manager = get_languagetool_manager()
+
+        if not manager.is_installed:
+            return ApiResponse(
+                success=False,
+                error="LanguageTool no está instalado"
+            )
+
+        if manager.is_running:
+            return ApiResponse(
+                success=True,
+                data={"message": "LanguageTool ya está corriendo"}
+            )
+
+        import asyncio
+        success = await asyncio.to_thread(manager.start)
+
+        if success:
+            return ApiResponse(
+                success=True,
+                data={"message": "LanguageTool iniciado correctamente"}
+            )
+        else:
+            return ApiResponse(
+                success=False,
+                error="No se pudo iniciar LanguageTool. Verifica que Java está disponible."
+            )
+
+    except Exception as e:
+        logger.error(f"Error starting LanguageTool: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.post("/api/languagetool/stop", response_model=ApiResponse)
+async def stop_languagetool_endpoint():
+    """
+    Detiene el servidor LanguageTool.
+
+    Returns:
+        ApiResponse con resultado
+    """
+    try:
+        from narrative_assistant.nlp.grammar.languagetool_manager import (
+            get_languagetool_manager,
+        )
+
+        manager = get_languagetool_manager()
+        success = manager.stop()
+
+        return ApiResponse(
+            success=success,
+            data={"message": "LanguageTool detenido"} if success else None,
+            error="No se pudo detener LanguageTool" if not success else None,
+        )
+
+    except Exception as e:
+        logger.error(f"Error stopping LanguageTool: {e}", exc_info=True)
         return ApiResponse(success=False, error=str(e))
 
 
