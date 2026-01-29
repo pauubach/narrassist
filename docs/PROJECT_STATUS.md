@@ -1,7 +1,7 @@
 # Estado del Proyecto - Narrative Assistant
 
 > **Última actualización**: 2026-01-29
-> **Versión**: 0.3.17
+> **Versión**: 0.3.20
 > **Changelog**: Ver [CHANGELOG.md](CHANGELOG.md)
 > **Roadmap**: Ver [ROADMAP.md](ROADMAP.md)
 
@@ -442,13 +442,13 @@
 
 ### 🔷 P2 - MEJORAS (Post-MVP)
 
-#### Backend - Mejoras de consistencia
+#### Backend - Mejoras de consistencia - ✅ COMPLETADO
 
-| Módulo | TODO |
-|--------|------|
-| `temporal/inconsistencies.py` | Verificación de inconsistencias temporales básica - faltan edge cases |
-| `focalization/violations.py` | Solo detecta violaciones simples |
-| `voice/deviations.py` | Umbral de desviación hardcodeado |
+| Módulo | Estado |
+|--------|--------|
+| `temporal/inconsistencies.py` | ✅ **COMPLETADO** - 5+ edge cases cubiertos |
+| `focalization/violations.py` | ✅ **COMPLETADO** - 5 tipos de violación |
+| `voice/deviations.py` | ✅ **COMPLETADO** - 4 umbrales parametrizables |
 
 #### Frontend - Archivos CSS - ✅ COMPLETADOS
 
@@ -459,14 +459,14 @@
 | `assets/design-system/utilities.css` | ✅ Incluye highlight animations (líneas 415-459) |
 | Temas PrimeVue | ✅ **6 presets configurados** (Aura, Lara, Material, Nora + Grammarly, Scrivener) |
 
-#### Exportaciones
+#### Exportaciones - ✅ COMPLETADO
 
 | Formato | Estado |
 |---------|--------|
 | JSON | ✅ Funcional |
 | Markdown | ✅ Funcional |
-| PDF | 🔄 Parcial (solo estructura) |
-| DOCX | 🔄 Parcial (sin estilos) |
+| PDF | ✅ **COMPLETADO** |
+| DOCX | ✅ **COMPLETADO** |
 
 ---
 
@@ -639,9 +639,9 @@ cargo tauri build --target x86_64-pc-windows-msvc
 | Módulo | Completitud | Prioridad | Estado |
 |--------|-------------|-----------|--------|
 | **Coreference Resolver** | 95% | ✅ | Votación expuesta en API con razonamiento |
-| **Register Analysis** | 90% | ✅ | Análisis por capítulo implementado |
-| **Voice Profiles** | 85% | ✅ | API expone 18 métricas completas (v0.3.19) |
-| **Speaker Attribution** | 85% | ✅ | Bug corregido en v0.3.13 |
+| **Register Analysis** | 95% | ✅ | Stats agregadas + per-chapter (v0.3.20) |
+| **Voice Profiles** | 90% | ✅ | 18 métricas + comparación entre personajes (v0.3.20) |
+| **Speaker Attribution** | 90% | ✅ | Voice matching mejorado + alternativas (v0.3.20) |
 | **Pacing Analysis** | 90% | ✅ | Curva de tensión implementada |
 | **Character Knowledge** | 85% | ✅ | Extracción rules + LLM + hybrid funcional |
 | **Sticky Sentences** | 95% | ✅ | Integrado en pipeline unificado |
@@ -662,7 +662,7 @@ cargo tauri build --target x86_64-pc-windows-msvc
 
 **Archivo**: `src/narrative_assistant/nlp/coreference_resolver.py`
 
-#### Register Analysis (90%) ✅
+#### Register Analysis (95%) ✅
 
 **✅ Implementado:**
 - `RegisterChangeDetector` con `detect_changes()`
@@ -670,13 +670,14 @@ cargo tauri build --target x86_64-pc-windows-msvc
 - Análisis por fragmento
 - **Análisis por capítulo** (v0.3.14)
 - **Alertas de cambio de registro** conectadas al pipeline (v0.3.17)
+- **Estadísticas agregadas** (v0.3.20): `consistency_pct`, `distribution_pct` globales
 
-**❌ Falta:**
-- Estadísticas agregadas (distribución de registros por obra)
+**❌ Falta (menor):**
+- Benchmarks de consistencia por género literario
 
 **Archivo**: `src/narrative_assistant/voice/register.py`
 
-#### Voice Profiles (85%) ✅
+#### Voice Profiles (90%) ✅
 
 **✅ Implementado:**
 - `VoiceMetrics` dataclass con 18 métricas
@@ -685,23 +686,25 @@ cargo tauri build --target x86_64-pc-windows-msvc
 - `to_dict()` expone las 18 métricas completas (v0.3.19)
 - `characteristic_words` y `top_fillers` retornados en API
 - Frontend types y transformers sincronizados
+- **Endpoint de comparación** `/voice-profiles/compare` (v0.3.20)
 
-**❌ Falta:**
-- Endpoint de comparación directa entre 2 personajes
+**❌ Falta (menor):**
+- Persistencia de perfiles en BD (actualmente se calculan on-the-fly)
 
 **Archivo**: `src/narrative_assistant/voice/profiles.py`
 
-#### Speaker Attribution (80%)
+#### Speaker Attribution (90%) ✅
 
 **✅ Implementado:**
-- 5 métodos de atribución (verb, proximity, context, name, coreference)
+- 5 métodos de atribución: explicit_verb, alternation, voice_profile, proximity, none
 - 4 niveles de confianza (high, medium, low, unknown)
-- `DialogueAttributor.attribute_dialogues()`
+- `SpeakerAttributor.attribute_dialogues()` funcional
+- **Voice matching mejorado** (v0.3.20): scoring multi-métrica (formalidad, longitud, puntuación, muletillas, vocabulario)
+- **Alternativas rankeadas** (v0.3.20): `alternative_speakers` poblado con candidatos y scores
+- API endpoint operativo con voice profiles integrados
 
-**❌ Falta:**
-- Voice matching débil (no usa `VoiceAnalyzer` para comparar estilo)
-- No hay feedback loop de correcciones del usuario
-- API endpoint faltante
+**❌ Falta (menor):**
+- Feedback loop de correcciones del usuario
 
 **Archivo**: `src/narrative_assistant/voice/speaker_attribution.py`
 
@@ -744,13 +747,13 @@ cargo tauri build --target x86_64-pc-windows-msvc
 | Módulo | Estado | Notas |
 |--------|--------|-------|
 | Character Knowledge | 85% | Extracción rules + LLM funcional. Falta: benchmarks formales |
-| Voice Profiles | 85% | ✅ API expone 18 métricas completas (v0.3.19) |
-| Register agregado | 90% | Solo falta distribución global |
-| Speaker Attribution + voice | 85% | ✅ Bug fix v0.3.13. Falta: voice matching con VoiceAnalyzer |
+| Voice Profiles | 90% | ✅ 18 métricas + comparación (v0.3.20). Falta: persistencia en BD |
+| Register agregado | 95% | ✅ Stats agregadas (v0.3.20). Falta: benchmarks por género |
+| Speaker Attribution | 90% | ✅ Voice matching mejorado + alternativas (v0.3.20). Falta: feedback loop |
 | Coreference razonamiento | 95% | ✅ Completado v0.3.14. Falta: persistencia de correcciones manuales |
 | Pacing tension curve | 90% | ✅ Completado v0.3.13. Falta: benchmarks de género |
 
-**Total restante**: Mejoras menores en Knowledge (benchmarks) + Register (distribución global)
+**Total restante**: Mejoras menores (benchmarks, feedback loops, persistencia de perfiles)
 
 ---
 

@@ -110,8 +110,8 @@ class DialogueAttribution:
     speech_verb: Optional[str] = None
     context_snippet: str = ""
 
-    # Alternativas consideradas
-    alternative_speakers: List[Tuple[int, float]] = field(default_factory=list)
+    # Alternativas consideradas: (entity_id, entity_name, score)
+    alternative_speakers: List[Tuple[int, str, float]] = field(default_factory=list)
 
     def to_dict(self) -> Dict:
         """Convierte a diccionario."""
@@ -326,16 +326,25 @@ class SpeakerAttributor:
                     continue
 
             # 4. Intentar perfil de voz
+            voice_scored = []
             if self.voice_profiles and current_participants:
-                best_match = self._match_voice_profile(text, current_participants)
-                if best_match:
-                    attr.speaker_id = best_match
-                    attr.speaker_name = self._get_entity_name(best_match)
-                    attr.confidence = AttributionConfidence.LOW
-                    attr.attribution_method = AttributionMethod.VOICE_PROFILE
-                    last_speaker = best_match
-                    attributions.append(attr)
-                    continue
+                voice_scored = self._score_voice_match(text, current_participants)
+
+            if voice_scored and voice_scored[0][1] >= 0.25:
+                best_id = voice_scored[0][0]
+                attr.speaker_id = best_id
+                attr.speaker_name = self._get_entity_name(best_id)
+                attr.confidence = AttributionConfidence.LOW
+                attr.attribution_method = AttributionMethod.VOICE_PROFILE
+                # Guardar alternativas (excluyendo el ganador)
+                attr.alternative_speakers = [
+                    (eid, self._get_entity_name(eid), sc)
+                    for eid, sc in voice_scored[1:]
+                    if sc > 0.1
+                ][:3]
+                last_speaker = best_id
+                attributions.append(attr)
+                continue
 
             # 5. Intentar proximidad simple (entidad mas cercana)
             if nearby:
@@ -344,6 +353,13 @@ class SpeakerAttributor:
                 attr.speaker_name = self._get_entity_name(closest)
                 attr.confidence = AttributionConfidence.LOW
                 attr.attribution_method = AttributionMethod.PROXIMITY
+                # Agregar alternativas de voz si las hay
+                if voice_scored:
+                    attr.alternative_speakers = [
+                        (eid, self._get_entity_name(eid), sc)
+                        for eid, sc in voice_scored
+                        if eid != closest and sc > 0.1
+                    ][:3]
                 last_speaker = closest
                 attributions.append(attr)
                 continue
@@ -351,6 +367,13 @@ class SpeakerAttributor:
             # 6. Sin atribucion clara
             attr.confidence = AttributionConfidence.UNKNOWN
             attr.attribution_method = AttributionMethod.NONE
+            # Aun asi agregar alternativas si hay scores
+            if voice_scored:
+                attr.alternative_speakers = [
+                    (eid, self._get_entity_name(eid), sc)
+                    for eid, sc in voice_scored
+                    if sc > 0.1
+                ][:3]
             attributions.append(attr)
 
         logger.info(f"Attributed {len(attributions)} dialogues")
@@ -449,6 +472,140 @@ class SpeakerAttributor:
 
         return result
 
+    def _score_voice_match(
+        self,
+        text: str,
+        candidates: List[int]
+    ) -> List[Tuple[int, float]]:
+        """
+        Puntua cada candidato por similitud con su perfil de voz.
+
+        Usa multiples metricas del VoiceProfile para scoring:
+        - Formalidad (usted/tu + formality_score)
+        - Longitud de intervencion
+        - Patrones de puntuacion (exclamaciones, preguntas, suspension)
+        - Muletillas
+        - Vocabulario caracteristico
+
+        Args:
+            text: Texto del dialogo
+            candidates: Lista de candidatos (entity_ids)
+
+        Returns:
+            Lista de (entity_id, score) ordenada por score descendente
+        """
+        if not candidates or not self.voice_profiles:
+            return []
+
+        text_lower = text.lower()
+        words = text.split()
+        word_count = len(words)
+        words_lower = set(w.lower() for w in words)
+
+        # Analizar rasgos del texto
+        uses_usted = 'usted' in text_lower
+        uses_tu = any(w in text_lower for w in ['tú', 'tu ', ' tu', 'tuyo', 'tuya'])
+        has_exclamation = '!' in text or '¡' in text
+        has_question = '?' in text or '¿' in text
+        has_ellipsis = '...' in text
+
+        scored: List[Tuple[int, float]] = []
+
+        for entity_id in candidates:
+            if entity_id not in self.voice_profiles:
+                continue
+
+            profile = self.voice_profiles[entity_id]
+            metrics = getattr(profile, 'metrics', None)
+            if not metrics:
+                continue
+
+            score = 0.0
+            weights_sum = 0.0
+
+            # 1. Formalidad via usted/tu (peso 0.20)
+            formality = getattr(metrics, 'formality_score', 0.5)
+            if uses_usted and formality > 0.6:
+                score += 0.20
+            elif uses_tu and formality < 0.4:
+                score += 0.20
+            elif not uses_usted and not uses_tu:
+                score += 0.10  # Neutral text, partial credit
+            weights_sum += 0.20
+
+            # 2. Longitud de intervencion (peso 0.20)
+            avg_len = getattr(metrics, 'avg_intervention_length', 0)
+            std_len = getattr(metrics, 'std_intervention_length', 0)
+            if avg_len > 0:
+                if std_len > 0:
+                    z_score = abs(word_count - avg_len) / std_len
+                    if z_score < 1.0:
+                        score += 0.20
+                    elif z_score < 2.0:
+                        score += 0.10
+                else:
+                    if abs(word_count - avg_len) < avg_len * 0.5:
+                        score += 0.15
+            weights_sum += 0.20
+
+            # 3. Patrones de puntuacion (peso 0.15)
+            punct_score = 0.0
+            exc_ratio = getattr(metrics, 'exclamation_ratio', 0)
+            qst_ratio = getattr(metrics, 'question_ratio', 0)
+            ell_ratio = getattr(metrics, 'ellipsis_ratio', 0)
+
+            if has_exclamation and exc_ratio > 0.15:
+                punct_score += 0.33
+            elif not has_exclamation and exc_ratio < 0.10:
+                punct_score += 0.20
+
+            if has_question and qst_ratio > 0.15:
+                punct_score += 0.33
+            elif not has_question and qst_ratio < 0.10:
+                punct_score += 0.20
+
+            if has_ellipsis and ell_ratio > 0.05:
+                punct_score += 0.33
+            elif not has_ellipsis and ell_ratio < 0.05:
+                punct_score += 0.20
+
+            score += punct_score * 0.15
+            weights_sum += 0.15
+
+            # 4. Muletillas (peso 0.20)
+            top_fillers = getattr(metrics, 'top_fillers', [])
+            filler_match = False
+            for filler_item in top_fillers:
+                filler_word = filler_item[0] if isinstance(filler_item, (list, tuple)) else str(filler_item)
+                if filler_word and filler_word.lower() in text_lower:
+                    filler_match = True
+                    break
+            if filler_match:
+                score += 0.20
+            weights_sum += 0.20
+
+            # 5. Vocabulario caracteristico (peso 0.25)
+            char_words = getattr(profile, 'characteristic_words', [])
+            if char_words and words_lower:
+                char_set = set()
+                for item in char_words[:15]:
+                    word = item[0] if isinstance(item, (list, tuple)) else str(item)
+                    char_set.add(word.lower())
+                overlap = len(words_lower & char_set)
+                if overlap > 0:
+                    score += min(overlap * 0.08, 0.25)
+            weights_sum += 0.25
+
+            # Normalizar por confianza del perfil
+            profile_confidence = getattr(profile, 'confidence', 0.5)
+            final_score = score * (0.5 + 0.5 * profile_confidence)
+
+            scored.append((entity_id, round(final_score, 3)))
+
+        # Ordenar por score descendente
+        scored.sort(key=lambda x: x[1], reverse=True)
+        return scored
+
     def _match_voice_profile(
         self,
         text: str,
@@ -464,52 +621,10 @@ class SpeakerAttributor:
         Returns:
             entity_id del mejor match o None
         """
-        if not candidates or not self.voice_profiles:
-            return None
-
-        best_match: Optional[int] = None
-        best_score = 0.0
-
-        text_lower = text.lower()
-        uses_usted = 'usted' in text_lower
-        uses_tu = any(w in text_lower for w in ['tú', 'tu ', ' tu', 'tuyo', 'tuya'])
-        word_count = len(text.split())
-
-        for entity_id in candidates:
-            if entity_id not in self.voice_profiles:
-                continue
-
-            profile = self.voice_profiles[entity_id]
-            score = 0.0
-
-            # Matching de formalidad
-            profile_uses_usted = getattr(profile, 'uses_usted', False)
-            profile_uses_tu = getattr(profile, 'uses_tu', False)
-
-            if uses_usted and profile_uses_usted:
-                score += 0.3
-            if uses_tu and profile_uses_tu:
-                score += 0.3
-
-            # Matching de longitud
-            avg_length = getattr(profile, 'avg_intervention_length', 0)
-            if avg_length > 0:
-                length_diff = abs(word_count - avg_length)
-                if length_diff < avg_length * 0.5:
-                    score += 0.2
-
-            # Matching de muletillas
-            filler_words = getattr(profile, 'filler_words', [])
-            for filler in filler_words:
-                if filler and filler.lower() in text_lower:
-                    score += 0.2
-                    break
-
-            if score > best_score:
-                best_score = score
-                best_match = entity_id
-
-        return best_match if best_score >= 0.3 else None
+        scored = self._score_voice_match(text, candidates)
+        if scored and scored[0][1] >= 0.25:
+            return scored[0][0]
+        return None
 
     def get_attribution_stats(
         self,

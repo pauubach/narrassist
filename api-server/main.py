@@ -63,7 +63,7 @@ import shutil
 # Setup logging IMMEDIATELY for early debugging
 import logging
 
-BACKEND_VERSION = "0.3.19"
+BACKEND_VERSION = "0.3.20"
 IS_EMBEDDED_RUNTIME = os.environ.get("NA_EMBEDDED") == "1" or "python-embed" in (sys.executable or "").lower()
 
 # Configure logging FIRST before using any loggers
@@ -12402,6 +12402,201 @@ async def get_voice_profiles(project_id: int):
         raise
     except Exception as e:
         logger.error(f"Error getting voice profiles: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.get("/api/projects/{project_id}/voice-profiles/compare", response_model=ApiResponse)
+async def compare_voice_profiles(
+    project_id: int,
+    entity_a: int = Query(..., description="ID de la primera entidad"),
+    entity_b: int = Query(..., description="ID de la segunda entidad"),
+):
+    """
+    Compara los perfiles de voz de dos personajes.
+
+    Devuelve las metricas de ambos perfiles lado a lado con deltas
+    y un indice de similitud global.
+
+    Returns:
+        ApiResponse con comparacion de perfiles
+    """
+    try:
+        from narrative_assistant.voice.profiles import VoiceProfileBuilder
+        from narrative_assistant.nlp.dialogue import detect_dialogues
+        from narrative_assistant.entities.repository import get_entity_repository
+        from narrative_assistant.persistence.chapter import get_chapter_repository
+
+        if not project_manager:
+            return ApiResponse(success=False, error="Project manager not initialized")
+
+        result = project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail=f"Proyecto {project_id} no encontrado")
+
+        entity_repo = get_entity_repository()
+        entities = entity_repo.get_entities_by_project(project_id, active_only=True)
+        characters = [e for e in entities if e.entity_type == "PER"]
+
+        entity_map = {e.id: e for e in characters}
+        if entity_a not in entity_map:
+            raise HTTPException(status_code=404, detail=f"Entidad {entity_a} no encontrada")
+        if entity_b not in entity_map:
+            raise HTTPException(status_code=404, detail=f"Entidad {entity_b} no encontrada")
+
+        # Obtener dialogos
+        chapter_repo = get_chapter_repository()
+        chapters = chapter_repo.get_by_project(project_id)
+
+        dialogues = []
+        for chapter in chapters:
+            dialogue_result = detect_dialogues(chapter.content)
+            if dialogue_result.is_success:
+                for d in dialogue_result.value.dialogues:
+                    dialogues.append({
+                        "text": d.text,
+                        "speaker_id": d.speaker_id,
+                        "speaker_hint": d.speaker_hint,
+                        "chapter": chapter.chapter_number,
+                        "position": d.start_char,
+                    })
+
+        if not dialogues:
+            return ApiResponse(success=False, error="No se encontraron diálogos para analizar")
+
+        # Construir perfiles
+        entity_data = [
+            {"id": e.id, "name": e.canonical_name, "aliases": e.aliases}
+            for e in characters
+        ]
+        builder = VoiceProfileBuilder()
+        profiles = builder.build_profiles(dialogues, entity_data)
+        profiles_map = {p.entity_id: p for p in profiles}
+
+        profile_a = profiles_map.get(entity_a)
+        profile_b = profiles_map.get(entity_b)
+
+        if not profile_a or not profile_b:
+            missing = []
+            if not profile_a:
+                missing.append(entity_map[entity_a].canonical_name)
+            if not profile_b:
+                missing.append(entity_map[entity_b].canonical_name)
+            return ApiResponse(
+                success=False,
+                error=f"No hay suficientes diálogos para: {', '.join(missing)}"
+            )
+
+        # Comparar metricas
+        ma = profile_a.metrics
+        mb = profile_b.metrics
+
+        def safe_delta(va: float, vb: float) -> float:
+            return round(va - vb, 3)
+
+        def similarity_ratio(va: float, vb: float) -> float:
+            """0 = opuestos, 1 = identicos."""
+            if va == 0 and vb == 0:
+                return 1.0
+            max_val = max(abs(va), abs(vb))
+            if max_val == 0:
+                return 1.0
+            return round(1.0 - abs(va - vb) / (max_val * 2), 3)
+
+        metrics_comparison = {
+            "avg_intervention_length": {
+                "a": round(ma.avg_intervention_length, 1),
+                "b": round(mb.avg_intervention_length, 1),
+                "delta": safe_delta(ma.avg_intervention_length, mb.avg_intervention_length),
+            },
+            "type_token_ratio": {
+                "a": round(ma.type_token_ratio, 3),
+                "b": round(mb.type_token_ratio, 3),
+                "delta": safe_delta(ma.type_token_ratio, mb.type_token_ratio),
+            },
+            "formality_score": {
+                "a": round(ma.formality_score, 3),
+                "b": round(mb.formality_score, 3),
+                "delta": safe_delta(ma.formality_score, mb.formality_score),
+            },
+            "filler_ratio": {
+                "a": round(ma.filler_ratio, 3),
+                "b": round(mb.filler_ratio, 3),
+                "delta": safe_delta(ma.filler_ratio, mb.filler_ratio),
+            },
+            "exclamation_ratio": {
+                "a": round(ma.exclamation_ratio, 3),
+                "b": round(mb.exclamation_ratio, 3),
+                "delta": safe_delta(ma.exclamation_ratio, mb.exclamation_ratio),
+            },
+            "question_ratio": {
+                "a": round(ma.question_ratio, 3),
+                "b": round(mb.question_ratio, 3),
+                "delta": safe_delta(ma.question_ratio, mb.question_ratio),
+            },
+            "avg_sentence_length": {
+                "a": round(ma.avg_sentence_length, 1),
+                "b": round(mb.avg_sentence_length, 1),
+                "delta": safe_delta(ma.avg_sentence_length, mb.avg_sentence_length),
+            },
+            "subordinate_clause_ratio": {
+                "a": round(ma.subordinate_clause_ratio, 3),
+                "b": round(mb.subordinate_clause_ratio, 3),
+                "delta": safe_delta(ma.subordinate_clause_ratio, mb.subordinate_clause_ratio),
+            },
+        }
+
+        # Indice de similitud global (media de similitudes individuales)
+        similarities = [
+            similarity_ratio(ma.avg_intervention_length, mb.avg_intervention_length),
+            similarity_ratio(ma.type_token_ratio, mb.type_token_ratio),
+            similarity_ratio(ma.formality_score, mb.formality_score),
+            similarity_ratio(ma.filler_ratio, mb.filler_ratio),
+            similarity_ratio(ma.exclamation_ratio, mb.exclamation_ratio),
+            similarity_ratio(ma.question_ratio, mb.question_ratio),
+            similarity_ratio(ma.avg_sentence_length, mb.avg_sentence_length),
+            similarity_ratio(ma.subordinate_clause_ratio, mb.subordinate_clause_ratio),
+        ]
+        overall_similarity = round(sum(similarities) / len(similarities), 3)
+
+        # Palabras caracteristicas compartidas vs unicas
+        words_a = set(w for w, _ in profile_a.characteristic_words[:15])
+        words_b = set(w for w, _ in profile_b.characteristic_words[:15])
+        shared_words = sorted(words_a & words_b)
+        unique_a = sorted(words_a - words_b)
+        unique_b = sorted(words_b - words_a)
+
+        return ApiResponse(
+            success=True,
+            data={
+                "project_id": project_id,
+                "entity_a": {
+                    "id": entity_a,
+                    "name": entity_map[entity_a].canonical_name,
+                    "total_interventions": ma.total_interventions,
+                    "total_words": ma.total_words,
+                    "confidence": profile_a.confidence,
+                },
+                "entity_b": {
+                    "id": entity_b,
+                    "name": entity_map[entity_b].canonical_name,
+                    "total_interventions": mb.total_interventions,
+                    "total_words": mb.total_words,
+                    "confidence": profile_b.confidence,
+                },
+                "metrics_comparison": metrics_comparison,
+                "overall_similarity": overall_similarity,
+                "vocabulary": {
+                    "shared_words": shared_words,
+                    "unique_to_a": unique_a,
+                    "unique_to_b": unique_b,
+                },
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error comparing voice profiles: {e}", exc_info=True)
         return ApiResponse(success=False, error=str(e))
 
 
