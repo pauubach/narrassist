@@ -27,6 +27,8 @@ import CharacterLocationTab from './CharacterLocationTab.vue'
 import ChapterProgressTab from './ChapterProgressTab.vue'
 import SensoryReportTab from './SensoryReportTab.vue'
 import SentenceEnergyTab from './SentenceEnergyTab.vue'
+import NarrativeTemplatesTab from './NarrativeTemplatesTab.vue'
+import NarrativeHealthTab from './NarrativeHealthTab.vue'
 
 type CategoryId = 'narrative' | 'style' | 'consistency'
 
@@ -75,6 +77,8 @@ const allSubTabs: SubTab[] = [
   { id: 'pacing', label: 'Ritmo', icon: 'pi pi-forward', component: 'PacingAnalysisTab', featureKey: 'pacing', category: 'narrative' },
   { id: 'emotions', label: 'Emociones', icon: 'pi pi-heart', component: 'EmotionalAnalysisTab', featureKey: 'emotional_analysis', category: 'narrative' },
   { id: 'progress', label: 'Progreso', icon: 'pi pi-chart-line', component: 'ChapterProgressTab', featureKey: 'chapter_progress', category: 'narrative' },
+  { id: 'templates', label: 'Plantillas', icon: 'pi pi-sitemap', component: 'NarrativeTemplatesTab', featureKey: 'narrative_templates', category: 'narrative' },
+  { id: 'health', label: 'Salud', icon: 'pi pi-heart-fill', component: 'NarrativeHealthTab', featureKey: 'narrative_health', category: 'narrative' },
   // Estilo
   { id: 'sticky', label: 'Densidad', icon: 'pi pi-align-left', component: 'StickySentencesTab', featureKey: 'sticky_sentences', category: 'style' },
   { id: 'echo', label: 'Ecos', icon: 'pi pi-replay', component: 'EchoReportTab', featureKey: 'echo_repetitions', category: 'style' },
@@ -216,6 +220,8 @@ async function loadFeatureAvailability() {
       <ChapterProgressTab v-if="activeTabId === 'progress'" :project-id="projectId" />
       <SensoryReportTab v-if="activeTabId === 'sensory'" :project-id="projectId" />
       <SentenceEnergyTab v-if="activeTabId === 'energy'" :project-id="projectId" />
+      <NarrativeTemplatesTab v-if="activeTabId === 'templates'" :project-id="projectId" />
+      <NarrativeHealthTab v-if="activeTabId === 'health'" :project-id="projectId" />
     </div>
   </div>
 </template>

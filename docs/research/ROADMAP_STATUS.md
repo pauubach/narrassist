@@ -221,8 +221,8 @@ Todas las features del Competitive Analysis clasificadas como "Quick Wins", "Dif
 
 | Feature | Tipo | Estado | Esfuerzo |
 |---------|------|--------|----------|
-| **Plantillas estructuras narrativas** (Hero's Journey, Three-Act, Save the Cat...) | BUILD | ❌ No implementado | 1.5 días |
-| **Narrative Health Check** (Completitud narrativa simplificada, 10-12 dimensiones) | BUILD | ❌ No implementado | 1.5-2 días |
+| **Plantillas estructuras narrativas** (Hero's Journey, Three-Act, Save the Cat, Kishotenketsu, Freytag) | BUILD | ✅ COMPLETO | Backend + API + Tab |
+| **Narrative Health Check** (12 dimensiones: protagonista, conflicto, clímax, resolución, arco emocional, etc.) | BUILD | ✅ COMPLETO | Backend + API + Tab |
 
 ### Sprint D: Arquetipos (2 días)
 
@@ -269,11 +269,11 @@ Todas las features del Competitive Analysis clasificadas como "Quick Wins", "Dif
 | ~~Frontend para features con backend listo~~ | ~~3~~ | ~~2-3~~ ✅ HECHO |
 | ~~Sprint A: Quick Wins (enhance)~~ | ~~3~~ | ~~1~~ ✅ HECHO |
 | ~~Sprint B: Sentence Energy~~ | ~~1~~ | ~~1-2~~ ✅ HECHO |
-| Sprint C: Estructura Narrativa | 2 | 3-4 |
+| ~~Sprint C: Estructura Narrativa~~ | ~~2~~ | ~~3-4~~ ✅ HECHO |
 | Sprint D: Arquetipos | 1 | 2 |
 | Infraestructura | 6 | 25 |
-| **TOTAL PENDIENTE (features)** | **3** | **~5-6 días** |
-| **TOTAL PENDIENTE (features + infra)** | **9** | **~30-31 días** |
+| **TOTAL PENDIENTE (features)** | **1** | **~2 días** |
+| **TOTAL PENDIENTE (features + infra)** | **7** | **~27 días** |
 
 ---
 

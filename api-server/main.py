@@ -2158,6 +2158,8 @@ async def get_analysis_status(project_id: int):
             "tension_curve": has_chapters,  # Curva de tensión narrativa
             "sensory_report": has_chapters,  # Reporte sensorial (5 sentidos)
             "sentence_energy": has_chapters,  # Energía de oraciones (voz, verbos, estructura)
+            "narrative_templates": has_chapters,  # Plantillas narrativas (diagnóstico)
+            "narrative_health": has_chapters and has_entities,  # Salud narrativa (12 dimensiones)
             "story_bible": has_entities,  # Story Bible / Wiki de entidades
             "speaker_attribution": has_entities and has_chapters,  # Atribución de hablantes
         }
@@ -9555,6 +9557,123 @@ async def get_chapter_progress(
         )
     except Exception as e:
         logger.error(f"Error in chapter progress analysis: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+# ============================================================================
+# Endpoints - Narrative Structure (Templates + Health Check)
+# ============================================================================
+
+@app.get("/api/projects/{project_id}/narrative-templates", response_model=ApiResponse)
+async def get_narrative_templates(
+    project_id: int,
+    mode: str = "basic",
+    llm_model: str = "llama3.2",
+):
+    """
+    Analiza qué plantillas narrativas encajan con el manuscrito.
+
+    Evalúa Tres Actos, Viaje del Héroe, Save the Cat, Kishotenketsu
+    y Cinco Actos (Freytag). Herramienta diagnóstica para el corrector.
+    """
+    try:
+        from narrative_assistant.analysis.chapter_summary import analyze_chapter_progress
+        from narrative_assistant.analysis.narrative_templates import NarrativeTemplateAnalyzer
+
+        # Obtener datos de capítulos (reusar chapter_progress)
+        report = analyze_chapter_progress(
+            project_id=project_id,
+            mode=mode,
+            llm_model=llm_model,
+        )
+
+        # Convertir capítulos a formato para el analizador
+        chapters_data = []
+        for ch in report.chapters:
+            chapters_data.append(ch.to_dict())
+
+        # Analizar plantillas
+        analyzer = NarrativeTemplateAnalyzer()
+        template_report = analyzer.analyze(
+            chapters_data=chapters_data,
+            total_chapters=report.total_chapters,
+        )
+
+        return ApiResponse(success=True, data=template_report.to_dict())
+
+    except ImportError as e:
+        logger.error(f"Module import error: {e}")
+        return ApiResponse(success=False, error="Módulo de plantillas narrativas no disponible")
+    except Exception as e:
+        logger.error(f"Error analyzing narrative templates: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@app.get("/api/projects/{project_id}/narrative-health", response_model=ApiResponse)
+async def get_narrative_health(
+    project_id: int,
+    mode: str = "basic",
+    llm_model: str = "llama3.2",
+):
+    """
+    Chequeo de salud narrativa del manuscrito.
+
+    Evalúa 12 dimensiones: protagonista, conflicto, objetivo, apuestas,
+    clímax, resolución, arco emocional, ritmo, coherencia, estructura,
+    equilibrio de personajes y tramas cerradas.
+    """
+    try:
+        from narrative_assistant.analysis.chapter_summary import analyze_chapter_progress
+        from narrative_assistant.analysis.narrative_health import NarrativeHealthChecker
+
+        # Obtener datos de capítulos
+        report = analyze_chapter_progress(
+            project_id=project_id,
+            mode=mode,
+            llm_model=llm_model,
+        )
+
+        # Convertir a formato para el checker
+        chapters_data = [ch.to_dict() for ch in report.chapters]
+
+        # Obtener entidades del proyecto
+        entities_data = []
+        try:
+            entities = entity_repository.get_by_project(project_id)
+            for ent in entities:
+                ent_dict = {
+                    "entity_type": ent.entity_type if hasattr(ent, 'entity_type') else "character",
+                    "name": ent.name if hasattr(ent, 'name') else "",
+                    "mention_count": ent.mention_count if hasattr(ent, 'mention_count') else 0,
+                    "chapters_present": len(ent.chapter_appearances) if hasattr(ent, 'chapter_appearances') else 0,
+                }
+                entities_data.append(ent_dict)
+        except Exception:
+            pass  # Sin entidades, el health check funciona con datos parciales
+
+        # Arcos y elementos Chekhov del chapter progress
+        character_arcs = [a.to_dict() for a in report.character_arcs]
+        chekhov_elements = [c.to_dict() for c in report.chekhov_elements]
+        abandoned_threads = [t.to_dict() for t in report.abandoned_threads]
+
+        # Ejecutar health check
+        checker = NarrativeHealthChecker()
+        health_report = checker.check(
+            chapters_data=chapters_data,
+            total_chapters=report.total_chapters,
+            entities_data=entities_data,
+            character_arcs=character_arcs,
+            chekhov_elements=chekhov_elements,
+            abandoned_threads=abandoned_threads,
+        )
+
+        return ApiResponse(success=True, data=health_report.to_dict())
+
+    except ImportError as e:
+        logger.error(f"Module import error: {e}")
+        return ApiResponse(success=False, error="Módulo de salud narrativa no disponible")
+    except Exception as e:
+        logger.error(f"Error in narrative health check: {e}", exc_info=True)
         return ApiResponse(success=False, error=str(e))
 
 
