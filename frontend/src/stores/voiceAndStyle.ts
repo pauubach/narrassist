@@ -309,6 +309,7 @@ export const useVoiceAndStyleStore = defineStore('voiceAndStyle', () => {
         changes: ApiRegisterChange[]
         summary: any
         stats: any
+        per_chapter: any[]
       }> = await response.json()
 
       if (data.success && data.data) {
