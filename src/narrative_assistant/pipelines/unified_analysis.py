@@ -238,7 +238,7 @@ class UnifiedConfig:
 
     @classmethod
     def standard(cls) -> "UnifiedConfig":
-        """Perfil Estándar: NER + correferencias + calidad básica."""
+        """Perfil Estándar: NER + correferencias + calidad + estilo."""
         return cls(
             run_structure=True,
             run_dialogue_detection=True,
@@ -254,10 +254,13 @@ class UnifiedConfig:
             run_lexical_repetitions=True,
             run_semantic_repetitions=False,
             run_coherence=True,
+            run_register_analysis=True,
+            run_sticky_sentences=True,
             run_temporal=False,
             run_focalization=False,
             run_voice_deviations=False,
             run_emotional=True,
+            run_pacing=True,
             run_consistency=True,
             run_temporal_consistency=False,
             use_llm=False,

@@ -1,7 +1,7 @@
 # Roadmap - Narrative Assistant
 
-> **Última actualización**: 2026-01-26
-> **Versión actual**: 0.2.9
+> **Última actualización**: 2026-01-29
+> **Versión actual**: 0.3.17
 > **Estado actual**: Ver [PROJECT_STATUS.md](PROJECT_STATUS.md)
 > **Historial de cambios**: Ver [CHANGELOG.md](CHANGELOG.md)
 
@@ -19,16 +19,16 @@ Este documento define las funcionalidades **pendientes de implementar**. Para el
 
 #### Backend sin UI Completa
 
-| Feature | Backend | Completitud | UI Necesaria |
-|---------|---------|-------------|--------------|
-| **Knowledge Tracking** | `character_knowledge.py` | 60% | Panel "Qué sabe cada personaje" |
-| **Voice Profiles** | `voice/profiles.py` | 70% | Vista de perfiles de voz |
-| **Register Analysis** | `voice/register.py` | 75% | Indicador de registro |
-| **Speaker Attribution** | `voice/speaker_attribution.py` | 80% | Atribución visual en diálogos |
-| **Coreference Voting** | `coreference_resolver.py` | 85% | Votación en EntityInspector |
-| **Pacing Analysis** | `analysis/pacing.py` | 80% | Panel de ritmo |
+| Feature | Backend | Completitud | Estado |
+|---------|---------|-------------|--------|
+| **Knowledge Tracking** | `character_knowledge.py` | 60% | Core `_extract_knowledge_facts()` vacío |
+| **Voice Profiles** | `voice/profiles.py` | 70% | API no devuelve todas las métricas |
+| ~~Register Analysis~~ | `voice/register.py` | 90% | ✅ Per-chapter (v0.3.14) + alertas (v0.3.17) |
+| ~~Speaker Attribution~~ | `voice/speaker_attribution.py` | 85% | ✅ Bug fix (v0.3.13) |
+| ~~Coreference Voting~~ | `coreference_resolver.py` | 95% | ✅ Razonamiento en API (v0.3.14) |
+| ~~Pacing Analysis~~ | `analysis/pacing.py` | 90% | ✅ Curva de tensión (v0.3.13) |
 
-**Esfuerzo estimado**: 15-22 días para completar módulos + crear UIs
+**Esfuerzo restante**: Knowledge Tracking (módulo crítico) + Voice Profiles (API)
 
 #### Funcionalidades Nuevas
 
@@ -66,7 +66,7 @@ Este documento define las funcionalidades **pendientes de implementar**. Para el
 |-------|-------------|--------------|
 | Code signing Windows | Certificado EV | ~$300/año |
 | Code signing macOS | Apple Developer | $99/año |
-| CI/CD Pipeline | GitHub Actions | 4-5 días |
+| ~~CI/CD Pipeline~~ | ~~GitHub Actions~~ | ✅ Completado (v0.3.0) |
 | i18n | Inglés + Catalán | 8-10 días |
 | Landing page | Sitio web producto | 5-6 días |
 | Auto-updater | Tauri updater plugin | 3-4 días |
@@ -75,15 +75,15 @@ Este documento define las funcionalidades **pendientes de implementar**. Para el
 
 ## Métricas Objetivo
 
-| Métrica | Actual (v0.2.9) | Objetivo v0.3.0 | Objetivo v0.4.0 |
-|---------|-----------------|-----------------|-----------------|
+| Métrica | Actual (v0.3.17) | Objetivo v0.4.0 | Objetivo v1.0.0 |
+|---------|-------------------|-----------------|-----------------|
 | Detectores | 14 | 18 | 25 |
 | Gazetteer | ~5,000 | 50,000 | 100,000 |
-| Endpoints API | 48+ | 65+ | 85+ |
-| Componentes Vue | 54 | 75+ | 95+ |
-| Test coverage | ~10% | 50% | 80%+ |
+| Endpoints API | 170 | 180+ | 200+ |
+| Componentes Vue | 89 | 95+ | 110+ |
+| Tests | 966+ | 1,200+ | 2,000+ |
 | Idiomas UI | 1 (ES) | 1 (ES) | 3 (ES, EN, CA) |
-| Completitud módulos | 60-85% | 95% | 100% |
+| Completitud módulos | 70-95% | 95% | 100% |
 
 ---
 
@@ -96,4 +96,4 @@ Este documento define las funcionalidades **pendientes de implementar**. Para el
 
 ---
 
-*Documento actualizado: 2026-01-26*
+*Documento actualizado: 2026-01-29*

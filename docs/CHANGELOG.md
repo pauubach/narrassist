@@ -6,6 +6,88 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
+## [0.3.17] - 2026-01-29
+
+### Added
+- **Sticky sentences integradas en pipeline unificado**
+  - Nuevo paso en Phase 5 de `unified_analysis.py`
+  - Detección de oraciones con >40% palabras funcionales (artículos, preposiciones, conjunciones)
+  - Generación automática de alertas vía `create_from_sticky_sentence()`
+- **Alertas de cambio de registro** conectadas al pipeline
+  - `create_from_register_change()` integrado en generación de alertas
+- **Alertas de eco léxico mejoradas**
+  - Migración de alertas genéricas a `create_from_word_echo()` con datos estructurados
+
+### Fixed
+- **Bare except** en `docx_parser.py:411` → `except (AttributeError, TypeError):`
+- **Versión hardcodeada** en `licensing/verification.py` → usa `_get_app_version()` dinámico
+
+---
+
+## [0.3.16] - 2026-01-29
+
+### Fixed
+- **CI build**: Re-trigger de GitHub Actions (re-tagging no lanza workflows)
+- TypeScript: `per_chapter: any[]` añadido al tipo de respuesta de register analysis
+
+---
+
+## [0.3.15] - 2026-01-29
+
+### Added
+- **Logging diagnóstico de BD para producción**
+  - Prefijos `[DB_INIT]`, `[SCHEMA]`, `[VERIFY]` en `database.py`
+  - Verificación post-init con conexión sqlite3 independiente
+  - WAL checkpoint forzado tras creación de esquema
+  - Fallback: creación forzada de esquema si tabla `projects` no existe
+- **Logging mejorado en `list_projects`**
+  - Diagnóstico de existencia de archivo de BD
+  - Enumeración directa de tablas vía sqlite3
+
+### Fixed
+- **TypeScript build**: Añadido `per_chapter` al tipo de respuesta en `voiceAndStyle.ts`
+
+---
+
+## [0.3.14] - 2026-01-29
+
+### Added
+- **Sprint de funcionalidades**:
+  - **Categorías en StyleTab**: Agrupación por categoría de detectores editoriales
+  - **Scene Cards**: Tarjetas de resumen por escena con personajes, ubicación y emociones
+  - **Registro por capítulo**: Análisis de registro lingüístico desglosado por capítulo
+  - **Razonamiento de correferencias**: Exposición de scores y razones de votación en API
+- **Sensory Report**: Informe de uso sensorial (vista, oído, tacto, olfato, gusto)
+- **Story Bible Export**: Exportación completa del universo narrativo
+- **Scrivener Export**: Exportación compatible con formato Scrivener
+
+### Fixed
+- Logging mode en producción corregido
+
+---
+
+## [0.3.13] - 2026-01-29
+
+### Added
+- **Speaker Attribution**: Corrección de bug en atribución de diálogos
+- **Style Alerts**: Alertas de estilo conectadas al pipeline
+- **Tension Curve**: Curva de tensión narrativa implementada en pacing
+
+### Fixed
+- **Embedded Python**: Fallos de importación de módulos en builds de producción resueltos
+
+---
+
+## [0.3.12] - 2026-01-28
+
+### Added
+- **Atributos por capítulo**: Mostrar todos los capítulos donde aparece cada atributo de personaje
+
+### Fixed
+- **Embedded Python**: Funcionamiento en máquinas limpias sin Python del sistema instalado
+
+---
+
 ## [0.3.11] - 2026-01-28
 
 ### Added
@@ -279,4 +361,4 @@ Las versiones 0.0.x fueron desarrollo interno sin changelog formal.
 
 ---
 
-*Documento generado: 2026-01-26*
+*Documento actualizado: 2026-01-29*

@@ -63,7 +63,7 @@ import shutil
 # Setup logging IMMEDIATELY for early debugging
 import logging
 
-BACKEND_VERSION = "0.3.17"
+BACKEND_VERSION = "0.3.18"
 IS_EMBEDDED_RUNTIME = os.environ.get("NA_EMBEDDED") == "1" or "python-embed" in (sys.executable or "").lower()
 
 # Configure logging FIRST before using any loggers
@@ -12567,7 +12567,8 @@ async def get_voice_deviations(
 @app.get("/api/projects/{project_id}/register-analysis", response_model=ApiResponse)
 async def get_register_analysis(
     project_id: int,
-    min_severity: str = Query("medium", description="Severidad mínima: low, medium, high")
+    min_severity: str = Query("medium", description="Severidad mínima: low, medium, high"),
+    chapter_number: Optional[int] = Query(None, description="Filtrar por número de capítulo")
 ):
     """
     Analiza el registro narrativo del proyecto.
@@ -12613,6 +12614,8 @@ async def get_register_analysis(
         # Construir segmentos: (texto, capítulo, posición, es_diálogo)
         segments = []
         for chapter in chapters:
+            if chapter_number is not None and chapter.chapter_number != chapter_number:
+                continue
             # Detectar diálogos para separar narración de diálogo
             dialogue_result = detect_dialogues(chapter.content)
             dialogue_ranges = []
@@ -14416,7 +14419,8 @@ def _get_sticky_recommendation(glue_percentage: float) -> str:
 async def get_echo_report(
     project_id: int,
     min_distance: int = Query(50, ge=10, le=500, description="Distancia mínima entre repeticiones"),
-    include_semantic: bool = Query(False, description="Incluir repeticiones semánticas")
+    include_semantic: bool = Query(False, description="Incluir repeticiones semánticas"),
+    chapter_number: Optional[int] = Query(None, description="Filtrar por número de capítulo")
 ):
     """
     Analiza repeticiones (ecos) de palabras en el proyecto.
@@ -14441,6 +14445,8 @@ async def get_echo_report(
         by_severity = {"high": 0, "medium": 0, "low": 0}
 
         for chapter in chapters:
+            if chapter_number is not None and chapter.chapter_number != chapter_number:
+                continue
             chapter_text = chapter.content or ""
             if not chapter_text.strip():
                 continue
@@ -14541,7 +14547,10 @@ async def get_echo_report(
 
 
 @app.get("/api/projects/{project_id}/sentence-variation", response_model=ApiResponse)
-async def get_sentence_variation(project_id: int):
+async def get_sentence_variation(
+    project_id: int,
+    chapter_number: Optional[int] = Query(None, description="Filtrar por número de capítulo")
+):
     """
     Analiza la variación en la longitud de las oraciones.
 
@@ -14567,6 +14576,8 @@ async def get_sentence_variation(project_id: int):
         global_distribution = {"short": 0, "medium": 0, "long": 0, "very_long": 0}
 
         for chapter in chapters:
+            if chapter_number is not None and chapter.chapter_number != chapter_number:
+                continue
             chapter_text = chapter.content or ""
             if not chapter_text.strip():
                 continue
@@ -14640,7 +14651,10 @@ async def get_sentence_variation(project_id: int):
 
 
 @app.get("/api/projects/{project_id}/pacing-analysis", response_model=ApiResponse)
-async def get_pacing_analysis(project_id: int):
+async def get_pacing_analysis(
+    project_id: int,
+    chapter_number: Optional[int] = Query(None, description="Filtrar por número de capítulo")
+):
     """
     Analiza el ritmo narrativo del proyecto.
 
@@ -14660,6 +14674,8 @@ async def get_pacing_analysis(project_id: int):
         chapters_data = []
 
         for chapter in chapters:
+            if chapter_number is not None and chapter.chapter_number != chapter_number:
+                continue
             chapter_text = chapter.content or ""
             if not chapter_text.strip():
                 continue
@@ -14734,7 +14750,10 @@ def _get_pacing_label(score: float) -> str:
 
 
 @app.get("/api/projects/{project_id}/tension-curve", response_model=ApiResponse)
-async def get_tension_curve(project_id: int):
+async def get_tension_curve(
+    project_id: int,
+    chapter_number: Optional[int] = Query(None, description="Filtrar por número de capítulo")
+):
     """
     Calcula la curva de tensión narrativa del proyecto.
 
@@ -14781,6 +14800,7 @@ async def get_tension_curve(project_id: int):
             }
             for ch in chapters
             if ch.content and ch.content.strip()
+            and (chapter_number is None or ch.chapter_number == chapter_number)
         ]
 
         full_text = "\n\n".join(ch.get("content", "") for ch in chapters_data)

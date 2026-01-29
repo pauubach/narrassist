@@ -1,7 +1,7 @@
 # Estado del Proyecto - Narrative Assistant
 
-> **Última actualización**: 2026-01-26
-> **Versión**: 0.3.0
+> **Última actualización**: 2026-01-29
+> **Versión**: 0.3.17
 > **Changelog**: Ver [CHANGELOG.md](CHANGELOG.md)
 > **Roadmap**: Ver [ROADMAP.md](ROADMAP.md)
 
@@ -19,10 +19,11 @@
 | **LLM Local** | Ollama (llama3.2, mistral, qwen2.5) - 100% offline |
 | **Frontend** | Vue 3.4, TypeScript 5.3, PrimeVue, Pinia, Vite |
 | **Desktop** | Tauri 2.0, Rust |
-| **API Bridge** | FastAPI, Uvicorn (48+ endpoints) |
-| **Diccionario Local** | Wiktionary, sinónimos, custom (v0.2.9) |
-| **Arco Emocional** | UI visual completa (v0.2.9) |
-| **Review Reports** | PDF/DOCX con estadísticas (v0.2.9) |
+| **API Bridge** | FastAPI, Uvicorn (170 endpoints) |
+| **Diccionario Local** | Wiktionary, sinónimos, custom |
+| **Arco Emocional** | UI visual completa |
+| **Review Reports** | PDF/DOCX con estadísticas |
+| **CI/CD** | GitHub Actions (Windows + macOS) |
 
 ---
 
@@ -113,7 +114,7 @@
 | Step | Estado | Módulo |
 |------|--------|--------|
 | 8.1 Alert Models | ✅ | `alerts/models.py` |
-| 8.2 Alert Engine | ✅ | `alerts/engine.py` (13 categorías) |
+| 8.2 Alert Engine | ✅ | `alerts/engine.py` (15 categorías, 15 `create_from_*` métodos) |
 | 8.3 Alert Repository | ✅ | `alerts/repository.py` |
 | 8.4 Character Sheets | ✅ | `exporters/character_sheets.py` |
 | 8.5 Style Guide | ✅ | `exporters/style_guide.py` |
@@ -191,28 +192,30 @@
 
 ## Inventario de Módulos Backend
 
-### Módulos Principales (18)
+### Módulos Principales (20)
 
 | # | Módulo | Archivos | Descripción |
 |---|--------|----------|-------------|
-| 1 | `core/` | 5 | Infraestructura: config, device, errors, result, model_manager |
-| 2 | `persistence/` | 6 | BD: database, project, session, history, fingerprint, chapter |
+| 1 | `core/` | 6 | Infraestructura: config, device, errors, result, model_manager, utils |
+| 2 | `persistence/` | 10 | BD: database, project, session, history, fingerprint, chapter, timeline, glossary, analysis |
 | 3 | `parsers/` | 5 | Documentos: base, docx, txt, structure, sanitization |
 | 4 | `entities/` | 4 | Entidades: models, repository, fusion, semantic_fusion |
-| 5 | `nlp/` | 12 | NLP core + submódulos |
-| 6 | `analysis/` | 4 | Consistencia: attributes, relationships, knowledge, emotional |
+| 5 | `nlp/` | 15+ | NLP core + submódulos |
+| 6 | `analysis/` | 5 | Consistencia: attributes, relationships, knowledge, emotional, pacing |
 | 7 | `voice/` | 4 | Voz: profiles, deviations, register, speaker_attribution |
 | 8 | `focalization/` | 2 | POV: declaration, violations |
 | 9 | `temporal/` | 3 | Timeline: markers, timeline, inconsistencies |
 | 10 | `relationships/` | 5 | Relaciones: models, detector, repository, analyzer, inference |
 | 11 | `interactions/` | 4 | Interacciones: models, detector, pattern_analyzer, repository |
-| 12 | `alerts/` | 3 | Alertas: models, engine, repository |
-| 13 | `llm/` | 2 | LLM local: client, expectation_inference |
+| 12 | `alerts/` | 3 | Alertas: models, engine (15 create_from_*), repository |
+| 13 | `llm/` | 3 | LLM local: client, expectation_inference, ollama_manager |
 | 14 | `pipelines/` | 3 | Orquestación: analysis, unified, export |
-| 15 | `exporters/` | 4 | Reportes: character_sheets, style_guide, document_exporter, review_report_exporter |
-| 18 | `dictionaries/` | 4 | Diccionario local: models, sources, manager (v0.2.9) |
-| 16 | `cli.py` | 1 | Interfaz de línea de comandos |
-| 17 | `api-server/` | 1 | FastAPI bridge (main.py - 3300+ líneas) |
+| 15 | `exporters/` | 5 | Reportes: character_sheets, style_guide, document_exporter, review_report, story_bible |
+| 16 | `corrections/` | 16 | Corrección editorial: 14 detectores + config + base |
+| 17 | `dictionaries/` | 4 | Diccionario local: models, sources, manager |
+| 18 | `licensing/` | 3 | Licencias: models, verification, fingerprint |
+| 19 | `cli.py` | 1 | Interfaz de línea de comandos |
+| 20 | `api-server/` | 1 | FastAPI bridge (main.py - 15,188 líneas, 170 endpoints) |
 
 ### Submódulos NLP (5)
 
@@ -221,47 +224,50 @@
 | `nlp/extraction/` | 7 | Pipeline de extracción: router, aggregator, base, extractors/ |
 | `nlp/grammar/` | 5 | Gramática: checker, spanish_rules, languagetool, base |
 | `nlp/orthography/` | 3 | Ortografía: spelling_checker, base |
-| `nlp/style/` | 2 | Estilo: repetition_detector, coherence_detector |
+| `nlp/style/` | 4 | Estilo: repetition_detector, coherence_detector, sticky_sentences, echo_report |
 | `nlp/training_data/` | 3 | Training: examples, weight_learner |
 
 ---
 
 ## Inventario de Componentes Frontend
 
-### Vistas (7)
+### Vistas (6)
 - `HomeView.vue` - Pantalla inicio
 - `ProjectsView.vue` - Lista de proyectos
 - `ProjectDetailView.vue` - Dashboard proyecto
-- `EntitiesView.vue` - Gestión entidades
 - `CharacterView.vue` - Ficha personaje
 - `AlertsView.vue` - Lista alertas
 - `SettingsView.vue` - Configuración
 
-### Componentes (54 total)
+### Componentes (83 en components/ + 6 vistas = 89 .vue totales)
 
-| Categoría | Cantidad | Componentes |
-|-----------|----------|-------------|
-| workspace/ | 8 | WorkspaceLayout, ProjectWorkspace, Tabs, TextTab, EntitiesTab, AlertsTab, RelationsTab, ResumenTab, PanelResizer |
+| Categoría | Cantidad | Componentes principales |
+|-----------|----------|------------------------|
+| workspace/ | 10+ | WorkspaceLayout, ProjectWorkspace, Tabs, TextTab, EntitiesTab, AlertsTab, RelationsTab, StyleTab, ResumenTab, PanelResizer |
 | sidebar/ | 3 | AlertsPanel, CharactersPanel, ChaptersPanel |
 | inspector/ | 4 | EntityInspector, AlertInspector, ChapterInspector, ProjectSummary |
 | panels/ | 3 | EntityPanel, AlertPanel, DetailPanel |
 | ds/ | 7 | DsBadge, DsCard, DsEmptyState, DsInput, DsListItem, DsLoadingState, DsTooltip |
-| modals/ | 2 | EntityModal, AlertModal |
-| analysis/ | 1 | AnalysisProgress |
+| modals/ | 3+ | EntityModal, AlertModal, CorrectionConfigModal |
+| analysis/ | 2+ | AnalysisProgress, EmotionalAnalysis |
 | document/ | 1 | TextHighlighter |
 | layout/ | 1 | StatusBar |
-| Root | 14 | AboutDialog, AlertList, BehaviorExpectations, ChapterTree, CharacterSheet, CommandPalette, DocumentViewer, EntityList, ExportDialog, KeyboardShortcutsDialog, MenuBar, MergeEntitiesDialog, RelationshipGraph, TutorialDialog |
+| Root | 20+ | AboutDialog, AlertList, BehaviorExpectations, ChapterTree, CharacterSheet, CommandPalette, DocumentViewer, EntityList, ExportDialog, KeyboardShortcutsDialog, LicenseDialog, MenuBar, MergeEntitiesDialog, ModelSetupDialog, RelationshipGraph, SceneCards, TutorialDialog, UndoMergeDialog, MergeHistoryPanel... |
 
-### Stores (7)
+### Stores (13)
 - `app.ts` - Estado global
 - `projects.ts` - Gestión proyectos
 - `workspace.ts` - Estado workspace
 - `selection.ts` - Selección actual
-- `theme.ts` - Temas UI (19KB, muy completo)
+- `theme.ts` - Temas UI
 - `analysis.ts` - Estado análisis
 - `system.ts` - Estado del sistema
+- `license.ts` - Sistema de licencias
+- `voiceAndStyle.ts` - Voz, registro, estilo
+- `corrections.ts` - Correcciones editoriales
+- Y 3 más...
 
-### Composables (8)
+### Composables (17)
 - `useKeyboardShortcuts.ts` - Atajos de teclado
 - `useAnalysisStream.ts` - SSE para análisis
 - `useEntityUtils.ts` - Utilidades de entidades
@@ -269,7 +275,7 @@
 - `useNavigation.ts` - Navegación
 - `useHighlight.ts` - Resaltado de texto
 - `usePerformance.ts` - Métricas de rendimiento
-- `index.ts` - Exportaciones
+- Y 10 más...
 
 ---
 
@@ -277,9 +283,10 @@
 
 | Suite | Tests | Estado |
 |-------|-------|--------|
-| Unit tests | 612 | ✅ Passing |
+| Unit tests | 966+ | ✅ Passing |
 | Integration | 12 | ✅ Passing |
-| E2E (Playwright) | Pending | 🔄 |
+| E2E (Playwright) | 35+ | ✅ Parcial |
+| Adversarial (GAN) | 60+ | ✅ Passing |
 
 ### Tests por módulo destacados:
 - `test_relationships.py` - 56 tests
@@ -287,32 +294,39 @@
 - `test_voice.py` - 46 tests
 - `test_sentiment.py` - 35 tests
 - `test_coreference_resolver.py` - 32 tests
-- Otros - 395 tests
+- `test_attribute_adversarial.py` - 60 tests (GAN-style)
+- `test_correction_config_e2e.py` - 35 tests (Playwright)
+- Otros - 600+ tests
 
 ---
 
-## Métricas Reales
+## Métricas Reales (v0.3.17)
 
 ### Backend
-- **Archivos Python**: 103
-- **Líneas de código**: ~49,000 LoC Python
+- **Archivos Python**: 177
+- **Líneas de código**: ~80,000+ LoC Python
 - **Tipos de entidad**: 18
 - **Tipos de relación**: 50+
-- **Categorías de alerta**: 13
+- **Categorías de alerta**: 15 (con 15 métodos `create_from_*`)
 - **Métodos de correferencia**: 4 (embeddings, llm, morpho, heuristics)
+- **Detectores editoriales**: 14
 
 ### Frontend
-- **Componentes Vue**: 53
-- **Vistas**: 7
-- **Líneas de código**: ~30,000 LoC TypeScript/Vue
-- **Stores Pinia**: 7
-- **Composables**: 8
-- **Endpoints API**: 33
+- **Componentes Vue**: 83
+- **Vistas**: 6
+- **Líneas de código**: ~60,000+ LoC TypeScript/Vue
+- **Stores Pinia**: 13
+- **Composables**: 17
+- **Archivos .vue totales**: 89
 
 ### API Server
-- **Líneas de código**: 4,000+ LoC
-- **Endpoints**: 48+ (GET, POST, PUT, DELETE)
-- **Integración backend**: Completa (imports de 20+ módulos)
+- **Líneas de código**: 15,188 LoC
+- **Endpoints**: 170 (GET, POST, PUT, DELETE, PATCH)
+- **Integración backend**: Completa (imports de 30+ módulos)
+
+### Tests
+- **Archivos de test**: 45
+- **Tests totales**: 966+
 
 ---
 
@@ -493,18 +507,19 @@
 
 ### Cómo empezar:
 ```bash
-cd /Users/paubach/repos/tfm
-source .venv/bin/activate
+cd d:\repos\tfm  # o la ruta del proyecto
+.venv\Scripts\activate  # Windows
+# source .venv/bin/activate  # Linux/macOS
 narrative-assistant verify
-pytest -v  # 612 tests
+pytest -v  # 966+ tests
 ```
 
 ### Archivos clave:
 - `docs/PROJECT_STATUS.md` - Este archivo
 - `CLAUDE.md` - Instrucciones para Claude
-- `src/narrative_assistant/` - Backend Python (103 archivos)
-- `frontend/src/` - Frontend Vue (53 componentes)
-- `api-server/main.py` - FastAPI bridge (3300+ líneas)
+- `src/narrative_assistant/` - Backend Python (177 archivos)
+- `frontend/src/` - Frontend Vue (89 archivos .vue)
+- `api-server/main.py` - FastAPI bridge (15,188 líneas, 170 endpoints)
 
 ### Estado de Tauri:
 ```
@@ -533,31 +548,33 @@ cargo tauri build --target x86_64-pc-windows-msvc
 
 ### Última actualización:
 ```
-2026-01-19: MVP LISTO PARA RELEASE
-- ✅ Backend completo (Phases 0-9) - 103 archivos Python
-- ✅ Frontend completo (Phases 10-14) - 53 componentes Vue
-- ✅ API server integrado (39 endpoints)
-- ✅ Tauri empaquetado (icons, menu, sidecar)
+2026-01-29: v0.3.17
+- ✅ Backend completo (Phases 0-9) - 177 archivos Python
+- ✅ Frontend completo (Phases 10-14) - 89 archivos Vue
+- ✅ API server integrado (170 endpoints, 15,188 líneas)
+- ✅ Tauri empaquetado (icons, menu, Python embebido)
 - ✅ Sistema de licencias
 - ✅ Modelos bajo demanda
+- ✅ CI/CD GitHub Actions (Windows + macOS)
+- ✅ Pipeline unificado con sticky sentences y alertas conectadas
 - ⚠️ Code signing pendiente (requiere certificados)
 ```
 
-### Resumen estado actual:
+### Resumen estado actual (v0.3.17):
 
 | Prioridad | Items | Estado |
 |-----------|-------|--------|
 | **P0** | 8 items | ✅ 100% completado |
 | **P1** | 7 items | ✅ 100% completado |
 | **P2** | 8 items | ✅ 75% (code signing pendiente) |
-| **P3** | 10 items | ⚠️ 10% (post-MVP) |
+| **P3** | 10 items | ⚠️ 40% (post-MVP) |
 
 ---
 
 ## Gap Analysis: Backend vs Frontend
 
-> **Audit realizado**: 2026-01-14
-> **Conclusión**: ~35% de funcionalidades backend NO tienen UI adecuada
+> **Audit actualizado**: 2026-01-29
+> **Conclusión**: ~20% de funcionalidades backend NO tienen UI adecuada (mejorado desde 35%)
 
 ### Features con soporte COMPLETO ✅
 
@@ -588,19 +605,19 @@ cargo tauri build --target x86_64-pc-windows-msvc
 
 | Feature Backend | Módulo | Impacto |
 |-----------------|--------|---------|
-| Correferencia Voting | `nlp/coreference_resolver.py` | Usuario no ve razón de fusión |
-| Knowledge Tracking | `analysis/character_knowledge.py` | Qué sabe cada personaje invisible |
-| Voice Profiles | `voice/profiles.py` | Análisis voz narrativa invisible |
-| Voice Deviations | `voice/deviations.py` | Solo alertas genéricas |
-| Register Analysis | `voice/register.py` | Registro lingüístico invisible |
-| Speaker Attribution | `voice/speaker_attribution.py` | Atribución diálogos invisible |
-| Focalization | `focalization/` | Solo alertas genéricas |
+| ~~Correferencia Voting~~ | `nlp/coreference_resolver.py` | ✅ **Razonamiento expuesto en API (v0.3.14)** |
+| Knowledge Tracking | `analysis/character_knowledge.py` | Qué sabe cada personaje invisible (core vacío) |
+| Voice Profiles | `voice/profiles.py` | Análisis voz narrativa parcialmente expuesto |
+| ~~Voice Deviations~~ | `voice/deviations.py` | ✅ **Endpoint implementado (main.py:12408-12564)** |
+| ~~Register Analysis~~ | `voice/register.py` | ✅ **Análisis por capítulo (v0.3.14)** |
+| ~~Speaker Attribution~~ | `voice/speaker_attribution.py` | ✅ **Bug corregido (v0.3.13)** |
+| ~~Focalization~~ | `focalization/` | ✅ **Declaraciones persistidas en SQLite** |
 | ~~Emotional Coherence~~ | `analysis/emotional_coherence.py` | ✅ **EmotionalAnalysis.vue (v0.2.9)** |
-| Style Guide Export | `exporters/style_guide.py` | **Stub en frontend** |
+| ~~Style Guide Export~~ | `exporters/style_guide.py` | ✅ **Completado** |
 | Interaction Patterns | `interactions/` | Invisible |
-| Spelling/Grammar Highlight | `nlp/orthography/`, `nlp/grammar/` | Solo lista, no marcados en texto |
+| ~~Spelling/Grammar Highlight~~ | `nlp/orthography/`, `nlp/grammar/` | ✅ **TextHighlighter implementado** |
 | Gazetteer Management | `nlp/ner.py` | Lista entidades no editable |
-| Undo Merge | `persistence/history.py` | No se puede deshacer |
+| ~~Undo Merge~~ | `persistence/history.py` | ✅ **UndoMergeDialog + MergeHistoryPanel** |
 
 ### Endpoints API no usados por frontend
 
@@ -613,48 +630,49 @@ cargo tauri build --target x86_64-pc-windows-msvc
 
 ---
 
-## 🔍 Análisis de Completitud de Módulos Backend (2026-01-26)
+## Análisis de Completitud de Módulos Backend (2026-01-29)
 
 > **Verificación exhaustiva**: Exploración del código fuente para determinar qué está realmente implementado vs qué falta completar.
 
 ### Resumen de Estado
 
-| Módulo | Completitud | Prioridad | Impacto en UI |
-|--------|-------------|-----------|---------------|
-| **Coreference Resolver** | 85% | Media | Exponer votación en API |
-| **Register Analysis** | 75% | Media | Añadir análisis por capítulo |
-| **Voice Profiles** | 70% | Alta | Devolver todas las métricas |
-| **Speaker Attribution** | 80% | Media | Integrar voice matching |
-| **Pacing Analysis** | 80% | Baja | Añadir curva de tensión |
+| Módulo | Completitud | Prioridad | Estado |
+|--------|-------------|-----------|--------|
+| **Coreference Resolver** | 95% | ✅ | Votación expuesta en API con razonamiento |
+| **Register Analysis** | 90% | ✅ | Análisis por capítulo implementado |
+| **Voice Profiles** | 70% | Media | Devolver todas las métricas |
+| **Speaker Attribution** | 85% | ✅ | Bug corregido en v0.3.13 |
+| **Pacing Analysis** | 90% | ✅ | Curva de tensión implementada |
 | **Character Knowledge** | 60% | 🎯 **CRÍTICA** | Core `_extract_knowledge_facts()` vacío |
+| **Sticky Sentences** | 95% | ✅ | Integrado en pipeline unificado |
 
 ### Detalle por Módulo
 
-#### Coreference Resolver (85%)
+#### Coreference Resolver (95%) ✅
 
 **✅ Implementado:**
 - Sistema de votación con 4 métodos: LLM (35%), embeddings (30%), morpho (20%), heuristics (15%)
 - `resolve_coreferences_voting()` funcional
 - Cadenas de correferencia y menciones no resueltas
+- **Razonamiento expuesto en API** (v0.3.14): scores individuales por método
+- **Endpoint API** con detalle de votación
 
 **❌ Falta:**
-- API endpoint para exponer scores individuales por método
-- Razonamiento textual de cada método
-- Persistencia de decisiones del usuario
+- Persistencia de decisiones del usuario (correcciones manuales)
 
 **Archivo**: `src/narrative_assistant/nlp/coreference_resolver.py`
 
-#### Register Analysis (75%)
+#### Register Analysis (90%) ✅
 
 **✅ Implementado:**
 - `RegisterChangeDetector` con `detect_changes()`
 - Clasificación: formal, neutral, coloquial, poético, técnico
 - Análisis por fragmento
+- **Análisis por capítulo** (v0.3.14)
+- **Alertas de cambio de registro** conectadas al pipeline (v0.3.17)
 
 **❌ Falta:**
-- Análisis por capítulo (solo fragmentos sueltos)
-- Estadísticas agregadas (distribución de registros)
-- Severidad de cambios (alta/media/baja)
+- Estadísticas agregadas (distribución de registros por obra)
 
 **Archivo**: `src/narrative_assistant/voice/register.py`
 
@@ -686,15 +704,16 @@ cargo tauri build --target x86_64-pc-windows-msvc
 
 **Archivo**: `src/narrative_assistant/voice/speaker_attribution.py`
 
-#### Pacing Analysis (80%)
+#### Pacing Analysis (90%) ✅
 
 **✅ Implementado:**
 - `PacingAnalyzer` con 10 tipos de problemas
 - 11 métricas por capítulo
 - Detección de capítulos "muertos"
+- **Curva de tensión narrativa** implementada (v0.3.13, pacing.py:676-811)
+- **Alertas de pacing** conectadas al pipeline
 
 **❌ Falta:**
-- Curva de tensión narrativa (`tension_curve`)
 - Comparación con benchmarks de género
 - Sugerencias específicas de corrección
 
@@ -717,16 +736,16 @@ cargo tauri build --target x86_64-pc-windows-msvc
 
 ### Esfuerzo para 100% Completitud
 
-| Módulo | Días | Notas |
-|--------|------|-------|
-| Character Knowledge (core) | 5-7 | **BLOQUEANTE para UI Knowledge** |
-| Voice Profiles completo | 3-4 | Extender API |
-| Register por capítulo | 2-3 | Nueva función |
-| Speaker Attribution + voice | 2-3 | Integrar VoiceAnalyzer |
-| Coreference razonamiento | 1-2 | Extender método existente |
-| Pacing tension curve | 2-3 | Nueva métrica |
+| Módulo | Estado | Notas |
+|--------|--------|-------|
+| Character Knowledge (core) | 60% | **BLOQUEANTE para UI Knowledge** - `_extract_knowledge_facts()` vacío |
+| Voice Profiles completo | 70% | Extender API con todas las métricas |
+| Register agregado | 90% | Solo falta distribución global |
+| Speaker Attribution + voice | 85% | ✅ Bug fix v0.3.13. Falta: voice matching con VoiceAnalyzer |
+| Coreference razonamiento | 95% | ✅ Completado v0.3.14. Falta: persistencia de correcciones manuales |
+| Pacing tension curve | 90% | ✅ Completado v0.3.13. Falta: benchmarks de género |
 
-**Total**: 15-22 días adicionales para completar módulos existentes
+**Total restante**: Character Knowledge (módulo crítico) + mejoras menores en Voice Profiles
 
 ---
 
@@ -957,10 +976,10 @@ A partir de 2026-01-14, cualquier feature nueva DEBE incluir:
 | 27 | Swagger/OpenAPI docs | 2-3h | ❌ No implementado |
 | 28 | i18n | 4-8h | ❌ No implementado (solo español) |
 | 29 | Sistema plugins | 8-16h | ❌ No implementado |
-| 30 | CI/CD pipeline | 4h | ❌ No hay .github/workflows |
+| 30 | CI/CD pipeline | 4h | ✅ **COMPLETADO** - GitHub Actions (Windows + macOS) |
 | 31 | Landing page | 4h | ❌ No implementado |
 
-**Subtotal P3: 4/10 completados**
+**Subtotal P3: 5/10 completados**
 
 ---
 
