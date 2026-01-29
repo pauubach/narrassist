@@ -339,12 +339,24 @@ if _DB_MODULES_LOADED:
         _write_debug(f"Phase 2b: AlertRepository not available: {type(e).__name__}: {e}")
         _early_logger.warning(f"AlertRepository not available: {type(e).__name__}: {e}")
 
-    # If at least project_manager is available, we're functional
+    # Verify NLP core dependencies are actually importable
     if project_manager is not None:
-        MODULES_LOADED = True
-        MODULES_ERROR = None
-        _write_debug("=== MODULES LOADED SUCCESSFULLY ===")
-        _early_logger.info("Modules loaded successfully (project_manager available)")
+        import importlib.util
+        _spacy_ok = importlib.util.find_spec("spacy") is not None
+        _numpy_ok = importlib.util.find_spec("numpy") is not None
+        if _spacy_ok and _numpy_ok:
+            MODULES_LOADED = True
+            MODULES_ERROR = None
+            _write_debug("=== MODULES LOADED SUCCESSFULLY ===")
+            _early_logger.info("Modules loaded successfully (project_manager + NLP deps available)")
+        else:
+            _missing = []
+            if not _numpy_ok: _missing.append("numpy")
+            if not _spacy_ok: _missing.append("spacy")
+            MODULES_LOADED = False
+            MODULES_ERROR = f"NLP dependencies missing: {', '.join(_missing)}"
+            _write_debug(f"=== MODULES PARTIALLY LOADED: {MODULES_ERROR} ===")
+            _early_logger.warning(f"Backend functional but NLP deps missing: {MODULES_ERROR}")
     else:
         _write_debug("=== MODULES NOT LOADED: project_manager is None ===")
         _early_logger.error("Modules not loaded: project_manager is None")
@@ -502,13 +514,26 @@ def load_narrative_assistant_modules():
         _write_debug(f"Phase 2b: AlertRepository not available: {type(e).__name__}: {e}")
         logger.warning(f"AlertRepository not available: {e}")
 
-    # Success if project_manager is available
+    # Success if project_manager AND NLP core deps are available
     if project_manager is not None:
-        MODULES_LOADED = True
-        MODULES_ERROR = None
-        _write_debug("=== load_narrative_assistant_modules() SUCCESS ===")
-        logger.info("Modules loaded successfully (on-demand)")
-        return True
+        import importlib.util
+        _spacy_ok = importlib.util.find_spec("spacy") is not None
+        _numpy_ok = importlib.util.find_spec("numpy") is not None
+        if _spacy_ok and _numpy_ok:
+            MODULES_LOADED = True
+            MODULES_ERROR = None
+            _write_debug("=== load_narrative_assistant_modules() SUCCESS ===")
+            logger.info("Modules loaded successfully (on-demand, NLP deps available)")
+            return True
+        else:
+            _missing = []
+            if not _numpy_ok: _missing.append("numpy")
+            if not _spacy_ok: _missing.append("spacy")
+            MODULES_LOADED = False
+            MODULES_ERROR = f"NLP dependencies missing: {', '.join(_missing)}"
+            _write_debug(f"=== load_narrative_assistant_modules() PARTIAL: {MODULES_ERROR} ===")
+            logger.warning(f"Modules partially loaded, NLP deps missing: {MODULES_ERROR}")
+            return False
     else:
         _write_debug("=== load_narrative_assistant_modules() FAILED: project_manager is None ===")
         return False
@@ -2160,6 +2185,7 @@ async def get_analysis_status(project_id: int):
             "sentence_energy": has_chapters,  # Energía de oraciones (voz, verbos, estructura)
             "narrative_templates": has_chapters,  # Plantillas narrativas (diagnóstico)
             "narrative_health": has_chapters and has_entities,  # Salud narrativa (12 dimensiones)
+            "character_archetypes": has_entities and has_chapters,  # Arquetipos Jung/Campbell
             "story_bible": has_entities,  # Story Bible / Wiki de entidades
             "speaker_attribution": has_entities and has_chapters,  # Atribución de hablantes
         }
@@ -9674,6 +9700,92 @@ async def get_narrative_health(
         return ApiResponse(success=False, error="Módulo de salud narrativa no disponible")
     except Exception as e:
         logger.error(f"Error in narrative health check: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+# ============================================================================
+# Endpoints - Character Archetypes
+# ============================================================================
+
+@app.get("/api/projects/{project_id}/character-archetypes", response_model=ApiResponse)
+async def get_character_archetypes(
+    project_id: int,
+    mode: str = "basic",
+    llm_model: str = "llama3.2",
+):
+    """
+    Detecta arquetipos de personaje (Jung/Campbell) en el manuscrito.
+
+    Clasifica personajes como Héroe, Sombra, Mentor, Heraldo, Guardián,
+    Cambiante, Embaucador, Inocente, Explorador, Sabio, Amante, Gobernante,
+    Cuidador, Creador, Bufón o Rebelde.
+    """
+    try:
+        from narrative_assistant.analysis.chapter_summary import analyze_chapter_progress
+        from narrative_assistant.analysis.character_archetypes import CharacterArchetypeAnalyzer
+
+        # Obtener datos de capítulos (arcos, chekhov, etc.)
+        progress = analyze_chapter_progress(
+            project_id=project_id,
+            mode=mode,
+            llm_model=llm_model,
+        )
+
+        # Obtener entidades
+        entities_data = []
+        try:
+            entities = entity_repository.get_by_project(project_id)
+            for ent in entities:
+                ent_dict = {
+                    "id": ent.id if hasattr(ent, 'id') else 0,
+                    "entity_type": ent.entity_type if hasattr(ent, 'entity_type') else "character",
+                    "name": ent.name if hasattr(ent, 'name') else ent.canonical_name if hasattr(ent, 'canonical_name') else "",
+                    "canonical_name": ent.canonical_name if hasattr(ent, 'canonical_name') else "",
+                    "importance": ent.importance if hasattr(ent, 'importance') else "secondary",
+                    "mention_count": ent.mention_count if hasattr(ent, 'mention_count') else 0,
+                    "chapters_present": len(ent.chapter_appearances) if hasattr(ent, 'chapter_appearances') else 0,
+                    "description": ent.description if hasattr(ent, 'description') else "",
+                }
+                entities_data.append(ent_dict)
+        except Exception as e:
+            logger.warning(f"Could not load entities for archetype analysis: {e}")
+
+        # Obtener relaciones
+        relationships_data = []
+        try:
+            from narrative_assistant.relationships.repository import get_relationship_repository
+            rel_repo = get_relationship_repository()
+            rels = rel_repo.get_by_project(project_id)
+            for rel in rels:
+                relationships_data.append({
+                    "entity1_id": rel.source_entity_id if hasattr(rel, 'source_entity_id') else 0,
+                    "entity2_id": rel.target_entity_id if hasattr(rel, 'target_entity_id') else 0,
+                    "relation_type": rel.relation_type.value if hasattr(rel.relation_type, 'value') else str(rel.relation_type),
+                    "subtype": rel.description if hasattr(rel, 'description') else "",
+                })
+        except Exception as e:
+            logger.warning(f"Could not load relationships for archetype analysis: {e}")
+
+        # Arcos de personaje del chapter progress
+        character_arcs = [a.to_dict() for a in progress.character_arcs]
+
+        # Analizar arquetipos
+        analyzer = CharacterArchetypeAnalyzer()
+        report = analyzer.analyze(
+            entities=entities_data,
+            character_arcs=character_arcs,
+            relationships=relationships_data,
+            interactions=[],  # No hay endpoint de interacciones aún
+            total_chapters=progress.total_chapters,
+        )
+
+        return ApiResponse(success=True, data=report.to_dict())
+
+    except ImportError as e:
+        logger.error(f"Module import error: {e}")
+        return ApiResponse(success=False, error="Módulo de arquetipos no disponible")
+    except Exception as e:
+        logger.error(f"Error analyzing character archetypes: {e}", exc_info=True)
         return ApiResponse(success=False, error=str(e))
 
 

@@ -1,7 +1,7 @@
 # Estado Real del Roadmap - Enero 2026
 
 > Documento generado automáticamente tras auditoría de código.
-> **Última auditoría exhaustiva: 29 Enero 2026 (Sesión 4)**
+> **Última auditoría exhaustiva: 29 Enero 2026 (Sesión 5)**
 
 ---
 
@@ -9,7 +9,7 @@
 
 **El proyecto está prácticamente completo para la funcionalidad core de correctores.**
 
-Todas las features del Competitive Analysis clasificadas como "Quick Wins", "Diferenciadores" y "Avanzado" están implementadas. Los 4 sprints planificados se han completado. Las 3 features que faltaban (Sensory Report UI, Story Bible UI, Scrivener Export UI) han sido implementadas en la Sesión 4. Solo queda backlog estratégico.
+Todas las features del Competitive Analysis clasificadas como "Quick Wins", "Diferenciadores" y "Avanzado" están implementadas. Los 4 sprints planificados (A-D) se han completado al 100%. **0 features pendientes** — solo queda infraestructura (CI/CD, code signing, i18n, landing page).
 
 ---
 
@@ -77,7 +77,7 @@ Todas las features del Competitive Analysis clasificadas como "Quick Wins", "Dif
 > StyleTab usa **dos filas**: categorías arriba (Narrativa/Estilo/Consistencia) y sub-tabs debajo.
 > CorrectionConfigPanel y Reglas Editoriales → `CorrectionConfigModal.vue` (modal).
 
-### Categoría: Narrativa (6 tabs)
+### Categoría: Narrativa (9 tabs)
 
 | ID | Label | Componente | Condicional |
 |----|-------|-----------|-------------|
@@ -87,8 +87,11 @@ Todas las features del Competitive Analysis clasificadas como "Quick Wins", "Dif
 | `pacing` | Ritmo | PacingAnalysisTab | `isFeatureAvailable('pacing')` |
 | `emotions` | Emociones | EmotionalAnalysisTab | `isFeatureAvailable('emotional_analysis')` |
 | `progress` | Progreso | ChapterProgressTab | `isFeatureAvailable('chapter_progress')` |
+| `templates` | Plantillas | NarrativeTemplatesTab | `isFeatureAvailable('narrative_templates')` |
+| `health` | Salud | NarrativeHealthTab | `isFeatureAvailable('narrative_health')` |
+| `archetypes` | Arquetipos | CharacterArchetypesTab | `isFeatureAvailable('character_archetypes')` |
 
-### Categoría: Estilo (5 tabs)
+### Categoría: Estilo (6 tabs)
 
 | ID | Label | Componente | Condicional |
 |----|-------|-----------|-------------|
@@ -97,6 +100,7 @@ Todas las features del Competitive Analysis clasificadas como "Quick Wins", "Dif
 | `variation` | Variación | SentenceVariationTab | `isFeatureAvailable('sentence_variation')` |
 | `readability` | Legibilidad | AgeReadabilityTab | `isFeatureAvailable('age_readability')` |
 | `sensory` | Sensorial | SensoryReportTab | `isFeatureAvailable('sensory_report')` |
+| `energy` | Energía | SentenceEnergyTab | `isFeatureAvailable('sentence_energy')` |
 
 ### Categoría: Consistencia (2 tabs)
 
@@ -131,6 +135,10 @@ Todas las features del Competitive Analysis clasificadas como "Quick Wins", "Dif
 | `/api/projects/{id}/voice-deviations` | Desviaciones de voz detectadas |
 | `/api/projects/{id}/emotional-analysis` | Análisis emocional |
 | `/api/projects/{id}/age-readability` | Legibilidad por edad |
+| `/api/projects/{id}/sentence-energy` | Energía de oraciones (voz pasiva, verbos débiles) |
+| `/api/projects/{id}/narrative-templates` | Plantillas narrativas (5 estructuras) |
+| `/api/projects/{id}/narrative-health` | Salud narrativa (12 dimensiones) |
+| `/api/projects/{id}/character-archetypes` | Arquetipos de personajes (Jung/Campbell) |
 
 ### Consistencia y Personajes
 
@@ -228,7 +236,7 @@ Todas las features del Competitive Analysis clasificadas como "Quick Wins", "Dif
 
 | Feature | Tipo | Estado | Esfuerzo |
 |---------|------|--------|----------|
-| **Character Archetype Detector** (Jung/Campbell) | BUILD | ⚠️ 10% (embeddings) | 2 días |
+| **Character Archetype Detector** (Jung/Campbell) | BUILD | ✅ COMPLETO | Backend + API + Tab |
 
 ### Ideas Futuras (v2.0+ — Para escritores, fuera de scope actual)
 
@@ -270,10 +278,10 @@ Todas las features del Competitive Analysis clasificadas como "Quick Wins", "Dif
 | ~~Sprint A: Quick Wins (enhance)~~ | ~~3~~ | ~~1~~ ✅ HECHO |
 | ~~Sprint B: Sentence Energy~~ | ~~1~~ | ~~1-2~~ ✅ HECHO |
 | ~~Sprint C: Estructura Narrativa~~ | ~~2~~ | ~~3-4~~ ✅ HECHO |
-| Sprint D: Arquetipos | 1 | 2 |
+| ~~Sprint D: Arquetipos~~ | ~~1~~ | ~~2~~ ✅ HECHO |
 | Infraestructura | 6 | 25 |
-| **TOTAL PENDIENTE (features)** | **1** | **~2 días** |
-| **TOTAL PENDIENTE (features + infra)** | **7** | **~27 días** |
+| **TOTAL PENDIENTE (features)** | **0** | **0 días** |
+| **TOTAL PENDIENTE (features + infra)** | **6** | **~25 días** |
 
 ---
 
@@ -287,6 +295,7 @@ Todas las features del Competitive Analysis clasificadas como "Quick Wins", "Dif
 | 29 Ene Sesión 2 | Dialogue Tags YA implementado, Voice Profiles 90%, Speaker Attribution 85% |
 | 29 Ene Sesión 3 | **Auditoría exhaustiva**: Sprint restante (4 items) TODOS completados: Scene Cards (SceneCardsView.vue + dual view), Register per-chapter (grid cards + accordion + ChapterTimeline), UI categorías (3 categorías con 2 filas), Coreference reasoning (collapsible voting en EntityInspector). Genre Benchmarking COMPLETO (12 géneros pacing + register). Alertas de estilo WIRED en pipeline. Tension curve IMPLEMENTADA. Sensory Report, Story Bible, Scrivener Export: backend+API OK, frontend pendiente. |
 | 29 Ene Sesión 4 | **Análisis 3 perspectivas** (Frontend/UX, Backend/Arquitectura, Producto/Competitivo). Consenso unánime: construir 3 UIs pendientes. Implementados: `SensoryReportTab.vue` (stats + balance + accordion + detalle paginado), `StoryBibleTab.vue` (sidebar + detail con TabView de 5 secciones), Scrivener export en `ExportDialog.vue` (card con opciones + descarga ZIP). Integrados en StyleTab, WorkspaceTabs, ProjectDetailView. **Ya no quedan features con backend sin frontend.** |
+| 29 Ene Sesión 5 | **4 Sprints completados** (A-D). Sprint A: Quick Wins (revisions UI, genre percentiles, sensory suggestions). Sprint B: Sentence Energy (voz pasiva, verbos débiles, energía). Sprint C: Estructura Narrativa (5 plantillas + 12 dimensiones salud narrativa). Sprint D: Arquetipos (16 arquetipos Jung/Campbell). **0 features pendientes — solo queda infraestructura.** |
 
 ---
 

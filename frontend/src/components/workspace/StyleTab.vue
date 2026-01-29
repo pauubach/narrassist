@@ -29,6 +29,7 @@ import SensoryReportTab from './SensoryReportTab.vue'
 import SentenceEnergyTab from './SentenceEnergyTab.vue'
 import NarrativeTemplatesTab from './NarrativeTemplatesTab.vue'
 import NarrativeHealthTab from './NarrativeHealthTab.vue'
+import CharacterArchetypesTab from './CharacterArchetypesTab.vue'
 
 type CategoryId = 'narrative' | 'style' | 'consistency'
 
@@ -79,6 +80,7 @@ const allSubTabs: SubTab[] = [
   { id: 'progress', label: 'Progreso', icon: 'pi pi-chart-line', component: 'ChapterProgressTab', featureKey: 'chapter_progress', category: 'narrative' },
   { id: 'templates', label: 'Plantillas', icon: 'pi pi-sitemap', component: 'NarrativeTemplatesTab', featureKey: 'narrative_templates', category: 'narrative' },
   { id: 'health', label: 'Salud', icon: 'pi pi-heart-fill', component: 'NarrativeHealthTab', featureKey: 'narrative_health', category: 'narrative' },
+  { id: 'archetypes', label: 'Arquetipos', icon: 'pi pi-users', component: 'CharacterArchetypesTab', featureKey: 'character_archetypes', category: 'narrative' },
   // Estilo
   { id: 'sticky', label: 'Densidad', icon: 'pi pi-align-left', component: 'StickySentencesTab', featureKey: 'sticky_sentences', category: 'style' },
   { id: 'echo', label: 'Ecos', icon: 'pi pi-replay', component: 'EchoReportTab', featureKey: 'echo_repetitions', category: 'style' },
@@ -222,6 +224,7 @@ async function loadFeatureAvailability() {
       <SentenceEnergyTab v-if="activeTabId === 'energy'" :project-id="projectId" />
       <NarrativeTemplatesTab v-if="activeTabId === 'templates'" :project-id="projectId" />
       <NarrativeHealthTab v-if="activeTabId === 'health'" :project-id="projectId" />
+      <CharacterArchetypesTab v-if="activeTabId === 'archetypes'" :project-id="projectId" />
     </div>
   </div>
 </template>

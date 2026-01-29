@@ -278,6 +278,7 @@ class FeatureProfile:
     sentence_energy: FeatureAvailability = FeatureAvailability.ENABLED  # Energía de oraciones
     narrative_templates: FeatureAvailability = FeatureAvailability.ENABLED  # Plantillas narrativas (diagnóstico)
     narrative_health: FeatureAvailability = FeatureAvailability.ENABLED  # Salud narrativa (12 dimensiones)
+    character_archetypes: FeatureAvailability = FeatureAvailability.ENABLED  # Arquetipos Jung/Campbell
     vital_status: FeatureAvailability = FeatureAvailability.ENABLED  # Muertes y reapariciones
     character_location: FeatureAvailability = FeatureAvailability.ENABLED  # Seguimiento de ubicaciones
     chapter_progress: FeatureAvailability = FeatureAvailability.ENABLED  # Resumen de avance por capítulo
@@ -317,6 +318,7 @@ class FeatureProfile:
                 "sentence_energy": self.sentence_energy.value,
                 "narrative_templates": self.narrative_templates.value,
                 "narrative_health": self.narrative_health.value,
+                "character_archetypes": self.character_archetypes.value,
                 "vital_status": self.vital_status.value,
                 "character_location": self.character_location.value,
                 "chapter_progress": self.chapter_progress.value,

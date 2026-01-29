@@ -38,6 +38,7 @@ export interface FeatureProfile {
     sentence_energy: FeatureAvailability
     narrative_templates: FeatureAvailability
     narrative_health: FeatureAvailability
+    character_archetypes: FeatureAvailability
     // Consistencia
     attribute_consistency: FeatureAvailability
     world_consistency: FeatureAvailability
@@ -81,7 +82,7 @@ const tabToFeaturesMap: Record<string, string[]> = {
     'voice_profiles', 'sticky_sentences', 'echo_repetitions',
     'sentence_variation', 'emotional_analysis', 'age_readability', 'editorial_rules',
     'sensory_report', 'sentence_energy',
-    'narrative_templates', 'narrative_health'
+    'narrative_templates', 'narrative_health', 'character_archetypes'
   ],
   glossary: ['glossary', 'terminology'],
   summary: [], // Siempre visible
