@@ -383,7 +383,8 @@
         :chapter-count="project.chapterCount"
         :entity-count="entitiesCount"
         :alert-count="alertsCount"
-        :has-analysis="(project.wordCount || 0) > 0 || entities.length > 0"
+        :has-analysis="project.analysisStatus === 'completed'"
+        :analysis-error="project.analysisStatus === 'error'"
       />
     </div>
   </div>
@@ -659,7 +660,7 @@ watch(() => workspaceStore.selectedEntityForMentions, async (entityId) => {
 // Computed: nombre original del documento (sin prefijo hash)
 const originalDocumentName = computed(() => {
   if (!project.value?.documentPath) return null
-  const filename = project.value.documentPath.split('/').pop() || project.value.documentPath
+  const filename = project.value.documentPath.split(/[/\\]/).pop() || project.value.documentPath
   const match = filename.match(/^[a-f0-9]{32}_(.+)$/)
   return match ? match[1] : filename
 })

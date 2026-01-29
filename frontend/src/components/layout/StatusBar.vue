@@ -23,6 +23,8 @@ interface Props {
   alertCount?: number
   /** Si hay un análisis completado */
   hasAnalysis?: boolean
+  /** Si el análisis terminó con error */
+  analysisError?: boolean
   /** Timestamp del último análisis */
   lastAnalysisTime?: string | null
 }
@@ -33,6 +35,7 @@ const props = withDefaults(defineProps<Props>(), {
   entityCount: 0,
   alertCount: 0,
   hasAnalysis: false,
+  analysisError: false,
   lastAnalysisTime: null
 })
 
@@ -164,8 +167,8 @@ const currentStepLabel = computed(() => {
 const analysisStatus = computed(() => {
   if (isAnalyzing.value) return null
 
-  // Si hay error
-  if (analysisStore.error) {
+  // Si hay error (del store o del prop)
+  if (analysisStore.error || props.analysisError) {
     return { icon: 'pi-times-circle', text: 'Error en análisis', class: 'status-error' }
   }
 
