@@ -393,4 +393,221 @@ tests/adversarial/
 └── test_pipeline_e2e_adversarial.py       # 52 cases (NUEVO)
 ```
 
-**Total: 818 tests adversariales** (157 nuevos en esta iteracion)
+**Total: 818+ tests adversariales** (157 nuevos en iteracion anterior, + E2E pipeline completo)
+
+---
+
+## 8. Analisis E2E del Pipeline Completo (UnifiedAnalysisPipeline)
+
+**Fecha**: 2026-01-30 | **Metodo**: 3 manuscritos realistas con inconsistencias plantadas
+
+Se ejecuto el pipeline completo (`UnifiedAnalysisPipeline`) sobre 3 manuscritos de prueba:
+- **Ficcion**: 4 capitulos, 6 inconsistencias plantadas (cabello, edad, piso, pierna, chaqueta)
+- **No ficcion**: 3 capitulos, 1 inconsistencia temporal (fecha Cortes 1521 vs 1519)
+- **Policiaco**: 3 capitulos, 3 inconsistencias plantadas (edad, hijos, ciudad)
+
+### 8.1 Resultados por Manuscrito
+
+| Manuscrito | Entidades | Atributos | Dialogos | Capitulos | Alertas | Errores Pipeline |
+|-----------|-----------|-----------|----------|-----------|---------|-----------------|
+| Ficcion   | 29        | 11        | 31       | 4         | 148     | 3 errores API   |
+| No ficcion| 28        | 1         | 0        | 3         | 67      | 3 errores API   |
+| Policiaco | 27        | 9         | 29       | 3         | 130     | 3 errores API   |
+
+### 8.2 Desglose de Alertas (Ficcion, 148 total)
+
+| Categoria | Count | Observacion |
+|-----------|-------|-------------|
+| orthography/spelling_typo | 58 | **MAYORIA FALSE POSITIVES** (`\n\n` = saltos de parrafo) |
+| orthography/spelling_case | 43 | Falsos positivos en nombres propios y dialogos |
+| style/coherence_break | 23 | Muchos son transiciones normales entre escenas |
+| repetition/word_echo | 16 | Nombres de personajes contados como repeticiones |
+| style/sticky_sentence | 8 | Logica invertida: 0% glue words marcado como "pegajoso" |
+| **consistency/** | **0** | **NINGUNA inconsistencia detectada de 6 plantadas** |
+
+### 8.3 BUGS CRITICOS del Pipeline
+
+#### Bug P1: Entity Fusion API Rota
+```
+EntityFusionService.merge_entities() got an unexpected keyword argument 'session_id'
+```
+- **Impacto**: Las entidades NUNCA se fusionan. "Maria", "Maria Garcia", "Garcia", "profesora Garcia" son 4 entidades separadas
+- **Causa**: Cambio de API en merge_entities() sin actualizar la llamada en el pipeline
+- **Gravedad**: CRITICA (rompe toda la cadena de analisis posterior)
+
+#### Bug P2: Attribute Persistence Rota
+```
+'ExtractedAttribute' object has no attribute 'attribute_type'
+```
+- **Impacto**: Los atributos extraidos no se guardan en la base de datos
+- **Causa**: Modelo `ExtractedAttribute` no tiene campo `attribute_type` pero el persistence layer lo espera
+- **Gravedad**: ALTA (atributos no se persisten para comparacion entre capitulos)
+
+#### Bug P3: Emotional Coherence API Rota
+```
+EmotionalCoherenceChecker.analyze_chapter() got an unexpected keyword argument 'entities'
+```
+- **Impacto**: Analisis emocional completamente inoperativo
+- **Causa**: Cambio de API sin actualizar llamada
+- **Gravedad**: MEDIA
+
+#### Bug P4: Spelling Checker Marca Parrafos como Errores
+- **Sintoma**: Cada `\n\n` (salto de parrafo) genera alerta CRITICA: "Error ortografico: '\n\n'"
+- **Impacto**: ~60% de alertas de ortografia son falsos positivos
+- **Causa**: El checker no filtra whitespace/newlines antes de verificar
+- **Gravedad**: ALTA (inunda la UI con ruido)
+
+#### Bug P5: Dialogue Speaker Attribution = 0%
+- **Sintoma**: 0 de 60 dialogos tienen speaker atribuido, incluso con marcadores explicitos ("dijo Maria", "pregunto Pedro")
+- **Causa**: Sin coreference activo, no hay fallback a patrones basicos de verbo de habla
+- **Gravedad**: ALTA
+
+#### Bug P6: Attribute Proximity Bias Confirmado en Pipeline Real
+- **Ejemplos reales encontrados**:
+  - `hair_color=negro` asignado a entidad "alta" (la palabra previa), no a "Maria Garcia"
+  - `hair_color=rubio` asignado a "Dos semanas" (expresion temporal), no a "Maria"
+  - `eye_color=azules` asignado a "Primero envenenada" (concepto basura), no a "Elena"
+  - `color=rojo` asignado a "vestido", no al personaje victima
+  - `distinctive_feature=noche` y `distinctive_feature=enemigos` asignados a "Torres" (palabras aleatorias)
+- **Gravedad**: CRITICA (los atributos extraidos son mayoritariamente basura)
+
+### 8.4 Deteccion de Inconsistencias Plantadas
+
+| Inconsistencia | Detectada? | Motivo del fallo |
+|---------------|-----------|-----------------|
+| Cabello Maria: negro -> rubio | NO | "rubio" asignado a "Dos semanas", no a Maria |
+| Edad Maria: 32 -> 35 | NO | Edad no extraida como atributo (no hay patron regex) |
+| Piso despacho: 2o -> 5o | NO | Ubicaciones de personajes no rastreadas |
+| Pierna Pedro: izq -> der | NO | Lateralidad no extraida como atributo |
+| Chaqueta Pedro: marron -> negra | NO | Color de ropa no asignado correctamente |
+| Edad Pedro: 25 -> 28 | NO | Edad no comparada temporalmente |
+| Cortes: 1521 vs 1519 | NO | Analisis temporal desactivado (experimental) |
+| Edad Isabel: 40 -> 35 -> 38 | NO | Edad no extraida correctamente |
+| Hijos Isabel: 1 -> 2 | NO | No hay patron para numero de hijos |
+| Ciudad ex-marido: Bcn -> Valencia | NO | No hay tracking de ubicacion de personajes |
+
+**Tasa de deteccion de inconsistencias: 0/10 = 0%**
+
+### 8.5 Lo Que Funciona Bien
+
+1. **Deteccion de capitulos**: 100% (4/4, 3/3, 3/3) con titulos correctos
+2. **Deteccion de dialogos**: Buena (31, 0, 29 dialogos detectados con marcador —)
+3. **Entidades principales**: Maria, Pedro, Torres, Elena, Isabel detectados
+4. **Ubicaciones**: Salamanca, Madrid, Barcelona, Valencia detectados
+5. **Profesiones**: "profesora", "doctora", "abogada", "doctor" correctamente asignados
+6. **Repeticiones lexicas**: Funcional (detecta ecos de palabras repetidas)
+7. **Coherencia narrativa**: Funcional (detecta saltos de tema y cambios de POV)
+
+### 8.6 Lo Que No Funciona
+
+1. **0% de inconsistencias detectadas** (critico - es la funcion principal del sistema)
+2. **~70% de alertas son ruido** (spelling FP, character name echoes, inverted sticky logic)
+3. **Fusion de entidades rota** (bug de API)
+4. **Atributos asignados a entidades incorrectas** (proximity bias)
+5. **Ningun dialogo con speaker** (0% atribucion)
+6. **Entidades duplicadas** sin fusionar (Maria x4, Torres x2, Isabel x3)
+7. **Clasificacion de tipo incorrecta** ("Carmen" como CONCEPT, "Petroglobal" como CHARACTER)
+
+### 8.7 Plan de Accion Inmediato (Pre-Sprint E1)
+
+Estos son fixes de infraestructura que deben resolverse ANTES de los sprints de mejora:
+
+| # | Fix | Gravedad | Complejidad |
+|---|-----|----------|-------------|
+| P0.1 | Fix API mismatch en `merge_entities()` (quitar `session_id`) | CRITICA | Baja |
+| P0.2 | Fix persistence de atributos (`attribute_type` missing) | ALTA | Baja |
+| P0.3 | Fix API mismatch en `EmotionalCoherenceChecker` | MEDIA | Baja |
+| P0.4 | Filtrar `\n\n` y whitespace en spelling checker | ALTA | Baja |
+| P0.5 | Excluir nombres de entidades del detector de repeticiones | MEDIA | Baja |
+| P0.6 | Fix logica invertida en sticky sentences (0% != sticky) | MEDIA | Baja |
+| P0.7 | Implementar fallback de speaker attribution por patron de verbo | ALTA | Media |
+
+**Impacto esperado tras P0**: Reducir alertas de ruido de ~70% a <10%, habilitar fusion de entidades, permitir persistencia de atributos
+
+---
+
+## 9. Evaluacion por Metodo (Precision / Recall / F1)
+
+**Fecha**: 2026-01-30 | Archivo: `tests/adversarial/test_method_evaluation.py`
+
+### 9.1 NER (Named Entity Recognition)
+
+| Metodo | Precision | Recall | F1 | Notas |
+|--------|-----------|--------|-----|-------|
+| spaCy base (es_core_news_lg) | 1.00 | **1.00** | **1.00** | Excelente en textos con contexto. Incluso detecta Eldric/Kael |
+| NERExtractor (post-procesado) | 0.00 | 0.00 | 0.00 | **BUG**: API rota, devuelve resultados incompatibles |
+
+**Conclusion NER**: spaCy base funciona muy bien. El post-procesado del NERExtractor rompe los resultados. Petroglobal se clasifica como PER en vez de ORG (label accuracy < text recall).
+
+### 9.2 Entity Fusion
+
+| Metodo | Precision | Recall | F1 | Notas |
+|--------|-----------|--------|-----|-------|
+| Normalizacion (titulos/prefijos) | **1.00** | **0.90** | **0.95** | Solo falla en diminutivos (Paco/Francisco) |
+| String similarity (SequenceMatcher 0.7) | 1.00 | 0.30 | 0.46 | Demasiado conservador, solo exactos |
+| Semantic (embeddings) | 0.00 | 0.00 | 0.00 | **BUG**: should_merge() rechaza todos los casos |
+| Combined(any) | 1.00 | 0.90 | 0.95 | Igual que normalizacion (domina el voto) |
+| Combined(majority) | 1.00 | 0.30 | 0.46 | Igual que string_sim (semantic siempre NO) |
+
+**Conclusion Fusion**: La normalizacion es el metodo dominante y funciona bien (F1=0.95). La fusion semantica esta rota (BUG en should_merge). String similarity es demasiado estricta. Falta soporte para diminutivos y nicknames.
+
+### 9.3 Attribute Extraction
+
+| Metodo | Recall | Precision | Notas |
+|--------|--------|-----------|-------|
+| Patterns (regex) | ~55% | ~67% | Detecta color, altura. Bug: proximity bias (hair -> "alta") |
+| Dependency (spaCy) | 0% | N/A | **BUG**: devuelve 0 atributos siempre |
+| Embeddings | N/A | N/A | Requiere modelo cargado |
+| LLM (Ollama) | N/A | N/A | Ollama caido durante tests |
+| Combined (votacion) | **45%** | **82%** | 9/20 correctos, 1 entidad incorrecta |
+
+**Detalle por caso de atributos combinados**:
+- Caso 1 (Maria, descriptiva): 3/3 OK + 1 wrong entity (hair -> "alta")
+- Caso 2 (Pedro, adjetivo): 1/3 OK (solo ojos, no rubio ni carpintero)
+- Caso 3 (Ana, titulo): 1/2 OK (profesion si, pelo no)
+- Caso 4 (Carlos/Lucia, 2 personajes): 1/4 OK (solo Carlos alto)
+- Caso 5 (Martinez, titulo+desc): 2/3 OK (profesion + delgado, no canoso)
+- Caso 6 (Elena, negacion): 0/2 OK (negacion no detectada, atributo a "no")
+- Caso 7 (Rosa, dialogo): 0/1 OK (autodescripcion en dialogo no detectada)
+- Caso 8 (Juan/Pablo, comparacion): 1/2 OK (Pablo si, Juan no)
+
+**Problemas clave encontrados**:
+1. `_extract_by_dependency()` devuelve 0 resultados siempre (BUG)
+2. Proximity bias asigna al token anterior, no a la entidad correcta
+3. Negacion "no era alta" genera atributo positivo (BUG)
+4. Atributos en dialogo no detectados (0%)
+5. Escenas multi-personaje pierden atributos del segundo personaje
+6. "rubio" en "joven rubio" no se extrae (patron no reconocido)
+
+### 9.4 Resumen Comparativo
+
+```
+                    Precision  Recall   F1      Estado
+NER (spaCy base)      1.00      1.00   1.00    EXCELENTE
+Fusion (normalizacion) 1.00     0.90   0.95    MUY BUENO
+Fusion (semantica)     0.00     0.00   0.00    ROTO
+Atributos (combinado)  0.82     0.45   0.58    DEFICIENTE
+Atributos (dependencia) N/A     0.00   0.00    ROTO
+Speaker attribution    N/A      0.00   0.00    ROTO sin coref
+Consistencia           N/A      0.00   0.00    NO FUNCIONA
+```
+
+### 9.5 Recomendaciones por Metodo
+
+1. **NER**: No tocar spaCy base. Arreglar NERExtractor wrapper.
+2. **Fusion**: Arreglar should_merge() API. Normalizacion funciona excelente.
+3. **Atributos**: Arreglar dependency extractor (prioridad 1). Corregir proximity bias. Implementar deteccion de negacion.
+4. **Speaker**: Implementar fallback de patrones basicos sin coreference.
+5. **Consistencia**: Depende de que atributos se extraigan correctamente primero.
+
+### 9.6 Votacion vs Metodo Individual
+
+En TODOS los sistemas evaluados, **un unico metodo domina**:
+- NER: spaCy base solo > spaCy + post-procesado
+- Fusion: Normalizacion sola = Combined(any) >> Combined(majority)
+- Atributos: Patterns solo > Combined (porque dependency/embeddings/LLM fallan)
+
+**Conclusion**: La votacion multi-metodo NO mejora resultados actualmente porque:
+1. Los metodos secundarios estan rotos (dependency=0, semantic=0, LLM caido)
+2. Cuando un metodo falla, arrastra el voto combinado
+3. Se recomienda **arreglar cada metodo individualmente** antes de optimizar la votacion
