@@ -124,6 +124,32 @@ class RegexExtractor(BaseExtractor):
         (r'(?P<entity>\w+)\s+era\s+(?P<value>joven|viej[oa]|ancian[oa]|mayor)', 0.85),
     ]
 
+    # Patrones para profesión (genéricos por sufijo + estructura sintáctica)
+    PROFESSION_PATTERNS = [
+        # "el detective Ruiz", "la doctora Ana", "el profesor Martinez"
+        (r'(?:[Ee]l|[Ll]a)\s+(?P<value>(?:\w+(?:ero|era|ista|or|ora|nte|dor|dora|tor|tora|ogo|oga|ario|aria|ivo|iva|ico|ica|ino|ina|ador|adora)))\s+(?P<entity>[A-ZÁÉÍÓÚÜÑ]\w+)', 0.90),
+        # "Pedro, un joven carpintero" / "Ana, una gran detective"
+        (r'(?P<entity>[A-ZÁÉÍÓÚÜÑ]\w+),\s+(?:un[oa]?\s+)?(?:\w+\s+)?(?P<value>\w+(?:ero|era|ista|or|ora|nte|dor|dora|tor|tora|ogo|oga|ario|aria|ivo|iva|ico|ica|ino|ina|ador|adora))\b', 0.80),
+        # "trabajaba como carpintero" / "trabaja de detective"
+        (r'trabaj(?:a|aba|ó)\s+(?:como|de)\s+(?P<value>\w+)', 0.85),
+        # "era carpintero" / "es médico" (sin artículo)
+        (r'(?P<entity>[A-ZÁÉÍÓÚÜÑ]\w+)\s+(?:era|es|fue|será)\s+(?:un[oa]?\s+)?(?P<value>(?:\w+(?:ero|era|ista|or|ora|nte|dor|dora|tor|tora|ogo|oga|ario|aria|ico|ica|ino|ina)))\b', 0.80),
+        # "la bibliotecaria del pueblo" -> apposition with article
+        (r'(?:[Ee]l|[Ll]a)\s+(?P<value>(?:\w+(?:ero|era|ista|or|ora|nte|dor|dora|tor|tora|ogo|oga|ario|aria|ivo|iva|ico|ica|ino|ina|ador|adora)))\s+(?:del?\s+\w+)', 0.75),
+    ]
+
+    # Palabras que coinciden con sufijos profesionales pero NO son profesiones
+    PROFESSION_EXCLUSIONS = {
+        "primero", "primera", "tercero", "tercera", "sincero", "sincera",
+        "entero", "entera", "ligero", "ligera", "severo", "severa",
+        "verdadero", "verdadera", "pasajero", "pasajera", "soltero", "soltera",
+        "certero", "certera", "guerrero", "guerrera",
+        "manera", "cantera", "madera", "ladera", "pradera", "carretera",
+        "anterior", "exterior", "interior", "superior", "inferior", "posterior",
+        "mejor", "peor", "mayor", "menor",
+        "oscuro", "oscura", "claro", "clara",
+    }
+
     # Indicadores de metáfora (para filtrar)
     METAPHOR_INDICATORS = [
         r'\bcomo\s+(?:el|la|un|una)\b',
@@ -171,6 +197,10 @@ class RegexExtractor(BaseExtractor):
             (re.compile(p, re.IGNORECASE), conf)
             for p, conf in self.AGE_PATTERNS
         ]
+        self._profession_patterns = [
+            (re.compile(p, re.UNICODE), conf)
+            for p, conf in self.PROFESSION_PATTERNS
+        ]
 
         self._metaphor_re = [
             re.compile(p, re.IGNORECASE) for p in self.METAPHOR_INDICATORS
@@ -192,6 +222,7 @@ class RegexExtractor(BaseExtractor):
             AttributeType.HEIGHT,
             AttributeType.BUILD,
             AttributeType.AGE,
+            AttributeType.PROFESSION,
         }
 
     def can_handle(self, context: ExtractionContext) -> float:
@@ -289,6 +320,15 @@ class RegexExtractor(BaseExtractor):
                     context.text,
                     self._age_patterns,
                     AttributeType.AGE,
+                    entity_names_lower,
+                    entity_names_list,
+                    context.chapter,
+                )
+            )
+
+            attributes.extend(
+                self._extract_professions(
+                    context.text,
                     entity_names_lower,
                     entity_names_list,
                     context.chapter,
@@ -410,6 +450,72 @@ class RegexExtractor(BaseExtractor):
                     chapter=chapter,
                     is_negated=is_negated,
                     is_metaphor=is_metaphor,
+                ))
+
+        return attributes
+
+    def _extract_professions(
+        self,
+        text: str,
+        entity_names: set[str],
+        entity_names_list: list[str],
+        chapter: Optional[int],
+    ) -> list[ExtractedAttribute]:
+        """
+        Extrae profesiones usando patrones de sufijo + estructura sintáctica.
+
+        Detecta profesiones genéricamente por sufijos productivos del español:
+        -ero/a, -ista, -or/a, -nte, -dor/a, -ico/a, -ario/a, -ogo/a, etc.
+        """
+        attributes = []
+
+        for pattern, base_confidence in self._profession_patterns:
+            for match in pattern.finditer(text):
+                try:
+                    value = match.group("value")
+                except IndexError:
+                    continue
+
+                if not value or len(value) < 4:
+                    continue
+
+                # Filtrar exclusiones (palabras que coinciden con sufijos pero no son profesiones)
+                if value.lower() in self.PROFESSION_EXCLUSIONS:
+                    continue
+
+                # Obtener entidad del patrón o buscar la más cercana
+                try:
+                    entity = match.group("entity")
+                except IndexError:
+                    entity = None
+
+                if not entity or entity.lower() not in entity_names:
+                    entity = self._find_nearest_entity(
+                        text, match.start(), entity_names_list
+                    )
+
+                if not entity:
+                    continue
+
+                # Verificar que la entidad existe en nuestro contexto
+                if entity.lower() not in entity_names:
+                    matched_entity = None
+                    for name in entity_names:
+                        if entity.lower() in name or name in entity.lower():
+                            matched_entity = name
+                            break
+                    if matched_entity:
+                        entity = matched_entity
+                    else:
+                        continue
+
+                attributes.append(self._create_attribute(
+                    entity_name=entity,
+                    attr_type=AttributeType.PROFESSION,
+                    value=value.strip(),
+                    confidence=base_confidence,
+                    source_text=match.group(0),
+                    chapter=chapter,
                 ))
 
         return attributes

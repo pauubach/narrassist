@@ -84,6 +84,280 @@ PREFIXES_TO_STRIP = [
 PREFIXES_TO_STRIP_SORTED = sorted(PREFIXES_TO_STRIP, key=len, reverse=True)
 
 
+# =============================================================================
+# Tabla de hipocorísticos españoles (diminutivos de nombres propios)
+# =============================================================================
+
+# Mapeo bidireccional: nombre formal → hipocorísticos conocidos
+# Fuente: RAE, uso común en España y Latinoamérica
+SPANISH_HYPOCORISTICS: dict[str, list[str]] = {
+    # -------------------------------------------------------------------------
+    # Masculinos
+    # -------------------------------------------------------------------------
+    "adolfo": ["fito"],
+    "agustin": ["agus"],
+    "alberto": ["berto", "alber", "beti", "bertin", "tito"],
+    "alejandro": ["alex", "álex", "alejo", "jandro", "sandro"],
+    "alfredo": ["fredo", "fred", "alfre"],
+    "alfonso": ["poncho", "fonso", "fonsi", "foncho"],
+    "alvaro": ["alvarito"],
+    "anastasio": ["tasio"],
+    "andres": ["andy"],
+    "angel": ["gelo"],
+    "antonio": ["toño", "toni", "toñin", "toñín"],
+    "bartolome": ["tolo"],
+    "carlos": ["charly", "carlitos"],
+    "constantino": ["tino"],
+    "daniel": ["dani"],
+    "david": ["davi"],
+    "domingo": ["mingo"],
+    "eduardo": ["edu", "lalo"],
+    "emilio": ["milo"],
+    "enrique": ["quique", "kike", "tico"],
+    "ernesto": ["neto"],
+    "esteban": ["estebi"],
+    "federico": ["fede", "quico"],
+    "felipe": ["pipe", "feli"],
+    "fernando": ["fer", "nando"],
+    "florentino": ["flo"],
+    "francisco": ["paco", "pancho", "pacho", "curro", "fran", "quico", "kiko", "cisco"],
+    "gabriel": ["gabi"],
+    "gonzalo": ["gonzo", "gonza", "chalo"],
+    "gregorio": ["goyo"],
+    "guillermo": ["guille", "memo", "willy"],
+    "ignacio": ["nacho", "iñaki"],
+    "inocencio": ["chencho"],
+    "jaime": ["jaimito"],
+    "javier": ["javi"],
+    "jesus": ["chucho", "chuy", "chu", "chus", "chechu", "chule", "xule"],
+    "joaquin": ["quino", "kin", "ximo", "chimo"],
+    "jorge": ["coque"],
+    "jose": ["pepe", "chepe", "pepito", "pepin", "pepín"],
+    "josemaria": ["chema", "chemari"],
+    "joseramon": ["joserra"],
+    "juan": ["juanito", "juancho"],
+    "juanmanuel": ["juanma"],
+    "leonardo": ["leo", "nardo"],
+    "leoncio": ["leo"],
+    "leopoldo": ["leo", "polo"],
+    "lorenzo": ["lencho"],
+    "luis": ["lucho"],
+    "manuel": ["manolo", "manu", "manolito", "lolo", "nolo"],
+    "marcelo": ["chelo"],
+    "marcos": ["marquitos"],
+    "mateo": ["teo"],
+    "miguel": ["migue"],
+    "nicolas": ["nico"],
+    "pablo": ["pablito"],
+    "patricio": ["pato"],
+    "pedro": ["perico"],
+    "rafael": ["rafa", "rafi"],
+    "ramon": ["moncho"],
+    "ricardo": ["richi", "ricky"],
+    "roberto": ["beto", "robi"],
+    "rodolfo": ["rudi", "fito"],
+    "rodrigo": ["rodri"],
+    "salvador": ["salva", "chava"],
+    "santiago": ["santi", "diego", "yago"],
+    "sebastian": ["sebas"],
+    "sergio": ["sergi", "checo"],
+    "teodoro": ["teo"],
+    "valentin": ["vale"],
+    "vicente": ["chente", "vicen"],
+    # -------------------------------------------------------------------------
+    # Femeninos
+    # -------------------------------------------------------------------------
+    "adolfa": ["dolfi", "fita"],
+    "antonia": ["toña", "toni"],
+    "asuncion": ["asun", "chon"],
+    "beatriz": ["bea"],
+    "carmen": ["carmela", "menchu", "carmina"],
+    "carolina": ["carol", "caro"],
+    "catalina": ["cata", "lina"],
+    "claudia": ["clau"],
+    "concepcion": ["concha", "conchita", "conchi"],
+    "consuelo": ["chelo"],
+    "cristina": ["cris"],
+    "dolores": ["lola", "loles", "lolita", "loli"],
+    "elena": ["nena"],
+    "enriqueta": ["queta"],
+    "esperanza": ["espe"],
+    "eulalia": ["lali"],
+    "francisca": ["paca", "paquita", "curra", "fran", "chesca", "cisca"],
+    "gregoria": ["goyi"],
+    "guadalupe": ["lupe", "lupita"],
+    "inmaculada": ["inma"],
+    "irene": ["ire"],
+    "isabel": ["isa", "chabela", "chavela", "beli", "chabeli"],
+    "josefa": ["pepa", "pepita", "pepi"],
+    "leocadia": ["leo", "cadia"],
+    "leoncia": ["leo"],
+    "leonor": ["leo", "nora"],
+    "lucia": ["luci", "lu"],
+    "luisa": ["lucha"],
+    "macarena": ["maca"],
+    "magdalena": ["magda", "malena", "malen"],
+    "manuela": ["manoli"],
+    "margarita": ["marga", "cuqui"],
+    "maria": ["mari", "marita"],
+    "mariaangeles": ["nines", "mariangeles"],
+    "mariacarmen": ["mamen", "maricarmen"],
+    "mariadolores": ["marilo"],
+    "mariaeugenia": ["maru"],
+    "mariaisabel": ["marisa"],
+    "mariajose": ["majo"],
+    "marialuisa": ["malu", "magüi"],
+    "mariateresa": ["maite", "maritere"],
+    "mariavictoria": ["marivi"],
+    "mercedes": ["meche", "merche", "menchu"],
+    "milagros": ["mila"],
+    "montserrat": ["montse"],
+    "natalia": ["nati", "nata"],
+    "patricia": ["patri", "pati"],
+    "pilar": ["pili", "piluca"],
+    "purificacion": ["puri"],
+    "remedios": ["reme"],
+    "rosa": ["rosi", "rosita"],
+    "rosario": ["charo", "chayo", "rosi"],
+    "silvia": ["silvi"],
+    "socorro": ["coco"],
+    "soledad": ["sole", "chole", "marisol"],
+    "susana": ["susi"],
+    "teresa": ["tere"],
+    "veronica": ["vero"],
+    "victoria": ["vicky", "vicki"],
+    "virginia": ["virgi"],
+}
+
+# Construir índice inverso: hipocorístico → nombres formales posibles
+# Un hipocorístico puede corresponder a varios nombres (ej: "leo" → leonardo, leoncio)
+_HYPOCORISTIC_TO_FORMALS: dict[str, list[str]] = {}
+for _formal, _hyps in SPANISH_HYPOCORISTICS.items():
+    for _h in _hyps:
+        _key = _h.lower()
+        if _key not in _HYPOCORISTIC_TO_FORMALS:
+            _HYPOCORISTIC_TO_FORMALS[_key] = []
+        _HYPOCORISTIC_TO_FORMALS[_key].append(_formal)
+
+# Compatibilidad: primer formal encontrado (para get_formal_name)
+_HYPOCORISTIC_TO_FORMAL: dict[str, str] = {
+    k: v[0] for k, v in _HYPOCORISTIC_TO_FORMALS.items()
+}
+
+# Sufijos diminutivos productivos en español
+DIMINUTIVE_SUFFIXES = [
+    ("ito", ""),     # Juanito → Juan
+    ("ita", ""),     # Anita → Ana (pero no "bonita")
+    ("illo", ""),    # Juanillo → Juan
+    ("illa", ""),    # Rosilla → Rosa (raro en nombres)
+    ("ín", ""),      # Pepín → Pepe / Agustín (nombre propio, no diminutivo)
+    ("ina", ""),     # Josefina → Josefa (cuidado: algunos son nombres propios)
+    ("ico", ""),     # Perico → Pedro (regional)
+    ("ica", ""),     # Federica → (nombre propio)
+    ("ete", ""),     # Juanete → (no aplica bien a nombres)
+    ("uela", ""),    # Solo en raros casos
+    ("uelo", ""),    # Solo en raros casos
+]
+
+
+def get_formal_name(name: str) -> Optional[str]:
+    """
+    Obtiene el nombre formal a partir de un hipocorístico.
+
+    Args:
+        name: Nombre que puede ser un hipocorístico (ej: "Paco")
+
+    Returns:
+        Nombre formal si existe (ej: "Francisco"), o None
+
+    Examples:
+        >>> get_formal_name("Paco")
+        'francisco'
+        >>> get_formal_name("Lola")
+        'dolores'
+        >>> get_formal_name("Juan")  # No es hipocorístico
+    """
+    name_lower = strip_accents(name.lower().strip())
+    return _HYPOCORISTIC_TO_FORMAL.get(name_lower)
+
+
+def get_hypocoristics(name: str) -> list[str]:
+    """
+    Obtiene los hipocorísticos de un nombre formal.
+
+    Args:
+        name: Nombre formal (ej: "Francisco")
+
+    Returns:
+        Lista de hipocorísticos conocidos (ej: ["paco", "pancho", "curro"])
+
+    Examples:
+        >>> get_hypocoristics("Francisco")
+        ['paco', 'pancho', 'curro', 'fran', 'quico', 'cisco']
+    """
+    name_lower = strip_accents(name.lower().strip())
+    return SPANISH_HYPOCORISTICS.get(name_lower, [])
+
+
+def are_hypocoristic_match(name1: str, name2: str) -> bool:
+    """
+    Comprueba si dos nombres son el mismo a través de hipocorísticos.
+
+    Detecta tanto el mapeo directo (Paco↔Francisco) como
+    hipocorísticos del mismo nombre (Paco↔Curro, ambos de Francisco).
+
+    Args:
+        name1: Primer nombre
+        name2: Segundo nombre
+
+    Returns:
+        True si son variantes del mismo nombre
+
+    Examples:
+        >>> are_hypocoristic_match("Paco", "Francisco")
+        True
+        >>> are_hypocoristic_match("Paco", "Curro")  # ambos de Francisco
+        True
+        >>> are_hypocoristic_match("Juan", "Pedro")
+        False
+    """
+    n1 = strip_accents(name1.lower().strip())
+    n2 = strip_accents(name2.lower().strip())
+
+    if n1 == n2:
+        return True
+
+    # Generar variantes: forma simple + forma compuesta sin espacios
+    # "jose maria" → ["jose maria", "josemaria"]
+    def _variants(name: str) -> list[str]:
+        vs = [name]
+        if " " in name:
+            vs.append(name.replace(" ", ""))
+        return vs
+
+    variants1 = _variants(n1)
+    variants2 = _variants(n2)
+
+    for v1 in variants1:
+        for v2 in variants2:
+            # Caso 1: ambos son hipocorísticos del mismo nombre formal
+            # Usar lista de posibles formales (leo → [leonardo, leoncio, leopoldo])
+            formals1 = _HYPOCORISTIC_TO_FORMALS.get(v1, [v1])
+            formals2 = _HYPOCORISTIC_TO_FORMALS.get(v2, [v2])
+
+            # Si comparten algún nombre formal → match
+            if set(formals1) & set(formals2):
+                return True
+
+            # Caso 2: uno es formal y el otro está en sus hipocorísticos
+            if v2 in SPANISH_HYPOCORISTICS.get(v1, []):
+                return True
+            if v1 in SPANISH_HYPOCORISTICS.get(v2, []):
+                return True
+
+    return False
+
+
 def strip_accents(text: str) -> str:
     """
     Quita acentos diacríticos del texto para comparación.
@@ -278,7 +552,32 @@ def names_match_after_normalization(name1: str, name2: str) -> bool:
     variants1_lower = {v.lower() for v in variants1}
     variants2_lower = {v.lower() for v in variants2}
 
-    return bool(variants1_lower & variants2_lower)
+    if variants1_lower & variants2_lower:
+        return True
+
+    # Verificar con normalización: contención a nivel de palabras
+    # "garcia" ⊂ "maria garcia" → True (palabras completas)
+    # "carlos" ⊄ "carolina" → False (no es palabra completa)
+    n1_normalized = normalize_for_comparison(name1)
+    n2_normalized = normalize_for_comparison(name2)
+
+    words1 = set(n1_normalized.split()) if n1_normalized else set()
+    words2 = set(n2_normalized.split()) if n2_normalized else set()
+
+    if words1 and words2:
+        # Si todas las palabras de uno están en el otro → match
+        if words1 <= words2 or words2 <= words1:
+            return True
+
+    # Verificar hipocorísticos (Paco ↔ Francisco, Lola ↔ Dolores)
+    # Extraer primer nombre (sin apellidos) para comparar hipocorísticos
+    first1 = n1_normalized.split()[0] if n1_normalized else ""
+    first2 = n2_normalized.split()[0] if n2_normalized else ""
+
+    if first1 and first2 and are_hypocoristic_match(first1, first2):
+        return True
+
+    return False
 
 
 @dataclass

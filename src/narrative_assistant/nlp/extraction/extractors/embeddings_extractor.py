@@ -95,7 +95,10 @@ class EmbeddingsExtractor(BaseExtractor):
     Funciona de forma complementaria a regex/dependency:
     - Clasifica valores ambiguos (¿"oscuro" es pelo o piel?)
     - Valida extracciones de otros métodos
-    - Encuentra atributos mediante búsqueda semántica
+    - Encuentra atributos mediante búsqueda semántica con sub-frases
+
+    Usa sub-frases (cláusulas separadas por comas, "y", "de") en vez de
+    oraciones completas para mejorar la señal semántica de cada atributo.
 
     Example:
         >>> extractor = EmbeddingsExtractor()
@@ -104,12 +107,14 @@ class EmbeddingsExtractor(BaseExtractor):
         >>> print(attr_type)  # AttributeType.HAIR_COLOR
     """
 
-    def __init__(self, similarity_threshold: float = 0.6):
+    def __init__(self, similarity_threshold: float = 0.40):
         """
         Inicializa el extractor.
 
         Args:
-            similarity_threshold: Umbral mínimo de similaridad semántica
+            similarity_threshold: Umbral mínimo de similaridad semántica.
+                                  Default 0.40 (reducido de 0.60 para funcionar
+                                  con sub-frases de oraciones descriptivas).
         """
         self.similarity_threshold = similarity_threshold
         self._embeddings = None
@@ -232,39 +237,71 @@ class EmbeddingsExtractor(BaseExtractor):
     ) -> list[ExtractedAttribute]:
         """
         Extrae atributos para una entidad específica.
+
+        Usa sub-frases (cláusulas) en vez de oraciones completas para mejorar
+        la señal semántica. Una oración como "era alta, de cabello negro y
+        ojos verdes" se divide en ["era alta", "de cabello negro", "ojos verdes"].
         """
+        import re
         attributes = []
 
         # Encontrar oraciones que mencionan la entidad
         sentences = self._find_entity_sentences(text, entity_name)
 
         for sentence in sentences:
-            # Calcular embedding de la oración (normalizado)
-            sent_embedding = self._embeddings.encode(sentence, normalize=True)
+            # Dividir en sub-frases para mejorar señal semántica
+            subphrases = self._split_into_subphrases(sentence)
 
-            # Comparar con templates de cada tipo de atributo
-            for attr_type, value_embs in self._value_embeddings.items():
-                for value, value_emb in value_embs.items():
-                    # Calcular similitud coseno directamente entre embeddings
-                    similarity = self._compute_similarity(sent_embedding, value_emb)
+            for subphrase in subphrases:
+                if len(subphrase.split()) < 2:
+                    continue  # Ignorar sub-frases muy cortas
 
-                    if similarity >= self.similarity_threshold:
-                        # Verificar que el valor aparece en la oración
-                        if value.lower() in sentence.lower():
-                            # Verificar que la entidad es el sujeto, no el objeto
-                            if self._is_entity_subject(sentence, entity_name, value):
-                                # Validar que el tipo de atributo coincide con la parte del cuerpo
-                                if self._validate_body_part_context(attr_type, sentence):
-                                    attributes.append(self._create_attribute(
-                                        entity_name=entity_name,
-                                        attr_type=attr_type,
-                                        value=value,
-                                        confidence=float(similarity) * 0.8,  # Reducir un poco
-                                        source_text=sentence,
-                                        chapter=chapter,
-                                    ))
+                # Calcular embedding de la sub-frase (normalizado)
+                sub_embedding = self._embeddings.encode(subphrase, normalize=True)
+
+                # Comparar con templates de cada tipo de atributo
+                for attr_type, value_embs in self._value_embeddings.items():
+                    for value, value_emb in value_embs.items():
+                        similarity = self._compute_similarity(sub_embedding, value_emb)
+
+                        if similarity >= self.similarity_threshold:
+                            # Verificar que el valor aparece en la sub-frase o la oración
+                            if value.lower() in subphrase.lower() or value.lower() in sentence.lower():
+                                # Verificar que la entidad es el sujeto
+                                if self._is_entity_subject(sentence, entity_name, value):
+                                    # Validar body part context contra la oración completa
+                                    if self._validate_body_part_context(attr_type, sentence):
+                                        attributes.append(self._create_attribute(
+                                            entity_name=entity_name,
+                                            attr_type=attr_type,
+                                            value=value,
+                                            confidence=float(similarity) * 0.85,
+                                            source_text=sentence,
+                                            chapter=chapter,
+                                        ))
 
         return attributes
+
+    def _split_into_subphrases(self, sentence: str) -> list[str]:
+        """
+        Divide una oración en sub-frases semánticas.
+
+        Separadores: comas, "y", "de" (cuando precede descripción),
+        punto y coma, guiones largos.
+
+        Ejemplo: "era alta, de cabello negro azabache y ojos verdes"
+        → ["era alta", "de cabello negro azabache", "ojos verdes"]
+        """
+        import re
+        # Separar por comas, " y ", punto y coma, guiones largos
+        parts = re.split(r',\s*|\s+y\s+|;\s*|—', sentence)
+        subphrases = [p.strip() for p in parts if p.strip()]
+
+        # También incluir la oración completa como fallback
+        if len(subphrases) > 1:
+            subphrases.append(sentence)
+
+        return subphrases
 
     def _is_entity_subject(
         self,
