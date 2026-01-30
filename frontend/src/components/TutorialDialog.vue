@@ -591,16 +591,17 @@ watch(() => props.visible, (newValue) => {
 })
 
 const nextStep = async () => {
-  if (currentStep.value === 0 && !systemCapabilities.value) {
-    await loadCapabilities()
-  }
-
   if (currentStep.value === 3) {
     // Aplicar configuración recomendada al pasar del paso de hardware
     applyRecommendedConfig()
   }
 
   currentStep.value++
+
+  // Si llegamos al paso de hardware y no tenemos capabilities, cargarlas
+  if (currentStep.value === 3 && !systemCapabilities.value) {
+    await loadCapabilities()
+  }
 }
 
 const prevStep = () => {
