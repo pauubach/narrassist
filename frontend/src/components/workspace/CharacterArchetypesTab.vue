@@ -6,12 +6,13 @@
  * basándose en arco, relaciones, interacciones e importancia.
  */
 
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import ProgressSpinner from 'primevue/progressspinner'
 import { apiUrl } from '@/config/api'
+import AnalysisErrorState from '@/components/shared/AnalysisErrorState.vue'
 
 const props = defineProps<{
   projectId: number
@@ -46,24 +47,36 @@ interface ArchetypeReport {
 
 const loading = ref(false)
 const report = ref<ArchetypeReport | null>(null)
+const errorMsg = ref<string | null>(null)
 const expandedCharacter = ref<number | null>(null)
 
 onMounted(() => {
   analyze()
 })
 
+watch(() => props.projectId, () => {
+  report.value = null
+  errorMsg.value = null
+  analyze()
+})
+
 async function analyze() {
   loading.value = true
+  errorMsg.value = null
   try {
     const response = await fetch(
       apiUrl(`/api/projects/${props.projectId}/character-archetypes`)
     )
+    if (!response.ok) throw new Error(`Error del servidor (${response.status})`)
     const data = await response.json()
     if (data.success) {
       report.value = data.data
+    } else {
+      errorMsg.value = data.error || 'Error al analizar arquetipos'
     }
   } catch (error) {
     console.error('Error analyzing character archetypes:', error)
+    errorMsg.value = error instanceof Error ? error.message : 'Error de conexión'
   } finally {
     loading.value = false
   }
@@ -134,6 +147,9 @@ function getConfidenceSeverity(c: number): 'success' | 'warn' | 'secondary' {
       <ProgressSpinner />
       <p>Analizando arquetipos de personajes...</p>
     </div>
+
+    <!-- Error -->
+    <AnalysisErrorState v-else-if="errorMsg" :message="errorMsg" :on-retry="analyze" />
 
     <!-- Empty -->
     <div v-else-if="!report" class="empty-state">

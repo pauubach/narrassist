@@ -27,6 +27,9 @@
       <p>Analizando densidad sensorial...</p>
     </div>
 
+    <!-- Error -->
+    <AnalysisErrorState v-else-if="errorMsg" :message="errorMsg" :on-retry="analyze" />
+
     <!-- Empty state -->
     <div v-else-if="!report" class="empty-state">
       <i class="pi pi-info-circle"></i>
@@ -249,7 +252,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
@@ -259,6 +262,7 @@ import AccordionPanel from 'primevue/accordionpanel'
 import AccordionHeader from 'primevue/accordionheader'
 import AccordionContent from 'primevue/accordioncontent'
 import { apiUrl } from '@/config/api'
+import AnalysisErrorState from '@/components/shared/AnalysisErrorState.vue'
 
 const props = defineProps<{
   projectId: number
@@ -266,6 +270,7 @@ const props = defineProps<{
 
 const loading = ref(false)
 const report = ref<any>(null)
+const errorMsg = ref<string | null>(null)
 const filterSense = ref<string | null>(null)
 const page = ref(0)
 const pageSize = 20
@@ -332,10 +337,17 @@ const paginatedDetails = computed(() => {
   return filteredDetails.value.slice(start, start + pageSize)
 })
 
+watch(() => props.projectId, () => {
+  report.value = null
+  errorMsg.value = null
+})
+
 async function analyze() {
   loading.value = true
+  errorMsg.value = null
   try {
     const res = await fetch(apiUrl(`/api/projects/${props.projectId}/sensory-report`))
+    if (!res.ok) throw new Error(`Error del servidor (${res.status})`)
     const json = await res.json()
     if (json.success) {
       report.value = json.data
@@ -343,9 +355,12 @@ async function analyze() {
       if (json.data.sense_names) {
         Object.assign(senseNames, json.data.sense_names)
       }
+    } else {
+      errorMsg.value = json.error || 'Error al analizar reporte sensorial'
     }
   } catch (e) {
     console.error('Sensory report error:', e)
+    errorMsg.value = e instanceof Error ? e.message : 'Error de conexión'
   } finally {
     loading.value = false
   }

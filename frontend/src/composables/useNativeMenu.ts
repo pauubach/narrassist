@@ -18,6 +18,8 @@ interface MenuEventHandlers {
   onPauseAnalysis?: () => void
   onTutorial?: () => void
   onKeyboardShortcuts?: () => void
+  onAbout?: () => void
+  onUserGuide?: () => void
 }
 
 export function useNativeMenu(handlers: MenuEventHandlers = {}) {
@@ -125,9 +127,21 @@ export function useNativeMenu(handlers: MenuEventHandlers = {}) {
         handlers.onKeyboardShortcuts?.()
         break
 
+      case 'about':
+        handlers.onAbout?.()
+        break
+
+      case 'user_guide':
+        handlers.onUserGuide?.()
+        break
+
       case 'check_updates':
         // TODO: Implementar verificacion de actualizaciones
         console.log('[Menu] Check updates - not implemented yet')
+        break
+
+      default:
+        console.log('[Menu] Unhandled event:', eventId)
         break
     }
   }

@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useAnalysisStore } from '@/stores/analysis'
 import { useAppStore } from '@/stores/app'
+import { useSystemStore } from '@/stores/system'
 import ProgressBar from 'primevue/progressbar'
 import Button from 'primevue/button'
 
@@ -41,9 +42,23 @@ const props = withDefaults(defineProps<Props>(), {
 
 const analysisStore = useAnalysisStore()
 const appStore = useAppStore()
+const systemStore = useSystemStore()
 
-// Versión de la aplicación (desde el backend)
-const appVersion = computed(() => appStore.backendVersion || '0.1.0')
+// Versión de la aplicación (desde el backend, con fallback entre stores)
+// systemStore se inicializa via waitForBackend() en ModelSetupDialog al arrancar
+// appStore se inicializa via checkBackendHealth() en HomeView
+const appVersion = computed(() =>
+  appStore.backendVersion
+  || (systemStore.backendVersion !== 'unknown' ? systemStore.backendVersion : null)
+  || '0.3.34'
+)
+
+// Si aún no tenemos versión, lanzar health check
+onMounted(async () => {
+  if (!appStore.backendVersion) {
+    await appStore.checkBackendHealth()
+  }
+})
 
 // Estado local para expandir/colapsar detalles
 const showDetails = ref(false)

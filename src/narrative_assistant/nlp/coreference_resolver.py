@@ -611,7 +611,7 @@ class EmbeddingsCorefMethod:
 
             # Calcular similitud
             try:
-                similarity = self.embeddings.compute_similarity(
+                similarity = self.embeddings.similarity(
                     anaphor_context,
                     candidate_context
                 )

@@ -14,7 +14,7 @@ describe('useDocumentTypeConfig', () => {
       expect(config.value.typeLabel).toBe('Ficción')
       expect(config.value.tabs.timeline).toBe(true)
       expect(config.value.tabs.relations).toBe(true)
-      expect(config.value.tabLabels.entities).toBe('Personajes')
+      expect(config.value.tabLabels.entities).toBe('Entidades')
     })
 
     it('oculta timeline y relaciones para autoayuda', () => {

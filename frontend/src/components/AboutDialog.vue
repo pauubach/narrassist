@@ -85,7 +85,7 @@ const isVisible = computed({
 })
 
 // Versión desde el backend
-const version = computed(() => systemStore.backendVersion || '0.1.0')
+const version = computed(() => systemStore.backendVersion || '0.3.34')
 
 const backendStatus = computed(() => ({
   connected: systemStore.backendConnected,

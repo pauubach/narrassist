@@ -515,7 +515,7 @@ class ChapterSummaryAnalyzer:
 
     def _get_chapters(self, project_id: int) -> list[dict]:
         """Obtiene los capítulos del proyecto."""
-        with self.db.connect() as conn:
+        with self.db.connection() as conn:
             cursor = conn.execute(
                 """
                 SELECT id, chapter_number, title, word_count, start_char, end_char, content
@@ -529,7 +529,7 @@ class ChapterSummaryAnalyzer:
 
     def _get_characters(self, project_id: int) -> dict[int, str]:
         """Obtiene todos los personajes del proyecto."""
-        with self.db.connect() as conn:
+        with self.db.connection() as conn:
             cursor = conn.execute(
                 """
                 SELECT id, canonical_name
@@ -542,7 +542,7 @@ class ChapterSummaryAnalyzer:
 
     def _get_first_appearances(self, project_id: int) -> dict[int, int]:
         """Obtiene el capítulo de primera aparición de cada personaje."""
-        with self.db.connect() as conn:
+        with self.db.connection() as conn:
             cursor = conn.execute(
                 """
                 SELECT e.id, MIN(c.chapter_number) as first_chapter
@@ -560,7 +560,7 @@ class ChapterSummaryAnalyzer:
         self, project_id: int, chapter_id: int
     ) -> dict[int, list[dict]]:
         """Obtiene menciones agrupadas por entidad para un capítulo."""
-        with self.db.connect() as conn:
+        with self.db.connection() as conn:
             cursor = conn.execute(
                 """
                 SELECT em.entity_id, em.surface_form, em.start_char, em.end_char,
@@ -584,7 +584,7 @@ class ChapterSummaryAnalyzer:
 
     def _get_interactions_by_chapter(self, project_id: int, chapter_id: int) -> list[dict]:
         """Obtiene interacciones para un capítulo."""
-        with self.db.connect() as conn:
+        with self.db.connection() as conn:
             cursor = conn.execute(
                 """
                 SELECT i.*,
@@ -602,7 +602,7 @@ class ChapterSummaryAnalyzer:
 
     def _get_locations_by_chapter(self, project_id: int, chapter_id: int) -> list[str]:
         """Obtiene ubicaciones mencionadas en un capítulo."""
-        with self.db.connect() as conn:
+        with self.db.connection() as conn:
             cursor = conn.execute(
                 """
                 SELECT DISTINCT e.canonical_name
@@ -734,7 +734,7 @@ class ChapterSummaryAnalyzer:
         for char_id, char_name in all_characters.items():
             first_ch = first_appearances.get(char_id, 999)
             if first_ch < chapter_num and char_id not in characters_in_chapter:
-                with self.db.connect() as conn:
+                with self.db.connection() as conn:
                     cursor = conn.execute(
                         "SELECT mention_count FROM entities WHERE id = ?",
                         (char_id,)
@@ -1042,7 +1042,7 @@ class ChapterSummaryAnalyzer:
         """
         elements: list[ChekhovElement] = []
 
-        with self.db.connect() as conn:
+        with self.db.connection() as conn:
             # Obtener objetos del proyecto
             cursor = conn.execute(
                 """

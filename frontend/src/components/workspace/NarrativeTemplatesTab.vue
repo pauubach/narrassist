@@ -6,7 +6,7 @@
  * Save the Cat, Kishotenketsu, Cinco Actos). Herramienta diagnóstica, no prescriptiva.
  */
 
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
@@ -16,6 +16,7 @@ import AccordionPanel from 'primevue/accordionpanel'
 import AccordionHeader from 'primevue/accordionheader'
 import AccordionContent from 'primevue/accordioncontent'
 import { apiUrl } from '@/config/api'
+import AnalysisErrorState from '@/components/shared/AnalysisErrorState.vue'
 
 const props = defineProps<{
   projectId: number
@@ -57,23 +58,35 @@ interface TemplateReport {
 
 const loading = ref(false)
 const report = ref<TemplateReport | null>(null)
+const errorMsg = ref<string | null>(null)
 
 onMounted(() => {
   analyze()
 })
 
+watch(() => props.projectId, () => {
+  report.value = null
+  errorMsg.value = null
+  analyze()
+})
+
 async function analyze() {
   loading.value = true
+  errorMsg.value = null
   try {
     const response = await fetch(
       apiUrl(`/api/projects/${props.projectId}/narrative-templates`)
     )
+    if (!response.ok) throw new Error(`Error del servidor (${response.status})`)
     const data = await response.json()
     if (data.success) {
       report.value = data.data
+    } else {
+      errorMsg.value = data.error || 'Error al analizar plantillas narrativas'
     }
   } catch (error) {
     console.error('Error analyzing narrative templates:', error)
+    errorMsg.value = error instanceof Error ? error.message : 'Error de conexión'
   } finally {
     loading.value = false
   }
@@ -155,6 +168,9 @@ const sortedMatches = computed(() => {
       <ProgressSpinner />
       <p>Analizando estructura narrativa...</p>
     </div>
+
+    <!-- Error -->
+    <AnalysisErrorState v-else-if="errorMsg" :message="errorMsg" :on-retry="analyze" />
 
     <!-- Empty -->
     <div v-else-if="!report" class="empty-state">

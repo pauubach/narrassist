@@ -36,13 +36,14 @@
 </template>
 
 <script setup lang="ts">
-import { RouterView } from 'vue-router'
+import { RouterView, useRouter } from 'vue-router'
 import { onMounted, ref, watch, computed } from 'vue'
 import Toast from 'primevue/toast'
 import { useAppStore } from '@/stores/app'
 import { useThemeStore } from '@/stores/theme'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { useNativeMenu } from './composables/useNativeMenu'
+import { useWorkspaceStore } from '@/stores/workspace'
 import KeyboardShortcutsDialog from '@/components/KeyboardShortcutsDialog.vue'
 import AboutDialog from '@/components/AboutDialog.vue'
 import TutorialDialog from '@/components/TutorialDialog.vue'
@@ -51,9 +52,11 @@ import MenuBar from '@/components/MenuBar.vue'
 import ModelSetupDialog from '@/components/ModelSetupDialog.vue'
 import { useSystemStore } from '@/stores/system'
 
+const router = useRouter()
 const appStore = useAppStore()
 const systemStore = useSystemStore()
 const themeStore = useThemeStore()
+const workspaceStore = useWorkspaceStore()
 const showShortcutsHelp = ref(false)
 const showAbout = ref(false)
 const showTutorial = ref(false)
@@ -77,8 +80,23 @@ useKeyboardShortcuts()
 
 // Activar manejo de menú nativo de Tauri
 useNativeMenu({
+  onSettings: () => { router.push('/settings') },
+  onViewChange: (view: string) => {
+    // Map menu view IDs to workspace tab IDs
+    const tabMap: Record<string, string> = {
+      chapters: 'text',
+      entities: 'entities',
+      alerts: 'alerts',
+      relationships: 'relationships',
+      timeline: 'timeline',
+    }
+    const tab = tabMap[view] || view
+    workspaceStore.setActiveTab(tab as any)
+  },
   onTutorial: () => { showTutorial.value = true },
   onKeyboardShortcuts: () => { showShortcutsHelp.value = true },
+  onAbout: () => { showAbout.value = true },
+  onUserGuide: () => { showUserGuide.value = true },
 })
 
 // Verificar si se debe mostrar el tutorial al inicio

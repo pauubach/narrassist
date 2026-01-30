@@ -7,12 +7,13 @@
  * coherencia, estructura, equilibrio de personajes y tramas cerradas.
  */
 
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import ProgressSpinner from 'primevue/progressspinner'
 import { apiUrl } from '@/config/api'
+import AnalysisErrorState from '@/components/shared/AnalysisErrorState.vue'
 
 const props = defineProps<{
   projectId: number
@@ -41,23 +42,35 @@ interface HealthReport {
 
 const loading = ref(false)
 const report = ref<HealthReport | null>(null)
+const errorMsg = ref<string | null>(null)
 
 onMounted(() => {
   analyze()
 })
 
+watch(() => props.projectId, () => {
+  report.value = null
+  errorMsg.value = null
+  analyze()
+})
+
 async function analyze() {
   loading.value = true
+  errorMsg.value = null
   try {
     const response = await fetch(
       apiUrl(`/api/projects/${props.projectId}/narrative-health`)
     )
+    if (!response.ok) throw new Error(`Error del servidor (${response.status})`)
     const data = await response.json()
     if (data.success) {
       report.value = data.data
+    } else {
+      errorMsg.value = data.error || 'Error al evaluar la salud narrativa'
     }
   } catch (error) {
     console.error('Error checking narrative health:', error)
+    errorMsg.value = error instanceof Error ? error.message : 'Error de conexión'
   } finally {
     loading.value = false
   }
@@ -138,6 +151,9 @@ const criticalCount = computed(() =>
       <ProgressSpinner />
       <p>Evaluando salud narrativa...</p>
     </div>
+
+    <!-- Error -->
+    <AnalysisErrorState v-else-if="errorMsg" :message="errorMsg" :on-retry="analyze" />
 
     <!-- Empty -->
     <div v-else-if="!report" class="empty-state">

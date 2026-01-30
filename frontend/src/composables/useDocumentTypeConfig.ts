@@ -62,7 +62,7 @@ const configByType: Record<DocumentType, DocumentTypeUIConfig> = {
     },
     tabLabels: {
       text: 'Texto',
-      entities: 'Personajes',
+      entities: 'Entidades',
       relations: 'Relaciones',
       timeline: 'Línea temporal',
       alerts: 'Alertas',
@@ -95,7 +95,7 @@ const configByType: Record<DocumentType, DocumentTypeUIConfig> = {
     },
     tabLabels: {
       text: 'Texto',
-      entities: 'Conceptos',  // Cambiado de "Personajes"
+      entities: 'Entidades',
       relations: 'Relaciones',
       timeline: 'Línea temporal',
       alerts: 'Alertas',
@@ -128,7 +128,7 @@ const configByType: Record<DocumentType, DocumentTypeUIConfig> = {
     },
     tabLabels: {
       text: 'Texto',
-      entities: 'Conceptos',
+      entities: 'Entidades',
       relations: 'Relaciones',
       timeline: 'Línea temporal',
       alerts: 'Alertas',
@@ -161,16 +161,16 @@ const configByType: Record<DocumentType, DocumentTypeUIConfig> = {
     },
     tabLabels: {
       text: 'Texto',
-      entities: 'Personas',  // Personas reales, no personajes
+      entities: 'Entidades',
       relations: 'Relaciones',
-      timeline: 'Cronología',  // Cambiado de "Línea temporal"
+      timeline: 'Cronología',
       alerts: 'Alertas',
       style: 'Estilo',
     },
     analysis: {
       temporal: true,
       relationships: true,
-      behaviorConsistency: false,  // Personas reales, no personajes
+      behaviorConsistency: false,
       dialogAnalysis: false,
       conceptTracking: false,
     },
@@ -194,7 +194,7 @@ const configByType: Record<DocumentType, DocumentTypeUIConfig> = {
     },
     tabLabels: {
       text: 'Texto',
-      entities: 'Personas',
+      entities: 'Entidades',
       relations: 'Relaciones',
       timeline: 'Cronología',
       alerts: 'Alertas',
@@ -227,7 +227,7 @@ const configByType: Record<DocumentType, DocumentTypeUIConfig> = {
     },
     tabLabels: {
       text: 'Texto',
-      entities: 'Personas',
+      entities: 'Entidades',
       relations: 'Relaciones',
       timeline: 'Cronología',
       alerts: 'Alertas',
@@ -260,7 +260,7 @@ const configByType: Record<DocumentType, DocumentTypeUIConfig> = {
     },
     tabLabels: {
       text: 'Texto',
-      entities: 'Conceptos',
+      entities: 'Entidades',
       relations: 'Relaciones',
       timeline: 'Línea temporal',
       alerts: 'Alertas',
@@ -293,7 +293,7 @@ const configByType: Record<DocumentType, DocumentTypeUIConfig> = {
     },
     tabLabels: {
       text: 'Contenido',
-      entities: 'Elementos',
+      entities: 'Entidades',
       relations: 'Relaciones',
       timeline: 'Línea temporal',
       alerts: 'Alertas',
@@ -326,7 +326,7 @@ const configByType: Record<DocumentType, DocumentTypeUIConfig> = {
     },
     tabLabels: {
       text: 'Texto',
-      entities: 'Personajes',
+      entities: 'Entidades',
       relations: 'Relaciones',
       timeline: 'Línea temporal',
       alerts: 'Alertas',
@@ -359,7 +359,7 @@ const configByType: Record<DocumentType, DocumentTypeUIConfig> = {
     },
     tabLabels: {
       text: 'Guion',
-      entities: 'Personajes',
+      entities: 'Entidades',
       relations: 'Relaciones',
       timeline: 'Línea temporal',
       alerts: 'Alertas',
@@ -392,7 +392,7 @@ const configByType: Record<DocumentType, DocumentTypeUIConfig> = {
     },
     tabLabels: {
       text: 'Texto',
-      entities: 'Personajes',
+      entities: 'Entidades',
       relations: 'Relaciones',
       timeline: 'Línea temporal',
       alerts: 'Alertas',
@@ -425,7 +425,7 @@ const configByType: Record<DocumentType, DocumentTypeUIConfig> = {
     },
     tabLabels: {
       text: 'Texto',
-      entities: 'Términos',
+      entities: 'Entidades',
       relations: 'Relaciones',
       timeline: 'Línea temporal',
       alerts: 'Alertas',
@@ -458,7 +458,7 @@ const configByType: Record<DocumentType, DocumentTypeUIConfig> = {
     },
     tabLabels: {
       text: 'Recetas',
-      entities: 'Ingredientes',
+      entities: 'Entidades',
       relations: 'Relaciones',
       timeline: 'Línea temporal',
       alerts: 'Alertas',
@@ -491,7 +491,7 @@ const configByType: Record<DocumentType, DocumentTypeUIConfig> = {
     },
     tabLabels: {
       text: 'Texto',
-      entities: 'Conceptos',
+      entities: 'Entidades',
       relations: 'Relaciones',
       timeline: 'Línea temporal',
       alerts: 'Alertas',

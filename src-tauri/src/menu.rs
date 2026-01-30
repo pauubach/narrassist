@@ -121,7 +121,7 @@ pub fn create_menu(app: &AppHandle) -> Result<Menu<Wry>, tauri::Error> {
     let keyboard_shortcuts = MenuItem::with_id(app, "keyboard_shortcuts", "Atajos de teclado", true, Some("CmdOrCtrl+/"))?;
     let separator8 = PredefinedMenuItem::separator(app)?;
     let check_updates = MenuItem::with_id(app, "check_updates", "Buscar actualizaciones...", true, None::<&str>)?;
-    let about = PredefinedMenuItem::about(app, Some("Acerca de Narrative Assistant"), None)?;
+    let about = MenuItem::with_id(app, "about", "Acerca de Narrative Assistant", true, None::<&str>)?;
 
     let help_menu = Submenu::with_items(
         app,

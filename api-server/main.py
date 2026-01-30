@@ -63,7 +63,7 @@ import shutil
 # Setup logging IMMEDIATELY for early debugging
 import logging
 
-BACKEND_VERSION = "0.3.21"
+BACKEND_VERSION = "0.3.34"
 IS_EMBEDDED_RUNTIME = os.environ.get("NA_EMBEDDED") == "1" or "python-embed" in (sys.executable or "").lower()
 
 # Configure logging FIRST before using any loggers
@@ -7232,7 +7232,7 @@ JSON:"""
                     if location_result.is_success:
                         location_report = location_result.value
                         inconsistency_count = len(location_report.inconsistencies) if hasattr(location_report, 'inconsistencies') else 0
-                        logger.info(f"Character location analysis: {len(location_report.events)} events, "
+                        logger.info(f"Character location analysis: {len(location_report.location_events)} events, "
                                    f"{inconsistency_count} inconsistencies")
                     else:
                         logger.warning(f"Character location analysis failed: {location_result.error}")
@@ -7272,7 +7272,7 @@ JSON:"""
                     len(vital_status_report.death_events) if vital_status_report else 0
                 )
                 analysis_progress_storage[project_id]["metrics"]["location_events"] = (
-                    len(location_report.events) if location_report else 0
+                    len(location_report.location_events) if location_report else 0
                 )
 
                 phase_durations["consistency"] = time.time() - phase_start_times["consistency"]
