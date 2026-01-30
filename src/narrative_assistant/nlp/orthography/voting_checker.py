@@ -504,6 +504,8 @@ class LanguageToolVoter(BaseVoter):
                     # language_tool_python usa snake_case (error_length, rule_id)
                     error_len = getattr(match, 'error_length', getattr(match, 'errorLength', 0))
                     word = text[match.offset:match.offset + error_len]
+                    # Limpiar newlines/whitespace del word
+                    word_clean = word.replace('\n', ' ').replace('\r', ' ').strip()
                     error_type = self._map_category(match.category or "")
 
                     vote = Vote(
@@ -519,13 +521,15 @@ class LanguageToolVoter(BaseVoter):
                         }
                     )
                     # Ignorar errores en whitespace/newlines
-                    if word.strip():
-                        results.append((word, match.offset, match.offset + error_len, vote))
+                    if word_clean:
+                        results.append((word_clean, match.offset, match.offset + error_len, vote))
             else:
                 # Usar cliente de servidor local
                 check_result = self._client.check(text, language="es")
                 for match in check_result.matches:
                     word = text[match.offset:match.offset + match.length]
+                    # Limpiar newlines/whitespace del word
+                    word_clean = word.replace('\n', ' ').replace('\r', ' ').strip()
                     error_type = self._map_category(match.rule_category)
 
                     vote = Vote(
@@ -541,8 +545,8 @@ class LanguageToolVoter(BaseVoter):
                         }
                     )
                     # Ignorar errores en whitespace/newlines
-                    if word.strip():
-                        results.append((word, match.offset, match.offset + match.length, vote))
+                    if word_clean:
+                        results.append((word_clean, match.offset, match.offset + match.length, vote))
 
         except Exception as e:
             logger.debug(f"Error en LanguageTool: {e}")
@@ -651,6 +655,9 @@ class PatternVoter(BaseVoter):
          ['poesía', 'filosofía', 'fantasía', 'energía', 'melancolía', 'alegría']),
         (r'\b(publico|clasico|historico|fantastico|romantico|dramatico)\b', 'accent',
          ['público', 'clásico', 'histórico', 'fantástico', 'romántico', 'dramático']),
+
+        # Números cardinales sin tilde
+        (r'\b(veintidos|veintitres|veintiseis)\b', 'accent', ['veintidós', 'veintitrés', 'veintiséis']),
 
         # Palabras interrogativas/exclamativas sin tilde
         (r'\b(Que)\b', 'accent', ['Qué']),  # Al inicio de oración interrogativa
@@ -1405,6 +1412,9 @@ class VotingSpellingChecker:
         # Fase 4: Convertir a SpellingIssues
         for result in voting_results:
             if result.is_error:
+                # Filtrar palabras que sean solo whitespace/newlines
+                if not result.word.strip():
+                    continue
                 issue = SpellingIssue(
                     word=result.word,
                     start_char=result.start_char,

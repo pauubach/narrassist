@@ -95,7 +95,7 @@ class UnifiedConfig:
     run_sticky_sentences: bool = True  # Detectar oraciones pesadas (exceso de glue words)
 
     # Análisis avanzado
-    run_temporal: bool = False  # Experimental
+    run_temporal: bool = True  # Extracción de marcadores temporales
     run_focalization: bool = False  # Experimental
     run_voice_deviations: bool = False  # Requiere voice_profiles
     run_emotional: bool = True  # Coherencia emocional (emoción declarada vs. comportamiento)
@@ -104,7 +104,7 @@ class UnifiedConfig:
 
     # Consistencia
     run_consistency: bool = True
-    run_temporal_consistency: bool = False
+    run_temporal_consistency: bool = True
     create_alerts: bool = True
 
     # Parámetros
@@ -1232,7 +1232,10 @@ class UnifiedAnalysisPipeline:
             # Filtrar entidades de tipo personaje
             character_entities = [
                 e for e in context.entities
-                if hasattr(e, "entity_type") and str(e.entity_type).upper() in ("CHARACTER", "PERSON", "PER")
+                if hasattr(e, "entity_type") and (
+                    (e.entity_type.value if hasattr(e.entity_type, 'value') else str(e.entity_type))
+                    .upper() in ("CHARACTER", "PERSON", "PER")
+                )
             ]
 
             if not character_entities:
@@ -2167,27 +2170,54 @@ class UnifiedAnalysisPipeline:
             return
 
         try:
-            from ..temporal.inconsistencies import TemporalInconsistencyDetector
-
-            detector = TemporalInconsistencyDetector()
-
-            # Detectar inconsistencias en los marcadores temporales
-            inconsistencies = detector.detect_inconsistencies(
-                markers=context.temporal_markers,
-                chapters=[ch.get("content", "") for ch in context.chapters],
+            from ..temporal.markers import TemporalMarker
+            from ..temporal.timeline import TimelineBuilder
+            from ..temporal.inconsistencies import (
+                VotingTemporalChecker,
+                TemporalDetectionConfig,
             )
 
-            if inconsistencies:
-                context.stats["temporal_inconsistencies"] = len(inconsistencies)
-                logger.info(f"Found {len(inconsistencies)} temporal inconsistencies")
+            # Filtrar solo TemporalMarker objects (no dicts)
+            markers = [
+                m for m in context.temporal_markers
+                if isinstance(m, TemporalMarker)
+            ]
+            if not markers:
+                logger.debug("No TemporalMarker objects available for consistency check")
+                return
+
+            # Construir timeline desde marcadores
+            builder = TimelineBuilder()
+            chapter_data = [
+                {
+                    "number": ch.get("number", i + 1) if isinstance(ch, dict) else getattr(ch, "chapter_number", i + 1),
+                    "title": ch.get("title", "") if isinstance(ch, dict) else getattr(ch, "title", ""),
+                    "start_position": ch.get("start_char", 0) if isinstance(ch, dict) else getattr(ch, "start_char", 0),
+                }
+                for i, ch in enumerate(context.chapters)
+            ]
+            timeline = builder.build_from_markers(markers, chapter_data)
+
+            # Configurar sin LLM por defecto (rápido)
+            config = TemporalDetectionConfig(use_llm=self.config.use_llm)
+
+            # Ejecutar verificación con votación
+            checker = VotingTemporalChecker(config)
+            result = checker.check(
+                timeline=timeline,
+                markers=markers,
+                text=context.full_text,
+            )
+
+            if result.inconsistencies:
+                context.stats["temporal_inconsistencies"] = len(result.inconsistencies)
+                logger.info(f"Found {len(result.inconsistencies)} temporal inconsistencies")
 
                 # Almacenar para generación de alertas
-                if not hasattr(context, "temporal_inconsistencies"):
-                    context.temporal_inconsistencies = []
-                context.temporal_inconsistencies.extend(inconsistencies)
+                context.temporal_inconsistencies.extend(result.inconsistencies)
 
-        except ImportError:
-            logger.debug("Temporal inconsistency module not available")
+        except ImportError as e:
+            logger.debug(f"Temporal inconsistency module not available: {e}")
         except Exception as e:
             logger.warning(f"Temporal consistency check failed: {e}")
 
@@ -2465,6 +2495,29 @@ class UnifiedAnalysisPipeline:
                     },
                     explanation=inc.explanation,
                     confidence=inc.confidence,
+                )
+                if result.is_success:
+                    context.alerts.append(result.value)
+
+            # Alertas de inconsistencias temporales
+            for tinc in context.temporal_inconsistencies:
+                inc_type = tinc.inconsistency_type.value if hasattr(tinc.inconsistency_type, 'value') else str(tinc.inconsistency_type)
+                result = engine.create_from_temporal_inconsistency(
+                    project_id=context.project_id,
+                    inconsistency_type=inc_type,
+                    description=tinc.description,
+                    explanation=tinc.suggestion or tinc.description,
+                    chapter=tinc.chapter,
+                    start_char=tinc.position,
+                    end_char=tinc.position + 50,  # Approximate span
+                    excerpt=tinc.expected or "",
+                    confidence=tinc.confidence,
+                    extra_data={
+                        "expected": tinc.expected,
+                        "found": tinc.found,
+                        "severity": tinc.severity.value if hasattr(tinc.severity, 'value') else str(tinc.severity),
+                        "methods_agreed": tinc.methods_agreed,
+                    },
                 )
                 if result.is_success:
                     context.alerts.append(result.value)

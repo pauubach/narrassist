@@ -1269,7 +1269,9 @@ class TestComplejoE2E:
         # Verificar que al menos algunos tienen speaker
         with_speaker = [
             d for d in dialogues
-            if getattr(d, "speaker", None) or getattr(d, "resolved_speaker", None)
+            if (d.get("speaker") if isinstance(d, dict) else getattr(d, "speaker", None))
+            or (d.get("resolved_speaker") if isinstance(d, dict)
+                else getattr(d, "resolved_speaker", None))
         ]
         # No es obligatorio que todos tengan speaker, pero al menos algunos
         if len(with_speaker) == 0 and len(dialogues) > 5:

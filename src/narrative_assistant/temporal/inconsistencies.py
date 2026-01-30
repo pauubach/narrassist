@@ -331,6 +331,92 @@ class TemporalConsistencyChecker:
                                 )
                             )
 
+        # Detectar fechas absolutas conflictivas entre capítulos
+        self._check_cross_chapter_date_conflicts(markers)
+
+    def _check_cross_chapter_date_conflicts(
+        self, markers: list[TemporalMarker]
+    ) -> None:
+        """
+        Detecta fechas absolutas que difieren entre capítulos para el mismo evento.
+
+        Estrategia: compara marcadores ABSOLUTE_DATE de diferentes capítulos.
+        Si comparten contexto textual (palabras clave cercanas) pero tienen
+        años distintos, es una inconsistencia.
+        """
+        import re
+
+        absolute = [
+            m for m in markers
+            if m.marker_type == MarkerType.ABSOLUTE_DATE and m.year and m.chapter
+        ]
+        if len(absolute) < 2:
+            return
+
+        # Extraer palabras clave del texto del marcador y contexto cercano
+        def _context_words(marker: TemporalMarker) -> set[str]:
+            """Extrae palabras significativas del texto del marcador."""
+            text = marker.text or ""
+            # Extraer palabras de más de 3 chars, excluyendo números y stopwords
+            words = re.findall(r'[A-ZÁÉÍÓÚÜÑa-záéíóúüñ]{4,}', text)
+            return {w.lower() for w in words}
+
+        # Comparar pares de marcadores en distintos capítulos
+        checked: set[tuple[int, int]] = set()
+        for i, m1 in enumerate(absolute):
+            for j, m2 in enumerate(absolute):
+                if i >= j:
+                    continue
+                if m1.chapter == m2.chapter:
+                    continue
+                if m1.year == m2.year:
+                    continue
+
+                pair_key = (min(i, j), max(i, j))
+                if pair_key in checked:
+                    continue
+                checked.add(pair_key)
+
+                # Las fechas difieren entre capítulos - posible conflicto
+                # Calcular similitud: ¿comparten contexto?
+                words1 = _context_words(m1)
+                words2 = _context_words(m2)
+                shared = words1 & words2
+
+                # Si comparten palabras de contexto o los años están muy cerca,
+                # es probable que se refieran al mismo evento
+                years_close = abs(m1.year - m2.year) <= 10
+
+                if shared or years_close:
+                    confidence = 0.6
+                    if shared and years_close:
+                        confidence = 0.85
+                    elif shared:
+                        confidence = 0.75
+
+                    self.inconsistencies.append(
+                        TemporalInconsistency(
+                            inconsistency_type=InconsistencyType.MARKER_CONFLICT,
+                            severity=InconsistencySeverity.HIGH,
+                            description=(
+                                f"Posible conflicto de fechas: "
+                                f"'{m1.text}' (cap. {m1.chapter}) vs "
+                                f"'{m2.text}' (cap. {m2.chapter}). "
+                                f"Años {m1.year} y {m2.year} difieren."
+                            ),
+                            chapter=m2.chapter or 0,
+                            position=m2.start_char,
+                            markers_involved=[m1, m2],
+                            expected=f"Año {m1.year} (cap. {m1.chapter})",
+                            found=f"Año {m2.year} (cap. {m2.chapter})",
+                            suggestion=(
+                                f"Verificar si ambas fechas ({m1.year} y {m2.year}) "
+                                f"se refieren al mismo evento."
+                            ),
+                            confidence=confidence,
+                        )
+                    )
+
     def _check_character_ages(
         self,
         timeline: Timeline,
