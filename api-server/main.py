@@ -9843,7 +9843,7 @@ async def get_chapter_progress(
 # ============================================================================
 
 @app.get("/api/projects/{project_id}/narrative-templates", response_model=ApiResponse)
-async def get_narrative_templates(
+def get_narrative_templates(
     project_id: int,
     mode: str = "basic",
     llm_model: str = "llama3.2",
@@ -9857,6 +9857,10 @@ async def get_narrative_templates(
     try:
         from narrative_assistant.analysis.chapter_summary import analyze_chapter_progress
         from narrative_assistant.analysis.narrative_templates import NarrativeTemplateAnalyzer
+
+        proj_result = project_manager.get(project_id)
+        if proj_result.is_failure:
+            raise HTTPException(status_code=404, detail="Proyecto no encontrado")
 
         # Obtener datos de capítulos (reusar chapter_progress)
         report = analyze_chapter_progress(
@@ -9879,16 +9883,19 @@ async def get_narrative_templates(
 
         return ApiResponse(success=True, data=template_report.to_dict())
 
+    except HTTPException:
+        raise
     except ImportError as e:
         logger.error(f"Module import error: {e}")
         return ApiResponse(success=False, error="Módulo de plantillas narrativas no disponible")
     except Exception as e:
         logger.error(f"Error analyzing narrative templates: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        user_msg = e.user_message if hasattr(e, 'user_message') and e.user_message else "Error interno del análisis"
+        return ApiResponse(success=False, error=user_msg)
 
 
 @app.get("/api/projects/{project_id}/narrative-health", response_model=ApiResponse)
-async def get_narrative_health(
+def get_narrative_health(
     project_id: int,
     mode: str = "basic",
     llm_model: str = "llama3.2",
@@ -9903,6 +9910,10 @@ async def get_narrative_health(
     try:
         from narrative_assistant.analysis.chapter_summary import analyze_chapter_progress
         from narrative_assistant.analysis.narrative_health import NarrativeHealthChecker
+
+        proj_result = project_manager.get(project_id)
+        if proj_result.is_failure:
+            raise HTTPException(status_code=404, detail="Proyecto no encontrado")
 
         # Obtener datos de capítulos
         report = analyze_chapter_progress(
@@ -9947,12 +9958,15 @@ async def get_narrative_health(
 
         return ApiResponse(success=True, data=health_report.to_dict())
 
+    except HTTPException:
+        raise
     except ImportError as e:
         logger.error(f"Module import error: {e}")
         return ApiResponse(success=False, error="Módulo de salud narrativa no disponible")
     except Exception as e:
         logger.error(f"Error in narrative health check: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        user_msg = e.user_message if hasattr(e, 'user_message') and e.user_message else "Error interno del análisis"
+        return ApiResponse(success=False, error=user_msg)
 
 
 # ============================================================================
@@ -9960,7 +9974,7 @@ async def get_narrative_health(
 # ============================================================================
 
 @app.get("/api/projects/{project_id}/character-archetypes", response_model=ApiResponse)
-async def get_character_archetypes(
+def get_character_archetypes(
     project_id: int,
     mode: str = "basic",
     llm_model: str = "llama3.2",
@@ -9975,6 +9989,10 @@ async def get_character_archetypes(
     try:
         from narrative_assistant.analysis.chapter_summary import analyze_chapter_progress
         from narrative_assistant.analysis.character_archetypes import CharacterArchetypeAnalyzer
+
+        proj_result = project_manager.get(project_id)
+        if proj_result.is_failure:
+            raise HTTPException(status_code=404, detail="Proyecto no encontrado")
 
         # Obtener datos de capítulos (arcos, chekhov, etc.)
         progress = analyze_chapter_progress(
@@ -10033,12 +10051,15 @@ async def get_character_archetypes(
 
         return ApiResponse(success=True, data=report.to_dict())
 
+    except HTTPException:
+        raise
     except ImportError as e:
         logger.error(f"Module import error: {e}")
         return ApiResponse(success=False, error="Módulo de arquetipos no disponible")
     except Exception as e:
         logger.error(f"Error analyzing character archetypes: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        user_msg = e.user_message if hasattr(e, 'user_message') and e.user_message else "Error interno del análisis"
+        return ApiResponse(success=False, error=user_msg)
 
 
 # ============================================================================
@@ -15650,7 +15671,7 @@ def _get_sticky_recommendation(glue_percentage: float) -> str:
 
 
 @app.get("/api/projects/{project_id}/sentence-energy", response_model=ApiResponse)
-async def get_sentence_energy(
+def get_sentence_energy(
     project_id: int,
     low_threshold: float = Query(40.0, ge=0.0, le=100.0, description="Umbral de baja energía (0-100)"),
     chapter_number: Optional[int] = Query(None, description="Filtrar por número de capítulo"),
@@ -15688,7 +15709,7 @@ async def get_sentence_energy(
             if not chapter_text.strip():
                 continue
 
-            result = detector.analyze(chapter_text, chapter=chapter.chapter_number)
+            result = detector.analyze(chapter_text, chapter=chapter.chapter_number, low_threshold=low_threshold)
             if result.is_failure:
                 continue
 
@@ -15773,7 +15794,8 @@ async def get_sentence_energy(
         raise
     except Exception as e:
         logger.error(f"Error analyzing sentence energy: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        user_msg = e.user_message if hasattr(e, 'user_message') and e.user_message else "Error interno del análisis"
+        return ApiResponse(success=False, error=user_msg)
 
 
 @app.get("/api/projects/{project_id}/echo-report", response_model=ApiResponse)
@@ -16588,7 +16610,7 @@ async def get_story_bible_entry(
 
 
 @app.get("/api/projects/{project_id}/sensory-report", response_model=ApiResponse)
-async def get_sensory_report(
+def get_sensory_report(
     project_id: int,
     chapter_number: Optional[int] = Query(None, description="Filtrar por capítulo"),
 ):
@@ -16668,7 +16690,8 @@ async def get_sensory_report(
         raise
     except Exception as e:
         logger.error(f"Error generating sensory report: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        user_msg = e.user_message if hasattr(e, 'user_message') and e.user_message else "Error interno del análisis"
+        return ApiResponse(success=False, error=user_msg)
 
 
 @app.get("/api/projects/{project_id}/age-readability", response_model=ApiResponse)

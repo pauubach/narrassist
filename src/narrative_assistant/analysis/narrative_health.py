@@ -80,6 +80,22 @@ DIMENSION_NAMES: dict[HealthDimension, str] = {
     HealthDimension.CHEKHOV: "Tramas cerradas",
 }
 
+# Pesos por dimensión: core narrativas (1.5x), complementarias (1.0x)
+DIMENSION_WEIGHTS: dict[HealthDimension, float] = {
+    HealthDimension.PROTAGONIST: 1.5,
+    HealthDimension.CONFLICT: 1.5,
+    HealthDimension.GOAL: 1.5,
+    HealthDimension.STAKES: 1.0,
+    HealthDimension.CLIMAX: 1.5,
+    HealthDimension.RESOLUTION: 1.0,
+    HealthDimension.EMOTIONAL_ARC: 1.0,
+    HealthDimension.PACING: 1.0,
+    HealthDimension.COHERENCE: 1.0,
+    HealthDimension.STRUCTURE: 1.0,
+    HealthDimension.CAST_BALANCE: 1.0,
+    HealthDimension.CHEKHOV: 1.0,
+}
+
 
 @dataclass
 class DimensionScore:
@@ -209,7 +225,11 @@ class NarrativeHealthChecker:
         # Calcular score global (media ponderada excluyendo N/A)
         scored = [d for d in report.dimensions if d.status != HealthStatus.NA]
         if scored:
-            report.overall_score = sum(d.score for d in scored) / len(scored)
+            total_weight = sum(DIMENSION_WEIGHTS.get(d.dimension, 1.0) for d in scored)
+            weighted_sum = sum(
+                d.score * DIMENSION_WEIGHTS.get(d.dimension, 1.0) for d in scored
+            )
+            report.overall_score = weighted_sum / total_weight
         else:
             report.overall_score = 0
 
@@ -411,33 +431,68 @@ class NarrativeHealthChecker:
     # =========================================================================
 
     def _check_stakes(self, chapters: list[dict], total: int) -> DimensionScore:
-        """¿Hay algo en juego? Heurística: intensidad tonal + conflictos."""
+        """¿Hay algo en juego? Heurística: intensidad tonal + eventos de alto riesgo."""
+        high_risk_events = {"death", "betrayal", "sacrifice", "conflict"}
         high_intensity = 0
+        risk_event_count = 0
+
         for ch in chapters:
             intensity = ch.get("tone_intensity", 0)
             if intensity >= 0.6:
                 high_intensity += 1
+            events = ch.get("key_events", []) + ch.get("llm_events", [])
+            for ev in events:
+                if ev.get("event_type") in high_risk_events:
+                    risk_event_count += 1
 
         ratio = high_intensity / total if total > 0 else 0
-        if ratio >= 0.25:
-            score = min(90, 50 + ratio * 80)
+        # Combinar señales: tonal + eventos
+        has_tone = ratio >= 0.25
+        has_events = risk_event_count >= 2
+
+        if has_tone and has_events:
+            score = min(95, 55 + ratio * 60 + risk_event_count * 5)
+            evidence = (
+                f"Intensidad tonal alta en {high_intensity} capítulos "
+                f"y {risk_event_count} eventos de alto riesgo"
+            )
             return DimensionScore(
                 dimension=HealthDimension.STAKES,
                 name=DIMENSION_NAMES[HealthDimension.STAKES],
                 icon=DIMENSION_ICONS[HealthDimension.STAKES],
                 score=score,
                 status=HealthStatus.OK,
-                explanation=f"Intensidad tonal alta en {high_intensity} capítulos ({ratio:.0%}), indica apuestas claras.",
+                explanation=f"{evidence}, indica apuestas claras.",
             )
-        elif high_intensity >= 1:
+        elif has_tone or has_events:
+            if has_tone:
+                score = min(80, 50 + ratio * 60)
+                explanation = f"Intensidad tonal alta en {high_intensity} capítulos ({ratio:.0%})."
+            else:
+                score = min(70, 45 + risk_event_count * 8)
+                explanation = f"{risk_event_count} eventos de alto riesgo detectados."
+            return DimensionScore(
+                dimension=HealthDimension.STAKES,
+                name=DIMENSION_NAMES[HealthDimension.STAKES],
+                icon=DIMENSION_ICONS[HealthDimension.STAKES],
+                score=score,
+                status=HealthStatus.OK if score >= 65 else HealthStatus.WARNING,
+                explanation=explanation,
+            )
+        elif high_intensity >= 1 or risk_event_count >= 1:
+            parts = []
+            if high_intensity:
+                parts.append(f"intensidad tonal en {high_intensity} cap.")
+            if risk_event_count:
+                parts.append(f"{risk_event_count} evento(s) de riesgo")
             return DimensionScore(
                 dimension=HealthDimension.STAKES,
                 name=DIMENSION_NAMES[HealthDimension.STAKES],
                 icon=DIMENSION_ICONS[HealthDimension.STAKES],
                 score=40,
                 status=HealthStatus.WARNING,
-                explanation=f"Intensidad tonal alta solo en {high_intensity} capítulo(s).",
-                suggestion="Las apuestas deberían escalar progresivamente a lo largo del manuscrito.",
+                explanation=f"Señales parciales: {', '.join(parts)}.",
+                suggestion="Las apuestas podrían escalar más progresivamente.",
             )
         else:
             return DimensionScore(
@@ -446,7 +501,7 @@ class NarrativeHealthChecker:
                 icon=DIMENSION_ICONS[HealthDimension.STAKES],
                 score=20,
                 status=HealthStatus.CRITICAL,
-                explanation="No se detecta intensidad tonal significativa.",
+                explanation="No se detecta intensidad tonal ni eventos de alto riesgo.",
                 suggestion="Sin apuestas claras el lector pierde interés. ¿Qué se pierde si el protagonista fracasa?",
             )
 
@@ -646,7 +701,7 @@ class NarrativeHealthChecker:
         # Detectar capítulos vacíos o casi vacíos
         dead_chapters = sum(1 for w in word_counts if w < avg * 0.2)
 
-        if max_ratio < 2.5 and dead_chapters == 0:
+        if max_ratio < 3.5 and dead_chapters == 0:
             return DimensionScore(
                 dimension=HealthDimension.PACING,
                 name=DIMENSION_NAMES[HealthDimension.PACING],
@@ -655,7 +710,7 @@ class NarrativeHealthChecker:
                 status=HealthStatus.OK,
                 explanation=f"Ritmo consistente: capítulos entre {min(word_counts)} y {max(word_counts)} palabras.",
             )
-        elif max_ratio < 4.0 and dead_chapters <= 1:
+        elif max_ratio < 5.0 and dead_chapters <= 1:
             return DimensionScore(
                 dimension=HealthDimension.PACING,
                 name=DIMENSION_NAMES[HealthDimension.PACING],
@@ -663,7 +718,7 @@ class NarrativeHealthChecker:
                 score=55,
                 status=HealthStatus.WARNING,
                 explanation=f"Variación de ritmo notable: capítulo más largo es {max_ratio:.1f}x el promedio.",
-                suggestion="Equilibre la extensión de los capítulos para mantener un ritmo más uniforme.",
+                suggestion="La alternancia de capítulos largos y cortos puede ser intencionada, pero compruebe que no haya zonas muertas.",
             )
         else:
             return DimensionScore(
@@ -672,7 +727,7 @@ class NarrativeHealthChecker:
                 icon=DIMENSION_ICONS[HealthDimension.PACING],
                 score=25,
                 status=HealthStatus.CRITICAL,
-                explanation=f"Ritmo muy irregular: {dead_chapters} capítulo(s) casi vacío(s), ratio max/min de {max_ratio:.1f}x.",
+                explanation=f"Ritmo muy irregular: {dead_chapters} capítulo(s) casi vacío(s), ratio max/avg de {max_ratio:.1f}x.",
                 suggestion="Hay zonas muertas o capítulos desproporcionados que pueden romper el ritmo de lectura.",
             )
 
@@ -705,7 +760,7 @@ class NarrativeHealthChecker:
 
         shift_ratio = sudden_shifts / (total - 1) if total > 1 else 0
 
-        if shift_ratio <= 0.2:
+        if shift_ratio <= 0.35:
             return DimensionScore(
                 dimension=HealthDimension.COHERENCE,
                 name=DIMENSION_NAMES[HealthDimension.COHERENCE],
@@ -714,7 +769,7 @@ class NarrativeHealthChecker:
                 status=HealthStatus.OK,
                 explanation=f"Progresión tonal fluida ({sudden_shifts} cambios bruscos de {total - 1} transiciones).",
             )
-        elif shift_ratio <= 0.4:
+        elif shift_ratio <= 0.55:
             return DimensionScore(
                 dimension=HealthDimension.COHERENCE,
                 name=DIMENSION_NAMES[HealthDimension.COHERENCE],
@@ -722,7 +777,7 @@ class NarrativeHealthChecker:
                 score=50,
                 status=HealthStatus.WARNING,
                 explanation=f"Se detectan {sudden_shifts} cambios bruscos de tono ({shift_ratio:.0%} de transiciones).",
-                suggestion="Los cambios emocionales abruptos pueden desorientar al lector si no están justificados narrativamente.",
+                suggestion="Los cambios emocionales abruptos pueden ser intencionados, pero verifique que estén justificados narrativamente.",
             )
         else:
             return DimensionScore(
@@ -828,9 +883,22 @@ class NarrativeHealthChecker:
         total_mentions = sum(mentions) or 1
         max_mentions = max(mentions)
 
-        # Personajes con menos de 5% de las menciones totales → "fantasma"
-        ghost_count = sum(1 for m in mentions if m / total_mentions < 0.02)
-        ghost_ratio = ghost_count / len(characters) if characters else 0
+        # Umbral adaptativo: con más personajes, el % mínimo baja
+        num_chars = len(characters)
+        if num_chars <= 10:
+            ghost_pct = 0.02
+        elif num_chars <= 25:
+            ghost_pct = 0.01
+        else:
+            ghost_pct = 0.005
+
+        # Un personaje es "fantasma" si tiene menos del umbral % de menciones
+        # Y además menos de 2 menciones absolutas
+        ghost_count = sum(
+            1 for m in mentions
+            if m / total_mentions < ghost_pct and m < 2
+        )
+        ghost_ratio = ghost_count / num_chars if num_chars else 0
 
         # Concentración del protagonista
         protag_ratio = max_mentions / total_mentions
@@ -945,7 +1013,7 @@ class NarrativeHealthChecker:
                 recs.append(f"[CRÍTICO] {dim.name}: {dim.suggestion}")
 
         # Segundo: advertencias con sugerencia
-        warnings = [d for d in report.dimensions if d.status == HealthStatus.WARNING and dim.suggestion]
+        warnings = [d for d in report.dimensions if d.status == HealthStatus.WARNING and d.suggestion]
         for dim in warnings:
             if dim.suggestion:
                 recs.append(f"[AVISO] {dim.name}: {dim.suggestion}")

@@ -269,9 +269,8 @@ PASSIVE_AUXILIARIES = {
     "fuera", "fueras", "fuéramos", "fuerais", "fueran",
     "fuese", "fueses", "fuésemos", "fueseis", "fuesen",
     "sido",
-    # Estar (para participio adjetival / pasiva de resultado)
-    "estar", "estoy", "estás", "está", "estamos", "estáis", "están",
-    "estaba", "estabas", "estábamos", "estabais", "estaban",
+    # Nota: estar NO se incluye — "estar + participio" es construcción
+    # estativa/atributiva, NO voz pasiva (RAE, Nueva Gramática §41.6)
 }
 
 # Sufijos de nominalizaciones (verbos convertidos en sustantivos abstractos)
@@ -289,6 +288,66 @@ NOMINALIZATION_EXCEPTIONS = {
     "esperanza", "confianza", "distancia",
     "ciudad", "sociedad", "realidad", "verdad",
     "corazón", "razón",
+    # Sustantivos completamente lexicalizados (no derivaciones productivas)
+    "habitación", "posición", "dirección", "educación", "situación",
+    "información", "comunicación", "organización", "condición",
+    "alimentación", "población", "relación", "tradición",
+    "religión", "televisión", "decisión", "comisión",
+    "dimensión", "ocasión", "profesión", "sesión", "misión",
+    "conocimiento", "nacimiento", "crecimiento", "departamento",
+    "apartamento", "documento", "instrumento", "monumento",
+    "independencia", "experiencia", "diferencia", "referencia",
+    "competencia", "existencia", "paciencia", "violencia",
+    "importancia", "tolerancia", "sustancia", "abundancia",
+    "seguridad", "capacidad", "necesidad", "actividad",
+    "comunidad", "oportunidad", "identidad", "universidad",
+}
+
+
+# Colocaciones fuertes de "hacer" donde el verbo NO es débil
+HACER_STRONG_COLLOCATIONS = {
+    "trizas", "pedazos", "añicos", "frente", "caso", "falta",
+    "daño", "ruido", "fuego", "efecto", "justicia", "historia",
+    "honor", "mella", "gracia", "cola", "trampa",
+}
+
+# Excepciones de "ir" como verbo de movimiento (no débil)
+# Patrón: ir/fue/va + preposición locativa → movimiento = enérgico
+IR_MOVEMENT_PREPS = {"a", "al", "hacia", "hasta", "por", "de", "desde"}
+
+# Formas de "ir" para la detección contextual
+IR_FORMS = {
+    "ir", "voy", "vas", "va", "vamos", "vais", "van",
+    "iba", "ibas", "íbamos", "ibais", "iban",
+    "fue", "fui", "fuiste", "fuimos", "fuisteis", "fueron",
+}
+
+# Formas de "hacer" para detección de colocaciones
+HACER_FORMS = {
+    "hacer", "hago", "haces", "hace", "hacemos", "hacéis", "hacen",
+    "hacía", "hacías", "hacíamos", "hacíais", "hacían",
+    "hizo", "hice", "hiciste", "hicimos", "hicisteis", "hicieron",
+    "haré", "harás", "hará", "haremos", "haréis", "harán",
+    "haría", "harías", "haríamos", "haríais", "harían",
+}
+
+# Formas de "haber" (auxiliar) para detección de tiempos compuestos
+HABER_FORMS = {
+    "he", "has", "ha", "hemos", "habéis", "han",
+    "había", "habías", "habíamos", "habíais", "habían",
+    "hubo", "hube", "hubiste", "hubimos", "hubisteis", "hubieron",
+    "habré", "habrás", "habrá", "habremos", "habréis", "habrán",
+    "habría", "habrías", "habríamos", "habríais", "habrían",
+    "haya", "hayas", "hayamos", "hayáis", "hayan",
+}
+
+# Excepciones idiomáticas de pasiva refleja (no son pasivas reales)
+REFLEXIVE_PASSIVE_EXCEPTIONS = {
+    "se trata", "se dice", "se sabe", "se cree", "se supone",
+    "se espera", "se puede", "se debe", "se necesita", "se quiere",
+    "se ve", "se oye", "se nota", "se parece", "se llama",
+    "se acerca", "se aleja", "se acuerda", "se olvida",
+    "se da cuenta", "se pone", "se queda", "se siente",
 }
 
 
@@ -352,6 +411,7 @@ class SentenceEnergyDetector:
         self,
         text: str,
         chapter: int = 0,
+        low_threshold: Optional[float] = None,
     ) -> Result[SentenceEnergyReport]:
         """
         Analizar energía de oraciones en un texto.
@@ -359,12 +419,15 @@ class SentenceEnergyDetector:
         Args:
             text: Texto a analizar
             chapter: Número de capítulo para contexto
+            low_threshold: Umbral de baja energía (override del default)
 
         Returns:
             Result con SentenceEnergyReport
         """
         if not text or not text.strip():
             return Result.success(SentenceEnergyReport())
+
+        threshold = low_threshold if low_threshold is not None else self.low_energy_threshold
 
         try:
             report = SentenceEnergyReport()
@@ -438,7 +501,7 @@ class SentenceEnergyDetector:
                     report.nominalization_count += 1
 
                 # Baja energía
-                if energy_score < self.low_energy_threshold:
+                if energy_score < threshold:
                     report.low_energy_sentences.append(sent_energy)
 
                 # Distribución
@@ -461,7 +524,7 @@ class SentenceEnergyDetector:
             logger.error(f"Error analyzing sentence energy: {e}", exc_info=True)
             error = NLPError(
                 message=f"Error en análisis de energía de oraciones: {e}",
-                severity=ErrorSeverity.MEDIUM,
+                severity=ErrorSeverity.RECOVERABLE,
             )
             return Result.failure(error)
 
@@ -496,16 +559,20 @@ class SentenceEnergyDetector:
         Analizar si la oración usa voz activa o pasiva.
 
         Patrón de voz pasiva en español:
-        ser/estar + participio (-ado/-ido/-to/-so/-cho)
+        - Pasiva perifrástica: ser + participio ("fue construido")
+        - Pasiva refleja: se + verbo 3ª persona ("se construyó")
+        Nota: estar + participio es estativo, NO pasivo (RAE §41.6)
 
         Returns:
             (score 0-100, is_passive, issues)
         """
         issues = []
         words_lower = [w.lower() for w in words]
+        text_lower = text.lower()
 
-        # Buscar patrón: auxiliar pasivo + participio
         passive_found = False
+
+        # 1. Pasiva perifrástica: ser + participio
         for i, word in enumerate(words_lower):
             if word in PASSIVE_AUXILIARIES:
                 # Buscar participio en las siguientes 3 palabras
@@ -524,10 +591,51 @@ class SentenceEnergyDetector:
                 if passive_found:
                     break
 
-        # Score: 100 = activa, 30 = pasiva (no 0 porque la pasiva a veces es válida)
-        score = 30.0 if passive_found else 100.0
+        # 2. Pasiva refleja: "se + verbo en 3ª persona"
+        if not passive_found:
+            for i, word in enumerate(words_lower):
+                if word == "se" and i + 1 < len(words_lower):
+                    # Comprobar que no es excepción idiomática
+                    two_word = f"se {words_lower[i + 1]}"
+                    three_word = f"se {' '.join(words_lower[i + 1: i + 3])}" if i + 2 < len(words_lower) else ""
+                    if two_word in REFLEXIVE_PASSIVE_EXCEPTIONS or three_word in REFLEXIVE_PASSIVE_EXCEPTIONS:
+                        continue
+                    # Heurística: "se" + verbo conjugado en 3ª persona
+                    next_word = words_lower[i + 1]
+                    if self._looks_like_third_person_verb(next_word):
+                        passive_found = True
+                        passive_fragment = " ".join(words[i: i + 3])
+                        issues.append(EnergyIssue(
+                            issue_type=EnergyIssueType.PASSIVE_VOICE,
+                            detail=f"Pasiva refleja: {passive_fragment}",
+                            suggestion="Considere usar un sujeto activo explícito",
+                            penalty=0.25,  # Menor que perifrástica (más natural en español)
+                        ))
+                        break
+
+        # Score: 100 = activa, 30 = pasiva perifrástica, 45 = pasiva refleja
+        if passive_found:
+            # Pasiva refleja es más natural en español → menor penalización
+            is_reflexive = any(i.detail.startswith("Pasiva refleja") for i in issues)
+            score = 45.0 if is_reflexive else 30.0
+        else:
+            score = 100.0
 
         return score, passive_found, issues
+
+    def _looks_like_third_person_verb(self, word: str) -> bool:
+        """Heurística para detectar verbos en 3ª persona singular/plural."""
+        # Terminaciones típicas de 3ª persona en español
+        third_person_endings = (
+            "a", "e", "ó", "ió", "an", "en", "aron", "ieron",
+            "aba", "ía", "ará", "erá", "irá",
+        )
+        if len(word) < 3:
+            return False
+        # Excluir palabras que terminan así pero no son verbos
+        if word in {"se", "de", "que", "le", "me", "te", "ne", "una", "la"}:
+            return False
+        return word.endswith(third_person_endings)
 
     def _is_participle(self, word: str) -> bool:
         """Verificar si una palabra parece ser un participio."""
@@ -543,6 +651,11 @@ class SentenceEnergyDetector:
         """
         Analizar la fuerza de los verbos en la oración.
 
+        Excepciones contextuales:
+        - haber + participio: evaluar el participio (verbo principal), no el auxiliar
+        - ir + preposición locativa: verbo de movimiento (no débil)
+        - hacer + colocación fuerte: "hacer trizas" es enérgico
+
         Returns:
             (score 0-100, has_weak_verb, issues)
         """
@@ -550,22 +663,45 @@ class SentenceEnergyDetector:
         words_lower = [w.lower() for w in words]
 
         weak_found = []
-        total_verbs = 0
+        # Índices a excluir (auxiliares de tiempos compuestos, etc.)
+        skip_indices: set[int] = set()
 
-        for word in words_lower:
+        # Pre-scan: detectar haber + participio (G3)
+        for i, word in enumerate(words_lower):
+            if word in HABER_FORMS and i + 1 < len(words_lower):
+                # Buscar participio en las siguientes 2 palabras
+                for j in range(i + 1, min(i + 3, len(words_lower))):
+                    if self._is_participle(words_lower[j]):
+                        # El auxiliar haber NO es débil en tiempos compuestos
+                        skip_indices.add(i)
+                        break
+
+        # Pre-scan: detectar ir + prep locativa (G4)
+        for i, word in enumerate(words_lower):
+            if word in IR_FORMS and i + 1 < len(words_lower):
+                next_w = words_lower[i + 1]
+                if next_w in IR_MOVEMENT_PREPS:
+                    # "ir a la tienda" = movimiento, no débil
+                    skip_indices.add(i)
+
+        # Pre-scan: detectar hacer + colocación fuerte (G6)
+        for i, word in enumerate(words_lower):
+            if word in HACER_FORMS and i + 1 < len(words_lower):
+                next_w = words_lower[i + 1]
+                if next_w in HACER_STRONG_COLLOCATIONS:
+                    skip_indices.add(i)
+
+        for i, word in enumerate(words_lower):
+            if i in skip_indices:
+                continue
             if word in WEAK_VERBS:
                 weak_found.append(word)
-                total_verbs += 1
 
-        # Si no encontramos verbos débiles, asumimos que los verbos son fuertes
-        # Si no detectamos verbos en absoluto, score neutro
         has_weak = len(weak_found) > 0
 
         if not weak_found:
-            # Sin verbos débiles → alta energía
             score = 100.0
         elif len(weak_found) == 1:
-            # Un verbo débil es normal (especialmente auxiliares)
             score = 70.0
         elif len(weak_found) == 2:
             score = 45.0

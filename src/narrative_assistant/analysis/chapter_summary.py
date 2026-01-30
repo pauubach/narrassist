@@ -15,11 +15,18 @@ Modos de análisis:
 
 import logging
 import re
+import threading
+import time
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
 
 logger = logging.getLogger(__name__)
+
+# Cache con TTL para analyze_chapter_progress
+_cache_lock = threading.Lock()
+_cache: dict[str, tuple[float, "ChapterProgressReport"]] = {}
+_CACHE_TTL_SECONDS = 60  # 1 minuto
 
 
 class AnalysisMode(str, Enum):
@@ -1115,6 +1122,9 @@ def analyze_chapter_progress(
     """
     Función de conveniencia para analizar el avance de un proyecto.
 
+    Incluye caché con TTL para evitar recálculos costosos cuando múltiples
+    endpoints solicitan los mismos datos en un intervalo corto.
+
     Args:
         project_id: ID del proyecto a analizar
         db_path: Ruta opcional a la base de datos
@@ -1124,6 +1134,45 @@ def analyze_chapter_progress(
     Returns:
         ChapterProgressReport con el análisis completo
     """
+    cache_key = f"{project_id}:{mode}:{llm_model}"
+    now = time.monotonic()
+
+    with _cache_lock:
+        if cache_key in _cache:
+            ts, cached_report = _cache[cache_key]
+            if now - ts < _CACHE_TTL_SECONDS:
+                logger.debug(f"Cache hit for chapter progress: project={project_id}, mode={mode}")
+                return cached_report
+            else:
+                del _cache[cache_key]
+
     analysis_mode = AnalysisMode(mode)
     analyzer = ChapterSummaryAnalyzer(db_path, mode=analysis_mode, llm_model=llm_model)
-    return analyzer.analyze_project(project_id)
+    report = analyzer.analyze_project(project_id)
+
+    with _cache_lock:
+        _cache[cache_key] = (time.monotonic(), report)
+        # Limpiar entradas expiradas
+        expired = [k for k, (ts, _) in _cache.items() if now - ts >= _CACHE_TTL_SECONDS]
+        for k in expired:
+            del _cache[k]
+
+    return report
+
+
+def invalidate_chapter_progress_cache(project_id: Optional[int] = None) -> None:
+    """
+    Invalidar caché de analyze_chapter_progress.
+
+    Args:
+        project_id: Si se proporciona, invalida solo ese proyecto.
+                    Si es None, limpia toda la caché.
+    """
+    with _cache_lock:
+        if project_id is None:
+            _cache.clear()
+        else:
+            prefix = f"{project_id}:"
+            keys_to_del = [k for k in _cache if k.startswith(prefix)]
+            for k in keys_to_del:
+                del _cache[k]

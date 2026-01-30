@@ -381,6 +381,9 @@ def _create_celebrity_profile() -> FeatureProfile:
         pov_focalization=FeatureAvailability.DISABLED,
         voice_profiles=FeatureAvailability.DISABLED,
         world_consistency=FeatureAvailability.DISABLED,
+        narrative_health=FeatureAvailability.OPTIONAL,
+        narrative_templates=FeatureAvailability.OPTIONAL,
+        character_archetypes=FeatureAvailability.OPTIONAL,
     )
 
 
@@ -397,6 +400,9 @@ def _create_divulgation_profile() -> FeatureProfile:
         pacing=FeatureAvailability.OPTIONAL,
         attribute_consistency=FeatureAvailability.OPTIONAL,
         terminology=FeatureAvailability.ENABLED,  # Muy relevante
+        narrative_health=FeatureAvailability.OPTIONAL,
+        narrative_templates=FeatureAvailability.OPTIONAL,
+        character_archetypes=FeatureAvailability.OPTIONAL,
     )
 
 
@@ -414,6 +420,9 @@ def _create_essay_profile() -> FeatureProfile:
         attribute_consistency=FeatureAvailability.DISABLED,
         world_consistency=FeatureAvailability.DISABLED,
         emotional_analysis=FeatureAvailability.OPTIONAL,
+        narrative_health=FeatureAvailability.DISABLED,
+        narrative_templates=FeatureAvailability.DISABLED,
+        character_archetypes=FeatureAvailability.DISABLED,
     )
 
 
@@ -430,6 +439,9 @@ def _create_self_help_profile() -> FeatureProfile:
         pacing=FeatureAvailability.OPTIONAL,
         attribute_consistency=FeatureAvailability.DISABLED,
         world_consistency=FeatureAvailability.DISABLED,
+        narrative_health=FeatureAvailability.DISABLED,
+        narrative_templates=FeatureAvailability.DISABLED,
+        character_archetypes=FeatureAvailability.DISABLED,
     )
 
 
@@ -449,6 +461,9 @@ def _create_technical_profile() -> FeatureProfile:
         world_consistency=FeatureAvailability.DISABLED,
         terminology=FeatureAvailability.ENABLED,  # Crítico
         glossary=FeatureAvailability.ENABLED,  # Crítico
+        narrative_health=FeatureAvailability.DISABLED,
+        narrative_templates=FeatureAvailability.DISABLED,
+        character_archetypes=FeatureAvailability.DISABLED,
     )
 
 
@@ -468,6 +483,9 @@ def _create_practical_profile() -> FeatureProfile:
         world_consistency=FeatureAvailability.DISABLED,
         terminology=FeatureAvailability.ENABLED,
         glossary=FeatureAvailability.ENABLED,
+        narrative_health=FeatureAvailability.DISABLED,
+        narrative_templates=FeatureAvailability.DISABLED,
+        character_archetypes=FeatureAvailability.DISABLED,
     )
 
 

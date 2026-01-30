@@ -192,10 +192,10 @@ def _save_the_cat_beats() -> list[TemplateBeat]:
 def _kishotenketsu_beats() -> list[TemplateBeat]:
     """Kishotenketsu (estructura narrativa japonesa, 4 actos)."""
     return [
-        TemplateBeat("ki_intro", "Ki (起) — Introducción", "Presentación de personajes y escenario", 0.12, 0.12),
-        TemplateBeat("sho_development", "Shō (承) — Desarrollo", "Profundización sin conflicto, vida cotidiana", 0.37, 0.12),
-        TemplateBeat("ten_twist", "Ten (転) — Giro", "Cambio inesperado, nueva perspectiva", 0.65, 0.12),
-        TemplateBeat("ketsu_conclusion", "Ketsu (結) — Conclusión", "Reconciliación de elementos, nuevo equilibrio", 0.90, 0.12),
+        TemplateBeat("ki_intro", "Ki (起) — Introducción", "Presentación de personajes y escenario", 0.12, 0.08),
+        TemplateBeat("sho_development", "Shō (承) — Desarrollo", "Profundización sin conflicto, vida cotidiana", 0.37, 0.08),
+        TemplateBeat("ten_twist", "Ten (転) — Giro", "Cambio inesperado, nueva perspectiva", 0.65, 0.08),
+        TemplateBeat("ketsu_conclusion", "Ketsu (結) — Conclusión", "Reconciliación de elementos, nuevo equilibrio", 0.90, 0.08),
     ]
 
 
@@ -355,6 +355,13 @@ class NarrativeTemplateAnalyzer:
 
             fit_score = min(100, base_score + position_bonus)
 
+            # Penalización por baja granularidad: plantillas con pocos beats
+            # tienden a inflar la puntuación porque cada beat pesa más
+            min_beats_full = 7
+            if total < min_beats_full:
+                granularity_factor = 0.7 + 0.3 * (total / min_beats_full)
+                fit_score *= granularity_factor
+
         # Generar gaps, fortalezas y sugerencias
         gaps = []
         strengths = []
@@ -460,9 +467,12 @@ class NarrativeTemplateAnalyzer:
         elif bid in ("road_back", "break_into_three"):
             self._detect_road_back(beat, chapters_data, total_chapters)
 
+        # === GIRO (Kishotenketsu Ten) ===
+        elif bid == "ten_twist":
+            self._detect_twist(beat, chapters_data, total_chapters)
+
         # === CLÍMAX ===
-        elif bid in ("climax", "resurrection", "finale", "climax_5",
-                      "ten_twist"):
+        elif bid in ("climax", "resurrection", "finale", "climax_5"):
             self._detect_climax(beat, chapters_data, total_chapters, pacing_data)
 
         # === RESOLUCIÓN / DESENLACE ===
@@ -489,20 +499,26 @@ class NarrativeTemplateAnalyzer:
             return
 
         new_chars = sum(len(c.get("new_characters", [])) for c in early)
-        has_new = new_chars >= 1
 
-        if has_new:
+        if new_chars >= 2:
             best = max(early, key=lambda c: len(c.get("new_characters", [])))
             beat.status = BeatStatus.DETECTED
             beat.detected_chapter = best["chapter_number"]
             beat.detected_position = best["chapter_number"] / total
             beat.confidence = min(0.9, 0.5 + new_chars * 0.1)
-            beat.evidence = f"{new_chars} personaje(s) introducido(s) en los primeros capítulos"
+            beat.evidence = f"{new_chars} personajes introducidos en los primeros capítulos"
+        elif new_chars >= 1:
+            best = max(early, key=lambda c: len(c.get("new_characters", [])))
+            beat.status = BeatStatus.POSSIBLE
+            beat.detected_chapter = best["chapter_number"]
+            beat.detected_position = best["chapter_number"] / total
+            beat.confidence = 0.35
+            beat.evidence = f"{new_chars} personaje introducido en los primeros capítulos"
         else:
             beat.status = BeatStatus.POSSIBLE
             beat.detected_chapter = 1
             beat.detected_position = 1 / total
-            beat.confidence = 0.3
+            beat.confidence = 0.2
             beat.evidence = "Primer capítulo presente pero sin nuevos personajes detectados"
 
     def _detect_inciting_incident(self, beat: TemplateBeat, chapters: list[dict], total: int) -> None:
@@ -536,27 +552,94 @@ class NarrativeTemplateAnalyzer:
         """Detectar rechazo: cambio emocional negativo tras el incidente."""
         zone = [c for c in chapters
                 if total * 0.08 <= c["chapter_number"] <= total * 0.25]
+
+        # Buscar emotional_shift negativo (señal fuerte)
+        for ch in zone:
+            events = ch.get("key_events", []) + ch.get("llm_events", [])
+            for ev in events:
+                if ev.get("event_type") == "emotional_shift":
+                    tone = ch.get("dominant_tone", "")
+                    if tone in ("negative", "tense", "melancholic", "fearful"):
+                        beat.status = BeatStatus.DETECTED
+                        beat.detected_chapter = ch["chapter_number"]
+                        beat.detected_position = ch["chapter_number"] / total
+                        beat.confidence = 0.65
+                        beat.evidence = (
+                            f"Cambio emocional con tono '{tone}' "
+                            f"en capítulo {ch['chapter_number']}"
+                        )
+                        return
+
+        # Buscar tono negativo combinado con conflicto (señal media)
+        for ch in zone:
+            tone = ch.get("dominant_tone", "")
+            has_conflict = ch.get("conflict_interactions", 0) > 0
+            if tone in ("negative", "tense", "melancholic", "fearful") and has_conflict:
+                beat.status = BeatStatus.POSSIBLE
+                beat.detected_chapter = ch["chapter_number"]
+                beat.detected_position = ch["chapter_number"] / total
+                beat.confidence = 0.45
+                beat.evidence = (
+                    f"Tono '{tone}' con conflicto "
+                    f"en capítulo {ch['chapter_number']}"
+                )
+                return
+
+        # Solo tono negativo (señal débil)
         for ch in zone:
             tone = ch.get("dominant_tone", "")
             if tone in ("negative", "tense", "melancholic", "fearful"):
                 beat.status = BeatStatus.POSSIBLE
                 beat.detected_chapter = ch["chapter_number"]
                 beat.detected_position = ch["chapter_number"] / total
-                beat.confidence = 0.35
+                beat.confidence = 0.3
                 beat.evidence = f"Tono '{tone}' en capítulo {ch['chapter_number']}"
                 return
 
     def _detect_mentor(self, beat: TemplateBeat, chapters: list[dict], total: int) -> None:
-        """Detectar mentor: nuevo personaje que aparece temprano con interacciones positivas."""
+        """Detectar mentor: nuevo personaje con interacciones positivas o alianzas."""
         zone = [c for c in chapters
                 if total * 0.10 <= c["chapter_number"] <= total * 0.30]
+
+        # Buscar alianza o nuevo personaje con muchas interacciones positivas (señal fuerte)
+        for ch in zone:
+            events = ch.get("key_events", []) + ch.get("llm_events", [])
+            has_alliance = any(ev.get("event_type") == "alliance" for ev in events)
+            pos_int = ch.get("positive_interactions", 0)
+            has_new = bool(ch.get("new_characters"))
+
+            if has_alliance and has_new:
+                beat.status = BeatStatus.DETECTED
+                beat.detected_chapter = ch["chapter_number"]
+                beat.detected_position = ch["chapter_number"] / total
+                beat.confidence = 0.7
+                beat.evidence = (
+                    f"Alianza con nuevo personaje en cap. {ch['chapter_number']}"
+                )
+                return
+
+            if has_new and pos_int >= 2:
+                beat.status = BeatStatus.DETECTED
+                beat.detected_chapter = ch["chapter_number"]
+                beat.detected_position = ch["chapter_number"] / total
+                beat.confidence = 0.6
+                beat.evidence = (
+                    f"Nuevo personaje con {pos_int} interacciones positivas "
+                    f"en cap. {ch['chapter_number']}"
+                )
+                return
+
+        # Nuevo personaje con alguna interacción positiva (señal débil)
         for ch in zone:
             if ch.get("new_characters") and ch.get("positive_interactions", 0) > 0:
                 beat.status = BeatStatus.POSSIBLE
                 beat.detected_chapter = ch["chapter_number"]
                 beat.detected_position = ch["chapter_number"] / total
                 beat.confidence = 0.35
-                beat.evidence = f"Nuevo personaje con interacciones positivas en cap. {ch['chapter_number']}"
+                beat.evidence = (
+                    f"Nuevo personaje con interacción positiva "
+                    f"en cap. {ch['chapter_number']}"
+                )
                 return
 
     def _detect_threshold(self, beat: TemplateBeat, chapters: list[dict], total: int) -> None:
@@ -598,18 +681,25 @@ class NarrativeTemplateAnalyzer:
         )
         total_interactions = sum(c.get("total_interactions", 0) for c in zone)
 
-        if total_events >= 2 or total_interactions >= 3:
+        if total_events >= 3 or total_interactions >= 5:
             mid_ch = zone[len(zone) // 2]
             beat.status = BeatStatus.DETECTED
             beat.detected_chapter = mid_ch["chapter_number"]
             beat.detected_position = mid_ch["chapter_number"] / total
             beat.confidence = min(0.85, 0.4 + total_events * 0.08 + total_interactions * 0.03)
             beat.evidence = f"{total_events} eventos y {total_interactions} interacciones en la zona central"
+        elif total_events >= 1 or total_interactions >= 2:
+            mid_ch = zone[len(zone) // 2]
+            beat.status = BeatStatus.POSSIBLE
+            beat.detected_chapter = mid_ch["chapter_number"]
+            beat.detected_position = mid_ch["chapter_number"] / total
+            beat.confidence = 0.3
+            beat.evidence = f"{total_events} eventos y {total_interactions} interacciones en la zona central (insuficiente para confirmar)"
         elif zone:
             beat.status = BeatStatus.POSSIBLE
             beat.detected_chapter = zone[0]["chapter_number"]
             beat.detected_position = zone[0]["chapter_number"] / total
-            beat.confidence = 0.3
+            beat.confidence = 0.2
             beat.evidence = "Capítulos centrales presentes pero con pocos eventos detectados"
 
     def _detect_midpoint(self, beat: TemplateBeat, chapters: list[dict], total: int,
@@ -728,12 +818,51 @@ class NarrativeTemplateAnalyzer:
                 beat.evidence = f"Cambio de ubicación en cap. {ch['chapter_number']}"
                 return
 
+    def _detect_twist(self, beat: TemplateBeat, chapters: list[dict], total: int) -> None:
+        """
+        Detectar giro (Ten 転) de Kishotenketsu.
+
+        El Ten NO es un clímax basado en conflicto. Es un cambio inesperado de
+        perspectiva, tono o información. Funciona sin conflicto.
+        Zona esperada: 53-77% del manuscrito.
+        """
+        zone = [c for c in chapters
+                if total * 0.53 <= c["chapter_number"] <= total * 0.77]
+
+        twist_indicators = {"revelation", "twist", "surprise", "discovery", "transformation"}
+
+        # Buscar eventos de giro/revelación
+        for ch in zone:
+            events = ch.get("key_events", []) + ch.get("llm_events", [])
+            for ev in events:
+                if ev.get("event_type") in twist_indicators:
+                    beat.status = BeatStatus.DETECTED
+                    beat.detected_chapter = ch["chapter_number"]
+                    beat.detected_position = ch["chapter_number"] / total
+                    beat.confidence = 0.7
+                    beat.evidence = f"Evento '{ev['event_type']}' sugiere giro narrativo"
+                    return
+
+        # Buscar cambio tonal significativo entre capítulos adyacentes
+        for i, ch in enumerate(zone):
+            if i == 0:
+                continue
+            prev_tone = zone[i - 1].get("dominant_tone", "")
+            curr_tone = ch.get("dominant_tone", "")
+            if prev_tone and curr_tone and prev_tone != curr_tone:
+                beat.status = BeatStatus.POSSIBLE
+                beat.detected_chapter = ch["chapter_number"]
+                beat.detected_position = ch["chapter_number"] / total
+                beat.confidence = 0.35
+                beat.evidence = f"Cambio de tono ({prev_tone} → {curr_tone}) en cap. {ch['chapter_number']}"
+                return
+
     def _detect_climax(self, beat: TemplateBeat, chapters: list[dict], total: int,
                        pacing: Optional[dict]) -> None:
         """Detectar clímax: pico máximo de tensión/conflicto."""
         zone = [c for c in chapters
                 if total * 0.75 <= c["chapter_number"] <= total * 0.95]
-        climax_events = {"climax_moment", "conflict", "resolution", "sacrifice", "death", "transformation"}
+        climax_events = {"climax_moment", "conflict", "sacrifice", "death", "transformation"}
 
         # Buscar eventos de clímax
         for ch in zone:

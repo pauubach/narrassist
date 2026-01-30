@@ -1,5 +1,5 @@
 """
-Detector de Arquetipos de Personaje (Jung / Campbell).
+Detector de Arquetipos de Personaje.
 
 Clasifica personajes en arquetipos narrativos basándose en:
 - Arco narrativo (growth, fall, redemption, static, circular)
@@ -9,15 +9,23 @@ Clasifica personajes en arquetipos narrativos basándose en:
 - Presencia (distribución en capítulos, trayectoria)
 - Atributos (físicos, psicológicos, rol)
 
-Arquetipos soportados (12 de Jung + 4 narrativos de Campbell):
-- Héroe, Sombra, Mentor, Heraldo, Guardián del Umbral, Cambiante
-- Embaucador (Trickster), Inocente, Explorador, Sabio, Amante, Gobernante
-- Cuidador, Creador, Bufón, Rebelde
+Arquetipos soportados (12 de Mark & Pearson + 4 funciones narrativas de Campbell/Vogler):
+- Arquetipos de personalidad (Mark & Pearson, 2001): Héroe, Inocente,
+  Explorador, Sabio, Amante, Gobernante, Cuidador, Creador, Bufón, Rebelde,
+  Sombra, Cambiante
+- Funciones narrativas (Campbell, 1949; Vogler, 2007): Mentor, Heraldo,
+  Guardián del Umbral, Embaucador (Trickster)
+
+Nota: Jung propuso los conceptos de arquetipo y sombra como estructuras
+del inconsciente colectivo, pero NO definió los 12 arquetipos de personalidad.
+La taxonomía de 12 fue desarrollada por Mark & Pearson en "The Hero and
+the Outlaw" (2001) adaptando ideas jungianas al análisis de marca/narrativa.
 
 Referencias:
-- Jung, C.G. "The Archetypes and the Collective Unconscious" (1959)
-- Campbell, Joseph. "The Hero with a Thousand Faces" (1949)
-- Vogler, Christopher. "The Writer's Journey" (2007)
+- Mark, M. & Pearson, C.S. "The Hero and the Outlaw" (2001) — 12 arquetipos
+- Campbell, Joseph. "The Hero with a Thousand Faces" (1949) — monomito
+- Vogler, Christopher. "The Writer's Journey" (2007) — funciones narrativas
+- Jung, C.G. "The Archetypes and the Collective Unconscious" (1959) — marco teórico
 """
 
 import logging
@@ -233,8 +241,7 @@ ARC_TYPE_SIGNALS: dict[str, dict[ArchetypeId, float]] = {
         ArchetypeId.HERO: 20, ArchetypeId.SHAPESHIFTER: 15, ArchetypeId.REBEL: 10,
     },
     "static": {
-        ArchetypeId.SAGE: 15, ArchetypeId.MENTOR: 15, ArchetypeId.GUARDIAN: 10
-        if hasattr(ArchetypeId, 'GUARDIAN') else ArchetypeId.THRESHOLD_GUARDIAN: 10,
+        ArchetypeId.SAGE: 15, ArchetypeId.MENTOR: 15, ArchetypeId.THRESHOLD_GUARDIAN: 10,
     },
     "circular": {
         ArchetypeId.TRICKSTER: 15, ArchetypeId.JESTER: 10, ArchetypeId.SHAPESHIFTER: 10,
@@ -270,7 +277,7 @@ SUBTYPE_SIGNALS: dict[str, dict[ArchetypeId, float]] = {
 
 class CharacterArchetypeAnalyzer:
     """
-    Analiza personajes y les asigna arquetipos de Jung/Campbell.
+    Analiza personajes y les asigna arquetipos de Mark & Pearson / Campbell.
 
     Usa datos ya analizados: arcos, relaciones, interacciones,
     importancia y presencia en el manuscrito.
@@ -380,6 +387,9 @@ class CharacterArchetypeAnalyzer:
         # --- Señal 5: Presencia ---
         self._score_presence(char, total_chapters, scores, signals)
 
+        # Preservar raw_scores para calcular confianza basada en evidencia real
+        raw_scores = dict(scores)
+
         # Normalizar scores a 0-100
         max_score = max(scores.values()) if scores else 1
         if max_score > 0:
@@ -390,7 +400,16 @@ class CharacterArchetypeAnalyzer:
         all_scores = []
         for archetype_id, score in scores.items():
             info = ARCHETYPE_INFO[archetype_id]
-            confidence = min(1.0, score / 100 * 0.8 + 0.1) if score > 0 else 0.0
+            # Confianza basada en evidencia bruta (raw_score), no normalizada
+            raw = raw_scores.get(archetype_id, 0)
+            if raw >= 40:
+                confidence = min(1.0, 0.7 + (raw - 40) / 100)
+            elif raw >= 20:
+                confidence = 0.4 + (raw - 20) / 50
+            elif raw > 0:
+                confidence = 0.1 + raw / 40
+            else:
+                confidence = 0.0
             all_scores.append(ArchetypeScore(
                 archetype=archetype_id,
                 name=info["name"],
@@ -430,7 +449,12 @@ class CharacterArchetypeAnalyzer:
     ) -> None:
         """Puntuar según importancia del personaje."""
         if importance == "protagonist":
-            scores[ArchetypeId.HERO] += 25
+            # Distribuido: no asumir que protagonista = Héroe
+            scores[ArchetypeId.HERO] += 10
+            scores[ArchetypeId.EXPLORER] += 5
+            scores[ArchetypeId.REBEL] += 5
+            scores[ArchetypeId.LOVER] += 5
+            scores[ArchetypeId.RULER] += 5
             signals[ArchetypeId.HERO].append("Protagonista del manuscrito")
         elif importance == "secondary":
             scores[ArchetypeId.MENTOR] += 8
@@ -661,26 +685,44 @@ class CharacterArchetypeAnalyzer:
         if not has_hero and len(characters) >= 3:
             notes.append(
                 "No se detectó un Héroe claro en el elenco. "
-                "Todo relato necesita un protagonista cuyo viaje guíe al lector."
+                "Esto puede indicar un protagonismo coral o un liderazgo narrativo difuso."
             )
 
         if has_hero and not has_shadow and len(characters) >= 3:
             notes.append(
                 "No se detectó una Sombra/Antagonista clara. "
-                "Un oponente definido eleva la tensión narrativa."
+                "El conflicto puede canalizarse de forma interna o ambiental."
             )
 
         if has_hero and not has_mentor and len(characters) >= 4:
             notes.append(
-                "No se detectó un Mentor. "
-                "Un guía o aliado sabio aporta profundidad al viaje del héroe."
+                "No se detectó un Mentor entre los personajes analizados. "
+                "No todas las estructuras narrativas requieren esta función."
             )
 
         # Diversidad de arquetipos
         if len(characters) >= 5 and len(primary_types) <= 2:
             notes.append(
-                f"Los {len(characters)} personajes comparten solo {len(primary_types)} arquetipos. "
-                "Más diversidad arquetipal enriquece la trama."
+                f"Los {len(characters)} personajes comparten solo "
+                f"{len(primary_types)} arquetipos distintos. "
+                "Puede ser una elección temática intencionada o una "
+                "oportunidad de diferenciación."
+            )
+
+        # Flat arc recognition (K.M. Weiland)
+        static_chars = []
+        for ch in characters:
+            for score in ch.all_scores:
+                if any("static" in s for s in score.signals):
+                    static_chars.append(ch.character_name)
+                    break
+        if static_chars:
+            names = ", ".join(f"«{n}»" for n in static_chars[:3])
+            notes.append(
+                f"Se detectaron arcos estáticos en {names}. "
+                "Un arco estático no implica ausencia de desarrollo: "
+                "puede tratarse de un 'flat arc' donde el personaje "
+                "transforma su entorno sin cambiar él mismo."
             )
 
         if not notes:
