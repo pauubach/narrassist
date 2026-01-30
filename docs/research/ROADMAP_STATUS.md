@@ -249,6 +249,19 @@ Todas las features del Competitive Analysis clasificadas como "Quick Wins", "Dif
 | **Development Stages Workflow** | Gestión de proceso, no análisis | "Checklist de fases editoriales" — guía de proceso del corrector |
 | **Brainstorm Infinito** | Ideación creativa, feature de escritor | "Sugerir alternativas" — ante un problema detectado, proponer direcciones |
 
+### Sprints de Calidad Post-Auditoría (Sesión 5)
+
+> Auditoría completa con 4 auditores + 3 paneles de 9 expertos.
+> Detalle completo: [AUDIT_DECISIONS_AND_ROADMAP.md](AUDIT_DECISIONS_AND_ROADMAP.md)
+
+| Sprint | Objetivo | Items | Días |
+|--------|----------|-------|------|
+| **E: Hotfix Crítico** | Crashes + XSS | 5 | <1 |
+| **F: Calidad Frontend** | Error handling, apiUrl, watch | 6 | 1-2 |
+| **G: Lingüística Española** | Pasiva refleja, estar, haber, nominalizaciones | 8 | 2-3 |
+| **H: Calibración Narrativa** | Tono diagnóstico, templates, arquetipos | 10 | 2-3 |
+| **I: Tests + Calibración Fina** | Cobertura esencial + umbrales | 15 | 3-4 |
+
 ### Infraestructura
 
 | Tarea | Prioridad | Esfuerzo | Bloqueante |
@@ -264,6 +277,8 @@ Todas las features del Competitive Analysis clasificadas como "Quick Wins", "Dif
 
 | Área | Estado | Prioridad |
 |------|--------|-----------|
+| Tests esenciales post-auditoría | 7 tests identificados como **ESENCIALES** | **ALTA** |
+| Tests recomendados post-auditoría | 6 tests adicionales | Media |
 | Fixtures faltantes | 14+ tests skipped | Media |
 | Tests E2E adicionales | Solo 12 specs | Media |
 | Coverage general | ~10% → objetivo 50% | Baja |
@@ -279,9 +294,11 @@ Todas las features del Competitive Analysis clasificadas como "Quick Wins", "Dif
 | ~~Sprint B: Sentence Energy~~ | ~~1~~ | ~~1-2~~ ✅ HECHO |
 | ~~Sprint C: Estructura Narrativa~~ | ~~2~~ | ~~3-4~~ ✅ HECHO |
 | ~~Sprint D: Arquetipos~~ | ~~1~~ | ~~2~~ ✅ HECHO |
+| Sprint E-I: Calidad post-auditoría | 44 | ~10 |
 | Infraestructura | 6 | 25 |
 | **TOTAL PENDIENTE (features)** | **0** | **0 días** |
-| **TOTAL PENDIENTE (features + infra)** | **6** | **~25 días** |
+| **TOTAL PENDIENTE (calidad)** | **44** | **~10 días** |
+| **TOTAL PENDIENTE (calidad + infra)** | **50** | **~35 días** |
 
 ---
 
@@ -296,6 +313,7 @@ Todas las features del Competitive Analysis clasificadas como "Quick Wins", "Dif
 | 29 Ene Sesión 3 | **Auditoría exhaustiva**: Sprint restante (4 items) TODOS completados: Scene Cards (SceneCardsView.vue + dual view), Register per-chapter (grid cards + accordion + ChapterTimeline), UI categorías (3 categorías con 2 filas), Coreference reasoning (collapsible voting en EntityInspector). Genre Benchmarking COMPLETO (12 géneros pacing + register). Alertas de estilo WIRED en pipeline. Tension curve IMPLEMENTADA. Sensory Report, Story Bible, Scrivener Export: backend+API OK, frontend pendiente. |
 | 29 Ene Sesión 4 | **Análisis 3 perspectivas** (Frontend/UX, Backend/Arquitectura, Producto/Competitivo). Consenso unánime: construir 3 UIs pendientes. Implementados: `SensoryReportTab.vue` (stats + balance + accordion + detalle paginado), `StoryBibleTab.vue` (sidebar + detail con TabView de 5 secciones), Scrivener export en `ExportDialog.vue` (card con opciones + descarga ZIP). Integrados en StyleTab, WorkspaceTabs, ProjectDetailView. **Ya no quedan features con backend sin frontend.** |
 | 29 Ene Sesión 5 | **4 Sprints completados** (A-D). Sprint A: Quick Wins (revisions UI, genre percentiles, sensory suggestions). Sprint B: Sentence Energy (voz pasiva, verbos débiles, energía). Sprint C: Estructura Narrativa (5 plantillas + 12 dimensiones salud narrativa). Sprint D: Arquetipos (16 arquetipos Jung/Campbell). **0 features pendientes — solo queda infraestructura.** |
+| 29 Ene Sesión 5b | **Auditoría exhaustiva post-Sprint D**: 4 auditores independientes (Frontend/UX, Backend/Arquitectura, Lógica/Concepto, Seguridad/API) + 3 paneles de 9 expertos (Lingüista, Corrector, Narratólogo, Arquitecto, Seguridad, QA, PO, UX, FE). **38 hallazgos, 0 rechazados**. 3 crashes críticos (ErrorSeverity, ArchetypeId, variable scoping), 1 XSS (v-html), 6 errores lingüísticos graves (pasiva refleja, estar+participio, haber compuesto). Planificados Sprints E-I de calidad (~10 días). Ver [AUDIT_DECISIONS_AND_ROADMAP.md](AUDIT_DECISIONS_AND_ROADMAP.md). |
 
 ---
 
@@ -303,6 +321,7 @@ Todas las features del Competitive Analysis clasificadas como "Quick Wins", "Dif
 
 | Documento | Contenido |
 |-----------|-----------|
+| [AUDIT_DECISIONS_AND_ROADMAP.md](AUDIT_DECISIONS_AND_ROADMAP.md) | **Decisiones de auditoría y hoja de ruta E-I** (38 hallazgos, 9 expertos) |
 | [UI_REDESIGN_PROPOSAL.md](UI_REDESIGN_PROPOSAL.md) | Propuesta reorganización de tabs (implementada como categorías) |
 | [COMPETITIVE_ANALYSIS_2025.md](COMPETITIVE_ANALYSIS_2025.md) | Análisis de competidores |
 | [ALERTS_INTEGRATION_MAP.md](ALERTS_INTEGRATION_MAP.md) | Mapa de alertas |
