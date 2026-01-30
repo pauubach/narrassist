@@ -291,6 +291,42 @@ class SpeakerAttributor:
                 context_snippet=context_after[:50] if context_after else ""
             )
 
+            # 0. Usar speaker_hint del detector de diálogos
+            speaker_hint = getattr(dialogue, 'speaker_hint', '') or ''
+            if speaker_hint:
+                hint_lower = speaker_hint.strip().lower()
+                if hint_lower in self.entity_names:
+                    matched_id = self.entity_names[hint_lower]
+                    attr.speaker_id = matched_id
+                    attr.speaker_name = self._get_entity_name(matched_id)
+                    attr.confidence = AttributionConfidence.HIGH
+                    attr.attribution_method = AttributionMethod.EXPLICIT_VERB
+                    attr.speech_verb = "speaker_hint"
+                    last_speaker = matched_id
+                    if matched_id not in current_participants:
+                        current_participants.append(matched_id)
+                    attributions.append(attr)
+                    continue
+                else:
+                    # Intentar coincidencia parcial (nombre sin apellido)
+                    for name, eid in self.entity_names.items():
+                        if hint_lower in name or name in hint_lower:
+                            attr.speaker_id = eid
+                            attr.speaker_name = self._get_entity_name(eid)
+                            attr.confidence = AttributionConfidence.HIGH
+                            attr.attribution_method = AttributionMethod.EXPLICIT_VERB
+                            attr.speech_verb = "speaker_hint"
+                            last_speaker = eid
+                            if eid not in current_participants:
+                                current_participants.append(eid)
+                            attributions.append(attr)
+                            break
+                    else:
+                        # No match found, fall through to next steps
+                        pass
+                    if attr.speaker_id is not None:
+                        continue
+
             # 1. Intentar deteccion explicita
             explicit = self._detect_explicit_speaker(
                 context_before, context_after, entity_mentions, start_char, end_char

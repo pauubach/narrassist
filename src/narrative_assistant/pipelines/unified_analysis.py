@@ -2329,7 +2329,7 @@ class UnifiedAnalysisPipeline:
                     chapter_text=content,
                     chapter_id=chapter_num,
                     dialogues=chapter_dialogues,
-                    entities=context.entities,
+                    entity_names=[e.canonical_name for e in context.entities],
                 )
 
                 if result.is_success and result.value:
@@ -2712,18 +2712,33 @@ class UnifiedAnalysisPipeline:
                 if not entity_id:
                     continue
 
+                # Determinar categoría del atributo para la columna attribute_type
+                attr_key = attr.attribute_type.value if hasattr(attr.attribute_type, 'value') else str(attr.attribute_type)
+                _PHYSICAL_ATTRS = {"eye_color", "hair_color", "hair_type", "height", "build", "age", "skin", "distinctive_feature"}
+                _PSYCHOLOGICAL_ATTRS = {"personality"}
+                _SOCIAL_ATTRS = {"profession"}
+                if attr_key in _PHYSICAL_ATTRS:
+                    attr_category = "physical"
+                elif attr_key in _PSYCHOLOGICAL_ATTRS:
+                    attr_category = "psychological"
+                elif attr_key in _SOCIAL_ATTRS:
+                    attr_category = "social"
+                elif attr_key == "location":
+                    attr_category = "location"
+                else:
+                    attr_category = "other"
+
                 with db.connection() as conn:
                     conn.execute("""
                         INSERT INTO entity_attributes
-                        (entity_id, attribute_type, value, confidence, source, chapter)
-                        VALUES (?, ?, ?, ?, ?, ?)
+                        (entity_id, attribute_type, attribute_key, attribute_value, confidence)
+                        VALUES (?, ?, ?, ?, ?)
                     """, (
                         entity_id,
-                        attr.attribute_type.value if hasattr(attr.attribute_type, 'value') else str(attr.attribute_type),
+                        attr_category,
+                        attr_key,
                         attr.value,
                         attr.confidence if hasattr(attr, 'confidence') else 0.8,
-                        attr.source if hasattr(attr, 'source') else "hybrid",
-                        attr.chapter_id if hasattr(attr, 'chapter_id') else None,
                     ))
                     persisted += 1
 

@@ -2889,38 +2889,65 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                 for token in sent:
                     # === Patrón 1: Sujeto + verbo copulativo + atributo ===
                     # "Juan era alto", "María estaba cansada"
-                    if token.lemma_ in self._copulative_verbs and token.pos_ == "AUX":
+                    # En spaCy UD español, el adjetivo/predicado es ROOT y
+                    # el verbo copulativo tiene dep_="cop". El sujeto es hijo del predicado.
+                    if token.dep_ == "cop" and token.lemma_ in self._copulative_verbs:
+                        predicate = token.head  # El adjetivo/predicado es el head
                         subject = None
                         attribute_value = None
                         attr_token = None
 
-                        for child in token.children:
-                            # Buscar sujeto nominal
+                        if predicate.pos_ in ("ADJ", "NOUN", "PROPN"):
+                            attribute_value = predicate.text
+                            attr_token = predicate
+
+                        for child in predicate.children:
                             if child.dep_ in ("nsubj", "nsubj:pass"):
                                 subject = child
-                            # Buscar atributo (adjetivo o sustantivo predicativo)
-                            elif child.dep_ in ("acomp", "attr", "xcomp", "ROOT") or \
-                                 (child.pos_ == "ADJ" and child.dep_ == "ROOT"):
-                                attribute_value = child.text
-                                attr_token = child
-
-                        # También buscar atributos como hijos del ROOT
-                        if not attribute_value:
-                            for child in token.head.children:
-                                if child.pos_ == "ADJ" and child != token:
-                                    attribute_value = child.text
-                                    attr_token = child
-                                    break
 
                         if subject and attribute_value:
                             entity_name = self._resolve_entity_from_token(
                                 subject, mention_spans, doc
                             )
                             if entity_name and len(attribute_value) > 1:
-                                # Determinar categoría
                                 category = self._infer_category(attribute_value, attr_token)
 
-                                confidence = 0.55  # Menor que patrones explícitos
+                                confidence = 0.55
+                                if confidence >= self.min_confidence:
+                                    attr = ExtractedAttribute(
+                                        entity_name=entity_name,
+                                        category=category,
+                                        key=AttributeKey.OTHER,
+                                        value=attribute_value.lower(),
+                                        source_text=sent.text,
+                                        start_char=sent.start_char,
+                                        end_char=sent.end_char,
+                                        confidence=confidence,
+                                        chapter_id=chapter_id,
+                                    )
+                                    attributes.append(attr)
+
+                    # Fallback: AUX que es ROOT (menos frecuente pero posible)
+                    elif token.lemma_ in self._copulative_verbs and token.pos_ == "AUX" and token.dep_ == "ROOT":
+                        subject = None
+                        attribute_value = None
+                        attr_token = None
+
+                        for child in token.children:
+                            if child.dep_ in ("nsubj", "nsubj:pass"):
+                                subject = child
+                            elif child.pos_ == "ADJ":
+                                attribute_value = child.text
+                                attr_token = child
+
+                        if subject and attribute_value:
+                            entity_name = self._resolve_entity_from_token(
+                                subject, mention_spans, doc
+                            )
+                            if entity_name and len(attribute_value) > 1:
+                                category = self._infer_category(attribute_value, attr_token)
+
+                                confidence = 0.55
                                 if confidence >= self.min_confidence:
                                     attr = ExtractedAttribute(
                                         entity_name=entity_name,

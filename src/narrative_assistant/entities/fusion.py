@@ -711,9 +711,9 @@ def run_automatic_fusion(
         for suggestion in suggestions:
             if suggestion.similarity >= auto_merge_threshold:
                 result = service.merge_entities(
+                    project_id=project_id,
                     entity_ids=[suggestion.entity1.id, suggestion.entity2.id],
                     canonical_name=suggestion.entity1.canonical_name,
-                    session_id=session_id,
                 )
                 if result.is_success:
                     merged_count += 1

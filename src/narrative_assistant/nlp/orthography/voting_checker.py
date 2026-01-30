@@ -518,7 +518,9 @@ class LanguageToolVoter(BaseVoter):
                             "category": match.category,
                         }
                     )
-                    results.append((word, match.offset, match.offset + error_len, vote))
+                    # Ignorar errores en whitespace/newlines
+                    if word.strip():
+                        results.append((word, match.offset, match.offset + error_len, vote))
             else:
                 # Usar cliente de servidor local
                 check_result = self._client.check(text, language="es")
@@ -538,7 +540,9 @@ class LanguageToolVoter(BaseVoter):
                             "category": match.rule_category,
                         }
                     )
-                    results.append((word, match.offset, match.offset + match.length, vote))
+                    # Ignorar errores en whitespace/newlines
+                    if word.strip():
+                        results.append((word, match.offset, match.offset + match.length, vote))
 
         except Exception as e:
             logger.debug(f"Error en LanguageTool: {e}")
@@ -1353,7 +1357,7 @@ class VotingSpellingChecker:
         # Fase 2b: Añadir errores de LanguageTool que no coinciden con palabras extraídas
         # (palabras muy cortas como "a", "e", "El" que no pasaron el filtro de longitud)
         for lt_word, lt_start, lt_end, lt_vote in lt_raw_results:
-            if lt_start not in words_positions:
+            if lt_start not in words_positions and lt_word.strip():
                 # Este error de LT no fue procesado - añadirlo directamente
                 sentence = self._extract_sentence(text, lt_start)
                 result = VotingResult(

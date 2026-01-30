@@ -384,12 +384,14 @@ class RegexExtractor(BaseExtractor):
                 # Detectar negaciones
                 is_negated = any(p.search(context_text) for p in self._negation_re)
 
+                # Filtrar atributos negados - no representan el estado real
+                if is_negated:
+                    continue
+
                 # Ajustar confianza
                 confidence = base_confidence
                 if is_metaphor:
                     confidence *= 0.5  # Reducir confianza para metáforas
-                if is_negated:
-                    confidence *= 0.9  # Leve reducción para negaciones
 
                 # Combinar "muy" con el valor si existe
                 try:
