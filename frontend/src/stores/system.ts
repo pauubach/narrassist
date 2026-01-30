@@ -28,6 +28,50 @@ export interface ModelsStatus {
   python_error?: string | null
 }
 
+export interface SystemCapabilities {
+  hardware: {
+    gpu: { type: string; name: string; memory_gb: number | null; device_id: number } | null
+    gpu_type: string
+    has_gpu: boolean
+    has_high_vram: boolean
+    has_cupy: boolean
+    cpu: { name: string }
+  }
+  ollama: {
+    installed: boolean
+    available: boolean
+    models: Array<{ name: string; size: number; modified: string }>
+    recommended_models: string[]
+  }
+  languagetool?: {
+    installed: boolean
+    running: boolean
+    installing: boolean
+    java_available: boolean
+  }
+  nlp_methods: {
+    coreference: Record<string, NLPMethod>
+    ner: Record<string, NLPMethod>
+    grammar: Record<string, NLPMethod>
+  }
+  recommended_config: {
+    device_preference: string
+    spacy_gpu_enabled: boolean
+    embeddings_gpu_enabled: boolean
+    batch_size: number
+  }
+}
+
+export interface NLPMethod {
+  name: string
+  description: string
+  weight?: number
+  available: boolean
+  default_enabled: boolean
+  requires_gpu: boolean
+  recommended_gpu: boolean
+}
+
 export const useSystemStore = defineStore('system', () => {
   const backendConnected = ref(false)
   const backendVersion = ref('unknown')
@@ -43,6 +87,10 @@ export const useSystemStore = defineStore('system', () => {
   const modelsLoading = ref(false)
   const modelsDownloading = ref(false)
   const modelsError = ref<string | null>(null)
+
+  // System capabilities (cached - loaded once at startup)
+  const systemCapabilities = ref<SystemCapabilities | null>(null)
+  const capabilitiesLoading = ref(false)
 
   // Computed: are all required models installed?
   const modelsReady = computed(() => modelsStatus.value?.all_required_installed ?? false)
@@ -204,6 +252,49 @@ export const useSystemStore = defineStore('system', () => {
   // No auto-check en creación del store.
   // El ModelSetupDialog llama a waitForBackend() que hace el health check con reintentos.
 
+  /**
+   * Carga las capacidades del sistema (hardware, Ollama, LanguageTool, NLP).
+   * Se cachea en el store - solo hace fetch si no hay datos previos o si se fuerza.
+   */
+  async function loadCapabilities(force = false): Promise<SystemCapabilities | null> {
+    if (systemCapabilities.value && !force) return systemCapabilities.value
+
+    capabilitiesLoading.value = true
+    try {
+      const response = await fetch(apiUrl('/api/system/capabilities'))
+      if (response.ok) {
+        const result = await response.json()
+        if (result.success && result.data) {
+          systemCapabilities.value = result.data
+          return result.data
+        }
+      }
+    } catch (error) {
+      console.error('Error loading system capabilities:', error)
+    } finally {
+      capabilitiesLoading.value = false
+    }
+    return null
+  }
+
+  /**
+   * Refresca solo la parte de capabilities que puede cambiar (Ollama, LT status).
+   * No muestra loading spinner, actualiza silenciosamente.
+   */
+  async function refreshCapabilities(): Promise<void> {
+    try {
+      const response = await fetch(apiUrl('/api/system/capabilities'))
+      if (response.ok) {
+        const result = await response.json()
+        if (result.success && result.data) {
+          systemCapabilities.value = result.data
+        }
+      }
+    } catch {
+      // Silent refresh, don't report errors
+    }
+  }
+
   async function installDependencies(): Promise<boolean> {
     modelsError.value = null
     
@@ -242,6 +333,8 @@ export const useSystemStore = defineStore('system', () => {
     modelsLoading,
     modelsDownloading,
     modelsError,
+    systemCapabilities,
+    capabilitiesLoading,
 
     // Computed
     modelsReady,
@@ -258,6 +351,8 @@ export const useSystemStore = defineStore('system', () => {
     checkModelsStatus,
     downloadModels,
     installDependencies,
+    loadCapabilities,
+    refreshCapabilities,
     stopPolling
   }
 })

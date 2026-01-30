@@ -351,7 +351,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
@@ -359,50 +359,9 @@ import Message from 'primevue/message'
 import Checkbox from 'primevue/checkbox'
 import ProgressSpinner from 'primevue/progressspinner'
 import { apiUrl } from '@/config/api'
+import { useSystemStore, type NLPMethod } from '@/stores/system'
 
-interface NLPMethod {
-  name: string
-  description: string
-  weight?: number
-  available: boolean
-  default_enabled: boolean
-  requires_gpu: boolean
-  recommended_gpu: boolean
-}
-
-interface SystemCapabilities {
-  hardware: {
-    gpu: { type: string; name: string; memory_gb: number | null; device_id: number } | null
-    gpu_type: string
-    has_gpu: boolean
-    has_high_vram: boolean
-    has_cupy: boolean
-    cpu: { name: string }
-  }
-  ollama: {
-    installed: boolean
-    available: boolean
-    models: Array<{ name: string; size: number; modified: string }>
-    recommended_models: string[]
-  }
-  languagetool?: {
-    installed: boolean
-    running: boolean
-    installing: boolean
-    java_available: boolean
-  }
-  nlp_methods: {
-    coreference: Record<string, NLPMethod>
-    ner: Record<string, NLPMethod>
-    grammar: Record<string, NLPMethod>
-  }
-  recommended_config: {
-    device_preference: string
-    spacy_gpu_enabled: boolean
-    embeddings_gpu_enabled: boolean
-    batch_size: number
-  }
-}
+const systemStore = useSystemStore()
 
 interface Props {
   visible: boolean
@@ -426,9 +385,9 @@ const currentStep = ref(0)
 const totalSteps = 5
 const dontShowAgain = ref(false)
 
-// Estado de capacidades
-const systemCapabilities = ref<SystemCapabilities | null>(null)
-const loadingCapabilities = ref(false)
+// Capabilities from the store (pre-loaded at startup)
+const systemCapabilities = computed(() => systemStore.systemCapabilities)
+const loadingCapabilities = computed(() => systemStore.capabilitiesLoading && !systemStore.systemCapabilities)
 
 // Títulos de pasos
 const stepTitles = ['', 'Cómo funciona', 'El Workspace', 'Tu Sistema', 'Listo']
@@ -466,36 +425,16 @@ const enabledMethodsList = computed(() => {
   return methods
 })
 
-// Cargar capacidades cuando se abre el diálogo
-watch(() => props.visible, async (newValue) => {
+// Reset step cuando se abre el diálogo
+watch(() => props.visible, (newValue) => {
   if (newValue) {
     currentStep.value = 0
-    await loadCapabilities()
-  }
-})
-
-onMounted(async () => {
-  if (props.visible) {
-    await loadCapabilities()
-  }
-})
-
-const loadCapabilities = async () => {
-  loadingCapabilities.value = true
-  try {
-    const response = await fetch(apiUrl('/api/system/capabilities'))
-    if (response.ok) {
-      const result = await response.json()
-      if (result.success && result.data) {
-        systemCapabilities.value = result.data
-      }
+    // Si no hay capabilities en el store, cargarlas
+    if (!systemStore.systemCapabilities) {
+      systemStore.loadCapabilities()
     }
-  } catch (error) {
-    console.error('Error loading system capabilities:', error)
-  } finally {
-    loadingCapabilities.value = false
   }
-}
+})
 
 // Estado de instalación interactiva en el tutorial
 const ollamaInstalling = ref(false)
@@ -518,8 +457,9 @@ const installOllama = async () => {
           if (statusResult.data?.is_installed) {
             clearInterval(ollamaPollTimer!)
             ollamaPollTimer = null
+            // Refresh capabilities BEFORE clearing flag to avoid UI flash
+            await systemStore.refreshCapabilities()
             ollamaInstalling.value = false
-            await loadCapabilities()
           }
         } catch { /* ignore */ }
       }, 3000)
@@ -539,7 +479,7 @@ const startOllama = async () => {
   try {
     await fetch(apiUrl('/api/ollama/start'), { method: 'POST' })
     await new Promise(r => setTimeout(r, 2000))
-    await loadCapabilities()
+    await systemStore.refreshCapabilities()
   } finally {
     ollamaStarting.value = false
   }
@@ -547,22 +487,34 @@ const startOllama = async () => {
 
 const installLanguageTool = async () => {
   ltInstalling.value = true
+  let ltPollCount = 0
   try {
     const resp = await fetch(apiUrl('/api/languagetool/install'), { method: 'POST' })
     const result = await resp.json()
     if (result.success) {
       ltPollTimer = setInterval(async () => {
+        ltPollCount++
+        // Timeout after 5 minutes (100 * 3s)
+        if (ltPollCount > 100) {
+          clearInterval(ltPollTimer!)
+          ltPollTimer = null
+          ltInstalling.value = false
+          return
+        }
         try {
           const statusResp = await fetch(apiUrl('/api/languagetool/status'))
           const statusResult = await statusResp.json()
-          if (statusResult.data?.status !== 'installing') {
+          const status = statusResult.data?.status
+          // Wait for a definitive installed state, not just 'not installing'
+          if (status === 'installed_not_running' || status === 'running') {
             clearInterval(ltPollTimer!)
             ltPollTimer = null
+            // Refresh capabilities BEFORE clearing flag to avoid UI flash
+            await systemStore.refreshCapabilities()
             ltInstalling.value = false
-            await loadCapabilities()
           }
         } catch { /* ignore */ }
-      }, 2000)
+      }, 3000)
     } else {
       ltInstalling.value = false
     }
@@ -576,7 +528,7 @@ const startLanguageTool = async () => {
   try {
     await fetch(apiUrl('/api/languagetool/start'), { method: 'POST' })
     await new Promise(r => setTimeout(r, 2000))
-    await loadCapabilities()
+    await systemStore.refreshCapabilities()
   } finally {
     ltStarting.value = false
   }
@@ -600,7 +552,7 @@ const nextStep = async () => {
 
   // Si llegamos al paso de hardware y no tenemos capabilities, cargarlas
   if (currentStep.value === 3 && !systemCapabilities.value) {
-    await loadCapabilities()
+    await systemStore.loadCapabilities()
   }
 }
 

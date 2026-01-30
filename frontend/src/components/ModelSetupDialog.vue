@@ -24,7 +24,10 @@ onMounted(async () => {
     return
   }
 
-  // 2. Backend listo - verificar estado de modelos
+  // 2. Backend listo - pre-cargar capabilities en background (no bloquea)
+  systemStore.loadCapabilities()
+
+  // 3. Verificar estado de modelos
   downloadPhase.value = 'checking'
   await systemStore.checkModelsStatus()
 
