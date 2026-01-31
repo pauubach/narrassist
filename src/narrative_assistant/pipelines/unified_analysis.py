@@ -473,6 +473,40 @@ class UnifiedAnalysisPipeline:
     def __init__(self, config: Optional[UnifiedConfig] = None):
         self.config = config or UnifiedConfig()
         self._executor = None
+        self._is_low_vram = False
+        
+        # Detectar si estamos en un sistema con poca VRAM
+        self._detect_hardware_limits()
+    
+    def _detect_hardware_limits(self) -> None:
+        """Detecta limitaciones de hardware y ajusta configuración."""
+        try:
+            from ..core.device import get_device_detector, MIN_SAFE_VRAM_GB
+            
+            detector = get_device_detector()
+            device = detector.detect_best_device("auto")
+            
+            if device.is_low_vram:
+                self._is_low_vram = True
+                # Reducir workers paralelos para evitar saturación de GPU
+                if self.config.max_workers > 2:
+                    logger.warning(
+                        f"GPU con poca VRAM ({device.memory_gb:.1f}GB < {MIN_SAFE_VRAM_GB}GB). "
+                        f"Reduciendo workers paralelos de {self.config.max_workers} a 2."
+                    )
+                    self.config.max_workers = 2
+        except Exception as e:
+            logger.debug(f"Error detecting hardware limits: {e}")
+    
+    def _clear_gpu_memory_if_needed(self) -> None:
+        """Limpia memoria GPU en sistemas con poca VRAM."""
+        if self._is_low_vram:
+            try:
+                from ..core.device import clear_gpu_memory
+                clear_gpu_memory()
+                logger.debug("GPU memory cleared between phases")
+            except Exception as e:
+                logger.debug(f"Error clearing GPU memory: {e}")
 
     def analyze(
         self,
@@ -507,6 +541,8 @@ class UnifiedAnalysisPipeline:
             phase_result = self._phase_1_parsing(path, project_name, context)
             if phase_result.is_failure:
                 return Result.failure(phase_result.error)
+            
+            self._clear_gpu_memory_if_needed()
 
             # ========== FASE 2: EXTRACCIÓN BASE ==========
             if progress_callback:
@@ -516,6 +552,8 @@ class UnifiedAnalysisPipeline:
             if phase_result.is_failure:
                 context.errors.append(phase_result.error)
                 logger.warning("Base extraction had errors, continuing...")
+            
+            self._clear_gpu_memory_if_needed()
 
             # ========== FASE 3: RESOLUCIÓN Y FUSIÓN ==========
             if progress_callback:
@@ -525,6 +563,8 @@ class UnifiedAnalysisPipeline:
             if phase_result.is_failure:
                 context.errors.append(phase_result.error)
                 logger.warning("Resolution had errors, continuing...")
+            
+            self._clear_gpu_memory_if_needed()
 
             # ========== FASE 4: EXTRACCIÓN PROFUNDA ==========
             if progress_callback:
@@ -534,6 +574,8 @@ class UnifiedAnalysisPipeline:
             if phase_result.is_failure:
                 context.errors.append(phase_result.error)
                 logger.warning("Deep extraction had errors, continuing...")
+            
+            self._clear_gpu_memory_if_needed()
 
             # ========== FASE 5: ANÁLISIS DE CALIDAD ==========
             if progress_callback:
@@ -543,6 +585,8 @@ class UnifiedAnalysisPipeline:
             if phase_result.is_failure:
                 context.errors.append(phase_result.error)
                 logger.warning("Quality analysis had errors, continuing...")
+            
+            self._clear_gpu_memory_if_needed()
 
             # ========== FASE 6: CONSISTENCIA Y ALERTAS ==========
             if progress_callback:

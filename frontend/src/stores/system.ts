@@ -64,6 +64,8 @@ export interface SystemCapabilities {
     coreference: Record<string, NLPMethod>
     ner: Record<string, NLPMethod>
     grammar: Record<string, NLPMethod>
+    spelling?: Record<string, NLPMethod>
+    character_knowledge?: Record<string, NLPMethod>
   }
   recommended_config: {
     device_preference: string

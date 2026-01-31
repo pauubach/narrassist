@@ -65,23 +65,37 @@ class EmbeddingsModel:
             progress_callback: Función para reportar progreso de descarga (mensaje, porcentaje)
         """
         from sentence_transformers import SentenceTransformer
+        from ..core.device import get_safe_batch_size, get_device_detector
 
         config = get_config()
         self.model_name = model_name or config.nlp.embeddings_model
 
-        # Detectar dispositivo
+        # Detectar dispositivo y verificar VRAM
+        detector = get_device_detector()
+        device_info = detector.detect_best_device(config.gpu.device_preference)
+        
         if device is None:
             if config.gpu.embeddings_gpu_enabled:
-                self.device = get_torch_device_string(config.gpu.device_preference)
+                # En GPUs con poca VRAM, usar CPU para embeddings
+                # Ollama ya usará la GPU para LLM
+                if device_info.is_low_vram:
+                    logger.warning(
+                        f"GPU {device_info.device_name} tiene poca VRAM ({device_info.memory_gb:.1f}GB). "
+                        "Usando CPU para embeddings para evitar conflictos con Ollama."
+                    )
+                    self.device = "cpu"
+                else:
+                    self.device = get_torch_device_string(config.gpu.device_preference)
             else:
                 self.device = "cpu"
         else:
             self.device = device
 
-        # Batch size según dispositivo
+        # Batch size seguro según dispositivo y VRAM disponible
         if batch_size is None:
             if self.device in ("cuda", "mps"):
-                self.batch_size = config.gpu.embeddings_batch_size_gpu
+                base_batch = config.gpu.embeddings_batch_size_gpu
+                self.batch_size = get_safe_batch_size(base_batch, device_info)
             else:
                 self.batch_size = config.gpu.embeddings_batch_size_cpu
         else:
@@ -151,6 +165,7 @@ class EmbeddingsModel:
         sentences: Union[str, list[str]],
         normalize: bool = True,
         show_progress: bool = False,
+        clear_cache: bool = False,
     ) -> np.ndarray:
         """
         Genera embeddings para textos.
@@ -159,10 +174,13 @@ class EmbeddingsModel:
             sentences: Texto o lista de textos
             normalize: Normalizar embeddings (para similitud coseno)
             show_progress: Mostrar barra de progreso
+            clear_cache: Si True, libera memoria GPU después de encoding
 
         Returns:
             Array numpy de embeddings [n_sentences, embedding_dim]
         """
+        from ..core.device import clear_gpu_memory
+        
         if isinstance(sentences, str):
             sentences = [sentences]
 
@@ -179,8 +197,11 @@ class EmbeddingsModel:
             error_msg = str(e).lower()
             if "out of memory" in error_msg or "cuda" in error_msg:
                 logger.warning(
-                    f"GPU OOM detectado, reintentando en CPU con batch_size reducido"
+                    f"GPU OOM detectado, limpiando memoria y reintentando en CPU"
                 )
+                # Limpiar memoria GPU
+                clear_gpu_memory()
+                
                 # Reducir batch size y forzar CPU
                 fallback_batch_size = max(4, self.batch_size // 4)
                 embeddings = self.model.encode(
@@ -193,6 +214,10 @@ class EmbeddingsModel:
                 )
             else:
                 raise
+        
+        # Limpiar caché si se solicita (importante en sistemas con poca VRAM)
+        if clear_cache and self.device != "cpu":
+            clear_gpu_memory()
 
         return embeddings
 

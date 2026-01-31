@@ -1236,7 +1236,7 @@ import {
   type FontFamily,
   type PresetInfo
 } from '@/stores/theme'
-import { useSystemStore, type LTInstallProgress, type LTState } from '@/stores/system'
+import { useSystemStore, type LTInstallProgress, type LTState, type SystemCapabilities, type NLPMethod } from '@/stores/system'
 import type { CorrectionConfig } from '@/types'
 
 const router = useRouter()
@@ -1383,51 +1383,7 @@ const availableLLMOptions = computed(() => {
   }))
 })
 
-interface NLPMethod {
-  name: string
-  description: string
-  weight?: number
-  available: boolean
-  default_enabled: boolean
-  requires_gpu: boolean
-  recommended_gpu: boolean
-}
-
-interface SystemCapabilities {
-  hardware: {
-    gpu: { type: string; name: string; memory_gb: number | null; device_id: number } | null
-    gpu_type: string
-    has_gpu: boolean
-    has_high_vram: boolean
-    has_cupy: boolean
-    cpu: { name: string }
-  }
-  ollama: {
-    installed: boolean
-    available: boolean
-    models: Array<{ name: string; size: number; modified: string }>
-    recommended_models: string[]
-  }
-  languagetool?: {
-    installed: boolean
-    running: boolean
-    installing: boolean
-    java_available: boolean
-  }
-  nlp_methods: {
-    coreference: Record<string, NLPMethod>
-    ner: Record<string, NLPMethod>
-    grammar: Record<string, NLPMethod>
-    spelling?: Record<string, NLPMethod>
-    character_knowledge?: Record<string, NLPMethod>
-  }
-  recommended_config: {
-    device_preference: string
-    spacy_gpu_enabled: boolean
-    embeddings_gpu_enabled: boolean
-    batch_size: number
-  }
-}
+// NLPMethod y SystemCapabilities importados desde @/stores/system
 
 interface EnabledMethods {
   coreference: string[]
@@ -1493,9 +1449,9 @@ const settings = ref<Settings>({
   characterKnowledgeMode: 'rules'
 })
 
-// Capacidades del sistema
-const systemCapabilities = ref<SystemCapabilities | null>(null)
-const loadingCapabilities = ref(false)
+// Capacidades del sistema - usar store centralizado
+const systemCapabilities = computed(() => systemStore.systemCapabilities)
+const loadingCapabilities = computed(() => systemStore.capabilitiesLoading)
 
 const dataLocation = ref('~/.narrative_assistant')
 const showResetDialog = ref(false)
@@ -2177,30 +2133,18 @@ const loadSettings = () => {
 }
 
 const loadSystemCapabilities = async (): Promise<boolean> => {
-  loadingCapabilities.value = true
-  try {
-    const response = await fetch(apiUrl('/api/system/capabilities'))
-    if (response.ok) {
-      const result = await response.json()
-      if (result.success && result.data) {
-        systemCapabilities.value = result.data
-
-        // Si es la primera vez (no hay settings guardados), aplicar defaults según hardware
-        const savedSettings = localStorage.getItem('narrative_assistant_settings')
-        if (!savedSettings) {
-          applyDefaultsFromCapabilities(result.data)
-        }
-        return true
-      }
+  // Usar el store centralizado
+  const capabilities = await systemStore.loadCapabilities(true) // force refresh
+  if (capabilities) {
+    // Si es la primera vez (no hay settings guardados), aplicar defaults según hardware
+    const savedSettings = localStorage.getItem('narrative_assistant_settings')
+    if (!savedSettings) {
+      applyDefaultsFromCapabilities(capabilities)
     }
-    console.error('Error loading system capabilities: response not ok or no data')
-    return false
-  } catch (error) {
-    console.error('Error loading system capabilities:', error)
-    return false
-  } finally {
-    loadingCapabilities.value = false
+    return true
   }
+  console.error('Error loading system capabilities')
+  return false
 }
 
 const applyDefaultsFromCapabilities = (capabilities: SystemCapabilities) => {

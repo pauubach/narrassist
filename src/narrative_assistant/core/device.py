@@ -5,8 +5,12 @@ Soporta:
 - NVIDIA CUDA (Linux/Windows)
 - Apple Metal (MPS) en Apple Silicon
 - Fallback automático a CPU
+
+Incluye gestión defensiva de memoria GPU para evitar crashes en sistemas
+con VRAM limitada (< 6GB).
 """
 
+import gc
 import logging
 import platform
 import threading
@@ -15,6 +19,9 @@ from enum import Enum, auto
 from typing import Optional
 
 logger = logging.getLogger(__name__)
+
+# Umbral de VRAM para considerar GPU "segura" para uso intensivo
+MIN_SAFE_VRAM_GB = 6.0
 
 # Lock para thread-safety en singleton
 _detector_lock = threading.Lock()
@@ -41,6 +48,20 @@ class DeviceInfo:
     def __str__(self) -> str:
         mem_str = f", {self.memory_gb:.1f}GB" if self.memory_gb else ""
         return f"{self.device_type.name}: {self.device_name}{mem_str}"
+
+    @property
+    def is_low_vram(self) -> bool:
+        """
+        Indica si el dispositivo tiene VRAM limitada.
+        
+        GPUs con < 6GB de VRAM pueden tener problemas al ejecutar
+        múltiples modelos (Ollama + embeddings + spaCy) simultáneamente.
+        """
+        if self.device_type == DeviceType.CPU:
+            return False  # CPU no tiene VRAM
+        if self.memory_gb is None:
+            return True  # Asumir low VRAM si no podemos detectar
+        return self.memory_gb < MIN_SAFE_VRAM_GB
 
 
 class DeviceDetector:
@@ -279,3 +300,99 @@ def get_torch_device_string(prefer: str = "auto") -> str:
     """
     get_device(prefer)  # Asegurar detección
     return get_device_detector().get_torch_device()
+
+
+def clear_gpu_memory() -> None:
+    """
+    Libera memoria GPU agresivamente.
+    
+    IMPORTANTE: Llamar esta función después de operaciones intensivas
+    (embeddings, LLM, etc.) en sistemas con VRAM limitada para evitar
+    saturación y posibles crashes/BSOD.
+    """
+    # Recolector de basura de Python primero
+    gc.collect()
+    
+    # Limpiar caché CUDA si está disponible
+    try:
+        import torch
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()  # Esperar a que termine todo
+            logger.debug("GPU memory cache cleared (CUDA)")
+    except ImportError:
+        pass
+    except Exception as e:
+        logger.debug(f"Error clearing CUDA memory: {e}")
+
+
+def get_gpu_memory_usage() -> Optional[tuple[float, float]]:
+    """
+    Obtiene uso actual de memoria GPU.
+    
+    Returns:
+        Tuple (used_gb, total_gb) o None si no hay GPU
+    """
+    try:
+        import torch
+        if torch.cuda.is_available():
+            device = torch.cuda.current_device()
+            used = torch.cuda.memory_allocated(device) / (1024**3)
+            total = torch.cuda.get_device_properties(device).total_memory / (1024**3)
+            return (used, total)
+    except Exception:
+        pass
+    return None
+
+
+def is_gpu_memory_low(threshold_fraction: float = 0.85) -> bool:
+    """
+    Verifica si la GPU está cerca del límite de memoria.
+    
+    Args:
+        threshold_fraction: Fracción de memoria usada para considerar "low" (default: 85%)
+    
+    Returns:
+        True si la memoria está por encima del umbral
+    """
+    usage = get_gpu_memory_usage()
+    if usage is None:
+        return False
+    used, total = usage
+    return (used / total) > threshold_fraction
+
+
+def get_safe_batch_size(default: int, device_info: Optional[DeviceInfo] = None) -> int:
+    """
+    Obtiene un batch size seguro basado en la VRAM disponible.
+    
+    En sistemas con VRAM limitada (< 6GB), reduce el batch size para
+    evitar saturación de memoria.
+    
+    Args:
+        default: Batch size por defecto
+        device_info: Info del dispositivo (auto-detecta si None)
+    
+    Returns:
+        Batch size ajustado
+    """
+    if device_info is None:
+        detector = get_device_detector()
+        device_info = detector.current_device
+        if device_info is None:
+            return default
+    
+    # En CPU no hay restricción de VRAM
+    if device_info.device_type == DeviceType.CPU:
+        return default
+    
+    # Ajustar según VRAM
+    if device_info.memory_gb:
+        if device_info.memory_gb < 4:
+            return max(4, default // 8)  # Muy poca VRAM
+        elif device_info.memory_gb < 6:
+            return max(8, default // 4)  # Poca VRAM (como Quadro M3000M)
+        elif device_info.memory_gb < 8:
+            return max(16, default // 2)  # VRAM media
+    
+    return default
