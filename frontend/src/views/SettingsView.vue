@@ -695,14 +695,27 @@
               </div>
               <div v-else class="ollama-action-card" :class="'ollama-state-' + (ltState === 'not_installed' ? 'not_installed' : ltState === 'installing' ? 'no_models' : 'not_running')" style="margin-bottom: 0.75rem;">
                 <div class="ollama-action-content">
-                  <i :class="ltState === 'installing' ? 'pi pi-spin pi-spinner' : 'pi pi-exclamation-triangle'"></i>
-                  <div class="ollama-action-text">
+                  <i v-if="ltState !== 'installing'" class="pi pi-exclamation-triangle"></i>
+                  <i v-else class="pi pi-download"></i>
+                  <div class="ollama-action-text" style="flex: 1;">
                     <strong>{{
                       ltState === 'not_installed' ? 'Corrector avanzado no disponible' :
                       ltState === 'installing' ? 'Instalando corrector avanzado' :
                       'Corrector avanzado no iniciado'
                     }}</strong>
                     <span>{{ ltStatusMessage }}</span>
+                    <!-- Barra de progreso para instalación -->
+                    <div v-if="ltState === 'installing' && ltInstallProgress" class="lt-progress-container">
+                      <ProgressBar 
+                        :value="ltInstallProgress.percentage" 
+                        :showValue="true"
+                        style="height: 8px; margin-top: 8px;"
+                      />
+                      <div class="lt-progress-detail">
+                        {{ ltInstallProgress.phase_label }}
+                        <span v-if="ltInstallProgress.percentage > 0"> · {{ Math.round(ltInstallProgress.percentage) }}%</span>
+                      </div>
+                    </div>
                   </div>
                   <Button
                     v-if="ltState !== 'installing'"
@@ -713,7 +726,6 @@
                     :loading="ltInstalling || ltStarting"
                     @click="ltActionConfig.action"
                   />
-                  <ProgressSpinner v-else style="width: 28px; height: 28px;" />
                 </div>
               </div>
 
@@ -1203,6 +1215,7 @@ import Badge from 'primevue/badge'
 import Tag from 'primevue/tag'
 import Checkbox from 'primevue/checkbox'
 import ProgressSpinner from 'primevue/progressspinner'
+import ProgressBar from 'primevue/progressbar'
 import Divider from 'primevue/divider'
 import { useToast } from 'primevue/usetoast'
 import CorrectionDefaultsManager from '@/components/settings/CorrectionDefaultsManager.vue'
@@ -1997,8 +2010,17 @@ const ollamaStatusMessage = computed(() => {
 // LanguageTool state (mismo patrón que Ollama)
 type LTState = 'not_installed' | 'installing' | 'installed_not_running' | 'running'
 
+interface LTInstallProgress {
+  phase: string
+  phase_label: string
+  percentage: number
+  detail: string
+  error?: string
+}
+
 const ltInstalling = ref(false)
 const ltStarting = ref(false)
+const ltInstallProgress = ref<LTInstallProgress | null>(null)
 let ltPollTimer: ReturnType<typeof setInterval> | null = null
 
 const ltState = computed<LTState>(() => {
@@ -2041,9 +2063,14 @@ const ltActionConfig = computed(() => {
 })
 
 const ltStatusMessage = computed(() => {
+  // Si está instalando y tenemos progreso, mostrar el detalle
+  if (ltState.value === 'installing' && ltInstallProgress.value) {
+    return ltInstallProgress.value.detail || ltInstallProgress.value.phase_label
+  }
+  
   const messages: Record<LTState, string> = {
-    not_installed: 'Instala LanguageTool para +2000 reglas de gramática y ortografía',
-    installing: 'Descargando Java y LanguageTool...',
+    not_installed: 'Instala LanguageTool para +2000 reglas de gramática y ortografía (~300MB)',
+    installing: 'Iniciando descarga...',
     installed_not_running: 'LanguageTool instalado pero no activo',
     running: 'Corrector avanzado activo'
   }
@@ -2076,10 +2103,17 @@ const startLTPoll = () => {
       const result = await response.json()
       if (result.success) {
         const data = result.data
+        
+        // Actualizar progreso si está disponible
+        if (data.install_progress) {
+          ltInstallProgress.value = data.install_progress
+        }
+        
         if (data.status !== 'installing') {
           clearInterval(ltPollTimer!)
           ltPollTimer = null
           ltInstalling.value = false
+          ltInstallProgress.value = null
           await loadSystemCapabilities()
           if (data.status === 'running') {
             toast.add({ severity: 'success', summary: 'LanguageTool instalado', detail: 'Corrector avanzado disponible', life: 3000 })
@@ -2091,7 +2125,7 @@ const startLTPoll = () => {
     } catch {
       // Ignorar errores de polling
     }
-  }, 2000)
+  }, 1000)  // Polling más frecuente para actualizar progreso
 }
 
 const startLanguageTool = async () => {
@@ -3521,6 +3555,29 @@ const handleScroll = () => {
 .ollama-action-text span {
   font-size: 0.8rem;
   color: var(--p-text-muted-color);
+}
+
+/* LanguageTool progress bar */
+.lt-progress-container {
+  margin-top: 0.5rem;
+  width: 100%;
+}
+
+.lt-progress-detail {
+  font-size: 0.75rem;
+  color: var(--p-text-muted-color);
+  margin-top: 0.25rem;
+  display: flex;
+  justify-content: space-between;
+}
+
+.lt-progress-container :deep(.p-progressbar) {
+  height: 8px;
+  border-radius: 4px;
+}
+
+.lt-progress-container :deep(.p-progressbar-value) {
+  background: var(--p-primary-color);
 }
 
 /* Setting deshabilitado visualmente */
