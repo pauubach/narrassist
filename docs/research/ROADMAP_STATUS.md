@@ -1,7 +1,7 @@
 # Estado Real del Roadmap - Enero 2026
 
 > Documento generado automáticamente tras auditoría de código.
-> **Última auditoría exhaustiva: 29 Enero 2026 (Sesión 5)**
+> **Última auditoría exhaustiva: 31 Enero 2026 (Sesión 7)**
 
 ---
 
@@ -198,12 +198,17 @@ Todas las features del Competitive Analysis clasificadas como "Quick Wins", "Dif
 
 **Total**: 332 tests unitarios
 
-### Tests Adversariales y Regresión
+### Tests Adversariales y Evaluación
 
-| Archivo | Tests | Área |
-|---------|-------|------|
-| `tests/adversarial/test_attribute_adversarial.py` | 21 | Attribute consistency |
-| `tests/regression/test_ojos_verdes_bug.py` | 8 | Bug "ojos verdes" |
+| Archivo | Tests | Estado | Área |
+|---------|-------|--------|------|
+| `tests/adversarial/test_full_pipeline_e2e.py` | 37 (30 passed, 7 xfail) | ✅ v0.3.37 | **Pipeline E2E**: 3 manuscritos (ficción, no-ficción, complejo), 40+ errores plantados |
+| `tests/adversarial/test_multimethod_evaluation.py` | 28 (28 passed) | ✅ v0.3.37 | **Evaluación multi-método**: extractores, fusión, NER, spelling |
+| `tests/adversarial/test_attribute_adversarial.py` | 21 | ✅ | Attribute consistency |
+| `tests/regression/test_ojos_verdes_bug.py` | 8 | ✅ | Bug "ojos verdes" |
+
+**Progreso xfails E2E**: 18 xfails (v0.3.35) → 7 xfails (v0.3.36) — 11 resueltos.
+Detalle: [XFAIL_RESEARCH_ROADMAP.md](XFAIL_RESEARCH_ROADMAP.md)
 
 ---
 
@@ -314,6 +319,8 @@ Todas las features del Competitive Analysis clasificadas como "Quick Wins", "Dif
 | 29 Ene Sesión 4 | **Análisis 3 perspectivas** (Frontend/UX, Backend/Arquitectura, Producto/Competitivo). Consenso unánime: construir 3 UIs pendientes. Implementados: `SensoryReportTab.vue` (stats + balance + accordion + detalle paginado), `StoryBibleTab.vue` (sidebar + detail con TabView de 5 secciones), Scrivener export en `ExportDialog.vue` (card con opciones + descarga ZIP). Integrados en StyleTab, WorkspaceTabs, ProjectDetailView. **Ya no quedan features con backend sin frontend.** |
 | 29 Ene Sesión 5 | **4 Sprints completados** (A-D). Sprint A: Quick Wins (revisions UI, genre percentiles, sensory suggestions). Sprint B: Sentence Energy (voz pasiva, verbos débiles, energía). Sprint C: Estructura Narrativa (5 plantillas + 12 dimensiones salud narrativa). Sprint D: Arquetipos (16 arquetipos Jung/Campbell). **0 features pendientes — solo queda infraestructura.** |
 | 29 Ene Sesión 5b | **Auditoría exhaustiva post-Sprint D**: 4 auditores independientes (Frontend/UX, Backend/Arquitectura, Lógica/Concepto, Seguridad/API) + 3 paneles de 9 expertos (Lingüista, Corrector, Narratólogo, Arquitecto, Seguridad, QA, PO, UX, FE). **38 hallazgos, 0 rechazados**. 3 crashes críticos (ErrorSeverity, ArchetypeId, variable scoping), 1 XSS (v-html), 6 errores lingüísticos graves (pasiva refleja, estar+participio, haber compuesto). Planificados Sprints E-I de calidad (~10 días). Ver [AUDIT_DECISIONS_AND_ROADMAP.md](AUDIT_DECISIONS_AND_ROADMAP.md). |
+| 30 Ene Sesión 6 | **Framework de evaluación multi-método** + tests adversariales E2E. 3 manuscritos de prueba (ficción/no-ficción/complejo) con 40+ errores plantados. Evaluación medida: extracción F1=0.71, fusión F1=1.00, NER F1=1.00, spelling F1=0.95. Mejoras: EmbeddingsExtractor (threshold 0.40 + sub-frases), RegexExtractor (+profesiones), tabla hipocorísticos (~50 nombres). 18 xfails categorizados en 5 grupos (A-E). |
+| 31 Ene Sesión 7 | **11 xfails resueltos** (18→7). Fixes: módulo temporal activado + cross-chapter date conflicts, LanguageTool newline cleanup, EntityType enum filter fix, accent patterns (veintidós/veintitrés/veintiséis), speaker attribution entity filter, test dict access fix. Análisis experto de 7 xfails restantes + investigación sintáctica con spaCy deps para posesivos. Roadmap de I+D creado. Ver [XFAIL_RESEARCH_ROADMAP.md](XFAIL_RESEARCH_ROADMAP.md). |
 
 ---
 
@@ -322,6 +329,7 @@ Todas las features del Competitive Analysis clasificadas como "Quick Wins", "Dif
 | Documento | Contenido |
 |-----------|-----------|
 | [AUDIT_DECISIONS_AND_ROADMAP.md](AUDIT_DECISIONS_AND_ROADMAP.md) | **Decisiones de auditoría y hoja de ruta E-I** (38 hallazgos, 9 expertos) |
+| [XFAIL_RESEARCH_ROADMAP.md](XFAIL_RESEARCH_ROADMAP.md) | **Roadmap I+D**: 7 xfails restantes, investigación posesivos, tests adversariales |
 | [UI_REDESIGN_PROPOSAL.md](UI_REDESIGN_PROPOSAL.md) | Propuesta reorganización de tabs (implementada como categorías) |
 | [COMPETITIVE_ANALYSIS_2025.md](COMPETITIVE_ANALYSIS_2025.md) | Análisis de competidores |
 | [ALERTS_INTEGRATION_MAP.md](ALERTS_INTEGRATION_MAP.md) | Mapa de alertas |
@@ -332,4 +340,4 @@ Todas las features del Competitive Analysis clasificadas como "Quick Wins", "Dif
 ---
 
 *Documento generado: Enero 2026*
-*Última auditoría exhaustiva: 29 Enero 2026 (Sesión 4)*
+*Última auditoría exhaustiva: 31 Enero 2026 (Sesión 7)*

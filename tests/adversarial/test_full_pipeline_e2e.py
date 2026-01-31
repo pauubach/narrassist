@@ -1122,7 +1122,7 @@ class TestNoFiccionE2E:
             pytest.xfail(
                 "Pipeline no detectó que Cortés tiene dos fechas (1521 vs 1519). "
                 f"Consistency alerts: {len(consistency_alerts)}. "
-                "BUG: análisis temporal desactivado (experimental)."
+                "BUG: regex temporal solo captura años 1900-2029 (no 15xx)."
             )
 
 
