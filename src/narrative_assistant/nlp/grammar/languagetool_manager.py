@@ -52,10 +52,48 @@ class LanguageToolManager:
         self._lock = threading.Lock()
         self._starting = False
 
-        # Rutas
-        self._project_root = self._find_project_root()
-        self._lt_dir = self._project_root / "tools" / "languagetool" if self._project_root else None
-        self._java_dir = self._project_root / "tools" / "java" if self._project_root else None
+        # Rutas - usar directorio de datos en producción, tools/ en desarrollo
+        self._tools_base = self._get_tools_base_dir()
+        self._lt_dir = self._tools_base / "languagetool" if self._tools_base else None
+        self._java_dir = self._tools_base / "java" if self._tools_base else None
+
+    def _get_tools_base_dir(self) -> Optional[Path]:
+        """
+        Obtener directorio base para tools (Java, LanguageTool).
+        
+        - Producción (NA_EMBEDDED=1): %LOCALAPPDATA%/Narrative Assistant/tools
+        - Desarrollo: <project_root>/tools
+        """
+        is_embedded = os.environ.get("NA_EMBEDDED") == "1"
+        
+        if is_embedded:
+            # Modo producción - usar directorio de datos del sistema
+            system = platform.system()
+            if system == "Windows":
+                localappdata = os.environ.get("LOCALAPPDATA", "")
+                if localappdata:
+                    tools_dir = Path(localappdata) / "Narrative Assistant" / "tools"
+                    tools_dir.mkdir(parents=True, exist_ok=True)
+                    return tools_dir
+            elif system == "Darwin":
+                tools_dir = Path.home() / "Library" / "Application Support" / "Narrative Assistant" / "tools"
+                tools_dir.mkdir(parents=True, exist_ok=True)
+                return tools_dir
+            else:
+                # Linux
+                xdg_data = os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local" / "share"))
+                tools_dir = Path(xdg_data) / "narrative-assistant" / "tools"
+                tools_dir.mkdir(parents=True, exist_ok=True)
+                return tools_dir
+        
+        # Modo desarrollo - buscar raíz del proyecto
+        project_root = self._find_project_root()
+        if project_root:
+            tools_dir = project_root / "tools"
+            tools_dir.mkdir(parents=True, exist_ok=True)
+            return tools_dir
+        
+        return None
 
     def _find_project_root(self) -> Optional[Path]:
         """Encontrar raíz del proyecto buscando CLAUDE.md o pyproject.toml."""
@@ -373,10 +411,9 @@ class LanguageToolInstaller:
 
         # Rutas - reutilizar la lógica del manager
         mgr = get_languagetool_manager()
-        self._project_root = mgr._project_root
-        self._tools_dir = self._project_root / "tools" if self._project_root else None
-        self._lt_dir = self._project_root / "tools" / "languagetool" if self._project_root else None
-        self._java_dir = self._project_root / "tools" / "java" if self._project_root else None
+        self._tools_dir = mgr._tools_base
+        self._lt_dir = mgr._lt_dir
+        self._java_dir = mgr._java_dir
 
     def _report(
         self,
@@ -415,8 +452,8 @@ class LanguageToolInstaller:
         Returns:
             Tupla (éxito, mensaje)
         """
-        if not self._project_root or not self._tools_dir:
-            msg = "No se pudo encontrar la raíz del proyecto"
+        if not self._tools_dir:
+            msg = "No se pudo determinar el directorio de instalación"
             self._report_error(msg)
             return False, msg
 
