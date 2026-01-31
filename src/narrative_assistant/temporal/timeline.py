@@ -523,16 +523,26 @@ class TimelineBuilder:
         """Detecta analepsis y prolepsis comparando orden cronológico vs discurso."""
         chronological = self.timeline.get_chronological_order()
         discourse = self.timeline.get_discourse_order()
+        
+        logger.info(f"[TIMELINE] Total eventos: {len(chronological)} cronológicos, {len(discourse)} en discurso")
 
         # Solo eventos con fecha conocida
         dated_chrono = [e for e in chronological if e.story_date]
         dated_discourse = [e for e in discourse if e.story_date]
+        
+        logger.info(f"[TIMELINE] Eventos con fecha: {len(dated_chrono)} de {len(chronological)}")
+        if dated_chrono:
+            logger.info(f"[TIMELINE] Rango fechas: {min(e.story_date for e in dated_chrono)} → {max(e.story_date for e in dated_chrono)}")
 
         if len(dated_chrono) < 2:
+            logger.info("[TIMELINE] Insuficientes eventos fechados para detectar analepsis/prolepsis")
             return
 
         # Crear índice cronológico
         chrono_index = {e.id: i for i, e in enumerate(dated_chrono)}
+        
+        analepsis_count = 0
+        prolepsis_count = 0
 
         # Comparar con orden del discurso
         for i, event in enumerate(dated_discourse):
@@ -548,7 +558,9 @@ class TimelineBuilder:
             # pero aparece después en el discurso = analepsis
             if chrono_pos_current < chrono_pos_prev:
                 event.narrative_order = NarrativeOrder.ANALEPSIS
-                logger.debug(f"Detected analepsis at event {event.id}: {event.description}")
+                analepsis_count += 1
+                logger.info(f"[TIMELINE] ANALEPSIS detectada: '{event.description[:50]}...' "
+                           f"(pos discurso={i}, pos crono={chrono_pos_current} < prev crono={chrono_pos_prev})")
             # Salto grande hacia adelante podría ser prolepsis
             elif chrono_pos_current > chrono_pos_prev + 3:
                 # Verificar si realmente es un salto significativo
@@ -556,9 +568,11 @@ class TimelineBuilder:
                     delta = event.story_date - prev_event.story_date
                     if delta.days > 365:  # Más de un año de salto
                         event.narrative_order = NarrativeOrder.PROLEPSIS
-                        logger.debug(
-                            f"Detected prolepsis at event {event.id}: {event.description}"
-                        )
+                        prolepsis_count += 1
+                        logger.info(f"[TIMELINE] PROLEPSIS detectada: '{event.description[:50]}...' "
+                                   f"(salto de {delta.days} días)")
+                                   
+        logger.info(f"[TIMELINE] Resultado: {analepsis_count} analepsis, {prolepsis_count} prolepsis")
 
     def export_to_mermaid(self) -> str:
         """Exporta timeline a diagrama Mermaid (Gantt)."""

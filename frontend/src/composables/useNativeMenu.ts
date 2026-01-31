@@ -1,8 +1,23 @@
 /**
  * Composable para manejar eventos del menu nativo de Tauri
  */
-import { onMounted, onUnmounted } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+
+// Variable para guardar la función listen de Tauri
+let tauriListen: ((event: string, handler: (event: { payload: string }) => void) => Promise<() => void>) | null = null
+
+// Dynamic import for Tauri event API (to avoid errors when running in browser)
+const tauriReady = ref(false)
+if (typeof window !== 'undefined' && '__TAURI__' in window) {
+  import('@tauri-apps/api/event').then(module => {
+    tauriListen = module.listen as typeof tauriListen
+    tauriReady.value = true
+    console.log('[Menu] Tauri event API loaded successfully')
+  }).catch(error => {
+    console.warn('[Menu] Failed to load Tauri event API:', error)
+  })
+}
 
 interface MenuEventHandlers {
   onNewProject?: () => void
@@ -147,20 +162,32 @@ export function useNativeMenu(handlers: MenuEventHandlers = {}) {
   }
 
   onMounted(async () => {
-    // Solo configurar listener si estamos en Tauri
-     
-    const win = window as any
+    // Solo configurar listener si estamos en Tauri y la API está lista
     if (typeof window !== 'undefined' && '__TAURI__' in window) {
-      try {
-        // Usar el objeto global de Tauri si esta disponible
-        if (win.__TAURI__?.event?.listen) {
-          unlisten = await win.__TAURI__.event.listen('menu-event', (event: { payload: string }) => {
-            handleMenuEvent(event.payload)
-          })
+      // Esperar a que la API de Tauri esté lista (máximo 2 segundos)
+      let attempts = 0
+      const maxAttempts = 20
+
+      const setupListener = async () => {
+        if (tauriListen) {
+          try {
+            unlisten = await tauriListen('menu-event', (event) => {
+              console.log('[Menu] Received menu event:', event.payload)
+              handleMenuEvent(event.payload)
+            })
+            console.log('[Menu] Listener setup successfully')
+          } catch (error) {
+            console.warn('[Menu] Failed to setup Tauri menu listener:', error)
+          }
+        } else if (attempts < maxAttempts) {
+          attempts++
+          setTimeout(setupListener, 100)
+        } else {
+          console.warn('[Menu] Tauri event API not available after timeout')
         }
-      } catch (error) {
-        console.warn('[Menu] Failed to setup Tauri menu listener:', error)
       }
+
+      setupListener()
     }
   })
 

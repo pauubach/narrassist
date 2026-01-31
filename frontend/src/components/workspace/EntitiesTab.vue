@@ -656,6 +656,23 @@ function navigateToAttributeSource(attr: EntityAttribute) {
 
 <template>
   <div class="entities-tab">
+    <!-- Header con explicación -->
+    <div class="entities-header">
+      <div class="header-content">
+        <h3>
+          <i class="pi pi-users"></i>
+          Gestión de Entidades
+        </h3>
+        <p class="header-subtitle">
+          Lista técnica de personajes, lugares y conceptos detectados. 
+          Fusiona duplicados, edita atributos y navega a menciones.
+          <span class="info-tip" v-tooltip.right="'Esta pestaña es para gestionar las entidades: fusionar duplicados, corregir tipos, editar atributos. Para una vista wiki consolidada, usa la pestaña Story Bible.'">
+            <i class="pi pi-info-circle"></i>
+          </span>
+        </p>
+      </div>
+    </div>
+
     <!-- Layout de 2 columnas: Lista izquierda + Contenido centro -->
     <div class="entities-layout">
       <!-- Panel izquierdo: Lista de entidades -->
@@ -1052,6 +1069,37 @@ function navigateToAttributeSource(attr: EntityAttribute) {
   flex-direction: column;
   height: 100%;
   overflow: hidden;
+}
+
+/* Header */
+.entities-header {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--surface-border);
+  background: var(--surface-card);
+}
+
+.entities-header h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+.header-subtitle {
+  margin: 0.25rem 0 0;
+  font-size: 0.85rem;
+  color: var(--text-color-secondary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.info-tip {
+  color: var(--primary-color);
+  cursor: help;
 }
 
 /* Layout de 2 columnas */

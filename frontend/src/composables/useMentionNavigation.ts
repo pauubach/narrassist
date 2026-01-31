@@ -37,6 +37,31 @@ export interface MentionNavigationState {
 export function useMentionNavigation(projectId: () => number) {
   const workspaceStore = useWorkspaceStore()
 
+  /**
+   * Deduplica menciones que son visualmente iguales
+   * (mismo capítulo, mismo texto, posición muy cercana)
+   */
+  function deduplicateMentions(mentions: Mention[]): Mention[] {
+    if (mentions.length <= 1) return mentions
+
+    const result: Mention[] = []
+    const POSITION_THRESHOLD = 20 // caracteres
+
+    for (const mention of mentions) {
+      const isDuplicate = result.some(existing => 
+        existing.chapterId === mention.chapterId &&
+        existing.surfaceForm.toLowerCase() === mention.surfaceForm.toLowerCase() &&
+        Math.abs(existing.startChar - mention.startChar) < POSITION_THRESHOLD
+      )
+
+      if (!isDuplicate) {
+        result.push(mention)
+      }
+    }
+
+    return result
+  }
+
   // Estado
   const state = ref<MentionNavigationState>({
     entityId: null,
@@ -101,6 +126,12 @@ export function useMentionNavigation(projectId: () => number) {
 
       // Si hay menciones, navegar a la primera
       if (state.value.mentions.length > 0) {
+        // Deduplicar menciones con misma posición visual (mismo capítulo + texto + posición cercana)
+        const dedupedMentions = deduplicateMentions(state.value.mentions)
+        if (dedupedMentions.length < state.value.mentions.length) {
+          console.log(`[MentionNav] Deduped ${state.value.mentions.length} -> ${dedupedMentions.length} mentions`)
+          state.value.mentions = dedupedMentions
+        }
         navigateToCurrentMention()
       }
 

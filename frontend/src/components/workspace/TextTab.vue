@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import DocumentViewer from '@/components/DocumentViewer.vue'
 import { useWorkspaceStore } from '@/stores/workspace'
 import type { Alert, Chapter } from '@/types'
@@ -178,12 +178,27 @@ const scrollTarget = computed((): ScrollTarget | null => {
 })
 
 // Watch: limpiar scrollToPosition del store después de consumirlo
+// Solo limpiar cuando el target realmente existe y ha sido procesado
 watch(scrollTarget, (target) => {
   if (target !== null) {
-    // Dar tiempo al DocumentViewer para procesar el scroll
-    setTimeout(() => {
-      workspaceStore.clearScrollToPosition()
-    }, 100)
+    // Esperar a que el DOM se actualice y el DocumentViewer procese el scroll
+    nextTick(() => {
+      setTimeout(() => {
+        workspaceStore.clearScrollToPosition()
+      }, 300) // Dar más tiempo para scroll animation
+    })
+  }
+})
+
+// onMounted: procesar scroll pendiente si el componente se monta después de setear la posición
+onMounted(async () => {
+  // Esperar al siguiente tick para asegurar que las props están actualizadas
+  await nextTick()
+  
+  // Si hay una posición pendiente cuando el componente se monta, el computed scrollTarget
+  // ya la habrá detectado. Solo necesitamos asegurar que se procese.
+  if (workspaceStore.scrollToPosition !== null) {
+    console.log('[TextTab] Scroll pendiente detectado al montar:', workspaceStore.scrollToPosition)
   }
 })
 </script>

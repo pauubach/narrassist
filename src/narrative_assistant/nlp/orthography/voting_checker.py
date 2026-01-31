@@ -424,11 +424,20 @@ class LanguageToolVoter(BaseVoter):
 
     name = "languagetool"
     weight = VOTER_WEIGHTS["languagetool"]
+    
+    # Reglas de LanguageTool a deshabilitar por defecto
+    # Evita falsos positivos con conjunciones/preposiciones comunes
+    DEFAULT_DISABLED_RULES = [
+        "SPANISH_WORD_REPEAT_RULE",  # Palabras repetidas (falso positivo con "y", "que")
+        "WORD_REPEAT_RULE",          # Variante general
+        "MORFOLOGIK_RULE_ES",        # A veces detecta neologismos válidos
+    ]
 
-    def __init__(self):
+    def __init__(self, disabled_rules: list[str] | None = None):
         super().__init__()
         self._tool = None
         self._use_python_lib = False
+        self._disabled_rules = disabled_rules if disabled_rules is not None else self.DEFAULT_DISABLED_RULES
 
         # Configurar Java 17 si está disponible
         self._setup_java17()
@@ -501,6 +510,11 @@ class LanguageToolVoter(BaseVoter):
                 # Usar language_tool_python
                 matches = self._tool.check(text)
                 for match in matches:
+                    # Filtrar reglas deshabilitadas
+                    rule_id = getattr(match, 'rule_id', getattr(match, 'ruleId', ''))
+                    if rule_id in self._disabled_rules:
+                        continue
+                        
                     # language_tool_python usa snake_case (error_length, rule_id)
                     error_len = getattr(match, 'error_length', getattr(match, 'errorLength', 0))
                     word = text[match.offset:match.offset + error_len]
@@ -515,7 +529,7 @@ class LanguageToolVoter(BaseVoter):
                         suggestions=match.replacements[:5],
                         error_type=error_type,
                         raw_response={
-                            "rule_id": getattr(match, 'rule_id', getattr(match, 'ruleId', '')),
+                            "rule_id": rule_id,
                             "message": match.message,
                             "category": match.category,
                         }
@@ -524,9 +538,17 @@ class LanguageToolVoter(BaseVoter):
                     if word_clean:
                         results.append((word_clean, match.offset, match.offset + error_len, vote))
             else:
-                # Usar cliente de servidor local
-                check_result = self._client.check(text, language="es")
+                # Usar cliente de servidor local con reglas deshabilitadas
+                check_result = self._client.check(
+                    text, 
+                    language="es",
+                    disabled_rules=self._disabled_rules
+                )
                 for match in check_result.matches:
+                    # Filtrar reglas deshabilitadas (por si el servidor no las filtró)
+                    if match.rule_id in self._disabled_rules:
+                        continue
+                        
                     word = text[match.offset:match.offset + match.length]
                     # Limpiar newlines/whitespace del word
                     word_clean = word.replace('\n', ' ').replace('\r', ' ').strip()

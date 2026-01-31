@@ -7916,6 +7916,7 @@ async def get_project_relationships(project_id: int):
     Returns:
         ApiResponse con datos de relaciones
     """
+    logger.info(f"[RELATIONSHIPS-API] Solicitando relaciones para proyecto {project_id}")
     try:
         from narrative_assistant.analysis import (
             RelationshipClusteringEngine,
@@ -7937,8 +7938,10 @@ async def get_project_relationships(project_id: int):
         # Obtener entidades del proyecto
         entity_repo = get_entity_repository()
         entities = entity_repo.get_entities_by_project(project_id, active_only=True)
+        logger.info(f"[RELATIONSHIPS-API] Entidades encontradas: {len(entities) if entities else 0}")
 
         if not entities:
+            logger.warning(f"[RELATIONSHIPS-API] Proyecto {project_id} sin entidades")
             return ApiResponse(
                 success=True,
                 data={
@@ -7957,6 +7960,7 @@ async def get_project_relationships(project_id: int):
         # Obtener capítulos
         chapter_repo = get_chapter_repository()
         chapters = chapter_repo.get_by_project(project_id)
+        logger.info(f"[RELATIONSHIPS-API] Capítulos encontrados: {len(chapters) if chapters else 0}")
 
         # Obtener menciones de entidades
         all_mentions = []
@@ -7970,6 +7974,7 @@ async def get_project_relationships(project_id: int):
                     "end_char": m.end_char,
                     "chapter_id": m.chapter_id,
                 })
+        logger.info(f"[RELATIONSHIPS-API] Menciones totales: {len(all_mentions)}")
 
         # 1. Análisis de clustering/relaciones
         clustering_engine = RelationshipClusteringEngine(use_embeddings=False)
@@ -8018,7 +8023,10 @@ async def get_project_relationships(project_id: int):
 
         # Detectar co-ocurrencias (menciones cercanas)
         WINDOW = 500  # caracteres
+        cooccurrence_count = 0
+        logger.info(f"[RELATIONSHIPS-API] Capítulos con menciones: {len(mentions_by_chapter)}")
         for ch_num, ch_mentions in mentions_by_chapter.items():
+            logger.debug(f"[RELATIONSHIPS-API] Capítulo {ch_num}: {len(ch_mentions)} menciones")
             ch_mentions.sort(key=lambda x: x["start_char"])
 
             for i, m1 in enumerate(ch_mentions):
@@ -8048,7 +8056,10 @@ async def get_project_relationships(project_id: int):
                         distance_chars=distance,
                         context=context[:200],  # Limitar contexto
                     )
+                    cooccurrence_count += 1
 
+        logger.info(f"[RELATIONSHIPS-API] Co-ocurrencias detectadas: {cooccurrence_count}")
+        
         # Ejecutar análisis de clustering
         clustering_result = clustering_engine.analyze()
 
@@ -8090,6 +8101,10 @@ async def get_project_relationships(project_id: int):
                     asymmetries.append(report.to_dict())
 
         # Construir respuesta y convertir tipos numpy a Python nativos
+        relations_count = len(clustering_result.get("relations", []))
+        clusters_count = len(clustering_result.get("clusters", []))
+        logger.info(f"[RELATIONSHIPS-API] Resultado: {relations_count} relaciones, {clusters_count} clusters, {len(asymmetries)} asimetrías")
+        
         response_data = {
             "project_id": project_id,
             "entity_count": len(entities),
@@ -8121,7 +8136,7 @@ async def get_project_relationships(project_id: int):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error getting relationships for project {project_id}: {e}", exc_info=True)
+        logger.error(f"[RELATIONSHIPS-API] Error proyecto {project_id}: {e}", exc_info=True)
         return ApiResponse(success=False, error=str(e))
 
 
@@ -15895,14 +15910,14 @@ async def get_echo_report(
                         chapter_severity["low"] += 1
 
             global_repetitions.extend(chapter_reps)
-            global_total_words += report.total_words
+            global_total_words += report.processed_words
 
             chapters_data.append({
                 "chapter_number": chapter.chapter_number,
                 "chapter_title": chapter.title or f"Capítulo {chapter.chapter_number}",
                 "repetitions": chapter_reps,
                 "repetition_count": len(chapter_reps),
-                "total_words": report.total_words,
+                "total_words": report.processed_words,
                 "by_severity": chapter_severity,
             })
 

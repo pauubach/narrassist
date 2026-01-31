@@ -342,6 +342,24 @@ NOT_ENTITY_PATTERNS = [
     r"^CAPITULO\s+(UNO|DOS|TRES|CUATRO|CINCO|SEIS|SIETE|OCHO|NUEVE|DIEZ)\b",
     # Números romanos solos como título (VII., VIII., etc.)
     r"^[IVXLC]+\.\s*",
+    # ===== NUEVOS PATRONES ITERACIÓN 4: Frases genéricas =====
+    # Lista común de adjetivos genéricos para reutilizar
+    # Patrón: palabra_indefinida + adjetivo_generico
+    #
+    # Frases indefinidas con "algo" + adjetivo (no son entidades específicas)
+    r"^algo\s+(extraño|raro|diferente|especial|terrible|horrible|malo|bueno|nuevo|viejo|grande|pequeño|oscuro|claro|misterioso|sospechoso|inquietante|inesperado|sorprendente)\b",
+    # Frases con "lo" + adjetivo sustantivado (no son entidades)
+    r"^lo\s+(extraño|raro|peor|mejor|malo|bueno|importante|difícil|fácil|curioso|interesante|terrible|horrible|posible|imposible|increíble|absurdo|lógico|normal|extraño)\b",
+    # Frases con "eso/esto/aquello" + adjetivo (pronombres demostrativos genéricos)
+    r"^(eso|esto|aquello)\s+(extraño|raro|terrible|horrible|malo|bueno|nuevo|viejo|diferente|especial)\b",
+    # Frases con "nada/todo" + adjetivo
+    r"^(nada|todo)\s+(extraño|especial|nuevo|malo|bueno|diferente|importante)\b",
+    # Frases genéricas con adjetivo + sustantivo común
+    r"^(el|la|un|una)\s+(mismo|misma|propio|propia|otro|otra|cierto|cierta|algún|alguna|ningún|ninguna)\s+(hombre|mujer|persona|cosa|lugar|momento|día|noche)\b",
+    # Frases con "cualquier" (indefinido genérico)
+    r"^cualquier\s+(cosa|persona|lugar|momento|día|forma|manera|caso)\b",
+    # Sustantivos abstractos solos muy comunes (con o sin artículo)
+    r"^((el|la)\s+)?(esperanza|verdad|mentira|realidad|vida|muerte|amor|odio|miedo|alegría|tristeza|soledad|felicidad|desgracia)\s*$",
 ]
 
 

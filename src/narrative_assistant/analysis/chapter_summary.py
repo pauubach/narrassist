@@ -591,8 +591,8 @@ class ChapterSummaryAnalyzer:
                        e1.canonical_name as from_name,
                        e2.canonical_name as to_name
                 FROM interactions i
-                JOIN entities e1 ON i.from_entity_id = e1.id
-                JOIN entities e2 ON i.to_entity_id = e2.id
+                JOIN entities e1 ON i.entity1_id = e1.id
+                LEFT JOIN entities e2 ON i.entity2_id = e2.id
                 WHERE i.project_id = ? AND i.chapter_id = ?
                 ORDER BY i.position
                 """,
@@ -696,10 +696,10 @@ class ChapterSummaryAnalyzer:
 
         # Procesar interacciones
         for interaction in interactions:
-            from_id = interaction["from_entity_id"]
-            to_id = interaction["to_entity_id"]
+            from_id = interaction["entity1_id"]
+            to_id = interaction["entity2_id"]
             from_name = interaction["from_name"]
-            to_name = interaction["to_name"]
+            to_name = interaction.get("to_name")  # Puede ser NULL
             int_type = interaction.get("interaction_type", "")
 
             for presence in summary.characters_present:
@@ -708,14 +708,14 @@ class ChapterSummaryAnalyzer:
                         presence.dialogues_count += 1
                     else:
                         presence.actions_count += 1
-                    if to_name not in presence.interactions_with:
+                    if to_name and to_name not in presence.interactions_with:
                         presence.interactions_with.append(to_name)
-                elif presence.entity_id == to_id:
+                elif to_id and presence.entity_id == to_id:
                     if from_name not in presence.interactions_with:
                         presence.interactions_with.append(from_name)
 
             tone = interaction.get("tone", "neutral")
-            if tone == "hostile":
+            if tone == "hostile" and to_name:
                 summary.key_events.append(NarrativeEvent(
                     event_type=EventType.CONFLICT,
                     description=f"Conflicto entre {from_name} y {to_name}",

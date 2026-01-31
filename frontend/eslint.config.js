@@ -62,7 +62,9 @@ export default tseslint.config(
       'vue/require-default-prop': 'off',
       'vue/max-attributes-per-line': 'off',
       'vue/singleline-html-element-content-newline': 'off',
-      'vue/html-self-closing': 'off'
+      'vue/html-self-closing': 'off',
+      // PrimeVue 4+ uses v-model:visible, v-model:expanded, etc.
+      'vue/no-v-model-argument': 'off'
     }
   },
 

@@ -10,6 +10,19 @@
         <p class="subtitle">
           Detecta incoherencias entre emociones declaradas y comportamientos de personajes.
         </p>
+        <!-- Estado del análisis -->
+        <p v-if="lastAnalysis" class="analysis-status success">
+          <i class="pi pi-check-circle"></i>
+          Último análisis: {{ lastAnalysis.toLocaleTimeString() }}
+        </p>
+        <p v-else-if="analysisError" class="analysis-status error">
+          <i class="pi pi-exclamation-triangle"></i>
+          Error: {{ analysisError }}
+        </p>
+        <p v-else class="analysis-status pending">
+          <i class="pi pi-info-circle"></i>
+          No analizado
+        </p>
       </div>
       <div class="header-controls">
         <Button
@@ -220,6 +233,8 @@ const toast = useToast()
 const loading = ref(false)
 const report = ref<any>(null)
 const typeFilter = ref('all')
+const lastAnalysis = ref<Date | null>(null)
+const analysisError = ref<string | null>(null)
 
 const typeOptions = [
   { label: 'Todas', value: 'all' },
@@ -270,6 +285,7 @@ const filteredGroups = computed((): CharacterGroup[] => {
 // Analyze
 async function analyze() {
   loading.value = true
+  analysisError.value = null
   try {
     const response = await fetch(
       apiUrl(`/api/projects/${props.projectId}/emotional-analysis`)
@@ -300,11 +316,13 @@ async function analyze() {
           "Los diálogos deben reflejar el estado emocional declarado del personaje.",
         ],
       }
+      lastAnalysis.value = new Date()
     } else {
       throw new Error(data.error || 'Error al analizar')
     }
   } catch (error) {
     console.error('Error analyzing emotional coherence:', error)
+    analysisError.value = error instanceof Error ? error.message : 'Error desconocido'
     toast.add({
       severity: 'error',
       summary: 'Error',
@@ -379,6 +397,26 @@ function getTypeLabel(type: string): string {
   margin: var(--ds-space-1) 0 0;
   color: var(--ds-color-text-secondary);
   font-size: var(--ds-font-size-sm);
+}
+
+.header-left .analysis-status {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.25rem 0 0;
+  font-size: 0.75rem;
+}
+
+.header-left .analysis-status.success {
+  color: var(--green-500);
+}
+
+.header-left .analysis-status.error {
+  color: var(--red-500);
+}
+
+.header-left .analysis-status.pending {
+  color: var(--text-color-secondary);
 }
 
 /* Loading & Empty states */

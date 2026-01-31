@@ -375,7 +375,7 @@ class EntityFusionService:
         for i, e1 in enumerate(entities):
             for e2 in entities[i + 1 :]:
                 # Saltar si son de tipos muy diferentes
-                if not self._types_compatible(e1.entity_type, e2.entity_type):
+                if not self._types_compatible_for_entities(e1, e2):
                     continue
 
                 # Calcular similaridad
@@ -397,6 +397,57 @@ class EntityFusionService:
 
         return suggestions[:max_suggestions]
 
+    def _types_compatible_for_entities(self, e1: Entity, e2: Entity) -> bool:
+        """Verifica si dos entidades pueden fusionarse según sus tipos Y nombres."""
+        type1 = e1.entity_type
+        type2 = e2.entity_type
+
+        # Usar verificación básica de tipos
+        if self._types_compatible(type1, type2):
+            # Si uno es CHARACTER y otro es CONCEPT, verificar que parecen nombres
+            if {type1, type2} == {EntityType.CHARACTER, EntityType.CONCEPT}:
+                # Solo permitir fusión si ambos parecen nombres propios
+                return self._looks_like_person_name(e1.canonical_name) and \
+                       self._looks_like_person_name(e2.canonical_name)
+            return True
+
+        return False
+
+    def _looks_like_person_name(self, name: str) -> bool:
+        """Verifica si un texto parece nombre de persona."""
+        if not name:
+            return False
+
+        # Debe empezar con mayúscula
+        if not name[0].isupper():
+            return False
+
+        # No debe ser una frase genérica
+        generic_patterns = [
+            "algo ", "lo ", "eso ", "esto ", "la ", "el ", "un ", "una ",
+            "cualquier ", "ningún ", "algún ", "todo ", "nada ",
+        ]
+        name_lower = name.lower()
+        for pattern in generic_patterns:
+            if name_lower.startswith(pattern):
+                return False
+
+        # Debe tener al menos una palabra que parezca nombre
+        words = name.split()
+        if not words:
+            return False
+
+        # Un nombre de persona típico: 1-4 palabras, sin números
+        if len(words) > 4:
+            return False
+
+        # No debe contener números
+        if any(c.isdigit() for c in name):
+            return False
+
+        # Al menos la primera palabra debe estar capitalizada
+        return words[0][0].isupper() if words[0] else False
+
     def _types_compatible(self, type1: EntityType, type2: EntityType) -> bool:
         """Verifica si dos tipos de entidad pueden fusionarse."""
         # Mismo tipo siempre compatible
@@ -411,6 +462,9 @@ class EntityFusionService:
             {EntityType.LOCATION, EntityType.BUILDING, EntityType.REGION},
             # Grupos
             {EntityType.ORGANIZATION, EntityType.FACTION, EntityType.FAMILY},
+            # CONCEPT puede fusionarse con CHARACTER cuando NER clasificó mal
+            # (ej: "María Sánchez" clasificado como MISC → CONCEPT pero es persona)
+            {EntityType.CHARACTER, EntityType.CONCEPT},
         ]
 
         for group in compatible_groups:

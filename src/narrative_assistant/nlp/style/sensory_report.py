@@ -374,11 +374,19 @@ SMELL_KEYWORDS: dict[str, float] = {
 
 # Gusto: verbos, adjetivos, sustantivos relacionados con saborear
 TASTE_KEYWORDS: dict[str, float] = {
-    # Verbos
-    "saborear": 0.95, "degustar": 0.95, "paladear": 0.95,
-    "probar": 0.7, "catar": 0.95, "tragar": 0.8,
-    "masticar": 0.85, "morder": 0.8, "lamer": 0.9,
-    "sorber": 0.85, "beber": 0.7, "comer": 0.6,
+    # Verbos (infinitivo + conjugaciones comunes)
+    "saborear": 0.95, "saboreó": 0.95, "saboreaba": 0.95,
+    "degustar": 0.95, "degustó": 0.95, "degustaba": 0.95, "degustando": 0.95,
+    "paladear": 0.95, "paladeó": 0.95, "paladeaba": 0.95,
+    "probar": 0.7, "probó": 0.7, "probaba": 0.7,
+    "catar": 0.95, "cató": 0.95, "cataba": 0.95,
+    "tragar": 0.8, "tragó": 0.8, "tragaba": 0.8,
+    "masticar": 0.85, "masticó": 0.85, "masticaba": 0.85,
+    "morder": 0.8, "mordió": 0.8, "mordía": 0.8,
+    "lamer": 0.9, "lamió": 0.9, "lamía": 0.9,
+    "sorber": 0.85, "sorbió": 0.85, "sorbía": 0.85,
+    "beber": 0.7, "bebió": 0.7, "bebía": 0.7,
+    "comer": 0.6, "comió": 0.6, "comía": 0.6,
     # Sabores básicos
     "dulce": 0.85, "amargo": 0.85, "salado": 0.9,
     "ácido": 0.85, "agrio": 0.9, "picante": 0.9,
@@ -401,6 +409,38 @@ SENSE_KEYWORDS: dict[SensoryType, dict[str, float]] = {
     SensoryType.TOUCH: TOUCH_KEYWORDS,
     SensoryType.SMELL: SMELL_KEYWORDS,
     SensoryType.TASTE: TASTE_KEYWORDS,
+}
+
+# Exclusiones: palabras que parecen sensoriales pero tienen significado diferente
+# Evita falsos positivos donde derivados morfológicos cambian el significado
+#
+# NOTA: Usamos tanto un set (para coincidencias exactas rápidas) como patrones
+# regex (para variantes morfológicas). Los patrones son más genéricos y capturan
+# la mayoría de casos; el set captura casos especiales que los patrones no cubren.
+
+import re
+
+# Patrones regex para exclusiones genéricas (compilados para eficiencia)
+# Estos capturan la mayoría de casos y son más mantenibles que listas exhaustivas
+SENSE_EXCLUSION_PATTERNS: list[re.Pattern] = [
+    # Cualquier forma de "gusto" precedida de artículo/preposición (no es sabor)
+    re.compile(r"\b(con|de|a|mucho|tanto|sumo|buen|mal)\s+(mucho\s+)?gusto\b", re.IGNORECASE),
+    # Formas de "gustos-" (placer, no sabor): gustoso, gustosa, gustosos, gustosas, gustosísimo, etc.
+    re.compile(r"\bgustoso?s?a?s?\b", re.IGNORECASE),  # gustoso, gustosa, gustosos, gustosas
+    re.compile(r"\bgustosísim[oa]s?\b", re.IGNORECASE),  # gustosísimo, gustosísima, gustosísimos, gustosísimas
+    # Formas de "gustosamente"
+    re.compile(r"\bgustosamente\b", re.IGNORECASE),
+    # Formas de "disgusto": disgustado, disgustada, a disgusto, etc.
+    re.compile(r"\b(a\s+)?disgust[oaei]\w*\b", re.IGNORECASE),
+]
+
+# Set para casos especiales que los patrones no capturan bien
+# Mantener mínimo - preferir patrones regex
+SENSE_EXCLUSIONS: set[str] = {
+    # Derivados de "delicioso" usados metafóricamente
+    "deliciosamente",  # A menudo no-sensorial: "deliciosamente irónico"
+    # "Exquisito" usado para describir modales/educación
+    "exquisitez",
 }
 
 # Nombres en español de cada sentido
@@ -587,6 +627,21 @@ class SensoryAnalyzer:
                     # Evitar duplicados en la misma posición
                     if pos in seen_positions:
                         continue
+
+                    # Filtrar palabras en la lista de exclusión (set)
+                    matched_word = match.group(0).lower()
+                    if matched_word in SENSE_EXCLUSIONS:
+                        continue
+
+                    # Verificar exclusiones usando patrones regex (más genéricos)
+                    # Tomamos contexto para verificar frases como "con gusto", "a disgusto", etc.
+                    ctx_start_excl = max(0, pos - 20)
+                    ctx_end_excl = min(len(text), match.end() + 10)
+                    context_for_exclusion = text[ctx_start_excl:ctx_end_excl].lower()
+
+                    if any(pattern.search(context_for_exclusion) for pattern in SENSE_EXCLUSION_PATTERNS):
+                        continue
+
                     seen_positions.add(pos)
 
                     # Extraer contexto

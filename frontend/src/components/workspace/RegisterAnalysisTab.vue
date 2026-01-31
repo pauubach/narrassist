@@ -97,8 +97,23 @@
 
       <!-- Register Distribution -->
       <div class="distribution-section">
-        <h4><i class="pi pi-chart-bar"></i> Distribución de Registros</h4>
-        <div class="distribution-bars">
+        <div class="distribution-header-row">
+          <h4><i class="pi pi-chart-bar"></i> Distribución de Registros</h4>
+          <SelectButton 
+            v-model="chartType" 
+            :options="chartTypeOptions" 
+            option-value="value"
+            :allow-empty="false"
+            class="chart-type-toggle"
+          >
+            <template #option="slotProps">
+              <i :class="slotProps.option.icon"></i>
+            </template>
+          </SelectButton>
+        </div>
+        
+        <!-- Bars view -->
+        <div v-if="chartType === 'bars'" class="distribution-bars">
           <div
             v-for="(value, register) in registerDistribution"
             :key="register"
@@ -115,6 +130,16 @@
             />
           </div>
         </div>
+        
+        <!-- Pie chart view -->
+        <div v-else class="distribution-pie">
+          <Chart 
+            type="pie" 
+            :data="pieChartData" 
+            :options="pieChartOptions"
+            class="pie-chart"
+          />
+        </div>
       </div>
 
       <!-- Register Changes -->
@@ -125,6 +150,13 @@
         </h4>
         <p class="changes-description">
           Los cambios abruptos de registro pueden indicar inconsistencias en el tono narrativo.
+          <span class="tooltip-text">
+            <i class="pi pi-info-circle"></i>
+            <strong>Nota:</strong> Es normal que el registro cambie entre narración y diálogo.
+            Los personajes suelen hablar en registro coloquial mientras que la narración
+            mantiene un tono neutro o literario. Revisa solo cambios inesperados dentro
+            del mismo tipo de texto.
+          </span>
         </p>
 
         <div v-if="changes.length > 0" class="changes-list">
@@ -294,6 +326,8 @@ import Accordion from 'primevue/accordion'
 import AccordionPanel from 'primevue/accordionpanel'
 import AccordionHeader from 'primevue/accordionheader'
 import AccordionContent from 'primevue/accordioncontent'
+import Chart from 'primevue/chart'
+import SelectButton from 'primevue/selectbutton'
 import { ChapterTimeline } from '@/components/shared'
 import { useVoiceAndStyleStore } from '@/stores/voiceAndStyle'
 import type { RegisterAnalysis, RegisterChange, RegisterSummary } from '@/types'
@@ -308,6 +342,12 @@ const store = useVoiceAndStyleStore()
 const loading = ref(false)
 const error = ref<string | null>(null)
 const selectedSeverity = ref('medium')
+const chartType = ref<'bars' | 'pie'>('bars')
+
+const chartTypeOptions = [
+  { icon: 'pi pi-chart-bar', value: 'bars' },
+  { icon: 'pi pi-chart-pie', value: 'pie' }
+]
 
 const severityOptions = [
   { label: 'Baja+', value: 'low' },
@@ -369,6 +409,55 @@ const registerDistribution = computed(() => {
 
   return distribution
 })
+
+// Pie chart data for register distribution
+const pieChartData = computed(() => {
+  const dist = registerDistribution.value
+  const labels = Object.keys(dist).map(r => getRegisterLabel(r))
+  const data = Object.values(dist).map(v => Math.round(v * 100))
+  const colors = Object.keys(dist).map(r => getRegisterColor(r))
+  
+  return {
+    labels,
+    datasets: [{
+      data,
+      backgroundColor: colors,
+      hoverBackgroundColor: colors.map(c => c + 'CC')
+    }]
+  }
+})
+
+const pieChartOptions = {
+  plugins: {
+    legend: {
+      position: 'right' as const,
+      labels: {
+        usePointStyle: true,
+        padding: 15
+      }
+    },
+    tooltip: {
+      callbacks: {
+        label: (ctx: { label: string; raw: number }) => `${ctx.label}: ${ctx.raw}%`
+      }
+    }
+  },
+  responsive: true,
+  maintainAspectRatio: false
+}
+
+// Get color for register type
+function getRegisterColor(register: string): string {
+  const colors: Record<string, string> = {
+    formal: '#6366f1',      // Indigo
+    neutral: '#8b5cf6',     // Violet  
+    colloquial: '#f59e0b',  // Amber
+    literary: '#10b981',    // Emerald
+    technical: '#3b82f6',   // Blue
+    poetic: '#ec4899'       // Pink
+  }
+  return colors[register.toLowerCase()] || '#64748b'
+}
 
 // Build chapters for timeline
 const timelineChapters = computed(() => {
@@ -689,6 +778,44 @@ watch(() => props.projectId, (newId) => {
 }
 
 /* Distribution Section */
+.distribution-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.distribution-header-row h4 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+.chart-type-toggle {
+  scale: 0.85;
+}
+
+.chart-type-toggle :deep(.p-button) {
+  padding: 0.5rem 0.75rem;
+}
+
+.distribution-pie {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 250px;
+}
+
+.pie-chart {
+  width: 100%;
+  max-width: 400px;
+  height: 250px;
+}
+
 .distribution-section h4,
 .changes-section h4,
 .chapters-section h4 {
@@ -754,6 +881,22 @@ watch(() => props.projectId, (newId) => {
   margin: 0 0 1rem 0;
   font-size: 0.875rem;
   color: var(--text-color-secondary);
+}
+
+.changes-description .tooltip-text {
+  display: block;
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  background: var(--surface-100);
+  border-radius: 6px;
+  border-left: 3px solid var(--primary-color);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.changes-description .tooltip-text i {
+  margin-right: 0.25rem;
+  color: var(--primary-color);
 }
 
 .changes-list {

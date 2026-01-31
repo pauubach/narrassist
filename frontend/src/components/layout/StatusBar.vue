@@ -50,7 +50,7 @@ const systemStore = useSystemStore()
 const appVersion = computed(() =>
   appStore.backendVersion
   || (systemStore.backendVersion !== 'unknown' ? systemStore.backendVersion : null)
-  || '0.3.34'
+  || 'sin conexión'
 )
 
 // Si aún no tenemos versión, lanzar health check

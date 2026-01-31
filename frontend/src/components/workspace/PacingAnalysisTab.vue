@@ -10,6 +10,19 @@
         <p class="subtitle">
           Analiza el equilibrio entre capítulos, diálogo y narración.
         </p>
+        <!-- Estado del análisis -->
+        <p v-if="lastAnalysis" class="analysis-status success">
+          <i class="pi pi-check-circle"></i>
+          Último análisis: {{ lastAnalysis.toLocaleTimeString() }}
+        </p>
+        <p v-else-if="analysisError" class="analysis-status error">
+          <i class="pi pi-exclamation-triangle"></i>
+          Error: {{ analysisError }}
+        </p>
+        <p v-else class="analysis-status pending">
+          <i class="pi pi-info-circle"></i>
+          No analizado
+        </p>
       </div>
       <div class="header-controls">
         <Button
@@ -317,6 +330,8 @@ const selectedChapter = ref<any>(null)
 const maxWords = ref(0)
 const genreComparison = ref<any>(null)
 const genreLoading = ref(false)
+const lastAnalysis = ref<Date | null>(null)
+const analysisError = ref<string | null>(null)
 
 const severityOptions = [
   { label: 'Todas', value: 'all' },
@@ -347,6 +362,7 @@ const filteredIssues = computed(() => {
 async function analyze() {
   loading.value = true
   selectedChapter.value = null
+  analysisError.value = null
   try {
     const response = await fetch(
       apiUrl(`/api/projects/${props.projectId}/pacing-analysis`)
@@ -355,6 +371,7 @@ async function analyze() {
 
     if (data.success) {
       report.value = data.data
+      lastAnalysis.value = new Date()
       // Calculate max words for bar scaling
       if (report.value.chapter_metrics?.length > 0) {
         maxWords.value = Math.max(...report.value.chapter_metrics.map((c: any) => c.word_count))
@@ -364,6 +381,7 @@ async function analyze() {
     }
   } catch (error) {
     console.error('Error analyzing pacing:', error)
+    analysisError.value = error instanceof Error ? error.message : 'Error desconocido'
     toast.add({
       severity: 'error',
       summary: 'Error',
@@ -519,6 +537,26 @@ function selectChapter(chapter: any) {
   margin: var(--ds-space-1) 0 0;
   color: var(--ds-color-text-secondary);
   font-size: var(--ds-font-size-sm);
+}
+
+.header-left .analysis-status {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.25rem 0 0;
+  font-size: 0.75rem;
+}
+
+.header-left .analysis-status.success {
+  color: var(--green-500);
+}
+
+.header-left .analysis-status.error {
+  color: var(--red-500);
+}
+
+.header-left .analysis-status.pending {
+  color: var(--text-color-secondary);
 }
 
 /* Loading & Empty states */

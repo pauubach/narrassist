@@ -130,6 +130,20 @@ fn main() {
             let menu = menu::create_menu(app.handle())?;
             app.set_menu(menu)?;
 
+            // Forzar la ventana a primer plano (fix para cuando se lanza desde el instalador NSIS)
+            // Cuando NSIS lanza la app después de la instalación, puede hacerlo en un contexto 
+            // diferente que causa que la ventana aparezca minimizada o detrás de otras ventanas
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+                // En Windows, también intentar traer al frente
+                #[cfg(target_os = "windows")]
+                {
+                    let _ = window.set_always_on_top(true);
+                    let _ = window.set_always_on_top(false);
+                }
+            }
+
             // Iniciar el backend automaticamente al arrancar la app
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {

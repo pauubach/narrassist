@@ -1491,6 +1491,18 @@ class UnifiedAnalysisPipeline:
 
     def _extract_relationships(self, context: AnalysisContext) -> None:
         """Extraer relaciones entre personajes usando clustering multi-técnica."""
+        logger.info("[RELATIONSHIPS] Iniciando extracción de relaciones...")
+        logger.info(f"[RELATIONSHIPS] Entidades disponibles: {len(context.entities) if context.entities else 0}")
+        logger.info(f"[RELATIONSHIPS] Capítulos disponibles: {len(context.chapters) if context.chapters else 0}")
+        
+        if not context.entities:
+            logger.warning("[RELATIONSHIPS] Sin entidades - abortando extracción de relaciones")
+            return
+            
+        if not context.chapters:
+            logger.warning("[RELATIONSHIPS] Sin capítulos - abortando extracción de relaciones")
+            return
+        
         try:
             from ..analysis.relationship_clustering import (
                 RelationshipClusteringEngine,
@@ -1502,8 +1514,9 @@ class UnifiedAnalysisPipeline:
             embedding_model = None
             try:
                 embedding_model = get_embeddings_model()
-            except Exception:
-                logger.debug("Embeddings not available for relationship clustering")
+                logger.debug("[RELATIONSHIPS] Modelo de embeddings cargado")
+            except Exception as e:
+                logger.debug(f"[RELATIONSHIPS] Embeddings no disponibles: {e}")
 
             engine = RelationshipClusteringEngine(
                 use_embeddings=embedding_model is not None,
@@ -1514,8 +1527,10 @@ class UnifiedAnalysisPipeline:
             if context.chapters and context.entities:
                 # Construir lista de menciones para co-ocurrencia
                 entity_mentions = []
+                entities_with_mentions = 0
                 for entity in context.entities:
-                    if hasattr(entity, 'mentions'):
+                    if hasattr(entity, 'mentions') and entity.mentions:
+                        entities_with_mentions += 1
                         for mention in entity.mentions:
                             entity_mentions.append({
                                 "entity_id": entity.id,
@@ -1523,6 +1538,8 @@ class UnifiedAnalysisPipeline:
                                 "start_char": mention.start_char if hasattr(mention, 'start_char') else 0,
                                 "end_char": mention.end_char if hasattr(mention, 'end_char') else 0,
                             })
+                logger.info(f"[RELATIONSHIPS] Entidades con menciones: {entities_with_mentions}/{len(context.entities)}")
+                logger.info(f"[RELATIONSHIPS] Total menciones para co-ocurrencia: {len(entity_mentions)}")
 
                 # Preparar datos de capítulos
                 chapters_data = [
@@ -1542,6 +1559,7 @@ class UnifiedAnalysisPipeline:
                 )
 
                 # Añadir co-ocurrencias al engine
+                logger.info(f"[RELATIONSHIPS] Co-ocurrencias encontradas: {len(cooccurrences)}")
                 for cooc in cooccurrences:
                     e1_name = next((e.canonical_name for e in context.entities if e.id == cooc.entity1_id), str(cooc.entity1_id))
                     e2_name = next((e.canonical_name for e in context.entities if e.id == cooc.entity2_id), str(cooc.entity2_id))
@@ -1561,9 +1579,12 @@ class UnifiedAnalysisPipeline:
             context.relationships = result.get("relations", [])
             context.stats["relationships_found"] = len(context.relationships)
             context.stats["character_clusters"] = len(result.get("clusters", []))
+            
+            logger.info(f"[RELATIONSHIPS] Relaciones detectadas: {len(context.relationships)}")
+            logger.info(f"[RELATIONSHIPS] Clusters de personajes: {context.stats.get('character_clusters', 0)}")
 
         except Exception as e:
-            logger.warning(f"Relationship extraction failed: {e}")
+            logger.error(f"[RELATIONSHIPS] Error en extracción: {e}", exc_info=True)
 
     def _extract_interactions(self, context: AnalysisContext) -> None:
         """
