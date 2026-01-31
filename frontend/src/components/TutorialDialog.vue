@@ -249,10 +249,20 @@
                 class="ml-2"
               />
             </div>
-            <div v-else-if="systemCapabilities.languagetool?.installing || ltInstalling" class="ollama-unavailable">
+            <div v-else-if="systemCapabilities.languagetool?.installing || ltInstalling" class="ollama-unavailable lt-installing">
               <Tag value="Instalando..." severity="info" />
-              <ProgressSpinner style="width: 20px; height: 20px; margin-left: 0.5rem;" />
-              <p>Descargando Java y LanguageTool...</p>
+              <div class="lt-progress-wrapper">
+                <div class="lt-progress-info">
+                  <span class="lt-progress-label">{{ ltInstallProgress?.phase_label || 'Iniciando...' }}</span>
+                  <span v-if="ltInstallProgress?.percentage" class="lt-progress-percent">{{ Math.round(ltInstallProgress.percentage) }}%</span>
+                </div>
+                <ProgressBar 
+                  :value="ltInstallProgress?.percentage || 0" 
+                  :showValue="false"
+                  class="lt-progress-bar"
+                />
+                <p class="lt-progress-detail">{{ ltInstallProgress?.detail || 'Descargando Java y LanguageTool...' }}</p>
+              </div>
             </div>
             <div v-else class="ollama-unavailable">
               <Tag value="No instalado" severity="info" />
@@ -358,6 +368,7 @@ import Tag from 'primevue/tag'
 import Message from 'primevue/message'
 import Checkbox from 'primevue/checkbox'
 import ProgressSpinner from 'primevue/progressspinner'
+import ProgressBar from 'primevue/progressbar'
 import { apiUrl } from '@/config/api'
 import { useSystemStore, type NLPMethod } from '@/stores/system'
 
@@ -439,10 +450,13 @@ watch(() => props.visible, (newValue) => {
 // Estado de instalación interactiva en el tutorial
 const ollamaInstalling = ref(false)
 const ollamaStarting = ref(false)
-const ltInstalling = ref(false)
-const ltStarting = ref(false)
+
+// LanguageTool: usar estado centralizado del store
+const ltInstalling = computed(() => systemStore.ltInstalling)
+const ltStarting = computed(() => systemStore.ltStarting)
+const ltInstallProgress = computed(() => systemStore.ltInstallProgress)
+
 let ollamaPollTimer: ReturnType<typeof setInterval> | null = null
-let ltPollTimer: ReturnType<typeof setInterval> | null = null
 
 const installOllama = async () => {
   ollamaInstalling.value = true
@@ -485,60 +499,15 @@ const startOllama = async () => {
   }
 }
 
-const installLanguageTool = async () => {
-  ltInstalling.value = true
-  let ltPollCount = 0
-  try {
-    const resp = await fetch(apiUrl('/api/languagetool/install'), { method: 'POST' })
-    const result = await resp.json()
-    if (result.success) {
-      ltPollTimer = setInterval(async () => {
-        ltPollCount++
-        // Timeout after 5 minutes (100 * 3s)
-        if (ltPollCount > 100) {
-          clearInterval(ltPollTimer!)
-          ltPollTimer = null
-          ltInstalling.value = false
-          return
-        }
-        try {
-          const statusResp = await fetch(apiUrl('/api/languagetool/status'))
-          const statusResult = await statusResp.json()
-          const status = statusResult.data?.status
-          // Wait for a definitive installed state, not just 'not installing'
-          if (status === 'installed_not_running' || status === 'running') {
-            clearInterval(ltPollTimer!)
-            ltPollTimer = null
-            // Refresh capabilities BEFORE clearing flag to avoid UI flash
-            await systemStore.refreshCapabilities()
-            ltInstalling.value = false
-          }
-        } catch { /* ignore */ }
-      }, 3000)
-    } else {
-      ltInstalling.value = false
-    }
-  } catch {
-    ltInstalling.value = false
-  }
-}
-
-const startLanguageTool = async () => {
-  ltStarting.value = true
-  try {
-    await fetch(apiUrl('/api/languagetool/start'), { method: 'POST' })
-    await new Promise(r => setTimeout(r, 2000))
-    await systemStore.refreshCapabilities()
-  } finally {
-    ltStarting.value = false
-  }
-}
+// LanguageTool: usar acciones centralizadas del store
+const installLanguageTool = () => systemStore.installLanguageTool()
+const startLanguageTool = () => systemStore.startLanguageTool()
 
 // Limpiar timers al cerrar diálogo
 watch(() => props.visible, (newValue) => {
   if (!newValue) {
     if (ollamaPollTimer) { clearInterval(ollamaPollTimer); ollamaPollTimer = null }
-    if (ltPollTimer) { clearInterval(ltPollTimer); ltPollTimer = null }
+    systemStore.stopLTPolling()
   }
 })
 
@@ -992,6 +961,52 @@ const finish = () => {
   align-items: center;
   gap: 0.75rem;
   flex-wrap: wrap;
+}
+
+/* LanguageTool installation progress */
+.ollama-unavailable.lt-installing {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.lt-progress-wrapper {
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
+.lt-progress-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.25rem;
+}
+
+.lt-progress-label {
+  font-size: 0.85rem;
+  color: var(--p-text-color);
+  font-weight: 500;
+}
+
+.lt-progress-percent {
+  font-size: 0.85rem;
+  color: var(--p-primary-color);
+  font-weight: 600;
+}
+
+.lt-progress-bar {
+  height: 8px;
+  border-radius: 4px;
+}
+
+.lt-progress-bar :deep(.p-progressbar-value) {
+  background: var(--p-primary-color);
+  border-radius: 4px;
+}
+
+.lt-progress-detail {
+  margin: 0.25rem 0 0 0 !important;
+  font-size: 0.8rem !important;
+  color: var(--p-text-muted-color) !important;
 }
 
 .ollama-status p {

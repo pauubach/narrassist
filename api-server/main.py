@@ -1369,7 +1369,7 @@ async def system_capabilities():
             ollama_host = "http://localhost:11434"
             logger.info(f"Verificando Ollama en {ollama_host}/api/tags...")
             req = urllib.request.Request(f"{ollama_host}/api/tags")
-            with urllib.request.urlopen(req, timeout=10.0) as response:
+            with urllib.request.urlopen(req, timeout=3.0) as response:  # Reduced from 10s
                 if response.status == 200:
                     ollama_available = True
                     data = json_module.loads(response.read().decode('utf-8'))
@@ -1702,31 +1702,37 @@ async def reset_database_endpoint():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-def _check_languagetool_available() -> bool:
-    """Verifica si LanguageTool está disponible, intentando iniciarlo si está instalado."""
+def _check_languagetool_available(auto_start: bool = False) -> bool:
+    """Verifica si LanguageTool está disponible.
+    
+    Args:
+        auto_start: Si es True, intenta iniciar LT si está instalado pero no corriendo.
+                   Default False para evitar lentitud en startup.
+    """
     try:
         import httpx
-        response = httpx.get("http://localhost:8081/v2/check", timeout=2.0)
+        response = httpx.get("http://localhost:8081/v2/check", timeout=1.5)
         if response.status_code in (200, 400):  # 400 = missing params but server up
             return True
     except Exception:
         pass
 
-    # Si no está corriendo, intentar iniciarlo
-    try:
-        from narrative_assistant.nlp.grammar import (
-            is_languagetool_installed,
-            ensure_languagetool_running,
-        )
-        if is_languagetool_installed():
-            logger.info("LanguageTool instalado pero no corriendo, intentando iniciar...")
-            if ensure_languagetool_running():
-                logger.info("LanguageTool iniciado correctamente")
-                return True
-            else:
-                logger.warning("No se pudo iniciar LanguageTool")
-    except Exception as e:
-        logger.debug(f"Error verificando/iniciando LanguageTool: {e}")
+    # Si no está corriendo y auto_start está habilitado, intentar iniciarlo
+    if auto_start:
+        try:
+            from narrative_assistant.nlp.grammar import (
+                is_languagetool_installed,
+                ensure_languagetool_running,
+            )
+            if is_languagetool_installed():
+                logger.info("LanguageTool instalado pero no corriendo, intentando iniciar...")
+                if ensure_languagetool_running():
+                    logger.info("LanguageTool iniciado correctamente")
+                    return True
+                else:
+                    logger.warning("No se pudo iniciar LanguageTool")
+        except Exception as e:
+            logger.debug(f"Error verificando/iniciando LanguageTool: {e}")
 
     return False
 

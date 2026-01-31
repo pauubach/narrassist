@@ -1236,11 +1236,13 @@ import {
   type FontFamily,
   type PresetInfo
 } from '@/stores/theme'
+import { useSystemStore, type LTInstallProgress, type LTState } from '@/stores/system'
 import type { CorrectionConfig } from '@/types'
 
 const router = useRouter()
 const toast = useToast()
 const themeStore = useThemeStore()
+const systemStore = useSystemStore()
 
 // Opciones de apariencia usando el store de tema
 const modeOptions = [
@@ -2007,30 +2009,12 @@ const ollamaStatusMessage = computed(() => {
   return messages[ollamaState.value]
 })
 
-// LanguageTool state (mismo patrón que Ollama)
-type LTState = 'not_installed' | 'installing' | 'installed_not_running' | 'running'
+// LanguageTool state - usar store centralizado
+const ltInstalling = computed(() => systemStore.ltInstalling)
+const ltStarting = computed(() => systemStore.ltStarting)
+const ltInstallProgress = computed(() => systemStore.ltInstallProgress)
 
-interface LTInstallProgress {
-  phase: string
-  phase_label: string
-  percentage: number
-  detail: string
-  error?: string
-}
-
-const ltInstalling = ref(false)
-const ltStarting = ref(false)
-const ltInstallProgress = ref<LTInstallProgress | null>(null)
-let ltPollTimer: ReturnType<typeof setInterval> | null = null
-
-const ltState = computed<LTState>(() => {
-  const lt = systemCapabilities.value?.languagetool
-  if (!lt) return 'not_installed'
-  if (lt.installing || ltInstalling.value) return 'installing'
-  if (!lt.installed) return 'not_installed'
-  if (!lt.running) return 'installed_not_running'
-  return 'running'
-})
+const ltState = computed<LTState>(() => systemStore.ltState)
 
 const ltActionConfig = computed(() => {
   const configs: Record<LTState, { label: string; icon: string; severity: string; action: () => void }> = {
@@ -2077,72 +2061,30 @@ const ltStatusMessage = computed(() => {
   return messages[ltState.value]
 })
 
+// LanguageTool install/start - usar acciones del store con toasts
 const installLanguageTool = async () => {
-  ltInstalling.value = true
-  try {
-    const response = await fetch(apiUrl('/api/languagetool/install'), { method: 'POST' })
-    const result = await response.json()
-    if (result.success) {
-      toast.add({ severity: 'info', summary: 'Instalando LanguageTool', detail: 'Descargando Java y LanguageTool...', life: 5000 })
-      startLTPoll()
-    } else {
-      toast.add({ severity: 'error', summary: 'Error', detail: result.error, life: 5000 })
-      ltInstalling.value = false
+  toast.add({ severity: 'info', summary: 'Instalando LanguageTool', detail: 'Descargando Java y LanguageTool...', life: 5000 })
+  const success = await systemStore.installLanguageTool()
+  if (success) {
+    await loadSystemCapabilities()
+    const lt = systemCapabilities.value?.languagetool
+    if (lt?.running) {
+      toast.add({ severity: 'success', summary: 'LanguageTool instalado', detail: 'Corrector avanzado disponible', life: 3000 })
+    } else if (lt?.installed) {
+      toast.add({ severity: 'success', summary: 'LanguageTool instalado', detail: 'Puedes iniciarlo desde aquí', life: 3000 })
     }
-  } catch (error) {
-    toast.add({ severity: 'error', summary: 'Error de conexión', detail: 'No se pudo conectar con el servidor', life: 3000 })
-    ltInstalling.value = false
+  } else {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo instalar LanguageTool', life: 5000 })
   }
 }
 
-const startLTPoll = () => {
-  if (ltPollTimer) return
-  ltPollTimer = setInterval(async () => {
-    try {
-      const response = await fetch(apiUrl('/api/languagetool/status'))
-      const result = await response.json()
-      if (result.success) {
-        const data = result.data
-        
-        // Actualizar progreso si está disponible
-        if (data.install_progress) {
-          ltInstallProgress.value = data.install_progress
-        }
-        
-        if (data.status !== 'installing') {
-          clearInterval(ltPollTimer!)
-          ltPollTimer = null
-          ltInstalling.value = false
-          ltInstallProgress.value = null
-          await loadSystemCapabilities()
-          if (data.status === 'running') {
-            toast.add({ severity: 'success', summary: 'LanguageTool instalado', detail: 'Corrector avanzado disponible', life: 3000 })
-          } else if (data.is_installed) {
-            toast.add({ severity: 'success', summary: 'LanguageTool instalado', detail: 'Puedes iniciarlo desde aquí', life: 3000 })
-          }
-        }
-      }
-    } catch {
-      // Ignorar errores de polling
-    }
-  }, 1000)  // Polling más frecuente para actualizar progreso
-}
-
 const startLanguageTool = async () => {
-  ltStarting.value = true
-  try {
-    const response = await fetch(apiUrl('/api/languagetool/start'), { method: 'POST' })
-    const result = await response.json()
-    if (result.success) {
-      await loadSystemCapabilities()
-      toast.add({ severity: 'success', summary: 'LanguageTool iniciado', detail: 'Corrector avanzado disponible', life: 3000 })
-    } else {
-      toast.add({ severity: 'error', summary: 'Error', detail: result.error, life: 5000 })
-    }
-  } catch {
-    toast.add({ severity: 'error', summary: 'Error de conexión', detail: 'No se pudo conectar con el servidor', life: 3000 })
-  } finally {
-    ltStarting.value = false
+  const success = await systemStore.startLanguageTool()
+  if (success) {
+    await loadSystemCapabilities()
+    toast.add({ severity: 'success', summary: 'LanguageTool iniciado', detail: 'Corrector avanzado disponible', life: 3000 })
+  } else {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo iniciar LanguageTool', life: 5000 })
   }
 }
 
@@ -2189,10 +2131,7 @@ onUnmounted(() => {
   if (saveDebounceTimer) {
     clearTimeout(saveDebounceTimer)
   }
-  if (ltPollTimer) {
-    clearInterval(ltPollTimer)
-    ltPollTimer = null
-  }
+  systemStore.stopLTPolling()
 })
 
 const loadSettings = () => {

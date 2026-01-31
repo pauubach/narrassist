@@ -9,6 +9,17 @@ export interface ModelStatus {
   path?: string
 }
 
+// LanguageTool install progress
+export interface LTInstallProgress {
+  phase: string
+  phase_label: string
+  percentage: number
+  detail: string
+  error?: string
+}
+
+export type LTState = 'not_installed' | 'installing' | 'installed_not_running' | 'running'
+
 export interface ModelsStatus {
   nlp_models: Record<string, ModelStatus>
   ollama: {
@@ -91,6 +102,22 @@ export const useSystemStore = defineStore('system', () => {
   // System capabilities (cached - loaded once at startup)
   const systemCapabilities = ref<SystemCapabilities | null>(null)
   const capabilitiesLoading = ref(false)
+
+  // LanguageTool state (centralized)
+  const ltInstalling = ref(false)
+  const ltStarting = ref(false)
+  const ltInstallProgress = ref<LTInstallProgress | null>(null)
+  let ltPollTimer: ReturnType<typeof setInterval> | null = null
+
+  // Computed: LanguageTool state
+  const ltState = computed<LTState>(() => {
+    const lt = systemCapabilities.value?.languagetool
+    if (!lt) return 'not_installed'
+    if (lt.installing || ltInstalling.value) return 'installing'
+    if (!lt.installed) return 'not_installed'
+    if (!lt.running) return 'installed_not_running'
+    return 'running'
+  })
 
   // Computed: are all required models installed?
   const modelsReady = computed(() => modelsStatus.value?.all_required_installed ?? false)
@@ -322,6 +349,99 @@ export const useSystemStore = defineStore('system', () => {
     return false
   }
 
+  // =========================================================================
+  // LanguageTool actions (centralized)
+  // =========================================================================
+
+  /**
+   * Install LanguageTool (Java + LT server).
+   * Starts installation and polls for progress until complete.
+   */
+  async function installLanguageTool(): Promise<boolean> {
+    ltInstalling.value = true
+    ltInstallProgress.value = null
+    let pollCount = 0
+
+    try {
+      const resp = await fetch(apiUrl('/api/languagetool/install'), { method: 'POST' })
+      const result = await resp.json()
+
+      if (!result.success) {
+        ltInstalling.value = false
+        return false
+      }
+
+      // Start polling for progress
+      return new Promise((resolve) => {
+        ltPollTimer = setInterval(async () => {
+          pollCount++
+          // Timeout after 10 minutes (600 * 1s)
+          if (pollCount > 600) {
+            stopLTPolling()
+            ltInstalling.value = false
+            ltInstallProgress.value = null
+            resolve(false)
+            return
+          }
+
+          try {
+            const statusResp = await fetch(apiUrl('/api/languagetool/status'))
+            const statusResult = await statusResp.json()
+            const data = statusResult.data
+            const status = data?.status
+
+            // Update progress if available
+            if (data?.install_progress) {
+              ltInstallProgress.value = data.install_progress
+            }
+
+            // Wait for a definitive installed state
+            if (status === 'installed_not_running' || status === 'running') {
+              stopLTPolling()
+              // Refresh capabilities BEFORE clearing flag to avoid UI flash
+              await refreshCapabilities()
+              ltInstalling.value = false
+              ltInstallProgress.value = null
+              resolve(true)
+            }
+          } catch {
+            // Ignore polling errors
+          }
+        }, 1000)
+      })
+    } catch {
+      ltInstalling.value = false
+      return false
+    }
+  }
+
+  /**
+   * Start LanguageTool server.
+   */
+  async function startLanguageTool(): Promise<boolean> {
+    ltStarting.value = true
+    try {
+      await fetch(apiUrl('/api/languagetool/start'), { method: 'POST' })
+      await new Promise(r => setTimeout(r, 2000))
+      await refreshCapabilities()
+      return true
+    } catch {
+      return false
+    } finally {
+      ltStarting.value = false
+    }
+  }
+
+  /**
+   * Stop LanguageTool polling timer.
+   */
+  function stopLTPolling() {
+    if (ltPollTimer) {
+      clearInterval(ltPollTimer)
+      ltPollTimer = null
+    }
+  }
+
   return {
     // State
     backendConnected,
@@ -335,6 +455,12 @@ export const useSystemStore = defineStore('system', () => {
     modelsError,
     systemCapabilities,
     capabilitiesLoading,
+
+    // LanguageTool state
+    ltInstalling,
+    ltStarting,
+    ltInstallProgress,
+    ltState,
 
     // Computed
     modelsReady,
@@ -353,6 +479,11 @@ export const useSystemStore = defineStore('system', () => {
     installDependencies,
     loadCapabilities,
     refreshCapabilities,
-    stopPolling
+    stopPolling,
+
+    // LanguageTool actions
+    installLanguageTool,
+    startLanguageTool,
+    stopLTPolling
   }
 })
