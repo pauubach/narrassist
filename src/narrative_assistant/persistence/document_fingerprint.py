@@ -307,14 +307,34 @@ class FingerprintMatcher:
             )
 
         # 2. Buscar por sample_hash (podría ser versión anterior)
+        # Nota: sample_hash se compara contra document_fingerprint (full_hash)
+        # usando prefijo, lo que detecta documentos que comparten inicio idéntico.
         sample_match = db.fetchone(
             """
             SELECT id, name, document_fingerprint, word_count
             FROM projects
             WHERE document_fingerprint LIKE ?
+            AND id != COALESCE(?, -1)
             """,
-            (fingerprint.sample_hash[:16] + "%",),  # Primeros 16 chars
+            (fingerprint.sample_hash[:16] + "%", None),
         )
+
+        if sample_match:
+            # El inicio del documento coincide — probable revisión
+            word_ratio = (
+                min(sample_match["word_count"], fingerprint.word_count)
+                / max(sample_match["word_count"], fingerprint.word_count)
+                if sample_match["word_count"] and fingerprint.word_count
+                else 0.0
+            )
+            return FingerprintMatch(
+                is_exact_match=False,
+                is_similar=True,
+                similarity_score=max(0.85, word_ratio),
+                existing_fingerprint=None,
+                existing_project_id=sample_match["id"],
+                existing_project_name=sample_match["name"],
+            )
 
         # 3. Buscar por word_count similar y calcular Jaccard
         similar_projects = db.fetchall(

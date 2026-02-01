@@ -69,7 +69,7 @@ pub fn create_menu(app: &AppHandle) -> Result<Menu<Wry>, tauri::Error> {
     let view_relationships = MenuItem::with_id(app, "view_relationships", "Relaciones", true, Some("CmdOrCtrl+4"))?;
     let view_timeline = MenuItem::with_id(app, "view_timeline", "Linea temporal", true, Some("CmdOrCtrl+5"))?;
     let separator5 = PredefinedMenuItem::separator(app)?;
-    let toggle_inspector = MenuItem::with_id(app, "toggle_inspector", "Mostrar/ocultar inspector", true, Some("CmdOrCtrl+I"))?;
+    let toggle_inspector = MenuItem::with_id(app, "toggle_inspector", "Mostrar/ocultar inspector", true, Some("CmdOrCtrl+Shift+I"))?;
     let toggle_sidebar = MenuItem::with_id(app, "toggle_sidebar", "Mostrar/ocultar sidebar", true, Some("CmdOrCtrl+B"))?;
     let separator6 = PredefinedMenuItem::separator(app)?;
     let fullscreen = PredefinedMenuItem::fullscreen(app, Some("Pantalla completa"))?;

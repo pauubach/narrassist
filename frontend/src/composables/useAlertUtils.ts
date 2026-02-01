@@ -165,7 +165,7 @@ const severityConfigs: Record<AlertSeverity, SeverityConfig> = {
   medium: {
     label: 'Medio',
     icon: 'pi pi-info-circle',
-    color: 'var(--ds-alert-medium)',
+    color: 'var(--ds-alert-medium-text, var(--ds-alert-medium))',
     priority: 3,
     primeSeverity: 'info',
   },

@@ -2435,6 +2435,9 @@ async def delete_project(project_id: int):
         project_repo = project_manager
         project_repo.delete(project_id)
 
+        # Limpiar progreso de análisis huérfano
+        analysis_progress_storage.pop(project_id, None)
+
         logger.info(f"Deleted project: {project_id}")
         return ApiResponse(success=True, message="Proyecto eliminado exitosamente")
     except Exception as e:
@@ -7570,6 +7573,14 @@ JSON:"""
                         tmp_path.unlink()
                     except Exception:
                         pass
+
+                # Limpiar progreso después de un delay para que el frontend lea el estado final
+                def _cleanup_progress(pid: int):
+                    analysis_progress_storage.pop(pid, None)
+
+                cleanup_timer = threading.Timer(300, _cleanup_progress, args=[project_id])
+                cleanup_timer.daemon = True
+                cleanup_timer.start()
 
         def _persist_chapters_to_db(chapters_data: list, proj_id: int, db: Database):
             """Persiste los capítulos y secciones en la base de datos."""

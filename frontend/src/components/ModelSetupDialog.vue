@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useSystemStore } from '@/stores/system'
 import Dialog from 'primevue/dialog'
 import ProgressBar from 'primevue/progressbar'
@@ -120,6 +120,11 @@ watch(() => systemStore.modelsError, (error) => {
     downloadPhase.value = 'error'
     stopProgressSimulation()
   }
+})
+
+// Limpiar timers al desmontar para evitar memory leaks
+onBeforeUnmount(() => {
+  stopProgressSimulation()
 })
 
 const missingModels = computed(() => {
@@ -249,7 +254,7 @@ async function recheckPython() {
 
       <!-- Backend error - timeout -->
       <template v-else-if="downloadPhase === 'backend-error'">
-        <div class="error-state">
+        <div class="error-state" role="alert" aria-live="assertive">
           <i class="pi pi-exclamation-triangle error-icon"></i>
           <h3>No se pudo conectar</h3>
           <p class="error-message">{{ systemStore.backendStartupError || 'El servidor no respondió a tiempo.' }}</p>
@@ -273,7 +278,7 @@ async function recheckPython() {
 
       <!-- Installing dependencies state -->
       <template v-else-if="downloadPhase === 'installing-deps'">
-        <div class="download-progress">
+        <div class="download-progress" role="status" aria-live="polite">
           <div class="download-header">
             <i class="pi pi-cog pi-spin download-icon"></i>
             <div>
@@ -303,7 +308,7 @@ async function recheckPython() {
 
       <!-- Downloading state (automatic) -->
       <template v-else-if="downloadPhase === 'downloading'">
-        <div class="download-progress">
+        <div class="download-progress" role="status" aria-live="polite">
           <div class="download-header">
             <i class="pi pi-download download-icon"></i>
             <div>
@@ -350,7 +355,7 @@ async function recheckPython() {
 
       <!-- Python missing state -->
       <template v-else-if="downloadPhase === 'python-missing'">
-        <div class="python-missing-state">
+        <div class="python-missing-state" role="alert" aria-live="assertive">
           <i class="pi pi-exclamation-circle python-icon"></i>
           <h3>Python 3.10+ requerido</h3>
           <p class="python-message">
@@ -386,7 +391,7 @@ async function recheckPython() {
 
       <!-- Error state -->
       <template v-else-if="downloadPhase === 'error'">
-        <div class="error-state">
+        <div class="error-state" role="alert" aria-live="assertive">
           <i class="pi pi-exclamation-triangle error-icon"></i>
           <h3>Error en la descarga</h3>
           <p class="error-message">{{ systemStore.modelsError }}</p>

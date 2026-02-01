@@ -328,6 +328,13 @@ class AppConfig:
             config.data_dir = Path(data_dir)
             config.cache_dir = config.data_dir / "cache"
 
+        # Asegurar que los directorios existan después de cualquier override
+        config.data_dir.mkdir(parents=True, exist_ok=True)
+        config.cache_dir.mkdir(parents=True, exist_ok=True)
+
+        # Re-detectar modelos para el data_dir final
+        config._detect_models_dir()
+
         return config
 
     @classmethod

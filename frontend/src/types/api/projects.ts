@@ -49,8 +49,8 @@ export interface ApiProject {
   description: string | null
   document_path: string | null
   document_format: string
-  created_at: string
-  last_modified: string
+  created_at: string | null
+  last_modified: string | null
   last_opened: string | null
   analysis_status: ApiAnalysisStatus
   analysis_progress: number

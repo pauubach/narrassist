@@ -347,7 +347,7 @@ function getAlertMessage(alert: Alert): string {
   color: var(--ds-alert-high);
 }
 .alert-panel__severity-btn--medium {
-  color: var(--ds-alert-medium);
+  color: var(--ds-alert-medium-text, var(--ds-alert-medium));
 }
 .alert-panel__severity-btn--low {
   color: var(--ds-alert-low);

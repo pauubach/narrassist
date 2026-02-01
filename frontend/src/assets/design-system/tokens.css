@@ -172,9 +172,10 @@
   --ds-alert-high-bg: #FFF3E0;
   --ds-alert-high-border: #FF9800;
 
-  --ds-alert-medium: #FBC02D;
+  --ds-alert-medium: #F9A825;
   --ds-alert-medium-bg: #FFFDE7;
   --ds-alert-medium-border: #FFEB3B;
+  --ds-alert-medium-text: #8D6E00;
 
   --ds-alert-low: #00897B;
   --ds-alert-low-bg: #E0F2F1;

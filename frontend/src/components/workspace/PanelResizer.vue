@@ -10,6 +10,8 @@ import { ref } from 'vue'
 const props = defineProps<{
   /** Posición del resizer */
   position: 'left' | 'right'
+  /** Posición actual como porcentaje (0-100) para accesibilidad */
+  currentPercent?: number
 }>()
 
 const emit = defineEmits<{
@@ -72,6 +74,9 @@ function handleKeyDown(event: KeyboardEvent) {
     role="separator"
     aria-orientation="vertical"
     :aria-label="`Redimensionar panel ${position === 'left' ? 'izquierdo' : 'derecho'}`"
+    :aria-valuenow="currentPercent ?? 50"
+    aria-valuemin="0"
+    aria-valuemax="100"
     tabindex="0"
     @mousedown="handleMouseDown"
     @keydown="handleKeyDown"

@@ -11,7 +11,7 @@ async function ensureBackendReady(): Promise<void> {
   const systemStore = useSystemStore()
   if (systemStore.backendReady) return
   // Esperar a que backendReady cambie a true (max 65s, el waitForBackend ya se ejecuta en ModelSetupDialog)
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     if (systemStore.backendReady) { resolve(); return }
     const unwatch = watch(() => systemStore.backendReady, (ready) => {
       if (ready) {
@@ -19,8 +19,15 @@ async function ensureBackendReady(): Promise<void> {
         resolve()
       }
     })
-    // Safety timeout: no bloquear indefinidamente
-    setTimeout(() => { unwatch(); resolve() }, 65000)
+    // Safety timeout: rechazar si el backend no responde
+    setTimeout(() => {
+      unwatch()
+      if (!systemStore.backendReady) {
+        reject(new Error('Backend no disponible después de 65s de espera'))
+      } else {
+        resolve()
+      }
+    }, 65000)
   })
 }
 
