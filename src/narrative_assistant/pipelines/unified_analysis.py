@@ -969,12 +969,23 @@ class UnifiedAnalysisPipeline:
                     # Convertir label a EntityType
                     label = group["label"]
                     label_str = str(label.value if hasattr(label, 'value') else label).upper()
-                    entity_type = (
-                        EntityType.CHARACTER if label_str == "PER"
-                        else EntityType.LOCATION if label_str == "LOC"
-                        else EntityType.ORGANIZATION if label_str == "ORG"
-                        else EntityType.CONCEPT
-                    )
+                    # Heurística para MISC: si parece nombre propio (2-3 palabras capitalizadas), es CHARACTER
+                    canonical_text = group.get("canonical_text") or canonical_name
+                    if label_str == "PER":
+                        entity_type = EntityType.CHARACTER
+                    elif label_str == "LOC":
+                        entity_type = EntityType.LOCATION
+                    elif label_str == "ORG":
+                        entity_type = EntityType.ORGANIZATION
+                    elif label_str == "MISC":
+                        # Intentar disambiguar MISC: nombres propios → CHARACTER
+                        ct_words = canonical_text.split()
+                        if 1 <= len(ct_words) <= 3 and all(w[0].isupper() for w in ct_words if w):
+                            entity_type = EntityType.CHARACTER
+                        else:
+                            entity_type = EntityType.CONCEPT
+                    else:
+                        entity_type = EntityType.CONCEPT
 
                     # Crear Entity object con el nombre canónico más completo
                     entity = Entity(

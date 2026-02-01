@@ -1034,7 +1034,7 @@ JSON:"""
                     filtered_count += 1
                     continue
 
-            # Reclasificar apellidos comunes a PER
+            # Reclasificar apellidos comunes a PER (sueltos o en nombre compuesto)
             if text_lower in COMMON_SURNAMES_AS_PER:
                 entity.label = EntityLabel.PER
                 entity.source = f"{entity.source}+reclassified"
@@ -1042,6 +1042,20 @@ JSON:"""
                 reclassified_count += 1
                 result.append(entity)
                 continue
+
+            # Reclasificar nombres compuestos (ej: "María Sánchez") a PER
+            # Si alguna palabra del nombre es un apellido conocido y todas empiezan con mayúscula
+            words = entity.text.split()
+            if 2 <= len(words) <= 3 and all(w[0].isupper() for w in words):
+                words_lower = [w.lower() for w in words]
+                has_surname = any(w in COMMON_SURNAMES_AS_PER for w in words_lower)
+                if has_surname:
+                    entity.label = EntityLabel.PER
+                    entity.source = f"{entity.source}+reclassified_fullname"
+                    logger.debug(f"MISC reclasificado a PER (nombre completo): '{entity.text}'")
+                    reclassified_count += 1
+                    result.append(entity)
+                    continue
 
             # Reclasificar pseudónimos literarios a PER
             if text_lower in LITERARY_PSEUDONYMS:
