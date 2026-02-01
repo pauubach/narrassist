@@ -267,6 +267,12 @@ fn spawn_embedded_backend(app: &AppHandle) -> Result<Child, String> {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
+    // En macOS, Python.framework necesita DYLD_FRAMEWORK_PATH para encontrar la libreria
+    #[cfg(target_os = "macos")]
+    {
+        command.env("DYLD_FRAMEWORK_PATH", &python_dir);
+    }
+
     // En Windows, evitar que se muestre una ventana de consola para Python
     #[cfg(target_os = "windows")]
     {
