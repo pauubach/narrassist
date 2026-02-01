@@ -1,27 +1,25 @@
-# Tareas pendientes que requieren macOS
+# Estado de macOS
 
-Estas tareas no se pueden completar sin acceso a hardware macOS real.
+## ✅ Completado
 
-## 1. ✅ Hardened Runtime + Entitlements (COMPLETADO)
+- **Hardened Runtime + Entitlements**: Configurado en `tauri.conf.json` y `Entitlements.plist`
+- **Firma ad-hoc**: `signingIdentity: "-"` permite que la app funcione sin certificado
 
-- ✅ `hardenedRuntime: true` en `src-tauri/tauri.conf.json`
-- ✅ `signingIdentity: "-"` (firma ad-hoc, sin Apple Developer Program)
-- ✅ `Entitlements.plist` creado con permisos para Python embebido
+## ⛔ No aplicable (requiere Apple Developer Program $99/año)
 
-## 2. Firma y notarización
+- Firma con certificado de Apple
+- Notarización
+- Bypass automático de Gatekeeper
 
-**NO APLICA** - Sin Apple Developer Program ($99/año), la app no puede ser firmada ni notarizada.
+**Limitación permanente:** Los usuarios deberán hacer "click derecho → Abrir" la primera vez.
 
-Los usuarios deberán:
-- Click derecho → Abrir (primera vez) para bypass de Gatekeeper
-- Esto es comportamiento estándar para apps no firmadas
-
-## 3. Validación del build macOS en hardware real
+## 🔲 Pendiente: Validación del build
 
 - [ ] Descargar el DMG generado por GitHub Actions
-- [ ] Instalar en Mac y verificar:
-  - [ ] La app arranca (con bypass de Gatekeeper: click derecho → Abrir)
-  - [ ] Python embebido (Framework) funciona correctamente
+- [ ] Instalar en Mac (click derecho → Abrir para bypass Gatekeeper)
+- [ ] Verificar:
+  - [ ] La app arranca correctamente
+  - [ ] Python embebido (Framework) funciona
   - [ ] Los modelos NLP se descargan al primer uso
   - [ ] Ollama se conecta correctamente
   - [ ] El análisis de documentos funciona end-to-end
