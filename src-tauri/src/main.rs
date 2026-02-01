@@ -257,12 +257,19 @@ fn spawn_embedded_backend(app: &AppHandle) -> Result<Child, String> {
         }
     }
 
+    // En macOS, PYTHONHOME debe apuntar a Python.framework/Versions/3.12
+    // En Windows, apunta al directorio python-embed directamente
+    #[cfg(target_os = "macos")]
+    let python_home = python_dir.join("Python.framework").join("Versions").join("3.12");
+    #[cfg(not(target_os = "macos"))]
+    let python_home = python_dir.clone();
+
     let mut command = Command::new(&python_path);
     command
         .arg(&main_py)
         .current_dir(&backend_api_dir)
         .env("PYTHONPATH", python_path_env)
-        .env("PYTHONHOME", &python_dir)
+        .env("PYTHONHOME", &python_home)
         .env("NA_EMBEDDED", "1")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
