@@ -437,6 +437,26 @@ fn spawn_embedded_backend(app: &AppHandle) -> Result<Child, String> {
     #[cfg(target_os = "macos")]
     {
         command.env("DYLD_FRAMEWORK_PATH", &python_dir);
+
+        // CRITICAL: Crear symlink Python en binaries/ si no existe
+        // El ejecutable python3 busca @executable_path/../Python que debe apuntar a
+        // python-embed/Python.framework/Versions/3.12/Python
+        let python_symlink = resource_dir.join("binaries").join("Python");
+        let python_lib = python_dir
+            .join("Python.framework")
+            .join("Versions")
+            .join("3.12")
+            .join("Python");
+
+        if !python_symlink.exists() && python_lib.exists() {
+            use std::os::unix::fs::symlink;
+            let relative_target = std::path::Path::new("python-embed")
+                .join("Python.framework")
+                .join("Versions")
+                .join("3.12")
+                .join("Python");
+            let _ = symlink(&relative_target, &python_symlink);
+        }
     }
 
     // En Windows, evitar que se muestre una ventana de consola para Python

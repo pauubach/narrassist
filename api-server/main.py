@@ -129,7 +129,19 @@ try:
 
     if using_embedded_python:
         embed_dir = os.path.dirname(sys.executable)
-        embed_site = os.path.join(embed_dir, "Lib", "site-packages")
+
+        # En Windows: python-embed/Lib/site-packages
+        # En macOS: python-embed/Python.framework/Versions/3.12/lib/python3.12/site-packages
+        if sys.platform == 'win32':
+            embed_site = os.path.join(embed_dir, "Lib", "site-packages")
+        elif sys.platform == 'darwin':
+            # sys.executable es python-embed/python3, buscar site-packages del framework
+            framework_dir = os.path.join(embed_dir, "Python.framework", "Versions", "3.12")
+            embed_site = os.path.join(framework_dir, "lib", "python3.12", "site-packages")
+        else:
+            # Linux fallback
+            embed_site = os.path.join(embed_dir, "lib", "python3.12", "site-packages")
+
         if embed_site not in sys.path:
             sys.path.insert(0, embed_site)
             _write_debug(f"Added embedded site-packages: {embed_site}")

@@ -200,7 +200,24 @@ def patch_python_framework(framework_dir: Path) -> bool:
         python3_root.symlink_to(python3_exe)
         print(f"\n🔗 Creado symlink: {python3_root} -> {python3_exe}")
 
-    # 4. Parchear todos los módulos .so en lib/python3.12/lib-dynload/
+    # 4. Parchear Python.app (ejecutable que se invoca al abrir archivos .py)
+    python_app_exe = versions_dir / "Resources" / "Python.app" / "Contents" / "MacOS" / "Python"
+    if python_app_exe.exists():
+        print(f"\n🍎 Parcheando Python.app ejecutable...")
+        deps = get_dependencies(python_app_exe)
+        for dep in deps:
+            if "/Library/Frameworks/Python.framework" in dep:
+                # Python.app/Contents/MacOS/Python está en Resources/.../MacOS/
+                # Python está en ../../../../Python
+                new_dep = dep.replace(
+                    "/Library/Frameworks/Python.framework/Versions/3.12/Python",
+                    "@executable_path/../../../../Python"
+                )
+                if patch_binary_dependency(python_app_exe, dep, new_dep):
+                    print(f"  ✅ {dep}")
+                    print(f"     → {new_dep}")
+
+    # 5. Parchear todos los módulos .so en lib/python3.12/lib-dynload/
     dynload_dir = versions_dir / "lib" / "python3.12" / "lib-dynload"
     if dynload_dir.exists():
         so_files = list(dynload_dir.glob("*.so"))
@@ -219,6 +236,11 @@ def patch_python_framework(framework_dir: Path) -> bool:
                             "/Library/Frameworks/Python.framework/Versions/3.12/Python",
                             "@loader_path/../../../Python"
                         )
+                        # También parchear todas las bibliotecas .dylib
+                        new_dep = new_dep.replace(
+                            "/Library/Frameworks/Python.framework/Versions/3.12/lib/",
+                            "@loader_path/../../../lib/"
+                        )
                         patch_binary_dependency(so_file, dep, new_dep)
 
                 if needs_patch:
@@ -226,7 +248,7 @@ def patch_python_framework(framework_dir: Path) -> bool:
 
             print(f"  ✅ Parcheados {patched_count} módulos")
 
-    # 5. Parchear bibliotecas en lib/ (si existen)
+    # 6. Parchear bibliotecas en lib/ (si existen)
     lib_dir = versions_dir / "lib"
     if lib_dir.exists():
         dylib_files = list(lib_dir.glob("*.dylib"))
@@ -263,6 +285,8 @@ def patch_python_framework(framework_dir: Path) -> bool:
     binaries_to_sign.extend(python_executables)  # Todos los ejecutables parcheados
     if python3_root.exists() and not python3_root.is_symlink():
         binaries_to_sign.append(python3_root)
+    if python_app_exe.exists():
+        binaries_to_sign.append(python_app_exe)
 
     signed_count = 0
     for binary in binaries_to_sign:
