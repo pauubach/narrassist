@@ -1,10 +1,10 @@
 <template>
-  <div class="alert-list">
+  <div class="alert-list" role="region" aria-label="Lista de alertas">
     <!-- Header con filtros -->
     <div class="list-header">
       <div class="header-left">
-        <h3 v-if="showTitle">Alertas</h3>
-        <span v-if="!showTitle" class="alert-count">{{ filteredAlerts.length }} alertas</span>
+        <h3 v-if="showTitle" id="alert-list-heading">Alertas</h3>
+        <span v-if="!showTitle" class="alert-count" aria-live="polite">{{ filteredAlerts.length }} alertas</span>
       </div>
       <div class="header-actions">
         <Button
@@ -20,7 +20,7 @@
     </div>
 
     <!-- Filtros -->
-    <div v-if="showFilters" class="filters-section">
+    <div v-if="showFilters" class="filters-section" role="search" aria-label="Filtros de alertas">
       <!-- Búsqueda -->
       <DsInput
         v-model="searchQuery"
@@ -39,6 +39,7 @@
           :label="sev.label"
           :severity="selectedSeverity === sev.value ? sev.severity : 'secondary'"
           :outlined="selectedSeverity !== sev.value"
+          :aria-pressed="selectedSeverity === sev.value"
           size="small"
           @click="selectSeverity(sev.value)"
         >
@@ -72,12 +73,12 @@
     </div>
 
     <!-- Lista de alertas -->
-    <div v-if="loading" class="list-loading">
+    <div v-if="loading" class="list-loading" role="status" aria-live="polite">
       <ProgressSpinner style="width: 30px; height: 30px" />
       <small>Cargando alertas...</small>
     </div>
 
-    <div v-else-if="filteredAlerts.length === 0" class="list-empty">
+    <div v-else-if="filteredAlerts.length === 0" class="list-empty" role="status">
       <i class="pi pi-check-circle empty-icon"></i>
       <p v-if="searchQuery || selectedSeverity !== 'all' || selectedCategory !== 'all' || selectedStatus !== 'all'">
         No se encontraron alertas con los filtros aplicados
@@ -99,11 +100,16 @@
       :item-size="compact ? 120 : 180"
       class="alerts-container alerts-virtual"
       :class="{ 'compact': compact }"
+      role="list"
+      aria-label="Alertas filtradas"
     >
       <template #item="{ item: alert, options }">
         <div
           :key="alert.id"
           class="alert-item"
+          role="listitem"
+          tabindex="0"
+          :aria-label="`${getSeverityLabel(alert.severity)}: ${alert.title}`"
           :class="[
             `alert-${alert.severity}`,
             { 'alert-selected': selectedAlertId === alert.id },
@@ -111,6 +117,7 @@
             { 'alert-odd': options.odd }
           ]"
           @click="onAlertClick(alert)"
+          @keydown.enter="onAlertClick(alert)"
         >
           <!-- Severidad indicator -->
           <div class="alert-severity-bar" :class="`severity-${alert.severity}`"></div>
@@ -196,17 +203,21 @@
     </VirtualScroller>
 
     <!-- Lista normal para pocos items o con paginación -->
-    <div v-else class="alerts-container" :class="{ 'compact': compact }">
+    <div v-else class="alerts-container" :class="{ 'compact': compact }" role="list" aria-label="Alertas filtradas">
       <div
         v-for="alert in paginatedAlerts"
         :key="alert.id"
         class="alert-item"
+        role="listitem"
+        tabindex="0"
+        :aria-label="`${getSeverityLabel(alert.severity)}: ${alert.title}`"
         :class="[
           `alert-${alert.severity}`,
           { 'alert-selected': selectedAlertId === alert.id },
           { 'alert-clickable': clickable }
         ]"
         @click="onAlertClick(alert)"
+        @keydown.enter="onAlertClick(alert)"
       >
         <!-- Severidad indicator -->
         <div class="alert-severity-bar" :class="`severity-${alert.severity}`"></div>

@@ -43,3 +43,5 @@ export { useDocumentTypeConfig } from './useDocumentTypeConfig'
 export type { DocumentTypeUIConfig } from './useDocumentTypeConfig'
 
 export { useAttributeLabels, getAttributeLabel } from './useAttributeLabels'
+
+export { ensureBackendReady } from './useBackendReady'

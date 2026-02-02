@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 
 export interface ModelStatus {
   installed: boolean
@@ -195,18 +196,9 @@ export const useSystemStore = defineStore('system', () => {
     modelsError.value = null
 
     try {
-      const response = await fetch(apiUrl('/api/models/status'))
-      if (response.ok) {
-        const data = await response.json()
-        if (data.success) {
-          modelsStatus.value = data.data
-          return data.data
-        } else {
-          modelsError.value = data.error || 'Error checking models'
-        }
-      } else {
-        modelsError.value = 'Failed to check models status'
-      }
+      const data = await api.get<ModelsStatus>('/api/models/status')
+      modelsStatus.value = data
+      return data
     } catch (error) {
       modelsError.value = error instanceof Error ? error.message : 'Network error'
     } finally {
@@ -220,30 +212,9 @@ export const useSystemStore = defineStore('system', () => {
     modelsError.value = null
 
     try {
-      const response = await fetch(apiUrl('/api/models/download'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ models, force })
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        if (data.success) {
-          // Start polling for status
-          pollModelsStatus()
-          return true
-        } else {
-          modelsError.value = data.error || 'Error starting download'
-        }
-      } else {
-        // Try to get error detail from response
-        try {
-          const errorData = await response.json()
-          modelsError.value = errorData.detail || `Failed to start model download (${response.status})`
-        } catch {
-          modelsError.value = `Failed to start model download (${response.status})`
-        }
-      }
+      await api.post('/api/models/download', { models, force })
+      pollModelsStatus()
+      return true
     } catch (error) {
       modelsError.value = error instanceof Error ? error.message : 'Network error'
     } finally {
@@ -290,14 +261,8 @@ export const useSystemStore = defineStore('system', () => {
 
     capabilitiesLoading.value = true
     try {
-      const response = await fetch(apiUrl('/api/system/capabilities'))
-      if (response.ok) {
-        const result = await response.json()
-        if (result.success && result.data) {
-          systemCapabilities.value = result.data
-          return result.data
-        }
-      }
+      systemCapabilities.value = await api.get<SystemCapabilities>('/api/system/capabilities')
+      return systemCapabilities.value
     } catch (error) {
       console.error('Error loading system capabilities:', error)
     } finally {
@@ -311,40 +276,17 @@ export const useSystemStore = defineStore('system', () => {
    * No muestra loading spinner, actualiza silenciosamente.
    */
   async function refreshCapabilities(): Promise<void> {
-    try {
-      const response = await fetch(apiUrl('/api/system/capabilities'))
-      if (response.ok) {
-        const result = await response.json()
-        if (result.success && result.data) {
-          systemCapabilities.value = result.data
-        }
-      }
-    } catch {
-      // Silent refresh, don't report errors
-    }
+    const data = await api.tryGet<SystemCapabilities>('/api/system/capabilities')
+    if (data) systemCapabilities.value = data
   }
 
   async function installDependencies(): Promise<boolean> {
     modelsError.value = null
-    
+
     try {
-      const response = await fetch(apiUrl('/api/dependencies/install'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      })
-      
-      if (response.ok) {
-        const data = await response.json()
-        if (data.success) {
-          // Start polling for status
-          pollModelsStatus()
-          return true
-        } else {
-          modelsError.value = data.error || 'Error installing dependencies'
-        }
-      } else {
-        modelsError.value = 'Failed to install dependencies'
-      }
+      await api.post('/api/dependencies/install')
+      pollModelsStatus()
+      return true
     } catch (error) {
       modelsError.value = error instanceof Error ? error.message : 'Network error'
     }
@@ -365,8 +307,7 @@ export const useSystemStore = defineStore('system', () => {
     let pollCount = 0
 
     try {
-      const resp = await fetch(apiUrl('/api/languagetool/install'), { method: 'POST' })
-      const result = await resp.json()
+      const result = await api.postRaw<{ success: boolean }>('/api/languagetool/install')
 
       if (!result.success) {
         ltInstalling.value = false
@@ -387,10 +328,7 @@ export const useSystemStore = defineStore('system', () => {
           }
 
           try {
-            const statusResp = await fetch(apiUrl('/api/languagetool/status'))
-            const statusResult = await statusResp.json()
-            const data = statusResult.data
-            const status = data?.status
+            const data = await api.get<{ status: string; install_progress?: LTInstallProgress }>('/api/languagetool/status')
 
             // Update progress if available
             if (data?.install_progress) {
@@ -398,7 +336,7 @@ export const useSystemStore = defineStore('system', () => {
             }
 
             // Wait for a definitive installed state
-            if (status === 'installed_not_running' || status === 'running') {
+            if (data?.status === 'installed_not_running' || data?.status === 'running') {
               stopLTPolling()
               // Refresh capabilities BEFORE clearing flag to avoid UI flash
               await refreshCapabilities()
@@ -423,7 +361,7 @@ export const useSystemStore = defineStore('system', () => {
   async function startLanguageTool(): Promise<boolean> {
     ltStarting.value = true
     try {
-      await fetch(apiUrl('/api/languagetool/start'), { method: 'POST' })
+      await api.postRaw('/api/languagetool/start')
       await new Promise(r => setTimeout(r, 2000))
       await refreshCapabilities()
       return true

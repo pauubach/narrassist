@@ -7,9 +7,8 @@
 
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
-import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 import type {
-  ApiResponse,
   VoiceProfile,
   VoiceProfilesResponse,
   RegisterAnalysis,
@@ -278,23 +277,14 @@ export const useVoiceAndStyleStore = defineStore('voiceAndStyle', () => {
     error.value = null
 
     try {
-      const response = await fetch(apiUrl(`/api/projects/${projectId}/voice-profiles`))
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-      }
-
-      const data: ApiResponse<{
+      const data = await api.get<{
         project_id: number
         profiles: ApiVoiceProfile[]
         stats: any
-      }> = await response.json()
+      }>(`/api/projects/${projectId}/voice-profiles`)
 
-      if (data.success && data.data) {
-        voiceProfiles.value[projectId] = (data.data.profiles || []).map(transformVoiceProfile)
-        return true
-      } else {
-        throw new Error(data.error || 'Error al cargar perfiles de voz')
-      }
+      voiceProfiles.value[projectId] = (data.profiles || []).map(transformVoiceProfile)
+      return true
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Error desconocido'
       console.error('Failed to fetch voice profiles:', err)
@@ -312,33 +302,22 @@ export const useVoiceAndStyleStore = defineStore('voiceAndStyle', () => {
     error.value = null
 
     try {
-      const response = await fetch(
-        apiUrl(`/api/projects/${projectId}/register-analysis?min_severity=${minSeverity}`)
-      )
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-      }
-
-      const data: ApiResponse<{
+      const data = await api.get<{
         project_id: number
         analyses: ApiRegisterAnalysis[]
         changes: ApiRegisterChange[]
         summary: any
         stats: any
         per_chapter: any[]
-      }> = await response.json()
+      }>(`/api/projects/${projectId}/register-analysis?min_severity=${minSeverity}`)
 
-      if (data.success && data.data) {
-        registerAnalyses.value[projectId] = {
-          analyses: (data.data.analyses || []).map(transformRegisterAnalysis),
-          changes: (data.data.changes || []).map(transformRegisterChange),
-          summary: data.data.summary || null,
-          perChapter: data.data.per_chapter || [],
-        }
-        return true
-      } else {
-        throw new Error(data.error || 'Error al cargar análisis de registro')
+      registerAnalyses.value[projectId] = {
+        analyses: (data.analyses || []).map(transformRegisterAnalysis),
+        changes: (data.changes || []).map(transformRegisterChange),
+        summary: data.summary || null,
+        perChapter: data.per_chapter || [],
       }
+      return true
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Error desconocido'
       console.error('Failed to fetch register analysis:', err)
@@ -357,29 +336,18 @@ export const useVoiceAndStyleStore = defineStore('voiceAndStyle', () => {
     error.value = null
 
     try {
-      const response = await fetch(
-        apiUrl(`/api/projects/${projectId}/chapters/${chapterNum}/dialogue-attributions`)
-      )
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-      }
-
-      const data: ApiResponse<{
+      const data = await api.get<{
         project_id: number
         chapter_number: number
         attributions: ApiDialogueAttribution[]
         stats: any
-      }> = await response.json()
+      }>(`/api/projects/${projectId}/chapters/${chapterNum}/dialogue-attributions`)
 
-      if (data.success && data.data) {
-        dialogueAttributions.value[key] = {
-          attributions: (data.data.attributions || []).map(transformDialogueAttribution),
-          stats: data.data.stats || null,
-        }
-        return true
-      } else {
-        throw new Error(data.error || 'Error al cargar atribución de diálogos')
+      dialogueAttributions.value[key] = {
+        attributions: (data.attributions || []).map(transformDialogueAttribution),
+        stats: data.stats || null,
       }
+      return true
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Error desconocido'
       console.error('Failed to fetch dialogue attributions:', err)
@@ -399,32 +367,21 @@ export const useVoiceAndStyleStore = defineStore('voiceAndStyle', () => {
     error.value = null
 
     try {
-      const response = await fetch(
-        apiUrl(`/api/projects/${projectId}/characters/${entityId}/knowledge?mode=${mode}`)
-      )
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-      }
-
-      const data: ApiResponse<{
+      const data = await api.get<{
         project_id: number
         entity_id: number
         entity_name: string
         knows_about_others: ApiKnowledgeFact[]
         others_know_about: ApiKnowledgeFact[]
         stats: any
-      }> = await response.json()
+      }>(`/api/projects/${projectId}/characters/${entityId}/knowledge?mode=${mode}`)
 
-      if (data.success && data.data) {
-        characterKnowledge.value[key] = {
-          knowsAboutOthers: (data.data.knows_about_others || []).map(transformKnowledgeFact),
-          othersKnowAbout: (data.data.others_know_about || []).map(transformKnowledgeFact),
-          stats: data.data.stats || {},
-        }
-        return true
-      } else {
-        throw new Error(data.error || 'Error al cargar conocimiento del personaje')
+      characterKnowledge.value[key] = {
+        knowsAboutOthers: (data.knows_about_others || []).map(transformKnowledgeFact),
+        othersKnowAbout: (data.others_know_about || []).map(transformKnowledgeFact),
+        stats: data.stats || {},
       }
+      return true
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Error desconocido'
       console.error('Failed to fetch character knowledge:', err)

@@ -2,7 +2,7 @@
  * Store para gestion de licencias
  */
 import { defineStore } from 'pinia'
-import { API_BASE } from '@/config/api'
+import { api } from '@/services/apiClient'
 import { ref, computed } from 'vue'
 
 // Tipos de licencia
@@ -99,16 +99,9 @@ export const useLicenseStore = defineStore('license', () => {
     error.value = null
 
     try {
-      const response = await fetch(`${API_BASE}/api/license/status`)
-      const result = await response.json()
-
-      if (result.success) {
-        licenseInfo.value = result.data
-      } else {
-        error.value = result.error || 'Error obteniendo estado de licencia'
-      }
+      licenseInfo.value = await api.get<LicenseInfo>('/api/license/status')
     } catch (e) {
-      error.value = 'No se pudo conectar con el servidor'
+      error.value = e instanceof Error ? e.message : 'No se pudo conectar con el servidor'
       console.error('Error fetching license status:', e)
     } finally {
       loading.value = false
@@ -120,23 +113,11 @@ export const useLicenseStore = defineStore('license', () => {
     error.value = null
 
     try {
-      const response = await fetch(`${API_BASE}/api/license/activate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ license_key: licenseKey }),
-      })
-
-      const result = await response.json()
-
-      if (result.success) {
-        await fetchLicenseStatus()
-        return true
-      } else {
-        error.value = result.error || 'Error activando licencia'
-        return false
-      }
+      await api.post('/api/license/activate', { license_key: licenseKey })
+      await fetchLicenseStatus()
+      return true
     } catch (e) {
-      error.value = 'No se pudo conectar con el servidor'
+      error.value = e instanceof Error ? e.message : 'Error activando licencia'
       console.error('Error activating license:', e)
       return false
     } finally {
@@ -149,21 +130,15 @@ export const useLicenseStore = defineStore('license', () => {
     error.value = null
 
     try {
-      const response = await fetch(`${API_BASE}/api/license/verify`, {
-        method: 'POST',
-      })
-
-      const result = await response.json()
-
-      if (result.success && result.data.valid) {
+      const data = await api.post<{ valid: boolean; message?: string }>('/api/license/verify')
+      if (data.valid) {
         await fetchLicenseStatus()
         return true
-      } else {
-        error.value = result.data?.message || result.error || 'Verificacion fallida'
-        return false
       }
+      error.value = data.message || 'Verificacion fallida'
+      return false
     } catch (e) {
-      error.value = 'No se pudo conectar con el servidor'
+      error.value = e instanceof Error ? e.message : 'Verificacion fallida'
       console.error('Error verifying license:', e)
       return false
     } finally {
@@ -173,12 +148,8 @@ export const useLicenseStore = defineStore('license', () => {
 
   async function fetchDevices() {
     try {
-      const response = await fetch(`${API_BASE}/api/license/devices`)
-      const result = await response.json()
-
-      if (result.success) {
-        devices.value = result.data.devices || []
-      }
+      const data = await api.get<{ devices: DeviceInfo[] }>('/api/license/devices')
+      devices.value = data.devices || []
     } catch (e) {
       console.error('Error fetching devices:', e)
     }
@@ -189,23 +160,11 @@ export const useLicenseStore = defineStore('license', () => {
     error.value = null
 
     try {
-      const response = await fetch(`${API_BASE}/api/license/devices/deactivate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ device_fingerprint: fingerprint }),
-      })
-
-      const result = await response.json()
-
-      if (result.success) {
-        await fetchDevices()
-        return true
-      } else {
-        error.value = result.error || 'Error desactivando dispositivo'
-        return false
-      }
+      await api.post('/api/license/devices/deactivate', { device_fingerprint: fingerprint })
+      await fetchDevices()
+      return true
     } catch (e) {
-      error.value = 'No se pudo conectar con el servidor'
+      error.value = e instanceof Error ? e.message : 'Error desactivando dispositivo'
       console.error('Error deactivating device:', e)
       return false
     } finally {
@@ -215,12 +174,7 @@ export const useLicenseStore = defineStore('license', () => {
 
   async function fetchUsage() {
     try {
-      const response = await fetch(`${API_BASE}/api/license/usage`)
-      const result = await response.json()
-
-      if (result.success) {
-        usage.value = result.data
-      }
+      usage.value = await api.get<UsageInfo>('/api/license/usage')
     } catch (e) {
       console.error('Error fetching usage:', e)
     }
@@ -228,10 +182,8 @@ export const useLicenseStore = defineStore('license', () => {
 
   async function checkModuleAccess(moduleName: LicenseModule): Promise<boolean> {
     try {
-      const response = await fetch(`${API_BASE}/api/license/check-module/${moduleName}`)
-      const result = await response.json()
-
-      return result.success && result.data?.has_access === true
+      const data = await api.get<{ has_access: boolean }>(`/api/license/check-module/${moduleName}`)
+      return data.has_access === true
     } catch (e) {
       console.error('Error checking module access:', e)
       return false
@@ -240,21 +192,13 @@ export const useLicenseStore = defineStore('license', () => {
 
   async function recordManuscriptUsage(projectId: number): Promise<boolean> {
     try {
-      const response = await fetch(`${API_BASE}/api/license/record-manuscript`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ project_id: projectId }),
-      })
-
-      const result = await response.json()
-
-      if (result.success && result.data?.allowed) {
+      const data = await api.post<{ allowed: boolean }>('/api/license/record-manuscript', { project_id: projectId })
+      if (data.allowed) {
         await fetchLicenseStatus()
         return true
-      } else {
-        error.value = result.error || 'Cuota de manuscritos excedida'
-        return false
       }
+      error.value = 'Cuota de manuscritos excedida'
+      return false
     } catch (e) {
       console.error('Error recording manuscript usage:', e)
       return true // Permitir en modo desarrollo si no hay conexion

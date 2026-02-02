@@ -81,7 +81,7 @@
   --ds-warning-50: #FEFCE8;
   --ds-warning-100: #FEF9C3;
   --ds-warning-500: #EAB308;
-  --ds-warning-600: #CA8A04;
+  --ds-warning-600: #A67304;
   --ds-warning-700: #A16207;
 
   /* Error/Danger */
@@ -110,8 +110,8 @@
   --ds-entity-organization: #1565C0;
   --ds-entity-organization-bg: rgba(21, 101, 192, 0.12);
 
-  --ds-entity-object: #F57C00;
-  --ds-entity-object-bg: rgba(245, 124, 0, 0.12);
+  --ds-entity-object: #D46200;
+  --ds-entity-object-bg: rgba(212, 98, 0, 0.12);
 
   --ds-entity-event: #8E24AA;
   --ds-entity-event-bg: rgba(142, 36, 170, 0.12);
@@ -143,8 +143,8 @@
   --ds-entity-concept: #5C6BC0;
   --ds-entity-concept-bg: rgba(92, 107, 192, 0.12);
 
-  --ds-entity-religion: #FF8F00;
-  --ds-entity-religion-bg: rgba(255, 143, 0, 0.12);
+  --ds-entity-religion: #C47400;
+  --ds-entity-religion-bg: rgba(196, 116, 0, 0.12);
 
   --ds-entity-magic-system: #C2185B;
   --ds-entity-magic-system-bg: rgba(194, 24, 91, 0.12);
@@ -168,11 +168,11 @@
   --ds-alert-critical-bg: #FFEBEE;
   --ds-alert-critical-border: #F44336;
 
-  --ds-alert-high: #F57C00;
+  --ds-alert-high: #D46200;
   --ds-alert-high-bg: #FFF3E0;
   --ds-alert-high-border: #FF9800;
 
-  --ds-alert-medium: #F9A825;
+  --ds-alert-medium: #9E7C00;
   --ds-alert-medium-bg: #FFFDE7;
   --ds-alert-medium-border: #FFEB3B;
   --ds-alert-medium-text: #8D6E00;

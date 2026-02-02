@@ -1,6 +1,6 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
-import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 
 export interface AnalysisProgress {
   project_id: number
@@ -177,29 +177,15 @@ export const useAnalysisStore = defineStore('analysis', () => {
         formData.append('file', file)
       }
 
-      const response = await fetch(apiUrl(`/api/projects/${projectId}/analyze`), {
-        method: 'POST',
-        body: formData
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`)
+      await api.postForm(`/api/projects/${projectId}/analyze`, formData)
+      currentAnalysis.value = {
+        project_id: projectId,
+        status: 'running',
+        progress: 0,
+        current_phase: 'Iniciando...',
+        phases: []
       }
-
-      const data = await response.json()
-      if (data.success) {
-        currentAnalysis.value = {
-          project_id: projectId,
-          status: 'running',
-          progress: 0,
-          current_phase: 'Iniciando...',
-          phases: []
-        }
-        return true
-      } else {
-        throw new Error(data.error || 'Error iniciando análisis')
-      }
+      return true
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Error desconocido'
       isAnalyzing.value = false
@@ -210,42 +196,33 @@ export const useAnalysisStore = defineStore('analysis', () => {
 
   async function getProgress(projectId: number) {
     try {
-      const response = await fetch(apiUrl(`/api/projects/${projectId}/analysis/progress`))
+      const progressData = await api.get<AnalysisProgress>(`/api/projects/${projectId}/analysis/progress`)
+      currentAnalysis.value = progressData
 
-      if (!response.ok) {
-        throw new Error('Error obteniendo progreso')
-      }
-
-      const data = await response.json()
-      if (data.success && data.data) {
-        currentAnalysis.value = data.data
-
-        // Actualizar executedPhases progresivamente según fases completadas
-        // Esto permite que las tabs se muestren sin esperar al final del análisis
-        if (data.data.phases && Array.isArray(data.data.phases)) {
-          if (!executedPhases.value[projectId]) {
-            executedPhases.value[projectId] = {}
-          }
-          for (const phase of data.data.phases) {
-            if (phase.completed) {
-              const frontendKey = BACKEND_PHASE_TO_FRONTEND[phase.id]
-              if (frontendKey) {
-                executedPhases.value[projectId][frontendKey] = true
-              }
+      // Actualizar executedPhases progresivamente según fases completadas
+      if (progressData.phases && Array.isArray(progressData.phases)) {
+        if (!executedPhases.value[projectId]) {
+          executedPhases.value[projectId] = {}
+        }
+        for (const phase of progressData.phases) {
+          if (phase.completed) {
+            const frontendKey = BACKEND_PHASE_TO_FRONTEND[phase.id]
+            if (frontendKey) {
+              executedPhases.value[projectId][frontendKey] = true
             }
           }
         }
-
-        // Actualizar estado
-        if (data.data.status === 'completed' || data.data.progress >= 100) {
-          isAnalyzing.value = false
-        } else if (data.data.status === 'error' || data.data.status === 'failed') {
-          isAnalyzing.value = false
-          error.value = data.data.error || 'Análisis fallido'
-        }
-
-        return data.data
       }
+
+      // Actualizar estado
+      if (progressData.status === 'completed' || progressData.progress >= 100) {
+        isAnalyzing.value = false
+      } else if (progressData.status === 'error' || progressData.status === 'failed') {
+        isAnalyzing.value = false
+        error.value = progressData.error || 'Análisis fallido'
+      }
+
+      return progressData
     } catch (err) {
       console.error('Error fetching progress:', err)
       return null
@@ -289,28 +266,16 @@ export const useAnalysisStore = defineStore('analysis', () => {
    */
   async function checkAnalysisStatus(projectId: number): Promise<boolean> {
     try {
-      const response = await fetch(apiUrl(`/api/projects/${projectId}/analysis/progress`))
-      if (!response.ok) {
-        // No hay análisis en curso, limpiar estado
-        clearAnalysis()
-        return false
+      const progressData = await api.get<AnalysisProgress>(`/api/projects/${projectId}/analysis/progress`)
+      const status = progressData.status
+      if (status === 'running' || status === 'pending') {
+        currentAnalysis.value = progressData
+        isAnalyzing.value = true
+        return true
       }
-
-      const data = await response.json()
-      if (data.success && data.data) {
-        const status = data.data.status
-        if (status === 'running' || status === 'pending') {
-          currentAnalysis.value = data.data
-          isAnalyzing.value = true
-          return true
-        }
-      }
-      // No hay análisis activo, limpiar estado previo si lo hay
       clearAnalysis()
       return false
-    } catch (err) {
-      console.error('Error checking analysis status:', err)
-      // En caso de error, asumir que no hay análisis
+    } catch {
       clearAnalysis()
       return false
     }
@@ -325,18 +290,13 @@ export const useAnalysisStore = defineStore('analysis', () => {
    */
   async function loadExecutedPhases(projectId: number): Promise<Partial<ExecutedPhases> | null> {
     try {
-      const response = await fetch(apiUrl(`/api/projects/${projectId}/analysis-status`))
-      if (!response.ok) {
-        return null
-      }
-      const data = await response.json()
-      if (data.success && data.data?.executed) {
-        executedPhases.value[projectId] = data.data.executed
-        return data.data.executed
+      const data = await api.get<{ executed: Partial<ExecutedPhases> }>(`/api/projects/${projectId}/analysis-status`)
+      if (data?.executed) {
+        executedPhases.value[projectId] = data.executed
+        return data.executed
       }
       return null
-    } catch (err) {
-      console.error('Error loading executed phases:', err)
+    } catch {
       return null
     }
   }
@@ -391,24 +351,9 @@ export const useAnalysisStore = defineStore('analysis', () => {
     error.value = null
 
     try {
-      const response = await fetch(apiUrl(`/api/projects/${projectId}/analyze`), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phases, force })
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.detail || `HTTP ${response.status}`)
-      }
-
-      const data = await response.json()
-      if (data.success) {
-        // Actualizar fases ejecutadas
-        await loadExecutedPhases(projectId)
-        return true
-      }
-      throw new Error(data.error || 'Error ejecutando análisis')
+      await api.post(`/api/projects/${projectId}/analyze`, { phases, force })
+      await loadExecutedPhases(projectId)
+      return true
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Error desconocido'
       console.error('Error in partial analysis:', err)

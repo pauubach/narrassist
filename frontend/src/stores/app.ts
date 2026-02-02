@@ -1,7 +1,7 @@
 import { ref, computed, watch, onUnmounted } from 'vue'
 import { defineStore } from 'pinia'
 import type { ThemeMode } from '@/types'
-import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 
 // Tauri imports (only available in Tauri environment)
 let tauriListen: ((event: string, handler: (event: { payload: unknown }) => void) => Promise<() => void>) | null = null
@@ -75,12 +75,7 @@ export const useAppStore = defineStore('app', () => {
     error.value = null
 
     try {
-      const response = await fetch(apiUrl('/api/health'))
-      if (!response.ok) {
-        throw new Error(`Backend returned ${response.status}`)
-      }
-
-      const data = await response.json()
+      const data = await api.getRaw<{ status: string; version?: string }>('/api/health')
       backendConnected.value = true
       backendVersion.value = data.version || null
       backendError.value = null

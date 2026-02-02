@@ -304,15 +304,16 @@ function handleNavigateFromSequential(source?: AlertSource) {
 </script>
 
 <template>
-  <div class="alerts-tab">
+  <div class="alerts-tab" role="region" aria-label="Gestión de alertas">
     <!-- Toolbar de filtros -->
-    <div class="alerts-toolbar">
+    <div class="alerts-toolbar" role="search" aria-label="Filtros de alertas">
       <div class="toolbar-row">
         <span class="p-input-icon-right search-wrapper">
           <InputText
             v-model="searchQuery"
             placeholder="Buscar alertas..."
             class="search-input"
+            aria-label="Buscar alertas"
           />
           <i class="pi pi-search" />
         </span>
@@ -378,7 +379,7 @@ function handleNavigateFromSequential(source?: AlertSource) {
 
         <div class="toolbar-spacer"></div>
 
-        <span class="results-count">
+        <span class="results-count" aria-live="polite" role="status">
           {{ stats.filtered }} de {{ stats.total }} alertas
           <span v-if="stats.active > 0" class="active-count">
             ({{ stats.active }} activas)
@@ -433,7 +434,7 @@ function handleNavigateFromSequential(source?: AlertSource) {
     </div>
 
     <!-- Estadísticas rápidas -->
-    <div class="alerts-stats">
+    <div class="alerts-stats" role="group" aria-label="Estadísticas por severidad">
       <div
         v-for="severity in ['critical', 'high', 'medium', 'low', 'info']"
         :key="severity"
@@ -450,7 +451,7 @@ function handleNavigateFromSequential(source?: AlertSource) {
     </div>
 
     <!-- Lista de alertas -->
-    <div class="alerts-list">
+    <div class="alerts-list" role="list" aria-label="Lista de alertas">
       <DsEmptyState
         v-if="filteredAlerts.length === 0 && !loading"
         :icon="analysisExecuted ? 'pi pi-check-circle' : 'pi pi-clock'"
@@ -466,8 +467,12 @@ function handleNavigateFromSequential(source?: AlertSource) {
         v-for="alert in filteredAlerts"
         :key="alert.id"
         class="alert-item"
+        role="listitem"
+        tabindex="0"
         :class="`alert-${alert.severity}`"
+        :aria-label="`${getSeverityLabel(alert.severity)}: ${alert.title}`"
         @click="handleAlertClick(alert)"
+        @keydown.enter="handleAlertClick(alert)"
       >
         <div class="alert-header">
           <DsBadge :severity="alert.severity" size="sm">
