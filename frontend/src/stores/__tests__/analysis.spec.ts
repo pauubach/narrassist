@@ -55,7 +55,7 @@ describe('analysisStore', () => {
 
       const result = await store.getProgress(1)
 
-      expect(mockFetch).toHaveBeenCalledWith('/api/projects/1/analysis/progress')
+      expect(mockFetch).toHaveBeenCalledWith('/api/projects/1/analysis/progress', expect.objectContaining({ method: 'GET' }))
       expect(result).toEqual(mockProgressData)
       expect(store.currentAnalysis).toEqual(mockProgressData)
     })

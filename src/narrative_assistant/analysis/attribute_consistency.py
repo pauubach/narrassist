@@ -634,8 +634,8 @@ class AttributeConsistencyChecker:
         elif len(name2) > len(name1):
             return name2
         else:
-            # Misma longitud, usar el normalizado
-            return normalized_key
+            # Misma longitud, usar el primer nombre original (preserva casing)
+            return name1
 
     def check_consistency(
         self,

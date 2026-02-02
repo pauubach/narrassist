@@ -4,7 +4,7 @@ import { api } from '@/services/apiClient'
 
 export interface AnalysisProgress {
   project_id: number
-  status: 'pending' | 'running' | 'completed' | 'failed'
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'error' | 'idle'
   progress: number
   current_phase: string
   current_action?: string

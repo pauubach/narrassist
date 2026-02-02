@@ -95,7 +95,7 @@ const configByType: Record<DocumentType, DocumentTypeUIConfig> = {
     },
     tabLabels: {
       text: 'Texto',
-      entities: 'Entidades',
+      entities: 'Conceptos',
       relations: 'Relaciones',
       timeline: 'Línea temporal',
       alerts: 'Alertas',
@@ -161,7 +161,7 @@ const configByType: Record<DocumentType, DocumentTypeUIConfig> = {
     },
     tabLabels: {
       text: 'Texto',
-      entities: 'Entidades',
+      entities: 'Personas',
       relations: 'Relaciones',
       timeline: 'Cronología',
       alerts: 'Alertas',
@@ -425,7 +425,7 @@ const configByType: Record<DocumentType, DocumentTypeUIConfig> = {
     },
     tabLabels: {
       text: 'Texto',
-      entities: 'Entidades',
+      entities: 'Términos',
       relations: 'Relaciones',
       timeline: 'Línea temporal',
       alerts: 'Alertas',
@@ -458,7 +458,7 @@ const configByType: Record<DocumentType, DocumentTypeUIConfig> = {
     },
     tabLabels: {
       text: 'Recetas',
-      entities: 'Entidades',
+      entities: 'Ingredientes',
       relations: 'Relaciones',
       timeline: 'Línea temporal',
       alerts: 'Alertas',
