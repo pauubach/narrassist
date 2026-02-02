@@ -171,7 +171,10 @@ async fn backend_watchdog(app_handle: AppHandle) {
 
         // Backend is down - attempt restart
         if restart_count >= MAX_RESTARTS {
-            eprintln!("[Watchdog] Max restarts ({}) reached, giving up", MAX_RESTARTS);
+            eprintln!(
+                "[Watchdog] Max restarts ({}) reached, giving up",
+                MAX_RESTARTS
+            );
             let _ = app_handle.emit(
                 "backend-status",
                 serde_json::json!({
@@ -182,7 +185,11 @@ async fn backend_watchdog(app_handle: AppHandle) {
             break;
         }
 
-        println!("[Watchdog] Attempting backend restart ({}/{})", restart_count + 1, MAX_RESTARTS);
+        println!(
+            "[Watchdog] Attempting backend restart ({}/{})",
+            restart_count + 1,
+            MAX_RESTARTS
+        );
 
         // Notify frontend
         let _ = app_handle.emit(
@@ -404,7 +411,10 @@ fn spawn_embedded_backend(app: &AppHandle) -> Result<Child, String> {
     // En macOS, PYTHONHOME debe apuntar a Python.framework/Versions/3.12
     // En Windows, apunta al directorio python-embed directamente
     #[cfg(target_os = "macos")]
-    let python_home = python_dir.join("Python.framework").join("Versions").join("3.12");
+    let python_home = python_dir
+        .join("Python.framework")
+        .join("Versions")
+        .join("3.12");
     #[cfg(not(target_os = "macos"))]
     let python_home = python_dir.clone();
 

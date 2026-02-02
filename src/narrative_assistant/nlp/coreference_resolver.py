@@ -1328,6 +1328,13 @@ class CoreferenceVotingResolver:
         zero_mentions = self._extract_zero_mentions(doc, text, get_sentence_idx, get_chapter_idx)
         mentions.extend(zero_mentions)
 
+        n_total = len(mentions)
+        n_zero = len(zero_mentions)
+        logger.info(
+            "Menciones extraídas: %d total, %d ZERO/pro-drop (%.0f%%)",
+            n_total, n_zero, (n_zero / n_total * 100) if n_total else 0,
+        )
+
         # Ordenar por posición
         mentions.sort(key=lambda m: m.start_char)
 

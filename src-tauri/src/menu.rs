@@ -79,14 +79,50 @@ pub const ALL_MENU_IDS: &[&str] = &[
 /// Crea el menu principal de la aplicacion
 pub fn create_menu(app: &AppHandle) -> Result<Menu<Wry>, tauri::Error> {
     // Menu Archivo
-    let new_project = MenuItem::with_id(app, file_menu::NEW_PROJECT, "Nuevo proyecto...", true, Some("CmdOrCtrl+N"))?;
-    let open_project = MenuItem::with_id(app, file_menu::OPEN_PROJECT, "Abrir proyecto...", true, Some("CmdOrCtrl+O"))?;
-    let close_project = MenuItem::with_id(app, file_menu::CLOSE_PROJECT, "Cerrar proyecto", true, Some("CmdOrCtrl+W"))?;
+    let new_project = MenuItem::with_id(
+        app,
+        file_menu::NEW_PROJECT,
+        "Nuevo proyecto...",
+        true,
+        Some("CmdOrCtrl+N"),
+    )?;
+    let open_project = MenuItem::with_id(
+        app,
+        file_menu::OPEN_PROJECT,
+        "Abrir proyecto...",
+        true,
+        Some("CmdOrCtrl+O"),
+    )?;
+    let close_project = MenuItem::with_id(
+        app,
+        file_menu::CLOSE_PROJECT,
+        "Cerrar proyecto",
+        true,
+        Some("CmdOrCtrl+W"),
+    )?;
     let separator1 = PredefinedMenuItem::separator(app)?;
-    let import = MenuItem::with_id(app, file_menu::IMPORT, "Importar manuscrito...", true, Some("CmdOrCtrl+I"))?;
-    let export = MenuItem::with_id(app, file_menu::EXPORT, "Exportar informe...", true, Some("CmdOrCtrl+E"))?;
+    let import = MenuItem::with_id(
+        app,
+        file_menu::IMPORT,
+        "Importar manuscrito...",
+        true,
+        Some("CmdOrCtrl+I"),
+    )?;
+    let export = MenuItem::with_id(
+        app,
+        file_menu::EXPORT,
+        "Exportar informe...",
+        true,
+        Some("CmdOrCtrl+E"),
+    )?;
     let separator2 = PredefinedMenuItem::separator(app)?;
-    let settings = MenuItem::with_id(app, file_menu::SETTINGS, "Configuracion...", true, Some("CmdOrCtrl+,"))?;
+    let settings = MenuItem::with_id(
+        app,
+        file_menu::SETTINGS,
+        "Configuracion...",
+        true,
+        Some("CmdOrCtrl+,"),
+    )?;
     let separator3 = PredefinedMenuItem::separator(app)?;
     let quit = PredefinedMenuItem::quit(app, Some("Salir"))?;
 
@@ -121,26 +157,55 @@ pub fn create_menu(app: &AppHandle) -> Result<Menu<Wry>, tauri::Error> {
         app,
         "Edicion",
         true,
-        &[
-            &undo,
-            &redo,
-            &separator4,
-            &cut,
-            &copy,
-            &paste,
-            &select_all,
-        ],
+        &[&undo, &redo, &separator4, &cut, &copy, &paste, &select_all],
     )?;
 
     // Menu Ver
-    let view_chapters = MenuItem::with_id(app, view_menu::CHAPTERS, "Capitulos", true, Some("CmdOrCtrl+1"))?;
-    let view_entities = MenuItem::with_id(app, view_menu::ENTITIES, "Entidades", true, Some("CmdOrCtrl+2"))?;
-    let view_alerts = MenuItem::with_id(app, view_menu::ALERTS, "Alertas", true, Some("CmdOrCtrl+3"))?;
-    let view_relationships = MenuItem::with_id(app, view_menu::RELATIONSHIPS, "Relaciones", true, Some("CmdOrCtrl+4"))?;
-    let view_timeline = MenuItem::with_id(app, view_menu::TIMELINE, "Linea temporal", true, Some("CmdOrCtrl+5"))?;
+    let view_chapters = MenuItem::with_id(
+        app,
+        view_menu::CHAPTERS,
+        "Capitulos",
+        true,
+        Some("CmdOrCtrl+1"),
+    )?;
+    let view_entities = MenuItem::with_id(
+        app,
+        view_menu::ENTITIES,
+        "Entidades",
+        true,
+        Some("CmdOrCtrl+2"),
+    )?;
+    let view_alerts =
+        MenuItem::with_id(app, view_menu::ALERTS, "Alertas", true, Some("CmdOrCtrl+3"))?;
+    let view_relationships = MenuItem::with_id(
+        app,
+        view_menu::RELATIONSHIPS,
+        "Relaciones",
+        true,
+        Some("CmdOrCtrl+4"),
+    )?;
+    let view_timeline = MenuItem::with_id(
+        app,
+        view_menu::TIMELINE,
+        "Linea temporal",
+        true,
+        Some("CmdOrCtrl+5"),
+    )?;
     let separator5 = PredefinedMenuItem::separator(app)?;
-    let toggle_inspector = MenuItem::with_id(app, view_menu::TOGGLE_INSPECTOR, "Mostrar/ocultar inspector", true, Some("CmdOrCtrl+Shift+I"))?;
-    let toggle_sidebar = MenuItem::with_id(app, view_menu::TOGGLE_SIDEBAR, "Mostrar/ocultar sidebar", true, Some("CmdOrCtrl+B"))?;
+    let toggle_inspector = MenuItem::with_id(
+        app,
+        view_menu::TOGGLE_INSPECTOR,
+        "Mostrar/ocultar inspector",
+        true,
+        Some("CmdOrCtrl+Shift+I"),
+    )?;
+    let toggle_sidebar = MenuItem::with_id(
+        app,
+        view_menu::TOGGLE_SIDEBAR,
+        "Mostrar/ocultar sidebar",
+        true,
+        Some("CmdOrCtrl+B"),
+    )?;
     let separator6 = PredefinedMenuItem::separator(app)?;
     let fullscreen = PredefinedMenuItem::fullscreen(app, Some("Pantalla completa"))?;
 
@@ -163,13 +228,49 @@ pub fn create_menu(app: &AppHandle) -> Result<Menu<Wry>, tauri::Error> {
     )?;
 
     // Menu Analisis
-    let run_analysis = MenuItem::with_id(app, analysis_menu::RUN, "Ejecutar analisis", true, Some("CmdOrCtrl+R"))?;
-    let pause_analysis = MenuItem::with_id(app, analysis_menu::PAUSE, "Pausar analisis", true, None::<&str>)?;
+    let run_analysis = MenuItem::with_id(
+        app,
+        analysis_menu::RUN,
+        "Ejecutar analisis",
+        true,
+        Some("CmdOrCtrl+R"),
+    )?;
+    let pause_analysis = MenuItem::with_id(
+        app,
+        analysis_menu::PAUSE,
+        "Pausar analisis",
+        true,
+        None::<&str>,
+    )?;
     let separator7 = PredefinedMenuItem::separator(app)?;
-    let analyze_structure = MenuItem::with_id(app, analysis_menu::STRUCTURE, "Analizar estructura", true, None::<&str>)?;
-    let analyze_entities = MenuItem::with_id(app, analysis_menu::ENTITIES, "Analizar entidades", true, None::<&str>)?;
-    let analyze_consistency = MenuItem::with_id(app, analysis_menu::CONSISTENCY, "Analizar consistencia", true, None::<&str>)?;
-    let analyze_style = MenuItem::with_id(app, analysis_menu::STYLE, "Analizar estilo", true, None::<&str>)?;
+    let analyze_structure = MenuItem::with_id(
+        app,
+        analysis_menu::STRUCTURE,
+        "Analizar estructura",
+        true,
+        None::<&str>,
+    )?;
+    let analyze_entities = MenuItem::with_id(
+        app,
+        analysis_menu::ENTITIES,
+        "Analizar entidades",
+        true,
+        None::<&str>,
+    )?;
+    let analyze_consistency = MenuItem::with_id(
+        app,
+        analysis_menu::CONSISTENCY,
+        "Analizar consistencia",
+        true,
+        None::<&str>,
+    )?;
+    let analyze_style = MenuItem::with_id(
+        app,
+        analysis_menu::STYLE,
+        "Analizar estilo",
+        true,
+        None::<&str>,
+    )?;
 
     let analysis_submenu = Submenu::with_items(
         app,
@@ -187,11 +288,35 @@ pub fn create_menu(app: &AppHandle) -> Result<Menu<Wry>, tauri::Error> {
     )?;
 
     // Menu Ayuda
-    let tutorial = MenuItem::with_id(app, help_menu::TUTORIAL, "Tutorial de bienvenida", true, None::<&str>)?;
-    let keyboard_shortcuts = MenuItem::with_id(app, help_menu::KEYBOARD_SHORTCUTS, "Atajos de teclado", true, Some("CmdOrCtrl+/"))?;
+    let tutorial = MenuItem::with_id(
+        app,
+        help_menu::TUTORIAL,
+        "Tutorial de bienvenida",
+        true,
+        None::<&str>,
+    )?;
+    let keyboard_shortcuts = MenuItem::with_id(
+        app,
+        help_menu::KEYBOARD_SHORTCUTS,
+        "Atajos de teclado",
+        true,
+        Some("CmdOrCtrl+/"),
+    )?;
     let separator8 = PredefinedMenuItem::separator(app)?;
-    let check_updates = MenuItem::with_id(app, help_menu::CHECK_UPDATES, "Buscar actualizaciones...", true, None::<&str>)?;
-    let about = MenuItem::with_id(app, help_menu::ABOUT, "Acerca de Narrative Assistant", true, None::<&str>)?;
+    let check_updates = MenuItem::with_id(
+        app,
+        help_menu::CHECK_UPDATES,
+        "Buscar actualizaciones...",
+        true,
+        None::<&str>,
+    )?;
+    let about = MenuItem::with_id(
+        app,
+        help_menu::ABOUT,
+        "Acerca de Narrative Assistant",
+        true,
+        None::<&str>,
+    )?;
 
     let help_submenu = Submenu::with_items(
         app,
@@ -244,11 +369,7 @@ mod tests {
     fn menu_ids_are_unique() {
         let mut seen = HashSet::new();
         for id in ALL_MENU_IDS {
-            assert!(
-                seen.insert(*id),
-                "ID de menu duplicado: '{}'",
-                id
-            );
+            assert!(seen.insert(*id), "ID de menu duplicado: '{}'", id);
         }
     }
 
@@ -257,11 +378,7 @@ mod tests {
     fn menu_ids_are_valid_identifiers() {
         for id in ALL_MENU_IDS {
             assert!(!id.is_empty(), "ID de menu vacio encontrado");
-            assert!(
-                !id.contains(' '),
-                "ID de menu '{}' contiene espacios",
-                id
-            );
+            assert!(!id.contains(' '), "ID de menu '{}' contiene espacios", id);
             assert!(
                 id.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'),
                 "ID de menu '{}' contiene caracteres invalidos (solo a-z, 0-9, _)",

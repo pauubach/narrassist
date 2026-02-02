@@ -404,3 +404,32 @@ class TestRobustnessGeneralization:
         )
         names = get_per_names(text)
         assert "alejandro" in names
+
+
+# ============================================================================
+# 6. Normalizacion: variantes ortograficas → misma entidad
+# ============================================================================
+
+class TestNormalizationGeneralization:
+    """
+    Verifica que _normalize_key consolida variantes de acentuacion
+    en una sola clave, sin overfitting a nombres concretos.
+    """
+
+    def test_normalize_key_strips_diacritics(self):
+        """Variantes con/sin tilde producen la misma clave."""
+        from narrative_assistant.pipelines.unified_analysis import _normalize_key
+
+        assert _normalize_key("María") == _normalize_key("Maria")
+        assert _normalize_key("María") == _normalize_key("Mária")
+        assert _normalize_key("Andrés") == _normalize_key("Andres")
+        assert _normalize_key("García") == _normalize_key("Garcia")
+        assert _normalize_key("  José  ") == _normalize_key("jose")
+
+    def test_normalize_key_preserves_distinction(self):
+        """Nombres distintos NO deben colisionar."""
+        from narrative_assistant.pipelines.unified_analysis import _normalize_key
+
+        assert _normalize_key("María") != _normalize_key("Marta")
+        assert _normalize_key("Pedro") != _normalize_key("Pablo")
+        assert _normalize_key("Ana") != _normalize_key("Andrea")
