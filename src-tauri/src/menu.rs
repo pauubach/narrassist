@@ -347,13 +347,29 @@ pub fn create_menu(app: &AppHandle) -> Result<Menu<Wry>, tauri::Error> {
 
 /// Maneja los eventos del menu
 pub fn handle_menu_event(app: &AppHandle, event_id: &str) {
-    // Emitir evento al frontend
-    if let Some(window) = app.get_webview_window("main") {
-        let _ = window.emit("menu-event", event_id);
-    }
+    println!("[Menu] Event received: '{}' (len={})", event_id, event_id.len());
 
-    // Log para debugging
-    println!("[Menu] Event: {}", event_id);
+    // Intentar emitir al frontend via la ventana principal
+    match app.get_webview_window("main") {
+        Some(window) => {
+            match window.emit("menu-event", event_id) {
+                Ok(_) => println!("[Menu] Emitted to window 'main' OK"),
+                Err(e) => {
+                    println!("[Menu] emit to window failed: {e}, trying app.emit()");
+                    if let Err(e2) = app.emit("menu-event", event_id) {
+                        println!("[Menu] app.emit() also failed: {e2}");
+                    }
+                }
+            }
+        }
+        None => {
+            // Fallback: emitir a todas las ventanas via AppHandle
+            println!("[Menu] Window 'main' not found, using app.emit()");
+            if let Err(e) = app.emit("menu-event", event_id) {
+                println!("[Menu] app.emit() failed: {e}");
+            }
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------

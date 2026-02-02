@@ -17,6 +17,7 @@ import stat
 import subprocess
 import threading
 import time
+import urllib.error
 import urllib.request
 import zipfile
 from dataclasses import dataclass, field
@@ -571,13 +572,24 @@ class LanguageToolInstaller:
     ) -> bool:
         """Descargar archivo con progreso reportado al callback."""
         try:
+            import ssl
+
             headers = {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
                 "Accept": "application/octet-stream,*/*",
             }
             req = urllib.request.Request(url, headers=headers)
 
-            with urllib.request.urlopen(req, timeout=300) as response:
+            # Crear contexto SSL con fallback para entornos embebidos
+            try:
+                ssl_ctx = ssl.create_default_context()
+            except Exception:
+                ssl_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+                ssl_ctx.check_hostname = False
+                ssl_ctx.verify_mode = ssl.CERT_NONE
+                logger.warning("Usando SSL sin verificación de certificados")
+
+            with urllib.request.urlopen(req, timeout=300, context=ssl_ctx) as response:
                 total_size = int(response.headers.get("Content-Length", 0))
                 block_size = 8192
                 downloaded = 0
@@ -602,8 +614,16 @@ class LanguageToolInstaller:
 
             return True
 
+        except urllib.error.URLError as e:
+            reason = str(getattr(e, "reason", e))
+            logger.warning(f"Error de red descargando {url}: {reason}")
+            self._report(phase, label, pct_start, f"Error de red: {reason}")
+            if dest.exists():
+                dest.unlink()
+            return False
         except Exception as e:
             logger.warning(f"Error descargando {url}: {e}")
+            self._report(phase, label, pct_start, f"Error: {e}")
             if dest.exists():
                 dest.unlink()
             return False

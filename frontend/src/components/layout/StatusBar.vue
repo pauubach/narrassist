@@ -184,7 +184,10 @@ const analysisStatus = computed(() => {
 
   // Si hay error (del store o del prop)
   if (analysisStore.error || props.analysisError) {
-    return { icon: 'pi-times-circle', text: 'Error en análisis', class: 'status-error' }
+    const detail = analysisStore.error
+      ? `Error en análisis: ${analysisStore.error}`
+      : 'Error en análisis'
+    return { icon: 'pi-times-circle', text: detail, class: 'status-error' }
   }
 
   // Si hay análisis completado

@@ -336,7 +336,9 @@ fn main() {
             Ok(())
         })
         .on_menu_event(|app, event| {
-            menu::handle_menu_event(app, event.id().as_ref());
+            let id = event.id();
+            println!("[Main] on_menu_event fired, id={:?}", id);
+            menu::handle_menu_event(app, id.as_ref());
         })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {

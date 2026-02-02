@@ -80,9 +80,11 @@ const tabs = computed<TabConfig[]>(() => {
     })
     .map(tab => ({
       ...tab,
-      // Aplicar label dinámico según tipo de documento (excepto summary/glossary que mantienen su label fijo)
-      label: (tab.id === 'summary' || tab.id === 'glossary') ? tab.label :
-             (tab.configKey ? getTabLabel(tab.configKey) : tab.label),
+      // Aplicar label dinámico según tipo de documento
+      // (summary, glossary y story-bible mantienen su label fijo)
+      label: (tab.id === 'summary' || tab.id === 'glossary' || tab.id === 'story-bible')
+        ? tab.label
+        : (tab.configKey ? getTabLabel(tab.configKey) : tab.label),
       // Añadir badges
       badge: tab.id === 'entities' ? props.entityCount :
              tab.id === 'alerts' ? props.alertCount : undefined,

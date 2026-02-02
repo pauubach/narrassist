@@ -47,6 +47,7 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "Narrative Assistant",
         "width": 1200,
         "height": 800,
