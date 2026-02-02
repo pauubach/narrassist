@@ -645,6 +645,82 @@ ATTRIBUTE_PATTERNS: list[tuple[str, AttributeKey, AttributeCategory, float, bool
         0.65,
         False,
     ),
+    # "era alto y moreno" - captura HEIGHT (alto/bajo) 
+    (
+        r"(\b[A-ZÁÉÍÓÚÜÑ][a-záéíóúüñ]+)\s+era\s+(alto|alta|bajo|baja)\s+y\s+"
+        r"(?:moreno|morena|rubio|rubia|castaño|castaña|pelirrojo|pelirroja|"
+        r"pálido|pálida|bronceado|bronceada|blanco|blanca|delgado|delgada|"
+        r"corpulento|corpulenta|esbelto|esbelta)",
+        AttributeKey.HEIGHT,
+        AttributeCategory.PHYSICAL,
+        0.8,
+        False,
+    ),
+    # "era alto y moreno" - captura SKIN/apariencia (moreno/rubio/etc)
+    (
+        r"(\b[A-ZÁÉÍÓÚÜÑ][a-záéíóúüñ]+)\s+era\s+(?:alto|alta|bajo|baja|muy\s+alto|"
+        r"muy\s+alta|muy\s+bajo|muy\s+baja)\s+y\s+"
+        r"(moreno|morena|rubio|rubia|castaño|castaña|pelirrojo|pelirroja|"
+        r"pálido|pálida|bronceado|bronceada|blanco|blanca)",
+        AttributeKey.SKIN,
+        AttributeCategory.PHYSICAL,
+        0.8,
+        False,
+    ),
+    # "era alto y delgado" - captura BUILD (delgado/corpulento/etc)
+    (
+        r"(\b[A-ZÁÉÍÓÚÜÑ][a-záéíóúüñ]+)\s+era\s+(?:alto|alta|bajo|baja|moreno|morena|"
+        r"rubio|rubia)\s+y\s+"
+        r"(delgado|delgada|corpulento|corpulenta|esbelto|esbelta|fornido|fornida|"
+        r"robusto|robusta|flaco|flaca|gordo|gorda)",
+        AttributeKey.BUILD,
+        AttributeCategory.PHYSICAL,
+        0.8,
+        False,
+    ),
+    # "una mujer rubia y delgada" / "un hombre moreno y fornido" - captura rubia/moreno (SKIN)
+    (
+        r"(?:una?\s+)?(?:mujer|hombre)\s+"
+        r"(rubia|rubio|morena|moreno|castaña|castaño|pelirroja|pelirrojo|"
+        r"pálida|pálido|bronceada|bronceado)\s+y\s+"
+        r"(?:delgada|delgado|alta|alto|baja|bajo|corpulenta|corpulento|fornida|fornido|"
+        r"esbelta|esbelto|robusta|robusto|flaca|flaco|gorda|gordo)",
+        AttributeKey.SKIN,
+        AttributeCategory.PHYSICAL,
+        0.75,
+        False,
+    ),
+    # "una mujer rubia y delgada" / "un hombre alto y fornido" - captura delgada/fornido (BUILD)
+    (
+        r"(?:una?\s+)?(?:mujer|hombre)\s+"
+        r"(?:rubia|rubio|morena|moreno|castaña|castaño|alta|alto|baja|bajo)\s+y\s+"
+        r"(delgada|delgado|corpulenta|corpulento|fornida|fornido|esbelta|esbelto|"
+        r"robusta|robusto|flaca|flaco|gorda|gordo)",
+        AttributeKey.BUILD,
+        AttributeCategory.PHYSICAL,
+        0.75,
+        False,
+    ),
+    # "El hombre gordo y bajo" / "La mujer alta y delgada" - captura gordo/alto (primer atributo)
+    (
+        r"[EeLl][la]?\s+(?:mujer|hombre|niño|niña|anciano|anciana|joven)\s+"
+        r"(gordo|gorda|alto|alta|bajo|baja|delgado|delgada|flaco|flaca)\s+y\s+"
+        r"(?:gordo|gorda|alto|alta|bajo|baja|delgado|delgada|flaco|flaca|moreno|morena|rubio|rubia)",
+        AttributeKey.BUILD,
+        AttributeCategory.PHYSICAL,
+        0.7,
+        False,
+    ),
+    # "El hombre gordo y bajo" - captura bajo (segundo atributo)
+    (
+        r"[EeLl][la]?\s+(?:mujer|hombre|niño|niña|anciano|anciana|joven)\s+"
+        r"(?:gordo|gorda|alto|alta|delgado|delgada|flaco|flaca|moreno|morena|rubio|rubia)\s+y\s+"
+        r"(gordo|gorda|alto|alta|bajo|baja|delgado|delgada|flaco|flaca)",
+        AttributeKey.BUILD,
+        AttributeCategory.PHYSICAL,
+        0.7,
+        False,
+    ),
     # "mujer alta" / "hombre bajo" (en contexto) - 1 grupo, resolver entidad desde contexto
     (
         r"(?:una?\s+)?(?:mujer|hombre)\s+(?:muy\s+)?(alto|alta|bajo|baja|delgado|delgada)",
@@ -681,6 +757,29 @@ ATTRIBUTE_PATTERNS: list[tuple[str, AttributeKey, AttributeCategory, float, bool
         AttributeKey.PERSONALITY,
         AttributeCategory.PSYCHOLOGICAL,
         0.75,
+        False,
+    ),
+    # "El niño tímido" / "La mujer valiente" - sustantivo genérico + adjetivo psicológico
+    (
+        r"[EeLl][la]?\s+(?:niño|niña|hombre|mujer|joven|anciano|anciana|chico|chica)\s+"
+        r"(tímido|tímida|valiente|cobarde|amable|cruel|generoso|generosa|"
+        r"arrogante|humilde|orgulloso|orgullosa|sabio|sabia|ingenuo|ingenua|"
+        r"astuto|astuta|paciente|impaciente|leal|honesto|honesta|introvertido|introvertida|"
+        r"extrovertido|extrovertida)",
+        AttributeKey.PERSONALITY,
+        AttributeCategory.PSYCHOLOGICAL,
+        0.7,
+        False,  # 1 grupo = resolver entidad con _find_nearest_entity
+    ),
+    # "un hombre cobarde" / "una mujer valiente"
+    (
+        r"(?:un|una)\s+(?:niño|niña|hombre|mujer|joven|anciano|anciana|chico|chica)\s+"
+        r"(tímido|tímida|valiente|cobarde|amable|cruel|generoso|generosa|"
+        r"arrogante|humilde|orgulloso|orgullosa|sabio|sabia|ingenuo|ingenua|"
+        r"astuto|astuta|paciente|impaciente|leal|honesto|honesta)",
+        AttributeKey.PERSONALITY,
+        AttributeCategory.PSYCHOLOGICAL,
+        0.7,
         False,
     ),
 
@@ -1081,6 +1180,15 @@ class AttributeExtractor:
         result = AttributeExtractionResult(processed_chars=len(text))
         all_extractions: dict[str, list[ExtractedAttribute]] = {}  # método -> atributos
 
+        # Crear y cachear doc spaCy para uso en _find_nearest_entity (scope resolver)
+        self._spacy_doc = None
+        try:
+            nlp = self._get_nlp()
+            if nlp:
+                self._spacy_doc = nlp(text)
+        except Exception as e:
+            logger.debug(f"Could not create spaCy doc for scope resolution: {e}")
+
         try:
             # 1. Extracción por LLM (mayor peso)
             if self.use_llm:
@@ -1470,8 +1578,11 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                     match_text=match.group(0),
                     match_pos_in_context=match_pos_in_context
                 )
-                if is_metaphor and self.filter_metaphors:
-                    continue
+                # En vez de filtrar completamente las metáforas, reducir confianza.
+                # Esto evita perder atributos reales en comparaciones válidas.
+                metaphor_confidence_penalty = 0.0
+                if is_metaphor:
+                    metaphor_confidence_penalty = 0.4  # Reducir confianza significativamente
 
                 # Verificar negación
                 is_negated = self._is_negated(context, match.start() - context_start)
@@ -1527,7 +1638,7 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                 # Ajustar confianza
                 confidence = base_conf
                 if is_metaphor:
-                    confidence *= 0.5
+                    confidence *= (1.0 - metaphor_confidence_penalty)  # ~0.6
                 if is_temporal_past:
                     # Reducir confianza para atributos del pasado (pero no descartar)
                     confidence *= 0.6
@@ -2453,8 +2564,31 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
         # Normalizar menciones al formato de 4 elementos
         normalized_mentions = _normalize_entity_mentions(entity_mentions)
 
-        # Extraer contexto alrededor de la posición (400 chars antes para capturar oraciones previas)
-        context_start = max(0, position - 400)
+        # ===== NUEVO: Intentar resolución por scope gramatical (reemplaza ventana fija) =====
+        # Si tenemos un doc spaCy disponible, usar dependency parsing como criterio principal
+        if hasattr(self, '_spacy_doc') and self._spacy_doc is not None:
+            try:
+                from .scope_resolver import ScopeResolver
+                resolver = ScopeResolver(self._spacy_doc, text)
+                scope_result = resolver.find_nearest_entity_by_scope(
+                    position, normalized_mentions, prefer_subject=True
+                )
+                if scope_result is not None:
+                    entity_name, confidence = scope_result
+                    if confidence >= 0.5:
+                        logger.debug(
+                            f"Entidad resuelta por scope gramatical: '{entity_name}' "
+                            f"(confianza={confidence:.2f})"
+                        )
+                        return entity_name
+            except Exception as e:
+                logger.debug(f"Scope resolution fallback: {e}")
+
+        # ===== FALLBACK: Heurísticas mejoradas con ventana ampliada =====
+        # Usar scope de oraciones en vez de chars fijos cuando sea posible,
+        # con 1500 chars como safety limit (antes era 400)
+        MAX_WINDOW = 1500
+        context_start = max(0, position - MAX_WINDOW)
         context = text[context_start:position]
 
         # También extraer un poco adelante (20 chars) para detectar patrones que inician en position
@@ -2465,7 +2599,7 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
         for name, start, end, entity_type in normalized_mentions:
             if end <= position:
                 distance = position - end
-                if distance < 400:  # Ventana amplia
+                if distance < MAX_WINDOW:
                     candidates.append((name, start, end, distance, entity_type))
 
         if not candidates:
@@ -2626,7 +2760,7 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                 gendered_candidates.sort(key=lambda x: x[1])
                 best_candidate = gendered_candidates[0]
                 # Aceptar si la distancia ajustada es razonable
-                if best_candidate[1] < 400:
+                if best_candidate[1] < MAX_WINDOW:
                     logger.debug(
                         f"Género detectado ({'femenino' if is_feminine else 'masculino'}): "
                         f"seleccionando '{best_candidate[0]}' (dist={best_candidate[2]}, "

@@ -40,14 +40,16 @@ FASE 6 - CONSISTENCIA Y ALERTAS:
 """
 
 import logging
+import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any, Callable, Optional
 
-from ..core.errors import NarrativeError, ErrorSeverity
+from ..core.errors import NarrativeError, ErrorSeverity, PhaseError, PhasePreconditionError
 from ..core.result import Result
 
 logger = logging.getLogger(__name__)
@@ -402,9 +404,26 @@ class AnalysisContext:
     errors: list = field(default_factory=list)
     warnings: list = field(default_factory=list)
 
+    # Tracking de fases completadas
+    completed_phases: set = field(default_factory=set)
+    skipped_phases: set = field(default_factory=set)
+
+    # Lock para acceso thread-safe a entity_map
+    _entity_map_lock: threading.Lock = field(default_factory=threading.Lock)
+
     # Timing
     start_time: datetime = field(default_factory=datetime.now)
     phase_times: dict = field(default_factory=dict)
+
+    def get_entity_id(self, name: str) -> Optional[int]:
+        """Acceso thread-safe a entity_map."""
+        with self._entity_map_lock:
+            return self.entity_map.get(name.lower())
+
+    def get_entity_map_snapshot(self) -> dict:
+        """Copia inmutable del entity_map para uso en threads."""
+        with self._entity_map_lock:
+            return dict(self.entity_map)
 
 
 @dataclass
@@ -538,64 +557,85 @@ class UnifiedAnalysisPipeline:
             if progress_callback:
                 progress_callback(0.0, "Parseando documento...")
 
-            phase_result = self._phase_1_parsing(path, project_name, context)
+            phase_result = self._run_phase(
+                "parsing", self._phase_1_parsing, context,
+                args=(path, project_name, context),
+                is_fatal=True,
+            )
             if phase_result.is_failure:
                 return Result.failure(phase_result.error)
-            
+
             self._clear_gpu_memory_if_needed()
 
             # ========== FASE 2: EXTRACCIÓN BASE ==========
             if progress_callback:
                 progress_callback(0.15, "Extracción base...")
 
-            phase_result = self._phase_2_base_extraction(context)
-            if phase_result.is_failure:
-                context.errors.append(phase_result.error)
-                logger.warning("Base extraction had errors, continuing...")
-            
+            precondition = self._check_precondition_text(context, "base_extraction")
+            if precondition.is_failure:
+                context.errors.append(precondition.error)
+            else:
+                self._run_phase(
+                    "base_extraction", self._phase_2_base_extraction, context,
+                    args=(context,),
+                )
             self._clear_gpu_memory_if_needed()
 
             # ========== FASE 3: RESOLUCIÓN Y FUSIÓN ==========
             if progress_callback:
                 progress_callback(0.35, "Resolviendo referencias...")
 
-            phase_result = self._phase_3_resolution(context)
-            if phase_result.is_failure:
-                context.errors.append(phase_result.error)
-                logger.warning("Resolution had errors, continuing...")
-            
+            precondition = self._check_precondition_entities(context, "resolution")
+            if precondition.is_failure:
+                context.errors.append(precondition.error)
+            else:
+                self._run_phase(
+                    "resolution", self._phase_3_resolution, context,
+                    args=(context,),
+                )
             self._clear_gpu_memory_if_needed()
 
             # ========== FASE 4: EXTRACCIÓN PROFUNDA ==========
             if progress_callback:
                 progress_callback(0.50, "Extracción profunda...")
 
-            phase_result = self._phase_4_deep_extraction(context)
-            if phase_result.is_failure:
-                context.errors.append(phase_result.error)
-                logger.warning("Deep extraction had errors, continuing...")
-            
+            precondition = self._check_precondition_entities(context, "deep_extraction")
+            if precondition.is_failure:
+                context.errors.append(precondition.error)
+            else:
+                self._run_phase(
+                    "deep_extraction", self._phase_4_deep_extraction, context,
+                    args=(context,),
+                )
             self._clear_gpu_memory_if_needed()
 
             # ========== FASE 5: ANÁLISIS DE CALIDAD ==========
             if progress_callback:
                 progress_callback(0.70, "Análisis de calidad...")
 
-            phase_result = self._phase_5_quality(context)
-            if phase_result.is_failure:
-                context.errors.append(phase_result.error)
-                logger.warning("Quality analysis had errors, continuing...")
-            
+            # Calidad solo requiere texto, no entidades
+            precondition = self._check_precondition_text(context, "quality")
+            if precondition.is_failure:
+                context.errors.append(precondition.error)
+            else:
+                self._run_phase(
+                    "quality", self._phase_5_quality, context,
+                    args=(context,),
+                )
             self._clear_gpu_memory_if_needed()
 
             # ========== FASE 6: CONSISTENCIA Y ALERTAS ==========
             if progress_callback:
                 progress_callback(0.85, "Verificando consistencia...")
 
-            phase_result = self._phase_6_consistency(context)
-            if phase_result.is_failure:
-                context.errors.append(phase_result.error)
-                logger.warning("Consistency check had errors, continuing...")
+            precondition = self._check_precondition_entities(context, "consistency")
+            if precondition.is_failure:
+                context.errors.append(precondition.error)
+            else:
+                self._run_phase(
+                    "consistency", self._phase_6_consistency, context,
+                    args=(context,),
+                )
 
             # ========== GENERAR ALERTAS ==========
             if self.config.create_alerts:
@@ -607,6 +647,9 @@ class UnifiedAnalysisPipeline:
             # ========== FINALIZAR ==========
             if progress_callback:
                 progress_callback(1.0, "Análisis completado")
+
+            # Log resumen de fases
+            self._log_phase_summary(context)
 
             report = self._build_report(context)
 
@@ -622,6 +665,172 @@ class UnifiedAnalysisPipeline:
             )
             logger.exception("Unexpected error in unified analysis")
             return Result.failure(error)
+
+    # =========================================================================
+    # VALIDACIÓN DE FASES Y EJECUCIÓN CONTROLADA
+    # =========================================================================
+
+    def _run_phase(
+        self,
+        phase_name: str,
+        phase_func: Callable,
+        context: AnalysisContext,
+        args: tuple = (),
+        is_fatal: bool = False,
+    ) -> Result[None]:
+        """
+        Ejecuta una fase con error handling tipado.
+
+        Captura excepciones y las convierte en PhaseError con contexto.
+        Registra la fase como completada o fallida.
+        """
+        phase_start = datetime.now()
+        try:
+            result = phase_func(*args)
+            elapsed = (datetime.now() - phase_start).total_seconds()
+            context.phase_times[phase_name] = elapsed
+
+            if result.is_failure:
+                context.skipped_phases.add(phase_name)
+                if is_fatal:
+                    return result
+                phase_error = PhaseError(
+                    phase_name=phase_name,
+                    input_summary=self._summarize_phase_input(context, phase_name),
+                    output_summary="Fase falló — sin output",
+                    original_error=str(result.error) if result.error else "Unknown",
+                )
+                context.errors.append(phase_error)
+                logger.warning(
+                    f"Phase '{phase_name}' failed after {elapsed:.1f}s: "
+                    f"{result.error}"
+                )
+                return result
+
+            context.completed_phases.add(phase_name)
+            logger.info(
+                f"Phase '{phase_name}' completed in {elapsed:.1f}s — "
+                f"{self._summarize_phase_output(context, phase_name)}"
+            )
+            return result
+
+        except Exception as e:
+            elapsed = (datetime.now() - phase_start).total_seconds()
+            context.phase_times[phase_name] = elapsed
+            context.skipped_phases.add(phase_name)
+
+            phase_error = PhaseError(
+                phase_name=phase_name,
+                input_summary=self._summarize_phase_input(context, phase_name),
+                output_summary="Excepción no controlada",
+                original_error=str(e),
+            )
+            context.errors.append(phase_error)
+            logger.exception(f"Phase '{phase_name}' crashed after {elapsed:.1f}s")
+
+            if is_fatal:
+                phase_error.severity = ErrorSeverity.FATAL
+                return Result.failure(phase_error)
+            return Result.failure(phase_error)
+
+    def _check_precondition_text(
+        self, context: AnalysisContext, phase_name: str
+    ) -> Result[None]:
+        """Verifica que el texto del documento existe."""
+        if not context.full_text or len(context.full_text.strip()) == 0:
+            error = PhasePreconditionError(
+                phase_name=phase_name,
+                missing_data="texto del documento (full_text vacío)",
+            )
+            context.skipped_phases.add(phase_name)
+            return Result.failure(error)
+        return Result.success(None)
+
+    def _check_precondition_entities(
+        self, context: AnalysisContext, phase_name: str
+    ) -> Result[None]:
+        """Verifica que hay entidades disponibles (NER funcionó)."""
+        if not context.entities:
+            word_count = len(context.full_text.split()) if context.full_text else 0
+            error = PhasePreconditionError(
+                phase_name=phase_name,
+                missing_data=(
+                    f"entidades (0 entidades para documento de {word_count} palabras). "
+                    "NER probablemente falló o no se ejecutó."
+                ),
+            )
+            context.skipped_phases.add(phase_name)
+            logger.warning(
+                f"Skipping phase '{phase_name}': no entities available "
+                f"(document has {word_count} words)"
+            )
+            return Result.failure(error)
+        return Result.success(None)
+
+    def _summarize_phase_input(self, context: AnalysisContext, phase_name: str) -> str:
+        """Resumen de datos de entrada para una fase (para diagnóstico)."""
+        parts = []
+        if context.full_text:
+            parts.append(f"text={len(context.full_text)} chars")
+        if context.chapters:
+            parts.append(f"chapters={len(context.chapters)}")
+        if context.entities:
+            parts.append(f"entities={len(context.entities)}")
+        if context.attributes:
+            parts.append(f"attributes={len(context.attributes)}")
+        return ", ".join(parts) if parts else "empty"
+
+    def _summarize_phase_output(self, context: AnalysisContext, phase_name: str) -> str:
+        """Resumen de datos de salida tras una fase (para diagnóstico)."""
+        summaries = {
+            "parsing": (
+                f"text={len(context.full_text)} chars, "
+                f"chapters={len(context.chapters)}"
+            ),
+            "base_extraction": f"entities={len(context.entities)}",
+            "resolution": (
+                f"coref_chains={len(context.coreference_chains)}, "
+                f"entity_map={len(context.entity_map)} entries"
+            ),
+            "deep_extraction": (
+                f"attributes={len(context.attributes)}, "
+                f"relationships={len(context.relationships)}"
+            ),
+            "quality": (
+                f"spelling={len(context.spelling_issues)}, "
+                f"grammar={len(context.grammar_issues)}, "
+                f"repetitions={len(context.lexical_repetitions)}"
+            ),
+            "consistency": (
+                f"inconsistencies={len(context.inconsistencies)}, "
+                f"emotional={len(context.emotional_incoherences)}"
+            ),
+        }
+        return summaries.get(phase_name, "ok")
+
+    def _log_phase_summary(self, context: AnalysisContext) -> None:
+        """Log resumen de todas las fases al finalizar el análisis."""
+        total_time = sum(context.phase_times.values())
+        completed = sorted(context.completed_phases)
+        skipped = sorted(context.skipped_phases)
+        error_count = len(context.errors)
+
+        logger.info(
+            f"Analysis complete in {total_time:.1f}s — "
+            f"phases completed: {completed}, "
+            f"phases skipped: {skipped}, "
+            f"errors: {error_count}"
+        )
+
+        if skipped:
+            logger.warning(
+                f"Skipped phases: {skipped}. "
+                "Results may be incomplete. Check errors for details."
+            )
+
+        for phase, elapsed in sorted(context.phase_times.items()):
+            status = "✓" if phase in context.completed_phases else "✗"
+            logger.info(f"  {status} {phase}: {elapsed:.1f}s")
 
     # =========================================================================
     # FASE 1: PARSING Y ESTRUCTURA
@@ -1134,7 +1343,7 @@ class UnifiedAnalysisPipeline:
     def _run_coreference(self, context: AnalysisContext) -> None:
         """Ejecutar resolución de correferencias."""
         try:
-            from ..nlp.coreference_resolver import resolve_coreferences_voting
+            from ..nlp.coreference_resolver import resolve_coreferences_voting, CorefConfig
 
             # Preparar datos de capítulos para correferencia
             chapters_data = None
@@ -1149,10 +1358,14 @@ class UnifiedAnalysisPipeline:
                     for ch in context.chapters
                 ]
 
+            coref_config = CorefConfig(
+                use_llm_for_coref=self.config.use_llm,
+            )
+
             result = resolve_coreferences_voting(
                 context.full_text,
                 chapters=chapters_data,
-                use_llm=self.config.use_llm
+                config=coref_config,
             )
 
             if result.chains:
@@ -1160,7 +1373,7 @@ class UnifiedAnalysisPipeline:
 
                 # Crear mapa de menciones a entidades
                 for chain in result.chains:
-                    entity_name = chain.representative
+                    entity_name = chain.main_mention
                     for mention in chain.mentions:
                         context.mention_to_entity[mention.text.lower()] = entity_name
 
@@ -1851,7 +2064,7 @@ class UnifiedAnalysisPipeline:
                 existing_attrs = {}
                 for attr in context.attributes:
                     if hasattr(attr, 'entity_name') and attr.entity_name == entity.canonical_name:
-                        key = attr.attribute_type.value if hasattr(attr.attribute_type, 'value') else str(attr.attribute_type)
+                        key = attr.key.value if hasattr(attr.key, 'value') else str(attr.key)
                         existing_attrs[key] = attr.value if hasattr(attr, 'value') else str(attr)
 
                 # Analizar personaje
@@ -2431,6 +2644,7 @@ class UnifiedAnalysisPipeline:
                 chapter_dialogues = dialogues_by_chapter.get(chapter_num, [])
 
                 # El checker analiza el capítulo completo
+                # analyze_chapter() retorna list[EmotionalIncoherence] directamente
                 result = checker.analyze_chapter(
                     chapter_text=content,
                     chapter_id=chapter_num,
@@ -2438,8 +2652,14 @@ class UnifiedAnalysisPipeline:
                     entity_names=[e.canonical_name for e in context.entities],
                 )
 
-                if result.is_success and result.value:
-                    for incoherence in result.value:
+                # Manejar tanto Result como list directa
+                if hasattr(result, 'is_success'):
+                    incoherences = result.value if result.is_success else []
+                else:
+                    incoherences = result if isinstance(result, list) else []
+
+                if incoherences:
+                    for incoherence in incoherences:
                         all_incoherences.append({
                             "entity_name": incoherence.entity_name,
                             "incoherence_type": incoherence.incoherence_type.value,
@@ -2814,7 +3034,14 @@ class UnifiedAnalysisPipeline:
         tasks: list[tuple[str, Callable]],
         context: AnalysisContext
     ) -> None:
-        """Ejecutar tareas en paralelo."""
+        """
+        Ejecutar tareas en paralelo con tracking de errores.
+
+        Cada tarea que falle se registra como warning con su nombre,
+        en vez de silenciar el error.
+        """
+        failed_tasks = []
+
         with ThreadPoolExecutor(max_workers=self.config.max_workers) as executor:
             futures = {
                 executor.submit(func, context): name
@@ -2826,7 +3053,17 @@ class UnifiedAnalysisPipeline:
                 try:
                     future.result()
                 except Exception as e:
-                    logger.warning(f"Parallel task {name} failed: {e}")
+                    failed_tasks.append(name)
+                    logger.warning(f"Parallel task '{name}' failed: {e}", exc_info=True)
+                    context.warnings.append(
+                        f"Sub-tarea '{name}' falló: {e}"
+                    )
+
+        if failed_tasks:
+            logger.warning(
+                f"Parallel execution: {len(failed_tasks)}/{len(tasks)} tasks failed: "
+                f"{failed_tasks}"
+            )
 
     def _persist_attributes(self, context: AnalysisContext) -> None:
         """Persistir atributos en la base de datos."""
@@ -2836,13 +3073,16 @@ class UnifiedAnalysisPipeline:
             db = get_database()
             persisted = 0
 
+            # Snapshot del entity_map para acceso thread-safe
+            entity_map_snapshot = context.get_entity_map_snapshot()
+
             for attr in context.attributes:
-                entity_id = context.entity_map.get(attr.entity_name.lower())
+                entity_id = entity_map_snapshot.get(attr.entity_name.lower())
                 if not entity_id:
                     continue
 
                 # Determinar categoría del atributo para la columna attribute_type
-                attr_key = attr.attribute_type.value if hasattr(attr.attribute_type, 'value') else str(attr.attribute_type)
+                attr_key = attr.key.value if hasattr(attr.key, 'value') else str(attr.key)
                 _PHYSICAL_ATTRS = {"eye_color", "hair_color", "hair_type", "height", "build", "age", "skin", "distinctive_feature"}
                 _PSYCHOLOGICAL_ATTRS = {"personality"}
                 _SOCIAL_ATTRS = {"profession"}

@@ -78,12 +78,30 @@ jobs:
           npm ci
           npm run build
       
+      - name: Run Frontend type-check
+        working-directory: frontend
+        run: npx vue-tsc --noEmit
+
+      - name: Run Frontend tests
+        working-directory: frontend
+        run: npx vitest run --reporter=verbose
+
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
-      
+        with:
+          components: rustfmt, clippy
+
+      - name: Rust format check
+        working-directory: src-tauri
+        run: cargo fmt --check
+
+      - name: Rust lint
+        working-directory: src-tauri
+        run: cargo clippy -- -D warnings
+
       - name: Install Tauri CLI
         run: cargo install tauri-cli --version "^2.0.0"
-      
+
       - name: Build Tauri (Windows)
         run: cargo tauri build --target x86_64-pc-windows-msvc
       
@@ -168,9 +186,27 @@ jobs:
           npm ci
           npm run build
       
+      - name: Run Frontend type-check
+        working-directory: frontend
+        run: npx vue-tsc --noEmit
+
+      - name: Run Frontend tests
+        working-directory: frontend
+        run: npx vitest run --reporter=verbose
+
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
-      
+        with:
+          components: rustfmt, clippy
+
+      - name: Rust format check
+        working-directory: src-tauri
+        run: cargo fmt --check
+
+      - name: Rust lint
+        working-directory: src-tauri
+        run: cargo clippy -- -D warnings
+
       - name: Install Tauri CLI
         run: cargo install tauri-cli --version "^2.0.0"
 

@@ -809,16 +809,16 @@ def _get_coreference_merge_suggestions(
     entities = repo.get_entities_by_project(project_id, active_only=True)
     entity_by_name = {e.canonical_name.lower(): e for e in entities}
 
-    # También indexar por menciones
+    # También indexar por aliases
     for entity in entities:
-        for mention in entity.mentions:
-            entity_by_name[mention.text.lower()] = entity
+        for alias in entity.aliases:
+            entity_by_name[alias.lower()] = entity
 
     # Procesar cada cadena de correferencia
     for chain in coreference_chains:
-        # chain.representative = nombre canónico (ej: "Fermín de Pas")
+        # chain.main_mention = nombre canónico (ej: "Fermín de Pas")
         # chain.mentions = lista de menciones (ej: ["el Magistral", "don Fermín", ...])
-        representative = getattr(chain, 'representative', None)
+        representative = getattr(chain, 'main_mention', None) or getattr(chain, 'representative', None)
         mentions = getattr(chain, 'mentions', [])
 
         if not representative or not mentions:

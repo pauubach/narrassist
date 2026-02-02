@@ -147,6 +147,65 @@ class ScannedPDFError(ParsingError):
 
 
 # =============================================================================
+# Errores de Pipeline (Fases)
+# =============================================================================
+
+
+@dataclass
+class PhaseError(NarrativeError):
+    """Error en una fase específica del pipeline de análisis."""
+
+    phase_name: str = ""
+    input_summary: str = ""
+    output_summary: str = ""
+    original_error: str = ""
+    message: str = field(init=False)
+    severity: ErrorSeverity = field(default=ErrorSeverity.RECOVERABLE, init=False)
+    user_message: Optional[str] = field(default=None, init=False)
+    context: dict[str, Any] = field(default_factory=dict, init=False)
+
+    def __post_init__(self):
+        self.message = f"Phase '{self.phase_name}' failed: {self.original_error}"
+        self.user_message = (
+            f"La fase '{self.phase_name}' del análisis falló. "
+            "Se continuará con los datos disponibles."
+        )
+        self.context = {
+            "phase_name": self.phase_name,
+            "input_summary": self.input_summary,
+            "output_summary": self.output_summary,
+            "original_error": self.original_error,
+        }
+        super().__post_init__()
+
+
+@dataclass
+class PhasePreconditionError(NarrativeError):
+    """Precondiciones de una fase no se cumplen (fase anterior falló o no produjo datos)."""
+
+    phase_name: str = ""
+    missing_data: str = ""
+    message: str = field(init=False)
+    severity: ErrorSeverity = field(default=ErrorSeverity.RECOVERABLE, init=False)
+    user_message: Optional[str] = field(default=None, init=False)
+    context: dict[str, Any] = field(default_factory=dict, init=False)
+
+    def __post_init__(self):
+        self.message = (
+            f"Phase '{self.phase_name}' skipped: missing required data ({self.missing_data})"
+        )
+        self.user_message = (
+            f"Se omitió la fase '{self.phase_name}' porque faltan datos necesarios "
+            f"({self.missing_data}). Esto puede deberse a un error en una fase anterior."
+        )
+        self.context = {
+            "phase_name": self.phase_name,
+            "missing_data": self.missing_data,
+        }
+        super().__post_init__()
+
+
+# =============================================================================
 # Errores de NLP
 # =============================================================================
 

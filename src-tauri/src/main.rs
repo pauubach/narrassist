@@ -5,6 +5,7 @@ mod menu;
 
 use std::io::{BufRead, BufReader};
 use std::process::{Child, Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use tauri::{AppHandle, Emitter, Manager, State};
@@ -12,14 +13,43 @@ use tauri::{AppHandle, Emitter, Manager, State};
 /// Estado compartido del servidor backend
 struct BackendServer {
     child: Arc<Mutex<Option<Child>>>,
+    /// Flag para evitar reinicio durante el cierre de la app
+    shutting_down: Arc<AtomicBool>,
 }
 
 impl BackendServer {
     fn new() -> Self {
         Self {
             child: Arc::new(Mutex::new(None)),
+            shutting_down: Arc::new(AtomicBool::new(false)),
         }
     }
+}
+
+/// Comprueba si el backend responde al health check
+async fn poll_health_once() -> bool {
+    let client = reqwest::Client::new();
+    match client
+        .get("http://127.0.0.1:8008/api/health")
+        .timeout(std::time::Duration::from_secs(2))
+        .send()
+        .await
+    {
+        Ok(response) => response.status().is_success(),
+        Err(_) => false,
+    }
+}
+
+/// Espera a que el backend responda al health check (con reintentos)
+async fn wait_for_health(max_attempts: u32, delay_ms: u64) -> bool {
+    for attempt in 1..=max_attempts {
+        if poll_health_once().await {
+            println!("[Watchdog] Backend healthy after {} attempts", attempt);
+            return true;
+        }
+        tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;
+    }
+    false
 }
 
 /// Inicia el servidor backend como sidecar
@@ -38,17 +68,9 @@ async fn start_backend_server(
     }
 
     // Verificar si el servidor ya esta corriendo externamente
-    let client = reqwest::Client::new();
-    if let Ok(response) = client
-        .get("http://127.0.0.1:8008/api/health")
-        .timeout(std::time::Duration::from_secs(1))
-        .send()
-        .await
-    {
-        if response.status().is_success() {
-            println!("[Setup] Backend server already running externally");
-            return Ok("Backend server already running externally".to_string());
-        }
+    if poll_health_once().await {
+        println!("[Setup] Backend server already running externally");
+        return Ok("Backend server already running externally".to_string());
     }
 
     // En modo desarrollo, indicar que se debe iniciar manualmente
@@ -78,8 +100,10 @@ async fn start_backend_server(
             *child_lock = Some(child);
         }
 
-        // Esperar un momento para que el servidor arranque
-        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+        // Esperar a que el backend responda (poll cada 500ms, max 30 intentos = 15s)
+        if !wait_for_health(30, 500).await {
+            eprintln!("[Setup] Backend did not respond after 15s of polling");
+        }
 
         Ok("Backend server started successfully".to_string())
     }
@@ -104,16 +128,126 @@ async fn stop_backend_server(server_state: State<'_, BackendServer>) -> Result<S
 /// Verifica si el servidor backend está corriendo
 #[tauri::command]
 async fn check_backend_health() -> Result<bool, String> {
-    let client = reqwest::Client::new();
+    Ok(poll_health_once().await)
+}
 
-    match client
-        .get("http://127.0.0.1:8008/api/health")
-        .timeout(std::time::Duration::from_secs(2))
-        .send()
-        .await
-    {
-        Ok(response) => Ok(response.status().is_success()),
-        Err(_) => Ok(false),
+/// Watchdog: monitoriza el backend y lo reinicia si se cae.
+/// Se ejecuta en un loop cada 15s en release builds.
+#[cfg(not(debug_assertions))]
+async fn backend_watchdog(app_handle: AppHandle) {
+    // Esperar a que el backend arranque inicialmente
+    tokio::time::sleep(tokio::time::Duration::from_secs(20)).await;
+
+    let mut consecutive_failures: u32 = 0;
+    const MAX_FAILURES_BEFORE_RESTART: u32 = 3;
+    const MAX_RESTARTS: u32 = 3;
+    let mut restart_count: u32 = 0;
+
+    loop {
+        tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
+
+        let server_state = app_handle.state::<BackendServer>();
+
+        // No reiniciar si la app se está cerrando
+        if server_state.shutting_down.load(Ordering::Relaxed) {
+            println!("[Watchdog] App shutting down, stopping watchdog");
+            break;
+        }
+
+        if poll_health_once().await {
+            consecutive_failures = 0;
+            continue;
+        }
+
+        consecutive_failures += 1;
+        eprintln!(
+            "[Watchdog] Health check failed ({}/{})",
+            consecutive_failures, MAX_FAILURES_BEFORE_RESTART
+        );
+
+        if consecutive_failures < MAX_FAILURES_BEFORE_RESTART {
+            continue;
+        }
+
+        // Backend is down - attempt restart
+        if restart_count >= MAX_RESTARTS {
+            eprintln!("[Watchdog] Max restarts ({}) reached, giving up", MAX_RESTARTS);
+            let _ = app_handle.emit(
+                "backend-status",
+                serde_json::json!({
+                    "status": "error",
+                    "message": "El servidor se detuvo y no pudo reiniciarse. Reinicia la aplicación."
+                }),
+            );
+            break;
+        }
+
+        println!("[Watchdog] Attempting backend restart ({}/{})", restart_count + 1, MAX_RESTARTS);
+
+        // Notify frontend
+        let _ = app_handle.emit(
+            "backend-status",
+            serde_json::json!({
+                "status": "restarting",
+                "message": "El servidor se detuvo, reiniciando..."
+            }),
+        );
+
+        // Kill old process if still hanging
+        {
+            let mut child_lock = server_state.child.lock().unwrap();
+            if let Some(mut child) = child_lock.take() {
+                let _ = child.kill();
+                let _ = child.wait();
+            }
+        }
+
+        // Spawn new process
+        match spawn_embedded_backend(&app_handle) {
+            Ok(mut child) => {
+                if let Some(stdout) = child.stdout.take() {
+                    spawn_output_logger(stdout, "stdout");
+                }
+                if let Some(stderr) = child.stderr.take() {
+                    spawn_output_logger(stderr, "stderr");
+                }
+
+                {
+                    let mut child_lock = server_state.child.lock().unwrap();
+                    *child_lock = Some(child);
+                }
+
+                // Wait for health
+                if wait_for_health(30, 500).await {
+                    println!("[Watchdog] Backend restarted successfully");
+                    restart_count += 1;
+                    consecutive_failures = 0;
+
+                    let _ = app_handle.emit(
+                        "backend-status",
+                        serde_json::json!({
+                            "status": "running",
+                            "message": "Servidor reiniciado correctamente"
+                        }),
+                    );
+                } else {
+                    eprintln!("[Watchdog] Backend failed to respond after restart");
+                    restart_count += 1;
+                }
+            }
+            Err(e) => {
+                eprintln!("[Watchdog] Failed to spawn backend: {}", e);
+                restart_count += 1;
+
+                let _ = app_handle.emit(
+                    "backend-status",
+                    serde_json::json!({
+                        "status": "error",
+                        "message": format!("Error reiniciando servidor: {}", e)
+                    }),
+                );
+            }
+        }
     }
 }
 
@@ -131,7 +265,7 @@ fn main() {
             app.set_menu(menu)?;
 
             // Forzar la ventana a primer plano (fix para cuando se lanza desde el instalador NSIS)
-            // Cuando NSIS lanza la app después de la instalación, puede hacerlo en un contexto 
+            // Cuando NSIS lanza la app después de la instalación, puede hacerlo en un contexto
             // diferente que causa que la ventana aparezca minimizada o detrás de otras ventanas
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();
@@ -165,6 +299,13 @@ fn main() {
                                 "message": msg
                             }),
                         );
+
+                        // Iniciar watchdog en release builds
+                        #[cfg(not(debug_assertions))]
+                        {
+                            let watchdog_handle = app_handle.clone();
+                            tauri::async_runtime::spawn(backend_watchdog(watchdog_handle));
+                        }
                     }
                     Err(e) => {
                         eprintln!("[Setup Error] Failed to start backend: {}", e);
@@ -187,8 +328,11 @@ fn main() {
         })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
-                // Detener el backend al cerrar la ventana
+                // Señalar al watchdog que pare antes de matar el backend
                 let server_state = window.state::<BackendServer>();
+                server_state.shutting_down.store(true, Ordering::Relaxed);
+
+                // Detener el backend al cerrar la ventana
                 tauri::async_runtime::block_on(async {
                     let _ = stop_backend_server(server_state).await;
                 });

@@ -136,16 +136,14 @@ COMMON_SPANISH_WORDS = {
 
 # Patrones regex para detectar errores
 SPELLING_PATTERNS = [
-    # Letras repetidas (más de 2 veces)
-    (r'(\w)\1{2,}', SpellingErrorType.REPEATED_CHAR, "Letras repetidas"),
-    # Espacios múltiples
-    (r'\s{2,}', SpellingErrorType.TYPO, "Espacios múltiples"),
+    # Letras repetidas (más de 2 veces), excluyendo números romanos (III, VIII, etc.)
+    (r'(?<![IVXLCDM])(\w)\1{2,}(?![IVXLCDM])', SpellingErrorType.REPEATED_CHAR, "Letras repetidas"),
+    # Espacios múltiples en la misma línea (NO saltos de párrafo \n\n)
+    (r'[^\S\n]{2,}', SpellingErrorType.TYPO, "Espacios múltiples"),
     # Puntuación duplicada
     (r'([.!?])\1+', SpellingErrorType.TYPO, "Puntuación duplicada"),
     # Coma o punto seguido de letra sin espacio
     (r'[,.](?=[a-záéíóúñ])', SpellingErrorType.TYPO, "Falta espacio después de puntuación"),
-    # Mayúscula después de coma (excepto nombres propios)
-    (r',\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?!\s+[A-ZÁÉÍÓÚÑ])', SpellingErrorType.CASE, "Mayúscula innecesaria"),
 ]
 
 

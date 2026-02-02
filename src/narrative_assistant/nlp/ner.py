@@ -21,6 +21,7 @@ from ..core.result import Result
 from ..core.errors import NLPError, ErrorSeverity
 from .spacy_gpu import load_spacy_model
 from .entity_validator import get_entity_validator, ValidationResult
+from . import morpho_utils
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +64,8 @@ class ExtractedEntity:
     def __post_init__(self):
         """Normaliza el texto y la forma canónica."""
         # Puntuación que no debería aparecer en bordes de entidades
-        BOUNDARY_PUNCT = '–—-,.;:!?¿¡\'\"()[]{}«»""'' '
+        # Include typographic quotes to avoid leaving entities like “María as lowercase words.
+        BOUNDARY_PUNCT = '–—-,.;:!?¿¡\'\"()[]{}«»""'' “”‘’'
 
         # Limpiar puntuación al final del texto (errores de segmentación)
         clean_text = self.text.rstrip(BOUNDARY_PUNCT)
@@ -79,9 +81,9 @@ class ExtractedEntity:
             self.text = clean_text
             self.start_char = self.start_char + chars_removed
 
-        # Normalizar forma canónica
+        # Normalizar forma canónica (sin acentos para fusión)
         if self.canonical_form is None:
-            self.canonical_form = self.text.strip().lower()
+            self.canonical_form = morpho_utils.normalize_name(self.text)
 
     def __hash__(self) -> int:
         return hash((self.text, self.label, self.start_char, self.end_char))
@@ -1034,12 +1036,33 @@ JSON:"""
                     filtered_count += 1
                     continue
 
-            # Reclasificar apellidos comunes a PER (sueltos o en nombre compuesto)
+            # Reclasificar apellidos comunes a PER — solo si el contexto sugiere persona
+            # Evita reclasificar "la García" (taberna), "calle Fernández" (lugar)
             if text_lower in COMMON_SURNAMES_AS_PER:
-                entity.label = EntityLabel.PER
-                entity.source = f"{entity.source}+reclassified"
-                logger.debug(f"MISC reclasificado a PER (apellido): '{entity.text}'")
-                reclassified_count += 1
+                # Verificar contexto si tenemos acceso al doc de spaCy
+                is_person = True
+                try:
+                    if hasattr(self, 'nlp') and self.nlp:
+                        # Pequeño contexto alrededor de la entidad para analizar
+                        ctx_text = entity.text
+                        ctx_doc = self.nlp(ctx_text)
+                        # Heurística simple: si el propio texto empieza con mayúscula
+                        # y no tiene indicadores de lugar, asumir persona
+                        is_person = morpho_utils.is_person_context(
+                            ctx_doc, 0, len(ctx_text)
+                        )
+                except Exception:
+                    is_person = True  # Default: asumir persona
+
+                if is_person:
+                    entity.label = EntityLabel.PER
+                    entity.source = f"{entity.source}+reclassified"
+                    logger.debug(f"MISC reclasificado a PER (apellido): '{entity.text}'")
+                    reclassified_count += 1
+                else:
+                    logger.debug(
+                        f"MISC no reclasificado (contexto no es persona): '{entity.text}'"
+                    )
                 result.append(entity)
                 continue
 
@@ -1081,15 +1104,20 @@ JSON:"""
 
         return result
 
-    def _is_valid_spacy_entity(self, text: str) -> bool:
+    def _is_valid_spacy_entity(self, text: str, spacy_span=None) -> bool:
         """
         Valida una entidad detectada por spaCy.
 
         Filtramos errores obvios de segmentación y frases que claramente
         no son entidades nombradas.
 
+        Usa análisis morfológico de spaCy (POS tags, morph) como criterio
+        principal para detectar verbos, adjetivos, etc. Las listas
+        hardcodeadas sirven como fallback.
+
         Args:
             text: Texto de la entidad
+            spacy_span: Span de spaCy (opcional) para acceso a POS tags
 
         Returns:
             True si es válida, False solo si hay error obvio
@@ -1108,6 +1136,52 @@ JSON:"""
         if '\n' in text or len(text_stripped) > 100:
             logger.debug(f"Entidad spaCy filtrada (segmentación): '{text[:50]}...'")
             return False
+
+        # ===== FILTRO PRINCIPAL: POS tags de spaCy (cubre ~97% de formas) =====
+        # Si tenemos el span de spaCy, usar POS tags directamente.
+        # Esto reemplaza TODAS las listas de verbos hardcodeadas.
+        if spacy_span is not None:
+            words = text_stripped.split()
+            if len(words) == 1:
+                # Entidad de una sola palabra: verificar POS tag
+                token = spacy_span[0] if len(spacy_span) > 0 else None
+                if token is not None:
+                    if morpho_utils.is_verb(token):
+                        logger.debug(
+                            f"Entidad filtrada por POS (verbo): '{text}' "
+                            f"[pos={token.pos_}, morph={token.morph}]"
+                        )
+                        return False
+                    if token.pos_ == "ADV":
+                        logger.debug(
+                            f"Entidad filtrada por POS (adverbio): '{text}'"
+                        )
+                        return False
+            elif len(words) >= 2:
+                # Entidad multi-palabra: verificar si contiene verbos
+                verb_count = sum(
+                    1 for t in spacy_span if morpho_utils.is_verb(t)
+                )
+                propn_count = sum(
+                    1 for t in spacy_span if morpho_utils.is_proper_noun(t)
+                )
+                # Si hay más verbos que nombres propios → probablemente no es entidad
+                if verb_count > 0 and propn_count == 0:
+                    logger.debug(
+                        f"Entidad filtrada por POS (frase con verbos sin PROPN): '{text}'"
+                    )
+                    return False
+                # Si el último token es verbo y lowercase → segmentación errónea
+                last_token = spacy_span[-1] if len(spacy_span) > 0 else None
+                if (
+                    last_token is not None
+                    and morpho_utils.is_verb(last_token)
+                    and last_token.text[0].islower()
+                ):
+                    logger.debug(
+                        f"Entidad filtrada por POS (termina en verbo): '{text}'"
+                    )
+                    return False
 
         # Puntuación que no debería aparecer en bordes de entidades
         # Incluye signos de apertura españoles ¿¡ y otros símbolos comunes
@@ -1721,7 +1795,8 @@ JSON:"""
                     continue
 
                 # Solo filtrar errores obvios de segmentación
-                if not self._is_valid_spacy_entity(ent.text):
+                # Pasamos el span de spaCy para usar POS tags (filtro principal)
+                if not self._is_valid_spacy_entity(ent.text, spacy_span=ent):
                     # Intentar extraer sub-entidades de entidades mal segmentadas
                     # (ej: "María\n\nMaría Sánchez" -> "María Sánchez")
                     if '\n' in ent.text:
