@@ -3,10 +3,14 @@
 
 mod menu;
 
+#[cfg(not(debug_assertions))]
 use std::io::{BufRead, BufReader};
-use std::process::{Child, Command, Stdio};
+use std::process::Child;
+#[cfg(not(debug_assertions))]
+use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
+#[cfg(not(debug_assertions))]
 use std::thread;
 use tauri::{AppHandle, Emitter, Manager, State};
 
@@ -41,6 +45,7 @@ async fn poll_health_once() -> bool {
 }
 
 /// Espera a que el backend responda al health check (con reintentos)
+#[cfg(not(debug_assertions))]
 async fn wait_for_health(max_attempts: u32, delay_ms: u64) -> bool {
     for attempt in 1..=max_attempts {
         if poll_health_once().await {
@@ -79,7 +84,7 @@ async fn start_backend_server(
         println!(
             "[Setup] Development mode: start backend manually with 'python api-server/main.py'"
         );
-        return Ok("Development mode: start backend manually".to_string());
+        Ok("Development mode: start backend manually".to_string())
     }
 
     // En modo release, usar el sidecar
@@ -447,6 +452,7 @@ fn spawn_embedded_backend(app: &AppHandle) -> Result<Child, String> {
         .map_err(|e| format!("Failed to spawn backend process: {}", e))
 }
 
+#[cfg(not(debug_assertions))]
 fn spawn_output_logger<T>(reader: T, label: &'static str)
 where
     T: std::io::Read + Send + 'static,

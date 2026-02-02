@@ -50,7 +50,8 @@ pub mod help_menu {
 }
 
 /// Todos los IDs de menu personalizados (no incluye predefinidos como Undo/Copy)
-pub const ALL_MENU_IDS: &[&str] = &[
+#[cfg(test)]
+const ALL_MENU_IDS: &[&str] = &[
     file_menu::NEW_PROJECT,
     file_menu::OPEN_PROJECT,
     file_menu::CLOSE_PROJECT,
