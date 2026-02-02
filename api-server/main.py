@@ -322,66 +322,177 @@ else:
 # Create FastAPI app and include routers
 # ============================================================================
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+try:
+    _early_logger.info("=== Starting FastAPI initialization ===")
+    _write_debug("=== Starting FastAPI initialization ===")
 
-logger = logging.getLogger(__name__)
-logger.info(f"Server starting - NA_VERSION: {deps.NA_VERSION}, MODULES_LOADED: {deps.MODULES_LOADED}")
+    _early_logger.info("Importing FastAPI...")
+    from fastapi import FastAPI
+    _early_logger.info("FastAPI imported successfully")
 
-app = FastAPI(
-    title="Narrative Assistant API",
-    description="API REST para el asistente de corrección narrativa",
-    version=deps.NA_VERSION,
-)
+    _early_logger.info("Importing CORSMiddleware...")
+    from fastapi.middleware.cors import CORSMiddleware
+    _early_logger.info("CORSMiddleware imported successfully")
 
-# Configure CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",   # Vite dev server
-        "tauri://localhost",       # Tauri production
-        "http://tauri.localhost",  # Tauri alternative
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+    logger = logging.getLogger(__name__)
+    logger.info(f"Server starting - NA_VERSION: {deps.NA_VERSION}, MODULES_LOADED: {deps.MODULES_LOADED}")
+    _early_logger.info(f"Creating FastAPI app instance...")
+
+    app = FastAPI(
+        title="Narrative Assistant API",
+        description="API REST para el asistente de corrección narrativa",
+        version=deps.NA_VERSION,
+    )
+    _early_logger.info("FastAPI app created successfully")
+
+    # Configure CORS
+    _early_logger.info("Adding CORS middleware...")
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            "http://localhost:5173",   # Vite dev server
+            "tauri://localhost",       # Tauri production
+            "http://tauri.localhost",  # Tauri alternative
+        ],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    _early_logger.info("CORS middleware added successfully")
+
+except Exception as e:
+    _early_logger.error(f"FATAL: Error during FastAPI initialization: {type(e).__name__}: {e}", exc_info=True)
+    _write_debug(f"FATAL: FastAPI initialization failed: {e}")
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)
 
 # ============================================================================
 # Include all route modules
 # ============================================================================
 
-from routers import (
-    alerts,
-    analysis,
-    chapters,
-    content,
-    editorial,
-    entities,
-    exports,
-    license,
-    projects,
-    prose,
-    relationships,
-    services,
-    system,
-    voice_style,
-)
+try:
+    _early_logger.info("=== Loading routers ===")
+    _write_debug("=== Loading routers ===")
 
-app.include_router(system.router)
-app.include_router(projects.router)
-app.include_router(analysis.router)
-app.include_router(entities.router)
-app.include_router(alerts.router)
-app.include_router(chapters.router)
-app.include_router(relationships.router)
-app.include_router(voice_style.router)
-app.include_router(prose.router)
-app.include_router(editorial.router)
-app.include_router(content.router)
-app.include_router(exports.router)
-app.include_router(license.router)
-app.include_router(services.router)
+    _early_logger.info("Importing system router...")
+    from routers import system
+    _early_logger.info("system router imported")
+
+    _early_logger.info("Importing projects router...")
+    from routers import projects
+    _early_logger.info("projects router imported")
+
+    _early_logger.info("Importing analysis router...")
+    from routers import analysis
+    _early_logger.info("analysis router imported")
+
+    _early_logger.info("Importing entities router...")
+    from routers import entities
+    _early_logger.info("entities router imported")
+
+    _early_logger.info("Importing alerts router...")
+    from routers import alerts
+    _early_logger.info("alerts router imported")
+
+    _early_logger.info("Importing chapters router...")
+    from routers import chapters
+    _early_logger.info("chapters router imported")
+
+    _early_logger.info("Importing relationships router...")
+    from routers import relationships
+    _early_logger.info("relationships router imported")
+
+    _early_logger.info("Importing voice_style router...")
+    from routers import voice_style
+    _early_logger.info("voice_style router imported")
+
+    _early_logger.info("Importing prose router...")
+    from routers import prose
+    _early_logger.info("prose router imported")
+
+    _early_logger.info("Importing editorial router...")
+    from routers import editorial
+    _early_logger.info("editorial router imported")
+
+    _early_logger.info("Importing content router...")
+    from routers import content
+    _early_logger.info("content router imported")
+
+    _early_logger.info("Importing exports router...")
+    from routers import exports
+    _early_logger.info("exports router imported")
+
+    _early_logger.info("Importing license router...")
+    from routers import license
+    _early_logger.info("license router imported")
+
+    _early_logger.info("Importing services router...")
+    from routers import services
+    _early_logger.info("services router imported")
+
+    _early_logger.info("All routers imported successfully")
+
+except Exception as e:
+    _early_logger.error(f"FATAL: Error importing routers: {type(e).__name__}: {e}", exc_info=True)
+    _write_debug(f"FATAL: Router import failed: {e}")
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)
+
+try:
+    _early_logger.info("=== Registering routers with FastAPI app ===")
+
+    _early_logger.info("Registering system router...")
+    app.include_router(system.router)
+
+    _early_logger.info("Registering projects router...")
+    app.include_router(projects.router)
+
+    _early_logger.info("Registering analysis router...")
+    app.include_router(analysis.router)
+
+    _early_logger.info("Registering entities router...")
+    app.include_router(entities.router)
+
+    _early_logger.info("Registering alerts router...")
+    app.include_router(alerts.router)
+
+    _early_logger.info("Registering chapters router...")
+    app.include_router(chapters.router)
+
+    _early_logger.info("Registering relationships router...")
+    app.include_router(relationships.router)
+
+    _early_logger.info("Registering voice_style router...")
+    app.include_router(voice_style.router)
+
+    _early_logger.info("Registering prose router...")
+    app.include_router(prose.router)
+
+    _early_logger.info("Registering editorial router...")
+    app.include_router(editorial.router)
+
+    _early_logger.info("Registering content router...")
+    app.include_router(content.router)
+
+    _early_logger.info("Registering exports router...")
+    app.include_router(exports.router)
+
+    _early_logger.info("Registering license router...")
+    app.include_router(license.router)
+
+    _early_logger.info("Registering services router...")
+    app.include_router(services.router)
+
+    _early_logger.info("All routers registered successfully")
+
+except Exception as e:
+    _early_logger.error(f"FATAL: Error registering routers: {type(e).__name__}: {e}", exc_info=True)
+    _write_debug(f"FATAL: Router registration failed: {e}")
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)
 
 # ============================================================================
 # Startup event
@@ -390,13 +501,19 @@ app.include_router(services.router)
 @app.on_event("startup")
 async def startup_load_modules():
     """Try to load narrative_assistant modules on server startup."""
+    _early_logger.info("=== Startup event triggered ===")
     if not deps.MODULES_LOADED:
         logger.info("Startup: attempting to load narrative_assistant modules...")
+        _early_logger.info("Startup: attempting to load narrative_assistant modules...")
         deps.load_narrative_assistant_modules()
         if deps.MODULES_LOADED:
             logger.info("Startup: modules loaded successfully")
+            _early_logger.info("Startup: modules loaded successfully")
         else:
             logger.warning(f"Startup: modules not loaded - {deps.MODULES_ERROR}")
+            _early_logger.warning(f"Startup: modules not loaded - {deps.MODULES_ERROR}")
+    else:
+        _early_logger.info("Startup: modules already loaded")
 
 
 # ============================================================================
@@ -407,6 +524,9 @@ if __name__ == "__main__":
     import sys
     import uvicorn
     import traceback
+
+    _early_logger.info("=== Main block starting ===")
+    _write_debug("=== Main block starting ===")
 
     # Fix para PyInstaller: DEBE ir ANTES de cualquier otra cosa
     if sys.stdout is None:
@@ -423,13 +543,22 @@ if __name__ == "__main__":
     if not hasattr(sys.stdin, 'isatty'):
         sys.stdin.isatty = lambda: False
 
+    _early_logger.info("stdio redirects configured")
+
     try:
         logger.info(f"Starting Narrative Assistant API Server v{deps.NA_VERSION}")
         logger.info("Server will be available at http://localhost:8008")
+        _early_logger.info(f"Starting Narrative Assistant API Server v{deps.NA_VERSION}")
+        _early_logger.info("Server will be available at http://localhost:8008")
 
         is_frozen = getattr(sys, 'frozen', False)
+        _early_logger.info(f"is_frozen: {is_frozen}")
+
+        _early_logger.info("=== About to call uvicorn.run() ===")
+        _write_debug("=== About to call uvicorn.run() ===")
 
         if is_frozen:
+            _early_logger.info("Running in frozen mode (with access_log)")
             uvicorn.run(
                 app,
                 host="127.0.0.1",
@@ -439,6 +568,7 @@ if __name__ == "__main__":
                 access_log=True,
             )
         else:
+            _early_logger.info("Running in normal mode")
             uvicorn.run(
                 app,
                 host="127.0.0.1",
@@ -446,6 +576,9 @@ if __name__ == "__main__":
                 reload=False,
                 log_level="info",
             )
+
+        _early_logger.info("uvicorn.run() returned (server stopped)")
+
     except Exception as e:
         error_msg = f"\n\n===== ERROR FATAL =====\n"
         error_msg += f"Error type: {type(e).__name__}\n"
@@ -454,6 +587,9 @@ if __name__ == "__main__":
 
         print(error_msg, file=sys.stderr)
         traceback.print_exc(file=sys.stderr)
+
+        _early_logger.error(f"FATAL EXCEPTION in main: {type(e).__name__}: {e}", exc_info=True)
+        _write_debug(f"FATAL EXCEPTION: {e}")
 
         try:
             if sys.platform == 'win32':
@@ -470,8 +606,9 @@ if __name__ == "__main__":
                 traceback.print_exc(file=f)
 
             print(f"\nError guardado en: {error_file}", file=sys.stderr)
-        except Exception:
-            pass
+            _early_logger.info(f"Error saved to: {error_file}")
+        except Exception as save_err:
+            _early_logger.error(f"Could not save error file: {save_err}")
 
         if sys.stdin and hasattr(sys.stdin, 'read'):
             try:
