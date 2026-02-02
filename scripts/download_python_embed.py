@@ -214,6 +214,21 @@ def download_macos_framework(target_dir: Path):
                 if python_link.exists():
                     python_link.unlink()
                 python_link.symlink_to(python_bin)
+
+                # Parchear el framework para usar rutas relativas
+                print(f"\n[Patch] Parcheando Python.framework para usar rutas relativas...")
+                patch_script = Path(__file__).parent / "patch_macos_python.py"
+                try:
+                    subprocess.run([
+                        sys.executable,
+                        str(patch_script),
+                        str(target_dir)
+                    ], check=True)
+                    print(f"[OK] Framework parcheado exitosamente")
+                except subprocess.CalledProcessError as e:
+                    print(f"[WARN] Error parcheando framework: {e}")
+                    print(f"[WARN] El framework puede no funcionar correctamente")
+
                 print(f"[OK] Python macOS listo: {python_link}")
                 return True
             else:

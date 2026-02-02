@@ -125,7 +125,10 @@ jobs:
       
       - name: Download Python Framework
         run: python3 scripts/download_python_embed.py
-      
+
+      - name: Patch Python Framework paths (macOS)
+        run: python3 scripts/patch_macos_python.py src-tauri/binaries/python-embed
+
       - name: Install pip in embedded Python
         working-directory: src-tauri/binaries/python-embed
         env:
