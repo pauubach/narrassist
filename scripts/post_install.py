@@ -321,7 +321,11 @@ def install_ollama(progress: ProgressReporter) -> bool:
 
             progress.report("Instalando Ollama...", 0.5)
             # Run installer silently
-            subprocess.run([str(installer_path), "/S"], check=True)
+            subprocess.run(
+                [str(installer_path), "/S"],
+                check=True,
+                creationflags=subprocess.CREATE_NO_WINDOW,
+            )
 
         elif system == "darwin":
             # Use brew if available, otherwise download

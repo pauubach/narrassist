@@ -328,21 +328,49 @@ export const useSystemStore = defineStore('system', () => {
           }
 
           try {
-            const data = await api.get<{ status: string; install_progress?: LTInstallProgress }>('/api/languagetool/status')
+            const data = await api.get<{
+              status: string
+              is_installing?: boolean
+              install_progress?: LTInstallProgress
+            }>('/api/languagetool/status')
 
             // Update progress if available
             if (data?.install_progress) {
               ltInstallProgress.value = data.install_progress
             }
 
-            // Wait for a definitive installed state
+            // Success: installation finished and LT is ready
             if (data?.status === 'installed_not_running' || data?.status === 'running') {
               stopLTPolling()
-              // Refresh capabilities BEFORE clearing flag to avoid UI flash
               await refreshCapabilities()
               ltInstalling.value = false
               ltInstallProgress.value = null
               resolve(true)
+              return
+            }
+
+            // Failure: progress reports an error
+            if (data?.install_progress?.error) {
+              stopLTPolling()
+              ltInstalling.value = false
+              // Keep ltInstallProgress so the UI can show the error briefly
+              resolve(false)
+              return
+            }
+
+            // Failure: install thread finished (not installing) but
+            // status reverted to not_installed — give 3s grace period
+            // to avoid race with thread startup.
+            if (
+              data?.status === 'not_installed' &&
+              !data?.is_installing &&
+              pollCount > 3
+            ) {
+              stopLTPolling()
+              ltInstalling.value = false
+              ltInstallProgress.value = null
+              resolve(false)
+              return
             }
           } catch {
             // Ignore polling errors

@@ -312,7 +312,9 @@ async def get_languagetool_status():
             "install_progress": None,
         }
 
-        if progress and installing:
+        # Siempre devolver progreso si existe (incluso tras fallo)
+        # para que el frontend pueda mostrar el error.
+        if progress:
             data["install_progress"] = {
                 "phase": progress.phase,
                 "phase_label": progress.phase_label,

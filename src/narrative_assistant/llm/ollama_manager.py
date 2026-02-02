@@ -370,6 +370,12 @@ class OllamaManager:
         except Exception as e:
             logger.debug(f"Error actualizando lista de modelos: {e}")
 
+    def _subprocess_kwargs(self) -> dict:
+        """Kwargs comunes para subprocess en Windows (ocultar ventana de consola)."""
+        if self._platform == InstallationPlatform.WINDOWS:
+            return {"creationflags": subprocess.CREATE_NO_WINDOW}
+        return {}
+
     def get_version(self) -> Optional[str]:
         """Obtiene la version de Ollama instalada."""
         if not self.is_installed:
@@ -381,7 +387,8 @@ class OllamaManager:
                 [ollama_exe, "--version"],
                 capture_output=True,
                 text=True,
-                timeout=10.0
+                timeout=10.0,
+                **self._subprocess_kwargs()
             )
             if result.returncode == 0:
                 # Parsear version del output
@@ -475,7 +482,8 @@ class OllamaManager:
                 result = subprocess.run(
                     [str(installer_path), "/S"],
                     capture_output=True,
-                    timeout=300.0  # 5 minutos
+                    timeout=300.0,  # 5 minutos
+                    creationflags=subprocess.CREATE_NO_WINDOW,
                 )
                 if result.returncode != 0:
                     # Fallback a instalacion interactiva
@@ -772,7 +780,8 @@ class OllamaManager:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
-                bufsize=1
+                bufsize=1,
+                **self._subprocess_kwargs()
             )
 
             for line in process.stdout:
@@ -843,7 +852,8 @@ class OllamaManager:
                 [ollama_exe, "rm", model_name],
                 capture_output=True,
                 text=True,
-                timeout=60.0
+                timeout=60.0,
+                **self._subprocess_kwargs()
             )
 
             if result.returncode == 0:

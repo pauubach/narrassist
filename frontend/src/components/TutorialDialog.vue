@@ -369,10 +369,12 @@ import Message from 'primevue/message'
 import Checkbox from 'primevue/checkbox'
 import ProgressSpinner from 'primevue/progressspinner'
 import ProgressBar from 'primevue/progressbar'
+import { useToast } from 'primevue/usetoast'
 import { apiUrl } from '@/config/api'
 import { useSystemStore, type NLPMethod } from '@/stores/system'
 
 const systemStore = useSystemStore()
+const toast = useToast()
 
 interface Props {
   visible: boolean
@@ -500,8 +502,24 @@ const startOllama = async () => {
 }
 
 // LanguageTool: usar acciones centralizadas del store
-const installLanguageTool = () => systemStore.installLanguageTool()
-const startLanguageTool = () => systemStore.startLanguageTool()
+const installLanguageTool = async () => {
+  toast.add({ severity: 'info', summary: 'Instalando LanguageTool', detail: 'Descargando Java y LanguageTool...', life: 5000 })
+  const success = await systemStore.installLanguageTool()
+  if (success) {
+    await systemStore.refreshCapabilities()
+    toast.add({ severity: 'success', summary: 'LanguageTool instalado', detail: 'Corrector avanzado disponible', life: 3000 })
+  } else {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo instalar LanguageTool. Verifica tu conexión a internet.', life: 8000 })
+  }
+}
+const startLanguageTool = async () => {
+  const success = await systemStore.startLanguageTool()
+  if (success) {
+    toast.add({ severity: 'success', summary: 'LanguageTool iniciado', detail: 'Corrector avanzado disponible', life: 3000 })
+  } else {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo iniciar LanguageTool', life: 5000 })
+  }
+}
 
 // Limpiar timers al cerrar diálogo
 watch(() => props.visible, (newValue) => {
