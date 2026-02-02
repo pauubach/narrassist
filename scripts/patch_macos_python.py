@@ -144,20 +144,20 @@ def patch_python_framework(framework_dir: Path) -> bool:
         python3_exe = versions_dir / "bin" / "python3.12"
 
     if python3_exe.exists():
-        print(f"\n🐍 Parcheando ejecutable python3...")
+        print(f"\n🐍 Parcheando ejecutable python3 en framework...")
 
         # Añadir RPATHs
         add_rpath(python3_exe, "@executable_path/..")
-        add_rpath(python3_exe, "@executable_path/../..")
 
         # Obtener dependencias
         deps = get_dependencies(python3_exe)
         for dep in deps:
             if "/Library/Frameworks/Python.framework" in dep:
-                # Cambiar a ruta relativa
+                # python3 está en bin/, Python está en ../Python
+                # /Library/Frameworks/Python.framework/Versions/3.12/Python -> @executable_path/../Python
                 new_dep = dep.replace(
-                    "/Library/Frameworks/Python.framework",
-                    "@executable_path/../.."
+                    "/Library/Frameworks/Python.framework/Versions/3.12/Python",
+                    "@executable_path/../Python"
                 )
                 if patch_binary_dependency(python3_exe, dep, new_dep):
                     print(f"  ✅ {dep}")
@@ -204,9 +204,10 @@ def patch_python_framework(framework_dir: Path) -> bool:
                 for dep in deps:
                     if "/Library/Frameworks/Python.framework" in dep:
                         needs_patch = True
+                        # .so está en lib/python3.12/lib-dynload/, Python está en ../../../Python
                         new_dep = dep.replace(
-                            "/Library/Frameworks/Python.framework",
-                            "@loader_path/../../.."
+                            "/Library/Frameworks/Python.framework/Versions/3.12/Python",
+                            "@loader_path/../../../Python"
                         )
                         patch_binary_dependency(so_file, dep, new_dep)
 
@@ -231,9 +232,10 @@ def patch_python_framework(framework_dir: Path) -> bool:
                 deps = get_dependencies(dylib)
                 for dep in deps:
                     if "/Library/Frameworks/Python.framework" in dep:
+                        # .dylib está en lib/, Python está en ../Python
                         new_dep = dep.replace(
-                            "/Library/Frameworks/Python.framework",
-                            "@loader_path/../.."
+                            "/Library/Frameworks/Python.framework/Versions/3.12/Python",
+                            "@loader_path/../Python"
                         )
                         patch_binary_dependency(dylib, dep, new_dep)
                         patched_count += 1
