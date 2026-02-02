@@ -137,31 +137,41 @@ def patch_python_framework(framework_dir: Path) -> bool:
         else:
             print(f"  ⚠️  No se pudo cambiar ID")
 
-    # 2. Parchear el ejecutable python3 en bin/
-    python3_exe = versions_dir / "bin" / "python3"
-    if not python3_exe.exists():
-        # Buscar python3.12
-        python3_exe = versions_dir / "bin" / "python3.12"
+    # 2. Parchear TODOS los ejecutables python en bin/
+    bin_dir = versions_dir / "bin"
+    python_executables = []
 
-    if python3_exe.exists():
-        print(f"\n🐍 Parcheando ejecutable python3 en framework...")
+    # Buscar python3 y python3.12 (ambos si existen)
+    for python_name in ["python3", "python3.12"]:
+        python_exe = bin_dir / python_name
+        if python_exe.exists() and not python_exe.is_symlink():
+            python_executables.append(python_exe)
 
-        # Añadir RPATHs
-        add_rpath(python3_exe, "@executable_path/..")
+    if python_executables:
+        print(f"\n🐍 Parcheando {len(python_executables)} ejecutable(s) python en framework...")
 
-        # Obtener dependencias
-        deps = get_dependencies(python3_exe)
-        for dep in deps:
-            if "/Library/Frameworks/Python.framework" in dep:
-                # python3 está en bin/, Python está en ../Python
-                # /Library/Frameworks/Python.framework/Versions/3.12/Python -> @executable_path/../Python
-                new_dep = dep.replace(
-                    "/Library/Frameworks/Python.framework/Versions/3.12/Python",
-                    "@executable_path/../Python"
-                )
-                if patch_binary_dependency(python3_exe, dep, new_dep):
-                    print(f"  ✅ {dep}")
-                    print(f"     → {new_dep}")
+        for python3_exe in python_executables:
+            print(f"  Parcheando {python3_exe.name}...")
+
+            # Añadir RPATHs
+            add_rpath(python3_exe, "@executable_path/..")
+
+            # Obtener dependencias
+            deps = get_dependencies(python3_exe)
+            for dep in deps:
+                if "/Library/Frameworks/Python.framework" in dep:
+                    # python3 está en bin/, Python está en ../Python
+                    # /Library/Frameworks/Python.framework/Versions/3.12/Python -> @executable_path/../Python
+                    new_dep = dep.replace(
+                        "/Library/Frameworks/Python.framework/Versions/3.12/Python",
+                        "@executable_path/../Python"
+                    )
+                    if patch_binary_dependency(python3_exe, dep, new_dep):
+                        print(f"    ✅ {dep}")
+                        print(f"       → {new_dep}")
+    else:
+        print(f"\n⚠️  No se encontraron ejecutables python en {bin_dir}")
+        return False
 
     # 3. Manejar python3 en la raíz (puede ser symlink o copia)
     python3_root = framework_dir / "python3"
@@ -249,7 +259,8 @@ def patch_python_framework(framework_dir: Path) -> bool:
 
     # Re-firmar binarios modificados (ad-hoc signing)
     print("🔏 Re-firmando binarios modificados...")
-    binaries_to_sign = [python_lib, python3_exe]
+    binaries_to_sign = [python_lib]
+    binaries_to_sign.extend(python_executables)  # Todos los ejecutables parcheados
     if python3_root.exists() and not python3_root.is_symlink():
         binaries_to_sign.append(python3_root)
 
@@ -262,29 +273,30 @@ def patch_python_framework(framework_dir: Path) -> bool:
     print(f"  ✅ {signed_count} binarios re-firmados\n")
 
     # Verificar que funciona
-    print("🧪 Verificando que el ejecutable funciona...")
+    print("🧪 Verificando que los ejecutables funcionan...")
 
-    # Probar el ejecutable en el framework
-    result_framework = run_command([str(python3_exe), "--version"], check=False)
-    if result_framework.returncode == 0:
-        print(f"  ✅ Framework python3: {result_framework.stdout.strip()}")
-    else:
-        print(f"  ⚠️  Framework python3 no funciona:")
-        print(f"     {result_framework.stderr}")
+    # Probar todos los ejecutables parcheados
+    all_working = True
+    for python_exe in python_executables:
+        result = run_command([str(python_exe), "--version"], check=False)
+        if result.returncode == 0:
+            print(f"  ✅ {python_exe.name}: {result.stdout.strip()}")
+        else:
+            print(f"  ⚠️  {python_exe.name} no funciona:")
+            print(f"     {result.stderr}")
+            all_working = False
 
     # Probar el ejecutable en la raíz (si existe y no es symlink)
     if python3_root.exists() and not python3_root.is_symlink():
         result_root = run_command([str(python3_root), "--version"], check=False)
         if result_root.returncode == 0:
             print(f"  ✅ Root python3: {result_root.stdout.strip()}")
-            return True
         else:
             print(f"  ⚠️  Root python3 no funciona:")
             print(f"     {result_root.stderr}")
-            return False
-    else:
-        # Solo el del framework importa si no hay copia en raíz
-        return result_framework.returncode == 0
+            all_working = False
+
+    return all_working
 
 
 def main():
