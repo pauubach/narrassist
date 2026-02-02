@@ -140,8 +140,8 @@ async fn check_backend_health() -> Result<bool, String> {
 /// Se ejecuta en un loop cada 15s en release builds.
 #[cfg(not(debug_assertions))]
 async fn backend_watchdog(app_handle: AppHandle) {
-    // Esperar a que el backend arranque inicialmente
-    tokio::time::sleep(tokio::time::Duration::from_secs(20)).await;
+    // Esperar a que el backend arranque inicialmente (45s para permitir carga completa)
+    tokio::time::sleep(tokio::time::Duration::from_secs(45)).await;
 
     let mut consecutive_failures: u32 = 0;
     const MAX_FAILURES_BEFORE_RESTART: u32 = 3;
@@ -407,6 +407,23 @@ fn spawn_embedded_backend(app: &AppHandle) -> Result<Child, String> {
         path_separator,
         backend_api_dir.display()
     );
+
+    // En macOS, añadir site-packages del framework embebido al PYTHONPATH
+    #[cfg(target_os = "macos")]
+    {
+        let embed_site = python_dir
+            .join("Python.framework")
+            .join("Versions")
+            .join("3.12")
+            .join("lib")
+            .join("python3.12")
+            .join("site-packages");
+
+        if embed_site.exists() {
+            python_path_env.push_str(path_separator);
+            python_path_env.push_str(&embed_site.display().to_string());
+        }
+    }
 
     if let Ok(existing) = std::env::var("PYTHONPATH") {
         if !existing.is_empty() {

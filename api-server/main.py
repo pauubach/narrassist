@@ -37,13 +37,23 @@ def _write_debug(msg):
     try:
         import os
         from datetime import datetime
-        localappdata = os.environ.get('LOCALAPPDATA', os.environ.get('TEMP', ''))
-        if localappdata:
-            debug_file = os.path.join(localappdata, "Narrative Assistant", "early-debug.txt")
-            os.makedirs(os.path.dirname(debug_file), exist_ok=True)
-            with open(debug_file, 'a', encoding='utf-8') as f:
-                f.write(f"{datetime.now().isoformat()} - {msg}\n")
-                f.flush()
+
+        # Platform-specific debug paths
+        if sys.platform == 'darwin':  # macOS
+            debug_dir = os.path.join(os.path.expanduser('~'), 'Library', 'Logs', 'Narrative Assistant')
+        elif sys.platform == 'win32':  # Windows
+            localappdata = os.environ.get('LOCALAPPDATA', os.environ.get('TEMP', ''))
+            if not localappdata:
+                raise Exception("No LOCALAPPDATA or TEMP")
+            debug_dir = os.path.join(localappdata, 'Narrative Assistant')
+        else:  # Linux
+            debug_dir = os.path.join(os.path.expanduser('~'), '.local', 'share', 'narrative-assistant')
+
+        debug_file = os.path.join(debug_dir, "early-debug.txt")
+        os.makedirs(debug_dir, exist_ok=True)
+        with open(debug_file, 'a', encoding='utf-8') as f:
+            f.write(f"{datetime.now().isoformat()} - {msg}\n")
+            f.flush()
     except Exception as e:
         try:
             import tempfile
