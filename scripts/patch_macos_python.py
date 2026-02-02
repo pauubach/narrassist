@@ -173,32 +173,45 @@ def patch_python_framework(framework_dir: Path) -> bool:
         print(f"\n⚠️  No se encontraron ejecutables python en {bin_dir}")
         return False
 
-    # 3. Manejar python3 en la raíz (puede ser symlink o copia)
+    # 3. Crear python3 en la raíz para cuando Tauri dereferencie symlinks
     python3_root = framework_dir / "python3"
-    if python3_root.exists():
-        if python3_root.is_symlink():
-            print(f"\n🔗 python3 es symlink (OK)")
-        else:
-            # Es una copia del binario, parchearlo también
-            print(f"\n🐍 Parcheando python3 en raíz (copia)...")
 
-            # Añadir RPATHs para que encuentre el framework
-            add_rpath(python3_root, "@executable_path")
+    # SIEMPRE crear una copia y parchearla, porque Tauri dereferencía symlinks durante bundle
+    if python_executables:
+        import shutil
 
-            deps = get_dependencies(python3_root)
-            for dep in deps:
-                if "/Library/Frameworks/Python.framework" in dep:
-                    new_dep = dep.replace(
-                        "/Library/Frameworks/Python.framework",
-                        "@executable_path"
-                    )
+        # Eliminar cualquier python3 existente (symlink o copia)
+        if python3_root.exists() or python3_root.is_symlink():
+            python3_root.unlink()
+
+        # Copiar el primer ejecutable python a la raíz
+        print(f"\n🐍 Creando python3 en raíz con rutas parcheadas para ubicación raíz...")
+        shutil.copy2(python_executables[0], python3_root)
+
+        # Parchear con rutas correctas para la ubicación raíz
+        # python3 en raíz: @executable_path apunta a python-embed/
+        # Python está en python-embed/Python.framework/Versions/3.12/Python
+
+        # Añadir RPATHs
+        add_rpath(python3_root, "@executable_path/Python.framework/Versions/3.12")
+        add_rpath(python3_root, "@executable_path/Python.framework/Versions/3.12/lib")
+
+        deps = get_dependencies(python3_root)
+        for dep in deps:
+            # Detectar tanto rutas absolutas como relativas que necesiten corrección
+            if "/Library/Frameworks/Python.framework/Versions/3.12/Python" in dep or \
+               "@executable_path/../Python" in dep or \
+               "Python.framework" in dep:
+                # python3 está en python-embed/, Python está en python-embed/Python.framework/Versions/3.12/Python
+                new_dep = "@executable_path/Python.framework/Versions/3.12/Python"
+                if dep != new_dep:  # Solo parchear si es diferente
                     if patch_binary_dependency(python3_root, dep, new_dep):
                         print(f"  ✅ {dep}")
                         print(f"     → {new_dep}")
-    elif python3_exe.exists():
-        # Crear symlink relativo
-        python3_root.symlink_to(python3_exe)
-        print(f"\n🔗 Creado symlink: {python3_root} -> {python3_exe}")
+
+        # Re-firmar después de modificar
+        adhoc_sign(python3_root)
+        print(f"  ✅ python3 en raíz parcheado y firmado")
 
     # 4. Parchear Python.app (ejecutable que se invoca al abrir archivos .py)
     python_app_exe = versions_dir / "Resources" / "Python.app" / "Contents" / "MacOS" / "Python"
