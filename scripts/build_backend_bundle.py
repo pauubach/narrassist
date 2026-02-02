@@ -79,6 +79,11 @@ python-docx==1.1.2
 pdfminer.six==20240706
 olefile==0.47
 charset-normalizer==3.4.0
+
+# Core NLP dependencies
+numpy>=1.24.0,<2.0.0
+spacy>=3.7.0,<4.0.0
+sentence-transformers>=2.2.0,<3.0.0
 """
     requirements.write_text(requirements_content, encoding='utf-8')
     print(f"[OK] Creado requirements.txt")
