@@ -45,6 +45,10 @@ class AlertRepository:
         """
         try:
             with self.db.transaction() as conn:
+                # Asegurar que content_hash está calculado
+                if not alert.content_hash:
+                    alert.content_hash = alert.compute_content_hash()
+
                 cursor = conn.execute(
                     """
                     INSERT INTO alerts (
@@ -53,8 +57,8 @@ class AlertRepository:
                         chapter, scene, start_char, end_char, excerpt,
                         entity_ids, confidence, source_module,
                         created_at, updated_at, status, resolved_at,
-                        resolution_note, extra_data
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        resolution_note, extra_data, content_hash
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         alert.project_id,
@@ -79,6 +83,7 @@ class AlertRepository:
                         alert.resolved_at.isoformat() if alert.resolved_at else None,
                         alert.resolution_note,
                         json.dumps(alert.extra_data),
+                        alert.content_hash,
                     ),
                 )
                 alert.id = cursor.lastrowid
@@ -368,6 +373,12 @@ class AlertRepository:
     def _row_to_alert(self, row) -> Alert:
         """Convierte una fila de DB a objeto Alert."""
         # sqlite3.Row permite acceso por nombre de columna
+        # Leer content_hash (puede no existir en DBs antiguas)
+        try:
+            content_hash = row["content_hash"] or ""
+        except (IndexError, KeyError):
+            content_hash = ""
+
         return Alert(
             id=row["id"],
             project_id=row["project_id"],
@@ -392,7 +403,52 @@ class AlertRepository:
             resolved_at=datetime.fromisoformat(row["resolved_at"]) if row["resolved_at"] else None,
             resolution_note=row["resolution_note"] or "",
             extra_data=json.loads(row["extra_data"]) if row["extra_data"] else {},
+            content_hash=content_hash,
         )
+
+
+    def apply_dismissals(self, project_id: int) -> Result[int]:
+        """
+        Aplica dismissals persistidos a alertas existentes.
+
+        Busca alertas cuyo content_hash coincida con un dismissal
+        y las marca como DISMISSED. Útil después de un re-análisis.
+
+        Args:
+            project_id: ID del proyecto
+
+        Returns:
+            Result con el número de alertas auto-descartadas
+        """
+        try:
+            with self.db.transaction() as conn:
+                cursor = conn.execute(
+                    """
+                    UPDATE alerts
+                    SET status = 'dismissed',
+                        updated_at = datetime('now'),
+                        resolution_note = 'Auto-descartada: coincide con descarte anterior'
+                    WHERE project_id = ?
+                      AND content_hash != ''
+                      AND content_hash IN (
+                          SELECT content_hash FROM alert_dismissals WHERE project_id = ?
+                      )
+                      AND status NOT IN ('dismissed', 'resolved', 'auto_resolved')
+                    """,
+                    (project_id, project_id),
+                )
+                count = cursor.rowcount
+
+            if count > 0:
+                logger.info(f"Auto-dismissed {count} alerts for project {project_id}")
+            return Result.success(count)
+        except Exception as e:
+            error = DatabaseError(
+                message="Error applying dismissals",
+                context={"error": str(e), "project_id": project_id},
+            )
+            logger.error(f"Failed to apply dismissals: {e}")
+            return Result.failure(error)
 
 
 def get_alert_repository() -> AlertRepository:

@@ -1892,6 +1892,15 @@ JSON:"""
             for ent in compound_loc_entities:
                 result.entities.append(ent)
 
+            # 2.4b Detección de personas compuestas con partículas
+            # ("García de la Vega", "De la Fuente")
+            report_progress("ner", 0.84, "Detectando apellidos con partículas...")
+            compound_per_entities = self._detect_compound_persons(
+                doc, text, entities_found, result.entities
+            )
+            for ent in compound_per_entities:
+                result.entities.append(ent)
+
             # 2.5 Separar entidades coordinadas ("Pedro y Carmen" -> ["Pedro", "Carmen"])
             report_progress("ner", 0.85, "Analizando nombres compuestos...")
             result.entities = self._split_coordinated_entities(doc, result.entities)
@@ -2531,6 +2540,138 @@ JSON:"""
                     new_entities.append(entity)
                     already_found.add(pos)
                     logger.debug(f"Nuevo patrón lugar compuesto (de): '{full_match}'")
+
+        return new_entities
+
+    # Apellidos comunes en español para detección de partículas
+    _COMMON_SURNAMES = {
+        "garcia", "martinez", "lopez", "fernandez", "rodriguez",
+        "perez", "sanchez", "romero", "navarro", "gonzalez",
+        "diaz", "hernandez", "moreno", "muñoz", "alvarez",
+        "jimenez", "ruiz", "torres", "dominguez", "ramos",
+        "vazquez", "castillo", "serrano", "ortiz", "marin",
+        "vega", "fuente", "cruz", "molina", "blanco",
+        "delgado", "ortega", "castro", "guerrero", "medina",
+        "flores", "campos", "herrera", "leon", "reyes",
+        # Variantes con tilde
+        "garcía", "martínez", "lópez", "fernández", "rodríguez",
+        "pérez", "sánchez", "gonzález", "díaz", "hernández",
+        "álvarez", "jiménez", "vázquez", "domínguez", "marín",
+    }
+
+    def _detect_compound_persons(
+        self,
+        doc,
+        full_text: str,
+        already_found: set[tuple[int, int]],
+        existing_entities: list[ExtractedEntity],
+    ) -> list[ExtractedEntity]:
+        """
+        Detecta nombres de personas compuestos con partículas (de, del, de la, etc.).
+
+        Busca patrones como "García de la Vega", "López de Córdoba", "De la Fuente".
+        Solo activa cuando al menos uno de los nombres es un PROPN reconocido por spaCy
+        o un apellido conocido.
+
+        Args:
+            doc: Documento spaCy procesado
+            full_text: Texto completo
+            already_found: Posiciones ya detectadas
+            existing_entities: Entidades ya detectadas
+
+        Returns:
+            Lista de NUEVAS entidades detectadas
+        """
+        import re
+        new_entities = []
+
+        # Patrón: NombrePropio + partícula + NombrePropio
+        # Partículas: de, del, de la, de los, de las
+        compound_pattern = (
+            r'\b([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+'
+            r'(de|del|de la|de los|de las)\s+'
+            r'([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)?)\b'
+        )
+
+        for match in re.finditer(compound_pattern, full_text):
+            first_word = match.group(1)
+            particle = match.group(2)
+            last_part = match.group(3)
+            full_match = match.group(0)
+
+            first_lower = first_word.lower()
+            last_lower = last_part.split()[0].lower() if last_part else ""
+
+            # Verificar que el PRIMER nombre sea un apellido o nombre propio.
+            # El primer token DEBE ser un nombre/apellido, no un sustantivo
+            # común (evita FP con "Nacimiento de Ana", "Batalla de Madrid").
+            first_is_surname = first_lower in self._COMMON_SURNAMES
+            first_is_propn = False
+            for token in doc:
+                if token.text == first_word:
+                    if token.pos_ == "PROPN" or token.ent_type_ == "PER":
+                        first_is_propn = True
+                    break  # Solo verificar el primer token
+
+            if not (first_is_surname or first_is_propn):
+                continue
+
+            # Excluir si el primer nombre es un prefijo de lugar
+            if first_lower in getattr(self, 'LOCATION_PREFIXES', set()):
+                continue
+
+            pattern_start = match.start()
+            pattern_end = match.end()
+            pos = (pattern_start, pattern_end)
+
+            if pos in already_found:
+                continue
+
+            # Verificar si extiende una entidad PER existente
+            extended = False
+            for i, ent in enumerate(existing_entities):
+                if (ent.start_char >= pattern_start and
+                    ent.end_char <= pattern_end and
+                    pattern_end - pattern_start > ent.end_char - ent.start_char and
+                    ent.label == EntityLabel.PER):
+
+                    old_pos = (ent.start_char, ent.end_char)
+                    if old_pos in already_found:
+                        already_found.discard(old_pos)
+                    already_found.add(pos)
+
+                    existing_entities[i] = ExtractedEntity(
+                        text=full_match,
+                        label=EntityLabel.PER,
+                        start_char=pattern_start,
+                        end_char=pattern_end,
+                        confidence=ent.confidence,
+                        source=ent.source + "+compound_person",
+                    )
+                    extended = True
+                    logger.debug(f"PER extendido con partícula: '{ent.text}' → '{full_match}'")
+                    break
+
+            if not extended:
+                # Verificar que no solape con entidades existentes
+                overlaps = False
+                for (s, e) in already_found:
+                    if not (pattern_end <= s or pattern_start >= e):
+                        overlaps = True
+                        break
+
+                if not overlaps:
+                    entity = ExtractedEntity(
+                        text=full_match,
+                        label=EntityLabel.PER,
+                        start_char=pattern_start,
+                        end_char=pattern_end,
+                        confidence=0.7,
+                        source="compound_person_pattern",
+                    )
+                    new_entities.append(entity)
+                    already_found.add(pos)
+                    logger.debug(f"Nuevo PER compuesto: '{full_match}'")
 
         return new_entities
 

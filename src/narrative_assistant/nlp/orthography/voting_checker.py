@@ -592,10 +592,235 @@ class LanguageToolVoter(BaseVoter):
 
 
 class PatternVoter(BaseVoter):
-    """Votante usando patrones regex para errores comunes en español."""
+    """Votante usando patrones regex para errores comunes en español.
+
+    Además de patrones regex, aplica reglas lingüísticas deterministas:
+    - Esdrújulas sin tilde (regla sin excepción en español)
+    - Interrogativas sin tilde en contexto de pregunta
+    - h omitida detectada por raíz (cubre todas las conjugaciones)
+    """
 
     name = "patterns"
     weight = VOTER_WEIGHTS["patterns"]
+
+    # ----------------------------------------------------------------
+    # Esdrújulas: mapa sin_tilde → con_tilde.
+    # Regla RAE: TODA esdrújula lleva tilde, sin excepción.
+    # Generado desde raíces morfológicas comunes para cubrir familias
+    # de palabras completas sin memorizar formas individuales.
+    # ----------------------------------------------------------------
+    @staticmethod
+    def _build_esdrujula_map() -> dict[str, str]:
+        m: dict[str, str] = {}
+
+        def _add_ico(ustem: str, astem: str):
+            for s in ("ico", "ica", "icos", "icas"):
+                m[ustem + s] = astem + s
+
+        def _add_ido(ustem: str, astem: str):
+            for s in ("ido", "ida", "idos", "idas"):
+                m[ustem + s] = astem + s
+
+        def _add_oaos(u: str, a: str):
+            for s in ("o", "a", "os", "as"):
+                m[u + s] = a + s
+
+        def _add_pair(u: str, a: str):
+            m[u] = a
+
+        # --- sufijo -ico/-ica (familias completas) ---
+        for us, ac in [
+            ("cientific", "científic"), ("fantastic", "fantástic"),
+            ("romantic", "romántic"), ("dramatic", "dramátic"),
+            ("tecnic", "técnic"), ("practic", "práctic"),
+            ("logic", "lógic"), ("tipic", "típic"), ("unic", "únic"),
+            ("artistic", "artístic"), ("economic", "económic"),
+            ("politic", "polític"), ("electronic", "electrónic"),
+            ("automatic", "automátic"), ("simpatic", "simpátic"),
+            ("mecanic", "mecánic"), ("organic", "orgánic"),
+            ("dinamic", "dinámic"), ("estatic", "estátic"),
+            ("cosmic", "cósmic"), ("comic", "cómic"),
+            ("tragic", "trágic"), ("magic", "mágic"),
+            ("basic", "básic"), ("plastic", "plástic"),
+            ("elastic", "elástic"), ("domestic", "doméstic"),
+            ("ecologic", "ecológic"), ("biologic", "biológic"),
+            ("psicologic", "psicológic"), ("ideologic", "ideológic"),
+            ("geographic", "geográfic"), ("caotic", "caótic"),
+            ("exotic", "exótic"), ("periodic", "periódic"),
+            ("tematic", "temátic"), ("sistematic", "sistemátic"),
+            ("matematic", "matemátic"), ("informatic", "informátic"),
+            ("acustic", "acústic"), ("optic", "óptic"),
+            ("energetic", "energétic"), ("genetic", "genétic"),
+            ("astronomic", "astronómic"), ("filosofic", "filosófic"),
+            ("fonetic", "fonétic"), ("erotic", "erótic"),
+            ("narcotic", "narcótic"), ("esceptic", "escéptic"),
+            ("antiseptic", "antiséptic"), ("diagnostic", "diagnóstic"),
+            ("pronostic", "pronóstic"), ("estoic", "estóic"),
+            # También incluye médico/público/clásico/histórico:
+            # altísima frecuencia en narrativa como sustantivo/adjetivo
+            ("medic", "médic"), ("public", "públic"),
+            ("classic", "clásic"), ("historic", "históric"),
+        ]:
+            _add_ico(us, ac)
+
+        # --- sufijo -ido/-ida (adjetivos) ---
+        for us, ac in [
+            ("rap", "ráp"), ("sol", "sól"), ("liqu", "líqu"),
+            ("val", "vál"), ("ac", "ác"), ("tim", "tím"),
+            ("humed", "húmed"), ("nit", "nít"), ("luc", "lúc"),
+            ("pal", "pál"), ("cal", "cál"), ("rig", "ríg"),
+            ("plac", "plác"), ("viv", "vív"), ("esplend", "esplénd"),
+        ]:
+            _add_ido(us, ac)
+
+        # --- sufijo -ogo/-oga ---
+        for us, ac in [
+            ("dialog", "diálog"), ("catalog", "catálog"),
+            ("epilog", "epílog"), ("prolog", "prólog"),
+            ("monolog", "monólog"),
+        ]:
+            _add_oaos(us, ac)
+
+        # --- individuales (sustantivos, adjetivos, adverbios) ---
+        indiv = {
+            # -ono
+            "telefono": "teléfono", "telefonos": "teléfonos",
+            "microfono": "micrófono", "microfonos": "micrófonos",
+            # -odo
+            "metodo": "método", "metodos": "métodos",
+            # -eno
+            "fenomeno": "fenómeno", "fenomenos": "fenómenos",
+            # -aro/-ara
+            "pajaro": "pájaro", "pajaros": "pájaros",
+            "cantaro": "cántaro", "cantaros": "cántaros",
+            "barbaro": "bárbaro", "barbara": "bárbara",
+            "barbaros": "bárbaros", "barbaras": "bárbaras",
+            # -ulo/-ula
+            "articulo": "artículo", "articulos": "artículos",
+            "capitulo": "capítulo", "capitulos": "capítulos",
+            "modulo": "módulo", "modulos": "módulos",
+            "formula": "fórmula", "formulas": "fórmulas",
+            "capsula": "cápsula", "capsulas": "cápsulas",
+            "espectaculo": "espectáculo", "espectaculos": "espectáculos",
+            "titulo": "título", "titulos": "títulos",
+            "estimulo": "estímulo", "estimulos": "estímulos",
+            "calculo": "cálculo", "calculos": "cálculos",
+            "vinculo": "vínculo", "vinculos": "vínculos",
+            "obstaculo": "obstáculo", "obstaculos": "obstáculos",
+            "circulo": "círculo", "circulos": "círculos",
+            "musculo": "músculo", "musculos": "músculos",
+            "vehiculo": "vehículo", "vehiculos": "vehículos",
+            "angulo": "ángulo", "angulos": "ángulos",
+            "triangulo": "triángulo", "triangulos": "triángulos",
+            "pendulo": "péndulo", "pendulos": "péndulos",
+            "ridiculo": "ridículo", "ridicula": "ridícula",
+            # -ero/-era
+            "numero": "número", "numeros": "números",
+            "genero": "género", "generos": "géneros",
+            "atmosfera": "atmósfera", "atmosferas": "atmósferas",
+            # -ara
+            "lampara": "lámpara", "lamparas": "lámparas",
+            "camara": "cámara", "camaras": "cámaras",
+            # -ima/-imo
+            "lagrima": "lágrima", "lagrimas": "lágrimas",
+            "maximo": "máximo", "maxima": "máxima",
+            "minimo": "mínimo", "minima": "mínima",
+            "ultimo": "último", "ultima": "última",
+            "ultimos": "últimos", "ultimas": "últimas",
+            "optimo": "óptimo", "optima": "óptima",
+            "pesimo": "pésimo", "pesima": "pésima",
+            "proximo": "próximo", "proxima": "próxima",
+            "intimo": "íntimo", "intima": "íntima",
+            "legitimo": "legítimo", "legitima": "legítima",
+            "victima": "víctima", "victimas": "víctimas",
+            # -ina/-ino
+            "maquina": "máquina", "maquinas": "máquinas",
+            "pagina": "página", "paginas": "páginas",
+            "fabrica": "fábrica", "fabricas": "fábricas",
+            "musica": "música", "musicas": "músicas",
+            # -ofo
+            "filosofo": "filósofo", "filosofa": "filósofa",
+            # -ipe
+            "principe": "príncipe", "principes": "príncipes",
+            # -aba
+            "silaba": "sílaba", "silabas": "sílabas",
+            # -igo
+            "vertigo": "vértigo",
+            # -ato
+            "sabado": "sábado", "sabados": "sábados",
+            # -isis/-esis
+            "analisis": "análisis", "sintesis": "síntesis",
+            "hipotesis": "hipótesis", "parentesis": "paréntesis",
+            "genesis": "génesis",
+            # -ito/-ita
+            "parasito": "parásito", "parasitos": "parásitos",
+            "proposito": "propósito", "propositos": "propósitos",
+            "ejercito": "ejército", "ejercitos": "ejércitos",
+            "credito": "crédito", "creditos": "créditos",
+            "deposito": "depósito", "depositos": "depósitos",
+            "transito": "tránsito", "habito": "hábito",
+            "habitos": "hábitos", "ambito": "ámbito",
+            "exito": "éxito", "exitos": "éxitos",
+            "limite": "límite", "limites": "límites",
+            "espiritu": "espíritu", "espiritus": "espíritus",
+            # -oe
+            "heroe": "héroe", "heroes": "héroes",
+            # adverbios
+            "rapidamente": "rápidamente",
+            "ultimamente": "últimamente",
+        }
+        m.update(indiv)
+        return m
+
+    _ESDRUJULA_MAP: dict[str, str] = {}  # Populated in __init__
+
+    # ----------------------------------------------------------------
+    # Interrogativas: sin tilde → con tilde (en contexto de pregunta).
+    # Regla RAE: pronombres/adverbios interrogativos siempre llevan
+    # tilde en preguntas directas e indirectas.
+    # ----------------------------------------------------------------
+    _INTERROGATIVE_MAP: dict[str, str] = {
+        "donde": "dónde", "como": "cómo", "cuando": "cuándo",
+        "quien": "quién", "quienes": "quiénes",
+        "que": "qué", "cual": "cuál", "cuales": "cuáles",
+        "cuanto": "cuánto", "cuanta": "cuánta",
+        "cuantos": "cuántos", "cuantas": "cuántas",
+    }
+
+    # ----------------------------------------------------------------
+    # h omitida: raíces comunes que empiezan con h-.
+    # Regla: si quitar la h produce un token reconocible, es error.
+    # Cubre TODAS las conjugaciones/derivaciones de cada raíz.
+    # ----------------------------------------------------------------
+    _H_STEMS: dict[str, str] = {
+        # raíz_sin_h → raíz_con_h (mínimo 3 chars para evitar FP)
+        "abit": "habit",    # habitar, habitación, habitaba, habitante...
+        "abitat": "habitat",
+        "abl": "habl",      # hablar, hablaba, hablando...
+        "onest": "honest",  # honesto, honestidad...
+        "onor": "honor",    # honor, honorable...
+        "onra": "honra",    # honra, honrado...
+        "ombr": "hombr",    # hombre, hombros...
+        "umild": "humild",  # humilde, humildad...
+        "umed": "humed",    # húmedo, humedad...
+        "uman": "human",    # humano, humanidad...
+        "umor": "humor",    # humor, humorístico...
+        "ospit": "hospit",  # hospital, hospitalario...
+        "ostil": "hostil",  # hostil, hostilidad...
+        "orribl": "horribl",  # horrible
+        "orror": "horror",  # horror, horroroso...
+        "ermanos": "hermanos",  # (ext. de patrón existente a plurales)
+        "ermanas": "hermanas",
+        "ijos": "hijos", "ijas": "hijas",
+        "ermos": "hermos",  # hermoso, hermosura...
+        "arin": "harin",    # harina
+        "erramienta": "herramienta",
+        "ielo": "hielo", "ierb": "hierb", "ierr": "hierr",
+        "uelg": "huelg",    # huelga
+        "uell": "huell",    # huella
+        "uert": "huert",    # huerto, huerta
+        "ues": "hues",      # hueso, huésped
+    }
 
     # Patrones de errores comunes en español
     ERROR_PATTERNS = [
@@ -613,6 +838,12 @@ class PatternVoter(BaseVoter):
         (r'\b(berduras|berde)\b', 'b_v', ['verduras', 'verde']),
         (r'\b(bolo|boló)\b', 'b_v', ['voló']),  # "Un pájaro bolo" -> "voló"
         (r'\b(abraso|abrasos)\b', 'b_v', ['abrazo', 'abrazos']),  # s/z confusion too
+        (r'\b(nuebo|nueba|nuebos|nuebas)\b', 'b_v', ['nuevo', 'nueva', 'nuevos', 'nuevas']),
+        (r'\b(avuela|avuelo|avuelos|avuelas)\b', 'b_v', ['abuela', 'abuelo', 'abuelos', 'abuelas']),
+        (r'\b(todabia)\b', 'b_v', ['todavía']),
+        (r'\b(lebanto|lebanta|lebantar|lebanvarse|levanvarse)\b', 'b_v',
+         ['levantó', 'levanta', 'levantar', 'levantarse', 'levantarse']),
+        (r'\b(Havian|havian|Havia|havias)\b', 'b_v', ['Habían', 'habían', 'Había', 'habías']),
 
         # Errores con h
         (r'\b(aver|aya|abia|abía|abian)\b', 'h', ['haber', 'haya', 'había', 'había', 'habían']),
@@ -621,6 +852,8 @@ class PatternVoter(BaseVoter):
         (r'\b(abitacion|abitante|abitar)\b', 'h', ['habitación', 'habitante', 'habitar']),
         (r'\b(acer|aciendo|echo|emos)\b', 'h', ['hacer', 'haciendo', 'hecho', 'hemos']),
         (r'\b(ubo|ubiera|ubieron)\b', 'h', ['hubo', 'hubiera', 'hubieron']),
+        (r'\b(ablaban|ablaba|ablar|ablo)\b', 'h', ['hablaban', 'hablaba', 'hablar', 'habló']),
+        (r'\b(Abian|abian|Abia|abia)\b', 'h', ['Habían', 'habían', 'Había', 'había']),
         # Verbos auxiliares con h omitida (contexto: "a ido" = "ha ido", "e estado" = "he estado")
         # Estos requieren contexto, pero los patrones pueden detectarlos en frases comunes
         (r'\ba\s+ido\b', 'h', ['ha ido']),
@@ -629,10 +862,19 @@ class PatternVoter(BaseVoter):
         (r'\ba\s+hecho\b', 'h', ['ha hecho']),
         (r'\be\s+ido\b', 'h', ['he ido']),
 
+        # Confusión g/j (ante e, i)
+        (r'\b(recojer|recojio|recojieron|recojí)\b', 'g_j', ['recoger', 'recogió', 'recogieron', 'recogí']),
+        (r'\b(exijente|exijir|exijencia)\b', 'g_j', ['exigente', 'exigir', 'exigencia']),
+        (r'\b(dirijer|dirijir|dirijio)\b', 'g_j', ['dirigir', 'dirigir', 'dirigió']),
+        (r'\b(elejir|elejí|elejido)\b', 'g_j', ['elegir', 'elegí', 'elegido']),
+        (r'\b(protejir|protejido|proteje)\b', 'g_j', ['proteger', 'protegido', 'protege']),
+        (r'\b(correjir|correjido|corrije)\b', 'g_j', ['corregir', 'corregido', 'corrige']),
+
         # Confusión ll/y
         (r'\b(caye|cayes|cayendo)\b', 'll_y', ['calle', 'calles', 'callendo']),
         (r'\b(poyo|poya)\b', 'll_y', ['pollo', 'polla']),
         (r'\b(vaya|baya|balla)\b', 'll_y', ['vaya', 'vaya', 'valla']),
+        (r'\b(oio|oió)\b', 'll_y', ['oyó', 'oyó']),
 
         # Redundancias y pleonasmos
         (r'\b(subir\s+arriba|bajar\s+abajo|salir\s+afuera|entrar\s+adentro)\b', 'redundancy', []),
@@ -669,6 +911,8 @@ class PatternVoter(BaseVoter):
          ['preguntó', 'respondió', 'pensó', 'comenzó', 'terminó', 'llegó', 'pasó', 'entró', 'salió', 'miró', 'habló']),
         (r'\b(acerco|alejo|sento|levanto|cayo|oyo|sintio|decidio|siguio|subio|bajo)\b', 'accent',
          ['acercó', 'alejó', 'sentó', 'levantó', 'cayó', 'oyó', 'sintió', 'decidió', 'siguió', 'subió', 'bajó']),
+        (r'\b(reian|reia|reias)\b', 'accent', ['reían', 'reía', 'reías']),
+        (r'\b(sabia|sabian|sabias)\b', 'accent', ['sabía', 'sabían', 'sabías']),
 
         # Sustantivos comunes sin tilde
         (r'\b(jardin|arbol|arboles|pajaro|pajaros|sabado|domingo)\b', 'accent',
@@ -696,9 +940,18 @@ class PatternVoter(BaseVoter):
             except re.error as e:
                 logger.warning(f"Patrón inválido '{pattern}': {e}")
 
-        self._available = len(self._compiled_patterns) > 0
+        # Construir mapa de esdrújulas (una sola vez)
+        if not PatternVoter._ESDRUJULA_MAP:
+            PatternVoter._ESDRUJULA_MAP = PatternVoter._build_esdrujula_map()
+
+        self._available = len(self._compiled_patterns) > 0 or bool(PatternVoter._ESDRUJULA_MAP)
         if self._available:
-            logger.info(f"PatternVoter inicializado con {len(self._compiled_patterns)} patrones")
+            logger.info(
+                f"PatternVoter inicializado con {len(self._compiled_patterns)} patrones "
+                f"+ {len(PatternVoter._ESDRUJULA_MAP)} esdrújulas "
+                f"+ {len(self._INTERROGATIVE_MAP)} interrogativas "
+                f"+ {len(self._H_STEMS)} raíces h-"
+            )
 
     def check_word(self, word: str, context: str = "") -> Optional[Vote]:
         if not self._available:
@@ -706,6 +959,7 @@ class PatternVoter(BaseVoter):
 
         word_lower = word.lower()
 
+        # Fase 1: Patrones regex explícitos (máxima confianza)
         for compiled, error_type, suggestions in self._compiled_patterns:
             if compiled.fullmatch(word_lower):
                 return Vote(
@@ -716,11 +970,78 @@ class PatternVoter(BaseVoter):
                     error_type=self._map_error_type(error_type),
                 )
 
+        # Fase 2: Regla de esdrújulas (regla determinista RAE)
+        esdrujula_result = self._check_esdrujula(word_lower)
+        if esdrujula_result:
+            return esdrujula_result
+
+        # Fase 3: Interrogativas sin tilde en contexto de pregunta
+        interrogative_result = self._check_interrogative(word_lower, context)
+        if interrogative_result:
+            return interrogative_result
+
+        # Fase 4: h omitida por raíz (cubre conjugaciones)
+        h_result = self._check_h_stem(word_lower)
+        if h_result:
+            return h_result
+
         return Vote(
             voter_name=self.name,
             is_error=False,
             confidence=0.5,  # Baja confianza si no coincide con patrones
         )
+
+    def _check_esdrujula(self, word_lower: str) -> Optional[Vote]:
+        """Detecta esdrújulas sin tilde usando mapa morfológico."""
+        # Solo palabras sin tilde
+        if any(c in word_lower for c in 'áéíóú'):
+            return None
+        suggestion = self._ESDRUJULA_MAP.get(word_lower)
+        if suggestion:
+            return Vote(
+                voter_name=self.name,
+                is_error=True,
+                confidence=0.88,  # Alta confianza: regla RAE sin excepción
+                suggestions=[suggestion],
+                error_type=SpellingErrorType.ACCENT,
+            )
+        return None
+
+    def _check_interrogative(self, word_lower: str, context: str) -> Optional[Vote]:
+        """Detecta interrogativas sin tilde en contexto de pregunta directa."""
+        if not context:
+            return None
+        suggestion = self._INTERROGATIVE_MAP.get(word_lower)
+        if not suggestion:
+            return None
+        # Verificar contexto de pregunta: ¿...? o ...?
+        if '?' in context or '¿' in context:
+            return Vote(
+                voter_name=self.name,
+                is_error=True,
+                confidence=0.85,
+                suggestions=[suggestion],
+                error_type=SpellingErrorType.ACCENT,
+            )
+        return None
+
+    def _check_h_stem(self, word_lower: str) -> Optional[Vote]:
+        """Detecta h omitida usando raíces morfológicas."""
+        # Solo palabras que empiecen con vocal (candidatas a h omitida)
+        if not word_lower or word_lower[0] not in 'aeiou':
+            return None
+        for stem_no_h, stem_h in self._H_STEMS.items():
+            if word_lower.startswith(stem_no_h):
+                # Reconstruir la palabra con h
+                corrected = stem_h + word_lower[len(stem_no_h):]
+                return Vote(
+                    voter_name=self.name,
+                    is_error=True,
+                    confidence=0.85,
+                    suggestions=[corrected],
+                    error_type=SpellingErrorType.MISSPELLING,
+                )
+        return None
 
     def _map_error_type(self, error_type: str) -> SpellingErrorType:
         mapping = {

@@ -97,6 +97,52 @@ def normalize_text(text: str) -> str:
     return ' '.join(result.lower().split())
 
 
+# Prefijos de título/parentesco que el NER puede incluir en el span de entidad
+# pero que no forman parte del nombre propio en sí.
+_ENTITY_PREFIXES = {
+    # Tratamientos
+    "don", "dona", "doña", "señor", "señora", "senor", "senora",
+    "sr", "sra", "sr.", "sra.",
+    # Parentesco
+    "hermano", "hermana", "hijo", "hija", "padre", "madre",
+    "abuelo", "abuela", "tio", "tia", "tío", "tía",
+    "primo", "prima", "sobrino", "sobrina", "nieto", "nieta",
+    "esposo", "esposa",
+    # Profesionales
+    "doctor", "doctora", "dr", "dra", "dr.", "dra.",
+    "profesor", "profesora", "maestro", "maestra",
+    "capitan", "capitán", "coronel", "general", "teniente",
+    "inspector", "inspectora", "comisario", "comisaria",
+    "fiscal", "juez", "jueza",
+    "ingeniero", "ingeniera", "arquitecto", "arquitecta",
+    "enfermero", "enfermera",
+    # Religiosos
+    "fray", "sor", "san", "santa", "santo",
+    # Nobiliarios
+    "rey", "reina", "principe", "príncipe", "princesa",
+    "conde", "condesa", "duque", "duquesa",
+    "lord", "lady", "sir",
+    # Militares
+    "sargento", "cabo", "almirante",
+    # Académicos
+    "licenciado", "licenciada",
+    # Exploradores/roles narrativos
+    "explorador", "exploradora", "mago", "maga",
+    "sacerdote", "sacerdotisa",
+}
+
+
+def _strip_entity_prefix(text_norm: str) -> str | None:
+    """
+    Si el texto normalizado empieza con un prefijo de título/parentesco
+    seguido de un nombre, devuelve solo el nombre. Retorna None si no aplica.
+    """
+    parts = text_norm.split()
+    if len(parts) >= 2 and parts[0] in _ENTITY_PREFIXES:
+        return " ".join(parts[1:])
+    return None
+
+
 def read_test_file(path: str) -> str:
     """Lee un archivo de texto de prueba."""
     full_path = PROJECT_ROOT / path
@@ -128,6 +174,8 @@ def evaluate_ner(text: str, gold: GoldStandard, verbose: bool = False) -> Evalua
             ner_result = result
 
         # Obtener entidades detectadas (solo PER)
+        # Para cada entidad, registrar tanto el texto completo como
+        # la versión sin prefijo de título/parentesco.
         detected = set()
         detected_original = {}
         for ent in ner_result.entities:
@@ -135,6 +183,11 @@ def evaluate_ner(text: str, gold: GoldStandard, verbose: bool = False) -> Evalua
                 text_norm = normalize_text(ent.text)
                 detected.add(text_norm)
                 detected_original[text_norm] = ent.text
+                # También registrar la forma sin prefijo
+                bare = _strip_entity_prefix(text_norm)
+                if bare and bare != text_norm:
+                    detected.add(bare)
+                    detected_original[bare] = ent.text
 
         # Gold entities normalizadas
         gold_entities = set()
@@ -148,6 +201,11 @@ def evaluate_ner(text: str, gold: GoldStandard, verbose: bool = False) -> Evalua
                     mention_norm = normalize_text(mention)
                     gold_entities.add(mention_norm)
                     gold_original[mention_norm] = mention
+                    # También registrar menciones sin prefijo
+                    bare = _strip_entity_prefix(mention_norm)
+                    if bare and bare != mention_norm:
+                        gold_entities.add(bare)
+                        gold_original[bare] = mention
 
         # Calcular metricas
         true_positives = detected & gold_entities
@@ -879,6 +937,9 @@ def evaluate_orthography(text: str, gold: GoldStandard, verbose: bool = False) -
         return metrics
 
     try:
+        # Filtrar secciones de metadatos (notas del autor, listas de errores, etc.)
+        narrative_text = _filter_metadata_sections(text)
+
         # Usar el nuevo sistema de votación multi-corrector
         from narrative_assistant.nlp.orthography import get_voting_spelling_checker
 
@@ -889,7 +950,7 @@ def evaluate_orthography(text: str, gold: GoldStandard, verbose: bool = False) -
             use_languagetool=True,  # Si disponible
             use_llm_arbitration=False,  # Desactivar LLM para evaluación rápida
         )
-        result = checker.check(text)
+        result = checker.check(narrative_text)
 
         if hasattr(result, 'is_success') and not result.is_success:
             metrics.details["error"] = str(result.error)

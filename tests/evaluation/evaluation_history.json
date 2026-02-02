@@ -1,0 +1,485 @@
+[
+  {
+    "timestamp": "2026-02-02T05:56:11.886059",
+    "overall_f1": 81.2,
+    "regressions": 0,
+    "improvements": 9,
+    "elapsed_seconds": 233.0,
+    "per_capability": {
+      "ner": {
+        "f1": 80.5,
+        "precision": 78.6,
+        "recall": 82.5
+      },
+      "fusion": {
+        "f1": 100.0,
+        "precision": 100.0,
+        "recall": 100.0
+      },
+      "attributes": {
+        "f1": 15.4,
+        "precision": 28.6,
+        "recall": 10.5
+      },
+      "inconsistencies": {
+        "f1": 0.0,
+        "precision": 0.0,
+        "recall": 0.0
+      },
+      "dialogue": {
+        "f1": 0.0,
+        "precision": 0.0,
+        "recall": 0.0
+      },
+      "grammar_dequeismo": {
+        "f1": 100.0,
+        "precision": 100.0,
+        "recall": 100.0
+      },
+      "grammar_queismo": {
+        "f1": 100.0,
+        "precision": 100.0,
+        "recall": 100.0
+      },
+      "grammar_laismo": {
+        "f1": 100.0,
+        "precision": 100.0,
+        "recall": 100.0
+      },
+      "relations": {
+        "f1": 95.7,
+        "precision": 100.0,
+        "recall": 91.7
+      },
+      "chapters": {
+        "f1": 100.0,
+        "precision": 100.0,
+        "recall": 100.0
+      },
+      "timeline": {
+        "f1": 95.1,
+        "precision": 90.6,
+        "recall": 100.0
+      },
+      "orthography": {
+        "f1": 77.2,
+        "precision": 78.0,
+        "recall": 76.5
+      }
+    }
+  },
+  {
+    "timestamp": "2026-02-02T09:49:01.475444",
+    "overall_f1": 88.0,
+    "regressions": 0,
+    "improvements": 2,
+    "elapsed_seconds": 175.3,
+    "per_capability": {
+      "ner": {
+        "f1": 81.9,
+        "precision": 79.1,
+        "recall": 85.0
+      },
+      "fusion": {
+        "f1": 100.0,
+        "precision": 100.0,
+        "recall": 100.0
+      },
+      "attributes": {
+        "f1": 15.4,
+        "precision": 28.6,
+        "recall": 10.5
+      },
+      "inconsistencies": {
+        "f1": 0.0,
+        "precision": 0.0,
+        "recall": 0.0
+      },
+      "dialogue": {
+        "f1": 0.0,
+        "precision": 0.0,
+        "recall": 0.0
+      },
+      "grammar_dequeismo": {
+        "f1": 100.0,
+        "precision": 100.0,
+        "recall": 100.0
+      },
+      "grammar_queismo": {
+        "f1": 100.0,
+        "precision": 100.0,
+        "recall": 100.0
+      },
+      "grammar_laismo": {
+        "f1": 100.0,
+        "precision": 100.0,
+        "recall": 100.0
+      },
+      "relations": {
+        "f1": 95.7,
+        "precision": 100.0,
+        "recall": 91.7
+      },
+      "chapters": {
+        "f1": 100.0,
+        "precision": 100.0,
+        "recall": 100.0
+      },
+      "timeline": {
+        "f1": 95.1,
+        "precision": 90.6,
+        "recall": 100.0
+      },
+      "orthography": {
+        "f1": 100.0,
+        "precision": 100.0,
+        "recall": 100.0
+      }
+    }
+  },
+  {
+    "timestamp": "2026-02-02T09:52:18.345299",
+    "overall_f1": 88.0,
+    "regressions": 0,
+    "improvements": 2,
+    "elapsed_seconds": 175.9,
+    "per_capability": {
+      "ner": {
+        "f1": 81.9,
+        "precision": 79.1,
+        "recall": 85.0
+      },
+      "fusion": {
+        "f1": 100.0,
+        "precision": 100.0,
+        "recall": 100.0
+      },
+      "attributes": {
+        "f1": 15.4,
+        "precision": 28.6,
+        "recall": 10.5
+      },
+      "inconsistencies": {
+        "f1": 0.0,
+        "precision": 0.0,
+        "recall": 0.0
+      },
+      "dialogue": {
+        "f1": 0.0,
+        "precision": 0.0,
+        "recall": 0.0
+      },
+      "grammar_dequeismo": {
+        "f1": 100.0,
+        "precision": 100.0,
+        "recall": 100.0
+      },
+      "grammar_queismo": {
+        "f1": 100.0,
+        "precision": 100.0,
+        "recall": 100.0
+      },
+      "grammar_laismo": {
+        "f1": 100.0,
+        "precision": 100.0,
+        "recall": 100.0
+      },
+      "relations": {
+        "f1": 95.7,
+        "precision": 100.0,
+        "recall": 91.7
+      },
+      "chapters": {
+        "f1": 100.0,
+        "precision": 100.0,
+        "recall": 100.0
+      },
+      "timeline": {
+        "f1": 95.1,
+        "precision": 90.6,
+        "recall": 100.0
+      },
+      "orthography": {
+        "f1": 100.0,
+        "precision": 100.0,
+        "recall": 100.0
+      }
+    }
+  },
+  {
+    "timestamp": "2026-02-02T10:28:51.546885",
+    "overall_f1": 86.5,
+    "regressions": 1,
+    "improvements": 0,
+    "elapsed_seconds": 211.3,
+    "per_capability": {
+      "ner": {
+        "f1": 79.1,
+        "precision": 73.9,
+        "recall": 85.0
+      },
+      "fusion": {
+        "f1": 100.0,
+        "precision": 100.0,
+        "recall": 100.0
+      },
+      "attributes": {
+        "f1": 15.4,
+        "precision": 28.6,
+        "recall": 10.5
+      },
+      "inconsistencies": {
+        "f1": 0.0,
+        "precision": 0.0,
+        "recall": 0.0
+      },
+      "dialogue": {
+        "f1": 0.0,
+        "precision": 0.0,
+        "recall": 0.0
+      },
+      "grammar_dequeismo": {
+        "f1": 100.0,
+        "precision": 100.0,
+        "recall": 100.0
+      },
+      "grammar_queismo": {
+        "f1": 100.0,
+        "precision": 100.0,
+        "recall": 100.0
+      },
+      "grammar_laismo": {
+        "f1": 100.0,
+        "precision": 100.0,
+        "recall": 100.0
+      },
+      "relations": {
+        "f1": 95.7,
+        "precision": 100.0,
+        "recall": 91.7
+      },
+      "chapters": {
+        "f1": 100.0,
+        "precision": 100.0,
+        "recall": 100.0
+      },
+      "timeline": {
+        "f1": 95.1,
+        "precision": 90.6,
+        "recall": 100.0
+      },
+      "orthography": {
+        "f1": 96.7,
+        "precision": 93.7,
+        "recall": 100.0
+      }
+    }
+  },
+  {
+    "timestamp": "2026-02-02T10:36:31.774148",
+    "overall_f1": 87.1,
+    "regressions": 0,
+    "improvements": 0,
+    "elapsed_seconds": 187.4,
+    "per_capability": {
+      "ner": {
+        "f1": 81.9,
+        "precision": 79.1,
+        "recall": 85.0
+      },
+      "fusion": {
+        "f1": 100.0,
+        "precision": 100.0,
+        "recall": 100.0
+      },
+      "attributes": {
+        "f1": 15.4,
+        "precision": 28.6,
+        "recall": 10.5
+      },
+      "inconsistencies": {
+        "f1": 0.0,
+        "precision": 0.0,
+        "recall": 0.0
+      },
+      "dialogue": {
+        "f1": 0.0,
+        "precision": 0.0,
+        "recall": 0.0
+      },
+      "grammar_dequeismo": {
+        "f1": 100.0,
+        "precision": 100.0,
+        "recall": 100.0
+      },
+      "grammar_queismo": {
+        "f1": 100.0,
+        "precision": 100.0,
+        "recall": 100.0
+      },
+      "grammar_laismo": {
+        "f1": 100.0,
+        "precision": 100.0,
+        "recall": 100.0
+      },
+      "relations": {
+        "f1": 95.7,
+        "precision": 100.0,
+        "recall": 91.7
+      },
+      "chapters": {
+        "f1": 100.0,
+        "precision": 100.0,
+        "recall": 100.0
+      },
+      "timeline": {
+        "f1": 95.1,
+        "precision": 90.6,
+        "recall": 100.0
+      },
+      "orthography": {
+        "f1": 96.7,
+        "precision": 93.7,
+        "recall": 100.0
+      }
+    }
+  },
+  {
+    "timestamp": "2026-02-02T11:05:28.193373",
+    "overall_f1": 88.2,
+    "regressions": 0,
+    "improvements": 0,
+    "elapsed_seconds": 314.6,
+    "per_capability": {
+      "ner": {
+        "f1": 81.9,
+        "precision": 79.1,
+        "recall": 85.0
+      },
+      "fusion": {
+        "f1": 100.0,
+        "precision": 100.0,
+        "recall": 100.0
+      },
+      "attributes": {
+        "f1": 15.4,
+        "precision": 28.6,
+        "recall": 10.5
+      },
+      "inconsistencies": {
+        "f1": 0.0,
+        "precision": 0.0,
+        "recall": 0.0
+      },
+      "dialogue": {
+        "f1": 0.0,
+        "precision": 0.0,
+        "recall": 0.0
+      },
+      "grammar_dequeismo": {
+        "f1": 100.0,
+        "precision": 100.0,
+        "recall": 100.0
+      },
+      "grammar_queismo": {
+        "f1": 100.0,
+        "precision": 100.0,
+        "recall": 100.0
+      },
+      "grammar_laismo": {
+        "f1": 100.0,
+        "precision": 100.0,
+        "recall": 100.0
+      },
+      "relations": {
+        "f1": 95.7,
+        "precision": 100.0,
+        "recall": 91.7
+      },
+      "chapters": {
+        "f1": 100.0,
+        "precision": 100.0,
+        "recall": 100.0
+      },
+      "timeline": {
+        "f1": 95.1,
+        "precision": 90.6,
+        "recall": 100.0
+      },
+      "orthography": {
+        "f1": 100.0,
+        "precision": 100.0,
+        "recall": 100.0
+      }
+    }
+  },
+  {
+    "timestamp": "2026-02-02T11:34:42.070112",
+    "overall_f1": 88.2,
+    "regressions": 0,
+    "improvements": 0,
+    "elapsed_seconds": 232.8,
+    "per_capability": {
+      "ner": {
+        "f1": 81.9,
+        "precision": 79.1,
+        "recall": 85.0
+      },
+      "fusion": {
+        "f1": 100.0,
+        "precision": 100.0,
+        "recall": 100.0
+      },
+      "attributes": {
+        "f1": 15.4,
+        "precision": 28.6,
+        "recall": 10.5
+      },
+      "inconsistencies": {
+        "f1": 0.0,
+        "precision": 0.0,
+        "recall": 0.0
+      },
+      "dialogue": {
+        "f1": 0.0,
+        "precision": 0.0,
+        "recall": 0.0
+      },
+      "grammar_dequeismo": {
+        "f1": 100.0,
+        "precision": 100.0,
+        "recall": 100.0
+      },
+      "grammar_queismo": {
+        "f1": 100.0,
+        "precision": 100.0,
+        "recall": 100.0
+      },
+      "grammar_laismo": {
+        "f1": 100.0,
+        "precision": 100.0,
+        "recall": 100.0
+      },
+      "relations": {
+        "f1": 95.7,
+        "precision": 100.0,
+        "recall": 91.7
+      },
+      "chapters": {
+        "f1": 100.0,
+        "precision": 100.0,
+        "recall": 100.0
+      },
+      "timeline": {
+        "f1": 95.1,
+        "precision": 90.6,
+        "recall": 100.0
+      },
+      "orthography": {
+        "f1": 100.0,
+        "precision": 100.0,
+        "recall": 100.0
+      }
+    }
+  }
+]

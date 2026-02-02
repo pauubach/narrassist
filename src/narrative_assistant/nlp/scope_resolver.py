@@ -4,6 +4,11 @@ Resolución de scope gramatical para vinculación de entidades y atributos.
 Reemplaza ventanas de caracteres fijas (400, 500 chars) con scope basado en
 unidades lingüísticas reales: oraciones, párrafos y relaciones de dependencia.
 
+Incluye detección de cláusulas relativas y resolución de identidad copulativa
+para manejar correctamente:
+- "El hombre que María había visto tenía ojos azules" → ojos azules → El hombre
+- "La mujer de ojos verdes que Juan conoció era María" → ojos verdes → María
+
 Uso:
     from narrative_assistant.nlp.scope_resolver import ScopeResolver
 
@@ -26,6 +31,12 @@ MAX_CHAR_FALLBACK = 1500
 
 # Número de oraciones vecinas a considerar para scope
 SENTENCE_WINDOW = 3
+
+# Artículos del español para matching flexible de nombres
+_SPANISH_ARTICLES = frozenset({"el", "la", "los", "las", "un", "una", "unos", "unas"})
+
+# Verbos copulativos para detección de identidad copulativa
+_COPULAR_LEMMAS = frozenset({"ser", "estar", "parecer", "resultar"})
 
 
 @dataclass
@@ -51,6 +62,8 @@ class ScopeResolver:
     1. Oración actual + N oraciones previas (sentence_scope)
     2. Límites de párrafo (paragraph_scope)
     3. Relaciones de dependencia para encontrar sujeto gramatical
+    4. Detección de cláusulas relativas para filtrar entidades irrelevantes
+    5. Identidad copulativa ("X era Y") para resolver sujetos no-entidad
     """
 
     def __init__(self, doc, text: str):
@@ -63,6 +76,7 @@ class ScopeResolver:
         self.text = text
         self._paragraph_boundaries = self._compute_paragraph_boundaries()
         self._sentence_spans = self._compute_sentence_spans()
+        self._rc_spans = self._compute_relative_clause_spans()
 
     def _compute_paragraph_boundaries(self) -> list[tuple[int, int]]:
         """Calcula los límites de todos los párrafos del texto."""
@@ -84,6 +98,42 @@ class ScopeResolver:
         for sent in self.doc.sents:
             spans.append((sent.start_char, sent.end_char))
         return spans
+
+    def _compute_relative_clause_spans(self) -> list[tuple[int, int, int]]:
+        """
+        Identifica spans de cláusulas relativas usando el árbol de dependencias.
+
+        Busca tokens con dep_ in ('acl', 'relcl') que son raíces de cláusulas
+        relativas que modifican un antecedente nominal.
+
+        Returns:
+            Lista de (rc_start_char, rc_end_char, antecedent_token_idx)
+        """
+        spans = []
+        for token in self.doc:
+            if token.dep_ in ("acl", "relcl"):
+                subtree = list(token.subtree)
+                if subtree:
+                    rc_start = min(t.idx for t in subtree)
+                    rc_end = max(t.idx + len(t.text) for t in subtree)
+                    spans.append((rc_start, rc_end, token.head.i))
+        return spans
+
+    def is_in_relative_clause(self, char_position: int) -> tuple[bool, Optional[int]]:
+        """
+        Verifica si una posición de caracteres cae dentro de una cláusula relativa.
+
+        Args:
+            char_position: Posición en caracteres a verificar
+
+        Returns:
+            Tupla (está_en_rc, índice_token_antecedente). El antecedente es el
+            token nominal que la RC modifica, o None si no está en RC.
+        """
+        for rc_start, rc_end, antecedent_idx in self._rc_spans:
+            if rc_start <= char_position < rc_end:
+                return (True, antecedent_idx)
+        return (False, None)
 
     def sentence_scope(
         self, position: int, window: int = SENTENCE_WINDOW
@@ -143,6 +193,10 @@ class ScopeResolver:
             start=0, end=len(self.text), scope_type="paragraph"
         )
 
+    # =========================================================================
+    # Resolución de sujeto gramatical
+    # =========================================================================
+
     def find_subject_for_predicate(self, predicate_token) -> Optional[str]:
         """
         Dado un token predicativo (adjetivo, participio), encuentra el sujeto.
@@ -159,18 +213,29 @@ class ScopeResolver:
         Returns:
             Texto del sujeto encontrado, o None
         """
-        # Caso 1: El predicado depende directamente de un verbo copulativo
+        text, _ = self._find_subject_token(predicate_token)
+        return text
+
+    def _find_subject_token(self, predicate_token) -> tuple[Optional[str], Optional[object]]:
+        """
+        Igual que find_subject_for_predicate pero retorna también el token del sujeto.
+
+        Útil para encadenar con búsqueda de identidad copulativa.
+
+        Returns:
+            Tupla (subject_text, subject_token) o (None, None)
+        """
+        # Caso 1: El predicado depende directamente de un verbo
         head = predicate_token.head
         if morpho_utils.is_verb(head):
-            # Buscar nsubj del verbo
             for child in head.children:
                 if child.dep_ in ("nsubj", "nsubj:pass"):
-                    return self._expand_entity_span(child)
+                    return (self._expand_entity_span(child), child)
 
         # Caso 2: El predicado ES el head (aposición, atributo directo)
         for child in predicate_token.children:
             if child.dep_ in ("nsubj", "nsubj:pass"):
-                return self._expand_entity_span(child)
+                return (self._expand_entity_span(child), child)
 
         # Caso 3: Buscar en ancestros (cadena de dependencias)
         current = predicate_token
@@ -181,9 +246,27 @@ class ScopeResolver:
             if morpho_utils.is_verb(current):
                 for child in current.children:
                     if child.dep_ in ("nsubj", "nsubj:pass"):
-                        return self._expand_entity_span(child)
+                        return (self._expand_entity_span(child), child)
 
-        return None
+        # Caso 4: ROOT nominal con estructura copulativa
+        # "La mujer de ojos verdes era María" → mujer=ROOT, Maria=acl+cop
+        # spaCy puede anidar la cópula profundamente en el subtree del acl:
+        # mujer → conoció(acl) → María(obj) → era(cop)
+        if current.head == current and current.pos_ == "NOUN":
+            # Buscar cop en el subtree completo de cualquier hijo acl/relcl
+            for child in current.children:
+                if child.dep_ in ("acl", "relcl"):
+                    for desc in child.subtree:
+                        if desc.dep_ == "cop":
+                            cop_lemma = (desc.lemma_ or "").lower()
+                            if cop_lemma in _COPULAR_LEMMAS:
+                                return (self._expand_entity_span(current), current)
+            # También buscar cop directo (otra variante de parseo)
+            for child in current.children:
+                if child.dep_ == "cop":
+                    return (self._expand_entity_span(current), current)
+
+        return (None, None)
 
     def _expand_entity_span(self, token) -> str:
         """
@@ -207,6 +290,151 @@ class ScopeResolver:
         tokens_in_span.sort(key=lambda t: t.i)
         return " ".join(t.text for t in tokens_in_span)
 
+    # =========================================================================
+    # Identidad copulativa: "X era Y"
+    # =========================================================================
+
+    def _find_copular_identity(self, subject_token) -> Optional[str]:
+        """
+        Busca identidad copulativa para un sujeto.
+
+        En oraciones copulativas ("X era Y", "X es Y"), el sujeto y el predicado
+        nominal son correferentes. Si el sujeto no está en entity_mentions pero
+        el predicado nominal sí, se puede usar esta relación.
+
+        Ejemplo: "La mujer de ojos verdes que Juan conoció era María."
+        → subject_token = "mujer" → identidad copulativa = "María"
+
+        Args:
+            subject_token: Token del sujeto gramatical
+
+        Returns:
+            Texto de la identidad copulativa, o None
+        """
+        head = subject_token.head
+
+        # Caso 0: subject es ROOT → buscar acl/relcl con estructura copulativa
+        # "La mujer de ojos verdes era María" → mujer=ROOT, Maria=acl, era=cop
+        # La cópula puede estar a cualquier profundidad en el subtree:
+        # mujer → conoció(acl) → María(obj) → era(cop)
+        if head is None or head == subject_token:
+            for child in subject_token.children:
+                if child.dep_ in ("acl", "relcl"):
+                    for desc in child.subtree:
+                        if desc.dep_ == "cop":
+                            cop_lemma = (desc.lemma_ or "").lower()
+                            if cop_lemma in _COPULAR_LEMMAS:
+                                # desc.head es el nominal predicativo (la identidad)
+                                return self._expand_entity_span(desc.head)
+            return None
+
+        # Caso 1: head es verbo copulativo → buscar attr/predicado nominal
+        if morpho_utils.is_verb(head):
+            lemma = (head.lemma_ or "").lower()
+            if lemma in _COPULAR_LEMMAS:
+                for child in head.children:
+                    if child.dep_ in ("attr", "acomp", "oprd") and child.i != subject_token.i:
+                        return self._expand_entity_span(child)
+
+        # Caso 2: head es predicado nominal (estructura con cop)
+        # spaCy puede parsear "X era Y" como: Y=ROOT, era=cop→Y, X=nsubj→Y
+        if not morpho_utils.is_verb(head):
+            for sibling in head.children:
+                if sibling.dep_ == "cop":
+                    cop_lemma = (sibling.lemma_ or "").lower()
+                    if cop_lemma in _COPULAR_LEMMAS:
+                        return self._expand_entity_span(head)
+
+        return None
+
+    # =========================================================================
+    # Matching flexible de nombres (maneja artículos y acentos)
+    # =========================================================================
+
+    @staticmethod
+    def _strip_articles(name: str) -> str:
+        """Elimina artículos iniciales de un nombre para matching flexible."""
+        words = name.strip().split()
+        while words and words[0].lower() in _SPANISH_ARTICLES:
+            words = words[1:]
+        return " ".join(words)
+
+    def _names_match_flexible(self, name1: str, name2: str) -> bool:
+        """
+        Compara nombres de forma flexible, manejando artículos y acentos.
+
+        "hombre" ↔ "El hombre" → True
+        "María" ↔ "Maria" → True
+        "mujer" ↔ "La mujer de ojos verdes" → False (demasiado diferente)
+        """
+        n1 = morpho_utils.normalize_name(name1)
+        n2 = morpho_utils.normalize_name(name2)
+        if n1 == n2:
+            return True
+
+        n1_stripped = morpho_utils.normalize_name(self._strip_articles(name1))
+        n2_stripped = morpho_utils.normalize_name(self._strip_articles(name2))
+
+        # Requiere al menos 2 chars tras eliminar artículos para evitar falsos positivos
+        if len(n1_stripped) < 2 or len(n2_stripped) < 2:
+            return False
+
+        if n1_stripped == n2_stripped:
+            return True
+        if n1_stripped == n2 or n1 == n2_stripped:
+            return True
+
+        return False
+
+    # =========================================================================
+    # Filtrado de entidades en cláusulas relativas
+    # =========================================================================
+
+    def _filter_rc_entities(
+        self,
+        attr_position: int,
+        entity_mentions: list[tuple[str, int, int, str]],
+    ) -> list[tuple[str, int, int, str]]:
+        """
+        Filtra entidades dentro de cláusulas relativas cuando el atributo está fuera.
+
+        Previene asignar atributos a entidades que están dentro de una RC
+        y no son el antecedente del atributo.
+
+        Ejemplo: "El hombre que María había visto tenía ojos azules."
+        → "ojos azules" está fuera de la RC
+        → "María" está dentro de "que María había visto"
+        → Se excluye "María" de los candidatos de proximidad
+
+        Args:
+            attr_position: Posición del atributo
+            entity_mentions: Lista de entidades candidatas
+
+        Returns:
+            Lista filtrada (sin entidades en RC). Si el filtrado elimina
+            todos los candidatos, retorna la lista original sin filtrar.
+        """
+        if not self._rc_spans:
+            return entity_mentions
+
+        attr_in_rc, _ = self.is_in_relative_clause(attr_position)
+        if attr_in_rc:
+            return entity_mentions  # Si el atributo está en RC, no filtrar
+
+        filtered = []
+        for mention in entity_mentions:
+            name, start, end, etype = mention
+            ent_in_rc, _ = self.is_in_relative_clause(start)
+            if not ent_in_rc:
+                filtered.append(mention)
+
+        # Safety: nunca eliminar todos los candidatos
+        return filtered if filtered else entity_mentions
+
+    # =========================================================================
+    # Resolución principal de entidad por scope
+    # =========================================================================
+
     def find_nearest_entity_by_scope(
         self,
         position: int,
@@ -220,9 +448,12 @@ class ScopeResolver:
 
         Estrategia:
         1. Intentar encontrar sujeto gramatical vía dependency parsing
-        2. Si no, buscar entidad más cercana en la misma oración
-        3. Si no, buscar en oraciones vecinas (scope de oración)
-        4. Fallback: proximidad con límite de 1500 chars
+           a. Matching flexible (maneja artículos: "hombre" ↔ "El hombre")
+           b. Identidad copulativa ("La mujer era María" → "María")
+        2. Filtrar entidades dentro de cláusulas relativas
+        3. Buscar entidad más cercana en la misma oración
+        4. Buscar en oraciones vecinas (scope de oración)
+        5. Fallback: proximidad con límite de 1500 chars
 
         Args:
             position: Posición del atributo/predicado en el texto
@@ -239,19 +470,52 @@ class ScopeResolver:
         if prefer_subject:
             token_at_pos = self._token_at_position(position)
             if token_at_pos:
-                subject = self.find_subject_for_predicate(token_at_pos)
-                if subject:
-                    # Buscar en entity_mentions la que coincida con el sujeto
-                    subject_lower = morpho_utils.normalize_name(subject)
+                subject_text, subject_token = self._find_subject_token(token_at_pos)
+                if subject_text:
+                    # 1a: Matching flexible con entity_mentions
+                    subject_match = None
                     for name, start, end, etype in entity_mentions:
-                        if morpho_utils.normalize_name(name) == subject_lower:
-                            return (name, 0.95)  # Alta confianza: sujeto gramatical
+                        if self._names_match_flexible(subject_text, name):
+                            subject_match = name
+                            break
 
-        # Paso 2: Buscar en la misma oración
+                    # 1b: Identidad copulativa
+                    # "La mujer ... era María" → subject="mujer" → identity="María"
+                    identity_match = None
+                    if subject_token is not None:
+                        identity = self._find_copular_identity(subject_token)
+                        if identity:
+                            for name, start, end, etype in entity_mentions:
+                                if self._names_match_flexible(identity, name):
+                                    identity_match = name
+                                    break
+
+                    # Decisión: si el sujeto es un NOUN descriptivo ("mujer", "hombre")
+                    # y la identidad copulativa resuelve a un nombre propio en las
+                    # entidades, preferir el nombre propio.
+                    if identity_match:
+                        is_descriptive_noun = (
+                            subject_token is not None
+                            and subject_token.pos_ == "NOUN"
+                        )
+                        if is_descriptive_noun or not subject_match:
+                            logger.debug(
+                                f"Identidad copulativa: '{subject_text}' = '{identity}' "
+                                f"→ entidad '{identity_match}'"
+                            )
+                            return (identity_match, 0.92)
+
+                    if subject_match:
+                        return (subject_match, 0.95)  # Alta confianza: sujeto gramatical
+
+        # Paso 2: Filtrar entidades dentro de cláusulas relativas
+        filtered_mentions = self._filter_rc_entities(position, entity_mentions)
+
+        # Paso 3: Buscar en la misma oración
         sent_scope = self.sentence_scope(position, window=0)
         candidates_in_sentence = [
             (name, start, end, etype)
-            for name, start, end, etype in entity_mentions
+            for name, start, end, etype in filtered_mentions
             if sent_scope.contains(start)
         ]
 
@@ -263,11 +527,11 @@ class ScopeResolver:
             )
             return (best[0], 0.85)  # Buena confianza: misma oración
 
-        # Paso 3: Buscar en scope de oraciones vecinas
+        # Paso 4: Buscar en scope de oraciones vecinas
         wider_scope = self.sentence_scope(position, window=SENTENCE_WINDOW)
         candidates_in_scope = [
             (name, start, end, etype)
-            for name, start, end, etype in entity_mentions
+            for name, start, end, etype in filtered_mentions
             if wider_scope.contains(start)
         ]
 
@@ -281,11 +545,11 @@ class ScopeResolver:
             confidence = max(0.5, 0.8 - (distance_chars / 2000))
             return (best[0], confidence)
 
-        # Paso 4: Respetar límite de párrafo
+        # Paso 5: Respetar límite de párrafo
         para_scope = self.paragraph_scope(position)
         candidates_in_paragraph = [
             (name, start, end, etype)
-            for name, start, end, etype in entity_mentions
+            for name, start, end, etype in filtered_mentions
             if para_scope.contains(start)
         ]
 
@@ -296,10 +560,10 @@ class ScopeResolver:
             )
             return (best[0], 0.45)  # Baja confianza: mismo párrafo pero lejos
 
-        # Paso 5: Fallback con límite de seguridad
+        # Paso 6: Fallback con límite de seguridad
         fallback_candidates = [
             (name, start, end, etype)
-            for name, start, end, etype in entity_mentions
+            for name, start, end, etype in filtered_mentions
             if abs(start - position) < MAX_CHAR_FALLBACK
         ]
 

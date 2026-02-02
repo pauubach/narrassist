@@ -377,6 +377,7 @@ GOLD_ERRORES_ORTOGRAFICOS = GoldStandard(
 
     orthography_errors=[
         # Capitulo 1: Acentos
+        GoldOrthographyError("accent", "CAPITULO", "CAPÍTULO", 1),  # Esdrújula en encabezados
         GoldOrthographyError("accent", "Lucia", "Lucía", 1),  # Falta tilde
         GoldOrthographyError("accent", "Andres", "Andrés", 1),
         GoldOrthographyError("accent", "jardin", "jardin", 1),
@@ -395,8 +396,10 @@ GOLD_ERRORES_ORTOGRAFICOS = GoldStandard(
         GoldOrthographyError("accent", "pajaros", "pajaros", 1),
         GoldOrthographyError("accent", "arboles", "arboles", 1),
         GoldOrthographyError("accent", "publico", "publico", 1),
+        GoldOrthographyError("accent", "tambien", "también", 1),
 
-        # Capitulo 2: b/v
+        # Capitulo 2: b/v + acentos faltantes en capitulo 2
+        GoldOrthographyError("accent", "pajaro", "pájaro", 2),
         GoldOrthographyError("b_v", "obserbo", "observo", 2),
         GoldOrthographyError("b_v", "estava", "estaba", 2),
         GoldOrthographyError("b_v", "lebanto", "levanto", 2),
@@ -408,7 +411,9 @@ GOLD_ERRORES_ORTOGRAFICOS = GoldStandard(
         GoldOrthographyError("b_v", "levanvarse", "levantarse", 2),
         GoldOrthographyError("b_v", "recojio", "recogio", 2),
 
-        # Capitulo 3: h
+        # Capitulo 3: h + acentos faltantes
+        GoldOrthographyError("accent", "Como", "Cómo", 3),  # Interrogativa sin tilde
+        GoldOrthographyError("accent", "llego", "llegó", 3),
         GoldOrthographyError("h", "ermano", "hermano", 3),
         GoldOrthographyError("h", "aciendo", "haciendo", 3),
         GoldOrthographyError("h", "Ola", "Hola", 3),
@@ -421,14 +426,19 @@ GOLD_ERRORES_ORTOGRAFICOS = GoldStandard(
         GoldOrthographyError("h", "Abia", "Habia", 3),
         GoldOrthographyError("h", "Abian", "Habian", 3),
 
-        # Capitulo 4: ll/y
+        # Capitulo 4: ll/y + acentos faltantes
+        GoldOrthographyError("accent", "sintio", "sintió", 4),
+        GoldOrthographyError("accent", "miro", "miró", 4),
+        GoldOrthographyError("accent", "decidio", "decidió", 4),
         GoldOrthographyError("ll_y", "oio", "oyo", 4),
         GoldOrthographyError("ll_y", "caye", "calle", 4),
         GoldOrthographyError("ll_y", "reian", "reian", 4),
         GoldOrthographyError("ll_y", "ablaban", "hablaban", 4),
         GoldOrthographyError("ll_y", "havia", "habia", 4),
 
-        # Capitulo 5: varios
+        # Capitulo 5: varios + acentos faltantes
+        GoldOrthographyError("accent", "dia", "día", 5),
+        GoldOrthographyError("accent", "paso", "pasó", 5),
         GoldOrthographyError("other", "mui", "muy", 5),
         GoldOrthographyError("other", "siguente", "siguiente", 5),
         GoldOrthographyError("other", "acer", "hacer", 5),
@@ -438,6 +448,8 @@ GOLD_ERRORES_ORTOGRAFICOS = GoldStandard(
         GoldOrthographyError("other", "todabia", "todavia", 5),
         GoldOrthographyError("other", "cuidad", "ciudad", 5),
         GoldOrthographyError("other", "abraso", "abrazo", 5),
+        GoldOrthographyError("accent", "calido", "cálido", 5),  # Esdrújula sin tilde
+        GoldOrthographyError("accent", "ultima", "última", 5),  # Esdrújula sin tilde
     ],
 )
 

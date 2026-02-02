@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 _database_lock = threading.Lock()
 
 # Versión del schema actual
-SCHEMA_VERSION = 11
+SCHEMA_VERSION = 13
 
 # Tablas esenciales que deben existir para una BD válida
 # Solo incluir las tablas básicas definidas en SCHEMA_SQL
@@ -74,6 +74,15 @@ CREATE TABLE IF NOT EXISTS chapters (
     structure_type TEXT DEFAULT 'chapter',
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    -- Métricas de enriquecimiento (computadas post-análisis)
+    dialogue_ratio REAL,
+    avg_sentence_length REAL,
+    scene_count INTEGER,
+    characters_present_count INTEGER,
+    pov_character TEXT,
+    dominant_tone TEXT,
+    tone_intensity REAL,
+    reading_time_minutes INTEGER,
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
 );
 
@@ -226,10 +235,14 @@ CREATE TABLE IF NOT EXISTS alerts (
     -- Datos adicionales específicos del tipo (JSON)
     extra_data TEXT DEFAULT '{}',
 
+    -- Hash de contenido para persistir dismissals entre re-análisis (versión 12)
+    content_hash TEXT DEFAULT '',
+
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_alerts_project ON alerts(project_id);
+CREATE INDEX IF NOT EXISTS idx_alerts_content_hash ON alerts(content_hash);
 CREATE INDEX IF NOT EXISTS idx_alerts_status ON alerts(status);
 CREATE INDEX IF NOT EXISTS idx_alerts_type ON alerts(alert_type);
 CREATE INDEX IF NOT EXISTS idx_alerts_category ON alerts(category);
@@ -760,8 +773,47 @@ CREATE TABLE IF NOT EXISTS speaker_corrections (
 CREATE INDEX IF NOT EXISTS idx_speaker_corrections_project ON speaker_corrections(project_id);
 CREATE INDEX IF NOT EXISTS idx_speaker_corrections_chapter ON speaker_corrections(project_id, chapter_number);
 
+-- ===================================================================
+-- NUEVAS TABLAS: Persistencia de dismissals (versión 12)
+-- ===================================================================
+
+-- Dismissals de alertas (persisten entre re-análisis vía content_hash)
+CREATE TABLE IF NOT EXISTS alert_dismissals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    content_hash TEXT NOT NULL,          -- Hash del contenido de la alerta (match entre reruns)
+    scope TEXT NOT NULL DEFAULT 'instance',  -- instance, document, project
+    reason TEXT DEFAULT '',              -- Razón del descarte (false_positive, not_applicable, etc.)
+    alert_type TEXT DEFAULT '',          -- Tipo de alerta (para estadísticas)
+    source_module TEXT DEFAULT '',       -- Módulo fuente (para estadísticas)
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    UNIQUE (project_id, content_hash)   -- Un hash solo puede descartarse una vez por proyecto
+);
+
+CREATE INDEX IF NOT EXISTS idx_dismissals_project ON alert_dismissals(project_id);
+CREATE INDEX IF NOT EXISTS idx_dismissals_hash ON alert_dismissals(content_hash);
+CREATE INDEX IF NOT EXISTS idx_dismissals_type ON alert_dismissals(alert_type);
+
+-- Reglas de supresión definidas por el usuario
+CREATE TABLE IF NOT EXISTS suppression_rules (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER,                  -- NULL = regla global (todos los proyectos)
+    rule_type TEXT NOT NULL,             -- alert_type, category, entity, source_module
+    pattern TEXT NOT NULL,               -- Patrón a suprimir (ej: "attribute_inconsistency", "spelling_*")
+    entity_name TEXT,                    -- Si rule_type='entity', nombre de la entidad
+    reason TEXT DEFAULT '',              -- Explicación de la regla
+    is_active INTEGER DEFAULT 1,         -- Si la regla está activa
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_suppression_project ON suppression_rules(project_id);
+CREATE INDEX IF NOT EXISTS idx_suppression_active ON suppression_rules(is_active);
+CREATE INDEX IF NOT EXISTS idx_suppression_type ON suppression_rules(rule_type);
+
 -- Insertar versión del schema
-INSERT OR REPLACE INTO schema_info (key, value) VALUES ('version', '11');
+INSERT OR REPLACE INTO schema_info (key, value) VALUES ('version', '12');
 """
 
 
@@ -912,6 +964,16 @@ class Database:
         migrations = [
             # (tabla, columna, definición SQL)
             ("entity_mentions", "metadata", "TEXT"),
+            ("alerts", "content_hash", "TEXT DEFAULT ''"),
+            # S-6: Métricas de enriquecimiento por capítulo
+            ("chapters", "dialogue_ratio", "REAL"),
+            ("chapters", "avg_sentence_length", "REAL"),
+            ("chapters", "scene_count", "INTEGER"),
+            ("chapters", "characters_present_count", "INTEGER"),
+            ("chapters", "pov_character", "TEXT"),
+            ("chapters", "dominant_tone", "TEXT"),
+            ("chapters", "tone_intensity", "REAL"),
+            ("chapters", "reading_time_minutes", "INTEGER"),
         ]
         for table, column, col_def in migrations:
             try:

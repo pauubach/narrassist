@@ -1,5 +1,11 @@
 """
 Router: alerts
+
+Endpoints para gestión de alertas, incluyendo:
+- CRUD de alertas
+- Dismissals persistentes (sobreviven re-análisis)
+- Estadísticas de descartes por detector
+- Batch operations
 """
 
 from fastapi import APIRouter
@@ -10,6 +16,8 @@ from deps import ApiResponse
 from fastapi import Request
 from typing import Optional, Any
 from deps import AlertResponse, _verify_alert_ownership
+
+from narrative_assistant.alerts.models import AlertStatus
 
 router = APIRouter()
 
@@ -73,6 +81,7 @@ async def list_alerts(
                 status=a.status.value if hasattr(a.status, 'value') else str(a.status),
                 entity_ids=getattr(a, 'entity_ids', []) or [],
                 confidence=getattr(a, 'confidence', 0.0) or 0.0,
+                content_hash=getattr(a, 'content_hash', '') or '',
                 created_at=a.created_at.isoformat() if hasattr(a.created_at, 'isoformat') else str(a.created_at),
                 updated_at=a.updated_at.isoformat() if hasattr(a, 'updated_at') and a.updated_at else None,
                 resolved_at=a.resolved_at.isoformat() if hasattr(a, 'resolved_at') and a.resolved_at else None,
@@ -127,6 +136,24 @@ async def update_alert_status(project_id: int, alert_id: int, request: Request):
         # Actualizar el status
         alert.status = status_map[new_status_str]
         deps.alert_repository.update(alert)
+
+        # Persistir dismissal para que sobreviva re-análisis
+        if new_status_str == 'dismissed' and deps.dismissal_repository:
+            reason = data.get('reason', '')
+            scope = data.get('scope', 'instance')
+            if alert.content_hash:
+                deps.dismissal_repository.dismiss(
+                    project_id=project_id,
+                    content_hash=alert.content_hash,
+                    alert_type=alert.alert_type,
+                    source_module=getattr(alert, 'source_module', ''),
+                    scope=scope,
+                    reason=reason,
+                )
+        elif new_status_str in ('open', 'active', 'reopen') and deps.dismissal_repository:
+            # Reabrir: eliminar dismissal persistido
+            if alert.content_hash:
+                deps.dismissal_repository.undismiss(project_id, alert.content_hash)
 
         status_messages = {
             'resolved': 'Alerta marcada como resuelta',
@@ -215,6 +242,251 @@ async def resolve_all_alerts(project_id: int):
         )
     except Exception as e:
         logger.error(f"Error resolving all alerts for project {project_id}: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+# =========================================================================
+# Dismissal endpoints (persistentes entre re-análisis)
+# =========================================================================
+
+
+@router.post("/api/projects/{project_id}/alerts/dismiss-batch", response_model=ApiResponse)
+async def dismiss_batch(project_id: int, request: Request):
+    """
+    Descarta múltiples alertas de una vez, persistiendo para re-análisis.
+
+    Body:
+        {
+            "alert_ids": [1, 2, 3],
+            "reason": "false_positive",
+            "scope": "instance"
+        }
+    """
+    try:
+        if not deps.dismissal_repository:
+            return ApiResponse(success=False, error="Dismissal repository not initialized")
+
+        data = await request.json()
+        alert_ids = data.get("alert_ids", [])
+        reason = data.get("reason", "")
+        scope = data.get("scope", "instance")
+
+        if not alert_ids:
+            return ApiResponse(success=False, error="No se proporcionaron IDs de alertas")
+
+        alert_repo = deps.alert_repository
+        dismissal_items = []
+
+        for alert_id in alert_ids:
+            result = alert_repo.get(alert_id)
+            if result.is_success:
+                alert = result.value
+                if alert.project_id == project_id:
+                    # Actualizar estado de la alerta
+                    alert.status = AlertStatus.DISMISSED
+                    alert_repo.update(alert)
+
+                    # Recoger datos para dismissal persistente
+                    if alert.content_hash:
+                        dismissal_items.append({
+                            "content_hash": alert.content_hash,
+                            "alert_type": alert.alert_type,
+                            "source_module": getattr(alert, "source_module", ""),
+                        })
+
+        # Persistir dismissals en batch
+        if dismissal_items:
+            deps.dismissal_repository.dismiss_batch(
+                project_id=project_id,
+                items=dismissal_items,
+                scope=scope,
+                reason=reason,
+            )
+
+        count = len(alert_ids)
+        logger.info(f"Batch dismissed {count} alerts for project {project_id}")
+
+        return ApiResponse(
+            success=True,
+            data={"dismissed_count": count, "persisted_count": len(dismissal_items)},
+            message=f"Se han descartado {count} alertas",
+        )
+    except Exception as e:
+        logger.error(f"Error in batch dismiss for project {project_id}: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@router.get("/api/projects/{project_id}/dismissals/stats", response_model=ApiResponse)
+async def get_dismissal_stats(project_id: int):
+    """
+    Obtiene estadísticas de descartes por tipo de alerta y módulo.
+
+    Útil para identificar qué detectores generan más falsos positivos
+    y priorizar mejoras de precisión.
+    """
+    try:
+        if not deps.dismissal_repository:
+            return ApiResponse(success=False, error="Dismissal repository not initialized")
+
+        result = deps.dismissal_repository.get_dismissal_stats(project_id)
+        if result.is_failure:
+            return ApiResponse(success=False, error="Error obteniendo estadísticas")
+
+        # Enriquecer con total de alertas por tipo para calcular FP rate
+        stats = result.value
+        if deps.alert_repository:
+            alert_result = deps.alert_repository.get_by_project(project_id)
+            if alert_result.is_success:
+                total_by_type: dict[str, int] = {}
+                for alert in alert_result.value:
+                    total_by_type[alert.alert_type] = total_by_type.get(alert.alert_type, 0) + 1
+
+                # Calcular false positive rate por tipo
+                fp_rates = {}
+                for alert_type, dismissed_count in stats.get("by_alert_type", {}).items():
+                    total = total_by_type.get(alert_type, dismissed_count)
+                    fp_rates[alert_type] = {
+                        "dismissed": dismissed_count,
+                        "total": total,
+                        "fp_rate": round(dismissed_count / max(total, 1), 2),
+                    }
+                stats["fp_rates"] = fp_rates
+
+        return ApiResponse(success=True, data=stats)
+    except Exception as e:
+        logger.error(f"Error getting dismissal stats for project {project_id}: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@router.post("/api/projects/{project_id}/alerts/apply-dismissals", response_model=ApiResponse)
+async def apply_dismissals(project_id: int):
+    """
+    Aplica dismissals persistidos a alertas actuales.
+
+    Útil después de un re-análisis: busca alertas cuyo content_hash
+    coincida con un dismissal previo y las marca como descartadas.
+    """
+    try:
+        if not deps.alert_repository:
+            return ApiResponse(success=False, error="Alert repository not initialized")
+
+        result = deps.alert_repository.apply_dismissals(project_id)
+        if result.is_failure:
+            return ApiResponse(success=False, error="Error aplicando dismissals")
+
+        count = result.value
+        return ApiResponse(
+            success=True,
+            data={"auto_dismissed_count": count},
+            message=f"Se han auto-descartado {count} alertas",
+        )
+    except Exception as e:
+        logger.error(f"Error applying dismissals for project {project_id}: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+# =========================================================================
+# Suppression Rules endpoints
+# =========================================================================
+
+
+@router.get("/api/projects/{project_id}/suppression-rules", response_model=ApiResponse)
+async def get_suppression_rules(project_id: int):
+    """Obtiene las reglas de supresión del proyecto (incluye globales)."""
+    try:
+        if not deps.dismissal_repository:
+            return ApiResponse(success=False, error="Dismissal repository not initialized")
+
+        result = deps.dismissal_repository.get_suppression_rules(project_id)
+        if result.is_failure:
+            return ApiResponse(success=False, error="Error obteniendo reglas")
+
+        rules_data = [
+            {
+                "id": r.id,
+                "project_id": r.project_id,
+                "rule_type": r.rule_type,
+                "pattern": r.pattern,
+                "entity_name": r.entity_name,
+                "reason": r.reason,
+                "is_active": r.is_active,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in result.value
+        ]
+
+        return ApiResponse(success=True, data=rules_data)
+    except Exception as e:
+        logger.error(f"Error getting suppression rules: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@router.post("/api/projects/{project_id}/suppression-rules", response_model=ApiResponse)
+async def create_suppression_rule(project_id: int, request: Request):
+    """
+    Crea una regla de supresión.
+
+    Body:
+        {
+            "rule_type": "alert_type",
+            "pattern": "spelling_*",
+            "entity_name": null,
+            "reason": "No relevante para este proyecto"
+        }
+    """
+    try:
+        if not deps.dismissal_repository:
+            return ApiResponse(success=False, error="Dismissal repository not initialized")
+
+        data = await request.json()
+        rule_type = data.get("rule_type", "")
+        pattern = data.get("pattern", "")
+
+        if not rule_type or not pattern:
+            return ApiResponse(success=False, error="rule_type y pattern son requeridos")
+
+        valid_types = {"alert_type", "category", "entity", "source_module"}
+        if rule_type not in valid_types:
+            return ApiResponse(
+                success=False,
+                error=f"rule_type inválido: {rule_type}. Válidos: {', '.join(valid_types)}"
+            )
+
+        result = deps.dismissal_repository.create_suppression_rule(
+            rule_type=rule_type,
+            pattern=pattern,
+            project_id=project_id,
+            entity_name=data.get("entity_name"),
+            reason=data.get("reason", ""),
+        )
+
+        if result.is_failure:
+            return ApiResponse(success=False, error="Error creando regla")
+
+        return ApiResponse(
+            success=True,
+            data={"id": result.value},
+            message="Regla de supresión creada",
+        )
+    except Exception as e:
+        logger.error(f"Error creating suppression rule: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@router.delete("/api/projects/{project_id}/suppression-rules/{rule_id}", response_model=ApiResponse)
+async def delete_suppression_rule(project_id: int, rule_id: int):
+    """Elimina una regla de supresión."""
+    try:
+        if not deps.dismissal_repository:
+            return ApiResponse(success=False, error="Dismissal repository not initialized")
+
+        result = deps.dismissal_repository.delete_suppression_rule(rule_id)
+        if result.is_failure:
+            return ApiResponse(success=False, error="Error eliminando regla")
+
+        return ApiResponse(success=True, message="Regla eliminada")
+    except Exception as e:
+        logger.error(f"Error deleting suppression rule {rule_id}: {e}", exc_info=True)
         return ApiResponse(success=False, error=str(e))
 
 

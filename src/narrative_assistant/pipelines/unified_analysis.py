@@ -41,6 +41,7 @@ FASE 6 - CONSISTENCIA Y ALERTAS:
 
 import logging
 import threading
+import unicodedata
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -50,9 +51,21 @@ from types import MappingProxyType
 from typing import Any, Callable, Optional
 
 from ..core.errors import NarrativeError, ErrorSeverity, PhaseError, PhasePreconditionError
+from ..core.memory_monitor import MemoryMonitor
 from ..core.result import Result
 
 logger = logging.getLogger(__name__)
+
+
+def _normalize_key(text: str) -> str:
+    """Normaliza un nombre para usarlo como clave de agrupación.
+
+    Elimina diacríticos (acentos, tildes) y convierte a minúsculas
+    para evitar duplicados por variantes de acentuación.
+    Ej: 'María García' → 'maria garcia'
+    """
+    nfkd = unicodedata.normalize("NFKD", text.strip().lower())
+    return "".join(c for c in nfkd if not unicodedata.combining(c))
 
 
 class AnalysisPhase(Enum):
@@ -115,6 +128,11 @@ class UnifiedConfig:
     parallel_extraction: bool = True
     max_workers: int = 4
     force_reanalysis: bool = False
+
+    # Memory bounds
+    enable_memory_monitoring: bool = True
+    memory_warning_mb: float = 2048  # Umbral de warning (MB)
+    max_chapter_chars_for_chunking: int = 100_000  # Capítulos >100k chars se procesan en chunks
 
     # Umbrales
     spelling_min_confidence: float = 0.6
@@ -493,7 +511,11 @@ class UnifiedAnalysisPipeline:
         self.config = config or UnifiedConfig()
         self._executor = None
         self._is_low_vram = False
-        
+        self._memory_monitor = MemoryMonitor(
+            warning_threshold_mb=self.config.memory_warning_mb,
+        )
+        self._memory_monitor.enabled = self.config.enable_memory_monitoring
+
         # Detectar si estamos en un sistema con poca VRAM
         self._detect_hardware_limits()
     
@@ -644,12 +666,16 @@ class UnifiedAnalysisPipeline:
 
                 self._generate_all_alerts(context)
 
+            # ========== ENRIQUECIMIENTO DE CAPÍTULOS ==========
+            self._enrich_chapter_metrics(context)
+
             # ========== FINALIZAR ==========
             if progress_callback:
                 progress_callback(1.0, "Análisis completado")
 
-            # Log resumen de fases
+            # Log resumen de fases y memoria
             self._log_phase_summary(context)
+            self._log_memory_summary(context)
 
             report = self._build_report(context)
 
@@ -679,16 +705,25 @@ class UnifiedAnalysisPipeline:
         is_fatal: bool = False,
     ) -> Result[None]:
         """
-        Ejecuta una fase con error handling tipado.
+        Ejecuta una fase con error handling tipado y monitoreo de memoria.
 
         Captura excepciones y las convierte en PhaseError con contexto.
         Registra la fase como completada o fallida.
+        Mide delta de memoria RSS antes/después de cada fase.
         """
         phase_start = datetime.now()
+        mem_start = self._memory_monitor.snapshot(phase_name, label="start")
+
         try:
             result = phase_func(*args)
             elapsed = (datetime.now() - phase_start).total_seconds()
             context.phase_times[phase_name] = elapsed
+
+            mem_end = self._memory_monitor.snapshot(phase_name, label="end")
+            mem_delta_str = ""
+            if mem_start and mem_end:
+                delta = mem_end.memory_mb - mem_start.memory_mb
+                mem_delta_str = f", mem: {mem_end.memory_mb:.0f} MB ({delta:+.1f})"
 
             if result.is_failure:
                 context.skipped_phases.add(phase_name)
@@ -702,14 +737,14 @@ class UnifiedAnalysisPipeline:
                 )
                 context.errors.append(phase_error)
                 logger.warning(
-                    f"Phase '{phase_name}' failed after {elapsed:.1f}s: "
+                    f"Phase '{phase_name}' failed after {elapsed:.1f}s{mem_delta_str}: "
                     f"{result.error}"
                 )
                 return result
 
             context.completed_phases.add(phase_name)
             logger.info(
-                f"Phase '{phase_name}' completed in {elapsed:.1f}s — "
+                f"Phase '{phase_name}' completed in {elapsed:.1f}s{mem_delta_str} — "
                 f"{self._summarize_phase_output(context, phase_name)}"
             )
             return result
@@ -717,6 +752,7 @@ class UnifiedAnalysisPipeline:
         except Exception as e:
             elapsed = (datetime.now() - phase_start).total_seconds()
             context.phase_times[phase_name] = elapsed
+            self._memory_monitor.snapshot(phase_name, label="end")
             context.skipped_phases.add(phase_name)
 
             phase_error = PhaseError(
@@ -831,6 +867,21 @@ class UnifiedAnalysisPipeline:
         for phase, elapsed in sorted(context.phase_times.items()):
             status = "✓" if phase in context.completed_phases else "✗"
             logger.info(f"  {status} {phase}: {elapsed:.1f}s")
+
+    def _log_memory_summary(self, context: AnalysisContext) -> None:
+        """Log resumen de uso de memoria al finalizar el análisis."""
+        report = self._memory_monitor.get_report()
+        if not report.snapshots:
+            return
+
+        # Almacenar métricas de memoria en stats
+        context.stats["memory_peak_mb"] = round(report.peak_mb, 1)
+        context.stats["memory_total_delta_mb"] = round(report.total_delta_mb, 1)
+        context.stats["memory_phase_deltas"] = {
+            k: round(v, 1) for k, v in report.get_phase_deltas().items()
+        }
+
+        logger.info(report.summary())
 
     # =========================================================================
     # FASE 1: PARSING Y ESTRUCTURA
@@ -1081,16 +1132,22 @@ class UnifiedAnalysisPipeline:
 
     def _run_enhanced_ner(self, context: AnalysisContext) -> None:
         """
-        NER mejorado con speaker hints de diálogos.
+        NER mejorado con speaker hints de diálogos y procesamiento por capítulos.
 
         Los speaker hints ayudan a:
         1. Confirmar entidades PERSON (boost de confianza)
         2. Descubrir entidades no detectadas por spaCy
 
         Este método:
-        1. Agrupa las menciones por nombre canónico
-        2. Crea UNA entidad por nombre único
-        3. Guarda TODAS las menciones en entity_mentions
+        1. Procesa NER capítulo por capítulo (evita cargar todo el texto en spaCy)
+        2. Agrupa las menciones por nombre canónico
+        3. Crea UNA entidad por nombre único
+        4. Guarda TODAS las menciones en entity_mentions
+
+        Optimización de memoria:
+        - Documentos con capítulos: procesa cada capítulo por separado
+        - Documentos sin capítulos o pequeños (<100k chars): procesa full_text
+        - Capítulos muy grandes (>max_chapter_chars_for_chunking): usa chunk_for_spacy()
         """
         try:
             from ..nlp.ner import NERExtractor
@@ -1107,15 +1164,17 @@ class UnifiedAnalysisPipeline:
                 logger.info(f"Cleared {deleted_count} previous entities before NER")
 
             extractor = NERExtractor()
-            result = extractor.extract_entities(context.full_text)
 
-            if result.is_success:
-                extracted_mentions = result.value.entities if hasattr(result.value, 'entities') else []
+            # Decidir estrategia de procesamiento
+            extracted_mentions = self._extract_ner_with_chunking(
+                extractor, context
+            )
 
-                if not extracted_mentions:
-                    logger.info("No entities extracted from NER")
-                    return
+            if not extracted_mentions:
+                logger.info("No entities extracted from NER")
+                return
 
+            if extracted_mentions:
                 # Obtener capítulos de la base de datos para mapear posiciones a chapter_id
                 chapter_repo = ChapterRepository()
                 db_chapters = chapter_repo.get_by_project(context.project_id)
@@ -1134,27 +1193,34 @@ class UnifiedAnalysisPipeline:
                     "label": None,
                     "mentions": [],
                     "max_confidence": 0.0,
-                    "canonical_text": None,  # Guardar el texto original más frecuente
+                    "canonical_text": None,  # Texto original más largo/completo
+                    "surface_variants": set(),  # Variantes observadas para aliases
                 })
 
                 for mention in extracted_mentions:
-                    canonical = mention.canonical_form or mention.text.strip().lower()
-                    group = entity_groups[canonical]
+                    raw_canonical = mention.canonical_form or mention.text.strip().lower()
+                    # Clave normalizada sin diacríticos para agrupar variantes
+                    norm_key = _normalize_key(raw_canonical)
+                    group = entity_groups[norm_key]
 
                     # Guardar el label (todos deberían ser iguales para el mismo nombre)
                     if group["label"] is None:
                         group["label"] = mention.label
 
                     # Guardar el texto original (preferir el más largo/completo)
-                    if group["canonical_text"] is None or len(mention.text) > len(group["canonical_text"]):
-                        group["canonical_text"] = mention.text.strip()
+                    surface = mention.text.strip()
+                    if group["canonical_text"] is None or len(surface) > len(group["canonical_text"]):
+                        group["canonical_text"] = surface
+
+                    # Registrar variante de superficie para aliases
+                    group["surface_variants"].add(surface)
 
                     # Actualizar confianza máxima
                     group["max_confidence"] = max(group["max_confidence"], mention.confidence)
 
                     # Añadir la mención con su posición
                     group["mentions"].append({
-                        "surface_form": mention.text.strip(),
+                        "surface_form": surface,
                         "start_char": mention.start_char,
                         "end_char": mention.end_char,
                         "confidence": mention.confidence,
@@ -1163,10 +1229,10 @@ class UnifiedAnalysisPipeline:
 
                 # Boost de confianza para entidades confirmadas por diálogos
                 for position, speaker in context.speaker_hints.items():
-                    speaker_lower = speaker.lower()
-                    if speaker_lower in entity_groups:
-                        entity_groups[speaker_lower]["max_confidence"] = min(
-                            1.0, entity_groups[speaker_lower]["max_confidence"] + 0.1
+                    speaker_key = _normalize_key(speaker)
+                    if speaker_key in entity_groups:
+                        entity_groups[speaker_key]["max_confidence"] = min(
+                            1.0, entity_groups[speaker_key]["max_confidence"] + 0.1
                         )
                         logger.debug(f"Boosted confidence for '{speaker}' from dialogue attribution")
 
@@ -1196,13 +1262,20 @@ class UnifiedAnalysisPipeline:
                     else:
                         entity_type = EntityType.CONCEPT
 
+                    # Construir aliases a partir de variantes de superficie observadas
+                    final_canonical = group["canonical_text"] or canonical_name
+                    aliases = sorted(
+                        v for v in group["surface_variants"]
+                        if v != final_canonical
+                    )
+
                     # Crear Entity object con el nombre canónico más completo
                     entity = Entity(
                         id=None,
                         project_id=context.project_id,
                         entity_type=entity_type,
-                        canonical_name=group["canonical_text"] or canonical_name,
-                        aliases=[],
+                        canonical_name=final_canonical,
+                        aliases=aliases,
                         importance=EntityImportance.PRIMARY if group["max_confidence"] > 0.8 else EntityImportance.SECONDARY,
                     )
 
@@ -1258,6 +1331,76 @@ class UnifiedAnalysisPipeline:
                 message=f"NER failed: {str(e)}",
                 severity=ErrorSeverity.RECOVERABLE
             ))
+
+    def _extract_ner_with_chunking(self, extractor, context: AnalysisContext) -> list:
+        """
+        Extrae entidades usando NER con procesamiento por capítulos.
+
+        Estrategia:
+        - Si hay capítulos, procesa cada uno por separado para limitar
+          el pico de memoria de spaCy (Doc objects son grandes).
+        - Ajusta char offsets al texto completo.
+        - Para documentos sin capítulos o muy pequeños, procesa de una vez.
+
+        Args:
+            extractor: NERExtractor instance
+            context: AnalysisContext con full_text y chapters
+
+        Returns:
+            Lista de ExtractedEntity con posiciones globales.
+        """
+        total_chars = len(context.full_text)
+
+        # Documentos pequeños (<100k chars) o sin capítulos: procesar de una vez
+        if total_chars < self.config.max_chapter_chars_for_chunking or not context.chapters:
+            logger.info(f"NER: processing full text ({total_chars} chars)")
+            result = extractor.extract_entities(context.full_text)
+            if result.is_success:
+                return result.value.entities if hasattr(result.value, 'entities') else []
+            return []
+
+        # Documentos grandes con capítulos: procesar capítulo por capítulo
+        logger.info(
+            f"NER: processing {len(context.chapters)} chapters separately "
+            f"(total {total_chars} chars) for memory efficiency"
+        )
+
+        all_mentions = []
+        for ch in context.chapters:
+            chapter_content = ch.get("content", "")
+            chapter_start = ch.get("start_char", 0)
+            chapter_num = ch.get("number", 0)
+
+            if not chapter_content.strip():
+                continue
+
+            # Procesar este capítulo
+            result = extractor.extract_entities(chapter_content)
+
+            if result.is_success:
+                chapter_entities = result.value.entities if hasattr(result.value, 'entities') else []
+
+                # Ajustar posiciones al texto completo (global offsets)
+                for entity in chapter_entities:
+                    entity.start_char += chapter_start
+                    entity.end_char += chapter_start
+
+                all_mentions.extend(chapter_entities)
+                logger.debug(
+                    f"NER chapter {chapter_num}: "
+                    f"{len(chapter_entities)} entities from {len(chapter_content)} chars"
+                )
+            else:
+                logger.warning(f"NER failed for chapter {chapter_num}")
+
+            # Limpiar memoria GPU entre capítulos en sistemas con poca VRAM
+            self._clear_gpu_memory_if_needed()
+
+        logger.info(
+            f"NER chunked extraction: {len(all_mentions)} total mentions "
+            f"from {len(context.chapters)} chapters"
+        )
+        return all_mentions
 
     def _extract_temporal_markers(self, context: AnalysisContext) -> None:
         """
@@ -3129,6 +3272,52 @@ class UnifiedAnalysisPipeline:
 
         except Exception as e:
             logger.warning(f"Failed to clear project data: {e}")
+
+    def _enrich_chapter_metrics(self, context: AnalysisContext) -> None:
+        """
+        Computa y persiste métricas de enriquecimiento para cada capítulo.
+
+        Métricas: dialogue_ratio, avg_sentence_length, scene_count,
+        characters_present_count, dominant_tone, tone_intensity,
+        reading_time_minutes.
+        """
+        if not context.chapters or not context.project_id:
+            return
+
+        try:
+            from ..persistence.chapter import (
+                ChapterRepository,
+                compute_chapter_metrics,
+            )
+
+            chapter_repo = ChapterRepository()
+            db_chapters = chapter_repo.get_by_project(context.project_id)
+            if not db_chapters:
+                return
+
+            # Nombres de entidades conocidas para conteo de presencia
+            entity_names = [
+                e.get("canonical_name") or e.get("name", "")
+                for e in (context.entities or [])
+                if e.get("canonical_name") or e.get("name")
+            ]
+
+            enriched_count = 0
+            for db_ch in db_chapters:
+                content = db_ch.content
+                if not content:
+                    continue
+
+                metrics = compute_chapter_metrics(content, entity_names or None)
+                if metrics and db_ch.id:
+                    chapter_repo.update_metrics(db_ch.id, metrics)
+                    enriched_count += 1
+
+            if enriched_count > 0:
+                logger.info(f"Chapter enrichment: {enriched_count} chapters enriched with metrics")
+
+        except Exception as e:
+            logger.warning(f"Chapter enrichment failed (non-fatal): {e}")
 
     def _build_report(self, context: AnalysisContext) -> UnifiedReport:
         """Construir informe final."""

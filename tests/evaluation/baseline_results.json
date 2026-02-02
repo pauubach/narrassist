@@ -1,17 +1,17 @@
 {
   "inconsistencias": {
-    "timestamp": "2026-01-18T13:46:39.746920",
+    "timestamp": "2026-02-02T11:34:42.070112",
     "gold_standard_name": "inconsistencias",
-    "text_file": "test_books/prueba_inconsistencias_personajes.txt",
+    "text_file": "test_books/evaluation_tests/prueba_inconsistencias_personajes.txt",
     "metrics": {
       "ner": {
         "capability": "ner",
-        "true_positives": 6,
-        "false_positives": 6,
-        "false_negatives": 1,
-        "precision": 0.5,
-        "recall": 0.8571428571428571,
-        "f1_score": 0.631578947368421,
+        "true_positives": 7,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0,
         "details": {}
       },
       "fusion": {
@@ -23,34 +23,79 @@
         "recall": 1.0,
         "f1_score": 1.0,
         "details": {}
+      },
+      "attributes": {
+        "capability": "attributes",
+        "true_positives": 2,
+        "false_positives": 5,
+        "false_negatives": 17,
+        "precision": 0.28600000000000003,
+        "recall": 0.105,
+        "f1_score": 0.154,
+        "details": {}
+      },
+      "inconsistencies": {
+        "capability": "inconsistencies",
+        "true_positives": 0,
+        "false_positives": 0,
+        "false_negatives": 8,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1_score": 0.0,
+        "details": {}
+      },
+      "dialogue": {
+        "capability": "dialogue",
+        "true_positives": 0,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1_score": 0.0,
+        "details": {}
       }
     },
     "summary": {
       "ner": {
-        "precision": 50.0,
-        "recall": 85.7,
-        "f1": 63.2
+        "precision": 100.0,
+        "recall": 100.0,
+        "f1": 100.0
       },
       "fusion": {
         "precision": 100.0,
         "recall": 100.0,
         "f1": 100.0
+      },
+      "attributes": {
+        "precision": 28.6,
+        "recall": 10.5,
+        "f1": 15.4
+      },
+      "inconsistencies": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "dialogue": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
       }
     }
   },
   "gramatica": {
-    "timestamp": "2026-01-18T13:46:59.167082",
+    "timestamp": "2026-02-02T11:34:42.070112",
     "gold_standard_name": "gramatica",
-    "text_file": "test_books/manuscrito_prueba_errores.txt",
+    "text_file": "test_books/evaluation_tests/manuscrito_prueba_errores.txt",
     "metrics": {
       "ner": {
         "capability": "ner",
         "true_positives": 2,
-        "false_positives": 5,
+        "false_positives": 0,
         "false_negatives": 0,
-        "precision": 0.2857142857142857,
+        "precision": 1.0,
         "recall": 1.0,
-        "f1_score": 0.4444444444444445,
+        "f1_score": 1.0,
         "details": {}
       },
       "fusion": {
@@ -85,20 +130,30 @@
       },
       "grammar_laismo": {
         "capability": "grammar_laismo",
-        "true_positives": 3,
+        "true_positives": 4,
         "false_positives": 0,
-        "false_negatives": 1,
+        "false_negatives": 0,
         "precision": 1.0,
-        "recall": 0.75,
-        "f1_score": 0.8571428571428571,
+        "recall": 1.0,
+        "f1_score": 1.0,
+        "details": {}
+      },
+      "dialogue": {
+        "capability": "dialogue",
+        "true_positives": 0,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1_score": 0.0,
         "details": {}
       }
     },
     "summary": {
       "ner": {
-        "precision": 28.6,
+        "precision": 100.0,
         "recall": 100.0,
-        "f1": 44.4
+        "f1": 100.0
       },
       "fusion": {
         "precision": 100.0,
@@ -117,24 +172,29 @@
       },
       "grammar_laismo": {
         "precision": 100.0,
-        "recall": 75.0,
-        "f1": 85.7
+        "recall": 100.0,
+        "f1": 100.0
+      },
+      "dialogue": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
       }
     }
   },
   "relaciones": {
-    "timestamp": "2026-01-18T13:47:09.346450",
+    "timestamp": "2026-02-02T11:34:42.070112",
     "gold_standard_name": "relaciones",
-    "text_file": "test_books/prueba_relaciones_personajes.txt",
+    "text_file": "test_books/evaluation_tests/prueba_relaciones_personajes.txt",
     "metrics": {
       "ner": {
         "capability": "ner",
         "true_positives": 5,
-        "false_positives": 2,
+        "false_positives": 1,
         "false_negatives": 1,
-        "precision": 0.7142857142857143,
-        "recall": 0.8333333333333334,
-        "f1_score": 0.7692307692307692,
+        "precision": 0.833,
+        "recall": 0.833,
+        "f1_score": 0.833,
         "details": {}
       },
       "relations": {
@@ -146,34 +206,49 @@
         "recall": 1.0,
         "f1_score": 1.0,
         "details": {}
+      },
+      "dialogue": {
+        "capability": "dialogue",
+        "true_positives": 0,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1_score": 0.0,
+        "details": {}
       }
     },
     "summary": {
       "ner": {
-        "precision": 71.4,
+        "precision": 83.3,
         "recall": 83.3,
-        "f1": 76.9
+        "f1": 83.3
       },
       "relations": {
         "precision": 100.0,
         "recall": 100.0,
         "f1": 100.0
+      },
+      "dialogue": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
       }
     }
   },
   "timeline": {
-    "timestamp": "2026-01-18T13:47:19.879999",
+    "timestamp": "2026-02-02T11:34:42.070112",
     "gold_standard_name": "timeline",
-    "text_file": "test_books/prueba_timeline_eventos.txt",
+    "text_file": "test_books/evaluation_tests/prueba_timeline_eventos.txt",
     "metrics": {
       "ner": {
         "capability": "ner",
-        "true_positives": 5,
-        "false_positives": 4,
-        "false_negatives": 2,
-        "precision": 0.5555555555555556,
-        "recall": 0.7142857142857143,
-        "f1_score": 0.6250000000000001,
+        "true_positives": 7,
+        "false_positives": 1,
+        "false_negatives": 0,
+        "precision": 0.875,
+        "recall": 1.0,
+        "f1_score": 0.9329999999999999,
         "details": {}
       },
       "chapters": {
@@ -188,30 +263,40 @@
       },
       "relations": {
         "capability": "relations",
-        "true_positives": 3,
-        "false_positives": 2,
-        "false_negatives": 1,
-        "precision": 0.6,
-        "recall": 0.75,
-        "f1_score": 0.6666666666666665,
+        "true_positives": 4,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0,
         "details": {}
       },
       "timeline": {
         "capability": "timeline",
         "true_positives": 29,
-        "false_positives": 24,
+        "false_positives": 3,
         "false_negatives": 0,
-        "precision": 0.5471698113207547,
+        "precision": 0.9059999999999999,
         "recall": 1.0,
-        "f1_score": 0.7073170731707317,
+        "f1_score": 0.951,
+        "details": {}
+      },
+      "dialogue": {
+        "capability": "dialogue",
+        "true_positives": 0,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1_score": 0.0,
         "details": {}
       }
     },
     "summary": {
       "ner": {
-        "precision": 55.6,
-        "recall": 71.4,
-        "f1": 62.5
+        "precision": 87.5,
+        "recall": 100.0,
+        "f1": 93.3
       },
       "chapters": {
         "precision": 100.0,
@@ -219,40 +304,45 @@
         "f1": 100.0
       },
       "relations": {
-        "precision": 60.0,
-        "recall": 75.0,
-        "f1": 66.7
+        "precision": 100.0,
+        "recall": 100.0,
+        "f1": 100.0
       },
       "timeline": {
-        "precision": 54.7,
+        "precision": 90.6,
         "recall": 100.0,
-        "f1": 70.7
+        "f1": 95.1
+      },
+      "dialogue": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
       }
     }
   },
   "capitulos": {
-    "timestamp": "2026-01-18T13:47:35.996570",
+    "timestamp": "2026-02-02T11:34:42.070112",
     "gold_standard_name": "capitulos",
-    "text_file": "test_books/prueba_capitulos_estructura.txt",
+    "text_file": "test_books/evaluation_tests/prueba_capitulos_estructura.txt",
     "metrics": {
       "ner": {
         "capability": "ner",
         "true_positives": 3,
-        "false_positives": 5,
+        "false_positives": 0,
         "false_negatives": 3,
-        "precision": 0.375,
+        "precision": 1.0,
         "recall": 0.5,
-        "f1_score": 0.42857142857142855,
+        "f1_score": 0.667,
         "details": {}
       },
       "chapters": {
         "capability": "chapters",
         "true_positives": 10,
-        "false_positives": 7,
+        "false_positives": 0,
         "false_negatives": 0,
-        "precision": 0.5882352941176471,
+        "precision": 1.0,
         "recall": 1.0,
-        "f1_score": 0.7407407407407407,
+        "f1_score": 1.0,
         "details": {}
       },
       "relations": {
@@ -264,23 +354,176 @@
         "recall": 1.0,
         "f1_score": 1.0,
         "details": {}
+      },
+      "dialogue": {
+        "capability": "dialogue",
+        "true_positives": 0,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1_score": 0.0,
+        "details": {}
       }
     },
     "summary": {
       "ner": {
-        "precision": 37.5,
+        "precision": 100.0,
         "recall": 50.0,
-        "f1": 42.9
+        "f1": 66.7
       },
       "chapters": {
-        "precision": 58.8,
+        "precision": 100.0,
         "recall": 100.0,
-        "f1": 74.1
+        "f1": 100.0
       },
       "relations": {
         "precision": 100.0,
         "recall": 100.0,
         "f1": 100.0
+      },
+      "dialogue": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    }
+  },
+  "narrativa_pura": {
+    "timestamp": "2026-02-02T11:34:42.070112",
+    "gold_standard_name": "narrativa_pura",
+    "text_file": "test_books/evaluation_tests/prueba_narrativa_pura.txt",
+    "metrics": {
+      "ner": {
+        "capability": "ner",
+        "true_positives": 8,
+        "false_positives": 1,
+        "false_negatives": 2,
+        "precision": 0.889,
+        "recall": 0.8,
+        "f1_score": 0.8420000000000001,
+        "details": {}
+      },
+      "chapters": {
+        "capability": "chapters",
+        "true_positives": 3,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0,
+        "details": {}
+      },
+      "relations": {
+        "capability": "relations",
+        "true_positives": 2,
+        "false_positives": 0,
+        "false_negatives": 1,
+        "precision": 1.0,
+        "recall": 0.667,
+        "f1_score": 0.8,
+        "details": {}
+      },
+      "dialogue": {
+        "capability": "dialogue",
+        "true_positives": 0,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1_score": 0.0,
+        "details": {}
+      }
+    },
+    "summary": {
+      "ner": {
+        "precision": 88.9,
+        "recall": 80.0,
+        "f1": 84.2
+      },
+      "chapters": {
+        "precision": 100.0,
+        "recall": 100.0,
+        "f1": 100.0
+      },
+      "relations": {
+        "precision": 100.0,
+        "recall": 66.7,
+        "f1": 80.0
+      },
+      "dialogue": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    }
+  },
+  "ortografia": {
+    "timestamp": "2026-02-02T11:34:42.070112",
+    "gold_standard_name": "ortografia",
+    "text_file": "test_books/evaluation_tests/prueba_ortografia.txt",
+    "metrics": {
+      "ner": {
+        "capability": "ner",
+        "true_positives": 2,
+        "false_positives": 6,
+        "false_negatives": 0,
+        "precision": 0.25,
+        "recall": 1.0,
+        "f1_score": 0.4,
+        "details": {}
+      },
+      "chapters": {
+        "capability": "chapters",
+        "true_positives": 5,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0,
+        "details": {}
+      },
+      "orthography": {
+        "capability": "orthography",
+        "true_positives": 63,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0,
+        "details": {}
+      },
+      "dialogue": {
+        "capability": "dialogue",
+        "true_positives": 0,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1_score": 0.0,
+        "details": {}
+      }
+    },
+    "summary": {
+      "ner": {
+        "precision": 25.0,
+        "recall": 100.0,
+        "f1": 40.0
+      },
+      "chapters": {
+        "precision": 100.0,
+        "recall": 100.0,
+        "f1": 100.0
+      },
+      "orthography": {
+        "precision": 100.0,
+        "recall": 100.0,
+        "f1": 100.0
+      },
+      "dialogue": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
       }
     }
   }

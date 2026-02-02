@@ -4,6 +4,7 @@ Modelos de datos para el sistema de alertas.
 Representa alertas generadas por diferentes detectores de inconsistencias.
 """
 
+import hashlib
 import json
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
@@ -103,6 +104,73 @@ class Alert:
 
     # Datos adicionales específicos del tipo de alerta
     extra_data: dict[str, Any] = field(default_factory=dict)
+
+    # Hash de contenido para identificar "misma alerta" entre re-análisis
+    content_hash: str = ""
+
+    def __post_init__(self):
+        """Calcula content_hash si no se proporcionó."""
+        if not self.content_hash:
+            self.content_hash = self.compute_content_hash()
+
+    def compute_content_hash(self) -> str:
+        """
+        Calcula hash determinista basado en el contenido semántico de la alerta.
+
+        Permite identificar la "misma" alerta entre re-análisis sucesivos,
+        incluso cuando el ID de la alerta cambia.
+
+        El hash se basa en:
+        - project_id: Agrupar por proyecto
+        - alert_type: Tipo de detector (attribute_inconsistency, spelling_typo, etc.)
+        - entity_ids: Entidades afectadas (ordenadas para determinismo)
+        - chapter: Capítulo donde ocurre
+        - key content: Campos clave según el tipo de alerta
+
+        Returns:
+            SHA-256 hex digest truncado a 16 chars
+        """
+        # Componentes principales (siempre presentes)
+        parts = [
+            str(self.project_id),
+            self.alert_type,
+            str(sorted(self.entity_ids)),
+            str(self.chapter or 0),
+        ]
+
+        # Componentes de contenido específicos del tipo de alerta
+        if self.alert_type == "attribute_inconsistency":
+            # Para inconsistencias de atributos: entidad + atributo + valores
+            ed = self.extra_data
+            parts.extend([
+                ed.get("entity_name", ""),
+                ed.get("attribute_key", ""),
+                str(sorted([ed.get("value1", ""), ed.get("value2", "")])),
+            ])
+        elif self.alert_type.startswith("spelling_"):
+            # Para ortografía: palabra + posición aproximada
+            ed = self.extra_data
+            parts.append(ed.get("word", ""))
+            parts.append(str(self.start_char or 0))
+        elif self.alert_type.startswith("grammar_"):
+            # Para gramática: texto + tipo de error
+            ed = self.extra_data
+            parts.append(ed.get("text", ""))
+            parts.append(ed.get("error_type", ""))
+        elif self.alert_type == "deceased_reappearance":
+            ed = self.extra_data
+            parts.extend([
+                ed.get("entity_name", ""),
+                str(ed.get("death_chapter", 0)),
+                str(ed.get("appearance_chapter", 0)),
+            ])
+        else:
+            # Para otros tipos: título + descripción (primeros 100 chars)
+            parts.append(self.title[:100])
+            parts.append(self.description[:100])
+
+        raw = "|".join(parts)
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
 
     def to_dict(self) -> dict[str, Any]:
         """Convierte la alerta a diccionario para persistencia."""

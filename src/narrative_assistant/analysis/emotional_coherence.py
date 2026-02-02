@@ -109,6 +109,43 @@ EMOTION_SENTIMENT_MAP: dict[str, set[str]] = {
     "aliviado": {"positive", "neutral"},
     "satisfecho": {"positive", "neutral"},
     "esperanzado": {"positive", "neutral"},
+    # Emociones positivas (variantes regionales y sinónimos)
+    "gozoso": {"positive"},
+    "jubiloso": {"positive"},
+    "exultante": {"positive"},
+    "ilusionado": {"positive", "neutral"},
+    "agradecido": {"positive", "neutral"},
+    "orgulloso": {"positive", "neutral"},
+    "conmovido": {"positive", "neutral"},
+    "encantado": {"positive"},
+    "maravillado": {"positive"},
+    "extasiado": {"positive"},
+    # Emociones negativas (variantes regionales y sinónimos)
+    "apenado": {"negative", "neutral"},
+    "afligido": {"negative"},
+    "desconsolado": {"negative"},
+    "desolado": {"negative"},
+    "compungido": {"negative", "neutral"},
+    "frustrado": {"negative"},
+    "humillado": {"negative"},
+    "avergonzado": {"negative", "neutral"},
+    "resentido": {"negative"},
+    "celoso": {"negative"},
+    "envidioso": {"negative"},
+    "indignado": {"negative"},
+    "furibundo": {"negative"},
+    "colérico": {"negative"},
+    "irritado": {"negative"},
+    "molesto": {"negative", "neutral"},
+    "hastiado": {"negative", "neutral"},
+    "harto": {"negative"},
+    "nostálgico": {"negative", "neutral"},
+    "desconcertado": {"negative", "neutral"},
+    "confundido": {"neutral"},
+    "sorprendido": {"neutral", "positive"},
+    "atónito": {"neutral"},
+    "perplejo": {"neutral"},
+    "estupefacto": {"neutral"},
     # Emociones neutras → cualquier tono
     "tranquilo": {"neutral", "positive"},
     "sereno": {"neutral", "positive"},
@@ -116,6 +153,12 @@ EMOTION_SENTIMENT_MAP: dict[str, set[str]] = {
     "pensativo": {"neutral"},
     "reflexivo": {"neutral"},
     "indiferente": {"neutral"},
+    "resignado": {"neutral", "negative"},
+    "apático": {"neutral"},
+    "escéptico": {"neutral"},
+    "cauteloso": {"neutral"},
+    "receloso": {"neutral", "negative"},
+    "suspicaz": {"neutral", "negative"},
 }
 
 # Pares de emociones opuestas (cambios extremos)
@@ -133,6 +176,24 @@ OPPOSITE_EMOTIONS: set[tuple[str, str]] = {
     ("triste", "alegre"),
     ("triste", "feliz"),
     ("angustiado", "sereno"),
+    ("angustiado", "tranquilo"),
+    # Pares adicionales
+    ("desesperado", "eufórico"),
+    ("desesperado", "feliz"),
+    ("horrorizado", "tranquilo"),
+    ("horrorizado", "sereno"),
+    ("asqueado", "encantado"),
+    ("indignado", "sereno"),
+    ("indignado", "tranquilo"),
+    ("furibundo", "sereno"),
+    ("furibundo", "tranquilo"),
+    ("humillado", "orgulloso"),
+    ("frustrado", "satisfecho"),
+    ("desolado", "eufórico"),
+    ("desolado", "feliz"),
+    ("afligido", "alegre"),
+    ("colérico", "sereno"),
+    ("colérico", "tranquilo"),
 }
 
 # Marcadores de ironía/sarcasmo
@@ -168,10 +229,14 @@ class EmotionalCoherenceChecker:
     y el comportamiento comunicativo de los personajes.
     """
 
+    # Ventana de proximidad por defecto (en caracteres)
+    DEFAULT_PROXIMITY_WINDOW: int = 500
+
     def __init__(
         self,
         sentiment_analyzer: Optional[SentimentAnalyzer] = None,
         min_confidence: float = 0.6,
+        proximity_window: Optional[int] = None,
     ):
         """
         Inicializa el verificador.
@@ -179,8 +244,11 @@ class EmotionalCoherenceChecker:
         Args:
             sentiment_analyzer: Analizador de sentimiento (usa singleton si None)
             min_confidence: Confianza mínima para reportar incoherencia
+            proximity_window: Ventana de proximidad en caracteres para correlacionar
+                emoción declarada y diálogo (default: 500)
         """
         self.sentiment = sentiment_analyzer or get_sentiment_analyzer()
+        self.proximity_window = proximity_window or self.DEFAULT_PROXIMITY_WINDOW
         self.min_confidence = min_confidence
 
         # Compilar patrones de regex
@@ -528,8 +596,8 @@ class EmotionalCoherenceChecker:
                 if speaker.lower() != declared.entity_name.lower():
                     continue
 
-                # Verificar proximidad (dentro de 500 caracteres)
-                if abs(start - declared.position) > 500:
+                # Verificar proximidad (dentro de la ventana configurada)
+                if abs(start - declared.position) > self.proximity_window:
                     continue
 
                 # Extraer contexto

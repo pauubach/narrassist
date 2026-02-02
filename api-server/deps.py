@@ -42,6 +42,7 @@ _log_file: Optional[Path] = None
 project_manager = None
 entity_repository = None
 alert_repository = None
+dismissal_repository = None
 chapter_repository = None
 section_repository = None
 get_config = None
@@ -176,6 +177,14 @@ def load_narrative_assistant_modules():
         _write_debug(f"Phase 2b: AlertRepository not available: {type(e).__name__}: {e}")
         logger.warning(f"AlertRepository not available: {e}")
 
+    try:
+        from narrative_assistant.persistence.dismissal_repository import DismissalRepository
+        deps.dismissal_repository = DismissalRepository()
+        _write_debug("Phase 2c OK: DismissalRepository loaded")
+    except Exception as e:
+        _write_debug(f"Phase 2c: DismissalRepository not available: {type(e).__name__}: {e}")
+        logger.warning(f"DismissalRepository not available: {e}")
+
     # Check NLP deps
     if deps.project_manager is not None:
         _spacy_ok = importlib.util.find_spec("spacy") is not None
@@ -282,6 +291,7 @@ class AlertResponse(BaseModel):
     status: str
     entity_ids: list[int] = []
     confidence: float = 0.0
+    content_hash: str = ""
     created_at: str
     updated_at: Optional[str] = None
     resolved_at: Optional[str] = None

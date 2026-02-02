@@ -1323,6 +1323,11 @@ class CoreferenceVotingResolver:
         definite_nps = self._extract_definite_nps(doc, text, get_sentence_idx, get_chapter_idx)
         mentions.extend(definite_nps)
 
+        # Extraer sujetos omitidos (pro-drop / ZERO)
+        # Solo 3ª persona singular/plural — 1ª/2ª persona no son útiles para correferencia
+        zero_mentions = self._extract_zero_mentions(doc, text, get_sentence_idx, get_chapter_idx)
+        mentions.extend(zero_mentions)
+
         # Ordenar por posición
         mentions.sort(key=lambda m: m.start_char)
 
@@ -1482,6 +1487,81 @@ class CoreferenceVotingResolver:
                         head_text=noun,
                     ))
 
+        return mentions
+
+    def _extract_zero_mentions(
+        self,
+        doc,
+        text: str,
+        get_sentence_idx,
+        get_chapter_idx,
+    ) -> list[Mention]:
+        """
+        Extrae menciones de sujeto omitido (pro-drop) en verbos finitos.
+
+        En español, el sujeto puede omitirse cuando la conjugación verbal
+        es inequívoca. Solo se extraen menciones de 3ª persona (singular
+        y plural) porque 1ª/2ª persona raramente son útiles para
+        correferencia narrativa.
+
+        Se genera con confianza baja (0.4) para evitar contaminar cadenas
+        existentes en la resolución posterior.
+
+        Returns:
+            Lista de menciones de tipo ZERO
+        """
+        mentions = []
+
+        # Posiciones de sujetos explícitos ya detectados (para evitar duplicar)
+        explicit_subj_verbs: set[int] = set()
+        for token in doc:
+            if token.dep_ in ("nsubj", "nsubj:pass") and token.head.pos_ == "VERB":
+                explicit_subj_verbs.add(token.head.i)
+
+        for token in doc:
+            # Solo verbos finitos
+            if token.pos_ != "VERB":
+                continue
+            morph = str(token.morph)
+            if "VerbForm=Fin" not in morph:
+                continue
+
+            # Saltar si ya tiene sujeto explícito
+            if token.i in explicit_subj_verbs:
+                continue
+
+            # Solo 3ª persona — 1ª/2ª no son útiles para correferencia narrativa
+            if "Person=3" not in morph:
+                continue
+
+            # Inferir número
+            if "Number=Sing" in morph:
+                number = Number.SINGULAR
+            elif "Number=Plur" in morph:
+                number = Number.PLURAL
+            else:
+                continue  # No se puede determinar
+
+            # Inferir género del contexto verbal (limitado — UNKNOWN por defecto)
+            gender = Gender.UNKNOWN
+
+            # Representación textual: verbo entre corchetes (ASCII-safe)
+            zero_text = f"[PRO {token.text}]"
+
+            mentions.append(Mention(
+                text=zero_text,
+                start_char=token.idx,
+                end_char=token.idx + len(token.text),
+                mention_type=MentionType.ZERO,
+                gender=gender,
+                number=number,
+                sentence_idx=get_sentence_idx(token),
+                chapter_idx=get_chapter_idx(token.idx),
+                context=self._get_context(text, None, window=50,
+                                         start=token.idx, end=token.idx + len(token.text)),
+            ))
+
+        logger.debug(f"Extraídas {len(mentions)} menciones pro-drop (ZERO)")
         return mentions
 
     # Nombres españoles comunes por género (para inferencia cuando spaCy no detecta)

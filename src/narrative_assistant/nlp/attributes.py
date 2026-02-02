@@ -262,6 +262,7 @@ COLORS = {
     "rubio", "rubios", "pelirrojo", "pelirrojos", "canoso", "canosos",
     "blanco", "blancos", "oscuro", "oscuros", "claro", "claros",
     "rojo", "rojos", "cobrizo", "cobrizos", "azabache",
+    "moreno", "morena", "morenos", "morenas",
 }
 
 # Tipos de pelo
@@ -1180,12 +1181,15 @@ class AttributeExtractor:
         result = AttributeExtractionResult(processed_chars=len(text))
         all_extractions: dict[str, list[ExtractedAttribute]] = {}  # método -> atributos
 
-        # Crear y cachear doc spaCy para uso en _find_nearest_entity (scope resolver)
+        # Crear y cachear doc spaCy y ScopeResolver para scope resolution
         self._spacy_doc = None
+        self._scope_resolver = None
         try:
             nlp = self._get_nlp()
             if nlp:
                 self._spacy_doc = nlp(text)
+                from .scope_resolver import ScopeResolver
+                self._scope_resolver = ScopeResolver(self._spacy_doc, text)
         except Exception as e:
             logger.debug(f"Could not create spaCy doc for scope resolution: {e}")
 
@@ -2421,12 +2425,9 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
         """
         Detecta si una entidad está dentro de una cláusula relativa.
 
-        En español, las cláusulas relativas comienzan con:
-        - "que" (pronombre relativo): "el hombre que vi"
-        - "quien/quienes": "la mujer a quien conocí"
-        - "cual/cuales": "el cual era..."
-        - "cuyo/cuya/cuyos/cuyas": "cuyo hermano..."
-        - "donde": "la casa donde vivía"
+        Usa dos estrategias:
+        1. Dep-tree (preferido): ScopeResolver con spans de RC del árbol de dependencias
+        2. Regex fallback: patrones de pronombres relativos + cierre de cláusula
 
         Ejemplo: "El hombre que María había visto tenía ojos azules."
         → "María" está dentro de "que María había visto" (cláusula relativa)
@@ -2441,21 +2442,33 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
         Returns:
             True si la entidad está dentro de una cláusula relativa
         """
-        import re as regex_module
-
         # La entidad está ANTES del atributo (ya filtrado en el caller)
         if entity_end > attribute_pos:
             return False
 
-        # Buscar si hay un pronombre relativo ANTES de la entidad
-        # que indica que la entidad está dentro de una cláusula relativa
-        # Patrón: Antecedente + "que/quien/etc" + [Entidad] + verbo + ... + atributo
+        # Estrategia 1: Dep-tree (ScopeResolver cacheado)
+        resolver = getattr(self, '_scope_resolver', None)
+        if resolver is not None:
+            try:
+                ent_in_rc, _ = resolver.is_in_relative_clause(entity_start)
+                attr_in_rc, _ = resolver.is_in_relative_clause(attribute_pos)
+                if ent_in_rc and not attr_in_rc:
+                    logger.debug(
+                        f"Entidad en cláusula relativa (dep-tree): "
+                        f"'{text[entity_start:entity_end]}'"
+                    )
+                    return True
+                if not ent_in_rc:
+                    return False  # Dep-tree es confiable: si dice que no está, confiar
+            except Exception as e:
+                logger.debug(f"RC detection via dep-tree failed: {e}")
 
-        # Buscar el contexto antes de la entidad (buscando el pronombre relativo)
+        # Estrategia 2: Regex fallback (cuando no hay dep-tree disponible)
+        import re as regex_module
+
         search_start = max(0, entity_start - 30)
         before_entity = text[search_start:entity_start]
 
-        # Patrones de inicio de cláusula relativa en español
         relative_patterns = [
             r'\bque\s*$',           # "...que María"
             r'\bquien(?:es)?\s*$',  # "...quien María"
@@ -2468,24 +2481,15 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
 
         for pattern in relative_patterns:
             if regex_module.search(pattern, before_entity, regex_module.IGNORECASE):
-                # Hay un pronombre relativo justo antes de la entidad
-                # Verificar que el atributo NO está dentro de la misma cláusula
-                # (buscar verbos entre la entidad y el atributo que podrían cerrar la cláusula)
-
                 between = text[entity_end:attribute_pos]
-
-                # Si encontramos un verbo seguido de otro verbo principal, la cláusula terminó
-                # Patrones de cierre de cláusula: verbo en pasado + verbo en imperfecto
-                # Ej: "había visto" (cláusula) + "tenía" (principal)
                 clause_closure = regex_module.search(
                     r'\b(?:había|hubo|hizo|fue|vio|conoció|dijo)\s+\w+\s+(?:tenía|era|estaba|llevaba|mostraba)\b',
                     between, regex_module.IGNORECASE
                 )
-
                 if clause_closure:
                     logger.debug(
-                        f"Entidad en cláusula relativa: '{text[entity_start:entity_end]}' "
-                        f"(patrón relativo antes, cierre de cláusula detectado)"
+                        f"Entidad en cláusula relativa (regex): "
+                        f"'{text[entity_start:entity_end]}'"
                     )
                     return True
 
@@ -2564,12 +2568,11 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
         # Normalizar menciones al formato de 4 elementos
         normalized_mentions = _normalize_entity_mentions(entity_mentions)
 
-        # ===== NUEVO: Intentar resolución por scope gramatical (reemplaza ventana fija) =====
-        # Si tenemos un doc spaCy disponible, usar dependency parsing como criterio principal
-        if hasattr(self, '_spacy_doc') and self._spacy_doc is not None:
+        # ===== Resolución por scope gramatical (reemplaza ventana fija) =====
+        # Usa ScopeResolver cacheado con dep parsing, RC filtering e identidad copulativa
+        resolver = getattr(self, '_scope_resolver', None)
+        if resolver is not None:
             try:
-                from .scope_resolver import ScopeResolver
-                resolver = ScopeResolver(self._spacy_doc, text)
                 scope_result = resolver.find_nearest_entity_by_scope(
                     position, normalized_mentions, prefer_subject=True
                 )
@@ -3045,13 +3048,14 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                             )
                             if entity_name and len(attribute_value) > 1:
                                 category = self._infer_category(attribute_value, attr_token)
+                                key = self._infer_key(attribute_value, attr_token)
 
                                 confidence = 0.55
                                 if confidence >= self.min_confidence:
                                     attr = ExtractedAttribute(
                                         entity_name=entity_name,
                                         category=category,
-                                        key=AttributeKey.OTHER,
+                                        key=key,
                                         value=attribute_value.lower(),
                                         source_text=sent.text,
                                         start_char=sent.start_char,
@@ -3080,13 +3084,14 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                             )
                             if entity_name and len(attribute_value) > 1:
                                 category = self._infer_category(attribute_value, attr_token)
+                                key = self._infer_key(attribute_value, attr_token)
 
                                 confidence = 0.55
                                 if confidence >= self.min_confidence:
                                     attr = ExtractedAttribute(
                                         entity_name=entity_name,
                                         category=category,
-                                        key=AttributeKey.OTHER,
+                                        key=key,
                                         value=attribute_value.lower(),
                                         source_text=sent.text,
                                         start_char=sent.start_char,
@@ -3144,7 +3149,7 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                                     attr = ExtractedAttribute(
                                         entity_name=token.text,
                                         category=self._infer_category(child.text, child),
-                                        key=AttributeKey.OTHER,
+                                        key=self._infer_key(child.text, child),
                                         value=child.text.lower(),
                                         source_text=sent.text,
                                         start_char=sent.start_char,
@@ -3239,6 +3244,21 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
 
         return None
 
+    # Colores que en uso copulativo ("era rubio") se refieren a pelo
+    _HAIR_COLOR_ADJECTIVES = frozenset({
+        "rubio", "rubia", "rubios", "rubias",
+        "moreno", "morena", "morenos", "morenas",
+        "castaño", "castaña", "castaños", "castañas",
+        "pelirrojo", "pelirroja", "pelirrojos", "pelirrojas",
+        "canoso", "canosa", "canosos", "canosas",
+    })
+
+    # Adjetivos de altura
+    _HEIGHT_ADJECTIVES = frozenset({
+        "alto", "alta", "altos", "altas",
+        "bajo", "baja", "bajos", "bajas",
+    })
+
     def _infer_category(self, value: str, token) -> AttributeCategory:
         """Infiere la categoría del atributo basándose en el valor y POS."""
         value_lower = value.lower()
@@ -3256,6 +3276,41 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
             return AttributeCategory.PHYSICAL
 
         return AttributeCategory.SOCIAL
+
+    def _infer_key(self, value: str, token=None) -> AttributeKey:
+        """
+        Infiere la clave específica de un atributo extraído por dependency parsing.
+
+        En español, adjetivos copulativos como "era moreno/rubio" se refieren
+        a color de pelo. Adjetivos como "era alto" se refieren a altura.
+        Adjetivos de constitución como "era delgado" a complexión.
+
+        Args:
+            value: Valor del atributo
+            token: Token spaCy del atributo (opcional, para contexto)
+
+        Returns:
+            AttributeKey más probable
+        """
+        value_lower = value.lower()
+
+        # Color de pelo: "era rubio", "era moreno", "era castaño"
+        if value_lower in self._HAIR_COLOR_ADJECTIVES:
+            return AttributeKey.HAIR_COLOR
+
+        # Altura: "era alto", "era baja"
+        if value_lower in self._HEIGHT_ADJECTIVES:
+            return AttributeKey.HEIGHT
+
+        # Constitución: "era delgado", "era corpulento"
+        if value_lower in BUILD_TYPES and value_lower not in self._HEIGHT_ADJECTIVES:
+            return AttributeKey.BUILD
+
+        # Personalidad: "era amable", "era valiente"
+        if value_lower in PERSONALITY_TRAITS:
+            return AttributeKey.PERSONALITY
+
+        return AttributeKey.OTHER
 
     def extract_from_context(
         self,
