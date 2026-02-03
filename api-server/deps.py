@@ -301,6 +301,7 @@ class AlertResponse(BaseModel):
 class DownloadModelsRequest(BaseModel):
     """Request para descargar modelos"""
     models: list[str] = ["spacy", "embeddings"]
+    force: bool = False
 
 
 class LicenseActivationRequest(BaseModel):
