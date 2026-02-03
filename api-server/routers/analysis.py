@@ -873,10 +873,21 @@ JSON:"""
 
                     fusion_pairs: list[tuple] = []  # (entity_to_keep, entity_to_merge)
 
+                    # Helper function to check if one name contains another as a word subset
+                    def is_name_subset(short_name: str, long_name: str) -> bool:
+                        """Check if short_name's words are a subset of long_name's words."""
+                        short_words = set(short_name.lower().split())
+                        long_words = set(long_name.lower().split())
+                        return short_words and long_words and short_words < long_words
+
                     for entity_type, type_entities in entities_by_type.items():
                         # Solo fusionar si hay más de una entidad del mismo tipo
                         if len(type_entities) < 2:
                             continue
+
+                        # Log entities for debugging fusion issues
+                        entity_names = [e.canonical_name for e in type_entities]
+                        logger.info(f"Fusion check: {entity_type.value} entities = {entity_names}")
 
                         # Comparar cada par de entidades
                         for i, ent1 in enumerate(type_entities):
@@ -884,13 +895,30 @@ JSON:"""
                                 if i >= j:  # Evitar duplicados y compararse consigo mismo
                                     continue
 
+                                # PRE-CHECK: If one name is a word subset of another, they should merge
+                                # This handles cases like "Juan" ⊂ "Juan Pérez"
+                                name1 = ent1.canonical_name
+                                name2 = ent2.canonical_name
+                                force_merge = is_name_subset(name1, name2) or is_name_subset(name2, name1)
+
+                                if force_merge:
+                                    logger.info(
+                                        f"Fusión forzada por nombre contenido: '{name1}' ↔ '{name2}'"
+                                    )
+
                                 # Calcular si deben fusionarse
                                 result = fusion_service.should_merge(ent1, ent2)
 
-                                if result.should_merge:
+                                # Merge if semantic service says so OR if name containment detected
+                                if result.should_merge or force_merge:
+                                    merge_reason = (
+                                        f"nombre contenido ({name1} ⊂ {name2} o viceversa)"
+                                        if force_merge and not result.should_merge
+                                        else result.reason
+                                    )
                                     logger.info(
                                         f"Fusión sugerida: '{ent1.canonical_name}' + '{ent2.canonical_name}' "
-                                        f"(similaridad: {result.similarity:.2f}, razón: {result.reason})"
+                                        f"(similaridad: {result.similarity:.2f}, razón: {merge_reason})"
                                     )
                                     # Priorizar el nombre más descriptivo (nombre propio > pronombre)
                                     # Criterios:
