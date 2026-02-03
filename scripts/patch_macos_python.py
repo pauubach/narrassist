@@ -173,45 +173,60 @@ def patch_python_framework(framework_dir: Path) -> bool:
         print(f"\n⚠️  No se encontraron ejecutables python en {bin_dir}")
         return False
 
-    # 3. Crear python3 en la raíz para cuando Tauri dereferencie symlinks
-    python3_root = framework_dir / "python3"
+    # 3. Crear python3 en la raíz: un wrapper shell + binario parcheado
+    # El wrapper configura PYTHONHOME para que Python encuentre lib-dynload
+    python3_wrapper = framework_dir / "python3"
+    python3_bin = framework_dir / "python3.bin"
 
-    # SIEMPRE crear una copia y parchearla, porque Tauri dereferencía symlinks durante bundle
     if python_executables:
         import shutil
 
         # Eliminar cualquier python3 existente (symlink o copia)
-        if python3_root.exists() or python3_root.is_symlink():
-            python3_root.unlink()
+        if python3_wrapper.exists() or python3_wrapper.is_symlink():
+            python3_wrapper.unlink()
+        if python3_bin.exists() or python3_bin.is_symlink():
+            python3_bin.unlink()
 
-        # Copiar el primer ejecutable python a la raíz
-        print(f"\n🐍 Creando python3 en raíz con rutas parcheadas para ubicación raíz...")
-        shutil.copy2(python_executables[0], python3_root)
+        # Copiar el ejecutable python a python3.bin y parchearlo
+        print(f"\n🐍 Creando python3.bin en raíz con rutas parcheadas...")
+        shutil.copy2(python_executables[0], python3_bin)
 
         # Parchear con rutas correctas para la ubicación raíz
-        # python3 en raíz: @executable_path apunta a python-embed/
-        # Python está en python-embed/Python.framework/Versions/3.12/Python
+        add_rpath(python3_bin, "@executable_path/Python.framework/Versions/3.12")
+        add_rpath(python3_bin, "@executable_path/Python.framework/Versions/3.12/lib")
 
-        # Añadir RPATHs
-        add_rpath(python3_root, "@executable_path/Python.framework/Versions/3.12")
-        add_rpath(python3_root, "@executable_path/Python.framework/Versions/3.12/lib")
-
-        deps = get_dependencies(python3_root)
+        deps = get_dependencies(python3_bin)
         for dep in deps:
-            # Detectar tanto rutas absolutas como relativas que necesiten corrección
             if "/Library/Frameworks/Python.framework/Versions/3.12/Python" in dep or \
                "@executable_path/../Python" in dep or \
                "Python.framework" in dep:
-                # python3 está en python-embed/, Python está en python-embed/Python.framework/Versions/3.12/Python
                 new_dep = "@executable_path/Python.framework/Versions/3.12/Python"
-                if dep != new_dep:  # Solo parchear si es diferente
-                    if patch_binary_dependency(python3_root, dep, new_dep):
+                if dep != new_dep:
+                    if patch_binary_dependency(python3_bin, dep, new_dep):
                         print(f"  ✅ {dep}")
                         print(f"     → {new_dep}")
 
         # Re-firmar después de modificar
-        adhoc_sign(python3_root)
-        print(f"  ✅ python3 en raíz parcheado y firmado")
+        adhoc_sign(python3_bin)
+        print(f"  ✅ python3.bin parcheado y firmado")
+
+        # Crear wrapper shell que configure PYTHONHOME
+        print(f"\n📜 Creando wrapper shell python3...")
+        wrapper_content = '''#!/bin/bash
+# Wrapper para python3 que configura PYTHONHOME
+
+# Obtener directorio donde está este script
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+# Configurar PYTHONHOME
+export PYTHONHOME="$SCRIPT_DIR/Python.framework/Versions/3.12"
+
+# Ejecutar python3.bin real con todos los argumentos
+exec "$SCRIPT_DIR/python3.bin" "$@"
+'''
+        python3_wrapper.write_text(wrapper_content)
+        python3_wrapper.chmod(0o755)
+        print(f"  ✅ python3 wrapper creado")
 
     # 4. Parchear Python.app (ejecutable que se invoca al abrir archivos .py)
     python_app_exe = versions_dir / "Resources" / "Python.app" / "Contents" / "MacOS" / "Python"
@@ -313,8 +328,8 @@ def patch_python_framework(framework_dir: Path) -> bool:
     print("🔏 Re-firmando binarios modificados...")
     binaries_to_sign = [python_lib]
     binaries_to_sign.extend(python_executables)  # Todos los ejecutables parcheados
-    if python3_root.exists() and not python3_root.is_symlink():
-        binaries_to_sign.append(python3_root)
+    if python3_bin.exists():
+        binaries_to_sign.append(python3_bin)
     if python_app_exe.exists():
         binaries_to_sign.append(python_app_exe)
 
@@ -340,14 +355,14 @@ def patch_python_framework(framework_dir: Path) -> bool:
             print(f"     {result.stderr}")
             all_working = False
 
-    # Probar el ejecutable en la raíz (si existe y no es symlink)
-    if python3_root.exists() and not python3_root.is_symlink():
-        result_root = run_command([str(python3_root), "--version"], check=False)
-        if result_root.returncode == 0:
-            print(f"  ✅ Root python3: {result_root.stdout.strip()}")
+    # Probar el wrapper (que configura PYTHONHOME correctamente)
+    if python3_wrapper.exists():
+        result_wrapper = run_command([str(python3_wrapper), "--version"], check=False)
+        if result_wrapper.returncode == 0:
+            print(f"  ✅ Wrapper python3: {result_wrapper.stdout.strip()}")
         else:
-            print(f"  ⚠️  Root python3 no funciona:")
-            print(f"     {result_root.stderr}")
+            print(f"  ⚠️  Wrapper python3 no funciona:")
+            print(f"     {result_wrapper.stderr}")
             all_working = False
 
     return all_working
