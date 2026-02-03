@@ -146,6 +146,21 @@ class AttributeKey(Enum):
     OTHER = "other"
 
 
+class AssignmentSource:
+    """
+    Fuente de asignación de un atributo a una entidad.
+    
+    Usado por CESP (Cascading Extraction with Syntactic Priority) para
+    priorizar atributos con evidencia sintáctica sobre proximidad.
+    """
+    GENITIVE = "genitive"           # "ojos azules de Pedro" - máxima prioridad
+    EXPLICIT_SUBJECT = "nsubj"      # Sujeto explícito sintáctico
+    IMPLICIT_SUBJECT = "inherited"  # Sujeto tácito heredado
+    PROXIMITY = "proximity"         # Asignación por proximidad - menor prioridad
+    LLM = "llm"                     # Asignado por LLM
+    EMBEDDINGS = "embeddings"       # Asignado por embeddings
+
+
 @dataclass
 class ExtractedAttribute:
     """
@@ -163,6 +178,8 @@ class ExtractedAttribute:
         is_negated: Si el atributo está negado ("no tenía ojos verdes")
         is_metaphor: Si se detectó como posible metáfora
         chapter_id: ID del capítulo donde se encontró
+        assignment_source: Fuente de la asignación (CESP)
+        sentence_idx: Índice de oración para deduplicación CESP
     """
 
     entity_name: str
@@ -176,6 +193,8 @@ class ExtractedAttribute:
     is_negated: bool = False
     is_metaphor: bool = False
     chapter_id: Optional[int] = None
+    assignment_source: Optional[str] = None  # AssignmentSource value
+    sentence_idx: int = 0  # Para deduplicación CESP
 
     def to_dict(self) -> dict:
         """Convierte a diccionario para serialización."""
@@ -191,6 +210,8 @@ class ExtractedAttribute:
             "is_negated": self.is_negated,
             "is_metaphor": self.is_metaphor,
             "chapter_id": self.chapter_id,
+            "assignment_source": self.assignment_source,
+            "sentence_idx": self.sentence_idx,
         }
 
 
@@ -316,7 +337,7 @@ EntityMention = tuple[str, int, int, Optional[str]]
 
 
 def _normalize_entity_mentions(
-    entity_mentions: Optional[list[tuple]] | None,
+    entity_mentions: Optional[list[tuple]],
 ) -> list[EntityMention]:
     """
     Normaliza entity_mentions al formato de 4 elementos.
@@ -1334,6 +1355,9 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                     start_char = text.find(evidence) if evidence else 0
                     end_char = start_char + len(evidence) if start_char >= 0 else 0
 
+                    # Calcular sentence_idx aproximado para CESP
+                    sentence_idx = max(0, start_char) // 500
+
                     attr = ExtractedAttribute(
                         entity_name=attr_data.get("entity", ""),
                         category=category,
@@ -1345,6 +1369,8 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                         confidence=float(attr_data.get("confidence", 0.8)),
                         is_negated=attr_data.get("is_negated", False),
                         chapter_id=chapter_id,
+                        assignment_source=AssignmentSource.LLM,  # CESP
+                        sentence_idx=sentence_idx,  # CESP
                     )
                     attributes.append(attr)
 
@@ -1447,6 +1473,8 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                                         key = self._map_attribute_key(key_str)
 
                                         start_char = text.find(sentence)
+                                        # Calcular sentence_idx aproximado para CESP
+                                        sentence_idx = max(0, start_char) // 500
                                         attr = ExtractedAttribute(
                                             entity_name=entity,
                                             category=category,
@@ -1457,6 +1485,8 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                                             end_char=max(0, start_char + len(sentence)),
                                             confidence=min(0.9, similarity),
                                             chapter_id=chapter_id,
+                                            assignment_source=AssignmentSource.EMBEDDINGS,  # CESP
+                                            sentence_idx=sentence_idx,  # CESP
                                         )
                                         attributes.append(attr)
                                         break  # Solo un match por descripción
@@ -1608,6 +1638,7 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
 
                 # Extraer grupos
                 groups = match.groups()
+                assignment_source = None  # CESP: determinar fuente de asignación
                 if len(groups) < 2:
                     value = groups[0] if groups else None
                     entity_name = self._find_nearest_entity(
@@ -1615,10 +1646,20 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                     )
                     if not entity_name:
                         continue
+                    # Asignado por proximidad (menor prioridad en CESP)
+                    assignment_source = AssignmentSource.PROXIMITY
                 elif swap_groups:
                     value, entity_name = groups[0], groups[1]
+                    # Si el patrón es "X de Entidad" (swap_groups=True), es genitivo
+                    # Ejemplo: "los ojos verdes de Juan"
+                    if " de " in match.group(0).lower():
+                        assignment_source = AssignmentSource.GENITIVE
+                    else:
+                        assignment_source = AssignmentSource.EXPLICIT_SUBJECT
                 else:
                     entity_name, value = groups[0], groups[1]
+                    # Patrón "Entidad + tenía/era + X" - sujeto explícito
+                    assignment_source = AssignmentSource.EXPLICIT_SUBJECT
 
                 # Verificar patrón contrastivo "No es X, sino Y"
                 match_end_in_context = match.end() - context_start
@@ -1689,6 +1730,10 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                 if value and value.lower() in emotional_states:
                     continue
 
+                # Calcular sentence_idx aproximado para CESP
+                # Usar posición / 500 como aproximación de oración
+                sentence_idx = match.start() // 500
+
                 attr = ExtractedAttribute(
                     entity_name=entity_name,
                     category=category,
@@ -1701,6 +1746,8 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                     is_negated=is_negated,
                     is_metaphor=is_metaphor,
                     chapter_id=chapter_id,
+                    assignment_source=assignment_source,  # CESP
+                    sentence_idx=sentence_idx,  # CESP
                 )
                 attributes.append(attr)
 
@@ -1853,6 +1900,8 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                     is_negated=best_attr.is_negated,
                     is_metaphor=best_attr.is_metaphor,
                     chapter_id=best_attr.chapter_id,
+                    assignment_source=best_attr.assignment_source,  # CESP: preservar fuente
+                    sentence_idx=best_attr.sentence_idx,  # CESP: preservar índice
                 )
                 final_attributes.append(final_attr)
 
@@ -2908,15 +2957,84 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
     def _deduplicate(
         self, attributes: list[ExtractedAttribute]
     ) -> list[ExtractedAttribute]:
-        """Elimina atributos duplicados, manteniendo el de mayor confianza."""
-        seen: dict[tuple, ExtractedAttribute] = {}
-
+        """
+        Elimina atributos duplicados usando CESP (Cascading Extraction with Syntactic Priority).
+        
+        CLAVE: Si el mismo atributo (tipo+valor+oración) está asignado a múltiples
+        entidades, conservar SOLO el que tiene mayor prioridad de fuente de asignación.
+        
+        Prioridad de fuentes:
+        1. GENITIVE ("de Pedro") - máxima prioridad
+        2. EXPLICIT_SUBJECT (nsubj) - sujeto sintáctico
+        3. LLM - comprensión semántica
+        4. IMPLICIT_SUBJECT - sujeto tácito
+        5. EMBEDDINGS - similitud semántica
+        6. PROXIMITY - menor prioridad (causa de falsos positivos)
+        
+        Esto elimina falsos positivos como:
+        - "ojos azules de Pedro" asignado a Juan por proximidad
+        """
+        # PASO 1: Agrupar por (tipo, valor, oración) SIN considerar entidad
+        # Esto detecta duplicados donde el mismo atributo fue asignado a múltiples entidades
+        from collections import defaultdict
+        
+        attr_groups: dict[tuple, list[ExtractedAttribute]] = defaultdict(list)
+        
         for attr in attributes:
-            key = (attr.entity_name.lower(), attr.key, attr.value)
-            if key not in seen or attr.confidence > seen[key].confidence:
-                seen[key] = attr
-
-        return list(seen.values())
+            # Clave: (key, value_normalizado, sentence_idx o start_char//500)
+            # Usamos start_char//500 como aproximación de oración si no hay sentence_idx
+            sentence_key = attr.sentence_idx if attr.sentence_idx > 0 else (attr.start_char // 500)
+            key = (
+                attr.key,
+                attr.value.lower().strip(),
+                sentence_key
+            )
+            attr_groups[key].append(attr)
+        
+        # PASO 2: Para cada grupo, seleccionar el mejor por prioridad de fuente
+        deduplicated: list[ExtractedAttribute] = []
+        
+        # Prioridad de fuentes de asignación (mayor número = mayor prioridad)
+        source_priority = {
+            AssignmentSource.GENITIVE: 100,
+            AssignmentSource.EXPLICIT_SUBJECT: 90,
+            AssignmentSource.LLM: 80,
+            AssignmentSource.IMPLICIT_SUBJECT: 50,
+            AssignmentSource.EMBEDDINGS: 40,
+            AssignmentSource.PROXIMITY: 10,
+            None: 5,  # Sin fuente especificada
+        }
+        
+        for key, group in attr_groups.items():
+            if len(group) == 1:
+                deduplicated.append(group[0])
+            else:
+                # Múltiples candidatos para el mismo atributo
+                # Ordenar por: (prioridad_fuente, confianza)
+                sorted_group = sorted(
+                    group,
+                    key=lambda a: (
+                        source_priority.get(a.assignment_source, 5),
+                        a.confidence
+                    ),
+                    reverse=True
+                )
+                
+                best = sorted_group[0]
+                
+                # Log si eliminamos falsos positivos
+                eliminated = [a for a in sorted_group[1:] if a.entity_name.lower() != best.entity_name.lower()]
+                for elim in eliminated:
+                    logger.info(
+                        f"[CESP] Eliminando falso positivo: {elim.key.value}='{elim.value}' "
+                        f"asignado a '{elim.entity_name}' por {elim.assignment_source or 'desconocido'}. "
+                        f"Correcto: '{best.entity_name}' por {best.assignment_source or 'mayor confianza'}"
+                    )
+                
+                deduplicated.append(best)
+        
+        logger.debug(f"Deduplicación CESP: {len(attributes)} -> {len(deduplicated)} atributos")
+        return deduplicated
 
     def _resolve_conflicts(
         self, attributes: list[ExtractedAttribute]
@@ -3052,6 +3170,9 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
 
                                 confidence = 0.55
                                 if confidence >= self.min_confidence:
+                                    # Calcular sentence_idx para CESP
+                                    sent_list = list(doc.sents)
+                                    sent_idx = sent_list.index(sent) if sent in sent_list else 0
                                     attr = ExtractedAttribute(
                                         entity_name=entity_name,
                                         category=category,
@@ -3062,6 +3183,8 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                                         end_char=sent.end_char,
                                         confidence=confidence,
                                         chapter_id=chapter_id,
+                                        assignment_source=AssignmentSource.EXPLICIT_SUBJECT,
+                                        sentence_idx=sent_idx,
                                     )
                                     attributes.append(attr)
 
@@ -3088,6 +3211,8 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
 
                                 confidence = 0.55
                                 if confidence >= self.min_confidence:
+                                    # Calcular sentence_idx
+                                    sent_idx = list(doc.sents).index(sent) if sent in doc.sents else 0
                                     attr = ExtractedAttribute(
                                         entity_name=entity_name,
                                         category=category,
@@ -3098,6 +3223,8 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                                         end_char=sent.end_char,
                                         confidence=confidence,
                                         chapter_id=chapter_id,
+                                        assignment_source=AssignmentSource.EXPLICIT_SUBJECT,
+                                        sentence_idx=sent_idx,
                                     )
                                     attributes.append(attr)
 
@@ -3126,6 +3253,9 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
 
                                 confidence = 0.5
                                 if confidence >= self.min_confidence:
+                                    # Calcular sentence_idx para CESP
+                                    sent_list = list(doc.sents)
+                                    sent_idx = sent_list.index(sent) if sent in sent_list else 0
                                     attr = ExtractedAttribute(
                                         entity_name=entity_name,
                                         category=AttributeCategory.PHYSICAL,
@@ -3136,6 +3266,8 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                                         end_char=sent.end_char,
                                         confidence=confidence,
                                         chapter_id=chapter_id,
+                                        assignment_source=AssignmentSource.EXPLICIT_SUBJECT,
+                                        sentence_idx=sent_idx,
                                     )
                                     attributes.append(attr)
 
@@ -3146,6 +3278,9 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                             if child.pos_ == "ADJ" and child.dep_ == "amod":
                                 confidence = 0.6
                                 if confidence >= self.min_confidence:
+                                    # Calcular sentence_idx para CESP
+                                    sent_list = list(doc.sents)
+                                    sent_idx = sent_list.index(sent) if sent in sent_list else 0
                                     attr = ExtractedAttribute(
                                         entity_name=token.text,
                                         category=self._infer_category(child.text, child),
@@ -3156,6 +3291,8 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                                         end_char=sent.end_char,
                                         confidence=confidence,
                                         chapter_id=chapter_id,
+                                        assignment_source=AssignmentSource.EXPLICIT_SUBJECT,
+                                        sentence_idx=sent_idx,
                                     )
                                     attributes.append(attr)
 
@@ -3537,6 +3674,8 @@ def resolve_attributes_with_coreferences(
                     is_negated=attr.is_negated,
                     is_metaphor=attr.is_metaphor,
                     chapter_id=attr.chapter_id,
+                    assignment_source=attr.assignment_source,  # CESP: preservar
+                    sentence_idx=attr.sentence_idx,  # CESP: preservar
                 )
                 resolved_attributes.append(resolved_attr)
                 logger.debug(

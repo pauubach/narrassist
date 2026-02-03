@@ -26,7 +26,7 @@ import threading
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Optional, Callable
+from typing import Optional, Callable, List
 
 from ...core.result import Result
 from ...core.errors import NLPError, ErrorSeverity
@@ -433,7 +433,7 @@ class LanguageToolVoter(BaseVoter):
         "MORFOLOGIK_RULE_ES",        # A veces detecta neologismos válidos
     ]
 
-    def __init__(self, disabled_rules: list[str] | None = None):
+    def __init__(self, disabled_rules: Optional[List[str]] = None):
         super().__init__()
         self._tool = None
         self._use_python_lib = False
