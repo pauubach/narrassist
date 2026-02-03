@@ -6,8 +6,8 @@ import { useAlertUtils } from '@/composables/useAlertUtils'
 /**
  * AlertsPanel - Panel compacto de alertas para el sidebar.
  *
- * Muestra un resumen de alertas agrupadas por severidad.
- * Click en cualquier fila navega al tab de alertas.
+ * Muestra las alertas directamente ordenadas por severidad.
+ * Click en una alerta navega al tab de alertas con esa alerta seleccionada.
  */
 
 const props = defineProps<{
@@ -20,35 +20,49 @@ const emit = defineEmits<{
   (e: 'navigate'): void
   /** Cuando se selecciona una severidad específica */
   (e: 'filter-severity', severity: AlertSeverity): void
+  /** Cuando se hace click en una alerta específica */
+  (e: 'alert-click', alert: Alert): void
 }>()
 
-const { getSeverityLabel, getSeverityColor } = useAlertUtils()
+const { getSeverityColor } = useAlertUtils()
+
+/** Orden de severidad para ordenar alertas */
+const severityOrder: Record<AlertSeverity, number> = {
+  critical: 0,
+  high: 1,
+  medium: 2,
+  low: 3,
+  info: 4
+}
 
 /** Total de alertas */
 const totalCount = computed(() => props.alerts.length)
 
-/** Alertas agrupadas por severidad */
-const alertsBySeverity = computed(() => {
-  const counts: Partial<Record<AlertSeverity, number>> = {}
-  const severityOrder: AlertSeverity[] = ['critical', 'high', 'medium', 'low', 'info']
+/** Número máximo de alertas a mostrar en el panel */
+const MAX_VISIBLE_ALERTS = 15
 
-  for (const alert of props.alerts) {
-    counts[alert.severity] = (counts[alert.severity] || 0) + 1
-  }
-
-  // Devolver solo las que tienen alertas, en orden de severidad
-  return severityOrder
-    .filter(s => counts[s] && counts[s]! > 0)
-    .map(severity => ({
-      severity,
-      count: counts[severity]!,
-      label: getSeverityLabel(severity),
-      color: getSeverityColor(severity)
-    }))
+/** Alertas ordenadas por severidad, limitadas */
+const sortedAlerts = computed(() => {
+  return [...props.alerts]
+    .sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity])
+    .slice(0, MAX_VISIBLE_ALERTS)
 })
 
-function handleRowClick(severity: AlertSeverity) {
-  emit('filter-severity', severity)
+/** Si hay más alertas de las que mostramos */
+const hasMoreAlerts = computed(() => props.alerts.length > MAX_VISIBLE_ALERTS)
+
+/** Truncar título si es muy largo */
+function truncateTitle(title: string, maxLen = 45): string {
+  if (title.length <= maxLen) return title
+  return title.slice(0, maxLen - 3) + '...'
+}
+
+function handleAlertClick(alert: Alert) {
+  emit('alert-click', alert)
+  emit('navigate')
+}
+
+function handleViewAll() {
   emit('navigate')
 }
 </script>
@@ -60,22 +74,35 @@ function handleRowClick(severity: AlertSeverity) {
       <span class="panel-count">{{ totalCount }}</span>
     </div>
 
-    <div v-if="alertsBySeverity.length === 0" class="empty-state">
+    <div v-if="alerts.length === 0" class="empty-state">
       <i class="pi pi-check-circle"></i>
       <span>Sin alertas</span>
     </div>
 
-    <div v-else class="severity-list">
+    <div v-else class="alerts-list">
       <button
-        v-for="item in alertsBySeverity"
-        :key="item.severity"
+        v-for="alert in sortedAlerts"
+        :key="alert.id"
         type="button"
-        class="severity-row"
-        @click="handleRowClick(item.severity)"
+        class="alert-row"
+        :title="alert.title"
+        @click="handleAlertClick(alert)"
       >
-        <span class="severity-dot" :style="{ backgroundColor: item.color }"></span>
-        <span class="severity-label">{{ item.label }}</span>
-        <span class="severity-count">{{ item.count }}</span>
+        <span
+          class="severity-dot"
+          :style="{ backgroundColor: getSeverityColor(alert.severity) }"
+        ></span>
+        <span class="alert-title">{{ truncateTitle(alert.title) }}</span>
+      </button>
+
+      <button
+        v-if="hasMoreAlerts"
+        type="button"
+        class="view-all-row"
+        @click="handleViewAll"
+      >
+        <i class="pi pi-arrow-right"></i>
+        <span>Ver todas ({{ totalCount }})</span>
       </button>
     </div>
   </div>
@@ -125,16 +152,18 @@ function handleRowClick(severity: AlertSeverity) {
   color: var(--ds-color-success);
 }
 
-.severity-list {
+.alerts-list {
   display: flex;
   flex-direction: column;
   padding: var(--ds-space-2);
+  overflow-y: auto;
+  flex: 1;
 }
 
-.severity-row {
+.alert-row {
   display: flex;
   align-items: center;
-  gap: var(--ds-space-3);
+  gap: var(--ds-space-2);
   padding: var(--ds-space-2) var(--ds-space-3);
   border: none;
   background: transparent;
@@ -145,26 +174,49 @@ function handleRowClick(severity: AlertSeverity) {
   text-align: left;
 }
 
-.severity-row:hover {
+.alert-row:hover {
   background: var(--ds-surface-hover);
 }
 
 .severity-dot {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   border-radius: var(--ds-radius-full);
   flex-shrink: 0;
 }
 
-.severity-label {
+.alert-title {
   flex: 1;
   font-size: var(--ds-font-size-sm);
   color: var(--ds-color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.severity-count {
-  font-size: var(--ds-font-size-sm);
-  font-weight: var(--ds-font-weight-medium);
+.view-all-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ds-space-2);
+  padding: var(--ds-space-2) var(--ds-space-3);
+  margin-top: var(--ds-space-2);
+  border: none;
+  background: transparent;
+  border-radius: var(--ds-radius-md);
+  cursor: pointer;
+  transition: background-color var(--ds-transition-fast);
+  width: 100%;
+  font-size: var(--ds-font-size-xs);
   color: var(--ds-color-text-secondary);
+}
+
+.view-all-row:hover {
+  background: var(--ds-surface-hover);
+  color: var(--ds-color-text);
+}
+
+.view-all-row i {
+  font-size: 0.75rem;
 }
 </style>

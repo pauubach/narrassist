@@ -142,6 +142,7 @@
                   :alerts="alerts"
                   @navigate="navigateToAlerts"
                   @filter-severity="handleFilterSeverity"
+                  @alert-click="onAlertSelect"
                 />
 
                 <!-- Panel Personajes -->

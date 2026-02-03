@@ -253,6 +253,60 @@ class EntityRepository:
             (delta, entity_id),
         )
 
+    def reconcile_mention_count(self, entity_id: int) -> int:
+        """
+        Reconcilia el contador de menciones con las menciones reales en la BD.
+
+        Esto asegura consistencia después de fusiones u otras operaciones.
+
+        Args:
+            entity_id: ID de la entidad
+
+        Returns:
+            El nuevo valor de mention_count
+        """
+        # Contar menciones reales
+        row = self.db.fetchone(
+            "SELECT COUNT(*) as cnt FROM entity_mentions WHERE entity_id = ?",
+            (entity_id,),
+        )
+        actual_count = row["cnt"] if row else 0
+
+        # Actualizar el campo mention_count
+        self.db.execute(
+            "UPDATE entities SET mention_count = ? WHERE id = ?",
+            (actual_count, entity_id),
+        )
+        return actual_count
+
+    def reconcile_all_mention_counts(self, project_id: int) -> int:
+        """
+        Reconcilia los contadores de menciones para todas las entidades de un proyecto.
+
+        Args:
+            project_id: ID del proyecto
+
+        Returns:
+            Número de entidades actualizadas
+        """
+        # Actualizar todas las entidades del proyecto en una sola query
+        self.db.execute(
+            """
+            UPDATE entities
+            SET mention_count = (
+                SELECT COUNT(*)
+                FROM entity_mentions
+                WHERE entity_mentions.entity_id = entities.id
+            )
+            WHERE project_id = ? AND is_active = 1
+            """,
+            (project_id,),
+        )
+        return self.db.fetchone(
+            "SELECT COUNT(*) as cnt FROM entities WHERE project_id = ? AND is_active = 1",
+            (project_id,),
+        )["cnt"] or 0
+
     # =========================================================================
     # Menciones - CRUD
     # =========================================================================

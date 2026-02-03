@@ -1031,6 +1031,17 @@ JSON:"""
                     if fusion_pairs:
                         deps.analysis_progress_storage[project_id]["current_action"] = f"Unificados {len(merged_entity_ids)} personajes duplicados"
 
+                    # Reconciliar contadores de menciones para garantizar consistencia
+                    # Esto asegura que mention_count coincida con las menciones reales en la BD
+                    try:
+                        reconciled = entity_repo.reconcile_all_mention_counts(project_id)
+                        logger.info(f"Reconciliados contadores de menciones para {reconciled} entidades")
+
+                        # Recargar entidades con contadores actualizados
+                        entities = entity_repo.get_entities_by_project(project_id, active_only=True)
+                    except Exception as recon_err:
+                        logger.warning(f"Error reconciliando contadores de menciones: {recon_err}")
+
                     deps.analysis_progress_storage[project_id]["progress"] = 57
                     update_time_remaining()
 
