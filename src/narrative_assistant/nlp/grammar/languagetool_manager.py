@@ -580,14 +580,19 @@ class LanguageToolInstaller:
             }
             req = urllib.request.Request(url, headers=headers)
 
-            # Crear contexto SSL con fallback para entornos embebidos
+            # Crear contexto SSL con certifi para entornos embebidos
             try:
-                ssl_ctx = ssl.create_default_context()
-            except Exception:
-                ssl_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-                ssl_ctx.check_hostname = False
-                ssl_ctx.verify_mode = ssl.CERT_NONE
-                logger.warning("Usando SSL sin verificación de certificados")
+                import certifi
+                ssl_ctx = ssl.create_default_context(cafile=certifi.where())
+            except ImportError:
+                # certifi no disponible, usar certificados del sistema
+                try:
+                    ssl_ctx = ssl.create_default_context()
+                except Exception:
+                    ssl_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+                    ssl_ctx.check_hostname = False
+                    ssl_ctx.verify_mode = ssl.CERT_NONE
+                    logger.warning("Usando SSL sin verificación de certificados")
 
             with urllib.request.urlopen(req, timeout=300, context=ssl_ctx) as response:
                 total_size = int(response.headers.get("Content-Length", 0))

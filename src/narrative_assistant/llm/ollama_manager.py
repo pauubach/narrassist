@@ -619,26 +619,59 @@ class OllamaManager:
         progress_callback: Optional[Callable[[DownloadProgress], None]],
     ) -> bool:
         """Descarga un archivo con reporte de progreso."""
+        import ssl
+        
         progress = DownloadProgress(status="downloading")
-
-        def report_hook(block_num: int, block_size: int, total_size: int) -> None:
-            progress.current_bytes = block_num * block_size
-            progress.total_bytes = total_size
-            if total_size > 0:
-                progress.percentage = min(100.0, progress.current_bytes * 100.0 / total_size)
-            if progress_callback:
-                progress_callback(progress)
+        
+        # Crear contexto SSL con certifi para entornos embebidos
+        try:
+            import certifi
+            ssl_ctx = ssl.create_default_context(cafile=certifi.where())
+        except ImportError:
+            try:
+                ssl_ctx = ssl.create_default_context()
+            except Exception:
+                ssl_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+                ssl_ctx.check_hostname = False
+                ssl_ctx.verify_mode = ssl.CERT_NONE
 
         for attempt in range(self._config.network_retries):
             try:
-                urllib.request.urlretrieve(url, dest, report_hook)
+                headers = {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                }
+                req = urllib.request.Request(url, headers=headers)
+                
+                with urllib.request.urlopen(req, timeout=300, context=ssl_ctx) as response:
+                    total_size = int(response.headers.get("Content-Length", 0))
+                    progress.total_bytes = total_size
+                    block_size = 8192
+                    downloaded = 0
+                    
+                    with open(dest, "wb") as f:
+                        while True:
+                            chunk = response.read(block_size)
+                            if not chunk:
+                                break
+                            f.write(chunk)
+                            downloaded += len(chunk)
+                            
+                            progress.current_bytes = downloaded
+                            if total_size > 0:
+                                progress.percentage = min(100.0, downloaded * 100.0 / total_size)
+                            if progress_callback:
+                                progress_callback(progress)
+                
                 progress.status = "complete"
                 progress.percentage = 100.0
                 if progress_callback:
                     progress_callback(progress)
                 return True
+                
             except Exception as e:
                 logger.debug(f"Intento {attempt + 1} fallido: {e}")
+                if dest.exists():
+                    dest.unlink()
                 if attempt < self._config.network_retries - 1:
                     time.sleep(self._config.retry_delay)
 

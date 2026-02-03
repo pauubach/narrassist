@@ -379,8 +379,23 @@ fn spawn_embedded_backend(app: &AppHandle) -> Result<Child, String> {
 
     let python_path = if cfg!(target_os = "windows") {
         python_dir.join("python.exe")
+    } else if cfg!(target_os = "macos") {
+        // En macOS usar el Python del framework directamente (no el wrapper)
+        // El wrapper python3 en python-embed/ tiene problemas con el path
+        let framework_python = python_dir
+            .join("Python.framework")
+            .join("Versions")
+            .join("3.12")
+            .join("bin")
+            .join("python3");
+        if framework_python.exists() {
+            framework_python
+        } else {
+            // Fallback al wrapper si no existe el del framework
+            python_dir.join("python3")
+        }
     } else {
-        // En macOS el script crea un symlink python3
+        // Linux y otros Unix
         let candidate = python_dir.join("python3");
         if candidate.exists() {
             candidate

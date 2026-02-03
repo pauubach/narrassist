@@ -81,6 +81,37 @@ for extra_path in (BACKEND_ROOT_DIR, API_SERVER_DIR):
 
 _write_debug(f"sys.path after backend insert (first 5): {sys.path[:5]}")
 
+# CRITICAL: Configure SSL with certifi BEFORE any network operations
+# This fixes SSL certificate errors in embedded Python on macOS
+def _configure_ssl_with_certifi():
+    """Configure SSL to use certifi certificates globally."""
+    try:
+        import ssl
+        import certifi
+        
+        # Create default context with certifi
+        ssl_context = ssl.create_default_context(cafile=certifi.where())
+        
+        # Monkey-patch urllib.request.urlopen to use certifi
+        import urllib.request
+        _original_urlopen = urllib.request.urlopen
+        
+        def _patched_urlopen(url, data=None, timeout=None, **kwargs):
+            if timeout is None:
+                timeout = 30
+            if 'context' not in kwargs:
+                url_str = url if isinstance(url, str) else getattr(url, 'full_url', str(url))
+                if isinstance(url_str, str) and url_str.startswith('https://'):
+                    kwargs['context'] = ssl_context
+            return _original_urlopen(url, data=data, timeout=timeout, **kwargs)
+        
+        urllib.request.urlopen = _patched_urlopen
+        _write_debug(f"SSL configured with certifi: {certifi.where()}")
+    except Exception as e:
+        _write_debug(f"SSL configuration failed: {e}")
+
+_configure_ssl_with_certifi()
+
 import site
 import shutil
 

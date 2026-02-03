@@ -199,9 +199,21 @@
               <p v-if="systemCapabilities.ollama.models.length > 0">
                 {{ systemCapabilities.ollama.models.length }} modelo(s) instalado(s)
               </p>
-              <p v-else class="no-models-hint">
-                Instala modelos con: <code>ollama pull llama3.2</code>
-              </p>
+              <div v-else-if="modelDownloading" class="model-downloading">
+                <i class="pi pi-spin pi-spinner"></i>
+                <span class="ml-2">Descargando modelo de IA...</span>
+              </div>
+              <div v-else class="no-models-hint">
+                <Button
+                  label="Descargar modelo"
+                  icon="pi pi-download"
+                  size="small"
+                  severity="info"
+                  :loading="modelDownloading"
+                  @click="downloadDefaultModel"
+                />
+                <p class="text-sm text-gray-500 mt-1">Requerido para análisis semántico (~2GB)</p>
+              </div>
             </div>
             <div v-else-if="systemCapabilities.ollama.installed" class="ollama-unavailable">
               <Tag value="No iniciado" severity="warning" />
@@ -452,11 +464,32 @@ watch(() => props.visible, (newValue) => {
 // Estado de instalación interactiva en el tutorial
 const ollamaInstalling = ref(false)
 const ollamaStarting = ref(false)
+const modelDownloading = ref(false)
 
 // LanguageTool: usar estado centralizado del store
 const ltInstalling = computed(() => systemStore.ltInstalling)
 const ltStarting = computed(() => systemStore.ltStarting)
 const ltInstallProgress = computed(() => systemStore.ltInstallProgress)
+
+// Descarga automática del modelo por defecto
+const downloadDefaultModel = async () => {
+  modelDownloading.value = true
+  toast.add({ severity: 'info', summary: 'Descargando modelo', detail: 'Esto puede tardar unos minutos...', life: 5000 })
+  try {
+    const resp = await fetch(apiUrl('/api/ollama/pull/llama3.2'), { method: 'POST' })
+    const result = await resp.json()
+    if (result.success) {
+      toast.add({ severity: 'success', summary: 'Modelo descargado', detail: 'Análisis semántico disponible', life: 3000 })
+      await systemStore.refreshCapabilities()
+    } else {
+      toast.add({ severity: 'error', summary: 'Error', detail: result.error || 'No se pudo descargar el modelo', life: 5000 })
+    }
+  } catch (e) {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Error de conexión descargando modelo', life: 5000 })
+  } finally {
+    modelDownloading.value = false
+  }
+}
 
 let ollamaPollTimer: ReturnType<typeof setInterval> | null = null
 
@@ -516,6 +549,15 @@ const startLanguageTool = async () => {
   const success = await systemStore.startLanguageTool()
   if (success) {
     toast.add({ severity: 'success', summary: 'LanguageTool iniciado', detail: 'Corrector avanzado disponible', life: 3000 })
+    // Polling para actualizar el estado en la UI
+    let attempts = 0
+    const pollInterval = setInterval(async () => {
+      await systemStore.refreshCapabilities()
+      attempts++
+      if (systemCapabilities.value?.languagetool?.running || attempts >= 10) {
+        clearInterval(pollInterval)
+      }
+    }, 1000)
   } else {
     toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo iniciar LanguageTool', life: 5000 })
   }
