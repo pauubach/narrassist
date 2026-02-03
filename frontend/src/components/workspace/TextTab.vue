@@ -182,10 +182,12 @@ const scrollTarget = computed((): ScrollTarget | null => {
 watch(scrollTarget, (target) => {
   if (target !== null) {
     // Esperar a que el DOM se actualice y el DocumentViewer procese el scroll
+    // DocumentViewer puede necesitar hasta 200ms + 3 retries de 150ms = 650ms
+    // Usamos 800ms para dar margen adicional
     nextTick(() => {
       setTimeout(() => {
         workspaceStore.clearScrollToPosition()
-      }, 300) // Dar más tiempo para scroll animation
+      }, 800)
     })
   }
 })

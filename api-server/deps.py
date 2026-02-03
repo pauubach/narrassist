@@ -323,6 +323,7 @@ class ChangeDataLocationRequest(BaseModel):
 class ChatRequest(BaseModel):
     message: str
     context: Optional[dict] = None
+    history: Optional[list] = None
 
 
 class GlossaryEntryRequest(BaseModel):

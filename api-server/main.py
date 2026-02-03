@@ -87,7 +87,29 @@ import shutil
 # Setup logging IMMEDIATELY for early debugging
 import logging
 
-BACKEND_VERSION = "0.3.34"
+# Version: read from pyproject.toml or narrative_assistant package
+def _get_version():
+    # Try reading from pyproject.toml first (most accurate for dev)
+    try:
+        import tomllib
+        pyproject = Path(__file__).parent.parent / "pyproject.toml"
+        if pyproject.exists():
+            with open(pyproject, "rb") as f:
+                data = tomllib.load(f)
+                v = data.get("project", {}).get("version")
+                if v:
+                    return v
+    except Exception:
+        pass
+    # Try importlib.metadata (installed package)
+    try:
+        from importlib.metadata import version
+        return version("narrative-assistant")
+    except Exception:
+        pass
+    return "dev"
+
+BACKEND_VERSION = _get_version()
 IS_EMBEDDED_RUNTIME = os.environ.get("NA_EMBEDDED") == "1" or "python-embed" in (sys.executable or "").lower()
 
 # Configure logging FIRST before using any loggers
