@@ -65,9 +65,9 @@ if __name__ == "__main__":
     launcher_script.write_text(launcher_content, encoding='utf-8')
     print(f"[OK] Creado launcher: {launcher_script.name}")
     
-    # Crear requirements.txt
+    # Crear requirements.txt (dependencias base sin NLP)
     requirements = target_dir / "requirements.txt"
-    requirements_content = """# Backend dependencies
+    requirements_content = """# Backend dependencies (base, sin NLP)
 fastapi==0.115.12
 uvicorn[standard]==0.34.0
 pydantic==2.10.4
@@ -79,14 +79,36 @@ python-docx==1.1.2
 pdfminer.six==20240706
 olefile==0.47
 charset-normalizer==3.4.0
-
-# Core NLP dependencies
-numpy>=1.24.0,<2.0.0
-spacy>=3.7.0,<4.0.0
-sentence-transformers>=2.2.0,<3.0.0
 """
     requirements.write_text(requirements_content, encoding='utf-8')
     print(f"[OK] Creado requirements.txt")
+
+    # Crear requirements-nlp.txt (NLP con versiones pinned para compatibilidad)
+    requirements_nlp = target_dir / "requirements-nlp.txt"
+    requirements_nlp_content = """# NLP dependencies with pinned versions for compatibility
+# These versions have been tested together and are known to work
+# DO NOT upgrade torch to 2.10+ without also upgrading numpy to 2.x
+
+# PyTorch CPU-only (compatible with numpy 1.x)
+# Using CPU version to minimize bundle size
+--index-url https://download.pytorch.org/whl/cpu
+torch==2.5.1
+
+# Switch back to PyPI for remaining packages
+--index-url https://pypi.org/simple
+
+# NumPy 1.x (required for compatibility with thinc wheels)
+numpy>=1.24.0,<2.0.0
+
+# spaCy and thinc (compatible versions)
+spacy>=3.7.0,<3.8.0
+thinc>=8.2.0,<8.3.0
+
+# Sentence transformers for embeddings
+sentence-transformers>=2.2.0,<3.0.0
+"""
+    requirements_nlp.write_text(requirements_nlp_content, encoding='utf-8')
+    print(f"[OK] Creado requirements-nlp.txt")
     
     # Calcular tamaño
     total_size = sum(f.stat().st_size for f in target_dir.rglob('*') if f.is_file())
