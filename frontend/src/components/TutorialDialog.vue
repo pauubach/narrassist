@@ -384,9 +384,13 @@ import ProgressBar from 'primevue/progressbar'
 import { useToast } from 'primevue/usetoast'
 import { apiUrl } from '@/config/api'
 import { useSystemStore, type NLPMethod } from '@/stores/system'
+import { storeToRefs } from 'pinia'
 
 const systemStore = useSystemStore()
 const toast = useToast()
+
+// Usar storeToRefs para obtener refs reactivos del store
+const { systemCapabilities, capabilitiesLoading } = storeToRefs(systemStore)
 
 interface Props {
   visible: boolean
@@ -410,9 +414,8 @@ const currentStep = ref(0)
 const totalSteps = 5
 const dontShowAgain = ref(false)
 
-// Capabilities from the store (pre-loaded at startup)
-const systemCapabilities = computed(() => systemStore.systemCapabilities)
-const loadingCapabilities = computed(() => systemStore.capabilitiesLoading && !systemStore.systemCapabilities)
+// loadingCapabilities computed (systemCapabilities ya viene de storeToRefs)
+const loadingCapabilities = computed(() => capabilitiesLoading.value && !systemCapabilities.value)
 
 // Títulos de pasos
 const stepTitles = ['', 'Cómo funciona', 'El Workspace', 'Tu Sistema', 'Listo']

@@ -65,12 +65,23 @@ def sign_all_binaries(framework_dir: Path) -> int:
     if failed_count > 0:
         print(f"⚠️  Fallos: {failed_count}")
     
-    # También firmar el python3 en la raíz si existe
+    # También firmar python3.bin en la raíz si existe (el wrapper shell python3 no necesita firma)
+    python3_bin = framework_dir / "python3.bin"
+    if python3_bin.exists():
+        if sign_binary(python3_bin):
+            print(f"✅ python3.bin firmado")
+            signed_count += 1
+    
+    # Fallback: si aún existe python3 como binario (no shell script)
     python3_root = framework_dir / "python3"
     if python3_root.exists() and not python3_root.is_symlink():
-        if sign_binary(python3_root):
-            print(f"✅ python3 en raíz firmado")
-            signed_count += 1
+        # Verificar si es binario o shell script
+        with open(python3_root, 'rb') as f:
+            magic = f.read(4)
+        if magic != b'#!/b':  # No es shell script
+            if sign_binary(python3_root):
+                print(f"✅ python3 en raíz firmado")
+                signed_count += 1
     
     print(f"\n{'='*80}")
     print(f"✅ Firma completada: {signed_count} binarios")
