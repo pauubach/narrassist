@@ -669,6 +669,17 @@ class UnifiedAnalysisPipeline:
             # ========== ENRIQUECIMIENTO DE CAPÍTULOS ==========
             self._enrich_chapter_metrics(context)
 
+            # ========== SINCRONIZAR CONTADORES DE MENCIONES ==========
+            try:
+                from ..entities.repository import get_entity_repository
+
+                entity_repo = get_entity_repository()
+                reconciled = entity_repo.reconcile_all_mention_counts(context.project_id)
+                context.stats["mention_counts_reconciled"] = reconciled
+                logger.info(f"Reconciled mention_count for {reconciled} entities")
+            except Exception as e:
+                logger.warning(f"Failed to reconcile mention counts: {e}")
+
             # ========== FINALIZAR ==========
             if progress_callback:
                 progress_callback(1.0, "Análisis completado")
@@ -1239,6 +1250,7 @@ class UnifiedAnalysisPipeline:
                 # Convertir y persistir entidades
                 persisted = []
                 total_mentions_saved = 0
+                mention_increments: dict[int, int] = {}
 
                 for canonical_name, group in entity_groups.items():
                     # Convertir label a EntityType
@@ -1313,10 +1325,20 @@ class UnifiedAnalysisPipeline:
                             if mentions_to_save:
                                 saved_count = entity_repo.create_mentions_batch(mentions_to_save)
                                 total_mentions_saved += saved_count
-                                logger.debug(f"Saved {saved_count} mentions for entity '{entity.canonical_name}'")
+                                if saved_count:
+                                    mention_increments[entity_id] = mention_increments.get(entity_id, 0) + saved_count
+                                    entity.mention_count = (entity.mention_count or 0) + saved_count
+                                    logger.debug(f"Saved {saved_count} mentions for entity '{entity.canonical_name}'")
 
                     except Exception as e:
                         logger.debug(f"Failed to persist entity '{canonical_name}': {e}")
+
+                if mention_increments:
+                    for entity_id, delta in mention_increments.items():
+                        try:
+                            entity_repo.increment_mention_count(entity_id, delta)
+                        except Exception as inc_err:
+                            logger.warning(f"Failed to increment mention_count for entity {entity_id}: {inc_err}")
 
                 context.entities = persisted
                 context.entity_map = {e.canonical_name.lower(): e.id for e in persisted}
@@ -1550,6 +1572,8 @@ class UnifiedAnalysisPipeline:
 
             mentions_to_save = []
             saved_count = 0
+            mention_increments: dict[int, int] = {}
+            entity_lookup = {e.id: e for e in context.entities if getattr(e, 'id', None)}
 
             for (start, end), detail in context.coref_voting_details.items():
                 # Buscar entity_id del antecedente resuelto
@@ -1592,7 +1616,20 @@ class UnifiedAnalysisPipeline:
 
             if mentions_to_save:
                 saved_count = entity_repo.create_mentions_batch(mentions_to_save)
-                logger.info(f"Coref voting: {saved_count} mentions with voting metadata saved")
+                if saved_count:
+                    for mention in mentions_to_save:
+                        mention_increments[mention.entity_id] = mention_increments.get(mention.entity_id, 0) + 1
+                        entity_obj = entity_lookup.get(mention.entity_id)
+                        if entity_obj:
+                            entity_obj.mention_count = (entity_obj.mention_count or 0) + 1
+                    logger.info(f"Coref voting: {saved_count} mentions with voting metadata saved")
+
+            if mention_increments:
+                for entity_id, delta in mention_increments.items():
+                    try:
+                        entity_repo.increment_mention_count(entity_id, delta)
+                    except Exception as inc_err:
+                        logger.warning(f"Failed to increment mention_count after coref for entity {entity_id}: {inc_err}")
 
         except Exception as e:
             logger.warning(f"Failed to persist coref voting details: {e}")

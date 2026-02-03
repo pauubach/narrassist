@@ -1,11 +1,4 @@
-/**
- * useMentionNavigation - Composable para navegar entre menciones de una entidad
- *
- * Permite cargar las menciones de una entidad y navegar entre ellas
- * con botones anterior/siguiente.
- */
-
-import { ref, computed, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { apiUrl } from '@/config/api'
 
@@ -34,69 +27,15 @@ export interface MentionNavigationState {
   error: string | null
 }
 
+/**
+ * useMentionNavigation - Composable para navegar entre menciones de una entidad
+ *
+ * Permite cargar las menciones de una entidad y navegar entre ellas
+ * con botones anterior/siguiente.
+ */
+
 export function useMentionNavigation(projectId: () => number) {
   const workspaceStore = useWorkspaceStore()
-
-  /**
-   * Normaliza texto para comparación (minúsculas, sin espacios extra)
-   */
-  function normalizeText(text: string): string {
-    return text.toLowerCase().trim().replace(/\s+/g, ' ')
-  }
-
-  /**
-   * Calcula IoU (Intersection over Union) de dos spans
-   */
-  function calculateIoU(start1: number, end1: number, start2: number, end2: number): number {
-    const intersectionStart = Math.max(start1, start2)
-    const intersectionEnd = Math.min(end1, end2)
-    if (intersectionEnd <= intersectionStart) return 0
-    const intersection = intersectionEnd - intersectionStart
-    const union = Math.max(end1, end2) - Math.min(start1, start2)
-    return union > 0 ? intersection / union : 0
-  }
-
-  /**
-   * Deduplica menciones que son visualmente iguales
-   * - Compara posiciones SIN importar chapter_id (puede haber errores de asignación)
-   * - Usa normalización de texto para comparación
-   * - Usa IoU >70% para detectar solapamientos parciales
-   */
-  function deduplicateMentions(mentions: Mention[]): Mention[] {
-    if (mentions.length <= 1) return mentions
-
-    const result: Mention[] = []
-    const POSITION_THRESHOLD = 20 // caracteres para texto muy cercano
-    const IOU_THRESHOLD = 0.7 // 70% de solapamiento
-
-    for (const mention of mentions) {
-      // Verificar si es duplicada de alguna existente
-      const isDuplicate = result.some(existing => {
-        // 1. Verificar solapamiento de posiciones (IoU > 70%)
-        const iou = calculateIoU(
-          mention.startChar, mention.endChar,
-          existing.startChar, existing.endChar
-        )
-        if (iou > IOU_THRESHOLD) return true
-
-        // 2. Mismo texto normalizado y posición muy cercana
-        const sameText = normalizeText(existing.surfaceForm) === normalizeText(mention.surfaceForm)
-        const distance = Math.min(
-          Math.abs(mention.startChar - existing.endChar),
-          Math.abs(existing.startChar - mention.endChar)
-        )
-        if (sameText && distance < POSITION_THRESHOLD) return true
-
-        return false
-      })
-
-      if (!isDuplicate) {
-        result.push(mention)
-      }
-    }
-
-    return result
-  }
 
   // Estado
   const state = ref<MentionNavigationState>({
@@ -124,6 +63,88 @@ export function useMentionNavigation(projectId: () => number) {
     if (!isActive.value) return ''
     return `${state.value.currentIndex + 1} / ${state.value.mentions.length}`
   })
+
+  /**
+   * Deduplica menciones (normaliza texto + solape/proximidad) y prioriza la más fiable.
+   */
+  function deduplicateMentions(mentions: Mention[]): Mention[] {
+    if (mentions.length <= 1) return mentions
+
+    const SOURCE_PRIORITY: Record<string, number> = {
+      manual: 4,
+      coref: 3,
+      ner: 2,
+      embeddings: 1,
+      heuristics: 1,
+      unknown: 0,
+    }
+
+    const normalizeSurface = (text: string): string => {
+      const noDiacritics = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      return noDiacritics.toLowerCase().replace(/[^\w\s'-]/g, ' ').split(/\s+/).filter(Boolean).join(' ')
+    }
+
+    const spanIoU = (aStart: number, aEnd: number, bStart: number, bEnd: number): number => {
+      const intersection = Math.max(0, Math.min(aEnd, bEnd) - Math.max(aStart, bStart))
+      if (intersection === 0) return 0
+      const union = Math.max(aEnd, bEnd) - Math.min(aStart, bStart)
+      return union === 0 ? 0 : intersection / union
+    }
+
+    const spanGap = (aStart: number, aEnd: number, bStart: number, bEnd: number): number => {
+      if (aEnd >= bStart && bEnd >= aStart) return 0
+      return Math.min(Math.abs(aEnd - bStart), Math.abs(bEnd - aStart))
+    }
+
+    const sourcePriority = (src?: string | null): number => SOURCE_PRIORITY[src?.toLowerCase() || 'unknown'] ?? 0
+
+    const choosePreferred = (a: Mention, b: Mention): Mention => {
+      if (a.confidence !== b.confidence) return a.confidence >= b.confidence ? a : b
+      const aPriority = sourcePriority(a.source)
+      const bPriority = sourcePriority(b.source)
+      if (aPriority !== bPriority) return aPriority > bPriority ? a : b
+      if (a.surfaceForm.length !== b.surfaceForm.length) return a.surfaceForm.length >= b.surfaceForm.length ? a : b
+      if (a.chapterId && !b.chapterId) return a
+      if (b.chapterId && !a.chapterId) return b
+      return a
+    }
+
+    const sorted = [...mentions].sort((a, b) => a.startChar - b.startChar)
+    const result: Mention[] = []
+    const normCache = new Map<Mention, string>()
+
+    for (const mention of sorted) {
+      const mentionNorm = normCache.get(mention) ?? normalizeSurface(mention.surfaceForm)
+      normCache.set(mention, mentionNorm)
+
+      let handled = false
+
+      for (let i = 0; i < result.length; i++) {
+        const existing = result[i]
+        const existingNorm = normCache.get(existing) ?? normalizeSurface(existing.surfaceForm)
+        normCache.set(existing, existingNorm)
+
+        const iou = spanIoU(mention.startChar, mention.endChar, existing.startChar, existing.endChar)
+        const gap = spanGap(mention.startChar, mention.endChar, existing.startChar, existing.endChar)
+
+        const looksDuplicate = iou >= 0.7 || gap < 10 || (mentionNorm === existingNorm && (iou > 0 || gap < 15))
+        if (!looksDuplicate) continue
+
+        const preferred = choosePreferred(mention, existing)
+        if (preferred === mention) {
+          result.splice(i, 1, mention)
+        }
+        handled = true
+        break
+      }
+
+      if (!handled) {
+        result.push(mention)
+      }
+    }
+
+    return result
+  }
 
   /**
    * Carga las menciones de una entidad desde el backend
@@ -162,7 +183,6 @@ export function useMentionNavigation(projectId: () => number) {
 
       // Si hay menciones, navegar a la primera
       if (state.value.mentions.length > 0) {
-        // Deduplicar menciones con misma posición visual (mismo capítulo + texto + posición cercana)
         const dedupedMentions = deduplicateMentions(state.value.mentions)
         if (dedupedMentions.length < state.value.mentions.length) {
           console.log(`[MentionNav] Deduped ${state.value.mentions.length} -> ${dedupedMentions.length} mentions`)
@@ -188,8 +208,6 @@ export function useMentionNavigation(projectId: () => number) {
     const mention = currentMention.value
     if (!mention) return
 
-    // Usar el store de workspace para navegar
-    // Pasar startChar (posición dentro del capítulo), surfaceForm (texto exacto) y chapterId
     workspaceStore.navigateToTextPosition(mention.startChar, mention.surfaceForm, mention.chapterId)
   }
 
@@ -239,9 +257,7 @@ export function useMentionNavigation(projectId: () => number) {
    * Inicia la navegación de menciones para una entidad
    */
   async function startNavigation(entityId: number) {
-    // Si ya estamos navegando la misma entidad, no recargar
     if (state.value.entityId === entityId && state.value.mentions.length > 0) {
-      // Solo navegar a la primera mención
       state.value.currentIndex = 0
       navigateToCurrentMention()
       return true

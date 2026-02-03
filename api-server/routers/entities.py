@@ -65,165 +65,86 @@ async def list_entities(
                     return ch.chapter_number
             return 1  # Default al capítulo 1 si no se encuentra
 
-        # Si se filtra por capítulo, obtener IDs de entidades con menciones en ese capítulo
-        chapter_entity_ids: Optional[set] = None
-        if chapter_number is not None:
-            chapter_entity_ids = set()
-            target_chapter = next(
-                (ch for ch in chapters if ch.chapter_number == chapter_number), None
-            )
-            if target_chapter:
-                for e in entities:
-                    mentions = entity_repo.get_mentions_by_entity(e.id)
-                    for m in mentions:
-                        if m.chapter_id == target_chapter.id:
-                            chapter_entity_ids.add(e.id)
-                            break
-                        # Fallback: comprobar por rango de posición
-                        if (target_chapter.start_char <= m.start_char < target_chapter.end_char):
-                            chapter_entity_ids.add(e.id)
-                            break
+        # Filtrar duplicados: considerar solapamiento global, normalización de texto y proximidad
+        import re
+        import unicodedata
 
-        # Calcular relevance_score para cada entidad
-        # Fórmula: menciones / (palabras / 1000) normalizado
-        # Una entidad mencionada 5 veces en 1000 palabras es muy relevante
-        # Una entidad mencionada 2 veces en 100000 palabras es poco relevante
-        words_in_thousands = max(word_count / 1000, 1)
+        filtered_mentions = []
+        removed_count = 0
 
-        entities_data = []
-        for e in entities:
-            mention_count = e.mention_count or 0
+        def normalize_surface_form(text: str) -> str:
+            """Normaliza texto (lower, sin diacríticos ni puntuación suave)."""
+            text = unicodedata.normalize("NFKD", text or "")
+            text = "".join(c for c in text if not unicodedata.combining(c))
+            text = re.sub(r"[^\w\s'-]", " ", text.lower())
+            return " ".join(text.split())
 
-            # Calcular relevance_score (0-1)
-            # Menciones por cada 1000 palabras, normalizado con sigmoid-like
-            mentions_per_k = mention_count / words_in_thousands
-            # Sigmoid suave: score = menciones_per_k / (menciones_per_k + 2)
-            # Con 2 menciones/1000 palabras -> 0.5
-            # Con 5 menciones/1000 palabras -> 0.71
-            # Con 10 menciones/1000 palabras -> 0.83
-            relevance_score = mentions_per_k / (mentions_per_k + 2) if mention_count > 0 else 0
+        def span_iou(a_start: int, a_end: int, b_start: int, b_end: int) -> float:
+            intersection = max(0, min(a_end, b_end) - max(a_start, b_start))
+            if intersection == 0:
+                return 0.0
+            union = max(a_end, b_end) - min(a_start, b_start)
+            return intersection / union if union else 0.0
 
-            # Aplicar filtros
-            if chapter_entity_ids is not None and e.id not in chapter_entity_ids:
-                continue
-            if min_relevance is not None and relevance_score < min_relevance:
-                continue
-            if min_mentions is not None and mention_count < min_mentions:
-                continue
-            if entity_type is not None and e.entity_type.value != entity_type:
-                continue
+        def span_gap(a_start: int, a_end: int, b_start: int, b_end: int) -> int:
+            if a_end >= b_start and b_end >= a_start:
+                return 0
+            return min(abs(a_end - b_start), abs(b_end - a_start))
 
-            # Calcular first_mention_chapter desde first_appearance_char
-            first_mention_chapter = get_chapter_for_position(e.first_appearance_char)
+        def prefer_mention(m1: dict, m2: dict) -> dict:
+            if m1["confidence"] != m2["confidence"]:
+                return m1 if m1["confidence"] >= m2["confidence"] else m2
+            if len(m1["surfaceForm"]) != len(m2["surfaceForm"]):
+                return m1 if len(m1["surfaceForm"]) >= len(m2["surfaceForm"]) else m2
+            # Fallback: preferir la que tenga chapterId definido
+            if m1.get("chapterId") and not m2.get("chapterId"):
+                return m1
+            if m2.get("chapterId") and not m1.get("chapterId"):
+                return m2
+            return m1
 
-            entities_data.append(
-                EntityResponse(
-                    id=e.id,
-                    project_id=e.project_id,
-                    entity_type=e.entity_type.value,
-                    canonical_name=e.canonical_name,
-                    aliases=e.aliases or [],
-                    importance=e.importance.value,
-                    description=e.description,
-                    first_appearance_char=e.first_appearance_char,
-                    first_mention_chapter=first_mention_chapter,
-                    mention_count=mention_count,
-                    is_active=e.is_active if hasattr(e, 'is_active') else True,
-                    merged_from_ids=e.merged_from_ids or [],
-                    relevance_score=round(relevance_score, 3),
-                    created_at=e.created_at.isoformat() if hasattr(e, 'created_at') and e.created_at else None,
-                    updated_at=e.updated_at.isoformat() if hasattr(e, 'updated_at') and e.updated_at else None,
+        norm_cache: dict[int, str] = {}
+
+        for mention in mentions_data:
+            dominated = False
+            replacement = None
+            mention_norm = norm_cache.setdefault(id(mention), normalize_surface_form(mention["surfaceForm"]))
+
+            for existing in filtered_mentions:
+                existing_norm = norm_cache.setdefault(id(existing), normalize_surface_form(existing["surfaceForm"]))
+
+                iou = span_iou(
+                    mention["startChar"], mention["endChar"],
+                    existing["startChar"], existing["endChar"]
                 )
-            )
+                gap = span_gap(
+                    mention["startChar"], mention["endChar"],
+                    existing["startChar"], existing["endChar"]
+                )
 
-        return ApiResponse(success=True, data=entities_data)
-    except Exception as e:
-        logger.error(f"Error listing entities for project {project_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+                # Considerar duplicado si hay solape alto o proximidad muy cercana
+                looks_duplicate = (
+                    iou >= 0.7
+                    or gap < 10
+                    or (mention_norm == existing_norm and (iou > 0 or gap < 15))
+                )
 
+                if not looks_duplicate:
+                    continue
 
-@router.post("/api/projects/{project_id}/entities/similarity", response_model=ApiResponse)
-async def calculate_entity_similarity(project_id: int, request: Request):
-    """
-    Calcula la similitud semántica entre múltiples entidades.
-
-    Útil para el preview de fusión: muestra qué tan relacionadas están las entidades
-    antes de confirmar la fusión.
-
-    Args:
-        project_id: ID del proyecto
-        request: Body con entity_ids (lista de IDs a comparar)
-
-    Returns:
-        ApiResponse con matriz de similitud entre pares de entidades
-    """
-    try:
-        data = await request.json()
-        entity_ids = data.get('entity_ids', [])
-
-        if len(entity_ids) < 2:
-            return ApiResponse(
-                success=False,
-                error="Se requieren al menos 2 entidades para calcular similitud"
-            )
-
-        entity_repo = deps.entity_repository
-
-        # Obtener las entidades
-        entities = []
-        for entity_id in entity_ids:
-            entity = entity_repo.get_entity(entity_id)
-            if entity and entity.project_id == project_id:
-                entities.append(entity)
-
-        if len(entities) < 2:
-            return ApiResponse(success=False, error="No se encontraron suficientes entidades válidas")
-
-        # Calcular similitud usando SemanticFusionService
-        try:
-            from narrative_assistant.entities.semantic_fusion import get_semantic_fusion_service
-            fusion_service = get_semantic_fusion_service()
-        except ImportError:
-            # Fallback: similitud basada en nombres (Jaccard)
-            fusion_service = None
-
-        similarity_matrix = []
-
-        for i, ent1 in enumerate(entities):
-            for j, ent2 in enumerate(entities):
-                if i >= j:
-                    continue  # Evitar duplicados y compararse consigo mismo
-
-                if fusion_service:
-                    # Usar embeddings semánticos
-                    similarity = fusion_service.compute_semantic_similarity(ent1, ent2)
-                    result = fusion_service.should_merge(ent1, ent2)
-                    reason = result.reason
-                    method = result.method
+                preferred = prefer_mention(mention, existing)
+                if preferred is mention:
+                    replacement = existing
                 else:
-                    # Fallback: similitud basada en nombres
-                    name1 = ent1.canonical_name.lower()
-                    name2 = ent2.canonical_name.lower()
+                    dominated = True
+                removed_count += 1
+                break
 
-                    # Jaccard sobre caracteres
-                    set1 = set(name1)
-                    set2 = set(name2)
-                    intersection = len(set1 & set2)
-                    union = len(set1 | set2)
-                    similarity = intersection / union if union > 0 else 0
-                    reason = "Similitud basada en caracteres (fallback)"
-                    method = "jaccard"
-
-                similarity_matrix.append({
-                    "entity1_id": ent1.id,
-                    "entity1_name": ent1.canonical_name,
-                    "entity2_id": ent2.id,
-                    "entity2_name": ent2.canonical_name,
-                    "similarity": round(similarity, 3),
-                    "should_merge": similarity >= 0.65,
-                    "reason": reason,
-                    "method": method
-                })
+            if replacement:
+                filtered_mentions.remove(replacement)
+                filtered_mentions.append(mention)
+            elif not dominated:
+                filtered_mentions.append(mention)
 
         # Calcular score promedio de fusión
         avg_similarity = sum(s["similarity"] for s in similarity_matrix) / len(similarity_matrix) if similarity_matrix else 0
@@ -1221,6 +1142,7 @@ async def get_entity_mentions(
                 "after_serialization": len(mentions_data),
                 "after_filtering": len(filtered_mentions),
                 "entity_mention_count_field": entity.mention_count,
+                "removed_duplicates": removed_count,
             }
         })
 
