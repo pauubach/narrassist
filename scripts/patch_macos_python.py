@@ -282,11 +282,28 @@ def patch_python_framework(framework_dir: Path) -> bool:
                             "/Library/Frameworks/Python.framework/Versions/3.12/Python",
                             "@loader_path/../Python"
                         )
+                        # Parchear referencias a otras bibliotecas en lib/
+                        new_dep = new_dep.replace(
+                            "/Library/Frameworks/Python.framework/Versions/3.12/lib/",
+                            "@loader_path/"
+                        )
                         patch_binary_dependency(dylib, dep, new_dep)
                         patched_count += 1
 
             if patched_count > 0:
                 print(f"  ✅ Parcheadas {len(dylib_files)} bibliotecas")
+
+    # 7. Parchear específicamente las referencias de OpenSSL entre librerías
+    # libssl.3.dylib referencia a libcrypto.3.dylib
+    libssl = lib_dir / "libssl.3.dylib"
+    libcrypto = lib_dir / "libcrypto.3.dylib"
+    if libssl.exists() and libcrypto.exists():
+        print(f"\n🔐 Parcheando referencias OpenSSL...")
+        deps = get_dependencies(libssl)
+        for dep in deps:
+            if "libcrypto" in dep and "/Library/Frameworks" in dep:
+                patch_binary_dependency(libssl, dep, "@loader_path/libcrypto.3.dylib")
+                print(f"  ✅ libssl.3.dylib → libcrypto.3.dylib parcheado")
 
     print(f"\n{'='*80}")
     print(f"✅ Framework parcheado exitosamente")
