@@ -56,9 +56,13 @@ export function transformInconsistency(apiInc: ApiTemporalInconsistency): Tempor
 export function transformTimeline(apiResponse: ApiTimelineResponse): Timeline {
   let timeSpan: TimeSpan | null = null
   if (apiResponse.time_span) {
+    const ts = apiResponse.time_span
     timeSpan = {
-      start: new Date(apiResponse.time_span.start),
-      end: new Date(apiResponse.time_span.end)
+      start: ts.start ? new Date(ts.start) : null,
+      end: ts.end ? new Date(ts.end) : null,
+      durationDays: ts.duration_days ?? 0,
+      isSynthetic: ts.is_synthetic ?? false,
+      hasRealDates: ts.has_real_dates ?? true
     }
   }
 

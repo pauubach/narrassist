@@ -944,8 +944,11 @@ async def get_emotional_analysis(project_id: int):
 
         # Obtener entidades (personajes)
         entities = deps.entity_repository.get_entities_by_project(project_id)
+        # entity_type es un enum, usar .value para comparar
         character_names = [
-            e.canonical_name for e in entities if e.entity_type == "PER"
+            e.canonical_name for e in entities
+            if (hasattr(e.entity_type, 'value') and e.entity_type.value in ["character", "animal", "creature"])
+            or e.entity_type in ["character", "PER", "animal", "creature"]
         ]
 
         if not character_names:

@@ -78,12 +78,18 @@
     <div v-if="timeline && timeline.timeSpan" class="time-span-info">
       <div class="time-span-content">
         <i class="pi pi-calendar-plus"></i>
-        <span>
+        <!-- Si hay fechas reales, mostrar rango completo -->
+        <span v-if="timeline.timeSpan.hasRealDates && timeline.timeSpan.start && timeline.timeSpan.end">
           La historia abarca desde
           <strong>{{ formatDateShort(timeline.timeSpan.start) }}</strong>
           hasta
           <strong>{{ formatDateShort(timeline.timeSpan.end) }}</strong>
-          ({{ calculateDuration(timeline.timeSpan.start, timeline.timeSpan.end) }})
+          ({{ formatDuration(timeline.timeSpan.durationDays) }})
+        </span>
+        <!-- Si son fechas sintéticas, mostrar solo la duración -->
+        <span v-else>
+          La historia abarca <strong>{{ formatDuration(timeline.timeSpan.durationDays) }}</strong>
+          <span class="synthetic-note">(sin fechas absolutas definidas)</span>
         </span>
       </div>
     </div>
@@ -536,29 +542,37 @@ const formatDateFull = (date: Date): string => {
   }).format(date)
 }
 
-// Calcular duracion entre fechas
-const calculateDuration = (start: Date, end: Date): string => {
-  const diffMs = end.getTime() - start.getTime()
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-
-  // Para fechas sinteticas (ano 1), mostrar solo dias
-  if (start.getFullYear() === 1 || end.getFullYear() === 1) {
-    return `${diffDays} dia${diffDays !== 1 ? 's' : ''}`
-  }
-
-  if (diffDays < 30) {
-    return `${diffDays} dias`
-  } else if (diffDays < 365) {
-    const months = Math.floor(diffDays / 30)
+// Formatear duración en días a texto legible
+const formatDuration = (days: number): string => {
+  if (days < 1) {
+    return 'menos de 1 día'
+  } else if (days === 1) {
+    return '1 día'
+  } else if (days < 30) {
+    return `${days} días`
+  } else if (days < 365) {
+    const months = Math.floor(days / 30)
+    const remainingDays = days % 30
+    if (remainingDays > 0 && months < 3) {
+      return `${months} mes${months > 1 ? 'es' : ''} y ${remainingDays} día${remainingDays > 1 ? 's' : ''}`
+    }
     return `${months} mes${months > 1 ? 'es' : ''}`
   } else {
-    const years = Math.floor(diffDays / 365)
-    const remainingMonths = Math.floor((diffDays % 365) / 30)
+    const years = Math.floor(days / 365)
+    const remainingMonths = Math.floor((days % 365) / 30)
     if (remainingMonths > 0) {
-      return `${years} ano${years > 1 ? 's' : ''} y ${remainingMonths} mes${remainingMonths > 1 ? 'es' : ''}`
+      return `${years} año${years > 1 ? 's' : ''} y ${remainingMonths} mes${remainingMonths > 1 ? 'es' : ''}`
     }
-    return `${years} ano${years > 1 ? 's' : ''}`
+    return `${years} año${years > 1 ? 's' : ''}`
   }
+}
+
+// Calcular duracion entre fechas (legacy, usado en otros lugares)
+const calculateDuration = (start: Date | null, end: Date | null): string => {
+  if (!start || !end) return ''
+  const diffMs = end.getTime() - start.getTime()
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+  return formatDuration(diffDays)
 }
 
 // Obtener nombre de entidad
@@ -648,6 +662,7 @@ const navigateToText = () => {
 const exportTimeline = () => {
   if (!timeline.value) return
 
+  const ts = timeline.value.timeSpan
   const exportData = {
     projectId: props.projectId,
     exportedAt: new Date().toISOString(),
@@ -656,10 +671,13 @@ const exportTimeline = () => {
       anchors: timeline.value.anchorCount,
       analepsis: timeline.value.analepsiCount,
       prolepsis: timeline.value.prolepsiCount,
-      timeSpan: timeline.value.timeSpan
+      timeSpan: ts
         ? {
-            start: timeline.value.timeSpan.start.toISOString(),
-            end: timeline.value.timeSpan.end.toISOString()
+            start: ts.start?.toISOString() || null,
+            end: ts.end?.toISOString() || null,
+            durationDays: ts.durationDays,
+            isSynthetic: ts.isSynthetic,
+            hasRealDates: ts.hasRealDates
           }
         : null
     },
@@ -785,6 +803,13 @@ watch(() => props.projectId, () => {
 
 .time-span-content i {
   font-size: 1.25rem;
+}
+
+.synthetic-note {
+  font-size: 0.8125rem;
+  color: var(--primary-500);
+  font-style: italic;
+  margin-left: 0.25rem;
 }
 
 /* Loading, Error & Empty States */

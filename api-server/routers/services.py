@@ -474,22 +474,35 @@ async def chat_with_assistant(project_id: int, request: ChatRequest):
             from narrative_assistant.llm import get_llm_client, is_llm_available
 
             if not is_llm_available():
+                logger.warning("LLM not available - Ollama might not be running")
                 return ApiResponse(
                     success=False,
-                    error="LLM no disponible. Asegúrate de que Ollama esté corriendo (ollama serve)"
+                    error="Ollama no está disponible. Ejecuta 'ollama serve' o usa scripts\\start_ollama_cpu.bat"
                 )
 
             llm_client = get_llm_client()
-            if not llm_client or not llm_client.is_available:
+            if not llm_client:
                 return ApiResponse(
                     success=False,
-                    error="Cliente LLM no disponible"
+                    error="No se pudo conectar con Ollama. Verifica que esté corriendo."
+                )
+
+            if not llm_client.is_available:
+                return ApiResponse(
+                    success=False,
+                    error="Ollama está corriendo pero el modelo no está disponible. Ejecuta: ollama pull llama3.2"
                 )
         except ImportError as e:
             logger.error(f"LLM module import error: {e}")
             return ApiResponse(
                 success=False,
-                error="Módulo LLM no disponible"
+                error="Módulo LLM no instalado correctamente"
+            )
+        except Exception as e:
+            logger.error(f"Error checking LLM availability: {e}")
+            return ApiResponse(
+                success=False,
+                error=f"Error al verificar Ollama: {str(e)}"
             )
 
         # Obtener capítulos del proyecto para contexto

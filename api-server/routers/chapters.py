@@ -689,7 +689,7 @@ async def get_chapter_emotional_analysis(project_id: int, chapter_number: int):
         # Obtener personajes
         entities = deps.entity_repository.get_entities_by_project(project_id)
         character_names = [
-            e.canonical_name for e in entities if e.entity_type == "PER"
+            e.canonical_name for e in entities if deps.is_character_entity(e)
         ]
 
         # Extraer diálogos
@@ -934,7 +934,7 @@ async def get_dialogue_attributions(project_id: int, chapter_number: int):
         # Obtener entidades (personajes)
         entity_repo = get_entity_repository()
         entities = entity_repo.get_entities_by_project(project_id, active_only=True)
-        characters = [e for e in entities if e.entity_type == "PER"]
+        characters = [e for e in entities if deps.is_character_entity(e)]
 
         # Obtener menciones de entidades en el capítulo
         entity_mentions = []
@@ -1076,7 +1076,7 @@ async def suggest_chapter_focalization(project_id: int, chapter_number: int):
 
         entity_repo = get_entity_repository()
         entities = entity_repo.get_entities_by_project(project_id, active_only=True)
-        characters = [e for e in entities if e.entity_type == "PER"]
+        characters = [e for e in entities if deps.is_character_entity(e)]
 
         repo = SQLiteFocalizationRepository()
         service = FocalizationDeclarationService(repository=repo)

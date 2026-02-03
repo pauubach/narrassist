@@ -855,25 +855,47 @@ watch(() => props.projectId, (newId) => {
   color: var(--text-color-secondary);
 }
 
-/* Progress bar colors */
-:deep(.register-formal .p-progressbar-value) {
-  background: var(--blue-500);
+/* Progress bar colors - PrimeVue 4 compatible */
+/* The p-progressbar component uses p-progressbar-value internally */
+.register-formal :deep(.p-progressbar-value),
+.register-formal:deep(.p-progressbar-value) {
+  background: #6366f1 !important; /* Indigo - Formal */
 }
 
-:deep(.register-neutral .p-progressbar-value) {
-  background: var(--gray-500);
+.register-neutral :deep(.p-progressbar-value),
+.register-neutral:deep(.p-progressbar-value) {
+  background: #8b5cf6 !important; /* Violet - Neutro (más visible que gris) */
 }
 
-:deep(.register-colloquial .p-progressbar-value) {
-  background: var(--orange-500);
+.register-colloquial :deep(.p-progressbar-value),
+.register-colloquial:deep(.p-progressbar-value) {
+  background: #f59e0b !important; /* Amber - Coloquial */
 }
 
-:deep(.register-technical .p-progressbar-value) {
-  background: var(--purple-500);
+.register-technical :deep(.p-progressbar-value),
+.register-technical:deep(.p-progressbar-value) {
+  background: #3b82f6 !important; /* Blue - Técnico */
 }
 
-:deep(.register-literary .p-progressbar-value) {
-  background: var(--green-500);
+.register-literary :deep(.p-progressbar-value),
+.register-literary:deep(.p-progressbar-value) {
+  background: #10b981 !important; /* Emerald - Literario */
+}
+
+.register-poetic :deep(.p-progressbar-value),
+.register-poetic:deep(.p-progressbar-value) {
+  background: #ec4899 !important; /* Pink - Poético */
+}
+
+/* Ensure progress bar has visible background track */
+.distribution-item :deep(.p-progressbar) {
+  background: var(--surface-200, #e5e7eb);
+  height: 8px;
+  border-radius: 4px;
+}
+
+.distribution-item :deep(.p-progressbar-value) {
+  border-radius: 4px;
 }
 
 /* Changes Section */

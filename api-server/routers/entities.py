@@ -1083,24 +1083,48 @@ async def get_entity_mentions(
         filtered_mentions = []
         removed_count = 0
 
+        def normalize_surface_form(text: str) -> str:
+            """Normaliza texto para comparación (minúsculas, sin espacios extra)."""
+            import unicodedata
+            text = text.lower().strip()
+            text = ' '.join(text.split())  # Normalizar espacios
+            return text
+
+        def calculate_iou(start1: int, end1: int, start2: int, end2: int) -> float:
+            """Calcula Intersection over Union de dos spans."""
+            intersection_start = max(start1, start2)
+            intersection_end = min(end1, end2)
+            if intersection_end <= intersection_start:
+                return 0.0
+            intersection = intersection_end - intersection_start
+            union = max(end1, end2) - min(start1, start2)
+            return intersection / union if union > 0 else 0.0
+
         for mention in mentions_data:
             dominated = False
             to_remove = None
 
             for existing in filtered_mentions:
-                # Solo filtrar si están en el mismo capítulo
-                if existing["chapterId"] != mention["chapterId"]:
-                    continue
-
-                # Verificar solapamiento de posiciones
+                # Verificar solapamiento de posiciones (INDEPENDIENTE del capítulo)
+                # Menciones con misma posición pero diferente chapter_id son duplicados
+                # debido a errores de asignación durante NER
                 overlaps = not (
                     mention["endChar"] <= existing["startChar"] or
                     mention["startChar"] >= existing["endChar"]
                 )
 
-                # Deduplicar menciones con mismo texto muy cercanas (< 10 chars)
+                # Calcular IoU para solapamientos parciales
+                iou = calculate_iou(
+                    mention["startChar"], mention["endChar"],
+                    existing["startChar"], existing["endChar"]
+                )
+
+                # Si IoU > 70%, considerarlas como la misma mención (diferente chapter_id o no)
+                high_overlap = iou > 0.7
+
+                # Deduplicar menciones con mismo texto normalizado muy cercanas (< 10 chars)
                 # Esto captura menciones duplicadas que no se solapan exactamente
-                same_text = existing["surfaceForm"].lower() == mention["surfaceForm"].lower()
+                same_text = normalize_surface_form(existing["surfaceForm"]) == normalize_surface_form(mention["surfaceForm"])
                 distance = min(
                     abs(mention["startChar"] - existing["endChar"]),
                     abs(existing["startChar"] - mention["endChar"])
@@ -1111,9 +1135,21 @@ async def get_entity_mentions(
                     # Son la misma mención con posiciones ligeramente diferentes
                     dominated = True
                     removed_count += 1
+                    logger.debug(f"Dedupe: '{mention['surfaceForm']}' muy cercana a '{existing['surfaceForm']}' (dist={distance})")
                     break
 
-                if overlaps:
+                # Si hay alto solapamiento (IoU > 70%), deduplicar aunque chapter_id difiera
+                if high_overlap and not overlaps:
+                    # IoU alto pero sin solapamiento exacto - preferir el de mayor confianza
+                    if mention["confidence"] >= existing["confidence"]:
+                        to_remove = existing
+                    else:
+                        dominated = True
+                    removed_count += 1
+                    logger.debug(f"Dedupe IoU: '{mention['surfaceForm']}' vs '{existing['surfaceForm']}' (IoU={iou:.2f})")
+                    break
+
+                if overlaps or high_overlap:
                     # Determinar cuál es más larga y cuál más corta
                     if len(mention["surfaceForm"]) > len(existing["surfaceForm"]):
                         longer, shorter = mention, existing

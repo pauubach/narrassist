@@ -91,7 +91,7 @@ async def get_voice_profiles(
         # Obtener entidades (solo personajes)
         entity_repo = get_entity_repository()
         entities = entity_repo.get_entities_by_project(project_id, active_only=True)
-        characters = [e for e in entities if e.entity_type == "PER"]
+        characters = [e for e in entities if deps.is_character_entity(e)]
 
         if not characters:
             return ApiResponse(
@@ -232,7 +232,7 @@ async def compare_voice_profiles(
 
         entity_repo = get_entity_repository()
         entities = entity_repo.get_entities_by_project(project_id, active_only=True)
-        characters = [e for e in entities if e.entity_type == "PER"]
+        characters = [e for e in entities if deps.is_character_entity(e)]
 
         entity_map = {e.id: e for e in characters}
         if entity_a not in entity_map:
@@ -431,7 +431,7 @@ async def get_voice_deviations(
         # Obtener entidades (solo personajes)
         entity_repo = get_entity_repository()
         entities = entity_repo.get_entities_by_project(project_id, active_only=True)
-        characters = [e for e in entities if e.entity_type == "PER"]
+        characters = [e for e in entities if deps.is_character_entity(e)]
 
         if not characters:
             return ApiResponse(
@@ -1094,7 +1094,7 @@ async def detect_focalization_violations(project_id: int):
 
         entity_repo = get_entity_repository()
         entities = entity_repo.get_entities_by_project(project_id, active_only=True)
-        characters = [e for e in entities if e.entity_type == "PER"]
+        characters = [e for e in entities if deps.is_character_entity(e)]
 
         repo = SQLiteFocalizationRepository()
         service = FocalizationDeclarationService(repository=repo)

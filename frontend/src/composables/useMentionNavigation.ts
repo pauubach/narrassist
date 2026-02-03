@@ -38,21 +38,57 @@ export function useMentionNavigation(projectId: () => number) {
   const workspaceStore = useWorkspaceStore()
 
   /**
+   * Normaliza texto para comparación (minúsculas, sin espacios extra)
+   */
+  function normalizeText(text: string): string {
+    return text.toLowerCase().trim().replace(/\s+/g, ' ')
+  }
+
+  /**
+   * Calcula IoU (Intersection over Union) de dos spans
+   */
+  function calculateIoU(start1: number, end1: number, start2: number, end2: number): number {
+    const intersectionStart = Math.max(start1, start2)
+    const intersectionEnd = Math.min(end1, end2)
+    if (intersectionEnd <= intersectionStart) return 0
+    const intersection = intersectionEnd - intersectionStart
+    const union = Math.max(end1, end2) - Math.min(start1, start2)
+    return union > 0 ? intersection / union : 0
+  }
+
+  /**
    * Deduplica menciones que son visualmente iguales
-   * (mismo capítulo, mismo texto, posición muy cercana)
+   * - Compara posiciones SIN importar chapter_id (puede haber errores de asignación)
+   * - Usa normalización de texto para comparación
+   * - Usa IoU >70% para detectar solapamientos parciales
    */
   function deduplicateMentions(mentions: Mention[]): Mention[] {
     if (mentions.length <= 1) return mentions
 
     const result: Mention[] = []
-    const POSITION_THRESHOLD = 20 // caracteres
+    const POSITION_THRESHOLD = 20 // caracteres para texto muy cercano
+    const IOU_THRESHOLD = 0.7 // 70% de solapamiento
 
     for (const mention of mentions) {
-      const isDuplicate = result.some(existing => 
-        existing.chapterId === mention.chapterId &&
-        existing.surfaceForm.toLowerCase() === mention.surfaceForm.toLowerCase() &&
-        Math.abs(existing.startChar - mention.startChar) < POSITION_THRESHOLD
-      )
+      // Verificar si es duplicada de alguna existente
+      const isDuplicate = result.some(existing => {
+        // 1. Verificar solapamiento de posiciones (IoU > 70%)
+        const iou = calculateIoU(
+          mention.startChar, mention.endChar,
+          existing.startChar, existing.endChar
+        )
+        if (iou > IOU_THRESHOLD) return true
+
+        // 2. Mismo texto normalizado y posición muy cercana
+        const sameText = normalizeText(existing.surfaceForm) === normalizeText(mention.surfaceForm)
+        const distance = Math.min(
+          Math.abs(mention.startChar - existing.endChar),
+          Math.abs(existing.startChar - mention.endChar)
+        )
+        if (sameText && distance < POSITION_THRESHOLD) return true
+
+        return false
+      })
 
       if (!isDuplicate) {
         result.push(mention)

@@ -54,8 +54,11 @@ export interface ApiTimelineResponse {
   analepsis_count: number
   prolepsis_count: number
   time_span: {
-    start: string
-    end: string
+    start: string | null      // null si fechas sintéticas
+    end: string | null        // null si fechas sintéticas
+    duration_days: number     // duración en días (siempre disponible)
+    is_synthetic: boolean     // true si usa año 1 como base ficticia
+    has_real_dates: boolean   // true si hay fechas absolutas en el texto
   } | null
   mermaid: string
   inconsistencies: ApiTemporalInconsistency[]

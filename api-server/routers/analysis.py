@@ -1954,6 +1954,19 @@ JSON:"""
                 phases[8]["current"] = False
                 phases[8]["duration"] = round(phase_durations["alerts"], 1)
 
+                # ========== RECONCILIACIÓN FINAL DE CONTADORES ==========
+                # Sincronizar mention_count de todas las entidades con las filas reales
+                # en entity_mentions. Esto es crítico porque:
+                # 1. NER crea menciones pero no actualiza mention_count
+                # 2. MentionFinder crea menciones adicionales
+                # 3. Las reconciliaciones anteriores pueden haberse saltado por excepciones
+                try:
+                    entity_repo = get_entity_repository()
+                    reconciled_count = entity_repo.reconcile_all_mention_counts(project_id)
+                    logger.info(f"Reconciliación final: {reconciled_count} entidades sincronizadas")
+                except Exception as recon_err:
+                    logger.warning(f"Error en reconciliación final de mention_count: {recon_err}")
+
                 # ========== COMPLETADO ==========
                 deps.analysis_progress_storage[project_id]["status"] = "completed"
                 deps.analysis_progress_storage[project_id]["current_phase"] = "Análisis completado"

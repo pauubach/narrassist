@@ -628,6 +628,19 @@ class TimelineBuilder:
 
         time_span = self.timeline.get_time_span()
 
+        # Detectar si las fechas son sintéticas (año 1 = fecha ficticia)
+        # Las fechas sintéticas se usan cuando no hay fechas absolutas en el texto
+        is_synthetic = False
+        has_real_dates = False
+        duration_days = 0
+
+        if time_span:
+            start_date, end_date = time_span
+            # Año 1 indica fechas sintéticas (no hay fechas reales en el texto)
+            is_synthetic = start_date.year == 1 or end_date.year == 1
+            has_real_dates = not is_synthetic
+            duration_days = (end_date - start_date).days
+
         return {
             "total_events": len(self.timeline.events),
             "anchor_events": len(self.timeline.anchor_events),
@@ -635,8 +648,12 @@ class TimelineBuilder:
             "prolepsis_count": len(self.timeline.get_prolepsis_events()),
             "time_span": (
                 {
-                    "start": time_span[0].isoformat(),
-                    "end": time_span[1].isoformat(),
+                    # Solo exponer fechas reales al frontend
+                    "start": time_span[0].isoformat() if has_real_dates else None,
+                    "end": time_span[1].isoformat() if has_real_dates else None,
+                    "duration_days": duration_days,
+                    "is_synthetic": is_synthetic,
+                    "has_real_dates": has_real_dates,
                 }
                 if time_span
                 else None

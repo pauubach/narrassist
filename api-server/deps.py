@@ -753,3 +753,20 @@ def _estimate_export_pages(data) -> int:
     elif hasattr(data, "word_count"):
         word_count = data.word_count or 0
     return max(1, word_count // 250)
+
+
+def is_character_entity(entity) -> bool:
+    """
+    Verifica si una entidad es un personaje (character, animal, creature).
+
+    Maneja tanto entity_type como enum (con .value) como string directo.
+    Compatible con entidades spaCy (PER) y tipos internos (character).
+    """
+    character_types = {"character", "animal", "creature", "PER", "PERSON"}
+
+    if hasattr(entity, 'entity_type'):
+        etype = entity.entity_type
+        if hasattr(etype, 'value'):
+            return etype.value in character_types
+        return etype in character_types
+    return False

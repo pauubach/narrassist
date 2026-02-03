@@ -50,8 +50,11 @@ export interface TemporalInconsistency {
 
 /** Rango temporal de la historia */
 export interface TimeSpan {
-  start: Date
-  end: Date
+  start: Date | null          // null si fechas sintéticas
+  end: Date | null            // null si fechas sintéticas
+  durationDays: number        // duración en días
+  isSynthetic: boolean        // true si no hay fechas absolutas en el texto
+  hasRealDates: boolean       // true si hay fechas absolutas en el texto
 }
 
 /** Timeline completo del proyecto */

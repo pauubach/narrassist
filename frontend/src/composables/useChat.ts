@@ -82,14 +82,21 @@ export function useChat(projectId: number) {
     isLoading.value = true
 
     try {
+      // Add timeout controller (30s for LLM response)
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000)
+
       const response = await fetch(`${API_BASE}/api/projects/${projectId}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: content,
           history: history.slice(0, -1) // Exclude current message
-        } as ChatRequest)
+        } as ChatRequest),
+        signal: controller.signal
       })
+
+      clearTimeout(timeoutId)
 
       const data = await response.json()
 
@@ -117,7 +124,18 @@ export function useChat(projectId: number) {
         })
       }
     } catch (e) {
-      const errorMsg = e instanceof Error ? e.message : 'Error de conexión'
+      let errorMsg = 'Error de conexión'
+
+      if (e instanceof Error) {
+        if (e.name === 'AbortError') {
+          errorMsg = 'La respuesta tardó demasiado. Verifica que Ollama esté corriendo.'
+        } else if (e.message.includes('fetch')) {
+          errorMsg = 'No se pudo conectar con el servidor. Verifica la conexión.'
+        } else {
+          errorMsg = e.message
+        }
+      }
+
       error.value = errorMsg
       messages.value.push({
         id: generateId(),

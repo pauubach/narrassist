@@ -161,16 +161,22 @@ def get_narrative_health(
         # Obtener entidades del proyecto
         entities_data = []
         try:
-            entities = deps.entity_repository.get_by_project(project_id)
+            entities = deps.entity_repository.get_entities_by_project(project_id)
             for ent in entities:
+                # Obtener tipo de entidad correctamente (puede ser enum o string)
+                etype = ent.entity_type if hasattr(ent, 'entity_type') else "character"
+                if hasattr(etype, 'value'):
+                    etype = etype.value
+
                 ent_dict = {
-                    "entity_type": ent.entity_type if hasattr(ent, 'entity_type') else "character",
-                    "name": ent.name if hasattr(ent, 'name') else "",
+                    "entity_type": etype,
+                    "name": ent.canonical_name if hasattr(ent, 'canonical_name') else (ent.name if hasattr(ent, 'name') else ""),
                     "mention_count": ent.mention_count if hasattr(ent, 'mention_count') else 0,
                     "chapters_present": len(ent.chapter_appearances) if hasattr(ent, 'chapter_appearances') else 0,
                 }
                 entities_data.append(ent_dict)
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Could not load entities for health check: {e}")
             pass  # Sin entidades, el health check funciona con datos parciales
 
         # Arcos y elementos Chekhov del chapter progress
@@ -701,8 +707,10 @@ async def get_pacing_analysis(
     Analiza el ritmo narrativo del proyecto.
 
     Detecta variaciones en el pacing a través de capítulos/escenas.
+    Devuelve métricas por capítulo, observaciones y recomendaciones.
     """
     try:
+        import re
         from narrative_assistant.analysis.pacing import get_pacing_analyzer
 
         result = deps.project_manager.get(project_id)
@@ -713,7 +721,10 @@ async def get_pacing_analysis(
         analyzer = get_pacing_analyzer()
         chapters = deps.chapter_repository.get_by_project(project_id)
 
-        chapters_data = []
+        chapter_metrics = []
+        issues = []
+        total_words = 0
+        total_dialogue_ratio = 0.0
 
         for chapter in chapters:
             if chapter_number is not None and chapter.chapter_number != chapter_number:
@@ -724,53 +735,135 @@ async def get_pacing_analysis(
 
             result = analyzer.analyze(chapter_text)
             if result.is_failure:
+                logger.warning(f"Failed to analyze chapter {chapter.chapter_number}: {result.error}")
                 continue
 
             report = result.value
 
-            chapters_data.append({
-                "chapter_number": chapter.chapter_number,
-                "chapter_title": chapter.title or f"Capítulo {chapter.chapter_number}",
+            # Contar palabras, oraciones, párrafos
+            words = chapter_text.split()
+            word_count = len(words)
+            total_words += word_count
+
+            # Contar oraciones (aproximación)
+            sentences = re.split(r'[.!?]+', chapter_text)
+            sentence_count = len([s for s in sentences if s.strip()])
+
+            # Contar párrafos
+            paragraphs = [p for p in chapter_text.split('\n\n') if p.strip()]
+            paragraph_count = len(paragraphs)
+
+            # Contar líneas de diálogo (líneas que empiezan con guión o están entre comillas)
+            dialogue_lines = len(re.findall(r'(?:^|\n)\s*[—–-]\s*[^\n]+|"[^"]+"|«[^»]+»', chapter_text))
+
+            dialogue_ratio = report.dialogue_ratio
+            total_dialogue_ratio += dialogue_ratio
+
+            chapter_metrics.append({
+                "segment_id": chapter.chapter_number,
+                "title": chapter.title or f"Capítulo {chapter.chapter_number}",
+                "word_count": word_count,
+                "sentence_count": sentence_count,
+                "paragraph_count": paragraph_count,
+                "dialogue_ratio": round(dialogue_ratio, 3),
+                "dialogue_lines": dialogue_lines,
+                "avg_sentence_length": round(word_count / sentence_count, 1) if sentence_count > 0 else 0,
+                "lexical_density": round(report.action_ratio + report.description_ratio, 3),
                 "pacing_score": round(report.overall_pacing, 2),
                 "pacing_label": _get_pacing_label(report.overall_pacing),
-                "metrics": {
-                    "dialogue_ratio": round(report.dialogue_ratio, 3),
-                    "action_ratio": round(report.action_ratio, 3),
-                    "description_ratio": round(report.description_ratio, 3),
-                    "avg_sentence_length": round(report.avg_sentence_length, 1),
-                },
-                "segments": [
-                    {
-                        "type": seg.segment_type.value,
-                        "start": seg.start_position,
-                        "end": seg.end_position,
-                        "pacing": round(seg.pacing_score, 2),
-                    }
-                    for seg in report.segments[:20]  # Limit segments
-                ],
             })
 
-        # Calcular variación de pacing
-        pacing_scores = [ch["pacing_score"] for ch in chapters_data]
-        pacing_variation = max(pacing_scores) - min(pacing_scores) if pacing_scores else 0
+        if not chapter_metrics:
+            return ApiResponse(
+                success=True,
+                data={
+                    "summary": {
+                        "total_chapters": 0,
+                        "avg_chapter_words": 0,
+                        "avg_dialogue_ratio": 0,
+                        "issues_count": 0,
+                    },
+                    "chapter_metrics": [],
+                    "issues": [],
+                    "recommendations": ["No hay capítulos con contenido para analizar."],
+                }
+            )
+
+        # Calcular estadísticas globales
+        num_chapters = len(chapter_metrics)
+        avg_words = total_words / num_chapters
+        avg_dialogue = total_dialogue_ratio / num_chapters
+
+        # Detectar observaciones/issues
+        for ch in chapter_metrics:
+            # Capítulo muy corto
+            if ch["word_count"] < avg_words * 0.4:
+                issues.append({
+                    "severity": "warning",
+                    "issue_type": "chapter_too_short",
+                    "title": ch["title"],
+                    "description": f"El capítulo tiene {ch['word_count']} palabras, significativamente menos que el promedio ({int(avg_words)}).",
+                    "explanation": "Los capítulos muy cortos pueden romper el ritmo de lectura.",
+                    "suggestion": "Considera expandir este capítulo o fusionarlo con otro."
+                })
+            # Capítulo muy largo
+            elif ch["word_count"] > avg_words * 2.0:
+                issues.append({
+                    "severity": "suggestion",
+                    "issue_type": "chapter_too_long",
+                    "title": ch["title"],
+                    "description": f"El capítulo tiene {ch['word_count']} palabras, más del doble del promedio ({int(avg_words)}).",
+                    "explanation": "Los capítulos muy largos pueden cansar al lector.",
+                    "suggestion": "Considera dividir este capítulo en secciones más manejables."
+                })
+
+            # Mucho diálogo
+            if ch["dialogue_ratio"] > 0.7:
+                issues.append({
+                    "severity": "info",
+                    "issue_type": "too_much_dialogue",
+                    "title": ch["title"],
+                    "description": f"Alto ratio de diálogo ({int(ch['dialogue_ratio']*100)}%).",
+                    "explanation": "Demasiado diálogo puede hacer que la narrativa se sienta como un guión.",
+                    "suggestion": "Añade descripciones o narraciones para equilibrar."
+                })
+            # Poco diálogo
+            elif ch["dialogue_ratio"] < 0.1 and ch["word_count"] > 1000:
+                issues.append({
+                    "severity": "info",
+                    "issue_type": "too_little_dialogue",
+                    "title": ch["title"],
+                    "description": f"Bajo ratio de diálogo ({int(ch['dialogue_ratio']*100)}%).",
+                    "explanation": "Poco diálogo puede hacer la lectura pesada.",
+                    "suggestion": "Considera añadir interacciones entre personajes."
+                })
 
         recommendations = []
-        if pacing_variation < 0.2:
+        pacing_scores = [ch["pacing_score"] for ch in chapter_metrics]
+        pacing_variation = max(pacing_scores) - min(pacing_scores) if pacing_scores else 0
+
+        if pacing_variation < 0.15:
             recommendations.append("El ritmo es muy uniforme. Considera variar entre escenas de acción y reflexión.")
-        if all(ch["pacing_score"] < 0.4 for ch in chapters_data):
+        if all(ch["pacing_score"] < 0.4 for ch in chapter_metrics):
             recommendations.append("El ritmo general es lento. Añade más diálogo o escenas de acción.")
-        if all(ch["pacing_score"] > 0.7 for ch in chapters_data):
+        if all(ch["pacing_score"] > 0.7 for ch in chapter_metrics):
             recommendations.append("El ritmo es muy acelerado. Incluye momentos de pausa para el lector.")
+        if avg_dialogue < 0.15:
+            recommendations.append("El manuscrito tiene poco diálogo. Las conversaciones ayudan a dinamizar la lectura.")
+        if not recommendations:
+            recommendations.append("El ritmo narrativo es equilibrado. ¡Buen trabajo!")
 
         return ApiResponse(
             success=True,
             data={
-                "global_stats": {
-                    "avg_pacing": round(sum(pacing_scores) / len(pacing_scores), 2) if pacing_scores else 0,
-                    "pacing_variation": round(pacing_variation, 2),
-                    "chapter_count": len(chapters_data),
+                "summary": {
+                    "total_chapters": num_chapters,
+                    "avg_chapter_words": round(avg_words),
+                    "avg_dialogue_ratio": round(avg_dialogue, 3),
+                    "issues_count": len(issues),
                 },
-                "chapters": chapters_data,
+                "chapter_metrics": chapter_metrics,
+                "issues": issues,
                 "recommendations": recommendations,
             }
         )
