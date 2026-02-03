@@ -1,0 +1,21 @@
+# NLP dependencies with pinned versions for compatibility
+# These versions have been tested together and are known to work
+# DO NOT upgrade torch to 2.10+ without also upgrading numpy to 2.x
+
+# PyTorch CPU-only (compatible with numpy 1.x)
+# Using CPU version to minimize bundle size
+--index-url https://download.pytorch.org/whl/cpu
+torch==2.5.1
+
+# Switch back to PyPI for remaining packages
+--index-url https://pypi.org/simple
+
+# NumPy 1.x (required for compatibility with thinc wheels)
+numpy>=1.24.0,<2.0.0
+
+# spaCy and thinc (compatible versions)
+spacy>=3.7.0,<3.8.0
+thinc>=8.2.0,<8.3.0
+
+# Sentence transformers for embeddings
+sentence-transformers>=2.2.0,<3.0.0

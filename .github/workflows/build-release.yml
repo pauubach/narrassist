@@ -40,6 +40,11 @@ jobs:
           src-tauri\binaries\python-embed\python.exe -m pip install -r src-tauri\binaries\backend\requirements.txt --no-warn-script-location
         shell: cmd
 
+      - name: Install NLP dependencies with pinned versions
+        run: |
+          src-tauri\binaries\python-embed\python.exe -m pip install -r src-tauri\binaries\backend\requirements-nlp.txt --no-warn-script-location
+        shell: cmd
+
       - name: Validate binaries and python embed (Windows)
         shell: pwsh
         run: |
@@ -146,6 +151,14 @@ jobs:
       - name: Install base dependencies in embedded Python
         run: |
           ./python3 -m pip install -r ../backend/requirements.txt --no-warn-script-location
+        working-directory: src-tauri/binaries/python-embed
+        env:
+          PYTHONHOME: ${{ github.workspace }}/src-tauri/binaries/python-embed/Python.framework/Versions/3.12
+          DYLD_FRAMEWORK_PATH: ${{ github.workspace }}/src-tauri/binaries/python-embed
+
+      - name: Install NLP dependencies with pinned versions
+        run: |
+          ./python3 -m pip install -r ../backend/requirements-nlp.txt --no-warn-script-location
         working-directory: src-tauri/binaries/python-embed
         env:
           PYTHONHOME: ${{ github.workspace }}/src-tauri/binaries/python-embed/Python.framework/Versions/3.12
