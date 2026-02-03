@@ -9,6 +9,7 @@ from deps import ApiResponse
 from fastapi import HTTPException
 from fastapi import Query
 from typing import Optional, Any
+from narrative_assistant.alerts.models import AlertStatus
 
 router = APIRouter()
 

@@ -10,6 +10,7 @@ from fastapi import HTTPException
 from fastapi import UploadFile, File
 from typing import Optional, Any
 from deps import generate_person_aliases
+from narrative_assistant.core.result import Result
 
 router = APIRouter()
 

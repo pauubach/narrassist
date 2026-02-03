@@ -11,6 +11,7 @@ from fastapi import UploadFile, File
 from fastapi import Body
 from typing import Optional, Any
 from deps import ProjectResponse, _get_project_stats
+from narrative_assistant.alerts.models import AlertStatus
 
 router = APIRouter()
 
