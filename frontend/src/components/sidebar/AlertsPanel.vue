@@ -16,12 +16,14 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  /** Cuando se hace click para navegar a alertas */
+  /** Cuando se hace click para navegar a pantalla de alertas */
   (e: 'navigate'): void
   /** Cuando se selecciona una severidad específica */
   (e: 'filter-severity', severity: AlertSeverity): void
-  /** Cuando se hace click en una alerta específica */
+  /** Cuando se hace click en una alerta específica - navega al texto */
   (e: 'alert-click', alert: Alert): void
+  /** Cuando se quiere navegar al texto donde está la alerta */
+  (e: 'alert-navigate', alert: Alert): void
 }>()
 
 const { getSeverityColor } = useAlertUtils()
@@ -59,7 +61,8 @@ function truncateTitle(title: string, maxLen = 45): string {
 
 function handleAlertClick(alert: Alert) {
   emit('alert-click', alert)
-  emit('navigate')
+  // Navegar al texto donde está la alerta, no a la pantalla de alertas
+  emit('alert-navigate', alert)
 }
 
 function handleViewAll() {

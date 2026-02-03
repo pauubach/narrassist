@@ -213,6 +213,15 @@ interface ScrollTarget {
   text?: string      // Texto a resaltar
 }
 
+interface AlertHighlightRange {
+  startChar: number
+  endChar: number
+  text?: string
+  chapterId?: number | null
+  color?: string
+  label?: string
+}
+
 const props = defineProps<{
   projectId: number
   documentTitle?: string
@@ -221,6 +230,8 @@ const props = defineProps<{
   scrollToTarget?: ScrollTarget | null
   /** Capítulos proporcionados por el padre (opcional, si no se pasan se cargan del API) */
   externalChapters?: Chapter[]
+  /** Rangos múltiples a resaltar (para alertas de inconsistencia) */
+  alertHighlightRanges?: AlertHighlightRange[]
 }>()
 
 const emit = defineEmits<{
@@ -1331,6 +1342,204 @@ watch(() => props.externalChapters, (newChapters) => {
   }
 }, { deep: true })
 
+// Watch para resaltar múltiples rangos de alerta (inconsistencias)
+watch(() => props.alertHighlightRanges, async (ranges) => {
+  // Primero limpiar highlights anteriores
+  clearAllAlertHighlights()
+
+  if (!ranges || ranges.length === 0) return
+
+  console.log('[DocumentViewer] Applying alert highlights:', ranges.length, 'ranges')
+
+  // Cargar los capítulos necesarios
+  const chapterIds = new Set<number>()
+  for (const range of ranges) {
+    if (range.chapterId) {
+      chapterIds.add(range.chapterId)
+    }
+  }
+
+  // Cargar capítulos necesarios y esperar a que estén listos
+  for (const chId of chapterIds) {
+    if (!loadedChapters.value.has(chId)) {
+      loadedChapters.value.add(chId)
+      touchChapter(chId)
+    }
+  }
+
+  await nextTick()
+  await new Promise(resolve => setTimeout(resolve, 300))
+
+  // Aplicar cada highlight con su color
+  for (const range of ranges) {
+    await applyAlertHighlight(range)
+  }
+
+  // Scroll al primer rango
+  if (ranges.length > 0) {
+    const firstRange = ranges[0]
+    if (firstRange.chapterId) {
+      const target: ScrollTarget = {
+        chapterId: firstRange.chapterId,
+        position: firstRange.startChar,
+        text: firstRange.text
+      }
+      await scrollToMention(target)
+    }
+  }
+}, { deep: true })
+
+// Limpiar todos los highlights de alerta
+const clearAllAlertHighlights = () => {
+  const highlights = viewerContainer.value?.querySelectorAll('.alert-multi-highlight')
+  if (highlights) {
+    highlights.forEach(el => {
+      const parent = el.parentNode
+      if (parent) {
+        while (el.firstChild) {
+          parent.insertBefore(el.firstChild, el)
+        }
+        parent.removeChild(el)
+        parent.normalize()
+      }
+    })
+  }
+}
+
+// Aplicar highlight para un rango específico de alerta
+const applyAlertHighlight = async (range: AlertHighlightRange): Promise<void> => {
+  if (!range.chapterId) {
+    console.warn('[DocumentViewer] No chapterId in range:', range)
+    return
+  }
+
+  const chapterElement = viewerContainer.value?.querySelector(`[data-chapter-id="${range.chapterId}"]`)
+  if (!chapterElement) {
+    console.warn('[DocumentViewer] Chapter element not found:', range.chapterId)
+    return
+  }
+
+  const contentElement = chapterElement.querySelector('.chapter-text')
+  if (!contentElement) {
+    console.warn('[DocumentViewer] No .chapter-text in chapter')
+    return
+  }
+
+  // Si no hay texto, intentar buscar por posición
+  const searchText = range.text ? cleanExcerptForSearch(range.text) : null
+  if (!searchText) {
+    console.warn('[DocumentViewer] No text to search for in range')
+    return
+  }
+
+  // Buscar el texto en el capítulo
+  const walker = document.createTreeWalker(contentElement, NodeFilter.SHOW_TEXT, null)
+
+  interface TextMatch {
+    node: Text
+    index: number
+    length: number
+    charPosition: number
+  }
+  const matches: TextMatch[] = []
+  let node: Text | null
+  let charCount = 0
+
+  while ((node = walker.nextNode() as Text | null)) {
+    const nodeText = node.textContent || ''
+    let searchIndex = 0
+
+    while (true) {
+      const index = nodeText.toLowerCase().indexOf(searchText.toLowerCase(), searchIndex)
+      if (index === -1) break
+
+      matches.push({
+        node,
+        index,
+        length: searchText.length,
+        charPosition: charCount + index
+      })
+      searchIndex = index + 1
+    }
+
+    charCount += nodeText.length
+  }
+
+  if (matches.length === 0) {
+    console.warn('[DocumentViewer] Text not found in chapter:', searchText.substring(0, 50))
+    return
+  }
+
+  // Seleccionar la ocurrencia más cercana a la posición indicada
+  let match = matches[0]
+  if (range.startChar !== undefined && matches.length > 1) {
+    // Calcular posición ajustada (restar offset del título si existe)
+    const chapter = chapters.value.find(ch => ch.id === range.chapterId)
+    let adjustedPosition = range.startChar
+    if (chapter) {
+      const titleOffset = getTitleOffset(chapter.content, chapter.title)
+      adjustedPosition = range.startChar - titleOffset
+    }
+
+    let minDistance = Math.abs(matches[0].charPosition - adjustedPosition)
+    for (const m of matches) {
+      const distance = Math.abs(m.charPosition - adjustedPosition)
+      if (distance < minDistance) {
+        minDistance = distance
+        match = m
+      }
+    }
+  }
+
+  // Crear el rango DOM
+  const domRange = document.createRange()
+  domRange.setStart(match.node, match.index)
+  domRange.setEnd(match.node, match.index + match.length)
+
+  // Crear span de highlight con color personalizado
+  const highlightSpan = document.createElement('span')
+  highlightSpan.className = 'alert-multi-highlight'
+
+  // Aplicar color personalizado o default
+  const color = range.color || '#fbbf24' // amarillo por defecto
+  highlightSpan.style.backgroundColor = hexToRgba(color, 0.4)
+  highlightSpan.style.boxShadow = `0 0 0 2px ${hexToRgba(color, 0.3)}`
+  highlightSpan.style.borderRadius = '3px'
+  highlightSpan.style.padding = '2px 4px'
+  highlightSpan.style.margin = '-2px -4px'
+
+  // Añadir etiqueta si existe
+  if (range.label) {
+    highlightSpan.setAttribute('data-label', range.label)
+    highlightSpan.title = range.label
+  }
+
+  try {
+    highlightSpan.appendChild(domRange.extractContents())
+    domRange.insertNode(highlightSpan)
+    console.log('[DocumentViewer] Applied highlight:', range.label || searchText.substring(0, 30))
+  } catch (e) {
+    console.warn('[DocumentViewer] Error creating highlight:', e)
+  }
+}
+
+// Convertir hex a rgba
+const hexToRgba = (hex: string, alpha: number): string => {
+  // Remover # si existe
+  const cleanHex = hex.replace('#', '')
+
+  // Expandir hex corto (3 chars) a largo (6 chars)
+  const fullHex = cleanHex.length === 3
+    ? cleanHex.split('').map(c => c + c).join('')
+    : cleanHex
+
+  const r = parseInt(fullHex.substring(0, 2), 16)
+  const g = parseInt(fullHex.substring(2, 4), 16)
+  const b = parseInt(fullHex.substring(4, 6), 16)
+
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
+
 // Escuchar cambios de configuración (evento personalizado desde SettingsView)
 const handleSettingsChange = () => {
   loadAppearanceSettings()
@@ -1883,6 +2092,43 @@ defineExpose({
     background: rgba(251, 191, 36, 0);
     box-shadow: 0 0 0 0 rgba(251, 191, 36, 0);
     opacity: 0;
+  }
+}
+
+/* Multi-highlight para alertas de inconsistencia */
+.alert-multi-highlight {
+  display: inline;
+  animation: alert-highlight-pulse 2s ease-in-out infinite;
+  cursor: help;
+  position: relative;
+}
+
+.alert-multi-highlight::after {
+  content: attr(data-label);
+  position: absolute;
+  top: -1.5em;
+  left: 0;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: inherit;
+  padding: 1px 4px;
+  border-radius: 3px;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+}
+
+.alert-multi-highlight:hover::after {
+  opacity: 1;
+}
+
+@keyframes alert-highlight-pulse {
+  0%, 100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.2);
   }
 }
 </style>

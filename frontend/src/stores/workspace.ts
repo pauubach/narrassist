@@ -136,6 +136,22 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   /** Subtab de estilo a activar (0 = detectores, 1 = reglas) */
   const styleTabSubtab = ref<number | null>(null)
 
+  /**
+   * Rangos múltiples a resaltar (para alertas de inconsistencia con varios sources)
+   * Cada rango tiene: startChar, endChar, text (opcional), chapterId (opcional), color (opcional)
+   */
+  const alertHighlightRanges = ref<Array<{
+    startChar: number
+    endChar: number
+    text?: string
+    chapterId?: number | null
+    color?: string
+    label?: string
+  }>>([])
+
+  /** ID de la alerta actualmente resaltada (para limpiar al cambiar) */
+  const highlightedAlertId = ref<number | null>(null)
+
   // ============================================================================
   // Getters
   // ============================================================================
@@ -328,6 +344,49 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   }
 
   /**
+   * Resalta múltiples rangos de texto (para alertas de inconsistencia).
+   * Hace scroll al primer rango y resalta todos simultáneamente.
+   *
+   * @param alertId ID de la alerta (para limpiar al cambiar)
+   * @param ranges Array de rangos a resaltar
+   */
+  function highlightAlertSources(
+    alertId: number,
+    ranges: Array<{
+      startChar: number
+      endChar: number
+      text?: string
+      chapterId?: number | null
+      color?: string
+      label?: string
+    }>
+  ) {
+    // Limpiar highlight anterior
+    alertHighlightRanges.value = []
+    highlightedAlertId.value = alertId
+
+    if (ranges.length === 0) return
+
+    // Guardar todos los rangos
+    alertHighlightRanges.value = ranges
+
+    // Hacer scroll al primer rango
+    const first = ranges[0]
+    scrollToPosition.value = first.startChar
+    scrollToText.value = first.text || null
+    scrollToChapterId.value = first.chapterId || null
+    setActiveTab('text')
+  }
+
+  /**
+   * Limpia los highlights de alerta
+   */
+  function clearAlertHighlights() {
+    alertHighlightRanges.value = []
+    highlightedAlertId.value = null
+  }
+
+  /**
    * Navega al tab de estilo con un subtab específico
    * @param subtab 0 = detectores de corrección, 1 = reglas editoriales
    */
@@ -394,6 +453,8 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     scrollToText,
     scrollToChapterId,
     styleTabSubtab,
+    alertHighlightRanges,
+    highlightedAlertId,
 
     // Getters
     centerWidth,
@@ -422,6 +483,8 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     navigateToEntityMentions,
     navigateToTextPosition,
     clearScrollToPosition,
+    highlightAlertSources,
+    clearAlertHighlights,
     navigateToStyleTab,
     openCorrectionConfig,
     clearStyleTabSubtab,

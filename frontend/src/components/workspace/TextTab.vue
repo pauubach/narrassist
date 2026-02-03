@@ -21,6 +21,15 @@ interface ScrollTarget {
   text?: string      // Texto a resaltar
 }
 
+interface AlertHighlightRange {
+  startChar: number
+  endChar: number
+  text?: string
+  chapterId?: number | null
+  color?: string
+  label?: string
+}
+
 interface Props {
   /** ID del proyecto */
   projectId: number
@@ -36,6 +45,8 @@ interface Props {
   scrollToChapterId?: number | null
   /** Posición de carácter al que hacer scroll */
   scrollToPosition?: number | null
+  /** Rangos múltiples a resaltar (para alertas de inconsistencia) */
+  alertHighlightRanges?: AlertHighlightRange[]
 }
 
 const props = defineProps<Props>()
@@ -237,6 +248,7 @@ onMounted(async () => {
         :scroll-to-chapter-id="scrollToChapterId"
         :scroll-to-target="scrollTarget"
         :external-chapters="chapters"
+        :alert-highlight-ranges="alertHighlightRanges"
         @chapter-visible="handleChapterVisible"
         @entity-click="handleEntityClick"
       />

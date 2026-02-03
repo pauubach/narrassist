@@ -143,6 +143,7 @@
                   @navigate="navigateToAlerts"
                   @filter-severity="handleFilterSeverity"
                   @alert-click="onAlertSelect"
+                  @alert-navigate="onAlertNavigate"
                 />
 
                 <!-- Panel Personajes -->
@@ -184,6 +185,7 @@
             :highlight-entity-id="highlightedEntityId"
             :scroll-to-chapter-id="scrollToChapterId"
             :scroll-to-position="workspaceStore.scrollToPosition"
+            :alert-highlight-ranges="workspaceStore.alertHighlightRanges"
             @chapter-visible="onChapterVisible"
             @entity-click="onEntityClick"
             @alert-click="onAlertClickFromText"
@@ -971,8 +973,8 @@ const onAlertClickFromText = (alert: Alert) => {
 
 /**
  * Navega al texto de una alerta.
- * Si se proporciona un source (para inconsistencias), navega a la ubicación de ese source
- * en lugar de la ubicación principal de la alerta.
+ * Si hay múltiples sources (inconsistencias), resalta todas las ubicaciones.
+ * Si se proporciona un source específico, navega solo a esa ubicación.
  */
 const onAlertNavigate = (alert: Alert, source?: AlertSource) => {
   // Convertir chapter NUMBER a chapter ID si es necesario
@@ -980,6 +982,25 @@ const onAlertNavigate = (alert: Alert, source?: AlertSource) => {
     if (chapterNumber === undefined || chapterNumber === null) return null
     const chapter = chapters.value.find(c => c.chapterNumber === chapterNumber)
     return chapter?.id ?? null
+  }
+
+  // Si hay múltiples sources y no se especifica uno concreto, resaltar todos
+  const sources = alert.extraData?.sources
+  if (sources && sources.length > 1 && !source) {
+    // Colores para distinguir los sources (valor1 vs valor2)
+    const colors = ['#ef4444', '#3b82f6'] // rojo y azul
+
+    const ranges = sources.map((s: AlertSource, idx: number) => ({
+      startChar: s.startChar,
+      endChar: s.endChar,
+      text: s.excerpt,
+      chapterId: getChapterId(s.chapter),
+      color: colors[idx % colors.length],
+      label: s.value
+    }))
+
+    workspaceStore.highlightAlertSources(alert.id, ranges)
+    return
   }
 
   // Si hay un source específico, usar sus datos de ubicación
@@ -992,7 +1013,8 @@ const onAlertNavigate = (alert: Alert, source?: AlertSource) => {
     // Obtener el ID del capítulo a partir del número
     const chapterId = getChapterId(targetChapter)
 
-    // Usar navigateToTextPosition para scroll preciso con resaltado
+    // Limpiar highlights anteriores y usar navegación simple
+    workspaceStore.clearAlertHighlights()
     workspaceStore.navigateToTextPosition(
       targetPosition,
       targetExcerpt || undefined,
