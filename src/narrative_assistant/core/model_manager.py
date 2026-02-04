@@ -133,6 +133,11 @@ class DownloadProgress:
 _download_progress: dict[ModelType, DownloadProgress] = {}
 _progress_lock = threading.Lock()
 
+# Cache de tamaños de modelos (consultados dinámicamente de HuggingFace)
+_model_sizes_cache: dict[str, int] = {}
+_model_sizes_cache_time: float = 0.0
+_MODEL_SIZES_CACHE_TTL = 3600.0  # 1 hora de cache
+
 
 @dataclass
 class ModelDownloadError(NarrativeError):
@@ -848,16 +853,30 @@ def _clear_download_progress(model_type: ModelType) -> None:
         _download_progress.pop(model_type, None)
 
 
-def get_model_size_from_huggingface(model_name: str) -> int | None:
+def get_model_size_from_huggingface(model_name: str, use_cache: bool = True) -> int | None:
     """
     Obtiene el tamaño real de un modelo desde HuggingFace Hub.
 
+    Los tamaños se cachean por 1 hora para evitar consultas excesivas.
+
     Args:
         model_name: Nombre del modelo en HuggingFace
+        use_cache: Si usar el cache (default True)
 
     Returns:
         Tamaño en bytes, o None si no se puede obtener
     """
+    import time
+
+    global _model_sizes_cache, _model_sizes_cache_time
+
+    # Verificar cache
+    if use_cache and model_name in _model_sizes_cache:
+        cache_age = time.time() - _model_sizes_cache_time
+        if cache_age < _MODEL_SIZES_CACHE_TTL:
+            logger.debug(f"Usando tamaño cacheado para {model_name}")
+            return _model_sizes_cache[model_name]
+
     try:
         from huggingface_hub import model_info
 
@@ -865,16 +884,76 @@ def get_model_size_from_huggingface(model_name: str) -> int | None:
         if info.siblings:
             total_size = sum(f.size for f in info.siblings if f.size)
             if total_size > 0:
-                logger.debug(f"Tamaño de {model_name} desde HuggingFace: {total_size} bytes")
+                logger.debug(f"Tamaño de {model_name} desde HuggingFace: {total_size} bytes ({total_size / (1024*1024):.1f} MB)")
+                # Guardar en cache
+                _model_sizes_cache[model_name] = total_size
+                _model_sizes_cache_time = time.time()
                 return total_size
     except Exception as e:
         logger.debug(f"No se pudo obtener tamaño de {model_name}: {e}")
     return None
 
 
-def get_real_model_sizes() -> dict[str, int]:
+def get_spacy_model_size(model_name: str) -> int | None:
     """
-    Obtiene tamaños reales de los modelos, consultando HuggingFace cuando es posible.
+    Obtiene el tamaño de un modelo spaCy desde GitHub releases.
+
+    Args:
+        model_name: Nombre del modelo spaCy (ej: es_core_news_lg)
+
+    Returns:
+        Tamaño en bytes, o None si no se puede obtener
+    """
+    import time
+    import urllib.request
+    import json
+
+    global _model_sizes_cache, _model_sizes_cache_time
+
+    cache_key = f"spacy/{model_name}"
+
+    # Verificar cache
+    if cache_key in _model_sizes_cache:
+        cache_age = time.time() - _model_sizes_cache_time
+        if cache_age < _MODEL_SIZES_CACHE_TTL:
+            return _model_sizes_cache[cache_key]
+
+    try:
+        # Consultar la API de GitHub para releases de spacy-models
+        # El modelo es un wheel de Python, el tamaño está en los assets del release
+        url = f"https://api.github.com/repos/explosion/spacy-models/releases/tags/{model_name}-3.7.0"
+
+        req = urllib.request.Request(url)
+        req.add_header("User-Agent", "NarrativeAssistant/1.0")
+
+        with urllib.request.urlopen(req, timeout=5) as response:
+            data = json.loads(response.read().decode())
+
+        # Buscar el asset del wheel
+        for asset in data.get("assets", []):
+            if asset["name"].endswith(".whl") or asset["name"].endswith(".tar.gz"):
+                size = asset.get("size", 0)
+                if size > 0:
+                    logger.debug(f"Tamaño de spaCy {model_name} desde GitHub: {size} bytes ({size / (1024*1024):.1f} MB)")
+                    _model_sizes_cache[cache_key] = size
+                    _model_sizes_cache_time = time.time()
+                    return size
+
+    except Exception as e:
+        logger.debug(f"No se pudo obtener tamaño de spaCy {model_name}: {e}")
+
+    return None
+
+
+def get_real_model_sizes(force_refresh: bool = False) -> dict[str, int]:
+    """
+    Obtiene tamaños reales de los modelos, consultando APIs externas.
+
+    Los resultados se cachean por 1 hora. Usa force_refresh=True para
+    forzar una consulta fresca.
+
+    Args:
+        force_refresh: Si True, ignora el cache y consulta de nuevo
 
     Returns:
         Dict con tamaños en bytes por tipo de modelo
@@ -884,16 +963,21 @@ def get_real_model_sizes() -> dict[str, int]:
     # Embeddings: consultar HuggingFace
     embeddings_info = KNOWN_MODELS[ModelType.EMBEDDINGS]
     hf_size = get_model_size_from_huggingface(
-        f"sentence-transformers/{embeddings_info.name}"
+        f"sentence-transformers/{embeddings_info.name}",
+        use_cache=not force_refresh,
     )
     if hf_size:
         sizes["embeddings"] = hf_size
     else:
         sizes["embeddings"] = embeddings_info.size_mb * 1024 * 1024
 
-    # spaCy: usar tamaño estimado (no hay API pública fácil)
+    # spaCy: consultar GitHub releases
     spacy_info = KNOWN_MODELS[ModelType.SPACY]
-    sizes["spacy"] = spacy_info.size_mb * 1024 * 1024
+    spacy_size = get_spacy_model_size(spacy_info.name)
+    if spacy_size:
+        sizes["spacy"] = spacy_size
+    else:
+        sizes["spacy"] = spacy_info.size_mb * 1024 * 1024
 
     return sizes
 
