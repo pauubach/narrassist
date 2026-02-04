@@ -245,11 +245,11 @@
           <!-- LanguageTool status -->
           <div class="ollama-status">
             <h4>Corrector Avanzado (LanguageTool)</h4>
-            <div v-if="systemCapabilities.languagetool?.running" class="ollama-available">
+            <div v-if="ltRunning" class="ollama-available">
               <Tag value="Activo" severity="success" />
               <p>+2000 reglas de gramática y ortografía</p>
             </div>
-            <div v-else-if="systemCapabilities.languagetool?.installed" class="ollama-unavailable">
+            <div v-else-if="ltInstalled" class="ollama-unavailable">
               <Tag value="No iniciado" severity="warning" />
               <Button
                 label="Iniciar"
@@ -261,7 +261,7 @@
                 class="ml-2"
               />
             </div>
-            <div v-else-if="systemCapabilities.languagetool?.installing || ltInstalling" class="ollama-unavailable lt-installing">
+            <div v-else-if="ltInstallingState || ltInstalling" class="ollama-unavailable lt-installing">
               <Tag value="Instalando..." severity="info" />
               <div class="lt-progress-wrapper">
                 <div class="lt-progress-info">
@@ -390,7 +390,7 @@ const systemStore = useSystemStore()
 const toast = useToast()
 
 // Usar storeToRefs para obtener refs reactivos del store
-const { systemCapabilities, capabilitiesLoading } = storeToRefs(systemStore)
+const { systemCapabilities, capabilitiesLoading, ltStarting, ltInstalling, ltInstallProgress } = storeToRefs(systemStore)
 
 interface Props {
   visible: boolean
@@ -416,6 +416,11 @@ const dontShowAgain = ref(false)
 
 // loadingCapabilities computed (systemCapabilities ya viene de storeToRefs)
 const loadingCapabilities = computed(() => capabilitiesLoading.value && !systemCapabilities.value)
+
+// Computed para estado de LanguageTool (garantiza reactividad)
+const ltRunning = computed(() => systemCapabilities.value?.languagetool?.running ?? false)
+const ltInstalled = computed(() => systemCapabilities.value?.languagetool?.installed ?? false)
+const ltInstallingState = computed(() => systemCapabilities.value?.languagetool?.installing ?? false)
 
 // Títulos de pasos
 const stepTitles = ['', 'Cómo funciona', 'El Workspace', 'Tu Sistema', 'Listo']
@@ -468,11 +473,6 @@ watch(() => props.visible, (newValue) => {
 const ollamaInstalling = ref(false)
 const ollamaStarting = ref(false)
 const modelDownloading = ref(false)
-
-// LanguageTool: usar estado centralizado del store
-const ltInstalling = computed(() => systemStore.ltInstalling)
-const ltStarting = computed(() => systemStore.ltStarting)
-const ltInstallProgress = computed(() => systemStore.ltInstallProgress)
 
 // Descarga automática del modelo por defecto
 const downloadDefaultModel = async () => {
