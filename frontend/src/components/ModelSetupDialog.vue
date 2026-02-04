@@ -7,9 +7,83 @@ import ProgressBar from 'primevue/progressbar'
 const systemStore = useSystemStore()
 
 const visible = ref(true) // Siempre visible al inicio
-const downloadProgress = ref(0)
-const currentModel = ref('')
 const downloadPhase = ref<'starting' | 'checking' | 'installing-deps' | 'downloading' | 'completed' | 'error' | 'python-missing' | 'backend-error'>('starting')
+
+// Progreso real desde el backend
+const realProgress = computed(() => {
+  const progress = systemStore.downloadProgress
+  if (!progress || Object.keys(progress).length === 0) return null
+
+  // Combinar progreso de todos los modelos activos
+  const models = Object.values(progress)
+  if (models.length === 0) return null
+
+  const totalBytes = models.reduce((sum, m) => sum + (m.bytes_total || 0), 0)
+  const downloadedBytes = models.reduce((sum, m) => sum + (m.bytes_downloaded || 0), 0)
+  const avgSpeed = models.reduce((sum, m) => sum + (m.speed_bps || 0), 0) / models.length
+
+  // Encontrar el modelo activo (no completado)
+  const activeModel = models.find(m => m.phase !== 'completed' && m.phase !== 'error')
+
+  return {
+    percent: totalBytes > 0 ? (downloadedBytes / totalBytes) * 100 : 0,
+    bytesDownloaded: downloadedBytes,
+    bytesTotal: totalBytes,
+    speedMbps: avgSpeed / (1024 * 1024),
+    phase: activeModel?.phase || 'downloading',
+    modelType: activeModel?.model_type || null,
+    hasRealProgress: downloadedBytes > 0 && totalBytes > 0,
+  }
+})
+
+// Progreso mostrado (real si está disponible, sino indeterminado)
+const displayProgress = computed(() => {
+  if (realProgress.value?.hasRealProgress) {
+    return Math.round(realProgress.value.percent)
+  }
+  return null // null = indeterminado
+})
+
+// Texto del modelo actual basado en progreso real
+const currentModel = computed(() => {
+  if (!realProgress.value) return 'Iniciando descarga...'
+
+  const phase = realProgress.value.phase
+  const modelType = realProgress.value.modelType
+
+  if (phase === 'connecting') return 'Conectando con el servidor...'
+  if (phase === 'installing') {
+    return modelType === 'spacy'
+      ? 'Instalando spaCy...'
+      : 'Instalando modelo de embeddings...'
+  }
+  if (phase === 'downloading') {
+    return modelType === 'spacy'
+      ? 'Descargando spaCy (modelo de lenguaje)...'
+      : 'Descargando Embeddings (análisis semántico)...'
+  }
+  return 'Procesando...'
+})
+
+// Info de velocidad y tamaño
+const downloadInfo = computed(() => {
+  if (!realProgress.value?.hasRealProgress) return null
+
+  const { bytesDownloaded, bytesTotal, speedMbps } = realProgress.value
+
+  const formatBytes = (bytes: number) => {
+    if (bytes >= 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`
+    if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(0)} MB`
+    if (bytes >= 1024) return `${(bytes / 1024).toFixed(0)} KB`
+    return `${bytes} B`
+  }
+
+  return {
+    downloaded: formatBytes(bytesDownloaded),
+    total: formatBytes(bytesTotal),
+    speed: speedMbps > 0 ? `${speedMbps.toFixed(1)} MB/s` : null,
+  }
+})
 
 // Fase de inicio: esperar a que el backend esté listo, luego verificar modelos
 onMounted(async () => {
@@ -60,71 +134,21 @@ onMounted(async () => {
 watch(() => systemStore.modelsReady, (ready) => {
   if (ready && visible.value) {
     downloadPhase.value = 'completed'
-    downloadProgress.value = 100
     setTimeout(() => {
       visible.value = false
     }, 2000)
   }
 })
 
-// Simulate realistic progress while downloading
-let progressInterval: ReturnType<typeof setInterval> | null = null
-
-function startProgressSimulation(phase: 'deps' | 'models' = 'models') {
-  downloadProgress.value = 0
-
-  progressInterval = setInterval(() => {
-    if (downloadProgress.value < 95) {
-      const increment = Math.random() * 2 + 0.5
-      downloadProgress.value = Math.min(95, downloadProgress.value + increment)
-
-      if (phase === 'deps') {
-        if (downloadProgress.value < 30) {
-          currentModel.value = 'Instalando numpy...'
-        } else if (downloadProgress.value < 60) {
-          currentModel.value = 'Instalando spaCy...'
-        } else {
-          currentModel.value = 'Instalando sentence-transformers...'
-        }
-      } else {
-        if (downloadProgress.value < 50) {
-          currentModel.value = 'spaCy (modelo de lenguaje)'
-        } else {
-          currentModel.value = 'Embeddings (análisis semántico)'
-        }
-      }
-    }
-  }, 500)
-}
-
-function stopProgressSimulation() {
-  if (progressInterval) {
-    clearInterval(progressInterval)
-    progressInterval = null
-  }
-}
-
-watch(() => systemStore.modelsDownloading, (downloading) => {
-  if (downloading) {
-    startProgressSimulation()
-  } else {
-    stopProgressSimulation()
-    if (systemStore.modelsReady) {
-      downloadProgress.value = 100
-    }
-  }
-})
-
 watch(() => systemStore.modelsError, (error) => {
   if (error) {
     downloadPhase.value = 'error'
-    stopProgressSimulation()
   }
 })
 
-// Limpiar timers al desmontar para evitar memory leaks
+// Limpiar al desmontar
 onBeforeUnmount(() => {
-  stopProgressSimulation()
+  systemStore.stopPolling()
 })
 
 const missingModels = computed(() => {
@@ -139,7 +163,12 @@ const missingModels = computed(() => {
     }))
 })
 
+// Usar tamaños reales del backend si están disponibles
 const totalDownloadSize = computed(() => {
+  const sizes = systemStore.modelSizes
+  if (sizes && sizes.total > 0) {
+    return Math.round(sizes.total / (1024 * 1024)) // Convertir a MB
+  }
   return missingModels.value.reduce((sum, m) => sum + m.sizeMb, 0)
 })
 
@@ -148,17 +177,13 @@ async function startAutomaticDownload() {
 }
 
 async function startDependenciesInstallation() {
-  downloadProgress.value = 0
-  currentModel.value = 'Instalando dependencias de Python...'
-  startProgressSimulation('deps')
   await systemStore.installDependencies()
 }
 
 // Watch for dependencies installation
 watch(() => systemStore.dependenciesInstalling, (installing) => {
   if (!installing && downloadPhase.value === 'installing-deps') {
-    // Dependencies installed, stop dep progress and check if backend is ready
-    stopProgressSimulation()
+    // Dependencies installed, check if backend is ready
     setTimeout(async () => {
       await systemStore.checkModelsStatus()
       if (!systemStore.dependenciesNeeded && systemStore.backendLoaded) {
@@ -209,6 +234,20 @@ async function retryStartup() {
     downloadPhase.value = 'downloading'
     startAutomaticDownload()
   }
+}
+
+// Helpers para estado de modelos individuales
+function isModelCompleted(modelName: string): boolean {
+  const progress = systemStore.downloadProgress
+  const modelType = modelName === 'es_core_news_lg' ? 'spacy' : 'embeddings'
+  return progress[modelType]?.phase === 'completed'
+}
+
+function isModelDownloading(modelName: string): boolean {
+  const progress = systemStore.downloadProgress
+  const modelType = modelName === 'es_core_news_lg' ? 'spacy' : 'embeddings'
+  const phase = progress[modelType]?.phase
+  return phase === 'downloading' || phase === 'connecting' || phase === 'installing'
 }
 
 async function recheckPython() {
@@ -289,12 +328,12 @@ async function recheckPython() {
 
           <div class="progress-section">
             <div class="progress-info">
-              <span class="current-model">{{ currentModel || 'Instalando numpy, spaCy, transformers...' }}</span>
-              <span class="progress-percent">{{ Math.round(downloadProgress) }}%</span>
+              <span class="current-model">Instalando numpy, spaCy, transformers...</span>
+              <span class="progress-phase">En progreso</span>
             </div>
+            <!-- Barra indeterminada para dependencias (no tenemos progreso real) -->
             <ProgressBar
-              :value="downloadProgress"
-              :show-value="false"
+              mode="indeterminate"
               class="progress-bar"
             />
           </div>
@@ -310,7 +349,7 @@ async function recheckPython() {
       <template v-else-if="downloadPhase === 'downloading'">
         <div class="download-progress" role="status" aria-live="polite">
           <div class="download-header">
-            <i class="pi pi-download download-icon"></i>
+            <i class="pi pi-download download-icon" :class="{ 'pi-spin': !realProgress?.hasRealProgress }"></i>
             <div>
               <h3>Completando instalación</h3>
               <p class="subtitle">Descargando modelos de análisis de texto</p>
@@ -319,19 +358,34 @@ async function recheckPython() {
 
           <div class="progress-section">
             <div class="progress-info">
-              <span class="current-model">{{ currentModel || 'Iniciando descarga...' }}</span>
-              <span class="progress-percent">{{ Math.round(downloadProgress) }}%</span>
+              <span class="current-model">{{ currentModel }}</span>
+              <span v-if="displayProgress !== null" class="progress-percent">{{ displayProgress }}%</span>
+              <span v-else class="progress-phase">Descargando...</span>
             </div>
+
+            <!-- Barra de progreso: determinada si hay progreso real, indeterminada si no -->
             <ProgressBar
-              :value="downloadProgress"
+              v-if="displayProgress !== null"
+              :value="displayProgress"
               :show-value="false"
               class="progress-bar"
             />
+            <ProgressBar
+              v-else
+              mode="indeterminate"
+              class="progress-bar"
+            />
+
+            <!-- Info de velocidad y bytes (solo si hay progreso real) -->
+            <div v-if="downloadInfo" class="download-stats">
+              <span class="download-bytes">{{ downloadInfo.downloaded }} / {{ downloadInfo.total }}</span>
+              <span v-if="downloadInfo.speed" class="download-speed">{{ downloadInfo.speed }}</span>
+            </div>
           </div>
 
           <div class="models-list">
             <div v-for="model in missingModels" :key="model.name" class="model-item">
-              <i class="pi" :class="downloadProgress > (model.name === 'spacy' ? 50 : 100) ? 'pi-check-circle text-green' : 'pi-circle'"></i>
+              <i class="pi" :class="isModelCompleted(model.name) ? 'pi-check-circle text-green' : (isModelDownloading(model.name) ? 'pi-spin pi-spinner text-blue' : 'pi-circle')"></i>
               <span class="model-name">{{ model.displayName }}</span>
               <span class="model-size">~{{ model.sizeMb }} MB</span>
             </div>
@@ -339,7 +393,7 @@ async function recheckPython() {
 
           <p class="download-note">
             <i class="pi pi-info-circle"></i>
-            Esta descarga solo se realiza una vez. Tamano total: ~{{ totalDownloadSize }} MB
+            Esta descarga solo se realiza una vez. Tamaño total: ~{{ totalDownloadSize }} MB
           </p>
         </div>
       </template>
@@ -481,6 +535,32 @@ async function recheckPython() {
 .progress-percent {
   color: var(--p-primary-color);
   font-weight: 600;
+}
+
+.progress-phase {
+  color: var(--p-text-muted-color);
+  font-style: italic;
+}
+
+.download-stats {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--p-text-muted-color);
+}
+
+.download-bytes {
+  font-family: monospace;
+}
+
+.download-speed {
+  color: var(--p-primary-color);
+  font-weight: 500;
+}
+
+.text-blue {
+  color: var(--p-primary-color) !important;
 }
 
 .progress-bar {

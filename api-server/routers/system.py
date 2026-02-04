@@ -233,7 +233,7 @@ async def models_status():
                 logger.warning(f"✗ {dep} NOT found")
 
         all_deps_installed = all(deps_status.values())
-        
+
         # EN MODO FROZEN: No auto-cargar módulos, requiere reinicio
         # (evita problemas de import con PyInstaller + numpy)
         needs_restart = False
@@ -263,7 +263,7 @@ async def models_status():
                     "python_error": python_error,
                 }
             )
-    
+
     try:
         from narrative_assistant.core.model_manager import get_model_manager
 
@@ -350,7 +350,7 @@ async def install_dependencies():
             # Usar el path de Python ya verificado
             python_exe = python_info["python_path"]
             logger.info(f"Starting dependencies installation using: {python_exe} (version {python_info['python_version']})")
-            
+
             # Lista de dependencias necesarias
             # sentence-transformers ya trae torch, transformers y scikit-learn como dependencias
             # No instalar paquetes redundantes - reduce el tiempo de instalación significativamente
@@ -359,7 +359,7 @@ async def install_dependencies():
                 "spacy>=3.7.0",
                 "sentence-transformers>=2.2.0",
             ]
-            
+
             # Configurar subprocess para no mostrar ventana en Windows
             creation_flags = 0
             if sys.platform == 'win32':
@@ -388,7 +388,7 @@ async def install_dependencies():
                     logger.error(f"Failed to install {dep}: {result.stderr}")
                     raise Exception(f"Failed to install {dep}: {result.stderr}")
                 logger.info(f"✓ {dep} installed")
-            
+
             logger.info("All dependencies installed successfully!")
 
             # Ensure target dir is in sys.path for imports
@@ -409,17 +409,17 @@ async def install_dependencies():
                 logger.error("Failed to load modules after installation")
                 logger.info("You may need to restart the application.")
                 raise Exception("Failed to load narrative_assistant modules after installation")
-            
+
         except Exception as e:
             logger.error(f"Error installing dependencies: {e}", exc_info=True)
             deps.INSTALLING_DEPENDENCIES = False
             deps.MODULES_ERROR = str(e)
-    
+
     # Ejecutar en segundo plano
     import threading
     thread = threading.Thread(target=install_task, daemon=True)
     thread.start()
-    
+
     return ApiResponse(
         success=True,
         message="Dependencies installation started. This may take several minutes. Check /api/models/status for progress.",
@@ -447,7 +447,7 @@ async def download_models(request: DownloadModelsRequest):
             status_code=400,
             detail="Dependencies not installed. Please install dependencies first via /api/dependencies/install"
         )
-    
+
     try:
         from narrative_assistant.core.model_manager import get_model_manager, ModelType
         import threading
@@ -483,6 +483,77 @@ async def download_models(request: DownloadModelsRequest):
         )
     except Exception as e:
         logger.error(f"Error starting model download: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/api/models/download/progress")
+async def download_progress():
+    """
+    Obtiene el progreso de las descargas de modelos activas.
+
+    Retorna información detallada sobre cada descarga en curso:
+    - Fase actual (connecting, downloading, installing, completed, error)
+    - Bytes descargados y total
+    - Porcentaje de progreso
+    - Velocidad de descarga en MB/s
+    - Tiempo estimado restante
+
+    Returns:
+        ApiResponse con estado de progreso de cada modelo
+    """
+    if not deps.MODULES_LOADED:
+        return ApiResponse(
+            success=True,
+            data={
+                "active_downloads": {},
+                "has_active": False,
+            }
+        )
+
+    try:
+        from narrative_assistant.core.model_manager import (
+            get_download_progress,
+            get_real_model_sizes,
+            KNOWN_MODELS,
+        )
+
+        progress = get_download_progress()
+        has_active = any(
+            p.get("phase") not in ("completed", "error", None)
+            for p in progress.values()
+        ) if progress else False
+
+        # Obtener tamaños reales de modelos
+        try:
+            real_sizes = get_real_model_sizes()
+        except Exception:
+            real_sizes = {
+                "spacy": KNOWN_MODELS.get("spacy", {}).get("size_mb", 560) * 1024 * 1024,
+                "embeddings": KNOWN_MODELS.get("embeddings", {}).get("size_mb", 470) * 1024 * 1024,
+            }
+
+        return ApiResponse(
+            success=True,
+            data={
+                "active_downloads": progress or {},
+                "has_active": has_active,
+                "model_sizes": {
+                    "spacy": real_sizes.get("spacy", 0),
+                    "embeddings": real_sizes.get("embeddings", 0),
+                    "total": sum(real_sizes.values()),
+                },
+            }
+        )
+    except ImportError:
+        return ApiResponse(
+            success=True,
+            data={
+                "active_downloads": {},
+                "has_active": False,
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error getting download progress: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -1180,5 +1251,3 @@ async def change_data_location(request: ChangeDataLocationRequest):
     except Exception as e:
         logger.error(f"Error changing data location: {e}", exc_info=True)
         return ApiResponse(success=False, error=str(e))
-
-

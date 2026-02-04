@@ -21,6 +21,19 @@ export interface LTInstallProgress {
 
 export type LTState = 'not_installed' | 'installing' | 'installed_not_running' | 'running'
 
+// Download progress info for real-time updates
+export interface DownloadProgressInfo {
+  model_type: string
+  phase: string
+  bytes_downloaded: number
+  bytes_total: number
+  percent: number
+  speed_bps: number
+  speed_mbps: number
+  eta_seconds: number | null
+  error: string | null
+}
+
 export interface ModelsStatus {
   nlp_models: Record<string, ModelStatus>
   ollama: {
@@ -101,6 +114,14 @@ export const useSystemStore = defineStore('system', () => {
   const modelsLoading = ref(false)
   const modelsDownloading = ref(false)
   const modelsError = ref<string | null>(null)
+
+  // Download progress (real-time)
+  const downloadProgress = ref<Record<string, DownloadProgressInfo>>({})
+  const modelSizes = ref<{ spacy: number; embeddings: number; total: number }>({
+    spacy: 560 * 1024 * 1024,
+    embeddings: 470 * 1024 * 1024,
+    total: 1030 * 1024 * 1024,
+  })
 
   // System capabilities (cached - loaded once at startup)
   const systemCapabilities = ref<SystemCapabilities | null>(null)
@@ -223,23 +244,48 @@ export const useSystemStore = defineStore('system', () => {
     return false
   }
 
-  // Poll models status while downloading
+  // Poll models status and download progress while downloading
   let pollInterval: number | null = null
+  let progressPollInterval: number | null = null
+
+  async function checkDownloadProgress(): Promise<void> {
+    try {
+      const response = await api.tryGet<{
+        active_downloads: Record<string, DownloadProgressInfo>
+        has_active: boolean
+        model_sizes: { spacy: number; embeddings: number; total: number }
+      }>('/api/models/download/progress')
+
+      if (response) {
+        downloadProgress.value = response.active_downloads || {}
+        if (response.model_sizes) {
+          modelSizes.value = response.model_sizes
+        }
+      }
+    } catch {
+      // Ignore errors in progress polling
+    }
+  }
 
   function pollModelsStatus() {
     if (pollInterval) return
 
+    // Poll status every 3 seconds
     pollInterval = window.setInterval(async () => {
       const status = await checkModelsStatus()
       if (status?.all_required_installed) {
         // All models ready, stop polling
-        if (pollInterval) {
-          clearInterval(pollInterval)
-          pollInterval = null
-        }
+        stopPolling()
         modelsDownloading.value = false
       }
-    }, 3000) // Check every 3 seconds
+    }, 3000)
+
+    // Poll progress every 500ms for smooth updates
+    if (!progressPollInterval) {
+      progressPollInterval = window.setInterval(async () => {
+        await checkDownloadProgress()
+      }, 500)
+    }
   }
 
   function stopPolling() {
@@ -247,6 +293,11 @@ export const useSystemStore = defineStore('system', () => {
       clearInterval(pollInterval)
       pollInterval = null
     }
+    if (progressPollInterval) {
+      clearInterval(progressPollInterval)
+      progressPollInterval = null
+    }
+    downloadProgress.value = {}
   }
 
   // No auto-check en creación del store.
@@ -425,6 +476,10 @@ export const useSystemStore = defineStore('system', () => {
     modelsError,
     systemCapabilities,
     capabilitiesLoading,
+
+    // Download progress (real-time)
+    downloadProgress,
+    modelSizes,
 
     // LanguageTool state
     ltInstalling,

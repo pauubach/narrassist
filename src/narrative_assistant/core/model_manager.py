@@ -62,12 +62,13 @@ class ModelInfo:
 # Definición de modelos conocidos con sus hashes
 # NOTA: Los hashes pueden variar entre versiones. Si falla verificación,
 # actualizar o establecer a None para omitir verificación.
+# Los tamaños son estimados iniciales; se obtienen dinámicamente cuando es posible.
 KNOWN_MODELS: dict[ModelType, ModelInfo] = {
     ModelType.SPACY: ModelInfo(
         model_type=ModelType.SPACY,
         name="es_core_news_lg",
         display_name="spaCy Español (es_core_news_lg)",
-        size_mb=500,
+        size_mb=560,  # Tamaño real aproximado del modelo
         # El hash se calcula sobre el archivo meta.json del modelo
         sha256=None,  # spaCy no provee hashes oficiales
         source_url="https://github.com/explosion/spacy-models",
@@ -77,13 +78,60 @@ KNOWN_MODELS: dict[ModelType, ModelInfo] = {
         model_type=ModelType.EMBEDDINGS,
         name="paraphrase-multilingual-MiniLM-L12-v2",
         display_name="Sentence Transformers Multilingüe",
-        size_mb=500,
+        size_mb=470,  # Tamaño real del modelo en HuggingFace
         # Hash del archivo config.json del modelo (identificador estable)
         sha256=None,  # Se verificará estructura en lugar de hash
         source_url="https://huggingface.co/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
         subdirectory="embeddings",
     ),
 }
+
+
+@dataclass
+class DownloadProgress:
+    """Estado de progreso de una descarga."""
+
+    model_type: ModelType
+    phase: str  # "connecting", "downloading", "installing", "completed", "error"
+    bytes_downloaded: int = 0
+    bytes_total: int = 0
+    speed_bps: float = 0.0  # bytes per second
+    error_message: str | None = None
+    started_at: float = 0.0  # timestamp
+
+    @property
+    def percent(self) -> float:
+        """Porcentaje de progreso (0-100)."""
+        if self.bytes_total <= 0:
+            return 0.0
+        return min(100.0, (self.bytes_downloaded / self.bytes_total) * 100)
+
+    @property
+    def eta_seconds(self) -> float | None:
+        """Tiempo estimado restante en segundos."""
+        if self.speed_bps <= 0 or self.bytes_total <= 0:
+            return None
+        remaining = self.bytes_total - self.bytes_downloaded
+        return remaining / self.speed_bps if remaining > 0 else 0.0
+
+    def to_dict(self) -> dict:
+        """Convierte a diccionario para API."""
+        return {
+            "model_type": self.model_type.value,
+            "phase": self.phase,
+            "bytes_downloaded": self.bytes_downloaded,
+            "bytes_total": self.bytes_total,
+            "percent": round(self.percent, 1),
+            "speed_bps": round(self.speed_bps, 0),
+            "speed_mbps": round(self.speed_bps / (1024 * 1024), 2) if self.speed_bps > 0 else 0,
+            "eta_seconds": round(self.eta_seconds, 0) if self.eta_seconds else None,
+            "error": self.error_message,
+        }
+
+
+# Estado global de descargas activas (thread-safe via locks)
+_download_progress: dict[ModelType, DownloadProgress] = {}
+_progress_lock = threading.Lock()
 
 
 @dataclass
@@ -389,12 +437,36 @@ class ModelManager:
             import spacy
             from spacy.cli import download
 
+            estimated_size = model_info.size_mb * 1024 * 1024
+
+            # Actualizar progreso global: conectando
+            _update_download_progress(
+                model_info.model_type,
+                phase="connecting",
+                bytes_total=estimated_size,
+            )
+
             if progress_callback:
                 progress_callback(f"Descargando {model_info.display_name}...", 0.1)
+
+            # Actualizar progreso global: descargando
+            _update_download_progress(
+                model_info.model_type,
+                phase="downloading",
+                bytes_total=estimated_size,
+            )
 
             # Descargar modelo usando spaCy CLI
             logger.info(f"Ejecutando spacy download {model_info.name}")
             download(model_info.name)
+
+            # Actualizar progreso global: instalando
+            _update_download_progress(
+                model_info.model_type,
+                phase="installing",
+                bytes_downloaded=int(estimated_size * 0.8),
+                bytes_total=estimated_size,
+            )
 
             if progress_callback:
                 progress_callback("Copiando modelo a cache local...", 0.7)
@@ -407,6 +479,14 @@ class ModelManager:
             logger.info(f"Copiando de {source_path} a {target_dir}")
             shutil.copytree(source_path, target_dir)
 
+            # Actualizar progreso global: completado
+            _update_download_progress(
+                model_info.model_type,
+                phase="completed",
+                bytes_downloaded=estimated_size,
+                bytes_total=estimated_size,
+            )
+
             if progress_callback:
                 progress_callback("Modelo instalado correctamente", 1.0)
 
@@ -414,6 +494,11 @@ class ModelManager:
             return Result.success(target_dir)
 
         except Exception as e:
+            _update_download_progress(
+                model_info.model_type,
+                phase="error",
+                error_message=str(e),
+            )
             return Result.failure(
                 ModelDownloadError(
                     model_name=model_info.name,
@@ -440,21 +525,73 @@ class ModelManager:
             os.environ["HF_HUB_OFFLINE"] = "0"
             os.environ["TRANSFORMERS_OFFLINE"] = "0"
 
+            # Intentar obtener tamaño real desde HuggingFace
+            estimated_size = model_info.size_mb * 1024 * 1024
+            real_size = get_model_size_from_huggingface(
+                f"sentence-transformers/{model_info.name}"
+            )
+            if real_size:
+                estimated_size = real_size
+
             try:
                 from sentence_transformers import SentenceTransformer
+
+                # Actualizar progreso global: conectando
+                _update_download_progress(
+                    model_info.model_type,
+                    phase="connecting",
+                    bytes_total=estimated_size,
+                )
 
                 if progress_callback:
                     progress_callback(f"Descargando {model_info.display_name}...", 0.1)
 
-                # Descargar modelo
+                # Actualizar progreso global: descargando
+                _update_download_progress(
+                    model_info.model_type,
+                    phase="downloading",
+                    bytes_total=estimated_size,
+                )
+
+                # Descargar modelo con monitoreo de directorio
                 logger.info(f"Descargando modelo: {model_info.name}")
-                model = SentenceTransformer(model_info.name)
+
+                # Iniciar monitoreo del cache de HuggingFace en background
+                monitor_stop = threading.Event()
+                monitor_thread = threading.Thread(
+                    target=self._monitor_hf_download,
+                    args=(model_info.name, estimated_size, monitor_stop),
+                    daemon=True,
+                )
+                monitor_thread.start()
+
+                try:
+                    model = SentenceTransformer(model_info.name)
+                finally:
+                    monitor_stop.set()
+                    monitor_thread.join(timeout=1.0)
+
+                # Actualizar progreso global: instalando
+                _update_download_progress(
+                    model_info.model_type,
+                    phase="installing",
+                    bytes_downloaded=int(estimated_size * 0.9),
+                    bytes_total=estimated_size,
+                )
 
                 if progress_callback:
                     progress_callback("Guardando modelo en cache local...", 0.8)
 
                 # Guardar en directorio local
                 model.save(str(target_dir))
+
+                # Actualizar progreso global: completado
+                _update_download_progress(
+                    model_info.model_type,
+                    phase="completed",
+                    bytes_downloaded=estimated_size,
+                    bytes_total=estimated_size,
+                )
 
                 if progress_callback:
                     progress_callback("Modelo instalado correctamente", 1.0)
@@ -475,12 +612,74 @@ class ModelManager:
                     os.environ.pop("TRANSFORMERS_OFFLINE", None)
 
         except Exception as e:
+            _update_download_progress(
+                model_info.model_type,
+                phase="error",
+                error_message=str(e),
+            )
             return Result.failure(
                 ModelDownloadError(
                     model_name=model_info.name,
                     reason=f"Error en descarga embeddings: {e}",
                 )
             )
+
+    def _monitor_hf_download(
+        self,
+        model_name: str,
+        total_size: int,
+        stop_event: threading.Event,
+    ) -> None:
+        """
+        Monitorea el progreso de descarga de HuggingFace en el cache.
+
+        Este método se ejecuta en un thread separado y actualiza el progreso
+        basándose en el tamaño de los archivos descargados.
+        """
+        import time
+
+        # Encontrar directorio de cache de HuggingFace
+        hf_cache = Path.home() / ".cache" / "huggingface" / "hub"
+        if not hf_cache.exists():
+            hf_cache = Path.home() / ".cache" / "torch" / "sentence_transformers"
+
+        last_size = 0
+        last_time = time.time()
+
+        while not stop_event.is_set():
+            try:
+                # Calcular tamaño actual del cache
+                current_size = 0
+                for cache_dir in [hf_cache, Path.home() / ".cache" / "torch"]:
+                    if cache_dir.exists():
+                        for f in cache_dir.rglob("*"):
+                            if f.is_file() and model_name.replace("/", "--") in str(f):
+                                current_size += f.stat().st_size
+
+                # Calcular velocidad
+                current_time = time.time()
+                elapsed = current_time - last_time
+                if elapsed > 0:
+                    speed = (current_size - last_size) / elapsed
+                else:
+                    speed = 0
+
+                # Actualizar progreso
+                _update_download_progress(
+                    ModelType.EMBEDDINGS,
+                    phase="downloading",
+                    bytes_downloaded=min(current_size, total_size),
+                    bytes_total=total_size,
+                    speed_bps=max(0, speed),
+                )
+
+                last_size = current_size
+                last_time = current_time
+
+            except Exception:
+                pass  # Ignorar errores de monitoreo
+
+            stop_event.wait(0.5)  # Actualizar cada 500ms
 
     def _verify_model_structure(self, model_type: ModelType, model_path: Path) -> bool:
         """
@@ -592,6 +791,111 @@ class ModelManager:
             # Eliminar todos
             for mt in ModelType:
                 self.clear_cache(mt)
+
+
+def get_download_progress(model_type: ModelType | None = None) -> dict[str, dict] | dict | None:
+    """
+    Obtiene el estado de progreso de descargas activas.
+
+    Args:
+        model_type: Tipo de modelo específico, o None para todos
+
+    Returns:
+        Estado de progreso como diccionario
+    """
+    with _progress_lock:
+        if model_type:
+            progress = _download_progress.get(model_type)
+            return progress.to_dict() if progress else None
+        return {mt.value: p.to_dict() for mt, p in _download_progress.items()}
+
+
+def _update_download_progress(
+    model_type: ModelType,
+    phase: str,
+    bytes_downloaded: int = 0,
+    bytes_total: int = 0,
+    speed_bps: float = 0.0,
+    error_message: str | None = None,
+) -> None:
+    """Actualiza el estado de progreso de una descarga."""
+    import time
+
+    with _progress_lock:
+        if model_type not in _download_progress:
+            _download_progress[model_type] = DownloadProgress(
+                model_type=model_type,
+                phase=phase,
+                started_at=time.time(),
+            )
+
+        progress = _download_progress[model_type]
+        # Crear nueva instancia con valores actualizados
+        _download_progress[model_type] = DownloadProgress(
+            model_type=model_type,
+            phase=phase,
+            bytes_downloaded=bytes_downloaded,
+            bytes_total=bytes_total,
+            speed_bps=speed_bps,
+            error_message=error_message,
+            started_at=progress.started_at,
+        )
+
+
+def _clear_download_progress(model_type: ModelType) -> None:
+    """Limpia el estado de progreso de una descarga completada."""
+    with _progress_lock:
+        _download_progress.pop(model_type, None)
+
+
+def get_model_size_from_huggingface(model_name: str) -> int | None:
+    """
+    Obtiene el tamaño real de un modelo desde HuggingFace Hub.
+
+    Args:
+        model_name: Nombre del modelo en HuggingFace
+
+    Returns:
+        Tamaño en bytes, o None si no se puede obtener
+    """
+    try:
+        from huggingface_hub import model_info
+
+        info = model_info(model_name)
+        if info.siblings:
+            total_size = sum(f.size for f in info.siblings if f.size)
+            if total_size > 0:
+                logger.debug(f"Tamaño de {model_name} desde HuggingFace: {total_size} bytes")
+                return total_size
+    except Exception as e:
+        logger.debug(f"No se pudo obtener tamaño de {model_name}: {e}")
+    return None
+
+
+def get_real_model_sizes() -> dict[str, int]:
+    """
+    Obtiene tamaños reales de los modelos, consultando HuggingFace cuando es posible.
+
+    Returns:
+        Dict con tamaños en bytes por tipo de modelo
+    """
+    sizes = {}
+
+    # Embeddings: consultar HuggingFace
+    embeddings_info = KNOWN_MODELS[ModelType.EMBEDDINGS]
+    hf_size = get_model_size_from_huggingface(
+        f"sentence-transformers/{embeddings_info.name}"
+    )
+    if hf_size:
+        sizes["embeddings"] = hf_size
+    else:
+        sizes["embeddings"] = embeddings_info.size_mb * 1024 * 1024
+
+    # spaCy: usar tamaño estimado (no hay API pública fácil)
+    spacy_info = KNOWN_MODELS[ModelType.SPACY]
+    sizes["spacy"] = spacy_info.size_mb * 1024 * 1024
+
+    return sizes
 
 
 def get_model_manager() -> ModelManager:
