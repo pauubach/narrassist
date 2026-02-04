@@ -48,6 +48,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
+from typing import Any
 
 from ..core.errors import ErrorSeverity, NarrativeError, PhaseError, PhasePreconditionError
 from ..core.memory_monitor import MemoryMonitor
@@ -350,7 +351,7 @@ class AnalysisContext:
     document_path: str = ""
     full_text: str = ""
     fingerprint: str = ""
-    raw_document: any | None = None  # RawDocument parseado
+    raw_document: Any | None = None  # RawDocument parseado
     document_type: str = "unknown"  # Tipo de documento detectado
     document_classification: dict = field(default_factory=dict)  # Clasificación completa
 
