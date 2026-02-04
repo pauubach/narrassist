@@ -1,0 +1,234 @@
+[project]
+name = "narrative-assistant"
+version = "0.4.40"
+description = "Asistente de Corrección Narrativa - Herramienta offline de análisis narrativo para correctores profesionales"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [
+    { name = "Pau Ubach" }
+]
+requires-python = ">=3.11"
+keywords = ["nlp", "narrative", "editing", "proofreading", "spacy"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Text Processing :: Linguistic",
+]
+
+dependencies = [
+    # Core NLP
+    "spacy>=3.7.0,<4.0.0",
+    # coreferee incompatible con spacy>=3.7 - hacer opcional con fallback
+    "sentence-transformers>=2.2.0,<3.0.0",
+
+    # Document parsing (MVP)
+    "python-docx>=1.1.0",
+    "chardet>=5.0.0",
+
+    # Database
+    "sqlite-utils>=3.35",
+
+    # CLI
+    "rich>=13.0.0",
+    "typer>=0.9.0",
+
+    # Utilities
+    "numpy>=1.24.0",
+    "psutil>=5.9.0",  # Monitoreo de recursos del sistema
+]
+
+[project.optional-dependencies]
+# GPU CUDA (Linux/Windows con NVIDIA)
+cuda = [
+    "cupy-cuda12x>=12.0.0",
+]
+
+# GPU Apple Silicon (macOS)
+apple = [
+    "thinc-apple-ops>=1.0.0",
+]
+
+# PDF support (reading)
+pdf = [
+    "pdfplumber>=0.10.0",
+    "pypdf>=4.0.0",
+]
+
+# PDF export (writing)
+pdf-export = [
+    "reportlab>=4.0.0",
+]
+
+# EPUB/ODT support
+ebook = [
+    "ebooklib>=0.18",
+    "odfpy>=1.4.0",
+]
+
+# Coreference (experimental - incompatible con spacy>=3.7)
+coref = [
+    "coreferee>=1.1.0,<1.5.0",
+]
+
+# Spelling checkers (sistema de votación multi-corrector)
+spelling = [
+    "pyspellchecker>=0.8.0",    # Pure Python, diccionario español incluido
+    "chunspell>=2.0.4",         # Hunspell precompilado para Windows/Linux/macOS
+    "symspellpy>=6.7.0",        # Algoritmo SymSpell de alta velocidad
+]
+
+# Development
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "pytest-mock>=3.10",
+    "ruff>=0.1.0",
+    "mypy>=1.0",
+    "pre-commit>=3.0",
+    "factory-boy>=3.2",
+    "syrupy>=4.0",
+]
+
+# Build (for creating installers)
+build = [
+    "pyinstaller>=6.0.0",
+]
+
+# Full installation (all optional except GPU)
+full = [
+    "narrative-assistant[pdf,pdf-export,ebook,spelling,dev]",
+]
+
+[project.scripts]
+narrative-assistant = "narrative_assistant.cli:main"
+na = "narrative_assistant.cli:main"
+
+[project.urls]
+Repository = "https://github.com/paubach/tfm"
+
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# =============================================================================
+# Ruff (Linting & Formatting)
+# =============================================================================
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "UP",   # pyupgrade
+    "N",    # pep8-naming
+    "C4",   # flake8-comprehensions
+    "SIM",  # flake8-simplify
+]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "E402",   # module level import not at top (intentional lazy imports)
+    "E741",   # ambiguous variable name (single letter ok in comprehensions)
+    "N818",   # exception name should end in Error
+    "SIM108", # ternary operator (readability preference)
+    "SIM102", # nested if (readability preference)
+    "SIM103", # return condition directly (readability preference)
+    "SIM105", # contextlib.suppress (explicit try/except preferred)
+    "SIM110", # any() instead of for loop (readability preference)
+    "SIM113", # enumerate suggestion (not always clearer)
+    "SIM114", # combine if branches (readability preference)
+    "SIM116", # dict instead of if statements (readability preference)
+    "UP042",  # str enum inheritance (intentional for serialization)
+    "UP045",  # Optional vs X | None (gradual migration)
+    "UP035",  # collections.abc imports (gradual migration)
+    "UP024",  # aliased errors (backward compatibility)
+    "UP041",  # aliased errors (backward compatibility)
+    "B007",   # unused loop variable (intentional in some cases)
+    "B904",   # raise from (not always needed)
+    "C414",   # unnecessary list in sorted (readability)
+    "C420",   # dict comprehension (readability)
+    "C401",   # unnecessary generator (readability)
+    "N803",   # argument name should be lowercase (math conventions: X, y)
+    "N806",   # variable in function should be lowercase (math conventions)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401", "I001"]  # Re-exports in __init__.py
+"**/tests/**" = ["F401", "F841", "F601", "F811", "E712", "N801", "SIM115", "SIM118", "B905"]  # Relaxed rules for tests
+# Files with conditional imports for availability checking
+"**/nlp/*.py" = ["F401"]
+"**/analysis/*.py" = ["F401"]
+"**/temporal/*.py" = ["F401"]
+"**/exporters/*.py" = ["F401"]  # reportlab, etc.
+"**/corrections/**/*.py" = ["F401"]
+"**/feature_profile/*.py" = ["F401"]
+"**/parsers/*.py" = ["F401"]  # optional parsers
+"**/llm/*.py" = ["F401"]  # optional LLM backends
+"**/pipelines/*.py" = ["F401", "F821"]  # type hints as strings
+"**/voice/*.py" = ["F401"]
+"**/cli.py" = ["F401", "F841"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["narrative_assistant"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+# =============================================================================
+# MyPy (Type Checking)
+# =============================================================================
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+exclude = ["tests", "docs"]
+
+# =============================================================================
+# Pytest
+# =============================================================================
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
+markers = [
+    "slow: marks tests as slow (NLP integration)",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
+# =============================================================================
+# Coverage
+# =============================================================================
+[tool.coverage.run]
+source = ["src/narrative_assistant"]
+branch = true
+omit = [
+    "*/tests/*",
+    "*/__pycache__/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+]

@@ -1,0 +1,3796 @@
+/**
+ * Overrides específicos para componentes de PrimeVue
+ * Este archivo se carga DESPUÉS del tema de PrimeVue para asegurar que los estilos tengan prioridad
+ *
+ * Nota: PrimeVue 4 usa clases diferentes. Incluimos selectores para ambas versiones.
+ */
+
+/* ============================================================================
+   DROPDOWN COMPONENT - Mejor padding y UX
+   ============================================================================ */
+
+/* Items del dropdown - PrimeVue 3 y 4 */
+.p-dropdown .p-dropdown-item,
+.p-dropdown-item,
+.p-select-option,
+.p-listbox-option {
+  padding: 0.75rem 1.25rem !important;
+  min-height: 2.5rem !important;
+  line-height: 1.5 !important;
+  font-size: 0.9375rem !important;
+  margin: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* Container de items - PrimeVue 3 y 4 */
+.p-dropdown-panel .p-dropdown-items,
+.p-dropdown-items,
+.p-select-list,
+.p-listbox-list {
+  padding: 0.5rem 0 !important;
+}
+
+/* Dropdown panel overlay */
+.p-dropdown-panel,
+.p-select-overlay {
+  border-radius: 6px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* ============================================================================
+   MENU COMPONENT - Mejor padding para menús contextuales
+   ============================================================================ */
+
+/* Items del menú contextual - PrimeVue 3 y 4 */
+.p-menu .p-menuitem-link,
+.p-menu .p-menuitem-content,
+.p-contextmenu .p-menuitem-link,
+.p-contextmenu .p-menuitem-content,
+.p-tieredmenu .p-menuitem-link,
+.p-tieredmenu .p-menuitem-content {
+  padding: 0.75rem 1.25rem !important;
+  gap: 0.75rem !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* Iconos del menú */
+.p-menu .p-menuitem-icon,
+.p-contextmenu .p-menuitem-icon,
+.p-tieredmenu .p-menuitem-icon {
+  font-size: 1rem !important;
+  width: 1.25rem !important;
+  margin-right: 0.5rem !important;
+  flex-shrink: 0 !important;
+}
+
+/* Texto del menú */
+.p-menu .p-menuitem-text,
+.p-contextmenu .p-menuitem-text,
+.p-tieredmenu .p-menuitem-text {
+  font-size: 0.9375rem !important;
+  flex: 1 !important;
+}
+
+/* Items del menú - sin márgenes */
+.p-menu .p-menuitem,
+.p-contextmenu .p-menuitem,
+.p-tieredmenu .p-menuitem {
+  margin: 0 !important;
+}
+
+/* Menú overlay - tamaño mínimo */
+.p-menu.p-menu-overlay,
+.p-contextmenu,
+.p-tieredmenu {
+  min-width: 180px !important;
+  border-radius: 6px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Separadores de menú */
+.p-menu .p-menu-separator,
+.p-contextmenu .p-menu-separator {
+  margin: 0.25rem 0 !important;
+  border-top: 1px solid var(--surface-border) !important;
+}
+
+/* ============================================================================
+   TAG COMPONENT - Padding consistente en toda la aplicación
+   ============================================================================ */
+
+/* Tags/Badges con padding adecuado y centrado vertical correcto - PrimeVue 3 y 4 */
+.p-tag {
+  padding: 0.25em 0.65em !important;
+  font-size: 0.8125rem !important;
+  font-weight: 500 !important;
+  border-radius: 4px !important;
+  line-height: 1 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.35rem !important;
+  vertical-align: middle !important;
+  height: auto !important;
+  box-sizing: border-box !important;
+}
+
+/* Tags pequeños (cuando se usa severity o rounded) */
+.p-tag.p-tag-sm,
+.p-tag[data-pc-section="root"].p-tag-sm {
+  padding: 0.2em 0.5em !important;
+  font-size: 0.75rem !important;
+  line-height: 1 !important;
+}
+
+/* Tags grandes */
+.p-tag.p-tag-lg {
+  padding: 0.35em 0.85em !important;
+  font-size: 0.9375rem !important;
+  line-height: 1 !important;
+}
+
+/* Iconos dentro de tags */
+.p-tag .p-tag-icon,
+.p-tag i,
+.p-tag .pi {
+  font-size: 0.75rem !important;
+  margin-right: 0.25rem !important;
+}
+
+/* Tags redondeados (pills) */
+.p-tag.p-tag-rounded {
+  border-radius: 1rem !important;
+  padding: 0.25em 0.75em !important;
+}
+
+/* Colores de severidad con mejor contraste */
+.p-tag.p-tag-success {
+  background: var(--green-500) !important;
+  color: white !important;
+}
+
+.p-tag.p-tag-info {
+  background: var(--blue-500) !important;
+  color: white !important;
+}
+
+.p-tag.p-tag-warning {
+  background: var(--yellow-500) !important;
+  color: var(--gray-900) !important;
+}
+
+.p-tag.p-tag-danger {
+  background: var(--red-500) !important;
+  color: white !important;
+}
+
+/* Dark mode: Tags con mejor contraste y visibilidad */
+.dark .p-tag.p-tag-info,
+html.dark .p-tag.p-tag-info {
+  background: var(--blue-400) !important;
+  color: var(--blue-950, #172554) !important;
+  font-weight: 600 !important;
+}
+
+.dark .p-tag.p-tag-success,
+html.dark .p-tag.p-tag-success {
+  background: var(--green-400) !important;
+  color: var(--green-950, #052e16) !important;
+  font-weight: 600 !important;
+}
+
+.dark .p-tag.p-tag-warning,
+html.dark .p-tag.p-tag-warning {
+  background: var(--yellow-400) !important;
+  color: var(--yellow-950, #422006) !important;
+  font-weight: 600 !important;
+}
+
+.dark .p-tag.p-tag-danger,
+html.dark .p-tag.p-tag-danger {
+  background: var(--red-400) !important;
+  color: var(--red-950, #450a0a) !important;
+  font-weight: 600 !important;
+}
+
+/* Tags secundarios (outline style) */
+.p-tag.p-tag-secondary {
+  background: var(--surface-100) !important;
+  color: var(--text-color-secondary) !important;
+  border: 1px solid var(--surface-border) !important;
+}
+
+/* ============================================================================
+   BADGE COMPONENT - Padding consistente para badges
+   ============================================================================ */
+
+/* Badges con padding adecuado y centrado vertical correcto */
+.p-badge {
+  padding: 0.25em 0.5em !important;
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  border-radius: 4px !important;
+  line-height: 1.2 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  vertical-align: middle !important;
+  height: auto !important;
+  min-height: 1.25rem !important;
+  box-sizing: border-box !important;
+}
+
+/* Badges grandes */
+.p-badge.p-badge-lg,
+.p-badge-lg {
+  padding: 0.35em 0.65em !important;
+  font-size: 0.875rem !important;
+}
+
+/* Badges extra grandes */
+.p-badge.p-badge-xl,
+.p-badge-xl {
+  padding: 0.4em 0.75em !important;
+  font-size: 1rem !important;
+}
+
+/* Colores de badges */
+.p-badge.p-badge-info,
+.p-badge-info {
+  background: var(--blue-500) !important;
+  color: white !important;
+}
+
+.p-badge.p-badge-success,
+.p-badge-success {
+  background: var(--green-500) !important;
+  color: white !important;
+}
+
+.p-badge.p-badge-warning,
+.p-badge-warning {
+  background: var(--yellow-500) !important;
+  color: var(--gray-900) !important;
+}
+
+.p-badge.p-badge-danger,
+.p-badge-danger {
+  background: var(--red-500) !important;
+  color: white !important;
+}
+
+.p-badge.p-badge-secondary,
+.p-badge-secondary {
+  background: var(--surface-200) !important;
+  color: var(--text-color) !important;
+}
+
+/* ============================================================================
+   MULTISELECT COMPONENT - Panel, checkboxes y tokens
+   ============================================================================ */
+
+/* Panel del MultiSelect - se renderiza en el body via Teleport */
+.p-multiselect-panel {
+  border-radius: 6px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  overflow: hidden !important;
+}
+
+/* Items wrapper - asegurar redondeo en esquinas inferiores */
+.p-multiselect-items-wrapper {
+  border-radius: 0 0 6px 6px !important;
+}
+
+/* Lista de items - padding vertical */
+.p-multiselect-items {
+  padding: 0.5rem 0 !important;
+}
+
+/* Cada item del dropdown */
+.p-multiselect-item {
+  padding: 0.5rem 0.75rem !important;
+  gap: 0.75rem !important;
+}
+
+/* Checkbox dentro de cada item - anadir margen izquierdo */
+.p-multiselect-item > .p-checkbox {
+  margin-left: 0.25rem !important;
+  margin-right: 0.5rem !important;
+  flex-shrink: 0 !important;
+}
+
+/* ============================================================================
+   MULTISELECT CHIP MODE - Tokens que NO se cortan y centrados verticalmente
+   ============================================================================ */
+
+/* Contenedor principal del multiselect en modo chip - altura minima adecuada */
+.p-multiselect.p-multiselect-chip {
+  min-height: 2.75rem !important;
+  display: flex !important;
+  align-items: stretch !important;
+}
+
+/* Contenedor de label - flex para centrado vertical correcto */
+.p-multiselect.p-multiselect-chip .p-multiselect-label-container {
+  display: flex !important;
+  align-items: center !important;
+  flex: 1 !important;
+  overflow: visible !important;
+}
+
+/* Label en modo chip - flex para wrap correcto de tokens, centrado vertical */
+.p-multiselect.p-multiselect-chip .p-multiselect-label {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  align-content: center !important;
+  gap: 0.375rem !important;
+  padding: 0.375rem 0.5rem !important;
+  min-height: unset !important;
+  height: auto !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  line-height: 1.4 !important;
+}
+
+/* Tokens/chips de valores seleccionados - padding visible, sin recorte, centrado vertical */
+.p-multiselect.p-multiselect-chip .p-multiselect-token {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0.3rem 0.625rem !important;
+  margin: 0.125rem 0 !important;
+  border-radius: 1rem !important;
+  font-size: 0.8125rem !important;
+  line-height: 1.2 !important;
+  height: auto !important;
+  min-height: 1.625rem !important;
+  max-height: none !important;
+  overflow: visible !important;
+  flex-shrink: 0 !important;
+  background: var(--surface-200, #e5e7eb) !important;
+  color: var(--text-color, #4b5563) !important;
+  box-sizing: border-box !important;
+  vertical-align: middle !important;
+}
+
+/* Label del token - texto visible completo y centrado */
+.p-multiselect.p-multiselect-chip .p-multiselect-token-label {
+  line-height: 1.2 !important;
+  white-space: nowrap !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+}
+
+/* Icono de eliminar token - separacion y tamano adecuados */
+.p-multiselect.p-multiselect-chip .p-multiselect-token-icon {
+  margin-left: 0.375rem !important;
+  font-size: 0.75rem !important;
+  cursor: pointer !important;
+  flex-shrink: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Fallback para modo comma (no chip) - mantener estilos originales */
+.p-multiselect:not(.p-multiselect-chip) .p-multiselect-label {
+  min-height: 2.5rem !important;
+  padding: 0.75rem !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+/* Header del MultiSelect (cuando tiene filtro o toggle all) */
+.p-multiselect-header {
+  padding: 0.75rem !important;
+  border-bottom: 1px solid var(--surface-border) !important;
+}
+
+/* Checkbox del header (select all) */
+.p-multiselect-header > .p-checkbox {
+  margin-left: 0.25rem !important;
+  margin-right: 0.5rem !important;
+}
+
+/* ============================================================================
+   MULTISELECT OPTIONS - Badges de velocidad con padding y centrado correcto
+   ============================================================================ */
+
+/* Tags/Badges dentro del panel del MultiSelect (badges de velocidad, etc) */
+.p-multiselect-panel .p-tag,
+.p-multiselect-panel .p-badge {
+  padding: 0.25em 0.5em !important;
+  font-size: 0.7rem !important;
+  font-weight: 600 !important;
+  line-height: 1.2 !important;
+  margin-left: 0.25rem !important;
+  vertical-align: middle !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: auto !important;
+  min-height: 1.125rem !important;
+}
+
+/* Contenedor de badges en opciones - centrado vertical */
+.p-multiselect-item .method-badges,
+.p-multiselect-panel .method-badges {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 0.25rem !important;
+}
+
+/* ============================================================================
+   TOAST / MESSAGE COMPONENT - Notificaciones flotantes con padding correcto
+   ============================================================================ */
+
+/* Toast container - padding y estructura */
+.p-toast-message,
+.p-toast .p-toast-message {
+  padding: 1rem 1.25rem !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  margin-bottom: 0.75rem !important;
+}
+
+/* Toast message content - flexbox para alineación correcta */
+.p-toast-message-content,
+.p-toast .p-toast-message-content {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 0.875rem !important;
+  padding: 0 !important;
+}
+
+/* Toast icon - alineación vertical centrada con primera línea de texto */
+.p-toast-message-icon,
+.p-toast .p-toast-message-icon {
+  font-size: 1.25rem !important;
+  flex-shrink: 0 !important;
+  margin-top: 0.125rem !important;
+  width: 1.5rem !important;
+  height: 1.5rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Toast text container - flex column para summary y detail */
+.p-toast-message-text,
+.p-toast .p-toast-message-text {
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0.25rem !important;
+  min-width: 0 !important;
+}
+
+/* Toast summary (título) */
+.p-toast-summary,
+.p-toast .p-toast-summary {
+  font-weight: 600 !important;
+  font-size: 0.9375rem !important;
+  line-height: 1.4 !important;
+  margin: 0 !important;
+}
+
+/* Toast detail (descripción) */
+.p-toast-detail,
+.p-toast .p-toast-detail {
+  font-size: 0.875rem !important;
+  line-height: 1.5 !important;
+  margin: 0 !important;
+  color: inherit !important;
+  opacity: 0.9 !important;
+}
+
+/* Toast close button - posición y tamaño */
+.p-toast-icon-close,
+.p-toast .p-toast-icon-close {
+  width: 1.75rem !important;
+  height: 1.75rem !important;
+  border-radius: 50% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  margin-left: 0.5rem !important;
+  opacity: 0.7 !important;
+  transition: opacity 0.2s ease !important;
+}
+
+.p-toast-icon-close:hover {
+  opacity: 1 !important;
+}
+
+/* ============================================================================
+   MESSAGE COMPONENT - Mensajes inline con padding correcto
+   ============================================================================ */
+
+/* Message container */
+.p-message,
+.p-inline-message {
+  padding: 1rem 1.25rem !important;
+  border-radius: 8px !important;
+  margin: 0.5rem 0 !important;
+}
+
+/* Message content - flexbox para alineación */
+.p-message-wrapper,
+.p-message .p-message-wrapper,
+.p-inline-message-text {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 0.875rem !important;
+  padding: 0 !important;
+}
+
+/* Message icon */
+.p-message-icon,
+.p-message .p-message-icon,
+.p-inline-message-icon {
+  font-size: 1.25rem !important;
+  flex-shrink: 0 !important;
+  margin-top: 0.125rem !important;
+  width: 1.5rem !important;
+  height: 1.5rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Message text */
+.p-message-text,
+.p-message .p-message-text {
+  flex: 1 !important;
+  line-height: 1.5 !important;
+  font-size: 0.9375rem !important;
+}
+
+/* Message close button */
+.p-message-close,
+.p-message .p-message-close {
+  width: 1.75rem !important;
+  height: 1.75rem !important;
+  border-radius: 50% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  margin-left: 0.5rem !important;
+}
+
+/* ============================================================================
+   SEVERITY COLORS - Colores consistentes para toast y message
+   ============================================================================ */
+
+/* Info severity */
+.p-toast-message-info,
+.p-message-info {
+  background: var(--blue-50, #eff6ff) !important;
+  border: 1px solid var(--blue-200, #bfdbfe) !important;
+  color: var(--blue-700, #1d4ed8) !important;
+}
+
+.p-toast-message-info .p-toast-message-icon,
+.p-message-info .p-message-icon {
+  color: var(--blue-500, #3b82f6) !important;
+}
+
+/* Success severity */
+.p-toast-message-success,
+.p-message-success {
+  background: var(--green-50, #f0fdf4) !important;
+  border: 1px solid var(--green-200, #bbf7d0) !important;
+  color: var(--green-700, #15803d) !important;
+}
+
+.p-toast-message-success .p-toast-message-icon,
+.p-message-success .p-message-icon {
+  color: var(--green-500, #22c55e) !important;
+}
+
+/* Warning severity */
+.p-toast-message-warn,
+.p-message-warn {
+  background: var(--yellow-50, #fefce8) !important;
+  border: 1px solid var(--yellow-200, #fef08a) !important;
+  color: var(--yellow-700, #a16207) !important;
+}
+
+.p-toast-message-warn .p-toast-message-icon,
+.p-message-warn .p-message-icon {
+  color: var(--yellow-500, #eab308) !important;
+}
+
+/* Error severity */
+.p-toast-message-error,
+.p-message-error {
+  background: var(--red-50, #fef2f2) !important;
+  border: 1px solid var(--red-200, #fecaca) !important;
+  color: var(--red-700, #b91c1c) !important;
+}
+
+.p-toast-message-error .p-toast-message-icon,
+.p-message-error .p-message-icon {
+  color: var(--red-500, #ef4444) !important;
+}
+
+/* ============================================================================
+   GENERAL COMPONENT FIXES
+   ============================================================================ */
+
+/* Asegurar que los componentes respetan el box-sizing */
+.p-component,
+.p-component *,
+.p-component *::before,
+.p-component *::after {
+  box-sizing: border-box;
+}
+
+/* ============================================================================
+   UI COMPACTNESS / DENSITY - Ajuste de espaciado por densidad de interfaz
+   Se añaden clases ui-compact, ui-normal, ui-comfortable al html element
+   ============================================================================ */
+
+/* Variable de escala base (se establece desde theme.ts) */
+:root {
+  --app-spacing-scale: 1;
+}
+
+/* ---- COMPACT MODE ---- */
+html.ui-compact .p-button {
+  padding: 0.4rem 0.65rem !important;
+  font-size: 0.8125rem !important;
+}
+
+html.ui-compact .p-inputtext,
+html.ui-compact .p-textarea,
+html.ui-compact .p-dropdown,
+html.ui-compact .p-select,
+html.ui-compact .p-multiselect {
+  padding: 0.4rem 0.65rem !important;
+  font-size: 0.8125rem !important;
+  min-height: 2rem !important;
+}
+
+html.ui-compact .p-card .p-card-body,
+html.ui-compact .p-panel .p-panel-content {
+  padding: 0.625rem !important;
+}
+
+html.ui-compact .p-card .p-card-header,
+html.ui-compact .p-panel .p-panel-header {
+  padding: 0.5rem 0.625rem !important;
+}
+
+html.ui-compact .p-datatable .p-datatable-tbody > tr > td,
+html.ui-compact .p-datatable .p-datatable-thead > tr > th {
+  padding: 0.375rem 0.5rem !important;
+}
+
+html.ui-compact .p-tabview .p-tabview-nav li .p-tabview-nav-link,
+html.ui-compact .p-tabview-nav-link {
+  padding: 0.5rem 0.75rem !important;
+}
+
+html.ui-compact .p-tree .p-treenode-content {
+  padding: 0.25rem !important;
+}
+
+html.ui-compact .p-menu .p-menuitem-link,
+html.ui-compact .p-menu .p-menuitem-content {
+  padding: 0.5rem 0.75rem !important;
+}
+
+/* ---- COMFORTABLE MODE ---- */
+html.ui-comfortable .p-button {
+  padding: 0.75rem 1.25rem !important;
+  font-size: 1rem !important;
+}
+
+html.ui-comfortable .p-inputtext,
+html.ui-comfortable .p-textarea,
+html.ui-comfortable .p-dropdown,
+html.ui-comfortable .p-select,
+html.ui-comfortable .p-multiselect {
+  padding: 0.75rem 1rem !important;
+  font-size: 1rem !important;
+  min-height: 3rem !important;
+}
+
+html.ui-comfortable .p-card .p-card-body,
+html.ui-comfortable .p-panel .p-panel-content {
+  padding: 1.5rem !important;
+}
+
+html.ui-comfortable .p-card .p-card-header,
+html.ui-comfortable .p-panel .p-panel-header {
+  padding: 1rem 1.5rem !important;
+}
+
+html.ui-comfortable .p-datatable .p-datatable-tbody > tr > td,
+html.ui-comfortable .p-datatable .p-datatable-thead > tr > th {
+  padding: 1rem 1.25rem !important;
+}
+
+html.ui-comfortable .p-tabview .p-tabview-nav li .p-tabview-nav-link,
+html.ui-comfortable .p-tabview-nav-link {
+  padding: 1rem 1.5rem !important;
+}
+
+html.ui-comfortable .p-tree .p-treenode-content {
+  padding: 0.625rem !important;
+}
+
+html.ui-comfortable .p-menu .p-menuitem-link,
+html.ui-comfortable .p-menu .p-menuitem-content {
+  padding: 1rem 1.5rem !important;
+}
+
+/* Gaps universales que respetan la escala */
+.p-card,
+.p-panel,
+.p-fieldset,
+.p-accordion {
+  --p-content-padding: calc(1rem * var(--app-spacing-scale, 1));
+}
+
+/* ============================================================================
+   STANDARDIZED FORM CONTROL HEIGHTS - Altura consistente en toda la aplicación
+   ============================================================================ */
+
+/* Altura base para controles de formulario */
+:root {
+  --form-control-height: 2.25rem;
+  --form-control-height-sm: 1.875rem;
+  --form-control-height-lg: 2.75rem;
+}
+
+/* InputText estándar */
+.p-inputtext {
+  height: var(--form-control-height) !important;
+  padding: 0.5rem 0.75rem !important;
+  font-size: 0.875rem !important;
+  box-sizing: border-box !important;
+}
+
+/* Dropdown / Select estándar */
+.p-dropdown,
+.p-select {
+  height: var(--form-control-height) !important;
+  box-sizing: border-box !important;
+}
+
+.p-dropdown .p-dropdown-label,
+.p-select .p-select-label {
+  padding: 0.5rem 0.75rem !important;
+  font-size: 0.875rem !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+.p-dropdown .p-dropdown-trigger,
+.p-select .p-select-dropdown {
+  width: 2rem !important;
+}
+
+/* Button estándar (mismo alto que inputs) */
+.p-button:not(.p-button-icon-only):not(.p-button-rounded) {
+  height: var(--form-control-height) !important;
+  padding: 0 1rem !important;
+  font-size: 0.875rem !important;
+  box-sizing: border-box !important;
+}
+
+/* Icon-only buttons - cuadrados */
+.p-button.p-button-icon-only {
+  width: var(--form-control-height) !important;
+  height: var(--form-control-height) !important;
+  padding: 0 !important;
+}
+
+/* Small variants */
+.p-inputtext.p-inputtext-sm,
+.p-dropdown.p-dropdown-sm,
+.p-select.p-select-sm,
+.p-button.p-button-sm:not(.p-button-icon-only) {
+  height: var(--form-control-height-sm) !important;
+  font-size: 0.8125rem !important;
+}
+
+.p-button.p-button-sm.p-button-icon-only {
+  width: var(--form-control-height-sm) !important;
+  height: var(--form-control-height-sm) !important;
+}
+
+/* Large variants */
+.p-inputtext.p-inputtext-lg,
+.p-dropdown.p-dropdown-lg,
+.p-select.p-select-lg,
+.p-button.p-button-lg:not(.p-button-icon-only) {
+  height: var(--form-control-height-lg) !important;
+  font-size: 1rem !important;
+}
+
+.p-button.p-button-lg.p-button-icon-only {
+  width: var(--form-control-height-lg) !important;
+  height: var(--form-control-height-lg) !important;
+}
+
+/* Asegurar alineación vertical en contenedores flex */
+.p-inputgroup,
+.p-inputgroup > * {
+  height: var(--form-control-height) !important;
+}
+
+/* Chips/Textarea mantienen altura automática */
+.p-textarea,
+.p-chips {
+  height: auto !important;
+  min-height: var(--form-control-height) !important;
+}
+
+/* MultiSelect estándar - misma altura que otros controles */
+.p-multiselect:not(.p-multiselect-chip) {
+  height: var(--form-control-height) !important;
+  box-sizing: border-box !important;
+}
+
+.p-multiselect:not(.p-multiselect-chip) .p-multiselect-label {
+  padding: 0.5rem 0.75rem !important;
+  font-size: 0.875rem !important;
+  display: flex !important;
+  align-items: center !important;
+  min-height: unset !important;
+}
+
+.p-multiselect .p-multiselect-trigger {
+  width: 2rem !important;
+}
+
+/* ============================================================================
+   DARK MODE ENHANCEMENTS - Mejoras de legibilidad para modo oscuro
+   ============================================================================ */
+
+/* --- Fondos que eran 'white' hardcodeado → usar variables --- */
+.dark .entity-list,
+.dark .entity-item,
+.dark .chapter-tree,
+.dark .character-sheet,
+.dark .document-viewer,
+.dark .entity-inspector,
+.dark .merge-dialog-content,
+.dark .timeline-view,
+.dark .alerts-view,
+html.dark .entity-list,
+html.dark .entity-item,
+html.dark .chapter-tree,
+html.dark .character-sheet,
+html.dark .document-viewer,
+html.dark .entity-inspector,
+html.dark .merge-dialog-content,
+html.dark .timeline-view,
+html.dark .alerts-view {
+  background: var(--p-surface-800, #1e293b) !important;
+  color: var(--p-text-color, #f1f5f9) !important;
+}
+
+/* Cards y paneles en dark mode */
+.dark .p-card,
+.dark .p-panel,
+.dark .p-dialog,
+html.dark .p-card,
+html.dark .p-panel,
+html.dark .p-dialog {
+  background: var(--p-surface-800, #1e293b) !important;
+}
+
+.dark .p-card .p-card-body,
+.dark .p-panel .p-panel-content,
+html.dark .p-card .p-card-body,
+html.dark .p-panel .p-panel-content {
+  background: var(--p-surface-800, #1e293b) !important;
+}
+
+/* --- Texto secundario con mejor contraste --- */
+.dark .text-secondary,
+.dark .text-muted,
+.dark [class*="text-color-secondary"],
+html.dark .text-secondary,
+html.dark .text-muted,
+html.dark [class*="text-color-secondary"] {
+  color: var(--p-surface-400, #94a3b8) !important;
+}
+
+/* Texto en elementos de lista y menús */
+.dark .p-menuitem-text,
+.dark .p-listbox-item,
+.dark .p-dropdown-item,
+.dark .p-tree-node-label,
+html.dark .p-menuitem-text,
+html.dark .p-listbox-item,
+html.dark .p-dropdown-item,
+html.dark .p-tree-node-label {
+  color: var(--p-text-color, #f1f5f9) !important;
+}
+
+/* --- Bordes más visibles en dark mode --- */
+.dark .p-card,
+.dark .p-panel,
+.dark .p-inputtext,
+.dark .p-dropdown,
+.dark .p-multiselect,
+.dark .p-textarea,
+html.dark .p-card,
+html.dark .p-panel,
+html.dark .p-inputtext,
+html.dark .p-dropdown,
+html.dark .p-multiselect,
+html.dark .p-textarea {
+  border-color: var(--p-surface-600, #475569) !important;
+}
+
+/* --- Headers y títulos en dark mode --- */
+.dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6,
+html.dark h1, html.dark h2, html.dark h3, html.dark h4, html.dark h5, html.dark h6 {
+  color: var(--p-text-color, #f8fafc) !important;
+}
+
+/* --- Mensajes y alertas en dark mode con mejor contraste --- */
+.dark .p-message-info,
+.dark .p-toast-message-info,
+html.dark .p-message-info,
+html.dark .p-toast-message-info {
+  background: rgba(59, 130, 246, 0.15) !important;
+  border-color: rgba(59, 130, 246, 0.4) !important;
+  color: #93c5fd !important;
+}
+
+.dark .p-message-success,
+.dark .p-toast-message-success,
+html.dark .p-message-success,
+html.dark .p-toast-message-success {
+  background: rgba(34, 197, 94, 0.15) !important;
+  border-color: rgba(34, 197, 94, 0.4) !important;
+  color: #86efac !important;
+}
+
+.dark .p-message-warn,
+.dark .p-toast-message-warn,
+html.dark .p-message-warn,
+html.dark .p-toast-message-warn {
+  background: rgba(234, 179, 8, 0.15) !important;
+  border-color: rgba(234, 179, 8, 0.4) !important;
+  color: #fde047 !important;
+}
+
+.dark .p-message-error,
+.dark .p-toast-message-error,
+html.dark .p-message-error,
+html.dark .p-toast-message-error {
+  background: rgba(239, 68, 68, 0.15) !important;
+  border-color: rgba(239, 68, 68, 0.4) !important;
+  color: #fca5a5 !important;
+}
+
+/* Iconos de mensaje en dark mode */
+.dark .p-message-icon,
+.dark .p-toast-message-icon,
+html.dark .p-message-icon,
+html.dark .p-toast-message-icon {
+  color: inherit !important;
+}
+
+/* --- Dropdowns y overlays en dark mode --- */
+/* Generic dark mode - uses standard surface variables */
+html.dark .p-dropdown-panel,
+html.dark .p-multiselect-panel,
+html.dark .p-menu,
+html.dark .p-contextmenu,
+html.dark .p-tieredmenu {
+  background: var(--p-surface-0, #1e293b) !important;
+  border-color: var(--p-surface-200, #475569) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+}
+
+html.dark .p-menuitem-text,
+html.dark .p-menuitem-icon {
+  color: var(--p-text-color, #f1f5f9) !important;
+}
+
+html.dark .p-menuitem-content {
+  background: transparent !important;
+  color: var(--p-text-color, #f1f5f9) !important;
+}
+
+html.dark .p-dropdown-item:hover,
+html.dark .p-multiselect-item:hover,
+html.dark .p-menuitem-content:hover {
+  background: var(--p-surface-100, #334155) !important;
+}
+
+/* --- Scrivener dark theme - uses inverted sepia palette --- */
+/* Menu components need explicit dark colors because Scrivener inverts the surface scale */
+html.scrivener-theme.dark .p-menu,
+html.scrivener-theme.dark .p-contextmenu,
+html.scrivener-theme.dark .p-tieredmenu {
+  background-color: #252114 !important;  /* sepia-50 dark */
+  border-color: #504834 !important;       /* sepia-300 dark */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
+}
+
+html.scrivener-theme.dark .p-menuitem-content {
+  background: transparent !important;
+  color: #E8DCC8 !important;              /* sepia-900 dark (light text) */
+}
+
+html.scrivener-theme.dark .p-menuitem-text,
+html.scrivener-theme.dark .p-menuitem-icon {
+  color: #E8DCC8 !important;              /* sepia-900 dark */
+}
+
+html.scrivener-theme.dark .p-menuitem-content:hover {
+  background-color: #3E3626 !important;   /* sepia-200 dark */
+}
+
+/* Menu hover - usando data attributes para mayor especificidad (PrimeVue 4) */
+html.scrivener-theme.dark .p-menu .p-menuitem > .p-menuitem-content:hover,
+html.scrivener-theme.dark .p-contextmenu .p-menuitem > .p-menuitem-content:hover,
+html.scrivener-theme.dark .p-tieredmenu .p-menuitem > .p-menuitem-content:hover,
+html.scrivener-theme.dark [data-pc-name="menu"] [data-pc-section="itemcontent"]:hover,
+html.scrivener-theme.dark [data-pc-name="contextmenu"] [data-pc-section="itemcontent"]:hover,
+html.scrivener-theme.dark [data-pc-name="tieredmenu"] [data-pc-section="itemcontent"]:hover {
+  background-color: #5A4A32 !important;
+  color: #E8DCC8 !important;
+}
+
+/* Estados focus/active en menús */
+html.scrivener-theme.dark .p-menuitem.p-focus > .p-menuitem-content,
+html.scrivener-theme.dark .p-menuitem-content:focus,
+html.scrivener-theme.dark [data-pc-section="itemcontent"]:focus,
+html.scrivener-theme.dark [data-p-focused="true"] > .p-menuitem-content {
+  background-color: #5A4A32 !important;
+  box-shadow: none !important;
+  outline: 2px solid #6E5C40 !important;
+  outline-offset: -2px;
+}
+
+html.scrivener-theme.dark .p-dropdown-panel,
+html.scrivener-theme.dark .p-multiselect-panel {
+  background-color: #252114 !important;
+  border-color: #504834 !important;
+}
+
+html.scrivener-theme.dark .p-dropdown-item,
+html.scrivener-theme.dark .p-multiselect-item {
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .p-dropdown-item:hover,
+html.scrivener-theme.dark .p-multiselect-item:hover {
+  background-color: #3E3626 !important;
+}
+
+/* --- Tabs en dark mode --- */
+.dark .p-tabview-panels,
+.dark .p-tabview-nav,
+html.dark .p-tabview-panels,
+html.dark .p-tabview-nav {
+  background: var(--p-surface-800, #1e293b) !important;
+}
+
+.dark .p-tabview-nav-link,
+html.dark .p-tabview-nav-link {
+  color: var(--p-surface-400, #94a3b8) !important;
+}
+
+.dark .p-tabview-nav-link.p-tabview-nav-link-active,
+.dark .p-tabview-nav-link[aria-selected="true"],
+html.dark .p-tabview-nav-link.p-tabview-nav-link-active,
+html.dark .p-tabview-nav-link[aria-selected="true"] {
+  color: var(--p-primary-color, #60a5fa) !important;
+}
+
+/* --- Inputs en dark mode con texto legible --- */
+.dark .p-inputtext,
+.dark .p-textarea,
+.dark .p-dropdown .p-dropdown-label,
+.dark .p-multiselect .p-multiselect-label,
+html.dark .p-inputtext,
+html.dark .p-textarea,
+html.dark .p-dropdown .p-dropdown-label,
+html.dark .p-multiselect .p-multiselect-label {
+  background: var(--p-surface-900, #0f172a) !important;
+  color: var(--p-text-color, #f1f5f9) !important;
+}
+
+/* Placeholder en dark mode - WCAG AA: mínimo 4.5:1 */
+.dark .p-inputtext::placeholder,
+.dark .p-textarea::placeholder,
+html.dark .p-inputtext::placeholder,
+html.dark .p-textarea::placeholder {
+  color: #94a3b8 !important; /* gray-400: 5.5:1 sobre #0f172a */
+}
+
+/* Placeholder en light mode - garantizar contraste en todos los temas */
+.p-inputtext::placeholder,
+.p-textarea::placeholder {
+  color: #64748b !important; /* gray-500: 4.6:1 sobre blanco */
+}
+
+/* --- Botones secundarios y outlined en dark mode --- */
+.dark .p-button-secondary,
+.dark .p-button-outlined,
+html.dark .p-button-secondary,
+html.dark .p-button-outlined {
+  color: var(--p-text-color, #f1f5f9) !important;
+  border-color: var(--p-surface-500, #64748b) !important;
+}
+
+.dark .p-button-secondary:hover,
+.dark .p-button-outlined:hover,
+html.dark .p-button-secondary:hover,
+html.dark .p-button-outlined:hover {
+  background: var(--p-surface-700, #334155) !important;
+}
+
+/* --- DataTable en dark mode --- */
+.dark .p-datatable,
+.dark .p-datatable-header,
+.dark .p-datatable-thead > tr > th,
+.dark .p-datatable-tbody > tr,
+html.dark .p-datatable,
+html.dark .p-datatable-header,
+html.dark .p-datatable-thead > tr > th,
+html.dark .p-datatable-tbody > tr {
+  background: var(--p-surface-800, #1e293b) !important;
+  color: var(--p-text-color, #f1f5f9) !important;
+}
+
+.dark .p-datatable-tbody > tr:nth-child(even),
+html.dark .p-datatable-tbody > tr:nth-child(even) {
+  background: var(--p-surface-850, #1a2332) !important;
+}
+
+.dark .p-datatable-tbody > tr:hover,
+html.dark .p-datatable-tbody > tr:hover {
+  background: var(--p-surface-700, #334155) !important;
+}
+
+/* --- Dialog en dark mode --- */
+.dark .p-dialog-header,
+.dark .p-dialog-content,
+.dark .p-dialog-footer,
+html.dark .p-dialog-header,
+html.dark .p-dialog-content,
+html.dark .p-dialog-footer {
+  background: var(--p-surface-800, #1e293b) !important;
+  color: var(--p-text-color, #f1f5f9) !important;
+}
+
+.dark .p-dialog-header,
+html.dark .p-dialog-header {
+  border-bottom-color: var(--p-surface-600, #475569) !important;
+}
+
+.dark .p-dialog-footer,
+html.dark .p-dialog-footer {
+  border-top-color: var(--p-surface-600, #475569) !important;
+}
+
+/* --- Chips/Tokens en dark mode --- */
+.dark .p-chip,
+.dark .p-multiselect-token,
+html.dark .p-chip,
+html.dark .p-multiselect-token {
+  background: var(--p-surface-600, #475569) !important;
+  color: var(--p-text-color, #f1f5f9) !important;
+}
+
+/* --- Tree en dark mode --- */
+.dark .p-tree,
+.dark .p-tree-container,
+html.dark .p-tree,
+html.dark .p-tree-container {
+  background: var(--p-surface-800, #1e293b) !important;
+}
+
+.dark .p-treenode-content:hover,
+html.dark .p-treenode-content:hover {
+  background: var(--p-surface-700, #334155) !important;
+}
+
+/* --- Scrollbar en dark mode --- */
+.dark ::-webkit-scrollbar-track,
+html.dark ::-webkit-scrollbar-track {
+  background: var(--p-surface-800, #1e293b) !important;
+}
+
+.dark ::-webkit-scrollbar-thumb,
+html.dark ::-webkit-scrollbar-thumb {
+  background: var(--p-surface-600, #475569) !important;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover,
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: var(--p-surface-500, #64748b) !important;
+}
+
+/* ============================================================================
+   BUTTON TEXT CONTRAST - Garantizar contraste en todos los temas
+   ============================================================================ */
+
+/* Botones text deben tener color con buen contraste */
+.p-button-text {
+  color: var(--p-primary-600, #2563eb) !important;
+}
+
+.p-button-text:hover {
+  background: color-mix(in srgb, var(--p-primary-500, #3b82f6) 12%, transparent) !important;
+  color: var(--p-primary-700, #1d4ed8) !important;
+}
+
+/* Dark mode: botones text más brillantes */
+.dark .p-button-text,
+html.dark .p-button-text {
+  color: var(--p-primary-400, #60a5fa) !important;
+}
+
+.dark .p-button-text:hover,
+html.dark .p-button-text:hover {
+  background: color-mix(in srgb, var(--p-primary-400, #60a5fa) 15%, transparent) !important;
+  color: var(--p-primary-300, #93c5fd) !important;
+}
+
+/* Botones text con severity */
+.p-button-text.p-button-success {
+  color: var(--p-green-700, #15803d) !important;
+}
+
+.p-button-text.p-button-danger {
+  color: var(--p-red-700, #b91c1c) !important;
+}
+
+.p-button-text.p-button-warning {
+  color: var(--p-yellow-700, #a16207) !important;
+}
+
+.p-button-text.p-button-secondary {
+  color: var(--p-text-color, #374151) !important;
+}
+
+/* Dark mode severity buttons */
+.dark .p-button-text.p-button-success,
+html.dark .p-button-text.p-button-success {
+  color: var(--p-green-400, #4ade80) !important;
+}
+
+.dark .p-button-text.p-button-danger,
+html.dark .p-button-text.p-button-danger {
+  color: var(--p-red-400, #f87171) !important;
+}
+
+.dark .p-button-text.p-button-warning,
+html.dark .p-button-text.p-button-warning {
+  color: var(--p-yellow-400, #facc15) !important;
+}
+
+.dark .p-button-text.p-button-secondary,
+html.dark .p-button-text.p-button-secondary {
+  color: var(--p-surface-400, #9ca3af) !important;
+}
+
+/* ============================================================================
+   ICON-ONLY BUTTONS - Garantizar contraste en TODOS los temas
+   ============================================================================ */
+
+/* Botones icon-only (text + rounded) necesitan color oscuro fijo */
+.p-button-text.p-button-rounded:not(.p-button-success):not(.p-button-danger):not(.p-button-warning) {
+  color: #1d4ed8 !important; /* blue-700: 4.6:1 sobre blanco, 4.0:1 sobre sepia */
+}
+
+.p-button-text.p-button-rounded:hover {
+  background: rgba(59, 130, 246, 0.12) !important;
+  color: #1e40af !important; /* blue-800 */
+}
+
+/* Dark mode icon buttons */
+.dark .p-button-text.p-button-rounded:not(.p-button-success):not(.p-button-danger):not(.p-button-warning),
+html.dark .p-button-text.p-button-rounded:not(.p-button-success):not(.p-button-danger):not(.p-button-warning) {
+  color: #93c5fd !important; /* blue-300: 8.5:1 sobre dark bg */
+}
+
+.dark .p-button-text.p-button-rounded:hover,
+html.dark .p-button-text.p-button-rounded:hover {
+  background: rgba(147, 197, 253, 0.15) !important;
+  color: #bfdbfe !important; /* blue-200 */
+}
+
+/* Botones outlined necesitan mejor contraste */
+.p-button-outlined {
+  color: #1d4ed8 !important; /* blue-700 */
+  border-color: #3b82f6 !important; /* blue-500 */
+}
+
+.p-button-outlined:hover {
+  background: rgba(59, 130, 246, 0.08) !important;
+  color: #1e40af !important;
+}
+
+.dark .p-button-outlined,
+html.dark .p-button-outlined {
+  color: #93c5fd !important; /* blue-300 */
+  border-color: #60a5fa !important; /* blue-400 */
+}
+
+.dark .p-button-outlined:hover,
+html.dark .p-button-outlined:hover {
+  background: rgba(147, 197, 253, 0.12) !important;
+  color: #bfdbfe !important;
+}
+
+/* ============================================================================
+   FLOATING ACTION BUTTONS - WCAG compliant in all themes
+   ============================================================================ */
+
+/* Floating action buttons container - consistent background across themes */
+.floating-actions {
+  background: var(--p-surface-0, #ffffff) !important;
+}
+
+.dark .floating-actions,
+html.dark .floating-actions {
+  background: var(--p-surface-800, #1e293b) !important;
+}
+
+/* Force icon buttons in floating actions to have proper contrast */
+.floating-actions .p-button {
+  color: #1e40af !important; /* blue-800: 8.5:1 on white */
+}
+
+.floating-actions .p-button:hover {
+  color: #1d4ed8 !important; /* blue-700 */
+  background: rgba(59, 130, 246, 0.12) !important;
+}
+
+/* Dark mode floating action buttons */
+.dark .floating-actions .p-button,
+html.dark .floating-actions .p-button {
+  color: #93c5fd !important; /* blue-300: 8.5:1 on dark */
+}
+
+.dark .floating-actions .p-button:hover,
+html.dark .floating-actions .p-button:hover {
+  color: #bfdbfe !important; /* blue-200 */
+  background: rgba(147, 197, 253, 0.15) !important;
+}
+
+/* ============================================================================
+   TEXT BUTTONS (general) - More specific selectors for all themes
+   ============================================================================ */
+
+/* Light mode: all themes including Scrivener sepia */
+.p-button.p-button-text:not([class*="-success"]):not([class*="-danger"]):not([class*="-warning"]):not([class*="-secondary"]) {
+  color: #1e40af !important; /* blue-800: 8.5:1 on white, 7.2:1 on sepia */
+}
+
+.p-button.p-button-text:not([class*="-success"]):not([class*="-danger"]):not([class*="-warning"]):not([class*="-secondary"]):hover {
+  color: #1d4ed8 !important;
+  background: rgba(59, 130, 246, 0.1) !important;
+}
+
+/* Dark mode text buttons */
+.dark .p-button.p-button-text:not([class*="-success"]):not([class*="-danger"]):not([class*="-warning"]):not([class*="-secondary"]),
+html.dark .p-button.p-button-text:not([class*="-success"]):not([class*="-danger"]):not([class*="-warning"]):not([class*="-secondary"]) {
+  color: #93c5fd !important; /* blue-300 */
+}
+
+.dark .p-button.p-button-text:not([class*="-success"]):not([class*="-danger"]):not([class*="-warning"]):not([class*="-secondary"]):hover,
+html.dark .p-button.p-button-text:not([class*="-success"]):not([class*="-danger"]):not([class*="-warning"]):not([class*="-secondary"]):hover {
+  color: #bfdbfe !important;
+  background: rgba(147, 197, 253, 0.12) !important;
+}
+
+/* ============================================================================
+   DOCUMENT VIEWER THEME CSS VARIABLES
+   ============================================================================
+   These variables control the document viewer appearance across all themes.
+   Each theme sets its own values; fallbacks use PrimeVue variables.
+   ============================================================================ */
+
+/* --- Default / Standard Themes (Aura, Lara, Material, Nora) - Light Mode --- */
+html:not(.dark):not(.scrivener-theme):not(.grammarly-theme),
+:root:not(.dark):not(.scrivener-theme):not(.grammarly-theme) {
+  --app-document-bg: var(--p-surface-0, #ffffff);
+  --app-document-text: var(--p-text-color, #1f2937);
+  --app-toolbar-bg: var(--p-surface-50, #fafafa);
+  --app-toolbar-border: var(--p-surface-200, #e5e5e5);
+  --app-text-secondary: var(--p-text-muted-color, #6b7280);
+}
+
+/* --- Default / Standard Themes - Dark Mode --- */
+html.dark:not(.scrivener-theme):not(.grammarly-theme) {
+  --app-document-bg: var(--p-surface-0, #0f172a);
+  --app-document-text: var(--p-text-color, #e2e8f0);
+  --app-toolbar-bg: var(--p-surface-50, #1e293b);
+  --app-toolbar-border: var(--p-surface-200, #334155);
+  --app-text-secondary: var(--p-text-muted-color, #94a3b8);
+}
+
+/* ============================================================================
+   GRAMMARLY THEME - Paleta gris neutra
+   ============================================================================
+   Grammarly usa grises neutros profesionales.
+   Light: #FFFFFF → #121212
+   Dark:  #121212 → #FAFAFA
+   ============================================================================ */
+
+/* --- Grammarly Light Mode --- */
+html.grammarly-theme:not(.dark),
+.grammarly-theme:not(.dark) {
+  --app-document-bg: #FFFFFF;
+  --app-document-text: #212121;
+  --app-toolbar-bg: #FAFAFA;
+  --app-toolbar-border: #E0E0E0;
+  --app-text-secondary: #757575;
+}
+
+/* --- Grammarly Dark Mode --- */
+html.grammarly-theme.dark,
+.grammarly-theme.dark {
+  --app-document-bg: #121212;
+  --app-document-text: #E5E5E5;
+  --app-toolbar-bg: #1E1E1E;
+  --app-toolbar-border: #2C2C2C;
+  --app-text-secondary: #A8A8A8;
+}
+
+/* Document viewer específico para Grammarly */
+html.grammarly-theme .document-viewer,
+html.grammarly-theme .viewer-content,
+.grammarly-theme .document-viewer,
+.grammarly-theme .viewer-content {
+  background: var(--app-document-bg) !important;
+  color: var(--app-document-text) !important;
+}
+
+html.grammarly-theme .viewer-toolbar,
+.grammarly-theme .viewer-toolbar {
+  background: var(--app-toolbar-bg) !important;
+  border-color: var(--app-toolbar-border) !important;
+}
+
+html.grammarly-theme .document-content,
+html.grammarly-theme .chapter-text,
+html.grammarly-theme .chapter-text p,
+html.grammarly-theme .chapter-title,
+.grammarly-theme .document-content,
+.grammarly-theme .chapter-text,
+.grammarly-theme .chapter-text p,
+.grammarly-theme .chapter-title {
+  color: var(--app-document-text) !important;
+}
+
+html.grammarly-theme .word-count,
+.grammarly-theme .word-count {
+  color: var(--app-text-secondary) !important;
+}
+
+/* ============================================================================
+   SCRIVENER THEME - Paleta sepia específica
+   ============================================================================
+   Scrivener usa tonos sepia cálidos, NO grises/azules estándar.
+   Light: #FBF7F0 (base) → #1A170F (oscuro)
+   Dark:  #1A170F (base) → #F7F2E8 (claro)
+   ============================================================================ */
+
+/* --- Scrivener Light Mode --- */
+/* Set CSS variables at root level for theme-aware components */
+html.scrivener-theme:not(.dark),
+.scrivener-theme:not(.dark) {
+  --app-document-bg: #FBF7F0;
+  --app-document-text: #322E20;
+  --app-toolbar-bg: #F7F2E8;
+  --app-toolbar-border: #E8DCC8;
+  --app-text-secondary: #6E6248;
+}
+
+/* --- Scrivener Dark Mode --- */
+html.scrivener-theme.dark,
+.scrivener-theme.dark {
+  --app-document-bg: #1A170F;
+  --app-document-text: #E8DCC8;
+  --app-toolbar-bg: #252114;
+  --app-toolbar-border: #3E3626;
+  --app-text-secondary: #A89878;
+}
+
+/* Document viewer específico para Scrivener - force override scoped styles */
+html.scrivener-theme .document-viewer,
+html.scrivener-theme .viewer-content,
+.scrivener-theme .document-viewer,
+.scrivener-theme .viewer-content {
+  background: var(--app-document-bg) !important;
+  color: var(--app-document-text) !important;
+}
+
+html.scrivener-theme .viewer-toolbar,
+.scrivener-theme .viewer-toolbar {
+  background: var(--app-toolbar-bg) !important;
+  border-color: var(--app-toolbar-border) !important;
+}
+
+/* Texto del documento en Scrivener */
+html.scrivener-theme .document-content,
+html.scrivener-theme .chapter-text,
+html.scrivener-theme .chapter-text p,
+html.scrivener-theme .chapter-title,
+.scrivener-theme .document-content,
+.scrivener-theme .chapter-text,
+.scrivener-theme .chapter-text p,
+.scrivener-theme .chapter-title {
+  color: var(--app-document-text) !important;
+}
+
+/* Textos secundarios (word count, etc) en Scrivener */
+html.scrivener-theme .word-count,
+html.scrivener-theme .text-color-secondary,
+.scrivener-theme .word-count,
+.scrivener-theme .text-color-secondary {
+  color: var(--app-text-secondary) !important;
+}
+
+/* Botones del toolbar en Scrivener dark - contraste WCAG AA */
+.scrivener-theme.dark .viewer-toolbar .p-button,
+.scrivener-theme.dark .viewer-toolbar .p-button-text,
+html.scrivener-theme.dark .viewer-toolbar .p-button,
+html.scrivener-theme.dark .viewer-toolbar .p-button-text {
+  color: #D8CAB0 !important; /* sepia-300: 6.5:1 sobre #1A170F */
+}
+
+.scrivener-theme.dark .viewer-toolbar .p-button:hover,
+.scrivener-theme.dark .viewer-toolbar .p-button-text:hover,
+html.scrivener-theme.dark .viewer-toolbar .p-button:hover,
+html.scrivener-theme.dark .viewer-toolbar .p-button-text:hover {
+  color: #E8DCC8 !important; /* sepia-200: más claro */
+  background: rgba(216, 202, 176, 0.12) !important;
+}
+
+/* Botones icon-only en Scrivener dark */
+.scrivener-theme.dark .p-button-text.p-button-rounded,
+html.scrivener-theme.dark .p-button-text.p-button-rounded {
+  color: #C4B494 !important; /* sepia-400: 4.9:1 - WCAG AA */
+}
+
+.scrivener-theme.dark .p-button-text.p-button-rounded:hover,
+html.scrivener-theme.dark .p-button-text.p-button-rounded:hover {
+  color: #D8CAB0 !important;
+  background: rgba(196, 180, 148, 0.15) !important;
+}
+
+/* Floating actions en Scrivener */
+.scrivener-theme .floating-actions {
+  background: var(--app-toolbar-bg, #F7F2E8) !important;
+  border-color: var(--app-toolbar-border, #E8DCC8) !important;
+}
+
+.scrivener-theme.dark .floating-actions,
+html.scrivener-theme.dark .floating-actions {
+  background: #252114 !important; /* sepia-50 dark */
+  border-color: #3E3626 !important;
+}
+
+.scrivener-theme.dark .floating-actions .p-button,
+html.scrivener-theme.dark .floating-actions .p-button {
+  color: #C4B494 !important;
+}
+
+.scrivener-theme.dark .floating-actions .p-button:hover,
+html.scrivener-theme.dark .floating-actions .p-button:hover {
+  color: #D8CAB0 !important;
+  background: rgba(196, 180, 148, 0.15) !important;
+}
+
+/* Grammarly Theme - Additional styles moved to main Grammarly section above */
+
+/* ============================================================================
+   WCAG CONTRAST FIXES - Colores con contraste mínimo 4.5:1
+   ============================================================================ */
+
+/* --- MESSAGE ERROR - El rojo debe ser visible --- */
+.p-message-error,
+.p-message.p-message-error {
+  background: #fef2f2 !important; /* red-50 */
+  border: 1px solid #f87171 !important; /* red-400 */
+  color: #991b1b !important; /* red-800: 7.2:1 contraste */
+}
+
+.p-message-error .p-message-text,
+.p-message.p-message-error .p-message-text {
+  color: #991b1b !important;
+}
+
+.p-message-error .p-message-icon,
+.p-message.p-message-error .p-message-icon {
+  color: #dc2626 !important; /* red-600 */
+}
+
+/* Links dentro de mensajes de error */
+.p-message-error a,
+.p-message-error .p-button-text,
+.p-message.p-message-error a,
+.p-message.p-message-error .p-button-text {
+  color: #b91c1c !important; /* red-700 */
+  font-weight: 600 !important;
+}
+
+.p-message-error .p-button-text:hover,
+.p-message.p-message-error .p-button-text:hover {
+  color: #991b1b !important;
+  background: rgba(220, 38, 38, 0.1) !important;
+}
+
+/* --- BOTONES TEXT/LINK - Colores con contraste WCAG --- */
+/* Cancelar y otros botones text deben ser legibles */
+.p-button-text.p-button-secondary,
+.p-button.p-button-text.p-button-secondary,
+button.p-button-text:not(.p-button-success):not(.p-button-danger):not(.p-button-warning):not(.p-button-info) {
+  color: #374151 !important; /* gray-700: 10:1 contraste sobre blanco */
+}
+
+.p-button-text.p-button-secondary:hover,
+.p-button.p-button-text.p-button-secondary:hover {
+  color: #1f2937 !important; /* gray-800 */
+  background: rgba(55, 65, 81, 0.08) !important;
+}
+
+/* Botón Cancelar específico (dentro de dialogs) */
+.p-dialog-footer .p-button-text,
+.p-dialog .p-button-text:not(.p-button-danger):not(.p-button-success) {
+  color: #4b5563 !important; /* gray-600: 7:1 contraste */
+  font-weight: 500 !important;
+}
+
+.p-dialog-footer .p-button-text:hover,
+.p-dialog .p-button-text:not(.p-button-danger):not(.p-button-success):hover {
+  color: #374151 !important;
+  background: rgba(75, 85, 99, 0.1) !important;
+}
+
+/* Dark mode - botones text secundarios */
+.dark .p-button-text.p-button-secondary,
+.dark .p-dialog-footer .p-button-text,
+html.dark .p-button-text.p-button-secondary,
+html.dark .p-dialog-footer .p-button-text {
+  color: #d1d5db !important; /* gray-300: 10:1 sobre dark bg */
+}
+
+.dark .p-button-text.p-button-secondary:hover,
+.dark .p-dialog-footer .p-button-text:hover,
+html.dark .p-button-text.p-button-secondary:hover,
+html.dark .p-dialog-footer .p-button-text:hover {
+  color: #e5e7eb !important;
+  background: rgba(209, 213, 219, 0.12) !important;
+}
+
+/* --- BOTONES PRIMARY - Asegurar contraste del texto --- */
+.p-button-primary,
+.p-button:not(.p-button-text):not(.p-button-outlined):not(.p-button-secondary) {
+  background: #2563eb !important; /* blue-600 */
+  border-color: #2563eb !important;
+  color: #ffffff !important;
+}
+
+.p-button-primary:hover,
+.p-button:not(.p-button-text):not(.p-button-outlined):not(.p-button-secondary):hover {
+  background: #1d4ed8 !important; /* blue-700 */
+  border-color: #1d4ed8 !important;
+}
+
+/* ============================================================================
+   SCRIVENER THEME - Variables CSS para colores semánticos
+   ============================================================================
+   Usa variables CSS para que los componentes teleportados (Dialog, etc.)
+   hereden correctamente los colores del tema.
+
+   Contraste WCAG AA (mínimo 4.5:1) verificado:
+   - Dark (fondo #1A170F):
+     - --scrivener-text: #E8DCC8 = 9.5:1
+     - --scrivener-text-muted: #C4B494 = 5.2:1
+     - --scrivener-text-button: #D8CAB0 = 6.5:1
+     - --scrivener-error: #fca5a5 = 9.1:1
+   ============================================================================ */
+
+/* Variables globales para Scrivener Dark */
+html.scrivener-theme.dark {
+  /* Colores de texto semánticos */
+  --scrivener-text: #E8DCC8;
+  --scrivener-text-muted: #C4B494;
+  --scrivener-text-button: #D8CAB0;
+  --scrivener-text-button-hover: #E8DCC8;
+  --scrivener-text-button-bg-hover: rgba(216, 202, 176, 0.15);
+  --scrivener-error: #fca5a5;
+  --scrivener-error-icon: #f87171;
+  --scrivener-error-bg: rgba(239, 68, 68, 0.15);
+  --scrivener-border: #504834;
+  --scrivener-primary-text: #93c5fd;
+  --scrivener-primary-text-hover: #bfdbfe;
+  --scrivener-primary-bg-hover: rgba(147, 197, 253, 0.12);
+
+  /* Override de colores de alerta para mejor visibilidad */
+  --ds-alert-critical: #ef4444 !important;
+  --ds-alert-critical-bg: rgba(239, 68, 68, 0.2) !important;
+  --ds-alert-high: #f97316 !important;
+  --ds-alert-high-bg: rgba(249, 115, 22, 0.2) !important;
+  --ds-alert-medium: #eab308 !important;
+  --ds-alert-medium-bg: rgba(234, 179, 8, 0.2) !important;
+  --ds-alert-low: #80CBC4 !important;
+  --ds-alert-low-bg: rgba(77, 182, 172, 0.2) !important;
+  --ds-alert-info: #3b82f6 !important;
+  --ds-alert-info-bg: rgba(59, 130, 246, 0.2) !important;
+
+  /* Override de variables de botones PrimeVue para Scrivener */
+  --p-button-text-primary-color: #C4B494 !important;
+  --p-button-text-primary-hover-color: #E8DCC8 !important;
+  --p-button-text-primary-active-color: #E8DCC8 !important;
+
+  /* FORZAR paleta de superficies oscuras sepia - PrimeVue variables */
+  --p-surface-0: #1A170F !important;
+  --p-surface-50: #252114 !important;
+  --p-surface-100: #302A1C !important;
+  --p-surface-200: #3E3626 !important;
+  --p-surface-300: #504834 !important;
+  --p-surface-400: #6E6248 !important;
+  --p-surface-500: #8C7C5C !important;
+  --p-surface-600: #A89878 !important;
+  --p-surface-700: #C4B494 !important;
+  --p-surface-800: #D8CAB0 !important;
+  --p-surface-900: #E8DCC8 !important;
+  --p-surface-950: #F7F2E8 !important;
+
+  /* Fondos de contenido y cards */
+  --p-content-background: #1A170F !important;
+  --p-content-hover-background: #252114 !important;
+
+  /* Fondo del body */
+  background-color: #1A170F !important;
+}
+
+/* FORZAR fondos oscuros en Scrivener Dark - elementos específicos */
+html.scrivener-theme.dark,
+html.scrivener-theme.dark body {
+  background-color: #1A170F !important;
+}
+
+html.scrivener-theme.dark .p-card,
+html.scrivener-theme.dark .p-dialog,
+html.scrivener-theme.dark .p-dialog-content,
+html.scrivener-theme.dark .p-panel,
+html.scrivener-theme.dark .p-fieldset,
+html.scrivener-theme.dark .p-tabview-panels,
+html.scrivener-theme.dark .p-accordion-content {
+  background-color: #252114 !important;
+}
+
+/* --- Diálogos - Estilos completos --- */
+html.scrivener-theme.dark .p-dialog {
+  border: 1px solid #504834 !important;
+  border-radius: 8px !important;
+  overflow: hidden !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.3) !important;
+}
+
+html.scrivener-theme.dark .p-dialog-header {
+  background-color: #302A1C !important;
+  border-bottom: 1px solid #504834 !important;
+  color: #E8DCC8 !important;
+  border-radius: 8px 8px 0 0 !important;
+}
+
+html.scrivener-theme.dark .p-dialog-header .p-dialog-title {
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .p-dialog-header .p-dialog-header-close {
+  color: #C4B494 !important;
+}
+
+html.scrivener-theme.dark .p-dialog-header .p-dialog-header-close:hover {
+  color: #E8DCC8 !important;
+  background-color: rgba(232, 220, 200, 0.1) !important;
+}
+
+html.scrivener-theme.dark .p-dialog-content {
+  background-color: #252114 !important;
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .p-dialog-footer {
+  background-color: #252114 !important;
+  border-top: 1px solid #504834 !important;
+  border-radius: 0 0 8px 8px !important;
+}
+
+/* Mask/Overlay del diálogo - evitar bordes raros */
+html.scrivener-theme.dark .p-dialog-mask {
+  background-color: rgba(10, 8, 4, 0.7) !important;
+}
+
+/* Botón Cancelar/Text en diálogos - FORZAR visibilidad */
+/* Usar atributo data-p="text" que PrimeVue añade a botones text */
+html.scrivener-theme.dark .p-dialog-footer button[data-p="text"],
+html.scrivener-theme.dark .p-dialog-footer .p-button-text,
+html.scrivener-theme.dark .p-dialog button[data-p="text"],
+html.scrivener-theme.dark .p-dialog .p-button-text,
+html.scrivener-theme.dark button.p-button-text[data-p="text"] {
+  color: #C4B494 !important;
+  background-color: transparent !important;
+}
+
+html.scrivener-theme.dark .p-dialog-footer button[data-p="text"]:hover,
+html.scrivener-theme.dark .p-dialog-footer .p-button-text:hover,
+html.scrivener-theme.dark .p-dialog button[data-p="text"]:hover,
+html.scrivener-theme.dark .p-dialog .p-button-text:hover,
+html.scrivener-theme.dark button.p-button-text[data-p="text"]:hover {
+  color: #E8DCC8 !important;
+  background-color: rgba(196, 180, 148, 0.15) !important;
+}
+
+/* Texto e iconos dentro del botón Text */
+html.scrivener-theme.dark .p-dialog-footer button[data-p="text"] .p-button-label,
+html.scrivener-theme.dark .p-dialog-footer button[data-p="text"] .p-button-icon,
+html.scrivener-theme.dark .p-dialog-footer button[data-p="text"] span,
+html.scrivener-theme.dark .p-dialog-footer button[data-p="text"] i,
+html.scrivener-theme.dark .p-dialog-footer .p-button-text .p-button-label,
+html.scrivener-theme.dark .p-dialog-footer .p-button-text .p-button-icon,
+html.scrivener-theme.dark .p-dialog-footer .p-button-text span,
+html.scrivener-theme.dark .p-dialog-footer .p-button-text i {
+  color: #C4B494 !important;
+}
+
+html.scrivener-theme.dark .p-dialog-footer button[data-p="text"]:hover .p-button-label,
+html.scrivener-theme.dark .p-dialog-footer button[data-p="text"]:hover .p-button-icon,
+html.scrivener-theme.dark .p-dialog-footer button[data-p="text"]:hover span,
+html.scrivener-theme.dark .p-dialog-footer button[data-p="text"]:hover i,
+html.scrivener-theme.dark .p-dialog-footer .p-button-text:hover .p-button-label,
+html.scrivener-theme.dark .p-dialog-footer .p-button-text:hover .p-button-icon,
+html.scrivener-theme.dark .p-dialog-footer .p-button-text:hover span,
+html.scrivener-theme.dark .p-dialog-footer .p-button-text:hover i {
+  color: #E8DCC8 !important;
+}
+
+/* Forzar todos los botones text globalmente en Scrivener dark */
+/* Usar :where() con especificidad 0 para el contexto y alta especificidad para el resto */
+/* Esto permite que !important gane sobre var() */
+html.scrivener-theme.dark .p-button-text:where(.p-button):where(.p-component) {
+  --p-button-text-primary-color: #C4B494;
+  color: #C4B494 !important;
+}
+
+html.scrivener-theme.dark .p-button-text:where(.p-button):where(.p-component):hover {
+  --p-button-text-primary-hover-color: #E8DCC8;
+  color: #E8DCC8 !important;
+  background-color: rgba(196, 180, 148, 0.15) !important;
+}
+
+/* Selectores adicionales con máxima especificidad */
+html.scrivener-theme.dark.scrivener-theme.dark .p-button-text,
+html.scrivener-theme.dark.scrivener-theme.dark button.p-button-text {
+  color: #C4B494 !important;
+}
+
+html.scrivener-theme.dark.scrivener-theme.dark .p-button-text:hover,
+html.scrivener-theme.dark.scrivener-theme.dark button.p-button-text:hover {
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .p-dropdown,
+html.scrivener-theme.dark .p-multiselect,
+html.scrivener-theme.dark .p-inputtext,
+html.scrivener-theme.dark .p-textarea,
+html.scrivener-theme.dark .p-selectbutton .p-button {
+  background-color: #302A1C !important;
+  border-color: #504834 !important;
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .p-selectbutton .p-button.p-highlight {
+  background-color: #504834 !important;
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .p-dropdown-panel,
+html.scrivener-theme.dark .p-multiselect-panel,
+html.scrivener-theme.dark .p-listbox {
+  background-color: #252114 !important;
+  border-color: #504834 !important;
+}
+
+html.scrivener-theme.dark .p-dropdown-item,
+html.scrivener-theme.dark .p-multiselect-item,
+html.scrivener-theme.dark .p-listbox-item {
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .p-dropdown-item:hover,
+html.scrivener-theme.dark .p-multiselect-item:hover,
+html.scrivener-theme.dark .p-listbox-item:hover {
+  background-color: #3E3626 !important;
+}
+
+/* Sidebar de navegación */
+html.scrivener-theme.dark .settings-sidebar,
+html.scrivener-theme.dark nav,
+html.scrivener-theme.dark aside {
+  background-color: #1A170F !important;
+}
+
+html.scrivener-theme.dark .settings-sidebar a,
+html.scrivener-theme.dark .nav-menu a {
+  color: #C4B494 !important;
+}
+
+html.scrivener-theme.dark .settings-sidebar a:hover,
+html.scrivener-theme.dark .nav-menu a:hover,
+html.scrivener-theme.dark .settings-sidebar a.active,
+html.scrivener-theme.dark .nav-menu a.active {
+  color: #E8DCC8 !important;
+  background-color: #302A1C !important;
+}
+
+/* Header y contenido principal */
+html.scrivener-theme.dark .settings-header,
+html.scrivener-theme.dark header {
+  background-color: #1A170F !important;
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .settings-content,
+html.scrivener-theme.dark main,
+html.scrivener-theme.dark .main-content {
+  background-color: #1A170F !important;
+}
+
+/* Secciones de configuración */
+html.scrivener-theme.dark .settings-section,
+html.scrivener-theme.dark .setting-group,
+html.scrivener-theme.dark section {
+  background-color: #252114 !important;
+  border-color: #504834 !important;
+}
+
+/* Labels y textos descriptivos */
+html.scrivener-theme.dark .setting-label,
+html.scrivener-theme.dark .setting-description,
+html.scrivener-theme.dark label {
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .setting-description,
+html.scrivener-theme.dark .text-muted,
+html.scrivener-theme.dark small {
+  color: #C4B494 !important;
+}
+
+/* Variables globales para Scrivener Light */
+html.scrivener-theme:not(.dark) {
+  --scrivener-text: #322E20;
+  --scrivener-text-muted: #6E6248;
+  --scrivener-text-button: #504834;
+  --scrivener-text-button-hover: #322E20;
+  --scrivener-text-button-bg-hover: rgba(80, 72, 52, 0.08);
+  --scrivener-error: #7f1d1d;
+  --scrivener-error-icon: #dc2626;
+  --scrivener-error-bg: #fef2f2;
+  --scrivener-border: #D8CAB0;
+  --scrivener-primary-text: #1e40af;
+  --scrivener-primary-text-hover: #1d4ed8;
+  --scrivener-primary-bg-hover: rgba(59, 130, 246, 0.1);
+}
+
+/* --- Mensajes de error --- */
+html.scrivener-theme.dark .p-message-error,
+html.scrivener-theme.dark .p-message.p-message-error {
+  background: var(--scrivener-error-bg) !important;
+  border: 1px solid var(--scrivener-error-icon) !important;
+  color: var(--scrivener-error) !important;
+}
+
+html.scrivener-theme.dark .p-message-error .p-message-text,
+html.scrivener-theme.dark .p-message.p-message-error .p-message-text {
+  color: var(--scrivener-error) !important;
+}
+
+html.scrivener-theme.dark .p-message-error .p-message-icon,
+html.scrivener-theme.dark .p-message.p-message-error .p-message-icon {
+  color: var(--scrivener-error-icon) !important;
+}
+
+html.scrivener-theme.dark .p-message-error a,
+html.scrivener-theme.dark .p-message-error .p-button-text {
+  color: var(--scrivener-error) !important;
+  font-weight: 600 !important;
+  text-decoration: underline !important;
+}
+
+/* --- Botones TEXT (secondary: Cancelar, etc.) --- */
+/* Usar selectores muy específicos para ganar a los defaults con !important */
+html.scrivener-theme.dark .p-button.p-button-text.p-button-secondary,
+html.scrivener-theme.dark .p-dialog-footer .p-button.p-button-text:not(.p-button-danger):not(.p-button-success),
+html.scrivener-theme.dark .p-dialog .p-button.p-button-text:not(.p-button-danger):not(.p-button-success) {
+  color: var(--scrivener-text-button) !important;
+  font-weight: 500 !important;
+}
+
+html.scrivener-theme.dark .p-button.p-button-text.p-button-secondary:hover,
+html.scrivener-theme.dark .p-dialog-footer .p-button.p-button-text:not(.p-button-danger):not(.p-button-success):hover,
+html.scrivener-theme.dark .p-dialog .p-button.p-button-text:not(.p-button-danger):not(.p-button-success):hover {
+  color: var(--scrivener-text-button-hover) !important;
+  background: var(--scrivener-text-button-bg-hover) !important;
+}
+
+/* --- Botones TEXT primary (azul) --- */
+html.scrivener-theme.dark .p-button.p-button-text:not(.p-button-secondary):not(.p-button-danger):not(.p-button-success):not(.p-button-warning) {
+  color: var(--scrivener-primary-text) !important;
+}
+
+html.scrivener-theme.dark .p-button.p-button-text:not(.p-button-secondary):not(.p-button-danger):not(.p-button-success):not(.p-button-warning):hover {
+  color: var(--scrivener-primary-text-hover) !important;
+  background: var(--scrivener-primary-bg-hover) !important;
+}
+
+/* --- Botones TEXT danger --- */
+html.scrivener-theme.dark .p-button.p-button-text.p-button-danger {
+  color: var(--scrivener-error) !important;
+}
+
+html.scrivener-theme.dark .p-button.p-button-text.p-button-danger:hover {
+  color: #fecaca !important;
+  background: rgba(252, 165, 165, 0.12) !important;
+}
+
+/* --- Scrivener Light mode --- */
+html.scrivener-theme:not(.dark) .p-message-error,
+html.scrivener-theme:not(.dark) .p-message.p-message-error {
+  background: var(--scrivener-error-bg) !important;
+  border: 1px solid #ef4444 !important;
+  color: var(--scrivener-error) !important;
+}
+
+html.scrivener-theme:not(.dark) .p-button.p-button-text.p-button-secondary,
+html.scrivener-theme:not(.dark) .p-dialog-footer .p-button.p-button-text:not(.p-button-danger):not(.p-button-success),
+html.scrivener-theme:not(.dark) .p-dialog .p-button.p-button-text:not(.p-button-danger):not(.p-button-success) {
+  color: var(--scrivener-text-button) !important;
+}
+
+html.scrivener-theme:not(.dark) .p-button.p-button-text.p-button-secondary:hover,
+html.scrivener-theme:not(.dark) .p-dialog-footer .p-button.p-button-text:not(.p-button-danger):not(.p-button-success):hover,
+html.scrivener-theme:not(.dark) .p-dialog .p-button.p-button-text:not(.p-button-danger):not(.p-button-success):hover {
+  color: var(--scrivener-text-button-hover) !important;
+  background: var(--scrivener-text-button-bg-hover) !important;
+}
+
+/* ============================================================================
+   SCRIVENER DARK - Colores globales de texto WCAG AA
+   Asegurar que TODO el texto sea legible en el fondo sepia oscuro (#1A170F)
+   ============================================================================ */
+
+/* Texto general - override de PrimeVue text colors */
+html.scrivener-theme.dark {
+  --p-text-color: var(--scrivener-text) !important;
+  --p-text-muted-color: var(--scrivener-text-muted) !important;
+  color: var(--scrivener-text) !important;
+}
+
+/* Títulos, encabezados, labels */
+html.scrivener-theme.dark h1,
+html.scrivener-theme.dark h2,
+html.scrivener-theme.dark h3,
+html.scrivener-theme.dark h4,
+html.scrivener-theme.dark h5,
+html.scrivener-theme.dark h6,
+html.scrivener-theme.dark label,
+html.scrivener-theme.dark .p-dialog-title,
+html.scrivener-theme.dark .p-card-title,
+html.scrivener-theme.dark .p-fieldset-legend {
+  color: var(--scrivener-text) !important;
+}
+
+/* Texto de párrafos y contenido */
+html.scrivener-theme.dark p,
+html.scrivener-theme.dark span,
+html.scrivener-theme.dark div,
+html.scrivener-theme.dark .p-card-content,
+html.scrivener-theme.dark .p-dialog-content,
+html.scrivener-theme.dark .p-message-text {
+  color: var(--scrivener-text);
+}
+
+/* Texto secundario/muted */
+html.scrivener-theme.dark .text-muted,
+html.scrivener-theme.dark .text-color-secondary,
+html.scrivener-theme.dark .p-text-secondary,
+html.scrivener-theme.dark small,
+html.scrivener-theme.dark .p-card-subtitle {
+  color: var(--scrivener-text-muted) !important;
+}
+
+/* Inputs y formularios */
+html.scrivener-theme.dark .p-inputtext,
+html.scrivener-theme.dark .p-dropdown-label,
+html.scrivener-theme.dark .p-multiselect-label,
+html.scrivener-theme.dark .p-textarea {
+  color: var(--scrivener-text) !important;
+}
+
+html.scrivener-theme.dark .p-inputtext::placeholder,
+html.scrivener-theme.dark .p-textarea::placeholder {
+  color: var(--scrivener-text-muted) !important;
+}
+
+/* Listas y tablas */
+html.scrivener-theme.dark .p-listbox-item,
+html.scrivener-theme.dark .p-dropdown-item,
+html.scrivener-theme.dark .p-datatable-tbody > tr > td {
+  color: var(--scrivener-text) !important;
+}
+
+/* Tooltips */
+html.scrivener-theme.dark .p-tooltip-text {
+  color: var(--scrivener-text) !important;
+}
+
+/* ============================================================================
+   SCRIVENER LIGHT - Colores globales de texto WCAG AA
+   Asegurar que TODO el texto sea legible en el fondo sepia claro (#FBF7F0)
+   Texto principal: #322E20 (contraste 10.5:1)
+   Texto secundario: #6E6248 (contraste 5.8:1)
+   ============================================================================ */
+
+/* Texto general - override de PrimeVue text colors */
+html.scrivener-theme:not(.dark) {
+  --p-text-color: var(--scrivener-text) !important;
+  --p-text-muted-color: var(--scrivener-text-muted) !important;
+  color: var(--scrivener-text) !important;
+}
+
+/* Títulos, encabezados, labels */
+html.scrivener-theme:not(.dark) h1,
+html.scrivener-theme:not(.dark) h2,
+html.scrivener-theme:not(.dark) h3,
+html.scrivener-theme:not(.dark) h4,
+html.scrivener-theme:not(.dark) h5,
+html.scrivener-theme:not(.dark) h6,
+html.scrivener-theme:not(.dark) label,
+html.scrivener-theme:not(.dark) .p-dialog-title,
+html.scrivener-theme:not(.dark) .p-card-title,
+html.scrivener-theme:not(.dark) .p-fieldset-legend {
+  color: var(--scrivener-text) !important;
+}
+
+/* Texto de párrafos y contenido */
+html.scrivener-theme:not(.dark) p,
+html.scrivener-theme:not(.dark) span,
+html.scrivener-theme:not(.dark) div,
+html.scrivener-theme:not(.dark) .p-card-content,
+html.scrivener-theme:not(.dark) .p-dialog-content,
+html.scrivener-theme:not(.dark) .p-message-text {
+  color: var(--scrivener-text);
+}
+
+/* Texto secundario/muted */
+html.scrivener-theme:not(.dark) .text-muted,
+html.scrivener-theme:not(.dark) .text-color-secondary,
+html.scrivener-theme:not(.dark) .p-text-secondary,
+html.scrivener-theme:not(.dark) small,
+html.scrivener-theme:not(.dark) .p-card-subtitle {
+  color: var(--scrivener-text-muted) !important;
+}
+
+/* Inputs y formularios */
+html.scrivener-theme:not(.dark) .p-inputtext,
+html.scrivener-theme:not(.dark) .p-dropdown-label,
+html.scrivener-theme:not(.dark) .p-multiselect-label,
+html.scrivener-theme:not(.dark) .p-textarea {
+  color: var(--scrivener-text) !important;
+}
+
+html.scrivener-theme:not(.dark) .p-inputtext::placeholder,
+html.scrivener-theme:not(.dark) .p-textarea::placeholder {
+  color: var(--scrivener-text-muted) !important;
+}
+
+/* Listas y tablas */
+html.scrivener-theme:not(.dark) .p-listbox-item,
+html.scrivener-theme:not(.dark) .p-dropdown-item,
+html.scrivener-theme:not(.dark) .p-datatable-tbody > tr > td {
+  color: var(--scrivener-text) !important;
+}
+
+/* Tooltips */
+html.scrivener-theme:not(.dark) .p-tooltip-text {
+  color: var(--scrivener-text) !important;
+}
+
+/* Cards de proyectos - textos específicos */
+html.scrivener-theme:not(.dark) .project-card,
+html.scrivener-theme:not(.dark) .project-card * {
+  color: var(--scrivener-text);
+}
+
+html.scrivener-theme:not(.dark) .project-card .project-name,
+html.scrivener-theme:not(.dark) .project-card h3,
+html.scrivener-theme:not(.dark) .project-card h4 {
+  color: var(--scrivener-text) !important;
+}
+
+html.scrivener-theme:not(.dark) .project-card .stat-value,
+html.scrivener-theme:not(.dark) .project-card .stat-label {
+  color: var(--scrivener-text) !important;
+}
+
+html.scrivener-theme:not(.dark) .project-card .date,
+html.scrivener-theme:not(.dark) .project-card .secondary-text {
+  color: var(--scrivener-text-muted) !important;
+}
+
+/* ============================================================================
+   SCRIVENER DARK - Cards de proyectos
+   ============================================================================ */
+html.scrivener-theme.dark .project-card,
+html.scrivener-theme.dark .p-card {
+  background-color: #252114 !important;
+  border-color: #504834 !important;
+}
+
+html.scrivener-theme.dark .project-card *,
+html.scrivener-theme.dark .project-card .project-name,
+html.scrivener-theme.dark .project-card h3,
+html.scrivener-theme.dark .project-card h4,
+html.scrivener-theme.dark .project-card .stat-value {
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .project-card .stat-label,
+html.scrivener-theme.dark .project-card .date,
+html.scrivener-theme.dark .project-card .secondary-text,
+html.scrivener-theme.dark .project-card small {
+  color: #C4B494 !important;
+}
+
+/* Header de la card */
+html.scrivener-theme.dark .project-card .p-card-header,
+html.scrivener-theme.dark .project-card header {
+  background-color: #302A1C !important;
+  border-color: #504834 !important;
+}
+
+/* Contenido interno */
+html.scrivener-theme.dark .project-card .p-card-body,
+html.scrivener-theme.dark .project-card .p-card-content,
+html.scrivener-theme.dark .project-card .card-content {
+  background-color: #252114 !important;
+}
+
+/* Barra de progreso */
+html.scrivener-theme.dark .project-card .p-progressbar,
+html.scrivener-theme.dark .p-progressbar {
+  background-color: #3E3626 !important;
+}
+
+html.scrivener-theme.dark .project-card .p-progressbar-value,
+html.scrivener-theme.dark .p-progressbar-value {
+  background-color: #8C7C5C !important;
+}
+
+/* Botones en cards */
+html.scrivener-theme.dark .project-card .p-button-text,
+html.scrivener-theme.dark .project-card a {
+  color: #C4B494 !important;
+}
+
+html.scrivener-theme.dark .project-card .p-button-text:hover,
+html.scrivener-theme.dark .project-card a:hover {
+  color: #E8DCC8 !important;
+  background-color: rgba(196, 180, 148, 0.15) !important;
+}
+
+/* Iconos */
+html.scrivener-theme.dark .project-card i,
+html.scrivener-theme.dark .project-card .pi {
+  color: #C4B494 !important;
+}
+
+/* ============================================================================
+   SCRIVENER DARK - Elementos de formulario adicionales
+   ============================================================================ */
+
+/* Search input */
+html.scrivener-theme.dark .p-inputgroup,
+html.scrivener-theme.dark .p-input-icon-left,
+html.scrivener-theme.dark .p-input-icon-right {
+  background-color: #302A1C !important;
+}
+
+html.scrivener-theme.dark .p-inputgroup .p-inputtext,
+html.scrivener-theme.dark .p-input-icon-left .p-inputtext,
+html.scrivener-theme.dark .p-input-icon-right .p-inputtext {
+  background-color: #302A1C !important;
+  border-color: #504834 !important;
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .p-inputgroup .pi,
+html.scrivener-theme.dark .p-input-icon-left .pi,
+html.scrivener-theme.dark .p-input-icon-right .pi {
+  color: #C4B494 !important;
+}
+
+/* Dropdown en header */
+html.scrivener-theme.dark .p-dropdown {
+  background-color: #302A1C !important;
+  border-color: #504834 !important;
+}
+
+html.scrivener-theme.dark .p-dropdown .p-dropdown-label {
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .p-dropdown .p-dropdown-trigger {
+  color: #C4B494 !important;
+}
+
+/* ============================================================================
+   SCRIVENER DARK - Sidebar de capítulos/estructura
+   ============================================================================ */
+html.scrivener-theme.dark .chapter-list,
+html.scrivener-theme.dark .structure-sidebar,
+html.scrivener-theme.dark .chapters-sidebar,
+html.scrivener-theme.dark [class*="sidebar"],
+html.scrivener-theme.dark [class*="chapter-list"],
+html.scrivener-theme.dark .workspace-sidebar {
+  background-color: #1A170F !important;
+}
+
+html.scrivener-theme.dark .chapter-item,
+html.scrivener-theme.dark .structure-item,
+html.scrivener-theme.dark [class*="chapter-item"] {
+  background-color: transparent !important;
+  color: #C4B494 !important;
+  border-color: #504834 !important;
+}
+
+html.scrivener-theme.dark .chapter-item:hover,
+html.scrivener-theme.dark .structure-item:hover,
+html.scrivener-theme.dark .chapter-item.active,
+html.scrivener-theme.dark .structure-item.active {
+  background-color: #252114 !important;
+  color: #E8DCC8 !important;
+}
+
+/* ============================================================================
+   SCRIVENER DARK - Paneles y cards adicionales
+   ============================================================================ */
+html.scrivener-theme.dark .summary-card,
+html.scrivener-theme.dark .info-card,
+html.scrivener-theme.dark .stat-card,
+html.scrivener-theme.dark [class*="-card"],
+html.scrivener-theme.dark [class*="Card"] {
+  background-color: #252114 !important;
+  border-color: #504834 !important;
+}
+
+html.scrivener-theme.dark .summary-card *,
+html.scrivener-theme.dark .info-card *,
+html.scrivener-theme.dark .stat-card * {
+  color: #E8DCC8 !important;
+}
+
+/* Paneles de workspace */
+html.scrivener-theme.dark .workspace-panel,
+html.scrivener-theme.dark .tab-panel,
+html.scrivener-theme.dark .content-panel,
+html.scrivener-theme.dark [class*="panel"] {
+  background-color: #1A170F !important;
+}
+
+/* Áreas de texto/reglas */
+html.scrivener-theme.dark .rules-editor,
+html.scrivener-theme.dark .editor-container,
+html.scrivener-theme.dark [class*="editor"] textarea,
+html.scrivener-theme.dark [class*="rules"] {
+  background-color: #252114 !important;
+  border-color: #504834 !important;
+  color: #E8DCC8 !important;
+}
+
+/* ============================================================================
+   SCRIVENER DARK - Scrollbars
+   ============================================================================ */
+html.scrivener-theme.dark ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+html.scrivener-theme.dark ::-webkit-scrollbar-track {
+  background: #1A170F !important;
+}
+
+html.scrivener-theme.dark ::-webkit-scrollbar-thumb {
+  background: #504834 !important;
+  border-radius: 5px;
+}
+
+html.scrivener-theme.dark ::-webkit-scrollbar-thumb:hover {
+  background: #6E6248 !important;
+}
+
+/* Firefox scrollbars */
+html.scrivener-theme.dark * {
+  scrollbar-color: #504834 #1A170F;
+  scrollbar-width: thin;
+}
+
+/* ============================================================================
+   SCRIVENER DARK - Select y componentes de filtro
+   ============================================================================ */
+html.scrivener-theme.dark .p-select,
+html.scrivener-theme.dark .p-multiselect,
+html.scrivener-theme.dark select,
+html.scrivener-theme.dark .filter-dropdown,
+html.scrivener-theme.dark [class*="filter"] .p-dropdown,
+html.scrivener-theme.dark [class*="filter"] select {
+  background-color: #302A1C !important;
+  border-color: #504834 !important;
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .p-select-label,
+html.scrivener-theme.dark .p-multiselect-label {
+  color: #E8DCC8 !important;
+}
+
+/* Paneles desplegables */
+html.scrivener-theme.dark .p-select-overlay,
+html.scrivener-theme.dark .p-dropdown-items-wrapper,
+html.scrivener-theme.dark .p-listbox-list-wrapper {
+  background-color: #252114 !important;
+}
+
+html.scrivener-theme.dark .p-select-option,
+html.scrivener-theme.dark .p-dropdown-items .p-dropdown-item {
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .p-select-option:hover,
+html.scrivener-theme.dark .p-dropdown-items .p-dropdown-item:hover {
+  background-color: #3E3626 !important;
+}
+
+html.scrivener-theme.dark .p-select-option.p-highlight,
+html.scrivener-theme.dark .p-dropdown-items .p-dropdown-item.p-highlight {
+  background-color: #504834 !important;
+  color: #E8DCC8 !important;
+}
+
+/* ============================================================================
+   SCRIVENER DARK - Tabs y navegación de workspace
+   ============================================================================ */
+html.scrivener-theme.dark .p-tabview-nav,
+html.scrivener-theme.dark .p-tabmenu-nav,
+html.scrivener-theme.dark .workspace-tabs {
+  background-color: #1A170F !important;
+  border-color: #504834 !important;
+}
+
+html.scrivener-theme.dark .p-tabview-nav-link,
+html.scrivener-theme.dark .p-tabmenu-nav-link,
+html.scrivener-theme.dark .workspace-tab {
+  color: #C4B494 !important;
+  background-color: transparent !important;
+}
+
+html.scrivener-theme.dark .p-tabview-nav-link:hover,
+html.scrivener-theme.dark .p-tabmenu-nav-link:hover,
+html.scrivener-theme.dark .workspace-tab:hover {
+  color: #E8DCC8 !important;
+  background-color: #252114 !important;
+}
+
+html.scrivener-theme.dark .p-tabview-nav-link.p-tabview-nav-link-active,
+html.scrivener-theme.dark .p-tabmenu-nav-link.p-tabmenu-nav-link-active,
+html.scrivener-theme.dark .workspace-tab.active {
+  color: #E8DCC8 !important;
+  border-color: var(--p-primary-color) !important;
+}
+
+/* ============================================================================
+   SCRIVENER DARK - Mensajes informativos
+   ============================================================================ */
+html.scrivener-theme.dark .p-message-info,
+html.scrivener-theme.dark .p-message.p-message-info {
+  background-color: rgba(59, 130, 246, 0.15) !important;
+  border-color: #3b82f6 !important;
+  color: #93c5fd !important;
+}
+
+html.scrivener-theme.dark .p-message-info .p-message-text {
+  color: #93c5fd !important;
+}
+
+html.scrivener-theme.dark .p-message-info .p-message-icon {
+  color: #60a5fa !important;
+}
+
+/* ============================================================================
+   SCRIVENER DARK - Panel de Estructura (Tree/Listbox lateral)
+   ============================================================================ */
+html.scrivener-theme.dark .structure-panel,
+html.scrivener-theme.dark .p-tree,
+html.scrivener-theme.dark .p-listbox,
+html.scrivener-theme.dark .chapters-panel,
+html.scrivener-theme.dark .document-tree,
+html.scrivener-theme.dark [class*="structure"],
+html.scrivener-theme.dark [class*="tree-panel"],
+html.scrivener-theme.dark .sidebar-content,
+html.scrivener-theme.dark .left-panel,
+html.scrivener-theme.dark .nav-panel {
+  background-color: #1A170F !important;
+  border-color: #504834 !important;
+}
+
+html.scrivener-theme.dark .p-tree-container,
+html.scrivener-theme.dark .p-listbox-list,
+html.scrivener-theme.dark .tree-container {
+  background-color: #1A170F !important;
+}
+
+html.scrivener-theme.dark .p-tree-node,
+html.scrivener-theme.dark .p-treenode,
+html.scrivener-theme.dark .p-listbox-item,
+html.scrivener-theme.dark .tree-node,
+html.scrivener-theme.dark .chapter-node {
+  color: #C4B494 !important;
+  background-color: transparent !important;
+}
+
+html.scrivener-theme.dark .p-tree-node:hover,
+html.scrivener-theme.dark .p-treenode:hover,
+html.scrivener-theme.dark .p-listbox-item:hover,
+html.scrivener-theme.dark .tree-node:hover,
+html.scrivener-theme.dark .chapter-node:hover {
+  background-color: #252114 !important;
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .p-tree-node.p-highlight,
+html.scrivener-theme.dark .p-treenode-selected,
+html.scrivener-theme.dark .p-listbox-item.p-highlight,
+html.scrivener-theme.dark .tree-node.selected,
+html.scrivener-theme.dark .chapter-node.active {
+  background-color: #302A1C !important;
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .p-tree-node-content,
+html.scrivener-theme.dark .p-treenode-content {
+  color: #C4B494 !important;
+}
+
+html.scrivener-theme.dark .p-tree-node-icon,
+html.scrivener-theme.dark .p-treenode-icon,
+html.scrivener-theme.dark .p-tree-toggler {
+  color: #8C7C5C !important;
+}
+
+/* Headers de paneles laterales */
+html.scrivener-theme.dark .panel-header,
+html.scrivener-theme.dark .sidebar-header,
+html.scrivener-theme.dark [class*="panel-header"],
+html.scrivener-theme.dark [class*="sidebar-header"] {
+  background-color: #252114 !important;
+  border-color: #504834 !important;
+  color: #E8DCC8 !important;
+}
+
+/* ============================================================================
+   SCRIVENER DARK - Todos los Select/Dropdown (fix global)
+   ============================================================================ */
+html.scrivener-theme.dark select,
+html.scrivener-theme.dark .p-select,
+html.scrivener-theme.dark .p-dropdown,
+html.scrivener-theme.dark .p-multiselect,
+html.scrivener-theme.dark .p-autocomplete-input,
+html.scrivener-theme.dark [class*="select"],
+html.scrivener-theme.dark [class*="dropdown"]:not(.p-dropdown-panel):not(.p-dropdown-items) {
+  background-color: #302A1C !important;
+  border-color: #504834 !important;
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .p-select .p-select-label,
+html.scrivener-theme.dark .p-dropdown .p-dropdown-label,
+html.scrivener-theme.dark .p-multiselect .p-multiselect-label,
+html.scrivener-theme.dark select option {
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .p-select .p-select-trigger,
+html.scrivener-theme.dark .p-dropdown .p-dropdown-trigger,
+html.scrivener-theme.dark .p-multiselect .p-multiselect-trigger {
+  color: #C4B494 !important;
+}
+
+/* Paneles de opciones */
+html.scrivener-theme.dark .p-select-overlay,
+html.scrivener-theme.dark .p-dropdown-panel,
+html.scrivener-theme.dark .p-multiselect-panel,
+html.scrivener-theme.dark .p-autocomplete-panel {
+  background-color: #252114 !important;
+  border-color: #504834 !important;
+}
+
+html.scrivener-theme.dark .p-select-option,
+html.scrivener-theme.dark .p-dropdown-item,
+html.scrivener-theme.dark .p-multiselect-item,
+html.scrivener-theme.dark .p-autocomplete-item {
+  color: #E8DCC8 !important;
+  background-color: transparent !important;
+}
+
+html.scrivener-theme.dark .p-select-option:hover,
+html.scrivener-theme.dark .p-dropdown-item:hover,
+html.scrivener-theme.dark .p-multiselect-item:hover,
+html.scrivener-theme.dark .p-autocomplete-item:hover {
+  background-color: #3E3626 !important;
+}
+
+html.scrivener-theme.dark .p-select-option.p-highlight,
+html.scrivener-theme.dark .p-dropdown-item.p-highlight,
+html.scrivener-theme.dark .p-multiselect-item.p-highlight,
+html.scrivener-theme.dark .p-autocomplete-item.p-highlight {
+  background-color: #504834 !important;
+  color: #E8DCC8 !important;
+}
+
+/* ============================================================================
+   SCRIVENER DARK - Alert/Severity Badges (colores más visibles)
+   ============================================================================ */
+
+/* Critical/Error - Rojo brillante */
+html.scrivener-theme.dark .severity-critical,
+html.scrivener-theme.dark .alert-critical,
+html.scrivener-theme.dark .p-tag-danger,
+html.scrivener-theme.dark .p-badge-danger,
+html.scrivener-theme.dark [class*="critical"],
+html.scrivener-theme.dark [class*="severity-critical"] {
+  background-color: #dc2626 !important;
+  color: #ffffff !important;
+  border-color: #dc2626 !important;
+}
+
+/* Warning/Alto - Naranja brillante */
+html.scrivener-theme.dark .severity-warning,
+html.scrivener-theme.dark .severity-high,
+html.scrivener-theme.dark .alert-warning,
+html.scrivener-theme.dark .alert-high,
+html.scrivener-theme.dark .p-tag-warning,
+html.scrivener-theme.dark .p-badge-warning,
+html.scrivener-theme.dark [class*="warning"],
+html.scrivener-theme.dark [class*="severity-high"] {
+  background-color: #f97316 !important;
+  color: #ffffff !important;
+  border-color: #f97316 !important;
+}
+
+/* Medium - Amarillo */
+html.scrivener-theme.dark .severity-medium,
+html.scrivener-theme.dark .alert-medium,
+html.scrivener-theme.dark [class*="severity-medium"] {
+  background-color: #eab308 !important;
+  color: #1A170F !important;
+  border-color: #eab308 !important;
+}
+
+/* Low/Info - Azul brillante */
+html.scrivener-theme.dark .severity-low,
+html.scrivener-theme.dark .severity-info,
+html.scrivener-theme.dark .alert-low,
+html.scrivener-theme.dark .alert-info,
+html.scrivener-theme.dark .p-tag-info,
+html.scrivener-theme.dark .p-badge-info,
+html.scrivener-theme.dark [class*="severity-low"],
+html.scrivener-theme.dark [class*="severity-info"] {
+  background-color: #3b82f6 !important;
+  color: #ffffff !important;
+  border-color: #3b82f6 !important;
+}
+
+/* Hint/Success - Verde */
+html.scrivener-theme.dark .severity-hint,
+html.scrivener-theme.dark .severity-success,
+html.scrivener-theme.dark .alert-hint,
+html.scrivener-theme.dark .alert-success,
+html.scrivener-theme.dark .p-tag-success,
+html.scrivener-theme.dark .p-badge-success,
+html.scrivener-theme.dark [class*="severity-hint"],
+html.scrivener-theme.dark [class*="severity-success"] {
+  background-color: #22c55e !important;
+  color: #ffffff !important;
+  border-color: #22c55e !important;
+}
+
+/* Badges numéricos de conteo */
+html.scrivener-theme.dark .p-badge,
+html.scrivener-theme.dark .count-badge,
+html.scrivener-theme.dark [class*="badge"] {
+  font-weight: 600 !important;
+}
+
+/* Tags genéricos */
+html.scrivener-theme.dark .p-tag {
+  font-weight: 500 !important;
+}
+
+/* ============================================================================
+   SCRIVENER DARK - Tablas de alertas
+   ============================================================================ */
+html.scrivener-theme.dark .p-datatable,
+html.scrivener-theme.dark .alerts-table,
+html.scrivener-theme.dark table {
+  background-color: #1A170F !important;
+}
+
+html.scrivener-theme.dark .p-datatable-header,
+html.scrivener-theme.dark .p-datatable-thead > tr > th {
+  background-color: #252114 !important;
+  border-color: #504834 !important;
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .p-datatable-tbody > tr {
+  background-color: #1A170F !important;
+  border-color: #504834 !important;
+}
+
+html.scrivener-theme.dark .p-datatable-tbody > tr:nth-child(even) {
+  background-color: #252114 !important;
+}
+
+html.scrivener-theme.dark .p-datatable-tbody > tr > td {
+  border-color: #504834 !important;
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .p-datatable-tbody > tr:hover {
+  background-color: #302A1C !important;
+}
+
+/* ============================================================================
+   SCRIVENER DARK - ChapterTree (Panel de Estructura)
+   El componente usa scoped styles, necesitamos !important para override
+   ============================================================================ */
+
+/* Contenedor principal del árbol de capítulos */
+html.scrivener-theme.dark .chapter-tree {
+  background: #1A170F !important;
+  color: #E8DCC8 !important;
+  box-shadow: none !important;
+}
+
+/* Header "Estructura" */
+html.scrivener-theme.dark .chapter-tree .tree-header {
+  background: #252114 !important;
+  border-color: #504834 !important;
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .chapter-tree .tree-header h3 {
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .chapter-tree .tree-header .p-button {
+  color: #C4B494 !important;
+}
+
+html.scrivener-theme.dark .chapter-tree .tree-header .p-button:hover {
+  color: #E8DCC8 !important;
+  background: rgba(196, 180, 148, 0.15) !important;
+}
+
+/* Contenido del árbol */
+html.scrivener-theme.dark .chapter-tree .tree-content {
+  background: #1A170F !important;
+}
+
+/* Items de capítulo */
+html.scrivener-theme.dark .chapter-tree .chapter-item {
+  background: #252114 !important;
+  border-color: #504834 !important;
+}
+
+html.scrivener-theme.dark .chapter-tree .chapter-item:hover {
+  background: #302A1C !important;
+  border-color: #6E6248 !important;
+}
+
+html.scrivener-theme.dark .chapter-tree .chapter-item.chapter-active {
+  background: #302A1C !important;
+  border-color: #8C7C5C !important;
+}
+
+/* Título del capítulo */
+html.scrivener-theme.dark .chapter-tree .chapter-title {
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .chapter-tree .chapter-item.chapter-active .chapter-title {
+  color: #D8CAB0 !important;
+}
+
+/* Icono del capítulo */
+html.scrivener-theme.dark .chapter-tree .chapter-icon {
+  color: #A89878 !important;
+}
+
+/* Conteo de palabras */
+html.scrivener-theme.dark .chapter-tree .chapter-words {
+  color: #C4B494 !important;
+}
+
+/* Meta del capítulo */
+html.scrivener-theme.dark .chapter-tree .chapter-meta {
+  color: #A89878 !important;
+}
+
+/* Stats del capítulo */
+html.scrivener-theme.dark .chapter-tree .chapter-stats {
+  border-color: #504834 !important;
+}
+
+html.scrivener-theme.dark .chapter-tree .stat-item {
+  color: #C4B494 !important;
+}
+
+html.scrivener-theme.dark .chapter-tree .stat-alerts {
+  color: #f97316 !important;
+}
+
+/* Secciones dentro de capítulos */
+html.scrivener-theme.dark .chapter-tree .sections-list {
+  border-color: #504834 !important;
+}
+
+html.scrivener-theme.dark .chapter-tree .section-item {
+  color: #C4B494 !important;
+}
+
+html.scrivener-theme.dark .chapter-tree .section-item:hover {
+  background: #302A1C !important;
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .chapter-tree .section-item.section-active {
+  background: #302A1C !important;
+  color: #D8CAB0 !important;
+}
+
+html.scrivener-theme.dark .chapter-tree .section-icon {
+  color: #6E6248 !important;
+}
+
+html.scrivener-theme.dark .chapter-tree .section-item.section-active .section-icon {
+  color: #A89878 !important;
+}
+
+/* Empty state */
+html.scrivener-theme.dark .chapter-tree .tree-empty {
+  color: #C4B494 !important;
+}
+
+html.scrivener-theme.dark .chapter-tree .tree-empty i {
+  color: #6E6248 !important;
+}
+
+/* Loading state */
+html.scrivener-theme.dark .chapter-tree .tree-loading {
+  color: #C4B494 !important;
+}
+
+/* Scrollbar dentro del árbol */
+html.scrivener-theme.dark .chapter-tree .tree-content::-webkit-scrollbar-track {
+  background: #1A170F !important;
+}
+
+html.scrivener-theme.dark .chapter-tree .tree-content::-webkit-scrollbar-thumb {
+  background: #504834 !important;
+}
+
+html.scrivener-theme.dark .chapter-tree .tree-content::-webkit-scrollbar-thumb:hover {
+  background: #6E6248 !important;
+}
+
+/* ChaptersPanel wrapper */
+html.scrivener-theme.dark .chapters-panel {
+  background: #1A170F !important;
+}
+
+/* ============================================================================
+   ENTITY INSPECTOR - Scrivener Dark Theme
+   ============================================================================ */
+
+/* Main inspector container */
+html.scrivener-theme.dark .entity-inspector {
+  background: #1A170F !important;
+  color: #E8DCC8 !important;
+}
+
+/* Inspector header */
+html.scrivener-theme.dark .entity-inspector .inspector-header {
+  background: #1A170F !important;
+  border-color: #504834 !important;
+}
+
+html.scrivener-theme.dark .entity-inspector .entity-name {
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .entity-inspector .entity-icon-wrapper {
+  background: rgba(212, 198, 164, 0.15) !important;
+}
+
+/* Inspector body */
+html.scrivener-theme.dark .entity-inspector .inspector-body {
+  background: #1A170F !important;
+}
+
+/* Section labels */
+html.scrivener-theme.dark .entity-inspector .section-label {
+  color: #C4B494 !important;
+}
+
+/* Alias tags */
+html.scrivener-theme.dark .entity-inspector .alias-tag {
+  background: #252114 !important;
+  color: #E8DCC8 !important;
+}
+
+/* Stats grid items - CRITICAL FIX for light background issue */
+html.scrivener-theme.dark .entity-inspector .stat-item {
+  background: #252114 !important;
+  border: 1px solid #504834 !important;
+}
+
+html.scrivener-theme.dark .entity-inspector .stat-item i {
+  color: #C4B494 !important;
+}
+
+html.scrivener-theme.dark .entity-inspector .stat-item .stat-value {
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .entity-inspector .stat-item .stat-label {
+  color: #C4B494 !important;
+}
+
+/* Stats grid - general */
+html.scrivener-theme.dark .entity-inspector .stats-grid {
+  background: transparent !important;
+}
+
+/* Importance badge */
+html.scrivener-theme.dark .entity-inspector .importance-badge {
+  background: #252114 !important;
+  color: #E8DCC8 !important;
+  border: 1px solid #504834 !important;
+}
+
+html.scrivener-theme.dark .entity-inspector .importance-badge.importance-main {
+  background: #3D2F1C !important;
+  color: #D4C6A4 !important;
+  border-color: #5A4A32 !important;
+}
+
+html.scrivener-theme.dark .entity-inspector .importance-badge.importance-secondary {
+  background: #2A2418 !important;
+  color: #C4B494 !important;
+}
+
+/* Description */
+html.scrivener-theme.dark .entity-inspector .description {
+  color: #C4B494 !important;
+}
+
+/* Inspector actions */
+html.scrivener-theme.dark .entity-inspector .inspector-actions {
+  background: #1A170F !important;
+  border-color: #504834 !important;
+}
+
+/* Mention navigation section */
+html.scrivener-theme.dark .entity-inspector .mention-navigation {
+  background: #252114 !important;
+  border-color: #504834 !important;
+}
+
+html.scrivener-theme.dark .entity-inspector .nav-title {
+  color: #D4C6A4 !important;
+}
+
+html.scrivener-theme.dark .entity-inspector .nav-counter {
+  color: #E8DCC8 !important;
+}
+
+/* Navigation context box */
+html.scrivener-theme.dark .entity-inspector .nav-context {
+  background: #1A170F !important;
+  border-color: #504834 !important;
+}
+
+html.scrivener-theme.dark .entity-inspector .context-chapter {
+  color: #C4B494 !important;
+}
+
+html.scrivener-theme.dark .entity-inspector .context-text {
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .entity-inspector .context-text mark {
+  background: rgba(212, 198, 164, 0.3) !important;
+  color: #D4C6A4 !important;
+}
+
+html.scrivener-theme.dark .entity-inspector .context-before,
+html.scrivener-theme.dark .entity-inspector .context-after {
+  color: #A89878 !important;
+}
+
+/* Navigation buttons */
+html.scrivener-theme.dark .entity-inspector .nav-controls .p-button {
+  color: #C4B494 !important;
+}
+
+html.scrivener-theme.dark .entity-inspector .nav-controls .p-button:hover:not(:disabled) {
+  background: rgba(212, 198, 164, 0.15) !important;
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .entity-inspector .nav-controls .p-button:disabled {
+  color: #6E6248 !important;
+  opacity: 0.5 !important;
+}
+
+/* ============================================================================
+   DOCUMENT VIEWER - Section headings (H2, H3, H4, H5) in Scrivener dark theme
+   ============================================================================ */
+
+/* H2 - Main section headings */
+html.scrivener-theme.dark .chapter-text .section-h2,
+html.scrivener-theme.dark .chapter-text h2 {
+  color: #E8DCC8 !important;
+  border-bottom-color: #504834 !important;
+}
+
+/* H3 - Subsections */
+html.scrivener-theme.dark .chapter-text .section-h3,
+html.scrivener-theme.dark .chapter-text h3 {
+  color: #E8DCC8 !important;
+}
+
+/* H4 - Sub-subsections */
+html.scrivener-theme.dark .chapter-text .section-h4,
+html.scrivener-theme.dark .chapter-text h4 {
+  color: #C4B494 !important;
+}
+
+/* H5 - Lowest level */
+html.scrivener-theme.dark .chapter-text .section-h5,
+html.scrivener-theme.dark .chapter-text h5 {
+  color: #A89878 !important;
+}
+
+/* ============================================================================
+   GLOBAL TabView Overrides - Consistent with WorkspaceTabs
+   Estas reglas aseguran que TODOS los TabView se vean igual en toda la app
+   ============================================================================ */
+
+/* Barra de navegación de tabs */
+.p-tabview > .p-tabview-nav-container > .p-tabview-nav-content > .p-tabview-nav {
+  border-bottom: 1px solid var(--ds-color-border, var(--p-surface-200));
+  gap: var(--ds-space-1, 0.25rem);
+  background: transparent;
+}
+
+/* Ocultar ink-bar por defecto de PrimeVue (usamos pseudo-elemento) */
+.p-tabview .p-tabview-ink-bar {
+  display: none !important;
+}
+
+/* Tabs individuales - estilo base */
+.p-tabview .p-tabview-nav .p-tabview-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border: none !important;
+  border-bottom: none !important;
+  background: transparent !important;
+  color: var(--ds-color-text-secondary, var(--p-text-muted-color));
+  font-size: var(--ds-font-size-sm, 0.875rem);
+  font-weight: var(--ds-font-weight-medium, 500);
+  transition: color 0.15s ease;
+  position: relative;
+}
+
+/* Icono dentro del tab - padding por defecto */
+.p-tabview .p-tabview-nav .p-tabview-nav-link i,
+.p-tabview .p-tabview-nav .p-tabview-nav-link .pi {
+  font-size: 1rem;
+  margin-right: 0.25rem;
+}
+
+/* Hover state */
+.p-tabview .p-tabview-nav .p-tabview-nav-link:hover {
+  color: var(--ds-color-text, var(--p-text-color)) !important;
+  background: transparent !important;
+}
+
+/* Tab activo - texto e icono en color primario */
+.p-tabview .p-tabview-nav .p-tabview-header.p-tabview-header-active .p-tabview-nav-link,
+.p-tabview .p-tabview-nav .p-tabview-header.p-highlight .p-tabview-nav-link,
+.p-tabview .p-tabview-nav .p-tabview-nav-link[aria-selected="true"] {
+  color: var(--ds-color-primary, var(--p-primary-color)) !important;
+  background: transparent !important;
+  border: none !important;
+}
+
+/* Tab activo - icono también en color primario */
+.p-tabview .p-tabview-nav .p-tabview-header.p-tabview-header-active .p-tabview-nav-link i,
+.p-tabview .p-tabview-nav .p-tabview-header.p-highlight .p-tabview-nav-link i,
+.p-tabview .p-tabview-nav .p-tabview-nav-link[aria-selected="true"] i {
+  color: var(--ds-color-primary, var(--p-primary-color)) !important;
+}
+
+/* Underline del tab activo - pseudo-elemento consistente con WorkspaceTabs */
+.p-tabview .p-tabview-nav .p-tabview-header.p-tabview-header-active .p-tabview-nav-link::after,
+.p-tabview .p-tabview-nav .p-tabview-header.p-highlight .p-tabview-nav-link::after,
+.p-tabview .p-tabview-nav .p-tabview-nav-link[aria-selected="true"]::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0.5rem;
+  right: 0.5rem;
+  height: 2px;
+  background-color: var(--ds-color-primary, var(--p-primary-color));
+  border-radius: 2px 2px 0 0;
+}
+
+/* Tabs no activos - sin underline */
+.p-tabview .p-tabview-nav .p-tabview-nav-link::after {
+  content: none;
+}
+
+/* Fix para que PrimeVue no añada bordes extras */
+.p-tabview .p-tabview-nav .p-tabview-header .p-tabview-nav-link {
+  border-bottom-width: 0 !important;
+}
+
+/* Panel de contenido - sin borde superior extra */
+.p-tabview .p-tabview-panels {
+  border-top: none;
+}
+
+/* ============================================================================
+   SCRIVENER DARK - TabView específico
+   ============================================================================ */
+html.scrivener-theme.dark .p-tabview > .p-tabview-nav-container > .p-tabview-nav-content > .p-tabview-nav {
+  background-color: transparent !important;
+  border-bottom-color: #504834 !important;
+}
+
+html.scrivener-theme.dark .p-tabview .p-tabview-nav .p-tabview-nav-link {
+  color: #C4B494 !important;
+}
+
+html.scrivener-theme.dark .p-tabview .p-tabview-nav .p-tabview-nav-link:hover {
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .p-tabview .p-tabview-nav .p-tabview-header.p-tabview-header-active .p-tabview-nav-link,
+html.scrivener-theme.dark .p-tabview .p-tabview-nav .p-tabview-header.p-highlight .p-tabview-nav-link,
+html.scrivener-theme.dark .p-tabview .p-tabview-nav .p-tabview-nav-link[aria-selected="true"] {
+  color: var(--p-primary-color, #60a5fa) !important;
+}
+
+html.scrivener-theme.dark .p-tabview .p-tabview-nav .p-tabview-header.p-tabview-header-active .p-tabview-nav-link i,
+html.scrivener-theme.dark .p-tabview .p-tabview-nav .p-tabview-header.p-highlight .p-tabview-nav-link i,
+html.scrivener-theme.dark .p-tabview .p-tabview-nav .p-tabview-nav-link[aria-selected="true"] i {
+  color: var(--p-primary-color, #60a5fa) !important;
+}
+
+html.scrivener-theme.dark .p-tabview .p-tabview-panels {
+  background-color: #1A170F !important;
+}
+
+/* ============================================================================
+   GLOBAL SelectButton Overrides - Dark Mode Fix
+   ============================================================================ */
+
+/* Base styling para todos los temas */
+.p-selectbutton {
+  display: inline-flex;
+  gap: 0;
+}
+
+.p-selectbutton .p-button {
+  border-radius: 0;
+  border-right-width: 0;
+}
+
+.p-selectbutton .p-button:first-child {
+  border-top-left-radius: var(--ds-radius-md, 6px);
+  border-bottom-left-radius: var(--ds-radius-md, 6px);
+}
+
+.p-selectbutton .p-button:last-child {
+  border-top-right-radius: var(--ds-radius-md, 6px);
+  border-bottom-right-radius: var(--ds-radius-md, 6px);
+  border-right-width: 1px;
+}
+
+/* Dark mode genérico */
+html.dark .p-selectbutton .p-button {
+  background-color: var(--p-surface-800, #1e293b);
+  border-color: var(--p-surface-600, #475569);
+  color: var(--p-surface-300, #cbd5e1);
+}
+
+html.dark .p-selectbutton .p-button:hover:not(.p-highlight) {
+  background-color: var(--p-surface-700, #334155);
+}
+
+html.dark .p-selectbutton .p-button.p-highlight {
+  background-color: var(--p-primary-color, #3b82f6);
+  border-color: var(--p-primary-color, #3b82f6);
+  color: #ffffff;
+}
+
+/* ============================================================================
+   SCRIVENER DARK - SelectButton específico
+   PrimeVue 4 usa ToggleButton internamente - selectors actualizados
+   ============================================================================ */
+html.scrivener-theme.dark .p-selectbutton.p-selectbutton,
+html.scrivener-theme.dark .p-selectbutton[data-pc-name="selectbutton"],
+html.scrivener-theme.dark [data-pc-name="selectbutton"] {
+  background-color: transparent !important;
+}
+
+/* SelectButton - Target interno ToggleButton (PrimeVue 4) */
+html.scrivener-theme.dark .p-selectbutton .p-button,
+html.scrivener-theme.dark .p-selectbutton .p-togglebutton,
+html.scrivener-theme.dark .p-selectbutton [data-pc-name="pcToggleButton"],
+html.scrivener-theme.dark .p-selectbutton [data-pc-name="togglebutton"],
+html.scrivener-theme.dark [data-pc-name="selectbutton"] .p-togglebutton,
+html.scrivener-theme.dark [data-pc-name="selectbutton"] [data-pc-name="pcToggleButton"] {
+  background-color: #302A1C !important;
+  border-color: #504834 !important;
+  color: #C4B494 !important;
+  font-weight: 500 !important;
+  padding: 0.5rem 0.875rem !important;
+  transition: all 0.15s ease !important;
+}
+
+/* Contenido del toggle button */
+html.scrivener-theme.dark .p-selectbutton .p-togglebutton-content,
+html.scrivener-theme.dark [data-pc-name="selectbutton"] [data-pc-section="content"] {
+  color: inherit !important;
+}
+
+/* Hover en no seleccionados */
+html.scrivener-theme.dark .p-selectbutton .p-togglebutton:not(.p-togglebutton-checked):hover,
+html.scrivener-theme.dark .p-selectbutton .p-button:hover:not(.p-highlight):not([aria-pressed="true"]),
+html.scrivener-theme.dark [data-pc-name="selectbutton"] [data-pc-name="pcToggleButton"]:not([data-p-checked="true"]):hover {
+  background-color: #3E3626 !important;
+  color: #E8DCC8 !important;
+}
+
+/* Estado seleccionado/checked */
+html.scrivener-theme.dark .p-selectbutton .p-togglebutton.p-togglebutton-checked,
+html.scrivener-theme.dark .p-selectbutton .p-button.p-highlight,
+html.scrivener-theme.dark .p-selectbutton [aria-pressed="true"],
+html.scrivener-theme.dark [data-pc-name="selectbutton"] [data-p-checked="true"],
+html.scrivener-theme.dark [data-pc-name="selectbutton"] .p-togglebutton-checked {
+  background-color: #5A4A32 !important;
+  border-color: #6E5C40 !important;
+  color: #E8DCC8 !important;
+}
+
+/* Hover en seleccionados */
+html.scrivener-theme.dark .p-selectbutton .p-togglebutton.p-togglebutton-checked:hover,
+html.scrivener-theme.dark .p-selectbutton .p-button.p-highlight:hover,
+html.scrivener-theme.dark [data-pc-name="selectbutton"] [data-p-checked="true"]:hover {
+  background-color: #6E5C40 !important;
+}
+
+/* Focus state - WCAG compliant */
+html.scrivener-theme.dark .p-selectbutton .p-togglebutton:focus,
+html.scrivener-theme.dark .p-selectbutton .p-button:focus,
+html.scrivener-theme.dark .p-selectbutton .p-button:focus-visible {
+  box-shadow: 0 0 0 2px rgba(212, 198, 164, 0.3) !important;
+  outline: none !important;
+}
+
+/* ============================================================================
+   SCRIVENER DARK - Slider específico
+   ============================================================================ */
+html.scrivener-theme.dark .p-slider {
+  background-color: #302A1C !important;
+}
+
+html.scrivener-theme.dark .p-slider .p-slider-range {
+  background-color: #6E5C40 !important;
+}
+
+html.scrivener-theme.dark .p-slider .p-slider-handle {
+  background-color: #E8DCC8 !important;
+  border-color: #6E5C40 !important;
+}
+
+html.scrivener-theme.dark .p-slider .p-slider-handle:hover {
+  background-color: #D4C6A4 !important;
+  border-color: #8C7C5C !important;
+}
+
+/* ============================================================================
+   SCRIVENER DARK - ToggleSwitch específico
+   ============================================================================ */
+html.scrivener-theme.dark .p-toggleswitch .p-toggleswitch-slider {
+  background-color: #302A1C !important;
+  border-color: #504834 !important;
+}
+
+html.scrivener-theme.dark .p-toggleswitch.p-toggleswitch-checked .p-toggleswitch-slider {
+  background-color: #5A4A32 !important;
+  border-color: #6E5C40 !important;
+}
+
+html.scrivener-theme.dark .p-toggleswitch .p-toggleswitch-slider::before {
+  background-color: #C4B494 !important;
+}
+
+html.scrivener-theme.dark .p-toggleswitch.p-toggleswitch-checked .p-toggleswitch-slider::before {
+  background-color: #E8DCC8 !important;
+}
+
+/* ============================================================================
+   SCRIVENER DARK - Dialog
+   ============================================================================ */
+html.scrivener-theme.dark .p-dialog {
+  background-color: #252015 !important;
+  border: 1px solid #504834 !important;
+}
+
+html.scrivener-theme.dark .p-dialog .p-dialog-header {
+  background-color: #1A170F !important;
+  border-bottom: 1px solid #504834 !important;
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .p-dialog .p-dialog-title {
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .p-dialog .p-dialog-header-close {
+  color: #C4B494 !important;
+}
+
+html.scrivener-theme.dark .p-dialog .p-dialog-header-close:hover {
+  background-color: #3E3626 !important;
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .p-dialog .p-dialog-content {
+  background-color: #252015 !important;
+  color: #C4B494 !important;
+}
+
+html.scrivener-theme.dark .p-dialog .p-dialog-footer {
+  background-color: #1A170F !important;
+  border-top: 1px solid #504834 !important;
+}
+
+/* ============================================================================
+   SCRIVENER DARK - InputText
+   ============================================================================ */
+html.scrivener-theme.dark .p-inputtext {
+  background-color: #302A1C !important;
+  border-color: #504834 !important;
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .p-inputtext:hover {
+  border-color: #6E5C40 !important;
+}
+
+html.scrivener-theme.dark .p-inputtext:focus {
+  border-color: #8C7C5C !important;
+  box-shadow: 0 0 0 2px rgba(140, 124, 92, 0.2) !important;
+}
+
+html.scrivener-theme.dark .p-inputtext::placeholder {
+  color: #8C7C5C !important;
+}
+
+/* ============================================================================
+   SCRIVENER DARK - Dropdown
+   ============================================================================ */
+html.scrivener-theme.dark .p-dropdown {
+  background-color: #302A1C !important;
+  border-color: #504834 !important;
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .p-dropdown:hover {
+  border-color: #6E5C40 !important;
+}
+
+html.scrivener-theme.dark .p-dropdown .p-dropdown-label {
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .p-dropdown .p-dropdown-trigger {
+  color: #C4B494 !important;
+}
+
+html.scrivener-theme.dark .p-dropdown-panel {
+  background-color: #252015 !important;
+  border-color: #504834 !important;
+}
+
+html.scrivener-theme.dark .p-dropdown-panel .p-dropdown-items .p-dropdown-item {
+  color: #C4B494 !important;
+}
+
+html.scrivener-theme.dark .p-dropdown-panel .p-dropdown-items .p-dropdown-item:hover {
+  background-color: #3E3626 !important;
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .p-dropdown-panel .p-dropdown-items .p-dropdown-item.p-highlight {
+  background-color: #5A4A32 !important;
+  color: #E8DCC8 !important;
+}
+
+/* ============================================================================
+   SCRIVENER DARK - Chips (InputChips en PrimeVue 4)
+   Selectores actualizados para v4
+   ============================================================================ */
+html.scrivener-theme.dark .p-chips,
+html.scrivener-theme.dark .p-inputchips,
+html.scrivener-theme.dark [data-pc-name="chips"],
+html.scrivener-theme.dark [data-pc-name="inputchips"] {
+  background-color: transparent !important;
+}
+
+/* Contenedor principal del input */
+html.scrivener-theme.dark .p-chips .p-chips-multiple-container,
+html.scrivener-theme.dark .p-inputchips .p-inputchips-input,
+html.scrivener-theme.dark [data-pc-name="chips"] [data-pc-section="container"],
+html.scrivener-theme.dark [data-pc-name="inputchips"] [data-pc-section="container"],
+html.scrivener-theme.dark .p-chips .p-inputtext,
+html.scrivener-theme.dark .p-inputchips .p-inputtext {
+  background-color: #302A1C !important;
+  border-color: #504834 !important;
+  padding: 0.375rem 0.5rem !important;
+  gap: 0.375rem !important;
+  min-height: 2.5rem !important;
+}
+
+/* Hover */
+html.scrivener-theme.dark .p-chips .p-chips-multiple-container:hover,
+html.scrivener-theme.dark .p-inputchips:hover .p-inputchips-input,
+html.scrivener-theme.dark [data-pc-name="inputchips"]:hover [data-pc-section="container"] {
+  border-color: #6E5C40 !important;
+}
+
+/* Focus */
+html.scrivener-theme.dark .p-chips:focus-within .p-chips-multiple-container,
+html.scrivener-theme.dark .p-inputchips:focus-within .p-inputchips-input,
+html.scrivener-theme.dark [data-pc-name="inputchips"]:focus-within [data-pc-section="container"] {
+  border-color: #8C7C5C !important;
+  box-shadow: 0 0 0 2px rgba(140, 124, 92, 0.2) !important;
+  outline: none !important;
+}
+
+/* Tokens/Chips individuales */
+html.scrivener-theme.dark .p-chips .p-chips-token,
+html.scrivener-theme.dark .p-chips .p-chip,
+html.scrivener-theme.dark .p-inputchips .p-chip,
+html.scrivener-theme.dark [data-pc-name="inputchips"] [data-pc-name="chip"],
+html.scrivener-theme.dark [data-pc-section="token"] {
+  background-color: #5A4A32 !important;
+  color: #E8DCC8 !important;
+  padding: 0.25rem 0.5rem !important;
+  border-radius: 4px !important;
+  border: none !important;
+}
+
+/* Icono de eliminar */
+html.scrivener-theme.dark .p-chips .p-chips-token-icon,
+html.scrivener-theme.dark .p-chips .p-chip-remove-icon,
+html.scrivener-theme.dark .p-inputchips .p-chip-remove-icon,
+html.scrivener-theme.dark [data-pc-section="removeicon"] {
+  color: #C4B494 !important;
+  margin-left: 0.375rem !important;
+}
+
+html.scrivener-theme.dark .p-chips .p-chips-token-icon:hover,
+html.scrivener-theme.dark .p-chips .p-chip-remove-icon:hover,
+html.scrivener-theme.dark .p-inputchips .p-chip-remove-icon:hover,
+html.scrivener-theme.dark [data-pc-section="removeicon"]:hover {
+  color: #E8DCC8 !important;
+}
+
+/* Input interno */
+html.scrivener-theme.dark .p-chips .p-chips-input-token input,
+html.scrivener-theme.dark .p-inputchips [data-pc-section="inputtoken"] input,
+html.scrivener-theme.dark [data-pc-name="inputchips"] input {
+  color: #E8DCC8 !important;
+  background: transparent !important;
+  border: none !important;
+}
+
+html.scrivener-theme.dark .p-chips .p-chips-input-token input::placeholder,
+html.scrivener-theme.dark .p-chips input.p-inputtext::placeholder,
+html.scrivener-theme.dark .p-chips [data-pc-section="input"]::placeholder {
+  color: #8C7C5C !important;
+}
+
+/* ============================================================================
+   SCRIVENER DARK - Form Labels
+   ============================================================================ */
+html.scrivener-theme.dark .field label,
+html.scrivener-theme.dark .edit-dialog label {
+  color: #C4B494 !important;
+}
+
+/* ============================================================================
+   SCRIVENER DARK - Button en Dialog footer
+   ============================================================================ */
+html.scrivener-theme.dark .p-dialog-footer .p-button {
+  background-color: #5A4A32 !important;
+  border-color: #6E5C40 !important;
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .p-dialog-footer .p-button:hover {
+  background-color: #6E5C40 !important;
+  border-color: #8C7C5C !important;
+}
+
+html.scrivener-theme.dark .p-dialog-footer .p-button.p-button-text {
+  background-color: transparent !important;
+  color: #C4B494 !important;
+}
+
+html.scrivener-theme.dark .p-dialog-footer .p-button.p-button-text:hover {
+  background-color: #3E3626 !important;
+  color: #E8DCC8 !important;
+}
+
+/* ============================================================================
+   SCRIVENER DARK - Issue Fixes (Jan 2026)
+   ============================================================================ */
+
+/* ----------------------------------------------------------------------------
+   FIX 1: SelectButton "Principal" - Better contrast for selected state
+   Current: bg #5A4A32 with text #E8DCC8 is hard to read
+   Solution: Use lighter background OR darker text with better contrast ratio
+   ---------------------------------------------------------------------------- */
+html.scrivener-theme.dark .p-selectbutton .p-togglebutton.p-togglebutton-checked,
+html.scrivener-theme.dark .p-selectbutton .p-button.p-highlight,
+html.scrivener-theme.dark .p-selectbutton [aria-pressed="true"],
+html.scrivener-theme.dark [data-pc-name="selectbutton"] [data-p-checked="true"],
+html.scrivener-theme.dark [data-pc-name="selectbutton"] .p-togglebutton-checked {
+  background-color: #7A6A4A !important;  /* Lighter brown for better contrast */
+  border-color: #9A8A6A !important;
+  color: #FFFBF5 !important;  /* Near-white for max readability */
+  font-weight: 600 !important;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.3) !important;
+}
+
+html.scrivener-theme.dark .p-selectbutton .p-togglebutton.p-togglebutton-checked:hover,
+html.scrivener-theme.dark .p-selectbutton .p-button.p-highlight:hover,
+html.scrivener-theme.dark [data-pc-name="selectbutton"] [data-p-checked="true"]:hover {
+  background-color: #8A7A5A !important;
+  border-color: #AA9A7A !important;
+}
+
+/* Non-selected buttons - ensure they look clearly different */
+html.scrivener-theme.dark .p-selectbutton .p-button:not(.p-highlight):not([aria-pressed="true"]),
+html.scrivener-theme.dark .p-selectbutton .p-togglebutton:not(.p-togglebutton-checked),
+html.scrivener-theme.dark [data-pc-name="selectbutton"] [data-p-checked="false"] {
+  background-color: #252015 !important;
+  border-color: #504834 !important;
+  color: #A89878 !important;  /* Muted text for unselected */
+}
+
+/* ----------------------------------------------------------------------------
+   FIX 2: Menu selected/focused item - Visible selection state
+   Problem: Dark on dark, selection not visible
+   ---------------------------------------------------------------------------- */
+html.scrivener-theme.dark .p-menu .p-menuitem.p-highlight > .p-menuitem-content,
+html.scrivener-theme.dark .p-menu [data-p-highlight="true"] > .p-menuitem-content,
+html.scrivener-theme.dark .p-contextmenu .p-menuitem.p-highlight > .p-menuitem-content,
+html.scrivener-theme.dark .p-contextmenu [data-p-highlight="true"] > .p-menuitem-content,
+html.scrivener-theme.dark .p-tieredmenu .p-menuitem.p-highlight > .p-menuitem-content,
+html.scrivener-theme.dark .p-tieredmenu [data-p-highlight="true"] > .p-menuitem-content {
+  background-color: #5A4A32 !important;
+  color: #FFFBF5 !important;
+}
+
+html.scrivener-theme.dark .p-menu .p-menuitem.p-highlight .p-menuitem-text,
+html.scrivener-theme.dark .p-menu .p-menuitem.p-highlight .p-menuitem-icon,
+html.scrivener-theme.dark .p-menu [data-p-highlight="true"] .p-menuitem-text,
+html.scrivener-theme.dark .p-menu [data-p-highlight="true"] .p-menuitem-icon,
+html.scrivener-theme.dark .p-contextmenu .p-menuitem.p-highlight .p-menuitem-text,
+html.scrivener-theme.dark .p-contextmenu .p-menuitem.p-highlight .p-menuitem-icon,
+html.scrivener-theme.dark .p-tieredmenu .p-menuitem.p-highlight .p-menuitem-text,
+html.scrivener-theme.dark .p-tieredmenu .p-menuitem.p-highlight .p-menuitem-icon {
+  color: #FFFBF5 !important;
+}
+
+/* Keyboard focus state - distinct from hover */
+html.scrivener-theme.dark .p-menu .p-menuitem.p-focus > .p-menuitem-content,
+html.scrivener-theme.dark .p-menu [data-p-focused="true"] > .p-menuitem-content,
+html.scrivener-theme.dark .p-contextmenu .p-menuitem.p-focus > .p-menuitem-content,
+html.scrivener-theme.dark .p-tieredmenu .p-menuitem.p-focus > .p-menuitem-content {
+  background-color: #3E3626 !important;
+  outline: 2px solid #7A6A4A !important;
+  outline-offset: -2px !important;
+}
+
+/* ----------------------------------------------------------------------------
+   FIX 3: Sub-tabs (Detectores/Reglas editoriales) - Match main tab styling
+   Problem: Underlines and different icon styling than main navigation
+   Solution: Remove underlines, consistent icon/text styling
+   ---------------------------------------------------------------------------- */
+/* Target TabView inside StyleTab specifically */
+html.scrivener-theme.dark .style-tabview .p-tabview-nav,
+html.scrivener-theme.dark .style-tabview .p-tabview-nav-content {
+  background-color: transparent !important;
+  border-bottom: 1px solid #504834 !important;
+}
+
+html.scrivener-theme.dark .style-tabview .p-tabview-nav .p-tabview-header,
+html.scrivener-theme.dark .style-tabview [data-pc-section="nav"] [data-pc-section="header"] {
+  margin-bottom: -1px !important;
+}
+
+html.scrivener-theme.dark .style-tabview .p-tabview-nav-link,
+html.scrivener-theme.dark .style-tabview [data-pc-section="headeraction"] {
+  background-color: transparent !important;
+  border: 1px solid transparent !important;
+  border-bottom: none !important;
+  border-radius: 6px 6px 0 0 !important;
+  color: #A89878 !important;
+  padding: 0.75rem 1rem !important;
+  gap: 0.5rem !important;
+  transition: all 0.15s ease !important;
+}
+
+html.scrivener-theme.dark .style-tabview .p-tabview-nav-link:hover,
+html.scrivener-theme.dark .style-tabview [data-pc-section="headeraction"]:hover {
+  background-color: #302A1C !important;
+  color: #E8DCC8 !important;
+}
+
+html.scrivener-theme.dark .style-tabview .p-tabview-header.p-tabview-header-active .p-tabview-nav-link,
+html.scrivener-theme.dark .style-tabview .p-tabview-header.p-highlight .p-tabview-nav-link,
+html.scrivener-theme.dark .style-tabview [data-p-active="true"] [data-pc-section="headeraction"] {
+  background-color: #252015 !important;
+  border-color: #504834 #504834 #252015 #504834 !important;
+  color: #E8DCC8 !important;
+  font-weight: 500 !important;
+}
+
+/* Remove underline indicator - use border-based active state instead */
+html.scrivener-theme.dark .style-tabview .p-tabview-ink-bar,
+html.scrivener-theme.dark .style-tabview [data-pc-section="inkbar"] {
+  display: none !important;
+}
+
+/* Icons in sub-tabs - consistent sizing */
+html.scrivener-theme.dark .style-tabview .p-tabview-nav-link i,
+html.scrivener-theme.dark .style-tabview [data-pc-section="headeraction"] i {
+  font-size: 1rem !important;
+  opacity: 0.8 !important;
+}
+
+html.scrivener-theme.dark .style-tabview .p-tabview-header.p-tabview-header-active .p-tabview-nav-link i,
+html.scrivener-theme.dark .style-tabview .p-tabview-header.p-highlight .p-tabview-nav-link i,
+html.scrivener-theme.dark .style-tabview [data-p-active="true"] i {
+  opacity: 1 !important;
+}
+
+/* ----------------------------------------------------------------------------
+   FIX 4: Dialog footer buttons - More spacing from content
+   Problem: Buttons too close to content above
+   ---------------------------------------------------------------------------- */
+html.scrivener-theme.dark .p-dialog .p-dialog-footer {
+  padding: 1.25rem 1.5rem !important;
+  margin-top: 0.5rem !important;
+  gap: 0.75rem !important;
+}
+
+html.scrivener-theme.dark .p-dialog .p-dialog-content {
+  padding-bottom: 1rem !important;
+}
+
+/* Add visual separator */
+html.scrivener-theme.dark .p-dialog .p-dialog-footer {
+  border-top: 1px solid #504834 !important;
+}
+
+/* ----------------------------------------------------------------------------
+   FIX 5: Quote selector buttons - Better differentiation
+   Problem: Quote style options look identical
+   Solution: Add visual indicators showing actual quote characters
+   ---------------------------------------------------------------------------- */
+/* Quote style SelectButton - show actual quote characters */
+html.scrivener-theme.dark .p-selectbutton.quote-selector .p-togglebutton,
+html.scrivener-theme.dark .p-selectbutton.quote-selector .p-button,
+html.scrivener-theme.dark [data-pc-name="selectbutton"].quote-selector .p-togglebutton {
+  min-width: 5rem !important;
+  padding: 0.5rem 0.75rem !important;
+}
+
+/* Generic fix for any SelectButton showing quote options via option content */
+html.scrivener-theme.dark .p-selectbutton .p-togglebutton-content,
+html.scrivener-theme.dark .p-selectbutton .p-button-label {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.25rem !important;
+}
+
+/* Better visual differentiation for all SelectButton options */
+html.scrivener-theme.dark .p-selectbutton {
+  border: 1px solid #504834 !important;
+  border-radius: 6px !important;
+  padding: 2px !important;
+  background-color: #1A170F !important;
+}
+
+html.scrivener-theme.dark .p-selectbutton .p-togglebutton,
+html.scrivener-theme.dark .p-selectbutton .p-button {
+  border-radius: 4px !important;
+  margin: 0 !important;
+}
+
+/* First button in group */
+html.scrivener-theme.dark .p-selectbutton .p-togglebutton:first-child,
+html.scrivener-theme.dark .p-selectbutton .p-button:first-child {
+  border-top-left-radius: 4px !important;
+  border-bottom-left-radius: 4px !important;
+}
+
+/* Last button in group */
+html.scrivener-theme.dark .p-selectbutton .p-togglebutton:last-child,
+html.scrivener-theme.dark .p-selectbutton .p-button:last-child {
+  border-top-right-radius: 4px !important;
+  border-bottom-right-radius: 4px !important;
+}
+
+/* Separator between buttons */
+html.scrivener-theme.dark .p-selectbutton .p-togglebutton:not(:last-child),
+html.scrivener-theme.dark .p-selectbutton .p-button:not(:last-child) {
+  border-right: 1px solid #3E3626 !important;
+}

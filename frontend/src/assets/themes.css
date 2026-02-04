@@ -1,0 +1,218 @@
+/**
+ * Narrative Assistant - Variables de tema personalizadas
+ *
+ * PrimeVue 4 maneja los colores base y componentes.
+ * Este archivo contiene solo variables específicas de la aplicación.
+ */
+
+:root {
+  /* ============================================================================
+     ENTITY HIGHLIGHTS - Colores para resaltado de entidades en el documento
+     ============================================================================ */
+  --entity-character: #7b1fa2;
+  --entity-character-bg: rgba(123, 31, 162, 0.12);
+  --entity-location: #00897b;
+  --entity-location-bg: rgba(0, 137, 123, 0.12);
+  --entity-object: #f57c00;
+  --entity-object-bg: rgba(245, 124, 0, 0.12);
+  --entity-organization: #1565c0;
+  --entity-organization-bg: rgba(21, 101, 192, 0.12);
+  --entity-other: #616161;
+  --entity-other-bg: rgba(97, 97, 97, 0.12);
+
+  /* ============================================================================
+     ALERT SEVERITY - Colores para niveles de alerta
+     ============================================================================ */
+  --alert-critical: #d32f2f;
+  --alert-critical-bg: #ffebee;
+  --alert-warning: #f57c00;
+  --alert-warning-bg: #fff3e0;
+  --alert-info: #0288d1;
+  --alert-info-bg: #e1f5fe;
+  --alert-hint: #616161;
+  --alert-hint-bg: #f5f5f5;
+
+  /* ============================================================================
+     CUSTOM SHADOWS - Sombras personalizadas
+     ============================================================================ */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 8px 0 rgba(0, 0, 0, 0.12);
+  --shadow-lg: 0 8px 16px 0 rgba(0, 0, 0, 0.16);
+}
+
+/* ============================================================================
+   DARK MODE - Ajustes para modo oscuro
+   ============================================================================ */
+.dark {
+  /* Entity highlights - más brillantes para fondo oscuro */
+  --entity-character: #ba68c8;
+  --entity-character-bg: rgba(186, 104, 200, 0.2);
+  --entity-location: #4db6ac;
+  --entity-location-bg: rgba(77, 182, 172, 0.2);
+  --entity-object: #ffa726;
+  --entity-object-bg: rgba(255, 167, 38, 0.2);
+  --entity-organization: #42a5f5;
+  --entity-organization-bg: rgba(66, 165, 245, 0.2);
+  --entity-other: #9e9e9e;
+  --entity-other-bg: rgba(158, 158, 158, 0.2);
+
+  /* Alert severity - ajustados para dark mode */
+  --alert-critical: #ef5350;
+  --alert-critical-bg: #3e1f1f;
+  --alert-warning: #ffa726;
+  --alert-warning-bg: #3e2e1f;
+  --alert-info: #42a5f5;
+  --alert-info-bg: #1f2d3e;
+  --alert-hint: #9e9e9e;
+  --alert-hint-bg: #2d2d30;
+
+  /* Shadows - más pronunciadas en dark mode */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.5);
+  --shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.6);
+  --shadow-md: 0 4px 8px 0 rgba(0, 0, 0, 0.7);
+  --shadow-lg: 0 8px 16px 0 rgba(0, 0, 0, 0.8);
+}
+
+/* ============================================================================
+   THEME TRANSITION - Transición suave al cambiar de tema
+   ============================================================================ */
+html.theme-transition,
+html.theme-transition *,
+html.theme-transition *:before,
+html.theme-transition *:after {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease !important;
+  transition-delay: 0 !important;
+}
+
+/* ============================================================================
+   ENTITY HIGHLIGHT CLASSES - Clases para resaltado en DocumentViewer
+   ============================================================================ */
+.entity-highlight {
+  padding: 0 0.125rem;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.entity-highlight-active {
+  background-color: var(--alert-warning-bg) !important;
+  outline: 2px solid var(--alert-warning);
+}
+
+.entity-character {
+  background-color: var(--entity-character-bg);
+  border-bottom: 2px solid var(--entity-character);
+}
+
+.entity-location {
+  background-color: var(--entity-location-bg);
+  border-bottom: 2px solid var(--entity-location);
+}
+
+.entity-object {
+  background-color: var(--entity-object-bg);
+  border-bottom: 2px solid var(--entity-object);
+}
+
+.entity-organization {
+  background-color: var(--entity-organization-bg);
+  border-bottom: 2px solid var(--entity-organization);
+}
+
+.entity-other {
+  background-color: var(--entity-other-bg);
+  border-bottom: 2px solid var(--entity-other);
+}
+
+/* ============================================================================
+   ALERT SEVERITY CLASSES - Clases para indicadores de severidad
+   ============================================================================ */
+.severity-critical {
+  background-color: var(--alert-critical);
+}
+
+.severity-warning {
+  background-color: var(--alert-warning);
+}
+
+.severity-info {
+  background-color: var(--alert-info);
+}
+
+.severity-hint {
+  background-color: var(--alert-hint);
+}
+
+/* ============================================================================
+   SCROLLBAR STYLES - Barras de desplazamiento personalizadas
+   ============================================================================ */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--p-surface-100);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--p-surface-400);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--p-surface-500);
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: var(--p-surface-800);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: var(--p-surface-600);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: var(--p-surface-500);
+}
+
+/* ============================================================================
+   TEXT SELECTION - Colores de selección de texto
+   ============================================================================ */
+::selection {
+  background-color: var(--p-primary-color);
+  color: white;
+}
+
+.dark ::selection {
+  background-color: var(--p-primary-400);
+  color: var(--p-surface-900);
+}
+
+/* ============================================================================
+   REDUCED MOTION - Accesibilidad para usuarios que prefieren menos animaciones
+   ============================================================================ */
+
+/* Cuando el usuario activa "Reducir animaciones" en la app */
+html.reduced-motion,
+html.reduced-motion *,
+html.reduced-motion *::before,
+html.reduced-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* También respetar preferencia del sistema operativo */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

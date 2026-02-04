@@ -1,0 +1,129 @@
+{
+  "ner": {
+    "precision": 0.4,
+    "recall": 0.8571428571428571,
+    "f1": 0.5454545454545455,
+    "true_positives": [
+      "Pedro",
+      "Juan",
+      "Juan Pérez",
+      "Pedro García",
+      "Elena",
+      "María"
+    ],
+    "false_positives": [
+      "ELENA",
+      "Martes",
+      "Saludó",
+      "Supo",
+      "Postre",
+      "PEDRO",
+      "Barba",
+      "Traía",
+      "MARÍA"
+    ],
+    "false_negatives": [
+      "María Sánchez"
+    ],
+    "rejected_by_validator": [
+      "INCONSISTENCIAS DE",
+      "Feliz cumpleaños",
+      "Me gusta tu perfume",
+      "Extrañaba su pelo negro natural",
+      "INCONSISTENCIAS",
+      "Personaje MARÍA",
+      "Ojos: azules",
+      "Personaje PEDRO",
+      "Pelo: canoso",
+      "Ojos: verdes",
+      "Ojos: no mencionados",
+      "Inconsistencias",
+      "INCONSISTENCIAS"
+    ],
+    "total_rejected": 13,
+    "validation_method": "heuristic"
+  },
+  "dequeismo": {
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0,
+    "true_positives": [
+      "pensaba de que",
+      "pienso de que",
+      "opinaba de que",
+      "pensamos de que"
+    ],
+    "false_positives": [],
+    "false_negatives": [],
+    "total_detected": 4,
+    "total_gold": 4
+  },
+  "queismo": {
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0,
+    "true_positives": [
+      "me acuerdo que",
+      "estoy seguro que",
+      "estaba segura que",
+      "me alegro que",
+      "después que",
+      "estaba convencido que",
+      "se alegraba que",
+      "a pesar que",
+      "me di cuenta que"
+    ],
+    "false_positives": [],
+    "false_negatives": []
+  },
+  "fusion_by_threshold": {
+    "0.65": {
+      "precision": 0.05405405405405406,
+      "recall": 0.6666666666666666,
+      "suggested_count": 529,
+      "correct_count": 2
+    },
+    "0.7": {
+      "precision": 0.11764705882352941,
+      "recall": 0.6666666666666666,
+      "suggested_count": 447,
+      "correct_count": 2
+    },
+    "0.75": {
+      "precision": 0.2222222222222222,
+      "recall": 0.6666666666666666,
+      "suggested_count": 321,
+      "correct_count": 2
+    },
+    "0.8": {
+      "precision": 0.25,
+      "recall": 0.6666666666666666,
+      "suggested_count": 303,
+      "correct_count": 2
+    },
+    "0.82": {
+      "precision": 0.25,
+      "recall": 0.6666666666666666,
+      "suggested_count": 303,
+      "correct_count": 2
+    },
+    "0.85": {
+      "precision": 0.14285714285714285,
+      "recall": 0.3333333333333333,
+      "suggested_count": 293,
+      "correct_count": 1
+    },
+    "0.88": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "suggested_count": 281,
+      "correct_count": 0
+    },
+    "0.9": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "suggested_count": 281,
+      "correct_count": 0
+    }
+  }
+}

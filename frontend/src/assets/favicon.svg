@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <defs>
+    <!-- Bic transparent body gradient -->
+    <linearGradient id="bicBody" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#e5e7eb"/>
+      <stop offset="30%" style="stop-color:#f9fafb"/>
+      <stop offset="70%" style="stop-color:#f9fafb"/>
+      <stop offset="100%" style="stop-color:#d1d5db"/>
+    </linearGradient>
+    <!-- Red cap gradient -->
+    <linearGradient id="redCap" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#dc2626"/>
+      <stop offset="30%" style="stop-color:#ef4444"/>
+      <stop offset="70%" style="stop-color:#ef4444"/>
+      <stop offset="100%" style="stop-color:#b91c1c"/>
+    </linearGradient>
+  </defs>
+
+  <!-- BIC pen body (hexagonal shape simplified as rectangle) - vertical orientation -->
+  <rect x="12" y="4" width="8" height="20" rx="0.5" fill="url(#bicBody)" stroke="#9ca3af" stroke-width="0.5"/>
+
+  <!-- Red ink tube inside (visible through transparent body) -->
+  <rect x="14.5" y="6" width="3" height="14" fill="#dc2626" opacity="0.7"/>
+
+  <!-- Classic Bic RED CAP (top) -->
+  <rect x="11" y="0" width="10" height="6" rx="1" fill="url(#redCap)"/>
+
+  <!-- Cap clip -->
+  <rect x="21" y="1" width="1.5" height="5" rx="0.5" fill="#dc2626"/>
+
+  <!-- Metal cone tip holder -->
+  <polygon points="12,24 20,24 17,28 15,28" fill="#d4af37"/>
+
+  <!-- Ballpoint tip -->
+  <circle cx="16" cy="29" r="1.5" fill="#1f2937"/>
+
+  <!-- Highlight reflection on body -->
+  <rect x="13" y="8" width="1" height="10" fill="white" opacity="0.6" rx="0.5"/>
+
+  <!-- Small vent hole detail -->
+  <circle cx="16" cy="10" r="0.8" fill="#9ca3af"/>
+</svg>

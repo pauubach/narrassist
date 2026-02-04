@@ -1,0 +1,315 @@
+name: Build Multi-Platform Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Trigger on version tags (v0.3.0, v0.3.1, etc.)
+
+permissions:
+  contents: write  # Needed to create releases
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: Download Python Embebido
+        run: python scripts/download_python_embed.py
+      
+      - name: Install pip in embedded Python (get-pip.py)
+        working-directory: src-tauri/binaries/python-embed
+        run: |
+          curl -o get-pip.py https://bootstrap.pypa.io/get-pip.py
+          .\python.exe get-pip.py
+          .\python.exe -m pip install --upgrade pip setuptools wheel
+          Remove-Item get-pip.py
+      
+      - name: Build Backend Bundle
+        run: python scripts/build_backend_bundle.py
+
+      - name: Install base dependencies in embedded Python
+        run: |
+          src-tauri\binaries\python-embed\python.exe -m pip install -r src-tauri\binaries\backend\requirements.txt --no-warn-script-location
+        shell: cmd
+
+      - name: Install NLP dependencies with pinned versions
+        run: |
+          src-tauri\binaries\python-embed\python.exe -m pip install -r src-tauri\binaries\backend\requirements-nlp.txt --no-warn-script-location
+        shell: cmd
+
+      - name: Validate binaries and python embed (Windows)
+        shell: pwsh
+        run: |
+          Write-Host "=== Contenido de src-tauri/binaries ==="
+          Get-ChildItem -Path src-tauri/binaries -Recurse
+
+          $pythonEmbed = "src-tauri/binaries/python-embed/python.exe"
+          if (!(Test-Path $pythonEmbed)) {
+            Write-Host "Contenido de src-tauri/binaries/python-embed:" 
+            if (Test-Path "src-tauri/binaries/python-embed") {
+              Get-ChildItem -Path src-tauri/binaries/python-embed
+            }
+            throw "python-embed no se encontro en $pythonEmbed"
+          }
+
+          if (!(Test-Path "src-tauri/binaries/backend")) {
+            throw "backend bundle no existe"
+          }
+
+          if (!(Test-Path "src-tauri/binaries/start-backend-x86_64-pc-windows-msvc.exe")) {
+            throw "launcher start-backend-x86_64-pc-windows-msvc.exe no existe"
+          }
+
+          Write-Host "Validaciones OK"
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      
+      - name: Build Frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+      
+      - name: Run Frontend type-check
+        working-directory: frontend
+        run: npx vue-tsc --noEmit
+
+      - name: Run Frontend tests
+        working-directory: frontend
+        run: npx vitest run --reporter=verbose
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Rust format check
+        working-directory: src-tauri
+        run: cargo fmt --check
+
+      - name: Rust lint
+        working-directory: src-tauri
+        run: cargo clippy -- -D warnings
+
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version "^2.0.0"
+
+      - name: Build Tauri (Windows)
+        run: cargo tauri build --target x86_64-pc-windows-msvc
+      
+      - name: Upload Windows Installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: narrative-assistant-windows
+          path: src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
+  
+  build-macos:
+    runs-on: macos-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: Download Python Framework
+        run: python3 scripts/download_python_embed.py
+
+      - name: Patch Python Framework paths (macOS)
+        run: python3 scripts/patch_macos_python.py src-tauri/binaries/python-embed
+
+      - name: Install pip in embedded Python
+        working-directory: src-tauri/binaries/python-embed
+        env:
+          PYTHONHOME: ${{ github.workspace }}/src-tauri/binaries/python-embed/Python.framework/Versions/3.12
+          DYLD_FRAMEWORK_PATH: ${{ github.workspace }}/src-tauri/binaries/python-embed
+        run: |
+          curl -o get-pip.py https://bootstrap.pypa.io/get-pip.py
+          ./python3 get-pip.py
+          ./python3 -m pip install --upgrade pip setuptools wheel
+          rm get-pip.py
+      
+      - name: Build Backend Bundle
+        run: python3 scripts/build_backend_bundle.py
+
+      - name: Install base dependencies in embedded Python
+        run: |
+          ./python3 -m pip install -r ../backend/requirements.txt --no-warn-script-location
+        working-directory: src-tauri/binaries/python-embed
+        env:
+          PYTHONHOME: ${{ github.workspace }}/src-tauri/binaries/python-embed/Python.framework/Versions/3.12
+          DYLD_FRAMEWORK_PATH: ${{ github.workspace }}/src-tauri/binaries/python-embed
+
+      - name: Install NLP dependencies with pinned versions
+        run: |
+          ./python3 -m pip install -r ../backend/requirements-nlp.txt --no-warn-script-location
+        working-directory: src-tauri/binaries/python-embed
+        env:
+          PYTHONHOME: ${{ github.workspace }}/src-tauri/binaries/python-embed/Python.framework/Versions/3.12
+          DYLD_FRAMEWORK_PATH: ${{ github.workspace }}/src-tauri/binaries/python-embed
+
+      - name: Sign all Python binaries (macOS)
+        run: python3 scripts/sign_macos_binaries.py src-tauri/binaries/python-embed
+
+      - name: Verify signatures (macOS)
+        run: |
+          echo "=== Verificando firmas de binarios Python ==="
+          # Verificar algunos binarios críticos
+          for so in $(find src-tauri/binaries/python-embed -name "*.so" | head -5); do
+            codesign -v "$so" && echo "✅ $so" || echo "❌ $so"
+          done
+          # Verificar python3.bin si existe
+          if [ -f "src-tauri/binaries/python-embed/python3.bin" ]; then
+            codesign -v "src-tauri/binaries/python-embed/python3.bin" && echo "✅ python3.bin" || echo "❌ python3.bin"
+          fi
+          # Contar totales
+          total_so=$(find src-tauri/binaries/python-embed -name "*.so" | wc -l)
+          total_dylib=$(find src-tauri/binaries/python-embed -name "*.dylib" | wc -l)
+          echo "📊 Total: $total_so .so, $total_dylib .dylib"
+
+      - name: Validate binaries and python embed (macOS)
+        run: |
+          set -euo pipefail
+          echo "=== Contenido de src-tauri/binaries ==="
+          ls -la src-tauri/binaries/
+          echo "=== Contenido de python-embed ==="
+          ls -la src-tauri/binaries/python-embed/ || true
+
+          if [ ! -d "src-tauri/binaries/python-embed" ]; then
+            echo "Directorio python-embed inexistente" >&2
+            exit 1
+          fi
+
+          if [ ! -d "src-tauri/binaries/python-embed/Python.framework" ] && [ ! -f "src-tauri/binaries/python-embed/python3" ]; then
+            echo "Python.framework o symlink python3 no encontrado" >&2
+            find src-tauri/binaries/python-embed -maxdepth 3 -print
+            exit 1
+          fi
+
+          if [ ! -e "src-tauri/binaries/start-backend-aarch64-apple-darwin" ] || [ ! -e "src-tauri/binaries/start-backend-x86_64-apple-darwin" ]; then
+            echo "Launchers de macOS no presentes" >&2
+            exit 1
+          fi
+      
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      
+      - name: Build Frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+      
+      - name: Run Frontend type-check
+        working-directory: frontend
+        run: npx vue-tsc --noEmit
+
+      - name: Run Frontend tests
+        working-directory: frontend
+        run: npx vitest run --reporter=verbose
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Rust format check
+        working-directory: src-tauri
+        run: cargo fmt --check
+
+      - name: Rust lint
+        working-directory: src-tauri
+        run: cargo clippy -- -D warnings
+
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version "^2.0.0"
+
+      - name: Ensure launcher permissions
+        run: |
+          chmod +x src-tauri/binaries/start-backend.sh
+          chmod +x src-tauri/binaries/start-backend-aarch64-apple-darwin
+          chmod +x src-tauri/binaries/start-backend-x86_64-apple-darwin
+      
+      
+      - name: Build Tauri (macOS)
+        run: cargo tauri build --target aarch64-apple-darwin
+      
+      - name: Upload macOS DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: narrative-assistant-macos
+          path: src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
+  
+  create-release:
+    needs: [build-windows, build-macos]
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: narrative-assistant-windows
+          path: artifacts/windows
+      
+      - name: Download macOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: narrative-assistant-macos
+          path: artifacts/macos
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            artifacts/windows/*.exe
+            artifacts/macos/*.dmg
+          body: |
+            ## Narrative Assistant ${{ github.ref_name }}
+            
+            **Instaladores multi-plataforma con Python embebido**
+            
+            ### Plataformas soportadas
+            - ✅ **Windows 10/11**: `Narrative-Assistant-Setup.exe` (~40-50 MB)
+            - ✅ **macOS 11+**: `Narrative-Assistant.dmg` (~60-70 MB)
+            
+            ### Características
+            - ✅ No requiere Python instalado en el sistema
+            - ✅ Instalación simple para usuarios no técnicos
+            - ✅ Primera ejecución descarga modelos NLP (~900MB)
+            - ✅ Después funciona 100% offline
+            
+            ### Notas
+            - **Windows**: Verificado funcional en v0.3.0
+            - **macOS**: Verificado funcional en v0.4.35 (Apple Silicon)
+            - **Documentación**: Ver [PYTHON_EMBED.md](https://github.com/${{ github.repository }}/blob/main/docs/PYTHON_EMBED.md)
+            
+            ### Verificación
+            Para verificar la integridad de los instaladores, consulte los checksums en los artifacts.
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

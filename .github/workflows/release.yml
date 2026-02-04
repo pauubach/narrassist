@@ -1,0 +1,165 @@
+name: Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  # Build para cada plataforma
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version "^2.0"
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Install Python dependencies
+        run: |
+          pip install -e ".[build]"
+          pip install -r api-server/requirements.txt
+
+      - name: Build sidecar
+        run: python scripts/build_sidecar.py --clean
+
+      - name: Verify sidecar was built
+        run: |
+          Write-Host "Checking binaries directory..."
+          Get-ChildItem -Path src-tauri/binaries/
+          Write-Host "Expected file for Windows: narrative-assistant-server-x86_64-pc-windows-msvc.exe"
+        shell: pwsh
+
+      - name: Prepare resources
+        run: |
+          New-Item -ItemType Directory -Force -Path src-tauri/resources
+          Copy-Item scripts/install_models.py src-tauri/resources/
+        shell: pwsh
+
+      - name: Build Tauri
+        run: cargo tauri build
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: src-tauri/target/release/bundle/nsis/*.exe
+
+  build-macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version "^2.0"
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Install Python dependencies
+        run: |
+          pip install -e ".[build]"
+          pip install -r api-server/requirements.txt
+
+      - name: Build sidecar
+        run: python scripts/build_sidecar.py --clean
+
+      - name: Verify sidecar was built
+        run: |
+          echo "Checking binaries directory..."
+          ls -la src-tauri/binaries/
+          echo "Expected file for macOS: narrative-assistant-server-*-apple-darwin*"
+
+      - name: Prepare resources
+        run: |
+          mkdir -p src-tauri/resources
+          cp scripts/install_models.py src-tauri/resources/
+
+      - name: Build Tauri
+        run: cargo tauri build
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-installer
+          path: src-tauri/target/release/bundle/dmg/*.dmg
+
+  # Crear release con todos los artefactos
+  create-release:
+    needs: [build-windows, build-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Display structure
+        run: ls -R artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          draft: true
+          generate_release_notes: true
+          files: |
+            artifacts/windows-installer/*
+            artifacts/macos-installer/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

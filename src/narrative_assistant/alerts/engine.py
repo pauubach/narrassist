@@ -1,0 +1,1652 @@
+"""
+Motor centralizado de alertas.
+
+Recibe alertas de todos los detectores, las clasifica, prioriza
+y gestiona su ciclo de vida.
+"""
+
+import logging
+import threading
+from collections import defaultdict
+from collections.abc import Callable
+from datetime import datetime
+from typing import Any, Optional
+
+from ..analysis.attribute_consistency import get_attribute_display_name
+from ..core.result import Result
+from .formatter import AlertFormatter
+from .models import Alert, AlertCategory, AlertFilter, AlertSeverity, AlertStatus
+from .repository import AlertRepository, get_alert_repository
+
+logger = logging.getLogger(__name__)
+
+# Lock para thread-safety en singleton
+_engine_lock = threading.Lock()
+_alert_engine: Optional["AlertEngine"] = None
+
+
+class AlertEngine:
+    """
+    Motor centralizado para gestión de alertas.
+
+    Características:
+    - Crea alertas desde diferentes detectores
+    - Clasifica y prioriza automáticamente
+    - Gestiona estados y transiciones
+    - Filtra y busca alertas
+    - Genera resúmenes y estadísticas
+    """
+
+    def __init__(self, repository: AlertRepository | None = None):
+        """
+        Inicializa el motor de alertas.
+
+        Args:
+            repository: Repositorio de alertas (opcional, usa singleton por defecto)
+        """
+        self.repo = repository or get_alert_repository()
+        self.alert_handlers: dict[str, Callable[[Any], Alert]] = {}
+
+    def register_handler(self, alert_type: str, handler: Callable[[Any], Alert]) -> None:
+        """
+        Registra un handler para convertir resultados de detector a alertas.
+
+        Args:
+            alert_type: Tipo de alerta (ej: "attribute_inconsistency")
+            handler: Función que convierte resultado a Alert
+        """
+        self.alert_handlers[alert_type] = handler
+        logger.debug(f"Registered handler for alert type: {alert_type}")
+
+    def create_alert(
+        self,
+        project_id: int,
+        category: AlertCategory,
+        severity: AlertSeverity,
+        alert_type: str,
+        title: str,
+        description: str,
+        explanation: str,
+        **kwargs,
+    ) -> Result[Alert]:
+        """
+        Crea una nueva alerta.
+
+        Args:
+            project_id: ID del proyecto
+            category: Categoría de la alerta
+            severity: Severidad
+            alert_type: Tipo específico
+            title: Título breve
+            description: Descripción corta
+            explanation: Explicación detallada
+            **kwargs: Campos opcionales (suggestion, chapter, entity_ids, etc.)
+
+        Returns:
+            Result con la alerta creada
+        """
+        alert = Alert(
+            id=0,  # Se asignará por la DB
+            project_id=project_id,
+            category=category,
+            severity=severity,
+            alert_type=alert_type,
+            title=title,
+            description=description,
+            explanation=explanation,
+            suggestion=kwargs.get("suggestion"),
+            chapter=kwargs.get("chapter"),
+            scene=kwargs.get("scene"),
+            start_char=kwargs.get("start_char"),
+            end_char=kwargs.get("end_char"),
+            excerpt=kwargs.get("excerpt", ""),
+            entity_ids=kwargs.get("entity_ids", []),
+            confidence=kwargs.get("confidence", 0.8),
+            source_module=kwargs.get("source_module", ""),
+            extra_data=kwargs.get("extra_data", {}),
+        )
+
+        return self.repo.create(alert)
+
+    def create_alerts_batch(
+        self, project_id: int, alerts_data: list[dict[str, Any]]
+    ) -> Result[list[Alert]]:
+        """
+        Crea múltiples alertas de una vez.
+
+        Args:
+            project_id: ID del proyecto
+            alerts_data: Lista de diccionarios con datos de alertas
+
+        Returns:
+            Result con lista de alertas creadas
+        """
+        created_alerts = []
+        errors = []
+
+        for data in alerts_data:
+            data["project_id"] = project_id
+            result = self.create_alert(**data)
+
+            if result.is_success:
+                created_alerts.append(result.value)
+            else:
+                errors.append(result.error)
+
+        if errors:
+            logger.warning(f"Created {len(created_alerts)} alerts with {len(errors)} errors")
+            return Result.partial(created_alerts, errors)
+
+        logger.info(f"Created {len(created_alerts)} alerts for project {project_id}")
+        return Result.success(created_alerts)
+
+    def get_alerts(
+        self, project_id: int, alert_filter: AlertFilter | None = None
+    ) -> Result[list[Alert]]:
+        """
+        Obtiene alertas con filtros opcionales.
+
+        Args:
+            project_id: ID del proyecto
+            alert_filter: Filtro opcional
+
+        Returns:
+            Result con lista de alertas filtradas
+        """
+        result = self.repo.get_by_project(project_id)
+        if result.is_failure:
+            return result
+
+        alerts = result.value
+
+        if alert_filter:
+            alerts = [a for a in alerts if alert_filter.matches(a)]
+            logger.debug(f"Filtered to {len(alerts)} alerts for project {project_id}")
+
+        return Result.success(alerts)
+
+    def get_alert(self, alert_id: int) -> Result[Alert]:
+        """
+        Obtiene una alerta específica por ID.
+
+        Args:
+            alert_id: ID de la alerta
+
+        Returns:
+            Result con la alerta
+        """
+        return self.repo.get(alert_id)
+
+    def update_alert_status(
+        self,
+        alert_id: int,
+        status: AlertStatus,
+        note: str = "",
+    ) -> Result[Alert]:
+        """
+        Actualiza el estado de una alerta.
+
+        Args:
+            alert_id: ID de la alerta
+            status: Nuevo estado
+            note: Nota sobre la resolución
+
+        Returns:
+            Result con la alerta actualizada
+        """
+        result = self.repo.get(alert_id)
+        if result.is_failure:
+            return result
+
+        alert = result.value
+        old_status = alert.status
+
+        alert.status = status
+        alert.resolution_note = note
+
+        if status in [AlertStatus.RESOLVED, AlertStatus.DISMISSED, AlertStatus.AUTO_RESOLVED]:
+            alert.resolved_at = datetime.now()
+
+        result = self.repo.update(alert)
+
+        if result.is_success:
+            logger.info(f"Alert {alert_id} status changed: {old_status.value} → {status.value}")
+
+        return result
+
+    def dismiss_alert(self, alert_id: int, reason: str = "") -> Result[Alert]:
+        """Descarta una alerta (falso positivo)."""
+        return self.update_alert_status(alert_id, AlertStatus.DISMISSED, f"Descartada: {reason}")
+
+    def resolve_alert(self, alert_id: int, resolution: str = "") -> Result[Alert]:
+        """Marca una alerta como resuelta."""
+        return self.update_alert_status(alert_id, AlertStatus.RESOLVED, f"Resuelto: {resolution}")
+
+    def acknowledge_alert(self, alert_id: int) -> Result[Alert]:
+        """Marca una alerta como vista/reconocida."""
+        return self.update_alert_status(alert_id, AlertStatus.ACKNOWLEDGED, "Usuario vio la alerta")
+
+    def get_summary(self, project_id: int) -> Result[dict[str, Any]]:
+        """
+        Genera resumen estadístico de alertas.
+
+        Args:
+            project_id: ID del proyecto
+
+        Returns:
+            Result con diccionario de estadísticas
+        """
+        result = self.repo.get_by_project(project_id)
+        if result.is_failure:
+            return result
+
+        alerts = result.value
+
+        summary = {
+            "total": len(alerts),
+            "open": sum(1 for a in alerts if a.is_open()),
+            "closed": sum(1 for a in alerts if a.is_closed()),
+            "by_category": defaultdict(int),
+            "by_severity": defaultdict(int),
+            "by_status": defaultdict(int),
+            "by_chapter": defaultdict(int),
+            "by_source": defaultdict(int),
+        }
+
+        for alert in alerts:
+            summary["by_category"][alert.category.value] += 1
+            summary["by_severity"][alert.severity.value] += 1
+            summary["by_status"][alert.status.value] += 1
+            summary["by_source"][alert.source_module] += 1
+            if alert.chapter:
+                summary["by_chapter"][alert.chapter] += 1
+
+        # Convertir defaultdict a dict normal
+        summary["by_category"] = dict(summary["by_category"])
+        summary["by_severity"] = dict(summary["by_severity"])
+        summary["by_status"] = dict(summary["by_status"])
+        summary["by_chapter"] = dict(summary["by_chapter"])
+        summary["by_source"] = dict(summary["by_source"])
+
+        return Result.success(summary)
+
+    def prioritize_alerts(self, alerts: list[Alert]) -> list[Alert]:
+        """
+        Ordena alertas por prioridad.
+
+        Criterios:
+        1. Severidad (CRITICAL > WARNING > INFO > HINT)
+        2. Confianza (mayor primero)
+        3. Capítulo (orden de aparición)
+
+        Args:
+            alerts: Lista de alertas sin ordenar
+
+        Returns:
+            Lista ordenada por prioridad
+        """
+        severity_order = {
+            AlertSeverity.CRITICAL: 0,
+            AlertSeverity.WARNING: 1,
+            AlertSeverity.INFO: 2,
+            AlertSeverity.HINT: 3,
+        }
+
+        return sorted(
+            alerts,
+            key=lambda a: (
+                severity_order.get(a.severity, 4),
+                -a.confidence,
+                a.chapter or 0,
+            ),
+        )
+
+    def calculate_severity_from_confidence(self, confidence: float) -> AlertSeverity:
+        """
+        Calcula severidad automáticamente basada en confianza.
+
+        Args:
+            confidence: Nivel de confianza (0.0-1.0)
+
+        Returns:
+            Severidad calculada
+        """
+        if confidence >= 0.9:
+            return AlertSeverity.CRITICAL
+        elif confidence >= 0.7:
+            return AlertSeverity.WARNING
+        elif confidence >= 0.5:
+            return AlertSeverity.INFO
+        else:
+            return AlertSeverity.HINT
+
+    def delete_alert(self, alert_id: int) -> Result[None]:
+        """
+        Elimina una alerta permanentemente.
+
+        Args:
+            alert_id: ID de la alerta
+
+        Returns:
+            Result indicando éxito o fallo
+        """
+        return self.repo.delete(alert_id)
+
+    # --- Métodos helper para crear alertas desde detectores específicos ---
+
+    def create_from_attribute_inconsistency(
+        self,
+        project_id: int,
+        entity_name: str,
+        entity_id: int,
+        attribute_key: str,
+        value1: str,
+        value2: str,
+        value1_source: dict[str, Any],
+        value2_source: dict[str, Any],
+        explanation: str,
+        confidence: float = 0.9,
+    ) -> Result[Alert]:
+        """
+        Crea alerta desde inconsistencia de atributo.
+
+        IMPORTANTE: Incluye referencias a ubicaciones para mostrar:
+        "Capítulo X: 'valor1' vs Capítulo Y: 'valor2'"
+
+        Args:
+            value1_source, value2_source: Deben incluir:
+                - chapter: int
+                - page: int (calculado con calculate_page_and_line)
+                - line: int (calculado con calculate_page_and_line)
+                - start_char: int
+                - end_char: int
+                - text/excerpt: str
+
+        Example:
+            value1_source = {
+                "chapter": 2,
+                "page": 14,
+                "line": 5,
+                "start_char": 1234,
+                "end_char": 1280,
+                "excerpt": "ojos azules"
+            }
+        """
+        severity = self.calculate_severity_from_confidence(confidence)
+
+        # Construir descripción con referencias mejoradas
+        ref1 = f"Cap. {value1_source.get('chapter', '?')}"
+        if "page" in value1_source:
+            ref1 += f", pág. {value1_source['page']}"
+        if "line" in value1_source:
+            ref1 += f", lín. {value1_source['line']}"
+
+        ref2 = f"Cap. {value2_source.get('chapter', '?')}"
+        if "page" in value2_source:
+            ref2 += f", pág. {value2_source['page']}"
+        if "line" in value2_source:
+            ref2 += f", lín. {value2_source['line']}"
+
+        # Estructura sources[] para frontend
+        sources = [
+            {
+                "chapter": value1_source.get("chapter"),
+                "page": value1_source.get("page", 1),
+                "line": value1_source.get("line", 1),
+                "start_char": value1_source.get("start_char", value1_source.get("position", 0)),
+                "end_char": value1_source.get("end_char", value1_source.get("start_char", 0) + 100),
+                "excerpt": value1_source.get("text", value1_source.get("excerpt", "")),
+                "value": value1,
+            },
+            {
+                "chapter": value2_source.get("chapter"),
+                "page": value2_source.get("page", 1),
+                "line": value2_source.get("line", 1),
+                "start_char": value2_source.get("start_char", value2_source.get("position", 0)),
+                "end_char": value2_source.get("end_char", value2_source.get("start_char", 0) + 100),
+                "excerpt": value2_source.get("text", value2_source.get("excerpt", "")),
+                "value": value2,
+            },
+        ]
+
+        # Traducir nombre del atributo para mostrar en español
+        from ..nlp.attributes import AttributeKey
+
+        try:
+            attr_key_enum = AttributeKey(attribute_key)
+            display_name = get_attribute_display_name(attr_key_enum)
+        except (ValueError, KeyError):
+            display_name = attribute_key.replace("_", " ")
+
+        return self.create_alert(
+            project_id=project_id,
+            category=AlertCategory.CONSISTENCY,
+            severity=severity,
+            alert_type="attribute_inconsistency",
+            title=f"Inconsistencia: {display_name} de {entity_name}",
+            description=f"{ref1}: '{value1}' vs {ref2}: '{value2}'",
+            explanation=explanation,
+            suggestion=f"Verificar cuál es el valor correcto para {display_name}",
+            chapter=value1_source.get("chapter"),
+            entity_ids=[entity_id],
+            confidence=confidence,
+            source_module="attribute_consistency",
+            extra_data={
+                "entity_name": entity_name,
+                "attribute_key": attribute_key,
+                "value1": value1,
+                "value2": value2,
+                # ✅ Nueva estructura sources[] (consistente, fácil de usar en UI)
+                "sources": sources,
+                # ⚠️ Deprecated: mantener por compatibilidad temporal
+                "value1_source": value1_source,
+                "value2_source": value2_source,
+            },
+        )
+
+    def create_from_spelling_issue(
+        self,
+        project_id: int,
+        word: str,
+        start_char: int,
+        end_char: int,
+        sentence: str,
+        error_type: str,
+        suggestions: list[str],
+        confidence: float,
+        explanation: str,
+        chapter: int | None = None,
+    ) -> Result[Alert]:
+        """
+        Crea alerta desde un error ortográfico.
+
+        Args:
+            project_id: ID del proyecto
+            word: Palabra con error
+            start_char: Posición inicio
+            end_char: Posición fin
+            sentence: Oración de contexto
+            error_type: Tipo de error (typo, accent, etc.)
+            suggestions: Sugerencias de corrección
+            confidence: Confianza (0.0-1.0)
+            explanation: Explicación del error
+            chapter: Número de capítulo (opcional)
+
+        Returns:
+            Result con la alerta creada
+        """
+        severity = self.calculate_severity_from_confidence(confidence)
+
+        suggestion_text = None
+        if suggestions:
+            suggestion_text = f"Sugerencias: {', '.join(suggestions[:3])}"
+
+        return self.create_alert(
+            project_id=project_id,
+            category=AlertCategory.ORTHOGRAPHY,
+            severity=severity,
+            alert_type=f"spelling_{error_type}",
+            title=f"Error ortográfico: '{word}'",
+            description=explanation,
+            explanation=AlertFormatter.format_context(sentence),
+            suggestion=suggestion_text,
+            chapter=chapter,
+            start_char=start_char,
+            end_char=end_char,
+            excerpt=sentence,
+            confidence=confidence,
+            source_module="spelling_checker",
+            extra_data={
+                "word": word,
+                "error_type": error_type,
+                "suggestions": suggestions,
+            },
+        )
+
+    def create_from_grammar_issue(
+        self,
+        project_id: int,
+        text: str,
+        start_char: int,
+        end_char: int,
+        sentence: str,
+        error_type: str,
+        suggestion: str | None,
+        confidence: float,
+        explanation: str,
+        rule_id: str = "",
+        chapter: int | None = None,
+    ) -> Result[Alert]:
+        """
+        Crea alerta desde un error gramatical.
+
+        Args:
+            project_id: ID del proyecto
+            text: Fragmento con error
+            start_char: Posición inicio
+            end_char: Posición fin
+            sentence: Oración de contexto
+            error_type: Tipo de error (gender_agreement, etc.)
+            suggestion: Corrección sugerida
+            confidence: Confianza (0.0-1.0)
+            explanation: Explicación del error
+            rule_id: ID de la regla gramatical
+            chapter: Número de capítulo (opcional)
+
+        Returns:
+            Result con la alerta creada
+        """
+        severity = self.calculate_severity_from_confidence(confidence)
+
+        return self.create_alert(
+            project_id=project_id,
+            category=AlertCategory.GRAMMAR,
+            severity=severity,
+            alert_type=f"grammar_{error_type}",
+            title=f"Error gramatical: {explanation[:50]}",
+            description=f"'{text}' → '{suggestion}'" if suggestion else f"'{text}'",
+            explanation=AlertFormatter.format_context(sentence),
+            suggestion=suggestion,
+            chapter=chapter,
+            start_char=start_char,
+            end_char=end_char,
+            excerpt=sentence,
+            confidence=confidence,
+            source_module="grammar_checker",
+            extra_data={
+                "text": text,
+                "error_type": error_type,
+                "rule_id": rule_id,
+            },
+        )
+
+    def create_from_correction_issue(
+        self,
+        project_id: int,
+        category: str,
+        issue_type: str,
+        text: str,
+        start_char: int,
+        end_char: int,
+        explanation: str,
+        suggestion: str | None = None,
+        confidence: float = 0.8,
+        context: str = "",
+        chapter: int | None = None,
+        rule_id: str = "",
+        extra_data: dict | None = None,
+    ) -> Result[Alert]:
+        """
+        Crea alerta desde un issue de corrección editorial.
+
+        Soporta tipografía, repeticiones y concordancia.
+
+        Args:
+            project_id: ID del proyecto
+            category: Categoría (typography, repetition, agreement)
+            issue_type: Tipo específico de issue
+            text: Fragmento problemático
+            start_char: Posición inicio
+            end_char: Posición fin
+            explanation: Explicación para el corrector
+            suggestion: Sugerencia de corrección (opcional)
+            confidence: Confianza (0.0-1.0)
+            context: Contexto alrededor del problema
+            chapter: Número de capítulo (opcional)
+            rule_id: ID de la regla
+            extra_data: Datos adicionales
+
+        Returns:
+            Result con la alerta creada
+        """
+        # Mapear categoría de corrección a AlertCategory
+        category_map = {
+            "typography": AlertCategory.TYPOGRAPHY,
+            "punctuation": AlertCategory.PUNCTUATION,
+            "repetition": AlertCategory.REPETITION,
+            "agreement": AlertCategory.AGREEMENT,
+        }
+        alert_category = category_map.get(category, AlertCategory.STYLE)
+
+        # Calcular severidad basada en confianza y tipo
+        severity = self.calculate_severity_from_confidence(confidence)
+
+        # Títulos legibles según categoría
+        category_titles = {
+            "typography": "Tipografía",
+            "punctuation": "Puntuación",
+            "repetition": "Repetición",
+            "agreement": "Concordancia",
+        }
+        title_prefix = category_titles.get(category, "Corrección")
+
+        # Descripción según si hay sugerencia
+        if suggestion:
+            description = f"'{text}' → '{suggestion}'"
+        else:
+            description = f"'{text}'"
+
+        return self.create_alert(
+            project_id=project_id,
+            category=alert_category,
+            severity=severity,
+            alert_type=f"{category}_{issue_type}",
+            title=f"{title_prefix}: {explanation[:50]}{'...' if len(explanation) > 50 else ''}",
+            description=description,
+            explanation=AlertFormatter.format_context(context, prefix="Contexto") or explanation,
+            suggestion=suggestion,
+            chapter=chapter,
+            start_char=start_char,
+            end_char=end_char,
+            excerpt=context or text,
+            confidence=confidence,
+            source_module="corrections_detector",
+            extra_data=extra_data
+            or {
+                "text": text,
+                "issue_type": issue_type,
+                "rule_id": rule_id,
+            },
+        )
+
+    def create_alerts_from_spelling_report(
+        self,
+        project_id: int,
+        report: Any,  # SpellingReport
+        chapter: int | None = None,
+        min_confidence: float = 0.5,
+    ) -> Result[list[Alert]]:
+        """
+        Crea alertas desde un SpellingReport completo.
+
+        Args:
+            project_id: ID del proyecto
+            report: SpellingReport con los issues
+            chapter: Número de capítulo (opcional)
+            min_confidence: Confianza mínima para crear alertas
+
+        Returns:
+            Result con lista de alertas creadas
+        """
+        alerts_data = []
+
+        for issue in report.issues:
+            if issue.confidence < min_confidence:
+                continue
+
+            alerts_data.append(
+                {
+                    "category": AlertCategory.ORTHOGRAPHY,
+                    "severity": self.calculate_severity_from_confidence(issue.confidence),
+                    "alert_type": f"spelling_{issue.error_type.value}",
+                    "title": f"Error ortográfico: '{issue.word}'",
+                    "description": issue.explanation,
+                    "explanation": AlertFormatter.format_context(issue.sentence),
+                    "suggestion": f"Sugerencias: {', '.join(issue.suggestions[:3])}"
+                    if issue.suggestions
+                    else None,
+                    "chapter": chapter,
+                    "start_char": issue.start_char,
+                    "end_char": issue.end_char,
+                    "excerpt": issue.sentence,
+                    "confidence": issue.confidence,
+                    "source_module": "spelling_checker",
+                    "extra_data": {
+                        "word": issue.word,
+                        "error_type": issue.error_type.value,
+                        "suggestions": issue.suggestions,
+                    },
+                }
+            )
+
+        return self.create_alerts_batch(project_id, alerts_data)
+
+    def create_alerts_from_grammar_report(
+        self,
+        project_id: int,
+        report: Any,  # GrammarReport
+        chapter: int | None = None,
+        min_confidence: float = 0.5,
+    ) -> Result[list[Alert]]:
+        """
+        Crea alertas desde un GrammarReport completo.
+
+        Args:
+            project_id: ID del proyecto
+            report: GrammarReport con los issues
+            chapter: Número de capítulo (opcional)
+            min_confidence: Confianza mínima para crear alertas
+
+        Returns:
+            Result con lista de alertas creadas
+        """
+        alerts_data = []
+
+        for issue in report.issues:
+            if issue.confidence < min_confidence:
+                continue
+
+            alerts_data.append(
+                {
+                    "category": AlertCategory.GRAMMAR,
+                    "severity": self.calculate_severity_from_confidence(issue.confidence),
+                    "alert_type": f"grammar_{issue.error_type.value}",
+                    "title": f"Error gramatical: {issue.explanation[:50]}",
+                    "description": f"'{issue.text}' → '{issue.suggestion}'"
+                    if issue.suggestion
+                    else f"'{issue.text}'",
+                    "explanation": AlertFormatter.format_context(issue.sentence),
+                    "suggestion": issue.suggestion,
+                    "chapter": chapter,
+                    "start_char": issue.start_char,
+                    "end_char": issue.end_char,
+                    "excerpt": issue.sentence,
+                    "confidence": issue.confidence,
+                    "source_module": "grammar_checker",
+                    "extra_data": {
+                        "text": issue.text,
+                        "error_type": issue.error_type.value,
+                        "rule_id": issue.rule_id,
+                    },
+                }
+            )
+
+        return self.create_alerts_batch(project_id, alerts_data)
+
+    # --- Métodos para módulos de análisis narrativo ---
+
+    def create_from_temporal_inconsistency(
+        self,
+        project_id: int,
+        inconsistency_type: str,
+        description: str,
+        explanation: str,
+        chapter: int,
+        start_char: int,
+        end_char: int,
+        excerpt: str,
+        confidence: float = 0.8,
+        entity_ids: list[int] | None = None,
+        extra_data: dict[str, Any] | None = None,
+    ) -> Result[Alert]:
+        """
+        Crea alerta desde inconsistencia temporal.
+
+        Args:
+            project_id: ID del proyecto
+            inconsistency_type: Tipo (timeline_gap, duration_conflict, etc.)
+            description: Descripción corta
+            explanation: Explicación detallada
+            chapter: Número de capítulo
+            start_char: Posición inicio
+            end_char: Posición fin
+            excerpt: Extracto del texto
+            confidence: Confianza (0.0-1.0)
+            entity_ids: IDs de entidades involucradas
+            extra_data: Datos adicionales
+
+        Returns:
+            Result con la alerta creada
+        """
+        severity = self.calculate_severity_from_confidence(confidence)
+
+        return self.create_alert(
+            project_id=project_id,
+            category=AlertCategory.TIMELINE_ISSUE,
+            severity=severity,
+            alert_type=f"temporal_{inconsistency_type}",
+            title=f"Inconsistencia temporal: {inconsistency_type}",
+            description=description,
+            explanation=explanation,
+            suggestion="Revisar la coherencia temporal de los eventos",
+            chapter=chapter,
+            start_char=start_char,
+            end_char=end_char,
+            excerpt=excerpt,
+            entity_ids=entity_ids or [],
+            confidence=confidence,
+            source_module="temporal_analysis",
+            extra_data=extra_data or {},
+        )
+
+    def create_from_voice_deviation(
+        self,
+        project_id: int,
+        entity_id: int,
+        entity_name: str,
+        deviation_type: str,
+        expected_value: str,
+        actual_value: str,
+        description: str,
+        explanation: str,
+        chapter: int,
+        start_char: int,
+        end_char: int,
+        excerpt: str,
+        confidence: float = 0.7,
+        extra_data: dict[str, Any] | None = None,
+    ) -> Result[Alert]:
+        """
+        Crea alerta desde desviación del perfil de voz.
+
+        Args:
+            project_id: ID del proyecto
+            entity_id: ID del personaje
+            entity_name: Nombre del personaje
+            deviation_type: Tipo (formality_shift, vocabulary_anomaly, etc.)
+            expected_value: Valor esperado según perfil
+            actual_value: Valor detectado
+            description: Descripción corta
+            explanation: Explicación detallada
+            chapter: Número de capítulo
+            start_char: Posición inicio
+            end_char: Posición fin
+            excerpt: Diálogo o texto con la desviación
+            confidence: Confianza (0.0-1.0)
+            extra_data: Datos adicionales
+
+        Returns:
+            Result con la alerta creada
+        """
+        severity = self.calculate_severity_from_confidence(confidence)
+
+        return self.create_alert(
+            project_id=project_id,
+            category=AlertCategory.VOICE_DEVIATION,
+            severity=severity,
+            alert_type=f"voice_{deviation_type}",
+            title=f"Desviación de voz: {entity_name}",
+            description=description,
+            explanation=explanation,
+            suggestion=f"Verificar si {entity_name} hablaría así según su perfil",
+            chapter=chapter,
+            start_char=start_char,
+            end_char=end_char,
+            excerpt=excerpt,
+            entity_ids=[entity_id],
+            confidence=confidence,
+            source_module="voice_deviation_detector",
+            extra_data={
+                "entity_name": entity_name,
+                "deviation_type": deviation_type,
+                "expected_value": expected_value,
+                "actual_value": actual_value,
+                **(extra_data or {}),
+            },
+        )
+
+    def create_from_register_change(
+        self,
+        project_id: int,
+        from_register: str,
+        to_register: str,
+        severity_level: str,
+        chapter: int,
+        position: int,
+        context_before: str,
+        context_after: str,
+        explanation: str,
+        confidence: float = 0.7,
+    ) -> Result[Alert]:
+        """
+        Crea alerta desde cambio de registro narrativo.
+
+        Args:
+            project_id: ID del proyecto
+            from_register: Registro anterior (formal_literary, colloquial, etc.)
+            to_register: Registro nuevo
+            severity_level: Severidad del cambio (high, medium, low)
+            chapter: Número de capítulo
+            position: Posición en el texto
+            context_before: Texto antes del cambio
+            context_after: Texto después del cambio
+            explanation: Explicación del cambio
+            confidence: Confianza (0.0-1.0)
+
+        Returns:
+            Result con la alerta creada
+        """
+        # Mapear severidad del detector a AlertSeverity
+        severity_map = {
+            "high": AlertSeverity.WARNING,
+            "medium": AlertSeverity.INFO,
+            "low": AlertSeverity.HINT,
+        }
+        severity = severity_map.get(severity_level, AlertSeverity.INFO)
+
+        return self.create_alert(
+            project_id=project_id,
+            category=AlertCategory.STYLE,
+            severity=severity,
+            alert_type="register_change",
+            title=f"Cambio de registro: {from_register} → {to_register}",
+            description=f"Transición de registro {from_register} a {to_register}",
+            explanation=explanation,
+            suggestion="Verificar si el cambio de registro es intencional",
+            chapter=chapter,
+            start_char=position,
+            end_char=position + len(context_after),
+            excerpt=f"...{context_before[-50:]} | {context_after[:50]}...",
+            confidence=confidence,
+            source_module="register_change_detector",
+            extra_data={
+                "from_register": from_register,
+                "to_register": to_register,
+                "severity_level": severity_level,
+                "context_before": context_before,
+                "context_after": context_after,
+            },
+        )
+
+    def create_from_focalization_violation(
+        self,
+        project_id: int,
+        violation_type: str,
+        declared_focalizer: str,
+        violated_rule: str,
+        description: str,
+        explanation: str,
+        chapter: int,
+        start_char: int,
+        end_char: int,
+        excerpt: str,
+        confidence: float = 0.8,
+        entity_ids: list[int] | None = None,
+        extra_data: dict[str, Any] | None = None,
+    ) -> Result[Alert]:
+        """
+        Crea alerta desde violación de focalización.
+
+        Args:
+            project_id: ID del proyecto
+            violation_type: Tipo (unauthorized_pov, omniscient_leak, etc.)
+            declared_focalizer: Focalizador declarado
+            violated_rule: Regla violada
+            description: Descripción corta
+            explanation: Explicación detallada
+            chapter: Número de capítulo
+            start_char: Posición inicio
+            end_char: Posición fin
+            excerpt: Texto con la violación
+            confidence: Confianza (0.0-1.0)
+            entity_ids: IDs de entidades involucradas
+            extra_data: Datos adicionales
+
+        Returns:
+            Result con la alerta creada
+        """
+        severity = self.calculate_severity_from_confidence(confidence)
+
+        return self.create_alert(
+            project_id=project_id,
+            category=AlertCategory.FOCALIZATION,
+            severity=severity,
+            alert_type=f"focalization_{violation_type}",
+            title=f"Violación de focalización: {violation_type}",
+            description=description,
+            explanation=explanation,
+            suggestion=f"El focalizador actual es {declared_focalizer}. {violated_rule}",
+            chapter=chapter,
+            start_char=start_char,
+            end_char=end_char,
+            excerpt=excerpt,
+            entity_ids=entity_ids or [],
+            confidence=confidence,
+            source_module="focalization_validator",
+            extra_data={
+                "violation_type": violation_type,
+                "declared_focalizer": declared_focalizer,
+                "violated_rule": violated_rule,
+                **(extra_data or {}),
+            },
+        )
+
+    def create_from_speaker_attribution(
+        self,
+        project_id: int,
+        dialogue_text: str,
+        chapter: int,
+        start_char: int,
+        end_char: int,
+        attribution_confidence: str,
+        possible_speakers: list[str],
+        context: str,
+        extra_data: dict[str, Any] | None = None,
+    ) -> Result[Alert]:
+        """
+        Crea alerta para diálogo con atribución ambigua.
+
+        Args:
+            project_id: ID del proyecto
+            dialogue_text: Texto del diálogo
+            chapter: Número de capítulo
+            start_char: Posición inicio
+            end_char: Posición fin
+            attribution_confidence: Nivel de confianza (unknown, low)
+            possible_speakers: Lista de posibles hablantes
+            context: Contexto narrativo
+            extra_data: Datos adicionales
+
+        Returns:
+            Result con la alerta creada
+        """
+        # Solo crear alertas para atribución desconocida o baja
+        if attribution_confidence not in ["unknown", "low"]:
+            return Result.success(None)  # type: ignore
+
+        severity = (
+            AlertSeverity.WARNING if attribution_confidence == "unknown" else AlertSeverity.INFO
+        )
+
+        speakers_str = ", ".join(possible_speakers) if possible_speakers else "desconocido"
+
+        return self.create_alert(
+            project_id=project_id,
+            category=AlertCategory.STYLE,
+            severity=severity,
+            alert_type="speaker_attribution_ambiguous",
+            title="Hablante ambiguo en diálogo",
+            description=f"No se pudo determinar quién dice: «{dialogue_text[:50]}...»",
+            explanation=f"Posibles hablantes: {speakers_str}. Contexto: {context[:100]}",
+            suggestion="Considerar añadir verbo de habla o clarificar el hablante",
+            chapter=chapter,
+            start_char=start_char,
+            end_char=end_char,
+            excerpt=dialogue_text,
+            confidence=0.5 if attribution_confidence == "low" else 0.3,
+            source_module="speaker_attribution",
+            extra_data={
+                "attribution_confidence": attribution_confidence,
+                "possible_speakers": possible_speakers,
+                "context": context,
+                **(extra_data or {}),
+            },
+        )
+
+    def create_from_emotional_incoherence(
+        self,
+        project_id: int,
+        entity_name: str,
+        incoherence_type: str,
+        declared_emotion: str,
+        actual_behavior: str,
+        declared_text: str,
+        behavior_text: str,
+        explanation: str,
+        confidence: float = 0.7,
+        suggestion: str | None = None,
+        chapter: int | None = None,
+        start_char: int | None = None,
+        end_char: int | None = None,
+        entity_ids: list[int] | None = None,
+        extra_data: dict[str, Any] | None = None,
+    ) -> Result[Alert]:
+        """
+        Crea alerta desde incoherencia emocional.
+
+        Args:
+            project_id: ID del proyecto
+            entity_name: Nombre del personaje
+            incoherence_type: Tipo (emotion_dialogue, emotion_action, temporal_jump)
+            declared_emotion: Emoción declarada
+            actual_behavior: Comportamiento detectado
+            declared_text: Texto donde se declara la emoción
+            behavior_text: Texto del comportamiento
+            explanation: Explicación de la incoherencia
+            confidence: Confianza de la detección
+            suggestion: Sugerencia de corrección
+            chapter: Capítulo
+            start_char: Posición inicial
+            end_char: Posición final
+            entity_ids: IDs de entidades involucradas
+            extra_data: Datos adicionales
+
+        Returns:
+            Result con la alerta creada
+        """
+        severity = self.calculate_severity_from_confidence(confidence)
+
+        # Mapear tipo de incoherencia a categoría
+        category_map = {
+            "emotion_dialogue": AlertCategory.VOICE_DEVIATION,
+            "emotion_action": AlertCategory.CONSISTENCY,
+            "temporal_jump": AlertCategory.TIMELINE_ISSUE,
+            "narrator_bias": AlertCategory.STYLE,
+        }
+        category = category_map.get(incoherence_type, AlertCategory.CONSISTENCY)
+
+        # Título según tipo
+        title_map = {
+            "emotion_dialogue": f"Incoherencia emocional en diálogo de {entity_name}",
+            "emotion_action": f"Acción inconsistente con estado emocional de {entity_name}",
+            "temporal_jump": f"Cambio emocional abrupto de {entity_name}",
+            "narrator_bias": f"Inconsistencia del narrador sobre {entity_name}",
+        }
+        title = title_map.get(incoherence_type, f"Incoherencia emocional: {entity_name}")
+
+        return self.create_alert(
+            project_id=project_id,
+            category=category,
+            severity=severity,
+            alert_type=f"emotional_{incoherence_type}",
+            title=title,
+            description=f"'{entity_name}' está '{declared_emotion}' pero muestra comportamiento {actual_behavior}",
+            explanation=explanation,
+            suggestion=suggestion,
+            chapter=chapter,
+            start_char=start_char,
+            end_char=end_char,
+            excerpt=behavior_text[:200] if behavior_text else "",
+            entity_ids=entity_ids or [],
+            confidence=confidence,
+            source_module="emotional_coherence",
+            extra_data={
+                "declared_emotion": declared_emotion,
+                "actual_behavior": actual_behavior,
+                "declared_text": declared_text[:200] if declared_text else "",
+                "incoherence_type": incoherence_type,
+                **(extra_data or {}),
+            },
+        )
+
+    def create_from_deceased_reappearance(
+        self,
+        project_id: int,
+        entity_id: int,
+        entity_name: str,
+        death_chapter: int,
+        appearance_chapter: int,
+        appearance_start_char: int,
+        appearance_end_char: int,
+        appearance_excerpt: str,
+        appearance_type: str,
+        death_excerpt: str = "",
+        confidence: float = 0.85,
+        extra_data: dict[str, Any] | None = None,
+    ) -> Result[Alert]:
+        """
+        Crea alerta cuando un personaje fallecido reaparece como vivo.
+
+        Esta es una inconsistencia narrativa grave: el personaje muere en
+        un capítulo y aparece actuando/hablando en un capítulo posterior.
+
+        Args:
+            project_id: ID del proyecto
+            entity_id: ID del personaje
+            entity_name: Nombre del personaje
+            death_chapter: Capítulo donde muere
+            appearance_chapter: Capítulo donde reaparece
+            appearance_start_char: Posición inicio de la reaparición
+            appearance_end_char: Posición fin de la reaparición
+            appearance_excerpt: Texto de la reaparición
+            appearance_type: Tipo de reaparición (dialogue, action)
+            death_excerpt: Texto donde se menciona la muerte
+            confidence: Confianza de la detección
+            extra_data: Datos adicionales
+
+        Returns:
+            Result con la alerta creada
+        """
+        severity = AlertSeverity.CRITICAL if confidence >= 0.8 else AlertSeverity.WARNING
+
+        # Descripción según tipo de aparición
+        if appearance_type == "dialogue":
+            action_desc = "habla"
+        else:
+            action_desc = "actúa"
+
+        return self.create_alert(
+            project_id=project_id,
+            category=AlertCategory.CONSISTENCY,
+            severity=severity,
+            alert_type="deceased_reappearance",
+            title=f"Personaje fallecido reaparece: {entity_name}",
+            description=(
+                f"{entity_name} muere en capítulo {death_chapter} "
+                f"pero {action_desc} en capítulo {appearance_chapter}"
+            ),
+            explanation=(
+                f"El personaje '{entity_name}' fue declarado muerto en el capítulo {death_chapter}. "
+                f"Sin embargo, aparece realizando acciones en el capítulo {appearance_chapter}, "
+                f"lo cual es una inconsistencia narrativa a menos que sea un flashback, "
+                f"recuerdo o aparición sobrenatural."
+            ),
+            suggestion=(
+                f"Verificar si '{entity_name}' realmente muere en el capítulo {death_chapter}. "
+                f"Si la reaparición es intencional (flashback, fantasma, recuerdo), "
+                f"considerar añadir contexto narrativo que lo aclare."
+            ),
+            chapter=appearance_chapter,
+            start_char=appearance_start_char,
+            end_char=appearance_end_char,
+            excerpt=appearance_excerpt[:300] if appearance_excerpt else "",
+            entity_ids=[entity_id],
+            confidence=confidence,
+            source_module="vital_status_analyzer",
+            extra_data={
+                "entity_name": entity_name,
+                "death_chapter": death_chapter,
+                "appearance_chapter": appearance_chapter,
+                "appearance_type": appearance_type,
+                "death_excerpt": death_excerpt[:200] if death_excerpt else "",
+                **(extra_data or {}),
+            },
+        )
+
+    # ==========================================================================
+    # Alertas de estilo
+    # ==========================================================================
+
+    def create_from_pacing_issue(
+        self,
+        project_id: int,
+        issue_type: str,
+        severity_level: str,
+        chapter: int | None,
+        segment_type: str,
+        description: str,
+        explanation: str,
+        suggestion: str = "",
+        actual_value: float = 0.0,
+        expected_range: tuple = (0.0, 0.0),
+        comparison_value: float | None = None,
+        confidence: float = 0.8,
+    ) -> Result[Alert]:
+        """
+        Crea alerta desde problema de ritmo narrativo.
+
+        Args:
+            issue_type: Tipo de problema (chapter_too_short, dense_text_block, etc.)
+            severity_level: info, suggestion, warning, issue
+            chapter: Número de capítulo afectado
+            segment_type: chapter, scene, paragraph
+            description: Descripción del problema
+            explanation: Explicación detallada
+            suggestion: Sugerencia de corrección
+            actual_value: Valor detectado
+            expected_range: Rango esperado
+            comparison_value: Valor medio del documento
+        """
+        severity_map = {
+            "issue": AlertSeverity.WARNING,
+            "warning": AlertSeverity.WARNING,
+            "suggestion": AlertSeverity.INFO,
+            "info": AlertSeverity.HINT,
+        }
+        severity = severity_map.get(severity_level, AlertSeverity.INFO)
+
+        issue_titles = {
+            "chapter_too_short": "Capítulo muy corto",
+            "chapter_too_long": "Capítulo muy largo",
+            "unbalanced_chapters": "Capítulos desbalanceados",
+            "too_much_dialogue": "Exceso de diálogo",
+            "too_little_dialogue": "Poco diálogo",
+            "dense_text_block": "Bloque de texto denso",
+            "sparse_text_block": "Texto disperso",
+            "rhythm_shift": "Cambio de ritmo",
+            "scene_too_short": "Escena muy corta",
+            "scene_too_long": "Escena muy larga",
+        }
+        title = issue_titles.get(issue_type, f"Problema de ritmo: {issue_type}")
+        if chapter:
+            title = f"{title} (Cap. {chapter})"
+
+        return self.create_alert(
+            project_id=project_id,
+            category=AlertCategory.STRUCTURE,
+            severity=severity,
+            alert_type=f"pacing_{issue_type}",
+            title=title,
+            description=description,
+            explanation=explanation,
+            suggestion=suggestion or "Revisar el equilibrio del ritmo narrativo en este segmento",
+            chapter=chapter,
+            confidence=confidence,
+            source_module="pacing_analyzer",
+            extra_data={
+                "issue_type": issue_type,
+                "segment_type": segment_type,
+                "actual_value": actual_value,
+                "expected_range": list(expected_range),
+                "comparison_value": comparison_value,
+            },
+        )
+
+    def create_from_sticky_sentence(
+        self,
+        project_id: int,
+        sentence: str,
+        glue_percentage: float,
+        chapter: int | None = None,
+        start_char: int | None = None,
+        end_char: int | None = None,
+        severity_level: str = "medium",
+        confidence: float = 0.75,
+    ) -> Result[Alert]:
+        """
+        Crea alerta desde frase pegajosa (alto porcentaje de palabras de relleno).
+
+        Args:
+            sentence: La frase detectada
+            glue_percentage: Porcentaje de palabras de relleno (0-100)
+            chapter: Capítulo donde aparece
+            start_char: Posición de inicio
+            end_char: Posición de fin
+            severity_level: critical, high, medium, low
+        """
+        severity_map = {
+            "critical": AlertSeverity.WARNING,
+            "high": AlertSeverity.WARNING,
+            "medium": AlertSeverity.INFO,
+            "low": AlertSeverity.HINT,
+        }
+        severity = severity_map.get(severity_level, AlertSeverity.INFO)
+
+        excerpt = sentence[:120] + "..." if len(sentence) > 120 else sentence
+
+        return self.create_alert(
+            project_id=project_id,
+            category=AlertCategory.STYLE,
+            severity=severity,
+            alert_type="sticky_sentence",
+            title="Frase pegajosa (exceso de palabras funcionales)",
+            description=f'Frase con {glue_percentage:.0f}% de palabras funcionales: "{excerpt}"',
+            explanation=(
+                f"Esta frase tiene un {glue_percentage:.0f}% de palabras funcionales "
+                f"(artículos, preposiciones, conjunciones), lo que dificulta la fluidez. "
+                f"Las frases con más del 40% de palabras funcionales suelen percibirse como pesadas."
+            ),
+            suggestion="Reformular para reducir las palabras de relleno y mejorar la claridad",
+            chapter=chapter,
+            start_char=start_char,
+            end_char=end_char,
+            excerpt=excerpt,
+            confidence=confidence,
+            source_module="sticky_sentences",
+            extra_data={
+                "glue_percentage": round(glue_percentage, 1),
+                "severity_level": severity_level,
+            },
+        )
+
+    def create_from_style_variation(
+        self,
+        project_id: int,
+        variation_type: str,
+        description: str,
+        explanation: str,
+        chapter: int | None = None,
+        start_char: int | None = None,
+        end_char: int | None = None,
+        excerpt: str = "",
+        confidence: float = 0.7,
+        extra_data: dict | None = None,
+    ) -> Result[Alert]:
+        """
+        Crea alerta desde variación estilística inesperada.
+
+        Args:
+            variation_type: tone_shift, formality_change, vocabulary_anomaly, register_inconsistency
+            description: Descripción de la variación
+            explanation: Explicación detallada
+        """
+        severity = self.calculate_severity_from_confidence(confidence)
+
+        type_titles = {
+            "tone_shift": "Cambio de tono narrativo",
+            "formality_change": "Cambio de formalidad",
+            "vocabulary_anomaly": "Vocabulario atípico",
+            "register_inconsistency": "Inconsistencia de registro",
+        }
+        title = type_titles.get(variation_type, f"Variación estilística: {variation_type}")
+
+        return self.create_alert(
+            project_id=project_id,
+            category=AlertCategory.STYLE,
+            severity=severity,
+            alert_type=f"style_variation_{variation_type}",
+            title=title,
+            description=description,
+            explanation=explanation,
+            suggestion="Verificar si la variación estilística es intencional",
+            chapter=chapter,
+            start_char=start_char,
+            end_char=end_char,
+            excerpt=excerpt[:200] if excerpt else "",
+            confidence=confidence,
+            source_module="style_analyzer",
+            extra_data={
+                "variation_type": variation_type,
+                **(extra_data or {}),
+            },
+        )
+
+    def create_from_word_echo(
+        self,
+        project_id: int,
+        word: str,
+        occurrences: list[dict],
+        min_distance: int,
+        chapter: int | None = None,
+        confidence: float = 0.8,
+    ) -> Result[Alert]:
+        """
+        Crea alerta desde eco de palabra (repetición a corta distancia).
+
+        Args:
+            word: Palabra repetida
+            occurrences: Lista de ocurrencias [{position, context}, ...]
+            min_distance: Distancia mínima entre repeticiones (en palabras)
+            chapter: Capítulo donde se detecta
+        """
+        # Severidad basada en distancia: más cerca = más severo
+        if min_distance < 10:
+            severity = AlertSeverity.WARNING
+        elif min_distance < 30:
+            severity = AlertSeverity.INFO
+        else:
+            severity = AlertSeverity.HINT
+
+        count = len(occurrences)
+
+        return self.create_alert(
+            project_id=project_id,
+            category=AlertCategory.REPETITION,
+            severity=severity,
+            alert_type="word_echo",
+            title=f'Eco: "{word}" ({count}x en {min_distance} palabras)',
+            description=f'La palabra "{word}" aparece {count} veces con solo {min_distance} palabras de distancia',
+            explanation=(
+                f'Se detectó repetición cercana de "{word}". '
+                f"Las repeticiones a menos de 30 palabras de distancia pueden "
+                f"percibirse como descuido estilístico, salvo que sean intencionales."
+            ),
+            suggestion=f'Considerar sinónimos o reformulación para evitar la repetición de "{word}"',
+            chapter=chapter,
+            confidence=confidence,
+            source_module="repetition_detector",
+            extra_data={
+                "word": word,
+                "occurrences": occurrences[:10],  # Limitar a 10 para no sobrecargar
+                "min_distance": min_distance,
+                "count": count,
+            },
+        )
+
+    # ==========================================================================
+    # Alertas de diálogos
+    # ==========================================================================
+
+    def create_from_dialogue_issue(
+        self,
+        project_id: int,
+        issue_type: str,
+        severity_level: str,
+        chapter: int,
+        paragraph: int,
+        start_char: int,
+        end_char: int,
+        text: str,
+        description: str,
+        suggestion: str,
+        consecutive_count: int = 1,
+        confidence: float = 0.85,
+    ) -> Result[Alert]:
+        """
+        Crea alerta desde un problema de diálogo.
+
+        Args:
+            project_id: ID del proyecto
+            issue_type: Tipo de problema (orphan_no_attribution, consecutive_no_change, etc.)
+            severity_level: Nivel de severidad (high, medium, low)
+            chapter: Número de capítulo
+            paragraph: Número de párrafo
+            start_char: Posición inicio del diálogo
+            end_char: Posición fin del diálogo
+            text: Texto del diálogo problemático
+            description: Descripción del problema
+            suggestion: Sugerencia de corrección
+            consecutive_count: Cantidad de diálogos consecutivos (para secuencias)
+            confidence: Confianza de la detección (0.0-1.0)
+
+        Returns:
+            Result con la alerta creada
+        """
+        # Mapear severidad
+        severity_map = {
+            "high": AlertSeverity.WARNING,
+            "medium": AlertSeverity.INFO,
+            "low": AlertSeverity.HINT,
+        }
+        severity = severity_map.get(severity_level, AlertSeverity.INFO)
+
+        # Títulos según tipo de problema
+        title_map = {
+            "orphan_no_attribution": "Diálogo sin atribución de hablante",
+            "orphan_no_context": "Diálogo sin contexto de escena",
+            "consecutive_no_change": f"Secuencia de {consecutive_count} diálogos sin indicar cambio de hablante",
+            "chapter_start_dialogue": "Capítulo inicia con diálogo sin contexto",
+        }
+        title = title_map.get(issue_type, f"Problema de diálogo: {issue_type}")
+
+        # Limitar texto para excerpt
+        excerpt = text[:200] + "..." if len(text) > 200 else text
+
+        return self.create_alert(
+            project_id=project_id,
+            category=AlertCategory.DIALOGUE,
+            severity=severity,
+            alert_type=f"dialogue_{issue_type}",
+            title=title,
+            description=description,
+            explanation=(
+                f"Se detectó un problema de contexto en el diálogo del capítulo {chapter}, "
+                f"párrafo {paragraph}. {description}"
+            ),
+            suggestion=suggestion,
+            chapter=chapter,
+            start_char=start_char,
+            end_char=end_char,
+            excerpt=excerpt,
+            confidence=confidence,
+            source_module="dialogue_validator",
+            extra_data={
+                "issue_type": issue_type,
+                "paragraph": paragraph,
+                "consecutive_count": consecutive_count,
+                "dialogue_text": text[:500] if text else "",
+            },
+        )
+
+    def create_alerts_from_dialogue_report(
+        self,
+        project_id: int,
+        report: Any,  # DialogueValidationReport
+        min_severity: str = "low",
+    ) -> Result[list[Alert]]:
+        """
+        Crea alertas desde un DialogueValidationReport completo.
+
+        Args:
+            project_id: ID del proyecto
+            report: DialogueValidationReport con los issues
+            min_severity: Severidad mínima para crear alertas (high, medium, low)
+
+        Returns:
+            Result con lista de alertas creadas
+        """
+        severity_order = {"high": 3, "medium": 2, "low": 1}
+        min_severity_value = severity_order.get(min_severity, 1)
+
+        alerts_data = []
+
+        for issue in report.issues:
+            # Filtrar por severidad mínima
+            issue_severity_value = severity_order.get(issue.severity.value, 1)
+            if issue_severity_value < min_severity_value:
+                continue
+
+            alerts_data.append(
+                {
+                    "category": AlertCategory.DIALOGUE,
+                    "severity": {
+                        "high": AlertSeverity.WARNING,
+                        "medium": AlertSeverity.INFO,
+                        "low": AlertSeverity.HINT,
+                    }.get(issue.severity.value, AlertSeverity.INFO),
+                    "alert_type": f"dialogue_{issue.issue_type.value}",
+                    "title": self._get_dialogue_issue_title(
+                        issue.issue_type.value, issue.consecutive_count
+                    ),
+                    "description": issue.description,
+                    "explanation": (
+                        f"Se detectó un problema de contexto en el diálogo del capítulo "
+                        f"{issue.location.chapter}, párrafo {issue.location.paragraph}. "
+                        f"{issue.description}"
+                    ),
+                    "suggestion": issue.suggestion,
+                    "chapter": issue.location.chapter,
+                    "start_char": issue.location.start_char,
+                    "end_char": issue.location.end_char,
+                    "excerpt": issue.location.text[:200] if issue.location.text else "",
+                    "confidence": 0.85 if issue.severity.value == "high" else 0.7,
+                    "source_module": "dialogue_validator",
+                    "extra_data": {
+                        "issue_type": issue.issue_type.value,
+                        "paragraph": issue.location.paragraph,
+                        "consecutive_count": issue.consecutive_count,
+                    },
+                }
+            )
+
+        return self.create_alerts_batch(project_id, alerts_data)
+
+    def _get_dialogue_issue_title(self, issue_type: str, consecutive_count: int = 1) -> str:
+        """Genera título para problema de diálogo."""
+        title_map = {
+            "orphan_no_attribution": "Diálogo sin atribución de hablante",
+            "orphan_no_context": "Diálogo sin contexto de escena",
+            "consecutive_no_change": f"Secuencia de {consecutive_count} diálogos sin indicar cambio",
+            "chapter_start_dialogue": "Capítulo inicia con diálogo sin contexto",
+        }
+        return title_map.get(issue_type, f"Problema de diálogo: {issue_type}")
+
+
+def get_alert_engine() -> AlertEngine:
+    """
+    Obtiene la instancia singleton del motor de alertas.
+
+    Thread-safe con double-checked locking.
+
+    Returns:
+        Instancia única de AlertEngine
+    """
+    global _alert_engine
+
+    if _alert_engine is None:
+        with _engine_lock:
+            if _alert_engine is None:
+                _alert_engine = AlertEngine()
+                logger.debug("AlertEngine singleton initialized")
+
+    return _alert_engine

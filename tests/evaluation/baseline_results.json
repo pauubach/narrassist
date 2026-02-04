@@ -1,0 +1,530 @@
+{
+  "inconsistencias": {
+    "timestamp": "2026-02-02T11:34:42.070112",
+    "gold_standard_name": "inconsistencias",
+    "text_file": "test_books/evaluation_tests/prueba_inconsistencias_personajes.txt",
+    "metrics": {
+      "ner": {
+        "capability": "ner",
+        "true_positives": 7,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0,
+        "details": {}
+      },
+      "fusion": {
+        "capability": "fusion",
+        "true_positives": 6,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0,
+        "details": {}
+      },
+      "attributes": {
+        "capability": "attributes",
+        "true_positives": 2,
+        "false_positives": 5,
+        "false_negatives": 17,
+        "precision": 0.28600000000000003,
+        "recall": 0.105,
+        "f1_score": 0.154,
+        "details": {}
+      },
+      "inconsistencies": {
+        "capability": "inconsistencies",
+        "true_positives": 0,
+        "false_positives": 0,
+        "false_negatives": 8,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1_score": 0.0,
+        "details": {}
+      },
+      "dialogue": {
+        "capability": "dialogue",
+        "true_positives": 0,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1_score": 0.0,
+        "details": {}
+      }
+    },
+    "summary": {
+      "ner": {
+        "precision": 100.0,
+        "recall": 100.0,
+        "f1": 100.0
+      },
+      "fusion": {
+        "precision": 100.0,
+        "recall": 100.0,
+        "f1": 100.0
+      },
+      "attributes": {
+        "precision": 28.6,
+        "recall": 10.5,
+        "f1": 15.4
+      },
+      "inconsistencies": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "dialogue": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    }
+  },
+  "gramatica": {
+    "timestamp": "2026-02-02T11:34:42.070112",
+    "gold_standard_name": "gramatica",
+    "text_file": "test_books/evaluation_tests/manuscrito_prueba_errores.txt",
+    "metrics": {
+      "ner": {
+        "capability": "ner",
+        "true_positives": 2,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0,
+        "details": {}
+      },
+      "fusion": {
+        "capability": "fusion",
+        "true_positives": 1,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0,
+        "details": {}
+      },
+      "grammar_dequeismo": {
+        "capability": "grammar_dequeismo",
+        "true_positives": 1,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0,
+        "details": {}
+      },
+      "grammar_queismo": {
+        "capability": "grammar_queismo",
+        "true_positives": 9,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0,
+        "details": {}
+      },
+      "grammar_laismo": {
+        "capability": "grammar_laismo",
+        "true_positives": 4,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0,
+        "details": {}
+      },
+      "dialogue": {
+        "capability": "dialogue",
+        "true_positives": 0,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1_score": 0.0,
+        "details": {}
+      }
+    },
+    "summary": {
+      "ner": {
+        "precision": 100.0,
+        "recall": 100.0,
+        "f1": 100.0
+      },
+      "fusion": {
+        "precision": 100.0,
+        "recall": 100.0,
+        "f1": 100.0
+      },
+      "grammar_dequeismo": {
+        "precision": 100.0,
+        "recall": 100.0,
+        "f1": 100.0
+      },
+      "grammar_queismo": {
+        "precision": 100.0,
+        "recall": 100.0,
+        "f1": 100.0
+      },
+      "grammar_laismo": {
+        "precision": 100.0,
+        "recall": 100.0,
+        "f1": 100.0
+      },
+      "dialogue": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    }
+  },
+  "relaciones": {
+    "timestamp": "2026-02-02T11:34:42.070112",
+    "gold_standard_name": "relaciones",
+    "text_file": "test_books/evaluation_tests/prueba_relaciones_personajes.txt",
+    "metrics": {
+      "ner": {
+        "capability": "ner",
+        "true_positives": 5,
+        "false_positives": 1,
+        "false_negatives": 1,
+        "precision": 0.833,
+        "recall": 0.833,
+        "f1_score": 0.833,
+        "details": {}
+      },
+      "relations": {
+        "capability": "relations",
+        "true_positives": 4,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0,
+        "details": {}
+      },
+      "dialogue": {
+        "capability": "dialogue",
+        "true_positives": 0,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1_score": 0.0,
+        "details": {}
+      }
+    },
+    "summary": {
+      "ner": {
+        "precision": 83.3,
+        "recall": 83.3,
+        "f1": 83.3
+      },
+      "relations": {
+        "precision": 100.0,
+        "recall": 100.0,
+        "f1": 100.0
+      },
+      "dialogue": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    }
+  },
+  "timeline": {
+    "timestamp": "2026-02-02T11:34:42.070112",
+    "gold_standard_name": "timeline",
+    "text_file": "test_books/evaluation_tests/prueba_timeline_eventos.txt",
+    "metrics": {
+      "ner": {
+        "capability": "ner",
+        "true_positives": 7,
+        "false_positives": 1,
+        "false_negatives": 0,
+        "precision": 0.875,
+        "recall": 1.0,
+        "f1_score": 0.9329999999999999,
+        "details": {}
+      },
+      "chapters": {
+        "capability": "chapters",
+        "true_positives": 5,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0,
+        "details": {}
+      },
+      "relations": {
+        "capability": "relations",
+        "true_positives": 4,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0,
+        "details": {}
+      },
+      "timeline": {
+        "capability": "timeline",
+        "true_positives": 29,
+        "false_positives": 3,
+        "false_negatives": 0,
+        "precision": 0.9059999999999999,
+        "recall": 1.0,
+        "f1_score": 0.951,
+        "details": {}
+      },
+      "dialogue": {
+        "capability": "dialogue",
+        "true_positives": 0,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1_score": 0.0,
+        "details": {}
+      }
+    },
+    "summary": {
+      "ner": {
+        "precision": 87.5,
+        "recall": 100.0,
+        "f1": 93.3
+      },
+      "chapters": {
+        "precision": 100.0,
+        "recall": 100.0,
+        "f1": 100.0
+      },
+      "relations": {
+        "precision": 100.0,
+        "recall": 100.0,
+        "f1": 100.0
+      },
+      "timeline": {
+        "precision": 90.6,
+        "recall": 100.0,
+        "f1": 95.1
+      },
+      "dialogue": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    }
+  },
+  "capitulos": {
+    "timestamp": "2026-02-02T11:34:42.070112",
+    "gold_standard_name": "capitulos",
+    "text_file": "test_books/evaluation_tests/prueba_capitulos_estructura.txt",
+    "metrics": {
+      "ner": {
+        "capability": "ner",
+        "true_positives": 3,
+        "false_positives": 0,
+        "false_negatives": 3,
+        "precision": 1.0,
+        "recall": 0.5,
+        "f1_score": 0.667,
+        "details": {}
+      },
+      "chapters": {
+        "capability": "chapters",
+        "true_positives": 10,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0,
+        "details": {}
+      },
+      "relations": {
+        "capability": "relations",
+        "true_positives": 1,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0,
+        "details": {}
+      },
+      "dialogue": {
+        "capability": "dialogue",
+        "true_positives": 0,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1_score": 0.0,
+        "details": {}
+      }
+    },
+    "summary": {
+      "ner": {
+        "precision": 100.0,
+        "recall": 50.0,
+        "f1": 66.7
+      },
+      "chapters": {
+        "precision": 100.0,
+        "recall": 100.0,
+        "f1": 100.0
+      },
+      "relations": {
+        "precision": 100.0,
+        "recall": 100.0,
+        "f1": 100.0
+      },
+      "dialogue": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    }
+  },
+  "narrativa_pura": {
+    "timestamp": "2026-02-02T11:34:42.070112",
+    "gold_standard_name": "narrativa_pura",
+    "text_file": "test_books/evaluation_tests/prueba_narrativa_pura.txt",
+    "metrics": {
+      "ner": {
+        "capability": "ner",
+        "true_positives": 8,
+        "false_positives": 1,
+        "false_negatives": 2,
+        "precision": 0.889,
+        "recall": 0.8,
+        "f1_score": 0.8420000000000001,
+        "details": {}
+      },
+      "chapters": {
+        "capability": "chapters",
+        "true_positives": 3,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0,
+        "details": {}
+      },
+      "relations": {
+        "capability": "relations",
+        "true_positives": 2,
+        "false_positives": 0,
+        "false_negatives": 1,
+        "precision": 1.0,
+        "recall": 0.667,
+        "f1_score": 0.8,
+        "details": {}
+      },
+      "dialogue": {
+        "capability": "dialogue",
+        "true_positives": 0,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1_score": 0.0,
+        "details": {}
+      }
+    },
+    "summary": {
+      "ner": {
+        "precision": 88.9,
+        "recall": 80.0,
+        "f1": 84.2
+      },
+      "chapters": {
+        "precision": 100.0,
+        "recall": 100.0,
+        "f1": 100.0
+      },
+      "relations": {
+        "precision": 100.0,
+        "recall": 66.7,
+        "f1": 80.0
+      },
+      "dialogue": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    }
+  },
+  "ortografia": {
+    "timestamp": "2026-02-02T11:34:42.070112",
+    "gold_standard_name": "ortografia",
+    "text_file": "test_books/evaluation_tests/prueba_ortografia.txt",
+    "metrics": {
+      "ner": {
+        "capability": "ner",
+        "true_positives": 2,
+        "false_positives": 6,
+        "false_negatives": 0,
+        "precision": 0.25,
+        "recall": 1.0,
+        "f1_score": 0.4,
+        "details": {}
+      },
+      "chapters": {
+        "capability": "chapters",
+        "true_positives": 5,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0,
+        "details": {}
+      },
+      "orthography": {
+        "capability": "orthography",
+        "true_positives": 63,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0,
+        "details": {}
+      },
+      "dialogue": {
+        "capability": "dialogue",
+        "true_positives": 0,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1_score": 0.0,
+        "details": {}
+      }
+    },
+    "summary": {
+      "ner": {
+        "precision": 25.0,
+        "recall": 100.0,
+        "f1": 40.0
+      },
+      "chapters": {
+        "precision": 100.0,
+        "recall": 100.0,
+        "f1": 100.0
+      },
+      "orthography": {
+        "precision": 100.0,
+        "recall": 100.0,
+        "f1": 100.0
+      },
+      "dialogue": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    }
+  }
+}

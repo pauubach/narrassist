@@ -1,0 +1,490 @@
+/**
+ * Design System Utilities - Narrative Assistant
+ *
+ * Clases de utilidad basadas en tokens.
+ * Siguiendo convención: .ds-{propiedad}-{valor}
+ */
+
+/* =============================================================================
+   DISPLAY & LAYOUT
+   ============================================================================= */
+
+.ds-flex { display: flex; }
+.ds-inline-flex { display: inline-flex; }
+.ds-grid { display: grid; }
+.ds-block { display: block; }
+.ds-inline-block { display: inline-block; }
+.ds-hidden { display: none; }
+
+/* Flex Direction */
+.ds-flex-row { flex-direction: row; }
+.ds-flex-col { flex-direction: column; }
+.ds-flex-row-reverse { flex-direction: row-reverse; }
+.ds-flex-col-reverse { flex-direction: column-reverse; }
+
+/* Flex Wrap */
+.ds-flex-wrap { flex-wrap: wrap; }
+.ds-flex-nowrap { flex-wrap: nowrap; }
+
+/* Justify Content */
+.ds-justify-start { justify-content: flex-start; }
+.ds-justify-end { justify-content: flex-end; }
+.ds-justify-center { justify-content: center; }
+.ds-justify-between { justify-content: space-between; }
+.ds-justify-around { justify-content: space-around; }
+.ds-justify-evenly { justify-content: space-evenly; }
+
+/* Align Items */
+.ds-items-start { align-items: flex-start; }
+.ds-items-end { align-items: flex-end; }
+.ds-items-center { align-items: center; }
+.ds-items-baseline { align-items: baseline; }
+.ds-items-stretch { align-items: stretch; }
+
+/* Align Self */
+.ds-self-start { align-self: flex-start; }
+.ds-self-end { align-self: flex-end; }
+.ds-self-center { align-self: center; }
+
+/* Flex Grow/Shrink */
+.ds-flex-1 { flex: 1 1 0%; }
+.ds-flex-auto { flex: 1 1 auto; }
+.ds-flex-none { flex: none; }
+.ds-grow { flex-grow: 1; }
+.ds-grow-0 { flex-grow: 0; }
+.ds-shrink { flex-shrink: 1; }
+.ds-shrink-0 { flex-shrink: 0; }
+
+/* =============================================================================
+   GAP (Spacing between flex/grid items)
+   ============================================================================= */
+
+.ds-gap-0 { gap: var(--ds-space-0); }
+.ds-gap-1 { gap: var(--ds-space-1); }
+.ds-gap-2 { gap: var(--ds-space-2); }
+.ds-gap-3 { gap: var(--ds-space-3); }
+.ds-gap-4 { gap: var(--ds-space-4); }
+.ds-gap-5 { gap: var(--ds-space-5); }
+.ds-gap-6 { gap: var(--ds-space-6); }
+.ds-gap-8 { gap: var(--ds-space-8); }
+
+/* =============================================================================
+   SPACING (Margin & Padding)
+   ============================================================================= */
+
+/* Margin All */
+.ds-m-0 { margin: var(--ds-space-0); }
+.ds-m-1 { margin: var(--ds-space-1); }
+.ds-m-2 { margin: var(--ds-space-2); }
+.ds-m-3 { margin: var(--ds-space-3); }
+.ds-m-4 { margin: var(--ds-space-4); }
+.ds-m-auto { margin: auto; }
+
+/* Margin X (horizontal) */
+.ds-mx-0 { margin-left: var(--ds-space-0); margin-right: var(--ds-space-0); }
+.ds-mx-1 { margin-left: var(--ds-space-1); margin-right: var(--ds-space-1); }
+.ds-mx-2 { margin-left: var(--ds-space-2); margin-right: var(--ds-space-2); }
+.ds-mx-3 { margin-left: var(--ds-space-3); margin-right: var(--ds-space-3); }
+.ds-mx-4 { margin-left: var(--ds-space-4); margin-right: var(--ds-space-4); }
+.ds-mx-auto { margin-left: auto; margin-right: auto; }
+
+/* Margin Y (vertical) */
+.ds-my-0 { margin-top: var(--ds-space-0); margin-bottom: var(--ds-space-0); }
+.ds-my-1 { margin-top: var(--ds-space-1); margin-bottom: var(--ds-space-1); }
+.ds-my-2 { margin-top: var(--ds-space-2); margin-bottom: var(--ds-space-2); }
+.ds-my-3 { margin-top: var(--ds-space-3); margin-bottom: var(--ds-space-3); }
+.ds-my-4 { margin-top: var(--ds-space-4); margin-bottom: var(--ds-space-4); }
+
+/* Margin Top */
+.ds-mt-0 { margin-top: var(--ds-space-0); }
+.ds-mt-1 { margin-top: var(--ds-space-1); }
+.ds-mt-2 { margin-top: var(--ds-space-2); }
+.ds-mt-3 { margin-top: var(--ds-space-3); }
+.ds-mt-4 { margin-top: var(--ds-space-4); }
+.ds-mt-6 { margin-top: var(--ds-space-6); }
+.ds-mt-8 { margin-top: var(--ds-space-8); }
+
+/* Margin Bottom */
+.ds-mb-0 { margin-bottom: var(--ds-space-0); }
+.ds-mb-1 { margin-bottom: var(--ds-space-1); }
+.ds-mb-2 { margin-bottom: var(--ds-space-2); }
+.ds-mb-3 { margin-bottom: var(--ds-space-3); }
+.ds-mb-4 { margin-bottom: var(--ds-space-4); }
+.ds-mb-6 { margin-bottom: var(--ds-space-6); }
+.ds-mb-8 { margin-bottom: var(--ds-space-8); }
+
+/* Margin Left */
+.ds-ml-0 { margin-left: var(--ds-space-0); }
+.ds-ml-1 { margin-left: var(--ds-space-1); }
+.ds-ml-2 { margin-left: var(--ds-space-2); }
+.ds-ml-3 { margin-left: var(--ds-space-3); }
+.ds-ml-4 { margin-left: var(--ds-space-4); }
+.ds-ml-auto { margin-left: auto; }
+
+/* Margin Right */
+.ds-mr-0 { margin-right: var(--ds-space-0); }
+.ds-mr-1 { margin-right: var(--ds-space-1); }
+.ds-mr-2 { margin-right: var(--ds-space-2); }
+.ds-mr-3 { margin-right: var(--ds-space-3); }
+.ds-mr-4 { margin-right: var(--ds-space-4); }
+.ds-mr-auto { margin-right: auto; }
+
+/* Padding All */
+.ds-p-0 { padding: var(--ds-space-0); }
+.ds-p-1 { padding: var(--ds-space-1); }
+.ds-p-2 { padding: var(--ds-space-2); }
+.ds-p-3 { padding: var(--ds-space-3); }
+.ds-p-4 { padding: var(--ds-space-4); }
+.ds-p-5 { padding: var(--ds-space-5); }
+.ds-p-6 { padding: var(--ds-space-6); }
+.ds-p-8 { padding: var(--ds-space-8); }
+
+/* Padding X (horizontal) */
+.ds-px-0 { padding-left: var(--ds-space-0); padding-right: var(--ds-space-0); }
+.ds-px-1 { padding-left: var(--ds-space-1); padding-right: var(--ds-space-1); }
+.ds-px-2 { padding-left: var(--ds-space-2); padding-right: var(--ds-space-2); }
+.ds-px-3 { padding-left: var(--ds-space-3); padding-right: var(--ds-space-3); }
+.ds-px-4 { padding-left: var(--ds-space-4); padding-right: var(--ds-space-4); }
+.ds-px-6 { padding-left: var(--ds-space-6); padding-right: var(--ds-space-6); }
+
+/* Padding Y (vertical) */
+.ds-py-0 { padding-top: var(--ds-space-0); padding-bottom: var(--ds-space-0); }
+.ds-py-1 { padding-top: var(--ds-space-1); padding-bottom: var(--ds-space-1); }
+.ds-py-2 { padding-top: var(--ds-space-2); padding-bottom: var(--ds-space-2); }
+.ds-py-3 { padding-top: var(--ds-space-3); padding-bottom: var(--ds-space-3); }
+.ds-py-4 { padding-top: var(--ds-space-4); padding-bottom: var(--ds-space-4); }
+.ds-py-6 { padding-top: var(--ds-space-6); padding-bottom: var(--ds-space-6); }
+
+/* =============================================================================
+   SIZING
+   ============================================================================= */
+
+.ds-w-full { width: 100%; }
+.ds-w-auto { width: auto; }
+.ds-w-fit { width: fit-content; }
+.ds-h-full { height: 100%; }
+.ds-h-auto { height: auto; }
+.ds-h-screen { height: 100vh; }
+
+.ds-min-w-0 { min-width: 0; }
+.ds-min-h-0 { min-height: 0; }
+.ds-max-w-full { max-width: 100%; }
+
+/* =============================================================================
+   TYPOGRAPHY
+   ============================================================================= */
+
+/* Font Size */
+.ds-text-xs { font-size: var(--ds-font-xs); }
+.ds-text-sm { font-size: var(--ds-font-sm); }
+.ds-text-base { font-size: var(--ds-font-base); }
+.ds-text-lg { font-size: var(--ds-font-lg); }
+.ds-text-xl { font-size: var(--ds-font-xl); }
+.ds-text-2xl { font-size: var(--ds-font-2xl); }
+.ds-text-3xl { font-size: var(--ds-font-3xl); }
+
+/* Font Weight */
+.ds-font-normal { font-weight: var(--ds-font-normal); }
+.ds-font-medium { font-weight: var(--ds-font-medium); }
+.ds-font-semibold { font-weight: var(--ds-font-semibold); }
+.ds-font-bold { font-weight: var(--ds-font-bold); }
+
+/* Text Alignment */
+.ds-text-left { text-align: left; }
+.ds-text-center { text-align: center; }
+.ds-text-right { text-align: right; }
+
+/* Text Decoration */
+.ds-underline { text-decoration: underline; }
+.ds-line-through { text-decoration: line-through; }
+.ds-no-underline { text-decoration: none; }
+
+/* Text Transform */
+.ds-uppercase { text-transform: uppercase; }
+.ds-lowercase { text-transform: lowercase; }
+.ds-capitalize { text-transform: capitalize; }
+
+/* Text Overflow */
+.ds-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ds-line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.ds-line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* =============================================================================
+   COLORS
+   ============================================================================= */
+
+/* Text Colors */
+.ds-text-primary { color: var(--ds-primary-500); }
+.ds-text-muted { color: var(--ds-surface-500); }
+.ds-text-subtle { color: var(--ds-surface-400); }
+.ds-text-success { color: var(--ds-success-500); }
+.ds-text-warning { color: var(--ds-warning-500); }
+.ds-text-error { color: var(--ds-error-500); }
+.ds-text-info { color: var(--ds-info-500); }
+
+/* Background Colors */
+.ds-bg-surface { background-color: var(--ds-surface-0); }
+.ds-bg-surface-50 { background-color: var(--ds-surface-50); }
+.ds-bg-surface-100 { background-color: var(--ds-surface-100); }
+.ds-bg-primary { background-color: var(--ds-primary-500); }
+.ds-bg-primary-50 { background-color: var(--ds-primary-50); }
+
+/* =============================================================================
+   BORDERS
+   ============================================================================= */
+
+.ds-border { border: var(--ds-border-1) solid var(--ds-surface-200); }
+.ds-border-0 { border: none; }
+.ds-border-t { border-top: var(--ds-border-1) solid var(--ds-surface-200); }
+.ds-border-b { border-bottom: var(--ds-border-1) solid var(--ds-surface-200); }
+.ds-border-l { border-left: var(--ds-border-1) solid var(--ds-surface-200); }
+.ds-border-r { border-right: var(--ds-border-1) solid var(--ds-surface-200); }
+
+/* Border Radius */
+.ds-rounded-none { border-radius: var(--ds-radius-none); }
+.ds-rounded-sm { border-radius: var(--ds-radius-sm); }
+.ds-rounded { border-radius: var(--ds-radius-default); }
+.ds-rounded-md { border-radius: var(--ds-radius-md); }
+.ds-rounded-lg { border-radius: var(--ds-radius-lg); }
+.ds-rounded-xl { border-radius: var(--ds-radius-xl); }
+.ds-rounded-full { border-radius: var(--ds-radius-full); }
+
+/* =============================================================================
+   SHADOWS
+   ============================================================================= */
+
+.ds-shadow-none { box-shadow: var(--ds-shadow-none); }
+.ds-shadow-xs { box-shadow: var(--ds-shadow-xs); }
+.ds-shadow-sm { box-shadow: var(--ds-shadow-sm); }
+.ds-shadow-md { box-shadow: var(--ds-shadow-md); }
+.ds-shadow-lg { box-shadow: var(--ds-shadow-lg); }
+.ds-shadow-xl { box-shadow: var(--ds-shadow-xl); }
+
+/* =============================================================================
+   POSITIONING
+   ============================================================================= */
+
+.ds-relative { position: relative; }
+.ds-absolute { position: absolute; }
+.ds-fixed { position: fixed; }
+.ds-sticky { position: sticky; }
+
+.ds-inset-0 { top: 0; right: 0; bottom: 0; left: 0; }
+.ds-top-0 { top: 0; }
+.ds-right-0 { right: 0; }
+.ds-bottom-0 { bottom: 0; }
+.ds-left-0 { left: 0; }
+
+/* =============================================================================
+   OVERFLOW
+   ============================================================================= */
+
+.ds-overflow-auto { overflow: auto; }
+.ds-overflow-hidden { overflow: hidden; }
+.ds-overflow-visible { overflow: visible; }
+.ds-overflow-x-auto { overflow-x: auto; }
+.ds-overflow-y-auto { overflow-y: auto; }
+.ds-overflow-x-hidden { overflow-x: hidden; }
+.ds-overflow-y-hidden { overflow-y: hidden; }
+
+/* =============================================================================
+   CURSOR
+   ============================================================================= */
+
+.ds-cursor-pointer { cursor: pointer; }
+.ds-cursor-default { cursor: default; }
+.ds-cursor-not-allowed { cursor: not-allowed; }
+.ds-cursor-grab { cursor: grab; }
+.ds-cursor-grabbing { cursor: grabbing; }
+
+/* =============================================================================
+   INTERACTIONS
+   ============================================================================= */
+
+.ds-select-none { user-select: none; }
+.ds-select-text { user-select: text; }
+.ds-select-all { user-select: all; }
+
+.ds-pointer-events-none { pointer-events: none; }
+.ds-pointer-events-auto { pointer-events: auto; }
+
+/* =============================================================================
+   TRANSITIONS
+   ============================================================================= */
+
+.ds-transition {
+  transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+  transition-duration: var(--ds-duration-normal);
+  transition-timing-function: var(--ds-ease-in-out);
+}
+
+.ds-transition-fast {
+  transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+  transition-duration: var(--ds-duration-fast);
+  transition-timing-function: var(--ds-ease-in-out);
+}
+
+.ds-transition-slow {
+  transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+  transition-duration: var(--ds-duration-slow);
+  transition-timing-function: var(--ds-ease-in-out);
+}
+
+.ds-transition-none { transition: none; }
+
+/* =============================================================================
+   OPACITY
+   ============================================================================= */
+
+.ds-opacity-0 { opacity: 0; }
+.ds-opacity-25 { opacity: 0.25; }
+.ds-opacity-50 { opacity: 0.5; }
+.ds-opacity-75 { opacity: 0.75; }
+.ds-opacity-100 { opacity: 1; }
+
+/* =============================================================================
+   VISIBILITY
+   ============================================================================= */
+
+.ds-visible { visibility: visible; }
+.ds-invisible { visibility: hidden; }
+
+/* =============================================================================
+   ACCESSIBILITY (Screen Reader Only)
+   ============================================================================= */
+
+.ds-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.ds-not-sr-only {
+  position: static;
+  width: auto;
+  height: auto;
+  padding: 0;
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+}
+
+/* =============================================================================
+   FOCUS STATES
+   ============================================================================= */
+
+.ds-focus-ring:focus,
+.ds-focus-ring:focus-visible {
+  outline: none;
+  box-shadow: var(--ds-focus-ring);
+}
+
+.ds-focus-visible:focus:not(:focus-visible) {
+  outline: none;
+  box-shadow: none;
+}
+
+.ds-focus-visible:focus-visible {
+  outline: none;
+  box-shadow: var(--ds-focus-ring);
+}
+
+/* =============================================================================
+   HIGHLIGHT ANIMATIONS
+   ============================================================================= */
+
+/**
+ * Animación de flash para resaltado temporal
+ * Usada por useHighlight.flashSpan() para llamar la atención del usuario
+ */
+@keyframes highlight-flash-pulse {
+  0% {
+    box-shadow: 0 0 0 0 var(--highlight-flash-color, var(--ds-primary-300));
+    background-color: var(--highlight-flash-color, var(--ds-primary-200));
+  }
+  25% {
+    box-shadow: 0 0 0 4px var(--highlight-flash-color, var(--ds-primary-300));
+  }
+  50% {
+    box-shadow: 0 0 0 8px transparent;
+    background-color: var(--highlight-flash-color, var(--ds-primary-100));
+  }
+  75% {
+    box-shadow: 0 0 0 4px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+    background-color: var(--highlight-flash-color, var(--ds-primary-50));
+  }
+}
+
+@keyframes highlight-flash-glow {
+  0%, 100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.highlight-flash {
+  animation: highlight-flash-pulse 0.6s ease-out;
+  border-radius: var(--ds-radius-sm);
+}
+
+.highlight-flash-repeat {
+  animation: highlight-flash-glow 1s ease-in-out infinite;
+}
+
+/* Variantes por tipo */
+.highlight-flash--entity {
+  --highlight-flash-color: var(--ds-primary-300);
+}
+
+.highlight-flash--alert {
+  --highlight-flash-color: var(--ds-warning-300);
+}
+
+.highlight-flash--mention {
+  --highlight-flash-color: var(--ds-info-300);
+}
+
+/* Estado activo del highlight (no flash, permanente) */
+.highlight-active {
+  background-color: var(--highlight-active-bg, rgba(var(--ds-primary-500-rgb), 0.2));
+  border-bottom: 2px solid var(--highlight-active-border, var(--ds-primary-500));
+  transition: background-color var(--ds-duration-fast) var(--ds-ease-in-out);
+}
+
+.highlight-active:hover {
+  background-color: var(--highlight-active-bg-hover, rgba(var(--ds-primary-500-rgb), 0.3));
+}
+
+/* Scroll smooth para navegación */
+.scroll-highlight-target {
+  scroll-margin-top: 100px;
+  scroll-margin-bottom: 100px;
+}
