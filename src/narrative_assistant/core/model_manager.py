@@ -904,9 +904,9 @@ def get_spacy_model_size(model_name: str) -> int | None:
     Returns:
         Tamaño en bytes, o None si no se puede obtener
     """
+    import json
     import time
     import urllib.request
-    import json
 
     global _model_sizes_cache, _model_sizes_cache_time
 
