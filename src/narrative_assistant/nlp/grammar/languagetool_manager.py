@@ -170,7 +170,19 @@ class LanguageToolManager:
                 java_exe = self._java_dir / "bin" / "java"
 
             if java_exe.exists():
-                return str(java_exe)
+                # Verificar que es ejecutable (arquitectura correcta)
+                try:
+                    result = subprocess.run(
+                        [str(java_exe), "-version"],
+                        capture_output=True,
+                        timeout=5
+                    )
+                    if result.returncode == 0:
+                        return str(java_exe)
+                    else:
+                        logger.warning(f"Java local existe pero no es ejecutable (¿arquitectura incorrecta?)")
+                except Exception as e:
+                    logger.warning(f"Java local no funciona: {e}")
 
         return None
 
@@ -377,11 +389,38 @@ LT_URLS = [
 ]
 
 JAVA_VERSION = "21"
+# URLs para diferentes plataformas y arquitecturas
+# macOS tiene versiones separadas para Intel (x64) y Apple Silicon (aarch64)
 JAVA_URLS = {
-    "Windows": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.2%2B13/OpenJDK21U-jre_x64_windows_hotspot_21.0.2_13.zip",
-    "Linux": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.2%2B13/OpenJDK21U-jre_x64_linux_hotspot_21.0.2_13.tar.gz",
-    "Darwin": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.2%2B13/OpenJDK21U-jre_x64_mac_hotspot_21.0.2_13.tar.gz",
+    "Windows": {
+        "x64": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.2%2B13/OpenJDK21U-jre_x64_windows_hotspot_21.0.2_13.zip",
+    },
+    "Linux": {
+        "x64": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.2%2B13/OpenJDK21U-jre_x64_linux_hotspot_21.0.2_13.tar.gz",
+        "aarch64": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.2%2B13/OpenJDK21U-jre_aarch64_linux_hotspot_21.0.2_13.tar.gz",
+    },
+    "Darwin": {
+        "x64": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.2%2B13/OpenJDK21U-jre_x64_mac_hotspot_21.0.2_13.tar.gz",
+        "aarch64": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.2%2B13/OpenJDK21U-jre_aarch64_mac_hotspot_21.0.2_13.tar.gz",
+    },
 }
+
+
+def _get_machine_arch() -> str:
+    """
+    Obtener la arquitectura de la máquina de forma normalizada.
+    
+    Returns:
+        'x64' para Intel/AMD64, 'aarch64' para ARM64/Apple Silicon
+    """
+    machine = platform.machine().lower()
+    if machine in ("arm64", "aarch64"):
+        return "aarch64"
+    elif machine in ("x86_64", "amd64", "x64"):
+        return "x64"
+    else:
+        # Default a x64 para compatibilidad
+        return "x64"
 
 
 @dataclass
@@ -640,10 +679,19 @@ class LanguageToolInstaller:
             logger.error(f"Sistema no soportado para Java: {system}")
             return False
 
-        java_url = JAVA_URLS[system]
+        arch = _get_machine_arch()
+        arch_urls = JAVA_URLS[system]
+        
+        if arch not in arch_urls:
+            # Fallback a x64 si la arquitectura no está soportada
+            logger.warning(f"Arquitectura {arch} no disponible para {system}, usando x64")
+            arch = "x64"
+        
+        java_url = arch_urls[arch]
+        logger.info(f"Descargando Java para {system}/{arch}")
         self._tools_dir.mkdir(parents=True, exist_ok=True)
 
-        archive_name = f"java-{JAVA_VERSION}.zip" if system == "Windows" else f"java-{JAVA_VERSION}.tar.gz"
+        archive_name = f"java-{JAVA_VERSION}-{arch}.zip" if system == "Windows" else f"java-{JAVA_VERSION}-{arch}.tar.gz"
         archive_path = self._tools_dir / archive_name
 
         # Descargar (5-30%)
