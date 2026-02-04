@@ -552,17 +552,20 @@ const startLanguageTool = async () => {
   const success = await systemStore.startLanguageTool()
   if (success) {
     toast.add({ severity: 'success', summary: 'LanguageTool iniciado', detail: 'Corrector avanzado disponible', life: 3000 })
-    // Polling para actualizar el estado en la UI
+  } else {
+    // Iniciar polling para actualizar el estado en la UI
     let attempts = 0
     const pollInterval = setInterval(async () => {
       await systemStore.refreshCapabilities()
       attempts++
-      if (systemCapabilities.value?.languagetool?.running || attempts >= 10) {
+      if (systemCapabilities.value?.languagetool?.running) {
         clearInterval(pollInterval)
+        toast.add({ severity: 'success', summary: 'LanguageTool iniciado', detail: 'Corrector avanzado disponible', life: 3000 })
+      } else if (attempts >= 10) {
+        clearInterval(pollInterval)
+        toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo iniciar LanguageTool', life: 5000 })
       }
     }, 1000)
-  } else {
-    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo iniciar LanguageTool', life: 5000 })
   }
 }
 

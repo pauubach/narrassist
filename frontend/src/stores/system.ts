@@ -390,9 +390,11 @@ export const useSystemStore = defineStore('system', () => {
     ltStarting.value = true
     try {
       await api.postRaw('/api/languagetool/start')
-      await new Promise(r => setTimeout(r, 2000))
+      // Dar tiempo a que LT arranque
+      await new Promise(r => setTimeout(r, 3000))
       await refreshCapabilities()
-      return true
+      // Verificar que realmente esté corriendo
+      return systemCapabilities.value?.languagetool?.running ?? false
     } catch {
       return false
     } finally {

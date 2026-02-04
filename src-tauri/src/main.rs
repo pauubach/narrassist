@@ -276,6 +276,14 @@ fn main() {
             let menu = menu::create_menu(app.handle())?;
             app.set_menu(menu)?;
 
+            // Registrar handler de eventos del menu
+            // En Tauri 2.0, on_menu_event debe llamarse en App, no en Builder
+            app.on_menu_event(|app_handle, event| {
+                let id = event.id();
+                println!("[Menu] on_menu_event fired, id={:?}", id);
+                menu::handle_menu_event(app_handle, id.as_ref());
+            });
+
             // Forzar la ventana a primer plano (fix para cuando se lanza desde el instalador NSIS)
             // Cuando NSIS lanza la app después de la instalación, puede hacerlo en un contexto
             // diferente que causa que la ventana aparezca minimizada o detrás de otras ventanas
@@ -334,11 +342,6 @@ fn main() {
             });
 
             Ok(())
-        })
-        .on_menu_event(|app, event| {
-            let id = event.id();
-            println!("[Main] on_menu_event fired, id={:?}", id);
-            menu::handle_menu_event(app, id.as_ref());
         })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
