@@ -117,7 +117,7 @@
         <Button label="Reintentar" @click="loadDocument" />
       </div>
 
-      <div v-else class="document-content">
+      <div v-else class="document-content" @click="handleDocumentClick">
         <!-- Renderizar capítulos con lazy loading -->
         <div
           v-for="chapter in chapters"
@@ -732,10 +732,11 @@ const getHighlightedContent = (chapter: Chapter): string => {
         const isActive = entity.id === props.highlightEntityId
         const entityType = entity.entity_type?.toLowerCase() || 'other'
 
+        // Usamos data-entity-id para event delegation (sin onclick inline)
         if (isActive) {
           return `<mark class="entity-highlight entity-highlight-active" data-entity-id="${entity.id}">${match}</mark>`
         } else {
-          return `<mark class="entity-highlight entity-${entityType}" data-entity-id="${entity.id}" onclick="window.handleEntityClick(${entity.id})">${match}</mark>`
+          return `<mark class="entity-highlight entity-${entityType}" data-entity-id="${entity.id}">${match}</mark>`
         }
       })
     }
@@ -1298,10 +1299,16 @@ const doExport = async () => {
   }
 }
 
-// Exponer función global para manejar clicks en entidades
-if (typeof window !== 'undefined') {
-  (window as any).handleEntityClick = (entityId: number) => {
-    emit('entityClick', entityId)
+// Event delegation para clicks en entidades (evita onclick inline y window pollution)
+const handleDocumentClick = (event: MouseEvent) => {
+  const target = event.target as HTMLElement
+
+  // Verificar si el click fue en una entidad resaltada
+  if (target.classList.contains('entity-highlight')) {
+    const entityId = target.dataset.entityId
+    if (entityId) {
+      emit('entityClick', parseInt(entityId, 10))
+    }
   }
 }
 

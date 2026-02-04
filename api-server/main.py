@@ -88,14 +88,14 @@ def _configure_ssl_with_certifi():
     try:
         import ssl
         import certifi
-        
+
         # Create default context with certifi
         ssl_context = ssl.create_default_context(cafile=certifi.where())
-        
+
         # Monkey-patch urllib.request.urlopen to use certifi
         import urllib.request
         _original_urlopen = urllib.request.urlopen
-        
+
         def _patched_urlopen(url, data=None, timeout=None, **kwargs):
             if timeout is None:
                 timeout = 30
@@ -104,7 +104,7 @@ def _configure_ssl_with_certifi():
                 if isinstance(url_str, str) and url_str.startswith('https://'):
                     kwargs['context'] = ssl_context
             return _original_urlopen(url, data=data, timeout=timeout, **kwargs)
-        
+
         urllib.request.urlopen = _patched_urlopen
         _write_debug(f"SSL configured with certifi: {certifi.where()}")
     except Exception as e:
@@ -418,8 +418,16 @@ try:
             "http://tauri.localhost",  # Tauri alternative
         ],
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        # Métodos HTTP explícitamente permitidos (solo los que usa la API)
+        allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+        # Headers comunes para API REST
+        allow_headers=[
+            "Content-Type",
+            "Accept",
+            "Accept-Language",
+            "Authorization",
+            "X-Requested-With",
+        ],
     )
     _early_logger.info("CORS middleware added successfully")
 

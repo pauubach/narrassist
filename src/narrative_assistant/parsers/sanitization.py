@@ -262,7 +262,7 @@ def validate_file_path(
             )
 
     # Verificar que no escapa del directorio actual o home
-    # (prevención básica de path traversal)
+    # (prevención de path traversal)
     config = get_config()
     safe_dirs = [
         Path.cwd(),
@@ -270,19 +270,34 @@ def validate_file_path(
         config.data_dir,
     ]
 
+    # Añadir directorios adicionales configurados por el usuario
+    if hasattr(config, "security") and hasattr(config.security, "additional_safe_dirs"):
+        for extra_dir in config.security.additional_safe_dirs:
+            try:
+                safe_dirs.append(Path(extra_dir).resolve())
+            except Exception:
+                pass
+
     # Verificar que el archivo está en algún directorio seguro
-    # o es un path absoluto explícito
     is_safe = any(_is_path_under(resolved, safe_dir) for safe_dir in safe_dirs)
 
-    # Bloquear path traversal: si tiene ".." y no está bajo directorio seguro
-    # NOTA: Removido el "and" - ahora basta con no estar en directorio seguro
+    # SEGURIDAD: Bloquear TODO lo que no esté en directorios seguros
+    # Esto previene acceso a archivos del sistema como /etc/passwd
     if not is_safe:
-        # Si tiene ".." explícito, es sospechoso
-        if ".." in str(path):
-            logger.warning(f"Posible path traversal detectado: {path}")
-            raise PermissionError(f"Ruta no permitida: {path}")
-        # Si no está en directorio seguro pero es absoluto y existe, permitir
-        # (el usuario podría estar abriendo un archivo de otro lugar)
+        logger.warning(
+            f"Acceso denegado a ruta fuera de directorios seguros: {path} "
+            f"(resuelto: {resolved}). Directorios permitidos: {safe_dirs}"
+        )
+        raise PermissionError(
+            f"Ruta fuera de directorios permitidos: {path}. "
+            f"El archivo debe estar en: directorio actual, home, o directorio de datos."
+        )
+
+    # Validación adicional: rechazar paths con ".." aunque estén en safe_dirs
+    # (por seguridad en profundidad)
+    if ".." in str(path):
+        logger.warning(f"Path traversal attempt con '..': {path}")
+        raise PermissionError(f"Ruta con componentes '..' no permitida: {path}")
 
     return resolved
 

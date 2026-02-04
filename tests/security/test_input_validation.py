@@ -16,7 +16,7 @@ from narrative_assistant.core.result import Result
 from narrative_assistant.parsers.sanitization import (
     InputSanitizer,
     sanitize_chapter_content,
-    validate_file_path,
+    validate_file_path_safe as validate_file_path,
 )
 
 # =============================================================================

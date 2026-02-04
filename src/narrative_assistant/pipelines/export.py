@@ -3,29 +3,56 @@ Funciones de exportación de informes de análisis.
 
 Soporta exportación a JSON y Markdown para compartir
 resultados de análisis con editores.
+
+Compatible con:
+- AnalysisReport (legacy)
+- UnifiedReport (recomendado)
 """
 
 import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 from ..alerts.models import Alert
 from ..core.result import Result
 from ..core.utils import format_duration
 from ..entities.models import Entity
-from .analysis_pipeline import AnalysisReport
+
+if TYPE_CHECKING:
+    from ..core.errors import NarrativeError
 
 logger = logging.getLogger(__name__)
 
 
-def export_report_json(report: AnalysisReport, output_path: str | Path) -> Result[None]:
+@runtime_checkable
+class ReportProtocol(Protocol):
+    """Protocolo para informes de análisis (soporta legacy y unified)."""
+
+    project_id: int
+    session_id: int
+    document_path: str
+    entities: list
+    alerts: list
+    stats: dict
+    errors: list
+    warnings: list
+    duration_seconds: float
+
+
+def _get_fingerprint(report: ReportProtocol) -> str:
+    """Obtiene el fingerprint del informe (compatible con ambos tipos)."""
+    # UnifiedReport usa 'fingerprint', AnalysisReport usa 'document_fingerprint'
+    return getattr(report, "document_fingerprint", None) or getattr(report, "fingerprint", "")
+
+
+def export_report_json(report: ReportProtocol, output_path: str | Path) -> Result[None]:
     """
     Exporta informe de análisis a JSON.
 
     Args:
-        report: Informe de análisis
+        report: Informe de análisis (AnalysisReport o UnifiedReport)
         output_path: Ruta del archivo de salida
 
     Returns:
@@ -41,7 +68,7 @@ def export_report_json(report: AnalysisReport, output_path: str | Path) -> Resul
                 "project_id": report.project_id,
                 "session_id": report.session_id,
                 "document_path": report.document_path,
-                "document_fingerprint": report.document_fingerprint,
+                "document_fingerprint": _get_fingerprint(report),
                 "analysis_duration_seconds": report.duration_seconds,
             },
             "stats": report.stats,
@@ -76,12 +103,12 @@ def export_report_json(report: AnalysisReport, output_path: str | Path) -> Resul
         return Result.failure(error)
 
 
-def export_report_markdown(report: AnalysisReport, output_path: str | Path) -> Result[None]:
+def export_report_markdown(report: ReportProtocol, output_path: str | Path) -> Result[None]:
     """
     Exporta informe de análisis a Markdown.
 
     Args:
-        report: Informe de análisis
+        report: Informe de análisis (AnalysisReport o UnifiedReport)
         output_path: Ruta del archivo de salida
 
     Returns:
