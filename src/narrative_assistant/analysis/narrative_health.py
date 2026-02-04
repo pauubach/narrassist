@@ -15,7 +15,6 @@ cada dimensión se adapta al contexto del tipo de documento.
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -24,16 +23,19 @@ logger = logging.getLogger(__name__)
 # Tipos
 # =============================================================================
 
+
 class HealthStatus(str, Enum):
     """Estado de salud de una dimensión narrativa."""
-    OK = "ok"              # Detectado con confianza
-    WARNING = "warning"    # Parcialmente detectado o mejorable
+
+    OK = "ok"  # Detectado con confianza
+    WARNING = "warning"  # Parcialmente detectado o mejorable
     CRITICAL = "critical"  # No detectado o con problemas graves
-    NA = "n_a"             # No aplica para este tipo de documento
+    NA = "n_a"  # No aplica para este tipo de documento
 
 
 class HealthDimension(str, Enum):
     """Dimensiones del chequeo de salud narrativa."""
+
     PROTAGONIST = "protagonist"
     CONFLICT = "conflict"
     GOAL = "goal"
@@ -100,14 +102,15 @@ DIMENSION_WEIGHTS: dict[HealthDimension, float] = {
 @dataclass
 class DimensionScore:
     """Puntuación de una dimensión de salud narrativa."""
+
     dimension: HealthDimension
     name: str
     icon: str
-    score: float            # 0-100
+    score: float  # 0-100
     status: HealthStatus
-    explanation: str        # Explicación breve del resultado
-    suggestion: str = ""    # Sugerencia de mejora (vacía si OK)
-    evidence: str = ""      # Evidencia concreta del texto
+    explanation: str  # Explicación breve del resultado
+    suggestion: str = ""  # Sugerencia de mejora (vacía si OK)
+    evidence: str = ""  # Evidencia concreta del texto
 
     def to_dict(self) -> dict:
         return {
@@ -125,6 +128,7 @@ class DimensionScore:
 @dataclass
 class NarrativeHealthReport:
     """Informe completo de salud narrativa."""
+
     overall_score: float = 0.0
     overall_status: HealthStatus = HealthStatus.CRITICAL
     dimensions: list[DimensionScore] = field(default_factory=list)
@@ -149,6 +153,7 @@ class NarrativeHealthReport:
 # Analizador
 # =============================================================================
 
+
 class NarrativeHealthChecker:
     """
     Chequeo de salud narrativa.
@@ -170,11 +175,11 @@ class NarrativeHealthChecker:
         self,
         chapters_data: list[dict],
         total_chapters: int,
-        entities_data: Optional[list[dict]] = None,
-        character_arcs: Optional[list[dict]] = None,
-        chekhov_elements: Optional[list[dict]] = None,
-        abandoned_threads: Optional[list[dict]] = None,
-        pacing_data: Optional[dict] = None,
+        entities_data: list[dict] | None = None,
+        character_arcs: list[dict] | None = None,
+        chekhov_elements: list[dict] | None = None,
+        abandoned_threads: list[dict] | None = None,
+        pacing_data: dict | None = None,
     ) -> NarrativeHealthReport:
         """
         Ejecutar chequeo de salud narrativa.
@@ -226,9 +231,7 @@ class NarrativeHealthChecker:
         scored = [d for d in report.dimensions if d.status != HealthStatus.NA]
         if scored:
             total_weight = sum(DIMENSION_WEIGHTS.get(d.dimension, 1.0) for d in scored)
-            weighted_sum = sum(
-                d.score * DIMENSION_WEIGHTS.get(d.dimension, 1.0) for d in scored
-            )
+            weighted_sum = sum(d.score * DIMENSION_WEIGHTS.get(d.dimension, 1.0) for d in scored)
             report.overall_score = weighted_sum / total_weight
         else:
             report.overall_score = 0
@@ -275,7 +278,9 @@ class NarrativeHealthChecker:
             )
 
         # Buscar personaje con más menciones
-        characters_sorted = sorted(characters, key=lambda c: c.get("mention_count", 0), reverse=True)
+        characters_sorted = sorted(
+            characters, key=lambda c: c.get("mention_count", 0), reverse=True
+        )
         protagonist = characters_sorted[0]
         mentions = protagonist.get("mention_count", 0)
         name = protagonist.get("name", "Desconocido")
@@ -395,15 +400,13 @@ class NarrativeHealthChecker:
     # Dimensión: Objetivo / Meta
     # =========================================================================
 
-    def _check_goal(
-        self, chapters: list[dict], entities: list[dict], total: int
-    ) -> DimensionScore:
+    def _check_goal(self, chapters: list[dict], entities: list[dict], total: int) -> DimensionScore:
         """¿El protagonista tiene un objetivo claro? Heurística: decisiones y acciones."""
         goal_events = {"decision", "departure", "discovery"}
         found = 0
         evidence_ch = None
 
-        for ch in chapters[:max(3, total // 3)]:
+        for ch in chapters[: max(3, total // 3)]:
             events = ch.get("key_events", []) + ch.get("llm_events", [])
             for ev in events:
                 if ev.get("event_type") in goal_events:
@@ -633,9 +636,7 @@ class NarrativeHealthChecker:
     # Dimensión: Arco emocional
     # =========================================================================
 
-    def _check_emotional_arc(
-        self, arcs: list[dict], total: int
-    ) -> DimensionScore:
+    def _check_emotional_arc(self, arcs: list[dict], total: int) -> DimensionScore:
         """¿El protagonista muestra un arco de transformación?"""
         if not arcs:
             return DimensionScore(
@@ -691,7 +692,7 @@ class NarrativeHealthChecker:
     # =========================================================================
 
     def _check_pacing(
-        self, chapters: list[dict], total: int, pacing_data: Optional[dict]
+        self, chapters: list[dict], total: int, pacing_data: dict | None
     ) -> DimensionScore:
         """¿El ritmo es apropiado? Sin zonas muertas largas."""
         word_counts = [c.get("word_count", 0) for c in chapters]
@@ -712,7 +713,9 @@ class NarrativeHealthChecker:
 
         # Detectar variación extrema
         max_ratio = max(word_counts) / avg if avg > 0 else 1
-        min_ratio = min(w for w in word_counts if w > 0) / avg if avg > 0 and any(w > 0 for w in word_counts) else 1
+        min(w for w in word_counts if w > 0) / avg if avg > 0 and any(
+            w > 0 for w in word_counts
+        ) else 1
 
         # Detectar capítulos vacíos o casi vacíos
         dead_chapters = sum(1 for w in word_counts if w < avg * 0.2)
@@ -770,8 +773,9 @@ class NarrativeHealthChecker:
 
         for i in range(1, len(tones)):
             prev, curr = tones[i - 1], tones[i]
-            if (prev in positive_tones and curr in negative_tones) or \
-               (prev in negative_tones and curr in positive_tones):
+            if (prev in positive_tones and curr in negative_tones) or (
+                prev in negative_tones and curr in positive_tones
+            ):
                 sudden_shifts += 1
 
         shift_ratio = sudden_shifts / (total - 1) if total > 1 else 0
@@ -825,8 +829,8 @@ class NarrativeHealthChecker:
         # Verificar que hay contenido en las tres partes
         third = max(1, total // 3)
         beginning = chapters[:third]
-        middle = chapters[third:2 * third]
-        ending = chapters[2 * third:]
+        middle = chapters[third : 2 * third]
+        ending = chapters[2 * third :]
 
         parts_with_content = 0
         for part in [beginning, middle, ending]:
@@ -842,7 +846,11 @@ class NarrativeHealthChecker:
             total_words = begin_words + middle_words + end_words
 
             if total_words > 0:
-                ratios = [begin_words / total_words, middle_words / total_words, end_words / total_words]
+                ratios = [
+                    begin_words / total_words,
+                    middle_words / total_words,
+                    end_words / total_words,
+                ]
                 min_ratio = min(ratios)
 
                 if min_ratio >= 0.15:
@@ -910,10 +918,7 @@ class NarrativeHealthChecker:
 
         # Un personaje es "fantasma" si tiene menos del umbral % de menciones
         # Y además menos de 2 menciones absolutas
-        ghost_count = sum(
-            1 for m in mentions
-            if m / total_mentions < ghost_pct and m < 2
-        )
+        ghost_count = sum(1 for m in mentions if m / total_mentions < ghost_pct and m < 2)
         ghost_ratio = ghost_count / num_chars if num_chars else 0
 
         # Concentración del protagonista
@@ -962,9 +967,7 @@ class NarrativeHealthChecker:
     # Dimensión: Tramas cerradas (Chekhov)
     # =========================================================================
 
-    def _check_chekhov(
-        self, chekhov: list[dict], threads: list[dict]
-    ) -> DimensionScore:
+    def _check_chekhov(self, chekhov: list[dict], threads: list[dict]) -> DimensionScore:
         """¿Los hilos narrativos se cierran? ¿Hay setup sin payoff?"""
         total_elements = len(chekhov)
         fired = sum(1 for e in chekhov if e.get("is_fired", False))
@@ -1029,7 +1032,9 @@ class NarrativeHealthChecker:
                 recs.append(f"[CRÍTICO] {dim.name}: {dim.suggestion}")
 
         # Segundo: advertencias con sugerencia
-        warnings = [d for d in report.dimensions if d.status == HealthStatus.WARNING and d.suggestion]
+        warnings = [
+            d for d in report.dimensions if d.status == HealthStatus.WARNING and d.suggestion
+        ]
         for dim in warnings:
             if dim.suggestion:
                 recs.append(f"[AVISO] {dim.name}: {dim.suggestion}")

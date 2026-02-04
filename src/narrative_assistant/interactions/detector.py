@@ -11,19 +11,17 @@ Detecta:
 
 import logging
 import re
-from typing import Optional
 
 from .models import (
-    EntityInteraction,
-    InteractionType,
-    InteractionTone,
-    DIALOGUE_VERBS,
-    ACTION_VERBS_POSITIVE,
     ACTION_VERBS_NEGATIVE,
     ACTION_VERBS_NEUTRAL,
-    THOUGHT_VERBS,
-    PHYSICAL_CONTACT_VERBS,
+    ACTION_VERBS_POSITIVE,
     INTERACTION_TYPE_INTENSITY,
+    PHYSICAL_CONTACT_VERBS,
+    THOUGHT_VERBS,
+    EntityInteraction,
+    InteractionTone,
+    InteractionType,
 )
 
 logger = logging.getLogger(__name__)
@@ -32,21 +30,62 @@ logger = logging.getLogger(__name__)
 # Palabras clave para clasificar tono
 TONE_KEYWORDS = {
     InteractionTone.HOSTILE: [
-        "golpeó", "atacó", "gritó", "insultó", "amenazó", "odio", "maldijo",
-        "escupió", "empujó", "hirió", "furioso", "rabia", "desprecio",
-        "ira", "violencia", "agresión", "furia",
+        "golpeó",
+        "atacó",
+        "gritó",
+        "insultó",
+        "amenazó",
+        "odio",
+        "maldijo",
+        "escupió",
+        "empujó",
+        "hirió",
+        "furioso",
+        "rabia",
+        "desprecio",
+        "ira",
+        "violencia",
+        "agresión",
+        "furia",
     ],
     InteractionTone.COLD: [
-        "ignoró", "evitó", "frialdad", "distante", "indiferente", "seco",
-        "cortante", "despectivo", "desdeñoso", "altivo", "desinterés",
+        "ignoró",
+        "evitó",
+        "frialdad",
+        "distante",
+        "indiferente",
+        "seco",
+        "cortante",
+        "despectivo",
+        "desdeñoso",
+        "altivo",
+        "desinterés",
     ],
     InteractionTone.WARM: [
-        "sonrió", "ayudó", "apoyó", "compartió", "alegró", "amable",
-        "cariño", "preocupó", "animó", "gentil", "cordial",
+        "sonrió",
+        "ayudó",
+        "apoyó",
+        "compartió",
+        "alegró",
+        "amable",
+        "cariño",
+        "preocupó",
+        "animó",
+        "gentil",
+        "cordial",
     ],
     InteractionTone.AFFECTIONATE: [
-        "abrazó", "besó", "acarició", "amor", "adoraba", "quería",
-        "ternura", "dulzura", "cariñosamente", "adoración", "devoción",
+        "abrazó",
+        "besó",
+        "acarició",
+        "amor",
+        "adoraba",
+        "quería",
+        "ternura",
+        "dulzura",
+        "cariñosamente",
+        "adoración",
+        "devoción",
     ],
 }
 
@@ -76,35 +115,28 @@ class InteractionDetector:
     def _compile_patterns(self) -> None:
         """Compila patrones regex para detección."""
         # Patrón para diálogos: —texto— o "texto"
-        self.dialogue_pattern = re.compile(
-            r'[—«"]([^—»"]+)[—»"]',
-            re.UNICODE
-        )
+        self.dialogue_pattern = re.compile(r'[—«"]([^—»"]+)[—»"]', re.UNICODE)
 
         # Patrón para verbos de acción con objeto
-        all_action_verbs = (
-            ACTION_VERBS_POSITIVE +
-            ACTION_VERBS_NEGATIVE +
-            ACTION_VERBS_NEUTRAL
-        )
+        all_action_verbs = ACTION_VERBS_POSITIVE + ACTION_VERBS_NEGATIVE + ACTION_VERBS_NEUTRAL
         verbs_pattern = "|".join(all_action_verbs)
         self.action_pattern = re.compile(
             rf"(?P<subject>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+({verbs_pattern})\s+(?:a\s+)?(?P<object>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
-            re.IGNORECASE
+            re.IGNORECASE,
         )
 
         # Patrón para pensamientos
         thought_verbs_pattern = "|".join(THOUGHT_VERBS)
         self.thought_pattern = re.compile(
             rf"(?P<subject>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+({thought_verbs_pattern})\s+(?:en\s+)?(?P<object>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
-            re.IGNORECASE
+            re.IGNORECASE,
         )
 
         # Patrón para contacto físico
         physical_verbs_pattern = "|".join(PHYSICAL_CONTACT_VERBS)
         self.physical_pattern = re.compile(
             rf"(?P<subject>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+({physical_verbs_pattern})\s+(?:a\s+)?(?P<object>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
-            re.IGNORECASE
+            re.IGNORECASE,
         )
 
     def detect_all(
@@ -129,23 +161,21 @@ class InteractionDetector:
         interactions = []
 
         # Detectar acciones
-        interactions.extend(
-            self.detect_actions(text, entities, chapter, start_offset)
-        )
+        interactions.extend(self.detect_actions(text, entities, chapter, start_offset))
 
         # Detectar pensamientos
-        interactions.extend(
-            self.detect_thoughts(text, entities, chapter, start_offset)
-        )
+        interactions.extend(self.detect_thoughts(text, entities, chapter, start_offset))
 
         # Detectar contacto físico (con mayor prioridad que acciones genéricas)
         physical = self.detect_physical_contact(text, entities, chapter, start_offset)
         # Marcar interacciones de acción que son en realidad contacto físico
         for p in physical:
             for i, action in enumerate(interactions):
-                if (action.initiator_name == p.initiator_name and
-                    action.receiver_name == p.receiver_name and
-                    abs(action.start_char - p.start_char) < 50):
+                if (
+                    action.initiator_name == p.initiator_name
+                    and action.receiver_name == p.receiver_name
+                    and abs(action.start_char - p.start_char) < 50
+                ):
                     interactions[i] = p
                     break
             else:
@@ -316,7 +346,7 @@ class InteractionDetector:
         chapter: int = 0,
         start_char: int = 0,
         end_char: int = 0,
-    ) -> Optional[EntityInteraction]:
+    ) -> EntityInteraction | None:
         """
         Detecta a quién se dirige un diálogo.
 
@@ -344,8 +374,10 @@ class InteractionDetector:
                     receiver = entity
                     break
                 # Si hay "tú", "usted", "te", asumir que es la otra entidad
-                if re.search(r'\b(tú|usted|te|ti)\b', dialogue_text, re.IGNORECASE):
-                    if len(context_entities) == 1 or (len(context_entities) == 2 and speaker in context_entities):
+                if re.search(r"\b(tú|usted|te|ti)\b", dialogue_text, re.IGNORECASE):
+                    if len(context_entities) == 1 or (
+                        len(context_entities) == 2 and speaker in context_entities
+                    ):
                         for e in context_entities:
                             if e.lower() != speaker.lower():
                                 receiver = e
@@ -398,7 +430,11 @@ class InteractionDetector:
                 if result.is_success and result.value:
                     # Convertir Sentiment enum a score numérico
                     state = result.value
-                    sentiment_name = state.sentiment.value if hasattr(state.sentiment, 'value') else str(state.sentiment)
+                    sentiment_name = (
+                        state.sentiment.value
+                        if hasattr(state.sentiment, "value")
+                        else str(state.sentiment)
+                    )
                     confidence = state.sentiment_confidence
 
                     # Mapear sentiment a score base
@@ -422,7 +458,7 @@ class InteractionDetector:
         """Clasifica tono basándose en keywords."""
         text_lower = text.lower()
 
-        scores = {tone: 0 for tone in InteractionTone}
+        scores = dict.fromkeys(InteractionTone, 0)
 
         for tone, keywords in TONE_KEYWORDS.items():
             for keyword in keywords:
@@ -464,9 +500,7 @@ class InteractionDetector:
                 interaction.start_char // 100,  # Agrupar por bloques de 100 chars
             )
 
-            if key not in seen:
-                seen[key] = interaction
-            elif interaction.confidence > seen[key].confidence:
+            if key not in seen or interaction.confidence > seen[key].confidence:
                 seen[key] = interaction
 
         return list(seen.values())

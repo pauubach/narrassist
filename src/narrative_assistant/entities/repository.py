@@ -9,14 +9,13 @@ import json
 import logging
 import threading
 from datetime import datetime
-from typing import Optional
 
-from ..persistence.database import get_database, Database
+from ..persistence.database import Database, get_database
 from .models import (
     Entity,
-    EntityType,
     EntityImportance,
     EntityMention,
+    EntityType,
     MergeHistory,
 )
 
@@ -31,7 +30,7 @@ class EntityRepository:
     para entidades narrativas y sus menciones.
     """
 
-    def __init__(self, database: Optional[Database] = None):
+    def __init__(self, database: Database | None = None):
         """
         Inicializa el repositorio.
 
@@ -55,10 +54,12 @@ class EntityRepository:
             ID de la entidad creada
         """
         # Serializar aliases y merged_from en JSON
-        merged_data = json.dumps({
-            "aliases": entity.aliases,
-            "merged_ids": entity.merged_from_ids,
-        })
+        merged_data = json.dumps(
+            {
+                "aliases": entity.aliases,
+                "merged_ids": entity.merged_from_ids,
+            }
+        )
 
         sql = """
             INSERT INTO entities (
@@ -87,7 +88,7 @@ class EntityRepository:
             logger.debug(f"Entidad creada: {entity.canonical_name} (ID={entity_id})")
             return entity_id
 
-    def get_entity(self, entity_id: int) -> Optional[Entity]:
+    def get_entity(self, entity_id: int) -> Entity | None:
         """
         Obtiene una entidad por ID.
 
@@ -106,7 +107,7 @@ class EntityRepository:
     def get_entities_by_project(
         self,
         project_id: int,
-        entity_type: Optional[EntityType] = None,
+        entity_type: EntityType | None = None,
         active_only: bool = True,
     ) -> list[Entity]:
         """
@@ -141,11 +142,11 @@ class EntityRepository:
     def update_entity(
         self,
         entity_id: int,
-        canonical_name: Optional[str] = None,
-        aliases: Optional[list[str]] = None,
-        importance: Optional[EntityImportance] = None,
-        description: Optional[str] = None,
-        merged_from_ids: Optional[list[int]] = None,
+        canonical_name: str | None = None,
+        aliases: list[str] | None = None,
+        importance: EntityImportance | None = None,
+        description: str | None = None,
+        merged_from_ids: list[int] | None = None,
     ) -> bool:
         """
         Actualiza campos de una entidad.
@@ -174,14 +175,14 @@ class EntityRepository:
             if current:
                 new_aliases = aliases if aliases is not None else current.aliases
                 new_merged = (
-                    merged_from_ids
-                    if merged_from_ids is not None
-                    else current.merged_from_ids
+                    merged_from_ids if merged_from_ids is not None else current.merged_from_ids
                 )
-                merged_data = json.dumps({
-                    "aliases": new_aliases,
-                    "merged_ids": new_merged,
-                })
+                merged_data = json.dumps(
+                    {
+                        "aliases": new_aliases,
+                        "merged_ids": new_merged,
+                    }
+                )
                 updates.append("merged_from_ids = ?")
                 params.append(merged_data)
 
@@ -302,10 +303,13 @@ class EntityRepository:
             """,
             (project_id,),
         )
-        return self.db.fetchone(
-            "SELECT COUNT(*) as cnt FROM entities WHERE project_id = ? AND is_active = 1",
-            (project_id,),
-        )["cnt"] or 0
+        return (
+            self.db.fetchone(
+                "SELECT COUNT(*) as cnt FROM entities WHERE project_id = ? AND is_active = 1",
+                (project_id,),
+            )["cnt"]
+            or 0
+        )
 
     # =========================================================================
     # Menciones - CRUD
@@ -413,8 +417,8 @@ class EntityRepository:
         entity_id: int,
         start_char: int,
         end_char: int,
-        chapter_id: Optional[int] = None,
-    ) -> Optional[EntityMention]:
+        chapter_id: int | None = None,
+    ) -> EntityMention | None:
         """
         Busca una mención por entity_id y posición de caracteres.
 
@@ -494,7 +498,7 @@ class EntityRepository:
         attribute_key: str,
         attribute_value: str,
         confidence: float = 1.0,
-        source_mention_id: Optional[int] = None,
+        source_mention_id: int | None = None,
     ) -> int:
         """
         Crea un nuevo atributo para una entidad.
@@ -590,21 +594,23 @@ class EntityRepository:
 
         result = []
         for row in rows:
-            result.append({
-                "id": row["id"],
-                "entity_id": row["entity_id"],
-                "category": row["attribute_type"],
-                "name": row["attribute_key"],
-                "value": row["attribute_value"],
-                "confidence": row["confidence"],
-                "source_mention_id": row["source_mention_id"],
-                "is_verified": bool(row["is_verified"]),
-                "created_at": row["created_at"],
-                "span_start": row["start_char"],
-                "span_end": row["end_char"],
-                "chapter_id": row["chapter_id"],
-                "chapter": row["chapter_number"],
-            })
+            result.append(
+                {
+                    "id": row["id"],
+                    "entity_id": row["entity_id"],
+                    "category": row["attribute_type"],
+                    "name": row["attribute_key"],
+                    "value": row["attribute_value"],
+                    "confidence": row["confidence"],
+                    "source_mention_id": row["source_mention_id"],
+                    "is_verified": bool(row["is_verified"]),
+                    "created_at": row["created_at"],
+                    "span_start": row["start_char"],
+                    "span_end": row["end_char"],
+                    "chapter_id": row["chapter_id"],
+                    "chapter": row["chapter_number"],
+                }
+            )
 
         # Enriquecer cada atributo con la lista de capítulos donde aparece
         # (desde attribute_evidences, no solo desde source_mention)
@@ -641,16 +647,18 @@ class EntityRepository:
                     attr["chapters"] = [attr["chapter"]]
                 else:
                     attr["chapters"] = []
-                attr["firstMentionChapter"] = attr["chapters"][0] if attr["chapters"] else attr["chapter"]
+                attr["firstMentionChapter"] = (
+                    attr["chapters"][0] if attr["chapters"] else attr["chapter"]
+                )
 
         return result
 
     def update_attribute(
         self,
         attribute_id: int,
-        attribute_key: Optional[str] = None,
-        attribute_value: Optional[str] = None,
-        is_verified: Optional[bool] = None,
+        attribute_key: str | None = None,
+        attribute_value: str | None = None,
+        is_verified: bool | None = None,
     ) -> bool:
         """
         Actualiza un atributo existente.
@@ -801,17 +809,19 @@ class EntityRepository:
 
         result = []
         for row in rows:
-            result.append({
-                "attribute_id": row["attribute_id"],
-                "entity_id": row["entity_id"],
-                "entity_name": row["entity_name"],
-                "attribute_type": row["attribute_type"],
-                "attribute_key": row["attribute_key"],
-                "attribute_value": row["attribute_value"],
-                "confidence": row["confidence"],
-                "source_mention_id": row["source_mention_id"],
-                "created_at": row["created_at"],
-            })
+            result.append(
+                {
+                    "attribute_id": row["attribute_id"],
+                    "entity_id": row["entity_id"],
+                    "entity_name": row["entity_name"],
+                    "attribute_type": row["attribute_type"],
+                    "attribute_key": row["attribute_key"],
+                    "attribute_value": row["attribute_value"],
+                    "confidence": row["confidence"],
+                    "source_mention_id": row["source_mention_id"],
+                    "created_at": row["created_at"],
+                }
+            )
 
         logger.debug(f"Retrieved {len(result)} attributes for project {project_id}")
         return result
@@ -828,7 +838,7 @@ class EntityRepository:
         source_snapshots: list[dict],
         canonical_names_before: list[str],
         merged_by: str = "user",
-        note: Optional[str] = None,
+        note: str | None = None,
     ) -> int:
         """
         Registra una fusión en el historial.
@@ -846,15 +856,19 @@ class EntityRepository:
             ID del registro
         """
         # Guardar en review_history con formato JSON
-        old_value = json.dumps({
-            "source_entity_ids": source_entity_ids,
-            "source_snapshots": source_snapshots,
-            "canonical_names_before": canonical_names_before,
-        })
-        new_value = json.dumps({
-            "result_entity_id": result_entity_id,
-            "merged_by": merged_by,
-        })
+        old_value = json.dumps(
+            {
+                "source_entity_ids": source_entity_ids,
+                "source_snapshots": source_snapshots,
+                "canonical_names_before": canonical_names_before,
+            }
+        )
+        new_value = json.dumps(
+            {
+                "result_entity_id": result_entity_id,
+                "merged_by": merged_by,
+            }
+        )
 
         sql = """
             INSERT INTO review_history (
@@ -1023,10 +1037,10 @@ class EntityRepository:
 # =============================================================================
 
 _repo_lock = threading.Lock()
-_entity_repository: Optional[EntityRepository] = None
+_entity_repository: EntityRepository | None = None
 
 
-def get_entity_repository(database: Optional[Database] = None) -> EntityRepository:
+def get_entity_repository(database: Database | None = None) -> EntityRepository:
     """
     Obtiene el singleton del repositorio de entidades.
 

@@ -7,13 +7,11 @@ autor decida si es intencional.
 """
 
 import re
-from collections import Counter
 from typing import Optional
 
 from ..base import BaseDetector, CorrectionIssue
 from ..config import CrutchWordsConfig
 from ..types import CorrectionCategory
-
 
 # Muletillas comunes por categoría con alternativas
 CRUTCH_CATEGORIES = {
@@ -131,19 +129,16 @@ class CrutchWordsDetector(BaseDetector):
     def _compile_patterns(self) -> dict[str, re.Pattern]:
         """Compila patrones regex para cada muletilla."""
         patterns = {}
-        for category, words in CRUTCH_CATEGORIES.items():
+        for _category, words in CRUTCH_CATEGORIES.items():
             for word in words:
                 # Patrón case insensitive, palabra completa
-                patterns[word] = re.compile(
-                    r"\b" + re.escape(word) + r"\b",
-                    re.IGNORECASE
-                )
+                patterns[word] = re.compile(r"\b" + re.escape(word) + r"\b", re.IGNORECASE)
         return patterns
 
     def detect(
         self,
         text: str,
-        chapter_index: Optional[int] = None,
+        chapter_index: int | None = None,
         spacy_doc=None,
         **kwargs,
     ) -> list[CorrectionIssue]:
@@ -246,10 +241,7 @@ class CrutchWordsDetector(BaseDetector):
                 )
 
         # Ordenar por z-score (más severos primero)
-        issues.sort(
-            key=lambda x: x.extra_data.get("z_score", 0),
-            reverse=True
-        )
+        issues.sort(key=lambda x: x.extra_data.get("z_score", 0), reverse=True)
 
         return issues
 
@@ -269,9 +261,9 @@ class CrutchWordsDetector(BaseDetector):
                     return self.config.check_filler_phrases
         return True  # Por defecto habilitado
 
-    def _get_alternatives(self, word: str) -> list[Optional[str]]:
+    def _get_alternatives(self, word: str) -> list[str | None]:
         """Obtiene alternativas para una muletilla."""
-        for category, words in CRUTCH_CATEGORIES.items():
+        for _category, words in CRUTCH_CATEGORIES.items():
             if word in words:
                 return words[word]
         return []
@@ -317,12 +309,14 @@ class CrutchWordsDetector(BaseDetector):
                 frequency = (count / word_count) * 10000
                 expected = EXPECTED_FREQUENCIES.get(word, 5)
                 if frequency > expected * 1.5:
-                    all_counts.append({
-                        "word": word,
-                        "count": count,
-                        "frequency": round(frequency, 2),
-                        "expected": expected,
-                    })
+                    all_counts.append(
+                        {
+                            "word": word,
+                            "count": count,
+                            "frequency": round(frequency, 2),
+                            "expected": expected,
+                        }
+                    )
 
         all_counts.sort(key=lambda x: x["frequency"], reverse=True)
         summary["top_overused"] = all_counts[:5]

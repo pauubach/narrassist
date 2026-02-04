@@ -12,7 +12,7 @@ import logging
 import re
 from collections import Counter
 from dataclasses import dataclass, field
-from typing import Optional, Any
+from typing import Any
 
 from narrative_assistant.core import Result
 
@@ -32,7 +32,7 @@ class GlossarySuggestion:
 
     # Estadísticas
     frequency: int = 0  # Veces que aparece
-    first_chapter: Optional[int] = None  # Primer capítulo donde aparece
+    first_chapter: int | None = None  # Primer capítulo donde aparece
     contexts: list[str] = field(default_factory=list)  # Ejemplos de uso (max 3)
 
     # Flags inferidos
@@ -97,20 +97,81 @@ class GlossaryExtractor:
     # Palabras comunes que NO deben sugerirse
     COMMON_PROPER_NOUNS = {
         # Nombres españoles muy comunes
-        "maría", "juan", "pedro", "ana", "josé", "luis", "carlos", "antonio",
-        "miguel", "francisco", "manuel", "carmen", "isabel", "rosa", "laura",
-        "david", "pablo", "jorge", "raúl", "andrés", "elena", "marta", "lucía",
-        "sofía", "alba", "sara", "paula", "daniela", "valeria", "emma",
+        "maría",
+        "juan",
+        "pedro",
+        "ana",
+        "josé",
+        "luis",
+        "carlos",
+        "antonio",
+        "miguel",
+        "francisco",
+        "manuel",
+        "carmen",
+        "isabel",
+        "rosa",
+        "laura",
+        "david",
+        "pablo",
+        "jorge",
+        "raúl",
+        "andrés",
+        "elena",
+        "marta",
+        "lucía",
+        "sofía",
+        "alba",
+        "sara",
+        "paula",
+        "daniela",
+        "valeria",
+        "emma",
         # Ciudades/países muy comunes
-        "españa", "madrid", "barcelona", "méxico", "argentina", "colombia",
-        "chile", "perú", "francia", "italia", "alemania", "londres", "parís",
-        "roma", "nueva york", "buenos aires", "lima", "bogotá",
+        "españa",
+        "madrid",
+        "barcelona",
+        "méxico",
+        "argentina",
+        "colombia",
+        "chile",
+        "perú",
+        "francia",
+        "italia",
+        "alemania",
+        "londres",
+        "parís",
+        "roma",
+        "nueva york",
+        "buenos aires",
+        "lima",
+        "bogotá",
         # Meses, días
-        "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
-        "agosto", "septiembre", "octubre", "noviembre", "diciembre",
-        "lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo",
+        "enero",
+        "febrero",
+        "marzo",
+        "abril",
+        "mayo",
+        "junio",
+        "julio",
+        "agosto",
+        "septiembre",
+        "octubre",
+        "noviembre",
+        "diciembre",
+        "lunes",
+        "martes",
+        "miércoles",
+        "jueves",
+        "viernes",
+        "sábado",
+        "domingo",
         # Otros comunes
-        "dios", "señor", "señora", "doctor", "doctora",
+        "dios",
+        "señor",
+        "señora",
+        "doctor",
+        "doctora",
     }
 
     # Patrones de términos técnicos
@@ -127,8 +188,24 @@ class GlossaryExtractor:
 
     # Sufijos que indican términos inventados en fantasía/ciencia ficción
     FANTASY_SUFFIXES = [
-        "iel", "ael", "wen", "dor", "thor", "mir", "gar", "dal", "rim",
-        "eth", "oth", "ath", "ion", "eon", "ium", "ar", "or", "ur",
+        "iel",
+        "ael",
+        "wen",
+        "dor",
+        "thor",
+        "mir",
+        "gar",
+        "dal",
+        "rim",
+        "eth",
+        "oth",
+        "ath",
+        "ion",
+        "eon",
+        "ium",
+        "ar",
+        "or",
+        "ur",
     ]
 
     def __init__(
@@ -136,7 +213,7 @@ class GlossaryExtractor:
         min_frequency: int = 2,
         max_frequency: int = 50,
         min_confidence: float = 0.5,
-        existing_terms: Optional[set[str]] = None,
+        existing_terms: set[str] | None = None,
     ):
         """
         Inicializa el extractor.
@@ -156,7 +233,7 @@ class GlossaryExtractor:
     def extract(
         self,
         chapters: list[dict],
-        entities: Optional[list[dict]] = None,
+        entities: list[dict] | None = None,
     ) -> Result[GlossaryExtractionReport]:
         """
         Extrae términos candidatos de los capítulos.
@@ -268,7 +345,7 @@ class GlossaryExtractor:
     ) -> None:
         """Procesa un capítulo extrayendo palabras candidatas."""
         # Dividir en oraciones para contexto
-        sentences = re.split(r'[.!?]+', content)
+        sentences = re.split(r"[.!?]+", content)
 
         for sentence in sentences:
             sentence = sentence.strip()
@@ -277,7 +354,7 @@ class GlossaryExtractor:
 
             # Buscar palabras con mayúscula que no están al inicio de oración
             # Patrón: palabra anterior + Palabra con mayúscula
-            pattern = r'(?<=[a-záéíóúñü]\s)([A-ZÁÉÍÓÚÑÜ][a-záéíóúñü]+)'
+            pattern = r"(?<=[a-záéíóúñü]\s)([A-ZÁÉÍÓÚÑÜ][a-záéíóúñü]+)"
             matches = re.finditer(pattern, sentence)
 
             for match in matches:
@@ -370,9 +447,9 @@ class GlossaryExtractor:
         self,
         word: str,
         count: int,
-        first_chapter: Optional[int],
+        first_chapter: int | None,
         contexts: list[str],
-    ) -> Optional[GlossarySuggestion]:
+    ) -> GlossarySuggestion | None:
         """
         Evalúa una palabra y genera una sugerencia si es candidata.
 
@@ -451,15 +528,8 @@ class GlossaryExtractor:
             r"[xzq][^u]",  # x, z, q no seguidos de u (raro)
         ]
 
-        for pattern in unusual_patterns:
-            if re.search(pattern, word_lower):
-                return True
-
-        return False
+        return any(re.search(pattern, word_lower) for pattern in unusual_patterns)
 
     def _is_technical(self, word: str) -> bool:
         """Determina si una palabra parece técnica."""
-        for pattern in self._compiled_technical:
-            if pattern.fullmatch(word):
-                return True
-        return False
+        return any(pattern.fullmatch(word) for pattern in self._compiled_technical)

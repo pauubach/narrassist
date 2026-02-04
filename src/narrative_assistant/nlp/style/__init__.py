@@ -26,88 +26,82 @@ Uso:
         print(f"Salto de coherencia: {brk.explanation}")
 """
 
-from .repetition_detector import (
-    Repetition,
-    RepetitionReport,
-    RepetitionType,
-    RepetitionSeverity,
-    RepetitionOccurrence,
-    RepetitionDetector,
-    get_repetition_detector,
-    reset_repetition_detector,
-)
-
 from .coherence_detector import (
     CoherenceBreak,
-    CoherenceReport,
     CoherenceBreakType,
-    CoherenceSeverity,
     CoherenceDetector,
+    CoherenceReport,
+    CoherenceSeverity,
     get_coherence_detector,
     reset_coherence_detector,
 )
-
 from .editorial_rules import (
-    EditorialRule,
-    EditorialRuleType,
-    EditorialRuleCategory,
+    PREDEFINED_RULES,
     EditorialIssue,
     EditorialReport,
+    EditorialRule,
+    EditorialRuleCategory,
     EditorialRulesChecker,
-    get_editorial_checker,
-    reset_editorial_checker,
-    PREDEFINED_RULES,
-    parse_user_rules,
+    EditorialRuleType,
     check_with_user_rules,
+    get_editorial_checker,
+    parse_user_rules,
+    reset_editorial_checker,
 )
-
 from .filler_detector import (
     Filler,
+    FillerDetector,
     FillerOccurrence,
     FillerReport,
-    FillerType,
     FillerSeverity,
-    FillerDetector,
+    FillerType,
     get_filler_detector,
     reset_filler_detector,
 )
-
-from .sensory_report import (
-    SensoryType,
-    SensoryDensity,
-    SensoryDetail,
-    ChapterSensoryStats,
-    SensoryReport,
-    SensoryAnalyzer,
-    get_sensory_analyzer,
-    reset_sensory_analyzer,
-    SENSE_NAMES,
-)
-
-from .sentence_energy import (
-    EnergyLevel,
-    EnergyIssueType,
-    EnergyIssue,
-    SentenceEnergy,
-    SentenceEnergyReport,
-    SentenceEnergyDetector,
-    get_sentence_energy_detector,
-    reset_sentence_energy_detector,
-)
-
 from .readability import (
-    ReadabilityLevel,
-    ReadabilityReport,
-    SentenceStats,
-    ReadabilityAnalyzer,
-    get_readability_analyzer,
-    reset_readability_analyzer,
-    count_syllables_spanish,
+    AGE_GROUP_THRESHOLDS,
+    SPANISH_SIGHT_WORDS,
     # Age-specific readability
     AgeGroup,
     AgeReadabilityReport,
-    AGE_GROUP_THRESHOLDS,
-    SPANISH_SIGHT_WORDS,
+    ReadabilityAnalyzer,
+    ReadabilityLevel,
+    ReadabilityReport,
+    SentenceStats,
+    count_syllables_spanish,
+    get_readability_analyzer,
+    reset_readability_analyzer,
+)
+from .repetition_detector import (
+    Repetition,
+    RepetitionDetector,
+    RepetitionOccurrence,
+    RepetitionReport,
+    RepetitionSeverity,
+    RepetitionType,
+    get_repetition_detector,
+    reset_repetition_detector,
+)
+from .sensory_report import (
+    SENSE_NAMES,
+    ChapterSensoryStats,
+    SensoryAnalyzer,
+    SensoryDensity,
+    SensoryDetail,
+    SensoryReport,
+    SensoryType,
+    get_sensory_analyzer,
+    reset_sensory_analyzer,
+)
+from .sentence_energy import (
+    EnergyIssue,
+    EnergyIssueType,
+    EnergyLevel,
+    SentenceEnergy,
+    SentenceEnergyDetector,
+    SentenceEnergyReport,
+    get_sentence_energy_detector,
+    reset_sentence_energy_detector,
 )
 
 __all__ = [

@@ -8,14 +8,15 @@ y gestiona su ciclo de vida.
 import logging
 import threading
 from collections import defaultdict
+from collections.abc import Callable
 from datetime import datetime
-from typing import Any, Callable, Optional
+from typing import Any, Optional
 
-from ..core.result import Result
 from ..analysis.attribute_consistency import get_attribute_display_name
+from ..core.result import Result
+from .formatter import AlertFormatter
 from .models import Alert, AlertCategory, AlertFilter, AlertSeverity, AlertStatus
 from .repository import AlertRepository, get_alert_repository
-from .formatter import AlertFormatter
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +37,7 @@ class AlertEngine:
     - Genera resúmenes y estadísticas
     """
 
-    def __init__(self, repository: Optional[AlertRepository] = None):
+    def __init__(self, repository: AlertRepository | None = None):
         """
         Inicializa el motor de alertas.
 
@@ -46,9 +47,7 @@ class AlertEngine:
         self.repo = repository or get_alert_repository()
         self.alert_handlers: dict[str, Callable[[Any], Alert]] = {}
 
-    def register_handler(
-        self, alert_type: str, handler: Callable[[Any], Alert]
-    ) -> None:
+    def register_handler(self, alert_type: str, handler: Callable[[Any], Alert]) -> None:
         """
         Registra un handler para convertir resultados de detector a alertas.
 
@@ -142,7 +141,7 @@ class AlertEngine:
         return Result.success(created_alerts)
 
     def get_alerts(
-        self, project_id: int, alert_filter: Optional[AlertFilter] = None
+        self, project_id: int, alert_filter: AlertFilter | None = None
     ) -> Result[list[Alert]]:
         """
         Obtiene alertas con filtros opcionales.
@@ -162,9 +161,7 @@ class AlertEngine:
 
         if alert_filter:
             alerts = [a for a in alerts if alert_filter.matches(a)]
-            logger.debug(
-                f"Filtered to {len(alerts)} alerts for project {project_id}"
-            )
+            logger.debug(f"Filtered to {len(alerts)} alerts for project {project_id}")
 
         return Result.success(alerts)
 
@@ -213,29 +210,21 @@ class AlertEngine:
         result = self.repo.update(alert)
 
         if result.is_success:
-            logger.info(
-                f"Alert {alert_id} status changed: {old_status.value} → {status.value}"
-            )
+            logger.info(f"Alert {alert_id} status changed: {old_status.value} → {status.value}")
 
         return result
 
     def dismiss_alert(self, alert_id: int, reason: str = "") -> Result[Alert]:
         """Descarta una alerta (falso positivo)."""
-        return self.update_alert_status(
-            alert_id, AlertStatus.DISMISSED, f"Descartada: {reason}"
-        )
+        return self.update_alert_status(alert_id, AlertStatus.DISMISSED, f"Descartada: {reason}")
 
     def resolve_alert(self, alert_id: int, resolution: str = "") -> Result[Alert]:
         """Marca una alerta como resuelta."""
-        return self.update_alert_status(
-            alert_id, AlertStatus.RESOLVED, f"Resuelto: {resolution}"
-        )
+        return self.update_alert_status(alert_id, AlertStatus.RESOLVED, f"Resuelto: {resolution}")
 
     def acknowledge_alert(self, alert_id: int) -> Result[Alert]:
         """Marca una alerta como vista/reconocida."""
-        return self.update_alert_status(
-            alert_id, AlertStatus.ACKNOWLEDGED, "Usuario vio la alerta"
-        )
+        return self.update_alert_status(alert_id, AlertStatus.ACKNOWLEDGED, "Usuario vio la alerta")
 
     def get_summary(self, project_id: int) -> Result[dict[str, Any]]:
         """
@@ -422,6 +411,7 @@ class AlertEngine:
 
         # Traducir nombre del atributo para mostrar en español
         from ..nlp.attributes import AttributeKey
+
         try:
             attr_key_enum = AttributeKey(attribute_key)
             display_name = get_attribute_display_name(attr_key_enum)
@@ -465,7 +455,7 @@ class AlertEngine:
         suggestions: list[str],
         confidence: float,
         explanation: str,
-        chapter: Optional[int] = None,
+        chapter: int | None = None,
     ) -> Result[Alert]:
         """
         Crea alerta desde un error ortográfico.
@@ -521,11 +511,11 @@ class AlertEngine:
         end_char: int,
         sentence: str,
         error_type: str,
-        suggestion: Optional[str],
+        suggestion: str | None,
         confidence: float,
         explanation: str,
         rule_id: str = "",
-        chapter: Optional[int] = None,
+        chapter: int | None = None,
     ) -> Result[Alert]:
         """
         Crea alerta desde un error gramatical.
@@ -579,12 +569,12 @@ class AlertEngine:
         start_char: int,
         end_char: int,
         explanation: str,
-        suggestion: Optional[str] = None,
+        suggestion: str | None = None,
         confidence: float = 0.8,
         context: str = "",
-        chapter: Optional[int] = None,
+        chapter: int | None = None,
         rule_id: str = "",
-        extra_data: Optional[dict] = None,
+        extra_data: dict | None = None,
     ) -> Result[Alert]:
         """
         Crea alerta desde un issue de corrección editorial.
@@ -651,7 +641,8 @@ class AlertEngine:
             excerpt=context or text,
             confidence=confidence,
             source_module="corrections_detector",
-            extra_data=extra_data or {
+            extra_data=extra_data
+            or {
                 "text": text,
                 "issue_type": issue_type,
                 "rule_id": rule_id,
@@ -662,7 +653,7 @@ class AlertEngine:
         self,
         project_id: int,
         report: Any,  # SpellingReport
-        chapter: Optional[int] = None,
+        chapter: int | None = None,
         min_confidence: float = 0.5,
     ) -> Result[list[Alert]]:
         """
@@ -683,26 +674,30 @@ class AlertEngine:
             if issue.confidence < min_confidence:
                 continue
 
-            alerts_data.append({
-                "category": AlertCategory.ORTHOGRAPHY,
-                "severity": self.calculate_severity_from_confidence(issue.confidence),
-                "alert_type": f"spelling_{issue.error_type.value}",
-                "title": f"Error ortográfico: '{issue.word}'",
-                "description": issue.explanation,
-                "explanation": AlertFormatter.format_context(issue.sentence),
-                "suggestion": f"Sugerencias: {', '.join(issue.suggestions[:3])}" if issue.suggestions else None,
-                "chapter": chapter,
-                "start_char": issue.start_char,
-                "end_char": issue.end_char,
-                "excerpt": issue.sentence,
-                "confidence": issue.confidence,
-                "source_module": "spelling_checker",
-                "extra_data": {
-                    "word": issue.word,
-                    "error_type": issue.error_type.value,
-                    "suggestions": issue.suggestions,
-                },
-            })
+            alerts_data.append(
+                {
+                    "category": AlertCategory.ORTHOGRAPHY,
+                    "severity": self.calculate_severity_from_confidence(issue.confidence),
+                    "alert_type": f"spelling_{issue.error_type.value}",
+                    "title": f"Error ortográfico: '{issue.word}'",
+                    "description": issue.explanation,
+                    "explanation": AlertFormatter.format_context(issue.sentence),
+                    "suggestion": f"Sugerencias: {', '.join(issue.suggestions[:3])}"
+                    if issue.suggestions
+                    else None,
+                    "chapter": chapter,
+                    "start_char": issue.start_char,
+                    "end_char": issue.end_char,
+                    "excerpt": issue.sentence,
+                    "confidence": issue.confidence,
+                    "source_module": "spelling_checker",
+                    "extra_data": {
+                        "word": issue.word,
+                        "error_type": issue.error_type.value,
+                        "suggestions": issue.suggestions,
+                    },
+                }
+            )
 
         return self.create_alerts_batch(project_id, alerts_data)
 
@@ -710,7 +705,7 @@ class AlertEngine:
         self,
         project_id: int,
         report: Any,  # GrammarReport
-        chapter: Optional[int] = None,
+        chapter: int | None = None,
         min_confidence: float = 0.5,
     ) -> Result[list[Alert]]:
         """
@@ -731,26 +726,30 @@ class AlertEngine:
             if issue.confidence < min_confidence:
                 continue
 
-            alerts_data.append({
-                "category": AlertCategory.GRAMMAR,
-                "severity": self.calculate_severity_from_confidence(issue.confidence),
-                "alert_type": f"grammar_{issue.error_type.value}",
-                "title": f"Error gramatical: {issue.explanation[:50]}",
-                "description": f"'{issue.text}' → '{issue.suggestion}'" if issue.suggestion else f"'{issue.text}'",
-                "explanation": AlertFormatter.format_context(issue.sentence),
-                "suggestion": issue.suggestion,
-                "chapter": chapter,
-                "start_char": issue.start_char,
-                "end_char": issue.end_char,
-                "excerpt": issue.sentence,
-                "confidence": issue.confidence,
-                "source_module": "grammar_checker",
-                "extra_data": {
-                    "text": issue.text,
-                    "error_type": issue.error_type.value,
-                    "rule_id": issue.rule_id,
-                },
-            })
+            alerts_data.append(
+                {
+                    "category": AlertCategory.GRAMMAR,
+                    "severity": self.calculate_severity_from_confidence(issue.confidence),
+                    "alert_type": f"grammar_{issue.error_type.value}",
+                    "title": f"Error gramatical: {issue.explanation[:50]}",
+                    "description": f"'{issue.text}' → '{issue.suggestion}'"
+                    if issue.suggestion
+                    else f"'{issue.text}'",
+                    "explanation": AlertFormatter.format_context(issue.sentence),
+                    "suggestion": issue.suggestion,
+                    "chapter": chapter,
+                    "start_char": issue.start_char,
+                    "end_char": issue.end_char,
+                    "excerpt": issue.sentence,
+                    "confidence": issue.confidence,
+                    "source_module": "grammar_checker",
+                    "extra_data": {
+                        "text": issue.text,
+                        "error_type": issue.error_type.value,
+                        "rule_id": issue.rule_id,
+                    },
+                }
+            )
 
         return self.create_alerts_batch(project_id, alerts_data)
 
@@ -767,8 +766,8 @@ class AlertEngine:
         end_char: int,
         excerpt: str,
         confidence: float = 0.8,
-        entity_ids: Optional[list[int]] = None,
-        extra_data: Optional[dict[str, Any]] = None,
+        entity_ids: list[int] | None = None,
+        extra_data: dict[str, Any] | None = None,
     ) -> Result[Alert]:
         """
         Crea alerta desde inconsistencia temporal.
@@ -825,7 +824,7 @@ class AlertEngine:
         end_char: int,
         excerpt: str,
         confidence: float = 0.7,
-        extra_data: Optional[dict[str, Any]] = None,
+        extra_data: dict[str, Any] | None = None,
     ) -> Result[Alert]:
         """
         Crea alerta desde desviación del perfil de voz.
@@ -952,8 +951,8 @@ class AlertEngine:
         end_char: int,
         excerpt: str,
         confidence: float = 0.8,
-        entity_ids: Optional[list[int]] = None,
-        extra_data: Optional[dict[str, Any]] = None,
+        entity_ids: list[int] | None = None,
+        extra_data: dict[str, Any] | None = None,
     ) -> Result[Alert]:
         """
         Crea alerta desde violación de focalización.
@@ -1012,7 +1011,7 @@ class AlertEngine:
         attribution_confidence: str,
         possible_speakers: list[str],
         context: str,
-        extra_data: Optional[dict[str, Any]] = None,
+        extra_data: dict[str, Any] | None = None,
     ) -> Result[Alert]:
         """
         Crea alerta para diálogo con atribución ambigua.
@@ -1036,9 +1035,7 @@ class AlertEngine:
             return Result.success(None)  # type: ignore
 
         severity = (
-            AlertSeverity.WARNING
-            if attribution_confidence == "unknown"
-            else AlertSeverity.INFO
+            AlertSeverity.WARNING if attribution_confidence == "unknown" else AlertSeverity.INFO
         )
 
         speakers_str = ", ".join(possible_speakers) if possible_speakers else "desconocido"
@@ -1077,12 +1074,12 @@ class AlertEngine:
         behavior_text: str,
         explanation: str,
         confidence: float = 0.7,
-        suggestion: Optional[str] = None,
-        chapter: Optional[int] = None,
-        start_char: Optional[int] = None,
-        end_char: Optional[int] = None,
-        entity_ids: Optional[list[int]] = None,
-        extra_data: Optional[dict[str, Any]] = None,
+        suggestion: str | None = None,
+        chapter: int | None = None,
+        start_char: int | None = None,
+        end_char: int | None = None,
+        entity_ids: list[int] | None = None,
+        extra_data: dict[str, Any] | None = None,
     ) -> Result[Alert]:
         """
         Crea alerta desde incoherencia emocional.
@@ -1125,10 +1122,7 @@ class AlertEngine:
             "temporal_jump": f"Cambio emocional abrupto de {entity_name}",
             "narrator_bias": f"Inconsistencia del narrador sobre {entity_name}",
         }
-        title = title_map.get(
-            incoherence_type,
-            f"Incoherencia emocional: {entity_name}"
-        )
+        title = title_map.get(incoherence_type, f"Incoherencia emocional: {entity_name}")
 
         return self.create_alert(
             project_id=project_id,
@@ -1168,7 +1162,7 @@ class AlertEngine:
         appearance_type: str,
         death_excerpt: str = "",
         confidence: float = 0.85,
-        extra_data: Optional[dict[str, Any]] = None,
+        extra_data: dict[str, Any] | None = None,
     ) -> Result[Alert]:
         """
         Crea alerta cuando un personaje fallecido reaparece como vivo.
@@ -1248,14 +1242,14 @@ class AlertEngine:
         project_id: int,
         issue_type: str,
         severity_level: str,
-        chapter: Optional[int],
+        chapter: int | None,
         segment_type: str,
         description: str,
         explanation: str,
         suggestion: str = "",
         actual_value: float = 0.0,
         expected_range: tuple = (0.0, 0.0),
-        comparison_value: Optional[float] = None,
+        comparison_value: float | None = None,
         confidence: float = 0.8,
     ) -> Result[Alert]:
         """
@@ -1323,9 +1317,9 @@ class AlertEngine:
         project_id: int,
         sentence: str,
         glue_percentage: float,
-        chapter: Optional[int] = None,
-        start_char: Optional[int] = None,
-        end_char: Optional[int] = None,
+        chapter: int | None = None,
+        start_char: int | None = None,
+        end_char: int | None = None,
         severity_level: str = "medium",
         confidence: float = 0.75,
     ) -> Result[Alert]:
@@ -1356,7 +1350,7 @@ class AlertEngine:
             severity=severity,
             alert_type="sticky_sentence",
             title="Frase pegajosa (exceso de palabras funcionales)",
-            description=f"Frase con {glue_percentage:.0f}% de palabras funcionales: \"{excerpt}\"",
+            description=f'Frase con {glue_percentage:.0f}% de palabras funcionales: "{excerpt}"',
             explanation=(
                 f"Esta frase tiene un {glue_percentage:.0f}% de palabras funcionales "
                 f"(artículos, preposiciones, conjunciones), lo que dificulta la fluidez. "
@@ -1381,12 +1375,12 @@ class AlertEngine:
         variation_type: str,
         description: str,
         explanation: str,
-        chapter: Optional[int] = None,
-        start_char: Optional[int] = None,
-        end_char: Optional[int] = None,
+        chapter: int | None = None,
+        start_char: int | None = None,
+        end_char: int | None = None,
         excerpt: str = "",
         confidence: float = 0.7,
-        extra_data: Optional[dict] = None,
+        extra_data: dict | None = None,
     ) -> Result[Alert]:
         """
         Crea alerta desde variación estilística inesperada.
@@ -1433,7 +1427,7 @@ class AlertEngine:
         word: str,
         occurrences: list[dict],
         min_distance: int,
-        chapter: Optional[int] = None,
+        chapter: int | None = None,
         confidence: float = 0.8,
     ) -> Result[Alert]:
         """
@@ -1460,14 +1454,14 @@ class AlertEngine:
             category=AlertCategory.REPETITION,
             severity=severity,
             alert_type="word_echo",
-            title=f"Eco: \"{word}\" ({count}x en {min_distance} palabras)",
-            description=f"La palabra \"{word}\" aparece {count} veces con solo {min_distance} palabras de distancia",
+            title=f'Eco: "{word}" ({count}x en {min_distance} palabras)',
+            description=f'La palabra "{word}" aparece {count} veces con solo {min_distance} palabras de distancia',
             explanation=(
-                f"Se detectó repetición cercana de \"{word}\". "
+                f'Se detectó repetición cercana de "{word}". '
                 f"Las repeticiones a menos de 30 palabras de distancia pueden "
                 f"percibirse como descuido estilístico, salvo que sean intencionales."
             ),
-            suggestion=f"Considerar sinónimos o reformulación para evitar la repetición de \"{word}\"",
+            suggestion=f'Considerar sinónimos o reformulación para evitar la repetición de "{word}"',
             chapter=chapter,
             confidence=confidence,
             source_module="repetition_detector",
@@ -1592,34 +1586,38 @@ class AlertEngine:
             if issue_severity_value < min_severity_value:
                 continue
 
-            alerts_data.append({
-                "category": AlertCategory.DIALOGUE,
-                "severity": {
-                    "high": AlertSeverity.WARNING,
-                    "medium": AlertSeverity.INFO,
-                    "low": AlertSeverity.HINT,
-                }.get(issue.severity.value, AlertSeverity.INFO),
-                "alert_type": f"dialogue_{issue.issue_type.value}",
-                "title": self._get_dialogue_issue_title(issue.issue_type.value, issue.consecutive_count),
-                "description": issue.description,
-                "explanation": (
-                    f"Se detectó un problema de contexto en el diálogo del capítulo "
-                    f"{issue.location.chapter}, párrafo {issue.location.paragraph}. "
-                    f"{issue.description}"
-                ),
-                "suggestion": issue.suggestion,
-                "chapter": issue.location.chapter,
-                "start_char": issue.location.start_char,
-                "end_char": issue.location.end_char,
-                "excerpt": issue.location.text[:200] if issue.location.text else "",
-                "confidence": 0.85 if issue.severity.value == "high" else 0.7,
-                "source_module": "dialogue_validator",
-                "extra_data": {
-                    "issue_type": issue.issue_type.value,
-                    "paragraph": issue.location.paragraph,
-                    "consecutive_count": issue.consecutive_count,
-                },
-            })
+            alerts_data.append(
+                {
+                    "category": AlertCategory.DIALOGUE,
+                    "severity": {
+                        "high": AlertSeverity.WARNING,
+                        "medium": AlertSeverity.INFO,
+                        "low": AlertSeverity.HINT,
+                    }.get(issue.severity.value, AlertSeverity.INFO),
+                    "alert_type": f"dialogue_{issue.issue_type.value}",
+                    "title": self._get_dialogue_issue_title(
+                        issue.issue_type.value, issue.consecutive_count
+                    ),
+                    "description": issue.description,
+                    "explanation": (
+                        f"Se detectó un problema de contexto en el diálogo del capítulo "
+                        f"{issue.location.chapter}, párrafo {issue.location.paragraph}. "
+                        f"{issue.description}"
+                    ),
+                    "suggestion": issue.suggestion,
+                    "chapter": issue.location.chapter,
+                    "start_char": issue.location.start_char,
+                    "end_char": issue.location.end_char,
+                    "excerpt": issue.location.text[:200] if issue.location.text else "",
+                    "confidence": 0.85 if issue.severity.value == "high" else 0.7,
+                    "source_module": "dialogue_validator",
+                    "extra_data": {
+                        "issue_type": issue.issue_type.value,
+                        "paragraph": issue.location.paragraph,
+                        "consecutive_count": issue.consecutive_count,
+                    },
+                }
+            )
 
         return self.create_alerts_batch(project_id, alerts_data)
 

@@ -8,7 +8,6 @@ en el texto para completar el conteo de menciones.
 import logging
 import re
 from dataclasses import dataclass
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +15,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class FoundMention:
     """Una mención encontrada de una entidad."""
+
     entity_name: str  # Nombre canónico de la entidad
     surface_form: str  # Forma en que aparece en el texto
     start_char: int
@@ -33,8 +33,25 @@ class MentionFinder:
 
     # Palabras que no deben buscarse como menciones (muy comunes)
     SKIP_PATTERNS = {
-        "el", "la", "los", "las", "un", "una", "de", "del", "al",
-        "y", "o", "a", "en", "que", "se", "no", "es", "su", "si",
+        "el",
+        "la",
+        "los",
+        "las",
+        "un",
+        "una",
+        "de",
+        "del",
+        "al",
+        "y",
+        "o",
+        "a",
+        "en",
+        "que",
+        "se",
+        "no",
+        "es",
+        "su",
+        "si",
     }
 
     def __init__(
@@ -59,8 +76,8 @@ class MentionFinder:
         self,
         text: str,
         entity_names: list[str],
-        aliases: Optional[dict[str, list[str]]] = None,
-        existing_positions: Optional[set[tuple[int, int]]] = None,
+        aliases: dict[str, list[str]] | None = None,
+        existing_positions: set[tuple[int, int]] | None = None,
     ) -> list[FoundMention]:
         """
         Busca todas las menciones de los nombres de entidades en el texto.
@@ -129,7 +146,7 @@ class MentionFinder:
         # Construir patrón regex
         if self.whole_word_only:
             # Límites de palabra, con soporte para español
-            pattern = rf'\b{re.escape(search_name)}\b'
+            pattern = rf"\b{re.escape(search_name)}\b"
         else:
             pattern = re.escape(search_name)
 
@@ -147,7 +164,7 @@ class MentionFinder:
                 # ¿Solapa con menciones ya detectadas por NER?
                 # Ej: NER detectó "María Sánchez" (0-14), evitar "María" (0-5)
                 overlaps_existing = False
-                for (e_start, e_end) in existing:
+                for e_start, e_end in existing:
                     if not (end <= e_start or start >= e_end):
                         overlaps_existing = True
                         break
@@ -157,7 +174,7 @@ class MentionFinder:
 
                 # ¿Solapa con algo ya encontrado en esta búsqueda?
                 overlaps_found = False
-                for (f_start, f_end) in found:
+                for f_start, f_end in found:
                     if not (end <= f_start or start >= f_end):
                         overlaps_found = True
                         break
@@ -166,18 +183,20 @@ class MentionFinder:
                     continue
 
                 # Verificar contexto (no en medio de otra palabra)
-                if start > 0 and text[start-1].isalpha():
+                if start > 0 and text[start - 1].isalpha():
                     continue
                 if end < len(text) and text[end].isalpha():
                     continue
 
-                mentions.append(FoundMention(
-                    entity_name=canonical_name,
-                    surface_form=match.group(),
-                    start_char=start,
-                    end_char=end,
-                    confidence=0.85,  # Menor que NER (0.9-1.0)
-                ))
+                mentions.append(
+                    FoundMention(
+                        entity_name=canonical_name,
+                        surface_form=match.group(),
+                        start_char=start,
+                        end_char=end,
+                        confidence=0.85,  # Menor que NER (0.9-1.0)
+                    )
+                )
 
         except re.error as e:
             logger.warning(f"Regex error searching for '{search_name}': {e}")
@@ -188,7 +207,7 @@ class MentionFinder:
         self,
         text: str,
         entity_name: str,
-        aliases: Optional[list[str]] = None,
+        aliases: list[str] | None = None,
     ) -> int:
         """
         Cuenta cuántas veces aparece una entidad (nombre + aliases).
@@ -213,7 +232,7 @@ class MentionFinder:
             if name.lower() in self.SKIP_PATTERNS:
                 continue
 
-            pattern = rf'\b{re.escape(name)}\b'
+            pattern = rf"\b{re.escape(name)}\b"
             flags = 0 if self.case_sensitive else re.IGNORECASE
 
             try:

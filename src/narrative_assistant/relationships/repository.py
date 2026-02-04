@@ -11,17 +11,16 @@ Almacena:
 import json
 import logging
 from datetime import datetime
-from typing import Optional
 
 from ..persistence.database import Database
 from .models import (
     EntityRelationship,
     InferredExpectations,
+    RelationCategory,
     RelationshipChange,
     RelationshipEvidence,
     RelationshipType,
     RelationType,
-    RelationCategory,
     RelationValence,
     TextReference,
 )
@@ -142,7 +141,7 @@ class RelationshipRepository:
     Gestiona tipos de relación, instancias, evidencias y cambios.
     """
 
-    def __init__(self, db: Optional[Database] = None):
+    def __init__(self, db: Database | None = None):
         """
         Inicializa el repositorio.
 
@@ -214,7 +213,7 @@ class RelationshipRepository:
         logger.debug(f"Tipo de relación creado: {rel_type.id}")
         return rel_type.id
 
-    def get_relationship_type(self, type_id: str) -> Optional[RelationshipType]:
+    def get_relationship_type(self, type_id: str) -> RelationshipType | None:
         """Obtiene un tipo de relación por ID."""
         with self.db.connection() as conn:
             row = conn.execute(
@@ -353,7 +352,7 @@ class RelationshipRepository:
             ),
         )
 
-    def get_relationship(self, rel_id: str) -> Optional[EntityRelationship]:
+    def get_relationship(self, rel_id: str) -> EntityRelationship | None:
         """Obtiene una relación por ID."""
         with self.db.connection() as conn:
             row = conn.execute(
@@ -372,10 +371,7 @@ class RelationshipRepository:
                 (rel_id,),
             ).fetchall()
 
-            rel.evidence = [
-                self._row_to_evidence(ev_row)
-                for ev_row in evidence_rows
-            ]
+            rel.evidence = [self._row_to_evidence(ev_row) for ev_row in evidence_rows]
 
         return rel
 
@@ -415,7 +411,7 @@ class RelationshipRepository:
         self,
         entity1_id: str,
         entity2_id: str,
-    ) -> Optional[EntityRelationship]:
+    ) -> EntityRelationship | None:
         """
         Obtiene la relación entre dos entidades específicas.
 
@@ -586,9 +582,7 @@ class RelationshipRepository:
         """Convierte una fila de BD a EntityRelationship."""
         expectations = None
         if row["expectations_json"]:
-            expectations = InferredExpectations.from_dict(
-                json.loads(row["expectations_json"])
-            )
+            expectations = InferredExpectations.from_dict(json.loads(row["expectations_json"]))
 
         return EntityRelationship(
             id=row["id"],
@@ -701,12 +695,10 @@ class RelationshipRepository:
             chapter=row["chapter"],
             change_type=row["change_type"],
             old_relation_type=(
-                RelationType(row["old_relation_type"])
-                if row["old_relation_type"] else None
+                RelationType(row["old_relation_type"]) if row["old_relation_type"] else None
             ),
             new_relation_type=(
-                RelationType(row["new_relation_type"])
-                if row["new_relation_type"] else None
+                RelationType(row["new_relation_type"]) if row["new_relation_type"] else None
             ),
             old_intensity=row["old_intensity"],
             new_intensity=row["new_intensity"],

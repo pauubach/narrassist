@@ -4,74 +4,73 @@ Tipos base para el módulo de corrección gramatical.
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
 
 class GrammarErrorType(Enum):
     """Tipos de errores gramaticales detectados."""
 
     # Concordancia
-    GENDER_AGREEMENT = "gender_agreement"          # el casa → la casa
-    NUMBER_AGREEMENT = "number_agreement"          # los casa → las casas
-    SUBJECT_VERB_AGREEMENT = "subject_verb"        # ellos va → ellos van
-    ADJECTIVE_AGREEMENT = "adjective_agreement"    # niña alto → niña alta
+    GENDER_AGREEMENT = "gender_agreement"  # el casa → la casa
+    NUMBER_AGREEMENT = "number_agreement"  # los casa → las casas
+    SUBJECT_VERB_AGREEMENT = "subject_verb"  # ellos va → ellos van
+    ADJECTIVE_AGREEMENT = "adjective_agreement"  # niña alto → niña alta
 
     # Uso de palabras
-    WRONG_PREPOSITION = "wrong_preposition"        # voy a casa → voy a la casa
-    MISSING_PREPOSITION = "missing_preposition"    # confío ti → confío en ti
-    EXTRA_PREPOSITION = "extra_preposition"        # dijo de que → dijo que
-    DEQUEISMO = "dequeismo"                        # pienso de que → pienso que
-    QUEISMO = "queismo"                            # me alegro que → me alegro de que
+    WRONG_PREPOSITION = "wrong_preposition"  # voy a casa → voy a la casa
+    MISSING_PREPOSITION = "missing_preposition"  # confío ti → confío en ti
+    EXTRA_PREPOSITION = "extra_preposition"  # dijo de que → dijo que
+    DEQUEISMO = "dequeismo"  # pienso de que → pienso que
+    QUEISMO = "queismo"  # me alegro que → me alegro de que
 
     # Verbos
-    WRONG_TENSE = "wrong_tense"                    # Ayer voy → Ayer fui
-    WRONG_MOOD = "wrong_mood"                      # Subjuntivo/Indicativo
-    INFINITIVE_ERROR = "infinitive_error"          # *Habemos → Hay/Somos
-    GERUND_ERROR = "gerund_error"                  # *Siendo que → Ya que
+    WRONG_TENSE = "wrong_tense"  # Ayer voy → Ayer fui
+    WRONG_MOOD = "wrong_mood"  # Subjuntivo/Indicativo
+    INFINITIVE_ERROR = "infinitive_error"  # *Habemos → Hay/Somos
+    GERUND_ERROR = "gerund_error"  # *Siendo que → Ya que
 
     # Pronombres
-    LEISMO = "leismo"                              # Le vi (persona) - aceptado en España
-    LAISMO = "laismo"                              # La dije → Le dije
-    LOISMO = "loismo"                              # Lo dije a ella → Le dije
+    LEISMO = "leismo"  # Le vi (persona) - aceptado en España
+    LAISMO = "laismo"  # La dije → Le dije
+    LOISMO = "loismo"  # Lo dije a ella → Le dije
 
     # Estructura
-    WORD_ORDER = "word_order"                      # Orden incorrecto
-    MISSING_WORD = "missing_word"                  # Falta palabra
-    EXTRA_WORD = "extra_word"                      # Palabra sobrante
-    SENTENCE_FRAGMENT = "sentence_fragment"        # Oración incompleta
-    RUN_ON_SENTENCE = "run_on_sentence"            # Oración demasiado larga
+    WORD_ORDER = "word_order"  # Orden incorrecto
+    MISSING_WORD = "missing_word"  # Falta palabra
+    EXTRA_WORD = "extra_word"  # Palabra sobrante
+    SENTENCE_FRAGMENT = "sentence_fragment"  # Oración incompleta
+    RUN_ON_SENTENCE = "run_on_sentence"  # Oración demasiado larga
 
     # Puntuación gramatical
-    COMMA_SPLICE = "comma_splice"                  # Coma donde debería ir punto
-    MISSING_COMMA = "missing_comma"                # Falta coma
-    WRONG_PUNCTUATION = "wrong_punctuation"        # Puntuación incorrecta
-    PUNCTUATION = "punctuation"                    # Error de puntuación general
+    COMMA_SPLICE = "comma_splice"  # Coma donde debería ir punto
+    MISSING_COMMA = "missing_comma"  # Falta coma
+    WRONG_PUNCTUATION = "wrong_punctuation"  # Puntuación incorrecta
+    PUNCTUATION = "punctuation"  # Error de puntuación general
 
     # Otros
-    REDUNDANCY = "redundancy"                      # subir arriba, bajar abajo
-    PLEONASM = "pleonasm"                          # Redundancia expresiva
-    ANACOLUTHON = "anacoluthon"                    # Cambio brusco de estructura
+    REDUNDANCY = "redundancy"  # subir arriba, bajar abajo
+    PLEONASM = "pleonasm"  # Redundancia expresiva
+    ANACOLUTHON = "anacoluthon"  # Cambio brusco de estructura
     OTHER = "other"
 
 
 class GrammarSeverity(Enum):
     """Severidad del error gramatical."""
 
-    ERROR = "error"        # Error claro que debe corregirse
-    WARNING = "warning"    # Posible error o estilo cuestionable
-    STYLE = "style"        # Sugerencia de estilo
-    INFO = "info"          # Información/posible mejora
+    ERROR = "error"  # Error claro que debe corregirse
+    WARNING = "warning"  # Posible error o estilo cuestionable
+    STYLE = "style"  # Sugerencia de estilo
+    INFO = "info"  # Información/posible mejora
 
 
 class GrammarDetectionMethod(Enum):
     """Método que detectó el error."""
 
-    SPACY_DEP = "spacy_dependency"    # Análisis de dependencias spaCy
-    REGEX = "regex"                    # Patrón regex
-    RULE = "rule"                      # Regla gramatical explícita
-    LLM = "llm"                        # LLM local (Ollama)
-    HEURISTIC = "heuristic"            # Heurística
-    LANGUAGETOOL = "languagetool"      # LanguageTool (+2000 reglas)
+    SPACY_DEP = "spacy_dependency"  # Análisis de dependencias spaCy
+    REGEX = "regex"  # Patrón regex
+    RULE = "rule"  # Regla gramatical explícita
+    LLM = "llm"  # LLM local (Ollama)
+    HEURISTIC = "heuristic"  # Heurística
+    LANGUAGETOOL = "languagetool"  # LanguageTool (+2000 reglas)
 
 
 @dataclass
@@ -79,24 +78,24 @@ class GrammarIssue:
     """Un error gramatical detectado."""
 
     # Texto y posición
-    text: str                          # Fragmento con error
-    start_char: int                    # Posición inicio en texto
-    end_char: int                      # Posición fin en texto
-    sentence: str                      # Oración completa
+    text: str  # Fragmento con error
+    start_char: int  # Posición inicio en texto
+    end_char: int  # Posición fin en texto
+    sentence: str  # Oración completa
 
     # Clasificación
     error_type: GrammarErrorType
     severity: GrammarSeverity = GrammarSeverity.WARNING
 
     # Corrección
-    suggestion: Optional[str] = None   # Corrección sugerida
+    suggestion: str | None = None  # Corrección sugerida
     alternatives: list[str] = field(default_factory=list)
 
     # Metadata
-    confidence: float = 0.5            # 0.0-1.0
+    confidence: float = 0.5  # 0.0-1.0
     detection_method: GrammarDetectionMethod = GrammarDetectionMethod.RULE
-    explanation: str = ""              # Explicación para el usuario
-    rule_id: str = ""                  # ID de la regla aplicada
+    explanation: str = ""  # Explicación para el usuario
+    rule_id: str = ""  # ID de la regla aplicada
 
     # Contexto gramatical
     affected_words: list[str] = field(default_factory=list)
@@ -246,7 +245,6 @@ VERB_PREPOSITION_RULES = {
     "olvidarse": "de",
     "quejarse": "de",
     "tratarse": "de",
-
     # Verbos con "en"
     "confiar": "en",
     "consistir": "en",
@@ -255,7 +253,6 @@ VERB_PREPOSITION_RULES = {
     "insistir": "en",
     "pensar": "en",  # pensar en algo
     "tardar": "en",
-
     # Verbos con "a"
     "acostumbrarse": "a",
     "aprender": "a",
@@ -272,7 +269,6 @@ VERB_PREPOSITION_RULES = {
     "oponerse": "a",
     "renunciar": "a",
     "volver": "a",
-
     # Verbos con "con"
     "casarse": "con",
     "contar": "con",
@@ -280,7 +276,6 @@ VERB_PREPOSITION_RULES = {
     "enfadarse": "con",
     "soñar": "con",
     "tropezar": "con",
-
     # Verbos con "por"
     "interesarse": "por",
     "preguntar": "por",
@@ -290,19 +285,48 @@ VERB_PREPOSITION_RULES = {
 
 # Verbos que NO llevan preposición antes de "que" (dequeísmo)
 VERBS_WITHOUT_DE_QUE = {
-    "pensar", "creer", "opinar", "considerar", "suponer",
-    "imaginar", "parecer", "resultar", "decir", "afirmar",
-    "negar", "asegurar", "sostener", "manifestar", "expresar",
-    "indicar", "señalar", "comunicar", "anunciar", "advertir",
-    "ver", "notar", "observar", "percibir", "sentir",
+    "pensar",
+    "creer",
+    "opinar",
+    "considerar",
+    "suponer",
+    "imaginar",
+    "parecer",
+    "resultar",
+    "decir",
+    "afirmar",
+    "negar",
+    "asegurar",
+    "sostener",
+    "manifestar",
+    "expresar",
+    "indicar",
+    "señalar",
+    "comunicar",
+    "anunciar",
+    "advertir",
+    "ver",
+    "notar",
+    "observar",
+    "percibir",
+    "sentir",
 }
 
 # Verbos que SÍ llevan preposición antes de "que" (queísmo)
 VERBS_WITH_DE_QUE = {
-    "acordarse", "alegrarse", "arrepentirse", "avergonzarse",
-    "convencerse", "darse cuenta", "enterarse", "olvidarse",
-    "quejarse", "estar seguro", "estar convencido",
-    "tener la certeza", "tener la seguridad",
+    "acordarse",
+    "alegrarse",
+    "arrepentirse",
+    "avergonzarse",
+    "convencerse",
+    "darse cuenta",
+    "enterarse",
+    "olvidarse",
+    "quejarse",
+    "estar seguro",
+    "estar convencido",
+    "tener la certeza",
+    "tener la seguridad",
 }
 
 # Redundancias basadas en lemas (verbo + adverbio innecesario)
@@ -341,49 +365,64 @@ REDUNDANT_EXPRESSIONS = {
 # Patrones regex para errores gramaticales
 GRAMMAR_PATTERNS = [
     # Dequeísmo
-    (r'\b(pienso|creo|opino|considero|supongo|digo|afirmo)\s+de\s+que\b',
-     GrammarErrorType.DEQUEISMO, "Dequeísmo: sobra 'de'"),
-
+    (
+        r"\b(pienso|creo|opino|considero|supongo|digo|afirmo)\s+de\s+que\b",
+        GrammarErrorType.DEQUEISMO,
+        "Dequeísmo: sobra 'de'",
+    ),
     # Queísmo
-    (r'\b(me alegro|me arrepiento|me acuerdo|me olvido|estoy seguro)\s+que\b',
-     GrammarErrorType.QUEISMO, "Queísmo: falta 'de'"),
-
+    (
+        r"\b(me alegro|me arrepiento|me acuerdo|me olvido|estoy seguro)\s+que\b",
+        GrammarErrorType.QUEISMO,
+        "Queísmo: falta 'de'",
+    ),
     # Laísmo
-    (r'\b(la|las)\s+(dije|digo|diré|dije|conté|cuento|contaré|pregunté|pregunto)\b',
-     GrammarErrorType.LAISMO, "Laísmo: usar 'le/les' en lugar de 'la/las'"),
-
+    (
+        r"\b(la|las)\s+(dije|digo|diré|dije|conté|cuento|contaré|pregunté|pregunto)\b",
+        GrammarErrorType.LAISMO,
+        "Laísmo: usar 'le/les' en lugar de 'la/las'",
+    ),
     # Loísmo
-    (r'\b(lo|los)\s+(dije|digo|diré|conté|cuento|contaré|pregunté|pregunto)\s+(a\s+(él|ella|ellos|ellas))\b',
-     GrammarErrorType.LOISMO, "Loísmo: usar 'le/les' en lugar de 'lo/los'"),
-
+    (
+        r"\b(lo|los)\s+(dije|digo|diré|conté|cuento|contaré|pregunté|pregunto)\s+(a\s+(él|ella|ellos|ellas))\b",
+        GrammarErrorType.LOISMO,
+        "Loísmo: usar 'le/les' en lugar de 'lo/los'",
+    ),
     # Concordancia artículo-sustantivo (casos obvios)
-    (r'\bel\s+(casa|mesa|silla|ventana|puerta|cama|cocina|sala)\b',
-     GrammarErrorType.GENDER_AGREEMENT, "Error de género: usar 'la'"),
-    (r'\bla\s+(libro|coche|perro|gato|árbol|cielo|suelo|techo)\b',
-     GrammarErrorType.GENDER_AGREEMENT, "Error de género: usar 'el'"),
-
+    (
+        r"\bel\s+(casa|mesa|silla|ventana|puerta|cama|cocina|sala)\b",
+        GrammarErrorType.GENDER_AGREEMENT,
+        "Error de género: usar 'la'",
+    ),
+    (
+        r"\bla\s+(libro|coche|perro|gato|árbol|cielo|suelo|techo)\b",
+        GrammarErrorType.GENDER_AGREEMENT,
+        "Error de género: usar 'el'",
+    ),
     # Concordancia número
-    (r'\b(el|la|un|una)\s+\w+s\b(?!\s+(que|de|en|con|para|por))',
-     GrammarErrorType.NUMBER_AGREEMENT, "Posible error de número"),
-
+    (
+        r"\b(el|la|un|una)\s+\w+s\b(?!\s+(que|de|en|con|para|por))",
+        GrammarErrorType.NUMBER_AGREEMENT,
+        "Posible error de número",
+    ),
     # Infinitivo incorrecto (*habemos)
-    (r'\bhabemos\b',
-     GrammarErrorType.INFINITIVE_ERROR, "Forma incorrecta: usar 'hay' o 'somos'"),
-
+    (r"\bhabemos\b", GrammarErrorType.INFINITIVE_ERROR, "Forma incorrecta: usar 'hay' o 'somos'"),
     # Gerundio de posterioridad
-    (r'\b\w+ó\s+\w+ando\b',
-     GrammarErrorType.GERUND_ERROR, "Posible gerundio de posterioridad"),
-
+    (r"\b\w+ó\s+\w+ando\b", GrammarErrorType.GERUND_ERROR, "Posible gerundio de posterioridad"),
     # Oraciones muy largas (más de 60 palabras)
     # Se detecta por separado con lógica especial
-
     # Coma antes de "y" en enumeración de dos elementos
-    (r'\b\w+,\s+y\s+\w+\b(?!\s*,)',
-     GrammarErrorType.WRONG_PUNCTUATION, "Coma innecesaria antes de 'y'"),
-
+    (
+        r"\b\w+,\s+y\s+\w+\b(?!\s*,)",
+        GrammarErrorType.WRONG_PUNCTUATION,
+        "Coma innecesaria antes de 'y'",
+    ),
     # Punto y coma mal usado
-    (r';\s+[a-záéíóúñ]',
-     GrammarErrorType.WRONG_PUNCTUATION, "Después de punto y coma se escribe minúscula"),
+    (
+        r";\s+[a-záéíóúñ]",
+        GrammarErrorType.WRONG_PUNCTUATION,
+        "Después de punto y coma se escribe minúscula",
+    ),
 ]
 
 # Palabras que suelen confundirse gramaticalmente

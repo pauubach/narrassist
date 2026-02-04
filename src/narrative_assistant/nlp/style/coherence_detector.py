@@ -15,11 +15,10 @@ import logging
 import threading
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
 import numpy as np
 
-from ...core.errors import NLPError, ErrorSeverity
+from ...core.errors import ErrorSeverity, NLPError
 from ...core.result import Result
 from ..embeddings import get_embeddings_model
 
@@ -29,19 +28,19 @@ logger = logging.getLogger(__name__)
 class CoherenceBreakType(Enum):
     """Tipos de saltos de coherencia detectados."""
 
-    ABRUPT_TOPIC_CHANGE = "abrupt_topic_change"      # Cambio brusco de tema
-    SCENE_DISCONTINUITY = "scene_discontinuity"      # Escena parece fuera de lugar
-    TEMPORAL_JUMP = "temporal_jump"                  # Posible salto temporal no marcado
-    POV_SHIFT = "pov_shift"                          # Posible cambio de POV no señalado
-    TONAL_SHIFT = "tonal_shift"                      # Cambio de tono narrativo
+    ABRUPT_TOPIC_CHANGE = "abrupt_topic_change"  # Cambio brusco de tema
+    SCENE_DISCONTINUITY = "scene_discontinuity"  # Escena parece fuera de lugar
+    TEMPORAL_JUMP = "temporal_jump"  # Posible salto temporal no marcado
+    POV_SHIFT = "pov_shift"  # Posible cambio de POV no señalado
+    TONAL_SHIFT = "tonal_shift"  # Cambio de tono narrativo
 
 
 class CoherenceSeverity(Enum):
     """Severidad del problema de coherencia."""
 
-    HIGH = "high"          # Muy brusco, probable error
-    MEDIUM = "medium"      # Notable, revisar
-    LOW = "low"            # Leve, posiblemente intencional
+    HIGH = "high"  # Muy brusco, probable error
+    MEDIUM = "medium"  # Notable, revisar
+    LOW = "low"  # Leve, posiblemente intencional
 
 
 @dataclass
@@ -49,20 +48,20 @@ class CoherenceBreak:
     """Un salto de coherencia detectado."""
 
     # Ubicación
-    segment_before_idx: int            # Índice del segmento anterior
-    segment_after_idx: int             # Índice del segmento posterior
-    position_char: int                 # Posición aproximada en caracteres
-    chapter_id: Optional[int] = None   # Capítulo donde ocurre
+    segment_before_idx: int  # Índice del segmento anterior
+    segment_after_idx: int  # Índice del segmento posterior
+    position_char: int  # Posición aproximada en caracteres
+    chapter_id: int | None = None  # Capítulo donde ocurre
 
     # Contenido (extractos para contexto)
-    text_before: str = ""              # Final del segmento anterior
-    text_after: str = ""               # Inicio del segmento posterior
+    text_before: str = ""  # Final del segmento anterior
+    text_after: str = ""  # Inicio del segmento posterior
 
     # Análisis
     break_type: CoherenceBreakType = CoherenceBreakType.ABRUPT_TOPIC_CHANGE
     severity: CoherenceSeverity = CoherenceSeverity.MEDIUM
-    similarity_score: float = 0.0      # Similitud medida (0-1)
-    expected_similarity: float = 0.5   # Similitud esperada (umbral usado)
+    similarity_score: float = 0.0  # Similitud medida (0-1)
+    expected_similarity: float = 0.5  # Similitud esperada (umbral usado)
 
     # Contexto adicional
     confidence: float = 0.8
@@ -159,10 +158,10 @@ class CoherenceDetector:
     """
 
     # Umbrales por defecto
-    DEFAULT_SIMILARITY_THRESHOLD = 0.3    # Por debajo = posible salto
+    DEFAULT_SIMILARITY_THRESHOLD = 0.3  # Por debajo = posible salto
     DEFAULT_HIGH_SEVERITY_THRESHOLD = 0.15  # Muy bajo = probable error
-    DEFAULT_MIN_SEGMENT_LENGTH = 50       # Caracteres mínimos por segmento
-    DEFAULT_CONTEXT_CHARS = 200           # Caracteres de contexto a mostrar
+    DEFAULT_MIN_SEGMENT_LENGTH = 50  # Caracteres mínimos por segmento
+    DEFAULT_CONTEXT_CHARS = 200  # Caracteres de contexto a mostrar
 
     def __init__(
         self,
@@ -192,11 +191,7 @@ class CoherenceDetector:
                 logger.warning(f"No se pudo cargar modelo de embeddings: {e}")
                 raise
 
-    def _segment_text(
-        self,
-        text: str,
-        method: str = "paragraph"
-    ) -> list[tuple[int, str]]:
+    def _segment_text(self, text: str, method: str = "paragraph") -> list[tuple[int, str]]:
         """
         Segmentar texto en unidades para análisis.
 
@@ -224,6 +219,7 @@ class CoherenceDetector:
             # Dividir por oraciones (usar spaCy si disponible)
             try:
                 from ..spacy_gpu import load_spacy_model
+
                 nlp = load_spacy_model()
                 doc = nlp(text)
 
@@ -245,16 +241,13 @@ class CoherenceDetector:
             step = 250
 
             for i in range(0, len(text) - window_size, step):
-                segment = text[i:i + window_size]
+                segment = text[i : i + window_size]
                 segments.append((i, segment))
 
         return segments
 
     def _classify_break_type(
-        self,
-        text_before: str,
-        text_after: str,
-        similarity: float
+        self, text_before: str, text_after: str, similarity: float
     ) -> CoherenceBreakType:
         """
         Clasificar el tipo de salto de coherencia.
@@ -269,9 +262,14 @@ class CoherenceDetector:
         """
         # Indicadores de cambio temporal
         temporal_markers = [
-            "años después", "meses más tarde", "al día siguiente",
-            "tiempo atrás", "hace mucho", "en el futuro",
-            "mientras tanto", "en ese momento"
+            "años después",
+            "meses más tarde",
+            "al día siguiente",
+            "tiempo atrás",
+            "hace mucho",
+            "en el futuro",
+            "mientras tanto",
+            "en ese momento",
         ]
 
         # Indicadores de cambio de POV
@@ -301,9 +299,9 @@ class CoherenceDetector:
     def detect(
         self,
         text: str,
-        chapter_id: Optional[int] = None,
+        chapter_id: int | None = None,
         segment_method: str = "paragraph",
-        custom_threshold: Optional[float] = None,
+        custom_threshold: float | None = None,
     ) -> Result[CoherenceReport]:
         """
         Detectar saltos de coherencia en un texto.
@@ -323,9 +321,7 @@ class CoherenceDetector:
         try:
             self._load_embeddings()
         except Exception as e:
-            return Result.failure(
-                CoherenceCheckError(original_error=str(e))
-            )
+            return Result.failure(CoherenceCheckError(original_error=str(e)))
 
         threshold = custom_threshold or self.similarity_threshold
         report = CoherenceReport()
@@ -364,18 +360,14 @@ class CoherenceDetector:
                         severity = CoherenceSeverity.LOW
 
                     # Clasificar tipo
-                    break_type = self._classify_break_type(
-                        text_before, text_after, sim
-                    )
+                    break_type = self._classify_break_type(text_before, text_after, sim)
 
                     # Crear extractos de contexto
-                    context_before = text_before[-self.DEFAULT_CONTEXT_CHARS:].strip()
-                    context_after = text_after[:self.DEFAULT_CONTEXT_CHARS].strip()
+                    context_before = text_before[-self.DEFAULT_CONTEXT_CHARS :].strip()
+                    context_after = text_after[: self.DEFAULT_CONTEXT_CHARS].strip()
 
                     # Generar explicación
-                    explanation = self._generate_explanation(
-                        break_type, severity, sim, threshold
-                    )
+                    explanation = self._generate_explanation(break_type, severity, sim, threshold)
 
                     brk = CoherenceBreak(
                         segment_before_idx=i,
@@ -405,9 +397,7 @@ class CoherenceDetector:
 
         except Exception as e:
             logger.error(f"Error en detección de coherencia: {e}")
-            return Result.failure(
-                CoherenceCheckError(original_error=str(e))
-            )
+            return Result.failure(CoherenceCheckError(original_error=str(e)))
 
     def detect_in_chapters(
         self,
@@ -458,16 +448,11 @@ class CoherenceDetector:
         """Generar explicación legible del salto detectado."""
 
         type_explanations = {
-            CoherenceBreakType.ABRUPT_TOPIC_CHANGE:
-                "Cambio brusco de tema entre párrafos",
-            CoherenceBreakType.SCENE_DISCONTINUITY:
-                "La escena parece no conectar con la anterior",
-            CoherenceBreakType.TEMPORAL_JUMP:
-                "Posible salto temporal no señalado claramente",
-            CoherenceBreakType.POV_SHIFT:
-                "Posible cambio de punto de vista narrativo",
-            CoherenceBreakType.TONAL_SHIFT:
-                "Cambio notable en el tono narrativo",
+            CoherenceBreakType.ABRUPT_TOPIC_CHANGE: "Cambio brusco de tema entre párrafos",
+            CoherenceBreakType.SCENE_DISCONTINUITY: "La escena parece no conectar con la anterior",
+            CoherenceBreakType.TEMPORAL_JUMP: "Posible salto temporal no señalado claramente",
+            CoherenceBreakType.POV_SHIFT: "Posible cambio de punto de vista narrativo",
+            CoherenceBreakType.TONAL_SHIFT: "Cambio notable en el tono narrativo",
         }
 
         severity_notes = {
@@ -483,7 +468,7 @@ class CoherenceDetector:
 
 
 # Singleton thread-safe
-_coherence_detector: Optional[CoherenceDetector] = None
+_coherence_detector: CoherenceDetector | None = None
 _coherence_lock = threading.Lock()
 
 
@@ -504,9 +489,7 @@ def get_coherence_detector(
     if _coherence_detector is None:
         with _coherence_lock:
             if _coherence_detector is None:
-                _coherence_detector = CoherenceDetector(
-                    similarity_threshold=similarity_threshold
-                )
+                _coherence_detector = CoherenceDetector(similarity_threshold=similarity_threshold)
 
     return _coherence_detector
 

@@ -10,8 +10,10 @@ Este módulo gestiona el ciclo de vida del servidor LanguageTool:
 El servidor se inicia como subproceso y consume ~500MB RAM.
 """
 
+import contextlib
 import logging
 import os
+import platform
 import shutil
 import stat
 import subprocess
@@ -20,10 +22,9 @@ import time
 import urllib.error
 import urllib.request
 import zipfile
-from dataclasses import dataclass, field
+from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Optional, Tuple
-import platform
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +50,7 @@ class LanguageToolManager:
             port: Puerto para el servidor (default: 8081)
         """
         self.port = port
-        self._process: Optional[subprocess.Popen] = None
+        self._process: subprocess.Popen | None = None
         self._lock = threading.Lock()
         self._starting = False
 
@@ -58,15 +59,15 @@ class LanguageToolManager:
         self._lt_dir = self._tools_base / "languagetool" if self._tools_base else None
         self._java_dir = self._tools_base / "java" if self._tools_base else None
 
-    def _get_tools_base_dir(self) -> Optional[Path]:
+    def _get_tools_base_dir(self) -> Path | None:
         """
         Obtener directorio base para tools (Java, LanguageTool).
-        
+
         - Producción (NA_EMBEDDED=1): %LOCALAPPDATA%/Narrative Assistant/tools
         - Desarrollo: <project_root>/tools
         """
         is_embedded = os.environ.get("NA_EMBEDDED") == "1"
-        
+
         if is_embedded:
             # Modo producción - usar directorio de datos del sistema
             system = platform.system()
@@ -77,7 +78,13 @@ class LanguageToolManager:
                     tools_dir.mkdir(parents=True, exist_ok=True)
                     return tools_dir
             elif system == "Darwin":
-                tools_dir = Path.home() / "Library" / "Application Support" / "Narrative Assistant" / "tools"
+                tools_dir = (
+                    Path.home()
+                    / "Library"
+                    / "Application Support"
+                    / "Narrative Assistant"
+                    / "tools"
+                )
                 tools_dir.mkdir(parents=True, exist_ok=True)
                 return tools_dir
             else:
@@ -86,17 +93,17 @@ class LanguageToolManager:
                 tools_dir = Path(xdg_data) / "narrative-assistant" / "tools"
                 tools_dir.mkdir(parents=True, exist_ok=True)
                 return tools_dir
-        
+
         # Modo desarrollo - buscar raíz del proyecto
         project_root = self._find_project_root()
         if project_root:
             tools_dir = project_root / "tools"
             tools_dir.mkdir(parents=True, exist_ok=True)
             return tools_dir
-        
+
         return None
 
-    def _find_project_root(self) -> Optional[Path]:
+    def _find_project_root(self) -> Path | None:
         """Encontrar raíz del proyecto buscando CLAUDE.md o pyproject.toml."""
         current = Path(__file__).resolve()
 
@@ -139,6 +146,7 @@ class LanguageToolManager:
         """Verificar si el servidor responde en el puerto."""
         try:
             import urllib.request
+
             url = f"http://localhost:{self.port}/v2/languages"
             req = urllib.request.Request(url, method="GET")
             with urllib.request.urlopen(req, timeout=2) as response:
@@ -146,17 +154,13 @@ class LanguageToolManager:
         except Exception:
             return False
 
-    def _get_java_command(self) -> Optional[str]:
+    def _get_java_command(self) -> str | None:
         """Obtener comando de Java (sistema o local)."""
         system = platform.system()
 
         # 1. Verificar Java del sistema
         try:
-            result = subprocess.run(
-                ["java", "-version"],
-                capture_output=True,
-                timeout=5
-            )
+            result = subprocess.run(["java", "-version"], capture_output=True, timeout=5)
             if result.returncode == 0:
                 return "java"
         except Exception:
@@ -173,14 +177,14 @@ class LanguageToolManager:
                 # Verificar que es ejecutable (arquitectura correcta)
                 try:
                     result = subprocess.run(
-                        [str(java_exe), "-version"],
-                        capture_output=True,
-                        timeout=5
+                        [str(java_exe), "-version"], capture_output=True, timeout=5
                     )
                     if result.returncode == 0:
                         return str(java_exe)
                     else:
-                        logger.warning(f"Java local existe pero no es ejecutable (¿arquitectura incorrecta?)")
+                        logger.warning(
+                            "Java local existe pero no es ejecutable (¿arquitectura incorrecta?)"
+                        )
                 except Exception as e:
                     logger.warning(f"Java local no funciona: {e}")
 
@@ -209,13 +213,17 @@ class LanguageToolManager:
 
             # Verificar instalación
             if not self.is_installed:
-                logger.warning("LanguageTool no está instalado. Ejecutar: python scripts/setup_languagetool.py")
+                logger.warning(
+                    "LanguageTool no está instalado. Ejecutar: python scripts/setup_languagetool.py"
+                )
                 return False
 
             # Verificar Java
             java_cmd = self._get_java_command()
             if not java_cmd:
-                logger.warning("Java no encontrado. Instalar Java o ejecutar: python scripts/setup_languagetool.py")
+                logger.warning(
+                    "Java no encontrado. Instalar Java o ejecutar: python scripts/setup_languagetool.py"
+                )
                 return False
 
             self._starting = True
@@ -227,10 +235,13 @@ class LanguageToolManager:
             cmd = [
                 java_cmd,
                 "-Xmx512m",
-                "-cp", str(jar_file),
+                "-cp",
+                str(jar_file),
                 "org.languagetool.server.HTTPServer",
-                "--port", str(self.port),
-                "--allow-origin", "*"
+                "--port",
+                str(self.port),
+                "--allow-origin",
+                "*",
             ]
 
             logger.info(f"Iniciando LanguageTool en puerto {self.port}...")
@@ -333,7 +344,7 @@ class LanguageToolManager:
 
 
 # Singleton
-_manager: Optional[LanguageToolManager] = None
+_manager: LanguageToolManager | None = None
 _manager_lock = threading.Lock()
 
 
@@ -409,7 +420,7 @@ JAVA_URLS = {
 def _get_machine_arch() -> str:
     """
     Obtener la arquitectura de la máquina de forma normalizada.
-    
+
     Returns:
         'x64' para Intel/AMD64, 'aarch64' para ARM64/Apple Silicon
     """
@@ -431,7 +442,7 @@ class InstallProgress:
     phase_label: str = ""
     percentage: float = 0.0
     detail: str = ""
-    error: Optional[str] = None
+    error: str | None = None
 
 
 class LanguageToolInstaller:
@@ -444,7 +455,7 @@ class LanguageToolInstaller:
 
     def __init__(
         self,
-        progress_callback: Optional[Callable[[InstallProgress], None]] = None,
+        progress_callback: Callable[[InstallProgress], None] | None = None,
     ):
         self._callback = progress_callback
         self._progress = InstallProgress()
@@ -485,7 +496,7 @@ class LanguageToolInstaller:
             self._callback(self._progress)
         logger.error(f"LT Install error: {error}")
 
-    def install(self) -> Tuple[bool, str]:
+    def install(self) -> tuple[bool, str]:
         """
         Ejecutar instalación completa. Bloqueante — llamar desde hilo background.
 
@@ -508,7 +519,9 @@ class LanguageToolInstaller:
                 self._report("checking_java", "Verificando Java", 5, "Java encontrado")
             else:
                 # Fase 2: Instalar Java (5-40%)
-                self._report("installing_java", "Instalando Java", 5, "Descargando OpenJDK Temurin...")
+                self._report(
+                    "installing_java", "Instalando Java", 5, "Descargando OpenJDK Temurin..."
+                )
                 success = self._install_java()
                 if not success:
                     msg = "Error instalando Java"
@@ -516,7 +529,9 @@ class LanguageToolInstaller:
                     return False, msg
 
             # Fase 3: Descargar LanguageTool (40-75%)
-            self._report("downloading_lt", "Descargando LanguageTool", 40, f"LanguageTool {LT_VERSION}...")
+            self._report(
+                "downloading_lt", "Descargando LanguageTool", 40, f"LanguageTool {LT_VERSION}..."
+            )
             zip_path = self._download_languagetool()
             if zip_path is None:
                 msg = "Error descargando LanguageTool"
@@ -524,7 +539,9 @@ class LanguageToolInstaller:
                 return False, msg
 
             # Fase 4: Extraer (75-85%)
-            self._report("extracting_lt", "Extrayendo LanguageTool", 75, "Descomprimiendo archivos...")
+            self._report(
+                "extracting_lt", "Extrayendo LanguageTool", 75, "Descomprimiendo archivos..."
+            )
             success = self._extract_languagetool(zip_path)
             if not success:
                 msg = "Error extrayendo LanguageTool"
@@ -532,7 +549,9 @@ class LanguageToolInstaller:
                 return False, msg
 
             # Fase 5: Crear scripts de inicio (85-90%)
-            self._report("creating_scripts", "Configurando scripts", 85, "Creando scripts de inicio...")
+            self._report(
+                "creating_scripts", "Configurando scripts", 85, "Creando scripts de inicio..."
+            )
             self._create_start_scripts()
 
             # Fase 6: Verificar (90-95%)
@@ -555,7 +574,9 @@ class LanguageToolInstaller:
                 "completed",
                 "Instalación completada",
                 100,
-                "LanguageTool instalado y activo" if started else "Instalado (servidor no iniciado)",
+                "LanguageTool instalado y activo"
+                if started
+                else "Instalado (servidor no iniciado)",
             )
 
             return True, "LanguageTool instalado correctamente"
@@ -622,6 +643,7 @@ class LanguageToolInstaller:
             # Crear contexto SSL con certifi para entornos embebidos
             try:
                 import certifi
+
                 ssl_ctx = ssl.create_default_context(cafile=certifi.where())
             except ImportError:
                 # certifi no disponible, usar certificados del sistema
@@ -652,7 +674,9 @@ class LanguageToolInstaller:
                             mb_dl = downloaded / (1024 * 1024)
                             mb_total = total_size / (1024 * 1024)
                             self._report(
-                                phase, label, pct,
+                                phase,
+                                label,
+                                pct,
                                 f"{mb_dl:.0f}/{mb_total:.0f} MB",
                             )
 
@@ -681,25 +705,32 @@ class LanguageToolInstaller:
 
         arch = _get_machine_arch()
         arch_urls = JAVA_URLS[system]
-        
+
         if arch not in arch_urls:
             # Fallback a x64 si la arquitectura no está soportada
             logger.warning(f"Arquitectura {arch} no disponible para {system}, usando x64")
             arch = "x64"
-        
+
         java_url = arch_urls[arch]
         logger.info(f"Descargando Java para {system}/{arch}")
         self._tools_dir.mkdir(parents=True, exist_ok=True)
 
-        archive_name = f"java-{JAVA_VERSION}-{arch}.zip" if system == "Windows" else f"java-{JAVA_VERSION}-{arch}.tar.gz"
+        archive_name = (
+            f"java-{JAVA_VERSION}-{arch}.zip"
+            if system == "Windows"
+            else f"java-{JAVA_VERSION}-{arch}.tar.gz"
+        )
         archive_path = self._tools_dir / archive_name
 
         # Descargar (5-30%)
         if not archive_path.exists():
             success = self._download_file(
-                java_url, archive_path,
-                "installing_java", "Descargando Java",
-                5, 30,
+                java_url,
+                archive_path,
+                "installing_java",
+                "Descargando Java",
+                5,
+                30,
             )
             if not success:
                 return False
@@ -718,13 +749,13 @@ class LanguageToolInstaller:
                     zf.extractall(self._tools_dir)
             else:
                 import tarfile
+
                 with tarfile.open(archive_path, "r:gz") as tf:
                     tf.extractall(self._tools_dir)
 
             # Encontrar directorio extraído
             extracted_dirs = [
-                d for d in self._tools_dir.iterdir()
-                if d.is_dir() and d.name.startswith("jdk-")
+                d for d in self._tools_dir.iterdir() if d.is_dir() and d.name.startswith("jdk-")
             ]
             if not extracted_dirs:
                 logger.error("No se encontró directorio Java extraído")
@@ -756,7 +787,7 @@ class LanguageToolInstaller:
             logger.error(f"Error extrayendo Java: {e}")
             return False
 
-    def _download_languagetool(self) -> Optional[Path]:
+    def _download_languagetool(self) -> Path | None:
         """Descargar LanguageTool probando múltiples mirrors."""
         self._tools_dir.mkdir(parents=True, exist_ok=True)
         zip_path = self._tools_dir / f"LanguageTool-{LT_VERSION}.zip"
@@ -767,14 +798,18 @@ class LanguageToolInstaller:
 
         for i, url in enumerate(LT_URLS):
             self._report(
-                "downloading_lt", "Descargando LanguageTool",
+                "downloading_lt",
+                "Descargando LanguageTool",
                 40 + i * 2,
                 f"Intentando mirror {i + 1}/{len(LT_URLS)}...",
             )
             success = self._download_file(
-                url, zip_path,
-                "downloading_lt", "Descargando LanguageTool",
-                42 + i * 2, 75,
+                url,
+                zip_path,
+                "downloading_lt",
+                "Descargando LanguageTool",
+                42 + i * 2,
+                75,
             )
             if success:
                 return zip_path
@@ -845,10 +880,8 @@ class LanguageToolInstaller:
             f'org.languagetool.server.HTTPServer --port {DEFAULT_PORT} --allow-origin "*"\n',
             encoding="utf-8",
         )
-        try:
+        with contextlib.suppress(Exception):
             sh.chmod(0o755)
-        except Exception:
-            pass
 
     @staticmethod
     def _remove_readonly(func, path, _excinfo) -> None:
@@ -858,12 +891,12 @@ class LanguageToolInstaller:
 
 
 # Estado global de instalación (thread-safe)
-_install_progress: Optional[InstallProgress] = None
+_install_progress: InstallProgress | None = None
 _installing: bool = False
 _install_lock = threading.Lock()
 
 
-def get_install_progress() -> Optional[InstallProgress]:
+def get_install_progress() -> InstallProgress | None:
     """Obtener progreso actual de la instalación."""
     return _install_progress
 
@@ -874,8 +907,8 @@ def is_lt_installing() -> bool:
 
 
 def start_lt_installation(
-    callback: Optional[Callable[[InstallProgress], None]] = None,
-) -> Tuple[bool, str]:
+    callback: Callable[[InstallProgress], None] | None = None,
+) -> tuple[bool, str]:
     """
     Iniciar instalación de LanguageTool en background.
 
@@ -891,7 +924,9 @@ def start_lt_installation(
         if _installing:
             return False, "Ya hay una instalación en curso"
         _installing = True
-        _install_progress = InstallProgress(phase="starting", phase_label="Iniciando...", percentage=0)
+        _install_progress = InstallProgress(
+            phase="starting", phase_label="Iniciando...", percentage=0
+        )
 
     def _progress_cb(progress: InstallProgress) -> None:
         global _install_progress
@@ -906,11 +941,13 @@ def start_lt_installation(
             installer.install()
         except Exception as e:
             logger.exception("Error en hilo de instalación de LanguageTool")
-            _progress_cb(InstallProgress(
-                phase="error",
-                phase_label="Error",
-                error=str(e),
-            ))
+            _progress_cb(
+                InstallProgress(
+                    phase="error",
+                    phase_label="Error",
+                    error=str(e),
+                )
+            )
         finally:
             _installing = False
 

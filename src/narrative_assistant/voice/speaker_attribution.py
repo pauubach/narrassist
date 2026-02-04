@@ -7,87 +7,203 @@ Determina quien dice que en los dialogos usando multiples estrategias:
 3. Perfil de voz (comparar estilo con perfiles conocidos)
 """
 
-import re
 import logging
+import re
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Tuple, Set, Any, Protocol
 from enum import Enum
+from typing import Any, Protocol
 
 logger = logging.getLogger(__name__)
 
 
 # Verbos de habla en espanol
-SPEECH_VERBS: Set[str] = {
+SPEECH_VERBS: set[str] = {
     # Neutros - infinitivos y conjugaciones comunes
-    'decir', 'dijo', 'dice', 'dije', 'dijeron', 'decía', 'dijiste',
-    'hablar', 'hablo', 'habla', 'hablaba', 'hablaron',
-    'responder', 'respondio', 'responde', 'respondia', 'respondieron',
-    'contestar', 'contesto', 'contesta', 'contestaba', 'contestaron',
-    'anadir', 'anadio', 'anade', 'anadia',
-    'agregar', 'agrego', 'agrega', 'agregaba',
-    'continuar', 'continuo', 'continua', 'continuaba',
-    'proseguir', 'prosiguio', 'prosigue',
-    'replicar', 'replico', 'replica',
-
+    "decir",
+    "dijo",
+    "dice",
+    "dije",
+    "dijeron",
+    "decía",
+    "dijiste",
+    "hablar",
+    "hablo",
+    "habla",
+    "hablaba",
+    "hablaron",
+    "responder",
+    "respondio",
+    "responde",
+    "respondia",
+    "respondieron",
+    "contestar",
+    "contesto",
+    "contesta",
+    "contestaba",
+    "contestaron",
+    "anadir",
+    "anadio",
+    "anade",
+    "anadia",
+    "agregar",
+    "agrego",
+    "agrega",
+    "agregaba",
+    "continuar",
+    "continuo",
+    "continua",
+    "continuaba",
+    "proseguir",
+    "prosiguio",
+    "prosigue",
+    "replicar",
+    "replico",
+    "replica",
     # Emocionales
-    'gritar', 'grito', 'grita', 'gritaba', 'gritaron',
-    'susurrar', 'susurro', 'susurra', 'susurraba',
-    'murmurar', 'murmuro', 'murmura', 'murmuraba',
-    'exclamar', 'exclamo', 'exclama', 'exclamaba',
-    'gemir', 'gimio', 'gime', 'gemia',
-    'sollozar', 'sollozo', 'solloza', 'sollozaba',
-    'chillar', 'chillo', 'chilla', 'chillaba',
-    'bramar', 'bramo', 'brama',
-    'rugir', 'rugio', 'ruge',
-
+    "gritar",
+    "grito",
+    "grita",
+    "gritaba",
+    "gritaron",
+    "susurrar",
+    "susurro",
+    "susurra",
+    "susurraba",
+    "murmurar",
+    "murmuro",
+    "murmura",
+    "murmuraba",
+    "exclamar",
+    "exclamo",
+    "exclama",
+    "exclamaba",
+    "gemir",
+    "gimio",
+    "gime",
+    "gemia",
+    "sollozar",
+    "sollozo",
+    "solloza",
+    "sollozaba",
+    "chillar",
+    "chillo",
+    "chilla",
+    "chillaba",
+    "bramar",
+    "bramo",
+    "brama",
+    "rugir",
+    "rugio",
+    "ruge",
     # Interrogativos
-    'preguntar', 'pregunto', 'pregunta', 'preguntaba', 'preguntaron',
-    'inquirir', 'inquirio', 'inquiere',
-    'interrogar', 'interrogo', 'interroga',
-    'cuestionar', 'cuestiono', 'cuestiona',
-
+    "preguntar",
+    "pregunto",
+    "pregunta",
+    "preguntaba",
+    "preguntaron",
+    "inquirir",
+    "inquirio",
+    "inquiere",
+    "interrogar",
+    "interrogo",
+    "interroga",
+    "cuestionar",
+    "cuestiono",
+    "cuestiona",
     # Declarativos
-    'afirmar', 'afirmo', 'afirma', 'afirmaba',
-    'asegurar', 'aseguro', 'asegura',
-    'confirmar', 'confirmo', 'confirma',
-    'negar', 'nego', 'niega', 'negaba',
-
+    "afirmar",
+    "afirmo",
+    "afirma",
+    "afirmaba",
+    "asegurar",
+    "aseguro",
+    "asegura",
+    "confirmar",
+    "confirmo",
+    "confirma",
+    "negar",
+    "nego",
+    "niega",
+    "negaba",
     # Otros
-    'comentar', 'comento', 'comenta', 'comentaba',
-    'explicar', 'explico', 'explica', 'explicaba',
-    'admitir', 'admitio', 'admite', 'admitia',
-    'confesar', 'confeso', 'confiesa', 'confesaba',
-    'insistir', 'insistio', 'insiste', 'insistia',
-    'ordenar', 'ordeno', 'ordena', 'ordenaba',
-    'sugerir', 'sugirio', 'sugiere', 'sugeria',
-    'advertir', 'advirtio', 'advierte',
-    'reclamar', 'reclamo', 'reclama',
-    'protestar', 'protesto', 'protesta',
-    'objetar', 'objeto', 'objeta',
-    'interrumpir', 'interrumpio', 'interrumpe',
-    'concluir', 'concluyo', 'concluye',
-    'sentenciar', 'sentencio', 'sentencia',
+    "comentar",
+    "comento",
+    "comenta",
+    "comentaba",
+    "explicar",
+    "explico",
+    "explica",
+    "explicaba",
+    "admitir",
+    "admitio",
+    "admite",
+    "admitia",
+    "confesar",
+    "confeso",
+    "confiesa",
+    "confesaba",
+    "insistir",
+    "insistio",
+    "insiste",
+    "insistia",
+    "ordenar",
+    "ordeno",
+    "ordena",
+    "ordenaba",
+    "sugerir",
+    "sugirio",
+    "sugiere",
+    "sugeria",
+    "advertir",
+    "advirtio",
+    "advierte",
+    "reclamar",
+    "reclamo",
+    "reclama",
+    "protestar",
+    "protesto",
+    "protesta",
+    "objetar",
+    "objeto",
+    "objeta",
+    "interrumpir",
+    "interrumpio",
+    "interrumpe",
+    "concluir",
+    "concluyo",
+    "concluye",
+    "sentenciar",
+    "sentencio",
+    "sentencia",
     # Saludos y despedidas
-    'saludar', 'saludo', 'saluda', 'saludaba',
-    'despedir', 'despidio', 'despide', 'despedia',
+    "saludar",
+    "saludo",
+    "saluda",
+    "saludaba",
+    "despedir",
+    "despidio",
+    "despide",
+    "despedia",
 }
 
 
 class AttributionConfidence(Enum):
     """Nivel de confianza de la atribucion."""
-    HIGH = "high"       # Verbo de habla explicito
-    MEDIUM = "medium"   # Alternancia clara
-    LOW = "low"         # Inferido por contexto/perfil
-    UNKNOWN = "unknown" # Sin atribucion clara
+
+    HIGH = "high"  # Verbo de habla explicito
+    MEDIUM = "medium"  # Alternancia clara
+    LOW = "low"  # Inferido por contexto/perfil
+    UNKNOWN = "unknown"  # Sin atribucion clara
 
 
 class AttributionMethod(Enum):
     """Metodo usado para la atribucion."""
-    EXPLICIT_VERB = "explicit_verb"     # Verbo de habla + nombre
-    ALTERNATION = "alternation"         # Patron de alternancia
-    VOICE_PROFILE = "voice_profile"     # Match con perfil de voz
-    PROXIMITY = "proximity"             # Mencion cercana
-    NONE = "none"                       # Sin metodo aplicable
+
+    EXPLICIT_VERB = "explicit_verb"  # Verbo de habla + nombre
+    ALTERNATION = "alternation"  # Patron de alternancia
+    VOICE_PROFILE = "voice_profile"  # Match con perfil de voz
+    PROXIMITY = "proximity"  # Mencion cercana
+    NONE = "none"  # Sin metodo aplicable
 
 
 @dataclass
@@ -101,19 +217,19 @@ class DialogueAttribution:
     chapter: int
 
     # Atribucion
-    speaker_id: Optional[int] = None
-    speaker_name: Optional[str] = None
+    speaker_id: int | None = None
+    speaker_name: str | None = None
     confidence: AttributionConfidence = AttributionConfidence.UNKNOWN
 
     # Evidencia
     attribution_method: AttributionMethod = AttributionMethod.NONE
-    speech_verb: Optional[str] = None
+    speech_verb: str | None = None
     context_snippet: str = ""
 
     # Alternativas consideradas: (entity_id, entity_name, score)
-    alternative_speakers: List[Tuple[int, str, float]] = field(default_factory=list)
+    alternative_speakers: list[tuple[int, str, float]] = field(default_factory=list)
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Convierte a diccionario."""
         return {
             "dialogue_id": self.dialogue_id,
@@ -133,14 +249,16 @@ class DialogueAttribution:
 @dataclass
 class SceneParticipants:
     """Participantes de una escena."""
+
     chapter: int
     scene_start: int
     scene_end: int
-    participants: List[int]  # entity_ids
+    participants: list[int]  # entity_ids
 
 
 class DialogueProtocol(Protocol):
     """Protocolo para objetos de dialogo."""
+
     text: str
     start_char: int
     end_char: int
@@ -149,27 +267,25 @@ class DialogueProtocol(Protocol):
 
 class EntityProtocol(Protocol):
     """Protocolo para objetos de entidad."""
+
     id: int
     canonical_name: str
 
 
 class VoiceProfileProtocol(Protocol):
     """Protocolo para perfiles de voz."""
+
     entity_id: int
     uses_usted: bool
     uses_tu: bool
     avg_intervention_length: float
-    filler_words: List[str]
+    filler_words: list[str]
 
 
 class SpeakerAttributor:
     """Atribuidor de hablante para dialogos."""
 
-    def __init__(
-        self,
-        entities: List[Any],
-        voice_profiles: Optional[Dict[int, Any]] = None
-    ):
+    def __init__(self, entities: list[Any], voice_profiles: dict[int, Any] | None = None):
         """
         Inicializa el atribuidor.
 
@@ -177,21 +293,21 @@ class SpeakerAttributor:
             entities: Lista de entidades del proyecto
             voice_profiles: Diccionario de perfiles de voz por entity_id
         """
-        self.entities: Dict[int, Any] = {}
-        self.entity_names: Dict[str, int] = {}
+        self.entities: dict[int, Any] = {}
+        self.entity_names: dict[str, int] = {}
 
         for e in entities:
-            entity_id = getattr(e, 'id', None)
+            entity_id = getattr(e, "id", None)
             if entity_id is not None:
                 self.entities[entity_id] = e
 
                 # Nombre canonico
-                name = getattr(e, 'canonical_name', getattr(e, 'name', ''))
+                name = getattr(e, "canonical_name", getattr(e, "name", ""))
                 if name:
                     self.entity_names[name.lower()] = entity_id
 
                 # Aliases
-                aliases = getattr(e, 'aliases', [])
+                aliases = getattr(e, "aliases", [])
                 for alias in aliases:
                     if alias:
                         self.entity_names[alias.lower()] = entity_id
@@ -206,32 +322,29 @@ class SpeakerAttributor:
     def _compile_patterns(self) -> None:
         """Compila patrones regex para deteccion de hablante."""
         # Patron: "—verbo Nombre" (despues del dialogo)
-        verbs_pattern = '|'.join(re.escape(v) for v in SPEECH_VERBS)
+        verbs_pattern = "|".join(re.escape(v) for v in SPEECH_VERBS)
 
         # Patron 1: "—dijo Juan" o "—respondio Maria"
         self.pattern_verb_name = re.compile(
-            r'[—\-]\s*(' + verbs_pattern + r')\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)',
-            re.IGNORECASE
+            r"[—\-]\s*(" + verbs_pattern + r")\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)", re.IGNORECASE
         )
 
         # Patron 2: "Juan dijo:" o "Maria respondio:"
         self.pattern_name_verb = re.compile(
-            r'([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+(' + verbs_pattern + r')\s*[:\.]?\s*[—\-]?',
-            re.IGNORECASE
+            r"([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+(" + verbs_pattern + r")\s*[:\.]?\s*[—\-]?", re.IGNORECASE
         )
 
         # Patron 3: ", dijo Juan" (con coma)
         self.pattern_comma_verb_name = re.compile(
-            r',\s*(' + verbs_pattern + r')\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)',
-            re.IGNORECASE
+            r",\s*(" + verbs_pattern + r")\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)", re.IGNORECASE
         )
 
     def attribute_dialogues(
         self,
-        dialogues: List[Any],
-        entity_mentions: Optional[List[Tuple[int, int, int]]] = None,
-        full_text: Optional[str] = None
-    ) -> List[DialogueAttribution]:
+        dialogues: list[Any],
+        entity_mentions: list[tuple[int, int, int]] | None = None,
+        full_text: str | None = None,
+    ) -> list[DialogueAttribution]:
         """
         Atribuye hablante a cada dialogo.
 
@@ -244,24 +357,21 @@ class SpeakerAttributor:
             Lista de atribuciones
         """
         entity_mentions = entity_mentions or []
-        attributions: List[DialogueAttribution] = []
+        attributions: list[DialogueAttribution] = []
 
         # Ordenar dialogos por posicion
-        sorted_dialogues = sorted(
-            dialogues,
-            key=lambda d: getattr(d, 'start_char', 0)
-        )
+        sorted_dialogues = sorted(dialogues, key=lambda d: getattr(d, "start_char", 0))
 
         # Contexto de escena
-        current_participants: List[int] = []
-        last_speaker: Optional[int] = None
+        current_participants: list[int] = []
+        last_speaker: int | None = None
         last_chapter: int = -1
 
         for i, dialogue in enumerate(sorted_dialogues):
-            text = getattr(dialogue, 'text', '')
-            start_char = getattr(dialogue, 'start_char', 0)
-            end_char = getattr(dialogue, 'end_char', len(text))
-            chapter = getattr(dialogue, 'chapter', 1)
+            text = getattr(dialogue, "text", "")
+            start_char = getattr(dialogue, "start_char", 0)
+            end_char = getattr(dialogue, "end_char", len(text))
+            chapter = getattr(dialogue, "chapter", 1)
 
             # Reset al cambiar de capitulo
             if chapter != last_chapter:
@@ -271,16 +381,16 @@ class SpeakerAttributor:
 
             # Obtener contexto del dialogo
             context_after = ""
-            if hasattr(dialogue, 'context_after'):
+            if hasattr(dialogue, "context_after"):
                 context_after = dialogue.context_after
             elif full_text and end_char < len(full_text):
-                context_after = full_text[end_char:end_char + 150]
+                context_after = full_text[end_char : end_char + 150]
 
             context_before = ""
-            if hasattr(dialogue, 'context_before'):
+            if hasattr(dialogue, "context_before"):
                 context_before = dialogue.context_before
             elif full_text and start_char > 0:
-                context_before = full_text[max(0, start_char - 150):start_char]
+                context_before = full_text[max(0, start_char - 150) : start_char]
 
             attr = DialogueAttribution(
                 dialogue_id=i,
@@ -288,11 +398,11 @@ class SpeakerAttributor:
                 start_char=start_char,
                 end_char=end_char,
                 chapter=chapter,
-                context_snippet=context_after[:50] if context_after else ""
+                context_snippet=context_after[:50] if context_after else "",
             )
 
             # 0. Usar speaker_hint del detector de diálogos
-            speaker_hint = getattr(dialogue, 'speaker_hint', '') or ''
+            speaker_hint = getattr(dialogue, "speaker_hint", "") or ""
             if speaker_hint:
                 hint_lower = speaker_hint.strip().lower()
                 if hint_lower in self.entity_names:
@@ -406,9 +516,7 @@ class SpeakerAttributor:
             # Aun asi agregar alternativas si hay scores
             if voice_scored:
                 attr.alternative_speakers = [
-                    (eid, self._get_entity_name(eid), sc)
-                    for eid, sc in voice_scored
-                    if sc > 0.1
+                    (eid, self._get_entity_name(eid), sc) for eid, sc in voice_scored if sc > 0.1
                 ][:3]
             attributions.append(attr)
 
@@ -419,17 +527,17 @@ class SpeakerAttributor:
         """Obtiene nombre de entidad por ID."""
         entity = self.entities.get(entity_id)
         if entity:
-            return getattr(entity, 'canonical_name', getattr(entity, 'name', str(entity_id)))
+            return getattr(entity, "canonical_name", getattr(entity, "name", str(entity_id)))
         return str(entity_id)
 
     def _detect_explicit_speaker(
         self,
         context_before: str,
         context_after: str,
-        entity_mentions: List[Tuple[int, int, int]],
+        entity_mentions: list[tuple[int, int, int]],
         dialogue_start: int,
-        dialogue_end: int
-    ) -> Optional[Tuple[int, str]]:
+        dialogue_end: int,
+    ) -> tuple[int, str] | None:
         """
         Detecta hablante explicito por verbo de habla.
 
@@ -461,10 +569,12 @@ class SpeakerAttributor:
                 return (self.entity_names[name], verb)
 
         # Buscar mencion cercana + verbo de habla
-        for entity_id, start, end in entity_mentions:
+        for entity_id, start, _end in entity_mentions:
             # Si la mencion esta muy cerca del dialogo
-            if (dialogue_start - 100 <= start <= dialogue_start or
-                dialogue_end <= start <= dialogue_end + 100):
+            if (
+                dialogue_start - 100 <= start <= dialogue_start
+                or dialogue_end <= start <= dialogue_end + 100
+            ):
                 # Verificar si hay verbo de habla
                 context = context_after[:100].lower()
                 for verb in SPEECH_VERBS:
@@ -474,11 +584,8 @@ class SpeakerAttributor:
         return None
 
     def _get_nearby_entities(
-        self,
-        position: int,
-        entity_mentions: List[Tuple[int, int, int]],
-        window: int = 500
-    ) -> List[int]:
+        self, position: int, entity_mentions: list[tuple[int, int, int]], window: int = 500
+    ) -> list[int]:
         """
         Obtiene entidades mencionadas cerca de una posicion.
 
@@ -490,7 +597,7 @@ class SpeakerAttributor:
         Returns:
             Lista de entity_ids ordenados por proximidad
         """
-        nearby: List[Tuple[int, int]] = []  # (entity_id, distance)
+        nearby: list[tuple[int, int]] = []  # (entity_id, distance)
 
         for entity_id, start, end in entity_mentions:
             distance = min(abs(start - position), abs(end - position))
@@ -499,8 +606,8 @@ class SpeakerAttributor:
 
         # Ordenar por distancia y eliminar duplicados
         nearby.sort(key=lambda x: x[1])
-        seen: Set[int] = set()
-        result: List[int] = []
+        seen: set[int] = set()
+        result: list[int] = []
         for entity_id, _ in nearby:
             if entity_id not in seen:
                 seen.add(entity_id)
@@ -508,11 +615,7 @@ class SpeakerAttributor:
 
         return result
 
-    def _score_voice_match(
-        self,
-        text: str,
-        candidates: List[int]
-    ) -> List[Tuple[int, float]]:
+    def _score_voice_match(self, text: str, candidates: list[int]) -> list[tuple[int, float]]:
         """
         Puntua cada candidato por similitud con su perfil de voz.
 
@@ -536,23 +639,23 @@ class SpeakerAttributor:
         text_lower = text.lower()
         words = text.split()
         word_count = len(words)
-        words_lower = set(w.lower() for w in words)
+        words_lower = {w.lower() for w in words}
 
         # Analizar rasgos del texto
-        uses_usted = 'usted' in text_lower
-        uses_tu = any(w in text_lower for w in ['tú', 'tu ', ' tu', 'tuyo', 'tuya'])
-        has_exclamation = '!' in text or '¡' in text
-        has_question = '?' in text or '¿' in text
-        has_ellipsis = '...' in text
+        uses_usted = "usted" in text_lower
+        uses_tu = any(w in text_lower for w in ["tú", "tu ", " tu", "tuyo", "tuya"])
+        has_exclamation = "!" in text or "¡" in text
+        has_question = "?" in text or "¿" in text
+        has_ellipsis = "..." in text
 
-        scored: List[Tuple[int, float]] = []
+        scored: list[tuple[int, float]] = []
 
         for entity_id in candidates:
             if entity_id not in self.voice_profiles:
                 continue
 
             profile = self.voice_profiles[entity_id]
-            metrics = getattr(profile, 'metrics', None)
+            metrics = getattr(profile, "metrics", None)
             if not metrics:
                 continue
 
@@ -560,18 +663,16 @@ class SpeakerAttributor:
             weights_sum = 0.0
 
             # 1. Formalidad via usted/tu (peso 0.20)
-            formality = getattr(metrics, 'formality_score', 0.5)
-            if uses_usted and formality > 0.6:
-                score += 0.20
-            elif uses_tu and formality < 0.4:
+            formality = getattr(metrics, "formality_score", 0.5)
+            if uses_usted and formality > 0.6 or uses_tu and formality < 0.4:
                 score += 0.20
             elif not uses_usted and not uses_tu:
                 score += 0.10  # Neutral text, partial credit
             weights_sum += 0.20
 
             # 2. Longitud de intervencion (peso 0.20)
-            avg_len = getattr(metrics, 'avg_intervention_length', 0)
-            std_len = getattr(metrics, 'std_intervention_length', 0)
+            avg_len = getattr(metrics, "avg_intervention_length", 0)
+            std_len = getattr(metrics, "std_intervention_length", 0)
             if avg_len > 0:
                 if std_len > 0:
                     z_score = abs(word_count - avg_len) / std_len
@@ -586,9 +687,9 @@ class SpeakerAttributor:
 
             # 3. Patrones de puntuacion (peso 0.15)
             punct_score = 0.0
-            exc_ratio = getattr(metrics, 'exclamation_ratio', 0)
-            qst_ratio = getattr(metrics, 'question_ratio', 0)
-            ell_ratio = getattr(metrics, 'ellipsis_ratio', 0)
+            exc_ratio = getattr(metrics, "exclamation_ratio", 0)
+            qst_ratio = getattr(metrics, "question_ratio", 0)
+            ell_ratio = getattr(metrics, "ellipsis_ratio", 0)
 
             if has_exclamation and exc_ratio > 0.15:
                 punct_score += 0.33
@@ -609,10 +710,12 @@ class SpeakerAttributor:
             weights_sum += 0.15
 
             # 4. Muletillas (peso 0.20)
-            top_fillers = getattr(metrics, 'top_fillers', [])
+            top_fillers = getattr(metrics, "top_fillers", [])
             filler_match = False
             for filler_item in top_fillers:
-                filler_word = filler_item[0] if isinstance(filler_item, (list, tuple)) else str(filler_item)
+                filler_word = (
+                    filler_item[0] if isinstance(filler_item, (list, tuple)) else str(filler_item)
+                )
                 if filler_word and filler_word.lower() in text_lower:
                     filler_match = True
                     break
@@ -621,7 +724,7 @@ class SpeakerAttributor:
             weights_sum += 0.20
 
             # 5. Vocabulario caracteristico (peso 0.25)
-            char_words = getattr(profile, 'characteristic_words', [])
+            char_words = getattr(profile, "characteristic_words", [])
             if char_words and words_lower:
                 char_set = set()
                 for item in char_words[:15]:
@@ -633,7 +736,7 @@ class SpeakerAttributor:
             weights_sum += 0.25
 
             # Normalizar por confianza del perfil
-            profile_confidence = getattr(profile, 'confidence', 0.5)
+            profile_confidence = getattr(profile, "confidence", 0.5)
             final_score = score * (0.5 + 0.5 * profile_confidence)
 
             scored.append((entity_id, round(final_score, 3)))
@@ -642,11 +745,7 @@ class SpeakerAttributor:
         scored.sort(key=lambda x: x[1], reverse=True)
         return scored
 
-    def _match_voice_profile(
-        self,
-        text: str,
-        candidates: List[int]
-    ) -> Optional[int]:
+    def _match_voice_profile(self, text: str, candidates: list[int]) -> int | None:
         """
         Intenta matching por perfil de voz.
 
@@ -662,10 +761,7 @@ class SpeakerAttributor:
             return scored[0][0]
         return None
 
-    def get_attribution_stats(
-        self,
-        attributions: List[DialogueAttribution]
-    ) -> Dict[str, Any]:
+    def get_attribution_stats(self, attributions: list[DialogueAttribution]) -> dict[str, Any]:
         """
         Genera estadisticas de atribucion.
 
@@ -678,44 +774,45 @@ class SpeakerAttributor:
         total = len(attributions)
         if total == 0:
             return {
-                'total_dialogues': 0,
-                'by_confidence': {'high': 0, 'medium': 0, 'low': 0, 'unknown': 0},
-                'by_method': {},
-                'attribution_rate': 0.0,
+                "total_dialogues": 0,
+                "by_confidence": {"high": 0, "medium": 0, "low": 0, "unknown": 0},
+                "by_method": {},
+                "attribution_rate": 0.0,
             }
 
         by_confidence = {
-            'high': sum(1 for a in attributions if a.confidence == AttributionConfidence.HIGH),
-            'medium': sum(1 for a in attributions if a.confidence == AttributionConfidence.MEDIUM),
-            'low': sum(1 for a in attributions if a.confidence == AttributionConfidence.LOW),
-            'unknown': sum(1 for a in attributions if a.confidence == AttributionConfidence.UNKNOWN),
+            "high": sum(1 for a in attributions if a.confidence == AttributionConfidence.HIGH),
+            "medium": sum(1 for a in attributions if a.confidence == AttributionConfidence.MEDIUM),
+            "low": sum(1 for a in attributions if a.confidence == AttributionConfidence.LOW),
+            "unknown": sum(
+                1 for a in attributions if a.confidence == AttributionConfidence.UNKNOWN
+            ),
         }
 
-        by_method: Dict[str, int] = {}
+        by_method: dict[str, int] = {}
         for a in attributions:
             method = a.attribution_method.value
             by_method[method] = by_method.get(method, 0) + 1
 
-        by_speaker: Dict[str, int] = {}
+        by_speaker: dict[str, int] = {}
         for a in attributions:
             if a.speaker_name:
                 by_speaker[a.speaker_name] = by_speaker.get(a.speaker_name, 0) + 1
 
-        attributed = total - by_confidence['unknown']
+        attributed = total - by_confidence["unknown"]
 
         return {
-            'total_dialogues': total,
-            'attributed_dialogues': attributed,
-            'by_confidence': by_confidence,
-            'by_method': by_method,
-            'by_speaker': by_speaker,
-            'attribution_rate': attributed / total if total > 0 else 0.0,
+            "total_dialogues": total,
+            "attributed_dialogues": attributed,
+            "by_confidence": by_confidence,
+            "by_method": by_method,
+            "by_speaker": by_speaker,
+            "attribution_rate": attributed / total if total > 0 else 0.0,
         }
 
     def get_unattributed_dialogues(
-        self,
-        attributions: List[DialogueAttribution]
-    ) -> List[DialogueAttribution]:
+        self, attributions: list[DialogueAttribution]
+    ) -> list[DialogueAttribution]:
         """
         Obtiene dialogos sin atribucion.
 
@@ -728,9 +825,8 @@ class SpeakerAttributor:
         return [a for a in attributions if a.confidence == AttributionConfidence.UNKNOWN]
 
     def get_low_confidence_dialogues(
-        self,
-        attributions: List[DialogueAttribution]
-    ) -> List[DialogueAttribution]:
+        self, attributions: list[DialogueAttribution]
+    ) -> list[DialogueAttribution]:
         """
         Obtiene dialogos con baja confianza.
 
@@ -741,18 +837,19 @@ class SpeakerAttributor:
             Lista de dialogos con confianza LOW o UNKNOWN
         """
         return [
-            a for a in attributions
+            a
+            for a in attributions
             if a.confidence in (AttributionConfidence.LOW, AttributionConfidence.UNKNOWN)
         ]
 
 
 def attribute_speakers(
-    dialogues: List[Any],
-    entities: List[Any],
-    entity_mentions: Optional[List[Tuple[int, int, int]]] = None,
-    voice_profiles: Optional[Dict[int, Any]] = None,
-    full_text: Optional[str] = None
-) -> Tuple[List[DialogueAttribution], Dict[str, Any]]:
+    dialogues: list[Any],
+    entities: list[Any],
+    entity_mentions: list[tuple[int, int, int]] | None = None,
+    voice_profiles: dict[int, Any] | None = None,
+    full_text: str | None = None,
+) -> tuple[list[DialogueAttribution], dict[str, Any]]:
     """
     Funcion de conveniencia para atribuir hablantes.
 
@@ -767,8 +864,6 @@ def attribute_speakers(
         Tupla de (atribuciones, estadisticas)
     """
     attributor = SpeakerAttributor(entities, voice_profiles)
-    attributions = attributor.attribute_dialogues(
-        dialogues, entity_mentions, full_text
-    )
+    attributions = attributor.attribute_dialogues(dialogues, entity_mentions, full_text)
     stats = attributor.get_attribution_stats(attributions)
     return attributions, stats

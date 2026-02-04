@@ -15,16 +15,16 @@ Formatos:
 
 import json
 import logging
-from dataclasses import dataclass, field, asdict
-from pathlib import Path
-from typing import Optional, Any
 from collections import defaultdict
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
+from typing import Any
 
+from ..core.errors import ErrorSeverity, NarrativeError
 from ..core.result import Result
-from ..core.errors import NarrativeError, ErrorSeverity
-from ..entities.models import Entity, EntityType, EntityImportance
+from ..entities.models import Entity, EntityType
 from ..entities.repository import get_entity_repository
-from ..nlp.attributes import ExtractedAttribute, AttributeKey, AttributeCategory
+from ..nlp.attributes import AttributeCategory, ExtractedAttribute
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +37,7 @@ class AttributeInfo:
     key: str  # "eye_color", "height", etc.
     value: str  # "azules", "alto", etc.
     confidence: float
-    first_mentioned_chapter: Optional[int]
+    first_mentioned_chapter: int | None
     occurrences: int = 1
     excerpts: list[str] = field(default_factory=list)
 
@@ -49,8 +49,8 @@ class MentionInfo:
     total_mentions: int
     chapters: list[int]  # Capítulos donde aparece
     mention_frequency: dict[int, int]  # {chapter_id: count}
-    first_appearance_chapter: Optional[int]
-    last_appearance_chapter: Optional[int]
+    first_appearance_chapter: int | None
+    last_appearance_chapter: int | None
 
 
 @dataclass
@@ -105,10 +105,10 @@ class CharacterSheet:
     relationships: list[dict[str, Any]] = field(default_factory=list)
 
     # Perfil de voz (si hay diálogos)
-    voice_profile: Optional[VoiceProfileSummary] = None
+    voice_profile: VoiceProfileSummary | None = None
 
     # Alertas/inconsistencias asociadas
-    alerts: Optional[AlertSummary] = None
+    alerts: AlertSummary | None = None
 
     # Metadata
     project_id: int = 0
@@ -142,9 +142,13 @@ class CharacterSheet:
         lines.append("## Apariciones")
         lines.append(f"- **Total de menciones:** {self.mentions.total_mentions}")
         if self.mentions.first_appearance_chapter:
-            lines.append(f"- **Primera aparición:** Capítulo {self.mentions.first_appearance_chapter}")
+            lines.append(
+                f"- **Primera aparición:** Capítulo {self.mentions.first_appearance_chapter}"
+            )
         if self.mentions.last_appearance_chapter:
-            lines.append(f"- **Última aparición:** Capítulo {self.mentions.last_appearance_chapter}")
+            lines.append(
+                f"- **Última aparición:** Capítulo {self.mentions.last_appearance_chapter}"
+            )
         if self.mentions.chapters:
             chapters_str = ", ".join(str(c) for c in sorted(self.mentions.chapters))
             lines.append(f"- **Aparece en capítulos:** {chapters_str}")
@@ -154,20 +158,24 @@ class CharacterSheet:
         if self.physical_attributes:
             lines.append("## Atributos Físicos")
             for attr in sorted(self.physical_attributes, key=lambda a: -a.confidence):
-                lines.append(f"- **{attr.key.replace('_', ' ').title()}:** {attr.value} "
-                             f"(confianza: {attr.confidence:.0%})")
+                lines.append(
+                    f"- **{attr.key.replace('_', ' ').title()}:** {attr.value} "
+                    f"(confianza: {attr.confidence:.0%})"
+                )
                 if attr.first_mentioned_chapter:
                     lines.append(f"  - Mencionado en cap. {attr.first_mentioned_chapter}")
                 if attr.excerpts:
-                    lines.append(f"  - _\"{attr.excerpts[0]}\"_")
+                    lines.append(f'  - _"{attr.excerpts[0]}"_')
             lines.append("")
 
         # Atributos psicológicos
         if self.psychological_attributes:
             lines.append("## Atributos Psicológicos")
             for attr in sorted(self.psychological_attributes, key=lambda a: -a.confidence):
-                lines.append(f"- **{attr.key.replace('_', ' ').title()}:** {attr.value} "
-                             f"(confianza: {attr.confidence:.0%})")
+                lines.append(
+                    f"- **{attr.key.replace('_', ' ').title()}:** {attr.value} "
+                    f"(confianza: {attr.confidence:.0%})"
+                )
             lines.append("")
 
         # Otros atributos
@@ -216,7 +224,7 @@ class CharacterSheet:
 
         # Footer
         lines.append("---")
-        lines.append(f"_Ficha generada automáticamente por Narrative Assistant_")
+        lines.append("_Ficha generada automáticamente por Narrative Assistant_")
 
         return "\n".join(lines)
 
@@ -287,19 +295,13 @@ def export_character_sheet(
         Ficha de personaje completa
     """
     # Filtrar atributos de esta entidad
-    entity_attrs = [
-        a for a in attributes
-        if a.entity_name == entity.canonical_name
-    ]
+    entity_attrs = [a for a in attributes if a.entity_name == entity.canonical_name]
 
     # Agrupar por categoría
     physical, psychological, other = _group_attributes_by_category(entity_attrs)
 
     # Calcular menciones (simplificado - en el futuro usar menciones reales de BD)
-    chapters_with_attrs = set(
-        a.chapter_id for a in entity_attrs
-        if a.chapter_id is not None
-    )
+    chapters_with_attrs = {a.chapter_id for a in entity_attrs if a.chapter_id is not None}
     mention_frequency = defaultdict(int)
     for attr in entity_attrs:
         if attr.chapter_id:
@@ -307,7 +309,7 @@ def export_character_sheet(
 
     mentions = MentionInfo(
         total_mentions=len(entity_attrs),
-        chapters=sorted(list(chapters_with_attrs)),
+        chapters=sorted(chapters_with_attrs),
         mention_frequency=dict(mention_frequency),
         first_appearance_chapter=min(chapters_with_attrs) if chapters_with_attrs else None,
         last_appearance_chapter=max(chapters_with_attrs) if chapters_with_attrs else None,
@@ -367,10 +369,7 @@ def export_all_character_sheets(
             return Result.success([])
 
         # Filtrar solo personajes
-        characters = [
-            e for e in entities
-            if e.entity_type == EntityType.CHARACTER
-        ]
+        characters = [e for e in entities if e.entity_type == EntityType.CHARACTER]
 
         if not characters:
             logger.warning(f"No characters found for project {project_id}")
@@ -383,10 +382,14 @@ def export_all_character_sheets(
             sheet = export_character_sheet(entity, attributes, project_id)
 
             # Nombre de archivo seguro
-            safe_name = "".join(
-                c if c.isalnum() or c in (' ', '-', '_') else '_'
-                for c in entity.canonical_name
-            ).strip().replace(' ', '_').lower()
+            safe_name = (
+                "".join(
+                    c if c.isalnum() or c in (" ", "-", "_") else "_" for c in entity.canonical_name
+                )
+                .strip()
+                .replace(" ", "_")
+                .lower()
+            )
 
             # Exportar según formato
             if format in ("json", "both"):

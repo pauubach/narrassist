@@ -118,9 +118,7 @@ class AlertRepository:
                 row = cursor.fetchone()
 
             if not row:
-                error = NarrativeError(
-                    message=f"Alert {alert_id} not found"
-                )
+                error = NarrativeError(message=f"Alert {alert_id} not found")
                 return Result.failure(error)
 
             alert = self._row_to_alert(row)
@@ -167,8 +165,8 @@ class AlertRepository:
     def get_by_project_prioritized(
         self,
         project_id: int,
-        current_chapter: Optional[int] = None,
-        status_filter: Optional[list[AlertStatus]] = None,
+        current_chapter: int | None = None,
+        status_filter: list[AlertStatus] | None = None,
     ) -> Result[list[Alert]]:
         """
         Obtiene alertas priorizadas por relevancia al capítulo actual.
@@ -245,7 +243,11 @@ class AlertRepository:
         except Exception as e:
             error = DatabaseError(
                 message="Error retrieving prioritized alerts",
-                context={"error": str(e), "project_id": project_id, "current_chapter": current_chapter},
+                context={
+                    "error": str(e),
+                    "project_id": project_id,
+                    "current_chapter": current_chapter,
+                },
             )
             logger.error(f"Failed to get prioritized alerts for project {project_id}: {e}")
             return Result.failure(error)
@@ -397,7 +399,9 @@ class AlertRepository:
             entity_ids=json.loads(row["entity_ids"]) if row["entity_ids"] else [],
             confidence=row["confidence"] or 0.8,
             source_module=row["source_module"] or "",
-            created_at=datetime.fromisoformat(row["created_at"]) if row["created_at"] else datetime.now(),
+            created_at=datetime.fromisoformat(row["created_at"])
+            if row["created_at"]
+            else datetime.now(),
             updated_at=datetime.fromisoformat(row["updated_at"]) if row["updated_at"] else None,
             status=AlertStatus(row["status"]),
             resolved_at=datetime.fromisoformat(row["resolved_at"]) if row["resolved_at"] else None,
@@ -405,7 +409,6 @@ class AlertRepository:
             extra_data=json.loads(row["extra_data"]) if row["extra_data"] else {},
             content_hash=content_hash,
         )
-
 
     def apply_dismissals(self, project_id: int) -> Result[int]:
         """

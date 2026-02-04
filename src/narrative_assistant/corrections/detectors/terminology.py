@@ -13,7 +13,6 @@ Ejemplos:
 import logging
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Optional
 
 from ..base import BaseDetector, CorrectionIssue
 from ..config import TerminologyConfig
@@ -25,6 +24,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class TermCluster:
     """Grupo de términos que refieren al mismo concepto."""
+
     canonical: str  # Término más frecuente/preferido
     variants: list[str] = field(default_factory=list)
     positions: dict[str, list[tuple[int, int]]] = field(default_factory=dict)
@@ -42,11 +42,27 @@ class TerminologyDetector(BaseDetector):
     # Términos que NO deben agruparse (son distintos a propósito)
     DO_NOT_CLUSTER = {
         # Pronombres y artículos
-        "él", "ella", "ellos", "ellas", "este", "esta", "ese", "esa",
+        "él",
+        "ella",
+        "ellos",
+        "ellas",
+        "este",
+        "esta",
+        "ese",
+        "esa",
         # Verbos auxiliares
-        "ser", "estar", "haber", "tener", "ir", "hacer",
+        "ser",
+        "estar",
+        "haber",
+        "tener",
+        "ir",
+        "hacer",
         # Conectores
-        "pero", "sin embargo", "aunque", "porque", "por tanto",
+        "pero",
+        "sin embargo",
+        "aunque",
+        "porque",
+        "por tanto",
     }
 
     # Grupos de sinónimos conocidos (para mejorar detección)
@@ -72,7 +88,7 @@ class TerminologyDetector(BaseDetector):
         {"feo", "horrible", "espantoso", "horrendo"},
     ]
 
-    def __init__(self, config: Optional[TerminologyConfig] = None):
+    def __init__(self, config: TerminologyConfig | None = None):
         self.config = config or TerminologyConfig()
         self._embeddings_model = None
         self._synonym_lookup = self._build_synonym_lookup()
@@ -100,7 +116,7 @@ class TerminologyDetector(BaseDetector):
     def detect(
         self,
         text: str,
-        chapter_index: Optional[int] = None,
+        chapter_index: int | None = None,
         spacy_doc=None,
         embeddings_model=None,
     ) -> list[CorrectionIssue]:
@@ -135,9 +151,7 @@ class TerminologyDetector(BaseDetector):
         # Generar issues para clusters con variaciones
         for cluster in clusters:
             if len(cluster.variants) >= 1:  # Al menos una variante
-                issues.extend(
-                    self._create_issues_for_cluster(cluster, text, chapter_index)
-                )
+                issues.extend(self._create_issues_for_cluster(cluster, text, chapter_index))
 
         return issues
 
@@ -192,18 +206,17 @@ class TerminologyDetector(BaseDetector):
 
                 if len(cluster_terms) > 1:
                     # Determinar término canónico (el más frecuente)
-                    canonical = max(
-                        cluster_terms,
-                        key=lambda t: len(cluster_positions.get(t, []))
-                    )
+                    canonical = max(cluster_terms, key=lambda t: len(cluster_positions.get(t, [])))
                     variants = [t for t in cluster_terms if t != canonical]
 
-                    clusters.append(TermCluster(
-                        canonical=canonical,
-                        variants=variants,
-                        positions=cluster_positions,
-                        similarity_score=1.0,  # Sinónimos conocidos = 100%
-                    ))
+                    clusters.append(
+                        TermCluster(
+                            canonical=canonical,
+                            variants=variants,
+                            positions=cluster_positions,
+                            similarity_score=1.0,  # Sinónimos conocidos = 100%
+                        )
+                    )
 
             processed.add(term)
 
@@ -213,9 +226,7 @@ class TerminologyDetector(BaseDetector):
             remaining = [t for t in term_positions if t not in processed]
 
             if len(remaining) >= 2:
-                embedding_clusters = self._cluster_by_embeddings(
-                    remaining, term_positions
-                )
+                embedding_clusters = self._cluster_by_embeddings(remaining, term_positions)
                 clusters.extend(embedding_clusters)
 
         return clusters
@@ -265,18 +276,19 @@ class TerminologyDetector(BaseDetector):
 
                 if len(similar_terms) > 1:
                     # Determinar canónico
-                    canonical = max(
-                        similar_terms,
-                        key=lambda t: len(term_positions.get(t, []))
-                    )
+                    canonical = max(similar_terms, key=lambda t: len(term_positions.get(t, [])))
                     variants = [t for t in similar_terms if t != canonical]
 
-                    clusters.append(TermCluster(
-                        canonical=canonical,
-                        variants=variants,
-                        positions={t: term_positions[t] for t in similar_terms},
-                        similarity_score=sum(similar_scores) / len(similar_scores) if similar_scores else 0.9,
-                    ))
+                    clusters.append(
+                        TermCluster(
+                            canonical=canonical,
+                            variants=variants,
+                            positions={t: term_positions[t] for t in similar_terms},
+                            similarity_score=sum(similar_scores) / len(similar_scores)
+                            if similar_scores
+                            else 0.9,
+                        )
+                    )
 
                 processed.add(term_i)
 
@@ -289,15 +301,13 @@ class TerminologyDetector(BaseDetector):
         self,
         cluster: TermCluster,
         text: str,
-        chapter_index: Optional[int],
+        chapter_index: int | None,
     ) -> list[CorrectionIssue]:
         """Crea issues para un cluster de términos variantes."""
         issues = []
 
         # Solo reportar si hay suficiente variación
-        total_occurrences = sum(
-            len(positions) for positions in cluster.positions.values()
-        )
+        total_occurrences = sum(len(positions) for positions in cluster.positions.values())
 
         if total_occurrences < self.config.min_occurrences:
             return issues

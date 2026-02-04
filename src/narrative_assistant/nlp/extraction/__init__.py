@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Pipeline de extracción de atributos híbrido.
 
@@ -18,23 +17,23 @@ Uso:
     >>> attributes = pipeline.extract(text, entity_names=["María", "Juan"])
 """
 
+from .aggregator import ResultAggregator
 from .base import (
+    AggregatedAttribute,
+    AttributeType,
     BaseExtractor,
+    ExtractedAttribute,
     ExtractionContext,
     ExtractionMethod,
     ExtractionResult,
-    ExtractedAttribute,
-    AggregatedAttribute,
-    AttributeType,
 )
-from .router import ComplexityRouter, ComplexityScore
-from .aggregator import ResultAggregator
 from .pipeline import (
     AttributeExtractionPipeline,
     PipelineConfig,
     get_extraction_pipeline,
     reset_extraction_pipeline,
 )
+from .router import ComplexityRouter, ComplexityScore
 
 __all__ = [
     # Base

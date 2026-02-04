@@ -9,29 +9,35 @@ Detecta:
 """
 
 import logging
-from collections import defaultdict
-from typing import Optional
 import statistics
+from collections import defaultdict
 
+from ..relationships import EntityRelationship, RelationType
 from .models import (
     EntityInteraction,
-    InteractionPattern,
     InteractionAlert,
-    InteractionType,
+    InteractionPattern,
     InteractionTone,
 )
-from ..relationships import EntityRelationship, RelationType
 
 logger = logging.getLogger(__name__)
 
 
 # Mapeo de tipos de relación a tonos esperados
 EXPECTED_TONES_BY_RELATION = {
-    RelationType.FRIEND: [InteractionTone.WARM, InteractionTone.AFFECTIONATE, InteractionTone.NEUTRAL],
+    RelationType.FRIEND: [
+        InteractionTone.WARM,
+        InteractionTone.AFFECTIONATE,
+        InteractionTone.NEUTRAL,
+    ],
     RelationType.ENEMY: [InteractionTone.HOSTILE, InteractionTone.COLD],
     RelationType.LOVER: [InteractionTone.AFFECTIONATE, InteractionTone.WARM],
     RelationType.RIVAL: [InteractionTone.COLD, InteractionTone.HOSTILE, InteractionTone.NEUTRAL],
-    RelationType.PARENT: [InteractionTone.WARM, InteractionTone.NEUTRAL, InteractionTone.AFFECTIONATE],
+    RelationType.PARENT: [
+        InteractionTone.WARM,
+        InteractionTone.NEUTRAL,
+        InteractionTone.AFFECTIONATE,
+    ],
     RelationType.CHILD: [InteractionTone.WARM, InteractionTone.NEUTRAL],
     RelationType.SIBLING: [InteractionTone.WARM, InteractionTone.NEUTRAL, InteractionTone.COLD],
     RelationType.MENTOR: [InteractionTone.WARM, InteractionTone.NEUTRAL],
@@ -54,7 +60,7 @@ class InteractionPatternAnalyzer:
     - Generar alertas por incoherencias con relaciones
     """
 
-    def __init__(self, relationships: Optional[list[EntityRelationship]] = None):
+    def __init__(self, relationships: list[EntityRelationship] | None = None):
         """
         Inicializa el analizador.
 
@@ -68,10 +74,7 @@ class InteractionPatternAnalyzer:
         """Construye mapa de relaciones por par de entidades."""
         rel_map = {}
         for rel in self.relationships:
-            key = self._normalize_pair(
-                rel.source_entity_name,
-                rel.target_entity_name
-            )
+            key = self._normalize_pair(rel.source_entity_name, rel.target_entity_name)
             rel_map[key] = rel
         return rel_map
 
@@ -142,9 +145,7 @@ class InteractionPatternAnalyzer:
         has_sudden_changes = self._detect_sudden_changes(interactions)
 
         # Verificar coherencia con relación
-        has_tone_mismatch = self._check_tone_mismatch(
-            entity1_name, entity2_name, avg_tone
-        )
+        has_tone_mismatch = self._check_tone_mismatch(entity1_name, entity2_name, avg_tone)
 
         return InteractionPattern(
             entity1_name=entity1_name,
@@ -256,7 +257,7 @@ class InteractionPatternAnalyzer:
         self,
         pattern: InteractionPattern,
         new_interaction: EntityInteraction,
-    ) -> Optional[InteractionAlert]:
+    ) -> InteractionAlert | None:
         """
         Detecta si una nueva interacción rompe el patrón establecido.
 
@@ -298,8 +299,7 @@ class InteractionPatternAnalyzer:
                     f"(score promedio: {pattern.average_sentiment_score:.2f})."
                 ),
                 suggestion=(
-                    "Verificar si hay un evento narrativo que justifique "
-                    "este cambio de tono."
+                    "Verificar si hay un evento narrativo que justifique este cambio de tono."
                 ),
                 confidence=0.7,
             )
@@ -309,8 +309,8 @@ class InteractionPatternAnalyzer:
     def check_relationship_coherence(
         self,
         interaction: EntityInteraction,
-        relationship: Optional[EntityRelationship] = None,
-    ) -> Optional[InteractionAlert]:
+        relationship: EntityRelationship | None = None,
+    ) -> InteractionAlert | None:
         """
         Verifica si una interacción es coherente con la relación.
 
@@ -322,10 +322,7 @@ class InteractionPatternAnalyzer:
             Alerta si hay incoherencia
         """
         if relationship is None:
-            pair_key = self._normalize_pair(
-                interaction.initiator_name,
-                interaction.receiver_name
-            )
+            pair_key = self._normalize_pair(interaction.initiator_name, interaction.receiver_name)
             relationship = self._relationship_map.get(pair_key)
 
         if relationship is None:
@@ -396,8 +393,8 @@ class InteractionPatternAnalyzer:
                 f"Se esperaban tonos: {expected_str}."
             ),
             suggestion=(
-                f"Verificar si existe un cambio de relación que justifique "
-                f"esta interacción, o marcarla como incoherencia intencional."
+                "Verificar si existe un cambio de relación que justifique "
+                "esta interacción, o marcarla como incoherencia intencional."
             ),
             confidence=0.7,
         )
@@ -419,10 +416,7 @@ class InteractionPatternAnalyzer:
         by_pair: dict[tuple[str, str], list[EntityInteraction]] = defaultdict(list)
 
         for interaction in interactions:
-            pair = self._normalize_pair(
-                interaction.initiator_name,
-                interaction.receiver_name
-            )
+            pair = self._normalize_pair(interaction.initiator_name, interaction.receiver_name)
             by_pair[pair].append(interaction)
 
         # Generar patrón para cada par
@@ -457,10 +451,7 @@ class InteractionPatternAnalyzer:
                 alerts.append(rel_alert)
 
             # Verificar anomalía respecto al patrón
-            pair = self._normalize_pair(
-                interaction.initiator_name,
-                interaction.receiver_name
-            )
+            pair = self._normalize_pair(interaction.initiator_name, interaction.receiver_name)
             pattern = patterns.get(pair)
 
             if pattern:
@@ -493,25 +484,31 @@ class InteractionPatternAnalyzer:
 
             # Asimetría muy alta
             if pattern.asymmetry_ratio < threshold or pattern.asymmetry_ratio > (1 - threshold):
-                dominant = pattern.entity1_name if pattern.asymmetry_ratio < 0.5 else pattern.entity2_name
-                passive = pattern.entity2_name if pattern.asymmetry_ratio < 0.5 else pattern.entity1_name
+                dominant = (
+                    pattern.entity1_name if pattern.asymmetry_ratio < 0.5 else pattern.entity2_name
+                )
+                passive = (
+                    pattern.entity2_name if pattern.asymmetry_ratio < 0.5 else pattern.entity1_name
+                )
 
-                alerts.append(InteractionAlert(
-                    code="INT_ONE_SIDED",
-                    alert_type="Interacciones unidireccionales",
-                    severity="info",
-                    entity1_name=dominant,
-                    entity2_name=passive,
-                    explanation=(
-                        f"Las interacciones entre {e1} y {e2} son muy asimétricas. "
-                        f"{dominant} inicia la mayoría de las interacciones "
-                        f"({int((1 - pattern.asymmetry_ratio if pattern.asymmetry_ratio < 0.5 else pattern.asymmetry_ratio) * 100)}%)."
-                    ),
-                    suggestion=(
-                        "Verificar si esta asimetría es intencional o si "
-                        f"{passive} debería tener más iniciativa."
-                    ),
-                    confidence=0.6,
-                ))
+                alerts.append(
+                    InteractionAlert(
+                        code="INT_ONE_SIDED",
+                        alert_type="Interacciones unidireccionales",
+                        severity="info",
+                        entity1_name=dominant,
+                        entity2_name=passive,
+                        explanation=(
+                            f"Las interacciones entre {e1} y {e2} son muy asimétricas. "
+                            f"{dominant} inicia la mayoría de las interacciones "
+                            f"({int((1 - pattern.asymmetry_ratio if pattern.asymmetry_ratio < 0.5 else pattern.asymmetry_ratio) * 100)}%)."
+                        ),
+                        suggestion=(
+                            "Verificar si esta asimetría es intencional o si "
+                            f"{passive} debería tener más iniciativa."
+                        ),
+                        confidence=0.6,
+                    )
+                )
 
         return alerts

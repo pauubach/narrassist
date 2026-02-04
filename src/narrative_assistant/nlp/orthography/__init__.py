@@ -32,9 +32,9 @@ Uso:
 """
 
 from .base import (
+    SpellingErrorType,
     SpellingIssue,
     SpellingReport,
-    SpellingErrorType,
     SpellingSeverity,
 )
 from .spelling_checker import (
@@ -46,12 +46,13 @@ from .spelling_checker import (
 # Sistema de votación multi-corrector
 try:
     from .voting_checker import (
+        Vote,
+        VotingResult,
         VotingSpellingChecker,
         get_voting_spelling_checker,
         reset_voting_spelling_checker,
-        VotingResult,
-        Vote,
     )
+
     _VOTING_AVAILABLE = True
 except ImportError:
     _VOTING_AVAILABLE = False

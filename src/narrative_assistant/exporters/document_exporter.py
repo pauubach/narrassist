@@ -20,23 +20,21 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from pathlib import Path
-from typing import Optional, Any
 
 from docx import Document
-from docx.shared import Inches, Pt, Cm, RGBColor
-from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.style import WD_STYLE_TYPE
-from docx.enum.table import WD_TABLE_ALIGNMENT
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.shared import Inches, Pt, RGBColor
 
+from ..core.errors import ErrorSeverity, NarrativeError
 from ..core.result import Result
-from ..core.errors import NarrativeError, ErrorSeverity
 
 logger = logging.getLogger(__name__)
 
 
 class ExportSection(Enum):
     """Secciones disponibles para exportar."""
+
     COVER = "cover"
     TOC = "toc"
     CHARACTER_SHEETS = "character_sheets"
@@ -111,7 +109,7 @@ class ProjectExportData:
     alerts: list[dict] = field(default_factory=list)
     timeline_events: list[dict] = field(default_factory=list)
     relationships: list[dict] = field(default_factory=list)
-    style_guide: Optional[dict] = None
+    style_guide: dict | None = None
 
     # Metadata
     generated_at: datetime = field(default_factory=datetime.now)
@@ -134,7 +132,7 @@ class DocumentExporter:
     def export_to_docx(
         self,
         data: ProjectExportData,
-        options: Optional[ExportOptions] = None,
+        options: ExportOptions | None = None,
     ) -> Result[bytes]:
         """
         Exporta el proyecto a formato DOCX.
@@ -198,7 +196,7 @@ class DocumentExporter:
     def export_to_pdf(
         self,
         data: ProjectExportData,
-        options: Optional[ExportOptions] = None,
+        options: ExportOptions | None = None,
     ) -> Result[bytes]:
         """
         Exporta el proyecto a formato PDF.
@@ -217,15 +215,21 @@ class DocumentExporter:
 
         try:
             # Intentar importar reportlab
-            from reportlab.lib.pagesizes import A4
-            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-            from reportlab.lib.units import cm
             from reportlab.lib.colors import HexColor, black, gray
+            from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT
+            from reportlab.lib.pagesizes import A4
+            from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+            from reportlab.lib.units import cm
             from reportlab.platypus import (
-                SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
-                PageBreak, ListFlowable, ListItem
+                ListFlowable,
+                ListItem,
+                PageBreak,
+                Paragraph,
+                SimpleDocTemplate,
+                Spacer,
+                Table,
+                TableStyle,
             )
-            from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_JUSTIFY
 
             buffer = io.BytesIO()
 
@@ -233,71 +237,83 @@ class DocumentExporter:
             doc = SimpleDocTemplate(
                 buffer,
                 pagesize=A4,
-                rightMargin=2*cm,
-                leftMargin=2*cm,
-                topMargin=2*cm,
-                bottomMargin=2*cm,
+                rightMargin=2 * cm,
+                leftMargin=2 * cm,
+                topMargin=2 * cm,
+                bottomMargin=2 * cm,
             )
 
             # Estilos
             styles = getSampleStyleSheet()
 
             # Estilo titulo
-            styles.add(ParagraphStyle(
-                name='CoverTitle',
-                parent=styles['Title'],
-                fontSize=28,
-                spaceAfter=30,
-                alignment=TA_CENTER,
-                textColor=HexColor('#1a1a2e'),
-            ))
+            styles.add(
+                ParagraphStyle(
+                    name="CoverTitle",
+                    parent=styles["Title"],
+                    fontSize=28,
+                    spaceAfter=30,
+                    alignment=TA_CENTER,
+                    textColor=HexColor("#1a1a2e"),
+                )
+            )
 
             # Estilo subtitulo
-            styles.add(ParagraphStyle(
-                name='CoverSubtitle',
-                parent=styles['Normal'],
-                fontSize=14,
-                spaceAfter=20,
-                alignment=TA_CENTER,
-                textColor=HexColor('#4a4a6a'),
-            ))
+            styles.add(
+                ParagraphStyle(
+                    name="CoverSubtitle",
+                    parent=styles["Normal"],
+                    fontSize=14,
+                    spaceAfter=20,
+                    alignment=TA_CENTER,
+                    textColor=HexColor("#4a4a6a"),
+                )
+            )
 
             # Estilo Heading1
-            styles.add(ParagraphStyle(
-                name='CustomHeading1',
-                parent=styles['Heading1'],
-                fontSize=18,
-                spaceBefore=20,
-                spaceAfter=12,
-                textColor=HexColor('#1a1a2e'),
-            ))
+            styles.add(
+                ParagraphStyle(
+                    name="CustomHeading1",
+                    parent=styles["Heading1"],
+                    fontSize=18,
+                    spaceBefore=20,
+                    spaceAfter=12,
+                    textColor=HexColor("#1a1a2e"),
+                )
+            )
 
             # Estilo Heading2
-            styles.add(ParagraphStyle(
-                name='CustomHeading2',
-                parent=styles['Heading2'],
-                fontSize=14,
-                spaceBefore=15,
-                spaceAfter=8,
-                textColor=HexColor('#2d2d4a'),
-            ))
+            styles.add(
+                ParagraphStyle(
+                    name="CustomHeading2",
+                    parent=styles["Heading2"],
+                    fontSize=14,
+                    spaceBefore=15,
+                    spaceAfter=8,
+                    textColor=HexColor("#2d2d4a"),
+                )
+            )
 
             # Estilo para alertas
-            styles.add(ParagraphStyle(
-                name='AlertCritical',
-                parent=styles['Normal'],
-                fontSize=10,
-                leftIndent=20,
-                textColor=HexColor('#dc3545'),
-            ))
+            styles.add(
+                ParagraphStyle(
+                    name="AlertCritical",
+                    parent=styles["Normal"],
+                    fontSize=10,
+                    leftIndent=20,
+                    textColor=HexColor("#dc3545"),
+                )
+            )
 
-            styles.add(ParagraphStyle(
-                name='AlertWarning',
-                parent=styles['Normal'],
-                fontSize=10,
-                leftIndent=20,
-                textColor=HexColor('#ffc107'),
-            ))
+            styles.add(
+                ParagraphStyle(
+                    name="AlertWarning",
+                    parent=styles["Normal"],
+                    fontSize=10,
+                    leftIndent=20,
+                    textColor=HexColor("#ffc107"),
+                )
+            )
 
             story = []
             sections = options.get_enabled_sections()
@@ -338,10 +354,12 @@ class DocumentExporter:
 
             # Footer
             story.append(Spacer(1, 30))
-            story.append(Paragraph(
-                f"Generado por Narrative Assistant el {data.generated_at.strftime('%Y-%m-%d %H:%M')}",
-                styles['Normal']
-            ))
+            story.append(
+                Paragraph(
+                    f"Generado por Narrative Assistant el {data.generated_at.strftime('%Y-%m-%d %H:%M')}",
+                    styles["Normal"],
+                )
+            )
 
             # Construir PDF
             doc.build(story)
@@ -376,7 +394,7 @@ class DocumentExporter:
 
         # Estilo para titulos de seccion
         try:
-            title_style = styles.add_style('SectionTitle', WD_STYLE_TYPE.PARAGRAPH)
+            title_style = styles.add_style("SectionTitle", WD_STYLE_TYPE.PARAGRAPH)
             title_style.font.size = Pt(18)
             title_style.font.bold = True
             title_style.font.color.rgb = RGBColor(26, 26, 46)
@@ -387,7 +405,7 @@ class DocumentExporter:
 
         # Estilo para subtitulos
         try:
-            subtitle_style = styles.add_style('SubsectionTitle', WD_STYLE_TYPE.PARAGRAPH)
+            subtitle_style = styles.add_style("SubsectionTitle", WD_STYLE_TYPE.PARAGRAPH)
             subtitle_style.font.size = Pt(14)
             subtitle_style.font.bold = True
             subtitle_style.font.color.rgb = RGBColor(45, 45, 74)
@@ -398,7 +416,7 @@ class DocumentExporter:
 
         # Estilo para extractos
         try:
-            excerpt_style = styles.add_style('Excerpt', WD_STYLE_TYPE.PARAGRAPH)
+            excerpt_style = styles.add_style("Excerpt", WD_STYLE_TYPE.PARAGRAPH)
             excerpt_style.font.size = Pt(10)
             excerpt_style.font.italic = True
             excerpt_style.font.color.rgb = RGBColor(100, 100, 100)
@@ -408,7 +426,7 @@ class DocumentExporter:
 
         # Estilo para alertas criticas
         try:
-            critical_style = styles.add_style('AlertCritical', WD_STYLE_TYPE.PARAGRAPH)
+            critical_style = styles.add_style("AlertCritical", WD_STYLE_TYPE.PARAGRAPH)
             critical_style.font.size = Pt(11)
             critical_style.font.color.rgb = RGBColor(220, 53, 69)
         except ValueError:
@@ -416,7 +434,7 @@ class DocumentExporter:
 
         # Estilo para advertencias
         try:
-            warning_style = styles.add_style('AlertWarning', WD_STYLE_TYPE.PARAGRAPH)
+            warning_style = styles.add_style("AlertWarning", WD_STYLE_TYPE.PARAGRAPH)
             warning_style.font.size = Pt(11)
             warning_style.font.color.rgb = RGBColor(255, 193, 7)
         except ValueError:
@@ -485,30 +503,30 @@ class DocumentExporter:
         # Campo TOC (requiere actualizacion manual en Word)
         toc_para = doc.add_paragraph()
         # Añadir campo TOC usando XML
-        from docx.oxml.ns import qn
         from docx.oxml import OxmlElement
+        from docx.oxml.ns import qn
 
         run = toc_para.add_run()
-        fld_char_begin = OxmlElement('w:fldChar')
-        fld_char_begin.set(qn('w:fldCharType'), 'begin')
+        fld_char_begin = OxmlElement("w:fldChar")
+        fld_char_begin.set(qn("w:fldCharType"), "begin")
         run._r.append(fld_char_begin)
 
         run2 = toc_para.add_run()
-        instr_text = OxmlElement('w:instrText')
+        instr_text = OxmlElement("w:instrText")
         instr_text.text = 'TOC \\o "1-3" \\h \\z \\u'
         run2._r.append(instr_text)
 
         run3 = toc_para.add_run()
-        fld_char_separate = OxmlElement('w:fldChar')
-        fld_char_separate.set(qn('w:fldCharType'), 'separate')
+        fld_char_separate = OxmlElement("w:fldChar")
+        fld_char_separate.set(qn("w:fldCharType"), "separate")
         run3._r.append(fld_char_separate)
 
         run4 = toc_para.add_run("Actualice este campo para ver el indice")
         run4.font.italic = True
 
         run5 = toc_para.add_run()
-        fld_char_end = OxmlElement('w:fldChar')
-        fld_char_end.set(qn('w:fldCharType'), 'end')
+        fld_char_end = OxmlElement("w:fldChar")
+        fld_char_end.set(qn("w:fldCharType"), "end")
         run5._r.append(fld_char_end)
 
         doc.add_page_break()
@@ -519,7 +537,7 @@ class DocumentExporter:
 
         # Tabla de estadisticas
         table = doc.add_table(rows=5, cols=2)
-        table.style = 'Table Grid'
+        table.style = "Table Grid"
 
         stats = [
             ("Total de palabras", f"{data.word_count:,}"),
@@ -554,8 +572,7 @@ class DocumentExporter:
         characters = data.characters
         if options.only_main_characters:
             characters = [
-                c for c in characters
-                if c.get("importance") in ("principal", "critical", "high")
+                c for c in characters if c.get("importance") in ("principal", "critical", "high")
             ]
 
         if not characters:
@@ -595,7 +612,7 @@ class DocumentExporter:
             if char.get("physical_attributes"):
                 doc.add_heading("Atributos Fisicos", level=3)
                 for attr in char["physical_attributes"]:
-                    p = doc.add_paragraph(style='List Bullet')
+                    p = doc.add_paragraph(style="List Bullet")
                     p.add_run(f"{attr.get('key', '').replace('_', ' ').title()}: ").bold = True
                     p.add_run(attr.get("value", ""))
                     if attr.get("confidence"):
@@ -605,7 +622,7 @@ class DocumentExporter:
             if char.get("psychological_attributes"):
                 doc.add_heading("Atributos Psicologicos", level=3)
                 for attr in char["psychological_attributes"]:
-                    p = doc.add_paragraph(style='List Bullet')
+                    p = doc.add_paragraph(style="List Bullet")
                     p.add_run(f"{attr.get('key', '').replace('_', ' ').title()}: ").bold = True
                     p.add_run(attr.get("value", ""))
 
@@ -615,17 +632,17 @@ class DocumentExporter:
                 doc.add_heading("Perfil de Voz", level=3)
 
                 if vp.get("total_interventions"):
-                    p = doc.add_paragraph(style='List Bullet')
+                    p = doc.add_paragraph(style="List Bullet")
                     p.add_run("Intervenciones: ").bold = True
                     p.add_run(str(vp["total_interventions"]))
 
                 if vp.get("formality_score") is not None:
-                    p = doc.add_paragraph(style='List Bullet')
+                    p = doc.add_paragraph(style="List Bullet")
                     p.add_run("Formalidad: ").bold = True
                     p.add_run(f"{vp['formality_score']:.0%}")
 
                 if vp.get("predominant_register"):
-                    p = doc.add_paragraph(style='List Bullet')
+                    p = doc.add_paragraph(style="List Bullet")
                     p.add_run("Registro: ").bold = True
                     p.add_run(vp["predominant_register"])
 
@@ -653,8 +670,7 @@ class DocumentExporter:
         severity_order = {"info": 0, "warning": 1, "error": 2, "critical": 3}
         min_severity = severity_order.get(options.min_alert_severity, 0)
         alerts = [
-            a for a in alerts
-            if severity_order.get(a.get("severity", "info"), 0) >= min_severity
+            a for a in alerts if severity_order.get(a.get("severity", "info"), 0) >= min_severity
         ]
 
         if not alerts:
@@ -743,7 +759,7 @@ class DocumentExporter:
             excerpt = alert["excerpt"][:200]
             if len(alert["excerpt"]) > 200:
                 excerpt += "..."
-            excerpt_para = doc.add_paragraph(style='Quote')
+            excerpt_para = doc.add_paragraph(style="Quote")
             excerpt_para.add_run(excerpt).italic = True
 
         # Confianza
@@ -773,7 +789,7 @@ class DocumentExporter:
             doc.add_heading(f"Capitulo {chapter}", level=2)
 
             for event in events_by_chapter[chapter]:
-                p = doc.add_paragraph(style='List Bullet')
+                p = doc.add_paragraph(style="List Bullet")
 
                 # Fecha si existe
                 if event.get("story_date"):
@@ -799,7 +815,7 @@ class DocumentExporter:
 
         # Crear tabla de relaciones
         table = doc.add_table(rows=1, cols=4)
-        table.style = 'Table Grid'
+        table.style = "Table Grid"
 
         # Encabezados
         headers = ["Personaje 1", "Relacion", "Personaje 2", "Intensidad"]
@@ -832,7 +848,7 @@ class DocumentExporter:
             doc.add_heading("Decisiones de Grafia", level=2)
 
             table = doc.add_table(rows=1, cols=3)
-            table.style = 'Table Grid'
+            table.style = "Table Grid"
 
             headers = ["Forma Canonica", "Variantes", "Recomendacion"]
             for i, header in enumerate(headers):
@@ -850,7 +866,7 @@ class DocumentExporter:
         if sg.get("characters"):
             doc.add_heading("Personajes Registrados", level=2)
             for char in sg["characters"]:
-                p = doc.add_paragraph(style='List Bullet')
+                p = doc.add_paragraph(style="List Bullet")
                 p.add_run(char.get("canonical_name", "")).bold = True
                 if char.get("aliases"):
                     p.add_run(f" (alias: {', '.join(char['aliases'])})")
@@ -874,7 +890,7 @@ class DocumentExporter:
             if sa.get("recommendations"):
                 doc.add_heading("Recomendaciones", level=3)
                 for rec in sa["recommendations"]:
-                    doc.add_paragraph(rec, style='List Bullet')
+                    doc.add_paragraph(rec, style="List Bullet")
 
     def _add_footer(self, doc: Document, data: ProjectExportData) -> None:
         """Añade footer al documento."""
@@ -901,28 +917,30 @@ class DocumentExporter:
 
         story = []
         story.append(Spacer(1, 100))
-        story.append(Paragraph(data.project_name, styles['CoverTitle']))
-        story.append(Paragraph("Informe de Analisis Narrativo", styles['CoverSubtitle']))
+        story.append(Paragraph(data.project_name, styles["CoverTitle"]))
+        story.append(Paragraph("Informe de Analisis Narrativo", styles["CoverSubtitle"]))
 
         if data.description:
             story.append(Spacer(1, 20))
-            story.append(Paragraph(data.description, styles['Normal']))
+            story.append(Paragraph(data.description, styles["Normal"]))
 
         story.append(Spacer(1, 100))
-        story.append(Paragraph(
-            f"Generado el {data.generated_at.strftime('%d de %B de %Y')}",
-            styles['CoverSubtitle']
-        ))
+        story.append(
+            Paragraph(
+                f"Generado el {data.generated_at.strftime('%d de %B de %Y')}",
+                styles["CoverSubtitle"],
+            )
+        )
 
         return story
 
     def _build_pdf_statistics(self, data: ProjectExportData, styles) -> list:
         """Construye seccion de estadisticas para PDF."""
-        from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
         from reportlab.lib.colors import black, lightgrey
+        from reportlab.platypus import Paragraph, Table, TableStyle
 
         story = []
-        story.append(Paragraph("Estadisticas del Proyecto", styles['CustomHeading1']))
+        story.append(Paragraph("Estadisticas del Proyecto", styles["CustomHeading1"]))
 
         table_data = [
             ["Metrica", "Valor"],
@@ -933,15 +951,19 @@ class DocumentExporter:
         ]
 
         table = Table(table_data, colWidths=[200, 150])
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), lightgrey),
-            ('TEXTCOLOR', (0, 0), (-1, 0), black),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            ('GRID', (0, 0), (-1, -1), 1, black),
-        ]))
+        table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), lightgrey),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), black),
+                    ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 10),
+                    ("BOTTOMPADDING", (0, 0), (-1, 0), 12),
+                    ("GRID", (0, 0), (-1, -1), 1, black),
+                ]
+            )
+        )
 
         story.append(table)
         return story
@@ -953,27 +975,25 @@ class DocumentExporter:
         styles,
     ) -> list:
         """Construye seccion de personajes para PDF."""
-        from reportlab.platypus import Paragraph, Spacer, ListFlowable, ListItem
+        from reportlab.platypus import Paragraph, Spacer
 
         story = []
-        story.append(Paragraph("Fichas de Personajes", styles['CustomHeading1']))
+        story.append(Paragraph("Fichas de Personajes", styles["CustomHeading1"]))
 
         if not data.characters:
-            story.append(Paragraph("No se detectaron personajes.", styles['Normal']))
+            story.append(Paragraph("No se detectaron personajes.", styles["Normal"]))
             return story
 
         characters = data.characters
         if options.only_main_characters:
             characters = [
-                c for c in characters
-                if c.get("importance") in ("principal", "critical", "high")
+                c for c in characters if c.get("importance") in ("principal", "critical", "high")
             ]
 
         for char in characters:
-            story.append(Paragraph(
-                char.get("canonical_name", "Sin nombre"),
-                styles['CustomHeading2']
-            ))
+            story.append(
+                Paragraph(char.get("canonical_name", "Sin nombre"), styles["CustomHeading2"])
+            )
 
             info_items = []
             if char.get("entity_type"):
@@ -984,7 +1004,7 @@ class DocumentExporter:
                 info_items.append(f"<b>Alias:</b> {', '.join(char['aliases'])}")
 
             for item in info_items:
-                story.append(Paragraph(item, styles['Normal']))
+                story.append(Paragraph(item, styles["Normal"]))
 
             story.append(Spacer(1, 10))
 
@@ -1000,10 +1020,10 @@ class DocumentExporter:
         from reportlab.platypus import Paragraph, Spacer
 
         story = []
-        story.append(Paragraph("Alertas e Inconsistencias", styles['CustomHeading1']))
+        story.append(Paragraph("Alertas e Inconsistencias", styles["CustomHeading1"]))
 
         if not data.alerts:
-            story.append(Paragraph("No se detectaron alertas.", styles['Normal']))
+            story.append(Paragraph("No se detectaron alertas.", styles["Normal"]))
             return story
 
         alerts = data.alerts
@@ -1013,8 +1033,7 @@ class DocumentExporter:
         severity_order = {"info": 0, "warning": 1, "error": 2, "critical": 3}
         min_severity = severity_order.get(options.min_alert_severity, 0)
         alerts = [
-            a for a in alerts
-            if severity_order.get(a.get("severity", "info"), 0) >= min_severity
+            a for a in alerts if severity_order.get(a.get("severity", "info"), 0) >= min_severity
         ]
 
         for alert in alerts[:20]:  # Limitar a 20 alertas
@@ -1022,16 +1041,16 @@ class DocumentExporter:
             title = alert.get("title", "Alerta")
 
             if severity == "critical":
-                style = styles['AlertCritical']
+                style = styles["AlertCritical"]
             elif severity == "warning":
-                style = styles['AlertWarning']
+                style = styles["AlertWarning"]
             else:
-                style = styles['Normal']
+                style = styles["Normal"]
 
             story.append(Paragraph(f"<b>{title}</b>", style))
 
             if alert.get("description"):
-                story.append(Paragraph(alert["description"], styles['Normal']))
+                story.append(Paragraph(alert["description"], styles["Normal"]))
 
             story.append(Spacer(1, 8))
 
@@ -1039,13 +1058,13 @@ class DocumentExporter:
 
     def _build_pdf_timeline(self, data: ProjectExportData, styles) -> list:
         """Construye seccion de timeline para PDF."""
-        from reportlab.platypus import Paragraph, Spacer
+        from reportlab.platypus import Paragraph
 
         story = []
-        story.append(Paragraph("Linea Temporal", styles['CustomHeading1']))
+        story.append(Paragraph("Linea Temporal", styles["CustomHeading1"]))
 
         if not data.timeline_events:
-            story.append(Paragraph("No se detectaron eventos temporales.", styles['Normal']))
+            story.append(Paragraph("No se detectaron eventos temporales.", styles["Normal"]))
             return story
 
         for event in data.timeline_events[:30]:  # Limitar
@@ -1053,80 +1072,87 @@ class DocumentExporter:
             desc = event.get("description", "Evento")
 
             text = f"<b>{date_str}</b> - {desc}" if date_str else desc
-            story.append(Paragraph(text, styles['Normal']))
+            story.append(Paragraph(text, styles["Normal"]))
 
         return story
 
     def _build_pdf_relationships(self, data: ProjectExportData, styles) -> list:
         """Construye seccion de relaciones para PDF."""
-        from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
         from reportlab.lib.colors import black, lightgrey
+        from reportlab.platypus import Paragraph, Table, TableStyle
 
         story = []
-        story.append(Paragraph("Relaciones entre Personajes", styles['CustomHeading1']))
+        story.append(Paragraph("Relaciones entre Personajes", styles["CustomHeading1"]))
 
         if not data.relationships:
-            story.append(Paragraph("No se detectaron relaciones.", styles['Normal']))
+            story.append(Paragraph("No se detectaron relaciones.", styles["Normal"]))
             return story
 
         table_data = [["Personaje 1", "Relacion", "Personaje 2"]]
         for rel in data.relationships[:20]:  # Limitar
-            table_data.append([
-                rel.get("source_entity_name", ""),
-                rel.get("relation_type", "").replace("_", " ").title(),
-                rel.get("target_entity_name", ""),
-            ])
+            table_data.append(
+                [
+                    rel.get("source_entity_name", ""),
+                    rel.get("relation_type", "").replace("_", " ").title(),
+                    rel.get("target_entity_name", ""),
+                ]
+            )
 
         table = Table(table_data, colWidths=[150, 100, 150])
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), lightgrey),
-            ('TEXTCOLOR', (0, 0), (-1, 0), black),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 9),
-            ('GRID', (0, 0), (-1, -1), 1, black),
-        ]))
+        table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), lightgrey),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), black),
+                    ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 9),
+                    ("GRID", (0, 0), (-1, -1), 1, black),
+                ]
+            )
+        )
 
         story.append(table)
         return story
 
     def _build_pdf_style_guide(self, data: ProjectExportData, styles) -> list:
         """Construye seccion de guia de estilo para PDF."""
-        from reportlab.platypus import Paragraph, Spacer
+        from reportlab.platypus import Paragraph
 
         story = []
-        story.append(Paragraph("Guia de Estilo", styles['CustomHeading1']))
+        story.append(Paragraph("Guia de Estilo", styles["CustomHeading1"]))
 
         if not data.style_guide:
-            story.append(Paragraph("No se genero guia de estilo.", styles['Normal']))
+            story.append(Paragraph("No se genero guia de estilo.", styles["Normal"]))
             return story
 
         sg = data.style_guide
 
         if sg.get("spelling_decisions"):
-            story.append(Paragraph("Decisiones de Grafia", styles['CustomHeading2']))
+            story.append(Paragraph("Decisiones de Grafia", styles["CustomHeading2"]))
             for decision in sg["spelling_decisions"]:
                 canonical = decision.get("canonical_form", "")
                 variants = ", ".join(decision.get("variants", []))
                 text = f"<b>{canonical}</b>"
                 if variants:
                     text += f" (variantes: {variants})"
-                story.append(Paragraph(text, styles['Normal']))
+                story.append(Paragraph(text, styles["Normal"]))
 
         if sg.get("style_analysis"):
             sa = sg["style_analysis"]
-            story.append(Paragraph("Analisis Estilistico", styles['CustomHeading2']))
+            story.append(Paragraph("Analisis Estilistico", styles["CustomHeading2"]))
 
             if sa.get("dialogue_style"):
-                story.append(Paragraph(
-                    f"<b>Estilo de dialogos:</b> {sa['dialogue_style']}",
-                    styles['Normal']
-                ))
+                story.append(
+                    Paragraph(
+                        f"<b>Estilo de dialogos:</b> {sa['dialogue_style']}", styles["Normal"]
+                    )
+                )
 
             if sa.get("recommendations"):
-                story.append(Paragraph("Recomendaciones:", styles['Normal']))
+                story.append(Paragraph("Recomendaciones:", styles["Normal"]))
                 for rec in sa["recommendations"]:
-                    story.append(Paragraph(f"- {rec}", styles['Normal']))
+                    story.append(Paragraph(f"- {rec}", styles["Normal"]))
 
         return story
 
@@ -1137,7 +1163,7 @@ def collect_export_data(
     entity_repository,
     alert_repository,
     chapter_repository,
-    options: Optional[ExportOptions] = None,
+    options: ExportOptions | None = None,
 ) -> Result[ProjectExportData]:
     """
     Recopila todos los datos necesarios para exportar un proyecto.
@@ -1175,6 +1201,7 @@ def collect_export_data(
         # Entidades/personajes
         if options.include_character_sheets and entity_repository:
             from ..entities.models import EntityType
+
             entities = entity_repository.get_by_project(project_id)
             data.entity_count = len(entities)
 
@@ -1188,7 +1215,9 @@ def collect_export_data(
                     "canonical_name": char.canonical_name,
                     "aliases": char.aliases or [],
                     "entity_type": char.entity_type.value,
-                    "importance": char.importance.value if hasattr(char.importance, 'value') else str(char.importance),
+                    "importance": char.importance.value
+                    if hasattr(char.importance, "value")
+                    else str(char.importance),
                     "mention_count": char.mention_count,
                 }
 
@@ -1228,18 +1257,24 @@ def collect_export_data(
             for alert in alerts:
                 alert_dict = {
                     "id": alert.id,
-                    "category": alert.category.value if hasattr(alert.category, 'value') else str(alert.category),
-                    "severity": alert.severity.value if hasattr(alert.severity, 'value') else str(alert.severity),
+                    "category": alert.category.value
+                    if hasattr(alert.category, "value")
+                    else str(alert.category),
+                    "severity": alert.severity.value
+                    if hasattr(alert.severity, "value")
+                    else str(alert.severity),
                     "alert_type": alert.alert_type,
                     "title": alert.title,
                     "description": alert.description,
                     "explanation": alert.explanation,
                     "suggestion": alert.suggestion,
                     "chapter": alert.chapter,
-                    "scene": getattr(alert, 'scene', None),
+                    "scene": getattr(alert, "scene", None),
                     "excerpt": alert.excerpt,
                     "confidence": alert.confidence,
-                    "status": alert.status.value if hasattr(alert.status, 'value') else str(alert.status),
+                    "status": alert.status.value
+                    if hasattr(alert.status, "value")
+                    else str(alert.status),
                 }
                 data.alerts.append(alert_dict)
 
@@ -1271,7 +1306,7 @@ def collect_export_data(
                         for ch in chapters
                     ]
 
-                    timeline = builder.build_from_markers(all_markers, chapter_data)
+                    builder.build_from_markers(all_markers, chapter_data)
                     json_data = builder.export_to_json()
                     data.timeline_events = json_data.get("events", [])
 
@@ -1282,6 +1317,7 @@ def collect_export_data(
         if options.include_relationships:
             try:
                 from ..relationships.repository import RelationshipRepository
+
                 rel_repo = RelationshipRepository()
                 relationships = rel_repo.get_by_project(project_id)
 

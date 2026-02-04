@@ -6,24 +6,24 @@ agrupa los resultados para presentar al corrector.
 """
 
 import logging
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Optional, Callable
 
 from .base import CorrectionIssue
 from .config import CorrectionConfig
 from .detectors import (
-    TypographyDetector,
-    RepetitionDetector,
     AgreementDetector,
-    TerminologyDetector,
-    RegionalDetector,
-    ClarityDetector,
-    GrammarDetector,
+    AnacolutoDetector,
     AnglicismsDetector,
+    ClarityDetector,
     CrutchWordsDetector,
     GlossaryDetector,
-    AnacolutoDetector,
+    GrammarDetector,
     POVDetector,
+    RegionalDetector,
+    RepetitionDetector,
+    TerminologyDetector,
+    TypographyDetector,
 )
 from .detectors.field_terminology import FieldTerminologyDetector
 from .types import CorrectionCategory
@@ -41,7 +41,7 @@ class CorrectionOrchestrator:
 
     def __init__(
         self,
-        config: Optional[CorrectionConfig] = None,
+        config: CorrectionConfig | None = None,
         max_workers: int = 3,
         embeddings_model=None,
     ):
@@ -79,10 +79,10 @@ class CorrectionOrchestrator:
     def analyze(
         self,
         text: str,
-        chapter_index: Optional[int] = None,
+        chapter_index: int | None = None,
         spacy_doc=None,
-        project_id: Optional[int] = None,
-        progress_callback: Optional[Callable[[str], None]] = None,
+        project_id: int | None = None,
+        progress_callback: Callable[[str], None] | None = None,
     ) -> list[CorrectionIssue]:
         """
         Ejecuta todos los detectores habilitados.
@@ -137,9 +137,7 @@ class CorrectionOrchestrator:
                     category = futures[future]
                     try:
                         issues = future.result()
-                        all_issues.extend(
-                            self._limit_issues(issues, category)
-                        )
+                        all_issues.extend(self._limit_issues(issues, category))
                     except Exception as e:
                         logger.error(f"Error en detector {category.value}: {e}")
 
@@ -149,9 +147,7 @@ class CorrectionOrchestrator:
                 progress_callback(f"Analizando {self._category_name(category)}...")
 
             try:
-                issues = self._run_detector(
-                    detector, text, chapter_index, spacy_doc
-                )
+                issues = self._run_detector(detector, text, chapter_index, spacy_doc)
                 all_issues.extend(self._limit_issues(issues, category))
             except Exception as e:
                 logger.error(f"Error en detector {category.value}: {e}")
@@ -162,9 +158,7 @@ class CorrectionOrchestrator:
                 progress_callback("Analizando terminología...")
 
             try:
-                terminology_issues = self._run_terminology_detector(
-                    text, chapter_index, spacy_doc
-                )
+                terminology_issues = self._run_terminology_detector(text, chapter_index, spacy_doc)
                 all_issues.extend(
                     self._limit_issues(terminology_issues, CorrectionCategory.TERMINOLOGY)
                 )
@@ -177,12 +171,8 @@ class CorrectionOrchestrator:
                 progress_callback("Analizando terminología especializada...")
 
             try:
-                field_issues = self._run_field_detector(
-                    text, chapter_index, spacy_doc
-                )
-                all_issues.extend(
-                    self._limit_issues(field_issues, CorrectionCategory.TERMINOLOGY)
-                )
+                field_issues = self._run_field_detector(text, chapter_index, spacy_doc)
+                all_issues.extend(self._limit_issues(field_issues, CorrectionCategory.TERMINOLOGY))
             except Exception as e:
                 logger.error(f"Error en detector de campo: {e}")
 
@@ -192,35 +182,27 @@ class CorrectionOrchestrator:
                 progress_callback("Verificando glosario del proyecto...")
 
             try:
-                glossary_issues = self._run_glossary_detector(
-                    text, chapter_index, project_id
-                )
-                all_issues.extend(
-                    self._limit_issues(glossary_issues, CorrectionCategory.GLOSSARY)
-                )
+                glossary_issues = self._run_glossary_detector(text, chapter_index, project_id)
+                all_issues.extend(self._limit_issues(glossary_issues, CorrectionCategory.GLOSSARY))
             except Exception as e:
                 logger.error(f"Error en detector de glosario: {e}")
 
         # Ordenar por posición en el texto
         all_issues.sort(key=lambda x: x.start_char)
 
-        logger.info(
-            f"Análisis de correcciones completado: {len(all_issues)} sugerencias"
-        )
+        logger.info(f"Análisis de correcciones completado: {len(all_issues)} sugerencias")
 
         return all_issues
 
     def _run_terminology_detector(
         self,
         text: str,
-        chapter_index: Optional[int],
+        chapter_index: int | None,
         spacy_doc,
     ) -> list[CorrectionIssue]:
         """Ejecuta el detector de terminología."""
         if self._terminology_detector is None:
-            self._terminology_detector = TerminologyDetector(
-                config=self.config.terminology
-            )
+            self._terminology_detector = TerminologyDetector(config=self.config.terminology)
 
         return self._terminology_detector.detect(
             text,
@@ -232,7 +214,7 @@ class CorrectionOrchestrator:
     def _run_field_detector(
         self,
         text: str,
-        chapter_index: Optional[int],
+        chapter_index: int | None,
         spacy_doc,
     ) -> list[CorrectionIssue]:
         """Ejecuta el detector de terminología de campo."""
@@ -251,7 +233,7 @@ class CorrectionOrchestrator:
     def _run_glossary_detector(
         self,
         text: str,
-        chapter_index: Optional[int],
+        chapter_index: int | None,
         project_id: int,
     ) -> list[CorrectionIssue]:
         """Ejecuta el detector de glosario."""
@@ -266,7 +248,7 @@ class CorrectionOrchestrator:
             project_id=project_id,
         )
 
-    def clear_glossary_cache(self, project_id: Optional[int] = None) -> None:
+    def clear_glossary_cache(self, project_id: int | None = None) -> None:
         """Limpia el caché del glosario (llamar tras modificar entradas)."""
         if self._glossary_detector:
             self._glossary_detector.clear_cache(project_id)
@@ -274,9 +256,9 @@ class CorrectionOrchestrator:
     def analyze_by_chapters(
         self,
         chapters: list[dict],
-        spacy_docs: Optional[list] = None,
-        project_id: Optional[int] = None,
-        progress_callback: Optional[Callable[[str, int, int], None]] = None,
+        spacy_docs: list | None = None,
+        project_id: int | None = None,
+        progress_callback: Callable[[str, int, int], None] | None = None,
     ) -> dict[int, list[CorrectionIssue]]:
         """
         Analiza correcciones por capítulo.
@@ -317,7 +299,7 @@ class CorrectionOrchestrator:
         self,
         detector,
         text: str,
-        chapter_index: Optional[int],
+        chapter_index: int | None,
         spacy_doc,
     ) -> list[CorrectionIssue]:
         """Ejecuta un detector individual."""
@@ -399,9 +381,9 @@ class CorrectionOrchestrator:
             "by_category": {},
             "by_type": {},
             "by_confidence": {
-                "high": 0,    # >= 0.8
+                "high": 0,  # >= 0.8
                 "medium": 0,  # >= 0.6
-                "low": 0,     # < 0.6
+                "low": 0,  # < 0.6
             },
         }
 

@@ -8,33 +8,33 @@ Proporciona herramientas para:
 - Identificar analepsis y prolepsis
 """
 
-from .markers import (
-    TemporalMarker,
-    MarkerType,
-    TemporalMarkerExtractor,
-    WORD_TO_NUM,
-)
-from .timeline import (
-    Timeline,
-    TimelineEvent,
-    TimelineResolution,
-    NarrativeOrder,
-    TimelineBuilder,
-)
 from .inconsistencies import (
-    # Basic checker
-    TemporalInconsistency,
-    InconsistencyType,
     InconsistencySeverity,
+    InconsistencyType,
+    TemporalCheckResult,
     TemporalConsistencyChecker,
+    TemporalDetectionConfig,
     # Voting system
     TemporalDetectionMethod,
-    TemporalDetectionConfig,
-    TemporalCheckResult,
+    # Basic checker
+    TemporalInconsistency,
     VotingTemporalChecker,
+    check_temporal_consistency_voting,
     get_voting_temporal_checker,
     reset_voting_temporal_checker,
-    check_temporal_consistency_voting,
+)
+from .markers import (
+    WORD_TO_NUM,
+    MarkerType,
+    TemporalMarker,
+    TemporalMarkerExtractor,
+)
+from .timeline import (
+    NarrativeOrder,
+    Timeline,
+    TimelineBuilder,
+    TimelineEvent,
+    TimelineResolution,
 )
 
 __all__ = [

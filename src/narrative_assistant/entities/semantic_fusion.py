@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Fusión semántica de entidades usando embeddings y LLMs locales (Ollama).
 
@@ -14,10 +13,7 @@ Los LLMs se ejecutan via Ollama (llama3.2, mistral, qwen2.5).
 import logging
 import unicodedata
 from dataclasses import dataclass
-from typing import Optional
 
-from ..core.result import Result
-from ..core.errors import NarrativeError, ErrorSeverity
 from ..core.config import get_config
 from ..nlp.embeddings import get_embeddings_model
 from .models import Entity, EntityType
@@ -39,12 +35,23 @@ def _get_fusion_threshold() -> float:
     except Exception:
         return SEMANTIC_SIMILARITY_THRESHOLD
 
+
 # Contextos que indican referencia anafórica
 ANAPHORIC_MARKERS = [
-    "el ", "la ", "los ", "las ",  # Artículos definidos
-    "ese ", "esa ", "esos ", "esas ",  # Demostrativos
-    "aquel ", "aquella ", "dicho ", "dicha ",  # Referencias
-    "mismo ", "misma ",  # Identidad
+    "el ",
+    "la ",
+    "los ",
+    "las ",  # Artículos definidos
+    "ese ",
+    "esa ",
+    "esos ",
+    "esas ",  # Demostrativos
+    "aquel ",
+    "aquella ",
+    "dicho ",
+    "dicha ",  # Referencias
+    "mismo ",
+    "misma ",  # Identidad
 ]
 
 # =============================================================================
@@ -55,29 +62,113 @@ ANAPHORIC_MARKERS = [
 # evitar que "la" coincida antes que "la señora")
 PREFIXES_TO_STRIP = [
     # Artículos
-    'el', 'la', 'los', 'las', 'un', 'una', 'unos', 'unas',
+    "el",
+    "la",
+    "los",
+    "las",
+    "un",
+    "una",
+    "unos",
+    "unas",
     # Demostrativos
-    'este', 'esta', 'estos', 'estas', 'ese', 'esa', 'esos', 'esas',
-    'aquel', 'aquella', 'aquellos', 'aquellas',
+    "este",
+    "esta",
+    "estos",
+    "estas",
+    "ese",
+    "esa",
+    "esos",
+    "esas",
+    "aquel",
+    "aquella",
+    "aquellos",
+    "aquellas",
     # Posesivos
-    'mi', 'mis', 'tu', 'tus', 'su', 'sus', 'nuestro', 'nuestra',
-    'nuestros', 'nuestras', 'vuestro', 'vuestra', 'vuestros', 'vuestras',
+    "mi",
+    "mis",
+    "tu",
+    "tus",
+    "su",
+    "sus",
+    "nuestro",
+    "nuestra",
+    "nuestros",
+    "nuestras",
+    "vuestro",
+    "vuestra",
+    "vuestros",
+    "vuestras",
     # Honoríficos
-    'don', 'doña', 'señor', 'señora', 'señorita', 'sr', 'sra', 'srta',
+    "don",
+    "doña",
+    "señor",
+    "señora",
+    "señorita",
+    "sr",
+    "sra",
+    "srta",
     # Profesionales
-    'doctor', 'doctora', 'dr', 'dra', 'ingeniero', 'ingeniera', 'ing',
-    'licenciado', 'licenciada', 'lic', 'profesor', 'profesora', 'prof',
-    'maestro', 'maestra',
+    "doctor",
+    "doctora",
+    "dr",
+    "dra",
+    "ingeniero",
+    "ingeniera",
+    "ing",
+    "licenciado",
+    "licenciada",
+    "lic",
+    "profesor",
+    "profesora",
+    "prof",
+    "maestro",
+    "maestra",
     # Nobiliarios
-    'conde', 'condesa', 'duque', 'duquesa', 'marqués', 'marquesa',
-    'barón', 'baronesa', 'príncipe', 'princesa', 'rey', 'reina',
-    'infante', 'infanta', 'lord', 'lady', 'sir',
+    "conde",
+    "condesa",
+    "duque",
+    "duquesa",
+    "marqués",
+    "marquesa",
+    "barón",
+    "baronesa",
+    "príncipe",
+    "princesa",
+    "rey",
+    "reina",
+    "infante",
+    "infanta",
+    "lord",
+    "lady",
+    "sir",
     # Religiosos
-    'padre', 'madre', 'hermano', 'hermana', 'fray', 'sor', 'san', 'santa',
-    'obispo', 'arzobispo', 'cardenal', 'papa', 'reverendo', 'reverenda',
+    "padre",
+    "madre",
+    "hermano",
+    "hermana",
+    "fray",
+    "sor",
+    "san",
+    "santa",
+    "obispo",
+    "arzobispo",
+    "cardenal",
+    "papa",
+    "reverendo",
+    "reverenda",
     # Militares
-    'capitán', 'capitana', 'coronel', 'coronela', 'general', 'generala',
-    'teniente', 'sargento', 'cabo', 'soldado', 'almirante', 'comandante',
+    "capitán",
+    "capitana",
+    "coronel",
+    "coronela",
+    "general",
+    "generala",
+    "teniente",
+    "sargento",
+    "cabo",
+    "soldado",
+    "almirante",
+    "comandante",
 ]
 
 # Ordenar de mayor a menor longitud para matching correcto
@@ -240,27 +331,25 @@ for _formal, _hyps in SPANISH_HYPOCORISTICS.items():
         _HYPOCORISTIC_TO_FORMALS[_key].append(_formal)
 
 # Compatibilidad: primer formal encontrado (para get_formal_name)
-_HYPOCORISTIC_TO_FORMAL: dict[str, str] = {
-    k: v[0] for k, v in _HYPOCORISTIC_TO_FORMALS.items()
-}
+_HYPOCORISTIC_TO_FORMAL: dict[str, str] = {k: v[0] for k, v in _HYPOCORISTIC_TO_FORMALS.items()}
 
 # Sufijos diminutivos productivos en español
 DIMINUTIVE_SUFFIXES = [
-    ("ito", ""),     # Juanito → Juan
-    ("ita", ""),     # Anita → Ana (pero no "bonita")
-    ("illo", ""),    # Juanillo → Juan
-    ("illa", ""),    # Rosilla → Rosa (raro en nombres)
-    ("ín", ""),      # Pepín → Pepe / Agustín (nombre propio, no diminutivo)
-    ("ina", ""),     # Josefina → Josefa (cuidado: algunos son nombres propios)
-    ("ico", ""),     # Perico → Pedro (regional)
-    ("ica", ""),     # Federica → (nombre propio)
-    ("ete", ""),     # Juanete → (no aplica bien a nombres)
-    ("uela", ""),    # Solo en raros casos
-    ("uelo", ""),    # Solo en raros casos
+    ("ito", ""),  # Juanito → Juan
+    ("ita", ""),  # Anita → Ana (pero no "bonita")
+    ("illo", ""),  # Juanillo → Juan
+    ("illa", ""),  # Rosilla → Rosa (raro en nombres)
+    ("ín", ""),  # Pepín → Pepe / Agustín (nombre propio, no diminutivo)
+    ("ina", ""),  # Josefina → Josefa (cuidado: algunos son nombres propios)
+    ("ico", ""),  # Perico → Pedro (regional)
+    ("ica", ""),  # Federica → (nombre propio)
+    ("ete", ""),  # Juanete → (no aplica bien a nombres)
+    ("uela", ""),  # Solo en raros casos
+    ("uelo", ""),  # Solo en raros casos
 ]
 
 
-def get_formal_name(name: str) -> Optional[str]:
+def get_formal_name(name: str) -> str | None:
     """
     Obtiene el nombre formal a partir de un hipocorístico.
 
@@ -382,11 +471,11 @@ def strip_accents(text: str) -> str:
         return text
 
     # NFD descompone los caracteres acentuados en base + acento
-    normalized = unicodedata.normalize('NFD', text)
+    normalized = unicodedata.normalize("NFD", text)
     # Filtrar solo los "Nonspacing Mark" (acentos), manteniendo todo lo demás
-    result = ''.join(c for c in normalized if unicodedata.category(c) != 'Mn')
+    result = "".join(c for c in normalized if unicodedata.category(c) != "Mn")
     # Recomponer cualquier carácter que pudiera haberse descompuesto
-    return unicodedata.normalize('NFC', result)
+    return unicodedata.normalize("NFC", result)
 
 
 def normalize_for_comparison(name: str) -> str:
@@ -426,7 +515,7 @@ def normalize_for_comparison(name: str) -> str:
     name = strip_accents(name)
 
     # 3. Minúsculas y espacios normalizados
-    return ' '.join(name.lower().split())
+    return " ".join(name.lower().split())
 
 
 def normalize_entity_name(name: str) -> str:
@@ -473,7 +562,7 @@ def normalize_entity_name(name: str) -> str:
                 changed = True
                 break
 
-    result = ' '.join(words) if words else name
+    result = " ".join(words) if words else name
     return result
 
 
@@ -511,8 +600,8 @@ def generate_name_variants(name: str) -> set[str]:
 
     def remove_accents(text: str) -> str:
         """Quita tildes/acentos de un texto."""
-        nfkd = unicodedata.normalize('NFKD', text)
-        return ''.join(c for c in nfkd if not unicodedata.combining(c))
+        nfkd = unicodedata.normalize("NFKD", text)
+        return "".join(c for c in nfkd if not unicodedata.combining(c))
 
     for variant in list(variants):
         no_accent = remove_accents(variant)
@@ -574,15 +663,13 @@ def names_match_after_normalization(name1: str, name2: str) -> bool:
     first1 = n1_normalized.split()[0] if n1_normalized else ""
     first2 = n2_normalized.split()[0] if n2_normalized else ""
 
-    if first1 and first2 and are_hypocoristic_match(first1, first2):
-        return True
-
-    return False
+    return bool(first1 and first2 and are_hypocoristic_match(first1, first2))
 
 
 @dataclass
 class SemanticFusionResult:
     """Resultado de análisis de fusión semántica."""
+
     should_merge: bool
     similarity: float
     reason: str
@@ -704,7 +791,7 @@ class SemanticFusionService:
         self,
         entity1: Entity,
         entity2: Entity,
-        narrative_context: Optional[str] = None,
+        narrative_context: str | None = None,
     ) -> SemanticFusionResult:
         """
         Determina si dos entidades deberían fusionarse.
@@ -790,7 +877,7 @@ class SemanticFusionService:
             return SemanticFusionResult(
                 should_merge=True,
                 similarity=alias_confidence,
-                reason=f"Relación de alias/título detectada",
+                reason="Relación de alias/título detectada",
                 confidence=alias_confidence,
                 method="alias",
             )
@@ -871,16 +958,34 @@ class SemanticFusionService:
         name2_lower = name2.lower().strip()
 
         # Títulos que preceden directamente al nombre
-        direct_titles = {'don', 'doña', 'fray', 'sor', 'san', 'santa'}
+        direct_titles = {"don", "doña", "fray", "sor", "san", "santa"}
 
         # Títulos profesionales/eclesiásticos/etc.
         role_titles = {
-            'doctor', 'doctora', 'dr', 'dra',
-            'padre', 'madre', 'hermano', 'hermana',  # religiosos
-            'general', 'coronel', 'capitán', 'comandante',
-            'conde', 'condesa', 'duque', 'duquesa', 'marqués', 'marquesa',
-            'profesor', 'profesora', 'maestro', 'maestra',
-            'licenciado', 'licenciada',
+            "doctor",
+            "doctora",
+            "dr",
+            "dra",
+            "padre",
+            "madre",
+            "hermano",
+            "hermana",  # religiosos
+            "general",
+            "coronel",
+            "capitán",
+            "comandante",
+            "conde",
+            "condesa",
+            "duque",
+            "duquesa",
+            "marqués",
+            "marquesa",
+            "profesor",
+            "profesora",
+            "maestro",
+            "maestra",
+            "licenciado",
+            "licenciada",
         }
 
         words1 = name1_lower.split()
@@ -906,7 +1011,7 @@ class SemanticFusionService:
 
         # Caso 2: "el doctor García" ↔ "García"
         # Artículo + título + apellido ↔ apellido solo
-        if len(words1) >= 3 and words1[0] in {'el', 'la'} and words1[1] in role_titles:
+        if len(words1) >= 3 and words1[0] in {"el", "la"} and words1[1] in role_titles:
             name_part1 = " ".join(words1[2:])
             if name_part1 == name2_lower:
                 return True, 0.90
@@ -914,7 +1019,7 @@ class SemanticFusionService:
             if words1[-1] == name2_lower or words1[-1] in words2:
                 return True, 0.80
 
-        if len(words2) >= 3 and words2[0] in {'el', 'la'} and words2[1] in role_titles:
+        if len(words2) >= 3 and words2[0] in {"el", "la"} and words2[1] in role_titles:
             name_part2 = " ".join(words2[2:])
             if name_part2 == name1_lower:
                 return True, 0.90
@@ -925,21 +1030,21 @@ class SemanticFusionService:
         # Este caso requiere LLM si use_llm está habilitado
         # Detectamos si hay patrón de posible apodo
         is_possible_nickname1 = (
-            len(words1) == 2 and
-            words1[0] in {'el', 'la'} and
-            len(name1.split()) > 1 and
-            name1.split()[1][0].isupper() and
-            len(name1.split()[1]) > 2 and
-            words1[1] not in role_titles  # No es un título conocido
+            len(words1) == 2
+            and words1[0] in {"el", "la"}
+            and len(name1.split()) > 1
+            and name1.split()[1][0].isupper()
+            and len(name1.split()[1]) > 2
+            and words1[1] not in role_titles  # No es un título conocido
         )
 
         is_possible_nickname2 = (
-            len(words2) == 2 and
-            words2[0] in {'el', 'la'} and
-            len(name2.split()) > 1 and
-            name2.split()[1][0].isupper() and
-            len(name2.split()[1]) > 2 and
-            words2[1] not in role_titles
+            len(words2) == 2
+            and words2[0] in {"el", "la"}
+            and len(name2.split()) > 1
+            and name2.split()[1][0].isupper()
+            and len(name2.split()[1]) > 2
+            and words2[1] not in role_titles
         )
 
         # Si uno es posible apodo y el otro es nombre propio corto (1-2 palabras),
@@ -951,13 +1056,11 @@ class SemanticFusionService:
 
         # Caso 4: Nombre dentro de nombre compuesto
         # "María" ↔ "María García" (el nombre corto está contenido en el largo)
-        if len(words1) == 1 and len(words2) > 1:
-            if words1[0] in words2:
-                return True, 0.85
+        if len(words1) == 1 and len(words2) > 1 and words1[0] in words2:
+            return True, 0.85
 
-        if len(words2) == 1 and len(words1) > 1:
-            if words2[0] in words1:
-                return True, 0.85
+        if len(words2) == 1 and len(words1) > 1 and words2[0] in words1:
+            return True, 0.85
 
         return False, 0.0
 
@@ -983,6 +1086,7 @@ class SemanticFusionService:
         """
         try:
             from ..llm.client import get_llm_client
+
             client = get_llm_client()
 
             if not client or not client.is_available:
@@ -1020,6 +1124,7 @@ JSON:"""
 
             # Parsear respuesta
             import json
+
             cleaned = response.strip()
 
             # Limpiar markdown si está presente
@@ -1067,7 +1172,7 @@ JSON:"""
 
         Se excluyen frases descriptivas como "el hombre alto".
         """
-        articles = {'el', 'la', 'los', 'las'}
+        articles = {"el", "la", "los", "las"}
 
         for entity in [entity1, entity2]:
             name = entity.canonical_name
@@ -1081,9 +1186,24 @@ JSON:"""
                 if first_lower in articles and second[0].isupper():
                     # Excluir sustantivos comunes que suelen ir después de artículo
                     common_nouns = {
-                        'hombre', 'mujer', 'niño', 'niña', 'joven', 'anciano',
-                        'persona', 'gente', 'mundo', 'vida', 'tiempo', 'día',
-                        'casa', 'calle', 'ciudad', 'país', 'tierra', 'mar',
+                        "hombre",
+                        "mujer",
+                        "niño",
+                        "niña",
+                        "joven",
+                        "anciano",
+                        "persona",
+                        "gente",
+                        "mundo",
+                        "vida",
+                        "tiempo",
+                        "día",
+                        "casa",
+                        "calle",
+                        "ciudad",
+                        "país",
+                        "tierra",
+                        "mar",
                     }
                     if second.lower() not in common_nouns:
                         return True
@@ -1173,15 +1293,30 @@ JSON:"""
             return True
 
         # Detectar si parece verbo conjugado (terminaciones típicas)
-        verb_endings = ('ar', 'er', 'ir', 'ando', 'endo', 'iendo', 'ado', 'ido',
-                        'é', 'ó', 'emos', 'aron', 'ieron', 'aba', 'ía')
+        verb_endings = (
+            "ar",
+            "er",
+            "ir",
+            "ando",
+            "endo",
+            "iendo",
+            "ado",
+            "ido",
+            "é",
+            "ó",
+            "emos",
+            "aron",
+            "ieron",
+            "aba",
+            "ía",
+        )
 
         # Artículos que pueden preceder títulos/apodos en español
         # "el Magistral", "la Regenta", "don Fermín" - estos son válidos para fusión
-        title_articles = {'el', 'la', 'don', 'doña', 'san', 'santa'}
+        title_articles = {"el", "la", "don", "doña", "san", "santa"}
 
         # Preposiciones que indican frases descriptivas (no nombres)
-        prepositions = {'sobre', 'para', 'por', 'sin', 'con', 'de', 'en', 'hacia', 'desde'}
+        prepositions = {"sobre", "para", "por", "sin", "con", "de", "en", "hacia", "desde"}
 
         def is_article_plus_title(words: list[str]) -> bool:
             """Detecta patrones como 'el Magistral', 'la Regenta', 'don Fermín'."""
@@ -1202,9 +1337,7 @@ JSON:"""
             if first in prepositions:
                 return True
             # 3+ palabras y no es artículo + título = probablemente frase
-            if len(words) >= 3 and not is_article_plus_title(words):
-                return True
-            return False
+            return bool(len(words) >= 3 and not is_article_plus_title(words))
 
         def has_verb(words: list[str]) -> bool:
             for w in words:
@@ -1247,8 +1380,22 @@ JSON:"""
 
         # Si alguno es pronombre, no son "nombres propios diferentes"
         pronouns = {
-            'él', 'ella', 'ellos', 'ellas', 'este', 'esta', 'ese', 'esa',
-            'aquel', 'aquella', 'lo', 'la', 'le', 'les', 'se', 'quien',
+            "él",
+            "ella",
+            "ellos",
+            "ellas",
+            "este",
+            "esta",
+            "ese",
+            "esa",
+            "aquel",
+            "aquella",
+            "lo",
+            "la",
+            "le",
+            "les",
+            "se",
+            "quien",
         }
         if name1.lower() in pronouns or name2.lower() in pronouns:
             return False
@@ -1282,8 +1429,8 @@ JSON:"""
         self,
         anaphoric_entity: Entity,
         candidates: list[Entity],
-        narrative_context: Optional[str] = None,
-    ) -> Optional[Entity]:
+        narrative_context: str | None = None,
+    ) -> Entity | None:
         """
         Resuelve a qué entidad se refiere una mención anafórica.
 
@@ -1328,12 +1475,13 @@ JSON:"""
 # LLM Integration Placeholder (Post-MVP)
 # =============================================================================
 
+
 async def resolve_coreference_with_local_llm(
     text: str,
     mention: str,
     candidates: list[str],
-    model_path: Optional[str] = None,
-) -> Optional[str]:
+    model_path: str | None = None,
+) -> str | None:
     """
     Resuelve correferencia usando un LLM LOCAL.
 
@@ -1377,11 +1525,11 @@ async def resolve_coreference_with_local_llm(
 # Singleton
 # =============================================================================
 
-_semantic_fusion_service: Optional[SemanticFusionService] = None
+_semantic_fusion_service: SemanticFusionService | None = None
 
 
 def get_semantic_fusion_service(
-    similarity_threshold: Optional[float] = None,
+    similarity_threshold: float | None = None,
 ) -> SemanticFusionService:
     """
     Obtiene singleton del servicio de fusión semántica.
@@ -1395,7 +1543,9 @@ def get_semantic_fusion_service(
     global _semantic_fusion_service
 
     if _semantic_fusion_service is None:
-        threshold = similarity_threshold if similarity_threshold is not None else _get_fusion_threshold()
+        threshold = (
+            similarity_threshold if similarity_threshold is not None else _get_fusion_threshold()
+        )
         _semantic_fusion_service = SemanticFusionService(
             similarity_threshold=threshold,
         )

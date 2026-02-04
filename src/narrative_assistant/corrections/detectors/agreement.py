@@ -8,11 +8,9 @@ Detecta discordancias de género y número entre:
 Requiere spaCy para el análisis morfológico.
 """
 
-from typing import Optional
-
 from ..base import BaseDetector, CorrectionIssue
 from ..config import AgreementConfig
-from ..types import CorrectionCategory, AgreementIssueType
+from ..types import AgreementIssueType, CorrectionCategory
 
 
 class AgreementDetector(BaseDetector):
@@ -65,7 +63,7 @@ class AgreementDetector(BaseDetector):
         "calor",  # El calor / La calor (regional)
     }
 
-    def __init__(self, config: Optional[AgreementConfig] = None):
+    def __init__(self, config: AgreementConfig | None = None):
         self.config = config or AgreementConfig()
 
     @property
@@ -79,7 +77,7 @@ class AgreementDetector(BaseDetector):
     def detect(
         self,
         text: str,
-        chapter_index: Optional[int] = None,
+        chapter_index: int | None = None,
         spacy_doc=None,
     ) -> list[CorrectionIssue]:
         """
@@ -113,7 +111,7 @@ class AgreementDetector(BaseDetector):
         return issues
 
     def _check_gender_agreement(
-        self, doc, text: str, chapter_index: Optional[int]
+        self, doc, text: str, chapter_index: int | None
     ) -> list[CorrectionIssue]:
         """Verifica concordancia de género entre sustantivos y modificadores."""
         issues = []
@@ -164,7 +162,9 @@ class AgreementDetector(BaseDetector):
                             ),
                             suggestion=None,  # Corrector decide
                             confidence=confidence,
-                            context=self._extract_context(text, child.idx, token.idx + len(token.text)),
+                            context=self._extract_context(
+                                text, child.idx, token.idx + len(token.text)
+                            ),
                             chapter_index=chapter_index,
                             rule_id="AGREE_GENDER",
                             extra_data={
@@ -179,7 +179,7 @@ class AgreementDetector(BaseDetector):
         return issues
 
     def _check_number_agreement(
-        self, doc, text: str, chapter_index: Optional[int]
+        self, doc, text: str, chapter_index: int | None
     ) -> list[CorrectionIssue]:
         """Verifica concordancia de número entre sustantivos y modificadores."""
         issues = []
@@ -225,7 +225,9 @@ class AgreementDetector(BaseDetector):
                             ),
                             suggestion=None,
                             confidence=confidence,
-                            context=self._extract_context(text, child.idx, token.idx + len(token.text)),
+                            context=self._extract_context(
+                                text, child.idx, token.idx + len(token.text)
+                            ),
                             chapter_index=chapter_index,
                             rule_id="AGREE_NUMBER",
                             extra_data={
@@ -239,7 +241,7 @@ class AgreementDetector(BaseDetector):
 
         return issues
 
-    def _get_gender(self, token) -> Optional[str]:
+    def _get_gender(self, token) -> str | None:
         """Obtiene el género de un token."""
         # Primero verificar irregulares
         lemma = token.lemma_.lower()
@@ -257,7 +259,7 @@ class AgreementDetector(BaseDetector):
 
         return None
 
-    def _get_number(self, token) -> Optional[str]:
+    def _get_number(self, token) -> str | None:
         """Obtiene el número de un token."""
         number = token.morph.get("Number")
         if number:
@@ -271,8 +273,16 @@ class AgreementDetector(BaseDetector):
         # Sustantivos femeninos que usan artículo masculino por eufonía
         # (empiezan por a- o ha- tónicas)
         euphonic_feminines = {
-            "agua", "águila", "alma", "arma", "área", "aula",
-            "hambre", "hada", "hacha", "habla",
+            "agua",
+            "águila",
+            "alma",
+            "arma",
+            "área",
+            "aula",
+            "hambre",
+            "hada",
+            "hacha",
+            "habla",
         }
 
         if lemma in euphonic_feminines:

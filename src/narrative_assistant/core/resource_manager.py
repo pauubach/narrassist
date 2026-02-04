@@ -11,18 +11,20 @@ Detecta capacidades de la máquina y optimiza el uso de recursos:
 
 import logging
 import os
+import platform
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Optional, Callable, Any
-import platform
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
 # Intentar importar psutil para monitoreo avanzado
 try:
     import psutil
+
     PSUTIL_AVAILABLE = True
 except ImportError:
     PSUTIL_AVAILABLE = False
@@ -31,22 +33,25 @@ except ImportError:
 
 class ResourceTier(Enum):
     """Clasificación de capacidad del sistema."""
-    LOW = "low"           # <4 cores, <8GB RAM, no GPU
-    MEDIUM = "medium"     # 4-8 cores, 8-16GB RAM, GPU opcional
-    HIGH = "high"         # >8 cores, >16GB RAM, GPU con >6GB VRAM
+
+    LOW = "low"  # <4 cores, <8GB RAM, no GPU
+    MEDIUM = "medium"  # 4-8 cores, 8-16GB RAM, GPU opcional
+    HIGH = "high"  # >8 cores, >16GB RAM, GPU con >6GB VRAM
 
 
 class TaskPriority(Enum):
     """Prioridad de tareas para scheduling."""
-    CRITICAL = 1   # NER, parsing básico
-    HIGH = 2       # Correferencias, embeddings
-    NORMAL = 3     # Análisis de calidad
-    LOW = 4        # Redundancia semántica, exportaciones
+
+    CRITICAL = 1  # NER, parsing básico
+    HIGH = 2  # Correferencias, embeddings
+    NORMAL = 3  # Análisis de calidad
+    LOW = 4  # Redundancia semántica, exportaciones
 
 
 @dataclass
 class SystemCapabilities:
     """Capacidades detectadas del sistema."""
+
     # CPU
     cpu_cores_logical: int = 1
     cpu_cores_physical: int = 1
@@ -92,6 +97,7 @@ class SystemCapabilities:
 @dataclass
 class ResourceRecommendation:
     """Recomendaciones de uso de recursos."""
+
     max_workers: int = 2
     batch_size_embeddings: int = 16
     batch_size_nlp: int = 100
@@ -131,7 +137,7 @@ class HeavyTaskSemaphore:
         self._active_tasks: list[str] = []
         self._lock = threading.Lock()
 
-    def acquire(self, task_name: str, timeout: Optional[float] = None) -> bool:
+    def acquire(self, task_name: str, timeout: float | None = None) -> bool:
         """
         Intenta adquirir el semáforo para una tarea pesada.
 
@@ -205,9 +211,9 @@ class ResourceManager:
         if self._initialized:
             return
 
-        self._capabilities: Optional[SystemCapabilities] = None
-        self._recommendation: Optional[ResourceRecommendation] = None
-        self._heavy_task_semaphore: Optional[HeavyTaskSemaphore] = None
+        self._capabilities: SystemCapabilities | None = None
+        self._recommendation: ResourceRecommendation | None = None
+        self._heavy_task_semaphore: HeavyTaskSemaphore | None = None
         self._initialized = True
 
         # Detectar capacidades al inicializar
@@ -274,9 +280,7 @@ class ResourceManager:
         """Estima RAM total cuando psutil no está disponible."""
         # Valores por defecto conservadores según plataforma
         system = platform.system().lower()
-        if system == "darwin":  # macOS
-            return 8192  # 8GB típico
-        elif system == "windows":
+        if system == "darwin" or system == "windows":  # macOS
             return 8192  # 8GB típico
         else:  # Linux
             try:
@@ -294,6 +298,7 @@ class ResourceManager:
         """Detecta GPU y VRAM."""
         try:
             import torch
+
             if torch.cuda.is_available():
                 caps.gpu_available = True
                 device = torch.cuda.current_device()
@@ -323,13 +328,16 @@ class ResourceManager:
     def _classify_tier(self, caps: SystemCapabilities) -> ResourceTier:
         """Clasifica el sistema en un tier de capacidad."""
         # HIGH: >8 cores, >16GB RAM, GPU con >6GB VRAM
-        if (caps.cpu_cores_physical >= 8 and
-            caps.ram_total_mb >= 16384 and
-            caps.gpu_available and not caps.gpu_is_low_vram):
+        if (
+            caps.cpu_cores_physical >= 8
+            and caps.ram_total_mb >= 16384
+            and caps.gpu_available
+            and not caps.gpu_is_low_vram
+        ):
             return ResourceTier.HIGH
 
         # MEDIUM: 4-8 cores, 8-16GB RAM
-        if (caps.cpu_cores_physical >= 4 and caps.ram_total_mb >= 8192):
+        if caps.cpu_cores_physical >= 4 and caps.ram_total_mb >= 8192:
             return ResourceTier.MEDIUM
 
         # LOW: resto
@@ -448,8 +456,8 @@ class ResourceManager:
         task_name: str,
         func: Callable[..., Any],
         *args,
-        timeout: Optional[float] = None,
-        **kwargs
+        timeout: float | None = None,
+        **kwargs,
     ) -> Any:
         """
         Ejecuta una tarea pesada con control de recursos.
@@ -515,7 +523,7 @@ class ResourceManager:
 
 
 # Singleton accessor
-_resource_manager: Optional[ResourceManager] = None
+_resource_manager: ResourceManager | None = None
 _manager_lock = threading.Lock()
 
 

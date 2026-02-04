@@ -13,9 +13,8 @@ import re
 import threading
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
-from .dialogue import detect_dialogues, DialogueSpan, DialogueResult
+from .dialogue import DialogueResult, DialogueSpan, detect_dialogues
 
 logger = logging.getLogger(__name__)
 
@@ -252,12 +251,12 @@ class DialogueContextValidator:
         chapter_text: str,
         chapter_number: int,
         chapter_start_char: int,
-    ) -> Optional[DialogueIssue]:
+    ) -> DialogueIssue | None:
         """
         Verifica si hay suficiente contexto antes del primer diálogo.
         """
         # Texto antes del primer diálogo
-        text_before = chapter_text[:first_dialogue.start_char].strip()
+        text_before = chapter_text[: first_dialogue.start_char].strip()
 
         # Si el capítulo empieza con diálogo o hay muy poco contexto
         if len(text_before) < self.min_context_chars:
@@ -305,7 +304,7 @@ class DialogueContextValidator:
             # También verificar si hay texto narrativo entre diálogos que indique hablante
             if i > 0 and not has_attribution:
                 prev_end = dialogues[i - 1].end_char
-                text_between = chapter_text[prev_end:dialogue.start_char].strip()
+                text_between = chapter_text[prev_end : dialogue.start_char].strip()
                 has_attribution = self._text_indicates_speaker(text_between)
 
             if not has_attribution:
@@ -343,7 +342,7 @@ class DialogueContextValidator:
             if not dialogue.attribution_text:
                 # Verificar si hay contexto entre diálogos
                 prev_end = dialogues[i - 1].end_char
-                text_between = chapter_text[prev_end:dialogue.start_char].strip()
+                text_between = chapter_text[prev_end : dialogue.start_char].strip()
 
                 if not self._text_indicates_speaker(text_between):
                     # Solo si no está ya en una secuencia reportada
@@ -358,7 +357,9 @@ class DialogueContextValidator:
                                 severity=DialogueIssueSeverity.LOW,
                                 location=DialogueLocation(
                                     chapter=chapter_number,
-                                    paragraph=self._get_paragraph(chapter_text, dialogue.start_char),
+                                    paragraph=self._get_paragraph(
+                                        chapter_text, dialogue.start_char
+                                    ),
                                     start_char=chapter_start_char + dialogue.start_char,
                                     end_char=chapter_start_char + dialogue.end_char,
                                     text=dialogue.text,
@@ -391,12 +392,8 @@ class DialogueContextValidator:
             r"(él|ella|ellos|ellas)\s+(dij|pregunt|respond)",
         ]
 
-        text_lower = text.lower()
-        for pattern in speaker_patterns:
-            if re.search(pattern, text, re.IGNORECASE):
-                return True
-
-        return False
+        text.lower()
+        return any(re.search(pattern, text, re.IGNORECASE) for pattern in speaker_patterns)
 
     def _create_sequence_issue(
         self,
@@ -429,8 +426,7 @@ class DialogueContextValidator:
                 text=first.text,
             ),
             description=(
-                f"Secuencia de {count} diálogos consecutivos sin indicar "
-                f"quién habla en cada caso."
+                f"Secuencia de {count} diálogos consecutivos sin indicar quién habla en cada caso."
             ),
             suggestion=(
                 f"En una secuencia de {count} diálogos, considera añadir "
@@ -450,7 +446,7 @@ class DialogueContextValidator:
 
 # Singleton thread-safe
 _validator_lock = threading.Lock()
-_validator_instance: Optional[DialogueContextValidator] = None
+_validator_instance: DialogueContextValidator | None = None
 
 
 def get_dialogue_validator() -> DialogueContextValidator:

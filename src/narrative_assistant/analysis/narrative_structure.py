@@ -16,7 +16,6 @@ import re
 import threading
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -82,8 +81,8 @@ class ProlepticReference:
     description: str
     evidence: list[str] = field(default_factory=list)
     # Referencia al evento real (si se encuentra)
-    resolved_event_chapter: Optional[int] = None
-    resolved_event_text: Optional[str] = None
+    resolved_event_chapter: int | None = None
+    resolved_event_text: str | None = None
     confidence: float = 0.8
 
     def to_dict(self) -> dict:
@@ -197,9 +196,7 @@ class NarrativeStructureDetector:
             (re.compile(p, re.IGNORECASE | re.MULTILINE | re.DOTALL), conf)
             for p, conf in PROLEPSIS_PATTERNS
         ]
-        self._future_markers = [
-            re.compile(p, re.IGNORECASE) for p in FUTURE_MARKERS
-        ]
+        self._future_markers = [re.compile(p, re.IGNORECASE) for p in FUTURE_MARKERS]
         self._conditional_patterns = [
             re.compile(p, re.IGNORECASE) for p in CONDITIONAL_VERB_PATTERNS
         ]
@@ -241,21 +238,15 @@ class NarrativeStructureDetector:
                     match_end = match.end()
 
                     # Obtener la oración completa
-                    sentence = self._extract_sentence(
-                        chapter_content, match_start, match_end
-                    )
+                    sentence = self._extract_sentence(chapter_content, match_start, match_end)
 
                     # Verificar si hay verbos condicionales en la oración
-                    has_conditional = any(
-                        p.search(sentence) for p in self._conditional_patterns
-                    )
+                    has_conditional = any(p.search(sentence) for p in self._conditional_patterns)
                     if has_conditional:
                         confidence = min(1.0, confidence + 0.05)
 
                     # Verificar si hay marcadores temporales futuros
-                    has_future_marker = any(
-                        m.search(sentence) for m in self._future_markers
-                    )
+                    has_future_marker = any(m.search(sentence) for m in self._future_markers)
                     if has_future_marker:
                         confidence = min(1.0, confidence + 0.05)
 
@@ -276,17 +267,13 @@ class NarrativeStructureDetector:
                         if has_future_marker:
                             evidence.append("Marcador temporal de anticipación")
                         if resolved_chapter:
-                            evidence.append(
-                                f"Evento encontrado en capítulo {resolved_chapter}"
-                            )
+                            evidence.append(f"Evento encontrado en capítulo {resolved_chapter}")
 
                         prolepsis = ProlepticReference(
                             anomaly_type=NarrativeAnomaly.PROLEPSIS,
                             location=NarrativeLocation(
                                 chapter=chapter_num,
-                                paragraph=self._get_paragraph_number(
-                                    chapter_content, match_start
-                                ),
+                                paragraph=self._get_paragraph_number(chapter_content, match_start),
                                 start_char=chapter_start + match_start,
                                 end_char=chapter_start + match_end,
                                 text=sentence,
@@ -416,7 +403,7 @@ class NarrativeStructureDetector:
         prolepsis_sentence: str,
         chapters: list[dict],
         current_chapter: int,
-    ) -> tuple[Optional[int], Optional[str]]:
+    ) -> tuple[int | None, str | None]:
         """
         Busca si el evento mencionado en la prolepsis ocurre más tarde.
 
@@ -473,7 +460,7 @@ class NarrativeStructureDetector:
         phrases = []
 
         # Normalizar espacios en blanco
-        normalized = re.sub(r'\s+', ' ', sentence.strip())
+        normalized = re.sub(r"\s+", " ", sentence.strip())
 
         # Patrones de frases importantes para eventos
         # Estos son los "núcleos" que deben coincidir
@@ -492,16 +479,18 @@ class NarrativeStructureDetector:
     def _find_key_phrase_in_content(self, phrase: str, content: str) -> bool:
         """Busca frase clave de forma flexible (tolerante a artículos)."""
         # Normalizar espacios
-        phrase_normalized = re.sub(r'\s+', ' ', phrase.strip().lower())
-        content_normalized = re.sub(r'\s+', ' ', content.lower())
+        phrase_normalized = re.sub(r"\s+", " ", phrase.strip().lower())
+        content_normalized = re.sub(r"\s+", " ", content.lower())
 
         # Buscar coincidencia directa
         if phrase_normalized in content_normalized:
             return True
 
         # Buscar sin artículos (la/el/una/un)
-        phrase_no_articles = re.sub(r'\b(la|el|un|una)\s+', '', phrase_normalized)
-        content_no_articles = re.sub(r'\b(la|el|un|una|pequeña|pequeño|gran|grande)\s+', '', content_normalized)
+        phrase_no_articles = re.sub(r"\b(la|el|un|una)\s+", "", phrase_normalized)
+        content_no_articles = re.sub(
+            r"\b(la|el|un|una|pequeña|pequeño|gran|grande)\s+", "", content_normalized
+        )
 
         return phrase_no_articles in content_no_articles
 
@@ -534,9 +523,7 @@ class NarrativeStructureDetector:
         for word in words:
             if word.lower() not in stopwords:
                 # Evitar verbos en condicional
-                if not word.lower().endswith("ría") and not word.lower().endswith(
-                    "rían"
-                ):
+                if not word.lower().endswith("ría") and not word.lower().endswith("rían"):
                     keywords.append(word)
 
         return keywords[:5]  # Máximo 5 keywords
@@ -545,7 +532,7 @@ class NarrativeStructureDetector:
         self,
         sentence: str,
         current_chapter: int,
-        resolved_chapter: Optional[int],
+        resolved_chapter: int | None,
     ) -> str:
         """Genera descripción legible de la prolepsis."""
         if resolved_chapter:
@@ -558,9 +545,7 @@ class NarrativeStructureDetector:
             f"uso de condicional con marcador temporal futuro"
         )
 
-    def _deduplicate(
-        self, prolepsis_list: list[ProlepticReference]
-    ) -> list[ProlepticReference]:
+    def _deduplicate(self, prolepsis_list: list[ProlepticReference]) -> list[ProlepticReference]:
         """Elimina prolepsis duplicadas o muy cercanas."""
         if not prolepsis_list:
             return []
@@ -583,7 +568,7 @@ class NarrativeStructureDetector:
 
 # Singleton thread-safe
 _detector_lock = threading.Lock()
-_detector_instance: Optional[NarrativeStructureDetector] = None
+_detector_instance: NarrativeStructureDetector | None = None
 
 
 def get_narrative_structure_detector() -> NarrativeStructureDetector:

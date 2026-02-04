@@ -2,17 +2,18 @@
 Gestión de proyectos (un proyecto = un manuscrito analizado).
 """
 
+import contextlib
 import json
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
-from .database import Database, get_database
-from .document_fingerprint import DocumentFingerprint, FingerprintMatcher, generate_fingerprint
-from ..core.errors import ProjectNotFoundError, DocumentAlreadyExistsError
+from ..core.errors import DocumentAlreadyExistsError, ProjectNotFoundError
 from ..core.result import Result
+from .database import Database, get_database
+from .document_fingerprint import FingerprintMatcher, generate_fingerprint
 
 logger = logging.getLogger(__name__)
 
@@ -35,24 +36,24 @@ class Project:
         settings: Configuración específica del proyecto
     """
 
-    id: Optional[int] = None
+    id: int | None = None
     name: str = ""
     description: str = ""
-    document_path: Optional[str] = None
+    document_path: str | None = None
     document_fingerprint: str = ""
     document_format: str = ""
     word_count: int = 0
     chapter_count: int = 0
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
-    last_opened_at: Optional[datetime] = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+    last_opened_at: datetime | None = None
     analysis_status: str = "pending"  # pending, analyzing, completed, error
     analysis_progress: float = 0.0
     settings: dict[str, Any] = field(default_factory=dict)
     document_type: str = "FIC"  # Tipo de documento (FIC, MEM, etc.)
-    document_subtype: Optional[str] = None  # Subtipo específico
+    document_subtype: str | None = None  # Subtipo específico
     document_type_confirmed: bool = False  # Si el usuario confirmó el tipo
-    detected_document_type: Optional[str] = None  # Tipo detectado automáticamente
+    detected_document_type: str | None = None  # Tipo detectado automáticamente
 
     def to_dict(self) -> dict:
         """Serializa a diccionario."""
@@ -79,10 +80,8 @@ class Project:
         """Crea desde fila de SQLite."""
         settings = {}
         if row["settings_json"]:
-            try:
+            with contextlib.suppress(json.JSONDecodeError):
                 settings = json.loads(row["settings_json"])
-            except json.JSONDecodeError:
-                pass
 
         return cls(
             id=row["id"],
@@ -95,13 +94,17 @@ class Project:
             chapter_count=row["chapter_count"] or 0,
             created_at=datetime.fromisoformat(row["created_at"]) if row["created_at"] else None,
             updated_at=datetime.fromisoformat(row["updated_at"]) if row["updated_at"] else None,
-            last_opened_at=datetime.fromisoformat(row["last_opened_at"]) if row["last_opened_at"] else None,
+            last_opened_at=datetime.fromisoformat(row["last_opened_at"])
+            if row["last_opened_at"]
+            else None,
             analysis_status=row["analysis_status"] or "pending",
             analysis_progress=row["analysis_progress"] or 0.0,
             settings=settings,
             document_type=row["document_type"] or "FIC",
             document_subtype=row["document_subtype"],
-            document_type_confirmed=bool(row["document_type_confirmed"]) if row["document_type_confirmed"] else False,
+            document_type_confirmed=bool(row["document_type_confirmed"])
+            if row["document_type_confirmed"]
+            else False,
             detected_document_type=row["detected_document_type"],
         )
 
@@ -115,7 +118,7 @@ class ProjectManager:
         project = manager.create_from_document(text, "Mi Novela", "docx")
     """
 
-    def __init__(self, db: Optional[Database] = None):
+    def __init__(self, db: Database | None = None):
         self.db = db or get_database()
         self.matcher = FingerprintMatcher()
 
@@ -124,7 +127,7 @@ class ProjectManager:
         text: str,
         name: str,
         document_format: str,
-        document_path: Optional[Path] = None,
+        document_path: Path | None = None,
         description: str = "",
         check_existing: bool = True,
     ) -> Result[Project]:
@@ -236,7 +239,7 @@ class ProjectManager:
 
         return Result.success(project)
 
-    def get_by_fingerprint(self, fingerprint: str) -> Optional[Project]:
+    def get_by_fingerprint(self, fingerprint: str) -> Project | None:
         """Busca proyecto por fingerprint exacto."""
         row = self.db.fetchone(
             "SELECT * FROM projects WHERE document_fingerprint = ?",
@@ -259,9 +262,7 @@ class ProjectManager:
     def update(self, project: Project) -> Result[Project]:
         """Actualiza un proyecto existente."""
         if not project.id:
-            return Result.failure(
-                ProjectNotFoundError(project_id=0)
-            )
+            return Result.failure(ProjectNotFoundError(project_id=0))
 
         self.db.execute(
             """
@@ -324,7 +325,7 @@ class ProjectManager:
         logger.info(f"Proyecto eliminado: ID {project_id}")
         return Result.success(True)
 
-    def find_similar(self, text: str) -> Optional[Project]:
+    def find_similar(self, text: str) -> Project | None:
         """
         Busca un proyecto con documento similar.
 

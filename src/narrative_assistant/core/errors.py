@@ -9,7 +9,7 @@ Severidades:
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 
 class ErrorSeverity(Enum):
@@ -34,7 +34,7 @@ class NarrativeError(Exception):
 
     message: str
     severity: ErrorSeverity = ErrorSeverity.RECOVERABLE
-    user_message: Optional[str] = None
+    user_message: str | None = None
     context: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
@@ -65,14 +65,12 @@ class CorruptedDocumentError(ParsingError):
     original_error: str = ""
     message: str = field(init=False)
     severity: ErrorSeverity = field(default=ErrorSeverity.FATAL, init=False)
-    user_message: Optional[str] = field(default=None, init=False)
+    user_message: str | None = field(default=None, init=False)
     context: dict[str, Any] = field(default_factory=dict, init=False)
 
     def __post_init__(self):
         self.message = f"Cannot parse document: {self.original_error}"
-        self.user_message = (
-            f"El documento '{self.file_path}' está corrupto o no es válido."
-        )
+        self.user_message = f"El documento '{self.file_path}' está corrupto o no es válido."
         self.context = {
             "file_path": self.file_path,
             "original_error": self.original_error,
@@ -87,14 +85,12 @@ class EmptyDocumentError(ParsingError):
     file_path: str = ""
     message: str = field(init=False)
     severity: ErrorSeverity = field(default=ErrorSeverity.FATAL, init=False)
-    user_message: Optional[str] = field(default=None, init=False)
+    user_message: str | None = field(default=None, init=False)
     context: dict[str, Any] = field(default_factory=dict, init=False)
 
     def __post_init__(self):
         self.message = "Document has no text content"
-        self.user_message = (
-            f"El documento '{self.file_path}' está vacío o solo contiene imágenes."
-        )
+        self.user_message = f"El documento '{self.file_path}' está vacío o solo contiene imágenes."
         self.context = {"file_path": self.file_path}
         super().__post_init__()
 
@@ -107,7 +103,7 @@ class UnsupportedFormatError(ParsingError):
     detected_format: str = ""
     message: str = field(init=False)
     severity: ErrorSeverity = field(default=ErrorSeverity.FATAL, init=False)
-    user_message: Optional[str] = field(default=None, init=False)
+    user_message: str | None = field(default=None, init=False)
     context: dict[str, Any] = field(default_factory=dict, init=False)
 
     def __post_init__(self):
@@ -130,7 +126,7 @@ class ScannedPDFError(ParsingError):
     file_path: str = ""
     message: str = field(init=False)
     severity: ErrorSeverity = field(default=ErrorSeverity.FATAL, init=False)
-    user_message: Optional[str] = field(default=None, init=False)
+    user_message: str | None = field(default=None, init=False)
     context: dict[str, Any] = field(default_factory=dict, init=False)
 
     def __post_init__(self):
@@ -161,7 +157,7 @@ class PhaseError(NarrativeError):
     original_error: str = ""
     message: str = field(init=False)
     severity: ErrorSeverity = field(default=ErrorSeverity.RECOVERABLE, init=False)
-    user_message: Optional[str] = field(default=None, init=False)
+    user_message: str | None = field(default=None, init=False)
     context: dict[str, Any] = field(default_factory=dict, init=False)
 
     def __post_init__(self):
@@ -187,7 +183,7 @@ class PhasePreconditionError(NarrativeError):
     missing_data: str = ""
     message: str = field(init=False)
     severity: ErrorSeverity = field(default=ErrorSeverity.RECOVERABLE, init=False)
-    user_message: Optional[str] = field(default=None, init=False)
+    user_message: str | None = field(default=None, init=False)
     context: dict[str, Any] = field(default_factory=dict, init=False)
 
     def __post_init__(self):
@@ -221,10 +217,10 @@ class ModelNotLoadedError(NLPError):
     """Modelo NLP no disponible en local."""
 
     model_name: str = ""
-    hint: Optional[str] = None  # Mensaje personalizado
+    hint: str | None = None  # Mensaje personalizado
     message: str = field(init=False)
     severity: ErrorSeverity = field(default=ErrorSeverity.FATAL, init=False)
-    user_message: Optional[str] = field(default=None, init=False)
+    user_message: str | None = field(default=None, init=False)
     context: dict[str, Any] = field(default_factory=dict, init=False)
 
     def __post_init__(self):
@@ -248,14 +244,13 @@ class ChapterProcessingError(NLPError):
     original_error: str = ""
     message: str = field(init=False)
     severity: ErrorSeverity = field(default=ErrorSeverity.RECOVERABLE, init=False)
-    user_message: Optional[str] = field(default=None, init=False)
+    user_message: str | None = field(default=None, init=False)
     context: dict[str, Any] = field(default_factory=dict, init=False)
 
     def __post_init__(self):
         self.message = f"Error processing chapter {self.chapter_num}: {self.original_error}"
         self.user_message = (
-            f"Error al analizar el capítulo {self.chapter_num}. "
-            "Se continuará con el resto."
+            f"Error al analizar el capítulo {self.chapter_num}. Se continuará con el resto."
         )
         self.context = {
             "chapter_num": self.chapter_num,
@@ -282,7 +277,7 @@ class ProjectNotFoundError(DatabaseError):
     project_id: int = 0
     message: str = field(init=False)
     severity: ErrorSeverity = field(default=ErrorSeverity.FATAL, init=False)
-    user_message: Optional[str] = field(default=None, init=False)
+    user_message: str | None = field(default=None, init=False)
     context: dict[str, Any] = field(default_factory=dict, init=False)
 
     def __post_init__(self):
@@ -300,7 +295,7 @@ class DocumentAlreadyExistsError(DatabaseError):
     existing_project_name: str = ""
     message: str = field(init=False)
     severity: ErrorSeverity = field(default=ErrorSeverity.FATAL, init=False)
-    user_message: Optional[str] = field(default=None, init=False)
+    user_message: str | None = field(default=None, init=False)
     context: dict[str, Any] = field(default_factory=dict, init=False)
 
     def __post_init__(self):
@@ -335,7 +330,7 @@ class OutOfMemoryError(ResourceError):
     estimated_mb: int = 0
     message: str = field(init=False)
     severity: ErrorSeverity = field(default=ErrorSeverity.DEGRADED, init=False)
-    user_message: Optional[str] = field(default=None, init=False)
+    user_message: str | None = field(default=None, init=False)
     context: dict[str, Any] = field(default_factory=dict, init=False)
 
     def __post_init__(self):
@@ -368,7 +363,7 @@ class LicenseNotFoundError(LicensingError):
 
     message: str = field(default="No license found", init=False)
     severity: ErrorSeverity = field(default=ErrorSeverity.FATAL, init=False)
-    user_message: Optional[str] = field(default=None, init=False)
+    user_message: str | None = field(default=None, init=False)
     context: dict[str, Any] = field(default_factory=dict, init=False)
 
     def __post_init__(self):
@@ -383,17 +378,16 @@ class LicenseNotFoundError(LicensingError):
 class LicenseExpiredError(LicensingError):
     """Licencia expirada."""
 
-    expired_at: Optional[str] = None
+    expired_at: str | None = None
     message: str = field(init=False)
     severity: ErrorSeverity = field(default=ErrorSeverity.FATAL, init=False)
-    user_message: Optional[str] = field(default=None, init=False)
+    user_message: str | None = field(default=None, init=False)
     context: dict[str, Any] = field(default_factory=dict, init=False)
 
     def __post_init__(self):
         self.message = "License expired"
         self.user_message = (
-            "Tu licencia ha expirado. "
-            "Por favor, renueva tu suscripción para continuar."
+            "Tu licencia ha expirado. Por favor, renueva tu suscripción para continuar."
         )
         self.context = {"expired_at": self.expired_at}
         super().__post_init__()
@@ -406,7 +400,7 @@ class LicenseOfflineError(LicensingError):
     grace_days_remaining: int = 0
     message: str = field(init=False)
     severity: ErrorSeverity = field(default=ErrorSeverity.DEGRADED, init=False)
-    user_message: Optional[str] = field(default=None, init=False)
+    user_message: str | None = field(default=None, init=False)
     context: dict[str, Any] = field(default_factory=dict, init=False)
 
     def __post_init__(self):
@@ -417,9 +411,7 @@ class LicenseOfflineError(LicensingError):
                 "Conéctate a internet para verificar tu licencia."
             )
         else:
-            self.user_message = (
-                "No se puede verificar la licencia sin conexión a internet."
-            )
+            self.user_message = "No se puede verificar la licencia sin conexión a internet."
         self.context = {"grace_days_remaining": self.grace_days_remaining}
         super().__post_init__()
 
@@ -432,7 +424,7 @@ class DeviceLimitError(LicensingError):
     max_devices: int = 0
     message: str = field(init=False)
     severity: ErrorSeverity = field(default=ErrorSeverity.FATAL, init=False)
-    user_message: Optional[str] = field(default=None, init=False)
+    user_message: str | None = field(default=None, init=False)
     context: dict[str, Any] = field(default_factory=dict, init=False)
 
     def __post_init__(self):
@@ -455,7 +447,7 @@ class DeviceCooldownError(LicensingError):
     hours_remaining: int = 0
     message: str = field(init=False)
     severity: ErrorSeverity = field(default=ErrorSeverity.FATAL, init=False)
-    user_message: Optional[str] = field(default=None, init=False)
+    user_message: str | None = field(default=None, init=False)
     context: dict[str, Any] = field(default_factory=dict, init=False)
 
     def __post_init__(self):
@@ -477,7 +469,7 @@ class QuotaExceededError(LicensingError):
     billing_period: str = ""
     message: str = field(init=False)
     severity: ErrorSeverity = field(default=ErrorSeverity.FATAL, init=False)
-    user_message: Optional[str] = field(default=None, init=False)
+    user_message: str | None = field(default=None, init=False)
     context: dict[str, Any] = field(default_factory=dict, init=False)
 
     def __post_init__(self):
@@ -502,7 +494,7 @@ class ModuleNotLicensedError(LicensingError):
     module_name: str = ""
     message: str = field(init=False)
     severity: ErrorSeverity = field(default=ErrorSeverity.FATAL, init=False)
-    user_message: Optional[str] = field(default=None, init=False)
+    user_message: str | None = field(default=None, init=False)
     context: dict[str, Any] = field(default_factory=dict, init=False)
 
     def __post_init__(self):

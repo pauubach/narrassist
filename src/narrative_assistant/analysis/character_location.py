@@ -14,20 +14,20 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
-from ..core.result import Result
 from ..core.errors import NLPError
+from ..core.result import Result
 
 logger = logging.getLogger(__name__)
 
 
 class LocationChangeType(Enum):
     """Tipo de cambio de ubicación."""
-    ARRIVAL = "arrival"          # Llegada a un lugar
-    DEPARTURE = "departure"      # Salida de un lugar
-    TRANSITION = "transition"    # Transición entre lugares
-    PRESENCE = "presence"        # Presencia en un lugar (sin movimiento explícito)
+
+    ARRIVAL = "arrival"  # Llegada a un lugar
+    DEPARTURE = "departure"  # Salida de un lugar
+    TRANSITION = "transition"  # Transición entre lugares
+    PRESENCE = "presence"  # Presencia en un lugar (sin movimiento explícito)
 
 
 @dataclass
@@ -37,10 +37,11 @@ class LocationEvent:
 
     Representa un cambio de ubicación o presencia en un lugar.
     """
+
     entity_id: int
     entity_name: str
-    location_id: Optional[int]   # ID de entidad LOC si existe
-    location_name: str           # Nombre del lugar
+    location_id: int | None  # ID de entidad LOC si existe
+    location_name: str  # Nombre del lugar
     chapter: int
     start_char: int
     end_char: int
@@ -74,6 +75,7 @@ class LocationInconsistency:
     Un personaje aparece en dos lugares incompatibles en el mismo
     momento narrativo.
     """
+
     entity_id: int
     entity_name: str
     location1_name: str
@@ -105,6 +107,7 @@ class CharacterLocationReport:
     """
     Reporte de ubicaciones de personajes.
     """
+
     project_id: int
     location_events: list[LocationEvent] = field(default_factory=list)
     inconsistencies: list[LocationInconsistency] = field(default_factory=list)
@@ -118,8 +121,8 @@ class CharacterLocationReport:
             "inconsistencies": [i.to_dict() for i in self.inconsistencies],
             "inconsistencies_count": len(self.inconsistencies),
             "current_locations": self.current_locations,
-            "characters_tracked": len(set(e.entity_id for e in self.location_events)),
-            "locations_found": len(set(e.location_name for e in self.location_events)),
+            "characters_tracked": len({e.entity_id for e in self.location_events}),
+            "locations_found": len({e.location_name for e in self.location_events}),
         }
 
 
@@ -186,23 +189,21 @@ class CharacterLocationAnalyzer:
             report = CharacterLocationReport(project_id=project_id)
 
             # Filtrar personajes (PER) y ubicaciones (LOC)
-            characters = {e['name'].lower(): e for e in entities if e.get('entity_type') == 'PER'}
-            locations = {e['name'].lower(): e for e in entities if e.get('entity_type') == 'LOC'}
+            characters = {e["name"].lower(): e for e in entities if e.get("entity_type") == "PER"}
+            locations = {e["name"].lower(): e for e in entities if e.get("entity_type") == "LOC"}
 
             # Tracking de última ubicación conocida por personaje
             last_known_location: dict[int, tuple[str, int]] = {}  # entity_id -> (location, chapter)
 
-            for chapter in sorted(chapters, key=lambda c: c.get('number', 0)):
-                chapter_num = chapter.get('number', 0)
-                content = chapter.get('content', '')
+            for chapter in sorted(chapters, key=lambda c: c.get("number", 0)):
+                chapter_num = chapter.get("number", 0)
+                content = chapter.get("content", "")
 
                 if not content:
                     continue
 
                 # Detectar eventos de ubicación
-                events = self._detect_location_events(
-                    content, chapter_num, characters, locations
-                )
+                events = self._detect_location_events(content, chapter_num, characters, locations)
 
                 for event in events:
                     report.location_events.append(event)
@@ -212,10 +213,11 @@ class CharacterLocationAnalyzer:
                         prev_loc, prev_chapter = last_known_location[event.entity_id]
 
                         # Si está en el mismo capítulo pero diferente ubicación sin transición
-                        if (prev_chapter == chapter_num and
-                            prev_loc.lower() != event.location_name.lower() and
-                            event.change_type != LocationChangeType.TRANSITION):
-
+                        if (
+                            prev_chapter == chapter_num
+                            and prev_loc.lower() != event.location_name.lower()
+                            and event.change_type != LocationChangeType.TRANSITION
+                        ):
                             inconsistency = LocationInconsistency(
                                 entity_id=event.entity_id,
                                 entity_name=event.entity_name,
@@ -226,7 +228,7 @@ class CharacterLocationAnalyzer:
                                 location2_chapter=chapter_num,
                                 location2_excerpt=event.excerpt,
                                 explanation=f"{event.entity_name} aparece en {event.location_name} "
-                                           f"pero estaba en {prev_loc} en el mismo capítulo",
+                                f"pero estaba en {prev_loc} en el mismo capítulo",
                                 confidence=0.7,
                             )
                             report.inconsistencies.append(inconsistency)
@@ -258,8 +260,7 @@ class CharacterLocationAnalyzer:
         for pattern in self.compiled_arrival:
             for match in pattern.finditer(text):
                 event = self._create_event(
-                    match, characters, locations, chapter, text,
-                    LocationChangeType.ARRIVAL
+                    match, characters, locations, chapter, text, LocationChangeType.ARRIVAL
                 )
                 if event:
                     events.append(event)
@@ -268,8 +269,7 @@ class CharacterLocationAnalyzer:
         for pattern in self.compiled_departure:
             for match in pattern.finditer(text):
                 event = self._create_event(
-                    match, characters, locations, chapter, text,
-                    LocationChangeType.DEPARTURE
+                    match, characters, locations, chapter, text, LocationChangeType.DEPARTURE
                 )
                 if event:
                     events.append(event)
@@ -278,8 +278,7 @@ class CharacterLocationAnalyzer:
         for pattern in self.compiled_presence:
             for match in pattern.finditer(text):
                 event = self._create_event(
-                    match, characters, locations, chapter, text,
-                    LocationChangeType.PRESENCE
+                    match, characters, locations, chapter, text, LocationChangeType.PRESENCE
                 )
                 if event:
                     events.append(event)
@@ -288,8 +287,7 @@ class CharacterLocationAnalyzer:
         for pattern in self.compiled_transition:
             for match in pattern.finditer(text):
                 event = self._create_event(
-                    match, characters, locations, chapter, text,
-                    LocationChangeType.TRANSITION
+                    match, characters, locations, chapter, text, LocationChangeType.TRANSITION
                 )
                 if event:
                     events.append(event)
@@ -304,12 +302,12 @@ class CharacterLocationAnalyzer:
         chapter: int,
         text: str,
         change_type: LocationChangeType,
-    ) -> Optional[LocationEvent]:
+    ) -> LocationEvent | None:
         """Crea un evento de ubicación a partir de un match."""
         try:
             groups = match.groupdict()
-            name = groups.get('name', '').strip()
-            loc = groups.get('loc', '').strip()
+            name = groups.get("name", "").strip()
+            loc = groups.get("loc", "").strip()
 
             if not name or not loc:
                 return None
@@ -328,7 +326,7 @@ class CharacterLocationAnalyzer:
 
             # Buscar la ubicación
             loc_data = locations.get(loc.lower())
-            loc_id = loc_data['id'] if loc_data else None
+            loc_id = loc_data["id"] if loc_data else None
 
             # Extraer contexto
             start = max(0, match.start() - 20)
@@ -336,8 +334,8 @@ class CharacterLocationAnalyzer:
             excerpt = text[start:end].strip()
 
             return LocationEvent(
-                entity_id=char_data['id'],
-                entity_name=char_data['name'],
+                entity_id=char_data["id"],
+                entity_name=char_data["name"],
                 location_id=loc_id,
                 location_name=loc,
                 chapter=chapter,

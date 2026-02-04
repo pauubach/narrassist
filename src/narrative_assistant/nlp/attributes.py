@@ -35,18 +35,18 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Optional
 
+from ..core.errors import ErrorSeverity, NLPError
 from ..core.result import Result
-from ..core.errors import NLPError, ErrorSeverity
 
 logger = logging.getLogger(__name__)
 
 # Pesos de votación por método (defaults heurísticos)
 # Se reemplazan automáticamente por pesos aprendidos si existe default_weights.json
 DEFAULT_METHOD_WEIGHTS = {
-    "llm": 0.40,        # Mayor peso - comprensión semántica
+    "llm": 0.40,  # Mayor peso - comprensión semántica
     "embeddings": 0.25,  # Similitud semántica
     "dependency": 0.20,  # Análisis sintáctico
-    "patterns": 0.15,    # Patrones regex (fallback)
+    "patterns": 0.15,  # Patrones regex (fallback)
 }
 
 # Pesos activos (pueden cambiar si se cargan pesos entrenados)
@@ -65,7 +65,7 @@ def _load_default_trained_weights() -> None:
     try:
         weights_file = Path(__file__).parent / "training_data" / "default_weights.json"
         if weights_file.exists():
-            with open(weights_file, "r", encoding="utf-8") as f:
+            with open(weights_file, encoding="utf-8") as f:
                 data = json.load(f)
 
             weights = data.get("weights", {})
@@ -149,16 +149,17 @@ class AttributeKey(Enum):
 class AssignmentSource:
     """
     Fuente de asignación de un atributo a una entidad.
-    
+
     Usado por CESP (Cascading Extraction with Syntactic Priority) para
     priorizar atributos con evidencia sintáctica sobre proximidad.
     """
-    GENITIVE = "genitive"           # "ojos azules de Pedro" - máxima prioridad
-    EXPLICIT_SUBJECT = "nsubj"      # Sujeto explícito sintáctico
+
+    GENITIVE = "genitive"  # "ojos azules de Pedro" - máxima prioridad
+    EXPLICIT_SUBJECT = "nsubj"  # Sujeto explícito sintáctico
     IMPLICIT_SUBJECT = "inherited"  # Sujeto tácito heredado
-    PROXIMITY = "proximity"         # Asignación por proximidad - menor prioridad
-    LLM = "llm"                     # Asignado por LLM
-    EMBEDDINGS = "embeddings"       # Asignado por embeddings
+    PROXIMITY = "proximity"  # Asignación por proximidad - menor prioridad
+    LLM = "llm"  # Asignado por LLM
+    EMBEDDINGS = "embeddings"  # Asignado por embeddings
 
 
 @dataclass
@@ -192,8 +193,8 @@ class ExtractedAttribute:
     confidence: float = 0.8
     is_negated: bool = False
     is_metaphor: bool = False
-    chapter_id: Optional[int] = None
-    assignment_source: Optional[str] = None  # AssignmentSource value
+    chapter_id: int | None = None
+    assignment_source: str | None = None  # AssignmentSource value
     sentence_idx: int = 0  # Para deduplicación CESP
 
     def to_dict(self) -> dict:
@@ -260,13 +261,12 @@ class AttributeExtractionError(NLPError):
     original_error: str = ""
     message: str = field(init=False)
     severity: ErrorSeverity = field(default=ErrorSeverity.RECOVERABLE, init=False)
-    user_message: Optional[str] = field(default=None, init=False)
+    user_message: str | None = field(default=None, init=False)
 
     def __post_init__(self):
         self.message = f"Attribute extraction error: {self.original_error}"
         self.user_message = (
-            "Error al extraer atributos. "
-            "Se continuará con los resultados parciales."
+            "Error al extraer atributos. Se continuará con los resultados parciales."
         )
         super().__post_init__()
 
@@ -277,53 +277,170 @@ class AttributeExtractionError(NLPError):
 
 # Colores válidos para ojos y pelo (español)
 COLORS = {
-    "azul", "azules", "verde", "verdes", "marrón", "marrones", "castaño",
-    "castaños", "negro", "negros", "gris", "grises", "miel", "avellana",
-    "ámbar", "violeta", "dorado", "dorados", "plateado", "plateados",
-    "rubio", "rubios", "pelirrojo", "pelirrojos", "canoso", "canosos",
-    "blanco", "blancos", "oscuro", "oscuros", "claro", "claros",
-    "rojo", "rojos", "cobrizo", "cobrizos", "azabache",
-    "moreno", "morena", "morenos", "morenas",
+    "azul",
+    "azules",
+    "verde",
+    "verdes",
+    "marrón",
+    "marrones",
+    "castaño",
+    "castaños",
+    "negro",
+    "negros",
+    "gris",
+    "grises",
+    "miel",
+    "avellana",
+    "ámbar",
+    "violeta",
+    "dorado",
+    "dorados",
+    "plateado",
+    "plateados",
+    "rubio",
+    "rubios",
+    "pelirrojo",
+    "pelirrojos",
+    "canoso",
+    "canosos",
+    "blanco",
+    "blancos",
+    "oscuro",
+    "oscuros",
+    "claro",
+    "claros",
+    "rojo",
+    "rojos",
+    "cobrizo",
+    "cobrizos",
+    "azabache",
+    "moreno",
+    "morena",
+    "morenos",
+    "morenas",
 }
 
 # Tipos de pelo
 HAIR_TYPES = {
-    "liso", "rizado", "ondulado", "encrespado", "lacio", "fino", "grueso",
-    "abundante", "escaso", "largo", "corto", "rapado", "calvo",
+    "liso",
+    "rizado",
+    "ondulado",
+    "encrespado",
+    "lacio",
+    "fino",
+    "grueso",
+    "abundante",
+    "escaso",
+    "largo",
+    "corto",
+    "rapado",
+    "calvo",
 }
 
 # Modificaciones de cabello (teñido, natural, etc.)
 # Consenso: teñido puede cambiar libremente, solo alerta si pasa a "natural"
 HAIR_MODIFICATIONS = {
-    "natural", "teñido", "teñida", "decolorado", "decolorada",
-    "mechas", "reflejos", "tinte", "de bote",  # coloquial: "rubia de bote"
-    "oxigenado", "oxigenada", "pintado", "pintada",
+    "natural",
+    "teñido",
+    "teñida",
+    "decolorado",
+    "decolorada",
+    "mechas",
+    "reflejos",
+    "tinte",
+    "de bote",  # coloquial: "rubia de bote"
+    "oxigenado",
+    "oxigenada",
+    "pintado",
+    "pintada",
 }
 
 # Constitución física
 BUILD_TYPES = {
-    "alto", "alta", "altos", "altas",
-    "bajo", "baja", "bajos", "bajas",
-    "delgado", "delgada", "delgados", "delgadas",
-    "corpulento", "corpulenta", "corpulentos", "corpulentas",
-    "esbelto", "esbelta", "esbeltos", "esbeltas",
-    "robusto", "robusta", "robustos", "robustas",
-    "musculoso", "musculosa", "musculosos", "musculosas",
-    "gordo", "gorda", "gordos", "gordas",
-    "flaco", "flaca", "flacos", "flacas",
-    "atlético", "atlética", "atléticos", "atléticas",
-    "enclenque", "enclenques",
-    "fornido", "fornida", "fornidos", "fornidas",
+    "alto",
+    "alta",
+    "altos",
+    "altas",
+    "bajo",
+    "baja",
+    "bajos",
+    "bajas",
+    "delgado",
+    "delgada",
+    "delgados",
+    "delgadas",
+    "corpulento",
+    "corpulenta",
+    "corpulentos",
+    "corpulentas",
+    "esbelto",
+    "esbelta",
+    "esbeltos",
+    "esbeltas",
+    "robusto",
+    "robusta",
+    "robustos",
+    "robustas",
+    "musculoso",
+    "musculosa",
+    "musculosos",
+    "musculosas",
+    "gordo",
+    "gorda",
+    "gordos",
+    "gordas",
+    "flaco",
+    "flaca",
+    "flacos",
+    "flacas",
+    "atlético",
+    "atlética",
+    "atléticos",
+    "atléticas",
+    "enclenque",
+    "enclenques",
+    "fornido",
+    "fornida",
+    "fornidos",
+    "fornidas",
 }
 
 # Rasgos de personalidad
 PERSONALITY_TRAITS = {
-    "amable", "cruel", "tímido", "tímida", "extrovertido", "extrovertida",
-    "introvertido", "introvertida", "valiente", "cobarde", "leal", "traidor",
-    "traidora", "honesto", "honesta", "mentiroso", "mentirosa", "generoso",
-    "generosa", "tacaño", "tacaña", "paciente", "impaciente", "orgulloso",
-    "orgullosa", "humilde", "arrogante", "sabio", "sabia", "ingenuo",
-    "ingenua", "astuto", "astuta", "torpe",
+    "amable",
+    "cruel",
+    "tímido",
+    "tímida",
+    "extrovertido",
+    "extrovertida",
+    "introvertido",
+    "introvertida",
+    "valiente",
+    "cobarde",
+    "leal",
+    "traidor",
+    "traidora",
+    "honesto",
+    "honesta",
+    "mentiroso",
+    "mentirosa",
+    "generoso",
+    "generosa",
+    "tacaño",
+    "tacaña",
+    "paciente",
+    "impaciente",
+    "orgulloso",
+    "orgullosa",
+    "humilde",
+    "arrogante",
+    "sabio",
+    "sabia",
+    "ingenuo",
+    "ingenua",
+    "astuto",
+    "astuta",
+    "torpe",
 }
 
 
@@ -333,11 +450,11 @@ PERSONALITY_TRAITS = {
 
 # Tipo para menciones de entidad: (name, start, end, entity_type)
 # entity_type puede ser: "PER", "LOC", "ORG", "MISC", None
-EntityMention = tuple[str, int, int, Optional[str]]
+EntityMention = tuple[str, int, int, str | None]
 
 
 def _normalize_entity_mentions(
-    entity_mentions: Optional[list[tuple]],
+    entity_mentions: list[tuple] | None,
 ) -> list[EntityMention]:
     """
     Normaliza entity_mentions al formato de 4 elementos.
@@ -371,14 +488,14 @@ def _normalize_entity_mentions(
     return normalized
 
 
-def _is_person_entity(entity_type: Optional[str]) -> bool:
+def _is_person_entity(entity_type: str | None) -> bool:
     """Verifica si el tipo de entidad es una persona."""
     if entity_type is None:
         return True  # Si no hay tipo, asumir que puede ser persona
     return entity_type.upper() in ("PER", "PERSON", "PERS")
 
 
-def _is_location_entity(entity_type: Optional[str]) -> bool:
+def _is_location_entity(entity_type: str | None) -> bool:
     """Verifica si el tipo de entidad es una ubicación."""
     if entity_type is None:
         return False  # Si no hay tipo, no asumir ubicación
@@ -447,7 +564,6 @@ ATTRIBUTE_PATTERNS: list[tuple[str, AttributeKey, AttributeCategory, float, bool
         0.5,  # Baja confianza, muy genérico
         False,
     ),
-
     # === PELO/CABELLO ===
     # "Tenía el cabello largo y negro" - TIPO (largo/corto)
     (
@@ -540,7 +656,6 @@ ATTRIBUTE_PATTERNS: list[tuple[str, AttributeKey, AttributeCategory, float, bool
         0.55,
         False,
     ),
-
     # === MODIFICACIÓN DE CABELLO (teñido/natural) ===
     # "era rubia de bote" / "rubia teñida"
     (
@@ -590,7 +705,6 @@ ATTRIBUTE_PATTERNS: list[tuple[str, AttributeKey, AttributeCategory, float, bool
         0.75,
         False,
     ),
-
     # === EDAD ===
     # "Juan, de 25 años,"
     (
@@ -624,7 +738,6 @@ ATTRIBUTE_PATTERNS: list[tuple[str, AttributeKey, AttributeCategory, float, bool
         0.7,
         False,
     ),
-
     # === ALTURA/CONSTITUCIÓN ===
     # "Juan era alto" / "María era delgada"
     (
@@ -667,7 +780,7 @@ ATTRIBUTE_PATTERNS: list[tuple[str, AttributeKey, AttributeCategory, float, bool
         0.65,
         False,
     ),
-    # "era alto y moreno" - captura HEIGHT (alto/bajo) 
+    # "era alto y moreno" - captura HEIGHT (alto/bajo)
     (
         r"(\b[A-ZÁÉÍÓÚÜÑ][a-záéíóúüñ]+)\s+era\s+(alto|alta|bajo|baja)\s+y\s+"
         r"(?:moreno|morena|rubio|rubia|castaño|castaña|pelirrojo|pelirroja|"
@@ -768,7 +881,6 @@ ATTRIBUTE_PATTERNS: list[tuple[str, AttributeKey, AttributeCategory, float, bool
         0.75,
         False,  # 1 grupo = resolver entidad con _find_nearest_entity
     ),
-
     # === PERSONALIDAD ===
     # "Juan era amable" / "María era valiente"
     (
@@ -804,7 +916,6 @@ ATTRIBUTE_PATTERNS: list[tuple[str, AttributeKey, AttributeCategory, float, bool
         0.7,
         False,
     ),
-
     # === PROFESIÓN/ROL ===
     # "Juan, el médico," / "María, la abogada,"
     (
@@ -841,7 +952,6 @@ ATTRIBUTE_PATTERNS: list[tuple[str, AttributeKey, AttributeCategory, float, bool
         0.7,
         False,
     ),
-
     # === RASGOS DISTINTIVOS ===
     # "Juan tenía una cicatriz en..."
     (
@@ -852,11 +962,9 @@ ATTRIBUTE_PATTERNS: list[tuple[str, AttributeKey, AttributeCategory, float, bool
         0.85,
         False,
     ),
-
     # ==========================================================================
     # LUGARES
     # ==========================================================================
-
     # === UBICACIÓN/CLIMA ===
     # "la ciudad de Valencia" / "el pueblo de Miraflores"
     (
@@ -886,7 +994,6 @@ ATTRIBUTE_PATTERNS: list[tuple[str, AttributeKey, AttributeCategory, float, bool
         0.7,
         True,
     ),
-
     # === ARQUITECTURA ===
     # "el viejo castillo" / "la antigua fortaleza"
     (
@@ -899,11 +1006,9 @@ ATTRIBUTE_PATTERNS: list[tuple[str, AttributeKey, AttributeCategory, float, bool
         0.75,
         True,
     ),
-
     # ==========================================================================
     # OBJETOS
     # ==========================================================================
-
     # === MATERIAL ===
     # "espada de acero" / "anillo de oro"
     (
@@ -918,7 +1023,6 @@ ATTRIBUTE_PATTERNS: list[tuple[str, AttributeKey, AttributeCategory, float, bool
         0.9,
         False,
     ),
-
     # === COLOR DE OBJETO ===
     # "capa roja" / "túnica negra"
     (
@@ -940,11 +1044,9 @@ ATTRIBUTE_PATTERNS: list[tuple[str, AttributeKey, AttributeCategory, float, bool
         0.8,
         False,
     ),
-
     # ==========================================================================
     # PATRONES GENÉRICOS (menor confianza)
     # ==========================================================================
-
     # "X era conocido por su Y" - captura genérica
     (
         r"(\b[A-ZÁÉÍÓÚÜÑ][a-záéíóúüñ]+)\s+era\s+conocid[oa]\s+por\s+su\s+(\w+)",
@@ -1097,13 +1199,9 @@ class AttributeExtractor:
             for pattern, key, cat, conf, swap in ATTRIBUTE_PATTERNS
         ]
 
-        self._metaphor_patterns = [
-            re.compile(p, re.IGNORECASE) for p in METAPHOR_INDICATORS
-        ]
+        self._metaphor_patterns = [re.compile(p, re.IGNORECASE) for p in METAPHOR_INDICATORS]
 
-        self._negation_patterns = [
-            re.compile(p, re.IGNORECASE) for p in NEGATION_INDICATORS
-        ]
+        self._negation_patterns = [re.compile(p, re.IGNORECASE) for p in NEGATION_INDICATORS]
 
         # Patrones contrastivos (No es X, sino Y)
         self._contrastive_patterns = [
@@ -1116,20 +1214,31 @@ class AttributeExtractor:
         ]
 
         # Indicadores condicionales (atributo hipotético)
-        self._conditional_patterns = [
-            re.compile(p, re.IGNORECASE) for p in CONDITIONAL_INDICATORS
-        ]
+        self._conditional_patterns = [re.compile(p, re.IGNORECASE) for p in CONDITIONAL_INDICATORS]
 
         # Verbos copulativos para atributos (español)
         self._copulative_verbs = {
-            "ser", "estar", "parecer", "resultar", "quedarse",
-            "volverse", "ponerse", "hacerse", "convertirse",
+            "ser",
+            "estar",
+            "parecer",
+            "resultar",
+            "quedarse",
+            "volverse",
+            "ponerse",
+            "hacerse",
+            "convertirse",
         }
 
         # Verbos de posesión/descripción
         self._descriptive_verbs = {
-            "tener", "poseer", "lucir", "mostrar", "presentar",
-            "llevar", "vestir", "portar",
+            "tener",
+            "poseer",
+            "lucir",
+            "mostrar",
+            "presentar",
+            "llevar",
+            "vestir",
+            "portar",
         }
 
     def _get_nlp(self):
@@ -1137,6 +1246,7 @@ class AttributeExtractor:
         if self._nlp is None:
             try:
                 from .spacy_gpu import load_spacy_model
+
                 self._nlp = load_spacy_model()
             except Exception as e:
                 logger.warning(f"No se pudo cargar spaCy: {e}")
@@ -1148,6 +1258,7 @@ class AttributeExtractor:
         if self._llm_client is None:
             try:
                 from ..llm.client import get_llm_client
+
                 self._llm_client = get_llm_client()
                 if self._llm_client and self._llm_client.is_available:
                     logger.info(f"LLM disponible para atributos: {self._llm_client.model_name}")
@@ -1163,6 +1274,7 @@ class AttributeExtractor:
         if self._embeddings_model is None:
             try:
                 from .embeddings import get_embeddings_model
+
                 self._embeddings_model = get_embeddings_model()
                 if self._embeddings_model:
                     logger.info("Embeddings disponible para atributos")
@@ -1176,8 +1288,8 @@ class AttributeExtractor:
     def extract_attributes(
         self,
         text: str,
-        entity_mentions: Optional[list[tuple[str, int, int]]] = None,
-        chapter_id: Optional[int] = None,
+        entity_mentions: list[tuple[str, int, int]] | None = None,
+        chapter_id: int | None = None,
     ) -> Result[AttributeExtractionResult]:
         """
         Extrae atributos del texto usando votación multi-método.
@@ -1210,6 +1322,7 @@ class AttributeExtractor:
             if nlp:
                 self._spacy_doc = nlp(text)
                 from .scope_resolver import ScopeResolver
+
                 self._scope_resolver = ScopeResolver(self._spacy_doc, text)
         except Exception as e:
             logger.debug(f"Could not create spaCy doc for scope resolution: {e}")
@@ -1219,9 +1332,7 @@ class AttributeExtractor:
             if self.use_llm:
                 llm_client = self._get_llm_client()
                 if llm_client:
-                    llm_attrs = self._extract_by_llm(
-                        text, entity_mentions, chapter_id, llm_client
-                    )
+                    llm_attrs = self._extract_by_llm(text, entity_mentions, chapter_id, llm_client)
                     all_extractions["llm"] = llm_attrs
                     logger.debug(f"LLM extrajo {len(llm_attrs)} atributos")
 
@@ -1237,21 +1348,15 @@ class AttributeExtractor:
 
             # 3. Extracción por dependencias (spaCy)
             if self.use_dependency_extraction:
-                dep_attrs = self._extract_by_dependency(
-                    text, entity_mentions, chapter_id
-                )
+                dep_attrs = self._extract_by_dependency(text, entity_mentions, chapter_id)
                 all_extractions["dependency"] = dep_attrs
                 logger.debug(f"Dependency extrajo {len(dep_attrs)} atributos")
 
             # 4. Extracción por patrones regex (fallback)
             if self.use_patterns:
-                pattern_attrs = self._extract_by_patterns(
-                    text, entity_mentions, chapter_id
-                )
+                pattern_attrs = self._extract_by_patterns(text, entity_mentions, chapter_id)
                 all_extractions["patterns"] = pattern_attrs
-                result.metaphors_filtered = sum(
-                    1 for a in pattern_attrs if a.is_metaphor
-                )
+                result.metaphors_filtered = sum(1 for a in pattern_attrs if a.is_metaphor)
                 logger.debug(f"Patterns extrajo {len(pattern_attrs)} atributos")
 
             # Votación ponderada para combinar resultados
@@ -1278,8 +1383,8 @@ class AttributeExtractor:
     def _extract_by_llm(
         self,
         text: str,
-        entity_mentions: Optional[list[tuple[str, int, int]]],
-        chapter_id: Optional[int],
+        entity_mentions: list[tuple[str, int, int]] | None,
+        chapter_id: int | None,
         llm_client: Any,
     ) -> list[ExtractedAttribute]:
         """
@@ -1295,10 +1400,13 @@ class AttributeExtractor:
         if entity_mentions:
             normalized = _normalize_entity_mentions(entity_mentions)
             # Filtrar solo personas para extracción de atributos físicos
-            known_entities = list(set(
-                name for name, _, _, entity_type in normalized
-                if entity_type is None or _is_person_entity(entity_type)
-            ))
+            known_entities = list(
+                {
+                    name
+                    for name, _, _, entity_type in normalized
+                    if entity_type is None or _is_person_entity(entity_type)
+                }
+            )
 
         # Limitar texto para no sobrecargar el LLM
         text_sample = text[:3000] if len(text) > 3000 else text
@@ -1308,7 +1416,7 @@ class AttributeExtractor:
 TEXTO:
 {text_sample}
 
-PERSONAJES: {', '.join(known_entities) if known_entities else 'Detectar'}
+PERSONAJES: {", ".join(known_entities) if known_entities else "Detectar"}
 
 REGLAS:
 - Una entrada por CADA mención (si un atributo aparece dos veces, dos entradas)
@@ -1386,8 +1494,8 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
     def _extract_by_embeddings(
         self,
         text: str,
-        entity_mentions: Optional[list[tuple[str, int, int]]],
-        chapter_id: Optional[int],
+        entity_mentions: list[tuple[str, int, int]] | None,
+        chapter_id: int | None,
         embeddings_model: Any,
     ) -> list[ExtractedAttribute]:
         """
@@ -1401,28 +1509,59 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
         canonical_descriptions = {
             # Físicos
             ("physical", "eye_color"): [
-                "tiene ojos azules", "tiene ojos verdes", "tiene ojos marrones",
-                "ojos de color", "sus ojos son", "la mirada",
+                "tiene ojos azules",
+                "tiene ojos verdes",
+                "tiene ojos marrones",
+                "ojos de color",
+                "sus ojos son",
+                "la mirada",
             ],
             ("physical", "hair_color"): [
-                "pelo rubio", "cabello negro", "pelo castaño", "pelirrojo",
-                "es rubia", "es rubio", "tiene el pelo", "su cabello",
+                "pelo rubio",
+                "cabello negro",
+                "pelo castaño",
+                "pelirrojo",
+                "es rubia",
+                "es rubio",
+                "tiene el pelo",
+                "su cabello",
             ],
             ("physical", "age"): [
-                "tiene años", "de edad", "joven", "viejo", "anciano", "niño",
+                "tiene años",
+                "de edad",
+                "joven",
+                "viejo",
+                "anciano",
+                "niño",
             ],
             ("physical", "build"): [
-                "alto", "baja", "delgado", "corpulento", "musculoso", "esbelto",
+                "alto",
+                "baja",
+                "delgado",
+                "corpulento",
+                "musculoso",
+                "esbelto",
             ],
             # Psicológicos
             ("psychological", "personality"): [
-                "es amable", "persona curiosa", "carácter", "temperamento",
-                "personalidad", "siempre fue", "era conocido por",
+                "es amable",
+                "persona curiosa",
+                "carácter",
+                "temperamento",
+                "personalidad",
+                "siempre fue",
+                "era conocido por",
             ],
             # Sociales
             ("social", "profession"): [
-                "trabaja como", "es médico", "profesión", "estudios como",
-                "se dedica a", "lingüista", "profesor", "abogado",
+                "trabaja como",
+                "es médico",
+                "profesión",
+                "estudios como",
+                "se dedica a",
+                "lingüista",
+                "profesor",
+                "abogado",
             ],
         }
 
@@ -1447,9 +1586,7 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                             desc_embedding = embeddings_model.encode(desc)
 
                             # Calcular similitud coseno
-                            similarity = self._cosine_similarity(
-                                sent_embedding, desc_embedding
-                            )
+                            similarity = self._cosine_similarity(sent_embedding, desc_embedding)
 
                             if similarity > 0.5:  # Umbral de similitud
                                 # Encontrar entidad en la oración
@@ -1459,9 +1596,7 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
 
                                 if entity:
                                     # Extraer valor del atributo
-                                    value = self._extract_value_from_sentence(
-                                        sentence, key_str
-                                    )
+                                    value = self._extract_value_from_sentence(sentence, key_str)
 
                                     if value:
                                         category = {
@@ -1518,8 +1653,8 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
         # Español usa: «», "", '', —, -
 
         # Comillas españolas «»
-        open_spanish = before.count('«')
-        close_spanish = before.count('»')
+        open_spanish = before.count("«")
+        close_spanish = before.count("»")
         if open_spanish > close_spanish:
             return True
 
@@ -1538,8 +1673,9 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
         # Guiones de diálogo (— largo o - corto al inicio de línea)
         # Buscar el último inicio de línea con guión
         import re
+
         # Patrón: inicio de línea o después de punto/salto seguido de guión
-        dialogue_start_pattern = re.compile(r'(?:^|\n)\s*[-—]')
+        dialogue_start_pattern = re.compile(r"(?:^|\n)\s*[-—]")
         matches = list(dialogue_start_pattern.finditer(before))
 
         if matches:
@@ -1548,11 +1684,21 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
 
             # Verificar si hay un cierre de diálogo
             # El diálogo termina con: otro guión, salto de línea, o verbo de habla
-            speech_verbs = ['dijo', 'preguntó', 'contestó', 'respondió', 'exclamó',
-                          'murmuró', 'gritó', 'susurró', 'añadió', 'comentó']
+            speech_verbs = [
+                "dijo",
+                "preguntó",
+                "contestó",
+                "respondió",
+                "exclamó",
+                "murmuró",
+                "gritó",
+                "susurró",
+                "añadió",
+                "comentó",
+            ]
             has_speech_verb = any(verb in between.lower() for verb in speech_verbs)
-            has_closing_dash = bool(re.search(r'\s[-—]\s', between))
-            has_newline = '\n' in between
+            has_closing_dash = bool(re.search(r"\s[-—]\s", between))
+            has_newline = "\n" in between
 
             # Si no hay indicador de fin de diálogo, estamos dentro
             if not has_speech_verb and not has_closing_dash and not has_newline:
@@ -1571,9 +1717,9 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                 if verb_match is not None:
                     after_verb = between[verb_match:]
                     # Si hay otro guión después del verbo, el texto posterior está en diálogo
-                    if re.search(r'\s[-—]\s', after_verb):
+                    if re.search(r"\s[-—]\s", after_verb):
                         # La posición está después de ese segundo guión?
-                        second_dash = re.search(r'\s[-—]\s', after_verb)
+                        second_dash = re.search(r"\s[-—]\s", after_verb)
                         if second_dash:
                             return True
 
@@ -1582,8 +1728,8 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
     def _extract_by_patterns(
         self,
         text: str,
-        entity_mentions: Optional[list[tuple[str, int, int]]],
-        chapter_id: Optional[int],
+        entity_mentions: list[tuple[str, int, int]] | None,
+        chapter_id: int | None,
     ) -> list[ExtractedAttribute]:
         """
         Extrae atributos usando patrones regex (método original).
@@ -1608,9 +1754,7 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
 
                 # Verificar si es metáfora (pasando info del match para detección precisa)
                 is_metaphor = self._is_metaphor(
-                    context,
-                    match_text=match.group(0),
-                    match_pos_in_context=match_pos_in_context
+                    context, match_text=match.group(0), match_pos_in_context=match_pos_in_context
                 )
                 # En vez de filtrar completamente las metáforas, reducir confianza.
                 # Esto evita perder atributos reales en comparaciones válidas.
@@ -1641,9 +1785,7 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                 assignment_source = None  # CESP: determinar fuente de asignación
                 if len(groups) < 2:
                     value = groups[0] if groups else None
-                    entity_name = self._find_nearest_entity(
-                        text, match.start(), entity_mentions
-                    )
+                    entity_name = self._find_nearest_entity(text, match.start(), entity_mentions)
                     if not entity_name:
                         continue
                     # Asignado por proximidad (menor prioridad en CESP)
@@ -1670,7 +1812,9 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                     if corrected_value:
                         # Usar el valor corregido
                         value = corrected_value
-                        logger.debug(f"Valor contrastivo corregido: {match.group(0)[:30]} → {value}")
+                        logger.debug(
+                            f"Valor contrastivo corregido: {match.group(0)[:30]} → {value}"
+                        )
                     else:
                         # Es contrastivo pero no pudimos extraer el valor correcto, ignorar
                         logger.debug(f"Atributo contrastivo ignorado: {match.group(0)[:40]}")
@@ -1683,11 +1827,13 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                 # Ajustar confianza
                 confidence = base_conf
                 if is_metaphor:
-                    confidence *= (1.0 - metaphor_confidence_penalty)  # ~0.6
+                    confidence *= 1.0 - metaphor_confidence_penalty  # ~0.6
                 if is_temporal_past:
                     # Reducir confianza para atributos del pasado (pero no descartar)
                     confidence *= 0.6
-                    logger.debug(f"Atributo temporal (pasado), reduciendo confianza: {match.group(0)[:30]}")
+                    logger.debug(
+                        f"Atributo temporal (pasado), reduciendo confianza: {match.group(0)[:30]}"
+                    )
 
                 if confidence < self.min_confidence:
                     continue
@@ -1697,17 +1843,62 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                 # capture palabras comunes en minúscula como si fueran nombres propios
                 invalid_entity_names = {
                     # Colores y adjetivos físicos
-                    'negro', 'rubio', 'castaño', 'moreno', 'blanco', 'gris', 'canoso',
-                    'alto', 'bajo', 'largo', 'corto', 'azules', 'verdes', 'marrones',
-                    'delgado', 'fornido', 'sorprendido', 'confundido', 'extraño',
+                    "negro",
+                    "rubio",
+                    "castaño",
+                    "moreno",
+                    "blanco",
+                    "gris",
+                    "canoso",
+                    "alto",
+                    "bajo",
+                    "largo",
+                    "corto",
+                    "azules",
+                    "verdes",
+                    "marrones",
+                    "delgado",
+                    "fornido",
+                    "sorprendido",
+                    "confundido",
+                    "extraño",
                     # Verbos comunes (infinitivos y gerundios)
-                    'llorar', 'reír', 'sonreír', 'caminar', 'correr', 'hablar', 'mirar',
-                    'llorando', 'riendo', 'sonriendo', 'caminando', 'corriendo', 'mirando',
+                    "llorar",
+                    "reír",
+                    "sonreír",
+                    "caminar",
+                    "correr",
+                    "hablar",
+                    "mirar",
+                    "llorando",
+                    "riendo",
+                    "sonriendo",
+                    "caminando",
+                    "corriendo",
+                    "mirando",
                     # Sustantivos comunes
-                    'emoción', 'emocion', 'felicidad', 'tristeza', 'dolor', 'alegría', 'alegria',
-                    'miedo', 'rabia', 'enojo', 'cansancio', 'sueño', 'hambre',
+                    "emoción",
+                    "emocion",
+                    "felicidad",
+                    "tristeza",
+                    "dolor",
+                    "alegría",
+                    "alegria",
+                    "miedo",
+                    "rabia",
+                    "enojo",
+                    "cansancio",
+                    "sueño",
+                    "hambre",
                     # Preposiciones y conjunciones
-                    'tanto', 'mucho', 'poco', 'algo', 'nada', 'todo', 'siempre', 'nunca',
+                    "tanto",
+                    "mucho",
+                    "poco",
+                    "algo",
+                    "nada",
+                    "todo",
+                    "siempre",
+                    "nunca",
                 }
                 if entity_name and entity_name.lower() in invalid_entity_names:
                     continue
@@ -1718,14 +1909,25 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                     # Buscar el entity_name en el texto original del match
                     original_text = match.group(0)
                     # Si la entidad aparece en minúscula en el texto original, probablemente no es nombre propio
-                    if entity_name.lower() in original_text.lower() and entity_name not in original_text:
+                    if (
+                        entity_name.lower() in original_text.lower()
+                        and entity_name not in original_text
+                    ):
                         # La entidad está en minúscula en el original - probable falso positivo
                         continue
 
                 # Filtrar valores que son estados emocionales (no atributos físicos)
                 emotional_states = {
-                    'sorprendido', 'confundido', 'extrañado', 'asustado', 'feliz',
-                    'triste', 'enfadado', 'nervioso', 'preocupado', 'emocionado',
+                    "sorprendido",
+                    "confundido",
+                    "extrañado",
+                    "asustado",
+                    "feliz",
+                    "triste",
+                    "enfadado",
+                    "nervioso",
+                    "preocupado",
+                    "emocionado",
                 }
                 if value and value.lower() in emotional_states:
                     continue
@@ -1785,8 +1987,16 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
 
                 # Filtrar valores que son estados emocionales (no atributos físicos)
                 emotional_states = {
-                    'sorprendido', 'confundido', 'extrañado', 'asustado', 'feliz',
-                    'triste', 'enfadado', 'nervioso', 'preocupado', 'emocionado',
+                    "sorprendido",
+                    "confundido",
+                    "extrañado",
+                    "asustado",
+                    "feliz",
+                    "triste",
+                    "enfadado",
+                    "nervioso",
+                    "preocupado",
+                    "emocionado",
                 }
                 if attr.value.lower() in emotional_states:
                     logger.debug(f"Atributo ignorado (estado emocional): {attr.value}")
@@ -1795,15 +2005,64 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                 # Filtrar entidades inválidas (pronombres, adverbios, colores, etc.)
                 # Incluir versiones con y sin tilde para ser robusto
                 invalid_entities = {
-                    "también", "tambien", "este", "esta", "esto", "ese", "esa", "eso",
-                    "aquel", "aquella", "aquello", "él", "el", "ella", "ellos", "ellas",
-                    "uno", "una", "algo", "alguien", "nadie", "nada", "todo",
-                    "todos", "todas", "otro", "otra", "otros", "otras", "mismo",
-                    "misma", "mismos", "mismas", "ambos", "ambas", "varios", "varias",
-                    "quien", "quién", "cual", "cuál", "cuales", "cuáles",
+                    "también",
+                    "tambien",
+                    "este",
+                    "esta",
+                    "esto",
+                    "ese",
+                    "esa",
+                    "eso",
+                    "aquel",
+                    "aquella",
+                    "aquello",
+                    "él",
+                    "el",
+                    "ella",
+                    "ellos",
+                    "ellas",
+                    "uno",
+                    "una",
+                    "algo",
+                    "alguien",
+                    "nadie",
+                    "nada",
+                    "todo",
+                    "todos",
+                    "todas",
+                    "otro",
+                    "otra",
+                    "otros",
+                    "otras",
+                    "mismo",
+                    "misma",
+                    "mismos",
+                    "mismas",
+                    "ambos",
+                    "ambas",
+                    "varios",
+                    "varias",
+                    "quien",
+                    "quién",
+                    "cual",
+                    "cuál",
+                    "cuales",
+                    "cuáles",
                     # Colores y adjetivos que no son entidades
-                    "negro", "rubio", "castaño", "moreno", "blanco", "gris", "canoso",
-                    "alto", "bajo", "largo", "corto", "azules", "verdes", "marrones",
+                    "negro",
+                    "rubio",
+                    "castaño",
+                    "moreno",
+                    "blanco",
+                    "gris",
+                    "canoso",
+                    "alto",
+                    "bajo",
+                    "largo",
+                    "corto",
+                    "azules",
+                    "verdes",
+                    "marrones",
                 }
                 if attr.entity_name.lower() in invalid_entities:
                     logger.debug(f"Atributo ignorado (entidad inválida): {attr.entity_name}")
@@ -1836,11 +2095,13 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
         else:
             normalized_weights = {m: 1.0 / len(active_methods) for m in active_methods}
 
-        logger.debug(f"Pesos normalizados para métodos activos {active_methods}: {normalized_weights}")
+        logger.debug(
+            f"Pesos normalizados para métodos activos {active_methods}: {normalized_weights}"
+        )
 
-        for group_key, method_attrs in grouped.items():
+        for _group_key, method_attrs in grouped.items():
             methods_with_attrs = list(method_attrs)
-            unique_methods = set(m for m, _ in methods_with_attrs)
+            unique_methods = {m for m, _ in methods_with_attrs}
             num_votes = len(unique_methods)
 
             if num_votes == 1:
@@ -1939,7 +2200,7 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
         }
         return mapping.get(key_str.lower(), AttributeKey.OTHER)
 
-    def _parse_llm_json(self, response: str) -> Optional[dict]:
+    def _parse_llm_json(self, response: str) -> dict | None:
         """Parsea respuesta JSON del LLM con limpieza y fallback."""
         try:
             # Limpiar respuesta
@@ -1968,7 +2229,7 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
             # Intentar parsear como markdown
             return self._parse_markdown_response(response)
 
-    def _parse_markdown_response(self, response: str) -> Optional[dict]:
+    def _parse_markdown_response(self, response: str) -> dict | None:
         """
         Parsea respuesta formateada del LLM cuando no devuelve JSON.
 
@@ -1980,23 +2241,21 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
         current_entity = None
 
         # Patrones para extraer información
-        entity_pattern = re.compile(r'\*\*([^*]+)\*\*')
-        attr_pattern = re.compile(
-            r'\*\s*\*\*([^*]+)\*\*:\s*([^(]+)(?:\("([^"]+)"\))?'
-        )
+        entity_pattern = re.compile(r"\*\*([^*]+)\*\*")
+        attr_pattern = re.compile(r'\*\s*\*\*([^*]+)\*\*:\s*([^(]+)(?:\("([^"]+)"\))?')
 
-        for line in response.split('\n'):
+        for line in response.split("\n"):
             line = line.strip()
             if not line:
                 continue
 
             # Detectar nombre de entidad
             entity_match = entity_pattern.match(line)
-            if entity_match and not ':' in line:
+            if entity_match and ":" not in line:
                 current_entity = entity_match.group(1).strip()
                 # Limpiar "(en la cafetería)" y similares
-                if '(' in current_entity:
-                    current_entity = current_entity.split('(')[0].strip()
+                if "(" in current_entity:
+                    current_entity = current_entity.split("(")[0].strip()
                 continue
 
             # Detectar atributo
@@ -2008,39 +2267,51 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
 
                 # Mapear key
                 key_mapping = {
-                    'eye color': 'eye_color',
-                    'hair color': 'hair_color',
-                    'hair type': 'hair_type',
-                    'hair modification': 'hair_modification',
-                    'height': 'height',
-                    'build': 'build',
-                    'age': 'age',
-                    'profession': 'profession',
+                    "eye color": "eye_color",
+                    "hair color": "hair_color",
+                    "hair type": "hair_type",
+                    "hair modification": "hair_modification",
+                    "height": "height",
+                    "build": "build",
+                    "age": "age",
+                    "profession": "profession",
                 }
-                key = key_mapping.get(key_raw, key_raw.replace(' ', '_'))
+                key = key_mapping.get(key_raw, key_raw.replace(" ", "_"))
 
-                if key in ['eye_color', 'hair_color', 'hair_type', 'hair_modification', 'height', 'build', 'age', 'profession']:
-                    attributes.append({
-                        'entity': current_entity,
-                        'key': key,
-                        'value': value,
-                        'evidence': evidence or '',
-                    })
+                if key in [
+                    "eye_color",
+                    "hair_color",
+                    "hair_type",
+                    "hair_modification",
+                    "height",
+                    "build",
+                    "age",
+                    "profession",
+                ]:
+                    attributes.append(
+                        {
+                            "entity": current_entity,
+                            "key": key,
+                            "value": value,
+                            "evidence": evidence or "",
+                        }
+                    )
 
         if attributes:
             logger.debug(f"Parseados {len(attributes)} atributos desde markdown")
-            return {'attributes': attributes}
+            return {"attributes": attributes}
         return None
 
     def _split_sentences(self, text: str) -> list[str]:
         """Divide texto en oraciones."""
         # Simple split por puntuación
-        sentences = re.split(r'[.!?]+', text)
+        sentences = re.split(r"[.!?]+", text)
         return [s.strip() for s in sentences if s.strip()]
 
     def _cosine_similarity(self, vec1, vec2) -> float:
         """Calcula similitud coseno entre dos vectores."""
         import numpy as np
+
         # Aplanar a 1D si vienen como 2D (batch de 1)
         v1 = np.array(vec1).flatten()
         v2 = np.array(vec2).flatten()
@@ -2054,9 +2325,9 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
     def _find_entity_in_sentence(
         self,
         sentence: str,
-        entity_mentions: Optional[list[tuple]],
+        entity_mentions: list[tuple] | None,
         full_text: str,
-    ) -> Optional[str]:
+    ) -> str | None:
         """
         Encuentra entidad SUJETO en una oración, incluyendo resolución de pronombres.
 
@@ -2101,19 +2372,54 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
         # El poseedor es quien tiene el atributo físico
         # =================================================================
         body_parts = (
-            'ojos', 'ojo', 'pelo', 'cabello', 'cara', 'rostro', 'manos', 'mano',
-            'piel', 'nariz', 'boca', 'labios', 'cejas', 'ceja', 'frente',
-            'mejillas', 'mejilla', 'barbilla', 'mentón', 'cuello', 'espalda',
-            'hombros', 'brazos', 'piernas', 'pies', 'dedos', 'uñas', 'dientes',
-            'sonrisa', 'mirada', 'expresión', 'gesto', 'voz', 'tono', 'altura',
-            'estatura', 'complexión', 'figura', 'silueta', 'cuerpo', 'aspecto'
+            "ojos",
+            "ojo",
+            "pelo",
+            "cabello",
+            "cara",
+            "rostro",
+            "manos",
+            "mano",
+            "piel",
+            "nariz",
+            "boca",
+            "labios",
+            "cejas",
+            "ceja",
+            "frente",
+            "mejillas",
+            "mejilla",
+            "barbilla",
+            "mentón",
+            "cuello",
+            "espalda",
+            "hombros",
+            "brazos",
+            "piernas",
+            "pies",
+            "dedos",
+            "uñas",
+            "dientes",
+            "sonrisa",
+            "mirada",
+            "expresión",
+            "gesto",
+            "voz",
+            "tono",
+            "altura",
+            "estatura",
+            "complexión",
+            "figura",
+            "silueta",
+            "cuerpo",
+            "aspecto",
         )
 
-        for name, start, end, entity_type in person_mentions:
+        for name, start, end, _entity_type in person_mentions:
             name_lower = name.lower()
             # Patrón: [artículo] [parte_cuerpo] de [Nombre]
             for part in body_parts:
-                pattern = rf'\b(?:el|la|los|las|su|sus)?\s*{part}\s+de\s+{regex_module.escape(name_lower)}\b'
+                pattern = rf"\b(?:el|la|los|las|su|sus)?\s*{part}\s+de\s+{regex_module.escape(name_lower)}\b"
                 if regex_module.search(pattern, sentence_lower):
                     logger.debug(f"Genitivo posesivo detectado: '{part} de {name}'")
                     return name
@@ -2122,12 +2428,14 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
         # CASO 2: Cláusula relativa - "María, QUE TENÍA ojos verdes, saludó"
         # El antecedente de la cláusula es el poseedor
         # =================================================================
-        relative_verbs = r'(?:tenía|tiene|era|es|parecía|parece|llevaba|lleva|lucía|luce|mostraba|muestra)'
+        relative_verbs = (
+            r"(?:tenía|tiene|era|es|parecía|parece|llevaba|lleva|lucía|luce|mostraba|muestra)"
+        )
 
-        for name, start, end, entity_type in person_mentions:
+        for name, start, end, _entity_type in person_mentions:
             name_lower = name.lower()
             # Patrón: [Nombre], que [verbo_descriptivo] [atributo]
-            pattern = rf'{regex_module.escape(name_lower)}\s*,\s*(?:que|quien|la cual|el cual)\s+{relative_verbs}\s+'
+            pattern = rf"{regex_module.escape(name_lower)}\s*,\s*(?:que|quien|la cual|el cual)\s+{relative_verbs}\s+"
             if regex_module.search(pattern, sentence_lower):
                 logger.debug(f"Cláusula relativa detectada para '{name}'")
                 return name
@@ -2137,10 +2445,12 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
         # En voz pasiva, el sujeto gramatical (paciente) es el poseedor
         # "por [Nombre]" es el agente, NO el poseedor
         # =================================================================
-        passive_pattern = r'(?:fue|era|había sido|ha sido|será|siendo)\s+\w+[oa]?(?:do|da|dos|das)?\s+por\s+'
+        passive_pattern = (
+            r"(?:fue|era|había sido|ha sido|será|siendo)\s+\w+[oa]?(?:do|da|dos|das)?\s+por\s+"
+        )
         if regex_module.search(passive_pattern, sentence_lower):
             # En voz pasiva, buscar el sujeto al inicio de la oración
-            for name, start, end, entity_type in person_mentions:
+            for name, start, end, _entity_type in person_mentions:
                 name_lower = name.lower()
                 # Si el nombre está al inicio (antes del verbo pasivo), es el sujeto paciente
                 name_pos = sentence_lower.find(name_lower)
@@ -2155,17 +2465,17 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
 
         # Patrones que indican que la entidad es OBJETO (no sujeto):
         object_patterns = [
-            r'\ba\s+{}\b',      # "a María", "a Juan"
-            r'\bcon\s+{}\b',    # "con María"
-            r'\bpara\s+{}\b',   # "para Juan"
-            r'\bhacia\s+{}\b',  # "hacia María"
-            r'\bsobre\s+{}\b',  # "sobre Juan"
+            r"\ba\s+{}\b",  # "a María", "a Juan"
+            r"\bcon\s+{}\b",  # "con María"
+            r"\bpara\s+{}\b",  # "para Juan"
+            r"\bhacia\s+{}\b",  # "hacia María"
+            r"\bsobre\s+{}\b",  # "sobre Juan"
         ]
 
         subject_candidates = []
         object_entities = set()
 
-        for name, start, end, entity_type in person_mentions:
+        for name, start, end, _entity_type in person_mentions:
             name_lower = name.lower()
             if name_lower not in sentence_lower:
                 continue
@@ -2192,7 +2502,7 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
         # =================================================================
         # FALLBACK: Resolución de pronombres
         # =================================================================
-        pronouns_pattern = r'\b(él|ella|sus?|este|esta|aquel|aquella)\b'
+        pronouns_pattern = r"\b(él|ella|sus?|este|esta|aquel|aquella)\b"
         has_pronoun = regex_module.search(pronouns_pattern, sentence_lower)
 
         if has_pronoun and sentence_start > 0:
@@ -2212,8 +2522,8 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                 pronoun_match = regex_module.search(pronouns_pattern, sentence_lower)
                 if pronoun_match:
                     pronoun = pronoun_match.group(1).lower()
-                    is_feminine = pronoun in ('ella', 'esta', 'aquella')
-                    is_masculine = pronoun in ('él', 'este', 'aquel')
+                    is_feminine = pronoun in ("ella", "esta", "aquella")
+                    is_masculine = pronoun in ("él", "este", "aquel")
 
                     if is_feminine or is_masculine:
                         # Filtrar por género
@@ -2221,11 +2531,18 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                         for name, start, end in mentions_before:
                             name_lower = name.lower().split()[0]
                             # Heurística simple: nombres terminados en 'a' suelen ser femeninos
-                            name_is_feminine = name_lower.endswith('a') and name_lower not in ('jesús', 'elías', 'josué')
+                            name_is_feminine = name_lower.endswith("a") and name_lower not in (
+                                "jesús",
+                                "elías",
+                                "josué",
+                            )
 
-                            if is_feminine and name_is_feminine:
-                                gendered.append((name, start, end))
-                            elif is_masculine and not name_is_feminine:
+                            if (
+                                is_feminine
+                                and name_is_feminine
+                                or is_masculine
+                                and not name_is_feminine
+                            ):
                                 gendered.append((name, start, end))
 
                         if gendered:
@@ -2240,7 +2557,7 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
         self,
         sentence: str,
         key_str: str,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Extrae valor de atributo de una oración."""
         sentence_lower = sentence.lower()
 
@@ -2289,13 +2606,13 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
             # Patrones para detectar profesiones/ocupaciones
             profession_patterns = [
                 # "era carpintero", "es médico", "fue ingeniero"
-                r'\b(?:era|es|fue|será)\s+(?:un|una)?\s*(\w+(?:ero|era|ista|or|ora|ico|ica|nte|dor|dora|tor|tora|ogo|oga|ino|ina|ario|aria|ador|adora))\b',
+                r"\b(?:era|es|fue|será)\s+(?:un|una)?\s*(\w+(?:ero|era|ista|or|ora|ico|ica|nte|dor|dora|tor|tora|ogo|oga|ino|ina|ario|aria|ador|adora))\b",
                 # "trabaja como X", "trabajaba de X"
-                r'\btrabaj(?:a|aba|ó)\s+(?:como|de)\s+(\w+)\b',
+                r"\btrabaj(?:a|aba|ó)\s+(?:como|de)\s+(\w+)\b",
                 # "se dedica a ser X", "se dedicaba a X"
-                r'\bse\s+dedica(?:ba)?\s+a\s+(?:ser\s+)?(\w+)\b',
+                r"\bse\s+dedica(?:ba)?\s+a\s+(?:ser\s+)?(\w+)\b",
                 # "de profesión X"
-                r'\bde\s+profesión\s+(\w+)\b',
+                r"\bde\s+profesión\s+(\w+)\b",
             ]
 
             for pattern in profession_patterns:
@@ -2304,18 +2621,46 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                     profession = match.group(1).lower()
                     # Excluir palabras muy genéricas que no son profesiones
                     excluded = {
-                        "hombre", "mujer", "persona", "tipo", "chico", "chica",
-                        "joven", "viejo", "niño", "niña", "señor", "señora",
-                        "alto", "bajo", "grande", "pequeño", "bueno", "malo",
+                        "hombre",
+                        "mujer",
+                        "persona",
+                        "tipo",
+                        "chico",
+                        "chica",
+                        "joven",
+                        "viejo",
+                        "niño",
+                        "niña",
+                        "señor",
+                        "señora",
+                        "alto",
+                        "bajo",
+                        "grande",
+                        "pequeño",
+                        "bueno",
+                        "malo",
                     }
                     if profession not in excluded and len(profession) > 3:
                         return profession
 
             # Fallback: lista mínima de profesiones comunes (solo las más frecuentes)
             common_professions = [
-                "médico", "médica", "abogado", "abogada", "profesor", "profesora",
-                "ingeniero", "ingeniera", "arquitecto", "arquitecta", "policía",
-                "bombero", "militar", "enfermero", "enfermera", "periodista",
+                "médico",
+                "médica",
+                "abogado",
+                "abogada",
+                "profesor",
+                "profesora",
+                "ingeniero",
+                "ingeniera",
+                "arquitecto",
+                "arquitecta",
+                "policía",
+                "bombero",
+                "militar",
+                "enfermero",
+                "enfermera",
+                "periodista",
             ]
             for prof in common_professions:
                 if prof in sentence_lower:
@@ -2323,7 +2668,9 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
 
         return None
 
-    def _is_metaphor(self, context: str, match_text: str = "", match_pos_in_context: int = 0) -> bool:
+    def _is_metaphor(
+        self, context: str, match_text: str = "", match_pos_in_context: int = 0
+    ) -> bool:
         """
         Detecta si el contexto sugiere una metáfora.
 
@@ -2351,7 +2698,7 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                 if metaphor_end <= match_pos_in_context:
                     between = context[metaphor_end:match_pos_in_context]
                     # Si hay puntuación entre la metáfora y el match, no afecta
-                    if ',' in between or '.' in between or ';' in between or '\n' in between:
+                    if "," in between or "." in between or ";" in between or "\n" in between:
                         continue
                     # Si hay más de 20 caracteres, probablemente no afecta
                     if len(between.strip()) > 20:
@@ -2366,7 +2713,7 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                 elif metaphor_pos >= match_end_in_context:
                     between = context[match_end_in_context:metaphor_pos]
                     # Si hay puntuación entre el match y la metáfora, no afecta
-                    if ',' in between or '.' in between or ';' in between or '\n' in between:
+                    if "," in between or "." in between or ";" in between or "\n" in between:
                         continue
                     # Si hay más de 20 caracteres, probablemente no afecta
                     if len(between.strip()) > 20:
@@ -2394,11 +2741,7 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
         before_context = context[:match_pos]
 
         # Buscar negación simple cercana (últimos 30 caracteres)
-        for pattern in self._negation_patterns:
-            if pattern.search(before_context[-30:]):
-                return True
-
-        return False
+        return any(pattern.search(before_context[-30:]) for pattern in self._negation_patterns)
 
     def _is_temporal_past(self, context: str, match_pos: int) -> bool:
         """
@@ -2408,11 +2751,7 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
         """
         before_context = context[:match_pos]
 
-        for pattern in self._temporal_past_patterns:
-            if pattern.search(before_context[-60:]):
-                return True
-
-        return False
+        return any(pattern.search(before_context[-60:]) for pattern in self._temporal_past_patterns)
 
     def _is_conditional(self, context: str, match_pos: int) -> bool:
         """
@@ -2422,15 +2761,11 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
         """
         before_context = context[:match_pos]
 
-        for pattern in self._conditional_patterns:
-            if pattern.search(before_context[-50:]):
-                return True
-
-        return False
+        return any(pattern.search(before_context[-50:]) for pattern in self._conditional_patterns)
 
     def _check_contrastive_correction(
         self, context: str, match_start: int, match_end: int, value: str
-    ) -> tuple[bool, Optional[str]]:
+    ) -> tuple[bool, str | None]:
         """
         Detecta patrón contrastivo "No es X, sino Y" y extrae el valor correcto.
 
@@ -2455,10 +2790,11 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                 if sino_pos > 0 and match_start < sino_pos:
                     # El valor actual está en la parte negada
                     # Buscar el valor después del "sino"
-                    after_sino = context[sino_pos + 4:].strip()
+                    after_sino = context[sino_pos + 4 :].strip()
                     # Extraer la primera palabra después de "sino" como posible corrección
                     import re
-                    color_match = re.search(r'\b([a-záéíóú]+)\b', after_sino)
+
+                    color_match = re.search(r"\b([a-záéíóú]+)\b", after_sino)
                     if color_match:
                         corrected = color_match.group(1).lower()
                         # Verificar que sea un color válido
@@ -2496,7 +2832,7 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
             return False
 
         # Estrategia 1: Dep-tree (ScopeResolver cacheado)
-        resolver = getattr(self, '_scope_resolver', None)
+        resolver = getattr(self, "_scope_resolver", None)
         if resolver is not None:
             try:
                 ent_in_rc, _ = resolver.is_in_relative_clause(entity_start)
@@ -2519,26 +2855,26 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
         before_entity = text[search_start:entity_start]
 
         relative_patterns = [
-            r'\bque\s*$',           # "...que María"
-            r'\bquien(?:es)?\s*$',  # "...quien María"
-            r'\bel\s+cual\s*$',     # "el cual María"
-            r'\bla\s+cual\s*$',
-            r'\bcuy[oa]s?\s*$',     # "cuyo hermano"
-            r'\bdonde\s*$',         # "donde María"
-            r'\bcuando\s*$',        # "cuando María"
+            r"\bque\s*$",  # "...que María"
+            r"\bquien(?:es)?\s*$",  # "...quien María"
+            r"\bel\s+cual\s*$",  # "el cual María"
+            r"\bla\s+cual\s*$",
+            r"\bcuy[oa]s?\s*$",  # "cuyo hermano"
+            r"\bdonde\s*$",  # "donde María"
+            r"\bcuando\s*$",  # "cuando María"
         ]
 
         for pattern in relative_patterns:
             if regex_module.search(pattern, before_entity, regex_module.IGNORECASE):
                 between = text[entity_end:attribute_pos]
                 clause_closure = regex_module.search(
-                    r'\b(?:había|hubo|hizo|fue|vio|conoció|dijo)\s+\w+\s+(?:tenía|era|estaba|llevaba|mostraba)\b',
-                    between, regex_module.IGNORECASE
+                    r"\b(?:había|hubo|hizo|fue|vio|conoció|dijo)\s+\w+\s+(?:tenía|era|estaba|llevaba|mostraba)\b",
+                    between,
+                    regex_module.IGNORECASE,
                 )
                 if clause_closure:
                     logger.debug(
-                        f"Entidad en cláusula relativa (regex): "
-                        f"'{text[entity_start:entity_end]}'"
+                        f"Entidad en cláusula relativa (regex): '{text[entity_start:entity_end]}'"
                     )
                     return True
 
@@ -2560,7 +2896,11 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
 
         if key == AttributeKey.HAIR_MODIFICATION:
             # Modificaciones: teñido, natural, decolorado, mechas, etc.
-            return value_lower in HAIR_MODIFICATIONS or "teñid" in value_lower or "de bote" in value_lower
+            return (
+                value_lower in HAIR_MODIFICATIONS
+                or "teñid" in value_lower
+                or "de bote" in value_lower
+            )
 
         if key == AttributeKey.BUILD:
             return value_lower in BUILD_TYPES
@@ -2578,10 +2918,30 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
         if key == AttributeKey.PROFESSION:
             # Excluir palabras genéricas que no son profesiones
             excluded = {
-                "hombre", "mujer", "persona", "tipo", "chico", "chica",
-                "joven", "viejo", "niño", "niña", "señor", "señora",
-                "alto", "bajo", "grande", "pequeño", "bueno", "malo",
-                "mejor", "peor", "primero", "primera", "último", "última",
+                "hombre",
+                "mujer",
+                "persona",
+                "tipo",
+                "chico",
+                "chica",
+                "joven",
+                "viejo",
+                "niño",
+                "niña",
+                "señor",
+                "señora",
+                "alto",
+                "bajo",
+                "grande",
+                "pequeño",
+                "bueno",
+                "malo",
+                "mejor",
+                "peor",
+                "primero",
+                "primera",
+                "último",
+                "última",
             }
             return value_lower not in excluded and len(value) > 3
 
@@ -2592,8 +2952,8 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
         self,
         text: str,
         position: int,
-        entity_mentions: Optional[list[tuple]],
-    ) -> Optional[str]:
+        entity_mentions: list[tuple] | None,
+    ) -> str | None:
         """
         Encuentra la entidad más cercana a una posición.
 
@@ -2619,7 +2979,7 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
 
         # ===== Resolución por scope gramatical (reemplaza ventana fija) =====
         # Usa ScopeResolver cacheado con dep parsing, RC filtering e identidad copulativa
-        resolver = getattr(self, '_scope_resolver', None)
+        resolver = getattr(self, "_scope_resolver", None)
         if resolver is not None:
             try:
                 scope_result = resolver.find_nearest_entity_by_scope(
@@ -2644,7 +3004,7 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
         context = text[context_start:position]
 
         # También extraer un poco adelante (20 chars) para detectar patrones que inician en position
-        context_forward = text[position:position + 20]
+        context_forward = text[position : position + 20]
 
         # Buscar todas las entidades antes de la posición con sus distancias
         candidates = []
@@ -2684,9 +3044,12 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                 # Fallback: heurística por nombre si no hay entity_type
                 name_words = name.split()
                 is_likely_person = (
-                    len(name_words) <= 2 and
-                    not any(word.lower() in ['parque', 'del', 'de', 'la', 'el', 'retiro', 'madrid'] for word in name_words) and
-                    name[0].isupper()
+                    len(name_words) <= 2
+                    and not any(
+                        word.lower() in ["parque", "del", "de", "la", "el", "retiro", "madrid"]
+                        for word in name_words
+                    )
+                    and name[0].isupper()
                 )
 
                 if is_likely_person:
@@ -2695,11 +3058,7 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                     location_candidates.append((name, start, end, adjusted_distance))
 
         # Buscar límites de oración (. ! ?) para entender contexto
-        last_sentence_break = max(
-            context.rfind('.'),
-            context.rfind('!'),
-            context.rfind('?')
-        )
+        last_sentence_break = max(context.rfind("."), context.rfind("!"), context.rfind("?"))
 
         # Buscar pronombres o verbos en 3ª persona que indican sujeto elíptico
         immediate_context = context[-50:] if len(context) > 50 else context
@@ -2709,37 +3068,53 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
         # - Posesivos: su, sus (pueden indicar el referente)
         # - "la", "lo", "le" son MUY comunes como artículos, NO usar para has_pronoun
         #   Ej: "llamaron la atención" - "la" es artículo, no pronombre
-        has_subject_pronoun = bool(regex_module.search(r'\b(ella|él)\b', immediate_context, regex_module.IGNORECASE))
+        has_subject_pronoun = bool(
+            regex_module.search(r"\b(ella|él)\b", immediate_context, regex_module.IGNORECASE)
+        )
         has_pronoun = has_subject_pronoun  # Solo pronombres de sujeto reales
 
         # IMPORTANTE: Buscar verbos en 3ª persona tanto en contexto anterior como en el inicio del match
         # El patrón puede empezar con el verbo (ej: "Llevaba el cabello corto")
         combined_context = immediate_context + " " + context_forward
-        has_3rd_person_verb = bool(regex_module.search(r'\b(tenía|era|estaba|llevaba|parecía|mostraba)\b', combined_context, regex_module.IGNORECASE))
+        has_3rd_person_verb = bool(
+            regex_module.search(
+                r"\b(tenía|era|estaba|llevaba|parecía|mostraba)\b",
+                combined_context,
+                regex_module.IGNORECASE,
+            )
+        )
 
         # Detectar pronombres posesivos que podrían referirse al objeto (no al sujeto)
         # Ej: "Juan la saludó, sorprendido por su cabello" -> "su" se refiere a "la" (María), no a Juan
         # Buscar tanto en contexto anterior como en el inicio del match (context_forward)
-        has_possessive = bool(regex_module.search(r'\b(su|sus)\b', immediate_context + " " + context_forward, regex_module.IGNORECASE))
+        has_possessive = bool(
+            regex_module.search(
+                r"\b(su|sus)\b", immediate_context + " " + context_forward, regex_module.IGNORECASE
+            )
+        )
 
         # IMPORTANTE: Detectar "la/lo/le" como pronombre OBJETO, no como artículo
         # "la" como artículo: "la cafetería", "la mesa", "la atención"
         # "la" como pronombre objeto: "la saludó", "la vio", "la llevó"
         # El pronombre objeto va ANTES de un verbo, el artículo va ANTES de un sustantivo
         # Patrón: "la/lo/le" seguido de verbo en 3ª persona indica pronombre objeto
-        has_object_pronoun = bool(regex_module.search(
-            r'\b(la|lo|le)\s+(?:saludó|vio|miró|abrazó|besó|llamó|llevó|trajo|cogió|tomó|dejó|encontró|conoció|reconoció|observó|siguió|esperó|ayudó)',
-            immediate_context, regex_module.IGNORECASE
-        ))
+        has_object_pronoun = bool(
+            regex_module.search(
+                r"\b(la|lo|le)\s+(?:saludó|vio|miró|abrazó|besó|llamó|llevó|trajo|cogió|tomó|dejó|encontró|conoció|reconoció|observó|siguió|esperó|ayudó)",
+                immediate_context,
+                regex_module.IGNORECASE,
+            )
+        )
 
         # Detectar pronombres de sujeto explícitos (Él/Ella) o indicadores de género (hombre/mujer)
         # Esto tiene MÁXIMA prioridad porque indica claramente el género del referente
         subject_pronoun_match = regex_module.search(
-            r'\b(él|ella)\b', immediate_context + " " + context_forward, regex_module.IGNORECASE
+            r"\b(él|ella)\b", immediate_context + " " + context_forward, regex_module.IGNORECASE
         )
         gender_noun_match = regex_module.search(
-            r'\b(hombre|mujer|chico|chica|señor|señora|niño|niña)\b',
-            immediate_context + " " + context_forward, regex_module.IGNORECASE
+            r"\b(hombre|mujer|chico|chica|señor|señora|niño|niña)\b",
+            immediate_context + " " + context_forward,
+            regex_module.IGNORECASE,
         )
 
         # Estrategia de selección mejorada:
@@ -2757,7 +3132,7 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
             is_feminine = False
             if subject_pronoun_match:
                 pronoun = subject_pronoun_match.group(1).lower()
-                is_feminine = (pronoun == "ella")
+                is_feminine = pronoun == "ella"
             elif gender_noun_match:
                 noun = gender_noun_match.group(1).lower()
                 is_feminine = noun in ("mujer", "chica", "señora", "niña")
@@ -2770,38 +3145,76 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
 
                 # Nombres femeninos comunes en español
                 feminine_names = {
-                    'maría', 'ana', 'elena', 'laura', 'carmen', 'isabel', 'rosa',
-                    'lucía', 'marta', 'paula', 'sara', 'andrea', 'claudia', 'sofía',
-                    'julia', 'clara', 'alba', 'irene', 'nuria', 'eva', 'raquel',
-                    'silvia', 'cristina', 'patricia', 'mónica', 'beatriz', 'alicia'
+                    "maría",
+                    "ana",
+                    "elena",
+                    "laura",
+                    "carmen",
+                    "isabel",
+                    "rosa",
+                    "lucía",
+                    "marta",
+                    "paula",
+                    "sara",
+                    "andrea",
+                    "claudia",
+                    "sofía",
+                    "julia",
+                    "clara",
+                    "alba",
+                    "irene",
+                    "nuria",
+                    "eva",
+                    "raquel",
+                    "silvia",
+                    "cristina",
+                    "patricia",
+                    "mónica",
+                    "beatriz",
+                    "alicia",
                 }
                 # Nombres masculinos comunes en español
                 masculine_names = {
-                    'juan', 'pedro', 'carlos', 'antonio', 'josé', 'luis', 'miguel',
-                    'francisco', 'javier', 'david', 'daniel', 'pablo', 'alejandro',
-                    'sergio', 'fernando', 'alberto', 'manuel', 'rafael', 'jorge',
-                    'mario', 'andrés', 'roberto', 'enrique', 'ricardo', 'diego'
+                    "juan",
+                    "pedro",
+                    "carlos",
+                    "antonio",
+                    "josé",
+                    "luis",
+                    "miguel",
+                    "francisco",
+                    "javier",
+                    "david",
+                    "daniel",
+                    "pablo",
+                    "alejandro",
+                    "sergio",
+                    "fernando",
+                    "alberto",
+                    "manuel",
+                    "rafael",
+                    "jorge",
+                    "mario",
+                    "andrés",
+                    "roberto",
+                    "enrique",
+                    "ricardo",
+                    "diego",
                 }
 
                 # Determinar si el nombre coincide con el género buscado
-                name_is_feminine = (
-                    first_name in feminine_names or
-                    (first_name.endswith('a') and first_name not in masculine_names)
+                name_is_feminine = first_name in feminine_names or (
+                    first_name.endswith("a") and first_name not in masculine_names
                 )
-                name_is_masculine = (
-                    first_name in masculine_names or
-                    (first_name.endswith('o') and first_name not in feminine_names)
+                name_is_masculine = first_name in masculine_names or (
+                    first_name.endswith("o") and first_name not in feminine_names
                 )
 
                 # Calcular ajuste de distancia por género
                 gender_adjustment = 0
-                if is_feminine and name_is_feminine:
+                if is_feminine and name_is_feminine or not is_feminine and name_is_masculine:
                     gender_adjustment = -100  # Gran boost para coincidencia de género
-                elif not is_feminine and name_is_masculine:
-                    gender_adjustment = -100  # Gran boost para coincidencia de género
-                elif is_feminine and name_is_masculine:
-                    gender_adjustment = 200  # Penalización fuerte por género incorrecto
-                elif not is_feminine and name_is_feminine:
+                elif is_feminine and name_is_masculine or not is_feminine and name_is_feminine:
                     gender_adjustment = 200  # Penalización fuerte por género incorrecto
 
                 adjusted_distance = distance + gender_adjustment
@@ -2829,8 +3242,9 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
             search_text = immediate_context + " " + context_forward
             # Patrón mejorado: pronombre objeto + verbo ... posesivo
             obj_pronoun_match = regex_module.search(
-                r'\b(la|lo)\s+(?:saludó|vio|miró|abrazó|besó|llamó|llevó).*?\b(su|sus)\b',
-                search_text, regex_module.IGNORECASE | regex_module.DOTALL
+                r"\b(la|lo)\s+(?:saludó|vio|miró|abrazó|besó|llamó|llevó).*?\b(su|sus)\b",
+                search_text,
+                regex_module.IGNORECASE | regex_module.DOTALL,
             )
 
             if obj_pronoun_match:
@@ -2838,7 +3252,7 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
 
                 # Determinar género del pronombre objeto
                 # "la" = femenino, "lo" = masculino
-                is_feminine = (obj_pronoun == "la")
+                is_feminine = obj_pronoun == "la"
 
                 # Buscar en candidates la entidad que mejor coincida con el género
                 # Heurística simple: nombres que terminan en 'a' son probablemente femeninos
@@ -2851,16 +3265,30 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                     gender_score = 0
 
                     if is_feminine:
-                        if name_lower.endswith('a') or name_lower in ['maría', 'ana', 'elena', 'laura', 'carmen', 'isabel']:
+                        if name_lower.endswith("a") or name_lower in [
+                            "maría",
+                            "ana",
+                            "elena",
+                            "laura",
+                            "carmen",
+                            "isabel",
+                        ]:
                             gender_score = -50  # Boost femenino (distancia menor = mejor)
                     else:
-                        if name_lower.endswith('o') or name_lower in ['juan', 'pedro', 'carlos', 'antonio', 'josé', 'luis']:
+                        if name_lower.endswith("o") or name_lower in [
+                            "juan",
+                            "pedro",
+                            "carlos",
+                            "antonio",
+                            "josé",
+                            "luis",
+                        ]:
                             gender_score = -50  # Boost masculino
 
                     # Si no coincide el género, penalizar
-                    if is_feminine and not name_lower.endswith('a'):
+                    if is_feminine and not name_lower.endswith("a"):
                         gender_score = 100
-                    if not is_feminine and not name_lower.endswith('o'):
+                    if not is_feminine and not name_lower.endswith("o"):
                         gender_score = 100
 
                     adjusted_distance = distance + gender_score
@@ -2902,16 +3330,16 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
 
                     if name_pos_in_context > 0:
                         # Buscar "a " justo antes del nombre
-                        prefix = context[max(0, name_pos_in_context - 3):name_pos_in_context]
-                        if prefix.strip().endswith('a') or ' a ' in prefix:
+                        prefix = context[max(0, name_pos_in_context - 3) : name_pos_in_context]
+                        if prefix.strip().endswith("a") or " a " in prefix:
                             is_object = True
 
                     # También verificar patrones de complemento indirecto
                     # "le dijo a Juan" → Juan es objeto
                     indirect_pattern = regex_module.search(
-                        rf'\b(le|les)\s+\w+\s+a\s+{regex_module.escape(name)}\b',
+                        rf"\b(le|les)\s+\w+\s+a\s+{regex_module.escape(name)}\b",
                         before_sentence_break,
-                        regex_module.IGNORECASE
+                        regex_module.IGNORECASE,
                     )
                     if indirect_pattern:
                         is_object = True
@@ -2920,7 +3348,9 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                     object_penalty = 150 if is_object else 0
                     adjusted_dist = dist_from_break + object_penalty
 
-                    before_break_candidates.append((name, start, end, dist_from_break, adjusted_dist, is_object))
+                    before_break_candidates.append(
+                        (name, start, end, dist_from_break, adjusted_dist, is_object)
+                    )
 
             if before_break_candidates:
                 # Ordenar por distancia ajustada (penalizando objetos)
@@ -2954,15 +3384,13 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
 
         return None
 
-    def _deduplicate(
-        self, attributes: list[ExtractedAttribute]
-    ) -> list[ExtractedAttribute]:
+    def _deduplicate(self, attributes: list[ExtractedAttribute]) -> list[ExtractedAttribute]:
         """
         Elimina atributos duplicados usando CESP (Cascading Extraction with Syntactic Priority).
-        
+
         CLAVE: Si el mismo atributo (tipo+valor+oración) está asignado a múltiples
         entidades, conservar SOLO el que tiene mayor prioridad de fuente de asignación.
-        
+
         Prioridad de fuentes:
         1. GENITIVE ("de Pedro") - máxima prioridad
         2. EXPLICIT_SUBJECT (nsubj) - sujeto sintáctico
@@ -2970,30 +3398,26 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
         4. IMPLICIT_SUBJECT - sujeto tácito
         5. EMBEDDINGS - similitud semántica
         6. PROXIMITY - menor prioridad (causa de falsos positivos)
-        
+
         Esto elimina falsos positivos como:
         - "ojos azules de Pedro" asignado a Juan por proximidad
         """
         # PASO 1: Agrupar por (tipo, valor, oración) SIN considerar entidad
         # Esto detecta duplicados donde el mismo atributo fue asignado a múltiples entidades
         from collections import defaultdict
-        
+
         attr_groups: dict[tuple, list[ExtractedAttribute]] = defaultdict(list)
-        
+
         for attr in attributes:
             # Clave: (key, value_normalizado, sentence_idx o start_char//500)
             # Usamos start_char//500 como aproximación de oración si no hay sentence_idx
             sentence_key = attr.sentence_idx if attr.sentence_idx > 0 else (attr.start_char // 500)
-            key = (
-                attr.key,
-                attr.value.lower().strip(),
-                sentence_key
-            )
+            key = (attr.key, attr.value.lower().strip(), sentence_key)
             attr_groups[key].append(attr)
-        
+
         # PASO 2: Para cada grupo, seleccionar el mejor por prioridad de fuente
         deduplicated: list[ExtractedAttribute] = []
-        
+
         # Prioridad de fuentes de asignación (mayor número = mayor prioridad)
         source_priority = {
             AssignmentSource.GENITIVE: 100,
@@ -3004,7 +3428,7 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
             AssignmentSource.PROXIMITY: 10,
             None: 5,  # Sin fuente especificada
         }
-        
+
         for key, group in attr_groups.items():
             if len(group) == 1:
                 deduplicated.append(group[0])
@@ -3013,32 +3437,29 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                 # Ordenar por: (prioridad_fuente, confianza)
                 sorted_group = sorted(
                     group,
-                    key=lambda a: (
-                        source_priority.get(a.assignment_source, 5),
-                        a.confidence
-                    ),
-                    reverse=True
+                    key=lambda a: (source_priority.get(a.assignment_source, 5), a.confidence),
+                    reverse=True,
                 )
-                
+
                 best = sorted_group[0]
-                
+
                 # Log si eliminamos falsos positivos
-                eliminated = [a for a in sorted_group[1:] if a.entity_name.lower() != best.entity_name.lower()]
+                eliminated = [
+                    a for a in sorted_group[1:] if a.entity_name.lower() != best.entity_name.lower()
+                ]
                 for elim in eliminated:
                     logger.info(
                         f"[CESP] Eliminando falso positivo: {elim.key.value}='{elim.value}' "
                         f"asignado a '{elim.entity_name}' por {elim.assignment_source or 'desconocido'}. "
                         f"Correcto: '{best.entity_name}' por {best.assignment_source or 'mayor confianza'}"
                     )
-                
+
                 deduplicated.append(best)
-        
+
         logger.debug(f"Deduplicación CESP: {len(attributes)} -> {len(deduplicated)} atributos")
         return deduplicated
 
-    def _resolve_conflicts(
-        self, attributes: list[ExtractedAttribute]
-    ) -> list[ExtractedAttribute]:
+    def _resolve_conflicts(self, attributes: list[ExtractedAttribute]) -> list[ExtractedAttribute]:
         """
         Resuelve conflictos donde una entidad tiene múltiples valores para el mismo atributo.
 
@@ -3053,12 +3474,12 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
         """
         # Atributos que pueden tener múltiples valores legítimos
         MULTI_VALUE_KEYS = {
-            AttributeKey.PERSONALITY,      # Puede tener múltiples rasgos
-            AttributeKey.FEAR,             # Puede tener múltiples miedos
-            AttributeKey.DESIRE,           # Puede tener múltiples deseos
+            AttributeKey.PERSONALITY,  # Puede tener múltiples rasgos
+            AttributeKey.FEAR,  # Puede tener múltiples miedos
+            AttributeKey.DESIRE,  # Puede tener múltiples deseos
             AttributeKey.DISTINCTIVE_FEATURE,  # Puede tener múltiples rasgos distintivos
-            AttributeKey.RELATIONSHIP,     # Múltiples relaciones
-            AttributeKey.OTHER,            # Categoría genérica
+            AttributeKey.RELATIONSHIP,  # Múltiples relaciones
+            AttributeKey.OTHER,  # Categoría genérica
         }
 
         # Agrupar por (entidad, key) - sin el valor
@@ -3091,16 +3512,14 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                     )
                 resolved.append(best)
 
-        logger.debug(
-            f"Resolución de conflictos: {len(attributes)} -> {len(resolved)} atributos"
-        )
+        logger.debug(f"Resolución de conflictos: {len(attributes)} -> {len(resolved)} atributos")
         return resolved
 
     def _extract_by_dependency(
         self,
         text: str,
-        entity_mentions: Optional[list[tuple[str, int, int]]],
-        chapter_id: Optional[int],
+        entity_mentions: list[tuple[str, int, int]] | None,
+        chapter_id: int | None,
     ) -> list[ExtractedAttribute]:
         """
         Extrae atributos usando dependency parsing de spaCy.
@@ -3189,7 +3608,11 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                                     attributes.append(attr)
 
                     # Fallback: AUX que es ROOT (menos frecuente pero posible)
-                    elif token.lemma_ in self._copulative_verbs and token.pos_ == "AUX" and token.dep_ == "ROOT":
+                    elif (
+                        token.lemma_ in self._copulative_verbs
+                        and token.pos_ == "AUX"
+                        and token.dep_ == "ROOT"
+                    ):
                         subject = None
                         attribute_value = None
                         attr_token = None
@@ -3212,7 +3635,9 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                                 confidence = 0.55
                                 if confidence >= self.min_confidence:
                                     # Calcular sentence_idx
-                                    sent_idx = list(doc.sents).index(sent) if sent in doc.sents else 0
+                                    sent_idx = (
+                                        list(doc.sents).index(sent) if sent in doc.sents else 0
+                                    )
                                     attr = ExtractedAttribute(
                                         entity_name=entity_name,
                                         category=category,
@@ -3306,7 +3731,7 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
         token,
         mention_spans: dict,
         doc,
-    ) -> Optional[str]:
+    ) -> str | None:
         """
         Resuelve un token a un nombre de entidad.
 
@@ -3331,9 +3756,9 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
             # 1. Buscar nombre propio más cercano ANTES del pronombre
             # Recorrer tokens anteriores buscando nombres propios
             best_candidate = None
-            best_distance = float('inf')
+            best_distance = float("inf")
 
-            for i, prev_token in enumerate(doc):
+            for _i, prev_token in enumerate(doc):
                 if prev_token.i >= token.i:
                     break  # Solo buscar antes del pronombre
 
@@ -3342,13 +3767,13 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                     distance = token.i - prev_token.i
 
                     # Filtrar lugares comunes
-                    if prev_token.text not in ['Retiro', 'Madrid'] and distance < best_distance:
+                    if prev_token.text not in ["Retiro", "Madrid"] and distance < best_distance:
                         # Verificar que no sea parte de un nombre de lugar
                         # Buscar si tiene preposiciones como "del", "de", "el" cerca
                         is_location = False
                         if prev_token.i > 0:
                             prev_prev = doc[prev_token.i - 1]
-                            if prev_prev.text.lower() in ['del', 'de', 'el', 'la']:
+                            if prev_prev.text.lower() in ["del", "de", "el", "la"]:
                                 is_location = True
 
                         if not is_location:
@@ -3366,9 +3791,9 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                 if end < token.idx:  # Está antes del pronombre
                     # Heurística para distinguir personas
                     name_words = name.split()
-                    is_likely_person = (
-                        len(name_words) <= 2 and
-                        not any(word.lower() in ['parque', 'del', 'de', 'la', 'el', 'retiro'] for word in name_words)
+                    is_likely_person = len(name_words) <= 2 and not any(
+                        word.lower() in ["parque", "del", "de", "la", "el", "retiro"]
+                        for word in name_words
                     )
 
                     if is_likely_person:
@@ -3382,19 +3807,44 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
         return None
 
     # Colores que en uso copulativo ("era rubio") se refieren a pelo
-    _HAIR_COLOR_ADJECTIVES = frozenset({
-        "rubio", "rubia", "rubios", "rubias",
-        "moreno", "morena", "morenos", "morenas",
-        "castaño", "castaña", "castaños", "castañas",
-        "pelirrojo", "pelirroja", "pelirrojos", "pelirrojas",
-        "canoso", "canosa", "canosos", "canosas",
-    })
+    _HAIR_COLOR_ADJECTIVES = frozenset(
+        {
+            "rubio",
+            "rubia",
+            "rubios",
+            "rubias",
+            "moreno",
+            "morena",
+            "morenos",
+            "morenas",
+            "castaño",
+            "castaña",
+            "castaños",
+            "castañas",
+            "pelirrojo",
+            "pelirroja",
+            "pelirrojos",
+            "pelirrojas",
+            "canoso",
+            "canosa",
+            "canosos",
+            "canosas",
+        }
+    )
 
     # Adjetivos de altura
-    _HEIGHT_ADJECTIVES = frozenset({
-        "alto", "alta", "altos", "altas",
-        "bajo", "baja", "bajos", "bajas",
-    })
+    _HEIGHT_ADJECTIVES = frozenset(
+        {
+            "alto",
+            "alta",
+            "altos",
+            "altas",
+            "bajo",
+            "baja",
+            "bajos",
+            "bajas",
+        }
+    )
 
     def _infer_category(self, value: str, token) -> AttributeCategory:
         """Infiere la categoría del atributo basándose en el valor y POS."""
@@ -3483,7 +3933,7 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
 
 def extract_attributes(
     text: str,
-    entity_mentions: Optional[list[tuple[str, int, int]]] = None,
+    entity_mentions: list[tuple[str, int, int]] | None = None,
 ) -> Result[AttributeExtractionResult]:
     """
     Función de conveniencia para extraer atributos.
@@ -3506,7 +3956,7 @@ def extract_attributes(
 import threading
 
 _extractor_lock = threading.Lock()
-_attribute_extractor: Optional[AttributeExtractor] = None
+_attribute_extractor: AttributeExtractor | None = None
 
 
 def get_attribute_extractor(
@@ -3559,6 +4009,7 @@ def reset_attribute_extractor() -> None:
 # Resolución de atributos con correferencias
 # =============================================================================
 
+
 def resolve_attributes_with_coreferences(
     attributes: list[ExtractedAttribute],
     coref_chains: list,  # list[CoreferenceChain] - evitar import circular
@@ -3595,7 +4046,7 @@ def resolve_attributes_with_coreferences(
         if not main_name:
             # Buscar la primera mención que sea nombre propio
             for mention in chain.mentions:
-                if hasattr(mention, 'mention_type'):
+                if hasattr(mention, "mention_type"):
                     # MentionType.PROPER_NOUN
                     if mention.mention_type.value == "proper_noun":
                         main_name = mention.text
@@ -3605,8 +4056,19 @@ def resolve_attributes_with_coreferences(
                     text_lower = mention.text.lower()
                     # No es pronombre
                     if text_lower not in {
-                        "él", "ella", "ellos", "ellas", "este", "esta",
-                        "ese", "esa", "aquel", "aquella", "lo", "la", "le",
+                        "él",
+                        "ella",
+                        "ellos",
+                        "ellas",
+                        "este",
+                        "esta",
+                        "ese",
+                        "esa",
+                        "aquel",
+                        "aquella",
+                        "lo",
+                        "la",
+                        "le",
                     }:
                         main_name = mention.text
                         break
@@ -3620,14 +4082,28 @@ def resolve_attributes_with_coreferences(
             mention_to_entity[mention_text_lower] = main_name
 
             # También mapear por posición
-            if hasattr(mention, 'start_char') and hasattr(mention, 'end_char'):
+            if hasattr(mention, "start_char") and hasattr(mention, "end_char"):
                 position_to_entity[(mention.start_char, mention.end_char)] = main_name
 
     # Resolver atributos
     resolved_attributes = []
     pronouns = {
-        "él", "ella", "ellos", "ellas", "este", "esta", "ese", "esa",
-        "aquel", "aquella", "lo", "la", "le", "les", "su", "sus",
+        "él",
+        "ella",
+        "ellos",
+        "ellas",
+        "este",
+        "esta",
+        "ese",
+        "esa",
+        "aquel",
+        "aquella",
+        "lo",
+        "la",
+        "le",
+        "les",
+        "su",
+        "sus",
     }
 
     for attr in attributes:
@@ -3635,9 +4111,9 @@ def resolve_attributes_with_coreferences(
 
         # Verificar si es pronombre o mención que necesita resolución
         needs_resolution = (
-            entity_lower in pronouns or
-            entity_lower in mention_to_entity or
-            not attr.entity_name[0].isupper()  # No empieza con mayúscula
+            entity_lower in pronouns
+            or entity_lower in mention_to_entity
+            or not attr.entity_name[0].isupper()  # No empieza con mayúscula
         )
 
         if needs_resolution:
@@ -3695,7 +4171,7 @@ def _find_nearest_antecedent(
     position_to_entity: dict[tuple[int, int], str],
     text: str,
     max_distance: int = 500,
-) -> Optional[str]:
+) -> str | None:
     """
     Encuentra el antecedente más cercano por posición en el texto.
 
@@ -3704,7 +4180,7 @@ def _find_nearest_antecedent(
     nearest_name = None
     nearest_distance = max_distance
 
-    for (start, end), name in position_to_entity.items():
+    for (_start, end), name in position_to_entity.items():
         # Solo considerar menciones anteriores
         if end <= position:
             distance = position - end
@@ -3718,6 +4194,7 @@ def _find_nearest_antecedent(
 # =============================================================================
 # Funciones para pesos entrenables
 # =============================================================================
+
 
 def set_method_weights(weights: dict[str, float]) -> None:
     """
@@ -3767,14 +4244,14 @@ def load_trained_weights(path: "Path") -> dict[str, float]:
         >>> print(weights)
         {'llm': 0.88, 'embeddings': 0.04, 'dependency': 0.04, 'patterns': 0.04}
     """
-    from pathlib import Path as PathClass
     import json
+    from pathlib import Path as PathClass
 
     path = PathClass(path)
     if not path.exists():
         raise FileNotFoundError(f"Archivo de pesos no encontrado: {path}")
 
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         data = json.load(f)
 
     weights = data.get("weights", {})
@@ -3826,7 +4303,8 @@ def train_weights_from_examples(
         {'llm': 0.88, 'embeddings': 0.04, 'dependency': 0.04, 'patterns': 0.04}
     """
     from pathlib import Path as PathClass
-    from .training_data import generate_synthetic_dataset, TrainableWeightedVoting
+
+    from .training_data import TrainableWeightedVoting, generate_synthetic_dataset
 
     # Generar dataset sintético
     examples = generate_synthetic_dataset(

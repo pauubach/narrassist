@@ -9,7 +9,6 @@ import logging
 import re
 from html.parser import HTMLParser
 from pathlib import Path
-from typing import Optional
 
 from ..core.errors import CorruptedDocumentError, EmptyDocumentError
 from ..core.result import Result
@@ -27,7 +26,7 @@ class HTMLTextExtractor(HTMLParser):
         super().__init__()
         self.paragraphs: list[dict] = []
         self.current_text: list[str] = []
-        self.current_heading_level: Optional[int] = None
+        self.current_heading_level: int | None = None
         self.in_paragraph = False
         self.in_heading = False
         self.skip_content = False
@@ -83,11 +82,13 @@ class HTMLTextExtractor(HTMLParser):
         """Guarda el texto acumulado como párrafo."""
         text = " ".join(self.current_text).strip()
         if text:
-            self.paragraphs.append({
-                "text": text,
-                "is_heading": self.in_heading,
-                "heading_level": self.current_heading_level,
-            })
+            self.paragraphs.append(
+                {
+                    "text": text,
+                    "is_heading": self.in_heading,
+                    "heading_level": self.current_heading_level,
+                }
+            )
         self.current_text = []
 
     def get_paragraphs(self) -> list[dict]:
@@ -116,11 +117,10 @@ class EpubParser(DocumentParser):
         try:
             import ebooklib
             from ebooklib import epub
+
             return True
         except ImportError:
-            logger.warning(
-                "ebooklib no instalado. Instalar con: pip install ebooklib"
-            )
+            logger.warning("ebooklib no instalado. Instalar con: pip install ebooklib")
             return False
 
     def parse(self, path: Path) -> Result[RawDocument]:
@@ -141,7 +141,7 @@ class EpubParser(DocumentParser):
         path = validation_result.value
 
         if not self._ebooklib_available:
-            from ..core.errors import NarrativeError, ErrorSeverity
+            from ..core.errors import ErrorSeverity, NarrativeError
 
             return Result.failure(
                 NarrativeError(
@@ -151,7 +151,7 @@ class EpubParser(DocumentParser):
                 )
             )
 
-        from ebooklib import epub, ITEM_DOCUMENT
+        from ebooklib import ITEM_DOCUMENT, epub
 
         try:
             book = epub.read_epub(str(path), options={"ignore_ncx": True})
@@ -258,22 +258,30 @@ class EpubParser(DocumentParser):
             # Autor
             creator = book.get_metadata("DC", "creator")
             if creator:
-                metadata["author"] = creator[0][0] if isinstance(creator[0], tuple) else str(creator[0])
+                metadata["author"] = (
+                    creator[0][0] if isinstance(creator[0], tuple) else str(creator[0])
+                )
 
             # Idioma
             language = book.get_metadata("DC", "language")
             if language:
-                metadata["language"] = language[0][0] if isinstance(language[0], tuple) else str(language[0])
+                metadata["language"] = (
+                    language[0][0] if isinstance(language[0], tuple) else str(language[0])
+                )
 
             # Descripción
             description = book.get_metadata("DC", "description")
             if description:
-                metadata["subject"] = description[0][0] if isinstance(description[0], tuple) else str(description[0])
+                metadata["subject"] = (
+                    description[0][0] if isinstance(description[0], tuple) else str(description[0])
+                )
 
             # Publisher
             publisher = book.get_metadata("DC", "publisher")
             if publisher:
-                metadata["publisher"] = publisher[0][0] if isinstance(publisher[0], tuple) else str(publisher[0])
+                metadata["publisher"] = (
+                    publisher[0][0] if isinstance(publisher[0], tuple) else str(publisher[0])
+                )
 
             # Fecha
             date = book.get_metadata("DC", "date")
@@ -282,6 +290,7 @@ class EpubParser(DocumentParser):
 
             # Verificar si hay imágenes
             from ebooklib import ITEM_IMAGE
+
             images = list(book.get_items_of_type(ITEM_IMAGE))
             metadata["has_images"] = len(images) > 0
 
@@ -362,20 +371,14 @@ class EpubParser(DocumentParser):
             r"^[ivxlcdm]+\.\s*",
         ]
 
-        for pattern in chapter_patterns:
-            if re.match(pattern, text, re.IGNORECASE):
-                return True
-
-        return False
+        return any(re.match(pattern, text, re.IGNORECASE) for pattern in chapter_patterns)
 
     def _detect_chapters_by_pattern(self, paragraphs: list[RawParagraph]) -> None:
         """
         Post-proceso para detectar capítulos por patrón de texto.
         """
         chapter_number_pattern = re.compile(r"^(\d{1,3})\s*$")
-        chapter_word_pattern = re.compile(
-            r"^cap[íi]tulo\s+(\d+)", re.IGNORECASE
-        )
+        chapter_word_pattern = re.compile(r"^cap[íi]tulo\s+(\d+)", re.IGNORECASE)
 
         current_chapter = 0
 
@@ -413,8 +416,16 @@ class EpubParser(DocumentParser):
     def _is_narrative_start(self, text: str) -> bool:
         """Verifica si el texto comienza con conectores narrativos."""
         narrative_starters = [
-            'cuando', 'mientras', 'entonces', 'sin embargo',
-            'de pronto', 'aquella', 'aquel', 'había', 'era', 'fue',
+            "cuando",
+            "mientras",
+            "entonces",
+            "sin embargo",
+            "de pronto",
+            "aquella",
+            "aquel",
+            "había",
+            "era",
+            "fue",
         ]
         text_lower = text.lower()
         return any(text_lower.startswith(starter) for starter in narrative_starters)

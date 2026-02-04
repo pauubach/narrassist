@@ -6,24 +6,16 @@ y los overrides específicos de cada subtipo.
 """
 
 from copy import deepcopy
-from typing import Optional, Any
-from dataclasses import fields, is_dataclass
+from typing import Any
 
 from .models import (
     CorrectionConfig,
-    DialogConfig,
-    RepetitionConfig,
-    SentenceConfig,
-    StyleConfig,
-    StructureConfig,
-    ReadabilityConfig,
-    InheritanceSource,
     DashType,
-    QuoteType,
+    InheritanceSource,
     MarkerDetectionMode,
     MarkerPreset,
+    QuoteType,
 )
-
 
 # =============================================================================
 # Presets de Marcadores de Diálogo
@@ -373,7 +365,6 @@ SUBTYPES_REGISTRY = {
             },
         },
     },
-
     # =========================================================================
     # MEMORIAS
     # =========================================================================
@@ -397,7 +388,6 @@ SUBTYPES_REGISTRY = {
             "style": {"analyze_register": False},  # Variación natural
         },
     },
-
     # =========================================================================
     # BIOGRAFÍA
     # =========================================================================
@@ -418,7 +408,6 @@ SUBTYPES_REGISTRY = {
         "parent": "BIO",
         "config": {},
     },
-
     # =========================================================================
     # FAMOSOS
     # =========================================================================
@@ -441,7 +430,6 @@ SUBTYPES_REGISTRY = {
             "dialog": {"enabled": True},
         },
     },
-
     # =========================================================================
     # DIVULGACIÓN
     # =========================================================================
@@ -462,7 +450,6 @@ SUBTYPES_REGISTRY = {
         "parent": "DIV",
         "config": {},
     },
-
     # =========================================================================
     # ENSAYO
     # =========================================================================
@@ -490,7 +477,6 @@ SUBTYPES_REGISTRY = {
         "parent": "ENS",
         "config": {},
     },
-
     # =========================================================================
     # AUTOAYUDA
     # =========================================================================
@@ -514,7 +500,6 @@ SUBTYPES_REGISTRY = {
         "parent": "AUT",
         "config": {},
     },
-
     # =========================================================================
     # TÉCNICO
     # =========================================================================
@@ -533,7 +518,6 @@ SUBTYPES_REGISTRY = {
         "parent": "TEC",
         "config": {},
     },
-
     # =========================================================================
     # PRÁCTICO
     # =========================================================================
@@ -562,7 +546,6 @@ SUBTYPES_REGISTRY = {
         "parent": "PRA",
         "config": {},
     },
-
     # =========================================================================
     # GRÁFICO
     # =========================================================================
@@ -590,7 +573,6 @@ SUBTYPES_REGISTRY = {
         "parent": "GRA",
         "config": {},
     },
-
     # =========================================================================
     # INFANTIL/JUVENIL - Ajustes críticos por edad
     # =========================================================================
@@ -721,7 +703,6 @@ SUBTYPES_REGISTRY = {
             },
         },
     },
-
     # =========================================================================
     # TEATRO/GUION
     # =========================================================================
@@ -748,6 +729,7 @@ SUBTYPES_REGISTRY = {
 # =============================================================================
 # Funciones de acceso
 # =============================================================================
+
 
 def get_type_defaults(type_code: str) -> dict:
     """
@@ -797,7 +779,14 @@ def _deep_merge(base: dict, override: dict) -> dict:
     return result
 
 
-def _apply_config_to_dataclass(config_obj: Any, config_dict: dict, category: str, source: InheritanceSource, source_name: str, correction_config: CorrectionConfig):
+def _apply_config_to_dataclass(
+    config_obj: Any,
+    config_dict: dict,
+    category: str,
+    source: InheritanceSource,
+    source_name: str,
+    correction_config: CorrectionConfig,
+):
     """
     Aplica un diccionario de configuración a un dataclass.
 
@@ -809,7 +798,7 @@ def _apply_config_to_dataclass(config_obj: Any, config_dict: dict, category: str
             correction_config.set_inheritance_info(category, key, source, source_name)
 
 
-def _load_user_overrides(type_code: str, subtype_code: Optional[str] = None) -> Optional[dict]:
+def _load_user_overrides(type_code: str, subtype_code: str | None = None) -> dict | None:
     """
     Carga overrides de usuario desde la base de datos.
 
@@ -822,6 +811,7 @@ def _load_user_overrides(type_code: str, subtype_code: Optional[str] = None) -> 
     """
     try:
         from .defaults_repository import get_defaults_repository
+
         repo = get_defaults_repository()
         result = repo.get_override(type_code, subtype_code)
         return result["overrides"] if result else None
@@ -831,10 +821,7 @@ def _load_user_overrides(type_code: str, subtype_code: Optional[str] = None) -> 
 
 
 def _apply_section_overrides(
-    config: 'CorrectionConfig',
-    overrides: dict,
-    source: InheritanceSource,
-    source_name: str
+    config: "CorrectionConfig", overrides: dict, source: InheritanceSource, source_name: str
 ) -> None:
     """
     Aplica overrides a todas las secciones de configuración.
@@ -858,19 +845,12 @@ def _apply_section_overrides(
     for section in sections:
         if section in overrides:
             _apply_config_to_dataclass(
-                section_attrs[section],
-                overrides[section],
-                section,
-                source,
-                source_name,
-                config
+                section_attrs[section], overrides[section], section, source, source_name, config
             )
 
 
 def get_correction_config(
-    type_code: str,
-    subtype_code: Optional[str] = None,
-    custom_overrides: Optional[dict] = None
+    type_code: str, subtype_code: str | None = None, custom_overrides: dict | None = None
 ) -> CorrectionConfig:
     """
     Construye una configuración de corrección con herencia aplicada.
@@ -920,41 +900,59 @@ def get_correction_config(
 
     if "dialog" in type_config:
         _apply_config_to_dataclass(
-            config.dialog, type_config["dialog"],
-            "dialog", InheritanceSource.TYPE, type_name, config
+            config.dialog,
+            type_config["dialog"],
+            "dialog",
+            InheritanceSource.TYPE,
+            type_name,
+            config,
         )
     if "repetition" in type_config:
         _apply_config_to_dataclass(
-            config.repetition, type_config["repetition"],
-            "repetition", InheritanceSource.TYPE, type_name, config
+            config.repetition,
+            type_config["repetition"],
+            "repetition",
+            InheritanceSource.TYPE,
+            type_name,
+            config,
         )
     if "sentence" in type_config:
         _apply_config_to_dataclass(
-            config.sentence, type_config["sentence"],
-            "sentence", InheritanceSource.TYPE, type_name, config
+            config.sentence,
+            type_config["sentence"],
+            "sentence",
+            InheritanceSource.TYPE,
+            type_name,
+            config,
         )
     if "style" in type_config:
         _apply_config_to_dataclass(
-            config.style, type_config["style"],
-            "style", InheritanceSource.TYPE, type_name, config
+            config.style, type_config["style"], "style", InheritanceSource.TYPE, type_name, config
         )
     if "structure" in type_config:
         _apply_config_to_dataclass(
-            config.structure, type_config["structure"],
-            "structure", InheritanceSource.TYPE, type_name, config
+            config.structure,
+            type_config["structure"],
+            "structure",
+            InheritanceSource.TYPE,
+            type_name,
+            config,
         )
     if "readability" in type_config:
         _apply_config_to_dataclass(
-            config.readability, type_config["readability"],
-            "readability", InheritanceSource.TYPE, type_name, config
+            config.readability,
+            type_config["readability"],
+            "readability",
+            InheritanceSource.TYPE,
+            type_name,
+            config,
         )
 
     # 1b. Aplicar overrides de usuario para el tipo (si existen)
     user_type_overrides = _load_user_overrides(type_code, None)
     if user_type_overrides:
         _apply_section_overrides(
-            config, user_type_overrides,
-            InheritanceSource.TYPE, f"{type_name} (personalizado)"
+            config, user_type_overrides, InheritanceSource.TYPE, f"{type_name} (personalizado)"
         )
 
     # 2. Aplicar overrides del subtipo
@@ -963,74 +961,124 @@ def get_correction_config(
 
         if "dialog" in subtype_config:
             _apply_config_to_dataclass(
-                config.dialog, subtype_config["dialog"],
-                "dialog", InheritanceSource.SUBTYPE, subtype_name, config
+                config.dialog,
+                subtype_config["dialog"],
+                "dialog",
+                InheritanceSource.SUBTYPE,
+                subtype_name,
+                config,
             )
         if "repetition" in subtype_config:
             _apply_config_to_dataclass(
-                config.repetition, subtype_config["repetition"],
-                "repetition", InheritanceSource.SUBTYPE, subtype_name, config
+                config.repetition,
+                subtype_config["repetition"],
+                "repetition",
+                InheritanceSource.SUBTYPE,
+                subtype_name,
+                config,
             )
         if "sentence" in subtype_config:
             _apply_config_to_dataclass(
-                config.sentence, subtype_config["sentence"],
-                "sentence", InheritanceSource.SUBTYPE, subtype_name, config
+                config.sentence,
+                subtype_config["sentence"],
+                "sentence",
+                InheritanceSource.SUBTYPE,
+                subtype_name,
+                config,
             )
         if "style" in subtype_config:
             _apply_config_to_dataclass(
-                config.style, subtype_config["style"],
-                "style", InheritanceSource.SUBTYPE, subtype_name, config
+                config.style,
+                subtype_config["style"],
+                "style",
+                InheritanceSource.SUBTYPE,
+                subtype_name,
+                config,
             )
         if "structure" in subtype_config:
             _apply_config_to_dataclass(
-                config.structure, subtype_config["structure"],
-                "structure", InheritanceSource.SUBTYPE, subtype_name, config
+                config.structure,
+                subtype_config["structure"],
+                "structure",
+                InheritanceSource.SUBTYPE,
+                subtype_name,
+                config,
             )
         if "readability" in subtype_config:
             _apply_config_to_dataclass(
-                config.readability, subtype_config["readability"],
-                "readability", InheritanceSource.SUBTYPE, subtype_name, config
+                config.readability,
+                subtype_config["readability"],
+                "readability",
+                InheritanceSource.SUBTYPE,
+                subtype_name,
+                config,
             )
 
         # 2b. Aplicar overrides de usuario para el subtipo (si existen)
         user_subtype_overrides = _load_user_overrides(type_code, subtype_code)
         if user_subtype_overrides:
             _apply_section_overrides(
-                config, user_subtype_overrides,
-                InheritanceSource.SUBTYPE, f"{subtype_name} (personalizado)"
+                config,
+                user_subtype_overrides,
+                InheritanceSource.SUBTYPE,
+                f"{subtype_name} (personalizado)",
             )
 
     # 3. Aplicar overrides personalizados
     if custom_overrides:
         if "dialog" in custom_overrides:
             _apply_config_to_dataclass(
-                config.dialog, custom_overrides["dialog"],
-                "dialog", InheritanceSource.CUSTOM, "Personalizado", config
+                config.dialog,
+                custom_overrides["dialog"],
+                "dialog",
+                InheritanceSource.CUSTOM,
+                "Personalizado",
+                config,
             )
         if "repetition" in custom_overrides:
             _apply_config_to_dataclass(
-                config.repetition, custom_overrides["repetition"],
-                "repetition", InheritanceSource.CUSTOM, "Personalizado", config
+                config.repetition,
+                custom_overrides["repetition"],
+                "repetition",
+                InheritanceSource.CUSTOM,
+                "Personalizado",
+                config,
             )
         if "sentence" in custom_overrides:
             _apply_config_to_dataclass(
-                config.sentence, custom_overrides["sentence"],
-                "sentence", InheritanceSource.CUSTOM, "Personalizado", config
+                config.sentence,
+                custom_overrides["sentence"],
+                "sentence",
+                InheritanceSource.CUSTOM,
+                "Personalizado",
+                config,
             )
         if "style" in custom_overrides:
             _apply_config_to_dataclass(
-                config.style, custom_overrides["style"],
-                "style", InheritanceSource.CUSTOM, "Personalizado", config
+                config.style,
+                custom_overrides["style"],
+                "style",
+                InheritanceSource.CUSTOM,
+                "Personalizado",
+                config,
             )
         if "structure" in custom_overrides:
             _apply_config_to_dataclass(
-                config.structure, custom_overrides["structure"],
-                "structure", InheritanceSource.CUSTOM, "Personalizado", config
+                config.structure,
+                custom_overrides["structure"],
+                "structure",
+                InheritanceSource.CUSTOM,
+                "Personalizado",
+                config,
             )
         if "readability" in custom_overrides:
             _apply_config_to_dataclass(
-                config.readability, custom_overrides["readability"],
-                "readability", InheritanceSource.CUSTOM, "Personalizado", config
+                config.readability,
+                custom_overrides["readability"],
+                "readability",
+                InheritanceSource.CUSTOM,
+                "Personalizado",
+                config,
             )
 
     return config

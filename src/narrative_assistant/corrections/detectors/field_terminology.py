@@ -9,10 +9,9 @@ audiencia general.
 import json
 import logging
 from pathlib import Path
-from typing import Optional
 
 from ..base import BaseDetector, CorrectionIssue
-from ..config import DocumentField, FieldDictionaryConfig, DocumentProfile
+from ..config import DocumentField, DocumentProfile, FieldDictionaryConfig
 from ..types import CorrectionCategory, FieldTermIssueType
 
 logger = logging.getLogger(__name__)
@@ -26,7 +25,7 @@ class FieldDictionary:
     de cada campo (jurídico, médico, informático, etc.).
     """
 
-    def __init__(self, dictionaries_path: Optional[Path] = None):
+    def __init__(self, dictionaries_path: Path | None = None):
         """
         Inicializa el diccionario de campos.
 
@@ -41,7 +40,7 @@ class FieldDictionary:
         self.dictionaries: dict[str, dict] = {}
         self._loaded_fields: set[DocumentField] = set()
 
-    def load(self, fields: Optional[list[DocumentField]] = None) -> None:
+    def load(self, fields: list[DocumentField] | None = None) -> None:
         """
         Carga los diccionarios de los campos especificados.
 
@@ -68,7 +67,7 @@ class FieldDictionary:
                 continue
 
             try:
-                with open(json_file, "r", encoding="utf-8") as f:
+                with open(json_file, encoding="utf-8") as f:
                     self.dictionaries[field_name] = json.load(f)
                 self._loaded_fields.add(field_enum)
                 logger.info(f"Loaded field dictionary: {field_name}")
@@ -99,9 +98,7 @@ class FieldDictionary:
 
         return result
 
-    def get_accessible_alternative(
-        self, term: str, field: DocumentField
-    ) -> Optional[str]:
+    def get_accessible_alternative(self, term: str, field: DocumentField) -> str | None:
         """
         Obtiene una alternativa más accesible para un término técnico.
 
@@ -181,7 +178,6 @@ BUILTIN_FIELD_TERMS = {
         "definition": "Aceptación de las pretensiones del demandante",
         "accessible_alternative": "aceptación de lo que pide el demandante",
     },
-
     # Términos médicos
     "etiología": {
         "field": DocumentField.MEDICAL,
@@ -233,7 +229,6 @@ BUILTIN_FIELD_TERMS = {
         "definition": "Predicción de la evolución",
         "accessible_alternative": "evolución esperada",
     },
-
     # Términos informáticos/técnicos
     "algoritmo": {
         "field": DocumentField.TECHNICAL,
@@ -285,7 +280,6 @@ BUILTIN_FIELD_TERMS = {
         "definition": "Reestructurar código sin cambiar funcionalidad",
         "accessible_alternative": "reorganizar el código",
     },
-
     # Términos de negocios
     "roi": {
         "field": DocumentField.BUSINESS,
@@ -327,7 +321,6 @@ BUILTIN_FIELD_TERMS = {
         "definition": "Lluvia de ideas",
         "accessible_alternative": "generar ideas en grupo",
     },
-
     # Términos académicos
     "metodología": {
         "field": DocumentField.ACADEMIC,
@@ -378,9 +371,9 @@ class FieldTerminologyDetector(BaseDetector):
 
     def __init__(
         self,
-        config: Optional[FieldDictionaryConfig] = None,
-        profile: Optional[DocumentProfile] = None,
-        dictionary: Optional[FieldDictionary] = None,
+        config: FieldDictionaryConfig | None = None,
+        profile: DocumentProfile | None = None,
+        dictionary: FieldDictionary | None = None,
     ):
         self.config = config or FieldDictionaryConfig()
         self.profile = profile or DocumentProfile()
@@ -393,7 +386,7 @@ class FieldTerminologyDetector(BaseDetector):
     def detect(
         self,
         text: str,
-        chapter_index: Optional[int] = None,
+        chapter_index: int | None = None,
         spacy_doc=None,
     ) -> list[CorrectionIssue]:
         """
@@ -416,13 +409,15 @@ class FieldTerminologyDetector(BaseDetector):
         if spacy_doc is not None:
             tokens = [
                 (token.text, token.idx, token.idx + len(token.text))
-                for token in spacy_doc if token.is_alpha
+                for token in spacy_doc
+                if token.is_alpha
             ]
         else:
             import re
+
             tokens = [
                 (m.group(), m.start(), m.end())
-                for m in re.finditer(r'\b[a-záéíóúüñA-ZÁÉÍÓÚÜÑ]+\b', text)
+                for m in re.finditer(r"\b[a-záéíóúüñA-ZÁÉÍÓÚÜÑ]+\b", text)
             ]
 
         # Buscar términos especializados
@@ -533,8 +528,8 @@ from ..config import AudienceType
 
 
 def get_field_detector(
-    config: Optional[FieldDictionaryConfig] = None,
-    profile: Optional[DocumentProfile] = None,
+    config: FieldDictionaryConfig | None = None,
+    profile: DocumentProfile | None = None,
 ) -> FieldTerminologyDetector:
     """Obtiene una instancia del detector de terminología de campo."""
     return FieldTerminologyDetector(config=config, profile=profile)

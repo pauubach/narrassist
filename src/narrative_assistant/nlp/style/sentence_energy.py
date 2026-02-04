@@ -26,8 +26,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
 
+from ...core.errors import ErrorSeverity, NLPError
 from ...core.result import Result
-from ...core.errors import NLPError, ErrorSeverity
 
 logger = logging.getLogger(__name__)
 
@@ -62,17 +62,20 @@ def reset_sentence_energy_detector() -> None:
 # Tipos
 # =============================================================================
 
+
 class EnergyLevel(Enum):
     """Nivel de energía de una oración."""
-    VERY_LOW = "very_low"    # 0-20: muy plana, pasiva, verbos débiles
-    LOW = "low"              # 20-40: baja energía
-    MEDIUM = "medium"        # 40-60: energía moderada
-    HIGH = "high"            # 60-80: buena energía
+
+    VERY_LOW = "very_low"  # 0-20: muy plana, pasiva, verbos débiles
+    LOW = "low"  # 20-40: baja energía
+    MEDIUM = "medium"  # 40-60: energía moderada
+    HIGH = "high"  # 60-80: buena energía
     VERY_HIGH = "very_high"  # 80-100: máxima energía, acción directa
 
 
 class EnergyIssueType(Enum):
     """Tipo de problema de energía detectado."""
+
     PASSIVE_VOICE = "passive_voice"
     WEAK_VERB = "weak_verb"
     NOMINALIZATION = "nominalization"
@@ -82,10 +85,11 @@ class EnergyIssueType(Enum):
 @dataclass
 class EnergyIssue:
     """Un problema específico que reduce la energía de una oración."""
+
     issue_type: EnergyIssueType
-    detail: str           # Texto que causa el problema
-    suggestion: str       # Sugerencia de mejora
-    penalty: float        # Penalización al score (0-1)
+    detail: str  # Texto que causa el problema
+    suggestion: str  # Sugerencia de mejora
+    penalty: float  # Penalización al score (0-1)
 
     def to_dict(self) -> dict:
         return {
@@ -106,13 +110,13 @@ class SentenceEnergy:
     end_char: int
 
     # Score principal
-    energy_score: float       # 0-100
+    energy_score: float  # 0-100
     energy_level: EnergyLevel
 
     # Sub-scores
-    voice_score: float        # 0-100 (100=activa, 0=pasiva)
-    verb_strength: float      # 0-100 (100=verbo fuerte, 0=débil)
-    structure_score: float    # 0-100 (variedad de puntuación, longitud)
+    voice_score: float  # 0-100 (100=activa, 0=pasiva)
+    verb_strength: float  # 0-100 (100=verbo fuerte, 0=débil)
+    structure_score: float  # 0-100 (variedad de puntuación, longitud)
 
     # Problemas detectados
     issues: list[EnergyIssue] = field(default_factory=list)
@@ -201,73 +205,301 @@ class SentenceEnergyReport:
 # Verbos débiles: verbos que no transmiten acción concreta
 WEAK_VERBS = {
     # Ser / Estar (copulativos)
-    "ser", "estar",
-    "soy", "eres", "es", "somos", "sois", "son",
-    "era", "eras", "éramos", "erais", "eran",
-    "fui", "fuiste", "fue", "fuimos", "fuisteis", "fueron",
-    "seré", "serás", "será", "seremos", "seréis", "serán",
-    "sería", "serías", "seríamos", "seríais", "serían",
-    "sea", "seas", "seamos", "seáis", "sean",
-    "estoy", "estás", "está", "estamos", "estáis", "están",
-    "estaba", "estabas", "estábamos", "estabais", "estaban",
-    "estuve", "estuviste", "estuvo", "estuvimos", "estuvisteis", "estuvieron",
-    "estaré", "estarás", "estará", "estaremos", "estaréis", "estarán",
-    "estaría", "estarías", "estaríamos", "estaríais", "estarían",
+    "ser",
+    "estar",
+    "soy",
+    "eres",
+    "es",
+    "somos",
+    "sois",
+    "son",
+    "era",
+    "eras",
+    "éramos",
+    "erais",
+    "eran",
+    "fui",
+    "fuiste",
+    "fue",
+    "fuimos",
+    "fuisteis",
+    "fueron",
+    "seré",
+    "serás",
+    "será",
+    "seremos",
+    "seréis",
+    "serán",
+    "sería",
+    "serías",
+    "seríamos",
+    "seríais",
+    "serían",
+    "sea",
+    "seas",
+    "seamos",
+    "seáis",
+    "sean",
+    "estoy",
+    "estás",
+    "está",
+    "estamos",
+    "estáis",
+    "están",
+    "estaba",
+    "estabas",
+    "estábamos",
+    "estabais",
+    "estaban",
+    "estuve",
+    "estuviste",
+    "estuvo",
+    "estuvimos",
+    "estuvisteis",
+    "estuvieron",
+    "estaré",
+    "estarás",
+    "estará",
+    "estaremos",
+    "estaréis",
+    "estarán",
+    "estaría",
+    "estarías",
+    "estaríamos",
+    "estaríais",
+    "estarían",
     # Haber (auxiliar)
-    "haber", "he", "has", "ha", "hemos", "habéis", "han",
-    "había", "habías", "habíamos", "habíais", "habían",
-    "hubo", "hay",
-    "habré", "habrás", "habrá", "habremos", "habréis", "habrán",
-    "habría", "habrías", "habríamos", "habríais", "habrían",
-    "haya", "hayas", "hayamos", "hayáis", "hayan",
+    "haber",
+    "he",
+    "has",
+    "ha",
+    "hemos",
+    "habéis",
+    "han",
+    "había",
+    "habías",
+    "habíamos",
+    "habíais",
+    "habían",
+    "hubo",
+    "hay",
+    "habré",
+    "habrás",
+    "habrá",
+    "habremos",
+    "habréis",
+    "habrán",
+    "habría",
+    "habrías",
+    "habríamos",
+    "habríais",
+    "habrían",
+    "haya",
+    "hayas",
+    "hayamos",
+    "hayáis",
+    "hayan",
     # Tener
-    "tener", "tengo", "tienes", "tiene", "tenemos", "tenéis", "tienen",
-    "tenía", "tenías", "teníamos", "teníais", "tenían",
-    "tuvo", "tuve", "tuviste", "tuvimos", "tuvisteis", "tuvieron",
-    "tendré", "tendrás", "tendrá", "tendremos", "tendréis", "tendrán",
-    "tendría", "tendrías", "tendríamos", "tendríais", "tendrían",
+    "tener",
+    "tengo",
+    "tienes",
+    "tiene",
+    "tenemos",
+    "tenéis",
+    "tienen",
+    "tenía",
+    "tenías",
+    "teníamos",
+    "teníais",
+    "tenían",
+    "tuvo",
+    "tuve",
+    "tuviste",
+    "tuvimos",
+    "tuvisteis",
+    "tuvieron",
+    "tendré",
+    "tendrás",
+    "tendrá",
+    "tendremos",
+    "tendréis",
+    "tendrán",
+    "tendría",
+    "tendrías",
+    "tendríamos",
+    "tendríais",
+    "tendrían",
     # Hacer (cuando es genérico)
-    "hacer", "hago", "haces", "hace", "hacemos", "hacéis", "hacen",
-    "hacía", "hacías", "hacíamos", "hacíais", "hacían",
-    "hizo", "hice", "hiciste", "hicimos", "hicisteis", "hicieron",
-    "haré", "harás", "hará", "haremos", "haréis", "harán",
-    "haría", "harías", "haríamos", "haríais", "harían",
+    "hacer",
+    "hago",
+    "haces",
+    "hace",
+    "hacemos",
+    "hacéis",
+    "hacen",
+    "hacía",
+    "hacías",
+    "hacíamos",
+    "hacíais",
+    "hacían",
+    "hizo",
+    "hice",
+    "hiciste",
+    "hicimos",
+    "hicisteis",
+    "hicieron",
+    "haré",
+    "harás",
+    "hará",
+    "haremos",
+    "haréis",
+    "harán",
+    "haría",
+    "harías",
+    "haríamos",
+    "haríais",
+    "harían",
     # Parecer
-    "parecer", "parezco", "pareces", "parece", "parecemos", "parecéis", "parecen",
-    "parecía", "parecías", "parecíamos", "parecíais", "parecían",
+    "parecer",
+    "parezco",
+    "pareces",
+    "parece",
+    "parecemos",
+    "parecéis",
+    "parecen",
+    "parecía",
+    "parecías",
+    "parecíamos",
+    "parecíais",
+    "parecían",
     # Resultar
-    "resultar", "resulta", "resultan", "resultaba", "resultaban",
+    "resultar",
+    "resulta",
+    "resultan",
+    "resultaba",
+    "resultaban",
     # Poder (modal, no acción)
-    "poder", "puedo", "puedes", "puede", "podemos", "podéis", "pueden",
-    "podía", "podías", "podíamos", "podíais", "podían",
-    "pudo", "pude", "pudiste", "pudimos", "pudisteis", "pudieron",
-    "podré", "podrás", "podrá", "podremos", "podréis", "podrán",
-    "podría", "podrías", "podríamos", "podríais", "podrían",
+    "poder",
+    "puedo",
+    "puedes",
+    "puede",
+    "podemos",
+    "podéis",
+    "pueden",
+    "podía",
+    "podías",
+    "podíamos",
+    "podíais",
+    "podían",
+    "pudo",
+    "pude",
+    "pudiste",
+    "pudimos",
+    "pudisteis",
+    "pudieron",
+    "podré",
+    "podrás",
+    "podrá",
+    "podremos",
+    "podréis",
+    "podrán",
+    "podría",
+    "podrías",
+    "podríamos",
+    "podríais",
+    "podrían",
     # Deber (modal)
-    "deber", "debo", "debes", "debe", "debemos", "debéis", "deben",
-    "debía", "debías", "debíamos", "debíais", "debían",
-    "debería", "deberías", "deberíamos", "deberíais", "deberían",
+    "deber",
+    "debo",
+    "debes",
+    "debe",
+    "debemos",
+    "debéis",
+    "deben",
+    "debía",
+    "debías",
+    "debíamos",
+    "debíais",
+    "debían",
+    "debería",
+    "deberías",
+    "deberíamos",
+    "deberíais",
+    "deberían",
     # Ir (cuando es auxiliar/perifrástico)
-    "ir", "voy", "vas", "va", "vamos", "vais", "van",
-    "iba", "ibas", "íbamos", "ibais", "iban",
+    "ir",
+    "voy",
+    "vas",
+    "va",
+    "vamos",
+    "vais",
+    "van",
+    "iba",
+    "ibas",
+    "íbamos",
+    "ibais",
+    "iban",
     # Existenciales genéricos
-    "existir", "existe", "existen", "existía", "existían",
-    "haber", "hay", "había", "hubo",
+    "existir",
+    "existe",
+    "existen",
+    "existía",
+    "existían",
     # Quedar
-    "quedar", "queda", "quedan", "quedaba", "quedaban",
+    "quedar",
+    "queda",
+    "quedan",
+    "quedaba",
+    "quedaban",
 }
 
 # Participios pasados más frecuentes en español (para detección de voz pasiva)
 # El patrón principal es: ser/estar + participio (-ado, -ido, -to, -so, -cho)
 PASSIVE_AUXILIARIES = {
-    "ser", "soy", "eres", "es", "somos", "sois", "son",
-    "era", "eras", "éramos", "erais", "eran",
-    "fui", "fuiste", "fue", "fuimos", "fuisteis", "fueron",
-    "seré", "serás", "será", "seremos", "seréis", "serán",
-    "sería", "serías", "seríamos", "seríais", "serían",
-    "sea", "seas", "seamos", "seáis", "sean",
-    "fuera", "fueras", "fuéramos", "fuerais", "fueran",
-    "fuese", "fueses", "fuésemos", "fueseis", "fuesen",
+    "ser",
+    "soy",
+    "eres",
+    "es",
+    "somos",
+    "sois",
+    "son",
+    "era",
+    "eras",
+    "éramos",
+    "erais",
+    "eran",
+    "fui",
+    "fuiste",
+    "fue",
+    "fuimos",
+    "fuisteis",
+    "fueron",
+    "seré",
+    "serás",
+    "será",
+    "seremos",
+    "seréis",
+    "serán",
+    "sería",
+    "serías",
+    "seríamos",
+    "seríais",
+    "serían",
+    "sea",
+    "seas",
+    "seamos",
+    "seáis",
+    "sean",
+    "fuera",
+    "fueras",
+    "fuéramos",
+    "fuerais",
+    "fueran",
+    "fuese",
+    "fueses",
+    "fuésemos",
+    "fueseis",
+    "fuesen",
     "sido",
     # Nota: estar NO se incluye — "estar + participio" es construcción
     # estativa/atributiva, NO voz pasiva (RAE, Nueva Gramática §41.6)
@@ -275,40 +507,120 @@ PASSIVE_AUXILIARIES = {
 
 # Sufijos de nominalizaciones (verbos convertidos en sustantivos abstractos)
 NOMINALIZATION_SUFFIXES = (
-    "ción", "sión", "miento", "amiento", "imiento",
-    "ncia", "encia", "anza", "idad", "edad",
+    "ción",
+    "sión",
+    "miento",
+    "amiento",
+    "imiento",
+    "ncia",
+    "encia",
+    "anza",
+    "idad",
+    "edad",
 )
 
 # Palabras que NO son nominalizaciones aunque terminen en esos sufijos
 NOMINALIZATION_EXCEPTIONS = {
-    "acción", "nación", "canción", "estación", "atención",
-    "emoción", "pasión", "tensión", "presión", "expresión",
-    "momento", "pensamiento", "sentimiento", "movimiento",
-    "presencia", "ausencia", "ciencia", "conciencia",
-    "esperanza", "confianza", "distancia",
-    "ciudad", "sociedad", "realidad", "verdad",
-    "corazón", "razón",
+    "acción",
+    "nación",
+    "canción",
+    "estación",
+    "atención",
+    "emoción",
+    "pasión",
+    "tensión",
+    "presión",
+    "expresión",
+    "momento",
+    "pensamiento",
+    "sentimiento",
+    "movimiento",
+    "presencia",
+    "ausencia",
+    "ciencia",
+    "conciencia",
+    "esperanza",
+    "confianza",
+    "distancia",
+    "ciudad",
+    "sociedad",
+    "realidad",
+    "verdad",
+    "corazón",
+    "razón",
     # Sustantivos completamente lexicalizados (no derivaciones productivas)
-    "habitación", "posición", "dirección", "educación", "situación",
-    "información", "comunicación", "organización", "condición",
-    "alimentación", "población", "relación", "tradición",
-    "religión", "televisión", "decisión", "comisión",
-    "dimensión", "ocasión", "profesión", "sesión", "misión",
-    "conocimiento", "nacimiento", "crecimiento", "departamento",
-    "apartamento", "documento", "instrumento", "monumento",
-    "independencia", "experiencia", "diferencia", "referencia",
-    "competencia", "existencia", "paciencia", "violencia",
-    "importancia", "tolerancia", "sustancia", "abundancia",
-    "seguridad", "capacidad", "necesidad", "actividad",
-    "comunidad", "oportunidad", "identidad", "universidad",
+    "habitación",
+    "posición",
+    "dirección",
+    "educación",
+    "situación",
+    "información",
+    "comunicación",
+    "organización",
+    "condición",
+    "alimentación",
+    "población",
+    "relación",
+    "tradición",
+    "religión",
+    "televisión",
+    "decisión",
+    "comisión",
+    "dimensión",
+    "ocasión",
+    "profesión",
+    "sesión",
+    "misión",
+    "conocimiento",
+    "nacimiento",
+    "crecimiento",
+    "departamento",
+    "apartamento",
+    "documento",
+    "instrumento",
+    "monumento",
+    "independencia",
+    "experiencia",
+    "diferencia",
+    "referencia",
+    "competencia",
+    "existencia",
+    "paciencia",
+    "violencia",
+    "importancia",
+    "tolerancia",
+    "sustancia",
+    "abundancia",
+    "seguridad",
+    "capacidad",
+    "necesidad",
+    "actividad",
+    "comunidad",
+    "oportunidad",
+    "identidad",
+    "universidad",
 }
 
 
 # Colocaciones fuertes de "hacer" donde el verbo NO es débil
 HACER_STRONG_COLLOCATIONS = {
-    "trizas", "pedazos", "añicos", "frente", "caso", "falta",
-    "daño", "ruido", "fuego", "efecto", "justicia", "historia",
-    "honor", "mella", "gracia", "cola", "trampa",
+    "trizas",
+    "pedazos",
+    "añicos",
+    "frente",
+    "caso",
+    "falta",
+    "daño",
+    "ruido",
+    "fuego",
+    "efecto",
+    "justicia",
+    "historia",
+    "honor",
+    "mella",
+    "gracia",
+    "cola",
+    "trampa",
 }
 
 # Excepciones de "ir" como verbo de movimiento (no débil)
@@ -317,43 +629,128 @@ IR_MOVEMENT_PREPS = {"a", "al", "hacia", "hasta", "por", "de", "desde"}
 
 # Formas de "ir" para la detección contextual
 IR_FORMS = {
-    "ir", "voy", "vas", "va", "vamos", "vais", "van",
-    "iba", "ibas", "íbamos", "ibais", "iban",
-    "fue", "fui", "fuiste", "fuimos", "fuisteis", "fueron",
+    "ir",
+    "voy",
+    "vas",
+    "va",
+    "vamos",
+    "vais",
+    "van",
+    "iba",
+    "ibas",
+    "íbamos",
+    "ibais",
+    "iban",
+    "fue",
+    "fui",
+    "fuiste",
+    "fuimos",
+    "fuisteis",
+    "fueron",
 }
 
 # Formas de "hacer" para detección de colocaciones
 HACER_FORMS = {
-    "hacer", "hago", "haces", "hace", "hacemos", "hacéis", "hacen",
-    "hacía", "hacías", "hacíamos", "hacíais", "hacían",
-    "hizo", "hice", "hiciste", "hicimos", "hicisteis", "hicieron",
-    "haré", "harás", "hará", "haremos", "haréis", "harán",
-    "haría", "harías", "haríamos", "haríais", "harían",
+    "hacer",
+    "hago",
+    "haces",
+    "hace",
+    "hacemos",
+    "hacéis",
+    "hacen",
+    "hacía",
+    "hacías",
+    "hacíamos",
+    "hacíais",
+    "hacían",
+    "hizo",
+    "hice",
+    "hiciste",
+    "hicimos",
+    "hicisteis",
+    "hicieron",
+    "haré",
+    "harás",
+    "hará",
+    "haremos",
+    "haréis",
+    "harán",
+    "haría",
+    "harías",
+    "haríamos",
+    "haríais",
+    "harían",
 }
 
 # Formas de "haber" (auxiliar) para detección de tiempos compuestos
 HABER_FORMS = {
-    "he", "has", "ha", "hemos", "habéis", "han",
-    "había", "habías", "habíamos", "habíais", "habían",
-    "hubo", "hube", "hubiste", "hubimos", "hubisteis", "hubieron",
-    "habré", "habrás", "habrá", "habremos", "habréis", "habrán",
-    "habría", "habrías", "habríamos", "habríais", "habrían",
-    "haya", "hayas", "hayamos", "hayáis", "hayan",
+    "he",
+    "has",
+    "ha",
+    "hemos",
+    "habéis",
+    "han",
+    "había",
+    "habías",
+    "habíamos",
+    "habíais",
+    "habían",
+    "hubo",
+    "hube",
+    "hubiste",
+    "hubimos",
+    "hubisteis",
+    "hubieron",
+    "habré",
+    "habrás",
+    "habrá",
+    "habremos",
+    "habréis",
+    "habrán",
+    "habría",
+    "habrías",
+    "habríamos",
+    "habríais",
+    "habrían",
+    "haya",
+    "hayas",
+    "hayamos",
+    "hayáis",
+    "hayan",
 }
 
 # Excepciones idiomáticas de pasiva refleja (no son pasivas reales)
 REFLEXIVE_PASSIVE_EXCEPTIONS = {
-    "se trata", "se dice", "se sabe", "se cree", "se supone",
-    "se espera", "se puede", "se debe", "se necesita", "se quiere",
-    "se ve", "se oye", "se nota", "se parece", "se llama",
-    "se acerca", "se aleja", "se acuerda", "se olvida",
-    "se da cuenta", "se pone", "se queda", "se siente",
+    "se trata",
+    "se dice",
+    "se sabe",
+    "se cree",
+    "se supone",
+    "se espera",
+    "se puede",
+    "se debe",
+    "se necesita",
+    "se quiere",
+    "se ve",
+    "se oye",
+    "se nota",
+    "se parece",
+    "se llama",
+    "se acerca",
+    "se aleja",
+    "se acuerda",
+    "se olvida",
+    "se da cuenta",
+    "se pone",
+    "se queda",
+    "se siente",
 }
 
 
 # =============================================================================
 # Detector
 # =============================================================================
+
 
 class SentenceEnergyDetector:
     """
@@ -386,32 +783,26 @@ class SentenceEnergyDetector:
         self.min_words = min_words
 
         # Patrones compilados
-        self._sentence_pattern = re.compile(
-            r'[.!?…]+(?:\s+|$)|[\n]{2,}',
-            re.UNICODE
-        )
-        self._word_pattern = re.compile(
-            r'\b([a-záéíóúüñA-ZÁÉÍÓÚÜÑ]+)\b',
-            re.UNICODE
-        )
+        self._sentence_pattern = re.compile(r"[.!?…]+(?:\s+|$)|[\n]{2,}", re.UNICODE)
+        self._word_pattern = re.compile(r"\b([a-záéíóúüñA-ZÁÉÍÓÚÜÑ]+)\b", re.UNICODE)
         # Participio: -ado, -ido, -to, -so, -cho
         self._participle_pattern = re.compile(
-            r'\b\w+(?:ado|ada|ados|adas|ido|ida|idos|idas'
-            r'|to|ta|tos|tas|so|sa|sos|sas|cho|cha|chos|chas)\b',
-            re.IGNORECASE | re.UNICODE
+            r"\b\w+(?:ado|ada|ados|adas|ido|ida|idos|idas"
+            r"|to|ta|tos|tas|so|sa|sos|sas|cho|cha|chos|chas)\b",
+            re.IGNORECASE | re.UNICODE,
         )
         # Nominalizaciones por sufijo
         self._nominalization_pattern = re.compile(
-            r'\b[a-záéíóúüñ]+(?:ción|sión|miento|amiento|imiento'
-            r'|ncia|encia|anza|idad|edad)\b',
-            re.IGNORECASE | re.UNICODE
+            r"\b[a-záéíóúüñ]+(?:ción|sión|miento|amiento|imiento"
+            r"|ncia|encia|anza|idad|edad)\b",
+            re.IGNORECASE | re.UNICODE,
         )
 
     def analyze(
         self,
         text: str,
         chapter: int = 0,
-        low_threshold: Optional[float] = None,
+        low_threshold: float | None = None,
     ) -> Result[SentenceEnergyReport]:
         """
         Analizar energía de oraciones en un texto.
@@ -552,9 +943,7 @@ class SentenceEnergyDetector:
     # Análisis de voz (activa vs pasiva)
     # =========================================================================
 
-    def _analyze_voice(
-        self, text: str, words: list[str]
-    ) -> tuple[float, bool, list[EnergyIssue]]:
+    def _analyze_voice(self, text: str, words: list[str]) -> tuple[float, bool, list[EnergyIssue]]:
         """
         Analizar si la oración usa voz activa o pasiva.
 
@@ -568,7 +957,7 @@ class SentenceEnergyDetector:
         """
         issues = []
         words_lower = [w.lower() for w in words]
-        text_lower = text.lower()
+        text.lower()
 
         passive_found = False
 
@@ -576,17 +965,19 @@ class SentenceEnergyDetector:
         for i, word in enumerate(words_lower):
             if word in PASSIVE_AUXILIARIES:
                 # Buscar participio en las siguientes 3 palabras
-                window = words_lower[i + 1: i + 4]
+                window = words_lower[i + 1 : i + 4]
                 for next_word in window:
                     if self._is_participle(next_word):
                         passive_found = True
-                        passive_fragment = " ".join(words[i: i + 3])
-                        issues.append(EnergyIssue(
-                            issue_type=EnergyIssueType.PASSIVE_VOICE,
-                            detail=passive_fragment,
-                            suggestion="Considere reescribir en voz activa",
-                            penalty=0.35,
-                        ))
+                        passive_fragment = " ".join(words[i : i + 3])
+                        issues.append(
+                            EnergyIssue(
+                                issue_type=EnergyIssueType.PASSIVE_VOICE,
+                                detail=passive_fragment,
+                                suggestion="Considere reescribir en voz activa",
+                                penalty=0.35,
+                            )
+                        )
                         break
                 if passive_found:
                     break
@@ -597,20 +988,29 @@ class SentenceEnergyDetector:
                 if word == "se" and i + 1 < len(words_lower):
                     # Comprobar que no es excepción idiomática
                     two_word = f"se {words_lower[i + 1]}"
-                    three_word = f"se {' '.join(words_lower[i + 1: i + 3])}" if i + 2 < len(words_lower) else ""
-                    if two_word in REFLEXIVE_PASSIVE_EXCEPTIONS or three_word in REFLEXIVE_PASSIVE_EXCEPTIONS:
+                    three_word = (
+                        f"se {' '.join(words_lower[i + 1 : i + 3])}"
+                        if i + 2 < len(words_lower)
+                        else ""
+                    )
+                    if (
+                        two_word in REFLEXIVE_PASSIVE_EXCEPTIONS
+                        or three_word in REFLEXIVE_PASSIVE_EXCEPTIONS
+                    ):
                         continue
                     # Heurística: "se" + verbo conjugado en 3ª persona
                     next_word = words_lower[i + 1]
                     if self._looks_like_third_person_verb(next_word):
                         passive_found = True
-                        passive_fragment = " ".join(words[i: i + 3])
-                        issues.append(EnergyIssue(
-                            issue_type=EnergyIssueType.PASSIVE_VOICE,
-                            detail=f"Pasiva refleja: {passive_fragment}",
-                            suggestion="Considere usar un sujeto activo explícito",
-                            penalty=0.25,  # Menor que perifrástica (más natural en español)
-                        ))
+                        passive_fragment = " ".join(words[i : i + 3])
+                        issues.append(
+                            EnergyIssue(
+                                issue_type=EnergyIssueType.PASSIVE_VOICE,
+                                detail=f"Pasiva refleja: {passive_fragment}",
+                                suggestion="Considere usar un sujeto activo explícito",
+                                penalty=0.25,  # Menor que perifrástica (más natural en español)
+                            )
+                        )
                         break
 
         # Score: 100 = activa, 30 = pasiva perifrástica, 45 = pasiva refleja
@@ -627,8 +1027,19 @@ class SentenceEnergyDetector:
         """Heurística para detectar verbos en 3ª persona singular/plural."""
         # Terminaciones típicas de 3ª persona en español
         third_person_endings = (
-            "a", "e", "ó", "ió", "an", "en", "aron", "ieron",
-            "aba", "ía", "ará", "erá", "irá",
+            "a",
+            "e",
+            "ó",
+            "ió",
+            "an",
+            "en",
+            "aron",
+            "ieron",
+            "aba",
+            "ía",
+            "ará",
+            "erá",
+            "irá",
         )
         if len(word) < 3:
             return False
@@ -645,9 +1056,7 @@ class SentenceEnergyDetector:
     # Análisis de fuerza del verbo
     # =========================================================================
 
-    def _analyze_verb_strength(
-        self, words: list[str]
-    ) -> tuple[float, bool, list[EnergyIssue]]:
+    def _analyze_verb_strength(self, words: list[str]) -> tuple[float, bool, list[EnergyIssue]]:
         """
         Analizar la fuerza de los verbos en la oración.
 
@@ -705,20 +1114,24 @@ class SentenceEnergyDetector:
             score = 70.0
         elif len(weak_found) == 2:
             score = 45.0
-            issues.append(EnergyIssue(
-                issue_type=EnergyIssueType.WEAK_VERB,
-                detail=f"Verbos débiles: {', '.join(weak_found[:3])}",
-                suggestion="Sustituya por verbos de acción más específicos",
-                penalty=0.25,
-            ))
+            issues.append(
+                EnergyIssue(
+                    issue_type=EnergyIssueType.WEAK_VERB,
+                    detail=f"Verbos débiles: {', '.join(weak_found[:3])}",
+                    suggestion="Sustituya por verbos de acción más específicos",
+                    penalty=0.25,
+                )
+            )
         else:
             score = 20.0
-            issues.append(EnergyIssue(
-                issue_type=EnergyIssueType.WEAK_VERB,
-                detail=f"Verbos débiles ({len(weak_found)}): {', '.join(weak_found[:4])}",
-                suggestion="La oración acumula demasiados verbos sin acción concreta",
-                penalty=0.40,
-            ))
+            issues.append(
+                EnergyIssue(
+                    issue_type=EnergyIssueType.WEAK_VERB,
+                    detail=f"Verbos débiles ({len(weak_found)}): {', '.join(weak_found[:4])}",
+                    suggestion="La oración acumula demasiados verbos sin acción concreta",
+                    penalty=0.40,
+                )
+            )
 
         return score, has_weak, issues
 
@@ -726,9 +1139,7 @@ class SentenceEnergyDetector:
     # Análisis de estructura
     # =========================================================================
 
-    def _analyze_structure(
-        self, text: str, words: list[str]
-    ) -> tuple[float, list[EnergyIssue]]:
+    def _analyze_structure(self, text: str, words: list[str]) -> tuple[float, list[EnergyIssue]]:
         """
         Analizar la estructura de la oración.
 
@@ -757,12 +1168,14 @@ class SentenceEnergyDetector:
         if word_count > 40:
             length_penalty = min((word_count - 40) * 1.5, 30.0)
             score = max(10, score - length_penalty)
-            issues.append(EnergyIssue(
-                issue_type=EnergyIssueType.EXCESSIVE_LENGTH,
-                detail=f"Oración de {word_count} palabras",
-                suggestion="Las oraciones largas pierden impacto. Considere dividirla.",
-                penalty=round(length_penalty / 100, 2),
-            ))
+            issues.append(
+                EnergyIssue(
+                    issue_type=EnergyIssueType.EXCESSIVE_LENGTH,
+                    detail=f"Oración de {word_count} palabras",
+                    suggestion="Las oraciones largas pierden impacto. Considere dividirla.",
+                    penalty=round(length_penalty / 100, 2),
+                )
+            )
         elif word_count > 30:
             # Penalización menor
             score = max(30, score - 10.0)
@@ -785,12 +1198,14 @@ class SentenceEnergyDetector:
         matches = self._nominalization_pattern.findall(text.lower())
         for match in matches:
             if match not in NOMINALIZATION_EXCEPTIONS and len(match) > 6:
-                issues.append(EnergyIssue(
-                    issue_type=EnergyIssueType.NOMINALIZATION,
-                    detail=match,
-                    suggestion=f'"{match}" podría expresarse con un verbo directo',
-                    penalty=0.10,
-                ))
+                issues.append(
+                    EnergyIssue(
+                        issue_type=EnergyIssueType.NOMINALIZATION,
+                        detail=match,
+                        suggestion=f'"{match}" podría expresarse con un verbo directo',
+                        penalty=0.10,
+                    )
+                )
 
         return issues
 
@@ -866,7 +1281,7 @@ class SentenceEnergyDetector:
         low_ratio = len(report.low_energy_sentences) / analyzed
         if low_ratio > 0.30:
             recommendations.append(
-                f"El {low_ratio*100:.0f}% de las oraciones tienen baja energía. "
+                f"El {low_ratio * 100:.0f}% de las oraciones tienen baja energía. "
                 "Revise las marcadas para mejorar el dinamismo."
             )
 
@@ -874,7 +1289,7 @@ class SentenceEnergyDetector:
         passive_ratio = report.passive_count / analyzed
         if passive_ratio > 0.20:
             recommendations.append(
-                f"El {passive_ratio*100:.0f}% de las oraciones usan voz pasiva. "
+                f"El {passive_ratio * 100:.0f}% de las oraciones usan voz pasiva. "
                 "La voz activa transmite más inmediatez."
             )
         elif report.passive_count > 3:
@@ -887,7 +1302,7 @@ class SentenceEnergyDetector:
         weak_ratio = report.weak_verb_count / analyzed
         if weak_ratio > 0.40:
             recommendations.append(
-                f"El {weak_ratio*100:.0f}% de las oraciones contienen verbos débiles "
+                f"El {weak_ratio * 100:.0f}% de las oraciones contienen verbos débiles "
                 "(ser, estar, tener, hacer). Busque verbos más específicos."
             )
 

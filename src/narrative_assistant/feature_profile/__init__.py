@@ -6,12 +6,12 @@ según el tipo de manuscrito (novela, memoria, ensayo, etc.).
 """
 
 from .models import (
+    DOCUMENT_SUBTYPES,
+    DOCUMENT_TYPES,
+    PROFILE_CREATORS,
     DocumentType,
     FeatureAvailability,
     FeatureProfile,
-    DOCUMENT_TYPES,
-    DOCUMENT_SUBTYPES,
-    PROFILE_CREATORS,
     create_feature_profile,
 )
 from .service import FeatureProfileService

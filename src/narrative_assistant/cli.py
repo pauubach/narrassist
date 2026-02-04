@@ -8,7 +8,6 @@ import argparse
 import logging
 import sys
 from pathlib import Path
-from typing import Optional
 
 from .core.config import get_config
 from .core.utils import format_duration
@@ -45,7 +44,8 @@ def main() -> int:
     )
 
     parser.add_argument(
-        "-v", "--verbose",
+        "-v",
+        "--verbose",
         action="store_true",
         help="Mostrar mensajes de debug",
     )
@@ -69,13 +69,13 @@ def main() -> int:
     )
 
     # Subcomando: verify
-    verify_parser = subparsers.add_parser(
+    subparsers.add_parser(
         "verify",
         help="Verificar el entorno de desarrollo",
     )
 
     # Subcomando: info
-    info_parser = subparsers.add_parser(
+    subparsers.add_parser(
         "info",
         help="Mostrar información del sistema",
     )
@@ -87,7 +87,7 @@ def main() -> int:
     )
     project_sub = project_parser.add_subparsers(dest="subcommand")
 
-    project_list = project_sub.add_parser("list", help="Listar proyectos")
+    project_sub.add_parser("list", help="Listar proyectos")
     project_info_cmd = project_sub.add_parser("info", help="Info de un proyecto")
     project_info_cmd.add_argument("id", type=int, help="ID del proyecto")
     project_delete = project_sub.add_parser("delete", help="Eliminar un proyecto")
@@ -103,14 +103,13 @@ def main() -> int:
     alerts_list = alerts_sub.add_parser("list", help="Listar alertas")
     alerts_list.add_argument("--project", "-p", type=int, help="ID del proyecto")
     alerts_list.add_argument(
-        "--severity", "-s",
+        "--severity",
+        "-s",
         choices=["critical", "warning", "info", "hint"],
-        help="Filtrar por severidad"
+        help="Filtrar por severidad",
     )
     alerts_list.add_argument(
-        "--status",
-        choices=["open", "resolved", "dismissed"],
-        help="Filtrar por estado"
+        "--status", choices=["open", "resolved", "dismissed"], help="Filtrar por estado"
     )
 
     alerts_show = alerts_sub.add_parser("show", help="Mostrar alerta")
@@ -133,7 +132,9 @@ def main() -> int:
 
     entities_list = entities_sub.add_parser("list", help="Listar entidades")
     entities_list.add_argument("--project", "-p", type=int, help="ID del proyecto")
-    entities_list.add_argument("--type", "-t", choices=["character", "location", "organization"], help="Filtrar por tipo")
+    entities_list.add_argument(
+        "--type", "-t", choices=["character", "location", "organization"], help="Filtrar por tipo"
+    )
 
     entities_show = entities_sub.add_parser("show", help="Mostrar entidad")
     entities_show.add_argument("id", type=int, help="ID de la entidad")
@@ -150,12 +151,16 @@ def main() -> int:
 
     export_sheet = export_sub.add_parser("character-sheet", help="Ficha de personaje")
     export_sheet.add_argument("entity_id", type=int, help="ID de la entidad")
-    export_sheet.add_argument("--format", "-f", choices=["md", "json"], default="md", help="Formato")
+    export_sheet.add_argument(
+        "--format", "-f", choices=["md", "json"], default="md", help="Formato"
+    )
     export_sheet.add_argument("--output", "-o", type=Path, help="Archivo de salida")
 
     export_style = export_sub.add_parser("style-guide", help="Guía de estilo")
     export_style.add_argument("--project", "-p", type=int, help="ID del proyecto")
-    export_style.add_argument("--format", "-f", choices=["md", "json"], default="md", help="Formato")
+    export_style.add_argument(
+        "--format", "-f", choices=["md", "json"], default="md", help="Formato"
+    )
     export_style.add_argument("--output", "-o", type=Path, help="Archivo de salida")
 
     export_report = export_sub.add_parser("full-report", help="Reporte completo")
@@ -194,12 +199,15 @@ def cmd_verify() -> int:
     # Verificar spaCy
     try:
         import spacy
+
         print(f"[OK] spaCy {spacy.__version__}")
         try:
-            nlp = spacy.load("es_core_news_lg")
-            print(f"[OK] Modelo es_core_news_lg cargado")
+            spacy.load("es_core_news_lg")
+            print("[OK] Modelo es_core_news_lg cargado")
         except OSError:
-            errors.append("Modelo spaCy no encontrado. Ejecutar: python -m spacy download es_core_news_lg")
+            errors.append(
+                "Modelo spaCy no encontrado. Ejecutar: python -m spacy download es_core_news_lg"
+            )
             print("[ERROR] Modelo es_core_news_lg NO encontrado")
     except ImportError:
         errors.append("spaCy no instalado")
@@ -208,6 +216,7 @@ def cmd_verify() -> int:
     # Verificar sentence-transformers
     try:
         import sentence_transformers
+
         print(f"[OK] sentence-transformers {sentence_transformers.__version__}")
     except ImportError:
         errors.append("sentence-transformers no instalado")
@@ -216,6 +225,7 @@ def cmd_verify() -> int:
     # Verificar PyTorch y GPU
     try:
         import torch
+
         print(f"[OK] PyTorch {torch.__version__}")
 
         if torch.cuda.is_available():
@@ -268,7 +278,7 @@ def cmd_info() -> int:
     return 0
 
 
-def cmd_analyze(document: Path, project_name: Optional[str]) -> int:
+def cmd_analyze(document: Path, project_name: str | None) -> int:
     """
     Analiza un documento completo.
 
@@ -279,7 +289,7 @@ def cmd_analyze(document: Path, project_name: Optional[str]) -> int:
     Returns:
         Código de salida
     """
-    from .pipelines import run_full_analysis, PipelineConfig
+    from .pipelines import PipelineConfig, run_full_analysis
 
     if not document.exists():
         print(f"Error: El archivo '{document}' no existe.")
@@ -322,7 +332,7 @@ def cmd_analyze(document: Path, project_name: Optional[str]) -> int:
         print("=" * 70)
         print()
         print(f"Motivo: {result.error.user_message}")
-        if hasattr(result.error, 'context') and result.error.context:
+        if hasattr(result.error, "context") and result.error.context:
             print(f"Contexto: {result.error.context}")
         return 1
 
@@ -488,7 +498,7 @@ def cmd_project(args) -> int:
 def cmd_alerts(args) -> int:
     """Gestiona alertas."""
     from .alerts.engine import get_alert_engine
-    from .alerts.models import AlertSeverity, AlertStatus, AlertFilter
+    from .alerts.models import AlertFilter, AlertSeverity, AlertStatus
 
     engine = get_alert_engine()
 
@@ -570,8 +580,8 @@ def cmd_alerts(args) -> int:
 
 def cmd_entities(args) -> int:
     """Gestiona entidades."""
-    from .entities.repository import get_entity_repository
     from .entities.models import EntityType
+    from .entities.repository import get_entity_repository
 
     repo = get_entity_repository()
 
@@ -596,7 +606,9 @@ def cmd_entities(args) -> int:
         print(f"{'ID':<6} {'Nombre':<30} {'Tipo':<15} {'Import.':<10}")
         print("-" * 65)
         for e in entities[:50]:  # Limitar a 50
-            print(f"{e.id:<6} {e.canonical_name[:30]:<30} {e.entity_type.value:<15} {e.importance.value:<10}")
+            print(
+                f"{e.id:<6} {e.canonical_name[:30]:<30} {e.entity_type.value:<15} {e.importance.value:<10}"
+            )
 
         if len(entities) > 50:
             print(f"... y {len(entities) - 50} entidades más")
@@ -656,7 +668,6 @@ def cmd_export(args) -> int:
         from .entities.repository import get_entity_repository
         from .exporters.character_sheets import (
             CharacterSheet,
-            AttributeInfo,
             MentionInfo,
         )
 

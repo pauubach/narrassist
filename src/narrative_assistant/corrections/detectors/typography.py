@@ -12,7 +12,6 @@ Detecta:
 """
 
 import re
-from typing import Optional
 
 from ..base import BaseDetector, CorrectionIssue
 from ..config import TypographyConfig
@@ -38,7 +37,7 @@ class TypographyDetector(BaseDetector):
         "hyphen": HYPHEN,
     }
 
-    def __init__(self, config: Optional[TypographyConfig] = None):
+    def __init__(self, config: TypographyConfig | None = None):
         self.config = config or TypographyConfig()
         self._compile_patterns()
 
@@ -52,20 +51,16 @@ class TypographyDetector(BaseDetector):
         )
 
         # Patrón para rangos numéricos (1990-2000, páginas 10-20)
-        self._range_pattern = re.compile(
-            r"\b(\d+)\s*([—–\-])\s*(\d+)\b"
-        )
+        self._range_pattern = re.compile(r"\b(\d+)\s*([—–\-])\s*(\d+)\b")
 
         # Patrón para incisos (palabra —inciso— palabra)
-        self._inciso_pattern = re.compile(
-            r"\w\s+([—–\-])[^—–\-\n]+([—–\-])\s+\w"
-        )
+        self._inciso_pattern = re.compile(r"\w\s+([—–\-])[^—–\-\n]+([—–\-])\s+\w")
 
         # Patrones de comillas
         # Usando Unicode escapes para evitar problemas de encoding
         self._quote_patterns = {
             "angular": re.compile(r"[\u00AB\u00BB]"),  # « »
-            "curly": re.compile(r"[\u201C\u201D]"),    # " "
+            "curly": re.compile(r"[\u201C\u201D]"),  # " "
             "straight": re.compile(r'"'),
         }
 
@@ -76,35 +71,34 @@ class TypographyDetector(BaseDetector):
         self._ellipsis_wrong = re.compile(r"(?<!\.)\.\.(?!\.)|\.{4,}")
 
         # Espaciado
-        self._space_before_punct = re.compile(r'\s+([.,;:!?\u00BB\"\)\]])')
+        self._space_before_punct = re.compile(r"\s+([.,;:!?\u00BB\"\)\]])")
         self._no_space_after_punct = re.compile(r"([.,;:!?])[A-Za-záéíóúüñÁÉÍÓÚÜÑ]")
         self._multiple_spaces = re.compile(r"  +")
 
         # Secuencias de puntuación inválidas
         # Detecta: ,. ,; ,: ;. :. !? ?! ?? !! (pero NO ...)
         self._invalid_sequences = re.compile(
-            r',\.|,;|,:|;\.|:\.|'  # Coma/punto y coma/dos puntos seguidos de otro signo
-            r'[!?]{2,}|'  # Signos de exclamación/interrogación repetidos
-            r'(?<!\.)\.\.(?!\.)'  # Exactamente dos puntos (no ...)
+            r",\.|,;|,:|;\.|:\.|"  # Coma/punto y coma/dos puntos seguidos de otro signo
+            r"[!?]{2,}|"  # Signos de exclamación/interrogación repetidos
+            r"(?<!\.)\.\.(?!\.)"  # Exactamente dos puntos (no ...)
         )
 
         # Pares de signos - apertura y cierre
         self._paired_signs = {
-            '«': '»',  # Comillas angulares
-            '»': '«',  # Inverso (para detectar cierre sin apertura)
-            '"': '"',  # Comillas inglesas apertura
+            "«": "»",  # Comillas angulares
+            "»": "«",  # Inverso (para detectar cierre sin apertura)
             '"': '"',  # Comillas inglesas cierre
-            '(': ')',
-            ')': '(',
-            '[': ']',
-            ']': '[',
-            '¿': '?',
-            '¡': '!',
+            "(": ")",
+            ")": "(",
+            "[": "]",
+            "]": "[",
+            "¿": "?",
+            "¡": "!",
         }
 
         # Comillas de apertura y sus cierres correspondientes
-        self._opening_quotes = {'«': '»', '"': '"'}
-        self._closing_quotes = {'»': '«', '"': '"'}
+        self._opening_quotes = {"«": "»", '"': '"'}
+        self._closing_quotes = {"»": "«", '"': '"'}
 
         # Patrón para detectar comilla seguida de punto (orden incorrecto según RAE)
         # RAE: el punto va DESPUÉS de la comilla de cierre
@@ -119,7 +113,7 @@ class TypographyDetector(BaseDetector):
     def detect(
         self,
         text: str,
-        chapter_index: Optional[int] = None,
+        chapter_index: int | None = None,
     ) -> list[CorrectionIssue]:
         """
         Detecta problemas tipográficos en el texto.
@@ -171,9 +165,7 @@ class TypographyDetector(BaseDetector):
 
         return issues
 
-    def _check_dialogue_dashes(
-        self, text: str, chapter_index: Optional[int]
-    ) -> list[CorrectionIssue]:
+    def _check_dialogue_dashes(self, text: str, chapter_index: int | None) -> list[CorrectionIssue]:
         """Verifica guiones en diálogos."""
         issues = []
         expected_dash = self.DASH_MAP[self.config.dialogue_dash]
@@ -187,10 +179,10 @@ class TypographyDetector(BaseDetector):
 
                 # Verificar contexto para reducir falsos positivos
                 # Si es un guion corto al inicio de línea, podría ser lista con viñetas
-                context_after = text[end:end+20] if end+20 < len(text) else text[end:]
+                context_after = text[end : end + 20] if end + 20 < len(text) else text[end:]
 
                 # Si parece una lista (número, letra con punto), no es diálogo
-                if re.match(r'\s*[a-zA-Z0-9]\s*[.):]', context_after):
+                if re.match(r"\s*[a-zA-Z0-9]\s*[.):]", context_after):
                     continue
 
                 # Si el guion es corto pero hay raya larga en el documento,
@@ -219,9 +211,7 @@ class TypographyDetector(BaseDetector):
 
         return issues
 
-    def _check_range_dashes(
-        self, text: str, chapter_index: Optional[int]
-    ) -> list[CorrectionIssue]:
+    def _check_range_dashes(self, text: str, chapter_index: int | None) -> list[CorrectionIssue]:
         """Verifica guiones en rangos numéricos."""
         issues = []
         # El estándar tipográfico usa semiraya (–) para rangos
@@ -253,17 +243,14 @@ class TypographyDetector(BaseDetector):
 
         return issues
 
-    def _check_quotes(
-        self, text: str, chapter_index: Optional[int]
-    ) -> list[CorrectionIssue]:
+    def _check_quotes(self, text: str, chapter_index: int | None) -> list[CorrectionIssue]:
         """Verifica consistencia de comillas."""
         issues = []
         preferred = self.config.quote_style
 
         # Contar tipos de comillas
         counts = {
-            style: len(pattern.findall(text))
-            for style, pattern in self._quote_patterns.items()
+            style: len(pattern.findall(text)) for style, pattern in self._quote_patterns.items()
         }
 
         # Si hay mezcla de estilos
@@ -304,9 +291,7 @@ class TypographyDetector(BaseDetector):
 
         return issues
 
-    def _check_ellipsis(
-        self, text: str, chapter_index: Optional[int]
-    ) -> list[CorrectionIssue]:
+    def _check_ellipsis(self, text: str, chapter_index: int | None) -> list[CorrectionIssue]:
         """Verifica puntos suspensivos."""
         issues = []
 
@@ -339,9 +324,7 @@ class TypographyDetector(BaseDetector):
 
         return issues
 
-    def _check_spacing(
-        self, text: str, chapter_index: Optional[int]
-    ) -> list[CorrectionIssue]:
+    def _check_spacing(self, text: str, chapter_index: int | None) -> list[CorrectionIssue]:
         """Verifica problemas de espaciado."""
         issues = []
 
@@ -369,12 +352,53 @@ class TypographyDetector(BaseDetector):
         # Falta espacio después de puntuación
         # Lista ampliada de abreviaturas comunes en español
         COMMON_ABBREVIATIONS = {
-            "sr.", "sra.", "srta.", "dr.", "dra.", "lic.", "ing.", "arq.",
-            "prof.", "mag.", "etc.", "ej.", "p.ej.", "pág.", "págs.", "cap.",
-            "vol.", "núm.", "nº.", "art.", "ed.", "fig.", "tel.", "fax.",
-            "av.", "avda.", "c.", "ctra.", "pza.", "urb.", "apdo.", "dpto.",
-            "http", "https", "www", "ftp", ".com", ".es", ".org", ".net",
-            "a.m.", "p.m.", "a.c.", "d.c.", "s.a.", "s.l.", "s.r.l.",
+            "sr.",
+            "sra.",
+            "srta.",
+            "dr.",
+            "dra.",
+            "lic.",
+            "ing.",
+            "arq.",
+            "prof.",
+            "mag.",
+            "etc.",
+            "ej.",
+            "p.ej.",
+            "pág.",
+            "págs.",
+            "cap.",
+            "vol.",
+            "núm.",
+            "nº.",
+            "art.",
+            "ed.",
+            "fig.",
+            "tel.",
+            "fax.",
+            "av.",
+            "avda.",
+            "c.",
+            "ctra.",
+            "pza.",
+            "urb.",
+            "apdo.",
+            "dpto.",
+            "http",
+            "https",
+            "www",
+            "ftp",
+            ".com",
+            ".es",
+            ".org",
+            ".net",
+            "a.m.",
+            "p.m.",
+            "a.c.",
+            "d.c.",
+            "s.a.",
+            "s.l.",
+            "s.r.l.",
         }
 
         for match in self._no_space_after_punct.finditer(text):
@@ -391,17 +415,17 @@ class TypographyDetector(BaseDetector):
                 continue
 
             # Ignorar números con punto decimal (3.14)
-            if match.group(1) == '.' and text[start-1:start].isdigit():
+            if match.group(1) == "." and text[start - 1 : start].isdigit():
                 char_after = match.group()[-1]
                 if char_after.isdigit():
                     continue
 
             # Ignorar horas (10:30)
-            if match.group(1) == ':' and text[max(0,start-2):start].isdigit():
+            if match.group(1) == ":" and text[max(0, start - 2) : start].isdigit():
                 continue
 
             # Ignorar si es parte de un email o URL
-            if '@' in context or '://' in context:
+            if "@" in context or "://" in context:
                 continue
 
             issues.append(
@@ -422,9 +446,7 @@ class TypographyDetector(BaseDetector):
 
         return issues
 
-    def _check_multiple_spaces(
-        self, text: str, chapter_index: Optional[int]
-    ) -> list[CorrectionIssue]:
+    def _check_multiple_spaces(self, text: str, chapter_index: int | None) -> list[CorrectionIssue]:
         """Verifica espacios múltiples."""
         issues = []
 
@@ -451,7 +473,7 @@ class TypographyDetector(BaseDetector):
         return issues
 
     def _check_invalid_sequences(
-        self, text: str, chapter_index: Optional[int]
+        self, text: str, chapter_index: int | None
     ) -> list[CorrectionIssue]:
         """Verifica secuencias de puntuación inválidas."""
         issues = []
@@ -462,20 +484,24 @@ class TypographyDetector(BaseDetector):
             found = match.group()
 
             # Determinar explicación según el tipo de secuencia
-            if found in (',.',):
-                explanation = "Secuencia ',.' inválida: la coma ya implica pausa, el punto es redundante"
+            if found in (",.",):
+                explanation = (
+                    "Secuencia ',.' inválida: la coma ya implica pausa, el punto es redundante"
+                )
                 suggestion = "."
-            elif found in (',;', ',:', ';.', ':.'):
-                explanation = f"Secuencia '{found}' inválida: signos de puntuación incompatibles juntos"
+            elif found in (",;", ",:", ";.", ":."):
+                explanation = (
+                    f"Secuencia '{found}' inválida: signos de puntuación incompatibles juntos"
+                )
                 suggestion = found[-1]  # Mantener el último
-            elif '?' in found or '!' in found:
-                if found == '?!' or found == '!?':
+            elif "?" in found or "!" in found:
+                if found == "?!" or found == "!?":
                     explanation = "Secuencia '?!' o '!?': en español se prefiere un solo signo"
-                    suggestion = '?' if found[0] == '?' else '!'
+                    suggestion = "?" if found[0] == "?" else "!"
                 else:
                     explanation = f"Secuencia '{found}': signos repetidos innecesariamente"
                     suggestion = found[0]
-            elif found == '..':
+            elif found == "..":
                 explanation = "Dos puntos seguidos: usa tres puntos (...) o uno solo (.)"
                 suggestion = "..."
             else:
@@ -500,30 +526,28 @@ class TypographyDetector(BaseDetector):
 
         return issues
 
-    def _check_unclosed_pairs(
-        self, text: str, chapter_index: Optional[int]
-    ) -> list[CorrectionIssue]:
+    def _check_unclosed_pairs(self, text: str, chapter_index: int | None) -> list[CorrectionIssue]:
         """Verifica pares de signos sin cerrar."""
         issues = []
 
         # Rastrear signos de apertura y sus posiciones
         # Stack para cada tipo de signo
         stacks = {
-            '«': [],  # Posiciones de « sin cerrar
+            "«": [],  # Posiciones de « sin cerrar
             '"': [],  # Posiciones de " sin cerrar
-            '(': [],  # Posiciones de ( sin cerrar
-            '[': [],  # Posiciones de [ sin cerrar
-            '¿': [],  # Posiciones de ¿ sin cerrar
-            '¡': [],  # Posiciones de ¡ sin cerrar
+            "(": [],  # Posiciones de ( sin cerrar
+            "[": [],  # Posiciones de [ sin cerrar
+            "¿": [],  # Posiciones de ¿ sin cerrar
+            "¡": [],  # Posiciones de ¡ sin cerrar
         }
 
         closers = {
-            '»': '«',
+            "»": "«",
             '"': '"',
-            ')': '(',
-            ']': '[',
-            '?': '¿',
-            '!': '¡',
+            ")": "(",
+            "]": "[",
+            "?": "¿",
+            "!": "¡",
         }
 
         for i, char in enumerate(text):
@@ -556,7 +580,7 @@ class TypographyDetector(BaseDetector):
 
         # Verificar signos de apertura sin cerrar
         for opener, positions in stacks.items():
-            closer = self._paired_signs.get(opener, '')
+            closer = self._paired_signs.get(opener, "")
             for pos in positions:
                 issues.append(
                     CorrectionIssue(
@@ -578,7 +602,7 @@ class TypographyDetector(BaseDetector):
         return issues
 
     def _check_quote_period_order(
-        self, text: str, chapter_index: Optional[int]
+        self, text: str, chapter_index: int | None
     ) -> list[CorrectionIssue]:
         """
         Verifica el orden de comilla y punto según la RAE.
@@ -604,7 +628,7 @@ class TypographyDetector(BaseDetector):
 
             # Obtener contexto para verificar si es oración independiente
             context_start = max(0, start - 50)
-            context = text[context_start:start]
+            text[context_start:start]
 
             # Si la comilla de apertura está seguida de mayúscula al inicio,
             # podría ser una cita independiente (permitido)

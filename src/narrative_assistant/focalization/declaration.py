@@ -5,23 +5,24 @@ Permite al usuario declarar la focalizacion de cada capitulo/escena.
 El sistema luego detecta violaciones a esa declaracion.
 """
 
-import re
 import logging
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional, Dict, Any, Protocol
+from typing import Any, Protocol
 
 logger = logging.getLogger(__name__)
 
 
 class FocalizationType(Enum):
     """Tipos de focalizacion segun Genette."""
-    ZERO = "zero"                       # Omnisciente, acceso a todo
-    INTERNAL_FIXED = "internal_fixed"   # Un solo personaje
+
+    ZERO = "zero"  # Omnisciente, acceso a todo
+    INTERNAL_FIXED = "internal_fixed"  # Un solo personaje
     INTERNAL_VARIABLE = "internal_variable"  # Cambia por escena
     INTERNAL_MULTIPLE = "internal_multiple"  # Varios simultaneos
-    EXTERNAL = "external"               # Solo observable
+    EXTERNAL = "external"  # Solo observable
 
 
 @dataclass
@@ -31,10 +32,10 @@ class FocalizationDeclaration:
     id: int
     project_id: int
     chapter: int
-    scene: Optional[int] = None  # None = todo el capitulo
+    scene: int | None = None  # None = todo el capitulo
 
     focalization_type: FocalizationType = FocalizationType.ZERO
-    focalizer_ids: List[int] = field(default_factory=list)  # IDs de personajes focalizadores
+    focalizer_ids: list[int] = field(default_factory=list)  # IDs de personajes focalizadores
 
     # Metadata
     declared_at: datetime = field(default_factory=datetime.now)
@@ -45,7 +46,7 @@ class FocalizationDeclaration:
     is_validated: bool = False
     violations_count: int = 0
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Convierte a diccionario."""
         return {
             "id": self.id,
@@ -65,16 +66,17 @@ class FocalizationDeclaration:
 @dataclass
 class FocalizationScope:
     """Define el alcance de una focalizacion."""
+
     start_chapter: int
-    start_scene: Optional[int] = None
+    start_scene: int | None = None
     end_chapter: int = 0
-    end_scene: Optional[int] = None
+    end_scene: int | None = None
 
     def __post_init__(self):
         if self.end_chapter == 0:
             self.end_chapter = self.start_chapter
 
-    def contains(self, chapter: int, scene: Optional[int] = None) -> bool:
+    def contains(self, chapter: int, scene: int | None = None) -> bool:
         """Verifica si una posicion esta dentro del alcance."""
         if chapter < self.start_chapter or chapter > self.end_chapter:
             return False
@@ -90,7 +92,7 @@ class FocalizationScope:
 class FocalizationRepository(Protocol):
     """Protocolo para repositorio de focalizacion."""
 
-    def get_entity(self, entity_id: int) -> Optional[Any]:
+    def get_entity(self, entity_id: int) -> Any | None:
         """Obtiene una entidad por ID."""
         ...
 
@@ -99,16 +101,16 @@ class FocalizationRepository(Protocol):
         ...
 
     def get_focalization(
-        self, project_id: int, chapter: int, scene: Optional[int]
-    ) -> Optional[FocalizationDeclaration]:
+        self, project_id: int, chapter: int, scene: int | None
+    ) -> FocalizationDeclaration | None:
         """Obtiene focalizacion para un capitulo/escena."""
         ...
 
-    def get_focalization_by_id(self, declaration_id: int) -> Optional[FocalizationDeclaration]:
+    def get_focalization_by_id(self, declaration_id: int) -> FocalizationDeclaration | None:
         """Obtiene focalizacion por ID."""
         ...
 
-    def get_all_focalizations(self, project_id: int) -> List[FocalizationDeclaration]:
+    def get_all_focalizations(self, project_id: int) -> list[FocalizationDeclaration]:
         """Obtiene todas las focalizaciones de un proyecto."""
         ...
 
@@ -121,15 +123,15 @@ class InMemoryFocalizationRepository:
     """Implementacion en memoria del repositorio de focalizacion."""
 
     def __init__(self):
-        self.focalizations: Dict[int, FocalizationDeclaration] = {}
+        self.focalizations: dict[int, FocalizationDeclaration] = {}
         self.counter: int = 0
-        self.entities: Dict[int, Any] = {}
+        self.entities: dict[int, Any] = {}
 
-    def set_entities(self, entities: Dict[int, Any]) -> None:
+    def set_entities(self, entities: dict[int, Any]) -> None:
         """Configura las entidades disponibles."""
         self.entities = entities
 
-    def get_entity(self, entity_id: int) -> Optional[Any]:
+    def get_entity(self, entity_id: int) -> Any | None:
         return self.entities.get(entity_id)
 
     def save_focalization(self, declaration: FocalizationDeclaration) -> FocalizationDeclaration:
@@ -140,17 +142,17 @@ class InMemoryFocalizationRepository:
         return declaration
 
     def get_focalization(
-        self, project_id: int, chapter: int, scene: Optional[int]
-    ) -> Optional[FocalizationDeclaration]:
+        self, project_id: int, chapter: int, scene: int | None
+    ) -> FocalizationDeclaration | None:
         for f in self.focalizations.values():
             if f.project_id == project_id and f.chapter == chapter and f.scene == scene:
                 return f
         return None
 
-    def get_focalization_by_id(self, declaration_id: int) -> Optional[FocalizationDeclaration]:
+    def get_focalization_by_id(self, declaration_id: int) -> FocalizationDeclaration | None:
         return self.focalizations.get(declaration_id)
 
-    def get_all_focalizations(self, project_id: int) -> List[FocalizationDeclaration]:
+    def get_all_focalizations(self, project_id: int) -> list[FocalizationDeclaration]:
         return [f for f in self.focalizations.values() if f.project_id == project_id]
 
     def delete_focalization(self, declaration_id: int) -> bool:
@@ -163,7 +165,7 @@ class InMemoryFocalizationRepository:
 class FocalizationDeclarationService:
     """Servicio para gestionar declaraciones de focalizacion."""
 
-    def __init__(self, repository: Optional[FocalizationRepository] = None):
+    def __init__(self, repository: FocalizationRepository | None = None):
         """
         Inicializa el servicio.
 
@@ -177,9 +179,9 @@ class FocalizationDeclarationService:
         project_id: int,
         chapter: int,
         focalization_type: FocalizationType,
-        focalizer_ids: List[int],
-        scene: Optional[int] = None,
-        notes: str = ""
+        focalizer_ids: list[int],
+        scene: int | None = None,
+        notes: str = "",
     ) -> FocalizationDeclaration:
         """
         Declara la focalizacion de un capitulo/escena.
@@ -196,11 +198,11 @@ class FocalizationDeclarationService:
             Declaracion creada
         """
         # Validar que los focalizadores existen (si hay repositorio con entidades)
-        if hasattr(self.repo, 'get_entity'):
+        if hasattr(self.repo, "get_entity"):
             for fid in focalizer_ids:
                 entity = self.repo.get_entity(fid)
-                if entity and hasattr(entity, 'entity_type'):
-                    if entity.entity_type not in ('person', 'PERSON', 'PER', 'CHARACTER'):
+                if entity and hasattr(entity, "entity_type"):
+                    if entity.entity_type not in ("person", "PERSON", "PER", "CHARACTER"):
                         raise ValueError(f"Entity {fid} is not a person")
 
         # Validar coherencia tipo-focalizadores
@@ -214,10 +216,10 @@ class FocalizationDeclarationService:
             focalization_type=focalization_type,
             focalizer_ids=focalizer_ids,
             declared_at=datetime.now(),
-            declared_by='user',
+            declared_by="user",
             notes=notes,
             is_validated=False,
-            violations_count=0
+            violations_count=0,
         )
 
         saved = self.repo.save_focalization(declaration)
@@ -225,9 +227,7 @@ class FocalizationDeclarationService:
         return saved
 
     def _validate_focalization_type(
-        self,
-        foc_type: FocalizationType,
-        focalizer_ids: List[int]
+        self, foc_type: FocalizationType, focalizer_ids: list[int]
     ) -> None:
         """Valida coherencia entre tipo y focalizadores."""
         if foc_type == FocalizationType.ZERO:
@@ -242,16 +242,12 @@ class FocalizationDeclarationService:
         elif foc_type == FocalizationType.INTERNAL_MULTIPLE:
             if len(focalizer_ids) < 2:
                 raise ValueError("Internal multiple requires at least 2 focalizers")
-        elif foc_type == FocalizationType.EXTERNAL:
-            if focalizer_ids:
-                raise ValueError("External focalization should not have focalizers")
+        elif foc_type == FocalizationType.EXTERNAL and focalizer_ids:
+            raise ValueError("External focalization should not have focalizers")
 
     def get_focalization(
-        self,
-        project_id: int,
-        chapter: int,
-        scene: Optional[int] = None
-    ) -> Optional[FocalizationDeclaration]:
+        self, project_id: int, chapter: int, scene: int | None = None
+    ) -> FocalizationDeclaration | None:
         """Obtiene la focalizacion declarada para una posicion."""
         # Buscar declaracion especifica para escena
         if scene is not None:
@@ -262,19 +258,16 @@ class FocalizationDeclarationService:
         # Buscar declaracion para capitulo completo
         return self.repo.get_focalization(project_id, chapter, None)
 
-    def get_all_declarations(
-        self,
-        project_id: int
-    ) -> List[FocalizationDeclaration]:
+    def get_all_declarations(self, project_id: int) -> list[FocalizationDeclaration]:
         """Obtiene todas las declaraciones de un proyecto."""
         return self.repo.get_all_focalizations(project_id)
 
     def update_focalization(
         self,
         declaration_id: int,
-        focalization_type: Optional[FocalizationType] = None,
-        focalizer_ids: Optional[List[int]] = None,
-        notes: Optional[str] = None
+        focalization_type: FocalizationType | None = None,
+        focalizer_ids: list[int] | None = None,
+        notes: str | None = None,
     ) -> FocalizationDeclaration:
         """Actualiza una declaracion existente."""
         declaration = self.repo.get_focalization_by_id(declaration_id)
@@ -287,7 +280,11 @@ class FocalizationDeclarationService:
             declaration.focalization_type = focalization_type
 
         if focalizer_ids is not None:
-            ftype = focalization_type if focalization_type is not None else declaration.focalization_type
+            ftype = (
+                focalization_type
+                if focalization_type is not None
+                else declaration.focalization_type
+            )
             self._validate_focalization_type(ftype, focalizer_ids)
             declaration.focalizer_ids = focalizer_ids
 
@@ -305,12 +302,8 @@ class FocalizationDeclarationService:
         return self.repo.delete_focalization(declaration_id)
 
     def suggest_focalization(
-        self,
-        project_id: int,
-        chapter: int,
-        text: str,
-        entities: List[Any]
-    ) -> Dict[str, Any]:
+        self, project_id: int, chapter: int, text: str, entities: list[Any]
+    ) -> dict[str, Any]:
         """
         Sugiere posible focalizacion basandose en el texto.
 
@@ -323,18 +316,18 @@ class FocalizationDeclarationService:
         Returns:
             Diccionario con sugerencia y evidencia
         """
-        suggestions: Dict[str, Any] = {
-            'suggested_type': None,
-            'suggested_focalizers': [],
-            'confidence': 0.0,
-            'evidence': []
+        suggestions: dict[str, Any] = {
+            "suggested_type": None,
+            "suggested_focalizers": [],
+            "confidence": 0.0,
+            "evidence": [],
         }
 
         text_lower = text.lower()
 
         # Buscar verbos de pensamiento/percepcion
-        thought_verbs = ['penso', 'sintio', 'sabia', 'recordo', 'imagino', 'temia']
-        perception_verbs = ['vio', 'oyo', 'escucho', 'noto', 'percibio']
+        thought_verbs = ["penso", "sintio", "sabia", "recordo", "imagino", "temia"]
+        perception_verbs = ["vio", "oyo", "escucho", "noto", "percibio"]
 
         thought_mentions = []
         for verb in thought_verbs + perception_verbs:
@@ -343,41 +336,41 @@ class FocalizationDeclarationService:
 
         # Si no hay verbos de pensamiento, podria ser externa
         if not thought_mentions:
-            suggestions['suggested_type'] = FocalizationType.EXTERNAL
-            suggestions['confidence'] = 0.4
-            suggestions['evidence'].append("No se detectan verbos de pensamiento/percepcion")
+            suggestions["suggested_type"] = FocalizationType.EXTERNAL
+            suggestions["confidence"] = 0.4
+            suggestions["evidence"].append("No se detectan verbos de pensamiento/percepcion")
             return suggestions
 
         # Buscar que personajes tienen acceso mental
         characters_with_thoughts: set = set()
         for entity in entities:
-            if not hasattr(entity, 'entity_type'):
+            if not hasattr(entity, "entity_type"):
                 continue
-            if entity.entity_type not in ('person', 'PERSON', 'PER', 'CHARACTER'):
+            if entity.entity_type not in ("person", "PERSON", "PER", "CHARACTER"):
                 continue
 
-            name = getattr(entity, 'canonical_name', getattr(entity, 'name', '')).lower()
+            name = getattr(entity, "canonical_name", getattr(entity, "name", "")).lower()
             # Buscar patron "Nombre penso/sintio..."
             for verb in thought_verbs:
                 pattern = f"{name}.*{verb}|{verb}.*{name}"
                 if re.search(pattern, text_lower):
-                    entity_id = getattr(entity, 'id', None)
+                    entity_id = getattr(entity, "id", None)
                     if entity_id:
                         characters_with_thoughts.add(entity_id)
-                        suggestions['evidence'].append(f"'{name}' + '{verb}'")
+                        suggestions["evidence"].append(f"'{name}' + '{verb}'")
 
         if len(characters_with_thoughts) == 0:
-            suggestions['suggested_type'] = FocalizationType.ZERO
-            suggestions['confidence'] = 0.3
-            suggestions['evidence'].append("Verbos de pensamiento sin sujeto claro identificado")
+            suggestions["suggested_type"] = FocalizationType.ZERO
+            suggestions["confidence"] = 0.3
+            suggestions["evidence"].append("Verbos de pensamiento sin sujeto claro identificado")
         elif len(characters_with_thoughts) == 1:
-            suggestions['suggested_type'] = FocalizationType.INTERNAL_FIXED
-            suggestions['suggested_focalizers'] = list(characters_with_thoughts)
-            suggestions['confidence'] = 0.6
+            suggestions["suggested_type"] = FocalizationType.INTERNAL_FIXED
+            suggestions["suggested_focalizers"] = list(characters_with_thoughts)
+            suggestions["confidence"] = 0.6
         else:
-            suggestions['suggested_type'] = FocalizationType.INTERNAL_VARIABLE
-            suggestions['suggested_focalizers'] = list(characters_with_thoughts)
-            suggestions['confidence'] = 0.5
+            suggestions["suggested_type"] = FocalizationType.INTERNAL_VARIABLE
+            suggestions["suggested_focalizers"] = list(characters_with_thoughts)
+            suggestions["confidence"] = 0.5
 
         return suggestions
 
@@ -426,20 +419,22 @@ class SQLiteFocalizationRepository:
             database: Instancia de Database. Si None, usa singleton.
         """
         from ..persistence.database import get_database
-        self.db = database or get_database()
-        self._entities_cache: Dict[int, Any] = {}
 
-    def set_entities(self, entities: Dict[int, Any]) -> None:
+        self.db = database or get_database()
+        self._entities_cache: dict[int, Any] = {}
+
+    def set_entities(self, entities: dict[int, Any]) -> None:
         """Configura las entidades disponibles."""
         self._entities_cache = entities
 
-    def get_entity(self, entity_id: int) -> Optional[Any]:
+    def get_entity(self, entity_id: int) -> Any | None:
         """Obtiene una entidad por ID."""
         if entity_id in self._entities_cache:
             return self._entities_cache[entity_id]
 
         # Buscar en la base de datos
         from ..entities.repository import get_entity_repository
+
         entity_repo = get_entity_repository()
         return entity_repo.get_entity(entity_id)
 
@@ -508,8 +503,8 @@ class SQLiteFocalizationRepository:
         return declaration
 
     def get_focalization(
-        self, project_id: int, chapter: int, scene: Optional[int]
-    ) -> Optional[FocalizationDeclaration]:
+        self, project_id: int, chapter: int, scene: int | None
+    ) -> FocalizationDeclaration | None:
         """Obtiene focalización para un capítulo/escena."""
         if scene is not None:
             row = self.db.fetchone(
@@ -526,7 +521,7 @@ class SQLiteFocalizationRepository:
 
         return self._row_to_declaration(row) if row else None
 
-    def get_focalization_by_id(self, declaration_id: int) -> Optional[FocalizationDeclaration]:
+    def get_focalization_by_id(self, declaration_id: int) -> FocalizationDeclaration | None:
         """Obtiene focalización por ID."""
         row = self.db.fetchone(
             "SELECT * FROM focalization_declarations WHERE id = ?",
@@ -534,7 +529,7 @@ class SQLiteFocalizationRepository:
         )
         return self._row_to_declaration(row) if row else None
 
-    def get_all_focalizations(self, project_id: int) -> List[FocalizationDeclaration]:
+    def get_all_focalizations(self, project_id: int) -> list[FocalizationDeclaration]:
         """Obtiene todas las focalizaciones de un proyecto."""
         rows = self.db.fetchall(
             """SELECT * FROM focalization_declarations
@@ -566,7 +561,9 @@ class SQLiteFocalizationRepository:
             scene=row["scene"],
             focalization_type=FocalizationType(row["focalization_type"]),
             focalizer_ids=focalizer_ids,
-            declared_at=datetime.fromisoformat(row["declared_at"]) if row["declared_at"] else datetime.now(),
+            declared_at=datetime.fromisoformat(row["declared_at"])
+            if row["declared_at"]
+            else datetime.now(),
             declared_by=row["declared_by"] or "user",
             notes=row["notes"] or "",
             is_validated=bool(row["is_validated"]),

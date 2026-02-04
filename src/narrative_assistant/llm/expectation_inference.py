@@ -25,7 +25,6 @@ import threading
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +92,7 @@ class BehavioralExpectation:
     source_chapters: list[int] = field(default_factory=list)
     related_traits: list[str] = field(default_factory=list)
     created_at: datetime = field(default_factory=datetime.now)
-    inference_method: Optional[str] = None  # Método que generó esta expectativa
+    inference_method: str | None = None  # Método que generó esta expectativa
     votes: dict[str, float] = field(default_factory=dict)  # Votos por método
 
     def to_dict(self) -> dict:
@@ -192,17 +191,19 @@ class InferenceConfig:
 
     # Métodos habilitados - Por defecto TODOS los métodos están disponibles
     # ya que todos los modelos vienen pre-instalados con la aplicación
-    enabled_methods: list[InferenceMethod] = field(default_factory=lambda: [
-        InferenceMethod.LLAMA3_2,
-        InferenceMethod.MISTRAL,
-        InferenceMethod.GEMMA2,
-        InferenceMethod.QWEN2_5,
-        InferenceMethod.RULE_BASED,
-        InferenceMethod.EMBEDDINGS,
-    ])
+    enabled_methods: list[InferenceMethod] = field(
+        default_factory=lambda: [
+            InferenceMethod.LLAMA3_2,
+            InferenceMethod.MISTRAL,
+            InferenceMethod.GEMMA2,
+            InferenceMethod.QWEN2_5,
+            InferenceMethod.RULE_BASED,
+            InferenceMethod.EMBEDDINGS,
+        ]
+    )
 
     # Pesos personalizados (opcional)
-    custom_weights: Optional[dict[InferenceMethod, float]] = None
+    custom_weights: dict[InferenceMethod, float] | None = None
 
     # Umbral mínimo de confianza
     min_confidence: float = 0.5
@@ -274,7 +275,7 @@ Responde SIEMPRE en formato JSON válido."""
         "venganza": [r"venganza", r"vengar", r"ajustar cuentas", r"represalia"],
     }
 
-    def __init__(self, config: Optional[InferenceConfig] = None):
+    def __init__(self, config: InferenceConfig | None = None):
         """
         Inicializa el motor.
 
@@ -306,6 +307,7 @@ Responde SIEMPRE en formato JSON válido."""
         # Verificar embeddings
         try:
             from narrative_assistant.nlp.embeddings import get_embeddings_model
+
             self._embeddings_model = get_embeddings_model()
         except Exception:
             pass
@@ -314,6 +316,7 @@ Responde SIEMPRE en formato JSON válido."""
         """Verifica si un modelo específico está disponible en Ollama."""
         try:
             import httpx
+
             response = httpx.get("http://localhost:11434/api/tags", timeout=2.0)
             if response.status_code == 200:
                 models = [m.get("name", "") for m in response.json().get("models", [])]
@@ -335,10 +338,9 @@ Responde SIEMPRE en formato JSON válido."""
                 return True
 
         # Verificar embeddings
-        if InferenceMethod.EMBEDDINGS in self._config.enabled_methods and self._embeddings_model:
-            return True
-
-        return False
+        return bool(
+            InferenceMethod.EMBEDDINGS in self._config.enabled_methods and self._embeddings_model
+        )
 
     @property
     def available_methods(self) -> list[str]:
@@ -369,8 +371,8 @@ Responde SIEMPRE en formato JSON válido."""
         character_name: str,
         text_samples: list[str],
         chapter_numbers: list[int],
-        existing_attributes: Optional[dict] = None,
-    ) -> Optional[CharacterBehaviorProfile]:
+        existing_attributes: dict | None = None,
+    ) -> CharacterBehaviorProfile | None:
         """
         Analiza un personaje para construir su perfil comportamental.
 
@@ -490,14 +492,17 @@ Responde SIEMPRE en formato JSON válido."""
         character_name: str,
         text_samples: list[str],
         chapter_numbers: list[int],
-        existing_attributes: Optional[dict],
-    ) -> Optional[dict]:
+        existing_attributes: dict | None,
+    ) -> dict | None:
         """Análisis usando un modelo LLM específico."""
         try:
             import httpx
 
             samples_text = "\n\n---\n\n".join(
-                [f"[Capítulo {ch}]\n{text}" for text, ch in zip(text_samples, chapter_numbers)]
+                [
+                    f"[Capítulo {ch}]\n{text}"
+                    for text, ch in zip(text_samples, chapter_numbers, strict=False)
+                ]
             )
 
             prompt = f"""Analiza el siguiente personaje basándote en los fragmentos de texto proporcionados.
@@ -539,7 +544,7 @@ Extrae la siguiente información sobre el personaje:
                     "options": {
                         "temperature": 0.3,
                         "num_predict": 2048,
-                    }
+                    },
                 },
                 timeout=600.0,  # 10 min - CPU sin GPU es muy lento
             )
@@ -551,6 +556,7 @@ Extrae la siguiente información sobre el personaje:
                 end = text.rfind("}") + 1
                 if start != -1 and end > start:
                     import json
+
                     return json.loads(text[start:end])
 
         except Exception as e:
@@ -584,8 +590,8 @@ Extrae la siguiente información sobre el personaje:
                 trait_emb = self._embeddings_model.encode([desc])[0]
                 # Calcular similitud coseno
                 similarity = float(
-                    sum(a * b for a, b in zip(text_emb, trait_emb)) /
-                    (sum(a**2 for a in text_emb)**0.5 * sum(b**2 for b in trait_emb)**0.5)
+                    sum(a * b for a, b in zip(text_emb, trait_emb, strict=False))
+                    / (sum(a**2 for a in text_emb) ** 0.5 * sum(b**2 for b in trait_emb) ** 0.5)
                 )
                 if similarity > 0.3:  # Umbral mínimo
                     traits[trait] = similarity
@@ -621,9 +627,7 @@ Extrae la siguiente información sobre el personaje:
             inference_method=method,
         )
 
-    def _consolidate_votes(
-        self, votes: dict[str, list[float]]
-    ) -> dict[str, float]:
+    def _consolidate_votes(self, votes: dict[str, list[float]]) -> dict[str, float]:
         """Consolida votos de múltiples métodos."""
         consolidated = {}
         for item, confidences in votes.items():
@@ -713,10 +717,14 @@ Extrae la siguiente información sobre el personaje:
         # Consolidar con votación
         final_violations = []
         for key, violations in all_violations.items():
-            if len(violations) >= 2 or (len(violations) == 1 and violations[0].consensus_score > 0.7):
+            if len(violations) >= 2 or (
+                len(violations) == 1 and violations[0].consensus_score > 0.7
+            ):
                 # Consenso alcanzado
                 best = violations[0]
-                best.detection_methods = [v.detection_methods[0] for v in violations if v.detection_methods]
+                best.detection_methods = [
+                    v.detection_methods[0] for v in violations if v.detection_methods
+                ]
                 best.consensus_score = len(violations) / len(self.available_methods)
                 final_violations.append(best)
 
@@ -750,13 +758,18 @@ Extrae la siguiente información sobre el personaje:
                     # Encontrar el texto exacto
                     match = re.search(pattern, text_lower)
                     if match:
-                        violation_text = text[max(0, match.start()-50):min(len(text), match.end()+50)]
+                        violation_text = text[
+                            max(0, match.start() - 50) : min(len(text), match.end() + 50)
+                        ]
 
                         # Buscar expectativa relacionada
                         related_exp = next(
-                            (e for e in profile.expectations
-                             if trait.lower() in [t.lower() for t in e.related_traits]),
-                            None
+                            (
+                                e
+                                for e in profile.expectations
+                                if trait.lower() in [t.lower() for t in e.related_traits]
+                            ),
+                            None,
                         )
                         if not related_exp:
                             related_exp = BehavioralExpectation(
@@ -769,16 +782,18 @@ Extrae la siguiente información sobre el personaje:
                                 related_traits=[trait],
                             )
 
-                        violations.append(ExpectationViolation(
-                            expectation=related_exp,
-                            violation_text=violation_text,
-                            chapter_number=chapter_number,
-                            position=position + (match.start() if match else 0),
-                            severity=ViolationSeverity.MEDIUM,
-                            explanation=f"El personaje {profile.character_name} actúa de forma contraria a su rasgo '{trait}'",
-                            detection_methods=["rule_based"],
-                            consensus_score=0.5,
-                        ))
+                        violations.append(
+                            ExpectationViolation(
+                                expectation=related_exp,
+                                violation_text=violation_text,
+                                chapter_number=chapter_number,
+                                position=position + (match.start() if match else 0),
+                                severity=ViolationSeverity.MEDIUM,
+                                explanation=f"El personaje {profile.character_name} actúa de forma contraria a su rasgo '{trait}'",
+                                detection_methods=["rule_based"],
+                                consensus_score=0.5,
+                            )
+                        )
 
         return violations
 
@@ -796,21 +811,34 @@ Extrae la siguiente información sobre el personaje:
         Envía el perfil del personaje y el texto al modelo LLM para
         analizar si hay comportamientos que contradicen la caracterización.
         """
-        import httpx
         import json
+
+        import httpx
 
         violations = []
 
         try:
             # Preparar contexto del personaje
-            traits_text = ", ".join(profile.personality_traits[:10]) if profile.personality_traits else "sin rasgos definidos"
-            values_text = ", ".join(profile.values[:5]) if profile.values else "sin valores definidos"
+            traits_text = (
+                ", ".join(profile.personality_traits[:10])
+                if profile.personality_traits
+                else "sin rasgos definidos"
+            )
+            values_text = (
+                ", ".join(profile.values[:5]) if profile.values else "sin valores definidos"
+            )
 
             # Formatear expectativas para el prompt
-            expectations_text = "\n".join([
-                f"- [{e.expectation_type.value}] {e.description} (confianza: {e.confidence:.0%})"
-                for e in profile.expectations[:5]
-            ]) if profile.expectations else "Sin expectativas definidas"
+            expectations_text = (
+                "\n".join(
+                    [
+                        f"- [{e.expectation_type.value}] {e.description} (confianza: {e.confidence:.0%})"
+                        for e in profile.expectations[:5]
+                    ]
+                )
+                if profile.expectations
+                else "Sin expectativas definidas"
+            )
 
             prompt = f"""Analiza si el siguiente texto contiene comportamientos que contradicen la caracterización establecida del personaje.
 
@@ -853,7 +881,7 @@ IMPORTANTE: Solo marca como violación si claramente contradice la caracterizaci
                     "options": {
                         "temperature": 0.2,  # Bajo para más consistencia
                         "num_predict": 1024,
-                    }
+                    },
                 },
                 timeout=120.0,
             )
@@ -875,20 +903,28 @@ IMPORTANTE: Solo marca como violación si claramente contradice la caracterizaci
                             "medium": ViolationSeverity.MEDIUM,
                             "low": ViolationSeverity.LOW,
                         }
-                        severity = severity_map.get(v.get("severity", "medium"), ViolationSeverity.MEDIUM)
+                        severity = severity_map.get(
+                            v.get("severity", "medium"), ViolationSeverity.MEDIUM
+                        )
 
                         # Encontrar o crear expectativa relacionada
                         related_exp = next(
-                            (e for e in profile.expectations
-                             if v.get("expectation_violated", "").lower() in e.description.lower()),
-                            None
+                            (
+                                e
+                                for e in profile.expectations
+                                if v.get("expectation_violated", "").lower()
+                                in e.description.lower()
+                            ),
+                            None,
                         )
                         if not related_exp:
                             related_exp = BehavioralExpectation(
                                 character_id=profile.character_id,
                                 character_name=profile.character_name,
                                 expectation_type=ExpectationType.BEHAVIORAL,
-                                description=v.get("expectation_violated", "Expectativa de comportamiento"),
+                                description=v.get(
+                                    "expectation_violated", "Expectativa de comportamiento"
+                                ),
                                 reasoning="Detectado por análisis LLM",
                                 confidence=0.6,
                             )
@@ -917,7 +953,7 @@ IMPORTANTE: Solo marca como violación si claramente contradice la caracterizaci
 
         return violations
 
-    def get_profile(self, character_id: int) -> Optional[CharacterBehaviorProfile]:
+    def get_profile(self, character_id: int) -> CharacterBehaviorProfile | None:
         """Obtiene el perfil cacheado de un personaje."""
         return self._profiles.get(character_id)
 
@@ -936,7 +972,7 @@ IMPORTANTE: Solo marca como violación si claramente contradice la caracterizaci
 
 
 # Singleton
-_engine: Optional[ExpectationInferenceEngine] = None
+_engine: ExpectationInferenceEngine | None = None
 _engine_lock = threading.Lock()
 
 
@@ -955,8 +991,8 @@ def infer_expectations(
     character_name: str,
     text_samples: list[str],
     chapter_numbers: list[int],
-    existing_attributes: Optional[dict] = None,
-) -> Optional[CharacterBehaviorProfile]:
+    existing_attributes: dict | None = None,
+) -> CharacterBehaviorProfile | None:
     """
     Función de conveniencia para analizar un personaje.
     """

@@ -8,7 +8,6 @@ sin modificar el código fuente.
 import json
 import logging
 from datetime import datetime
-from typing import Optional
 
 from ..persistence.database import Database, get_database
 
@@ -23,7 +22,7 @@ class CorrectionConfigDefaultsRepository:
     no como configuraciones completas.
     """
 
-    def __init__(self, db: Optional[Database] = None):
+    def __init__(self, db: Database | None = None):
         """
         Inicializa el repositorio.
 
@@ -32,11 +31,7 @@ class CorrectionConfigDefaultsRepository:
         """
         self.db = db or get_database()
 
-    def get_override(
-        self,
-        type_code: str,
-        subtype_code: Optional[str] = None
-    ) -> Optional[dict]:
+    def get_override(self, type_code: str, subtype_code: str | None = None) -> dict | None:
         """
         Obtiene el override de un tipo o subtipo.
 
@@ -55,7 +50,7 @@ class CorrectionConfigDefaultsRepository:
                     FROM correction_config_overrides
                     WHERE type_code = ? AND subtype_code IS NULL
                     """,
-                    (type_code,)
+                    (type_code,),
                 )
             else:
                 cursor = conn.execute(
@@ -64,14 +59,14 @@ class CorrectionConfigDefaultsRepository:
                     FROM correction_config_overrides
                     WHERE type_code = ? AND subtype_code = ?
                     """,
-                    (type_code, subtype_code)
+                    (type_code, subtype_code),
                 )
 
             row = cursor.fetchone()
             if row:
                 return {
                     "overrides": json.loads(row["overrides_json"]),
-                    "updated_at": row["updated_at"]
+                    "updated_at": row["updated_at"],
                 }
             return None
 
@@ -93,12 +88,14 @@ class CorrectionConfigDefaultsRepository:
 
             results = []
             for row in cursor.fetchall():
-                results.append({
-                    "type_code": row["type_code"],
-                    "subtype_code": row["subtype_code"],
-                    "overrides": json.loads(row["overrides_json"]),
-                    "updated_at": row["updated_at"]
-                })
+                results.append(
+                    {
+                        "type_code": row["type_code"],
+                        "subtype_code": row["subtype_code"],
+                        "overrides": json.loads(row["overrides_json"]),
+                        "updated_at": row["updated_at"],
+                    }
+                )
             return results
 
     def get_overrides_for_type(self, type_code: str) -> list[dict]:
@@ -119,25 +116,22 @@ class CorrectionConfigDefaultsRepository:
                 WHERE type_code = ?
                 ORDER BY subtype_code NULLS FIRST
                 """,
-                (type_code,)
+                (type_code,),
             )
 
             results = []
             for row in cursor.fetchall():
-                results.append({
-                    "type_code": row["type_code"],
-                    "subtype_code": row["subtype_code"],
-                    "overrides": json.loads(row["overrides_json"]),
-                    "updated_at": row["updated_at"]
-                })
+                results.append(
+                    {
+                        "type_code": row["type_code"],
+                        "subtype_code": row["subtype_code"],
+                        "overrides": json.loads(row["overrides_json"]),
+                        "updated_at": row["updated_at"],
+                    }
+                )
             return results
 
-    def set_override(
-        self,
-        type_code: str,
-        subtype_code: Optional[str],
-        overrides: dict
-    ) -> bool:
+    def set_override(self, type_code: str, subtype_code: str | None, overrides: dict) -> bool:
         """
         Crea o actualiza un override.
 
@@ -167,20 +161,13 @@ class CorrectionConfigDefaultsRepository:
                     overrides_json = excluded.overrides_json,
                     updated_at = excluded.updated_at
                 """,
-                (type_code, subtype_code, overrides_json, now)
+                (type_code, subtype_code, overrides_json, now),
             )
 
-        logger.info(
-            f"Override guardado: {type_code}"
-            f"{f'/{subtype_code}' if subtype_code else ''}"
-        )
+        logger.info(f"Override guardado: {type_code}{f'/{subtype_code}' if subtype_code else ''}")
         return True
 
-    def delete_override(
-        self,
-        type_code: str,
-        subtype_code: Optional[str] = None
-    ) -> bool:
+    def delete_override(self, type_code: str, subtype_code: str | None = None) -> bool:
         """
         Elimina un override (reset a hardcoded defaults).
 
@@ -198,7 +185,7 @@ class CorrectionConfigDefaultsRepository:
                     DELETE FROM correction_config_overrides
                     WHERE type_code = ? AND subtype_code IS NULL
                     """,
-                    (type_code,)
+                    (type_code,),
                 )
             else:
                 cursor = conn.execute(
@@ -206,15 +193,14 @@ class CorrectionConfigDefaultsRepository:
                     DELETE FROM correction_config_overrides
                     WHERE type_code = ? AND subtype_code = ?
                     """,
-                    (type_code, subtype_code)
+                    (type_code, subtype_code),
                 )
 
             deleted = cursor.rowcount > 0
 
         if deleted:
             logger.info(
-                f"Override eliminado: {type_code}"
-                f"{f'/{subtype_code}' if subtype_code else ''}"
+                f"Override eliminado: {type_code}{f'/{subtype_code}' if subtype_code else ''}"
             )
         return deleted
 
@@ -226,9 +212,7 @@ class CorrectionConfigDefaultsRepository:
             Número de overrides eliminados.
         """
         with self.db.connection() as conn:
-            cursor = conn.execute(
-                "DELETE FROM correction_config_overrides"
-            )
+            cursor = conn.execute("DELETE FROM correction_config_overrides")
             count = cursor.rowcount
 
         logger.info(f"Todos los overrides eliminados: {count} registros")
@@ -251,14 +235,14 @@ class CorrectionConfigDefaultsRepository:
                 WHERE type_code = ?
                 LIMIT 1
                 """,
-                (type_code,)
+                (type_code,),
             )
             return cursor.fetchone() is not None
 
 
 # Singleton para acceso global
-_repository: Optional[CorrectionConfigDefaultsRepository] = None
-_repository_lock = __import__('threading').Lock()
+_repository: CorrectionConfigDefaultsRepository | None = None
+_repository_lock = __import__("threading").Lock()
 
 
 def get_defaults_repository() -> CorrectionConfigDefaultsRepository:

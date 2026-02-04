@@ -15,10 +15,9 @@ import logging
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
+from ..core.errors import ErrorSeverity, NLPError
 from ..core.result import Result
-from ..core.errors import NLPError, ErrorSeverity
 
 logger = logging.getLogger(__name__)
 
@@ -51,8 +50,8 @@ class DialogueSpan:
     start_char: int
     end_char: int
     dialogue_type: DialogueType
-    attribution_text: Optional[str] = None
-    speaker_hint: Optional[str] = None
+    attribution_text: str | None = None
+    speaker_hint: str | None = None
     confidence: float = 0.9
 
     def __post_init__(self):
@@ -132,13 +131,12 @@ class DialogueDetectionError(NLPError):
     original_error: str = ""
     message: str = field(init=False)
     severity: ErrorSeverity = field(default=ErrorSeverity.RECOVERABLE, init=False)
-    user_message: Optional[str] = field(default=None, init=False)
+    user_message: str | None = field(default=None, init=False)
 
     def __post_init__(self):
         self.message = f"Dialogue detection error: {self.original_error}"
         self.user_message = (
-            "Error al detectar diálogos. "
-            "Se continuará con los resultados parciales."
+            "Error al detectar diálogos. Se continuará con los resultados parciales."
         )
         super().__post_init__()
 
@@ -301,7 +299,7 @@ def _normalize_dashes(text: str) -> str:
     return result
 
 
-def _extract_speaker_hint(attribution: str) -> Optional[str]:
+def _extract_speaker_hint(attribution: str) -> str | None:
     """
     Extrae una pista del hablante del texto de atribución.
 

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Sistema de pesos entrenables para votación ponderada.
 
@@ -13,9 +12,9 @@ Métodos disponibles:
 
 import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+
 import numpy as np
 
 from .training_examples import TrainingExample
@@ -26,6 +25,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class TrainingResult:
     """Resultado del entrenamiento de pesos."""
+
     weights: dict  # {método: peso}
     mse: float  # Error cuadrático medio
     accuracy: float  # Precisión en clasificación
@@ -60,7 +60,7 @@ class TrainableWeightedVoting:
 
     def __init__(
         self,
-        methods: Optional[list[str]] = None,
+        methods: list[str] | None = None,
         min_weight: float = 0.05,
         normalize: bool = True,
     ):
@@ -79,7 +79,7 @@ class TrainableWeightedVoting:
         # Pesos actuales (empezar con defaults)
         self.weights = {m: self.DEFAULT_WEIGHTS.get(m, 0.25) for m in self.methods}
         self.is_trained = False
-        self.training_result: Optional[TrainingResult] = None
+        self.training_result: TrainingResult | None = None
 
     def train(
         self,
@@ -150,7 +150,7 @@ class TrainableWeightedVoting:
         if self.normalize:
             weights_raw = weights_raw / weights_raw.sum()
 
-        weights = {m: float(w) for m, w in zip(self.methods, weights_raw)}
+        weights = {m: float(w) for m, w in zip(self.methods, weights_raw, strict=False)}
 
         # Calcular métricas
         predictions = X @ weights_raw
@@ -199,7 +199,9 @@ class TrainableWeightedVoting:
                     yield [remaining]
                 return
 
-            for w in np.arange(self.min_weight, 1.0 - current_sum - self.min_weight * (n_methods - depth - 1), step):
+            for w in np.arange(
+                self.min_weight, 1.0 - current_sum - self.min_weight * (n_methods - depth - 1), step
+            ):
                 for rest in generate_weight_combinations(n_methods, current_sum + w, depth + 1):
                     yield [w] + rest
 
@@ -219,7 +221,7 @@ class TrainableWeightedVoting:
             logger.info(f"Grid search: {n_iterations} combinaciones evaluadas")
 
         # Resultados
-        weights = {m: float(w) for m, w in zip(self.methods, best_weights)}
+        weights = {m: float(w) for m, w in zip(self.methods, best_weights, strict=False)}
         predictions = X @ best_weights
         accuracy = self._calculate_accuracy(predictions, y)
         cv_scores = self._cross_validate(X, y, cv_folds)
@@ -371,7 +373,7 @@ class TrainableWeightedVoting:
 
     def load(self, path: Path) -> None:
         """Carga pesos desde archivo."""
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             data = json.load(f)
 
         self.methods = data["methods"]
@@ -397,9 +399,10 @@ class TrainableWeightedVoting:
 # Funciones de utilidad
 # =============================================================================
 
+
 def train_weights_from_examples(
     examples: list[TrainingExample],
-    output_path: Optional[Path] = None,
+    output_path: Path | None = None,
     method: str = "nnls",
 ) -> dict[str, float]:
     """

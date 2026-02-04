@@ -45,64 +45,64 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
-from ..alerts.engine import AlertEngine, get_alert_engine
+from ..alerts.engine import get_alert_engine
 from ..alerts.models import Alert, AlertCategory, AlertSeverity
 from ..analysis.attribute_consistency import (
     AttributeConsistencyChecker,
     AttributeInconsistency,
 )
-from ..core.errors import NarrativeError, ErrorSeverity
+from ..analysis.emotional_coherence import (
+    EmotionalIncoherence,
+    get_emotional_coherence_checker,
+)
+from ..core.errors import ErrorSeverity, NarrativeError
 from ..core.result import Result
 from ..core.utils import format_duration
 from ..entities.models import Entity
 from ..entities.repository import get_entity_repository
-from ..nlp.attributes import AttributeExtractor, ExtractedAttribute as LegacyExtractedAttribute
-from ..nlp.attributes import AttributeKey, AttributeCategory as LegacyAttributeCategory
+from ..focalization import (
+    FocalizationDeclaration,
+    FocalizationViolation,
+    FocalizationViolationDetector,
+)
+from ..focalization.declaration import get_focalization_service
+from ..nlp.attributes import AttributeCategory as LegacyAttributeCategory
+from ..nlp.attributes import AttributeExtractor, AttributeKey
+from ..nlp.attributes import ExtractedAttribute as LegacyExtractedAttribute
 from ..nlp.extraction import (
-    AttributeExtractionPipeline,
-    PipelineConfig as ExtractionPipelineConfig,
     AggregatedAttribute,
+    AttributeExtractionPipeline,
     AttributeType,
+)
+from ..nlp.extraction import (
+    PipelineConfig as ExtractionPipelineConfig,
 )
 from ..nlp.ner import NERExtractor
 from ..parsers.base import detect_format, get_parser
-from ..parsers.structure_detector import StructureDetector
 from ..parsers.document_classifier import (
-    classify_document,
-    DocumentType,
     DocumentClassification,
+    DocumentType,
+    classify_document,
 )
+from ..parsers.structure_detector import StructureDetector
 from ..persistence.database import get_database
 from ..persistence.document_fingerprint import generate_fingerprint
 from ..persistence.project import ProjectManager
 from ..persistence.session import SessionManager
 from ..temporal import (
-    TemporalMarkerExtractor,
-    TimelineBuilder,
     TemporalConsistencyChecker,
     TemporalInconsistency,
+    TemporalMarkerExtractor,
     Timeline,
+    TimelineBuilder,
 )
 from ..voice import (
-    VoiceProfile,
-    VoiceProfileBuilder,
     VoiceDeviation,
     VoiceDeviationDetector,
-)
-from ..focalization import (
-    FocalizationType,
-    FocalizationDeclaration,
-    FocalizationDeclarationService,
-    FocalizationViolation,
-    FocalizationViolationDetector,
-)
-from ..focalization.declaration import get_focalization_service
-from ..analysis.emotional_coherence import (
-    EmotionalCoherenceChecker,
-    EmotionalIncoherence,
-    get_emotional_coherence_checker,
+    VoiceProfile,
+    VoiceProfileBuilder,
 )
 
 logger = logging.getLogger(__name__)
@@ -133,24 +133,27 @@ class PipelineConfig:
     run_consistency: bool = True
     run_temporal: bool = True  # Análisis temporal habilitado por defecto
     run_voice: bool = True  # Análisis de voz habilitado por defecto
-    run_focalization: bool = False  # Análisis de focalización deshabilitado por defecto (requiere declaraciones)
+    run_focalization: bool = (
+        False  # Análisis de focalización deshabilitado por defecto (requiere declaraciones)
+    )
     run_emotional: bool = True  # Análisis de coherencia emocional habilitado por defecto
     create_alerts: bool = True
     min_confidence: float = 0.5
-    batch_size: Optional[int] = None
+    batch_size: int | None = None
     force_reanalysis: bool = False
     # Nuevo pipeline híbrido de extracción de atributos
     use_hybrid_extraction: bool = True  # Usar nuevo pipeline por defecto
     use_llm_extraction: bool = False  # LLM deshabilitado por defecto (requiere Ollama)
     llm_ensemble_mode: bool = False  # Múltiples modelos con votación
-    llm_models: Optional[list[str]] = None  # Modelos Ollama a usar
+    llm_models: list[str] | None = None  # Modelos Ollama a usar
 
 
 @dataclass
 class SectionInfo:
     """Información de una sección dentro de un capítulo."""
+
     number: int
-    title: Optional[str]
+    title: str | None
     heading_level: int  # 2=H2, 3=H3, 4=H4
     start_char: int
     end_char: int
@@ -160,8 +163,9 @@ class SectionInfo:
 @dataclass
 class ChapterInfo:
     """Información de un capítulo detectado."""
+
     number: int
-    title: Optional[str]
+    title: str | None
     content: str
     start_char: int
     end_char: int
@@ -198,19 +202,25 @@ class AnalysisReport:
     alerts: list[Alert] = field(default_factory=list)
     chapters: list[ChapterInfo] = field(default_factory=list)
     document_type: DocumentType = DocumentType.UNKNOWN  # Tipo de documento clasificado
-    document_classification: Optional[DocumentClassification] = None  # Clasificación completa
-    timeline: Optional[Timeline] = None  # Timeline narrativo
+    document_classification: DocumentClassification | None = None  # Clasificación completa
+    timeline: Timeline | None = None  # Timeline narrativo
     temporal_inconsistencies: list[TemporalInconsistency] = field(default_factory=list)
     voice_profiles: list[VoiceProfile] = field(default_factory=list)  # Perfiles de voz
     voice_deviations: list[VoiceDeviation] = field(default_factory=list)  # Desviaciones de voz
-    focalization_declarations: list[FocalizationDeclaration] = field(default_factory=list)  # Declaraciones de focalización
-    focalization_violations: list[FocalizationViolation] = field(default_factory=list)  # Violaciones de focalización
-    emotional_incoherences: list[EmotionalIncoherence] = field(default_factory=list)  # Incoherencias emocionales
+    focalization_declarations: list[FocalizationDeclaration] = field(
+        default_factory=list
+    )  # Declaraciones de focalización
+    focalization_violations: list[FocalizationViolation] = field(
+        default_factory=list
+    )  # Violaciones de focalización
+    emotional_incoherences: list[EmotionalIncoherence] = field(
+        default_factory=list
+    )  # Incoherencias emocionales
     stats: dict[str, Any] = field(default_factory=dict)
     errors: list[NarrativeError] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     start_time: datetime = field(default_factory=datetime.now)
-    end_time: Optional[datetime] = None
+    end_time: datetime | None = None
 
     @property
     def duration_seconds(self) -> float:
@@ -237,8 +247,8 @@ class AnalysisReport:
 
 def run_full_analysis(
     document_path: str | Path,
-    project_name: Optional[str] = None,
-    config: Optional[PipelineConfig] = None,
+    project_name: str | None = None,
+    config: PipelineConfig | None = None,
 ) -> Result[AnalysisReport]:
     """
     Ejecuta análisis completo de un manuscrito.
@@ -262,12 +272,13 @@ def run_full_analysis(
         >>>     print(f"Alertas: {len(report.alerts)}")
     """
     import warnings
+
     warnings.warn(
         "run_full_analysis está deprecado. "
         "Use unified_analysis.run_unified_analysis() en su lugar. "
         "Ver docstring del módulo para guía de migración.",
         DeprecationWarning,
-        stacklevel=2
+        stacklevel=2,
     )
     path = Path(document_path)
     config = config or PipelineConfig()
@@ -360,11 +371,13 @@ def run_full_analysis(
             logger.warning("Structure detection failed, continuing without it")
         else:
             structure = structure_result.value
-            report.stats["chapters"] = len(structure.chapters) if hasattr(structure, 'chapters') else 0
+            report.stats["chapters"] = (
+                len(structure.chapters) if hasattr(structure, "chapters") else 0
+            )
             logger.info(f"Detected {report.stats['chapters']} chapters")
 
             # Extraer y guardar capítulos
-            if hasattr(structure, 'chapters') and structure.chapters:
+            if hasattr(structure, "chapters") and structure.chapters:
                 full_text = raw_document.full_text
                 chapters_info = []
                 for ch in structure.chapters:
@@ -374,31 +387,44 @@ def run_full_analysis(
 
                     # Calcular start_char del contenido (después del título)
                     chapter_full_text = full_text[ch.start_char : ch.end_char]
-                    first_newline = chapter_full_text.find('\n')
+                    first_newline = chapter_full_text.find("\n")
                     if first_newline != -1:
                         # Saltar título y líneas vacías
                         content_offset = first_newline + 1
-                        while content_offset < len(chapter_full_text) and chapter_full_text[content_offset] == '\n':
+                        while (
+                            content_offset < len(chapter_full_text)
+                            and chapter_full_text[content_offset] == "\n"
+                        ):
                             content_offset += 1
                         content_start_char = ch.start_char + content_offset
                     else:
                         content_start_char = ch.start_char
 
                     # Convertir secciones del Chapter a SectionInfo
-                    section_infos = _convert_sections_to_info(ch.sections) if hasattr(ch, 'sections') and ch.sections else []
+                    section_infos = (
+                        _convert_sections_to_info(ch.sections)
+                        if hasattr(ch, "sections") and ch.sections
+                        else []
+                    )
                     if section_infos:
-                        logger.info(f"Capítulo {ch.number}: {len(section_infos)} secciones detectadas")
+                        logger.info(
+                            f"Capítulo {ch.number}: {len(section_infos)} secciones detectadas"
+                        )
 
-                    chapters_info.append(ChapterInfo(
-                        number=ch.number,
-                        title=ch.title,
-                        content=content,
-                        start_char=content_start_char,
-                        end_char=ch.end_char,
-                        word_count=word_count,
-                        structure_type=ch.structure_type.value if hasattr(ch.structure_type, 'value') else str(ch.structure_type),
-                        sections=section_infos
-                    ))
+                    chapters_info.append(
+                        ChapterInfo(
+                            number=ch.number,
+                            title=ch.title,
+                            content=content,
+                            start_char=content_start_char,
+                            end_char=ch.end_char,
+                            word_count=word_count,
+                            structure_type=ch.structure_type.value
+                            if hasattr(ch.structure_type, "value")
+                            else str(ch.structure_type),
+                            sections=section_infos,
+                        )
+                    )
                 report.chapters = chapters_info
 
                 # Persistir capítulos en la base de datos
@@ -436,7 +462,7 @@ def run_full_analysis(
             else:
                 attr_extraction = attr_result.value
                 # attr_extraction es un AttributeExtractionResult con .attributes
-                if hasattr(attr_extraction, 'attributes'):
+                if hasattr(attr_extraction, "attributes"):
                     attributes = attr_extraction.attributes
                 else:
                     attributes = attr_extraction if isinstance(attr_extraction, list) else []
@@ -484,7 +510,9 @@ def run_full_analysis(
             if reload_result.is_success:
                 attributes_for_consistency = reload_result.value or []
                 report.stats["attributes_for_consistency"] = len(attributes_for_consistency)
-                logger.info(f"Reloaded {len(attributes_for_consistency)} attributes from DB for consistency check")
+                logger.info(
+                    f"Reloaded {len(attributes_for_consistency)} attributes from DB for consistency check"
+                )
 
                 if attributes_for_consistency:
                     consistency_result = _run_consistency_analysis(attributes_for_consistency)
@@ -514,9 +542,7 @@ def run_full_analysis(
 
         # STEP 12: Análisis temporal (timeline)
         if config.run_temporal and report.chapters:
-            temporal_result = _run_temporal_analysis(
-                raw_document.full_text, report.chapters
-            )
+            temporal_result = _run_temporal_analysis(raw_document.full_text, report.chapters)
             if temporal_result.is_failure:
                 report.errors.append(temporal_result.error)
                 logger.warning("Temporal analysis failed")
@@ -525,7 +551,9 @@ def run_full_analysis(
                 report.timeline = timeline_data["timeline"]
                 report.temporal_inconsistencies = timeline_data["inconsistencies"]
                 report.stats["temporal_markers"] = timeline_data["markers_count"]
-                report.stats["timeline_events"] = len(report.timeline.events) if report.timeline else 0
+                report.stats["timeline_events"] = (
+                    len(report.timeline.events) if report.timeline else 0
+                )
                 report.stats["temporal_inconsistencies"] = len(report.temporal_inconsistencies)
                 logger.info(
                     f"Temporal analysis: {timeline_data['markers_count']} markers, "
@@ -553,9 +581,7 @@ def run_full_analysis(
 
         # STEP 13: Análisis de voz y registro
         if config.run_voice and report.entities:
-            voice_result = _run_voice_analysis(
-                report.chapters, report.entities
-            )
+            voice_result = _run_voice_analysis(report.chapters, report.entities)
             if voice_result.is_failure:
                 report.errors.append(voice_result.error)
                 logger.warning(f"Voice analysis failed: {voice_result.error.message}")
@@ -585,9 +611,7 @@ def run_full_analysis(
         # NOTA: Este paso requiere que el usuario haya declarado la focalización
         # de los capítulos. Si no hay declaraciones, se omite.
         if config.run_focalization and report.chapters and report.entities:
-            foc_result = _run_focalization_analysis(
-                project_id, report.chapters, report.entities
-            )
+            foc_result = _run_focalization_analysis(project_id, report.chapters, report.entities)
             if foc_result.is_failure:
                 report.errors.append(foc_result.error)
                 logger.warning(f"Focalization analysis failed: {foc_result.error.message}")
@@ -615,16 +639,16 @@ def run_full_analysis(
 
         # STEP 15: Análisis de coherencia emocional
         if config.run_emotional and report.chapters and report.entities:
-            emotional_result = _run_emotional_analysis(
-                project_id, report.chapters, report.entities
-            )
+            emotional_result = _run_emotional_analysis(project_id, report.chapters, report.entities)
             if emotional_result.is_failure:
                 report.errors.append(emotional_result.error)
                 logger.warning(f"Emotional analysis failed: {emotional_result.error.message}")
             else:
                 report.emotional_incoherences = emotional_result.value or []
                 report.stats["emotional_incoherences"] = len(report.emotional_incoherences)
-                logger.info(f"Emotional analysis: {len(report.emotional_incoherences)} incoherences")
+                logger.info(
+                    f"Emotional analysis: {len(report.emotional_incoherences)} incoherences"
+                )
 
                 # Crear alertas de incoherencias emocionales
                 if config.create_alerts and report.emotional_incoherences:
@@ -660,7 +684,7 @@ def run_full_analysis(
 
 
 def _get_or_create_project_with_text(
-    path: Path, project_name: Optional[str], text: str, fingerprint: Any
+    path: Path, project_name: str | None, text: str, fingerprint: Any
 ) -> Result[int]:
     """
     Obtiene o crea un proyecto con texto ya parseado.
@@ -731,7 +755,7 @@ def _clear_project_data(project_id: int) -> Result[dict]:
 
         db = get_database()
         entity_repo = get_entity_repository()
-        alert_repo = get_alert_repository()
+        get_alert_repository()
 
         stats = {
             "entities_deleted": 0,
@@ -741,10 +765,7 @@ def _clear_project_data(project_id: int) -> Result[dict]:
 
         # 1. Borrar alertas del proyecto
         with db.connection() as conn:
-            cursor = conn.execute(
-                "DELETE FROM alerts WHERE project_id = ?",
-                (project_id,)
-            )
+            cursor = conn.execute("DELETE FROM alerts WHERE project_id = ?", (project_id,))
             stats["alerts_deleted"] = cursor.rowcount
 
         # 2. Borrar atributos (a través de entities)
@@ -757,16 +778,13 @@ def _clear_project_data(project_id: int) -> Result[dict]:
             with db.connection() as conn:
                 cursor = conn.execute(
                     f"DELETE FROM entity_attributes WHERE entity_id IN ({placeholders})",
-                    tuple(entity_ids)
+                    tuple(entity_ids),
                 )
                 stats["attributes_deleted"] = cursor.rowcount
 
         # 3. Borrar entidades (soft delete o hard delete)
         with db.connection() as conn:
-            cursor = conn.execute(
-                "DELETE FROM entities WHERE project_id = ?",
-                (project_id,)
-            )
+            cursor = conn.execute("DELETE FROM entities WHERE project_id = ?", (project_id,))
             stats["entities_deleted"] = cursor.rowcount
 
         logger.info(
@@ -871,15 +889,16 @@ def _run_ner(text: str, project_id: int) -> Result[list[Entity]]:
         ner_result = extraction_result.value
 
         # Validar que ner_result no sea None
-        if ner_result is None or not hasattr(ner_result, 'entities'):
+        if ner_result is None or not hasattr(ner_result, "entities"):
             logger.warning("NER extraction returned None or invalid result, using empty list")
             return Result.success([])
 
         entities_data = ner_result.entities
 
         # Persistir entidades en la DB
-        from ..entities.models import EntityType, EntityImportance
         import re
+
+        from ..entities.models import EntityImportance, EntityType
 
         # Mapeo de EntityLabel a EntityType
         label_to_type = {
@@ -894,7 +913,7 @@ def _run_ner(text: str, project_id: int) -> Result[list[Entity]]:
         for entity_obj in entities_data:
             # Limpiar canonical_form: eliminar saltos de línea, múltiples espacios
             raw_text = entity_obj.text.strip()
-            canonical = re.sub(r'\s+', ' ', raw_text)  # Normalizar espacios
+            canonical = re.sub(r"\s+", " ", raw_text)  # Normalizar espacios
             canonical = canonical.strip()
 
             # ============================================================
@@ -906,9 +925,9 @@ def _run_ner(text: str, project_id: int) -> Result[list[Entity]]:
                 continue
 
             # 2. Ignorar títulos de capítulos
-            if re.match(r'^cap[ií]tulo\s+\d+', canonical, re.IGNORECASE):
+            if re.match(r"^cap[ií]tulo\s+\d+", canonical, re.IGNORECASE):
                 continue
-            if re.match(r'^chapter\s+\d+', canonical, re.IGNORECASE):
+            if re.match(r"^chapter\s+\d+", canonical, re.IGNORECASE):
                 continue
 
             # 3. Ignorar frases largas (probablemente no son nombres)
@@ -917,47 +936,51 @@ def _run_ner(text: str, project_id: int) -> Result[list[Entity]]:
                 continue
 
             # 4. Ignorar líneas que parecen descripciones o narración
-            description_starts = r'^(ten[ií]a|era|estaba|llevaba|parec[ií]a|hab[ií]a|fue|ser[ií]a|est[aá])'
+            description_starts = (
+                r"^(ten[ií]a|era|estaba|llevaba|parec[ií]a|hab[ií]a|fue|ser[ií]a|est[aá])"
+            )
             if re.match(description_starts, canonical, re.IGNORECASE):
                 continue
 
             # 5. Ignorar expresiones de diálogo y exclamaciones
-            dialogue_starters = r'^(buenos\s*d[ií]as?|hola|adi[oó]s|gracias|por\s*favor|imposible|claro|vale|bien|no|s[ií]|qu[eé]|c[oó]mo|pero|pasa)'
+            dialogue_starters = r"^(buenos\s*d[ií]as?|hola|adi[oó]s|gracias|por\s*favor|imposible|claro|vale|bien|no|s[ií]|qu[eé]|c[oó]mo|pero|pasa)"
             if re.match(dialogue_starters, canonical, re.IGNORECASE):
                 continue
 
             # 6. Ignorar descripciones físicas
-            physical_desc = r'^(cabello|pelo|ojos|cara|manos|piernas|brazos|pies|cuerpo|barba|bigote)'
+            physical_desc = (
+                r"^(cabello|pelo|ojos|cara|manos|piernas|brazos|pies|cuerpo|barba|bigote)"
+            )
             if re.match(physical_desc, canonical, re.IGNORECASE):
                 continue
 
             # 7. Ignorar frases posesivas
-            possessive_desc = r'^(sus?|mis?|tus?)\s+'
+            possessive_desc = r"^(sus?|mis?|tus?)\s+"
             if re.match(possessive_desc, canonical, re.IGNORECASE):
                 continue
 
             # 8. Ignorar frases de narración
-            narrative_phrases = r'^(algo|todo|nada|alguien|nadie|alguno|ninguno|el\s+otro\s+d[ií]a|fresh\s*test|test|pipeline)'
+            narrative_phrases = r"^(algo|todo|nada|alguien|nadie|alguno|ninguno|el\s+otro\s+d[ií]a|fresh\s*test|test|pipeline)"
             if re.match(narrative_phrases, canonical, re.IGNORECASE):
                 continue
 
             # 9. Ignorar verbos
-            verbs = r'^(hacer|estar|ser|tener|ir|venir|decir|ver|dar|saber|querer|llegar|pasar|deber|poner|parecer|quedar|creer|hablar|seguir|encontrar|sentarse?|tocó?|entró?|miró?|preguntó?|respondió?|dijo)'
+            verbs = r"^(hacer|estar|ser|tener|ir|venir|decir|ver|dar|saber|querer|llegar|pasar|deber|poner|parecer|quedar|creer|hablar|seguir|encontrar|sentarse?|tocó?|entró?|miró?|preguntó?|respondió?|dijo)"
             if re.match(verbs, canonical, re.IGNORECASE):
                 continue
 
             # 10. Ignorar artículos y preposiciones solas
-            common_words = r'^(el|la|los|las|un|una|unos|unas|este|esta|estos|estas|ese|esa|esos|esas|aquel|aquella|aquellos|aquellas|otro|otra|otros|otras|de|del|al|en|con|por|para|sin|sobre|bajo|entre|hacia|desde|hasta)$'
+            common_words = r"^(el|la|los|las|un|una|unos|unas|este|esta|estos|estas|ese|esa|esos|esas|aquel|aquella|aquellos|aquellas|otro|otra|otros|otras|de|del|al|en|con|por|para|sin|sobre|bajo|entre|hacia|desde|hasta)$"
             if re.match(common_words, canonical, re.IGNORECASE):
                 continue
 
             # 11. Ignorar frases que contienen "extraño", "pasando", etc. (fragmentos de oraciones)
-            fragment_patterns = r'(extra[ñn]o|pasando|pasaba|ocurr|sucedi|confund|sorprend)'
+            fragment_patterns = r"(extra[ñn]o|pasando|pasaba|ocurr|sucedi|confund|sorprend)"
             if re.search(fragment_patterns, canonical, re.IGNORECASE):
                 continue
 
             # 12. Ignorar si es solo un artículo + sustantivo común
-            common_nouns = r'^(el|la|los|las|un|una)\s+(hombre|mujer|ni[ñn]o|ni[ñn]a|persona|gente|cosa|casa|puerta|mesa|cocina|cafeter[ií]a|barrio|centro|d[ií]a|semana|ma[ñn]ana|noche|tarde|cambio|aspecto)$'
+            common_nouns = r"^(el|la|los|las|un|una)\s+(hombre|mujer|ni[ñn]o|ni[ñn]a|persona|gente|cosa|casa|puerta|mesa|cocina|cafeter[ií]a|barrio|centro|d[ií]a|semana|ma[ñn]ana|noche|tarde|cambio|aspecto)$"
             if re.match(common_nouns, canonical, re.IGNORECASE):
                 continue
 
@@ -968,12 +991,12 @@ def _run_ner(text: str, project_id: int) -> Result[list[Entity]]:
                 continue
 
             # 14. Ignorar exclamaciones e interjecciones
-            exclamations = r'^(ay|oh|eh|ah|uy|vaya|caramba|diablos|cielos|dios)$'
+            exclamations = r"^(ay|oh|eh|ah|uy|vaya|caramba|diablos|cielos|dios)$"
             if re.match(exclamations, canonical, re.IGNORECASE):
                 continue
 
             # 15. Ignorar frases que contienen solo pronombres
-            only_pronouns = r'^([eé]l|ella|ellos|ellas|yo|t[uú]|nosotros|vosotros|usted|ustedes)$'
+            only_pronouns = r"^([eé]l|ella|ellos|ellas|yo|t[uú]|nosotros|vosotros|usted|ustedes)$"
             if re.match(only_pronouns, canonical, re.IGNORECASE):
                 continue
 
@@ -987,7 +1010,9 @@ def _run_ner(text: str, project_id: int) -> Result[list[Entity]]:
             should_add = True
             key_to_replace = None
 
-            for existing_key, (existing_obj, existing_canonical, existing_confidence) in list(unique_entities.items()):
+            for existing_key, (existing_obj, existing_canonical, existing_confidence) in list(
+                unique_entities.items()
+            ):
                 # Si son exactamente iguales (case-insensitive)
                 if canonical_lower == existing_key:
                     # Mantener el de mayor confianza
@@ -1002,7 +1027,9 @@ def _run_ner(text: str, project_id: int) -> Result[list[Entity]]:
                 if existing_key in canonical_lower and existing_obj.label == entity_obj.label:
                     # El nuevo es más completo, reemplazar
                     key_to_replace = existing_key
-                    logger.debug(f"Replacing '{existing_canonical}' with more complete '{canonical}'")
+                    logger.debug(
+                        f"Replacing '{existing_canonical}' with more complete '{canonical}'"
+                    )
                     break
 
                 # Si el existente contiene al nuevo (ej: "María Sánchez" ya existe, viene "María")
@@ -1010,7 +1037,9 @@ def _run_ner(text: str, project_id: int) -> Result[list[Entity]]:
                 if canonical_lower in existing_key and existing_obj.label == entity_obj.label:
                     # El existente es más completo, no agregar
                     should_add = False
-                    logger.debug(f"Skipping '{canonical}' - already have more complete '{existing_canonical}'")
+                    logger.debug(
+                        f"Skipping '{canonical}' - already have more complete '{existing_canonical}'"
+                    )
                     break
 
             if key_to_replace:
@@ -1063,7 +1092,9 @@ def _run_ner(text: str, project_id: int) -> Result[list[Entity]]:
             except Exception as e:
                 logger.error(f"Exception persisting entity '{canonical_clean}': {e}")
 
-        logger.info(f"Persisted {len(persisted_entities)} unique entities from {len(entities_data)} extracted mentions")
+        logger.info(
+            f"Persisted {len(persisted_entities)} unique entities from {len(entities_data)} extracted mentions"
+        )
         return Result.success(persisted_entities)
 
     except Exception as e:
@@ -1117,11 +1148,11 @@ def _run_entity_fusion(project_id: int, session_id: int) -> Result[int]:
 
                 if merge_result.is_success:
                     merged_count += 1
-                    logger.info(f"Successfully merged into entity ID: {merge_result.value.result_entity_id}")
-                else:
-                    logger.warning(
-                        f"Failed to merge '{name1}' + '{name2}': {merge_result.error}"
+                    logger.info(
+                        f"Successfully merged into entity ID: {merge_result.value.result_entity_id}"
                     )
+                else:
+                    logger.warning(f"Failed to merge '{name1}' + '{name2}': {merge_result.error}")
 
         return Result.success(merged_count)
 
@@ -1146,15 +1177,21 @@ def _convert_sections_to_info(sections: list) -> list["SectionInfo"]:
     """
     result = []
     for s in sections:
-        subsections = _convert_sections_to_info(s.subsections) if hasattr(s, 'subsections') and s.subsections else []
-        result.append(SectionInfo(
-            number=s.number,
-            title=s.title,
-            heading_level=s.heading_level,
-            start_char=s.start_char,
-            end_char=s.end_char,
-            subsections=subsections
-        ))
+        subsections = (
+            _convert_sections_to_info(s.subsections)
+            if hasattr(s, "subsections") and s.subsections
+            else []
+        )
+        result.append(
+            SectionInfo(
+                number=s.number,
+                title=s.title,
+                heading_level=s.heading_level,
+                start_char=s.start_char,
+                end_char=s.end_char,
+                subsections=subsections,
+            )
+        )
     return result
 
 
@@ -1171,8 +1208,9 @@ def _persist_chapters(chapters: list["ChapterInfo"], project_id: int) -> Result[
     """
     try:
         from ..persistence.chapter import (
-            ChapterRepository, ChapterData,
-            SectionRepository, SectionData
+            ChapterData,
+            ChapterRepository,
+            SectionRepository,
         )
 
         chapter_repo = ChapterRepository()
@@ -1193,7 +1231,7 @@ def _persist_chapters(chapters: list["ChapterInfo"], project_id: int) -> Result[
                 start_char=ch.start_char,
                 end_char=ch.end_char,
                 word_count=ch.word_count,
-                structure_type=ch.structure_type
+                structure_type=ch.structure_type,
             )
             for ch in chapters
         ]
@@ -1211,13 +1249,14 @@ def _persist_chapters(chapters: list["ChapterInfo"], project_id: int) -> Result[
                 )
                 total_sections += sections_created
 
-        logger.info(f"Persisted {len(created_chapters)} chapters and {total_sections} sections for project {project_id}")
+        logger.info(
+            f"Persisted {len(created_chapters)} chapters and {total_sections} sections for project {project_id}"
+        )
         return Result.success(len(created_chapters))
 
     except Exception as e:
         error = NarrativeError(
-            message=f"Error persisting chapters: {e}",
-            severity=ErrorSeverity.RECOVERABLE
+            message=f"Error persisting chapters: {e}", severity=ErrorSeverity.RECOVERABLE
         )
         logger.exception("Error persisting chapters")
         return Result.failure(error)
@@ -1227,8 +1266,8 @@ def _persist_sections_recursive(
     sections: list["SectionInfo"],
     project_id: int,
     chapter_id: int,
-    parent_section_id: Optional[int],
-    section_repo: "SectionRepository"
+    parent_section_id: int | None,
+    section_repo: "SectionRepository",
 ) -> int:
     """
     Persiste secciones recursivamente (incluyendo subsecciones).
@@ -1256,7 +1295,7 @@ def _persist_sections_recursive(
             title=s.title,
             heading_level=s.heading_level,
             start_char=s.start_char,
-            end_char=s.end_char
+            end_char=s.end_char,
         )
         created = section_repo.create(section_data)
         count += 1
@@ -1273,8 +1312,8 @@ def _persist_sections_recursive(
 def _run_attribute_extraction(
     text: str,
     entities: list[Entity],
-    config: Optional[PipelineConfig] = None,
-    chapters: Optional[list[ChapterInfo]] = None,
+    config: PipelineConfig | None = None,
+    chapters: list[ChapterInfo] | None = None,
 ) -> Result[list[Any]]:
     """
     Extrae atributos de las entidades.
@@ -1304,7 +1343,7 @@ def _run_hybrid_attribute_extraction(
     text: str,
     entities: list[Entity],
     config: PipelineConfig,
-    chapters: Optional[list[ChapterInfo]] = None,
+    chapters: list[ChapterInfo] | None = None,
 ) -> Result[list[Any]]:
     """
     Extrae atributos usando el pipeline híbrido.
@@ -1401,20 +1440,17 @@ def _run_legacy_attribute_extraction(text: str, entities: list[Entity]) -> Resul
     """
     try:
         import re
+
         extractor = AttributeExtractor()
 
         # Encontrar todas las menciones de cada entidad en el texto
         entity_mentions = []
 
         for entity in entities:
-            pattern = r'\b' + re.escape(entity.canonical_name) + r'\b'
+            pattern = r"\b" + re.escape(entity.canonical_name) + r"\b"
 
             for match in re.finditer(pattern, text, re.IGNORECASE):
-                entity_mentions.append((
-                    entity.canonical_name,
-                    match.start(),
-                    match.end()
-                ))
+                entity_mentions.append((entity.canonical_name, match.start(), match.end()))
 
         logger.debug(f"Found {len(entity_mentions)} entity mentions for attribute extraction")
 
@@ -1467,9 +1503,13 @@ def _convert_to_legacy_format(
 
         # Determinar categoría basándose en el tipo
         if attr.attribute_type in {
-            AttributeType.EYE_COLOR, AttributeType.HAIR_COLOR,
-            AttributeType.HAIR_TYPE, AttributeType.HEIGHT,
-            AttributeType.BUILD, AttributeType.AGE, AttributeType.SKIN,
+            AttributeType.EYE_COLOR,
+            AttributeType.HAIR_COLOR,
+            AttributeType.HAIR_TYPE,
+            AttributeType.HEIGHT,
+            AttributeType.BUILD,
+            AttributeType.AGE,
+            AttributeType.SKIN,
             AttributeType.DISTINCTIVE_FEATURE,
         }:
             category = LegacyAttributeCategory.PHYSICAL
@@ -1536,19 +1576,23 @@ def _persist_attributes(
             entity_id = entity_map.get(entity_name_lower)
 
             if not entity_id:
-                logger.warning(f"Entity not found for attribute: {attr.entity_name} -> {attr.key}={attr.value}")
+                logger.warning(
+                    f"Entity not found for attribute: {attr.entity_name} -> {attr.key}={attr.value}"
+                )
                 continue
 
             # Mapear category a attribute_type
-            attribute_type = str(attr.category.value) if hasattr(attr.category, 'value') else str(attr.category)
+            attribute_type = (
+                str(attr.category.value) if hasattr(attr.category, "value") else str(attr.category)
+            )
 
             # Mapear key
-            attribute_key = str(attr.key.value) if hasattr(attr.key, 'value') else str(attr.key)
+            attribute_key = str(attr.key.value) if hasattr(attr.key, "value") else str(attr.key)
 
             # Buscar mention_id si el atributo tiene posición de caracteres
             source_mention_id = None
-            if hasattr(attr, 'start_char') and hasattr(attr, 'end_char') and attr.start_char > 0:
-                chapter_id = getattr(attr, 'chapter_id', None)
+            if hasattr(attr, "start_char") and hasattr(attr, "end_char") and attr.start_char > 0:
+                chapter_id = getattr(attr, "chapter_id", None)
                 mention = entity_repo.find_mention_by_position(
                     entity_id=entity_id,
                     start_char=attr.start_char,
@@ -1570,7 +1614,9 @@ def _persist_attributes(
                 )
                 persisted_count += 1
             except Exception as e:
-                logger.error(f"Failed to persist attribute {attribute_key}={attr.value} for entity {entity_id}: {e}")
+                logger.error(
+                    f"Failed to persist attribute {attribute_key}={attr.value} for entity {entity_id}: {e}"
+                )
 
         logger.info(f"Persisted {persisted_count} attributes from {len(attributes)} extracted")
         return Result.success(persisted_count)
@@ -1598,7 +1644,7 @@ def _reload_attributes_from_db(project_id: int) -> Result[list[Any]]:
         Result con lista de ExtractedAttribute reconstruidos
     """
     try:
-        from ..nlp.attributes import ExtractedAttribute, AttributeKey, AttributeCategory
+        from ..nlp.attributes import AttributeCategory, AttributeKey, ExtractedAttribute
 
         entity_repo = get_entity_repository()
 
@@ -1650,10 +1696,7 @@ def _run_consistency_analysis(
 ) -> Result[list[AttributeInconsistency]]:
     """Analiza consistencia de atributos."""
     try:
-        checker = AttributeConsistencyChecker(
-            use_embeddings=True,
-            min_confidence=0.5
-        )
+        checker = AttributeConsistencyChecker(use_embeddings=True, min_confidence=0.5)
         result = checker.check_consistency(attributes)
         return result
 
@@ -1682,7 +1725,9 @@ def _create_alerts_from_inconsistencies(
 
         logger.info(f"Processing {len(inconsistencies)} inconsistencies for alerts...")
         for incon in inconsistencies:
-            logger.debug(f"Processing inconsistency: {incon.entity_name}.{incon.attribute_key.value} = {incon.value1} vs {incon.value2}, confidence={incon.confidence}")
+            logger.debug(
+                f"Processing inconsistency: {incon.entity_name}.{incon.attribute_key.value} = {incon.value1} vs {incon.value2}, confidence={incon.confidence}"
+            )
 
             # Filtrar por confianza mínima
             if incon.confidence < min_confidence:
@@ -1706,9 +1751,7 @@ def _create_alerts_from_inconsistencies(
                     entity_id = found_entities[0].id
                     logger.debug(f"Found entity_id={entity_id} for '{incon.entity_name}'")
                 else:
-                    logger.warning(
-                        f"Entity not found: {incon.entity_name}, skipping alert"
-                    )
+                    logger.warning(f"Entity not found: {incon.entity_name}, skipping alert")
                     continue
 
             # Construir fuentes con información de ubicación
@@ -1739,7 +1782,7 @@ def _create_alerts_from_inconsistencies(
 
             if alert_result.is_success:
                 alerts.append(alert_result.value)
-                logger.debug(f"  -> Alert created successfully")
+                logger.debug("  -> Alert created successfully")
             else:
                 logger.warning(f"Failed to create alert: {alert_result.error}")
 
@@ -1815,12 +1858,14 @@ def _run_temporal_analysis(
         inconsistencies = checker.check(timeline, all_markers, character_ages)
         logger.info(f"Found {len(inconsistencies)} temporal inconsistencies")
 
-        return Result.success({
-            "timeline": timeline,
-            "markers": all_markers,
-            "markers_count": len(all_markers),
-            "inconsistencies": inconsistencies,
-        })
+        return Result.success(
+            {
+                "timeline": timeline,
+                "markers": all_markers,
+                "markers_count": len(all_markers),
+                "inconsistencies": inconsistencies,
+            }
+        )
 
     except Exception as e:
         error = NarrativeError(
@@ -1846,9 +1891,9 @@ def _persist_timeline(
     """
     try:
         from ..persistence.timeline import (
-            TimelineRepository,
-            TimelineEventData,
             TemporalMarkerData,
+            TimelineEventData,
+            TimelineRepository,
         )
 
         repo = TimelineRepository()
@@ -1861,41 +1906,55 @@ def _persist_timeline(
             if event.story_date:
                 story_date_str = event.story_date.isoformat()
 
-            events_data.append(TimelineEventData(
-                id=None,
-                project_id=project_id,
-                event_id=event.id,
-                chapter=event.chapter,
-                paragraph=event.paragraph,
-                description=event.description,
-                story_date=story_date_str,
-                story_date_resolution=event.story_date_resolution.value if event.story_date_resolution else "UNKNOWN",
-                narrative_order=event.narrative_order.value if event.narrative_order else "CHRONOLOGICAL",
-                discourse_position=event.discourse_position,
-                confidence=event.confidence,
-            ))
+            events_data.append(
+                TimelineEventData(
+                    id=None,
+                    project_id=project_id,
+                    event_id=event.id,
+                    chapter=event.chapter,
+                    paragraph=event.paragraph,
+                    description=event.description,
+                    story_date=story_date_str,
+                    story_date_resolution=event.story_date_resolution.value
+                    if event.story_date_resolution
+                    else "UNKNOWN",
+                    narrative_order=event.narrative_order.value
+                    if event.narrative_order
+                    else "CHRONOLOGICAL",
+                    discourse_position=event.discourse_position,
+                    confidence=event.confidence,
+                )
+            )
 
         # Convertir marcadores a TemporalMarkerData
         markers_data = []
         for marker in markers:
-            markers_data.append(TemporalMarkerData(
-                id=None,
-                project_id=project_id,
-                chapter=marker.chapter,
-                marker_type=marker.marker_type.value if hasattr(marker.marker_type, 'value') else str(marker.marker_type),
-                text=marker.text,
-                start_char=marker.start_char,
-                end_char=marker.end_char,
-                confidence=marker.confidence,
-                year=marker.year,
-                month=marker.month,
-                day=marker.day,
-                direction=marker.direction.value if hasattr(marker, 'direction') and marker.direction and hasattr(marker.direction, 'value') else getattr(marker, 'direction', None),
-                quantity=getattr(marker, 'quantity', None),
-                magnitude=getattr(marker, 'magnitude', None),
-                age=getattr(marker, 'age', None),
-                entity_id=getattr(marker, 'entity_id', None),
-            ))
+            markers_data.append(
+                TemporalMarkerData(
+                    id=None,
+                    project_id=project_id,
+                    chapter=marker.chapter,
+                    marker_type=marker.marker_type.value
+                    if hasattr(marker.marker_type, "value")
+                    else str(marker.marker_type),
+                    text=marker.text,
+                    start_char=marker.start_char,
+                    end_char=marker.end_char,
+                    confidence=marker.confidence,
+                    year=marker.year,
+                    month=marker.month,
+                    day=marker.day,
+                    direction=marker.direction.value
+                    if hasattr(marker, "direction")
+                    and marker.direction
+                    and hasattr(marker.direction, "value")
+                    else getattr(marker, "direction", None),
+                    quantity=getattr(marker, "quantity", None),
+                    magnitude=getattr(marker, "magnitude", None),
+                    age=getattr(marker, "age", None),
+                    entity_id=getattr(marker, "entity_id", None),
+                )
+            )
 
         # Guardar en base de datos
         repo.save_events(project_id, events_data)
@@ -1952,8 +2011,7 @@ def _create_alerts_from_temporal_inconsistencies(
         for incon in inconsistencies:
             severity = severity_map.get(incon.severity.value, AlertSeverity.INFO)
             category = category_map.get(
-                incon.inconsistency_type.value,
-                AlertCategory.TIMELINE_ISSUE
+                incon.inconsistency_type.value, AlertCategory.TIMELINE_ISSUE
             )
 
             # Construir título descriptivo
@@ -2028,12 +2086,14 @@ def _run_voice_analysis(
         for chapter in chapters:
             # Extraer diálogos del contenido del capítulo
             dialogues = _extract_dialogues_from_chapter(chapter, entities_dict)
-            chapters_dict.append({
-                "number": chapter.number,
-                "title": chapter.title,
-                "content": chapter.content,
-                "dialogues": dialogues,
-            })
+            chapters_dict.append(
+                {
+                    "number": chapter.number,
+                    "title": chapter.title,
+                    "content": chapter.content,
+                    "dialogues": dialogues,
+                }
+            )
 
         # Construir perfiles de voz
         builder = VoiceProfileBuilder(min_interventions=3)
@@ -2048,14 +2108,15 @@ def _run_voice_analysis(
         deviations = detector.detect_deviations(profiles, dialogues_all)
 
         logger.info(
-            f"Voice analysis complete: {len(profiles)} profiles, "
-            f"{len(deviations)} deviations"
+            f"Voice analysis complete: {len(profiles)} profiles, {len(deviations)} deviations"
         )
 
-        return Result.success({
-            "profiles": profiles,
-            "deviations": deviations,
-        })
+        return Result.success(
+            {
+                "profiles": profiles,
+                "deviations": deviations,
+            }
+        )
 
     except Exception as e:
         error = NarrativeError(
@@ -2102,13 +2163,12 @@ def _extract_dialogues_from_chapter(
 
     # Patrones de diálogo en español
     # 1. Guión largo (—) o guión medio (–)
-    dialogue_pattern_dash = r'[—–]\s*([^—–\n]+?)(?=[—–\n]|$)'
+    dialogue_pattern_dash = r"[—–]\s*([^—–\n]+?)(?=[—–\n]|$)"
     # 2. Comillas tipográficas «»
-    dialogue_pattern_guillemets = r'«([^»]+)»'
+    dialogue_pattern_guillemets = r"«([^»]+)»"
     # 3. Comillas dobles
     dialogue_pattern_quotes = r'"([^"]+)"'
 
-    position = 0
     all_matches = []
 
     # Buscar con todos los patrones
@@ -2139,12 +2199,14 @@ def _extract_dialogues_from_chapter(
                     speaker_id = char_id
 
         if speaker_id:
-            dialogues.append({
-                "text": dialogue_text,
-                "speaker_id": speaker_id,
-                "chapter": chapter.number,
-                "position": chapter.start_char + pos,
-            })
+            dialogues.append(
+                {
+                    "text": dialogue_text,
+                    "speaker_id": speaker_id,
+                    "chapter": chapter.number,
+                    "position": chapter.start_char + pos,
+                }
+            )
 
     return dialogues
 
@@ -2164,7 +2226,7 @@ def _create_alerts_from_voice_deviations(
         Result con lista de alertas creadas
     """
     from ..alerts.repository import get_alert_repository
-    from ..voice.deviations import DeviationSeverity, DeviationType
+    from ..voice.deviations import DeviationType
 
     try:
         alert_repo = get_alert_repository()
@@ -2189,8 +2251,7 @@ def _create_alerts_from_voice_deviations(
         for deviation in deviations:
             severity = severity_map.get(deviation.severity.value, AlertSeverity.INFO)
             category = category_map.get(
-                deviation.deviation_type.value,
-                AlertCategory.CHARACTER_CONSISTENCY
+                deviation.deviation_type.value, AlertCategory.CHARACTER_CONSISTENCY
             )
 
             # Construir título descriptivo
@@ -2200,8 +2261,10 @@ def _create_alerts_from_voice_deviations(
             description = deviation.description
             if deviation.text:
                 # Truncar texto si es muy largo
-                text_preview = deviation.text[:150] + "..." if len(deviation.text) > 150 else deviation.text
-                description += f"\n\nTexto: \"{text_preview}\""
+                text_preview = (
+                    deviation.text[:150] + "..." if len(deviation.text) > 150 else deviation.text
+                )
+                description += f'\n\nTexto: "{text_preview}"'
 
             # Crear alerta en la base de datos
             alert_id = alert_repo.create_alert(
@@ -2264,10 +2327,12 @@ def _run_focalization_analysis(
 
         if not declarations:
             logger.info("No focalization declarations found, skipping analysis")
-            return Result.success({
-                "declarations": [],
-                "violations": [],
-            })
+            return Result.success(
+                {
+                    "declarations": [],
+                    "violations": [],
+                }
+            )
 
         # Convertir entidades a formato compatible
         entity_list = []
@@ -2281,9 +2346,7 @@ def _run_focalization_analysis(
         all_violations = []
         for chapter in chapters:
             violations = detector.detect_violations(
-                project_id=project_id,
-                text=chapter.content,
-                chapter=chapter.number
+                project_id=project_id, text=chapter.content, chapter=chapter.number
             )
             all_violations.extend(violations)
 
@@ -2292,10 +2355,12 @@ def _run_focalization_analysis(
             f"{len(all_violations)} violations"
         )
 
-        return Result.success({
-            "declarations": declarations,
-            "violations": all_violations,
-        })
+        return Result.success(
+            {
+                "declarations": declarations,
+                "violations": all_violations,
+            }
+        )
 
     except Exception as e:
         error = NarrativeError(
@@ -2321,7 +2386,6 @@ def _create_alerts_from_focalization_violations(
         Result con lista de alertas creadas
     """
     from ..alerts.repository import get_alert_repository
-    from ..focalization.violations import ViolationType, ViolationSeverity
 
     try:
         alert_repo = get_alert_repository()
@@ -2349,8 +2413,12 @@ def _create_alerts_from_focalization_violations(
             if violation.suggestion:
                 description += f"\n\nSugerencia: {violation.suggestion}"
             if violation.text_excerpt:
-                excerpt = violation.text_excerpt[:150] + "..." if len(violation.text_excerpt) > 150 else violation.text_excerpt
-                description += f"\n\nTexto: \"{excerpt}\""
+                excerpt = (
+                    violation.text_excerpt[:150] + "..."
+                    if len(violation.text_excerpt) > 150
+                    else violation.text_excerpt
+                )
+                description += f'\n\nTexto: "{excerpt}"'
 
             # Crear alerta
             alert_id = alert_repo.create_alert(
@@ -2421,9 +2489,7 @@ def _run_emotional_analysis(
                 # Extraer diálogos del capítulo
                 dialogue_result = detect_dialogues(chapter.content)
                 if dialogue_result.is_failure:
-                    logger.warning(
-                        f"Could not extract dialogues from chapter {chapter.number}"
-                    )
+                    logger.warning(f"Could not extract dialogues from chapter {chapter.number}")
                     dialogues_data = []
                 else:
                     # Convertir DialogueSpan a formato esperado por analyze_chapter
@@ -2509,16 +2575,14 @@ def _create_alerts_from_emotional_incoherences(
             if incoherence.confidence >= 0.8:
                 severity = AlertSeverity.WARNING
             elif incoherence.confidence >= 0.6:
-                severity = severity_map.get(
-                    incoherence.incoherence_type, AlertSeverity.INFO
-                )
+                severity = severity_map.get(incoherence.incoherence_type, AlertSeverity.INFO)
             else:
                 severity = AlertSeverity.HINT
 
             # Construir título descriptivo
             title = type_labels.get(
                 incoherence.incoherence_type,
-                f"Incoherencia emocional: {incoherence.incoherence_type.value}"
+                f"Incoherencia emocional: {incoherence.incoherence_type.value}",
             )
             if incoherence.entity_name:
                 title = f"{incoherence.entity_name}: {title}"
@@ -2538,7 +2602,7 @@ def _create_alerts_from_emotional_incoherences(
                     if len(incoherence.behavior_text) > 150
                     else incoherence.behavior_text
                 )
-                description += f"\n\nTexto: \"{excerpt}\""
+                description += f'\n\nTexto: "{excerpt}"'
 
             if incoherence.suggestion:
                 description += f"\n\nSugerencia: {incoherence.suggestion}"
@@ -2547,6 +2611,7 @@ def _create_alerts_from_emotional_incoherences(
             entity_id = None
             if incoherence.entity_name:
                 from ..entities.repository import get_entity_repository
+
                 entity_repo = get_entity_repository()
                 entity = entity_repo.find_by_name(project_id, incoherence.entity_name)
                 if entity:

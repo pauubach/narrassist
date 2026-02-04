@@ -16,75 +16,79 @@ Fuentes de información:
 
 import logging
 import re
+from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Optional
-from collections import defaultdict
 
 logger = logging.getLogger(__name__)
 
 
 class MentionType(Enum):
     """Tipo de mención de una entidad sobre otra."""
-    DIALOGUE = "dialogue"           # En diálogo directo
-    THOUGHT = "thought"             # Pensamiento/monólogo interno
-    NARRATION = "narration"         # Narración describe que A piensa en B
-    ACTION = "action"               # Acción que implica conocimiento
+
+    DIALOGUE = "dialogue"  # En diálogo directo
+    THOUGHT = "thought"  # Pensamiento/monólogo interno
+    NARRATION = "narration"  # Narración describe que A piensa en B
+    ACTION = "action"  # Acción que implica conocimiento
 
 
 class KnowledgeType(Enum):
     """Tipo de conocimiento que A tiene sobre B."""
-    EXISTENCE = "existence"         # Sabe que existe
-    IDENTITY = "identity"           # Sabe quién es (nombre, rol)
-    ATTRIBUTE = "attribute"         # Conoce atributo (físico, psicológico)
-    LOCATION = "location"           # Sabe dónde está
-    RELATIONSHIP = "relationship"   # Sabe relación con tercero
-    SECRET = "secret"               # Conoce un secreto
-    HISTORY = "history"             # Conoce su pasado
-    INTENTION = "intention"         # Conoce intenciones de B
+
+    EXISTENCE = "existence"  # Sabe que existe
+    IDENTITY = "identity"  # Sabe quién es (nombre, rol)
+    ATTRIBUTE = "attribute"  # Conoce atributo (físico, psicológico)
+    LOCATION = "location"  # Sabe dónde está
+    RELATIONSHIP = "relationship"  # Sabe relación con tercero
+    SECRET = "secret"  # Conoce un secreto
+    HISTORY = "history"  # Conoce su pasado
+    INTENTION = "intention"  # Conoce intenciones de B
 
 
 class OpinionValence(Enum):
     """Valencia de la opinión."""
+
     VERY_NEGATIVE = -2
     NEGATIVE = -1
     NEUTRAL = 0
     POSITIVE = 1
     VERY_POSITIVE = 2
-    AMBIVALENT = 3      # Sentimientos mezclados
+    AMBIVALENT = 3  # Sentimientos mezclados
     UNKNOWN = 4
 
 
 class IntentionType(Enum):
     """Tipo de intención de A respecto a B."""
+
     # Positivas
-    HELP = "help"                   # Quiere ayudar
-    PROTECT = "protect"             # Quiere proteger
-    BEFRIEND = "befriend"           # Quiere ser amigo
-    LOVE = "love"                   # Quiere relación romántica
-    COLLABORATE = "collaborate"     # Quiere colaborar
+    HELP = "help"  # Quiere ayudar
+    PROTECT = "protect"  # Quiere proteger
+    BEFRIEND = "befriend"  # Quiere ser amigo
+    LOVE = "love"  # Quiere relación romántica
+    COLLABORATE = "collaborate"  # Quiere colaborar
 
     # Negativas
-    HARM = "harm"                   # Quiere dañar
-    DECEIVE = "deceive"             # Quiere engañar
-    AVOID = "avoid"                 # Quiere evitar
-    COMPETE = "compete"             # Quiere competir/vencer
-    REVENGE = "revenge"             # Quiere vengarse
+    HARM = "harm"  # Quiere dañar
+    DECEIVE = "deceive"  # Quiere engañar
+    AVOID = "avoid"  # Quiere evitar
+    COMPETE = "compete"  # Quiere competir/vencer
+    REVENGE = "revenge"  # Quiere vengarse
 
     # Neutras/Transaccionales
-    OBTAIN = "obtain"               # Quiere obtener algo (objeto)
-    LEARN = "learn"                 # Quiere aprender/saber
-    USE = "use"                     # Quiere usar (objeto/persona)
-    FIND = "find"                   # Quiere encontrar
+    OBTAIN = "obtain"  # Quiere obtener algo (objeto)
+    LEARN = "learn"  # Quiere aprender/saber
+    USE = "use"  # Quiere usar (objeto/persona)
+    FIND = "find"  # Quiere encontrar
     UNKNOWN = "unknown"
 
 
 class KnowledgeExtractionMode(Enum):
     """Modo de extracción de conocimiento."""
-    RULES = "rules"      # Patrones regex + spaCy dependency (rápido, ~70% precisión)
-    LLM = "llm"          # Ollama local (lento, ~90% precisión)
-    HYBRID = "hybrid"    # Rules primero, LLM para casos ambiguos
+
+    RULES = "rules"  # Patrones regex + spaCy dependency (rápido, ~70% precisión)
+    LLM = "llm"  # Ollama local (lento, ~90% precisión)
+    HYBRID = "hybrid"  # Rules primero, LLM para casos ambiguos
 
 
 @dataclass
@@ -95,34 +99,35 @@ class DirectedMention:
     Captura el contexto donde un personaje habla, piensa o
     actúa en relación a otra entidad.
     """
-    id: Optional[int] = None
+
+    id: int | None = None
     project_id: int = 0
 
     # Quién menciona a quién
-    source_entity_id: int = 0       # A (quien menciona)
-    target_entity_id: int = 0       # B (mencionado)
+    source_entity_id: int = 0  # A (quien menciona)
+    target_entity_id: int = 0  # B (mencionado)
     source_name: str = ""
     target_name: str = ""
 
     # Tipo y contexto
     mention_type: MentionType = MentionType.NARRATION
     chapter: int = 0
-    scene: Optional[int] = None
+    scene: int | None = None
 
     # Ubicación en texto
     start_char: int = 0
     end_char: int = 0
 
     # Contenido
-    text_excerpt: str = ""          # Extracto del texto
-    speaker_text: str = ""          # Lo que dice/piensa A (si aplica)
+    text_excerpt: str = ""  # Extracto del texto
+    speaker_text: str = ""  # Lo que dice/piensa A (si aplica)
 
     # Análisis
-    sentiment_score: float = 0.0    # -1.0 a 1.0
+    sentiment_score: float = 0.0  # -1.0 a 1.0
     confidence: float = 0.5
 
     # Metadatos
-    created_at: Optional[datetime] = None
+    created_at: datetime | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -147,32 +152,33 @@ class KnowledgeFact:
     Representa un pedazo de información que un personaje
     tiene sobre otra entidad.
     """
-    id: Optional[int] = None
+
+    id: int | None = None
     project_id: int = 0
 
     # Quién sabe qué de quién
-    knower_entity_id: int = 0       # A (quien sabe)
-    known_entity_id: int = 0        # B (sobre quien se sabe)
+    knower_entity_id: int = 0  # A (quien sabe)
+    known_entity_id: int = 0  # B (sobre quien se sabe)
     knower_name: str = ""
     known_name: str = ""
 
     # El conocimiento
     knowledge_type: KnowledgeType = KnowledgeType.EXISTENCE
-    fact_description: str = ""      # Descripción del hecho
-    fact_value: str = ""            # Valor específico (ej: "ojos azules")
+    fact_description: str = ""  # Descripción del hecho
+    fact_value: str = ""  # Valor específico (ej: "ojos azules")
 
     # Cómo lo supo
-    source_chapter: int = 0         # Capítulo donde lo aprendió
-    source_mention_id: Optional[int] = None  # Mención donde se evidencia
-    learned_how: str = ""           # "told", "observed", "deduced", "overheard"
+    source_chapter: int = 0  # Capítulo donde lo aprendió
+    source_mention_id: int | None = None  # Mención donde se evidencia
+    learned_how: str = ""  # "told", "observed", "deduced", "overheard"
 
     # Veracidad
-    is_accurate: Optional[bool] = None  # True si el conocimiento es correcto
-    actual_value: Optional[str] = None  # Valor real (si difiere)
+    is_accurate: bool | None = None  # True si el conocimiento es correcto
+    actual_value: str | None = None  # Valor real (si difiere)
 
     # Metadatos
     confidence: float = 0.5
-    created_at: Optional[datetime] = None
+    created_at: datetime | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -198,18 +204,19 @@ class Opinion:
     Representa la valoración emocional/evaluativa de un personaje
     sobre otra entidad.
     """
-    id: Optional[int] = None
+
+    id: int | None = None
     project_id: int = 0
 
     # Quién opina de quién
-    holder_entity_id: int = 0       # A (quien opina)
-    target_entity_id: int = 0       # B (sobre quien se opina)
+    holder_entity_id: int = 0  # A (quien opina)
+    target_entity_id: int = 0  # B (sobre quien se opina)
     holder_name: str = ""
     target_name: str = ""
 
     # La opinión
     valence: OpinionValence = OpinionValence.UNKNOWN
-    opinion_summary: str = ""       # Resumen de la opinión
+    opinion_summary: str = ""  # Resumen de la opinión
     opinion_aspects: list[str] = field(default_factory=list)  # Aspectos específicos
 
     # Evidencia
@@ -217,12 +224,12 @@ class Opinion:
     evidence_excerpts: list[str] = field(default_factory=list)
 
     # Evolución
-    initial_valence: Optional[OpinionValence] = None  # Opinión inicial
-    changed_at_chapter: Optional[int] = None  # Cuándo cambió
+    initial_valence: OpinionValence | None = None  # Opinión inicial
+    changed_at_chapter: int | None = None  # Cuándo cambió
 
     # Metadatos
     confidence: float = 0.5
-    created_at: Optional[datetime] = None
+    created_at: datetime | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -231,7 +238,9 @@ class Opinion:
             "target_entity_id": self.target_entity_id,
             "holder_name": self.holder_name,
             "target_name": self.target_name,
-            "valence": self.valence.value if isinstance(self.valence, OpinionValence) else self.valence,
+            "valence": self.valence.value
+            if isinstance(self.valence, OpinionValence)
+            else self.valence,
             "opinion_summary": self.opinion_summary,
             "opinion_aspects": self.opinion_aspects,
             "evidence_chapters": self.evidence_chapters,
@@ -247,36 +256,37 @@ class Intention:
     Representa lo que un personaje quiere hacer/conseguir
     respecto a otra entidad.
     """
-    id: Optional[int] = None
+
+    id: int | None = None
     project_id: int = 0
 
     # Quién quiere qué respecto a quién
-    agent_entity_id: int = 0        # A (quien tiene la intención)
-    target_entity_id: int = 0       # B (objetivo de la intención)
+    agent_entity_id: int = 0  # A (quien tiene la intención)
+    target_entity_id: int = 0  # B (objetivo de la intención)
     agent_name: str = ""
     target_name: str = ""
 
     # La intención
     intention_type: IntentionType = IntentionType.UNKNOWN
     intention_description: str = ""  # Descripción detallada
-    motivation: str = ""            # Por qué quiere esto
+    motivation: str = ""  # Por qué quiere esto
 
     # Estado
-    is_active: bool = True          # Si la intención sigue vigente
-    is_fulfilled: bool = False      # Si se cumplió
-    is_abandoned: bool = False      # Si se abandonó
+    is_active: bool = True  # Si la intención sigue vigente
+    is_fulfilled: bool = False  # Si se cumplió
+    is_abandoned: bool = False  # Si se abandonó
 
     # Temporalidad
     first_evidence_chapter: int = 0
-    last_evidence_chapter: Optional[int] = None
-    fulfilled_chapter: Optional[int] = None
+    last_evidence_chapter: int | None = None
+    fulfilled_chapter: int | None = None
 
     # Evidencia
     evidence_excerpts: list[str] = field(default_factory=list)
 
     # Metadatos
     confidence: float = 0.5
-    created_at: Optional[datetime] = None
+    created_at: datetime | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -301,6 +311,7 @@ class KnowledgeAsymmetryReport:
 
     Compara qué sabe A de B vs qué sabe B de A.
     """
+
     entity_a_id: int
     entity_b_id: int
     entity_a_name: str
@@ -308,13 +319,13 @@ class KnowledgeAsymmetryReport:
 
     # Conocimiento de A sobre B
     a_knows_about_b: list[KnowledgeFact] = field(default_factory=list)
-    a_opinion_of_b: Optional[Opinion] = None
+    a_opinion_of_b: Opinion | None = None
     a_intentions_toward_b: list[Intention] = field(default_factory=list)
     a_mentions_b_count: int = 0
 
     # Conocimiento de B sobre A
     b_knows_about_a: list[KnowledgeFact] = field(default_factory=list)
-    b_opinion_of_a: Optional[Opinion] = None
+    b_opinion_of_a: Opinion | None = None
     b_intentions_toward_a: list[Intention] = field(default_factory=list)
     b_mentions_a_count: int = 0
 
@@ -384,18 +395,37 @@ class CharacterKnowledgeAnalyzer:
 
     # Verbos que indican intención positiva/negativa
     POSITIVE_INTENTION_VERBS = {
-        "ayudar", "proteger", "salvar", "cuidar", "apoyar",
-        "acompañar", "defender", "rescatar"
+        "ayudar",
+        "proteger",
+        "salvar",
+        "cuidar",
+        "apoyar",
+        "acompañar",
+        "defender",
+        "rescatar",
     }
 
     NEGATIVE_INTENTION_VERBS = {
-        "matar", "destruir", "dañar", "herir", "engañar",
-        "traicionar", "robar", "vengarse", "eliminar"
+        "matar",
+        "destruir",
+        "dañar",
+        "herir",
+        "engañar",
+        "traicionar",
+        "robar",
+        "vengarse",
+        "eliminar",
     }
 
     OBTAIN_VERBS = {
-        "conseguir", "obtener", "comprar", "adquirir", "encontrar",
-        "recuperar", "robar", "tomar"
+        "conseguir",
+        "obtener",
+        "comprar",
+        "adquirir",
+        "encontrar",
+        "recuperar",
+        "robar",
+        "tomar",
     }
 
     def __init__(self, project_id: int = 0, entities: list[dict] = None):
@@ -459,7 +489,7 @@ class CharacterKnowledgeAnalyzer:
                 continue  # No contar auto-referencias
 
             # Buscar mención (case insensitive)
-            pattern = rf'\b{re.escape(name)}\b'
+            pattern = rf"\b{re.escape(name)}\b"
             matches = list(re.finditer(pattern, dialogue_text, re.IGNORECASE))
 
             for match in matches:
@@ -495,7 +525,7 @@ class CharacterKnowledgeAnalyzer:
         text: str,
         chapter: int,
         start_char: int,
-        extraction_mode: Optional[KnowledgeExtractionMode] = None,
+        extraction_mode: KnowledgeExtractionMode | None = None,
     ) -> tuple[list[DirectedMention], list[KnowledgeFact], list[Opinion]]:
         """
         Analiza narración para detectar pensamientos, conocimiento y opiniones.
@@ -519,8 +549,8 @@ class CharacterKnowledgeAnalyzer:
         for pattern in self.THOUGHT_PATTERNS:
             for match in re.finditer(pattern, text, re.IGNORECASE):
                 groups = match.groupdict()
-                source_name = groups.get('name', '').lower()
-                target_name = groups.get('target', '').lower()
+                source_name = groups.get("name", "").lower()
+                target_name = groups.get("target", "").lower()
 
                 source_id = self._name_to_id.get(source_name)
                 target_id = self._name_to_id.get(target_name) if target_name else None
@@ -531,12 +561,14 @@ class CharacterKnowledgeAnalyzer:
                         source_entity_id=source_id,
                         target_entity_id=target_id or 0,
                         source_name=self._entity_names.get(source_id, source_name),
-                        target_name=self._entity_names.get(target_id, target_name) if target_id else "",
+                        target_name=self._entity_names.get(target_id, target_name)
+                        if target_id
+                        else "",
                         mention_type=MentionType.THOUGHT,
                         chapter=chapter,
                         start_char=start_char + match.start(),
                         end_char=start_char + match.end(),
-                        text_excerpt=text[max(0, match.start()-50):match.end()+50],
+                        text_excerpt=text[max(0, match.start() - 50) : match.end() + 50],
                         confidence=0.7,
                         created_at=datetime.now(),
                     )
@@ -547,8 +579,8 @@ class CharacterKnowledgeAnalyzer:
         for pattern in self.OPINION_POSITIVE_PATTERNS:
             for match in re.finditer(pattern, text, re.IGNORECASE):
                 groups = match.groupdict()
-                holder_name = groups.get('name', '').lower()
-                target_name = groups.get('target', '').lower()
+                holder_name = groups.get("name", "").lower()
+                target_name = groups.get("target", "").lower()
 
                 holder_id = self._name_to_id.get(holder_name)
                 target_id = self._name_to_id.get(target_name)
@@ -563,7 +595,7 @@ class CharacterKnowledgeAnalyzer:
                         valence=OpinionValence.POSITIVE,
                         opinion_summary=match.group(0),
                         evidence_chapters=[chapter],
-                        evidence_excerpts=[text[max(0, match.start()-30):match.end()+30]],
+                        evidence_excerpts=[text[max(0, match.start() - 30) : match.end() + 30]],
                         confidence=0.7,
                         created_at=datetime.now(),
                     )
@@ -574,8 +606,8 @@ class CharacterKnowledgeAnalyzer:
         for pattern in self.OPINION_NEGATIVE_PATTERNS:
             for match in re.finditer(pattern, text, re.IGNORECASE):
                 groups = match.groupdict()
-                holder_name = groups.get('name', '').lower()
-                target_name = groups.get('target', '').lower()
+                holder_name = groups.get("name", "").lower()
+                target_name = groups.get("target", "").lower()
 
                 holder_id = self._name_to_id.get(holder_name)
                 target_id = self._name_to_id.get(target_name)
@@ -590,7 +622,7 @@ class CharacterKnowledgeAnalyzer:
                         valence=OpinionValence.NEGATIVE,
                         opinion_summary=match.group(0),
                         evidence_chapters=[chapter],
-                        evidence_excerpts=[text[max(0, match.start()-30):match.end()+30]],
+                        evidence_excerpts=[text[max(0, match.start() - 30) : match.end() + 30]],
                         confidence=0.7,
                         created_at=datetime.now(),
                     )
@@ -613,9 +645,9 @@ class CharacterKnowledgeAnalyzer:
         for pattern in self.INTENTION_PATTERNS:
             for match in re.finditer(pattern, text, re.IGNORECASE):
                 groups = match.groupdict()
-                agent_name = groups.get('name', '').lower()
-                action = groups.get('action', '').lower()
-                target_name = groups.get('target', '').lower()
+                agent_name = groups.get("name", "").lower()
+                action = groups.get("action", "").lower()
+                target_name = groups.get("target", "").lower()
 
                 agent_id = self._name_to_id.get(agent_name)
                 target_id = self._name_to_id.get(target_name)
@@ -637,11 +669,13 @@ class CharacterKnowledgeAnalyzer:
                     agent_entity_id=agent_id,
                     target_entity_id=target_id or 0,
                     agent_name=self._entity_names.get(agent_id, agent_name),
-                    target_name=self._entity_names.get(target_id, target_name) if target_id else target_name,
+                    target_name=self._entity_names.get(target_id, target_name)
+                    if target_id
+                    else target_name,
                     intention_type=intention_type,
                     intention_description=match.group(0),
                     first_evidence_chapter=chapter,
-                    evidence_excerpts=[text[max(0, match.start()-30):match.end()+30]],
+                    evidence_excerpts=[text[max(0, match.start() - 30) : match.end() + 30]],
                     confidence=0.6,
                     created_at=datetime.now(),
                 )
@@ -666,17 +700,57 @@ class CharacterKnowledgeAnalyzer:
         """
         # Palabras positivas y negativas en español
         positive_words = {
-            "bien", "bueno", "buena", "genial", "maravilloso", "excelente",
-            "fantástico", "increíble", "amor", "cariño", "querido", "querida",
-            "gracias", "feliz", "alegre", "hermoso", "hermosa", "bello", "bella",
-            "amigo", "amiga", "confío", "confiar", "admirar", "admiro",
+            "bien",
+            "bueno",
+            "buena",
+            "genial",
+            "maravilloso",
+            "excelente",
+            "fantástico",
+            "increíble",
+            "amor",
+            "cariño",
+            "querido",
+            "querida",
+            "gracias",
+            "feliz",
+            "alegre",
+            "hermoso",
+            "hermosa",
+            "bello",
+            "bella",
+            "amigo",
+            "amiga",
+            "confío",
+            "confiar",
+            "admirar",
+            "admiro",
         }
 
         negative_words = {
-            "mal", "malo", "mala", "terrible", "horrible", "odio", "odiar",
-            "detesto", "detestar", "maldito", "maldita", "inútil", "estúpido",
-            "idiota", "traidor", "traidora", "mentiroso", "mentirosa",
-            "desconfío", "desconfiar", "temo", "temer", "miedo",
+            "mal",
+            "malo",
+            "mala",
+            "terrible",
+            "horrible",
+            "odio",
+            "odiar",
+            "detesto",
+            "detestar",
+            "maldito",
+            "maldita",
+            "inútil",
+            "estúpido",
+            "idiota",
+            "traidor",
+            "traidora",
+            "mentiroso",
+            "mentirosa",
+            "desconfío",
+            "desconfiar",
+            "temo",
+            "temer",
+            "miedo",
         }
 
         # Extraer ventana de texto
@@ -685,7 +759,7 @@ class CharacterKnowledgeAnalyzer:
         context = text[context_start:context_end].lower()
 
         # Contar palabras
-        words = re.findall(r'\b\w+\b', context)
+        words = re.findall(r"\b\w+\b", context)
 
         positive_count = sum(1 for w in words if w in positive_words)
         negative_count = sum(1 for w in words if w in negative_words)
@@ -708,30 +782,59 @@ class CharacterKnowledgeAnalyzer:
         entity_b_name = self._entity_names.get(entity_b_id, str(entity_b_id))
 
         # Filtrar datos relevantes
-        a_mentions_b = [m for m in self._mentions
-                        if m.source_entity_id == entity_a_id and m.target_entity_id == entity_b_id]
-        b_mentions_a = [m for m in self._mentions
-                        if m.source_entity_id == entity_b_id and m.target_entity_id == entity_a_id]
+        a_mentions_b = [
+            m
+            for m in self._mentions
+            if m.source_entity_id == entity_a_id and m.target_entity_id == entity_b_id
+        ]
+        b_mentions_a = [
+            m
+            for m in self._mentions
+            if m.source_entity_id == entity_b_id and m.target_entity_id == entity_a_id
+        ]
 
-        a_knows_b = [k for k in self._knowledge
-                     if k.knower_entity_id == entity_a_id and k.known_entity_id == entity_b_id]
-        b_knows_a = [k for k in self._knowledge
-                     if k.knower_entity_id == entity_b_id and k.known_entity_id == entity_a_id]
+        a_knows_b = [
+            k
+            for k in self._knowledge
+            if k.knower_entity_id == entity_a_id and k.known_entity_id == entity_b_id
+        ]
+        b_knows_a = [
+            k
+            for k in self._knowledge
+            if k.knower_entity_id == entity_b_id and k.known_entity_id == entity_a_id
+        ]
 
-        a_opinion_b = next((o for o in self._opinions
-                            if o.holder_entity_id == entity_a_id and o.target_entity_id == entity_b_id), None)
-        b_opinion_a = next((o for o in self._opinions
-                            if o.holder_entity_id == entity_b_id and o.target_entity_id == entity_a_id), None)
+        a_opinion_b = next(
+            (
+                o
+                for o in self._opinions
+                if o.holder_entity_id == entity_a_id and o.target_entity_id == entity_b_id
+            ),
+            None,
+        )
+        b_opinion_a = next(
+            (
+                o
+                for o in self._opinions
+                if o.holder_entity_id == entity_b_id and o.target_entity_id == entity_a_id
+            ),
+            None,
+        )
 
-        a_intentions_b = [i for i in self._intentions
-                          if i.agent_entity_id == entity_a_id and i.target_entity_id == entity_b_id]
-        b_intentions_a = [i for i in self._intentions
-                          if i.agent_entity_id == entity_b_id and i.target_entity_id == entity_a_id]
+        a_intentions_b = [
+            i
+            for i in self._intentions
+            if i.agent_entity_id == entity_a_id and i.target_entity_id == entity_b_id
+        ]
+        b_intentions_a = [
+            i
+            for i in self._intentions
+            if i.agent_entity_id == entity_b_id and i.target_entity_id == entity_a_id
+        ]
 
         # Calcular scores de asimetría
         knowledge_score = self._calculate_knowledge_asymmetry(
-            len(a_knows_b), len(b_knows_a),
-            len(a_mentions_b), len(b_mentions_a)
+            len(a_knows_b), len(b_knows_a), len(a_mentions_b), len(b_mentions_a)
         )
 
         opinion_score = self._calculate_opinion_asymmetry(a_opinion_b, b_opinion_a)
@@ -748,8 +851,9 @@ class CharacterKnowledgeAnalyzer:
             )
 
         if a_opinion_b and b_opinion_a:
-            if (a_opinion_b.valence.value > 0 and b_opinion_a.valence.value < 0) or \
-               (a_opinion_b.valence.value < 0 and b_opinion_a.valence.value > 0):
+            if (a_opinion_b.valence.value > 0 and b_opinion_a.valence.value < 0) or (
+                a_opinion_b.valence.value < 0 and b_opinion_a.valence.value > 0
+            ):
                 alerts.append(
                     f"Opiniones opuestas: {entity_a_name} y {entity_b_name} "
                     f"tienen opiniones contrarias el uno del otro"
@@ -795,15 +899,23 @@ class CharacterKnowledgeAnalyzer:
 
     def _calculate_opinion_asymmetry(
         self,
-        a_opinion: Optional[Opinion],
-        b_opinion: Optional[Opinion],
+        a_opinion: Opinion | None,
+        b_opinion: Opinion | None,
     ) -> float:
         """Calcula score de asimetría de opinión (-1 a 1)."""
         if not a_opinion and not b_opinion:
             return 0.0
 
-        a_val = a_opinion.valence.value if a_opinion and a_opinion.valence != OpinionValence.UNKNOWN else 0
-        b_val = b_opinion.valence.value if b_opinion and b_opinion.valence != OpinionValence.UNKNOWN else 0
+        a_val = (
+            a_opinion.valence.value
+            if a_opinion and a_opinion.valence != OpinionValence.UNKNOWN
+            else 0
+        )
+        b_val = (
+            b_opinion.valence.value
+            if b_opinion and b_opinion.valence != OpinionValence.UNKNOWN
+            else 0
+        )
 
         # Normalizar a -1 a 1
         return (a_val - b_val) / 4  # Max diferencia es 4 (-2 a 2)
@@ -862,46 +974,79 @@ class CharacterKnowledgeAnalyzer:
     # Patrones para detectar conocimiento de hechos
     KNOWLEDGE_PATTERNS = [
         # REFERENCIA: "A sabía/conocía que B era/tenía X" (ya lo sabía)
-        (r"(?P<knower>\w+)\s+(?:sabía|conocía)\s+(?:de\s+)?que\s+(?P<known>\w+)\s+(?:era|tenía|estaba|había)\s+(?P<fact>.+?)(?:\.|,|;|$)",
-         KnowledgeType.ATTRIBUTE, "knew"),
+        (
+            r"(?P<knower>\w+)\s+(?:sabía|conocía)\s+(?:de\s+)?que\s+(?P<known>\w+)\s+(?:era|tenía|estaba|había)\s+(?P<fact>.+?)(?:\.|,|;|$)",
+            KnowledgeType.ATTRIBUTE,
+            "knew",
+        ),
         # ADQUISICIÓN: "A descubrió/averiguó/se enteró que B era/tenía X"
-        (r"(?P<knower>\w+)\s+(?:descubrió|averiguó|se\s+enteró)\s+(?:de\s+)?que\s+(?P<known>\w+)\s+(?:era|tenía|estaba|había)\s+(?P<fact>.+?)(?:\.|,|;|$)",
-         KnowledgeType.ATTRIBUTE, "discovered"),
+        (
+            r"(?P<knower>\w+)\s+(?:descubrió|averiguó|se\s+enteró)\s+(?:de\s+)?que\s+(?P<known>\w+)\s+(?:era|tenía|estaba|había)\s+(?P<fact>.+?)(?:\.|,|;|$)",
+            KnowledgeType.ATTRIBUTE,
+            "discovered",
+        ),
         # REFERENCIA: "A recordaba que B X"
-        (r"(?P<knower>\w+)\s+(?:recordaba|recordó)\s+(?:de\s+)?que\s+(?P<known>\w+)\s+(?P<fact>.+?)(?:\.|,|;|$)",
-         KnowledgeType.HISTORY, "remembered"),
+        (
+            r"(?P<knower>\w+)\s+(?:recordaba|recordó)\s+(?:de\s+)?que\s+(?P<known>\w+)\s+(?P<fact>.+?)(?:\.|,|;|$)",
+            KnowledgeType.HISTORY,
+            "remembered",
+        ),
         # ADQUISICIÓN: "A se dio cuenta de que B X"
-        (r"(?P<knower>\w+)\s+se\s+dio\s+cuenta\s+de\s+que\s+(?P<known>\w+)\s+(?P<fact>.+?)(?:\.|,|;|$)",
-         KnowledgeType.ATTRIBUTE, "observed"),
+        (
+            r"(?P<knower>\w+)\s+se\s+dio\s+cuenta\s+de\s+que\s+(?P<known>\w+)\s+(?P<fact>.+?)(?:\.|,|;|$)",
+            KnowledgeType.ATTRIBUTE,
+            "observed",
+        ),
         # ADQUISICIÓN: "A notó/observó que B X"
-        (r"(?P<knower>\w+)\s+(?:notó|observó|advirtió)\s+que\s+(?P<known>\w+)\s+(?P<fact>.+?)(?:\.|,|;|$)",
-         KnowledgeType.ATTRIBUTE, "observed"),
+        (
+            r"(?P<knower>\w+)\s+(?:notó|observó|advirtió)\s+que\s+(?P<known>\w+)\s+(?P<fact>.+?)(?:\.|,|;|$)",
+            KnowledgeType.ATTRIBUTE,
+            "observed",
+        ),
         # REFERENCIA: "para A, B era X" (conocimiento implícito/asumido)
-        (r"para\s+(?P<knower>\w+),?\s+(?P<known>\w+)\s+era\s+(?P<fact>.+?)(?:\.|,|;|$)",
-         KnowledgeType.ATTRIBUTE, "assumed"),
+        (
+            r"para\s+(?P<knower>\w+),?\s+(?P<known>\w+)\s+era\s+(?P<fact>.+?)(?:\.|,|;|$)",
+            KnowledgeType.ATTRIBUTE,
+            "assumed",
+        ),
         # IGNORANCIA: "A ignoraba/desconocía que B X"
-        (r"(?P<knower>\w+)\s+(?:ignoraba|desconocía|no\s+sabía)\s+que\s+(?P<known>\w+)\s+(?P<fact>.+?)(?:\.|,|;|$)",
-         KnowledgeType.ATTRIBUTE, "unknown"),
+        (
+            r"(?P<knower>\w+)\s+(?:ignoraba|desconocía|no\s+sabía)\s+que\s+(?P<known>\w+)\s+(?P<fact>.+?)(?:\.|,|;|$)",
+            KnowledgeType.ATTRIBUTE,
+            "unknown",
+        ),
     ]
 
     # Patrones para detectar que A sabe dónde está B
     LOCATION_PATTERNS = [
         # REFERENCIA: "A sabía dónde vivía B"
-        (r"(?P<knower>\w+)\s+(?:sabía|conocía)\s+(?P<fact>(?:dónde|donde)\s+(?:estaba|vivía|se encontraba))\s+(?P<known>\w+)",
-         KnowledgeType.LOCATION, "knew"),
+        (
+            r"(?P<knower>\w+)\s+(?:sabía|conocía)\s+(?P<fact>(?:dónde|donde)\s+(?:estaba|vivía|se encontraba))\s+(?P<known>\w+)",
+            KnowledgeType.LOCATION,
+            "knew",
+        ),
         # ADQUISICIÓN: "A encontró a B en LUGAR"
-        (r"(?P<knower>\w+)\s+(?:encontró|localizó|halló)\s+a\s+(?P<known>\w+)\s+en\s+(?P<location>.+?)(?:\.|,|;|$)",
-         KnowledgeType.LOCATION, "observed"),
+        (
+            r"(?P<knower>\w+)\s+(?:encontró|localizó|halló)\s+a\s+(?P<known>\w+)\s+en\s+(?P<location>.+?)(?:\.|,|;|$)",
+            KnowledgeType.LOCATION,
+            "observed",
+        ),
     ]
 
     # Patrones para detectar secretos
     SECRET_PATTERNS = [
         # REFERENCIA: "A guardaba/sabía el secreto de B"
-        (r"(?P<knower>\w+)\s+(?:sabía|conocía|guardaba)\s+el\s+(?P<fact>secreto)\s+de\s+(?P<known>\w+)",
-         KnowledgeType.SECRET, "knew"),
+        (
+            r"(?P<knower>\w+)\s+(?:sabía|conocía|guardaba)\s+el\s+(?P<fact>secreto)\s+de\s+(?P<known>\w+)",
+            KnowledgeType.SECRET,
+            "knew",
+        ),
         # ADQUISICIÓN: "B le confesó/reveló su secreto a A"
-        (r"(?P<known>\w+)\s+le\s+(?:confesó|reveló|contó)\s+(?:su\s+)?(?P<fact>secreto)\s+a\s+(?P<knower>\w+)",
-         KnowledgeType.SECRET, "told"),
+        (
+            r"(?P<known>\w+)\s+le\s+(?:confesó|reveló|contó)\s+(?:su\s+)?(?P<fact>secreto)\s+a\s+(?P<knower>\w+)",
+            KnowledgeType.SECRET,
+            "told",
+        ),
     ]
 
     # Patrones para detectar revelaciones (alguien le dice/muestra algo a otro)
@@ -909,24 +1054,39 @@ class CharacterKnowledgeAnalyzer:
         # "... le contó/dijo/confesó/reveló a KNOWER que KNOWN era/tenía FACT" (3 entidades)
         # e.g. "Ana le contó a Luis que Pedro era ladrón"
         # e.g. "El médico le contó a Ana que Luis estaba enfermo"
-        (r"le\s+(?:contó|dijo|confesó|reveló)\s+a\s+(?P<knower>\w+)\s+que\s+(?P<known>\w+)\s+(?P<fact>(?:era|tenía|estaba|había)\s+.+?)(?:\.|,|;|$)",
-         KnowledgeType.ATTRIBUTE, "told"),
+        (
+            r"le\s+(?:contó|dijo|confesó|reveló)\s+a\s+(?P<knower>\w+)\s+que\s+(?P<known>\w+)\s+(?P<fact>(?:era|tenía|estaba|había)\s+.+?)(?:\.|,|;|$)",
+            KnowledgeType.ATTRIBUTE,
+            "told",
+        ),
         # "KNOWN le contó/dijo/confesó/reveló a KNOWER que era/tenía FACT" (2 entidades)
         # e.g. "Pedro le confesó a María que era espía"
-        (r"(?P<known>\w+)\s+le\s+(?:contó|dijo|confesó|reveló)\s+a\s+(?P<knower>\w+)\s+que\s+(?P<fact>(?:era|tenía|estaba|había)\s+.+?)(?:\.|,|;|$)",
-         KnowledgeType.ATTRIBUTE, "told"),
+        (
+            r"(?P<known>\w+)\s+le\s+(?:contó|dijo|confesó|reveló)\s+a\s+(?P<knower>\w+)\s+que\s+(?P<fact>(?:era|tenía|estaba|había)\s+.+?)(?:\.|,|;|$)",
+            KnowledgeType.ATTRIBUTE,
+            "told",
+        ),
         # "KNOWN le mostró FACT a KNOWER"
         # e.g. "Pedro le mostró la cicatriz de su mano a María por primera vez"
-        (r"(?P<known>\w+)\s+le\s+mostró\s+(?P<fact>.+?)\s+a\s+(?P<knower>\w+)",
-         KnowledgeType.ATTRIBUTE, "shown"),
+        (
+            r"(?P<known>\w+)\s+le\s+mostró\s+(?P<fact>.+?)\s+a\s+(?P<knower>\w+)",
+            KnowledgeType.ATTRIBUTE,
+            "shown",
+        ),
         # "KNOWN le dio su dirección/ubicación a KNOWER"
         # e.g. "Elena le dio su dirección a Carlos por teléfono"
-        (r"(?P<known>\w+)\s+le\s+dio\s+su\s+(?P<fact>dirección|ubicación)\s+a\s+(?P<knower>\w+)",
-         KnowledgeType.LOCATION, "told"),
+        (
+            r"(?P<known>\w+)\s+le\s+dio\s+su\s+(?P<fact>dirección|ubicación)\s+a\s+(?P<knower>\w+)",
+            KnowledgeType.LOCATION,
+            "told",
+        ),
         # "—FACT— dijo KNOWN a KNOWER" (revelación en diálogo directo)
         # e.g. "—Soy médico —dijo Juan a María."
-        (r"—(?P<fact>.+?)\s*—\s*dijo\s+(?P<known>\w+)\s+a\s+(?P<knower>\w+)",
-         KnowledgeType.IDENTITY, "told"),
+        (
+            r"—(?P<fact>.+?)\s*—\s*dijo\s+(?P<known>\w+)\s+a\s+(?P<knower>\w+)",
+            KnowledgeType.IDENTITY,
+            "told",
+        ),
     ]
 
     def _auto_select_mode(self) -> KnowledgeExtractionMode:
@@ -937,7 +1097,7 @@ class CharacterKnowledgeAnalyzer:
             HYBRID si hay GPU/LLM disponible, RULES si solo CPU.
         """
         try:
-            from ..core.device import get_device_detector, DeviceType
+            from ..core.device import get_device_detector
             from ..llm.client import get_client
 
             # Verificar si hay LLM disponible
@@ -960,7 +1120,7 @@ class CharacterKnowledgeAnalyzer:
         text: str,
         chapter: int,
         start_char: int = 0,
-        mode: Optional[KnowledgeExtractionMode] = None,
+        mode: KnowledgeExtractionMode | None = None,
     ) -> list[KnowledgeFact]:
         """
         Extrae hechos de conocimiento del texto.
@@ -989,7 +1149,9 @@ class CharacterKnowledgeAnalyzer:
             if len(facts) < 2:  # Si encontramos poco, usar LLM
                 llm_facts = self._extract_knowledge_facts_llm(text, chapter, start_char)
                 # Fusionar evitando duplicados
-                existing_keys = {(f.knower_entity_id, f.known_entity_id, f.fact_value) for f in facts}
+                existing_keys = {
+                    (f.knower_entity_id, f.known_entity_id, f.fact_value) for f in facts
+                }
                 for f in llm_facts:
                     key = (f.knower_entity_id, f.known_entity_id, f.fact_value)
                     if key not in existing_keys:
@@ -1015,19 +1177,19 @@ class CharacterKnowledgeAnalyzer:
         facts = []
 
         all_patterns = (
-            self.KNOWLEDGE_PATTERNS +
-            self.LOCATION_PATTERNS +
-            self.SECRET_PATTERNS +
-            self.REVELATION_PATTERNS
+            self.KNOWLEDGE_PATTERNS
+            + self.LOCATION_PATTERNS
+            + self.SECRET_PATTERNS
+            + self.REVELATION_PATTERNS
         )
 
         for pattern, knowledge_type, learned_how in all_patterns:
             for match in re.finditer(pattern, text, re.IGNORECASE):
                 groups = match.groupdict()
 
-                knower_name = groups.get('knower', '').lower()
-                known_name = groups.get('known', '').lower()
-                fact_text = groups.get('fact', '') or groups.get('location', '')
+                knower_name = groups.get("knower", "").lower()
+                known_name = groups.get("known", "").lower()
+                fact_text = groups.get("fact", "") or groups.get("location", "")
 
                 knower_id = self._name_to_id.get(knower_name)
                 known_id = self._name_to_id.get(known_name)
@@ -1091,7 +1253,7 @@ class CharacterKnowledgeAnalyzer:
 
             prompt = f"""Analiza el siguiente texto narrativo y extrae qué personajes saben sobre otros personajes.
 
-Personajes conocidos: {', '.join(character_names)}
+Personajes conocidos: {", ".join(character_names)}
 
 Texto:
 {text[:2000]}
@@ -1111,14 +1273,15 @@ Responde solo con el JSON, sin explicaciones."""
 
             # Parsear respuesta JSON
             import json
+
             try:
                 # Buscar JSON en la respuesta
-                json_match = re.search(r'\[.*\]', response, re.DOTALL)
+                json_match = re.search(r"\[.*\]", response, re.DOTALL)
                 if json_match:
                     extracted = json.loads(json_match.group())
                     for item in extracted:
-                        knower_name = item.get('knower', '').lower()
-                        known_name = item.get('known', '').lower()
+                        knower_name = item.get("knower", "").lower()
+                        known_name = item.get("known", "").lower()
 
                         knower_id = self._name_to_id.get(knower_name)
                         known_id = self._name_to_id.get(known_name)
@@ -1128,15 +1291,14 @@ Responde solo con el JSON, sin explicaciones."""
 
                         # Mapear tipo
                         type_map = {
-                            'attribute': KnowledgeType.ATTRIBUTE,
-                            'location': KnowledgeType.LOCATION,
-                            'secret': KnowledgeType.SECRET,
-                            'identity': KnowledgeType.IDENTITY,
-                            'history': KnowledgeType.HISTORY,
+                            "attribute": KnowledgeType.ATTRIBUTE,
+                            "location": KnowledgeType.LOCATION,
+                            "secret": KnowledgeType.SECRET,
+                            "identity": KnowledgeType.IDENTITY,
+                            "history": KnowledgeType.HISTORY,
                         }
                         knowledge_type = type_map.get(
-                            item.get('type', '').lower(),
-                            KnowledgeType.ATTRIBUTE
+                            item.get("type", "").lower(), KnowledgeType.ATTRIBUTE
                         )
 
                         fact = KnowledgeFact(
@@ -1146,10 +1308,10 @@ Responde solo con el JSON, sin explicaciones."""
                             knower_name=self._entity_names.get(knower_id, knower_name),
                             known_name=self._entity_names.get(known_id, known_name),
                             knowledge_type=knowledge_type,
-                            fact_description=item.get('fact', '')[:200],
-                            fact_value=item.get('fact', '')[:100],
+                            fact_description=item.get("fact", "")[:200],
+                            fact_value=item.get("fact", "")[:100],
                             source_chapter=chapter,
-                            learned_how=item.get('how', 'deduced'),
+                            learned_how=item.get("how", "deduced"),
                             confidence=0.85,  # Mayor confianza con LLM
                             created_at=datetime.now(),
                         )
@@ -1182,12 +1344,38 @@ _IGNORANCE_MODES = {"unknown"}
 def _extract_significant_words(text: str) -> set[str]:
     """Extrae palabras significativas de un texto (≥3 caracteres, sin stopwords)."""
     stopwords = {
-        "que", "una", "uno", "con", "por", "para", "del", "los", "las",
-        "les", "era", "tenía", "estaba", "había", "muy", "más", "como",
-        "pero", "sobre", "este", "esta", "ese", "esa", "sus", "sabe",
-        "desde", "aquella", "cada", "día", "noche",
+        "que",
+        "una",
+        "uno",
+        "con",
+        "por",
+        "para",
+        "del",
+        "los",
+        "las",
+        "les",
+        "era",
+        "tenía",
+        "estaba",
+        "había",
+        "muy",
+        "más",
+        "como",
+        "pero",
+        "sobre",
+        "este",
+        "esta",
+        "ese",
+        "esa",
+        "sus",
+        "sabe",
+        "desde",
+        "aquella",
+        "cada",
+        "día",
+        "noche",
     }
-    words = set(re.findall(r'\b\w{3,}\b', text.lower()))
+    words = set(re.findall(r"\b\w{3,}\b", text.lower()))
     return words - stopwords
 
 
@@ -1220,10 +1408,7 @@ def _facts_related(fact_a: KnowledgeFact, fact_b: KnowledgeFact) -> bool:
     # (e.g., "ojos azules" vs "ojos verdes" → contradicción, no anachronismo)
     diff_a = words_a - words_b
     diff_b = words_b - words_a
-    if diff_a and diff_b:
-        return False
-
-    return True
+    return not (diff_a and diff_b)
 
 
 def detect_knowledge_anachronisms(
@@ -1256,37 +1441,33 @@ def detect_knowledge_anachronisms(
 
     anachronisms = []
 
-    for (knower_id, known_id), group_facts in groups.items():
+    for (_knower_id, _known_id), group_facts in groups.items():
         # Separar por rol semántico
-        references = [
-            f for f in group_facts if f.learned_how in _REFERENCE_MODES
-        ]
-        acquisitions = [
-            f for f in group_facts if f.learned_how in _ACQUISITION_MODES
-        ]
-        ignorances = [
-            f for f in group_facts if f.learned_how in _IGNORANCE_MODES
-        ]
+        references = [f for f in group_facts if f.learned_how in _REFERENCE_MODES]
+        acquisitions = [f for f in group_facts if f.learned_how in _ACQUISITION_MODES]
+        ignorances = [f for f in group_facts if f.learned_how in _IGNORANCE_MODES]
 
         # Caso 1: Referencia antes de adquisición explícita
         for ref in references:
             for acq in acquisitions:
                 if acq.source_chapter > ref.source_chapter and _facts_related(ref, acq):
                     gap = acq.source_chapter - ref.source_chapter
-                    anachronisms.append({
-                        "knower_name": ref.knower_name,
-                        "known_name": ref.known_name,
-                        "fact_value": ref.fact_value,
-                        "fact_description": ref.fact_description,
-                        "used_chapter": ref.source_chapter,
-                        "learned_chapter": acq.source_chapter,
-                        "severity": "high" if gap > 3 else "medium",
-                        "description": (
-                            f"{ref.knower_name} referencia "
-                            f"'{ref.fact_value}' en capítulo {ref.source_chapter}, "
-                            f"pero lo aprende en capítulo {acq.source_chapter}"
-                        ),
-                    })
+                    anachronisms.append(
+                        {
+                            "knower_name": ref.knower_name,
+                            "known_name": ref.known_name,
+                            "fact_value": ref.fact_value,
+                            "fact_description": ref.fact_description,
+                            "used_chapter": ref.source_chapter,
+                            "learned_chapter": acq.source_chapter,
+                            "severity": "high" if gap > 3 else "medium",
+                            "description": (
+                                f"{ref.knower_name} referencia "
+                                f"'{ref.fact_value}' en capítulo {ref.source_chapter}, "
+                                f"pero lo aprende en capítulo {acq.source_chapter}"
+                            ),
+                        }
+                    )
 
         # Caso 2: Ignorancia → referencia sin adquisición intermedia
         for ign in ignorances:
@@ -1299,48 +1480,48 @@ def detect_knowledge_anachronisms(
                         for acq in acquisitions
                     )
                     if not has_acq_between:
-                        anachronisms.append({
-                            "knower_name": ref.knower_name,
-                            "known_name": ref.known_name,
-                            "fact_value": ref.fact_value,
-                            "fact_description": ref.fact_description,
-                            "used_chapter": ref.source_chapter,
-                            "learned_chapter": None,
-                            "severity": "high",
-                            "description": (
-                                f"{ref.knower_name} no sabía "
-                                f"'{ign.fact_value}' en capítulo {ign.source_chapter}, "
-                                f"pero lo referencia en capítulo {ref.source_chapter} "
-                                f"sin evento de aprendizaje intermedio"
-                            ),
-                        })
+                        anachronisms.append(
+                            {
+                                "knower_name": ref.knower_name,
+                                "known_name": ref.known_name,
+                                "fact_value": ref.fact_value,
+                                "fact_description": ref.fact_description,
+                                "used_chapter": ref.source_chapter,
+                                "learned_chapter": None,
+                                "severity": "high",
+                                "description": (
+                                    f"{ref.knower_name} no sabía "
+                                    f"'{ign.fact_value}' en capítulo {ign.source_chapter}, "
+                                    f"pero lo referencia en capítulo {ref.source_chapter} "
+                                    f"sin evento de aprendizaje intermedio"
+                                ),
+                            }
+                        )
 
         # Caso 3: Adquisición temprana antes de revelación explícita
         # (descubrió/observó en cap X, pero se lo cuentan en cap Y > X)
-        early_discoveries = [
-            f for f in group_facts if f.learned_how in ("discovered", "observed")
-        ]
-        explicit_tells = [
-            f for f in group_facts if f.learned_how in ("told", "shown")
-        ]
+        early_discoveries = [f for f in group_facts if f.learned_how in ("discovered", "observed")]
+        explicit_tells = [f for f in group_facts if f.learned_how in ("told", "shown")]
         for disc in early_discoveries:
             for tell in explicit_tells:
                 if tell.source_chapter > disc.source_chapter and _facts_related(disc, tell):
                     gap = tell.source_chapter - disc.source_chapter
-                    anachronisms.append({
-                        "knower_name": disc.knower_name,
-                        "known_name": disc.known_name,
-                        "fact_value": disc.fact_value,
-                        "fact_description": disc.fact_description,
-                        "used_chapter": disc.source_chapter,
-                        "learned_chapter": tell.source_chapter,
-                        "severity": "medium" if gap <= 3 else "high",
-                        "description": (
-                            f"{disc.knower_name} descubre "
-                            f"'{disc.fact_value}' en capítulo {disc.source_chapter}, "
-                            f"pero se lo comunican en capítulo {tell.source_chapter}"
-                        ),
-                    })
+                    anachronisms.append(
+                        {
+                            "knower_name": disc.knower_name,
+                            "known_name": disc.known_name,
+                            "fact_value": disc.fact_value,
+                            "fact_description": disc.fact_description,
+                            "used_chapter": disc.source_chapter,
+                            "learned_chapter": tell.source_chapter,
+                            "severity": "medium" if gap <= 3 else "high",
+                            "description": (
+                                f"{disc.knower_name} descubre "
+                                f"'{disc.fact_value}' en capítulo {disc.source_chapter}, "
+                                f"pero se lo comunican en capítulo {tell.source_chapter}"
+                            ),
+                        }
+                    )
 
     # Deduplicar por (knower, fact_value, used_chapter, learned_chapter)
     seen = set()

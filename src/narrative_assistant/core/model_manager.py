@@ -18,16 +18,16 @@ Uso:
 """
 
 import hashlib
-import json
 import logging
 import os
 import shutil
 import socket
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Optional
 
 from .errors import ErrorSeverity, ModelNotLoadedError, NarrativeError
 from .result import Result
@@ -54,7 +54,7 @@ class ModelInfo:
     name: str
     display_name: str
     size_mb: int
-    sha256: Optional[str]  # None si no se conoce el hash
+    sha256: str | None  # None si no se conoce el hash
     source_url: str  # URL informativo (no se usa directamente)
     subdirectory: str  # Subdirectorio dentro de models/
 
@@ -94,7 +94,7 @@ class ModelDownloadError(NarrativeError):
     reason: str = ""
     message: str = ""
     severity: ErrorSeverity = ErrorSeverity.FATAL
-    user_message: Optional[str] = None
+    user_message: str | None = None
 
     def __post_init__(self):
         if not self.message:
@@ -117,7 +117,7 @@ class ModelVerificationError(NarrativeError):
     actual_hash: str = ""
     message: str = ""
     severity: ErrorSeverity = ErrorSeverity.FATAL
-    user_message: Optional[str] = None
+    user_message: str | None = None
 
     def __post_init__(self):
         if not self.message:
@@ -143,7 +143,7 @@ class ModelManager:
     - Muestra progreso de descarga con tqdm
     """
 
-    def __init__(self, models_dir: Optional[Path] = None):
+    def __init__(self, models_dir: Path | None = None):
         """
         Inicializa el gestor de modelos.
 
@@ -177,7 +177,7 @@ class ModelManager:
         if self.bundled_models_dir:
             logger.info(f"Modelos bundled encontrados en: {self.bundled_models_dir}")
 
-    def _find_bundled_models_dir(self) -> Optional[Path]:
+    def _find_bundled_models_dir(self) -> Path | None:
         """
         Busca el directorio de modelos bundled con la app.
 
@@ -189,7 +189,7 @@ class ModelManager:
         import sys
 
         # Obtener directorio del ejecutable
-        if getattr(sys, 'frozen', False):
+        if getattr(sys, "frozen", False):
             # Running as compiled
             exe_dir = Path(sys.executable).parent
         else:
@@ -216,7 +216,7 @@ class ModelManager:
 
         return None
 
-    def get_model_path(self, model_type: ModelType) -> Optional[Path]:
+    def get_model_path(self, model_type: ModelType) -> Path | None:
         """
         Obtiene la ruta al modelo si existe localmente.
 
@@ -266,7 +266,7 @@ class ModelManager:
         self,
         model_type: ModelType,
         force_download: bool = False,
-        progress_callback: Optional[Callable[[str, float], None]] = None,
+        progress_callback: Callable[[str, float], None] | None = None,
     ) -> Result[Path]:
         """
         Asegura que un modelo esté disponible, descargándolo si es necesario.
@@ -316,9 +316,7 @@ class ModelManager:
 
             # Descargar modelo
             logger.info(f"Descargando modelo: {model_info.display_name}")
-            download_result = self._download_model(
-                model_info, force_download, progress_callback
-            )
+            download_result = self._download_model(model_info, force_download, progress_callback)
 
             if download_result.is_failure:
                 return download_result
@@ -334,7 +332,7 @@ class ModelManager:
         self,
         model_info: ModelInfo,
         force: bool,
-        progress_callback: Optional[Callable[[str, float], None]],
+        progress_callback: Callable[[str, float], None] | None,
     ) -> Result[Path]:
         """
         Descarga un modelo específico.
@@ -374,15 +372,13 @@ class ModelManager:
             # Limpiar directorio parcial si existe
             if target_dir.exists():
                 shutil.rmtree(target_dir, ignore_errors=True)
-            return Result.failure(
-                ModelDownloadError(model_name=model_info.name, reason=str(e))
-            )
+            return Result.failure(ModelDownloadError(model_name=model_info.name, reason=str(e)))
 
     def _download_spacy_model(
         self,
         model_info: ModelInfo,
         target_dir: Path,
-        progress_callback: Optional[Callable[[str, float], None]],
+        progress_callback: Callable[[str, float], None] | None,
     ) -> Result[Path]:
         """
         Descarga modelo spaCy usando la CLI de spaCy.
@@ -429,7 +425,7 @@ class ModelManager:
         self,
         model_info: ModelInfo,
         target_dir: Path,
-        progress_callback: Optional[Callable[[str, float], None]],
+        progress_callback: Callable[[str, float], None] | None,
     ) -> Result[Path]:
         """
         Descarga modelo de embeddings usando sentence-transformers.
@@ -516,10 +512,9 @@ class ModelManager:
                 return False
 
             # Puede tener pytorch_model.bin o model.safetensors
-            has_weights = (
-                (model_path / "pytorch_model.bin").exists()
-                or (model_path / "model.safetensors").exists()
-            )
+            has_weights = (model_path / "pytorch_model.bin").exists() or (
+                model_path / "model.safetensors"
+            ).exists()
             if not has_weights:
                 logger.warning("Archivo de pesos faltante en modelo embeddings")
                 return False
@@ -552,7 +547,7 @@ class ModelManager:
             try:
                 socket.create_connection((host, port), timeout=timeout)
                 return True
-            except (socket.timeout, socket.error):
+            except (TimeoutError, OSError):
                 continue
 
         return False
@@ -578,7 +573,7 @@ class ModelManager:
 
         return status
 
-    def clear_cache(self, model_type: Optional[ModelType] = None) -> None:
+    def clear_cache(self, model_type: ModelType | None = None) -> None:
         """
         Elimina modelos del cache.
 
@@ -626,7 +621,7 @@ def reset_model_manager() -> None:
 
 def ensure_spacy_model(
     force_download: bool = False,
-    progress_callback: Optional[Callable[[str, float], None]] = None,
+    progress_callback: Callable[[str, float], None] | None = None,
 ) -> Result[Path]:
     """
     Función de conveniencia para asegurar modelo spaCy.
@@ -638,14 +633,12 @@ def ensure_spacy_model(
     Returns:
         Result con Path al modelo
     """
-    return get_model_manager().ensure_model(
-        ModelType.SPACY, force_download, progress_callback
-    )
+    return get_model_manager().ensure_model(ModelType.SPACY, force_download, progress_callback)
 
 
 def ensure_embeddings_model(
     force_download: bool = False,
-    progress_callback: Optional[Callable[[str, float], None]] = None,
+    progress_callback: Callable[[str, float], None] | None = None,
 ) -> Result[Path]:
     """
     Función de conveniencia para asegurar modelo de embeddings.
@@ -657,6 +650,4 @@ def ensure_embeddings_model(
     Returns:
         Result con Path al modelo
     """
-    return get_model_manager().ensure_model(
-        ModelType.EMBEDDINGS, force_download, progress_callback
-    )
+    return get_model_manager().ensure_model(ModelType.EMBEDDINGS, force_download, progress_callback)

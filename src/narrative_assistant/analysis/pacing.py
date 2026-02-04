@@ -15,13 +15,13 @@ import logging
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 
 class PacingIssueType(Enum):
     """Tipos de problemas de ritmo detectables."""
+
     CHAPTER_TOO_SHORT = "chapter_too_short"
     CHAPTER_TOO_LONG = "chapter_too_long"
     UNBALANCED_CHAPTERS = "unbalanced_chapters"
@@ -36,6 +36,7 @@ class PacingIssueType(Enum):
 
 class PacingSeverity(Enum):
     """Severidad del problema de ritmo."""
+
     INFO = "info"  # Observación, no necesariamente un problema
     SUGGESTION = "suggestion"  # Sugerencia de mejora
     WARNING = "warning"  # Problema potencial
@@ -45,9 +46,10 @@ class PacingSeverity(Enum):
 @dataclass
 class PacingMetrics:
     """Métricas de ritmo para un segmento de texto."""
+
     segment_id: int
     segment_type: str  # "chapter", "scene", "paragraph"
-    title: Optional[str] = None
+    title: str | None = None
 
     # Métricas básicas
     word_count: int = 0
@@ -91,11 +93,12 @@ class PacingMetrics:
 @dataclass
 class PacingIssue:
     """Un problema de ritmo detectado."""
+
     issue_type: PacingIssueType
     severity: PacingSeverity
     segment_id: int
     segment_type: str
-    title: Optional[str] = None
+    title: str | None = None
 
     description: str = ""
     explanation: str = ""
@@ -104,7 +107,7 @@ class PacingIssue:
     # Valores para contexto
     actual_value: float = 0.0
     expected_range: tuple = (0.0, 0.0)
-    comparison_value: Optional[float] = None  # Media del documento
+    comparison_value: float | None = None  # Media del documento
 
     def to_dict(self) -> dict:
         """Convierte a diccionario."""
@@ -126,6 +129,7 @@ class PacingIssue:
 @dataclass
 class PacingAnalysisResult:
     """Resultado del análisis de ritmo."""
+
     document_metrics: dict = field(default_factory=dict)
     chapter_metrics: list = field(default_factory=list)
     issues: list = field(default_factory=list)
@@ -135,25 +139,58 @@ class PacingAnalysisResult:
         """Convierte a diccionario."""
         return {
             "document_metrics": self.document_metrics,
-            "chapter_metrics": [m.to_dict() if hasattr(m, 'to_dict') else m for m in self.chapter_metrics],
-            "issues": [i.to_dict() if hasattr(i, 'to_dict') else i for i in self.issues],
+            "chapter_metrics": [
+                m.to_dict() if hasattr(m, "to_dict") else m for m in self.chapter_metrics
+            ],
+            "issues": [i.to_dict() if hasattr(i, "to_dict") else i for i in self.issues],
             "summary": self.summary,
         }
 
 
 # Verbos de acción comunes en español
 ACTION_VERBS = {
-    'correr', 'saltar', 'golpear', 'lanzar', 'gritar', 'huir', 'perseguir',
-    'luchar', 'atacar', 'defender', 'escapar', 'caer', 'subir', 'bajar',
-    'empujar', 'tirar', 'agarrar', 'soltar', 'romper', 'abrir', 'cerrar',
-    'entrar', 'salir', 'llegar', 'partir', 'arrancar', 'frenar', 'chocar',
-    'disparar', 'apuñalar', 'matar', 'herir', 'sangrar', 'morir', 'nacer',
+    "correr",
+    "saltar",
+    "golpear",
+    "lanzar",
+    "gritar",
+    "huir",
+    "perseguir",
+    "luchar",
+    "atacar",
+    "defender",
+    "escapar",
+    "caer",
+    "subir",
+    "bajar",
+    "empujar",
+    "tirar",
+    "agarrar",
+    "soltar",
+    "romper",
+    "abrir",
+    "cerrar",
+    "entrar",
+    "salir",
+    "llegar",
+    "partir",
+    "arrancar",
+    "frenar",
+    "chocar",
+    "disparar",
+    "apuñalar",
+    "matar",
+    "herir",
+    "sangrar",
+    "morir",
+    "nacer",
 }
 
 
 @dataclass
 class GenreBenchmarks:
     """Benchmarks de referencia para un género literario."""
+
     genre_code: str
     genre_label: str
     min_chapter_words: int
@@ -344,7 +381,7 @@ GENRE_BENCHMARKS: dict[str, GenreBenchmarks] = {
 }
 
 
-def get_genre_benchmarks(genre_code: str) -> Optional[GenreBenchmarks]:
+def get_genre_benchmarks(genre_code: str) -> GenreBenchmarks | None:
     """Obtiene los benchmarks para un género dado."""
     return GENRE_BENCHMARKS.get(genre_code)
 
@@ -372,7 +409,7 @@ def compute_percentile_rank(value: float, range_min: float, range_max: float) ->
 def compare_with_benchmarks(
     metrics: dict,
     genre_code: str,
-) -> Optional[dict]:
+) -> dict | None:
     """
     Compara las métricas de un documento contra los benchmarks de su género.
 
@@ -393,75 +430,87 @@ def compare_with_benchmarks(
     avg_words = metrics.get("avg_chapter_words", 0)
     if avg_words > 0:
         if avg_words < benchmarks.min_chapter_words:
-            deviations.append({
-                "metric": "avg_chapter_words",
-                "label": "Longitud media de capítulo",
-                "actual": round(avg_words),
-                "expected_range": [benchmarks.min_chapter_words, benchmarks.max_chapter_words],
-                "status": "below",
-                "message": f"Los capítulos son cortos para {benchmarks.genre_label} "
-                           f"(media {round(avg_words)} vs mínimo {benchmarks.min_chapter_words})",
-            })
+            deviations.append(
+                {
+                    "metric": "avg_chapter_words",
+                    "label": "Longitud media de capítulo",
+                    "actual": round(avg_words),
+                    "expected_range": [benchmarks.min_chapter_words, benchmarks.max_chapter_words],
+                    "status": "below",
+                    "message": f"Los capítulos son cortos para {benchmarks.genre_label} "
+                    f"(media {round(avg_words)} vs mínimo {benchmarks.min_chapter_words})",
+                }
+            )
         elif avg_words > benchmarks.max_chapter_words:
-            deviations.append({
-                "metric": "avg_chapter_words",
-                "label": "Longitud media de capítulo",
-                "actual": round(avg_words),
-                "expected_range": [benchmarks.min_chapter_words, benchmarks.max_chapter_words],
-                "status": "above",
-                "message": f"Los capítulos son largos para {benchmarks.genre_label} "
-                           f"(media {round(avg_words)} vs máximo {benchmarks.max_chapter_words})",
-            })
+            deviations.append(
+                {
+                    "metric": "avg_chapter_words",
+                    "label": "Longitud media de capítulo",
+                    "actual": round(avg_words),
+                    "expected_range": [benchmarks.min_chapter_words, benchmarks.max_chapter_words],
+                    "status": "above",
+                    "message": f"Los capítulos son largos para {benchmarks.genre_label} "
+                    f"(media {round(avg_words)} vs máximo {benchmarks.max_chapter_words})",
+                }
+            )
 
     # Comparar ratio de diálogo
     dialogue_ratio = metrics.get("dialogue_ratio", -1)
     if dialogue_ratio >= 0:
         low, high = benchmarks.dialogue_ratio_range
         if dialogue_ratio < low:
-            deviations.append({
-                "metric": "dialogue_ratio",
-                "label": "Ratio de diálogo",
-                "actual": round(dialogue_ratio, 3),
-                "expected_range": [low, high],
-                "status": "below",
-                "message": f"Poco diálogo para {benchmarks.genre_label} "
-                           f"({round(dialogue_ratio * 100, 1)}% vs {round(low * 100)}%-{round(high * 100)}%)",
-            })
+            deviations.append(
+                {
+                    "metric": "dialogue_ratio",
+                    "label": "Ratio de diálogo",
+                    "actual": round(dialogue_ratio, 3),
+                    "expected_range": [low, high],
+                    "status": "below",
+                    "message": f"Poco diálogo para {benchmarks.genre_label} "
+                    f"({round(dialogue_ratio * 100, 1)}% vs {round(low * 100)}%-{round(high * 100)}%)",
+                }
+            )
         elif dialogue_ratio > high:
-            deviations.append({
-                "metric": "dialogue_ratio",
-                "label": "Ratio de diálogo",
-                "actual": round(dialogue_ratio, 3),
-                "expected_range": [low, high],
-                "status": "above",
-                "message": f"Mucho diálogo para {benchmarks.genre_label} "
-                           f"({round(dialogue_ratio * 100, 1)}% vs {round(low * 100)}%-{round(high * 100)}%)",
-            })
+            deviations.append(
+                {
+                    "metric": "dialogue_ratio",
+                    "label": "Ratio de diálogo",
+                    "actual": round(dialogue_ratio, 3),
+                    "expected_range": [low, high],
+                    "status": "above",
+                    "message": f"Mucho diálogo para {benchmarks.genre_label} "
+                    f"({round(dialogue_ratio * 100, 1)}% vs {round(low * 100)}%-{round(high * 100)}%)",
+                }
+            )
 
     # Comparar longitud de oraciones
     avg_sent_len = metrics.get("avg_sentence_length", 0)
     if avg_sent_len > 0:
         low, high = benchmarks.avg_sentence_length_range
         if avg_sent_len < low:
-            deviations.append({
-                "metric": "avg_sentence_length",
-                "label": "Longitud media de oración",
-                "actual": round(avg_sent_len, 1),
-                "expected_range": [low, high],
-                "status": "below",
-                "message": f"Oraciones cortas para {benchmarks.genre_label} "
-                           f"({round(avg_sent_len, 1)} vs {low}-{high} palabras)",
-            })
+            deviations.append(
+                {
+                    "metric": "avg_sentence_length",
+                    "label": "Longitud media de oración",
+                    "actual": round(avg_sent_len, 1),
+                    "expected_range": [low, high],
+                    "status": "below",
+                    "message": f"Oraciones cortas para {benchmarks.genre_label} "
+                    f"({round(avg_sent_len, 1)} vs {low}-{high} palabras)",
+                }
+            )
         elif avg_sent_len > high:
-            deviations.append({
-                "metric": "avg_sentence_length",
-                "label": "Longitud media de oración",
-                "actual": round(avg_sent_len, 1),
-                "expected_range": [low, high],
-                "status": "above",
-                "message": f"Oraciones largas para {benchmarks.genre_label} "
-                           f"({round(avg_sent_len, 1)} vs {low}-{high} palabras)",
-            })
+            deviations.append(
+                {
+                    "metric": "avg_sentence_length",
+                    "label": "Longitud media de oración",
+                    "actual": round(avg_sent_len, 1),
+                    "expected_range": [low, high],
+                    "status": "above",
+                    "message": f"Oraciones largas para {benchmarks.genre_label} "
+                    f"({round(avg_sent_len, 1)} vs {low}-{high} palabras)",
+                }
+            )
 
     # Comparar tensión media
     avg_tension = metrics.get("avg_tension")
@@ -473,31 +522,35 @@ def compare_with_benchmarks(
         elif avg_tension > high:
             tension_status = "above"
         if tension_status != "within":
-            deviations.append({
-                "metric": "avg_tension",
-                "label": "Tensión narrativa media",
-                "actual": round(avg_tension, 3),
-                "expected_range": [low, high],
-                "status": tension_status,
-                "message": f"Tensión {'baja' if tension_status == 'below' else 'alta'} "
-                           f"para {benchmarks.genre_label} "
-                           f"({round(avg_tension, 2)} vs {low}-{high})",
-            })
+            deviations.append(
+                {
+                    "metric": "avg_tension",
+                    "label": "Tensión narrativa media",
+                    "actual": round(avg_tension, 3),
+                    "expected_range": [low, high],
+                    "status": tension_status,
+                    "message": f"Tensión {'baja' if tension_status == 'below' else 'alta'} "
+                    f"para {benchmarks.genre_label} "
+                    f"({round(avg_tension, 2)} vs {low}-{high})",
+                }
+            )
 
     # Comparar arco narrativo
     arc_type = metrics.get("tension_arc_type", "")
     arc_match = arc_type in benchmarks.expected_arc_types if arc_type else None
 
     if arc_type and not arc_match:
-        deviations.append({
-            "metric": "tension_arc_type",
-            "label": "Tipo de arco narrativo",
-            "actual": arc_type,
-            "expected": benchmarks.expected_arc_types,
-            "status": "mismatch",
-            "message": f"El arco narrativo '{arc_type}' no es habitual en {benchmarks.genre_label} "
-                       f"(esperados: {', '.join(benchmarks.expected_arc_types)})",
-        })
+        deviations.append(
+            {
+                "metric": "tension_arc_type",
+                "label": "Tipo de arco narrativo",
+                "actual": arc_type,
+                "expected": benchmarks.expected_arc_types,
+                "status": "mismatch",
+                "message": f"El arco narrativo '{arc_type}' no es habitual en {benchmarks.genre_label} "
+                f"(esperados: {', '.join(benchmarks.expected_arc_types)})",
+            }
+        )
 
     # Calcular percentiles para todas las métricas numéricas
     percentiles: dict[str, int] = {}
@@ -540,7 +593,7 @@ def _generate_pacing_suggestions(
     deviations: list[dict],
     benchmarks: GenreBenchmarks,
     arc_type: str,
-    arc_match: Optional[bool],
+    arc_match: bool | None,
 ) -> list[dict]:
     """
     Genera sugerencias de corrección basadas en las desviaciones detectadas.
@@ -562,87 +615,105 @@ def _generate_pacing_suggestions(
 
         if metric == "avg_chapter_words":
             if status == "below":
-                suggestions.append({
-                    "metric": metric,
-                    "priority": "medium",
-                    "suggestion": f"Los capítulos son más cortos de lo habitual en {benchmarks.genre_label}. "
-                                  f"Considere desarrollar más las escenas, añadir descripciones "
-                                  f"o contextualización para alcanzar al menos {benchmarks.min_chapter_words} palabras.",
-                })
+                suggestions.append(
+                    {
+                        "metric": metric,
+                        "priority": "medium",
+                        "suggestion": f"Los capítulos son más cortos de lo habitual en {benchmarks.genre_label}. "
+                        f"Considere desarrollar más las escenas, añadir descripciones "
+                        f"o contextualización para alcanzar al menos {benchmarks.min_chapter_words} palabras.",
+                    }
+                )
             else:
-                suggestions.append({
-                    "metric": metric,
-                    "priority": "medium",
-                    "suggestion": f"Los capítulos son más largos de lo habitual en {benchmarks.genre_label}. "
-                                  f"Considere dividir capítulos extensos en secciones o capítulos más cortos "
-                                  f"para mantener el ritmo del lector.",
-                })
+                suggestions.append(
+                    {
+                        "metric": metric,
+                        "priority": "medium",
+                        "suggestion": f"Los capítulos son más largos de lo habitual en {benchmarks.genre_label}. "
+                        f"Considere dividir capítulos extensos en secciones o capítulos más cortos "
+                        f"para mantener el ritmo del lector.",
+                    }
+                )
 
         elif metric == "dialogue_ratio":
             if status == "below":
                 low_pct = round(benchmarks.dialogue_ratio_range[0] * 100)
-                suggestions.append({
-                    "metric": metric,
-                    "priority": "medium",
-                    "suggestion": f"El manuscrito tiene poco diálogo para {benchmarks.genre_label}. "
-                                  f"Convertir pasajes narrativos en escenas dialogadas puede "
-                                  f"dinamizar el ritmo. Referencia: al menos {low_pct}% de diálogo.",
-                })
+                suggestions.append(
+                    {
+                        "metric": metric,
+                        "priority": "medium",
+                        "suggestion": f"El manuscrito tiene poco diálogo para {benchmarks.genre_label}. "
+                        f"Convertir pasajes narrativos en escenas dialogadas puede "
+                        f"dinamizar el ritmo. Referencia: al menos {low_pct}% de diálogo.",
+                    }
+                )
             else:
                 high_pct = round(benchmarks.dialogue_ratio_range[1] * 100)
-                suggestions.append({
-                    "metric": metric,
-                    "priority": "low",
-                    "suggestion": f"El manuscrito tiene mucho diálogo para {benchmarks.genre_label}. "
-                                  f"Intercalar más narración, descripción o reflexión entre diálogos "
-                                  f"puede equilibrar el ritmo. Referencia: máximo {high_pct}%.",
-                })
+                suggestions.append(
+                    {
+                        "metric": metric,
+                        "priority": "low",
+                        "suggestion": f"El manuscrito tiene mucho diálogo para {benchmarks.genre_label}. "
+                        f"Intercalar más narración, descripción o reflexión entre diálogos "
+                        f"puede equilibrar el ritmo. Referencia: máximo {high_pct}%.",
+                    }
+                )
 
         elif metric == "avg_sentence_length":
             if status == "below":
-                suggestions.append({
-                    "metric": metric,
-                    "priority": "low",
-                    "suggestion": f"Las oraciones son cortas para {benchmarks.genre_label}. "
-                                  f"Combinar oraciones simples con coordinación o subordinación "
-                                  f"puede dar mayor fluidez y complejidad al texto.",
-                })
+                suggestions.append(
+                    {
+                        "metric": metric,
+                        "priority": "low",
+                        "suggestion": f"Las oraciones son cortas para {benchmarks.genre_label}. "
+                        f"Combinar oraciones simples con coordinación o subordinación "
+                        f"puede dar mayor fluidez y complejidad al texto.",
+                    }
+                )
             else:
-                suggestions.append({
-                    "metric": metric,
-                    "priority": "medium",
-                    "suggestion": f"Las oraciones son largas para {benchmarks.genre_label}. "
-                                  f"Dividir oraciones complejas en dos o tres más simples "
-                                  f"facilita la lectura y mejora la claridad.",
-                })
+                suggestions.append(
+                    {
+                        "metric": metric,
+                        "priority": "medium",
+                        "suggestion": f"Las oraciones son largas para {benchmarks.genre_label}. "
+                        f"Dividir oraciones complejas en dos o tres más simples "
+                        f"facilita la lectura y mejora la claridad.",
+                    }
+                )
 
         elif metric == "avg_tension":
             if status == "below":
-                suggestions.append({
-                    "metric": metric,
-                    "priority": "high",
-                    "suggestion": f"La tensión narrativa es baja para {benchmarks.genre_label}. "
-                                  f"Introducir conflictos, preguntas sin respuesta o situaciones "
-                                  f"de urgencia puede aumentar el interés del lector.",
-                })
+                suggestions.append(
+                    {
+                        "metric": metric,
+                        "priority": "high",
+                        "suggestion": f"La tensión narrativa es baja para {benchmarks.genre_label}. "
+                        f"Introducir conflictos, preguntas sin respuesta o situaciones "
+                        f"de urgencia puede aumentar el interés del lector.",
+                    }
+                )
             else:
-                suggestions.append({
-                    "metric": metric,
-                    "priority": "low",
-                    "suggestion": f"La tensión narrativa es alta para {benchmarks.genre_label}. "
-                                  f"Incluir momentos de calma, reflexión o descanso narrativo "
-                                  f"evita la fatiga del lector y da más impacto a los clímax.",
-                })
+                suggestions.append(
+                    {
+                        "metric": metric,
+                        "priority": "low",
+                        "suggestion": f"La tensión narrativa es alta para {benchmarks.genre_label}. "
+                        f"Incluir momentos de calma, reflexión o descanso narrativo "
+                        f"evita la fatiga del lector y da más impacto a los clímax.",
+                    }
+                )
 
         elif metric == "tension_arc_type":
             expected = ", ".join(benchmarks.expected_arc_types)
-            suggestions.append({
-                "metric": metric,
-                "priority": "low",
-                "suggestion": f"El arco de tensión '{arc_type}' difiere de los habituales "
-                              f"en {benchmarks.genre_label} ({expected}). Esto no es necesariamente "
-                              f"un problema, pero revise que la estructura sirve a la intención narrativa.",
-            })
+            suggestions.append(
+                {
+                    "metric": metric,
+                    "priority": "low",
+                    "suggestion": f"El arco de tensión '{arc_type}' difiere de los habituales "
+                    f"en {benchmarks.genre_label} ({expected}). Esto no es necesariamente "
+                    f"un problema, pero revise que la estructura sirve a la intención narrativa.",
+                }
+            )
 
     return suggestions
 
@@ -756,30 +827,26 @@ class PacingAnalyzer:
             )
 
         # Contar palabras
-        words = re.findall(r'\b\w+\b', text.lower())
+        words = re.findall(r"\b\w+\b", text.lower())
         word_count = len(words)
         unique_words = set(words)
 
         # Contar oraciones
-        sentences = re.split(r'[.!?]+', text)
+        sentences = re.split(r"[.!?]+", text)
         sentences = [s.strip() for s in sentences if s.strip()]
         sentence_count = len(sentences)
 
         # Contar párrafos
-        paragraphs = [p.strip() for p in text.split('\n\n') if p.strip()]
+        paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
         paragraph_count = len(paragraphs) or 1
 
         # Detectar diálogos
-        dialogue_pattern = r'^[\s]*[—\-«"\'"].*?[»"\'"]?\s*$'
         dialogue_lines = []
         for para in paragraphs:
-            if para.startswith(('—', '-', '«', '"', "'")):
+            if para.startswith(("—", "-", "«", '"', "'")):
                 dialogue_lines.append(para)
 
-        dialogue_words_count = sum(
-            len(re.findall(r'\b\w+\b', line))
-            for line in dialogue_lines
-        )
+        dialogue_words_count = sum(len(re.findall(r"\b\w+\b", line)) for line in dialogue_lines)
 
         # Ratio de diálogo
         dialogue_ratio = dialogue_words_count / word_count if word_count > 0 else 0.0
@@ -840,43 +907,47 @@ class PacingAnalyzer:
 
         for m in metrics:
             if m.word_count < self.min_chapter_words:
-                issues.append(PacingIssue(
-                    issue_type=PacingIssueType.CHAPTER_TOO_SHORT,
-                    severity=PacingSeverity.WARNING,
-                    segment_id=m.segment_id,
-                    segment_type=m.segment_type,
-                    title=m.title,
-                    description=f"Capítulo {m.segment_id} tiene solo {m.word_count} palabras",
-                    explanation=(
-                        f"Los capítulos muy cortos ({m.word_count} palabras) pueden "
-                        f"interrumpir el flujo narrativo o parecer incompletos."
-                    ),
-                    suggestion=(
-                        "Considere expandir el contenido, fusionar con otro capítulo "
-                        "o verificar si es intencional (ej: capítulo de transición)."
-                    ),
-                    actual_value=m.word_count,
-                    expected_range=(self.min_chapter_words, self.max_chapter_words),
-                ))
+                issues.append(
+                    PacingIssue(
+                        issue_type=PacingIssueType.CHAPTER_TOO_SHORT,
+                        severity=PacingSeverity.WARNING,
+                        segment_id=m.segment_id,
+                        segment_type=m.segment_type,
+                        title=m.title,
+                        description=f"Capítulo {m.segment_id} tiene solo {m.word_count} palabras",
+                        explanation=(
+                            f"Los capítulos muy cortos ({m.word_count} palabras) pueden "
+                            f"interrumpir el flujo narrativo o parecer incompletos."
+                        ),
+                        suggestion=(
+                            "Considere expandir el contenido, fusionar con otro capítulo "
+                            "o verificar si es intencional (ej: capítulo de transición)."
+                        ),
+                        actual_value=m.word_count,
+                        expected_range=(self.min_chapter_words, self.max_chapter_words),
+                    )
+                )
 
             elif m.word_count > self.max_chapter_words:
-                issues.append(PacingIssue(
-                    issue_type=PacingIssueType.CHAPTER_TOO_LONG,
-                    severity=PacingSeverity.SUGGESTION,
-                    segment_id=m.segment_id,
-                    segment_type=m.segment_type,
-                    title=m.title,
-                    description=f"Capítulo {m.segment_id} tiene {m.word_count} palabras",
-                    explanation=(
-                        f"Los capítulos muy largos ({m.word_count} palabras) pueden "
-                        f"cansar al lector o dificultar encontrar puntos de pausa."
-                    ),
-                    suggestion=(
-                        "Considere dividir en dos capítulos si hay un punto de quiebre natural."
-                    ),
-                    actual_value=m.word_count,
-                    expected_range=(self.min_chapter_words, self.max_chapter_words),
-                ))
+                issues.append(
+                    PacingIssue(
+                        issue_type=PacingIssueType.CHAPTER_TOO_LONG,
+                        severity=PacingSeverity.SUGGESTION,
+                        segment_id=m.segment_id,
+                        segment_type=m.segment_type,
+                        title=m.title,
+                        description=f"Capítulo {m.segment_id} tiene {m.word_count} palabras",
+                        explanation=(
+                            f"Los capítulos muy largos ({m.word_count} palabras) pueden "
+                            f"cansar al lector o dificultar encontrar puntos de pausa."
+                        ),
+                        suggestion=(
+                            "Considere dividir en dos capítulos si hay un punto de quiebre natural."
+                        ),
+                        actual_value=m.word_count,
+                        expected_range=(self.min_chapter_words, self.max_chapter_words),
+                    )
+                )
 
         return issues
 
@@ -902,42 +973,46 @@ class PacingAnalyzer:
             ratio = m.word_count / avg
 
             if ratio > self.chapter_variance_threshold:
-                issues.append(PacingIssue(
-                    issue_type=PacingIssueType.UNBALANCED_CHAPTERS,
-                    severity=PacingSeverity.INFO,
-                    segment_id=m.segment_id,
-                    segment_type=m.segment_type,
-                    title=m.title,
-                    description=(
-                        f"Capítulo {m.segment_id} es {ratio:.1f}x más largo que el promedio"
-                    ),
-                    explanation=(
-                        f"Este capítulo ({m.word_count} palabras) es significativamente "
-                        f"más largo que el promedio del libro ({avg:.0f} palabras)."
-                    ),
-                    suggestion="Verificar si el ritmo es intencional.",
-                    actual_value=m.word_count,
-                    comparison_value=avg,
-                ))
+                issues.append(
+                    PacingIssue(
+                        issue_type=PacingIssueType.UNBALANCED_CHAPTERS,
+                        severity=PacingSeverity.INFO,
+                        segment_id=m.segment_id,
+                        segment_type=m.segment_type,
+                        title=m.title,
+                        description=(
+                            f"Capítulo {m.segment_id} es {ratio:.1f}x más largo que el promedio"
+                        ),
+                        explanation=(
+                            f"Este capítulo ({m.word_count} palabras) es significativamente "
+                            f"más largo que el promedio del libro ({avg:.0f} palabras)."
+                        ),
+                        suggestion="Verificar si el ritmo es intencional.",
+                        actual_value=m.word_count,
+                        comparison_value=avg,
+                    )
+                )
 
             elif ratio < 1 / self.chapter_variance_threshold:
-                issues.append(PacingIssue(
-                    issue_type=PacingIssueType.UNBALANCED_CHAPTERS,
-                    severity=PacingSeverity.INFO,
-                    segment_id=m.segment_id,
-                    segment_type=m.segment_type,
-                    title=m.title,
-                    description=(
-                        f"Capítulo {m.segment_id} es {ratio:.1f}x más corto que el promedio"
-                    ),
-                    explanation=(
-                        f"Este capítulo ({m.word_count} palabras) es significativamente "
-                        f"más corto que el promedio del libro ({avg:.0f} palabras)."
-                    ),
-                    suggestion="Verificar si el ritmo es intencional.",
-                    actual_value=m.word_count,
-                    comparison_value=avg,
-                ))
+                issues.append(
+                    PacingIssue(
+                        issue_type=PacingIssueType.UNBALANCED_CHAPTERS,
+                        severity=PacingSeverity.INFO,
+                        segment_id=m.segment_id,
+                        segment_type=m.segment_type,
+                        title=m.title,
+                        description=(
+                            f"Capítulo {m.segment_id} es {ratio:.1f}x más corto que el promedio"
+                        ),
+                        explanation=(
+                            f"Este capítulo ({m.word_count} palabras) es significativamente "
+                            f"más corto que el promedio del libro ({avg:.0f} palabras)."
+                        ),
+                        suggestion="Verificar si el ritmo es intencional.",
+                        actual_value=m.word_count,
+                        comparison_value=avg,
+                    )
+                )
 
         return issues
 
@@ -951,42 +1026,46 @@ class PacingAnalyzer:
                 continue
 
             if m.dialogue_ratio < min_ratio:
-                issues.append(PacingIssue(
-                    issue_type=PacingIssueType.TOO_LITTLE_DIALOGUE,
-                    severity=PacingSeverity.INFO,
-                    segment_id=m.segment_id,
-                    segment_type=m.segment_type,
-                    title=m.title,
-                    description=(
-                        f"Capítulo {m.segment_id}: solo {m.dialogue_ratio*100:.0f}% es diálogo"
-                    ),
-                    explanation=(
-                        f"Este capítulo tiene muy poco diálogo ({m.dialogue_ratio*100:.0f}%). "
-                        f"Mucha narración seguida puede ralentizar el ritmo."
-                    ),
-                    suggestion="Considere añadir diálogos para dinamizar.",
-                    actual_value=m.dialogue_ratio,
-                    expected_range=self.dialogue_ratio_range,
-                ))
+                issues.append(
+                    PacingIssue(
+                        issue_type=PacingIssueType.TOO_LITTLE_DIALOGUE,
+                        severity=PacingSeverity.INFO,
+                        segment_id=m.segment_id,
+                        segment_type=m.segment_type,
+                        title=m.title,
+                        description=(
+                            f"Capítulo {m.segment_id}: solo {m.dialogue_ratio * 100:.0f}% es diálogo"
+                        ),
+                        explanation=(
+                            f"Este capítulo tiene muy poco diálogo ({m.dialogue_ratio * 100:.0f}%). "
+                            f"Mucha narración seguida puede ralentizar el ritmo."
+                        ),
+                        suggestion="Considere añadir diálogos para dinamizar.",
+                        actual_value=m.dialogue_ratio,
+                        expected_range=self.dialogue_ratio_range,
+                    )
+                )
 
             elif m.dialogue_ratio > max_ratio:
-                issues.append(PacingIssue(
-                    issue_type=PacingIssueType.TOO_MUCH_DIALOGUE,
-                    severity=PacingSeverity.INFO,
-                    segment_id=m.segment_id,
-                    segment_type=m.segment_type,
-                    title=m.title,
-                    description=(
-                        f"Capítulo {m.segment_id}: {m.dialogue_ratio*100:.0f}% es diálogo"
-                    ),
-                    explanation=(
-                        f"Este capítulo tiene mucho diálogo ({m.dialogue_ratio*100:.0f}%). "
-                        f"Puede sentirse como un guión o carecer de contexto."
-                    ),
-                    suggestion="Considere añadir narración, acotaciones o descripciones.",
-                    actual_value=m.dialogue_ratio,
-                    expected_range=self.dialogue_ratio_range,
-                ))
+                issues.append(
+                    PacingIssue(
+                        issue_type=PacingIssueType.TOO_MUCH_DIALOGUE,
+                        severity=PacingSeverity.INFO,
+                        segment_id=m.segment_id,
+                        segment_type=m.segment_type,
+                        title=m.title,
+                        description=(
+                            f"Capítulo {m.segment_id}: {m.dialogue_ratio * 100:.0f}% es diálogo"
+                        ),
+                        explanation=(
+                            f"Este capítulo tiene mucho diálogo ({m.dialogue_ratio * 100:.0f}%). "
+                            f"Puede sentirse como un guión o carecer de contexto."
+                        ),
+                        suggestion="Considere añadir narración, acotaciones o descripciones.",
+                        actual_value=m.dialogue_ratio,
+                        expected_range=self.dialogue_ratio_range,
+                    )
+                )
 
         return issues
 
@@ -1002,63 +1081,67 @@ class PacingAnalyzer:
                 continue
 
             # Dividir en párrafos
-            paragraphs = [p.strip() for p in content.split('\n\n') if p.strip()]
+            paragraphs = [p.strip() for p in content.split("\n\n") if p.strip()]
 
             # Buscar secuencias largas sin diálogo
             consecutive_narrative = 0
             narrative_words = 0
 
-            for i, para in enumerate(paragraphs):
-                is_dialogue = para.startswith(('—', '-', '«', '"', "'"))
+            for _i, para in enumerate(paragraphs):
+                is_dialogue = para.startswith(("—", "-", "«", '"', "'"))
 
                 if is_dialogue:
                     # Resetear contador
                     if narrative_words > self.dense_block_threshold:
-                        issues.append(PacingIssue(
-                            issue_type=PacingIssueType.DENSE_TEXT_BLOCK,
-                            severity=PacingSeverity.SUGGESTION,
-                            segment_id=chapter_num,
-                            segment_type="chapter",
-                            title=ch.get("title", ""),
-                            description=(
-                                f"Cap. {chapter_num}: Bloque de {narrative_words} palabras "
-                                f"sin diálogo"
-                            ),
-                            explanation=(
-                                f"Hay un bloque de {consecutive_narrative} párrafos "
-                                f"({narrative_words} palabras) sin diálogo. "
-                                f"Esto puede hacer la lectura densa."
-                            ),
-                            suggestion="Considere intercalar diálogos o dividir en escenas.",
-                            actual_value=narrative_words,
-                            expected_range=(0, self.dense_block_threshold),
-                        ))
+                        issues.append(
+                            PacingIssue(
+                                issue_type=PacingIssueType.DENSE_TEXT_BLOCK,
+                                severity=PacingSeverity.SUGGESTION,
+                                segment_id=chapter_num,
+                                segment_type="chapter",
+                                title=ch.get("title", ""),
+                                description=(
+                                    f"Cap. {chapter_num}: Bloque de {narrative_words} palabras "
+                                    f"sin diálogo"
+                                ),
+                                explanation=(
+                                    f"Hay un bloque de {consecutive_narrative} párrafos "
+                                    f"({narrative_words} palabras) sin diálogo. "
+                                    f"Esto puede hacer la lectura densa."
+                                ),
+                                suggestion="Considere intercalar diálogos o dividir en escenas.",
+                                actual_value=narrative_words,
+                                expected_range=(0, self.dense_block_threshold),
+                            )
+                        )
                     consecutive_narrative = 0
                     narrative_words = 0
                 else:
                     consecutive_narrative += 1
-                    narrative_words += len(re.findall(r'\b\w+\b', para))
+                    narrative_words += len(re.findall(r"\b\w+\b", para))
 
             # Verificar al final del capítulo
             if narrative_words > self.dense_block_threshold:
-                issues.append(PacingIssue(
-                    issue_type=PacingIssueType.DENSE_TEXT_BLOCK,
-                    severity=PacingSeverity.SUGGESTION,
-                    segment_id=chapter_num,
-                    segment_type="chapter",
-                    title=ch.get("title", ""),
-                    description=(
-                        f"Cap. {chapter_num}: Bloque final de {narrative_words} palabras "
-                        f"sin diálogo"
-                    ),
-                    explanation=(
-                        f"El capítulo termina con {consecutive_narrative} párrafos "
-                        f"({narrative_words} palabras) sin diálogo."
-                    ),
-                    suggestion="Considere si es intencional como cierre descriptivo.",
-                    actual_value=narrative_words,
-                    expected_range=(0, self.dense_block_threshold),
-                ))
+                issues.append(
+                    PacingIssue(
+                        issue_type=PacingIssueType.DENSE_TEXT_BLOCK,
+                        severity=PacingSeverity.SUGGESTION,
+                        segment_id=chapter_num,
+                        segment_type="chapter",
+                        title=ch.get("title", ""),
+                        description=(
+                            f"Cap. {chapter_num}: Bloque final de {narrative_words} palabras "
+                            f"sin diálogo"
+                        ),
+                        explanation=(
+                            f"El capítulo termina con {consecutive_narrative} párrafos "
+                            f"({narrative_words} palabras) sin diálogo."
+                        ),
+                        suggestion="Considere si es intencional como cierre descriptivo.",
+                        actual_value=narrative_words,
+                        expected_range=(0, self.dense_block_threshold),
+                    )
+                )
 
         return issues
 
@@ -1080,16 +1163,18 @@ class PacingAnalyzer:
             "avg_chapter_words": sum(word_counts) / len(metrics),
             "min_chapter_words": min(word_counts),
             "max_chapter_words": max(word_counts),
-            "chapter_word_variance": max(word_counts) / min(word_counts) if min(word_counts) > 0 else 0,
-            "avg_dialogue_ratio": sum(dialogue_ratios) / len(dialogue_ratios) if dialogue_ratios else 0,
+            "chapter_word_variance": max(word_counts) / min(word_counts)
+            if min(word_counts) > 0
+            else 0,
+            "avg_dialogue_ratio": sum(dialogue_ratios) / len(dialogue_ratios)
+            if dialogue_ratios
+            else 0,
             "issues_count": len(issues),
             "issues_by_type": {
-                t.value: sum(1 for i in issues if i.issue_type == t)
-                for t in PacingIssueType
+                t.value: sum(1 for i in issues if i.issue_type == t) for t in PacingIssueType
             },
             "issues_by_severity": {
-                s.value: sum(1 for i in issues if i.severity == s)
-                for s in PacingSeverity
+                s.value: sum(1 for i in issues if i.severity == s) for s in PacingSeverity
             },
         }
 
@@ -1115,7 +1200,7 @@ def analyze_pacing(
 
 
 # Singleton para uso global
-_pacing_analyzer: Optional[PacingAnalyzer] = None
+_pacing_analyzer: PacingAnalyzer | None = None
 _lock = __import__("threading").Lock()
 
 
@@ -1132,6 +1217,7 @@ def get_pacing_analyzer(**kwargs) -> PacingAnalyzer:
 @dataclass
 class TensionPoint:
     """Un punto en la curva de tensión narrativa."""
+
     chapter: int
     title: str
     tension_score: float  # 0.0-1.0
@@ -1153,6 +1239,7 @@ class TensionPoint:
 @dataclass
 class TensionCurve:
     """Curva de tensión narrativa completa."""
+
     points: list[TensionPoint]
     avg_tension: float = 0.0
     max_tension: float = 0.0
@@ -1246,12 +1333,12 @@ def compute_tension_curve(
 
     for i, (ch, metrics) in enumerate(all_metrics):
         # Componentes de tensión (más alto = más tensión)
-        action_score = norm_action[i]                         # Más acción = más tensión
-        short_sentences = 1.0 - norm_sent_len[i]              # Oraciones cortas = más tensión
-        short_paragraphs = 1.0 - norm_para_len[i]             # Párrafos cortos = más ritmo
-        dialogue_intensity = norm_dialogue[i]                  # Más diálogo = más conflicto potencial
-        exclamation_score = norm_exclamation[i]                # Puntuación expresiva
-        question_score = norm_question[i]                      # Interrogación = incertidumbre
+        action_score = norm_action[i]  # Más acción = más tensión
+        short_sentences = 1.0 - norm_sent_len[i]  # Oraciones cortas = más tensión
+        short_paragraphs = 1.0 - norm_para_len[i]  # Párrafos cortos = más ritmo
+        dialogue_intensity = norm_dialogue[i]  # Más diálogo = más conflicto potencial
+        exclamation_score = norm_exclamation[i]  # Puntuación expresiva
+        question_score = norm_question[i]  # Interrogación = incertidumbre
 
         # Ponderación de componentes
         weights = {
@@ -1280,14 +1367,16 @@ def compute_tension_curve(
         cumulative_words += metrics.word_count
         position_ratio = cumulative_words / total_words if total_words > 0 else 0.0
 
-        points.append(TensionPoint(
-            chapter=ch.get("number", i + 1),
-            title=ch.get("title", f"Capítulo {ch.get('number', i + 1)}"),
-            tension_score=tension_score,
-            components=components,
-            word_count=metrics.word_count,
-            position_ratio=position_ratio,
-        ))
+        points.append(
+            TensionPoint(
+                chapter=ch.get("number", i + 1),
+                title=ch.get("title", f"Capítulo {ch.get('number', i + 1)}"),
+                tension_score=tension_score,
+                components=components,
+                word_count=metrics.word_count,
+                position_ratio=position_ratio,
+            )
+        )
 
     # Calcular metadatos de la curva
     tension_scores = [p.tension_score for p in points]
@@ -1323,9 +1412,9 @@ def _classify_tension_arc(scores: list[float]) -> str:
         return "flat"
 
     n = len(scores)
-    first_third = sum(scores[:n // 3]) / max(n // 3, 1)
-    mid_third = sum(scores[n // 3: 2 * n // 3]) / max(n // 3, 1)
-    last_third = sum(scores[2 * n // 3:]) / max(n - 2 * (n // 3), 1)
+    first_third = sum(scores[: n // 3]) / max(n // 3, 1)
+    mid_third = sum(scores[n // 3 : 2 * n // 3]) / max(n // 3, 1)
+    last_third = sum(scores[2 * n // 3 :]) / max(n - 2 * (n // 3), 1)
 
     # Detectar variación
     variance = max(scores) - min(scores)
@@ -1335,8 +1424,9 @@ def _classify_tension_arc(scores: list[float]) -> str:
     # Contar picos (cambios de dirección)
     direction_changes = 0
     for i in range(1, len(scores) - 1):
-        if (scores[i] > scores[i - 1] and scores[i] > scores[i + 1]) or \
-           (scores[i] < scores[i - 1] and scores[i] < scores[i + 1]):
+        if (scores[i] > scores[i - 1] and scores[i] > scores[i + 1]) or (
+            scores[i] < scores[i - 1] and scores[i] < scores[i + 1]
+        ):
             direction_changes += 1
 
     if direction_changes >= len(scores) // 3:

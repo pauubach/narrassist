@@ -16,7 +16,6 @@ import platform
 import threading
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +41,7 @@ class DeviceInfo:
     device_type: DeviceType
     device_name: str
     device_id: int  # Para CUDA multi-GPU, -1 para CPU
-    memory_gb: Optional[float]  # Memoria disponible si se puede detectar
+    memory_gb: float | None  # Memoria disponible si se puede detectar
     is_available: bool
 
     def __str__(self) -> str:
@@ -53,7 +52,7 @@ class DeviceInfo:
     def is_low_vram(self) -> bool:
         """
         Indica si el dispositivo tiene VRAM limitada.
-        
+
         GPUs con < 6GB de VRAM pueden tener problemas al ejecutar
         múltiples modelos (Ollama + embeddings + spaCy) simultáneamente.
         """
@@ -75,11 +74,11 @@ class DeviceDetector:
     """
 
     def __init__(self):
-        self._detected_device: Optional[DeviceInfo] = None
+        self._detected_device: DeviceInfo | None = None
         self._torch_available: bool = False
         self._cupy_available: bool = False
 
-    def detect_cuda(self) -> Optional[DeviceInfo]:
+    def detect_cuda(self) -> DeviceInfo | None:
         """Detecta GPU NVIDIA con CUDA."""
         try:
             import torch
@@ -89,9 +88,7 @@ class DeviceDetector:
             if torch.cuda.is_available():
                 device_id = 0  # Usar primera GPU por defecto
                 device_name = torch.cuda.get_device_name(device_id)
-                memory_gb = torch.cuda.get_device_properties(device_id).total_memory / (
-                    1024**3
-                )
+                memory_gb = torch.cuda.get_device_properties(device_id).total_memory / (1024**3)
 
                 logger.info(f"CUDA disponible: {device_name} ({memory_gb:.1f} GB)")
                 return DeviceInfo(
@@ -108,7 +105,7 @@ class DeviceDetector:
 
         return None
 
-    def detect_mps(self) -> Optional[DeviceInfo]:
+    def detect_mps(self) -> DeviceInfo | None:
         """Detecta GPU Apple Silicon (Metal Performance Shaders)."""
         try:
             import torch
@@ -199,8 +196,7 @@ class DeviceDetector:
             device = self.detect_mps()
             if device is None:
                 raise RuntimeError(
-                    "MPS solicitado pero no disponible. "
-                    "Requiere macOS 12.3+ y Apple Silicon."
+                    "MPS solicitado pero no disponible. Requiere macOS 12.3+ y Apple Silicon."
                 )
             self._detected_device = device
             return device
@@ -225,7 +221,7 @@ class DeviceDetector:
         return cpu_device
 
     @property
-    def current_device(self) -> Optional[DeviceInfo]:
+    def current_device(self) -> DeviceInfo | None:
         """Dispositivo detectado actualmente."""
         return self._detected_device
 
@@ -254,7 +250,7 @@ class DeviceDetector:
 
 
 # Singleton global
-_device_detector: Optional[DeviceDetector] = None
+_device_detector: DeviceDetector | None = None
 
 
 def get_device_detector() -> DeviceDetector:
@@ -305,17 +301,18 @@ def get_torch_device_string(prefer: str = "auto") -> str:
 def clear_gpu_memory() -> None:
     """
     Libera memoria GPU agresivamente.
-    
+
     IMPORTANTE: Llamar esta función después de operaciones intensivas
     (embeddings, LLM, etc.) en sistemas con VRAM limitada para evitar
     saturación y posibles crashes/BSOD.
     """
     # Recolector de basura de Python primero
     gc.collect()
-    
+
     # Limpiar caché CUDA si está disponible
     try:
         import torch
+
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
             torch.cuda.synchronize()  # Esperar a que termine todo
@@ -326,15 +323,16 @@ def clear_gpu_memory() -> None:
         logger.debug(f"Error clearing CUDA memory: {e}")
 
 
-def get_gpu_memory_usage() -> Optional[tuple[float, float]]:
+def get_gpu_memory_usage() -> tuple[float, float] | None:
     """
     Obtiene uso actual de memoria GPU.
-    
+
     Returns:
         Tuple (used_gb, total_gb) o None si no hay GPU
     """
     try:
         import torch
+
         if torch.cuda.is_available():
             device = torch.cuda.current_device()
             used = torch.cuda.memory_allocated(device) / (1024**3)
@@ -348,10 +346,10 @@ def get_gpu_memory_usage() -> Optional[tuple[float, float]]:
 def is_gpu_memory_low(threshold_fraction: float = 0.85) -> bool:
     """
     Verifica si la GPU está cerca del límite de memoria.
-    
+
     Args:
         threshold_fraction: Fracción de memoria usada para considerar "low" (default: 85%)
-    
+
     Returns:
         True si la memoria está por encima del umbral
     """
@@ -362,17 +360,17 @@ def is_gpu_memory_low(threshold_fraction: float = 0.85) -> bool:
     return (used / total) > threshold_fraction
 
 
-def get_safe_batch_size(default: int, device_info: Optional[DeviceInfo] = None) -> int:
+def get_safe_batch_size(default: int, device_info: DeviceInfo | None = None) -> int:
     """
     Obtiene un batch size seguro basado en la VRAM disponible.
-    
+
     En sistemas con VRAM limitada (< 6GB), reduce el batch size para
     evitar saturación de memoria.
-    
+
     Args:
         default: Batch size por defecto
         device_info: Info del dispositivo (auto-detecta si None)
-    
+
     Returns:
         Batch size ajustado
     """
@@ -381,11 +379,11 @@ def get_safe_batch_size(default: int, device_info: Optional[DeviceInfo] = None) 
         device_info = detector.current_device
         if device_info is None:
             return default
-    
+
     # En CPU no hay restricción de VRAM
     if device_info.device_type == DeviceType.CPU:
         return default
-    
+
     # Ajustar según VRAM
     if device_info.memory_gb:
         if device_info.memory_gb < 4:
@@ -394,5 +392,5 @@ def get_safe_batch_size(default: int, device_info: Optional[DeviceInfo] = None) 
             return max(8, default // 4)  # Poca VRAM (como Quadro M3000M)
         elif device_info.memory_gb < 8:
             return max(16, default // 2)  # VRAM media
-    
+
     return default

@@ -14,27 +14,22 @@ Uso:
     result = manager.lookup("efímero")
 """
 
-import hashlib
-import io
 import json
 import logging
 import os
-import shutil
-import socket
 import sqlite3
 import threading
-import zipfile
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Optional
 
 from ..core.errors import ErrorSeverity, NarrativeError
 from ..core.result import Result
 from .models import (
+    EXTERNAL_DICTIONARIES,
     DictionaryEntry,
     DictionarySource,
-    EXTERNAL_DICTIONARIES,
-    ExternalDictionaryLink,
 )
 from .sources import (
     BaseDictionarySource,
@@ -78,7 +73,7 @@ class DictionaryDownloadError(NarrativeError):
     reason: str = ""
     message: str = ""
     severity: ErrorSeverity = ErrorSeverity.ERROR
-    user_message: Optional[str] = None
+    user_message: str | None = None
 
     def __post_init__(self):
         if not self.message:
@@ -104,7 +99,7 @@ class DictionaryManager:
     - 100% offline después de descarga inicial
     """
 
-    def __init__(self, data_dir: Optional[Path] = None):
+    def __init__(self, data_dir: Path | None = None):
         """
         Inicializa el gestor de diccionarios.
 
@@ -148,7 +143,7 @@ class DictionaryManager:
     def lookup(
         self,
         word: str,
-        sources: Optional[list[DictionarySource]] = None,
+        sources: list[DictionarySource] | None = None,
         merge_results: bool = True,
     ) -> Result[DictionaryEntry]:
         """
@@ -206,9 +201,7 @@ class DictionaryManager:
         merged = self._merge_entries(word, results)
         return Result.success(merged)
 
-    def _merge_entries(
-        self, word: str, entries: list[DictionaryEntry]
-    ) -> DictionaryEntry:
+    def _merge_entries(self, word: str, entries: list[DictionaryEntry]) -> DictionaryEntry:
         """Combina múltiples entradas en una sola."""
         if not entries:
             return DictionaryEntry(word=word, lemma=word)
@@ -303,9 +296,7 @@ class DictionaryManager:
 
         return sorted(results)[:limit]
 
-    def get_external_link(
-        self, word: str, dictionary: str = "rae"
-    ) -> Optional[str]:
+    def get_external_link(self, word: str, dictionary: str = "rae") -> str | None:
         """
         Genera un enlace a un diccionario externo.
 
@@ -332,8 +323,7 @@ class DictionaryManager:
             Dict {nombre: url}
         """
         return {
-            name: ext_dict.get_word_url(word)
-            for name, ext_dict in EXTERNAL_DICTIONARIES.items()
+            name: ext_dict.get_word_url(word) for name, ext_dict in EXTERNAL_DICTIONARIES.items()
         }
 
     def get_status(self) -> dict:
@@ -362,7 +352,7 @@ class DictionaryManager:
 
     def ensure_dictionaries(
         self,
-        progress_callback: Optional[Callable[[str, float], None]] = None,
+        progress_callback: Callable[[str, float], None] | None = None,
     ) -> Result[None]:
         """
         Asegura que los diccionarios estén disponibles.
@@ -477,7 +467,12 @@ class DictionaryManager:
                 ("efímero", "efímero", "adjective", "Que dura poco tiempo."),
                 ("ubicuo", "ubicuo", "adjective", "Que está presente en todas partes."),
                 ("prolijo", "prolijo", "adjective", "Largo, dilatado con exceso."),
-                ("parsimonia", "parsimonia", "noun", "Lentitud y calma en el modo de hablar o actuar."),
+                (
+                    "parsimonia",
+                    "parsimonia",
+                    "noun",
+                    "Lentitud y calma en el modo de hablar o actuar.",
+                ),
                 ("diáfano", "diáfano", "adjective", "Dicho de un cuerpo: Que deja pasar la luz."),
                 ("incólume", "incólume", "adjective", "Sano, sin lesión ni menoscabo."),
                 ("diatriba", "diatriba", "noun", "Discurso o escrito violento e injurioso."),
@@ -492,9 +487,12 @@ class DictionaryManager:
                     "INSERT OR IGNORE INTO words (word, normalized, lemma) VALUES (?, ?, ?)",
                     (word, normalized, lemma),
                 )
-                word_id = cursor.lastrowid or cursor.execute(
-                    "SELECT id FROM words WHERE normalized = ?", (normalized,)
-                ).fetchone()[0]
+                word_id = (
+                    cursor.lastrowid
+                    or cursor.execute(
+                        "SELECT id FROM words WHERE normalized = ?", (normalized,)
+                    ).fetchone()[0]
+                )
 
                 cursor.execute(
                     "INSERT INTO definitions (word_id, text, category, position) VALUES (?, ?, ?, 0)",
@@ -541,7 +539,11 @@ class DictionaryManager:
 
             # Insertar algunos sinónimos de ejemplo
             sample_synonyms = [
-                ("grande", ["enorme", "vasto", "amplio", "extenso", "inmenso"], ["pequeño", "diminuto"]),
+                (
+                    "grande",
+                    ["enorme", "vasto", "amplio", "extenso", "inmenso"],
+                    ["pequeño", "diminuto"],
+                ),
                 ("pequeño", ["diminuto", "minúsculo", "reducido", "chico"], ["grande", "enorme"]),
                 ("rápido", ["veloz", "raudo", "presto", "ligero", "ágil"], ["lento", "pausado"]),
                 ("lento", ["pausado", "calmado", "tardo", "perezoso"], ["rápido", "veloz"]),
@@ -551,9 +553,21 @@ class DictionaryManager:
                 ("triste", ["afligido", "apesadumbrado", "melancólico"], ["feliz", "alegre"]),
                 ("hermoso", ["bello", "bonito", "precioso", "lindo", "guapo"], ["feo", "horrible"]),
                 ("feo", ["horrible", "espantoso", "horroroso"], ["hermoso", "bello"]),
-                ("comenzar", ["empezar", "iniciar", "principiar"], ["terminar", "acabar", "finalizar"]),
-                ("terminar", ["acabar", "finalizar", "concluir"], ["comenzar", "empezar", "iniciar"]),
-                ("hablar", ["decir", "expresar", "comunicar", "conversar"], ["callar", "silenciar"]),
+                (
+                    "comenzar",
+                    ["empezar", "iniciar", "principiar"],
+                    ["terminar", "acabar", "finalizar"],
+                ),
+                (
+                    "terminar",
+                    ["acabar", "finalizar", "concluir"],
+                    ["comenzar", "empezar", "iniciar"],
+                ),
+                (
+                    "hablar",
+                    ["decir", "expresar", "comunicar", "conversar"],
+                    ["callar", "silenciar"],
+                ),
                 ("callar", ["silenciar", "enmudecer", "omitir"], ["hablar", "decir"]),
                 ("crear", ["inventar", "generar", "producir", "idear"], ["destruir", "eliminar"]),
                 ("destruir", ["demoler", "aniquilar", "arruinar"], ["crear", "construir"]),
@@ -577,9 +591,9 @@ class DictionaryManager:
         self,
         word: str,
         definition: str,
-        category: Optional[str] = None,
-        synonyms: Optional[list[str]] = None,
-        antonyms: Optional[list[str]] = None,
+        category: str | None = None,
+        synonyms: list[str] | None = None,
+        antonyms: list[str] | None = None,
     ) -> Result[None]:
         """
         Añade una palabra al diccionario personalizado.

@@ -7,12 +7,13 @@ Permite:
 - Análisis de patrones de corrección
 """
 
+import contextlib
 import json
 import logging
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 from .database import Database, get_database
 
@@ -48,6 +49,10 @@ class ChangeType(Enum):
     ANALYSIS_STARTED = "analysis_started"
     ANALYSIS_COMPLETED = "analysis_completed"
 
+    # Otros
+    UNDO = "undo"
+    OTHER = "other"
+
 
 @dataclass
 class HistoryEntry:
@@ -66,15 +71,15 @@ class HistoryEntry:
         created_at: Timestamp
     """
 
-    id: Optional[int] = None
+    id: int | None = None
     project_id: int = 0
     action_type: ChangeType = ChangeType.ALERT_CREATED
     target_type: str = ""
-    target_id: Optional[int] = None
-    old_value: Optional[dict[str, Any]] = None
-    new_value: Optional[dict[str, Any]] = None
+    target_id: int | None = None
+    old_value: dict[str, Any] | None = None
+    new_value: dict[str, Any] | None = None
     note: str = ""
-    created_at: Optional[datetime] = None
+    created_at: datetime | None = None
 
     @classmethod
     def from_row(cls, row) -> "HistoryEntry":
@@ -83,16 +88,12 @@ class HistoryEntry:
         new_value = None
 
         if row["old_value_json"]:
-            try:
+            with contextlib.suppress(json.JSONDecodeError):
                 old_value = json.loads(row["old_value_json"])
-            except json.JSONDecodeError:
-                pass
 
         if row["new_value_json"]:
-            try:
+            with contextlib.suppress(json.JSONDecodeError):
                 new_value = json.loads(row["new_value_json"])
-            except json.JSONDecodeError:
-                pass
 
         return cls(
             id=row["id"],
@@ -137,7 +138,7 @@ class HistoryManager:
         )
     """
 
-    def __init__(self, project_id: int, db: Optional[Database] = None):
+    def __init__(self, project_id: int, db: Database | None = None):
         self.project_id = project_id
         self.db = db or get_database()
 
@@ -145,9 +146,9 @@ class HistoryManager:
         self,
         action_type: ChangeType,
         target_type: str = "",
-        target_id: Optional[int] = None,
-        old_value: Optional[dict] = None,
-        new_value: Optional[dict] = None,
+        target_id: int | None = None,
+        old_value: dict | None = None,
+        new_value: dict | None = None,
         note: str = "",
     ) -> HistoryEntry:
         """
@@ -203,9 +204,9 @@ class HistoryManager:
         self,
         limit: int = 100,
         offset: int = 0,
-        action_types: Optional[list[ChangeType]] = None,
-        target_type: Optional[str] = None,
-        target_id: Optional[int] = None,
+        action_types: list[ChangeType] | None = None,
+        target_type: str | None = None,
+        target_id: int | None = None,
     ) -> list[HistoryEntry]:
         """
         Obtiene entradas del historial con filtros opcionales.
@@ -248,7 +249,7 @@ class HistoryManager:
 
         return [HistoryEntry.from_row(row) for row in rows]
 
-    def get_entry(self, entry_id: int) -> Optional[HistoryEntry]:
+    def get_entry(self, entry_id: int) -> HistoryEntry | None:
         """Obtiene una entrada específica por ID."""
         row = self.db.fetchone(
             "SELECT * FROM review_history WHERE id = ? AND project_id = ?",
@@ -301,7 +302,7 @@ class HistoryManager:
             return False
         return entry.old_value is not None
 
-    def get_undo_info(self, entry_id: int) -> Optional[dict]:
+    def get_undo_info(self, entry_id: int) -> dict | None:
         """
         Obtiene información para deshacer una acción.
 
@@ -412,7 +413,7 @@ class HistoryManager:
 
             # 5. Registrar la reversión en el historial
             self.record(
-                action_type=ActionType.OTHER,
+                action_type=ChangeType.UNDO,
                 target_type=undo_info.get("target_type"),
                 target_id=target_id,
                 note=f"Deshecha acción #{entry_id}: {action_type}",
@@ -579,10 +580,12 @@ class HistoryManager:
                     ]
 
                     # Actualizar la entidad principal
-                    new_merged_data = json.dumps({
-                        "aliases": new_aliases,
-                        "merged_ids": new_merged_ids,
-                    })
+                    new_merged_data = json.dumps(
+                        {
+                            "aliases": new_aliases,
+                            "merged_ids": new_merged_ids,
+                        }
+                    )
 
                     conn.execute(
                         "UPDATE entities SET merged_from_ids = ?, updated_at = datetime('now') WHERE id = ?",
@@ -593,8 +596,7 @@ class HistoryManager:
 
             # 5. Actualizar contador de menciones en la entidad principal
             total_restored = sum(
-                snapshots_by_id.get(eid, {}).get("mention_count", 0)
-                for eid in source_entity_ids
+                snapshots_by_id.get(eid, {}).get("mention_count", 0) for eid in source_entity_ids
             )
             if total_restored > 0:
                 conn.execute(

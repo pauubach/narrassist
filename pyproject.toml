@@ -140,9 +140,46 @@ select = [
 ]
 ignore = [
     "E501",   # line too long (handled by formatter)
+    "E402",   # module level import not at top (intentional lazy imports)
+    "E741",   # ambiguous variable name (single letter ok in comprehensions)
     "N818",   # exception name should end in Error
     "SIM108", # ternary operator (readability preference)
+    "SIM102", # nested if (readability preference)
+    "SIM103", # return condition directly (readability preference)
+    "SIM105", # contextlib.suppress (explicit try/except preferred)
+    "SIM110", # any() instead of for loop (readability preference)
+    "SIM113", # enumerate suggestion (not always clearer)
+    "SIM114", # combine if branches (readability preference)
+    "SIM116", # dict instead of if statements (readability preference)
+    "UP042",  # str enum inheritance (intentional for serialization)
+    "UP045",  # Optional vs X | None (gradual migration)
+    "UP035",  # collections.abc imports (gradual migration)
+    "UP024",  # aliased errors (backward compatibility)
+    "UP041",  # aliased errors (backward compatibility)
+    "B007",   # unused loop variable (intentional in some cases)
+    "B904",   # raise from (not always needed)
+    "C414",   # unnecessary list in sorted (readability)
+    "C420",   # dict comprehension (readability)
+    "C401",   # unnecessary generator (readability)
+    "N803",   # argument name should be lowercase (math conventions: X, y)
+    "N806",   # variable in function should be lowercase (math conventions)
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401", "I001"]  # Re-exports in __init__.py
+"**/tests/**" = ["F401", "F841"]  # Unused imports/vars in tests
+# Files with conditional imports for availability checking
+"**/nlp/*.py" = ["F401"]
+"**/analysis/*.py" = ["F401"]
+"**/temporal/*.py" = ["F401"]
+"**/exporters/*.py" = ["F401"]  # reportlab, etc.
+"**/corrections/**/*.py" = ["F401"]
+"**/feature_profile/*.py" = ["F401"]
+"**/parsers/*.py" = ["F401"]  # optional parsers
+"**/llm/*.py" = ["F401"]  # optional LLM backends
+"**/pipelines/*.py" = ["F401", "F821"]  # type hints as strings
+"**/voice/*.py" = ["F401"]
+"**/cli.py" = ["F401", "F841"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["narrative_assistant"]

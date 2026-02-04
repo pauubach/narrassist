@@ -4,12 +4,10 @@ API de alto nivel para el sistema de configuración de corrección.
 Proporciona funciones fáciles de usar desde el API server y frontend.
 """
 
-from typing import Optional
-
 from .models import CorrectionConfig
 from .registry import (
-    TYPES_REGISTRY,
     SUBTYPES_REGISTRY,
+    TYPES_REGISTRY,
     get_correction_config,
 )
 
@@ -46,27 +44,29 @@ def get_types_with_subtypes() -> list[dict]:
         subtypes = []
         for subtype_code, subtype_info in SUBTYPES_REGISTRY.items():
             if subtype_info.get("parent") == type_code:
-                subtypes.append({
-                    "code": subtype_code,
-                    "name": subtype_info.get("name", subtype_code),
-                })
+                subtypes.append(
+                    {
+                        "code": subtype_code,
+                        "name": subtype_info.get("name", subtype_code),
+                    }
+                )
 
-        result.append({
-            "code": type_code,
-            "name": type_info.get("name", type_code),
-            "description": type_info.get("description", ""),
-            "icon": type_info.get("icon", "pi-file"),
-            "color": type_info.get("color", "#6366f1"),
-            "subtypes": subtypes,
-        })
+        result.append(
+            {
+                "code": type_code,
+                "name": type_info.get("name", type_code),
+                "description": type_info.get("description", ""),
+                "icon": type_info.get("icon", "pi-file"),
+                "color": type_info.get("color", "#6366f1"),
+                "subtypes": subtypes,
+            }
+        )
 
     return result
 
 
 def get_config_for_project(
-    type_code: str,
-    subtype_code: Optional[str] = None,
-    customizations: Optional[dict] = None
+    type_code: str, subtype_code: str | None = None, customizations: dict | None = None
 ) -> dict:
     """
     Obtiene la configuración de corrección para un proyecto.
@@ -84,10 +84,7 @@ def get_config_for_project(
     return config.to_dict()
 
 
-def get_effective_config(
-    type_code: str,
-    subtype_code: Optional[str] = None
-) -> CorrectionConfig:
+def get_effective_config(type_code: str, subtype_code: str | None = None) -> CorrectionConfig:
     """
     Obtiene el objeto CorrectionConfig efectivo.
 
@@ -103,7 +100,7 @@ def get_effective_config(
     return get_correction_config(type_code, subtype_code)
 
 
-def get_type_info(type_code: str) -> Optional[dict]:
+def get_type_info(type_code: str) -> dict | None:
     """
     Obtiene información de un tipo específico.
 
@@ -116,7 +113,7 @@ def get_type_info(type_code: str) -> Optional[dict]:
     return TYPES_REGISTRY.get(type_code.upper())
 
 
-def get_subtype_info(subtype_code: str) -> Optional[dict]:
+def get_subtype_info(subtype_code: str) -> dict | None:
     """
     Obtiene información de un subtipo específico.
 
@@ -129,7 +126,7 @@ def get_subtype_info(subtype_code: str) -> Optional[dict]:
     return SUBTYPES_REGISTRY.get(subtype_code.upper())
 
 
-def validate_type_subtype(type_code: str, subtype_code: Optional[str] = None) -> tuple[bool, str]:
+def validate_type_subtype(type_code: str, subtype_code: str | None = None) -> tuple[bool, str]:
     """
     Valida que un tipo y subtipo sean compatibles.
 
@@ -164,10 +161,7 @@ def validate_type_subtype(type_code: str, subtype_code: Optional[str] = None) ->
     return True, ""
 
 
-def get_config_diff(
-    type_code: str,
-    subtype_code: Optional[str] = None
-) -> dict:
+def get_config_diff(type_code: str, subtype_code: str | None = None) -> dict:
     """
     Obtiene las diferencias entre la configuración del tipo y subtipo.
 
@@ -180,7 +174,7 @@ def get_config_diff(
     Returns:
         Dict con parámetros sobrescritos y sus valores
     """
-    from .registry import get_type_defaults, get_subtype_overrides
+    from .registry import get_subtype_overrides, get_type_defaults
 
     type_config = get_type_defaults(type_code)
     subtype_overrides = get_subtype_overrides(subtype_code) if subtype_code else {}
@@ -197,11 +191,13 @@ def get_config_diff(
             for param, value in values.items():
                 type_value = type_config.get(category, {}).get(param)
                 if type_value != value:
-                    diff["effective_overrides"].append({
-                        "category": category,
-                        "parameter": param,
-                        "type_value": type_value,
-                        "subtype_value": value,
-                    })
+                    diff["effective_overrides"].append(
+                        {
+                            "category": category,
+                            "parameter": param,
+                            "type_value": type_value,
+                            "subtype_value": value,
+                        }
+                    )
 
     return diff

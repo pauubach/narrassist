@@ -4,11 +4,9 @@ Repositorio de Timeline.
 Gestiona el almacenamiento y recuperación de eventos temporales y marcadores.
 """
 
-import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
 
 from .database import Database, get_database
 
@@ -19,21 +17,21 @@ logger = logging.getLogger(__name__)
 class TimelineEventData:
     """Datos de un evento del timeline almacenado."""
 
-    id: Optional[int]
+    id: int | None
     project_id: int
     event_id: str
-    chapter: Optional[int]
-    paragraph: Optional[int]
+    chapter: int | None
+    paragraph: int | None
     description: str
-    story_date: Optional[str]
+    story_date: str | None
     story_date_resolution: str = "UNKNOWN"
     narrative_order: str = "CHRONOLOGICAL"
-    discourse_position: Optional[int] = None
+    discourse_position: int | None = None
     confidence: float = 0.5
     # Para timelines sin fechas absolutas (Día 0, Día +1, etc.)
-    day_offset: Optional[int] = None
-    weekday: Optional[str] = None
-    created_at: Optional[str] = None
+    day_offset: int | None = None
+    weekday: str | None = None
+    created_at: str | None = None
 
     def to_dict(self) -> dict:
         """Convierte a diccionario para serialización JSON."""
@@ -77,7 +75,7 @@ class TimelineEventData:
 class TemporalMarkerData:
     """Datos de un marcador temporal almacenado."""
 
-    id: Optional[int]
+    id: int | None
     project_id: int
     chapter: int
     marker_type: str
@@ -86,17 +84,17 @@ class TemporalMarkerData:
     end_char: int
     confidence: float = 0.5
     # Componentes para fechas absolutas
-    year: Optional[int] = None
-    month: Optional[int] = None
-    day: Optional[int] = None
+    year: int | None = None
+    month: int | None = None
+    day: int | None = None
     # Para marcadores relativos
-    direction: Optional[str] = None
-    quantity: Optional[int] = None
-    magnitude: Optional[str] = None
+    direction: str | None = None
+    quantity: int | None = None
+    magnitude: str | None = None
     # Para edades
-    age: Optional[int] = None
-    entity_id: Optional[int] = None
-    created_at: Optional[str] = None
+    age: int | None = None
+    entity_id: int | None = None
+    created_at: str | None = None
 
     def to_dict(self) -> dict:
         """Convierte a diccionario para serialización JSON."""
@@ -158,7 +156,7 @@ class TimelineRepository:
     Permite crear, leer y eliminar eventos del timeline y marcadores.
     """
 
-    def __init__(self, db: Optional[Database] = None):
+    def __init__(self, db: Database | None = None):
         """
         Inicializa el repositorio.
 
@@ -186,10 +184,7 @@ class TimelineRepository:
 
         with self.db.connection() as conn:
             # Eliminar eventos anteriores
-            conn.execute(
-                "DELETE FROM timeline_events WHERE project_id = ?",
-                (project_id,)
-            )
+            conn.execute("DELETE FROM timeline_events WHERE project_id = ?", (project_id,))
 
             # Insertar nuevos eventos
             for event in events:
@@ -215,7 +210,7 @@ class TimelineRepository:
                         event.day_offset,
                         event.weekday,
                         now,
-                    )
+                    ),
                 )
             conn.commit()
 
@@ -239,7 +234,7 @@ class TimelineRepository:
                 WHERE project_id = ?
                 ORDER BY discourse_position, chapter, id
                 """,
-                (project_id,)
+                (project_id,),
             )
             rows = cursor.fetchall()
 
@@ -257,8 +252,7 @@ class TimelineRepository:
         """
         with self.db.connection() as conn:
             cursor = conn.execute(
-                "SELECT COUNT(*) FROM timeline_events WHERE project_id = ?",
-                (project_id,)
+                "SELECT COUNT(*) FROM timeline_events WHERE project_id = ?", (project_id,)
             )
             count = cursor.fetchone()[0]
 
@@ -275,10 +269,7 @@ class TimelineRepository:
             Número de eventos eliminados
         """
         with self.db.connection() as conn:
-            cursor = conn.execute(
-                "DELETE FROM timeline_events WHERE project_id = ?",
-                (project_id,)
-            )
+            cursor = conn.execute("DELETE FROM timeline_events WHERE project_id = ?", (project_id,))
             conn.commit()
             return cursor.rowcount
 
@@ -301,10 +292,7 @@ class TimelineRepository:
 
         with self.db.connection() as conn:
             # Eliminar marcadores anteriores
-            conn.execute(
-                "DELETE FROM temporal_markers WHERE project_id = ?",
-                (project_id,)
-            )
+            conn.execute("DELETE FROM temporal_markers WHERE project_id = ?", (project_id,))
 
             # Insertar nuevos marcadores
             for marker in markers:
@@ -333,14 +321,14 @@ class TimelineRepository:
                         marker.age,
                         marker.entity_id,
                         now,
-                    )
+                    ),
                 )
             conn.commit()
 
         logger.info(f"Guardados {len(markers)} marcadores temporales para proyecto {project_id}")
         return len(markers)
 
-    def get_markers(self, project_id: int, chapter: Optional[int] = None) -> list[TemporalMarkerData]:
+    def get_markers(self, project_id: int, chapter: int | None = None) -> list[TemporalMarkerData]:
         """
         Obtiene marcadores temporales de un proyecto.
 
@@ -359,7 +347,7 @@ class TimelineRepository:
                     WHERE project_id = ? AND chapter = ?
                     ORDER BY start_char
                     """,
-                    (project_id, chapter)
+                    (project_id, chapter),
                 )
             else:
                 cursor = conn.execute(
@@ -368,7 +356,7 @@ class TimelineRepository:
                     WHERE project_id = ?
                     ORDER BY chapter, start_char
                     """,
-                    (project_id,)
+                    (project_id,),
                 )
             rows = cursor.fetchall()
 
@@ -386,8 +374,7 @@ class TimelineRepository:
         """
         with self.db.connection() as conn:
             cursor = conn.execute(
-                "SELECT COUNT(*) FROM temporal_markers WHERE project_id = ?",
-                (project_id,)
+                "SELECT COUNT(*) FROM temporal_markers WHERE project_id = ?", (project_id,)
             )
             return cursor.fetchone()[0]
 
@@ -403,8 +390,7 @@ class TimelineRepository:
         """
         with self.db.connection() as conn:
             cursor = conn.execute(
-                "DELETE FROM temporal_markers WHERE project_id = ?",
-                (project_id,)
+                "DELETE FROM temporal_markers WHERE project_id = ?", (project_id,)
             )
             conn.commit()
             return cursor.rowcount

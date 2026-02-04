@@ -20,11 +20,11 @@ Uso:
 """
 
 import logging
+from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Optional, Iterator
+from typing import Optional
 
-from .title_preprocessor import TitlePreprocessor, ProcessedDocument, ProcessedParagraph
-from .spacy_gpu import load_spacy_model
+from .title_preprocessor import ProcessedDocument, ProcessedParagraph, TitlePreprocessor
 
 logger = logging.getLogger(__name__)
 
@@ -40,14 +40,15 @@ class TitleAwareDoc:
         preceding_title: Título que precede a este contenido (si aplica)
         paragraph_index: Índice del párrafo en el documento
     """
+
     doc: object  # Doc de spaCy
     is_title: bool
-    preceding_title: Optional['TitleAwareDoc'] = None
+    preceding_title: Optional["TitleAwareDoc"] = None
     paragraph_index: int = 0
-    text: Optional[str] = None
+    text: str | None = None
 
     def __post_init__(self):
-        if self.text is None and hasattr(self.doc, 'text'):
+        if self.text is None and hasattr(self.doc, "text"):
             self.text = self.doc.text
 
 
@@ -63,9 +64,10 @@ class TitleAwareAnalysisResult:
         title_count: Número de títulos procesados
         content_count: Número de párrafos de contenido procesados
     """
+
     docs: list[object]  # list[Doc]
     preprocessed: ProcessedDocument
-    grouped_by_title: list[tuple[Optional[object], list[object]]]
+    grouped_by_title: list[tuple[object | None, list[object]]]
     title_count: int
     content_count: int
 
@@ -107,7 +109,6 @@ def analyze_with_title_handling(nlp, text: str) -> TitleAwareAnalysisResult:
     title_index_map = {}  # Mapeo de índice de párrafo a índice de título
 
     # Procesar todos los párrafos con spaCy
-    last_title_doc = None
     last_title_index = -1
 
     for i, para in enumerate(processed.paragraphs):
@@ -124,7 +125,6 @@ def analyze_with_title_handling(nlp, text: str) -> TitleAwareAnalysisResult:
         title_aware_docs.append(aware_doc)
 
         if para.is_title:
-            last_title_doc = aware_doc
             last_title_index = i
             title_index_map[i] = (aware_doc, [])
         else:
@@ -168,9 +168,7 @@ def analyze_with_title_handling(nlp, text: str) -> TitleAwareAnalysisResult:
 
 
 def analyze_paragraphs_separately(
-    nlp,
-    text: str,
-    keep_titles: bool = False
+    nlp, text: str, keep_titles: bool = False
 ) -> Iterator[tuple[ProcessedParagraph, object]]:
     """
     Analiza un texto párrafo por párrafo, detectando títulos.
@@ -203,11 +201,7 @@ def analyze_paragraphs_separately(
         yield para, doc
 
 
-def extract_entities_by_title(
-    nlp,
-    text: str,
-    entity_labels: Optional[list[str]] = None
-) -> dict:
+def extract_entities_by_title(nlp, text: str, entity_labels: list[str] | None = None) -> dict:
     """
     Extrae entidades agrupadas por título de capítulo.
 
@@ -263,11 +257,7 @@ def extract_entities_by_title(
     return entities_by_title
 
 
-def extract_dependencies_by_title(
-    nlp,
-    text: str,
-    dep_labels: Optional[list[str]] = None
-) -> dict:
+def extract_dependencies_by_title(nlp, text: str, dep_labels: list[str] | None = None) -> dict:
     """
     Extrae relaciones de dependencia agrupadas por título.
 
@@ -311,13 +301,15 @@ def extract_dependencies_by_title(
                     continue
 
                 head = token.head
-                deps_list.append({
-                    'dependent': token.text,
-                    'dependent_pos': token.pos_,
-                    'head': head.text,
-                    'head_pos': head.pos_,
-                    'dependency': token.dep_,
-                })
+                deps_list.append(
+                    {
+                        "dependent": token.text,
+                        "dependent_pos": token.pos_,
+                        "head": head.text,
+                        "head_pos": head.pos_,
+                        "dependency": token.dep_,
+                    }
+                )
 
         if deps_list:
             deps_by_title[title_text] = deps_list
@@ -325,10 +317,7 @@ def extract_dependencies_by_title(
     return deps_by_title
 
 
-def get_parsing_quality_metrics(
-    nlp,
-    text: str
-) -> dict:
+def get_parsing_quality_metrics(nlp, text: str) -> dict:
     """
     Calcula métricas de calidad del parsing de spaCy.
 
@@ -353,20 +342,24 @@ def get_parsing_quality_metrics(
     doc_without_titles = nlp(content_text)
 
     metrics = {
-        'text_length': len(text),
-        'content_length': len(content_text),
-        'title_count': processed.title_count,
-        'with_titles': {
-            'sentence_count': len(list(doc_with_titles.sents)),
-            'entity_count': len(doc_with_titles.ents),
-            'verb_count': sum(1 for token in doc_with_titles if token.pos_ == 'VERB'),
-            'root_verbs': sum(1 for token in doc_with_titles if token.pos_ == 'VERB' and token.dep_ == 'ROOT'),
+        "text_length": len(text),
+        "content_length": len(content_text),
+        "title_count": processed.title_count,
+        "with_titles": {
+            "sentence_count": len(list(doc_with_titles.sents)),
+            "entity_count": len(doc_with_titles.ents),
+            "verb_count": sum(1 for token in doc_with_titles if token.pos_ == "VERB"),
+            "root_verbs": sum(
+                1 for token in doc_with_titles if token.pos_ == "VERB" and token.dep_ == "ROOT"
+            ),
         },
-        'without_titles': {
-            'sentence_count': len(list(doc_without_titles.sents)),
-            'entity_count': len(doc_without_titles.ents),
-            'verb_count': sum(1 for token in doc_without_titles if token.pos_ == 'VERB'),
-            'root_verbs': sum(1 for token in doc_without_titles if token.pos_ == 'VERB' and token.dep_ == 'ROOT'),
+        "without_titles": {
+            "sentence_count": len(list(doc_without_titles.sents)),
+            "entity_count": len(doc_without_titles.ents),
+            "verb_count": sum(1 for token in doc_without_titles if token.pos_ == "VERB"),
+            "root_verbs": sum(
+                1 for token in doc_without_titles if token.pos_ == "VERB" and token.dep_ == "ROOT"
+            ),
         },
     }
 

@@ -5,15 +5,15 @@ Recibe alertas de todos los módulos de análisis, las clasifica, prioriza
 y presenta al usuario de forma unificada.
 """
 
+from .formatter import AlertFormatter, get_alert_formatter
 from .models import (
     Alert,
     AlertCategory,
+    AlertFilter,
     AlertSeverity,
     AlertStatus,
-    AlertFilter,
 )
 from .repository import AlertRepository, get_alert_repository
-from .formatter import AlertFormatter, get_alert_formatter
 
 # AlertEngine depends on analysis modules which import NLP libraries (numpy, spacy).
 # These are NOT available in embedded Python (production) until the user

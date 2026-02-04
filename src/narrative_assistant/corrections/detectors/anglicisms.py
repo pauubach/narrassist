@@ -19,7 +19,6 @@ from ..base import BaseDetector, CorrectionIssue
 from ..config import AnglicismsConfig
 from ..types import CorrectionCategory
 
-
 # Anglicismos crudos (sin adaptación, tienen equivalente español claro)
 ANGLICISMS_RAW = {
     # Negocios/Marketing
@@ -40,7 +39,6 @@ ANGLICISMS_RAW = {
     "business": ("negocio", "empresa"),
     "partner": ("socio",),
     "sponsor": ("patrocinador",),
-
     # Tecnología (con equivalentes claros)
     "link": ("enlace", "vínculo"),
     "click": ("clic", "pulsar"),
@@ -62,7 +60,6 @@ ANGLICISMS_RAW = {
     "smartphone": ("teléfono inteligente", "móvil"),
     "tablet": ("tableta",),
     "laptop": ("portátil", "ordenador portátil"),
-
     # Vida cotidiana
     "shopping": ("compras",),
     "parking": ("aparcamiento", "estacionamiento"),
@@ -79,7 +76,6 @@ ANGLICISMS_RAW = {
     "fake": ("falso", "falsificación"),
     "feeling": ("sensación", "sentimiento"),
     "relax": ("relajarse", "descanso"),
-
     # Medios/Entretenimiento
     "show": ("espectáculo", "programa"),
     "casting": ("audición", "selección"),
@@ -93,7 +89,6 @@ ANGLICISMS_RAW = {
     "hater": ("detractor",),
     "follower": ("seguidor",),
     "like": ("me gusta",),
-
     # Trabajo/Oficina
     "freelance": ("autónomo", "independiente"),
     "outsourcing": ("externalización", "subcontratación"),
@@ -103,7 +98,6 @@ ANGLICISMS_RAW = {
     "empowerment": ("empoderamiento",),
     "leadership": ("liderazgo",),
     "feedback loop": ("ciclo de retroalimentación",),
-
     # Otros
     "ok": ("de acuerdo", "bien", "vale"),
     "stop": ("alto", "parar", "detener"),
@@ -120,17 +114,50 @@ ANGLICISMS_RAW = {
 
 # Anglicismos aceptados por la RAE (no alertar)
 ACCEPTED_BY_RAE = {
-    "software", "hardware", "internet", "web", "wifi",
-    "blues", "jazz", "rock", "pop", "punk", "hip-hop", "rap",
-    "club", "bar", "pub", "hotel", "motel",
-    "film", "set", "best seller", "thriller",
-    "marketing", "stock", "holding",
-    "sprint", "golf", "tenis", "rugby", "fútbol",
-    "camping", "rally", "karting",
-    "whisky", "gin", "vodka", "brandy",
-    "jean", "jeans", "jersey", "pullover",
-    "express", "vip",
-    "airbag", "stop",  # señales de tráfico
+    "software",
+    "hardware",
+    "internet",
+    "web",
+    "wifi",
+    "blues",
+    "jazz",
+    "rock",
+    "pop",
+    "punk",
+    "hip-hop",
+    "rap",
+    "club",
+    "bar",
+    "pub",
+    "hotel",
+    "motel",
+    "film",
+    "set",
+    "best seller",
+    "thriller",
+    "marketing",
+    "stock",
+    "holding",
+    "sprint",
+    "golf",
+    "tenis",
+    "rugby",
+    "fútbol",
+    "camping",
+    "rally",
+    "karting",
+    "whisky",
+    "gin",
+    "vodka",
+    "brandy",
+    "jean",
+    "jeans",
+    "jersey",
+    "pullover",
+    "express",
+    "vip",
+    "airbag",
+    "stop",  # señales de tráfico
 }
 
 # Patrones morfológicos de anglicismos no adaptados
@@ -145,14 +172,40 @@ ANGLICISM_PATTERNS = [
 # Palabras que parecen anglicismos pero son válidas en español
 FALSE_POSITIVES = {
     # Palabras españolas que terminan en -ing
-    "ring", "ping", "bing",  # onomatopeyas
+    "ring",
+    "ping",
+    "bing",  # onomatopeyas
     # Palabras que terminan en -er
-    "taller", "mujer", "poder", "saber", "hacer", "querer", "ver",
-    "comer", "beber", "correr", "ser", "tener", "volver", "poner",
-    "caer", "traer", "leer", "creer", "poseer", "proveer",
-    "ayer", "primer", "tercer", "cualquier",
+    "taller",
+    "mujer",
+    "poder",
+    "saber",
+    "hacer",
+    "querer",
+    "ver",
+    "comer",
+    "beber",
+    "correr",
+    "ser",
+    "tener",
+    "volver",
+    "poner",
+    "caer",
+    "traer",
+    "leer",
+    "creer",
+    "poseer",
+    "proveer",
+    "ayer",
+    "primer",
+    "tercer",
+    "cualquier",
     # Otras
-    "internet", "club", "film", "pub", "bar",
+    "internet",
+    "club",
+    "film",
+    "pub",
+    "bar",
 }
 
 
@@ -180,7 +233,6 @@ GALICISMS_RAW = {
     "dessert": ("postre",),
     "sommelier": ("sumiller",),
     "maître": ("jefe de sala", "metre"),
-
     # Moda y estética
     "chic": ("elegante", "sofisticado"),
     "glamour": ("encanto", "atractivo"),
@@ -194,7 +246,6 @@ GALICISMS_RAW = {
     "silhouette": ("silueta",),
     "parure": ("aderezo", "juego de joyas"),
     "bijou": ("joya", "alhaja"),
-
     # Arte y cultura
     "atelier": ("taller", "estudio"),
     "soirée": ("velada", "fiesta nocturna"),
@@ -208,7 +259,6 @@ GALICISMS_RAW = {
     "naïf": ("ingenuo", "naíf"),
     "blasé": ("hastiado", "desencantado"),
     "ennui": ("tedio", "hastío", "aburrimiento"),
-
     # Sociedad y comportamiento
     "savoir-faire": ("saber hacer", "habilidad"),
     "savoir-vivre": ("saber vivir", "buenas maneras"),
@@ -225,7 +275,6 @@ GALICISMS_RAW = {
     "joie de vivre": ("alegría de vivir",),
     "bon vivant": ("vividor", "sibarita"),
     "enfant terrible": ("niño terrible",),
-
     # Decoración e interiorismo
     "boudoir": ("tocador", "gabinete íntimo"),
     "chaise longue": ("diván", "tumbona"),
@@ -234,7 +283,6 @@ GALICISMS_RAW = {
     "toilette": ("tocador", "aseo"),
     "parquet": ("parqué", "entarimado"),
     "plafond": ("techo", "límite"),
-
     # Otros
     "ambiance": ("ambiente", "atmósfera"),
     "cachet": ("caché", "distinción"),
@@ -261,13 +309,36 @@ GALICISMS_RAW = {
 
 # Galicismos aceptados o muy usados (no alertar)
 GALICISMS_ACCEPTED = {
-    "hotel", "restaurante", "menú", "café", "ballet",
-    "debut", "fiesta", "gala", "garage", "garaje",
-    "bulevar", "jardín", "chófer", "chofer",
-    "carné", "carnet", "comité", "corsé",
-    "dossier", "élite", "equipaje", "etiqueta",
-    "pantalón", "paté", "suflé", "consomé",
-    "bidé", "parqué", "rol", "matiné",
+    "hotel",
+    "restaurante",
+    "menú",
+    "café",
+    "ballet",
+    "debut",
+    "fiesta",
+    "gala",
+    "garage",
+    "garaje",
+    "bulevar",
+    "jardín",
+    "chófer",
+    "chofer",
+    "carné",
+    "carnet",
+    "comité",
+    "corsé",
+    "dossier",
+    "élite",
+    "equipaje",
+    "etiqueta",
+    "pantalón",
+    "paté",
+    "suflé",
+    "consomé",
+    "bidé",
+    "parqué",
+    "rol",
+    "matiné",
 }
 
 # Patrones morfológicos de galicismos
@@ -283,11 +354,30 @@ GALICISM_PATTERNS = [
 # Falsos positivos para galicismos
 GALICISM_FALSE_POSITIVES = {
     # Palabras españolas comunes
-    "equipaje", "personaje", "paisaje", "viaje", "linaje",
-    "coraje", "mensaje", "lenguaje", "homenaje", "pasaje",
-    "arbitraje", "hospedaje", "aterrizaje", "embalaje",
-    "coqueta", "silueta", "maleta", "carreta", "paleta",
-    "jinete", "banquete", "paquete", "raqueta", "cohete",
+    "equipaje",
+    "personaje",
+    "paisaje",
+    "viaje",
+    "linaje",
+    "coraje",
+    "mensaje",
+    "lenguaje",
+    "homenaje",
+    "pasaje",
+    "arbitraje",
+    "hospedaje",
+    "aterrizaje",
+    "embalaje",
+    "coqueta",
+    "silueta",
+    "maleta",
+    "carreta",
+    "paleta",
+    "jinete",
+    "banquete",
+    "paquete",
+    "raqueta",
+    "cohete",
 }
 
 
@@ -309,12 +399,10 @@ class AnglicismsDetector(BaseDetector):
     def __init__(self, config: Optional["AnglicismsConfig"] = None):
         self.config = config or AnglicismsConfig()
         self._compiled_anglicism_patterns = [
-            (re.compile(pattern, re.IGNORECASE), desc)
-            for pattern, desc in ANGLICISM_PATTERNS
+            (re.compile(pattern, re.IGNORECASE), desc) for pattern, desc in ANGLICISM_PATTERNS
         ]
         self._compiled_galicism_patterns = [
-            (re.compile(pattern, re.IGNORECASE), desc)
-            for pattern, desc in GALICISM_PATTERNS
+            (re.compile(pattern, re.IGNORECASE), desc) for pattern, desc in GALICISM_PATTERNS
         ]
 
     @property
@@ -328,7 +416,7 @@ class AnglicismsDetector(BaseDetector):
     def detect(
         self,
         text: str,
-        chapter_index: Optional[int] = None,
+        chapter_index: int | None = None,
         spacy_doc=None,
         **kwargs,
     ) -> list[CorrectionIssue]:
@@ -364,11 +452,11 @@ class AnglicismsDetector(BaseDetector):
         return issues
 
     def _detect_dictionary_anglicisms(
-        self, text: str, chapter_index: Optional[int]
+        self, text: str, chapter_index: int | None
     ) -> list[CorrectionIssue]:
         """Detecta anglicismos del diccionario."""
         issues = []
-        text_lower = text.lower()
+        text.lower()
 
         for anglicism, alternatives in ANGLICISMS_RAW.items():
             # Buscar el anglicismo (case insensitive, palabra completa)
@@ -420,7 +508,7 @@ class AnglicismsDetector(BaseDetector):
         return issues
 
     def _detect_pattern_anglicisms(
-        self, text: str, chapter_index: Optional[int]
+        self, text: str, chapter_index: int | None
     ) -> list[CorrectionIssue]:
         """Detecta anglicismos por patrones morfológicos."""
         issues = []
@@ -473,25 +561,22 @@ class AnglicismsDetector(BaseDetector):
             return True
 
         # Verificar si está entre comillas (probablemente intencional)
-        before = text[max(0, start - 10):start]
-        after = text[end:min(len(text), end + 10)]
+        before = text[max(0, start - 10) : start]
+        after = text[end : min(len(text), end + 10)]
         if '"' in before and '"' in after:
             return True
         if "«" in before and "»" in after:
             return True
 
         # Verificar si es parte de nombre propio (ej: "John Smith")
-        if start > 0 and text[start - 1] not in " \n\t.!?¿¡":
-            return True
-
-        return False
+        return bool(start > 0 and text[start - 1] not in " \n\t.!?¿¡")
 
     # ========================================================================
     # GALICISMOS
     # ========================================================================
 
     def _detect_dictionary_galicisms(
-        self, text: str, chapter_index: Optional[int]
+        self, text: str, chapter_index: int | None
     ) -> list[CorrectionIssue]:
         """Detecta galicismos del diccionario."""
         issues = []
@@ -547,7 +632,7 @@ class AnglicismsDetector(BaseDetector):
         return issues
 
     def _detect_pattern_galicisms(
-        self, text: str, chapter_index: Optional[int]
+        self, text: str, chapter_index: int | None
     ) -> list[CorrectionIssue]:
         """Detecta galicismos por patrones morfológicos."""
         issues = []
@@ -603,15 +688,12 @@ class AnglicismsDetector(BaseDetector):
             return True
 
         # Verificar si está entre comillas
-        before = text[max(0, start - 10):start]
-        after = text[end:min(len(text), end + 10)]
+        before = text[max(0, start - 10) : start]
+        after = text[end : min(len(text), end + 10)]
         if '"' in before and '"' in after:
             return True
         if "«" in before and "»" in after:
             return True
 
         # Verificar si es parte de nombre propio
-        if start > 0 and text[start - 1] not in " \n\t.!?¿¡":
-            return True
-
-        return False
+        return bool(start > 0 and text[start - 1] not in " \n\t.!?¿¡")

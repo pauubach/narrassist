@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Pipeline principal de extracción de atributos híbrido.
 
@@ -9,17 +8,17 @@ Orquesta múltiples extractores usando:
 """
 
 import logging
-from dataclasses import dataclass, field
-from typing import Optional, Any
+from dataclasses import dataclass
+from typing import Any
 
+from .aggregator import ResultAggregator
 from .base import (
+    AggregatedAttribute,
     BaseExtractor,
     ExtractionContext,
     ExtractionMethod,
-    AggregatedAttribute,
 )
 from .router import ComplexityRouter
-from .aggregator import ResultAggregator
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +40,7 @@ class PipelineConfig:
         enable_cache: Habilitar cache de resultados
         cache_ttl_seconds: TTL del cache en segundos
     """
+
     use_regex: bool = True
     use_dependency: bool = True
     use_embeddings: bool = True
@@ -78,8 +78,8 @@ class AttributeExtractionPipeline:
 
     def __init__(
         self,
-        config: Optional[PipelineConfig] = None,
-        extractors: Optional[list[BaseExtractor]] = None,
+        config: PipelineConfig | None = None,
+        extractors: list[BaseExtractor] | None = None,
     ):
         """
         Inicializa el pipeline.
@@ -92,9 +92,7 @@ class AttributeExtractionPipeline:
         self.router = ComplexityRouter(
             complexity_threshold_for_llm=self.config.complexity_threshold_for_llm
         )
-        self.aggregator = ResultAggregator(
-            min_confidence=self.config.min_confidence
-        )
+        self.aggregator = ResultAggregator(min_confidence=self.config.min_confidence)
 
         # Inicializar extractores
         self.extractors = extractors or self._create_default_extractors()
@@ -110,6 +108,7 @@ class AttributeExtractionPipeline:
         """Lazy loading del modelo spaCy."""
         if self._nlp is None:
             from ..spacy_gpu import load_spacy_model
+
             self._nlp = load_spacy_model()
         return self._nlp
 
@@ -119,17 +118,20 @@ class AttributeExtractionPipeline:
 
         if self.config.use_regex:
             from .extractors.regex_extractor import RegexExtractor
+
             extractors.append(RegexExtractor())
             logger.debug("RegexExtractor enabled")
 
         if self.config.use_dependency:
             from .extractors.dependency_extractor import DependencyExtractor
+
             extractors.append(DependencyExtractor())
             logger.debug("DependencyExtractor enabled")
 
         if self.config.use_embeddings:
             try:
                 from .extractors.embeddings_extractor import EmbeddingsExtractor
+
                 extractors.append(EmbeddingsExtractor())
                 logger.debug("EmbeddingsExtractor enabled")
             except ImportError as e:
@@ -138,6 +140,7 @@ class AttributeExtractionPipeline:
         if self.config.use_llm:
             try:
                 from .extractors.llm_extractor import LLMExtractor
+
                 extractors.append(LLMExtractor())
                 logger.debug("LLMExtractor enabled")
             except ImportError as e:
@@ -149,8 +152,8 @@ class AttributeExtractionPipeline:
         self,
         text: str,
         entity_names: list[str],
-        entity_mentions: Optional[list[tuple[str, int, int]]] = None,
-        chapter: Optional[int] = None,
+        entity_mentions: list[tuple[str, int, int]] | None = None,
+        chapter: int | None = None,
     ) -> list[AggregatedAttribute]:
         """
         Extrae atributos del texto.
@@ -194,9 +197,7 @@ class AttributeExtractionPipeline:
 
         # Seleccionar extractores
         selected_extractors = self._select_extractors(complexity)
-        logger.info(
-            f"Using extractors: {[e.method.value for e in selected_extractors]}"
-        )
+        logger.info(f"Using extractors: {[e.method.value for e in selected_extractors]}")
 
         # Ejecutar extractores
         results = self._run_extractors(selected_extractors, context)
@@ -275,13 +276,10 @@ class AttributeExtractionPipeline:
                 result = extractor.extract(context)
                 results.append(result)
                 logger.debug(
-                    f"{extractor.method.value}: "
-                    f"{len(result.attributes)} attributes extracted"
+                    f"{extractor.method.value}: {len(result.attributes)} attributes extracted"
                 )
             except Exception as e:
-                logger.warning(
-                    f"Extractor {extractor.method.value} failed: {e}"
-                )
+                logger.warning(f"Extractor {extractor.method.value} failed: {e}")
 
         return results
 
@@ -296,10 +294,7 @@ class AttributeExtractionPipeline:
         results = []
 
         with ThreadPoolExecutor(max_workers=self.config.max_workers) as executor:
-            futures = {
-                executor.submit(e.extract, context): e
-                for e in extractors
-            }
+            futures = {executor.submit(e.extract, context): e for e in extractors}
 
             for future in as_completed(futures):
                 extractor = futures[future]
@@ -307,13 +302,10 @@ class AttributeExtractionPipeline:
                     result = future.result()
                     results.append(result)
                     logger.debug(
-                        f"{extractor.method.value}: "
-                        f"{len(result.attributes)} attributes extracted"
+                        f"{extractor.method.value}: {len(result.attributes)} attributes extracted"
                     )
                 except Exception as e:
-                    logger.warning(
-                        f"Extractor {extractor.method.value} failed: {e}"
-                    )
+                    logger.warning(f"Extractor {extractor.method.value} failed: {e}")
 
         return results
 
@@ -326,12 +318,12 @@ class AttributeExtractionPipeline:
 # Singleton
 # =============================================================================
 
-_pipeline_instance: Optional[AttributeExtractionPipeline] = None
+_pipeline_instance: AttributeExtractionPipeline | None = None
 _pipeline_lock = None
 
 
 def get_extraction_pipeline(
-    config: Optional[PipelineConfig] = None,
+    config: PipelineConfig | None = None,
 ) -> AttributeExtractionPipeline:
     """
     Obtiene singleton del pipeline de extracción.
@@ -346,6 +338,7 @@ def get_extraction_pipeline(
 
     if _pipeline_lock is None:
         import threading
+
         _pipeline_lock = threading.Lock()
 
     if _pipeline_instance is None:

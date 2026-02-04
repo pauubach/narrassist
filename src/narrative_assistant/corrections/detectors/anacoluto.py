@@ -13,11 +13,10 @@ Detecta:
 """
 
 import re
-from typing import Optional
 
 from ..base import BaseDetector, CorrectionIssue
 from ..config import AnacolutoConfig
-from ..types import CorrectionCategory, AnacolutoIssueType
+from ..types import AnacolutoIssueType, CorrectionCategory
 
 
 class AnacolutoDetector(BaseDetector):
@@ -30,30 +29,33 @@ class AnacolutoDetector(BaseDetector):
 
     # Patrones para detectar marcadores de subordinación
     SUBORDINATE_MARKERS = re.compile(
-        r'\b(que|quien|quienes|cual|cuales|cuyo|cuya|cuyos|cuyas|'
-        r'donde|cuando|como|mientras|aunque|porque|si|sino|'
-        r'ya que|puesto que|dado que|a pesar de que|pese a que|'
-        r'con tal de que|siempre que|una vez que|antes de que|después de que)\b',
-        re.IGNORECASE
+        r"\b(que|quien|quienes|cual|cuales|cuyo|cuya|cuyos|cuyas|"
+        r"donde|cuando|como|mientras|aunque|porque|si|sino|"
+        r"ya que|puesto que|dado que|a pesar de que|pese a que|"
+        r"con tal de que|siempre que|una vez que|antes de que|después de que)\b",
+        re.IGNORECASE,
     )
 
     # Patrones de inicio que pueden indicar nominativus pendens
     NOMINATIVUS_PATTERNS = [
         # "Juan, su hermano llegó" - nombre seguido de coma y pronombre posesivo
-        re.compile(r'^([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s*,\s+(su|sus|mi|mis|tu|tus)\s', re.IGNORECASE),
+        re.compile(r"^([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s*,\s+(su|sus|mi|mis|tu|tus)\s", re.IGNORECASE),
         # "En cuanto a Juan, su hermano..."
-        re.compile(r'^(en cuanto a|respecto a|en lo que respecta a|por lo que respecta a)\s+[^,]+,\s+(su|sus)\s', re.IGNORECASE),
+        re.compile(
+            r"^(en cuanto a|respecto a|en lo que respecta a|por lo que respecta a)\s+[^,]+,\s+(su|sus)\s",
+            re.IGNORECASE,
+        ),
         # "Lo que pasa es que" seguido de muchas subordinadas
-        re.compile(r'^lo que pasa es que\b', re.IGNORECASE),
+        re.compile(r"^lo que pasa es que\b", re.IGNORECASE),
     ]
 
     # Marcadores de gerundio inicial (posible dangling modifier)
-    GERUND_START = re.compile(r'^([A-ZÁÉÍÓÚÑ][a-záéíóúñ]*ndo)\b', re.IGNORECASE)
+    GERUND_START = re.compile(r"^([A-ZÁÉÍÓÚÑ][a-záéíóúñ]*ndo)\b", re.IGNORECASE)
 
     # Patrón para detectar fin de oración
     SENTENCE_END = re.compile(r'[.!?]+(?:\s|$|"|\)|»|\')')
 
-    def __init__(self, config: Optional[AnacolutoConfig] = None):
+    def __init__(self, config: AnacolutoConfig | None = None):
         self.config = config or AnacolutoConfig()
         self._nlp = None
 
@@ -70,9 +72,11 @@ class AnacolutoDetector(BaseDetector):
         if self._nlp is None:
             try:
                 from narrative_assistant.nlp.spacy_gpu import load_spacy_model
+
                 self._nlp = load_spacy_model()
             except Exception as e:
                 import logging
+
                 logging.getLogger(__name__).warning(f"No se pudo cargar spaCy: {e}")
                 return None
         return self._nlp
@@ -80,7 +84,7 @@ class AnacolutoDetector(BaseDetector):
     def detect(
         self,
         text: str,
-        chapter_index: Optional[int] = None,
+        chapter_index: int | None = None,
         **kwargs,
     ) -> list[CorrectionIssue]:
         """
@@ -177,9 +181,9 @@ class AnacolutoDetector(BaseDetector):
         sentence: str,
         start: int,
         end: int,
-        chapter_index: Optional[int],
+        chapter_index: int | None,
         full_text: str,
-    ) -> Optional[CorrectionIssue]:
+    ) -> CorrectionIssue | None:
         """
         Detecta nominativus pendens (sujeto "colgado").
 
@@ -218,10 +222,10 @@ class AnacolutoDetector(BaseDetector):
         sentence: str,
         start: int,
         end: int,
-        chapter_index: Optional[int],
+        chapter_index: int | None,
         full_text: str,
         nlp,
-    ) -> Optional[CorrectionIssue]:
+    ) -> CorrectionIssue | None:
         """
         Detecta cambios de construcción sintáctica a mitad de oración.
 
@@ -242,7 +246,8 @@ class AnacolutoDetector(BaseDetector):
             # Buscar cláusulas sin verbo finito
             verbs = [token for token in doc if token.pos_ == "VERB"]
             finite_verbs = [
-                v for v in verbs
+                v
+                for v in verbs
                 if v.morph.get("VerbForm") and v.morph.get("VerbForm")[0] in ["Fin"]
             ]
 
@@ -280,10 +285,10 @@ class AnacolutoDetector(BaseDetector):
         sentence: str,
         start: int,
         end: int,
-        chapter_index: Optional[int],
+        chapter_index: int | None,
         full_text: str,
         nlp,
-    ) -> Optional[CorrectionIssue]:
+    ) -> CorrectionIssue | None:
         """
         Detecta cláusulas incompletas (subordinadas que no se cierran).
         """
@@ -330,10 +335,10 @@ class AnacolutoDetector(BaseDetector):
         sentence: str,
         start: int,
         end: int,
-        chapter_index: Optional[int],
+        chapter_index: int | None,
         full_text: str,
         nlp,
-    ) -> Optional[CorrectionIssue]:
+    ) -> CorrectionIssue | None:
         """
         Detecta modificadores "colgantes" (dangling modifiers).
 
@@ -366,9 +371,18 @@ class AnacolutoDetector(BaseDetector):
                     if main_subject.i > gerund.i + 3:
                         # Verbos que típicamente requieren agente animado
                         animate_verbs = {
-                            "caminando", "corriendo", "pensando", "mirando",
-                            "hablando", "escribiendo", "leyendo", "trabajando",
-                            "jugando", "comiendo", "durmiendo", "esperando"
+                            "caminando",
+                            "corriendo",
+                            "pensando",
+                            "mirando",
+                            "hablando",
+                            "escribiendo",
+                            "leyendo",
+                            "trabajando",
+                            "jugando",
+                            "comiendo",
+                            "durmiendo",
+                            "esperando",
                         }
                         gerund_lemma = gerund.lemma_.lower()
 
@@ -404,10 +418,10 @@ class AnacolutoDetector(BaseDetector):
         sentence: str,
         start: int,
         end: int,
-        chapter_index: Optional[int],
+        chapter_index: int | None,
         full_text: str,
         nlp,
-    ) -> Optional[CorrectionIssue]:
+    ) -> CorrectionIssue | None:
         """
         Detecta cambios problemáticos de sujeto dentro de una oración.
 
@@ -425,12 +439,14 @@ class AnacolutoDetector(BaseDetector):
         subjects = []
         for token in doc:
             if token.dep_ in ["nsubj", "nsubj:pass"]:
-                subjects.append({
-                    "token": token,
-                    "text": token.text,
-                    "pos": token.i,
-                    "head_verb": token.head,
-                })
+                subjects.append(
+                    {
+                        "token": token,
+                        "text": token.text,
+                        "pos": token.i,
+                        "head_verb": token.head,
+                    }
+                )
 
         # Si hay menos de 2 sujetos, no hay cambio
         if len(subjects) < 2:
@@ -451,21 +467,27 @@ class AnacolutoDetector(BaseDetector):
                 continue
 
             # Verificar si hay conector entre los sujetos
-            tokens_between = [
-                t for t in doc
-                if prev_subj["pos"] < t.i < curr_subj["pos"]
-            ]
+            tokens_between = [t for t in doc if prev_subj["pos"] < t.i < curr_subj["pos"]]
 
             # Conectores que hacen válido un cambio de sujeto
             valid_connectors = {
-                "y", "pero", "aunque", "mientras", "cuando", "porque",
-                "sin embargo", "no obstante", "además", "también",
-                "por su parte", "en cambio", "mientras tanto",
+                "y",
+                "pero",
+                "aunque",
+                "mientras",
+                "cuando",
+                "porque",
+                "sin embargo",
+                "no obstante",
+                "además",
+                "también",
+                "por su parte",
+                "en cambio",
+                "mientras tanto",
             }
 
             has_valid_connector = any(
-                t.text.lower() in valid_connectors or
-                t.dep_ == "cc"  # Conjunción coordinante
+                t.text.lower() in valid_connectors or t.dep_ == "cc"  # Conjunción coordinante
                 for t in tokens_between
             )
 
@@ -479,8 +501,7 @@ class AnacolutoDetector(BaseDetector):
                 if prev_verb != curr_verb:
                     # Verificar si hay puntuación de separación
                     text_between = sentence[
-                        prev_subj["token"].idx + len(prev_subj["text"]):
-                        curr_subj["token"].idx
+                        prev_subj["token"].idx + len(prev_subj["text"]) : curr_subj["token"].idx
                     ]
 
                     # Si no hay coma ni punto y coma, es más problemático

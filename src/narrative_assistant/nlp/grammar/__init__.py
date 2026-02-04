@@ -33,51 +33,51 @@ Configuración (en AppConfig.grammar o variables de entorno):
 """
 
 from .base import (
+    GrammarDetectionMethod,
+    GrammarErrorType,
     GrammarIssue,
     GrammarReport,
-    GrammarErrorType,
     GrammarSeverity,
-    GrammarDetectionMethod,
 )
 from .grammar_checker import (
     GrammarChecker,
     get_grammar_checker,
     reset_grammar_checker,
 )
-from .spanish_rules import (
-    SpanishRulesConfig,
-    apply_spanish_rules,
-    check_dequeismo,
-    check_queismo,
-    check_laismo,
-    check_loismo,
-    check_gender_agreement,
-    check_number_agreement,
-    check_adjective_agreement,
-    check_redundancy,
-    check_punctuation,
-)
 from .languagetool_client import (
-    LTMatch,
+    LanguageToolClient,
     LTCheckResult,
     LTClientError,
-    LanguageToolClient,
+    LTMatch,
     get_languagetool_client,
     is_languagetool_available,
     reset_languagetool_client,
 )
 from .languagetool_manager import (
-    LanguageToolManager,
-    get_languagetool_manager,
-    ensure_languagetool_running,
-    stop_languagetool,
-    is_languagetool_installed,
     # Instalador
     InstallProgress,
     LanguageToolInstaller,
+    LanguageToolManager,
+    ensure_languagetool_running,
     get_install_progress,
+    get_languagetool_manager,
+    is_languagetool_installed,
     is_lt_installing,
     start_lt_installation,
+    stop_languagetool,
+)
+from .spanish_rules import (
+    SpanishRulesConfig,
+    apply_spanish_rules,
+    check_adjective_agreement,
+    check_dequeismo,
+    check_gender_agreement,
+    check_laismo,
+    check_loismo,
+    check_number_agreement,
+    check_punctuation,
+    check_queismo,
+    check_redundancy,
 )
 
 __all__ = [

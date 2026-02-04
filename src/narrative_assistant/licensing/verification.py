@@ -13,35 +13,30 @@ import logging
 import threading
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from pathlib import Path
-from typing import Optional
 from urllib.parse import urljoin
 
-from ..core.config import get_config
+from ..core.errors import ErrorSeverity, NarrativeError
 from ..core.result import Result
-from ..core.errors import NarrativeError, ErrorSeverity
+from .fingerprint import get_hardware_fingerprint, get_hardware_info
 from .models import (
-    License,
-    LicenseStatus,
-    LicenseTier,
-    LicenseBundle,
-    LicenseModule,
+    DEVICE_DEACTIVATION_COOLDOWN_HOURS,
     Device,
     DeviceStatus,
+    License,
+    LicenseBundle,
+    LicenseModule,
+    LicenseStatus,
+    LicenseTier,
     Subscription,
     UsageRecord,
-    TierLimits,
-    OFFLINE_GRACE_PERIOD_DAYS,
-    DEVICE_DEACTIVATION_COOLDOWN_HOURS,
     initialize_licensing_schema,
 )
-from .fingerprint import get_hardware_fingerprint, get_hardware_info
 
 logger = logging.getLogger(__name__)
 
 # Lock para thread-safety
 _license_lock = threading.Lock()
-_cached_license: Optional[License] = None
+_cached_license: License | None = None
 
 
 # =============================================================================
@@ -52,6 +47,7 @@ _cached_license: Optional[License] = None
 @dataclass
 class LicenseError(NarrativeError):
     """Error base para problemas de licencia."""
+
     pass
 
 
@@ -61,7 +57,7 @@ class LicenseNotFoundError(LicenseError):
 
     message: str = "No license found"
     severity: ErrorSeverity = ErrorSeverity.FATAL
-    user_message: Optional[str] = None
+    user_message: str | None = None
 
     def __post_init__(self):
         if self.user_message is None:
@@ -76,16 +72,15 @@ class LicenseNotFoundError(LicenseError):
 class LicenseExpiredError(LicenseError):
     """Licencia expirada."""
 
-    expired_at: Optional[datetime] = None
+    expired_at: datetime | None = None
     message: str = "License expired"
     severity: ErrorSeverity = ErrorSeverity.FATAL
-    user_message: Optional[str] = None
+    user_message: str | None = None
 
     def __post_init__(self):
         if self.user_message is None:
             self.user_message = (
-                "Tu licencia ha expirado. "
-                "Por favor, renueva tu suscripcion para continuar."
+                "Tu licencia ha expirado. Por favor, renueva tu suscripcion para continuar."
             )
         super().__post_init__()
 
@@ -94,10 +89,10 @@ class LicenseExpiredError(LicenseError):
 class LicenseOfflineError(LicenseError):
     """No se puede verificar licencia (sin conexion)."""
 
-    grace_remaining: Optional[timedelta] = None
+    grace_remaining: timedelta | None = None
     message: str = "Cannot verify license offline"
     severity: ErrorSeverity = ErrorSeverity.DEGRADED
-    user_message: Optional[str] = None
+    user_message: str | None = None
 
     def __post_init__(self):
         if self.grace_remaining:
@@ -107,9 +102,7 @@ class LicenseOfflineError(LicenseError):
                 "Conectate a internet para verificar tu licencia."
             )
         else:
-            self.user_message = (
-                "No se puede verificar la licencia sin conexion a internet."
-            )
+            self.user_message = "No se puede verificar la licencia sin conexion a internet."
         super().__post_init__()
 
 
@@ -121,7 +114,7 @@ class DeviceLimitError(LicenseError):
     max_devices: int = 0
     message: str = "Device limit reached"
     severity: ErrorSeverity = ErrorSeverity.FATAL
-    user_message: Optional[str] = None
+    user_message: str | None = None
 
     def __post_init__(self):
         if self.user_message is None:
@@ -136,24 +129,20 @@ class DeviceLimitError(LicenseError):
 class DeviceCooldownError(LicenseError):
     """Dispositivo en periodo de cooldown."""
 
-    cooldown_ends: Optional[datetime] = None
+    cooldown_ends: datetime | None = None
     message: str = "Device in cooldown period"
     severity: ErrorSeverity = ErrorSeverity.FATAL
-    user_message: Optional[str] = None
+    user_message: str | None = None
 
     def __post_init__(self):
         if self.cooldown_ends:
-            hours_remaining = int(
-                (self.cooldown_ends - datetime.utcnow()).total_seconds() / 3600
-            )
+            hours_remaining = int((self.cooldown_ends - datetime.utcnow()).total_seconds() / 3600)
             self.user_message = (
                 f"Este dispositivo fue desactivado recientemente. "
                 f"Podras reactivarlo en {hours_remaining} horas."
             )
         else:
-            self.user_message = (
-                "Este dispositivo esta en periodo de espera tras desactivacion."
-            )
+            self.user_message = "Este dispositivo esta en periodo de espera tras desactivacion."
         super().__post_init__()
 
 
@@ -166,7 +155,7 @@ class QuotaExceededError(LicenseError):
     billing_period: str = ""
     message: str = "Manuscript quota exceeded"
     severity: ErrorSeverity = ErrorSeverity.FATAL
-    user_message: Optional[str] = None
+    user_message: str | None = None
 
     def __post_init__(self):
         if self.user_message is None:
@@ -182,10 +171,10 @@ class QuotaExceededError(LicenseError):
 class ModuleNotLicensedError(LicenseError):
     """Modulo no incluido en la licencia."""
 
-    module: Optional[LicenseModule] = None
+    module: LicenseModule | None = None
     message: str = "Module not licensed"
     severity: ErrorSeverity = ErrorSeverity.FATAL
-    user_message: Optional[str] = None
+    user_message: str | None = None
 
     def __post_init__(self):
         if self.user_message is None:
@@ -207,12 +196,12 @@ class VerificationResult:
     """Resultado de verificacion de licencia."""
 
     is_valid: bool
-    license: Optional[License]
+    license: License | None
     status: LicenseStatus
     message: str
     is_offline: bool = False
-    grace_remaining: Optional[timedelta] = None
-    quota_remaining: Optional[int] = None
+    grace_remaining: timedelta | None = None
+    quota_remaining: int | None = None
     devices_remaining: int = 0
 
     @property
@@ -220,9 +209,7 @@ class VerificationResult:
         """Verifica si se puede analizar un manuscrito."""
         if not self.is_valid:
             return False
-        if self.quota_remaining is not None and self.quota_remaining <= 0:
-            return False
-        return True
+        return not (self.quota_remaining is not None and self.quota_remaining <= 0)
 
 
 # =============================================================================
@@ -247,7 +234,7 @@ class LicenseVerifier:
     def __init__(
         self,
         db=None,
-        license_server_url: Optional[str] = None,
+        license_server_url: str | None = None,
     ):
         """
         Args:
@@ -256,12 +243,13 @@ class LicenseVerifier:
         """
         self._db = db
         self._license_server = license_server_url or self.DEFAULT_LICENSE_SERVER
-        self._current_fingerprint: Optional[str] = None
+        self._current_fingerprint: str | None = None
 
     def _get_db(self):
         """Obtiene instancia de base de datos."""
         if self._db is None:
             from ..persistence.database import get_database
+
             self._db = get_database()
             # Asegurar que el schema de licencias existe
             initialize_licensing_schema(self._db)
@@ -272,6 +260,7 @@ class LicenseVerifier:
         """Obtiene la versión actual de la aplicación."""
         try:
             from .. import __version__
+
             return __version__
         except Exception:
             return "unknown"
@@ -324,9 +313,7 @@ class LicenseVerifier:
 
             # 4. Verificar estado final
             if license_obj.status == LicenseStatus.EXPIRED:
-                return Result.failure(
-                    LicenseExpiredError(expired_at=license_obj.expires_at)
-                )
+                return Result.failure(LicenseExpiredError(expired_at=license_obj.expires_at))
 
             # 5. Calcular cuota restante
             quota_remaining = self._calculate_quota_remaining(license_obj)
@@ -377,17 +364,19 @@ class LicenseVerifier:
         ya que la verificacion de licencias es el unico caso permitido.
         """
         try:
-            import urllib.request
             import urllib.error
+            import urllib.request
 
             fingerprint = self._get_current_fingerprint()
 
             # Preparar request
             url = urljoin(self._license_server, f"/verify/{license_obj.license_key}")
-            data = json.dumps({
-                "device_fingerprint": fingerprint,
-                "app_version": self._get_app_version(),
-            }).encode("utf-8")
+            data = json.dumps(
+                {
+                    "device_fingerprint": fingerprint,
+                    "app_version": self._get_app_version(),
+                }
+            ).encode("utf-8")
 
             request = urllib.request.Request(
                 url,
@@ -693,7 +682,7 @@ class LicenseVerifier:
     # Gestion de Cuotas
     # =========================================================================
 
-    def _calculate_quota_remaining(self, license_obj: License) -> Optional[int]:
+    def _calculate_quota_remaining(self, license_obj: License) -> int | None:
         """Calcula manuscritos restantes en el periodo actual."""
         limits = license_obj.limits
         if limits.max_manuscripts_per_month == 0:
@@ -715,7 +704,7 @@ class LicenseVerifier:
 
         return max(0, remaining)
 
-    def check_quota(self, license_obj: Optional[License] = None) -> Result[int]:
+    def check_quota(self, license_obj: License | None = None) -> Result[int]:
         """
         Verifica si hay cuota disponible.
 
@@ -846,7 +835,7 @@ class LicenseVerifier:
     def check_module(
         self,
         module: LicenseModule,
-        license_obj: Optional[License] = None,
+        license_obj: License | None = None,
     ) -> Result[bool]:
         """
         Verifica si un modulo esta disponible.
@@ -928,8 +917,12 @@ class LicenseVerifier:
                         license_obj.tier.value,
                         license_obj.bundle.value,
                         license_obj.status.value,
-                        license_obj.last_verified_at.isoformat() if license_obj.last_verified_at else None,
-                        license_obj.grace_period_ends_at.isoformat() if license_obj.grace_period_ends_at else None,
+                        license_obj.last_verified_at.isoformat()
+                        if license_obj.last_verified_at
+                        else None,
+                        license_obj.grace_period_ends_at.isoformat()
+                        if license_obj.grace_period_ends_at
+                        else None,
                         json.dumps(license_obj.extra_data),
                         license_obj.id,
                     ),
@@ -950,10 +943,16 @@ class LicenseVerifier:
                         license_obj.tier.value,
                         license_obj.bundle.value,
                         license_obj.status.value,
-                        license_obj.created_at.isoformat() if license_obj.created_at else datetime.utcnow().isoformat(),
+                        license_obj.created_at.isoformat()
+                        if license_obj.created_at
+                        else datetime.utcnow().isoformat(),
                         license_obj.activated_at.isoformat() if license_obj.activated_at else None,
-                        license_obj.last_verified_at.isoformat() if license_obj.last_verified_at else None,
-                        license_obj.grace_period_ends_at.isoformat() if license_obj.grace_period_ends_at else None,
+                        license_obj.last_verified_at.isoformat()
+                        if license_obj.last_verified_at
+                        else None,
+                        license_obj.grace_period_ends_at.isoformat()
+                        if license_obj.grace_period_ends_at
+                        else None,
                         json.dumps(license_obj.extra_data),
                     ),
                 )
@@ -970,8 +969,8 @@ class LicenseVerifier:
             Result con la licencia activada
         """
         try:
-            import urllib.request
             import urllib.error
+            import urllib.request
 
             fingerprint = self._get_current_fingerprint()
             hw_info_result = get_hardware_info()
@@ -979,12 +978,14 @@ class LicenseVerifier:
 
             # Request al servidor
             url = urljoin(self._license_server, "/activate")
-            data = json.dumps({
-                "license_key": license_key,
-                "device_fingerprint": fingerprint,
-                "device_name": hw_info.device_name if hw_info else "Unknown",
-                "os_info": hw_info.os_info if hw_info else "Unknown",
-            }).encode("utf-8")
+            data = json.dumps(
+                {
+                    "license_key": license_key,
+                    "device_fingerprint": fingerprint,
+                    "device_name": hw_info.device_name if hw_info else "Unknown",
+                    "os_info": hw_info.os_info if hw_info else "Unknown",
+                }
+            ).encode("utf-8")
 
             request = urllib.request.Request(
                 url,
@@ -1005,8 +1006,7 @@ class LicenseVerifier:
                         message=response_data.get("error", "Activation failed"),
                         severity=ErrorSeverity.FATAL,
                         user_message=response_data.get(
-                            "message",
-                            "No se pudo activar la licencia. Verifica la clave."
+                            "message", "No se pudo activar la licencia. Verifica la clave."
                         ),
                     )
                 )
@@ -1061,7 +1061,7 @@ class LicenseVerifier:
 # =============================================================================
 
 
-def get_cached_license() -> Optional[License]:
+def get_cached_license() -> License | None:
     """Obtiene la licencia cacheada (thread-safe)."""
     with _license_lock:
         return _cached_license
@@ -1161,7 +1161,7 @@ def deactivate_device(device_id: int) -> Result[Device]:
     return verifier.deactivate_device(device_id)
 
 
-def get_license_info() -> Optional[dict]:
+def get_license_info() -> dict | None:
     """
     Obtiene informacion de la licencia para mostrar al usuario.
 

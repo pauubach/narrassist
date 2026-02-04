@@ -9,94 +9,193 @@ Diferencia con deviations.py:
 - register.py: Cambios de registro en la narracion general o entre escenas
 """
 
-import re
 import logging
-from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Tuple, Set
-from enum import Enum
+import re
 from collections import Counter
+from dataclasses import dataclass, field
+from enum import Enum
 
 logger = logging.getLogger(__name__)
 
 
 class RegisterType(Enum):
     """Tipos de registro narrativo."""
+
     FORMAL_LITERARY = "formal_literary"  # Vocabulario culto, sintaxis elaborada
-    NEUTRAL = "neutral"                   # Estandar, equilibrado
-    COLLOQUIAL = "colloquial"            # Informal, cercano
-    TECHNICAL = "technical"               # Jerga especializada
-    POETIC = "poetic"                     # Metaforico, lirico
+    NEUTRAL = "neutral"  # Estandar, equilibrado
+    COLLOQUIAL = "colloquial"  # Informal, cercano
+    TECHNICAL = "technical"  # Jerga especializada
+    POETIC = "poetic"  # Metaforico, lirico
 
 
 # Indicadores de registro formal/literario
-FORMAL_INDICATORS: Set[str] = {
+FORMAL_INDICATORS: set[str] = {
     # Verbos formales
-    'contemplar', 'observar', 'percibir', 'manifestar', 'acontecer',
-    'transcurrir', 'acaecer', 'proferir', 'esgrimir', 'denotar',
-    'considerar', 'apreciar', 'constatar', 'evidenciar', 'inferir',
-    'dilucidar', 'elucidar', 'discernir', 'vislumbrar', 'atisbar',
+    "contemplar",
+    "observar",
+    "percibir",
+    "manifestar",
+    "acontecer",
+    "transcurrir",
+    "acaecer",
+    "proferir",
+    "esgrimir",
+    "denotar",
+    "considerar",
+    "apreciar",
+    "constatar",
+    "evidenciar",
+    "inferir",
+    "dilucidar",
+    "elucidar",
+    "discernir",
+    "vislumbrar",
+    "atisbar",
     # Conectores formales
-    'asimismo', 'no obstante', 'sin embargo', 'empero', 'por ende',
-    'en consecuencia', 'cabe destacar', 'en virtud de', 'habida cuenta',
-    'ora', 'antano', 'otrora', 'acaso', 'ciertamente',
+    "asimismo",
+    "no obstante",
+    "sin embargo",
+    "empero",
+    "por ende",
+    "en consecuencia",
+    "cabe destacar",
+    "en virtud de",
+    "habida cuenta",
+    "ora",
+    "antano",
+    "otrora",
+    "acaso",
+    "ciertamente",
     # Vocabulario culto
-    'vastedad', 'magnanimo', 'ignominia', 'sempiterno', 'inexorable',
-    'pletora', 'aquiescencia', 'desazón', 'pesadumbre', 'congoja',
-    'melancolía', 'añoranza', 'tribulación', 'zozobra', 'desasosiego',
+    "vastedad",
+    "magnanimo",
+    "ignominia",
+    "sempiterno",
+    "inexorable",
+    "pletora",
+    "aquiescencia",
+    "desazón",
+    "pesadumbre",
+    "congoja",
+    "melancolía",
+    "añoranza",
+    "tribulación",
+    "zozobra",
+    "desasosiego",
     # Formas verbales cultas
-    'hubiese', 'hubiere', 'aconteciese', 'acaeciere',
+    "hubiese",
+    "hubiere",
+    "aconteciese",
+    "acaeciere",
 }
 
 # Indicadores de registro coloquial
 # NOTA: Usamos palabras completas, no substrings, para evitar falsos positivos
-COLLOQUIAL_INDICATORS: Set[str] = {
+COLLOQUIAL_INDICATORS: set[str] = {
     # Expresiones coloquiales clasicas
-    'mola', 'flipar', 'currar', 'mogollon', 'rollo', 'molar',
-    'flipante', 'pasada', 'guay', 'chulo', 'majo',
-    'lio', 'movida', 'chungo', 'petar', 'tope', 'mazo',
+    "mola",
+    "flipar",
+    "currar",
+    "mogollon",
+    "rollo",
+    "molar",
+    "flipante",
+    "pasada",
+    "guay",
+    "chulo",
+    "majo",
+    "lio",
+    "movida",
+    "chungo",
+    "petar",
+    "tope",
+    "mazo",
     # Muletillas clasicas
-    'colega', 'chaval', 'chavala', 'pavo', 'tronco',
+    "colega",
+    "chaval",
+    "chavala",
+    "pavo",
+    "tronco",
     # Intensificadores coloquiales
-    'flipando', 'petando', 'molando', 'brutal',
+    "flipando",
+    "petando",
+    "molando",
+    "brutal",
     # Lenguaje juvenil moderno / Gen Z
-    'bro', 'crack', 'random', 'cringe', 'mood',
-    'vibe', 'vibes', 'crush', 'hype', 'ghostear',
-    'stalkear', 'shippear', 'trolear', 'lol', 'wtf',
-    'pov', 'slay', 'based', 'goat', 'lit',
-    'fam', 'squad', 'flow', 'chill', 'lowkey',
-    'highkey', 'flex', 'savage', 'salty', 'sus',
+    "bro",
+    "crack",
+    "random",
+    "cringe",
+    "mood",
+    "vibe",
+    "vibes",
+    "crush",
+    "hype",
+    "ghostear",
+    "stalkear",
+    "shippear",
+    "trolear",
+    "lol",
+    "wtf",
+    "pov",
+    "slay",
+    "based",
+    "goat",
+    "lit",
+    "fam",
+    "squad",
+    "flow",
+    "chill",
+    "lowkey",
+    "highkey",
+    "flex",
+    "savage",
+    "salty",
+    "sus",
     # Expresiones juveniles en espanol
-    'flipo', 'locura', 'posta', 'heavy', 'fuerte',
-    'rayada', 'rallado', 'colgado', 'pirao', 'empanao',
-    'quedada', 'plan', 'rato', 'pego', 'morro',
+    "flipo",
+    "locura",
+    "posta",
+    "heavy",
+    "fuerte",
+    "rayada",
+    "rallado",
+    "colgado",
+    "pirao",
+    "empanao",
+    "quedada",
+    "plan",
+    "rato",
+    "pego",
+    "morro",
 }
 
 # Patrones tecnicos por dominio
-TECHNICAL_PATTERNS: List[str] = [
+TECHNICAL_PATTERNS: list[str] = [
     # Medicos
-    r'\b(diagnostico|sintoma|patologia|etiologia|pronostico|anamnesis)\b',
-    r'\b(quirurgico|intervencion|lesion|traumatismo|secuela)\b',
+    r"\b(diagnostico|sintoma|patologia|etiologia|pronostico|anamnesis)\b",
+    r"\b(quirurgico|intervencion|lesion|traumatismo|secuela)\b",
     # Legales
-    r'\b(jurisprudencia|tipificacion|prescripcion|prevaricacion)\b',
-    r'\b(sentencia|dictamen|fallo|resolucion|alegato|demanda)\b',
+    r"\b(jurisprudencia|tipificacion|prescripcion|prevaricacion)\b",
+    r"\b(sentencia|dictamen|fallo|resolucion|alegato|demanda)\b",
     # Tecnologicos
-    r'\b(algoritmo|interfaz|protocolo|implementacion|parametro)\b',
-    r'\b(sistema|proceso|funcion|modulo|componente|arquitectura)\b',
+    r"\b(algoritmo|interfaz|protocolo|implementacion|parametro)\b",
+    r"\b(sistema|proceso|funcion|modulo|componente|arquitectura)\b",
     # Cientificos
-    r'\b(hipotesis|variable|correlacion|metodologia|paradigma)\b',
-    r'\b(experimento|muestra|analisis|resultado|conclusion)\b',
+    r"\b(hipotesis|variable|correlacion|metodologia|paradigma)\b",
+    r"\b(experimento|muestra|analisis|resultado|conclusion)\b",
 ]
 
 # Patrones poeticos
-POETIC_PATTERNS: List[str] = [
+POETIC_PATTERNS: list[str] = [
     # Similes elaborados
-    r'como\s+\w+\s+de\s+\w+\s+\w+',
+    r"como\s+\w+\s+de\s+\w+\s+\w+",
     # Verbos poeticos
-    r'\b(susurraba|murmuraba|danzaba|flotaba|brillaba|centelleaba)\b',
+    r"\b(susurraba|murmuraba|danzaba|flotaba|brillaba|centelleaba)\b",
     # Personificacion de elementos naturales
-    r'(el|la)\s+(luna|sol|viento|noche|mar|cielo)\s+(lloraba|cantaba|danzaba|susurraba|gritaba)',
+    r"(el|la)\s+(luna|sol|viento|noche|mar|cielo)\s+(lloraba|cantaba|danzaba|susurraba|gritaba)",
     # Metaforas de color con verbos
-    r'(sangraba|lloraba)\s+(carmesi|escarlata)',
+    r"(sangraba|lloraba)\s+(carmesi|escarlata)",
 ]
 
 
@@ -110,16 +209,16 @@ class RegisterAnalysis:
     is_dialogue: bool
 
     primary_register: RegisterType
-    register_scores: Dict[RegisterType, float] = field(default_factory=dict)
+    register_scores: dict[RegisterType, float] = field(default_factory=dict)
     confidence: float = 0.5
 
     # Indicadores encontrados
-    formal_indicators: List[str] = field(default_factory=list)
-    colloquial_indicators: List[str] = field(default_factory=list)
-    technical_terms: List[str] = field(default_factory=list)
-    poetic_devices: List[str] = field(default_factory=list)
+    formal_indicators: list[str] = field(default_factory=list)
+    colloquial_indicators: list[str] = field(default_factory=list)
+    technical_terms: list[str] = field(default_factory=list)
+    poetic_devices: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Convierte a diccionario."""
         return {
             "text_segment": self.text_segment[:200] if self.text_segment else "",
@@ -149,7 +248,7 @@ class RegisterChange:
     severity: str  # 'high', 'medium', 'low', 'none'
     explanation: str
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Convierte a diccionario."""
         return {
             "from_register": self.from_register.value,
@@ -188,11 +287,7 @@ class RegisterAnalyzer:
                 logger.warning(f"Invalid poetic pattern: {pattern}")
 
     def analyze_segment(
-        self,
-        text: str,
-        chapter: int,
-        position: int,
-        is_dialogue: bool = False
+        self, text: str, chapter: int, position: int, is_dialogue: bool = False
     ) -> RegisterAnalysis:
         """
         Analiza el registro de un segmento de texto.
@@ -213,17 +308,17 @@ class RegisterAnalyzer:
                 position=position,
                 is_dialogue=is_dialogue,
                 primary_register=RegisterType.NEUTRAL,
-                register_scores={r: 0.2 for r in RegisterType},
-                confidence=0.0
+                register_scores=dict.fromkeys(RegisterType, 0.2),
+                confidence=0.0,
             )
 
         text_lower = text.lower()
-        words = set(re.findall(r'\b\w+\b', text_lower))
+        words = set(re.findall(r"\b\w+\b", text_lower))
 
         # Encontrar indicadores formales (palabras completas o frases)
         formal_found = []
         for indicator in self.formal_set:
-            if ' ' in indicator:
+            if " " in indicator:
                 # Es una frase, buscar como substring
                 if indicator in text_lower:
                     formal_found.append(indicator)
@@ -251,7 +346,7 @@ class RegisterAnalyzer:
             matches = pattern.findall(text_lower)
             if matches:
                 if isinstance(matches[0], tuple):
-                    poetic_found.extend([' '.join(m) for m in matches])
+                    poetic_found.extend([" ".join(m) for m in matches])
                 else:
                     poetic_found.extend(matches)
 
@@ -261,7 +356,7 @@ class RegisterAnalyzer:
             len(formal_found),
             len(colloquial_found),
             len(technical_found),
-            len(poetic_found)
+            len(poetic_found),
         )
 
         # Determinar registro primario
@@ -279,7 +374,7 @@ class RegisterAnalyzer:
             formal_indicators=formal_found,
             colloquial_indicators=colloquial_found,
             technical_terms=technical_found[:5],
-            poetic_devices=poetic_found[:5]
+            poetic_devices=poetic_found[:5],
         )
 
     def _calculate_scores(
@@ -288,8 +383,8 @@ class RegisterAnalyzer:
         formal_count: int,
         colloquial_count: int,
         technical_count: int,
-        poetic_count: int
-    ) -> Dict[RegisterType, float]:
+        poetic_count: int,
+    ) -> dict[RegisterType, float]:
         """
         Calcula scores normalizados por tipo de registro.
 
@@ -304,7 +399,7 @@ class RegisterAnalyzer:
             Diccionario con scores por tipo de registro
         """
         if total_words == 0:
-            return {r: 0.2 for r in RegisterType}
+            return dict.fromkeys(RegisterType, 0.2)
 
         # Normalizar por longitud del texto
         norm = max(total_words / 100, 1)
@@ -338,7 +433,7 @@ class RegisterAnalyzer:
 class RegisterChangeDetector:
     """Detector de cambios de registro en documentos."""
 
-    def __init__(self, analyzer: Optional[RegisterAnalyzer] = None):
+    def __init__(self, analyzer: RegisterAnalyzer | None = None):
         """
         Inicializa el detector.
 
@@ -346,12 +441,11 @@ class RegisterChangeDetector:
             analyzer: Analizador de registro (opcional)
         """
         self.analyzer = analyzer or RegisterAnalyzer()
-        self.analyses: List[RegisterAnalysis] = []
+        self.analyses: list[RegisterAnalysis] = []
 
     def analyze_document(
-        self,
-        segments: List[Tuple[str, int, int, bool]]
-    ) -> List[RegisterAnalysis]:
+        self, segments: list[tuple[str, int, int, bool]]
+    ) -> list[RegisterAnalysis]:
         """
         Analiza todos los segmentos del documento.
 
@@ -364,18 +458,13 @@ class RegisterChangeDetector:
         self.analyses = []
 
         for text, chapter, position, is_dialogue in segments:
-            analysis = self.analyzer.analyze_segment(
-                text, chapter, position, is_dialogue
-            )
+            analysis = self.analyzer.analyze_segment(text, chapter, position, is_dialogue)
             self.analyses.append(analysis)
 
         logger.info(f"Analyzed {len(self.analyses)} segments for register")
         return self.analyses
 
-    def detect_changes(
-        self,
-        min_severity: str = 'medium'
-    ) -> List[RegisterChange]:
+    def detect_changes(self, min_severity: str = "medium") -> list[RegisterChange]:
         """
         Detecta cambios significativos de registro.
 
@@ -405,25 +494,23 @@ class RegisterChangeDetector:
             severity = self._calculate_severity(prev, curr)
 
             if self._should_report(severity, min_severity):
-                changes.append(RegisterChange(
-                    from_register=prev.primary_register,
-                    to_register=curr.primary_register,
-                    chapter=curr.chapter,
-                    position=curr.position,
-                    context_before=prev.text_segment,
-                    context_after=curr.text_segment,
-                    severity=severity,
-                    explanation=self._generate_explanation(prev, curr)
-                ))
+                changes.append(
+                    RegisterChange(
+                        from_register=prev.primary_register,
+                        to_register=curr.primary_register,
+                        chapter=curr.chapter,
+                        position=curr.position,
+                        context_before=prev.text_segment,
+                        context_after=curr.text_segment,
+                        severity=severity,
+                        explanation=self._generate_explanation(prev, curr),
+                    )
+                )
 
         logger.info(f"Detected {len(changes)} register changes")
         return changes
 
-    def _calculate_severity(
-        self,
-        prev: RegisterAnalysis,
-        curr: RegisterAnalysis
-    ) -> str:
+    def _calculate_severity(self, prev: RegisterAnalysis, curr: RegisterAnalysis) -> str:
         """
         Calcula severidad del cambio de registro.
 
@@ -436,20 +523,20 @@ class RegisterChangeDetector:
         """
         # Distancia entre registros
         register_distance = {
-            (RegisterType.FORMAL_LITERARY, RegisterType.COLLOQUIAL): 'high',
-            (RegisterType.COLLOQUIAL, RegisterType.FORMAL_LITERARY): 'high',
-            (RegisterType.TECHNICAL, RegisterType.COLLOQUIAL): 'high',
-            (RegisterType.COLLOQUIAL, RegisterType.TECHNICAL): 'high',
-            (RegisterType.POETIC, RegisterType.TECHNICAL): 'medium',
-            (RegisterType.TECHNICAL, RegisterType.POETIC): 'medium',
-            (RegisterType.FORMAL_LITERARY, RegisterType.TECHNICAL): 'low',
-            (RegisterType.TECHNICAL, RegisterType.FORMAL_LITERARY): 'low',
-            (RegisterType.POETIC, RegisterType.FORMAL_LITERARY): 'low',
-            (RegisterType.FORMAL_LITERARY, RegisterType.POETIC): 'low',
-            (RegisterType.NEUTRAL, RegisterType.COLLOQUIAL): 'medium',
-            (RegisterType.COLLOQUIAL, RegisterType.NEUTRAL): 'medium',
-            (RegisterType.NEUTRAL, RegisterType.FORMAL_LITERARY): 'low',
-            (RegisterType.FORMAL_LITERARY, RegisterType.NEUTRAL): 'low',
+            (RegisterType.FORMAL_LITERARY, RegisterType.COLLOQUIAL): "high",
+            (RegisterType.COLLOQUIAL, RegisterType.FORMAL_LITERARY): "high",
+            (RegisterType.TECHNICAL, RegisterType.COLLOQUIAL): "high",
+            (RegisterType.COLLOQUIAL, RegisterType.TECHNICAL): "high",
+            (RegisterType.POETIC, RegisterType.TECHNICAL): "medium",
+            (RegisterType.TECHNICAL, RegisterType.POETIC): "medium",
+            (RegisterType.FORMAL_LITERARY, RegisterType.TECHNICAL): "low",
+            (RegisterType.TECHNICAL, RegisterType.FORMAL_LITERARY): "low",
+            (RegisterType.POETIC, RegisterType.FORMAL_LITERARY): "low",
+            (RegisterType.FORMAL_LITERARY, RegisterType.POETIC): "low",
+            (RegisterType.NEUTRAL, RegisterType.COLLOQUIAL): "medium",
+            (RegisterType.COLLOQUIAL, RegisterType.NEUTRAL): "medium",
+            (RegisterType.NEUTRAL, RegisterType.FORMAL_LITERARY): "low",
+            (RegisterType.FORMAL_LITERARY, RegisterType.NEUTRAL): "low",
         }
 
         pair = (prev.primary_register, curr.primary_register)
@@ -458,9 +545,9 @@ class RegisterChangeDetector:
 
         # Si cambia pero no esta en la tabla
         if prev.primary_register != curr.primary_register:
-            return 'low'
+            return "low"
 
-        return 'none'
+        return "none"
 
     def _should_report(self, severity: str, min_severity: str) -> bool:
         """
@@ -473,14 +560,10 @@ class RegisterChangeDetector:
         Returns:
             True si debe reportarse
         """
-        severity_order = {'none': 0, 'low': 1, 'medium': 2, 'high': 3}
+        severity_order = {"none": 0, "low": 1, "medium": 2, "high": 3}
         return severity_order.get(severity, 0) >= severity_order.get(min_severity, 0)
 
-    def _generate_explanation(
-        self,
-        prev: RegisterAnalysis,
-        curr: RegisterAnalysis
-    ) -> str:
+    def _generate_explanation(self, prev: RegisterAnalysis, curr: RegisterAnalysis) -> str:
         """
         Genera explicacion del cambio.
 
@@ -504,22 +587,17 @@ class RegisterChangeDetector:
                 f"a formal ('{curr.formal_indicators[0]}')"
             )
         elif prev.technical_terms and curr.poetic_devices:
-            explanations.append(
-                f"Cambio de registro tecnico a poetico"
-            )
+            explanations.append("Cambio de registro tecnico a poetico")
         elif prev.poetic_devices and curr.technical_terms:
-            explanations.append(
-                f"Cambio de registro poetico a tecnico"
-            )
+            explanations.append("Cambio de registro poetico a tecnico")
         else:
             explanations.append(
-                f"Cambio de registro {prev.primary_register.value} "
-                f"a {curr.primary_register.value}"
+                f"Cambio de registro {prev.primary_register.value} a {curr.primary_register.value}"
             )
 
         return "; ".join(explanations)
 
-    def get_register_distribution(self) -> Dict[RegisterType, int]:
+    def get_register_distribution(self) -> dict[RegisterType, int]:
         """
         Devuelve distribucion de registros en el documento.
 
@@ -529,7 +607,7 @@ class RegisterChangeDetector:
         distribution = Counter(a.primary_register for a in self.analyses)
         return dict(distribution)
 
-    def get_summary(self) -> Dict:
+    def get_summary(self) -> dict:
         """
         Devuelve resumen del analisis de registro.
 
@@ -538,11 +616,11 @@ class RegisterChangeDetector:
         """
         if not self.analyses:
             return {
-                'total_segments': 0,
-                'narrative_segments': 0,
-                'dialogue_segments': 0,
-                'distribution': {},
-                'dominant_register': None,
+                "total_segments": 0,
+                "narrative_segments": 0,
+                "dialogue_segments": 0,
+                "distribution": {},
+                "dominant_register": None,
             }
 
         narrative = [a for a in self.analyses if not a.is_dialogue]
@@ -552,18 +630,17 @@ class RegisterChangeDetector:
         dominant = max(distribution.items(), key=lambda x: x[1])[0] if distribution else None
 
         return {
-            'total_segments': len(self.analyses),
-            'narrative_segments': len(narrative),
-            'dialogue_segments': len(dialogue),
-            'distribution': {k.value: v for k, v in distribution.items()},
-            'dominant_register': dominant.value if dominant else None,
+            "total_segments": len(self.analyses),
+            "narrative_segments": len(narrative),
+            "dialogue_segments": len(dialogue),
+            "distribution": {k.value: v for k, v in distribution.items()},
+            "dominant_register": dominant.value if dominant else None,
         }
 
 
 def analyze_register_changes(
-    segments: List[Tuple[str, int, int, bool]],
-    min_severity: str = 'medium'
-) -> Tuple[List[RegisterAnalysis], List[RegisterChange]]:
+    segments: list[tuple[str, int, int, bool]], min_severity: str = "medium"
+) -> tuple[list[RegisterAnalysis], list[RegisterChange]]:
     """
     Funcion de conveniencia para analizar cambios de registro.
 
@@ -584,26 +661,26 @@ def analyze_register_changes(
 # Benchmarks de registro por género
 # =============================================================================
 
+
 @dataclass
 class RegisterGenreBenchmarks:
     """Benchmarks de referencia de registro para un género literario."""
+
     genre_code: str
     genre_label: str
     expected_primary: str  # Registro dominante esperado
-    consistency_range: Tuple[float, float]  # Rango aceptable de consistencia (%)
-    register_distribution: Dict[str, Tuple[float, float]]  # Rango esperado por registro
+    consistency_range: tuple[float, float]  # Rango aceptable de consistencia (%)
+    register_distribution: dict[str, tuple[float, float]]  # Rango esperado por registro
     max_high_severity_changes: int  # Máximo de cambios de alta severidad tolerables
     notes: str = ""
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "genre_code": self.genre_code,
             "genre_label": self.genre_label,
             "expected_primary": self.expected_primary,
             "consistency_range": list(self.consistency_range),
-            "register_distribution": {
-                k: list(v) for k, v in self.register_distribution.items()
-            },
+            "register_distribution": {k: list(v) for k, v in self.register_distribution.items()},
             "max_high_severity_changes": self.max_high_severity_changes,
             "notes": self.notes,
         }
@@ -611,7 +688,7 @@ class RegisterGenreBenchmarks:
 
 # Benchmarks de registro por género literario
 # Basados en convenciones editoriales y guías de estilo
-REGISTER_GENRE_BENCHMARKS: Dict[str, RegisterGenreBenchmarks] = {
+REGISTER_GENRE_BENCHMARKS: dict[str, RegisterGenreBenchmarks] = {
     "FIC": RegisterGenreBenchmarks(
         genre_code="FIC",
         genre_label="Ficción narrativa",
@@ -795,17 +872,17 @@ REGISTER_GENRE_BENCHMARKS: Dict[str, RegisterGenreBenchmarks] = {
 }
 
 
-def get_register_genre_benchmarks(genre_code: str) -> Optional[RegisterGenreBenchmarks]:
+def get_register_genre_benchmarks(genre_code: str) -> RegisterGenreBenchmarks | None:
     """Obtiene los benchmarks de registro para un género dado."""
     return REGISTER_GENRE_BENCHMARKS.get(genre_code)
 
 
 def compare_register_with_benchmarks(
-    summary: Dict,
+    summary: dict,
     genre_code: str,
     changes_count: int = 0,
     high_severity_count: int = 0,
-) -> Optional[Dict]:
+) -> dict | None:
     """
     Compara las métricas de registro de un documento contra los benchmarks del género.
 
@@ -836,37 +913,43 @@ def compare_register_with_benchmarks(
         # Comparar consistencia
         low, high = benchmarks.consistency_range
         if consistency_pct < low:
-            deviations.append({
-                "metric": "consistency",
-                "label": "Consistencia de registro",
-                "actual": round(consistency_pct, 1),
-                "expected_range": [low, high],
-                "status": "below",
-                "message": f"Registro poco consistente para {benchmarks.genre_label} "
-                           f"({round(consistency_pct, 1)}% vs mínimo {low}%)",
-            })
+            deviations.append(
+                {
+                    "metric": "consistency",
+                    "label": "Consistencia de registro",
+                    "actual": round(consistency_pct, 1),
+                    "expected_range": [low, high],
+                    "status": "below",
+                    "message": f"Registro poco consistente para {benchmarks.genre_label} "
+                    f"({round(consistency_pct, 1)}% vs mínimo {low}%)",
+                }
+            )
         elif consistency_pct > high:
-            deviations.append({
-                "metric": "consistency",
-                "label": "Consistencia de registro",
-                "actual": round(consistency_pct, 1),
-                "expected_range": [low, high],
-                "status": "above",
-                "message": f"Registro excesivamente uniforme para {benchmarks.genre_label} "
-                           f"({round(consistency_pct, 1)}% vs máximo {high}%)",
-            })
+            deviations.append(
+                {
+                    "metric": "consistency",
+                    "label": "Consistencia de registro",
+                    "actual": round(consistency_pct, 1),
+                    "expected_range": [low, high],
+                    "status": "above",
+                    "message": f"Registro excesivamente uniforme para {benchmarks.genre_label} "
+                    f"({round(consistency_pct, 1)}% vs máximo {high}%)",
+                }
+            )
 
         # Comparar registro dominante esperado
         if dominant_register != benchmarks.expected_primary:
-            deviations.append({
-                "metric": "dominant_register",
-                "label": "Registro dominante",
-                "actual": dominant_register,
-                "expected": benchmarks.expected_primary,
-                "status": "mismatch",
-                "message": f"El registro dominante es '{dominant_register}' pero se esperaba "
-                           f"'{benchmarks.expected_primary}' para {benchmarks.genre_label}",
-            })
+            deviations.append(
+                {
+                    "metric": "dominant_register",
+                    "label": "Registro dominante",
+                    "actual": dominant_register,
+                    "expected": benchmarks.expected_primary,
+                    "status": "mismatch",
+                    "message": f"El registro dominante es '{dominant_register}' pero se esperaba "
+                    f"'{benchmarks.expected_primary}' para {benchmarks.genre_label}",
+                }
+            )
 
         # Comparar distribución por tipo de registro
         for reg_type, (exp_low, exp_high) in benchmarks.register_distribution.items():
@@ -874,42 +957,48 @@ def compare_register_with_benchmarks(
             reg_ratio = reg_count / total_segments if total_segments > 0 else 0
 
             if reg_ratio < exp_low and (exp_low - reg_ratio) > 0.05:
-                deviations.append({
-                    "metric": f"distribution_{reg_type}",
-                    "label": f"Proporción de registro {reg_type}",
-                    "actual": round(reg_ratio, 3),
-                    "expected_range": [exp_low, exp_high],
-                    "status": "below",
-                    "message": f"Poco uso de registro {reg_type} "
-                               f"({round(reg_ratio * 100, 1)}% vs {round(exp_low * 100)}-{round(exp_high * 100)}%)",
-                })
+                deviations.append(
+                    {
+                        "metric": f"distribution_{reg_type}",
+                        "label": f"Proporción de registro {reg_type}",
+                        "actual": round(reg_ratio, 3),
+                        "expected_range": [exp_low, exp_high],
+                        "status": "below",
+                        "message": f"Poco uso de registro {reg_type} "
+                        f"({round(reg_ratio * 100, 1)}% vs {round(exp_low * 100)}-{round(exp_high * 100)}%)",
+                    }
+                )
             elif reg_ratio > exp_high and (reg_ratio - exp_high) > 0.05:
-                deviations.append({
-                    "metric": f"distribution_{reg_type}",
-                    "label": f"Proporción de registro {reg_type}",
-                    "actual": round(reg_ratio, 3),
-                    "expected_range": [exp_low, exp_high],
-                    "status": "above",
-                    "message": f"Exceso de registro {reg_type} "
-                               f"({round(reg_ratio * 100, 1)}% vs {round(exp_low * 100)}-{round(exp_high * 100)}%)",
-                })
+                deviations.append(
+                    {
+                        "metric": f"distribution_{reg_type}",
+                        "label": f"Proporción de registro {reg_type}",
+                        "actual": round(reg_ratio, 3),
+                        "expected_range": [exp_low, exp_high],
+                        "status": "above",
+                        "message": f"Exceso de registro {reg_type} "
+                        f"({round(reg_ratio * 100, 1)}% vs {round(exp_low * 100)}-{round(exp_high * 100)}%)",
+                    }
+                )
 
     # Comparar cambios de alta severidad
     if high_severity_count > benchmarks.max_high_severity_changes:
-        deviations.append({
-            "metric": "high_severity_changes",
-            "label": "Cambios de registro bruscos",
-            "actual": high_severity_count,
-            "expected_max": benchmarks.max_high_severity_changes,
-            "status": "above",
-            "message": f"Demasiados cambios bruscos de registro ({high_severity_count} vs "
-                       f"máximo {benchmarks.max_high_severity_changes} para {benchmarks.genre_label})",
-        })
+        deviations.append(
+            {
+                "metric": "high_severity_changes",
+                "label": "Cambios de registro bruscos",
+                "actual": high_severity_count,
+                "expected_max": benchmarks.max_high_severity_changes,
+                "status": "above",
+                "message": f"Demasiados cambios bruscos de registro ({high_severity_count} vs "
+                f"máximo {benchmarks.max_high_severity_changes} para {benchmarks.genre_label})",
+            }
+        )
 
     # Calcular percentiles para métricas numéricas con rango
     from narrative_assistant.analysis.pacing import compute_percentile_rank
 
-    percentiles: Dict[str, int] = {}
+    percentiles: dict[str, int] = {}
     if total_segments > 0 and dominant_register:
         dominant_count = distribution.get(dominant_register, 0)
         consistency_pct = (dominant_count / total_segments) * 100
@@ -933,6 +1022,8 @@ def compare_register_with_benchmarks(
         "genre": benchmarks.to_dict(),
         "deviations": deviations,
         "deviation_count": len(deviations),
-        "dominant_register_match": dominant_register == benchmarks.expected_primary if dominant_register else None,
+        "dominant_register_match": dominant_register == benchmarks.expected_primary
+        if dominant_register
+        else None,
         "percentiles": percentiles,
     }

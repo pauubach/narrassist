@@ -8,21 +8,17 @@ permitiendo al autor aceptar/rechazar cada cambio individualmente.
 
 import io
 import logging
-import re
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Any
-from xml.etree import ElementTree as ET
 
 from docx import Document
-from docx.shared import RGBColor, Pt
 from docx.oxml import parse_xml
-from docx.oxml.ns import qn, nsmap
+from docx.oxml.ns import nsmap, qn
 
+from ..core.errors import ErrorSeverity, NarrativeError
 from ..core.result import Result
-from ..core.errors import NarrativeError, ErrorSeverity
 from ..corrections.base import CorrectionIssue
 
 logger = logging.getLogger(__name__)
@@ -47,7 +43,7 @@ class TrackChangeOptions:
     min_confidence: float = 0.5
 
     # Categorías a incluir (None = todas)
-    categories: Optional[list[str]] = None
+    categories: list[str] | None = None
 
     # Marcar como revisión (True) o aplicar directamente (False)
     as_track_changes: bool = True
@@ -79,7 +75,7 @@ class CorrectedDocumentExporter:
         self,
         original_path: Path,
         corrections: list[CorrectionIssue],
-        options: Optional[TrackChangeOptions] = None,
+        options: TrackChangeOptions | None = None,
     ) -> Result[bytes]:
         """
         Exporta el documento con correcciones como Track Changes.
@@ -155,7 +151,7 @@ class CorrectedDocumentExporter:
         self,
         original_bytes: bytes,
         corrections: list[CorrectionIssue],
-        options: Optional[TrackChangeOptions] = None,
+        options: TrackChangeOptions | None = None,
     ) -> Result[bytes]:
         """
         Exporta desde bytes del documento original.
@@ -269,8 +265,7 @@ class CorrectedDocumentExporter:
                     applied += 1
             except Exception as e:
                 logger.warning(
-                    f"No se pudo aplicar corrección en posición "
-                    f"{correction.start_char}: {e}"
+                    f"No se pudo aplicar corrección en posición {correction.start_char}: {e}"
                 )
 
         return applied
@@ -286,20 +281,20 @@ class CorrectedDocumentExporter:
         current_pos = 0
 
         for para_idx, para in enumerate(doc.paragraphs):
-            para_start = current_pos
-
             for run_idx, run in enumerate(para.runs):
                 run_text = run.text
                 if run_text:
-                    text_map.append({
-                        "paragraph_idx": para_idx,
-                        "paragraph": para,
-                        "run_idx": run_idx,
-                        "run": run,
-                        "start": current_pos,
-                        "end": current_pos + len(run_text),
-                        "text": run_text,
-                    })
+                    text_map.append(
+                        {
+                            "paragraph_idx": para_idx,
+                            "paragraph": para,
+                            "run_idx": run_idx,
+                            "run": run,
+                            "start": current_pos,
+                            "end": current_pos + len(run_text),
+                            "text": run_text,
+                        }
+                    )
                     current_pos += len(run_text)
 
             # Añadir salto de línea entre párrafos
@@ -336,10 +331,7 @@ class CorrectedDocumentExporter:
 
         # Calcular posición relativa dentro del run
         relative_start = correction.start_char - target_entry["start"]
-        relative_end = min(
-            correction.end_char - target_entry["start"],
-            len(target_entry["text"])
-        )
+        relative_end = min(correction.end_char - target_entry["start"], len(target_entry["text"]))
 
         original_text = target_entry["text"]
 
@@ -386,10 +378,10 @@ class CorrectedDocumentExporter:
                     if search_text in run.text:
                         if options.as_track_changes:
                             # Reemplazar con track change
-                            new_text = run.text.replace(
+                            run.text.replace(
                                 search_text,
                                 correction.suggestion or "",
-                                1  # Solo primera ocurrencia
+                                1,  # Solo primera ocurrencia
                             )
                             self._apply_track_change_to_run(
                                 run,
@@ -398,11 +390,7 @@ class CorrectedDocumentExporter:
                                 options.author,
                             )
                         else:
-                            run.text = run.text.replace(
-                                search_text,
-                                correction.suggestion or "",
-                                1
-                            )
+                            run.text = run.text.replace(search_text, correction.suggestion or "", 1)
                         return True
 
         return False
@@ -432,8 +420,8 @@ class CorrectedDocumentExporter:
             del_element = parse_xml(
                 f'<w:del xmlns:w="{WORD_NS}" w:id="{revision_id}" '
                 f'w:author="{author}" w:date="{date}">'
-                f'<w:r><w:delText>{self._escape_xml(old_text)}</w:delText></w:r>'
-                f'</w:del>'
+                f"<w:r><w:delText>{self._escape_xml(old_text)}</w:delText></w:r>"
+                f"</w:del>"
             )
             parent.insert(list(parent).index(run_element), del_element)
 
@@ -443,8 +431,8 @@ class CorrectedDocumentExporter:
             ins_element = parse_xml(
                 f'<w:ins xmlns:w="{WORD_NS}" w:id="{self._revision_id}" '
                 f'w:author="{author}" w:date="{date}">'
-                f'<w:r><w:t>{self._escape_xml(new_text)}</w:t></w:r>'
-                f'</w:ins>'
+                f"<w:r><w:t>{self._escape_xml(new_text)}</w:t></w:r>"
+                f"</w:ins>"
             )
             parent.insert(list(parent).index(run_element), ins_element)
 
@@ -481,7 +469,7 @@ class CorrectedDocumentExporter:
             before_run = parse_xml(
                 f'<w:r xmlns:w="{WORD_NS}">'
                 f'<w:t xml:space="preserve">{self._escape_xml(before)}</w:t>'
-                f'</w:r>'
+                f"</w:r>"
             )
             if run_props is not None:
                 before_run.insert(0, deepcopy(run_props))
@@ -497,8 +485,8 @@ class CorrectedDocumentExporter:
             del_element = parse_xml(
                 f'<w:del xmlns:w="{WORD_NS}" w:id="{self._revision_id}" '
                 f'w:author="{options.author}" w:date="{date}">'
-                f'<w:r><w:delText>{self._escape_xml(target)}</w:delText></w:r>'
-                f'</w:del>'
+                f"<w:r><w:delText>{self._escape_xml(target)}</w:delText></w:r>"
+                f"</w:del>"
             )
             parent.insert(run_index, del_element)
             run_index += 1
@@ -509,8 +497,8 @@ class CorrectedDocumentExporter:
                 ins_element = parse_xml(
                     f'<w:ins xmlns:w="{WORD_NS}" w:id="{self._revision_id}" '
                     f'w:author="{options.author}" w:date="{date}">'
-                    f'<w:r><w:t>{self._escape_xml(replacement)}</w:t></w:r>'
-                    f'</w:ins>'
+                    f"<w:r><w:t>{self._escape_xml(replacement)}</w:t></w:r>"
+                    f"</w:ins>"
                 )
                 parent.insert(run_index, ins_element)
                 run_index += 1
@@ -518,9 +506,7 @@ class CorrectedDocumentExporter:
             # Aplicar directamente sin track changes
             if replacement:
                 replace_run = parse_xml(
-                    f'<w:r xmlns:w="{WORD_NS}">'
-                    f'<w:t>{self._escape_xml(replacement)}</w:t>'
-                    f'</w:r>'
+                    f'<w:r xmlns:w="{WORD_NS}"><w:t>{self._escape_xml(replacement)}</w:t></w:r>'
                 )
                 if run_props is not None:
                     replace_run.insert(0, deepcopy(run_props))
@@ -532,7 +518,7 @@ class CorrectedDocumentExporter:
             after_run = parse_xml(
                 f'<w:r xmlns:w="{WORD_NS}">'
                 f'<w:t xml:space="preserve">{self._escape_xml(after)}</w:t>'
-                f'</w:r>'
+                f"</w:r>"
             )
             if run_props is not None:
                 after_run.insert(0, deepcopy(run_props))
@@ -557,8 +543,8 @@ class CorrectedDocumentExporter:
 def export_with_track_changes(
     original_path: Path,
     corrections: list[CorrectionIssue],
-    output_path: Optional[Path] = None,
-    options: Optional[TrackChangeOptions] = None,
+    output_path: Path | None = None,
+    options: TrackChangeOptions | None = None,
 ) -> Result[Path]:
     """
     Función de conveniencia para exportar con Track Changes.

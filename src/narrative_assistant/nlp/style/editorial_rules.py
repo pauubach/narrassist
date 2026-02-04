@@ -17,11 +17,12 @@ Uso:
     result = checker.check(text, custom_rules=[...])
 """
 
-import re
+import contextlib
 import logging
-from enum import Enum
+import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Optional, Callable
+from enum import Enum
 
 from ..grammar.base import GrammarSeverity
 
@@ -89,14 +90,14 @@ class EditorialRule:
     rule_type: EditorialRuleType
     category: EditorialRuleCategory
     pattern: str
-    replacement: Optional[str] = None
+    replacement: str | None = None
     context_words: list[str] = field(default_factory=list)
     severity: GrammarSeverity = GrammarSeverity.STYLE
     enabled: bool = True
     examples: list[tuple[str, str]] = field(default_factory=list)
 
     # Función de validación personalizada (opcional)
-    validator: Optional[Callable[[str, re.Match], bool]] = None
+    validator: Callable[[str, re.Match], bool] | None = None
 
 
 @dataclass
@@ -106,7 +107,7 @@ class EditorialIssue:
     rule_id: str
     rule_name: str
     text: str
-    replacement: Optional[str]
+    replacement: str | None
     start: int
     end: int
     severity: GrammarSeverity
@@ -162,7 +163,7 @@ PREDEFINED_RULES: list[EditorialRule] = [
         id="singular_body_parts",
         name="Órganos únicos en singular",
         description="Partes del cuerpo únicas (corazón, cerebro, mente, vida) "
-                    "deben ir en singular con posesivos plurales",
+        "deben ir en singular con posesivos plurales",
         rule_type=EditorialRuleType.CONTEXTUAL,
         category=EditorialRuleCategory.SYNTAX,
         pattern=r"\b(nuestros?|vuestros?|sus)\s+(corazones|cerebros|mentes|vidas|almas|cabezas)\b",
@@ -175,7 +176,6 @@ PREDEFINED_RULES: list[EditorialRule] = [
             ("vuestras vidas", "vuestra vida"),
         ],
     ),
-
     # -------------------------------------------------------------------------
     # NÚMEROS: EDADES VS AÑOS
     # -------------------------------------------------------------------------
@@ -192,7 +192,6 @@ PREDEFINED_RULES: list[EditorialRule] = [
             ("cumplió treinta años", "cumplió 30 años"),
         ],
     ),
-
     EditorialRule(
         id="years_with_letters",
         name="Duración en años con letra",
@@ -206,7 +205,6 @@ PREDEFINED_RULES: list[EditorialRule] = [
             ("hace 10 años", "hace diez años"),
         ],
     ),
-
     # -------------------------------------------------------------------------
     # DOBLES ESPACIOS
     # -------------------------------------------------------------------------
@@ -223,7 +221,6 @@ PREDEFINED_RULES: list[EditorialRule] = [
             ("palabra  palabra", "palabra palabra"),
         ],
     ),
-
     # -------------------------------------------------------------------------
     # EXPRESIONES PREFERIDAS
     # -------------------------------------------------------------------------
@@ -240,7 +237,6 @@ PREDEFINED_RULES: list[EditorialRule] = [
             ("por contra, él pensaba", "por el contrario, él pensaba"),
         ],
     ),
-
     # -------------------------------------------------------------------------
     # PARTITIVOS CON ARTÍCULO
     # -------------------------------------------------------------------------
@@ -257,7 +253,6 @@ PREDEFINED_RULES: list[EditorialRule] = [
             ("el resto de gente", "el resto de la gente"),
         ],
     ),
-
     EditorialRule(
         id="mayoria_de_articulo",
         name="La mayoría de + artículo",
@@ -270,7 +265,6 @@ PREDEFINED_RULES: list[EditorialRule] = [
             ("la mayoría de personas", "la mayoría de las personas"),
         ],
     ),
-
     EditorialRule(
         id="mayor_parte_de_articulo",
         name="La mayor parte de + artículo",
@@ -283,7 +277,6 @@ PREDEFINED_RULES: list[EditorialRule] = [
             ("la mayor parte de tiempo", "la mayor parte del tiempo"),
         ],
     ),
-
     # -------------------------------------------------------------------------
     # DEMOSTRATIVOS SIN ACENTO (RAE 2010)
     # -------------------------------------------------------------------------
@@ -301,7 +294,6 @@ PREDEFINED_RULES: list[EditorialRule] = [
             ("aquélla mujer", "aquella mujer"),
         ],
     ),
-
     # -------------------------------------------------------------------------
     # SOLO SIN ACENTO (RAE 2010)
     # -------------------------------------------------------------------------
@@ -318,7 +310,6 @@ PREDEFINED_RULES: list[EditorialRule] = [
             ("sólo quería", "solo quería"),
         ],
     ),
-
     # -------------------------------------------------------------------------
     # GUIONES: CORTOS -> LARGOS EN INCISOS
     # -------------------------------------------------------------------------
@@ -335,7 +326,6 @@ PREDEFINED_RULES: list[EditorialRule] = [
             (" -dijo ella- ", " —dijo ella— "),
         ],
     ),
-
     # -------------------------------------------------------------------------
     # AÚN ASÍ -> AUN ASÍ
     # -------------------------------------------------------------------------
@@ -352,7 +342,6 @@ PREDEFINED_RULES: list[EditorialRule] = [
             ("aún así, continuó", "aun así, continuó"),
         ],
     ),
-
     # -------------------------------------------------------------------------
     # AGUDIZAR -> AGUZAR (SENTIDOS)
     # -------------------------------------------------------------------------
@@ -370,7 +359,6 @@ PREDEFINED_RULES: list[EditorialRule] = [
             ("agudizar la vista", "aguzar la vista"),
         ],
     ),
-
     # -------------------------------------------------------------------------
     # PUNTUACIÓN INTERROGATIVA
     # -------------------------------------------------------------------------
@@ -388,7 +376,6 @@ PREDEFINED_RULES: list[EditorialRule] = [
             ("Pero, ¿por qué?", "Pero ¿por qué?"),
         ],
     ),
-
     # -------------------------------------------------------------------------
     # QUIZÁS -> QUIZÁ
     # -------------------------------------------------------------------------
@@ -405,7 +392,6 @@ PREDEFINED_RULES: list[EditorialRule] = [
             ("quizás venga", "quizá venga"),
         ],
     ),
-
     # -------------------------------------------------------------------------
     # PERÍODO -> PERIODO
     # -------------------------------------------------------------------------
@@ -422,7 +408,6 @@ PREDEFINED_RULES: list[EditorialRule] = [
             ("el período de prueba", "el periodo de prueba"),
         ],
     ),
-
     # -------------------------------------------------------------------------
     # CARDÍACO -> CARDIACO
     # -------------------------------------------------------------------------
@@ -439,7 +424,6 @@ PREDEFINED_RULES: list[EditorialRule] = [
             ("ataque cardíaco", "ataque cardiaco"),
         ],
     ),
-
     # -------------------------------------------------------------------------
     # SISTEMA INMUNITARIO (NO INMUNOLÓGICO)
     # -------------------------------------------------------------------------
@@ -457,7 +441,6 @@ PREDEFINED_RULES: list[EditorialRule] = [
             ("sistema inmune", "sistema inmunitario"),
         ],
     ),
-
     # -------------------------------------------------------------------------
     # ALIMENTICIO -> ALIMENTARIO
     # -------------------------------------------------------------------------
@@ -474,7 +457,6 @@ PREDEFINED_RULES: list[EditorialRule] = [
             ("sector alimenticio", "sector alimentario"),
         ],
     ),
-
     # -------------------------------------------------------------------------
     # EXCESO DE ADVERBIOS EN -MENTE
     # -------------------------------------------------------------------------
@@ -497,6 +479,7 @@ PREDEFINED_RULES: list[EditorialRule] = [
 # CHECKER
 # =============================================================================
 
+
 class EditorialRulesChecker:
     """
     Verificador de reglas editoriales.
@@ -504,7 +487,7 @@ class EditorialRulesChecker:
     Aplica reglas predefinidas y personalizadas al texto.
     """
 
-    def __init__(self, rules: Optional[list[EditorialRule]] = None):
+    def __init__(self, rules: list[EditorialRule] | None = None):
         """
         Inicializa el checker.
 
@@ -557,8 +540,8 @@ class EditorialRulesChecker:
     def check(
         self,
         text: str,
-        custom_rules: Optional[list[EditorialRule]] = None,
-        categories: Optional[list[EditorialRuleCategory]] = None,
+        custom_rules: list[EditorialRule] | None = None,
+        categories: list[EditorialRuleCategory] | None = None,
     ) -> EditorialReport:
         """
         Analiza el texto buscando problemas editoriales.
@@ -579,12 +562,10 @@ class EditorialRulesChecker:
             for rule in custom_rules:
                 all_rules.append(rule)
                 if rule.pattern and rule.id not in self._compiled_patterns:
-                    try:
+                    with contextlib.suppress(re.error):
                         self._compiled_patterns[rule.id] = re.compile(
                             rule.pattern, re.IGNORECASE | re.UNICODE
                         )
-                    except re.error:
-                        pass
 
         # Aplicar cada regla
         for rule in all_rules:
@@ -627,9 +608,7 @@ class EditorialRulesChecker:
 
         return report
 
-    def _calculate_replacement(
-        self, rule: EditorialRule, match: re.Match
-    ) -> Optional[str]:
+    def _calculate_replacement(self, rule: EditorialRule, match: re.Match) -> str | None:
         """Calcula el texto de reemplazo para una coincidencia."""
 
         if rule.replacement:
@@ -662,16 +641,21 @@ class EditorialRulesChecker:
 
         # Mapeo posesivos plural -> singular
         possessive_map = {
-            "nuestros": "nuestro", "nuestras": "nuestra",
-            "vuestros": "vuestro", "vuestras": "vuestra",
+            "nuestros": "nuestro",
+            "nuestras": "nuestra",
+            "vuestros": "vuestro",
+            "vuestras": "vuestra",
             "sus": "su",
         }
 
         # Mapeo sustantivos plural -> singular
         noun_map = {
-            "corazones": "corazón", "cerebros": "cerebro",
-            "mentes": "mente", "vidas": "vida",
-            "almas": "alma", "cabezas": "cabeza",
+            "corazones": "corazón",
+            "cerebros": "cerebro",
+            "mentes": "mente",
+            "vidas": "vida",
+            "almas": "alma",
+            "cabezas": "cabeza",
         }
 
         words = text.split()
@@ -685,8 +669,16 @@ class EditorialRulesChecker:
     def _remove_accent(self, word: str) -> str:
         """Quita la tilde de un demostrativo."""
         accent_map = {
-            "é": "e", "á": "a", "í": "i", "ó": "o", "ú": "u",
-            "É": "E", "Á": "A", "Í": "I", "Ó": "O", "Ú": "U",
+            "é": "e",
+            "á": "a",
+            "í": "i",
+            "ó": "o",
+            "ú": "u",
+            "É": "E",
+            "Á": "A",
+            "Í": "I",
+            "Ó": "O",
+            "Ú": "U",
         }
         result = word
         for accented, plain in accent_map.items():
@@ -698,11 +690,17 @@ class EditorialRulesChecker:
         text = match.group(0)
         # Conjugaciones de agudizar -> aguzar
         replacements = {
-            "agudizo": "aguzo", "agudizas": "aguzas", "agudiza": "aguza",
-            "agudizamos": "aguzamos", "agudizan": "aguzan",
-            "agudizó": "aguzó", "agudizaron": "aguzaron",
-            "agudizaba": "aguzaba", "agudizaban": "aguzaban",
-            "agudizar": "aguzar", "agudizando": "aguzando",
+            "agudizo": "aguzo",
+            "agudizas": "aguzas",
+            "agudiza": "aguza",
+            "agudizamos": "aguzamos",
+            "agudizan": "aguzan",
+            "agudizó": "aguzó",
+            "agudizaron": "aguzaron",
+            "agudizaba": "aguzaba",
+            "agudizaban": "aguzaban",
+            "agudizar": "aguzar",
+            "agudizando": "aguzando",
         }
         for old, new in replacements.items():
             if old in text.lower():
@@ -719,9 +717,7 @@ class EditorialRulesChecker:
 
         return base
 
-    def get_rules_by_category(
-        self, category: EditorialRuleCategory
-    ) -> list[EditorialRule]:
+    def get_rules_by_category(self, category: EditorialRuleCategory) -> list[EditorialRule]:
         """Obtiene todas las reglas de una categoría."""
         return [r for r in self.rules if r.category == category]
 
@@ -757,7 +753,7 @@ class EditorialRulesChecker:
 import threading
 
 _lock = threading.Lock()
-_instance: Optional[EditorialRulesChecker] = None
+_instance: EditorialRulesChecker | None = None
 
 
 def get_editorial_checker() -> EditorialRulesChecker:
@@ -780,6 +776,7 @@ def reset_editorial_checker() -> None:
 # =============================================================================
 # PARSER DE REGLAS EN TEXTO LIBRE
 # =============================================================================
+
 
 def _make_word_pattern(text: str) -> str:
     """
@@ -830,51 +827,43 @@ def parse_user_rules(rules_text: str) -> list[EditorialRule]:
 
     # Patrones de parsing
     # 1. Sustitución explícita con comillas: "X" -> "Y"
-    substitution_quoted = re.compile(
-        r'"([^"]+)"\s*[-=]>\s*"([^"]+)"',
-        re.UNICODE
-    )
+    substitution_quoted = re.compile(r'"([^"]+)"\s*[-=]>\s*"([^"]+)"', re.UNICODE)
 
     # 1b. Sustitución sin comillas: palabra -> otra (o frase corta)
-    substitution_unquoted = re.compile(
-        r'(\S+)\s*[-=]>\s*(.+?)(?:\s*[\(\[]|$)',
-        re.UNICODE
-    )
+    substitution_unquoted = re.compile(r"(\S+)\s*[-=]>\s*(.+?)(?:\s*[\(\[]|$)", re.UNICODE)
 
     # 2. Preferir X sobre Y
     prefer_pattern = re.compile(
         r'preferir\s+"([^"]+)"\s+(?:sobre|a|en vez de|en lugar de)\s+"([^"]+)"',
-        re.IGNORECASE | re.UNICODE
+        re.IGNORECASE | re.UNICODE,
     )
 
     # 2b. Preferir sin comillas
     prefer_unquoted = re.compile(
-        r'preferir\s+(\S+)\s+(?:sobre|a|en vez de|en lugar de)\s+(\S+)',
-        re.IGNORECASE | re.UNICODE
+        r"preferir\s+(\S+)\s+(?:sobre|a|en vez de|en lugar de)\s+(\S+)", re.IGNORECASE | re.UNICODE
     )
 
     # 3. Evitar / No usar
     avoid_pattern = re.compile(
         r'(?:evitar|no usar|prohibido|incorrecto)[:\s]+["\']?([^"\']+?)["\']?\s*$',
-        re.IGNORECASE | re.UNICODE
+        re.IGNORECASE | re.UNICODE,
     )
 
     # 4. X (no Y) - formato común
     not_pattern = re.compile(
-        r'([^(]+?)\s*\((?:no|nunca|incorrecto)[:\s]*([^)]+)\)',
-        re.IGNORECASE | re.UNICODE
+        r"([^(]+?)\s*\((?:no|nunca|incorrecto)[:\s]*([^)]+)\)", re.IGNORECASE | re.UNICODE
     )
 
     # Procesar línea por línea
-    for line in rules_text.split('\n'):
+    for line in rules_text.split("\n"):
         line = line.strip()
 
         # Ignorar líneas vacías, comentarios y headers
-        if not line or line.startswith('#') or line.startswith('//'):
+        if not line or line.startswith("#") or line.startswith("//"):
             continue
 
         # Quitar bullet points
-        if line.startswith('-') or line.startswith('*') or line.startswith('•'):
+        if line.startswith("-") or line.startswith("*") or line.startswith("•"):
             line = line[1:].strip()
 
         # Intentar cada patrón
@@ -907,8 +896,8 @@ def parse_user_rules(rules_text: str) -> list[EditorialRule]:
                 new_text = match.group(2).strip()
 
                 # Limpiar comillas residuales
-                old_text = old_text.strip('"\'')
-                new_text = new_text.strip('"\'')
+                old_text = old_text.strip("\"'")
+                new_text = new_text.strip("\"'")
 
                 if old_text and new_text and old_text != new_text and len(old_text) > 1:
                     rule_counter += 1

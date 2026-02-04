@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Extractor basado en LLM local (Ollama) con soporte multi-modelo.
 
@@ -12,18 +11,16 @@ IMPORTANTE: Solo usa modelos LOCALES para mantener privacidad.
 
 import json
 import logging
-from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass, field
-from typing import Optional
+from dataclasses import dataclass
 
 from ..base import (
-    BaseExtractor,
-    ExtractionMethod,
-    ExtractionContext,
-    ExtractionResult,
-    ExtractedAttribute,
     AttributeType,
+    BaseExtractor,
+    ExtractedAttribute,
+    ExtractionContext,
+    ExtractionMethod,
+    ExtractionResult,
 )
 
 logger = logging.getLogger(__name__)
@@ -33,9 +30,11 @@ logger = logging.getLogger(__name__)
 # Configuración de modelos
 # =============================================================================
 
+
 @dataclass
 class LLMModelConfig:
     """Configuración de un modelo LLM."""
+
     name: str  # Nombre en Ollama (ej: "mistral:7b-instruct")
     display_name: str  # Nombre para mostrar
     weight: float = 1.0  # Peso en votación (1.0 = normal)
@@ -132,20 +131,23 @@ RESPUESTA:"""
 # Resultado de un modelo individual
 # =============================================================================
 
+
 @dataclass
 class SingleModelResult:
     """Resultado de extracción de un solo modelo."""
+
     model_name: str
     attributes: list[dict]  # Atributos crudos del JSON
     raw_response: str
     success: bool
-    error: Optional[str] = None
+    error: str | None = None
     latency_ms: float = 0.0
 
 
 @dataclass
 class EnsembleVote:
     """Voto de ensemble para un atributo."""
+
     entity: str
     attribute_type: str
     value: str
@@ -158,6 +160,7 @@ class EnsembleVote:
 # =============================================================================
 # Extractor Multi-LLM
 # =============================================================================
+
 
 class LLMExtractor(BaseExtractor):
     """
@@ -194,7 +197,7 @@ class LLMExtractor(BaseExtractor):
         model_name: str = "mistral:7b-instruct",
         # Modo ensemble
         use_ensemble: bool = False,
-        ensemble_models: Optional[list[str]] = None,
+        ensemble_models: list[str] | None = None,
         min_votes_for_consensus: int = 2,
         # Configuración general
         base_url: str = "http://localhost:11434",
@@ -222,7 +225,7 @@ class LLMExtractor(BaseExtractor):
         self._max_parallel = max_parallel_models
 
         self._client = None
-        self._available_models: Optional[list[str]] = None
+        self._available_models: list[str] | None = None
 
     @property
     def method(self) -> ExtractionMethod:
@@ -246,6 +249,7 @@ class LLMExtractor(BaseExtractor):
         if self._client is None:
             try:
                 import ollama
+
                 self._client = ollama.Client(host=self._base_url)
             except ImportError:
                 raise RuntimeError(
@@ -292,9 +296,7 @@ class LLMExtractor(BaseExtractor):
         for config in RECOMMENDED_MODELS:
             # Verificar si está instalado (comparar sin tag de versión)
             model_base = config.name.split(":")[0]
-            is_available = any(
-                model_base in avail for avail in available
-            )
+            is_available = any(model_base in avail for avail in available)
 
             if is_available and config.ram_required_gb <= max_ram_gb:
                 recommended.append(config)
@@ -333,8 +335,7 @@ class LLMExtractor(BaseExtractor):
             # Filtrar solo los que están disponibles
             available = set(self.get_available_models())
             return [
-                m for m in self._ensemble_models
-                if any(m.split(":")[0] in a for a in available)
+                m for m in self._ensemble_models if any(m.split(":")[0] in a for a in available)
             ]
 
         # Si no se especificaron, usar todos los disponibles que conocemos
@@ -347,7 +348,7 @@ class LLMExtractor(BaseExtractor):
                     ensemble.append(avail)
                     break
 
-        return ensemble[:self._max_parallel]  # Limitar
+        return ensemble[: self._max_parallel]  # Limitar
 
     def extract(self, context: ExtractionContext) -> ExtractionResult:
         """
@@ -398,10 +399,7 @@ class LLMExtractor(BaseExtractor):
 
         # Ejecutar modelos en paralelo
         with ThreadPoolExecutor(max_workers=self._max_parallel) as executor:
-            futures = {
-                executor.submit(self._call_model, model, context): model
-                for model in models
-            }
+            futures = {executor.submit(self._call_model, model, context): model for model in models}
 
             for future in as_completed(futures):
                 model_name = futures[future]
@@ -443,6 +441,7 @@ class LLMExtractor(BaseExtractor):
             SingleModelResult con atributos extraídos
         """
         import time
+
         start_time = time.time()
 
         try:
@@ -450,8 +449,7 @@ class LLMExtractor(BaseExtractor):
 
             # Obtener configuración del modelo
             config = MODELS_BY_NAME.get(
-                model_name,
-                LLMModelConfig(name=model_name, display_name=model_name)
+                model_name, LLMModelConfig(name=model_name, display_name=model_name)
             )
 
             # Preparar prompt
@@ -532,7 +530,7 @@ class LLMExtractor(BaseExtractor):
             # Obtener peso del modelo
             config = MODELS_BY_NAME.get(
                 result.model_name,
-                LLMModelConfig(name=result.model_name, display_name=result.model_name)
+                LLMModelConfig(name=result.model_name, display_name=result.model_name),
             )
             weight = config.weight
 
@@ -597,14 +595,16 @@ class LLMExtractor(BaseExtractor):
             except ValueError:
                 attr_type = AttributeType.OTHER
 
-            attributes.append(self._create_attribute(
-                entity_name=vote.entity,
-                attr_type=attr_type,
-                value=vote.value,
-                confidence=final_confidence,
-                source_text=vote.evidence or f"Ensemble ({vote.consensus})",
-                chapter=context.chapter,
-            ))
+            attributes.append(
+                self._create_attribute(
+                    entity_name=vote.entity,
+                    attr_type=attr_type,
+                    value=vote.value,
+                    confidence=final_confidence,
+                    source_text=vote.evidence or f"Ensemble ({vote.consensus})",
+                    chapter=context.chapter,
+                )
+            )
 
             logger.debug(
                 f"Voto: {vote.entity}.{vote.attribute_type}={vote.value} "
@@ -618,7 +618,7 @@ class LLMExtractor(BaseExtractor):
         self,
         entity_name: str,
         known_entities: list[str],
-    ) -> Optional[str]:
+    ) -> str | None:
         """Encuentra la entidad conocida que coincide."""
         entity_lower = entity_name.lower()
 
@@ -637,7 +637,7 @@ class LLMExtractor(BaseExtractor):
         self,
         item: dict,
         context: ExtractionContext,
-    ) -> Optional[ExtractedAttribute]:
+    ) -> ExtractedAttribute | None:
         """Convierte item del LLM a ExtractedAttribute."""
         entity = item.get("entity", "")
         attr_type_str = item.get("attribute", "other")
@@ -670,6 +670,7 @@ class LLMExtractor(BaseExtractor):
 # Funciones de utilidad
 # =============================================================================
 
+
 def list_available_models(base_url: str = "http://localhost:11434") -> list[str]:
     """
     Lista modelos disponibles en Ollama.
@@ -679,6 +680,7 @@ def list_available_models(base_url: str = "http://localhost:11434") -> list[str]
     """
     try:
         import ollama
+
         client = ollama.Client(host=base_url)
         response = client.list()
         return [m.get("name", "") for m in response.get("models", [])]

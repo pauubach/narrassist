@@ -8,33 +8,33 @@ Proporciona herramientas para:
 - Identificar inconsistencias estilísticas en diálogos
 """
 
-from .profiles import (
-    VoiceProfile,
-    VoiceMetrics,
-    VoiceProfileBuilder,
-)
 from .deviations import (
-    VoiceDeviation,
     DeviationType,
+    VoiceDeviation,
     VoiceDeviationDetector,
 )
+from .profiles import (
+    VoiceMetrics,
+    VoiceProfile,
+    VoiceProfileBuilder,
+)
 from .register import (
-    RegisterType,
-    RegisterAnalysis,
-    RegisterChange,
-    RegisterAnalyzer,
-    RegisterChangeDetector,
-    FORMAL_INDICATORS,
     COLLOQUIAL_INDICATORS,
+    FORMAL_INDICATORS,
+    RegisterAnalysis,
+    RegisterAnalyzer,
+    RegisterChange,
+    RegisterChangeDetector,
+    RegisterType,
     analyze_register_changes,
 )
 from .speaker_attribution import (
+    SPEECH_VERBS,
     AttributionConfidence,
     AttributionMethod,
     DialogueAttribution,
     SceneParticipants,
     SpeakerAttributor,
-    SPEECH_VERBS,
     attribute_speakers,
 )
 

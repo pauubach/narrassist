@@ -11,9 +11,9 @@ import logging
 import sqlite3
 import sys
 import threading
+from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator, Optional
 
 from ..core.config import get_config
 
@@ -28,8 +28,13 @@ SCHEMA_VERSION = 13
 # Tablas esenciales que deben existir para una BD válida
 # Solo incluir las tablas básicas definidas en SCHEMA_SQL
 ESSENTIAL_TABLES = {
-    'projects', 'chapters', 'entities', 'entity_mentions',
-    'alerts', 'sessions', 'correction_config_overrides'
+    "projects",
+    "chapters",
+    "entities",
+    "entity_mentions",
+    "alerts",
+    "sessions",
+    "correction_config_overrides",
 }
 
 # SQL de creación de tablas
@@ -828,7 +833,7 @@ class Database:
     - Transacciones explícitas
     """
 
-    def __init__(self, db_path: Optional[Path] = None):
+    def __init__(self, db_path: Path | None = None):
         """
         Inicializa conexión a base de datos.
 
@@ -843,7 +848,7 @@ class Database:
             isinstance(self.db_path, str) and self.db_path.startswith(":")
         )
         # Para :memory: mantenemos una conexión persistente
-        self._shared_connection: Optional[sqlite3.Connection] = None
+        self._shared_connection: sqlite3.Connection | None = None
         self._ensure_secure_permissions()
         self._initialize_schema()
 
@@ -884,7 +889,9 @@ class Database:
 
                 if size == 0:
                     # Empty file (e.g., from a previous failed init) - delete and recreate
-                    logger.warning("[DB_INIT] DB file exists but is empty (0 bytes), deleting to recreate")
+                    logger.warning(
+                        "[DB_INIT] DB file exists but is empty (0 bytes), deleting to recreate"
+                    )
                     self.db_path.unlink()
                 else:
                     # Verificar integridad de la BD existente
@@ -893,7 +900,9 @@ class Database:
                         logger.info("[DB_INIT] Schema verificado OK, retornando")
                         return  # BD válida, no hacer nada más
                     except Exception as e:
-                        logger.warning(f"[DB_INIT] BD posiblemente corrupta: {e}. Eliminando para recrear...")
+                        logger.warning(
+                            f"[DB_INIT] BD posiblemente corrupta: {e}. Eliminando para recrear..."
+                        )
                         # Delete the corrupt file and all auxiliary files
                         try:
                             self.db_path.unlink()
@@ -901,7 +910,9 @@ class Database:
                                 aux_path = Path(str(self.db_path) + suffix)
                                 if aux_path.exists():
                                     aux_path.unlink()
-                                    logger.info(f"[DB_INIT] Eliminado archivo auxiliar corrupto: {aux_path}")
+                                    logger.info(
+                                        f"[DB_INIT] Eliminado archivo auxiliar corrupto: {aux_path}"
+                                    )
                         except Exception as del_err:
                             logger.error(f"[DB_INIT] Error eliminando BD corrupta: {del_err}")
             else:
@@ -1011,7 +1022,9 @@ class Database:
 
                 missing = ESSENTIAL_TABLES - table_names
                 if missing:
-                    logger.error(f"[SCHEMA] ALERTA CRÍTICA: Faltan tablas tras executescript: {missing}")
+                    logger.error(
+                        f"[SCHEMA] ALERTA CRÍTICA: Faltan tablas tras executescript: {missing}"
+                    )
                     raise RuntimeError(f"Schema incompleto, faltan: {missing}")
 
             # Verificación INDEPENDIENTE: abrir nueva conexión para confirmar persistencia
@@ -1026,7 +1039,9 @@ class Database:
                     logger.info(f"[SCHEMA] Tablas en conexión independiente: {verify_names}")
                     verify_missing = ESSENTIAL_TABLES - verify_names
                     if verify_missing:
-                        logger.error(f"[SCHEMA] FALLO PERSISTENCIA: tablas no persistidas a disco: {verify_missing}")
+                        logger.error(
+                            f"[SCHEMA] FALLO PERSISTENCIA: tablas no persistidas a disco: {verify_missing}"
+                        )
                         # Forzar WAL checkpoint
                         logger.info("[SCHEMA] Forzando WAL checkpoint...")
                         verify_conn.execute("PRAGMA wal_checkpoint(FULL)")
@@ -1036,7 +1051,9 @@ class Database:
                         verify_names2 = {t[0] for t in verify_tables2}
                         logger.info(f"[SCHEMA] Tablas post-checkpoint: {verify_names2}")
                         if ESSENTIAL_TABLES - verify_names2:
-                            raise RuntimeError(f"Schema no persistido a disco: {ESSENTIAL_TABLES - verify_names2}")
+                            raise RuntimeError(
+                                f"Schema no persistido a disco: {ESSENTIAL_TABLES - verify_names2}"
+                            )
                 finally:
                     verify_conn.close()
 
@@ -1144,7 +1161,7 @@ class Database:
         with self.connection() as conn:
             return conn.executemany(sql, params_list)
 
-    def fetchone(self, sql: str, params: tuple = ()) -> Optional[sqlite3.Row]:
+    def fetchone(self, sql: str, params: tuple = ()) -> sqlite3.Row | None:
         """Ejecuta y retorna una fila."""
         with self.connection() as conn:
             return conn.execute(sql, params).fetchone()
@@ -1161,10 +1178,10 @@ class Database:
 
 
 # Singleton
-_database: Optional[Database] = None
+_database: Database | None = None
 
 
-def get_database(db_path: Optional[Path] = None) -> Database:
+def get_database(db_path: Path | None = None) -> Database:
     """Obtiene instancia singleton de base de datos (thread-safe)."""
     global _database
     logger.info(f"get_database llamado con db_path={db_path}")
@@ -1233,9 +1250,12 @@ def repair_database() -> tuple[bool, str]:
                     logger.warning(f"VACUUM falló: {vacuum_err}")
 
             # Paso 2: Verificar y crear tablas faltantes
-            existing = {row[0] for row in conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            ).fetchall()}
+            existing = {
+                row[0]
+                for row in conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                ).fetchall()
+            }
             logger.info(f"Tablas existentes: {existing}")
 
             missing = ESSENTIAL_TABLES - existing
@@ -1245,9 +1265,12 @@ def repair_database() -> tuple[bool, str]:
                 conn.commit()
 
                 # Verificar de nuevo
-                existing = {row[0] for row in conn.execute(
-                    "SELECT name FROM sqlite_master WHERE type='table'"
-                ).fetchall()}
+                existing = {
+                    row[0]
+                    for row in conn.execute(
+                        "SELECT name FROM sqlite_master WHERE type='table'"
+                    ).fetchall()
+                }
                 still_missing = ESSENTIAL_TABLES - existing
 
                 if still_missing:

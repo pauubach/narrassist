@@ -10,8 +10,8 @@ Estrategias:
 
 import logging
 import re
+from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Iterator, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ class TextChunk:
     start_char: int
     end_char: int
     chunk_index: int
-    total_chunks: Optional[int] = None
+    total_chunks: int | None = None
     metadata: dict = None
 
     def __post_init__(self):
@@ -162,7 +162,7 @@ class TextChunker:
         """
         # Buscar fin de oración en la región cercana al final
         search_start = max(start + self.min_chunk_size, end - 200)
-        search_region = text[search_start:end + 100]
+        search_region = text[search_start : end + 100]
 
         # Buscar el último fin de oración antes del límite
         last_boundary = -1

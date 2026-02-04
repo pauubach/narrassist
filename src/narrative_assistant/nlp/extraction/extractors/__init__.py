@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Extractores individuales para el pipeline híbrido.
 
@@ -9,13 +8,14 @@ Cada extractor implementa BaseExtractor y se especializa en un método:
 - LLMExtractor: Refinamiento con LLM local (Ollama)
 """
 
-from .regex_extractor import RegexExtractor
 from .dependency_extractor import DependencyExtractor
 from .embeddings_extractor import EmbeddingsExtractor
+from .regex_extractor import RegexExtractor
 
 # LLMExtractor se importa condicionalmente (requiere ollama)
 try:
     from .llm_extractor import LLMExtractor
+
     __all__ = [
         "RegexExtractor",
         "DependencyExtractor",

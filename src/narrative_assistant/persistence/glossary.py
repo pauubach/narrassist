@@ -10,11 +10,11 @@ permitiendo:
 
 import json
 import logging
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
-from typing import Optional, Any
+from typing import Any
 
-from .database import get_database, Database
+from .database import Database, get_database
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ class GlossaryEntry:
     """
 
     # Identificación
-    id: Optional[int] = None
+    id: int | None = None
     project_id: int = 0
 
     # Término principal
@@ -41,7 +41,7 @@ class GlossaryEntry:
 
     # Clasificación
     category: str = "general"  # "personaje", "lugar", "objeto", "concepto", "técnico"
-    subcategory: Optional[str] = None  # Más específico si es necesario
+    subcategory: str | None = None  # Más específico si es necesario
 
     # Metadata para el LLM
     context_notes: str = ""  # Notas adicionales para el LLM (ej: "Solo aparece en capítulos 3-5")
@@ -56,11 +56,11 @@ class GlossaryEntry:
 
     # Estadísticas (actualizadas durante análisis)
     usage_count: int = 0  # Veces que aparece en el texto
-    first_chapter: Optional[int] = None  # Primer capítulo donde aparece
+    first_chapter: int | None = None  # Primer capítulo donde aparece
 
     # Timestamps
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Serializa a diccionario."""
@@ -171,7 +171,7 @@ class GlossaryRepository:
     CREATE INDEX IF NOT EXISTS idx_glossary_category ON project_glossary(category);
     """
 
-    def __init__(self, db: Optional[Database] = None):
+    def __init__(self, db: Database | None = None):
         """Inicializa el repositorio."""
         self.db = db or get_database()
         self._ensure_table()
@@ -254,7 +254,7 @@ class GlossaryRepository:
                 raise ValueError(f"El término '{entry.term}' ya existe en el glosario")
             raise
 
-    def get(self, entry_id: int) -> Optional[GlossaryEntry]:
+    def get(self, entry_id: int) -> GlossaryEntry | None:
         """Obtiene una entrada por ID."""
         cursor = self.db.execute(
             "SELECT * FROM project_glossary WHERE id = ?",
@@ -263,7 +263,7 @@ class GlossaryRepository:
         row = cursor.fetchone()
         return GlossaryEntry.from_row(dict(row)) if row else None
 
-    def get_by_term(self, project_id: int, term: str) -> Optional[GlossaryEntry]:
+    def get_by_term(self, project_id: int, term: str) -> GlossaryEntry | None:
         """Busca una entrada por término exacto (case insensitive)."""
         cursor = self.db.execute(
             "SELECT * FROM project_glossary WHERE project_id = ? AND term = ? COLLATE NOCASE",
@@ -272,9 +272,7 @@ class GlossaryRepository:
         row = cursor.fetchone()
         return GlossaryEntry.from_row(dict(row)) if row else None
 
-    def find_by_term_or_variant(
-        self, project_id: int, search_term: str
-    ) -> Optional[GlossaryEntry]:
+    def find_by_term_or_variant(self, project_id: int, search_term: str) -> GlossaryEntry | None:
         """
         Busca una entrada por término principal o variantes.
 
@@ -315,7 +313,7 @@ class GlossaryRepository:
     def list_by_project(
         self,
         project_id: int,
-        category: Optional[str] = None,
+        category: str | None = None,
         only_technical: bool = False,
         only_invented: bool = False,
         only_for_publication: bool = False,
@@ -437,7 +435,7 @@ class GlossaryRepository:
         self,
         project_id: int,
         max_entries: int = 50,
-        categories: Optional[list[str]] = None,
+        categories: list[str] | None = None,
     ) -> str:
         """
         Genera contexto de glosario para el LLM.
@@ -549,9 +547,7 @@ class GlossaryRepository:
                 is_technical=item.get("is_technical", False),
                 is_invented=item.get("is_invented", False),
                 is_proper_noun=item.get("is_proper_noun", False),
-                include_in_publication_glossary=item.get(
-                    "include_in_publication_glossary", False
-                ),
+                include_in_publication_glossary=item.get("include_in_publication_glossary", False),
             )
 
             if existing:

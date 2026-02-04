@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Sistema de corrección ortográfica multi-votante con arbitraje LLM.
 
@@ -21,21 +20,21 @@ Uso:
     result = checker.check(text)
 """
 
+import contextlib
 import logging
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Optional, Callable, List
 
 from ...core.result import Result
-from ...core.errors import NLPError, ErrorSeverity
 from .base import (
+    DetectionMethod,
+    SpellingErrorType,
     SpellingIssue,
     SpellingReport,
-    SpellingErrorType,
     SpellingSeverity,
-    DetectionMethod,
 )
 
 logger = logging.getLogger(__name__)
@@ -46,9 +45,9 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 # Umbrales de confianza
-CONFIDENCE_HIGH = 0.75      # Consenso alto → aceptar sin LLM
-CONFIDENCE_MEDIUM = 0.50    # Consenso medio → puede necesitar LLM
-CONFIDENCE_LOW = 0.30       # Consenso bajo → siempre consultar LLM
+CONFIDENCE_HIGH = 0.75  # Consenso alto → aceptar sin LLM
+CONFIDENCE_MEDIUM = 0.50  # Consenso medio → puede necesitar LLM
+CONFIDENCE_LOW = 0.30  # Consenso bajo → siempre consultar LLM
 
 # Pesos de cada votante (suman 1.0)
 # Calibrados según evaluación con prueba_ortografia.txt (51 errores gold):
@@ -65,12 +64,12 @@ CONFIDENCE_LOW = 0.30       # Consenso bajo → siempre consultar LLM
 # - Mayor peso a votantes con mejor F1 y precision
 # - BETO y pyspellchecker se usan principalmente para aumentar recall
 VOTER_WEIGHTS = {
-    "patterns": 0.26,       # MEJOR: P=87.3%, R=69.7%, F1=77.5% - Muy rápido y preciso
-    "languagetool": 0.24,   # BUENO: P=62.2%, R=79.8%, F1=69.9% - Alto recall, contexto
-    "symspell": 0.16,       # MEDIO: P=74.2%, R=46.5%, F1=57.1% - Muy rápido
-    "hunspell": 0.14,       # MEDIO: P=63.5%, R=54.5%, F1=58.7% - Diccionario profesional
-    "beto": 0.12,           # MEJORADO: P=45.3%, R=85.7%, F1=59.3% - BETO base
-    "pyspellchecker": 0.08, # BAJO:  P=40.0%, R=62.6% - Solo para recall
+    "patterns": 0.26,  # MEJOR: P=87.3%, R=69.7%, F1=77.5% - Muy rápido y preciso
+    "languagetool": 0.24,  # BUENO: P=62.2%, R=79.8%, F1=69.9% - Alto recall, contexto
+    "symspell": 0.16,  # MEDIO: P=74.2%, R=46.5%, F1=57.1% - Muy rápido
+    "hunspell": 0.14,  # MEDIO: P=63.5%, R=54.5%, F1=58.7% - Diccionario profesional
+    "beto": 0.12,  # MEJORADO: P=45.3%, R=85.7%, F1=59.3% - BETO base
+    "pyspellchecker": 0.08,  # BAJO:  P=40.0%, R=62.6% - Solo para recall
 }
 # Total: 0.26 + 0.24 + 0.16 + 0.14 + 0.12 + 0.08 = 1.00
 
@@ -81,6 +80,7 @@ MIN_CONFIDENCE_FOR_CONSENSUS = 0.65
 
 class VoterStatus(Enum):
     """Estado de cada votante."""
+
     AVAILABLE = "available"
     UNAVAILABLE = "unavailable"
     ERROR = "error"
@@ -89,17 +89,19 @@ class VoterStatus(Enum):
 @dataclass
 class Vote:
     """Voto de un corrector individual."""
+
     voter_name: str
-    is_error: bool              # True si detecta error
-    confidence: float           # 0.0-1.0
+    is_error: bool  # True si detecta error
+    confidence: float  # 0.0-1.0
     suggestions: list[str] = field(default_factory=list)
-    error_type: Optional[SpellingErrorType] = None
-    raw_response: Optional[dict] = None
+    error_type: SpellingErrorType | None = None
+    raw_response: dict | None = None
 
 
 @dataclass
 class VotingResult:
     """Resultado agregado de la votación."""
+
     word: str
     start_char: int
     end_char: int
@@ -114,9 +116,9 @@ class VotingResult:
     needs_llm_arbitration: bool = False
 
     # Después de arbitraje LLM (si aplica)
-    llm_verdict: Optional[bool] = None
-    llm_confidence: Optional[float] = None
-    llm_explanation: Optional[str] = None
+    llm_verdict: bool | None = None
+    llm_confidence: float | None = None
+    llm_explanation: str | None = None
 
     # Resultado final
     final_suggestions: list[str] = field(default_factory=list)
@@ -145,6 +147,7 @@ class VotingResult:
 # Votantes individuales
 # =============================================================================
 
+
 class BaseVoter:
     """Clase base para votantes."""
 
@@ -153,13 +156,13 @@ class BaseVoter:
 
     def __init__(self):
         self._available = False
-        self._init_error: Optional[str] = None
+        self._init_error: str | None = None
 
     @property
     def is_available(self) -> bool:
         return self._available
 
-    def check_word(self, word: str, context: str = "") -> Optional[Vote]:
+    def check_word(self, word: str, context: str = "") -> Vote | None:
         """Verificar una palabra. Retorna None si no disponible."""
         raise NotImplementedError
 
@@ -174,7 +177,8 @@ class PySpellCheckerVoter(BaseVoter):
         super().__init__()
         try:
             from spellchecker import SpellChecker
-            self._checker = SpellChecker(language='es')
+
+            self._checker = SpellChecker(language="es")
             self._available = True
             logger.info("PySpellChecker inicializado correctamente")
         except ImportError:
@@ -184,7 +188,7 @@ class PySpellCheckerVoter(BaseVoter):
             self._init_error = f"Error inicializando pyspellchecker: {e}"
             logger.warning(self._init_error)
 
-    def check_word(self, word: str, context: str = "") -> Optional[Vote]:
+    def check_word(self, word: str, context: str = "") -> Vote | None:
         if not self._available:
             return None
 
@@ -227,7 +231,7 @@ class ChunspellVoter(BaseVoter):
     name = "hunspell"
     weight = VOTER_WEIGHTS["hunspell"]
 
-    def __init__(self, dict_path: Optional[Path] = None):
+    def __init__(self, dict_path: Path | None = None):
         super().__init__()
         try:
             # chunspell installs as 'hunspell' module
@@ -251,14 +255,14 @@ class ChunspellVoter(BaseVoter):
             self._init_error = f"Error inicializando hunspell: {e}"
             logger.warning(self._init_error)
 
-    def _find_spanish_dict(self, custom_path: Optional[Path] = None) -> Optional[str]:
+    def _find_spanish_dict(self, custom_path: Path | None = None) -> str | None:
         """Buscar diccionarios españoles en ubicaciones comunes.
 
         Returns path without extension - hunspell adds .aff and .dic automatically.
         """
         if custom_path:
-            base_path = custom_path.with_suffix('')  # Remove extension if any
-            if base_path.with_suffix('.aff').exists() and base_path.with_suffix('.dic').exists():
+            base_path = custom_path.with_suffix("")  # Remove extension if any
+            if base_path.with_suffix(".aff").exists() and base_path.with_suffix(".dic").exists():
                 return str(base_path)
 
         # Ubicaciones comunes (base paths without extension)
@@ -270,14 +274,14 @@ class ChunspellVoter(BaseVoter):
         ]
 
         for base_path in common_paths:
-            aff = base_path.with_suffix('.aff')
-            dic = base_path.with_suffix('.dic')
+            aff = base_path.with_suffix(".aff")
+            dic = base_path.with_suffix(".dic")
             if aff.exists() and dic.exists():
                 return str(base_path)
 
         return None
 
-    def check_word(self, word: str, context: str = "") -> Optional[Vote]:
+    def check_word(self, word: str, context: str = "") -> Vote | None:
         if not self._available:
             return None
 
@@ -310,7 +314,7 @@ class SymSpellVoter(BaseVoter):
     name = "symspell"
     weight = VOTER_WEIGHTS["symspell"]
 
-    def __init__(self, dict_path: Optional[Path] = None):
+    def __init__(self, dict_path: Path | None = None):
         super().__init__()
         try:
             from symspellpy import SymSpell, Verbosity
@@ -335,16 +339,12 @@ class SymSpellVoter(BaseVoter):
             self._init_error = f"Error inicializando symspellpy: {e}"
             logger.warning(self._init_error)
 
-    def _load_dictionary(self, custom_path: Optional[Path] = None) -> bool:
+    def _load_dictionary(self, custom_path: Path | None = None) -> bool:
         """Cargar diccionario de frecuencias español."""
 
         # Intentar cargar diccionario personalizado
         if custom_path and custom_path.exists():
-            return self._symspell.load_dictionary(
-                str(custom_path),
-                term_index=0,
-                count_index=1
-            )
+            return self._symspell.load_dictionary(str(custom_path), term_index=0, count_index=1)
 
         # Buscar en ubicaciones comunes
         common_paths = [
@@ -357,11 +357,7 @@ class SymSpellVoter(BaseVoter):
         for path in common_paths:
             if path.exists():
                 try:
-                    loaded = self._symspell.load_dictionary(
-                        str(path),
-                        term_index=0,
-                        count_index=1
-                    )
+                    loaded = self._symspell.load_dictionary(str(path), term_index=0, count_index=1)
                     if loaded:
                         logger.info(f"SymSpell: diccionario cargado desde {path}")
                         return True
@@ -372,7 +368,7 @@ class SymSpellVoter(BaseVoter):
         logger.warning("SymSpell: no se encontró diccionario español")
         return False
 
-    def check_word(self, word: str, context: str = "") -> Optional[Vote]:
+    def check_word(self, word: str, context: str = "") -> Vote | None:
         if not self._available:
             return None
 
@@ -380,9 +376,7 @@ class SymSpellVoter(BaseVoter):
             from symspellpy import Verbosity
 
             suggestions = self._symspell.lookup(
-                word.lower(),
-                Verbosity.CLOSEST,
-                max_edit_distance=2
+                word.lower(), Verbosity.CLOSEST, max_edit_distance=2
             )
 
             if not suggestions:
@@ -424,20 +418,22 @@ class LanguageToolVoter(BaseVoter):
 
     name = "languagetool"
     weight = VOTER_WEIGHTS["languagetool"]
-    
+
     # Reglas de LanguageTool a deshabilitar por defecto
     # Evita falsos positivos con conjunciones/preposiciones comunes
     DEFAULT_DISABLED_RULES = [
         "SPANISH_WORD_REPEAT_RULE",  # Palabras repetidas (falso positivo con "y", "que")
-        "WORD_REPEAT_RULE",          # Variante general
-        "MORFOLOGIK_RULE_ES",        # A veces detecta neologismos válidos
+        "WORD_REPEAT_RULE",  # Variante general
+        "MORFOLOGIK_RULE_ES",  # A veces detecta neologismos válidos
     ]
 
-    def __init__(self, disabled_rules: Optional[List[str]] = None):
+    def __init__(self, disabled_rules: list[str] | None = None):
         super().__init__()
         self._tool = None
         self._use_python_lib = False
-        self._disabled_rules = disabled_rules if disabled_rules is not None else self.DEFAULT_DISABLED_RULES
+        self._disabled_rules = (
+            disabled_rules if disabled_rules is not None else self.DEFAULT_DISABLED_RULES
+        )
 
         # Configurar Java 17 si está disponible
         self._setup_java17()
@@ -445,7 +441,8 @@ class LanguageToolVoter(BaseVoter):
         # Intentar primero language_tool_python (más fácil de usar)
         try:
             import language_tool_python
-            self._tool = language_tool_python.LanguageTool('es')
+
+            self._tool = language_tool_python.LanguageTool("es")
             self._use_python_lib = True
             self._available = True
             logger.info("LanguageTool inicializado con language_tool_python")
@@ -475,6 +472,7 @@ class LanguageToolVoter(BaseVoter):
     def _setup_java17(self):
         """Configurar Java 17 si está disponible."""
         import os
+
         java17_paths = [
             r"C:\Program Files\Microsoft\jdk-17.0.17.10-hotspot",
             r"C:\Program Files\Eclipse Adoptium\jdk-17",
@@ -482,20 +480,18 @@ class LanguageToolVoter(BaseVoter):
         ]
         for java_path in java17_paths:
             if Path(java_path).exists():
-                os.environ['JAVA_HOME'] = java_path
-                os.environ['PATH'] = f"{java_path}\\bin;{os.environ.get('PATH', '')}"
+                os.environ["JAVA_HOME"] = java_path
+                os.environ["PATH"] = f"{java_path}\\bin;{os.environ.get('PATH', '')}"
                 logger.debug(f"Java 17 configurado: {java_path}")
                 return
 
     def close(self):
         """Cerrar el cliente LanguageTool."""
         if self._tool and self._use_python_lib:
-            try:
+            with contextlib.suppress(Exception):
                 self._tool.close()
-            except Exception:
-                pass
 
-    def check_word(self, word: str, context: str = "") -> Optional[Vote]:
+    def check_word(self, word: str, context: str = "") -> Vote | None:
         """LanguageTool necesita contexto, no palabras individuales."""
         return None
 
@@ -511,15 +507,15 @@ class LanguageToolVoter(BaseVoter):
                 matches = self._tool.check(text)
                 for match in matches:
                     # Filtrar reglas deshabilitadas
-                    rule_id = getattr(match, 'rule_id', getattr(match, 'ruleId', ''))
+                    rule_id = getattr(match, "rule_id", getattr(match, "ruleId", ""))
                     if rule_id in self._disabled_rules:
                         continue
-                        
+
                     # language_tool_python usa snake_case (error_length, rule_id)
-                    error_len = getattr(match, 'error_length', getattr(match, 'errorLength', 0))
-                    word = text[match.offset:match.offset + error_len]
+                    error_len = getattr(match, "error_length", getattr(match, "errorLength", 0))
+                    word = text[match.offset : match.offset + error_len]
                     # Limpiar newlines/whitespace del word
-                    word_clean = word.replace('\n', ' ').replace('\r', ' ').strip()
+                    word_clean = word.replace("\n", " ").replace("\r", " ").strip()
                     error_type = self._map_category(match.category or "")
 
                     vote = Vote(
@@ -532,7 +528,7 @@ class LanguageToolVoter(BaseVoter):
                             "rule_id": rule_id,
                             "message": match.message,
                             "category": match.category,
-                        }
+                        },
                     )
                     # Ignorar errores en whitespace/newlines
                     if word_clean:
@@ -540,18 +536,16 @@ class LanguageToolVoter(BaseVoter):
             else:
                 # Usar cliente de servidor local con reglas deshabilitadas
                 check_result = self._client.check(
-                    text, 
-                    language="es",
-                    disabled_rules=self._disabled_rules
+                    text, language="es", disabled_rules=self._disabled_rules
                 )
                 for match in check_result.matches:
                     # Filtrar reglas deshabilitadas (por si el servidor no las filtró)
                     if match.rule_id in self._disabled_rules:
                         continue
-                        
-                    word = text[match.offset:match.offset + match.length]
+
+                    word = text[match.offset : match.offset + match.length]
                     # Limpiar newlines/whitespace del word
-                    word_clean = word.replace('\n', ' ').replace('\r', ' ').strip()
+                    word_clean = word.replace("\n", " ").replace("\r", " ").strip()
                     error_type = self._map_category(match.rule_category)
 
                     vote = Vote(
@@ -564,11 +558,13 @@ class LanguageToolVoter(BaseVoter):
                             "rule_id": match.rule_id,
                             "message": match.message,
                             "category": match.rule_category,
-                        }
+                        },
                     )
                     # Ignorar errores en whitespace/newlines
                     if word_clean:
-                        results.append((word_clean, match.offset, match.offset + match.length, vote))
+                        results.append(
+                            (word_clean, match.offset, match.offset + match.length, vote)
+                        )
 
         except Exception as e:
             logger.debug(f"Error en LanguageTool: {e}")
@@ -630,53 +626,94 @@ class PatternVoter(BaseVoter):
 
         # --- sufijo -ico/-ica (familias completas) ---
         for us, ac in [
-            ("cientific", "científic"), ("fantastic", "fantástic"),
-            ("romantic", "romántic"), ("dramatic", "dramátic"),
-            ("tecnic", "técnic"), ("practic", "práctic"),
-            ("logic", "lógic"), ("tipic", "típic"), ("unic", "únic"),
-            ("artistic", "artístic"), ("economic", "económic"),
-            ("politic", "polític"), ("electronic", "electrónic"),
-            ("automatic", "automátic"), ("simpatic", "simpátic"),
-            ("mecanic", "mecánic"), ("organic", "orgánic"),
-            ("dinamic", "dinámic"), ("estatic", "estátic"),
-            ("cosmic", "cósmic"), ("comic", "cómic"),
-            ("tragic", "trágic"), ("magic", "mágic"),
-            ("basic", "básic"), ("plastic", "plástic"),
-            ("elastic", "elástic"), ("domestic", "doméstic"),
-            ("ecologic", "ecológic"), ("biologic", "biológic"),
-            ("psicologic", "psicológic"), ("ideologic", "ideológic"),
-            ("geographic", "geográfic"), ("caotic", "caótic"),
-            ("exotic", "exótic"), ("periodic", "periódic"),
-            ("tematic", "temátic"), ("sistematic", "sistemátic"),
-            ("matematic", "matemátic"), ("informatic", "informátic"),
-            ("acustic", "acústic"), ("optic", "óptic"),
-            ("energetic", "energétic"), ("genetic", "genétic"),
-            ("astronomic", "astronómic"), ("filosofic", "filosófic"),
-            ("fonetic", "fonétic"), ("erotic", "erótic"),
-            ("narcotic", "narcótic"), ("esceptic", "escéptic"),
-            ("antiseptic", "antiséptic"), ("diagnostic", "diagnóstic"),
-            ("pronostic", "pronóstic"), ("estoic", "estóic"),
+            ("cientific", "científic"),
+            ("fantastic", "fantástic"),
+            ("romantic", "romántic"),
+            ("dramatic", "dramátic"),
+            ("tecnic", "técnic"),
+            ("practic", "práctic"),
+            ("logic", "lógic"),
+            ("tipic", "típic"),
+            ("unic", "únic"),
+            ("artistic", "artístic"),
+            ("economic", "económic"),
+            ("politic", "polític"),
+            ("electronic", "electrónic"),
+            ("automatic", "automátic"),
+            ("simpatic", "simpátic"),
+            ("mecanic", "mecánic"),
+            ("organic", "orgánic"),
+            ("dinamic", "dinámic"),
+            ("estatic", "estátic"),
+            ("cosmic", "cósmic"),
+            ("comic", "cómic"),
+            ("tragic", "trágic"),
+            ("magic", "mágic"),
+            ("basic", "básic"),
+            ("plastic", "plástic"),
+            ("elastic", "elástic"),
+            ("domestic", "doméstic"),
+            ("ecologic", "ecológic"),
+            ("biologic", "biológic"),
+            ("psicologic", "psicológic"),
+            ("ideologic", "ideológic"),
+            ("geographic", "geográfic"),
+            ("caotic", "caótic"),
+            ("exotic", "exótic"),
+            ("periodic", "periódic"),
+            ("tematic", "temátic"),
+            ("sistematic", "sistemátic"),
+            ("matematic", "matemátic"),
+            ("informatic", "informátic"),
+            ("acustic", "acústic"),
+            ("optic", "óptic"),
+            ("energetic", "energétic"),
+            ("genetic", "genétic"),
+            ("astronomic", "astronómic"),
+            ("filosofic", "filosófic"),
+            ("fonetic", "fonétic"),
+            ("erotic", "erótic"),
+            ("narcotic", "narcótic"),
+            ("esceptic", "escéptic"),
+            ("antiseptic", "antiséptic"),
+            ("diagnostic", "diagnóstic"),
+            ("pronostic", "pronóstic"),
+            ("estoic", "estóic"),
             # También incluye médico/público/clásico/histórico:
             # altísima frecuencia en narrativa como sustantivo/adjetivo
-            ("medic", "médic"), ("public", "públic"),
-            ("classic", "clásic"), ("historic", "históric"),
+            ("medic", "médic"),
+            ("public", "públic"),
+            ("classic", "clásic"),
+            ("historic", "históric"),
         ]:
             _add_ico(us, ac)
 
         # --- sufijo -ido/-ida (adjetivos) ---
         for us, ac in [
-            ("rap", "ráp"), ("sol", "sól"), ("liqu", "líqu"),
-            ("val", "vál"), ("ac", "ác"), ("tim", "tím"),
-            ("humed", "húmed"), ("nit", "nít"), ("luc", "lúc"),
-            ("pal", "pál"), ("cal", "cál"), ("rig", "ríg"),
-            ("plac", "plác"), ("viv", "vív"), ("esplend", "esplénd"),
+            ("rap", "ráp"),
+            ("sol", "sól"),
+            ("liqu", "líqu"),
+            ("val", "vál"),
+            ("ac", "ác"),
+            ("tim", "tím"),
+            ("humed", "húmed"),
+            ("nit", "nít"),
+            ("luc", "lúc"),
+            ("pal", "pál"),
+            ("cal", "cál"),
+            ("rig", "ríg"),
+            ("plac", "plác"),
+            ("viv", "vív"),
+            ("esplend", "esplénd"),
         ]:
             _add_ido(us, ac)
 
         # --- sufijo -ogo/-oga ---
         for us, ac in [
-            ("dialog", "diálog"), ("catalog", "catálog"),
-            ("epilog", "epílog"), ("prolog", "prólog"),
+            ("dialog", "diálog"),
+            ("catalog", "catálog"),
+            ("epilog", "epílog"),
+            ("prolog", "prólog"),
             ("monolog", "monólog"),
         ]:
             _add_oaos(us, ac)
@@ -684,87 +721,150 @@ class PatternVoter(BaseVoter):
         # --- individuales (sustantivos, adjetivos, adverbios) ---
         indiv = {
             # -ono
-            "telefono": "teléfono", "telefonos": "teléfonos",
-            "microfono": "micrófono", "microfonos": "micrófonos",
+            "telefono": "teléfono",
+            "telefonos": "teléfonos",
+            "microfono": "micrófono",
+            "microfonos": "micrófonos",
             # -odo
-            "metodo": "método", "metodos": "métodos",
+            "metodo": "método",
+            "metodos": "métodos",
             # -eno
-            "fenomeno": "fenómeno", "fenomenos": "fenómenos",
+            "fenomeno": "fenómeno",
+            "fenomenos": "fenómenos",
             # -aro/-ara
-            "pajaro": "pájaro", "pajaros": "pájaros",
-            "cantaro": "cántaro", "cantaros": "cántaros",
-            "barbaro": "bárbaro", "barbara": "bárbara",
-            "barbaros": "bárbaros", "barbaras": "bárbaras",
+            "pajaro": "pájaro",
+            "pajaros": "pájaros",
+            "cantaro": "cántaro",
+            "cantaros": "cántaros",
+            "barbaro": "bárbaro",
+            "barbara": "bárbara",
+            "barbaros": "bárbaros",
+            "barbaras": "bárbaras",
             # -ulo/-ula
-            "articulo": "artículo", "articulos": "artículos",
-            "capitulo": "capítulo", "capitulos": "capítulos",
-            "modulo": "módulo", "modulos": "módulos",
-            "formula": "fórmula", "formulas": "fórmulas",
-            "capsula": "cápsula", "capsulas": "cápsulas",
-            "espectaculo": "espectáculo", "espectaculos": "espectáculos",
-            "titulo": "título", "titulos": "títulos",
-            "estimulo": "estímulo", "estimulos": "estímulos",
-            "calculo": "cálculo", "calculos": "cálculos",
-            "vinculo": "vínculo", "vinculos": "vínculos",
-            "obstaculo": "obstáculo", "obstaculos": "obstáculos",
-            "circulo": "círculo", "circulos": "círculos",
-            "musculo": "músculo", "musculos": "músculos",
-            "vehiculo": "vehículo", "vehiculos": "vehículos",
-            "angulo": "ángulo", "angulos": "ángulos",
-            "triangulo": "triángulo", "triangulos": "triángulos",
-            "pendulo": "péndulo", "pendulos": "péndulos",
-            "ridiculo": "ridículo", "ridicula": "ridícula",
+            "articulo": "artículo",
+            "articulos": "artículos",
+            "capitulo": "capítulo",
+            "capitulos": "capítulos",
+            "modulo": "módulo",
+            "modulos": "módulos",
+            "formula": "fórmula",
+            "formulas": "fórmulas",
+            "capsula": "cápsula",
+            "capsulas": "cápsulas",
+            "espectaculo": "espectáculo",
+            "espectaculos": "espectáculos",
+            "titulo": "título",
+            "titulos": "títulos",
+            "estimulo": "estímulo",
+            "estimulos": "estímulos",
+            "calculo": "cálculo",
+            "calculos": "cálculos",
+            "vinculo": "vínculo",
+            "vinculos": "vínculos",
+            "obstaculo": "obstáculo",
+            "obstaculos": "obstáculos",
+            "circulo": "círculo",
+            "circulos": "círculos",
+            "musculo": "músculo",
+            "musculos": "músculos",
+            "vehiculo": "vehículo",
+            "vehiculos": "vehículos",
+            "angulo": "ángulo",
+            "angulos": "ángulos",
+            "triangulo": "triángulo",
+            "triangulos": "triángulos",
+            "pendulo": "péndulo",
+            "pendulos": "péndulos",
+            "ridiculo": "ridículo",
+            "ridicula": "ridícula",
             # -ero/-era
-            "numero": "número", "numeros": "números",
-            "genero": "género", "generos": "géneros",
-            "atmosfera": "atmósfera", "atmosferas": "atmósferas",
+            "numero": "número",
+            "numeros": "números",
+            "genero": "género",
+            "generos": "géneros",
+            "atmosfera": "atmósfera",
+            "atmosferas": "atmósferas",
             # -ara
-            "lampara": "lámpara", "lamparas": "lámparas",
-            "camara": "cámara", "camaras": "cámaras",
+            "lampara": "lámpara",
+            "lamparas": "lámparas",
+            "camara": "cámara",
+            "camaras": "cámaras",
             # -ima/-imo
-            "lagrima": "lágrima", "lagrimas": "lágrimas",
-            "maximo": "máximo", "maxima": "máxima",
-            "minimo": "mínimo", "minima": "mínima",
-            "ultimo": "último", "ultima": "última",
-            "ultimos": "últimos", "ultimas": "últimas",
-            "optimo": "óptimo", "optima": "óptima",
-            "pesimo": "pésimo", "pesima": "pésima",
-            "proximo": "próximo", "proxima": "próxima",
-            "intimo": "íntimo", "intima": "íntima",
-            "legitimo": "legítimo", "legitima": "legítima",
-            "victima": "víctima", "victimas": "víctimas",
+            "lagrima": "lágrima",
+            "lagrimas": "lágrimas",
+            "maximo": "máximo",
+            "maxima": "máxima",
+            "minimo": "mínimo",
+            "minima": "mínima",
+            "ultimo": "último",
+            "ultima": "última",
+            "ultimos": "últimos",
+            "ultimas": "últimas",
+            "optimo": "óptimo",
+            "optima": "óptima",
+            "pesimo": "pésimo",
+            "pesima": "pésima",
+            "proximo": "próximo",
+            "proxima": "próxima",
+            "intimo": "íntimo",
+            "intima": "íntima",
+            "legitimo": "legítimo",
+            "legitima": "legítima",
+            "victima": "víctima",
+            "victimas": "víctimas",
             # -ina/-ino
-            "maquina": "máquina", "maquinas": "máquinas",
-            "pagina": "página", "paginas": "páginas",
-            "fabrica": "fábrica", "fabricas": "fábricas",
-            "musica": "música", "musicas": "músicas",
+            "maquina": "máquina",
+            "maquinas": "máquinas",
+            "pagina": "página",
+            "paginas": "páginas",
+            "fabrica": "fábrica",
+            "fabricas": "fábricas",
+            "musica": "música",
+            "musicas": "músicas",
             # -ofo
-            "filosofo": "filósofo", "filosofa": "filósofa",
+            "filosofo": "filósofo",
+            "filosofa": "filósofa",
             # -ipe
-            "principe": "príncipe", "principes": "príncipes",
+            "principe": "príncipe",
+            "principes": "príncipes",
             # -aba
-            "silaba": "sílaba", "silabas": "sílabas",
+            "silaba": "sílaba",
+            "silabas": "sílabas",
             # -igo
             "vertigo": "vértigo",
             # -ato
-            "sabado": "sábado", "sabados": "sábados",
+            "sabado": "sábado",
+            "sabados": "sábados",
             # -isis/-esis
-            "analisis": "análisis", "sintesis": "síntesis",
-            "hipotesis": "hipótesis", "parentesis": "paréntesis",
+            "analisis": "análisis",
+            "sintesis": "síntesis",
+            "hipotesis": "hipótesis",
+            "parentesis": "paréntesis",
             "genesis": "génesis",
             # -ito/-ita
-            "parasito": "parásito", "parasitos": "parásitos",
-            "proposito": "propósito", "propositos": "propósitos",
-            "ejercito": "ejército", "ejercitos": "ejércitos",
-            "credito": "crédito", "creditos": "créditos",
-            "deposito": "depósito", "depositos": "depósitos",
-            "transito": "tránsito", "habito": "hábito",
-            "habitos": "hábitos", "ambito": "ámbito",
-            "exito": "éxito", "exitos": "éxitos",
-            "limite": "límite", "limites": "límites",
-            "espiritu": "espíritu", "espiritus": "espíritus",
+            "parasito": "parásito",
+            "parasitos": "parásitos",
+            "proposito": "propósito",
+            "propositos": "propósitos",
+            "ejercito": "ejército",
+            "ejercitos": "ejércitos",
+            "credito": "crédito",
+            "creditos": "créditos",
+            "deposito": "depósito",
+            "depositos": "depósitos",
+            "transito": "tránsito",
+            "habito": "hábito",
+            "habitos": "hábitos",
+            "ambito": "ámbito",
+            "exito": "éxito",
+            "exitos": "éxitos",
+            "limite": "límite",
+            "limites": "límites",
+            "espiritu": "espíritu",
+            "espiritus": "espíritus",
             # -oe
-            "heroe": "héroe", "heroes": "héroes",
+            "heroe": "héroe",
+            "heroes": "héroes",
             # adverbios
             "rapidamente": "rápidamente",
             "ultimamente": "últimamente",
@@ -780,11 +880,18 @@ class PatternVoter(BaseVoter):
     # tilde en preguntas directas e indirectas.
     # ----------------------------------------------------------------
     _INTERROGATIVE_MAP: dict[str, str] = {
-        "donde": "dónde", "como": "cómo", "cuando": "cuándo",
-        "quien": "quién", "quienes": "quiénes",
-        "que": "qué", "cual": "cuál", "cuales": "cuáles",
-        "cuanto": "cuánto", "cuanta": "cuánta",
-        "cuantos": "cuántos", "cuantas": "cuántas",
+        "donde": "dónde",
+        "como": "cómo",
+        "cuando": "cuándo",
+        "quien": "quién",
+        "quienes": "quiénes",
+        "que": "qué",
+        "cual": "cuál",
+        "cuales": "cuáles",
+        "cuanto": "cuánto",
+        "cuanta": "cuánta",
+        "cuantos": "cuántos",
+        "cuantas": "cuántas",
     }
 
     # ----------------------------------------------------------------
@@ -794,144 +901,207 @@ class PatternVoter(BaseVoter):
     # ----------------------------------------------------------------
     _H_STEMS: dict[str, str] = {
         # raíz_sin_h → raíz_con_h (mínimo 3 chars para evitar FP)
-        "abit": "habit",    # habitar, habitación, habitaba, habitante...
+        "abit": "habit",  # habitar, habitación, habitaba, habitante...
         "abitat": "habitat",
-        "abl": "habl",      # hablar, hablaba, hablando...
+        "abl": "habl",  # hablar, hablaba, hablando...
         "onest": "honest",  # honesto, honestidad...
-        "onor": "honor",    # honor, honorable...
-        "onra": "honra",    # honra, honrado...
-        "ombr": "hombr",    # hombre, hombros...
+        "onor": "honor",  # honor, honorable...
+        "onra": "honra",  # honra, honrado...
+        "ombr": "hombr",  # hombre, hombros...
         "umild": "humild",  # humilde, humildad...
-        "umed": "humed",    # húmedo, humedad...
-        "uman": "human",    # humano, humanidad...
-        "umor": "humor",    # humor, humorístico...
+        "umed": "humed",  # húmedo, humedad...
+        "uman": "human",  # humano, humanidad...
+        "umor": "humor",  # humor, humorístico...
         "ospit": "hospit",  # hospital, hospitalario...
         "ostil": "hostil",  # hostil, hostilidad...
         "orribl": "horribl",  # horrible
         "orror": "horror",  # horror, horroroso...
         "ermanos": "hermanos",  # (ext. de patrón existente a plurales)
         "ermanas": "hermanas",
-        "ijos": "hijos", "ijas": "hijas",
+        "ijos": "hijos",
+        "ijas": "hijas",
         "ermos": "hermos",  # hermoso, hermosura...
-        "arin": "harin",    # harina
+        "arin": "harin",  # harina
         "erramienta": "herramienta",
-        "ielo": "hielo", "ierb": "hierb", "ierr": "hierr",
-        "uelg": "huelg",    # huelga
-        "uell": "huell",    # huella
-        "uert": "huert",    # huerto, huerta
-        "ues": "hues",      # hueso, huésped
+        "ielo": "hielo",
+        "ierb": "hierb",
+        "ierr": "hierr",
+        "uelg": "huelg",  # huelga
+        "uell": "huell",  # huella
+        "uert": "huert",  # huerto, huerta
+        "ues": "hues",  # hueso, huésped
     }
 
     # Patrones de errores comunes en español
     ERROR_PATTERNS = [
         # Confusión b/v
-        (r'\b(estava|estavan|estuve|estubo)\b', 'b_v', ['estaba', 'estaban', 'estuve', 'estuvo']),
-        (r'\b(iva|ivan|ivas)\b', 'b_v', ['iba', 'iban', 'ibas']),
-        (r'\b(haver|aver|habia|havia)\b', 'b_v', ['haber', 'a ver', 'había', 'había']),
-        (r'\b(tubo|tubieron|tubiste)\b', 'b_v', ['tuvo', 'tuvieron', 'tuviste']),
-        (r'\b(boi|bamos|bais)\b', 'b_v', ['voy', 'vamos', 'vais']),
-        (r'\b(bolver|bolber|bolvio)\b', 'b_v', ['volver', 'volver', 'volvió']),
-        (r'\b(obserbar|obserbo)\b', 'b_v', ['observar', 'observo']),
-        (r'\b(recivir|recivi|recivio)\b', 'b_v', ['recibir', 'recibí', 'recibió']),
-        (r'\b(escrivir|escrivio|escriví)\b', 'b_v', ['escribir', 'escribió', 'escribí']),
-        (r'\b(berdad|berdadero)\b', 'b_v', ['verdad', 'verdadero']),
-        (r'\b(berduras|berde)\b', 'b_v', ['verduras', 'verde']),
-        (r'\b(bolo|boló)\b', 'b_v', ['voló']),  # "Un pájaro bolo" -> "voló"
-        (r'\b(abraso|abrasos)\b', 'b_v', ['abrazo', 'abrazos']),  # s/z confusion too
-        (r'\b(nuebo|nueba|nuebos|nuebas)\b', 'b_v', ['nuevo', 'nueva', 'nuevos', 'nuevas']),
-        (r'\b(avuela|avuelo|avuelos|avuelas)\b', 'b_v', ['abuela', 'abuelo', 'abuelos', 'abuelas']),
-        (r'\b(todabia)\b', 'b_v', ['todavía']),
-        (r'\b(lebanto|lebanta|lebantar|lebanvarse|levanvarse)\b', 'b_v',
-         ['levantó', 'levanta', 'levantar', 'levantarse', 'levantarse']),
-        (r'\b(Havian|havian|Havia|havias)\b', 'b_v', ['Habían', 'habían', 'Había', 'habías']),
-
+        (r"\b(estava|estavan|estuve|estubo)\b", "b_v", ["estaba", "estaban", "estuve", "estuvo"]),
+        (r"\b(iva|ivan|ivas)\b", "b_v", ["iba", "iban", "ibas"]),
+        (r"\b(haver|aver|habia|havia)\b", "b_v", ["haber", "a ver", "había", "había"]),
+        (r"\b(tubo|tubieron|tubiste)\b", "b_v", ["tuvo", "tuvieron", "tuviste"]),
+        (r"\b(boi|bamos|bais)\b", "b_v", ["voy", "vamos", "vais"]),
+        (r"\b(bolver|bolber|bolvio)\b", "b_v", ["volver", "volver", "volvió"]),
+        (r"\b(obserbar|obserbo)\b", "b_v", ["observar", "observo"]),
+        (r"\b(recivir|recivi|recivio)\b", "b_v", ["recibir", "recibí", "recibió"]),
+        (r"\b(escrivir|escrivio|escriví)\b", "b_v", ["escribir", "escribió", "escribí"]),
+        (r"\b(berdad|berdadero)\b", "b_v", ["verdad", "verdadero"]),
+        (r"\b(berduras|berde)\b", "b_v", ["verduras", "verde"]),
+        (r"\b(bolo|boló)\b", "b_v", ["voló"]),  # "Un pájaro bolo" -> "voló"
+        (r"\b(abraso|abrasos)\b", "b_v", ["abrazo", "abrazos"]),  # s/z confusion too
+        (r"\b(nuebo|nueba|nuebos|nuebas)\b", "b_v", ["nuevo", "nueva", "nuevos", "nuevas"]),
+        (r"\b(avuela|avuelo|avuelos|avuelas)\b", "b_v", ["abuela", "abuelo", "abuelos", "abuelas"]),
+        (r"\b(todabia)\b", "b_v", ["todavía"]),
+        (
+            r"\b(lebanto|lebanta|lebantar|lebanvarse|levanvarse)\b",
+            "b_v",
+            ["levantó", "levanta", "levantar", "levantarse", "levantarse"],
+        ),
+        (r"\b(Havian|havian|Havia|havias)\b", "b_v", ["Habían", "habían", "Había", "habías"]),
         # Errores con h
-        (r'\b(aver|aya|abia|abía|abian)\b', 'h', ['haber', 'haya', 'había', 'había', 'habían']),
-        (r'\b(acia|asta|ola|ora|ombre|uevo)\b', 'h', ['hacia', 'hasta', 'hola', 'hora', 'hombre', 'huevo']),
-        (r'\b(ermano|ermana|ijo|ija)\b', 'h', ['hermano', 'hermana', 'hijo', 'hija']),
-        (r'\b(abitacion|abitante|abitar)\b', 'h', ['habitación', 'habitante', 'habitar']),
-        (r'\b(acer|aciendo|echo|emos)\b', 'h', ['hacer', 'haciendo', 'hecho', 'hemos']),
-        (r'\b(ubo|ubiera|ubieron)\b', 'h', ['hubo', 'hubiera', 'hubieron']),
-        (r'\b(ablaban|ablaba|ablar|ablo)\b', 'h', ['hablaban', 'hablaba', 'hablar', 'habló']),
-        (r'\b(Abian|abian|Abia|abia)\b', 'h', ['Habían', 'habían', 'Había', 'había']),
+        (r"\b(aver|aya|abia|abía|abian)\b", "h", ["haber", "haya", "había", "había", "habían"]),
+        (
+            r"\b(acia|asta|ola|ora|ombre|uevo)\b",
+            "h",
+            ["hacia", "hasta", "hola", "hora", "hombre", "huevo"],
+        ),
+        (r"\b(ermano|ermana|ijo|ija)\b", "h", ["hermano", "hermana", "hijo", "hija"]),
+        (r"\b(abitacion|abitante|abitar)\b", "h", ["habitación", "habitante", "habitar"]),
+        (r"\b(acer|aciendo|echo|emos)\b", "h", ["hacer", "haciendo", "hecho", "hemos"]),
+        (r"\b(ubo|ubiera|ubieron)\b", "h", ["hubo", "hubiera", "hubieron"]),
+        (r"\b(ablaban|ablaba|ablar|ablo)\b", "h", ["hablaban", "hablaba", "hablar", "habló"]),
+        (r"\b(Abian|abian|Abia|abia)\b", "h", ["Habían", "habían", "Había", "había"]),
         # Verbos auxiliares con h omitida (contexto: "a ido" = "ha ido", "e estado" = "he estado")
         # Estos requieren contexto, pero los patrones pueden detectarlos en frases comunes
-        (r'\ba\s+ido\b', 'h', ['ha ido']),
-        (r'\be\s+estado\b', 'h', ['he estado']),
-        (r'\ba\s+sido\b', 'h', ['ha sido']),
-        (r'\ba\s+hecho\b', 'h', ['ha hecho']),
-        (r'\be\s+ido\b', 'h', ['he ido']),
-
+        (r"\ba\s+ido\b", "h", ["ha ido"]),
+        (r"\be\s+estado\b", "h", ["he estado"]),
+        (r"\ba\s+sido\b", "h", ["ha sido"]),
+        (r"\ba\s+hecho\b", "h", ["ha hecho"]),
+        (r"\be\s+ido\b", "h", ["he ido"]),
         # Confusión g/j (ante e, i)
-        (r'\b(recojer|recojio|recojieron|recojí)\b', 'g_j', ['recoger', 'recogió', 'recogieron', 'recogí']),
-        (r'\b(exijente|exijir|exijencia)\b', 'g_j', ['exigente', 'exigir', 'exigencia']),
-        (r'\b(dirijer|dirijir|dirijio)\b', 'g_j', ['dirigir', 'dirigir', 'dirigió']),
-        (r'\b(elejir|elejí|elejido)\b', 'g_j', ['elegir', 'elegí', 'elegido']),
-        (r'\b(protejir|protejido|proteje)\b', 'g_j', ['proteger', 'protegido', 'protege']),
-        (r'\b(correjir|correjido|corrije)\b', 'g_j', ['corregir', 'corregido', 'corrige']),
-
+        (
+            r"\b(recojer|recojio|recojieron|recojí)\b",
+            "g_j",
+            ["recoger", "recogió", "recogieron", "recogí"],
+        ),
+        (r"\b(exijente|exijir|exijencia)\b", "g_j", ["exigente", "exigir", "exigencia"]),
+        (r"\b(dirijer|dirijir|dirijio)\b", "g_j", ["dirigir", "dirigir", "dirigió"]),
+        (r"\b(elejir|elejí|elejido)\b", "g_j", ["elegir", "elegí", "elegido"]),
+        (r"\b(protejir|protejido|proteje)\b", "g_j", ["proteger", "protegido", "protege"]),
+        (r"\b(correjir|correjido|corrije)\b", "g_j", ["corregir", "corregido", "corrige"]),
         # Confusión ll/y
-        (r'\b(caye|cayes|cayendo)\b', 'll_y', ['calle', 'calles', 'callendo']),
-        (r'\b(poyo|poya)\b', 'll_y', ['pollo', 'polla']),
-        (r'\b(vaya|baya|balla)\b', 'll_y', ['vaya', 'vaya', 'valla']),
-        (r'\b(oio|oió)\b', 'll_y', ['oyó', 'oyó']),
-
+        (r"\b(caye|cayes|cayendo)\b", "ll_y", ["calle", "calles", "callendo"]),
+        (r"\b(poyo|poya)\b", "ll_y", ["pollo", "polla"]),
+        (r"\b(vaya|baya|balla)\b", "ll_y", ["vaya", "vaya", "valla"]),
+        (r"\b(oio|oió)\b", "ll_y", ["oyó", "oyó"]),
         # Redundancias y pleonasmos
-        (r'\b(subir\s+arriba|bajar\s+abajo|salir\s+afuera|entrar\s+adentro)\b', 'redundancy', []),
-        (r'\b(mas\s+mejor|mas\s+peor|mas\s+mayor|mas\s+menor)\b', 'redundancy', []),
-
+        (r"\b(subir\s+arriba|bajar\s+abajo|salir\s+afuera|entrar\s+adentro)\b", "redundancy", []),
+        (r"\b(mas\s+mejor|mas\s+peor|mas\s+mayor|mas\s+menor)\b", "redundancy", []),
         # Palabras comúnmente mal escritas
-        (r'\b(atravez|atraves)\b', 'other', ['a través']),
-        (r'\b(enserio|encerio)\b', 'other', ['en serio']),
-        (r'\b(asique|hací que)\b', 'other', ['así que']),
-        (r'\b(alomejor|alamejor)\b', 'other', ['a lo mejor']),
-        (r'\b(sobretodo)\b', 'other', ['sobre todo']),
-        (r'\b(osea)\b', 'other', ['o sea']),
-        (r'\b(porque|por que|porqué|por qué)\b', 'accent', []),  # Requiere contexto
-        (r'\b(sino|si no)\b', 'other', []),  # Requiere contexto
-        (r'\b(cuidad)\b', 'other', ['ciudad']),  # Omisión de letras
-        (r'\b(siguente|sigiente)\b', 'other', ['siguiente']),  # Omisión de u
-
+        (r"\b(atravez|atraves)\b", "other", ["a través"]),
+        (r"\b(enserio|encerio)\b", "other", ["en serio"]),
+        (r"\b(asique|hací que)\b", "other", ["así que"]),
+        (r"\b(alomejor|alamejor)\b", "other", ["a lo mejor"]),
+        (r"\b(sobretodo)\b", "other", ["sobre todo"]),
+        (r"\b(osea)\b", "other", ["o sea"]),
+        (r"\b(porque|por que|porqué|por qué)\b", "accent", []),  # Requiere contexto
+        (r"\b(sino|si no)\b", "other", []),  # Requiere contexto
+        (r"\b(cuidad)\b", "other", ["ciudad"]),  # Omisión de letras
+        (r"\b(siguente|sigiente)\b", "other", ["siguiente"]),  # Omisión de u
         # Acentos faltantes comunes (palabras agudas terminadas en vocal/n/s)
-        (r'\b(dia|dias)\b', 'accent', ['día', 'días']),
-        (r'\b(tambien|ademas|quiza|quizas)\b', 'accent', ['también', 'además', 'quizá', 'quizás']),
-        (r'\b(asi|ahi|aqui|alli)\b', 'accent', ['así', 'ahí', 'aquí', 'allí']),
-        (r'\b(cafe|mama|papa|sofa)\b', 'accent', ['café', 'mamá', 'papá', 'sofá']),
+        (r"\b(dia|dias)\b", "accent", ["día", "días"]),
+        (r"\b(tambien|ademas|quiza|quizas)\b", "accent", ["también", "además", "quizá", "quizás"]),
+        (r"\b(asi|ahi|aqui|alli)\b", "accent", ["así", "ahí", "aquí", "allí"]),
+        (r"\b(cafe|mama|papa|sofa)\b", "accent", ["café", "mamá", "papá", "sofá"]),
         # Condicional "sería" (común confusión con "seria" = grave)
         # "seria interesante" casi siempre es "sería interesante"
-        (r'\b(seria)\b', 'accent', ['sería']),  # Requiere contexto pero alta probabilidad
-
+        (r"\b(seria)\b", "accent", ["sería"]),  # Requiere contexto pero alta probabilidad
         # Nombres propios comunes que claramente necesitan tilde
         # (excluimos Jose/Maria que pueden escribirse sin tilde en España)
-        (r'\b(Lucia|Andres|Adrian|Ines|Ramon|Tomas|Simon|Ivan|Nicolas|Sebastian|Martin|Raul)\b', 'accent',
-         ['Lucía', 'Andrés', 'Adrián', 'Inés', 'Ramón', 'Tomás', 'Simón', 'Iván', 'Nicolás', 'Sebastián', 'Martín', 'Raúl']),
-
+        (
+            r"\b(Lucia|Andres|Adrian|Ines|Ramon|Tomas|Simon|Ivan|Nicolas|Sebastian|Martin|Raul)\b",
+            "accent",
+            [
+                "Lucía",
+                "Andrés",
+                "Adrián",
+                "Inés",
+                "Ramón",
+                "Tomás",
+                "Simón",
+                "Iván",
+                "Nicolás",
+                "Sebastián",
+                "Martín",
+                "Raúl",
+            ],
+        ),
         # Verbos en pretérito perfecto simple (muy comunes)
-        (r'\b(pregunto|respondio|penso|comenzo|termino|llego|paso|entro|salio|miro|hablo)\b', 'accent',
-         ['preguntó', 'respondió', 'pensó', 'comenzó', 'terminó', 'llegó', 'pasó', 'entró', 'salió', 'miró', 'habló']),
-        (r'\b(acerco|alejo|sento|levanto|cayo|oyo|sintio|decidio|siguio|subio|bajo)\b', 'accent',
-         ['acercó', 'alejó', 'sentó', 'levantó', 'cayó', 'oyó', 'sintió', 'decidió', 'siguió', 'subió', 'bajó']),
-        (r'\b(reian|reia|reias)\b', 'accent', ['reían', 'reía', 'reías']),
-        (r'\b(sabia|sabian|sabias)\b', 'accent', ['sabía', 'sabían', 'sabías']),
-
+        (
+            r"\b(pregunto|respondio|penso|comenzo|termino|llego|paso|entro|salio|miro|hablo)\b",
+            "accent",
+            [
+                "preguntó",
+                "respondió",
+                "pensó",
+                "comenzó",
+                "terminó",
+                "llegó",
+                "pasó",
+                "entró",
+                "salió",
+                "miró",
+                "habló",
+            ],
+        ),
+        (
+            r"\b(acerco|alejo|sento|levanto|cayo|oyo|sintio|decidio|siguio|subio|bajo)\b",
+            "accent",
+            [
+                "acercó",
+                "alejó",
+                "sentó",
+                "levantó",
+                "cayó",
+                "oyó",
+                "sintió",
+                "decidió",
+                "siguió",
+                "subió",
+                "bajó",
+            ],
+        ),
+        (r"\b(reian|reia|reias)\b", "accent", ["reían", "reía", "reías"]),
+        (r"\b(sabia|sabian|sabias)\b", "accent", ["sabía", "sabían", "sabías"]),
         # Sustantivos comunes sin tilde
-        (r'\b(jardin|arbol|arboles|pajaro|pajaros|sabado|domingo)\b', 'accent',
-         ['jardín', 'árbol', 'árboles', 'pájaro', 'pájaros', 'sábado', 'domingo']),
-        (r'\b(poesia|filosofia|fantasia|energia|melancolia|alegria)\b', 'accent',
-         ['poesía', 'filosofía', 'fantasía', 'energía', 'melancolía', 'alegría']),
-        (r'\b(publico|clasico|historico|fantastico|romantico|dramatico)\b', 'accent',
-         ['público', 'clásico', 'histórico', 'fantástico', 'romántico', 'dramático']),
-
+        (
+            r"\b(jardin|arbol|arboles|pajaro|pajaros|sabado|domingo)\b",
+            "accent",
+            ["jardín", "árbol", "árboles", "pájaro", "pájaros", "sábado", "domingo"],
+        ),
+        (
+            r"\b(poesia|filosofia|fantasia|energia|melancolia|alegria)\b",
+            "accent",
+            ["poesía", "filosofía", "fantasía", "energía", "melancolía", "alegría"],
+        ),
+        (
+            r"\b(publico|clasico|historico|fantastico|romantico|dramatico)\b",
+            "accent",
+            ["público", "clásico", "histórico", "fantástico", "romántico", "dramático"],
+        ),
         # Números cardinales sin tilde
-        (r'\b(veintidos|veintitres|veintiseis)\b', 'accent', ['veintidós', 'veintitrés', 'veintiséis']),
-
+        (
+            r"\b(veintidos|veintitres|veintiseis)\b",
+            "accent",
+            ["veintidós", "veintitrés", "veintiséis"],
+        ),
         # Palabras interrogativas/exclamativas sin tilde
-        (r'\b(Que)\b', 'accent', ['Qué']),  # Al inicio de oración interrogativa
+        (r"\b(Que)\b", "accent", ["Qué"]),  # Al inicio de oración interrogativa
     ]
 
     def __init__(self):
         super().__init__()
         import re
+
         self._compiled_patterns = []
         for pattern, error_type, suggestions in self.ERROR_PATTERNS:
             try:
@@ -953,7 +1123,7 @@ class PatternVoter(BaseVoter):
                 f"+ {len(self._H_STEMS)} raíces h-"
             )
 
-    def check_word(self, word: str, context: str = "") -> Optional[Vote]:
+    def check_word(self, word: str, context: str = "") -> Vote | None:
         if not self._available:
             return None
 
@@ -991,10 +1161,10 @@ class PatternVoter(BaseVoter):
             confidence=0.5,  # Baja confianza si no coincide con patrones
         )
 
-    def _check_esdrujula(self, word_lower: str) -> Optional[Vote]:
+    def _check_esdrujula(self, word_lower: str) -> Vote | None:
         """Detecta esdrújulas sin tilde usando mapa morfológico."""
         # Solo palabras sin tilde
-        if any(c in word_lower for c in 'áéíóú'):
+        if any(c in word_lower for c in "áéíóú"):
             return None
         suggestion = self._ESDRUJULA_MAP.get(word_lower)
         if suggestion:
@@ -1007,7 +1177,7 @@ class PatternVoter(BaseVoter):
             )
         return None
 
-    def _check_interrogative(self, word_lower: str, context: str) -> Optional[Vote]:
+    def _check_interrogative(self, word_lower: str, context: str) -> Vote | None:
         """Detecta interrogativas sin tilde en contexto de pregunta directa."""
         if not context:
             return None
@@ -1015,7 +1185,7 @@ class PatternVoter(BaseVoter):
         if not suggestion:
             return None
         # Verificar contexto de pregunta: ¿...? o ...?
-        if '?' in context or '¿' in context:
+        if "?" in context or "¿" in context:
             return Vote(
                 voter_name=self.name,
                 is_error=True,
@@ -1025,15 +1195,15 @@ class PatternVoter(BaseVoter):
             )
         return None
 
-    def _check_h_stem(self, word_lower: str) -> Optional[Vote]:
+    def _check_h_stem(self, word_lower: str) -> Vote | None:
         """Detecta h omitida usando raíces morfológicas."""
         # Solo palabras que empiecen con vocal (candidatas a h omitida)
-        if not word_lower or word_lower[0] not in 'aeiou':
+        if not word_lower or word_lower[0] not in "aeiou":
             return None
         for stem_no_h, stem_h in self._H_STEMS.items():
             if word_lower.startswith(stem_no_h):
                 # Reconstruir la palabra con h
-                corrected = stem_h + word_lower[len(stem_no_h):]
+                corrected = stem_h + word_lower[len(stem_no_h) :]
                 return Vote(
                     voter_name=self.name,
                     is_error=True,
@@ -1045,12 +1215,12 @@ class PatternVoter(BaseVoter):
 
     def _map_error_type(self, error_type: str) -> SpellingErrorType:
         mapping = {
-            'b_v': SpellingErrorType.MISSPELLING,
-            'h': SpellingErrorType.MISSPELLING,
-            'll_y': SpellingErrorType.MISSPELLING,
-            'accent': SpellingErrorType.ACCENT,
-            'redundancy': SpellingErrorType.MISSPELLING,
-            'other': SpellingErrorType.MISSPELLING,
+            "b_v": SpellingErrorType.MISSPELLING,
+            "h": SpellingErrorType.MISSPELLING,
+            "ll_y": SpellingErrorType.MISSPELLING,
+            "accent": SpellingErrorType.ACCENT,
+            "redundancy": SpellingErrorType.MISSPELLING,
+            "other": SpellingErrorType.MISSPELLING,
         }
         return mapping.get(error_type, SpellingErrorType.MISSPELLING)
 
@@ -1071,21 +1241,21 @@ class BETOVoter(BaseVoter):
 
     # Modelos disponibles por orden de preferencia (MLM > NER para ortografía)
     MODELS = [
-        "dccuchile/bert-base-spanish-wwm-cased",     # BETO base - mejor para MLM
-        "PlanTL-GOB-ES/roberta-base-bne",            # RoBERTa español BNE
-        "bertin-project/bertin-roberta-base-spanish", # SpanBERTa
+        "dccuchile/bert-base-spanish-wwm-cased",  # BETO base - mejor para MLM
+        "PlanTL-GOB-ES/roberta-base-bne",  # RoBERTa español BNE
+        "bertin-project/bertin-roberta-base-spanish",  # SpanBERTa
         "mrm8488/bert-spanish-cased-finetuned-ner",  # NER - PEOR para ortografía
     ]
 
-    def __init__(self, model_name: Optional[str] = None):
+    def __init__(self, model_name: str | None = None):
         super().__init__()
         self._model = None
         self._tokenizer = None
         self._fill_mask = None
 
         try:
-            from transformers import pipeline, AutoTokenizer, AutoModelForMaskedLM
             import torch
+            from transformers import AutoModelForMaskedLM, AutoTokenizer, pipeline
 
             # Seleccionar modelo
             model_to_use = model_name or self._find_available_model()
@@ -1115,12 +1285,10 @@ class BETOVoter(BaseVoter):
             self._init_error = f"Error inicializando BETO: {e}"
             logger.warning(self._init_error)
 
-    def _find_available_model(self) -> Optional[str]:
+    def _find_available_model(self) -> str | None:
         """Buscar modelo disponible (en cache o descargable)."""
         try:
-            from transformers import AutoConfig
             from pathlib import Path
-            import os
 
             # Primero buscar en cache local
             cache_dir = Path.home() / ".cache" / "huggingface" / "hub"
@@ -1138,7 +1306,7 @@ class BETOVoter(BaseVoter):
         except Exception:
             return None
 
-    def check_word(self, word: str, context: str = "") -> Optional[Vote]:
+    def check_word(self, word: str, context: str = "") -> Vote | None:
         """
         Verificar si una palabra encaja en el contexto usando BETO.
 
@@ -1155,21 +1323,22 @@ class BETOVoter(BaseVoter):
 
             # Encontrar posición de la palabra en el contexto
             import re
-            pattern = re.compile(r'\b' + re.escape(word_lower) + r'\b', re.IGNORECASE)
+
+            pattern = re.compile(r"\b" + re.escape(word_lower) + r"\b", re.IGNORECASE)
             match = pattern.search(context_lower)
 
             if not match:
                 return None
 
             # Reemplazar palabra con [MASK]
-            masked_context = context[:match.start()] + "[MASK]" + context[match.end():]
+            masked_context = context[: match.start()] + "[MASK]" + context[match.end() :]
 
             # Obtener predicciones
             predictions = self._fill_mask(masked_context)
 
             # Verificar si la palabra original está entre las predicciones
-            predicted_words = [p['token_str'].lower().strip() for p in predictions]
-            predicted_scores = {p['token_str'].lower().strip(): p['score'] for p in predictions}
+            predicted_words = [p["token_str"].lower().strip() for p in predictions]
+            predicted_scores = {p["token_str"].lower().strip(): p["score"] for p in predictions}
 
             if word_lower in predicted_words:
                 # La palabra encaja bien en el contexto
@@ -1181,12 +1350,12 @@ class BETOVoter(BaseVoter):
                 )
             else:
                 # La palabra no encaja - posible error
-                best_prediction = predictions[0]['token_str'] if predictions else ""
+                predictions[0]["token_str"] if predictions else ""
                 return Vote(
                     voter_name=self.name,
                     is_error=True,
                     confidence=0.7,
-                    suggestions=[p['token_str'] for p in predictions[:3]],
+                    suggestions=[p["token_str"] for p in predictions[:3]],
                     error_type=SpellingErrorType.MISSPELLING,
                 )
 
@@ -1206,19 +1375,20 @@ VOTER_CHARACTERISTICS = {
     #            "balanced" = confianza equilibrada
     #
     # Medido con prueba_ortografia.txt (51 errores gold):
-    "patterns": (0.873, 0.697, "precision"),     # P=87.3%, R=69.7% - MUY preciso
-    "symspell": (0.742, 0.465, "precision"),     # P=74.2%, R=46.5% - Preciso
-    "hunspell": (0.635, 0.545, "balanced"),      # P=63.5%, R=54.5% - Equilibrado
-    "languagetool": (0.622, 0.798, "recall"),    # P=62.2%, R=79.8% - Alto recall
+    "patterns": (0.873, 0.697, "precision"),  # P=87.3%, R=69.7% - MUY preciso
+    "symspell": (0.742, 0.465, "precision"),  # P=74.2%, R=46.5% - Preciso
+    "hunspell": (0.635, 0.545, "balanced"),  # P=63.5%, R=54.5% - Equilibrado
+    "languagetool": (0.622, 0.798, "recall"),  # P=62.2%, R=79.8% - Alto recall
     "pyspellchecker": (0.400, 0.626, "recall"),  # P=40.0%, R=62.6% - Recall medio, ruidoso
     # BETO base (dccuchile/bert-base-spanish-wwm-cased) - mejor que NER model
-    "beto": (0.453, 0.857, "recall"),            # P=45.3%, R=85.7% - BETO base, mejor que NER
+    "beto": (0.453, 0.857, "recall"),  # P=45.3%, R=85.7% - BETO base, mejor que NER
 }
 
 
 # =============================================================================
 # Agregador de votos inteligente
 # =============================================================================
+
 
 class VoteAggregator:
     """
@@ -1255,11 +1425,11 @@ class VoteAggregator:
             return voting_result
 
         # Fase 1: Clasificar votos por tipo de votante
-        precision_voters_error = []   # Alta precisión que dicen ERROR
-        precision_voters_ok = []      # Alta precisión que dicen OK
-        recall_voters_error = []      # Alto recall que dicen ERROR
-        recall_voters_ok = []         # Alto recall que dicen OK
-        balanced_votes = []           # Votantes equilibrados
+        precision_voters_error = []  # Alta precisión que dicen ERROR
+        precision_voters_ok = []  # Alta precisión que dicen OK
+        recall_voters_error = []  # Alto recall que dicen ERROR
+        recall_voters_ok = []  # Alto recall que dicen OK
+        balanced_votes = []  # Votantes equilibrados
 
         for vote in voting_result.votes:
             chars = VOTER_CHARACTERISTICS.get(vote.voter_name, (0.5, 0.5, "balanced"))
@@ -1290,7 +1460,7 @@ class VoteAggregator:
 
             # Para palabras muy cortas (1-2 chars), confiar en LanguageTool
             # porque necesitan contexto (a/ha, e/he, el/él)
-            is_short_contextual = len(word) <= 2 and word in ['a', 'e', 'el']
+            is_short_contextual = len(word) <= 2 and word in ["a", "e", "el"]
 
             if is_short_contextual and lt_vote.confidence >= 0.8:
                 voting_result.is_error = True
@@ -1301,14 +1471,17 @@ class VoteAggregator:
 
         # Regla 1: Si un votante de alta precisión dice ERROR con alta confianza → ES ERROR
         high_precision_errors = [
-            (v, p) for v, p in precision_voters_error
-            if v.confidence >= 0.8 and p >= 0.75
+            (v, p) for v, p in precision_voters_error if v.confidence >= 0.8 and p >= 0.75
         ]
         if high_precision_errors:
             # Alta confianza en que es error
-            best_vote, best_precision = max(high_precision_errors, key=lambda x: x[0].confidence * x[1])
+            best_vote, best_precision = max(
+                high_precision_errors, key=lambda x: x[0].confidence * x[1]
+            )
             voting_result.is_error = True
-            voting_result.aggregated_confidence = min(0.95, best_vote.confidence * best_precision * 1.2)
+            voting_result.aggregated_confidence = min(
+                0.95, best_vote.confidence * best_precision * 1.2
+            )
             voting_result.needs_llm_arbitration = False
 
             # Agregar sugerencias
@@ -1316,10 +1489,7 @@ class VoteAggregator:
             return voting_result
 
         # Regla 2: Si un votante de alto recall dice NO ERROR → probablemente NO es error
-        high_recall_ok = [
-            (v, r) for v, r in recall_voters_ok
-            if v.confidence >= 0.7 and r >= 0.75
-        ]
+        high_recall_ok = [(v, r) for v, r in recall_voters_ok if v.confidence >= 0.7 and r >= 0.75]
         if high_recall_ok and not precision_voters_error:
             # Si alto recall dice OK y ningún preciso dice error → NO es error
             voting_result.is_error = False
@@ -1386,12 +1556,7 @@ class VoteAggregator:
         suggestion_counts = Counter(all_suggestions)
         return [s for s, _ in suggestion_counts.most_common(5)]
 
-    def _needs_arbitration(
-        self,
-        result: VotingResult,
-        error_score: float,
-        ok_score: float
-    ) -> bool:
+    def _needs_arbitration(self, result: VotingResult, error_score: float, ok_score: float) -> bool:
         """Determinar si necesita consultar LLM."""
 
         # Pocos votantes → necesita LLM
@@ -1424,9 +1589,7 @@ class VoteAggregator:
             # Conflicto real: precisión dice error, recall dice ok
             if error_has_precision and ok_has_recall:
                 # Esto es esperado, no necesita LLM si la diferencia es clara
-                if abs(error_score - ok_score) >= 0.25:
-                    return False
-                return True
+                return not abs(error_score - ok_score) >= 0.25
 
         return False
 
@@ -1435,6 +1598,7 @@ class VoteAggregator:
 # Árbitro LLM
 # =============================================================================
 
+
 class LLMArbitrator:
     """Árbitro LLM para casos dudosos."""
 
@@ -1442,6 +1606,7 @@ class LLMArbitrator:
         self._available = False
         try:
             from ...llm.client import get_llm_client
+
             self._client = get_llm_client()
             self._available = True
         except Exception as e:
@@ -1494,7 +1659,7 @@ Solo responde con el JSON, sin texto adicional."""
             import re
 
             # Extraer JSON de la respuesta
-            json_match = re.search(r'\{[^}]+\}', response, re.DOTALL)
+            json_match = re.search(r"\{[^}]+\}", response, re.DOTALL)
             if json_match:
                 result = json.loads(json_match.group())
                 return (
@@ -1514,14 +1679,19 @@ Solo responde con el JSON, sin texto adicional."""
         lines = []
         for vote in votes:
             status = "DETECTA ERROR" if vote.is_error else "NO detecta error"
-            suggestions = f" (sugerencias: {', '.join(vote.suggestions[:3])})" if vote.suggestions else ""
-            lines.append(f"- {vote.voter_name}: {status} (confianza: {vote.confidence:.0%}){suggestions}")
+            suggestions = (
+                f" (sugerencias: {', '.join(vote.suggestions[:3])})" if vote.suggestions else ""
+            )
+            lines.append(
+                f"- {vote.voter_name}: {status} (confianza: {vote.confidence:.0%}){suggestions}"
+            )
         return "\n".join(lines)
 
 
 # =============================================================================
 # Corrector principal con votación
 # =============================================================================
+
 
 class VotingSpellingChecker:
     """
@@ -1540,9 +1710,9 @@ class VotingSpellingChecker:
         min_confidence: float = MIN_CONFIDENCE_FOR_CONSENSUS,
     ):
         self._voters: list[BaseVoter] = []
-        self._lt_voter: Optional[LanguageToolVoter] = None
+        self._lt_voter: LanguageToolVoter | None = None
         self._aggregator = VoteAggregator(min_confidence_for_consensus=min_confidence)
-        self._arbitrator: Optional[LLMArbitrator] = None
+        self._arbitrator: LLMArbitrator | None = None
 
         # Inicializar votantes por orden de prioridad/precisión
 
@@ -1609,8 +1779,8 @@ class VotingSpellingChecker:
     def check(
         self,
         text: str,
-        known_entities: Optional[list[str]] = None,
-        progress_callback: Optional[Callable[[float, str], None]] = None,
+        known_entities: list[str] | None = None,
+        progress_callback: Callable[[float, str], None] | None = None,
     ) -> Result[SpellingReport]:
         """
         Verificar texto con sistema de votación.
@@ -1629,12 +1799,12 @@ class VotingSpellingChecker:
             return Result.success(SpellingReport())
 
         report = SpellingReport()
-        known_words = set(w.lower() for w in (known_entities or []))
+        known_words = {w.lower() for w in (known_entities or [])}
 
         # Extraer palabras del texto (mínimo 2 caracteres, o 1 para errores conocidos)
         # Incluimos palabras de 1-2 chars solo si pueden ser errores de h omitida (a, e, el)
-        word_pattern = re.compile(r'\b([a-záéíóúüñA-ZÁÉÍÓÚÜÑ]{2,})\b')
-        short_word_pattern = re.compile(r'\b([aeAE])\b')  # "a" -> "ha", "e" -> "he"
+        word_pattern = re.compile(r"\b([a-záéíóúüñA-ZÁÉÍÓÚÜÑ]{2,})\b")
+        short_word_pattern = re.compile(r"\b([aeAE])\b")  # "a" -> "ha", "e" -> "he"
         words_to_check: list[tuple[str, int, int, str]] = []
 
         # Añadir palabras cortas especiales (posibles errores de h)
@@ -1679,7 +1849,7 @@ class VotingSpellingChecker:
         for i, (word, start, end, sentence) in enumerate(words_to_check):
             if progress_callback and i % 50 == 0:
                 progress = 0.1 + (0.6 * i / total_words)
-                progress_callback(progress, f"Procesando palabra {i+1}/{total_words}...")
+                progress_callback(progress, f"Procesando palabra {i + 1}/{total_words}...")
 
             result = VotingResult(
                 word=word,
@@ -1732,7 +1902,9 @@ class VotingSpellingChecker:
 
             if needs_arbitration:
                 if progress_callback:
-                    progress_callback(0.75, f"Consultando LLM para {len(needs_arbitration)} casos dudosos...")
+                    progress_callback(
+                        0.75, f"Consultando LLM para {len(needs_arbitration)} casos dudosos..."
+                    )
 
                 for result in needs_arbitration:
                     is_error, confidence, explanation = self._arbitrator.arbitrate(
@@ -1764,11 +1936,14 @@ class VotingSpellingChecker:
                     end_char=result.end_char,
                     sentence=result.sentence,
                     error_type=result.final_error_type,
-                    severity=SpellingSeverity.ERROR if result.aggregated_confidence > 0.7 else SpellingSeverity.WARNING,
+                    severity=SpellingSeverity.ERROR
+                    if result.aggregated_confidence > 0.7
+                    else SpellingSeverity.WARNING,
                     suggestions=result.final_suggestions,
                     confidence=result.aggregated_confidence,
                     detection_method=DetectionMethod.DICTIONARY,
-                    explanation=result.llm_explanation or f"Detectado por {result.voters_detecting_error}/{result.voters_total} correctores",
+                    explanation=result.llm_explanation
+                    or f"Detectado por {result.voters_detecting_error}/{result.voters_total} correctores",
                 )
                 report.add_issue(issue)
 
@@ -1784,14 +1959,14 @@ class VotingSpellingChecker:
     def _extract_sentence(self, text: str, position: int) -> str:
         """Extraer la oración que contiene la posición dada."""
         start = position
-        while start > 0 and text[start-1] not in '.!?\n':
+        while start > 0 and text[start - 1] not in ".!?\n":
             start -= 1
 
         end = position
-        while end < len(text) and text[end] not in '.!?\n':
+        while end < len(text) and text[end] not in ".!?\n":
             end += 1
 
-        sentence = text[start:end+1].strip()
+        sentence = text[start : end + 1].strip()
         if len(sentence) > 200:
             word_start = position - start
             context_start = max(0, word_start - 80)
@@ -1806,7 +1981,7 @@ class VotingSpellingChecker:
 # =============================================================================
 
 _lock = threading.Lock()
-_instance: Optional[VotingSpellingChecker] = None
+_instance: VotingSpellingChecker | None = None
 
 
 def get_voting_spelling_checker(**kwargs) -> VotingSpellingChecker:

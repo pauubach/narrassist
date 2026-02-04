@@ -10,16 +10,18 @@ Componentes:
 """
 
 # attribute_consistency uses only stdlib + internal modules
+import contextlib
+
 from .attribute_consistency import (
+    # Clase principal
+    AttributeConsistencyChecker,
     # Tipos principales
     AttributeInconsistency,
     InconsistencyType,
-    # Clase principal
-    AttributeConsistencyChecker,
+    check_attribute_consistency,
     # Funciones de conveniencia
     get_consistency_checker,
     reset_consistency_checker,
-    check_attribute_consistency,
     # Utilidades (para tests)
     reset_lemma_cache,
 )
@@ -27,70 +29,60 @@ from .attribute_consistency import (
 # Modules below depend on NLP libraries (numpy, spacy, sentence-transformers).
 # They are NOT available in embedded Python (production) until the user
 # installs the full NLP stack. Gracefully degrade if missing.
-try:
+with contextlib.suppress(ImportError):
     from .relationship_clustering import (
-        RelationStrength,
-        RelationValence,
+        CharacterCluster,
         CoOccurrence,
         InferredRelation,
-        CharacterCluster,
         KnowledgeAsymmetry,
         RelationshipClusteringEngine,
+        RelationStrength,
+        RelationValence,
         extract_cooccurrences_from_chapters,
     )
-except ImportError:
-    pass
 
-try:
+with contextlib.suppress(ImportError):
     from .character_knowledge import (
-        MentionType,
-        KnowledgeType,
-        OpinionValence,
-        IntentionType,
-        DirectedMention,
-        KnowledgeFact,
-        Opinion,
-        Intention,
-        KnowledgeAsymmetryReport,
         CharacterKnowledgeAnalyzer,
+        DirectedMention,
+        Intention,
+        IntentionType,
+        KnowledgeAsymmetryReport,
+        KnowledgeFact,
+        KnowledgeType,
+        MentionType,
+        Opinion,
+        OpinionValence,
     )
-except ImportError:
-    pass
 
-try:
+with contextlib.suppress(ImportError):
     from .emotional_coherence import (
-        IncoherenceType,
-        EmotionalIncoherence,
         EmotionalCoherenceChecker,
+        EmotionalIncoherence,
+        IncoherenceType,
         get_emotional_coherence_checker,
         reset_emotional_coherence_checker,
     )
-except ImportError:
-    pass
 
-try:
+with contextlib.suppress(ImportError):
     from .vital_status import (
-        VitalStatus,
         DeathEvent,
         PostMortemAppearance,
-        VitalStatusReport,
+        VitalStatus,
         VitalStatusAnalyzer,
+        VitalStatusReport,
         analyze_vital_status,
     )
-except ImportError:
-    pass
 
-try:
+with contextlib.suppress(ImportError):
     from .semantic_redundancy import (
         DuplicateType,
         RedundancyMode,
-        SemanticDuplicate,
         RedundancyReport,
+        SemanticDuplicate,
         SemanticRedundancyDetector,
         get_semantic_redundancy_detector,
     )
-except ImportError:
-    pass
 
 __all__ = [
     # Tipos - Consistency

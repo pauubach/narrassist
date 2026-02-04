@@ -35,9 +35,9 @@ from .models import (
 )
 from .sources import (
     BaseDictionarySource,
-    WiktionarySource,
-    SynonymSource,
     CustomDictionarySource,
+    SynonymSource,
+    WiktionarySource,
 )
 
 __all__ = [

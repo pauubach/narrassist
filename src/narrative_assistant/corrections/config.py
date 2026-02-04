@@ -10,7 +10,7 @@ según el tipo de texto (literario, técnico, jurídico, etc.).
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Literal, Optional
+from typing import Literal
 
 
 class DocumentField(Enum):
@@ -83,9 +83,9 @@ class DocumentProfile:
     def is_field_relevant(self, check_field: DocumentField) -> bool:
         """Verifica si un campo es relevante para el documento."""
         return (
-            check_field == self.document_field or
-            check_field in self.secondary_fields or
-            check_field == DocumentField.GENERAL
+            check_field == self.document_field
+            or check_field in self.secondary_fields
+            or check_field == DocumentField.GENERAL
         )
 
     def to_dict(self) -> dict:
@@ -106,9 +106,7 @@ class DocumentProfile:
         """Crea desde diccionario."""
         return cls(
             document_field=DocumentField(data.get("document_field", "literary")),
-            secondary_fields=[
-                DocumentField(f) for f in data.get("secondary_fields", [])
-            ],
+            secondary_fields=[DocumentField(f) for f in data.get("secondary_fields", [])],
             register=RegisterLevel(data.get("register", "neutral")),
             audience=AudienceType(data.get("audience", "general")),
             region=data.get("region", "es_ES"),
@@ -125,9 +123,7 @@ class FieldDictionaryConfig:
     enabled: bool = True
 
     # Campos cuyos diccionarios cargar
-    active_fields: list[DocumentField] = field(
-        default_factory=lambda: [DocumentField.GENERAL]
-    )
+    active_fields: list[DocumentField] = field(default_factory=lambda: [DocumentField.GENERAL])
 
     # Alertar cuando se usa terminología de un campo no configurado
     alert_unexpected_field_terms: bool = True
@@ -475,7 +471,9 @@ class CorrectionConfig:
     glossary: GlossaryConfig = field(default_factory=GlossaryConfig)
     anacoluto: AnacolutoConfig = field(default_factory=AnacolutoConfig)
     pov: POVConfig = field(default_factory=POVConfig)
-    orthographic_variants: OrthographicVariantsConfig = field(default_factory=OrthographicVariantsConfig)
+    orthographic_variants: OrthographicVariantsConfig = field(
+        default_factory=OrthographicVariantsConfig
+    )
 
     # Configuración global
     # Máximo de issues por categoría (para no abrumar)
@@ -709,7 +707,9 @@ class CorrectionConfig:
                 DocumentField(f) for f in field_dict_data.get("active_fields", ["general"])
             ],
             alert_unexpected_field_terms=field_dict_data.get("alert_unexpected_field_terms", True),
-            suggest_accessible_alternatives=field_dict_data.get("suggest_accessible_alternatives", False),
+            suggest_accessible_alternatives=field_dict_data.get(
+                "suggest_accessible_alternatives", False
+            ),
             min_confidence=field_dict_data.get("min_confidence", 0.7),
         )
 

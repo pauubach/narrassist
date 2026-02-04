@@ -18,18 +18,15 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Any
 
 from docx import Document
-from docx.shared import Inches, Pt, Cm, RGBColor, Twips
-from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.style import WD_STYLE_TYPE
-from docx.enum.table import WD_TABLE_ALIGNMENT, WD_ROW_HEIGHT_RULE
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.shared import Inches, Pt, RGBColor
 
+from ..core.errors import ErrorSeverity, NarrativeError
 from ..core.result import Result
-from ..core.errors import NarrativeError, ErrorSeverity
 from ..corrections.base import CorrectionIssue
-from ..corrections.types import CorrectionCategory
 
 logger = logging.getLogger(__name__)
 
@@ -54,20 +51,20 @@ CATEGORY_DISPLAY_NAMES = {
 
 # Colores por categoría (para visualización)
 CATEGORY_COLORS = {
-    "typography": RGBColor(41, 128, 185),     # Azul
-    "repetition": RGBColor(155, 89, 182),     # Morado
-    "agreement": RGBColor(231, 76, 60),       # Rojo
-    "punctuation": RGBColor(230, 126, 34),    # Naranja
-    "terminology": RGBColor(46, 204, 113),    # Verde
-    "regional": RGBColor(26, 188, 156),       # Turquesa
-    "clarity": RGBColor(52, 73, 94),          # Gris oscuro
-    "grammar": RGBColor(192, 57, 43),         # Rojo oscuro
-    "anglicisms": RGBColor(241, 196, 15),     # Amarillo
-    "crutch_words": RGBColor(142, 68, 173),   # Púrpura
-    "glossary": RGBColor(39, 174, 96),        # Verde esmeralda
-    "anacoluto": RGBColor(211, 84, 0),        # Naranja oscuro
-    "pov": RGBColor(127, 140, 141),           # Gris
-    "orthography": RGBColor(44, 62, 80),      # Azul oscuro
+    "typography": RGBColor(41, 128, 185),  # Azul
+    "repetition": RGBColor(155, 89, 182),  # Morado
+    "agreement": RGBColor(231, 76, 60),  # Rojo
+    "punctuation": RGBColor(230, 126, 34),  # Naranja
+    "terminology": RGBColor(46, 204, 113),  # Verde
+    "regional": RGBColor(26, 188, 156),  # Turquesa
+    "clarity": RGBColor(52, 73, 94),  # Gris oscuro
+    "grammar": RGBColor(192, 57, 43),  # Rojo oscuro
+    "anglicisms": RGBColor(241, 196, 15),  # Amarillo
+    "crutch_words": RGBColor(142, 68, 173),  # Púrpura
+    "glossary": RGBColor(39, 174, 96),  # Verde esmeralda
+    "anacoluto": RGBColor(211, 84, 0),  # Naranja oscuro
+    "pov": RGBColor(127, 140, 141),  # Gris
+    "orthography": RGBColor(44, 62, 80),  # Azul oscuro
 }
 
 
@@ -87,7 +84,7 @@ class ReviewReportOptions:
 
     # Filtros
     min_confidence: float = 0.0
-    categories: Optional[list[str]] = None
+    categories: list[str] | None = None
     max_issues_per_category: int = 50
 
     # Formato
@@ -99,6 +96,7 @@ class ReviewReportOptions:
 @dataclass
 class CategoryStats:
     """Estadísticas por categoría."""
+
     category: str
     display_name: str
     total: int = 0
@@ -143,7 +141,7 @@ class ReviewReportExporter:
     def prepare_report_data(
         self,
         issues: list[CorrectionIssue],
-        options: Optional[ReviewReportOptions] = None,
+        options: ReviewReportOptions | None = None,
     ) -> ReviewReportData:
         """
         Prepara los datos para el informe.
@@ -174,7 +172,7 @@ class ReviewReportExporter:
                 category=cat_name,
                 display_name=CATEGORY_DISPLAY_NAMES.get(cat_name, cat_name.title()),
                 total=len(cat_issues),
-                issues=cat_issues[:options.max_issues_per_category],
+                issues=cat_issues[: options.max_issues_per_category],
             )
 
             # Contar por confianza
@@ -187,9 +185,7 @@ class ReviewReportExporter:
                     stats.low_confidence += 1
 
                 # Contar por tipo
-                stats.by_type[issue.issue_type] = (
-                    stats.by_type.get(issue.issue_type, 0) + 1
-                )
+                stats.by_type[issue.issue_type] = stats.by_type.get(issue.issue_type, 0) + 1
 
             categories_stats.append(stats)
 
@@ -213,10 +209,7 @@ class ReviewReportExporter:
         type_counts: Counter = Counter()
         for issue in filtered:
             type_counts[(issue.category, issue.issue_type)] += 1
-        top_issues = [
-            (cat, typ, count)
-            for (cat, typ), count in type_counts.most_common(10)
-        ]
+        top_issues = [(cat, typ, count) for (cat, typ), count in type_counts.most_common(10)]
 
         return ReviewReportData(
             document_title=options.document_title,
@@ -260,7 +253,7 @@ class ReviewReportExporter:
     def export_to_docx(
         self,
         issues: list[CorrectionIssue],
-        options: Optional[ReviewReportOptions] = None,
+        options: ReviewReportOptions | None = None,
     ) -> Result[bytes]:
         """
         Exporta el informe a formato DOCX.
@@ -329,7 +322,7 @@ class ReviewReportExporter:
     def export_to_pdf(
         self,
         issues: list[CorrectionIssue],
-        options: Optional[ReviewReportOptions] = None,
+        options: ReviewReportOptions | None = None,
     ) -> Result[bytes]:
         """
         Exporta el informe a formato PDF.
@@ -346,15 +339,21 @@ class ReviewReportExporter:
 
         try:
             # Intentar importar reportlab
-            from reportlab.lib.pagesizes import A4
-            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-            from reportlab.lib.units import cm
             from reportlab.lib.colors import HexColor, black, gray, lightgrey
+            from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT, TA_RIGHT
+            from reportlab.lib.pagesizes import A4
+            from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+            from reportlab.lib.units import cm
             from reportlab.platypus import (
-                SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
-                PageBreak, ListFlowable, ListItem
+                ListFlowable,
+                ListItem,
+                PageBreak,
+                Paragraph,
+                SimpleDocTemplate,
+                Spacer,
+                Table,
+                TableStyle,
             )
-            from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_JUSTIFY, TA_RIGHT
 
             # Preparar datos
             data = self.prepare_report_data(issues, options)
@@ -365,10 +364,10 @@ class ReviewReportExporter:
             pdf_doc = SimpleDocTemplate(
                 buffer,
                 pagesize=A4,
-                rightMargin=2*cm,
-                leftMargin=2*cm,
-                topMargin=2*cm,
-                bottomMargin=2*cm,
+                rightMargin=2 * cm,
+                leftMargin=2 * cm,
+                topMargin=2 * cm,
+                bottomMargin=2 * cm,
             )
 
             # Configurar estilos
@@ -403,10 +402,12 @@ class ReviewReportExporter:
 
             # Footer
             story.append(Spacer(1, 30))
-            story.append(Paragraph(
-                f"Generado por Narrative Assistant el {data.generated_at.strftime('%Y-%m-%d %H:%M')}",
-                styles['Normal']
-            ))
+            story.append(
+                Paragraph(
+                    f"Generado por Narrative Assistant el {data.generated_at.strftime('%Y-%m-%d %H:%M')}",
+                    styles["Normal"],
+                )
+            )
 
             # Construir PDF
             pdf_doc.build(story)
@@ -441,7 +442,7 @@ class ReviewReportExporter:
 
         # Estilo para título de sección
         try:
-            section_style = styles.add_style('ReviewSection', WD_STYLE_TYPE.PARAGRAPH)
+            section_style = styles.add_style("ReviewSection", WD_STYLE_TYPE.PARAGRAPH)
             section_style.font.size = Pt(16)
             section_style.font.bold = True
             section_style.font.color.rgb = RGBColor(26, 26, 46)
@@ -452,7 +453,7 @@ class ReviewReportExporter:
 
         # Estilo para subsección
         try:
-            subsection_style = styles.add_style('ReviewSubsection', WD_STYLE_TYPE.PARAGRAPH)
+            subsection_style = styles.add_style("ReviewSubsection", WD_STYLE_TYPE.PARAGRAPH)
             subsection_style.font.size = Pt(13)
             subsection_style.font.bold = True
             subsection_style.font.color.rgb = RGBColor(45, 45, 74)
@@ -463,7 +464,7 @@ class ReviewReportExporter:
 
         # Estilo para contexto/cita
         try:
-            context_style = styles.add_style('ReviewContext', WD_STYLE_TYPE.PARAGRAPH)
+            context_style = styles.add_style("ReviewContext", WD_STYLE_TYPE.PARAGRAPH)
             context_style.font.size = Pt(10)
             context_style.font.italic = True
             context_style.font.color.rgb = RGBColor(100, 100, 100)
@@ -473,7 +474,7 @@ class ReviewReportExporter:
 
         # Estilo para número de estadística
         try:
-            stat_style = styles.add_style('StatNumber', WD_STYLE_TYPE.PARAGRAPH)
+            stat_style = styles.add_style("StatNumber", WD_STYLE_TYPE.PARAGRAPH)
             stat_style.font.size = Pt(28)
             stat_style.font.bold = True
             stat_style.font.color.rgb = RGBColor(41, 128, 185)
@@ -546,7 +547,7 @@ class ReviewReportExporter:
         doc.add_heading("Distribución por Confianza", level=2)
 
         table = doc.add_table(rows=4, cols=3)
-        table.style = 'Table Grid'
+        table.style = "Table Grid"
 
         headers = ["Nivel", "Cantidad", "Porcentaje"]
         for i, header in enumerate(headers):
@@ -575,7 +576,7 @@ class ReviewReportExporter:
             for i, (category, issue_type, count) in enumerate(data.top_issues_by_type[:10], 1):
                 cat_name = CATEGORY_DISPLAY_NAMES.get(category, category)
                 type_name = issue_type.replace("_", " ").title()
-                p = doc.add_paragraph(style='List Number')
+                p = doc.add_paragraph(style="List Number")
                 p.add_run(f"{cat_name} - {type_name}: ").bold = True
                 p.add_run(f"{count}")
 
@@ -587,7 +588,7 @@ class ReviewReportExporter:
 
         # Tabla de categorías
         table = doc.add_table(rows=len(data.categories) + 1, cols=5)
-        table.style = 'Table Grid'
+        table.style = "Table Grid"
 
         # Encabezados
         headers = ["Categoría", "Total", "Alta", "Media", "Baja"]
@@ -621,8 +622,7 @@ class ReviewReportExporter:
 
                 type_items = sorted(cat.by_type.items(), key=lambda x: -x[1])
                 type_text = ", ".join(
-                    f"{t.replace('_', ' ').title()} ({c})"
-                    for t, c in type_items[:5]
+                    f"{t.replace('_', ' ').title()} ({c})" for t, c in type_items[:5]
                 )
                 p.add_run(type_text)
 
@@ -635,7 +635,7 @@ class ReviewReportExporter:
         # Tabla
         sorted_chapters = sorted(data.by_chapter.items())
         table = doc.add_table(rows=len(sorted_chapters) + 1, cols=2)
-        table.style = 'Table Grid'
+        table.style = "Table Grid"
 
         # Encabezados
         table.rows[0].cells[0].text = "Capítulo"
@@ -712,7 +712,7 @@ class ReviewReportExporter:
         recommendations = self._generate_recommendations(data)
 
         for rec in recommendations:
-            p = doc.add_paragraph(style='List Bullet')
+            p = doc.add_paragraph(style="List Bullet")
             p.add_run(rec)
 
         doc.add_paragraph()
@@ -737,59 +737,69 @@ class ReviewReportExporter:
 
     def _setup_pdf_styles(self, styles) -> None:
         """Configura estilos adicionales para PDF."""
-        from reportlab.lib.styles import ParagraphStyle
         from reportlab.lib.colors import HexColor
-        from reportlab.lib.enums import TA_CENTER, TA_LEFT
+        from reportlab.lib.enums import TA_CENTER
+        from reportlab.lib.styles import ParagraphStyle
 
         # Título de portada
-        styles.add(ParagraphStyle(
-            name='ReportTitle',
-            parent=styles['Title'],
-            fontSize=28,
-            spaceAfter=20,
-            alignment=TA_CENTER,
-            textColor=HexColor('#1a1a2e'),
-        ))
+        styles.add(
+            ParagraphStyle(
+                name="ReportTitle",
+                parent=styles["Title"],
+                fontSize=28,
+                spaceAfter=20,
+                alignment=TA_CENTER,
+                textColor=HexColor("#1a1a2e"),
+            )
+        )
 
         # Subtítulo
-        styles.add(ParagraphStyle(
-            name='ReportSubtitle',
-            parent=styles['Normal'],
-            fontSize=16,
-            spaceAfter=15,
-            alignment=TA_CENTER,
-            textColor=HexColor('#4a4a6a'),
-        ))
+        styles.add(
+            ParagraphStyle(
+                name="ReportSubtitle",
+                parent=styles["Normal"],
+                fontSize=16,
+                spaceAfter=15,
+                alignment=TA_CENTER,
+                textColor=HexColor("#4a4a6a"),
+            )
+        )
 
         # Número grande
-        styles.add(ParagraphStyle(
-            name='BigNumber',
-            parent=styles['Normal'],
-            fontSize=48,
-            alignment=TA_CENTER,
-            textColor=HexColor('#2980b9'),
-            fontName='Helvetica-Bold',
-        ))
+        styles.add(
+            ParagraphStyle(
+                name="BigNumber",
+                parent=styles["Normal"],
+                fontSize=48,
+                alignment=TA_CENTER,
+                textColor=HexColor("#2980b9"),
+                fontName="Helvetica-Bold",
+            )
+        )
 
         # Sección
-        styles.add(ParagraphStyle(
-            name='SectionHeader',
-            parent=styles['Heading1'],
-            fontSize=16,
-            spaceBefore=20,
-            spaceAfter=10,
-            textColor=HexColor('#1a1a2e'),
-        ))
+        styles.add(
+            ParagraphStyle(
+                name="SectionHeader",
+                parent=styles["Heading1"],
+                fontSize=16,
+                spaceBefore=20,
+                spaceAfter=10,
+                textColor=HexColor("#1a1a2e"),
+            )
+        )
 
         # Subsección
-        styles.add(ParagraphStyle(
-            name='SubsectionHeader',
-            parent=styles['Heading2'],
-            fontSize=13,
-            spaceBefore=15,
-            spaceAfter=8,
-            textColor=HexColor('#2d2d4a'),
-        ))
+        styles.add(
+            ParagraphStyle(
+                name="SubsectionHeader",
+                parent=styles["Heading2"],
+                fontSize=13,
+                spaceBefore=15,
+                spaceAfter=8,
+                textColor=HexColor("#2d2d4a"),
+            )
+        )
 
     def _build_pdf_cover(self, data: ReviewReportData, styles) -> list:
         """Construye la portada para PDF."""
@@ -797,57 +807,71 @@ class ReviewReportExporter:
 
         story = []
         story.append(Spacer(1, 80))
-        story.append(Paragraph("Informe de Revisión Editorial", styles['ReportTitle']))
-        story.append(Paragraph(data.document_title, styles['ReportSubtitle']))
+        story.append(Paragraph("Informe de Revisión Editorial", styles["ReportTitle"]))
+        story.append(Paragraph(data.document_title, styles["ReportSubtitle"]))
         story.append(Spacer(1, 40))
-        story.append(Paragraph(str(data.total_issues), styles['BigNumber']))
-        story.append(Paragraph("observaciones detectadas", styles['ReportSubtitle']))
+        story.append(Paragraph(str(data.total_issues), styles["BigNumber"]))
+        story.append(Paragraph("observaciones detectadas", styles["ReportSubtitle"]))
         story.append(Spacer(1, 60))
-        story.append(Paragraph(
-            f"Generado el {data.generated_at.strftime('%d de %B de %Y a las %H:%M')}",
-            styles['Normal']
-        ))
+        story.append(
+            Paragraph(
+                f"Generado el {data.generated_at.strftime('%d de %B de %Y a las %H:%M')}",
+                styles["Normal"],
+            )
+        )
 
         return story
 
     def _build_pdf_summary(self, data: ReviewReportData, styles) -> list:
         """Construye resumen ejecutivo para PDF."""
+        from reportlab.lib.colors import black, lightgrey
         from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
-        from reportlab.lib.colors import black, lightgrey, HexColor
 
         story = []
-        story.append(Paragraph("Resumen Ejecutivo", styles['SectionHeader']))
+        story.append(Paragraph("Resumen Ejecutivo", styles["SectionHeader"]))
 
         # Totales
-        story.append(Paragraph(
-            f"<b>Total de observaciones:</b> {data.total_issues}",
-            styles['Normal']
-        ))
+        story.append(
+            Paragraph(f"<b>Total de observaciones:</b> {data.total_issues}", styles["Normal"])
+        )
         story.append(Spacer(1, 10))
 
         # Tabla de confianza
-        story.append(Paragraph("Distribución por Confianza", styles['SubsectionHeader']))
+        story.append(Paragraph("Distribución por Confianza", styles["SubsectionHeader"]))
 
         table_data = [
             ["Nivel", "Cantidad", "Porcentaje"],
-            ["Alta (≥80%)", str(data.total_by_confidence["high"]),
-             f"{(data.total_by_confidence['high'] / data.total_issues * 100) if data.total_issues > 0 else 0:.1f}%"],
-            ["Media (50-80%)", str(data.total_by_confidence["medium"]),
-             f"{(data.total_by_confidence['medium'] / data.total_issues * 100) if data.total_issues > 0 else 0:.1f}%"],
-            ["Baja (<50%)", str(data.total_by_confidence["low"]),
-             f"{(data.total_by_confidence['low'] / data.total_issues * 100) if data.total_issues > 0 else 0:.1f}%"],
+            [
+                "Alta (≥80%)",
+                str(data.total_by_confidence["high"]),
+                f"{(data.total_by_confidence['high'] / data.total_issues * 100) if data.total_issues > 0 else 0:.1f}%",
+            ],
+            [
+                "Media (50-80%)",
+                str(data.total_by_confidence["medium"]),
+                f"{(data.total_by_confidence['medium'] / data.total_issues * 100) if data.total_issues > 0 else 0:.1f}%",
+            ],
+            [
+                "Baja (<50%)",
+                str(data.total_by_confidence["low"]),
+                f"{(data.total_by_confidence['low'] / data.total_issues * 100) if data.total_issues > 0 else 0:.1f}%",
+            ],
         ]
 
         table = Table(table_data, colWidths=[120, 80, 80])
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), lightgrey),
-            ('TEXTCOLOR', (0, 0), (-1, 0), black),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('GRID', (0, 0), (-1, -1), 1, black),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-        ]))
+        table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), lightgrey),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), black),
+                    ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 10),
+                    ("GRID", (0, 0), (-1, -1), 1, black),
+                    ("BOTTOMPADDING", (0, 0), (-1, 0), 8),
+                ]
+            )
+        )
 
         story.append(table)
         story.append(Spacer(1, 15))
@@ -856,32 +880,38 @@ class ReviewReportExporter:
 
     def _build_pdf_by_category(self, data: ReviewReportData, styles) -> list:
         """Construye desglose por categoría para PDF."""
-        from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
         from reportlab.lib.colors import black, lightgrey
+        from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
 
         story = []
-        story.append(Paragraph("Desglose por Categoría", styles['SectionHeader']))
+        story.append(Paragraph("Desglose por Categoría", styles["SectionHeader"]))
 
         table_data = [["Categoría", "Total", "Alta", "Media", "Baja"]]
         for cat in data.categories:
-            table_data.append([
-                cat.display_name,
-                str(cat.total),
-                str(cat.high_confidence),
-                str(cat.medium_confidence),
-                str(cat.low_confidence),
-            ])
+            table_data.append(
+                [
+                    cat.display_name,
+                    str(cat.total),
+                    str(cat.high_confidence),
+                    str(cat.medium_confidence),
+                    str(cat.low_confidence),
+                ]
+            )
 
         table = Table(table_data, colWidths=[120, 60, 60, 60, 60])
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), lightgrey),
-            ('TEXTCOLOR', (0, 0), (-1, 0), black),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('ALIGN', (1, 1), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 9),
-            ('GRID', (0, 0), (-1, -1), 1, black),
-        ]))
+        table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), lightgrey),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), black),
+                    ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                    ("ALIGN", (1, 1), (-1, -1), "CENTER"),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 9),
+                    ("GRID", (0, 0), (-1, -1), 1, black),
+                ]
+            )
+        )
 
         story.append(table)
         story.append(Spacer(1, 20))
@@ -890,11 +920,11 @@ class ReviewReportExporter:
 
     def _build_pdf_by_chapter(self, data: ReviewReportData, styles) -> list:
         """Construye desglose por capítulo para PDF."""
-        from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
         from reportlab.lib.colors import black, lightgrey
+        from reportlab.platypus import Paragraph, Spacer, Table, TableStyle
 
         story = []
-        story.append(Paragraph("Distribución por Capítulo", styles['SectionHeader']))
+        story.append(Paragraph("Distribución por Capítulo", styles["SectionHeader"]))
 
         table_data = [["Capítulo", "Observaciones"]]
         for chapter, count in sorted(data.by_chapter.items()):
@@ -902,12 +932,16 @@ class ReviewReportExporter:
             table_data.append([chapter_name, str(count)])
 
         table = Table(table_data, colWidths=[150, 100])
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), lightgrey),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('GRID', (0, 0), (-1, -1), 1, black),
-        ]))
+        table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), lightgrey),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, 0), (-1, -1), 10),
+                    ("GRID", (0, 0), (-1, -1), 1, black),
+                ]
+            )
+        )
 
         story.append(table)
         story.append(Spacer(1, 20))
@@ -924,28 +958,30 @@ class ReviewReportExporter:
         from reportlab.platypus import Paragraph, Spacer
 
         story = []
-        story.append(Paragraph("Observaciones Destacadas", styles['SectionHeader']))
+        story.append(Paragraph("Observaciones Destacadas", styles["SectionHeader"]))
 
         # Solo mostrar las primeras de cada categoría
         for cat in data.categories[:5]:
             if not cat.issues:
                 continue
 
-            story.append(Paragraph(
-                f"<b>{cat.display_name}</b> ({cat.total} total)",
-                styles['SubsectionHeader']
-            ))
+            story.append(
+                Paragraph(
+                    f"<b>{cat.display_name}</b> ({cat.total} total)", styles["SubsectionHeader"]
+                )
+            )
 
             for issue in cat.issues[:3]:
                 type_name = issue.issue_type.replace("_", " ").title()
-                text = f'<b>{type_name}</b>: "{issue.text[:50]}..."' if len(issue.text) > 50 else f'<b>{type_name}</b>: "{issue.text}"'
-                story.append(Paragraph(text, styles['Normal']))
+                text = (
+                    f'<b>{type_name}</b>: "{issue.text[:50]}..."'
+                    if len(issue.text) > 50
+                    else f'<b>{type_name}</b>: "{issue.text}"'
+                )
+                story.append(Paragraph(text, styles["Normal"]))
 
                 if issue.suggestion:
-                    story.append(Paragraph(
-                        f'→ Sugerencia: "{issue.suggestion}"',
-                        styles['Normal']
-                    ))
+                    story.append(Paragraph(f'→ Sugerencia: "{issue.suggestion}"', styles["Normal"]))
 
                 story.append(Spacer(1, 5))
 
@@ -958,12 +994,12 @@ class ReviewReportExporter:
         from reportlab.platypus import Paragraph, Spacer
 
         story = []
-        story.append(Paragraph("Recomendaciones", styles['SectionHeader']))
+        story.append(Paragraph("Recomendaciones", styles["SectionHeader"]))
 
         recommendations = self._generate_recommendations(data)
 
         for rec in recommendations:
-            story.append(Paragraph(f"• {rec}", styles['Normal']))
+            story.append(Paragraph(f"• {rec}", styles["Normal"]))
 
         story.append(Spacer(1, 15))
 
@@ -986,7 +1022,9 @@ class ReviewReportExporter:
             )
 
         # Nivel de confianza
-        high_ratio = data.total_by_confidence["high"] / data.total_issues if data.total_issues > 0 else 0
+        high_ratio = (
+            data.total_by_confidence["high"] / data.total_issues if data.total_issues > 0 else 0
+        )
         if high_ratio > 0.5:
             recommendations.append(
                 "La mayoría de observaciones tienen alta confianza (≥80%). "
@@ -1000,7 +1038,7 @@ class ReviewReportExporter:
 
         # Por tipos específicos
         for category, issue_type, count in data.top_issues_by_type[:3]:
-            cat_name = CATEGORY_DISPLAY_NAMES.get(category, category)
+            CATEGORY_DISPLAY_NAMES.get(category, category)
             type_name = issue_type.replace("_", " ")
 
             if issue_type in ("lexical_close", "sentence_start"):
@@ -1037,7 +1075,7 @@ def export_review_report(
     issues: list[CorrectionIssue],
     output_path: Path,
     format: str = "docx",
-    options: Optional[ReviewReportOptions] = None,
+    options: ReviewReportOptions | None = None,
 ) -> Result[Path]:
     """
     Función de conveniencia para exportar informe de revisión.

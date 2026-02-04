@@ -4,40 +4,39 @@ Tipos base para el módulo de corrección ortográfica.
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
 
 class SpellingErrorType(Enum):
     """Tipos de errores ortográficos detectados."""
 
-    TYPO = "typo"                      # Error tipográfico (tecla adyacente)
-    MISSPELLING = "misspelling"        # Palabra mal escrita
-    ACCENT = "accent"                  # Falta o sobra tilde (María/Maria)
-    CASE = "case"                      # Mayúscula/minúscula incorrecta
-    HOMOPHONE = "homophone"            # Confusión de homófonos (haber/a ver)
-    SPLIT_WORD = "split_word"          # Palabra dividida incorrectamente
-    JOINED_WORD = "joined_word"        # Palabras unidas incorrectamente
-    REPEATED_CHAR = "repeated_char"    # Caracteres repetidos (holaaa)
-    FOREIGN_WORD = "foreign_word"      # Palabra extranjera sin marcar
-    OCR_ERROR = "ocr_error"            # Error típico de OCR (rn→m, l→1)
+    TYPO = "typo"  # Error tipográfico (tecla adyacente)
+    MISSPELLING = "misspelling"  # Palabra mal escrita
+    ACCENT = "accent"  # Falta o sobra tilde (María/Maria)
+    CASE = "case"  # Mayúscula/minúscula incorrecta
+    HOMOPHONE = "homophone"  # Confusión de homófonos (haber/a ver)
+    SPLIT_WORD = "split_word"  # Palabra dividida incorrectamente
+    JOINED_WORD = "joined_word"  # Palabras unidas incorrectamente
+    REPEATED_CHAR = "repeated_char"  # Caracteres repetidos (holaaa)
+    FOREIGN_WORD = "foreign_word"  # Palabra extranjera sin marcar
+    OCR_ERROR = "ocr_error"  # Error típico de OCR (rn→m, l→1)
 
 
 class SpellingSeverity(Enum):
     """Severidad del error ortográfico."""
 
-    ERROR = "error"        # Error claro que debe corregirse
-    WARNING = "warning"    # Posible error, requiere revisión
-    INFO = "info"          # Sugerencia de mejora
+    ERROR = "error"  # Error claro que debe corregirse
+    WARNING = "warning"  # Posible error, requiere revisión
+    INFO = "info"  # Sugerencia de mejora
 
 
 class DetectionMethod(Enum):
     """Método que detectó el error."""
 
-    DICTIONARY = "dictionary"      # Diccionario (hunspell/aspell)
-    LEVENSHTEIN = "levenshtein"   # Distancia de edición
-    REGEX = "regex"                # Patrón regex
-    LLM = "llm"                    # LLM local (Ollama)
-    CONTEXT = "context"            # Análisis de contexto
+    DICTIONARY = "dictionary"  # Diccionario (hunspell/aspell)
+    LEVENSHTEIN = "levenshtein"  # Distancia de edición
+    REGEX = "regex"  # Patrón regex
+    LLM = "llm"  # LLM local (Ollama)
+    CONTEXT = "context"  # Análisis de contexto
 
 
 @dataclass
@@ -45,10 +44,10 @@ class SpellingIssue:
     """Un error ortográfico detectado."""
 
     # Texto original y posición
-    word: str                          # Palabra con error
-    start_char: int                    # Posición inicio en texto
-    end_char: int                      # Posición fin en texto
-    sentence: str                      # Oración donde aparece
+    word: str  # Palabra con error
+    start_char: int  # Posición inicio en texto
+    end_char: int  # Posición fin en texto
+    sentence: str  # Oración donde aparece
 
     # Clasificación
     error_type: SpellingErrorType
@@ -56,15 +55,15 @@ class SpellingIssue:
 
     # Corrección
     suggestions: list[str] = field(default_factory=list)
-    best_suggestion: Optional[str] = None
+    best_suggestion: str | None = None
 
     # Metadata
-    confidence: float = 0.5            # 0.0-1.0
+    confidence: float = 0.5  # 0.0-1.0
     detection_method: DetectionMethod = DetectionMethod.DICTIONARY
-    explanation: str = ""              # Explicación para el usuario
+    explanation: str = ""  # Explicación para el usuario
 
     # Para deduplicación
-    context_hash: str = ""             # Hash del contexto para agrupar
+    context_hash: str = ""  # Hash del contexto para agrupar
 
     def __post_init__(self):
         """Validar y normalizar."""
@@ -182,23 +181,23 @@ class SpellingReport:
 
 # Errores de tildes más comunes
 COMMON_ACCENT_ERRORS: dict[str, str] = {
-    "mas": "más",           # conjunción vs adverbio
-    "si": "sí",             # condicional vs afirmación
-    "el": "él",             # artículo vs pronombre
-    "tu": "tú",             # posesivo vs pronombre
-    "mi": "mí",             # posesivo vs pronombre
-    "se": "sé",             # pronombre vs verbo
-    "de": "dé",             # preposición vs verbo
-    "te": "té",             # pronombre vs sustantivo
-    "solo": "sólo",         # adjetivo vs adverbio (según contexto)
-    "aun": "aún",           # conjunción vs adverbio
-    "donde": "dónde",       # relativo vs interrogativo
-    "como": "cómo",         # relativo vs interrogativo
-    "cuando": "cuándo",     # relativo vs interrogativo
-    "que": "qué",           # relativo vs interrogativo
-    "quien": "quién",       # relativo vs interrogativo
-    "cual": "cuál",         # relativo vs interrogativo
-    "cuanto": "cuánto",     # relativo vs interrogativo
+    "mas": "más",  # conjunción vs adverbio
+    "si": "sí",  # condicional vs afirmación
+    "el": "él",  # artículo vs pronombre
+    "tu": "tú",  # posesivo vs pronombre
+    "mi": "mí",  # posesivo vs pronombre
+    "se": "sé",  # pronombre vs verbo
+    "de": "dé",  # preposición vs verbo
+    "te": "té",  # pronombre vs sustantivo
+    "solo": "sólo",  # adjetivo vs adverbio (según contexto)
+    "aun": "aún",  # conjunción vs adverbio
+    "donde": "dónde",  # relativo vs interrogativo
+    "como": "cómo",  # relativo vs interrogativo
+    "cuando": "cuándo",  # relativo vs interrogativo
+    "que": "qué",  # relativo vs interrogativo
+    "quien": "quién",  # relativo vs interrogativo
+    "cual": "cuál",  # relativo vs interrogativo
+    "cuanto": "cuánto",  # relativo vs interrogativo
 }
 
 # Confusiones de homófonos
@@ -232,11 +231,11 @@ COMMON_HOMOPHONES: dict[str, list[str]] = {
 
 # Errores típicos de OCR
 OCR_CONFUSIONS: dict[str, str] = {
-    "rn": "m",      # "carne" -> "came"
-    "cl": "d",      # "clave" -> "dave"
+    "rn": "m",  # "carne" -> "came"
+    "cl": "d",  # "clave" -> "dave"
     "vv": "w",
     "li": "h",
-    "ll": "ll",     # a veces se confunde
+    "ll": "ll",  # a veces se confunde
     "1": "l",
     "0": "o",
     "O": "0",

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Clasificador de tipo de documento para ajustar análisis.
 
@@ -26,7 +25,6 @@ import logging
 import re
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -35,26 +33,26 @@ class DocumentType(Enum):
     """Tipos de documento soportados (sincronizado con FeatureProfile)."""
 
     # Tipos principales
-    FICTION = "fiction"           # Novela, cuento, relato
-    ESSAY = "essay"               # Ensayo, artículo de opinión
-    SELF_HELP = "self_help"       # Autoayuda, desarrollo personal
-    TECHNICAL = "technical"       # Manual técnico, documentación
-    MEMOIR = "memoir"             # Memorias, autobiografía
+    FICTION = "fiction"  # Novela, cuento, relato
+    ESSAY = "essay"  # Ensayo, artículo de opinión
+    SELF_HELP = "self_help"  # Autoayuda, desarrollo personal
+    TECHNICAL = "technical"  # Manual técnico, documentación
+    MEMOIR = "memoir"  # Memorias, autobiografía
 
     # Nuevos tipos (añadidos para sincronizar con FeatureProfile)
-    BIOGRAPHY = "biography"       # Biografías de terceros
-    CELEBRITY = "celebrity"       # Libros de famosos/influencers
-    DIVULGATION = "divulgation"   # Divulgación científica/histórica
-    PRACTICAL = "practical"       # Cocina, jardinería, DIY, guías
-    CHILDREN = "children"         # Infantil/juvenil
-    DRAMA = "drama"               # Teatro, guiones cine/TV
-    GRAPHIC = "graphic"           # Novela gráfica, cómic, manga
+    BIOGRAPHY = "biography"  # Biografías de terceros
+    CELEBRITY = "celebrity"  # Libros de famosos/influencers
+    DIVULGATION = "divulgation"  # Divulgación científica/histórica
+    PRACTICAL = "practical"  # Cocina, jardinería, DIY, guías
+    CHILDREN = "children"  # Infantil/juvenil
+    DRAMA = "drama"  # Teatro, guiones cine/TV
+    GRAPHIC = "graphic"  # Novela gráfica, cómic, manga
 
     # Tipos legacy (mapear a nuevos)
-    COOKBOOK = "cookbook"         # -> PRACTICAL
-    ACADEMIC = "academic"         # -> ESSAY
+    COOKBOOK = "cookbook"  # -> PRACTICAL
+    ACADEMIC = "academic"  # -> ESSAY
 
-    UNKNOWN = "unknown"           # No clasificado
+    UNKNOWN = "unknown"  # No clasificado
 
 
 @dataclass
@@ -71,127 +69,127 @@ class DocumentClassification:
 FICTION_INDICATORS = {
     # Patrones de diálogo
     "dialog_markers": [
-        r'--\s*[A-ZÁÉÍÓÚÑ¡¿]',  # Doble guión (clásico español: La Regenta, etc.)
-        r'[—–]\s*[A-ZÁÉÍÓÚÑ¡¿]',  # Guión largo/medio seguido de mayúscula o ¡¿
+        r"--\s*[A-ZÁÉÍÓÚÑ¡¿]",  # Doble guión (clásico español: La Regenta, etc.)
+        r"[—–]\s*[A-ZÁÉÍÓÚÑ¡¿]",  # Guión largo/medio seguido de mayúscula o ¡¿
         r'"[^"]+"\s*[,\.]?\s*(dijo|preguntó|respondió|exclamó|murmuró|susurró)',
-        r'«[^»]+»',  # Comillas latinas (angulares)
+        r"«[^»]+»",  # Comillas latinas (angulares)
     ],
     # Descripciones narrativas
     "narrative_descriptions": [
-        r'\b(ojos|cabello|rostro|mirada|sonrisa)\s+(de|del|de la)\b',
-        r'\b(alta?|bajo|rubio|moreno|delgado|gordo)\b.*\b(hombre|mujer|chico|chica)\b',
+        r"\b(ojos|cabello|rostro|mirada|sonrisa)\s+(de|del|de la)\b",
+        r"\b(alta?|bajo|rubio|moreno|delgado|gordo)\b.*\b(hombre|mujer|chico|chica)\b",
     ],
     # Acciones de personajes
     "character_actions": [
-        r'\b(caminó|corrió|saltó|miró|observó|pensó)\b',
-        r'\bse\s+(levantó|sentó|acercó|alejó|giró)\b',
+        r"\b(caminó|corrió|saltó|miró|observó|pensó)\b",
+        r"\bse\s+(levantó|sentó|acercó|alejó|giró)\b",
     ],
     # Estructuras narrativas
     "narrative_structures": [
-        r'\bcapítulo\s+\d+\b',
-        r'\bprólogo\b',
-        r'\bepílogo\b',
+        r"\bcapítulo\s+\d+\b",
+        r"\bprólogo\b",
+        r"\bepílogo\b",
     ],
 }
 
 SELF_HELP_INDICATORS = {
     # Consejos directos al lector
     "direct_advice": [
-        r'\b(debes|deberías|tienes que|necesitas|intenta|prueba)\b',
-        r'\bsi\s+(quieres|deseas|buscas)\b',
-        r'\bte\s+(recomiendo|sugiero|aconsejo)\b',
+        r"\b(debes|deberías|tienes que|necesitas|intenta|prueba)\b",
+        r"\bsi\s+(quieres|deseas|buscas)\b",
+        r"\bte\s+(recomiendo|sugiero|aconsejo)\b",
     ],
     # Conceptos abstractos
     "abstract_concepts": [
-        r'\b(felicidad|éxito|bienestar|autoestima|confianza|motivación)\b',
-        r'\b(crecimiento personal|desarrollo personal|superación)\b',
-        r'\b(mentalidad|actitud|enfoque|perspectiva)\b',
+        r"\b(felicidad|éxito|bienestar|autoestima|confianza|motivación)\b",
+        r"\b(crecimiento personal|desarrollo personal|superación)\b",
+        r"\b(mentalidad|actitud|enfoque|perspectiva)\b",
     ],
     # Estructura de tips/pasos
     "tips_structure": [
-        r'^\s*\d+\.\s+[A-ZÁÉÍÓÚÑ]',  # Lista numerada
-        r'\b(paso\s+\d+|tip\s+#?\d+|consejo\s+#?\d+)\b',
-        r'\b(primero|segundo|tercero|finalmente|por último)\b',
+        r"^\s*\d+\.\s+[A-ZÁÉÍÓÚÑ]",  # Lista numerada
+        r"\b(paso\s+\d+|tip\s+#?\d+|consejo\s+#?\d+)\b",
+        r"\b(primero|segundo|tercero|finalmente|por último)\b",
     ],
     # Preguntas retóricas
     "rhetorical_questions": [
-        r'\¿(alguna vez|has pensado|te has preguntado|por qué|cómo puedes)\b',
-        r'\¿qué\s+(pasaría|harías|pensarías)\b',
+        r"\¿(alguna vez|has pensado|te has preguntado|por qué|cómo puedes)\b",
+        r"\¿qué\s+(pasaría|harías|pensarías)\b",
     ],
 }
 
 ESSAY_INDICATORS = {
     # Argumentación
     "argumentation": [
-        r'\b(por tanto|por lo tanto|en consecuencia|así pues)\b',
-        r'\b(sin embargo|no obstante|aunque|a pesar de)\b',
-        r'\b(en primer lugar|en segundo lugar|finalmente)\b',
+        r"\b(por tanto|por lo tanto|en consecuencia|así pues)\b",
+        r"\b(sin embargo|no obstante|aunque|a pesar de)\b",
+        r"\b(en primer lugar|en segundo lugar|finalmente)\b",
     ],
     # Referencias a autores/fuentes
     "references": [
-        r'\bsegún\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+\b',
-        r'\([A-Za-z]+,\s*\d{4}\)',  # (Autor, año)
-        r'\bcomo\s+(señala|indica|afirma|sostiene)\s+[A-ZÁÉÍÓÚÑ]',
+        r"\bsegún\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+\b",
+        r"\([A-Za-z]+,\s*\d{4}\)",  # (Autor, año)
+        r"\bcomo\s+(señala|indica|afirma|sostiene)\s+[A-ZÁÉÍÓÚÑ]",
     ],
     # Reflexiones abstractas
     "abstract_reflection": [
-        r'\b(la sociedad|la humanidad|el ser humano|la historia)\b',
-        r'\b(cabe\s+(señalar|destacar|mencionar)|es\s+importante\s+notar)\b',
+        r"\b(la sociedad|la humanidad|el ser humano|la historia)\b",
+        r"\b(cabe\s+(señalar|destacar|mencionar)|es\s+importante\s+notar)\b",
     ],
 }
 
 TECHNICAL_INDICATORS = {
     # Términos técnicos y procedimientos
     "technical_terms": [
-        r'\b(configurar|instalar|ejecutar|implementar|compilar)\b',
-        r'\b(parámetro|variable|función|método|clase|objeto)\b',
-        r'\b(base de datos|servidor|cliente|red|protocolo)\b',
+        r"\b(configurar|instalar|ejecutar|implementar|compilar)\b",
+        r"\b(parámetro|variable|función|método|clase|objeto)\b",
+        r"\b(base de datos|servidor|cliente|red|protocolo)\b",
     ],
     # Instrucciones paso a paso
     "instructions": [
-        r'^\s*\d+\.\s+(Abrir?|Click|Seleccionar?|Introduzca?)\b',
-        r'\bejecutar?\s+el\s+(comando|script|programa)\b',
-        r'\bver\s+(figura|tabla|diagrama)\s+\d+\b',
+        r"^\s*\d+\.\s+(Abrir?|Click|Seleccionar?|Introduzca?)\b",
+        r"\bejecutar?\s+el\s+(comando|script|programa)\b",
+        r"\bver\s+(figura|tabla|diagrama)\s+\d+\b",
     ],
     # Código o comandos
     "code_markers": [
-        r'`[^`]+`',  # Código inline
-        r'^\s*\$\s+\w+',  # Comandos shell
-        r'\b(function|def|class|import|return)\b',
+        r"`[^`]+`",  # Código inline
+        r"^\s*\$\s+\w+",  # Comandos shell
+        r"\b(function|def|class|import|return)\b",
     ],
 }
 
 COOKBOOK_INDICATORS = {
     # Ingredientes
     "ingredients": [
-        r'\d+\s*(g|kg|ml|l|cucharada|taza|unidad)\s+de\s+',
-        r'\b(harina|azúcar|sal|aceite|huevo|leche|mantequilla)\b',
+        r"\d+\s*(g|kg|ml|l|cucharada|taza|unidad)\s+de\s+",
+        r"\b(harina|azúcar|sal|aceite|huevo|leche|mantequilla)\b",
     ],
     # Instrucciones de cocina
     "cooking_instructions": [
-        r'\b(mezclar|batir|hornear|freír|hervir|cocer|añadir)\b',
-        r'\ba\s+(\d+|fuego\s+(lento|medio|alto))\s*°?C?\b',
-        r'\bdurante\s+\d+\s*(minutos?|horas?)\b',
+        r"\b(mezclar|batir|hornear|freír|hervir|cocer|añadir)\b",
+        r"\ba\s+(\d+|fuego\s+(lento|medio|alto))\s*°?C?\b",
+        r"\bdurante\s+\d+\s*(minutos?|horas?)\b",
     ],
 }
 
 MEMOIR_INDICATORS = {
     # Primera persona pasado
     "first_person_past": [
-        r'\b(yo|mi|mis|me)\b.*\b(recuerdo|recordaba|era|tenía|vivía)\b',
-        r'\bcuando\s+(yo\s+)?(era|tenía)\s+\d+\s*años\b',
+        r"\b(yo|mi|mis|me)\b.*\b(recuerdo|recordaba|era|tenía|vivía)\b",
+        r"\bcuando\s+(yo\s+)?(era|tenía)\s+\d+\s*años\b",
     ],
     # Referencias autobiográficas
     "autobiographical": [
-        r'\bmi\s+(madre|padre|familia|infancia|juventud)\b',
-        r'\ben\s+aquella\s+época\b',
-        r'\b(años\s+después|tiempo\s+después|con\s+el\s+tiempo)\b',
+        r"\bmi\s+(madre|padre|familia|infancia|juventud)\b",
+        r"\ben\s+aquella\s+época\b",
+        r"\b(años\s+después|tiempo\s+después|con\s+el\s+tiempo)\b",
     ],
     # Metacognición del autor (exclusivo de memoir)
     "author_metacognition": [
-        r'\b(ahora\s+(sé|entiendo)|mirando\s+atrás)\b',
-        r'\b(no\s+recuerdo\s+(bien|exactamente)|creo\s+que\s+era)\b',
-        r'\b(según\s+me\s+(contaron|dijeron))\b',
+        r"\b(ahora\s+(sé|entiendo)|mirando\s+atrás)\b",
+        r"\b(no\s+recuerdo\s+(bien|exactamente)|creo\s+que\s+era)\b",
+        r"\b(según\s+me\s+(contaron|dijeron))\b",
     ],
 }
 
@@ -202,173 +200,173 @@ MEMOIR_INDICATORS = {
 BIOGRAPHY_INDICATORS = {
     # Nacimiento y origen en tercera persona
     "birth_origin": [
-        r'\b(nació|nacía)\s+(en|el)\b',
-        r'\bvino\s+al\s+mundo\b',
-        r'\b(era|fue)\s+(hijo|hija)\s+de\b',
+        r"\b(nació|nacía)\s+(en|el)\b",
+        r"\bvino\s+al\s+mundo\b",
+        r"\b(era|fue)\s+(hijo|hija)\s+de\b",
     ],
     # Fuentes y testimonios (muy discriminativo)
     "sources_testimony": [
-        r'\bsegún\s+(testimonios?|fuentes|relatos)\b',
-        r'\b(testigos|contemporáneos)\s+(afirman|relatan)\b',
-        r'\bsegún\s+(su\s+)?(biógrafo|historiador)\b',
+        r"\bsegún\s+(testimonios?|fuentes|relatos)\b",
+        r"\b(testigos|contemporáneos)\s+(afirman|relatan)\b",
+        r"\bsegún\s+(su\s+)?(biógrafo|historiador)\b",
     ],
     # Muerte y legado
     "death_legacy": [
-        r'\b(falleció|murió)\s+(en|el|a\s+los)\b',
-        r'\bsus\s+últimos\s+(días|años|momentos)\b',
-        r'\b(dejó|legó)\s+(un|una|su)\s+(legado|huella|obra)\b',
+        r"\b(falleció|murió)\s+(en|el|a\s+los)\b",
+        r"\bsus\s+últimos\s+(días|años|momentos)\b",
+        r"\b(dejó|legó)\s+(un|una|su)\s+(legado|huella|obra)\b",
     ],
 }
 
 CELEBRITY_INDICATORS = {
     # Vocabulario de redes sociales
     "social_media_audience": [
-        r'\bmis?\s+(seguidores?|followers?|suscriptores?)\b',
-        r'\bmi\s+(comunidad|audiencia|público)\b',
-        r'\b(Instagram|TikTok|YouTube|Twitter|redes\s+sociales)\b',
+        r"\bmis?\s+(seguidores?|followers?|suscriptores?)\b",
+        r"\bmi\s+(comunidad|audiencia|público)\b",
+        r"\b(Instagram|TikTok|YouTube|Twitter|redes\s+sociales)\b",
     ],
     # Marca personal
     "personal_brand": [
-        r'\bmi\s+(marca|proyecto|negocio|emprendimiento)\b',
-        r'\b(monetizar|facturar|generar\s+ingresos)\b',
-        r'\b(colaboración|sponsor|patrocinador)\b',
+        r"\bmi\s+(marca|proyecto|negocio|emprendimiento)\b",
+        r"\b(monetizar|facturar|generar\s+ingresos)\b",
+        r"\b(colaboración|sponsor|patrocinador)\b",
     ],
     # Relación parasocial
     "parasocial_relationship": [
-        r'\bustedes\s+(saben|conocen|me\s+conocen)\b',
-        r'\b(gracias\s+a\s+ustedes?|sin\s+ustedes?)\b',
-        r'\bmi\s+(historia|experiencia)\s+con\s+ustedes\b',
+        r"\bustedes\s+(saben|conocen|me\s+conocen)\b",
+        r"\b(gracias\s+a\s+ustedes?|sin\s+ustedes?)\b",
+        r"\bmi\s+(historia|experiencia)\s+con\s+ustedes\b",
     ],
 }
 
 DIVULGATION_INDICATORS = {
     # Referencias a estudios
     "study_references": [
-        r'\b(un\s+)?estudio\s+(demuestra|revela|sugiere|indica)\b',
-        r'\b(la\s+)?investigación\s+(científica\s+)?(demuestra|sugiere)\b',
-        r'\b(según|de\s+acuerdo\s+con)\s+(la\s+)?ciencia\b',
+        r"\b(un\s+)?estudio\s+(demuestra|revela|sugiere|indica)\b",
+        r"\b(la\s+)?investigación\s+(científica\s+)?(demuestra|sugiere)\b",
+        r"\b(según|de\s+acuerdo\s+con)\s+(la\s+)?ciencia\b",
     ],
     # Científicos como agentes
     "scientist_agents": [
-        r'\b(los\s+)?científicos\s+(descubrieron|encontraron|afirman)\b',
-        r'\b(los\s+)?investigadores\s+(han\s+)?(demostrado|descubierto)\b',
-        r'\b(los\s+)?expertos\s+(señalan|indican|advierten)\b',
+        r"\b(los\s+)?científicos\s+(descubrieron|encontraron|afirman)\b",
+        r"\b(los\s+)?investigadores\s+(han\s+)?(demostrado|descubierto)\b",
+        r"\b(los\s+)?expertos\s+(señalan|indican|advierten)\b",
     ],
     # Datos curiosos
     "curiosity_markers": [
-        r'\b(curioso|sorprendente|fascinante)\s+(es\s+que|resulta)\b',
-        r'\¿sabías\s+que\b',
-        r'\blo\s+que\s+(pocos|muchos)\s+saben\b',
+        r"\b(curioso|sorprendente|fascinante)\s+(es\s+que|resulta)\b",
+        r"\¿sabías\s+que\b",
+        r"\blo\s+que\s+(pocos|muchos)\s+saben\b",
     ],
     # Comparaciones didácticas
     "didactic_comparisons": [
-        r'\bes\s+como\s+si\b',
-        r'\bimagina\s+(que|un[ao]?)\b',
-        r'\bpiensa\s+en\s+(un[ao]?|cómo)\b',
+        r"\bes\s+como\s+si\b",
+        r"\bimagina\s+(que|un[ao]?)\b",
+        r"\bpiensa\s+en\s+(un[ao]?|cómo)\b",
     ],
 }
 
 PRACTICAL_INDICATORS = {
     # Ingredientes con medidas
     "ingredients_measures": [
-        r'\d+\s*(g|kg|ml|l|cucharada|taza|unidad)s?\s+(de\s+)?\w+',
-        r'\b(harina|azúcar|sal|aceite|huevo|leche|mantequilla)\b',
+        r"\d+\s*(g|kg|ml|l|cucharada|taza|unidad)s?\s+(de\s+)?\w+",
+        r"\b(harina|azúcar|sal|aceite|huevo|leche|mantequilla)\b",
     ],
     # Pasos numerados
     "numbered_steps": [
-        r'^\s*(Paso\s+)?\d+[.):]\s+[A-ZÁÉÍÓÚÑ]',
-        r'\bprimero,?\s+\w+.*\bluego,?\s+\w+',
+        r"^\s*(Paso\s+)?\d+[.):]\s+[A-ZÁÉÍÓÚÑ]",
+        r"\bprimero,?\s+\w+.*\bluego,?\s+\w+",
     ],
     # Tiempos de preparación
     "preparation_times": [
-        r'\btiempo\s+(de\s+)?(preparación|cocción)\s*[:\-]?\s*\d+',
-        r'\bdurante\s+\d+\s*(minutos?|horas?)\b',
-        r'\b\d+\s*°C\b',
+        r"\btiempo\s+(de\s+)?(preparación|cocción)\s*[:\-]?\s*\d+",
+        r"\bdurante\s+\d+\s*(minutos?|horas?)\b",
+        r"\b\d+\s*°C\b",
     ],
     # Verbos imperativos
     "imperative_instructions": [
-        r'\b(mezcl[ae]|bat[ae]|añad[ae]|horn[ae]a|cocin[ae]|cort[ae]|pel[ae])\b',
-        r'\b(dobla|pega|recorta|pinta|mide|marca)\b',
+        r"\b(mezcl[ae]|bat[ae]|añad[ae]|horn[ae]a|cocin[ae]|cort[ae]|pel[ae])\b",
+        r"\b(dobla|pega|recorta|pinta|mide|marca)\b",
     ],
 }
 
 CHILDREN_INDICATORS = {
     # Onomatopeyas
     "onomatopoeia": [
-        r'\b¡?(Pum|Zas|Plop|Crac|Bum|Miau|Guau|Muuu|Piip)!?\b',
-        r'\b(tic-tac|pim-pam|rin-rin)\b',
+        r"\b¡?(Pum|Zas|Plop|Crac|Bum|Miau|Guau|Muuu|Piip)!?\b",
+        r"\b(tic-tac|pim-pam|rin-rin)\b",
     ],
     # Fórmulas narrativas clásicas
     "classic_formulas": [
-        r'\b(Había|Érase)\s+una\s+vez\b',
-        r'\bcolorín\s+colorado\b',
-        r'\by\s+fueron\s+felices\b',
+        r"\b(Había|Érase)\s+una\s+vez\b",
+        r"\bcolorín\s+colorado\b",
+        r"\by\s+fueron\s+felices\b",
     ],
     # Preguntas al lector
     "reader_questions": [
-        r'\¿(Sabes|Puedes|Quieres|Adivina)\s+(qué|quién|cómo|dónde)\b',
-        r'\¿(Te\s+gusta|Conoces|Has\s+visto)\b',
+        r"\¿(Sabes|Puedes|Quieres|Adivina)\s+(qué|quién|cómo|dónde)\b",
+        r"\¿(Te\s+gusta|Conoces|Has\s+visto)\b",
     ],
     # Repeticiones intencionales
     "intentional_repetitions": [
-        r'\b(\w{3,})\s+y\s+\1\b',  # "grande y grande"
-        r'\bmuy,?\s+muy\b',
+        r"\b(\w{3,})\s+y\s+\1\b",  # "grande y grande"
+        r"\bmuy,?\s+muy\b",
     ],
     # Vocabulario simple y diminutivos
     "simple_vocabulary": [
-        r'\b\w+it[oa]s?\b',  # Diminutivos: -ito, -ita
-        r'\b(mamá|papá|abuelito|hermanito)\b',
+        r"\b\w+it[oa]s?\b",  # Diminutivos: -ito, -ita
+        r"\b(mamá|papá|abuelito|hermanito)\b",
     ],
 }
 
 DRAMA_INDICATORS = {
     # Personaje: diálogo - nombres con vocales (excluye romanos IVXLC)
     "character_dialogue_format": [
-        r'^([A-ZÁÉÍÓÚÑ]*[AEIOUÁÉÍÓÚ][A-ZÁÉÍÓÚÑ]*)\s*[:\-—]+\s*[a-záéíóúñ¡¿]',  # PERSONAJE: diálogo
-        r'^([A-ZÁÉÍÓÚÑ]*[AEIOUÁÉÍÓÚ][A-ZÁÉÍÓÚÑ]*)\s*\.\s*[-—]+',  # PERSONAJE. —
+        r"^([A-ZÁÉÍÓÚÑ]*[AEIOUÁÉÍÓÚ][A-ZÁÉÍÓÚÑ]*)\s*[:\-—]+\s*[a-záéíóúñ¡¿]",  # PERSONAJE: diálogo
+        r"^([A-ZÁÉÍÓÚÑ]*[AEIOUÁÉÍÓÚ][A-ZÁÉÍÓÚÑ]*)\s*\.\s*[-—]+",  # PERSONAJE. —
     ],
     # Acotaciones escénicas
     "stage_directions": [
-        r'\((Se\s+levanta|Entra|Sale|Pausa|Silencio|Aparte)[^)]*\)',
-        r'\((con|en\s+voz|mirando|hacia)[^)]*\)',
+        r"\((Se\s+levanta|Entra|Sale|Pausa|Silencio|Aparte)[^)]*\)",
+        r"\((con|en\s+voz|mirando|hacia)[^)]*\)",
     ],
     # Estructura de actos/escenas
     "act_scene_structure": [
-        r'^(ACTO|ESCENA|CUADRO|JORNADA)\s+([IVXLC]+|\d+)',
-        r'\b(Primer|Segundo|Tercer)\s+(acto|cuadro)\b',
+        r"^(ACTO|ESCENA|CUADRO|JORNADA)\s+([IVXLC]+|\d+)",
+        r"\b(Primer|Segundo|Tercer)\s+(acto|cuadro)\b",
     ],
     # Sluglines de cine
     "sluglines": [
-        r'^(INT\.|EXT\.)\s+[A-ZÁÉÍÓÚÑ\s]+\s*[-–—]\s*(DÍA|NOCHE|AMANECER)',
-        r'^(INTERIOR|EXTERIOR)\s+[-–—]',
+        r"^(INT\.|EXT\.)\s+[A-ZÁÉÍÓÚÑ\s]+\s*[-–—]\s*(DÍA|NOCHE|AMANECER)",
+        r"^(INTERIOR|EXTERIOR)\s+[-–—]",
     ],
     # Transiciones de cine/TV
     "transitions": [
-        r'^(FADE\s+(IN|OUT)|CORTE\s+A|FUNDIDO|DISOLVENCIA)',
-        r'^(FIN\s+DE\s+)?(ACTO|ESCENA)',
+        r"^(FADE\s+(IN|OUT)|CORTE\s+A|FUNDIDO|DISOLVENCIA)",
+        r"^(FIN\s+DE\s+)?(ACTO|ESCENA)",
     ],
 }
 
 GRAPHIC_INDICATORS = {
     # Onomatopeyas mayúsculas
     "onomatopoeia_caps": [
-        r'\b(BOOM|CRASH|BANG|ZAP|POW|KABOOM|WHAM|CRACK|SPLASH)!*\b',
-        r'\b(AAARGH|AAAH|NOOO|SIII)!*\b',
+        r"\b(BOOM|CRASH|BANG|ZAP|POW|KABOOM|WHAM|CRACK|SPLASH)!*\b",
+        r"\b(AAARGH|AAAH|NOOO|SIII)!*\b",
     ],
     # Acotaciones visuales
     "visual_directions": [
-        r'\[(viñeta|plano|panel|splash|página)[^\]]*\]',
-        r'\b(viñeta|panel)\s+\d+\b',
+        r"\[(viñeta|plano|panel|splash|página)[^\]]*\]",
+        r"\b(viñeta|panel)\s+\d+\b",
     ],
     # Puntuación enfática
     "emphatic_punctuation": [
-        r'[!?]{2,}',
-        r'\b[A-ZÁÉÍÓÚÑ]{4,}[!?]+',  # PALABRAS EN MAYÚSCULAS!
+        r"[!?]{2,}",
+        r"\b[A-ZÁÉÍÓÚÑ]{4,}[!?]+",  # PALABRAS EN MAYÚSCULAS!
     ],
     # Globos de texto
     "speech_bubbles": [
-        r'\b(globo|bocadillo)\s+(de\s+)?(texto|diálogo|pensamiento)\b',
-        r'\b(off|voz\s+en\s+off)\b',
+        r"\b(globo|bocadillo)\s+(de\s+)?(texto|diálogo|pensamiento)\b",
+        r"\b(off|voz\s+en\s+off)\b",
     ],
 }
 
@@ -452,8 +450,8 @@ class DocumentClassifier:
     def classify(
         self,
         text: str,
-        title: Optional[str] = None,
-        metadata: Optional[dict] = None,
+        title: str | None = None,
+        metadata: dict | None = None,
     ) -> DocumentClassification:
         """
         Clasifica un documento basándose en su contenido.
@@ -563,7 +561,7 @@ class DocumentClassifier:
             if sample and sample not in samples:
                 samples.append(sample)
 
-        return samples if samples else [text[:self.SAMPLE_SIZE]]
+        return samples if samples else [text[: self.SAMPLE_SIZE]]
 
     def _count_matches(
         self,
@@ -657,8 +655,16 @@ class DocumentClassifier:
         title_hints = {
             # Tipos principales
             DocumentType.FICTION: ["novela", "cuento", "relato", "historia de", "aventuras"],
-            DocumentType.SELF_HELP: ["cómo", "secretos de", "guía para", "manual de vida",
-                                     "felicidad", "éxito", "superación", "autoayuda"],
+            DocumentType.SELF_HELP: [
+                "cómo",
+                "secretos de",
+                "guía para",
+                "manual de vida",
+                "felicidad",
+                "éxito",
+                "superación",
+                "autoayuda",
+            ],
             DocumentType.ESSAY: ["ensayo", "reflexiones", "pensamiento", "filosofía"],
             DocumentType.TECHNICAL: ["manual", "guía técnica", "tutorial", "documentación"],
             DocumentType.COOKBOOK: ["recetas", "cocina", "gastronomía", "chef"],
@@ -667,8 +673,14 @@ class DocumentClassifier:
             DocumentType.BIOGRAPHY: ["biografía", "vida de", "vida y obra"],
             DocumentType.CELEBRITY: ["mi historia", "mi verdad", "sin filtros", "@"],
             DocumentType.DIVULGATION: ["divulgación", "ciencia", "historia de la"],
-            DocumentType.PRACTICAL: ["guía práctica", "hágalo usted", "diy", "bricolaje",
-                                     "jardín", "manualidades"],
+            DocumentType.PRACTICAL: [
+                "guía práctica",
+                "hágalo usted",
+                "diy",
+                "bricolaje",
+                "jardín",
+                "manualidades",
+            ],
             DocumentType.CHILDREN: ["infantil", "juvenil", "cuentos para niños", "fábulas"],
             DocumentType.DRAMA: ["teatro", "obra dramática", "comedia", "tragedia", "guión"],
             DocumentType.GRAPHIC: ["cómic", "novela gráfica", "manga", "historieta"],
@@ -831,7 +843,7 @@ class DocumentClassifier:
 
 
 # Singleton
-_classifier: Optional[DocumentClassifier] = None
+_classifier: DocumentClassifier | None = None
 
 
 def get_document_classifier() -> DocumentClassifier:
@@ -844,8 +856,8 @@ def get_document_classifier() -> DocumentClassifier:
 
 def classify_document(
     text: str,
-    title: Optional[str] = None,
-    metadata: Optional[dict] = None,
+    title: str | None = None,
+    metadata: dict | None = None,
 ) -> DocumentClassification:
     """
     Atajo para clasificar un documento.

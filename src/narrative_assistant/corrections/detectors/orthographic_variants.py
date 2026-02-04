@@ -18,7 +18,6 @@ from ..base import BaseDetector, CorrectionIssue
 from ..config import OrthographicVariantsConfig
 from ..types import CorrectionCategory
 
-
 # ============================================================================
 # VARIANTES ORTOGRÁFICAS RAE
 # ============================================================================
@@ -38,13 +37,11 @@ SIMPLIFIED_CONSONANTS = {
     "siquiátrico": ("psiquiátrico", "La RAE prefiere la forma con ps-"),
     "seudo": ("pseudo", "La RAE prefiere la forma con ps-"),
     "seudónimo": ("pseudónimo", "La RAE prefiere la forma con ps-"),
-
     # obs- → os- (RAE prefiere la forma simplificada)
     "obscuro": ("oscuro", "La RAE prefiere la forma simplificada"),
     "obscura": ("oscura", "La RAE prefiere la forma simplificada"),
     "obscuridad": ("oscuridad", "La RAE prefiere la forma simplificada"),
     "obscurecer": ("oscurecer", "La RAE prefiere la forma simplificada"),
-
     # subs- → sus- (RAE prefiere la forma simplificada en algunos casos)
     "substancia": ("sustancia", "La RAE prefiere la forma simplificada"),
     "substancial": ("sustancial", "La RAE prefiere la forma simplificada"),
@@ -57,20 +54,16 @@ SIMPLIFIED_CONSONANTS = {
     "substituto": ("sustituto", "La RAE prefiere la forma simplificada"),
     "substraer": ("sustraer", "La RAE prefiere la forma simplificada"),
     "substracción": ("sustracción", "La RAE prefiere la forma simplificada"),
-
     # trans- → tras- (ambas válidas, pero trans- es más formal)
     "trasporte": ("transporte", "La forma 'transporte' es más frecuente en el uso culto"),
     "trasportista": ("transportista", "La forma 'transportista' es más frecuente"),
     "traspasar": ("transpasar", "Ambas formas válidas; 'traspasar' es más común"),
-
     # gn- → n- (simplificación)
     "nomo": ("gnomo", "La RAE prefiere la forma etimológica con gn-"),
     "nóstico": ("gnóstico", "La RAE prefiere la forma etimológica con gn-"),
-
     # mn- → n- (simplificación)
     "nemotecnia": ("mnemotecnia", "La RAE prefiere la forma con mn-"),
     "nemotécnico": ("mnemotécnico", "La RAE prefiere la forma con mn-"),
-
     # pt- → t- (simplificación)
     "setiembre": ("septiembre", "La RAE prefiere la forma con pt-"),
     "sétimo": ("séptimo", "La RAE prefiere la forma con pt-"),
@@ -81,7 +74,6 @@ H_VARIANTS = {
     # Formas con h- preferidas
     "armonía": ("harmonía", "La RAE acepta ambas, pero 'armonía' sin h es más común"),
     "armónico": ("harmónico", "La RAE acepta ambas, pero 'armónico' sin h es más común"),
-
     # Formas sin h- incorrectas
     "aora": ("ahora", "La forma correcta es con h"),
     "asta": ("hasta", "La forma correcta es con h (preposición)"),  # Ojo: asta = cuerno
@@ -132,7 +124,6 @@ ACCENT_VARIANTS = {
     "maniaco": ("maníaco", "Ambas válidas; forma esdrújula es más tradicional"),
     "zodiaco": ("zodíaco", "Ambas válidas; forma esdrújula menos frecuente"),
     "elegiaco": ("elegíaco", "Ambas válidas; forma esdrújula es más culta"),
-
     # Adverbios interrogativos
     "adonde": ("adónde", "Verificar: 'adonde' (relativo) vs 'adónde' (interrogativo)"),
     "como": ("cómo", "Verificar: 'como' (comparativo) vs 'cómo' (interrogativo)"),
@@ -199,7 +190,7 @@ class OrthographicVariantsDetector(BaseDetector):
     def detect(
         self,
         text: str,
-        chapter_index: Optional[int] = None,
+        chapter_index: int | None = None,
         spacy_doc=None,
         **kwargs,
     ) -> list[CorrectionIssue]:
@@ -221,34 +212,28 @@ class OrthographicVariantsDetector(BaseDetector):
 
         # Detectar cada categoría si está habilitada
         if self.config.check_consonant_groups:
-            issues.extend(self._detect_variants(
-                text, SIMPLIFIED_CONSONANTS, "consonant_group", chapter_index
-            ))
+            issues.extend(
+                self._detect_variants(text, SIMPLIFIED_CONSONANTS, "consonant_group", chapter_index)
+            )
 
         if self.config.check_h_variants:
-            issues.extend(self._detect_variants(
-                text, H_VARIANTS, "h_variant", chapter_index
-            ))
+            issues.extend(self._detect_variants(text, H_VARIANTS, "h_variant", chapter_index))
 
         if self.config.check_bv_confusion:
-            issues.extend(self._detect_variants(
-                text, BV_VARIANTS, "bv_confusion", chapter_index
-            ))
+            issues.extend(self._detect_variants(text, BV_VARIANTS, "bv_confusion", chapter_index))
 
         if self.config.check_lly_confusion:
-            issues.extend(self._detect_variants(
-                text, LLY_VARIANTS, "lly_confusion", chapter_index
-            ))
+            issues.extend(self._detect_variants(text, LLY_VARIANTS, "lly_confusion", chapter_index))
 
         if self.config.check_accent_variants:
-            issues.extend(self._detect_variants(
-                text, ACCENT_VARIANTS, "accent_variant", chapter_index
-            ))
+            issues.extend(
+                self._detect_variants(text, ACCENT_VARIANTS, "accent_variant", chapter_index)
+            )
 
         if self.config.check_loanword_adaptation:
-            issues.extend(self._detect_variants(
-                text, ADAPTED_LOANWORDS, "unadapted_loanword", chapter_index
-            ))
+            issues.extend(
+                self._detect_variants(text, ADAPTED_LOANWORDS, "unadapted_loanword", chapter_index)
+            )
 
         return issues
 
@@ -257,7 +242,7 @@ class OrthographicVariantsDetector(BaseDetector):
         text: str,
         variants_dict: dict[str, tuple[str, str]],
         issue_type: str,
-        chapter_index: Optional[int],
+        chapter_index: int | None,
     ) -> list[CorrectionIssue]:
         """
         Detecta variantes de un diccionario específico.
@@ -289,9 +274,7 @@ class OrthographicVariantsDetector(BaseDetector):
                 confidence = self._get_confidence(issue_type)
 
                 # Crear mensaje de explicación
-                full_explanation = (
-                    f'"{original}" → "{suggestion}". {explanation}'
-                )
+                full_explanation = f'"{original}" → "{suggestion}". {explanation}'
 
                 issues.append(
                     CorrectionIssue(

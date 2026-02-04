@@ -4,26 +4,26 @@ Sistema unificado de configuración de corrección.
 Centraliza TODOS los parámetros de corrección con herencia tipo → subtipo.
 """
 
+from .api import (
+    get_config_for_project,
+    get_effective_config,
+    get_types_with_subtypes,
+)
 from .models import (
     CorrectionConfig,
     DialogConfig,
+    InheritanceSource,
+    ParameterValue,
     RepetitionConfig,
     SentenceConfig,
     StyleConfig,
-    InheritanceSource,
-    ParameterValue,
 )
 from .registry import (
-    get_correction_config,
-    get_type_defaults,
-    get_subtype_overrides,
-    TYPES_REGISTRY,
     SUBTYPES_REGISTRY,
-)
-from .api import (
-    get_types_with_subtypes,
-    get_config_for_project,
-    get_effective_config,
+    TYPES_REGISTRY,
+    get_correction_config,
+    get_subtype_overrides,
+    get_type_defaults,
 )
 
 __all__ = [

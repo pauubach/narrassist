@@ -21,14 +21,13 @@ import json
 import logging
 import re
 import unicodedata
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Optional, Any
-from collections import Counter, defaultdict
+from typing import Any
 
+from ..core.errors import ErrorSeverity, NarrativeError
 from ..core.result import Result
-from ..core.errors import NarrativeError, ErrorSeverity
 from ..entities.models import Entity, EntityType
 from ..entities.repository import get_entity_repository
 
@@ -39,16 +38,19 @@ logger = logging.getLogger(__name__)
 # Enums para estilos detectados
 # =============================================================================
 
+
 class DialogueStyle(Enum):
     """Estilo de diálogos detectado."""
-    RAYA = "raya"                # —Hola —dijo
-    GUILLEMETS = "guillemets"    # «Hola»
-    QUOTES = "quotes"            # "Hola"
+
+    RAYA = "raya"  # —Hola —dijo
+    GUILLEMETS = "guillemets"  # «Hola»
+    QUOTES = "quotes"  # "Hola"
     MIXED = "mixed"
 
 
 class NumberStyle(Enum):
     """Estilo de números detectado."""
+
     WORDS_UNDER_10 = "words_under_10"
     WORDS_UNDER_100 = "words_under_100"
     ALWAYS_DIGITS = "always_digits"
@@ -74,7 +76,7 @@ class EntityListing:
     canonical_name: str
     aliases: list[str]
     importance: str
-    first_mention_chapter: Optional[int] = None
+    first_mention_chapter: int | None = None
     description: str = ""  # Descripción breve (opcional)
 
 
@@ -155,7 +157,7 @@ class StyleGuide:
     organizations: list[EntityListing]
 
     # Análisis estilístico (opcional - requiere texto)
-    style_analysis: Optional[StyleAnalysis] = None
+    style_analysis: StyleAnalysis | None = None
 
     # Términos especiales (placeholder para futuro)
     special_terms: list[str] = field(default_factory=list)
@@ -212,11 +214,19 @@ class StyleGuide:
         if self.spelling_decisions:
             lines.append("| Forma Canónica | Variantes Encontradas | Frecuencia | Recomendación |")
             lines.append("|----------------|----------------------|------------|---------------|")
-            for decision in sorted(self.spelling_decisions, key=lambda d: -sum(d.frequency.values())):
+            for decision in sorted(
+                self.spelling_decisions, key=lambda d: -sum(d.frequency.values())
+            ):
                 variants_str = ", ".join(decision.variants) if decision.variants else "ninguna"
                 freq_total = sum(decision.frequency.values())
-                recommendation = "✓ Usar forma canónica" if decision.recommendation == "canonical" else "⚠ Variantes permitidas"
-                lines.append(f"| **{decision.canonical_form}** | {variants_str} | {freq_total} | {recommendation} |")
+                recommendation = (
+                    "✓ Usar forma canónica"
+                    if decision.recommendation == "canonical"
+                    else "⚠ Variantes permitidas"
+                )
+                lines.append(
+                    f"| **{decision.canonical_form}** | {variants_str} | {freq_total} | {recommendation} |"
+                )
             lines.append("")
             if any(d.notes for d in self.spelling_decisions):
                 lines.append("### Notas:")
@@ -271,7 +281,9 @@ class StyleGuide:
             if minor_chars:
                 lines.append("### Personajes Menores")
                 lines.append("")
-                minor_names = [c.canonical_name for c in sorted(minor_chars, key=lambda c: c.canonical_name)]
+                minor_names = [
+                    c.canonical_name for c in sorted(minor_chars, key=lambda c: c.canonical_name)
+                ]
                 lines.append(", ".join(minor_names))
                 lines.append("")
         else:
@@ -324,7 +336,9 @@ class StyleGuide:
             lines.append("")
             lines.append(f"- **Total de palabras:** {sa.statistics.total_words:,}")
             lines.append(f"- **Total de oraciones:** {sa.statistics.total_sentences:,}")
-            lines.append(f"- **Longitud media de oración:** {sa.statistics.avg_sentence_length:.1f} palabras")
+            lines.append(
+                f"- **Longitud media de oración:** {sa.statistics.avg_sentence_length:.1f} palabras"
+            )
             lines.append(f"- **Riqueza léxica (TTR):** {sa.statistics.vocabulary_richness:.1%}")
             lines.append("")
 
@@ -335,14 +349,20 @@ class StyleGuide:
                 "raya": "Raya española (—)",
                 "guillemets": "Comillas angulares («»)",
                 "quotes": 'Comillas inglesas ("")',
-                "mixed": "Estilo mixto"
+                "mixed": "Estilo mixto",
             }
-            lines.append(f"**Estilo detectado:** {style_labels.get(sa.dialogue_style, sa.dialogue_style)}")
+            lines.append(
+                f"**Estilo detectado:** {style_labels.get(sa.dialogue_style, sa.dialogue_style)}"
+            )
             lines.append("")
             for pattern in sa.dialogue_patterns:
                 lines.append(f"- **{pattern.name}:** {pattern.frequency} ocurrencias")
                 if pattern.examples:
-                    lines.append(f"  - Ejemplo: _{pattern.examples[0][:50]}..._" if len(pattern.examples[0]) > 50 else f"  - Ejemplo: _{pattern.examples[0]}_")
+                    lines.append(
+                        f"  - Ejemplo: _{pattern.examples[0][:50]}..._"
+                        if len(pattern.examples[0]) > 50
+                        else f"  - Ejemplo: _{pattern.examples[0]}_"
+                    )
                 lines.append(f"  - {pattern.recommendation}")
             lines.append("")
 
@@ -364,13 +384,17 @@ class StyleGuide:
                 "words_under_10": "Palabras para números menores a 10",
                 "words_under_100": "Palabras para números menores a 100",
                 "always_digits": "Siempre en cifras",
-                "mixed": "Estilo mixto"
+                "mixed": "Estilo mixto",
             }
-            lines.append(f"**Estilo detectado:** {number_labels.get(sa.number_style, sa.number_style)}")
+            lines.append(
+                f"**Estilo detectado:** {number_labels.get(sa.number_style, sa.number_style)}"
+            )
             lines.append("")
-            if sa.number_examples.get('words'):
-                lines.append(f"- Ejemplos en palabras: {', '.join(sa.number_examples['words'][:5])}")
-            if sa.number_examples.get('digits'):
+            if sa.number_examples.get("words"):
+                lines.append(
+                    f"- Ejemplos en palabras: {', '.join(sa.number_examples['words'][:5])}"
+                )
+            if sa.number_examples.get("digits"):
                 lines.append(f"- Ejemplos en cifras: {', '.join(sa.number_examples['digits'][:5])}")
             lines.append("")
 
@@ -392,9 +416,11 @@ class StyleGuide:
                 foreign_labels = {
                     "italic": "En cursiva",
                     "quotes": "Entre comillas",
-                    "none": "Sin marcado especial"
+                    "none": "Sin marcado especial",
                 }
-                lines.append(f"**Tratamiento:** {foreign_labels.get(sa.foreign_word_style, sa.foreign_word_style)}")
+                lines.append(
+                    f"**Tratamiento:** {foreign_labels.get(sa.foreign_word_style, sa.foreign_word_style)}"
+                )
                 lines.append("")
                 lines.append(f"Ejemplos: {', '.join(sa.foreign_examples[:5])}")
                 lines.append("")
@@ -433,16 +459,17 @@ class StyleGuide:
         lines.append(f"**Total de entidades:** {self.total_entities}")
         lines.append(f"**Variaciones de grafía detectadas:** {self.total_spelling_variants}")
         if self.style_analysis:
-            lines.append(f"**Inconsistencias de estilo:** {len(self.style_analysis.consistency_issues)}")
+            lines.append(
+                f"**Inconsistencias de estilo:** {len(self.style_analysis.consistency_issues)}"
+            )
 
         return "\n".join(lines)
 
 
 def _normalize_text(s: str) -> str:
     """Normaliza string quitando acentos."""
-    return ''.join(
-        c for c in unicodedata.normalize('NFD', s)
-        if unicodedata.category(c) != 'Mn'
+    return "".join(
+        c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn"
     ).lower()
 
 
@@ -461,11 +488,11 @@ def _detect_spelling_variants(entities: list[Entity]) -> list[SpellingDecision]:
         all_forms = [entity.canonical_name] + (entity.aliases or [])
 
         # Contar frecuencias (simplificado - en realidad debería contar en el texto)
-        frequency = {form: 1 for form in all_forms}
+        frequency = dict.fromkeys(all_forms, 1)
 
         # Detectar variantes
         variants = []
-        for alias in (entity.aliases or []):
+        for alias in entity.aliases or []:
             if _normalize_text(alias) == _normalize_text(entity.canonical_name):
                 # Misma palabra, diferente acentuación
                 variants.append(alias)
@@ -476,7 +503,7 @@ def _detect_spelling_variants(entities: list[Entity]) -> list[SpellingDecision]:
                 variants=variants,
                 frequency=frequency,
                 recommendation="canonical",
-                notes=f"Se encontraron {len(variants)} variante(s) de grafía. Se recomienda usar siempre la forma canónica."
+                notes=f"Se encontraron {len(variants)} variante(s) de grafía. Se recomienda usar siempre la forma canónica.",
             )
             decisions.append(decision)
 
@@ -487,24 +514,25 @@ def _detect_spelling_variants(entities: list[Entity]) -> list[SpellingDecision]:
 # StyleAnalyzer - Analizador de patrones estilísticos
 # =============================================================================
 
+
 class StyleAnalyzer:
     """Analizador de patrones de estilo en texto narrativo."""
 
     def __init__(self):
         """Inicializa el analizador con patrones de regex."""
         self.patterns = {
-            'raya_dialogue': re.compile(r'—[^—\n]+(?:—[^—\n]*)?'),
-            'guillemet_dialogue': re.compile(r'«[^»]+»'),
-            'quote_dialogue': re.compile(r'"[^"]+"|"[^"]+"|"[^"]*"'),
-            'semicolon': re.compile(r';'),
-            'ellipsis': re.compile(r'\.{3}|…'),
-            'em_dash': re.compile(r'—'),
-            'numbers_digits': re.compile(r'\b\d+\b'),
-            'numbers_words': re.compile(
-                r'\b(uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|'
-                r'once|doce|trece|catorce|quince|veinte|treinta|cuarenta|'
-                r'cincuenta|sesenta|setenta|ochenta|noventa|cien|ciento|mil)\b',
-                re.IGNORECASE
+            "raya_dialogue": re.compile(r"—[^—\n]+(?:—[^—\n]*)?"),
+            "guillemet_dialogue": re.compile(r"«[^»]+»"),
+            "quote_dialogue": re.compile(r'"[^"]+"|"[^"]+"|"[^"]*"'),
+            "semicolon": re.compile(r";"),
+            "ellipsis": re.compile(r"\.{3}|…"),
+            "em_dash": re.compile(r"—"),
+            "numbers_digits": re.compile(r"\b\d+\b"),
+            "numbers_words": re.compile(
+                r"\b(uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|"
+                r"once|doce|trece|catorce|quince|veinte|treinta|cuarenta|"
+                r"cincuenta|sesenta|setenta|ochenta|noventa|cien|ciento|mil)\b",
+                re.IGNORECASE,
             ),
         }
 
@@ -549,14 +577,14 @@ class StyleAnalyzer:
             formality_level="medium",
             statistics=stats,
             consistency_issues=issues,
-            recommendations=recommendations
+            recommendations=recommendations,
         )
 
     def _analyze_dialogues(self, text: str) -> tuple[DialogueStyle, list[StylePattern]]:
         """Analiza el estilo de diálogos."""
-        raya_matches = self.patterns['raya_dialogue'].findall(text)
-        guillemet_matches = self.patterns['guillemet_dialogue'].findall(text)
-        quote_matches = self.patterns['quote_dialogue'].findall(text)
+        raya_matches = self.patterns["raya_dialogue"].findall(text)
+        guillemet_matches = self.patterns["guillemet_dialogue"].findall(text)
+        quote_matches = self.patterns["quote_dialogue"].findall(text)
 
         raya_count = len(raya_matches)
         guillemet_count = len(guillemet_matches)
@@ -566,31 +594,37 @@ class StyleAnalyzer:
         patterns = []
 
         if raya_count > 0:
-            patterns.append(StylePattern(
-                name="Raya española",
-                description="Diálogos marcados con raya (—)",
-                frequency=raya_count,
-                examples=raya_matches[:3],
-                recommendation="Estilo estándar en español"
-            ))
+            patterns.append(
+                StylePattern(
+                    name="Raya española",
+                    description="Diálogos marcados con raya (—)",
+                    frequency=raya_count,
+                    examples=raya_matches[:3],
+                    recommendation="Estilo estándar en español",
+                )
+            )
 
         if guillemet_count > 0:
-            patterns.append(StylePattern(
-                name="Comillas angulares",
-                description="Diálogos marcados con « »",
-                frequency=guillemet_count,
-                examples=guillemet_matches[:3],
-                recommendation="Común en ediciones académicas"
-            ))
+            patterns.append(
+                StylePattern(
+                    name="Comillas angulares",
+                    description="Diálogos marcados con « »",
+                    frequency=guillemet_count,
+                    examples=guillemet_matches[:3],
+                    recommendation="Común en ediciones académicas",
+                )
+            )
 
         if quote_count > 0:
-            patterns.append(StylePattern(
-                name="Comillas inglesas",
-                description='Diálogos marcados con " "',
-                frequency=quote_count,
-                examples=quote_matches[:3],
-                recommendation="Más común en traducciones del inglés"
-            ))
+            patterns.append(
+                StylePattern(
+                    name="Comillas inglesas",
+                    description='Diálogos marcados con " "',
+                    frequency=quote_count,
+                    examples=quote_matches[:3],
+                    recommendation="Más común en traducciones del inglés",
+                )
+            )
 
         # Determinar estilo predominante
         if total == 0:
@@ -611,42 +645,46 @@ class StyleAnalyzer:
         patterns = []
 
         # Punto y coma
-        semicolons = len(self.patterns['semicolon'].findall(text))
-        sentences = len(re.findall(r'[.!?]+', text))
+        semicolons = len(self.patterns["semicolon"].findall(text))
+        sentences = len(re.findall(r"[.!?]+", text))
 
         if sentences > 0:
             ratio = semicolons / sentences
             if ratio > 0.1:
-                freq = 'alto'
+                freq = "alto"
             elif ratio > 0.02:
-                freq = 'medio'
+                freq = "medio"
             elif semicolons > 0:
-                freq = 'bajo'
+                freq = "bajo"
             else:
-                freq = 'ninguno'
+                freq = "ninguno"
         else:
-            freq = 'ninguno'
+            freq = "ninguno"
 
-        patterns.append(StylePattern(
-            name="Punto y coma",
-            description="Uso de ; en el texto",
-            frequency=semicolons,
-            examples=[],
-            recommendation="Uso moderado recomendado para narrativa"
-        ))
+        patterns.append(
+            StylePattern(
+                name="Punto y coma",
+                description="Uso de ; en el texto",
+                frequency=semicolons,
+                examples=[],
+                recommendation="Uso moderado recomendado para narrativa",
+            )
+        )
 
         # Puntos suspensivos
-        ellipsis_matches = self.patterns['ellipsis'].findall(text)
-        patterns.append(StylePattern(
-            name="Puntos suspensivos",
-            description="Uso de ... o …",
-            frequency=len(ellipsis_matches),
-            examples=ellipsis_matches[:3],
-            recommendation="Usar con moderación para énfasis"
-        ))
+        ellipsis_matches = self.patterns["ellipsis"].findall(text)
+        patterns.append(
+            StylePattern(
+                name="Puntos suspensivos",
+                description="Uso de ... o …",
+                frequency=len(ellipsis_matches),
+                examples=ellipsis_matches[:3],
+                recommendation="Usar con moderación para énfasis",
+            )
+        )
 
         # Oxford comma (simplificado - buscar ", y" vs "y")
-        oxford_pattern = re.compile(r'\w+,\s+\w+,\s+y\s+\w+')
+        oxford_pattern = re.compile(r"\w+,\s+\w+,\s+y\s+\w+")
         oxford_matches = oxford_pattern.findall(text)
         uses_oxford = len(oxford_matches) > 0
 
@@ -654,18 +692,25 @@ class StyleAnalyzer:
 
     def _analyze_numbers(self, text: str) -> tuple[NumberStyle, dict[str, list[str]]]:
         """Analiza el estilo de números."""
-        digit_matches = self.patterns['numbers_digits'].findall(text)
-        word_matches = self.patterns['numbers_words'].findall(text)
+        digit_matches = self.patterns["numbers_digits"].findall(text)
+        word_matches = self.patterns["numbers_words"].findall(text)
 
-        examples = {
-            'digits': digit_matches[:5],
-            'words': word_matches[:5]
-        }
+        examples = {"digits": digit_matches[:5], "words": word_matches[:5]}
 
         # Analizar números pequeños (1-10)
         small_digits = [d for d in digit_matches if d.isdigit() and int(d) <= 10]
-        small_words_list = ['uno', 'dos', 'tres', 'cuatro', 'cinco',
-                           'seis', 'siete', 'ocho', 'nueve', 'diez']
+        small_words_list = [
+            "uno",
+            "dos",
+            "tres",
+            "cuatro",
+            "cinco",
+            "seis",
+            "siete",
+            "ocho",
+            "nueve",
+            "diez",
+        ]
         small_words = [w for w in word_matches if w.lower() in small_words_list]
 
         if len(small_digits) > len(small_words) * 2:
@@ -682,25 +727,27 @@ class StyleAnalyzer:
         patterns = []
 
         # Títulos (el Rey, el Presidente, la Reina)
-        title_pattern = re.compile(r'\b(el|la|los|las)\s+([A-Z][a-záéíóúñü]+)\b')
+        title_pattern = re.compile(r"\b(el|la|los|las)\s+([A-Z][a-záéíóúñü]+)\b")
         titles = title_pattern.findall(text)
 
         if titles:
             examples = [f"{t[0]} {t[1]}" for t in titles[:3]]
-            patterns.append(StylePattern(
-                name="Títulos con mayúscula",
-                description="Cargos/títulos en mayúscula después de artículo",
-                frequency=len(titles),
-                examples=examples,
-                recommendation="RAE recomienda minúscula para cargos genéricos"
-            ))
+            patterns.append(
+                StylePattern(
+                    name="Títulos con mayúscula",
+                    description="Cargos/títulos en mayúscula después de artículo",
+                    frequency=len(titles),
+                    examples=examples,
+                    recommendation="RAE recomienda minúscula para cargos genéricos",
+                )
+            )
 
         return patterns
 
     def _analyze_foreign_words(self, text: str) -> tuple[str, list[str]]:
         """Detecta tratamiento de extranjerismos."""
         # Palabras en cursiva (Markdown)
-        italic_pattern = re.compile(r'\*([a-zA-Z]+)\*|_([a-zA-Z]+)_')
+        italic_pattern = re.compile(r"\*([a-zA-Z]+)\*|_([a-zA-Z]+)_")
         italics = italic_pattern.findall(text)
 
         # Palabras entre comillas que podrían ser extranjerismos
@@ -709,20 +756,20 @@ class StyleAnalyzer:
         examples = []
 
         if italics:
-            style = 'italic'
+            style = "italic"
             examples = [i[0] or i[1] for i in italics[:5]]
         elif quoted:
-            style = 'quotes'
+            style = "quotes"
             examples = quoted[:5]
         else:
-            style = 'none'
+            style = "none"
 
         return style, examples
 
     def _calculate_statistics(self, text: str) -> TextStatistics:
         """Calcula estadísticas generales."""
-        words = re.findall(r'\b\w+\b', text)
-        sentences = re.split(r'[.!?]+', text)
+        words = re.findall(r"\b\w+\b", text)
+        sentences = re.split(r"[.!?]+", text)
         sentences = [s for s in sentences if s.strip()]
 
         word_count = len(words)
@@ -730,29 +777,25 @@ class StyleAnalyzer:
         avg_sentence = word_count / sentence_count if sentence_count else 0
 
         # Type-Token Ratio
-        unique_words = set(w.lower() for w in words)
+        unique_words = {w.lower() for w in words}
         ttr = len(unique_words) / word_count if word_count else 0
 
         return TextStatistics(
             total_words=word_count,
             total_sentences=sentence_count,
             avg_sentence_length=round(avg_sentence, 1),
-            vocabulary_richness=round(ttr, 3)
+            vocabulary_richness=round(ttr, 3),
         )
 
     def _detect_inconsistencies(
-        self,
-        dialogue_style: DialogueStyle,
-        number_style: NumberStyle,
-        text: str
+        self, dialogue_style: DialogueStyle, number_style: NumberStyle, text: str
     ) -> list[str]:
         """Detecta inconsistencias de estilo."""
         issues = []
 
         if dialogue_style == DialogueStyle.MIXED:
             issues.append(
-                "Se detectan múltiples estilos de diálogo (raya, comillas). "
-                "Considere unificar."
+                "Se detectan múltiples estilos de diálogo (raya, comillas). Considere unificar."
             )
 
         if number_style == NumberStyle.MIXED:
@@ -764,23 +807,16 @@ class StyleAnalyzer:
         return issues
 
     def _generate_recommendations(
-        self,
-        dialogue_style: DialogueStyle,
-        number_style: NumberStyle,
-        issues: list[str]
+        self, dialogue_style: DialogueStyle, number_style: NumberStyle, issues: list[str]
     ) -> list[str]:
         """Genera recomendaciones de estilo."""
         recommendations = []
 
         if dialogue_style == DialogueStyle.RAYA:
-            recommendations.append(
-                "✓ Uso correcto de raya española para diálogos"
-            )
+            recommendations.append("✓ Uso correcto de raya española para diálogos")
 
         if number_style == NumberStyle.WORDS_UNDER_10:
-            recommendations.append(
-                "✓ Números pequeños escritos en palabras (convención literaria)"
-            )
+            recommendations.append("✓ Números pequeños escritos en palabras (convención literaria)")
 
         for issue in issues:
             recommendations.append(f"⚠️ {issue}")
@@ -791,7 +827,7 @@ class StyleAnalyzer:
 def generate_style_guide(
     project_id: int,
     project_name: str,
-    text: Optional[str] = None,
+    text: str | None = None,
 ) -> Result[StyleGuide]:
     """
     Genera una guía de estilo completa para un proyecto.

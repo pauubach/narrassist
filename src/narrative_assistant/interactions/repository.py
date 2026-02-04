@@ -10,15 +10,14 @@ Almacena:
 import json
 import logging
 from datetime import datetime
-from typing import Optional
 
 from ..persistence.database import Database
 from .models import (
     EntityInteraction,
-    InteractionPattern,
     InteractionAlert,
-    InteractionType,
+    InteractionPattern,
     InteractionTone,
+    InteractionType,
 )
 
 logger = logging.getLogger(__name__)
@@ -167,7 +166,7 @@ class InteractionRepository:
     Gestiona interacciones, patrones y alertas.
     """
 
-    def __init__(self, db: Optional[Database] = None):
+    def __init__(self, db: Database | None = None):
         """
         Inicializa el repositorio.
 
@@ -242,7 +241,7 @@ class InteractionRepository:
 
         return interaction.id
 
-    def get_interaction(self, interaction_id: str) -> Optional[EntityInteraction]:
+    def get_interaction(self, interaction_id: str) -> EntityInteraction | None:
         """Obtiene una interacción por ID."""
         with self.db.connection() as conn:
             row = conn.execute(
@@ -258,7 +257,7 @@ class InteractionRepository:
     def get_interactions_for_project(
         self,
         project_id: int,
-        chapter: Optional[int] = None,
+        chapter: int | None = None,
         incoherent_only: bool = False,
     ) -> list[EntityInteraction]:
         """
@@ -415,10 +414,7 @@ class InteractionRepository:
             sentiment_score=row["sentiment_score"] or 0.0,
             intensity=row["intensity"] or 0.5,
             relationship_id=row["relationship_id"],
-            expected_tone=(
-                InteractionTone(row["expected_tone"])
-                if row["expected_tone"] else None
-            ),
+            expected_tone=(InteractionTone(row["expected_tone"]) if row["expected_tone"] else None),
             is_coherent=bool(row["is_coherent"]),
             coherence_note=row["coherence_note"] or "",
             confidence=row["confidence"] or 0.5,
@@ -552,7 +548,7 @@ class InteractionRepository:
     def get_alerts_for_project(
         self,
         project_id: int,
-        status: Optional[str] = None,
+        status: str | None = None,
     ) -> list[InteractionAlert]:
         """
         Obtiene alertas de un proyecto.

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Generador de ejemplos de entrenamiento sintéticos para votación ponderada.
 
@@ -18,9 +17,8 @@ Escenarios incluidos:
 import json
 import logging
 import random
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +40,7 @@ class TrainingExample:
         scenario: Escenario de prueba para análisis
         notes: Notas adicionales
     """
+
     entity_name: str
     attribute_key: str
     attribute_value: str
@@ -108,7 +107,6 @@ SCENARIOS = {
             },
         ],
     },
-
     # Escenario 2: Solo LLM detecta (atributos implícitos)
     "llm_implicit": {
         "description": "Solo el LLM detecta atributos implícitos/contextuales",
@@ -155,7 +153,6 @@ SCENARIOS = {
             },
         ],
     },
-
     # Escenario 3: Patterns mejor (formato explícito)
     "patterns_explicit": {
         "description": "Patrones regex funcionan mejor por formato explícito",
@@ -186,7 +183,6 @@ SCENARIOS = {
             },
         ],
     },
-
     # Escenario 4: Errores ortográficos (LLM robusto)
     "typos": {
         "description": "Texto con errores ortográficos - LLM más robusto",
@@ -217,7 +213,6 @@ SCENARIOS = {
             },
         ],
     },
-
     # Escenario 5: Metáforas (patterns filtra mejor)
     "metaphors": {
         "description": "Texto con metáforas - patterns las filtra correctamente",
@@ -256,7 +251,6 @@ SCENARIOS = {
             },
         ],
     },
-
     # Escenario 6: Correferencias (necesita contexto)
     "coreference": {
         "description": "Atributos con pronombres que requieren resolución",
@@ -287,7 +281,6 @@ SCENARIOS = {
             },
         ],
     },
-
     # Escenario 7: Atributos negados
     "negated": {
         "description": "Atributos que están negados en el texto",
@@ -318,7 +311,6 @@ SCENARIOS = {
             },
         ],
     },
-
     # Escenario 8: Diálogos (contexto diferente)
     "dialogue": {
         "description": "Atributos mencionados en diálogos",
@@ -341,7 +333,6 @@ SCENARIOS = {
             },
         ],
     },
-
     # Escenario 9: Embeddings destacan (similitud semántica)
     "semantic_similarity": {
         "description": "Casos donde embeddings capturan mejor la semántica",
@@ -364,7 +355,6 @@ SCENARIOS = {
             },
         ],
     },
-
     # Escenario 10: Dependency parsing destaca (estructura sintáctica)
     "syntactic": {
         "description": "Estructura sintáctica clara - dependency parsing mejor",
@@ -387,7 +377,6 @@ SCENARIOS = {
             },
         ],
     },
-
     # Escenario 11: Falsos positivos (todos fallan)
     "false_positives": {
         "description": "Casos donde no hay atributo real pero se detecta incorrectamente",
@@ -410,7 +399,6 @@ SCENARIOS = {
             },
         ],
     },
-
     # Escenario 12: Múltiples entidades (desambiguación)
     "disambiguation": {
         "description": "Múltiples entidades - necesita desambiguar",
@@ -545,7 +533,7 @@ def load_training_data(path: Path) -> list[TrainingExample]:
     """
     examples = []
 
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         for line in f:
             if line.strip():
                 data = json.loads(line)
@@ -558,6 +546,7 @@ def load_training_data(path: Path) -> list[TrainingExample]:
 # =============================================================================
 # Análisis del dataset
 # =============================================================================
+
 
 def analyze_dataset(examples: list[TrainingExample]) -> dict:
     """

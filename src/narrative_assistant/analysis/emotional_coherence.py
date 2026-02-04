@@ -14,16 +14,13 @@ Tipos de coherencia verificados:
 
 import logging
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
 
 from ..nlp.sentiment import (
-    SentimentAnalyzer,
     EmotionalState,
-    DeclaredEmotionalState,
     Sentiment,
-    Emotion,
+    SentimentAnalyzer,
     get_sentiment_analyzer,
 )
 
@@ -32,15 +29,17 @@ logger = logging.getLogger(__name__)
 
 class IncoherenceType(Enum):
     """Tipos de incoherencia emocional."""
+
     EMOTION_DIALOGUE = "emotion_dialogue"  # Estado vs. cómo habla
-    EMOTION_ACTION = "emotion_action"      # Estado vs. qué hace
-    TEMPORAL_JUMP = "temporal_jump"        # Cambio emocional abrupto
-    NARRATOR_BIAS = "narrator_bias"        # Narrador inconsistente
+    EMOTION_ACTION = "emotion_action"  # Estado vs. qué hace
+    TEMPORAL_JUMP = "temporal_jump"  # Cambio emocional abrupto
+    NARRATOR_BIAS = "narrator_bias"  # Narrador inconsistente
 
 
 @dataclass
 class EmotionalIncoherence:
     """Incoherencia emocional detectada."""
+
     entity_name: str
     incoherence_type: IncoherenceType
     declared_emotion: str
@@ -49,8 +48,8 @@ class EmotionalIncoherence:
     behavior_text: str
     confidence: float
     explanation: str
-    suggestion: Optional[str] = None
-    chapter_id: Optional[int] = None
+    suggestion: str | None = None
+    chapter_id: int | None = None
     start_char: int = 0
     end_char: int = 0
 
@@ -234,9 +233,9 @@ class EmotionalCoherenceChecker:
 
     def __init__(
         self,
-        sentiment_analyzer: Optional[SentimentAnalyzer] = None,
+        sentiment_analyzer: SentimentAnalyzer | None = None,
         min_confidence: float = 0.6,
-        proximity_window: Optional[int] = None,
+        proximity_window: int | None = None,
     ):
         """
         Inicializa el verificador.
@@ -257,17 +256,11 @@ class EmotionalCoherenceChecker:
 
     def _has_irony_marker(self, text: str) -> bool:
         """Detecta si hay marcadores de ironía en el texto."""
-        for pattern in self._irony_patterns:
-            if pattern.search(text):
-                return True
-        return False
+        return any(pattern.search(text) for pattern in self._irony_patterns)
 
     def _has_concealment_marker(self, text: str) -> bool:
         """Detecta si hay marcadores de disimulo en el texto."""
-        for pattern in self._concealment_patterns:
-            if pattern.search(text):
-                return True
-        return False
+        return any(pattern.search(text) for pattern in self._concealment_patterns)
 
     def _emotion_to_expected_sentiment(self, emotion: str) -> set[str]:
         """
@@ -281,11 +274,7 @@ class EmotionalCoherenceChecker:
         """
         return EMOTION_SENTIMENT_MAP.get(emotion.lower(), {"neutral"})
 
-    def _is_coherent(
-        self,
-        expected_sentiments: set[str],
-        actual_sentiment: Sentiment
-    ) -> bool:
+    def _is_coherent(self, expected_sentiments: set[str], actual_sentiment: Sentiment) -> bool:
         """Verifica si el sentimiento actual es coherente con lo esperado."""
         return actual_sentiment.value in expected_sentiments
 
@@ -305,10 +294,7 @@ class EmotionalCoherenceChecker:
         return pair in OPPOSITE_EMOTIONS or reverse in OPPOSITE_EMOTIONS
 
     def _generate_explanation(
-        self,
-        entity_name: str,
-        declared_emotion: str,
-        detected_state: EmotionalState
+        self, entity_name: str, declared_emotion: str, detected_state: EmotionalState
     ) -> str:
         """Genera explicación de la incoherencia."""
         return (
@@ -320,10 +306,7 @@ class EmotionalCoherenceChecker:
         )
 
     def _generate_suggestion(
-        self,
-        entity_name: str,
-        declared_emotion: str,
-        detected_state: EmotionalState
+        self, entity_name: str, declared_emotion: str, detected_state: EmotionalState
     ) -> str:
         """Genera sugerencia de corrección."""
         expected = self._emotion_to_expected_sentiment(declared_emotion)
@@ -353,10 +336,10 @@ class EmotionalCoherenceChecker:
         declared_emotion: str,
         dialogue_text: str,
         context: str = "",
-        chapter_id: Optional[int] = None,
+        chapter_id: int | None = None,
         start_char: int = 0,
         end_char: int = 0,
-    ) -> Optional[EmotionalIncoherence]:
+    ) -> EmotionalIncoherence | None:
         """
         Verifica coherencia entre emoción declarada y diálogo.
 
@@ -400,7 +383,9 @@ class EmotionalCoherenceChecker:
 
         # Verificar confianza mínima
         if dialogue_sentiment.sentiment_confidence < self.min_confidence:
-            logger.debug(f"Confianza baja ({dialogue_sentiment.sentiment_confidence:.2f}), ignorando")
+            logger.debug(
+                f"Confianza baja ({dialogue_sentiment.sentiment_confidence:.2f}), ignorando"
+            )
             return None
 
         # Mapear emoción declarada a sentimiento esperado
@@ -461,27 +446,29 @@ class EmotionalCoherenceChecker:
             # Si son capítulos consecutivos y hay cambio extremo
             if curr_chapter == prev_chapter + 1:
                 if self._is_extreme_change(prev_emotion, curr_emotion):
-                    incoherences.append(EmotionalIncoherence(
-                        entity_name=entity_name,
-                        incoherence_type=IncoherenceType.TEMPORAL_JUMP,
-                        declared_emotion=prev_emotion,
-                        actual_behavior=curr_emotion,
-                        declared_text=prev_text[:200] if len(prev_text) > 200 else prev_text,
-                        behavior_text=curr_text[:200] if len(curr_text) > 200 else curr_text,
-                        chapter_id=curr_chapter,
-                        confidence=0.7,
-                        explanation=(
-                            f"'{entity_name}' cambia de '{prev_emotion}' "
-                            f"(capítulo {prev_chapter}) a '{curr_emotion}' "
-                            f"(capítulo {curr_chapter}) sin transición aparente."
-                        ),
-                        suggestion=(
-                            f"Considere añadir una transición temporal o emocional "
-                            f"que justifique el cambio de estado de '{entity_name}'. "
-                            f"Por ejemplo, un salto temporal explícito o eventos "
-                            f"que expliquen la evolución emocional."
-                        ),
-                    ))
+                    incoherences.append(
+                        EmotionalIncoherence(
+                            entity_name=entity_name,
+                            incoherence_type=IncoherenceType.TEMPORAL_JUMP,
+                            declared_emotion=prev_emotion,
+                            actual_behavior=curr_emotion,
+                            declared_text=prev_text[:200] if len(prev_text) > 200 else prev_text,
+                            behavior_text=curr_text[:200] if len(curr_text) > 200 else curr_text,
+                            chapter_id=curr_chapter,
+                            confidence=0.7,
+                            explanation=(
+                                f"'{entity_name}' cambia de '{prev_emotion}' "
+                                f"(capítulo {prev_chapter}) a '{curr_emotion}' "
+                                f"(capítulo {curr_chapter}) sin transición aparente."
+                            ),
+                            suggestion=(
+                                f"Considere añadir una transición temporal o emocional "
+                                f"que justifique el cambio de estado de '{entity_name}'. "
+                                f"Por ejemplo, un salto temporal explícito o eventos "
+                                f"que expliquen la evolución emocional."
+                            ),
+                        )
+                    )
 
         return incoherences
 
@@ -491,8 +478,8 @@ class EmotionalCoherenceChecker:
         declared_emotion: str,
         action_text: str,
         context: str = "",
-        chapter_id: Optional[int] = None,
-    ) -> Optional[EmotionalIncoherence]:
+        chapter_id: int | None = None,
+    ) -> EmotionalIncoherence | None:
         """
         Verifica coherencia entre emoción declarada y acciones.
 
@@ -623,7 +610,7 @@ class EmotionalCoherenceChecker:
 
 
 # Singleton
-_checker_instance: Optional[EmotionalCoherenceChecker] = None
+_checker_instance: EmotionalCoherenceChecker | None = None
 
 
 def get_emotional_coherence_checker() -> EmotionalCoherenceChecker:

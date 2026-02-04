@@ -7,24 +7,26 @@ organizados por categoría con soporte para herencia tipo → subtipo.
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional, Any, Literal
+from typing import Any, Literal
 
 
 class InheritanceSource(str, Enum):
     """Origen de un valor de configuración."""
-    DEFAULT = "default"      # Valor por defecto global
-    TYPE = "type"            # Heredado del tipo
-    SUBTYPE = "subtype"      # Heredado del subtipo
-    CUSTOM = "custom"        # Personalizado por el usuario
+
+    DEFAULT = "default"  # Valor por defecto global
+    TYPE = "type"  # Heredado del tipo
+    SUBTYPE = "subtype"  # Heredado del subtipo
+    CUSTOM = "custom"  # Personalizado por el usuario
 
 
 class DashType(str, Enum):
     """Tipos de guiones/rayas para diálogos."""
-    EM_DASH = "em_dash"      # Raya española (—) U+2014
-    EN_DASH = "en_dash"      # Guión largo (–) U+2013
-    HYPHEN = "hyphen"        # Guión simple (-) U+002D
-    NONE = "none"            # No usar guiones para diálogo
-    AUTO = "auto"            # Detectar automáticamente del documento
+
+    EM_DASH = "em_dash"  # Raya española (—) U+2014
+    EN_DASH = "en_dash"  # Guión largo (–) U+2013
+    HYPHEN = "hyphen"  # Guión simple (-) U+002D
+    NONE = "none"  # No usar guiones para diálogo
+    AUTO = "auto"  # Detectar automáticamente del documento
 
     @property
     def char(self) -> str:
@@ -51,11 +53,12 @@ class DashType(str, Enum):
 
 class QuoteType(str, Enum):
     """Tipos de comillas para diálogos/pensamientos."""
-    ANGULAR = "angular"      # Comillas angulares/latinas («»)
-    DOUBLE = "double"        # Comillas inglesas dobles ("")
-    SINGLE = "single"        # Comillas simples ('')
-    NONE = "none"            # No usar comillas
-    AUTO = "auto"            # Detectar automáticamente del documento
+
+    ANGULAR = "angular"  # Comillas angulares/latinas («»)
+    DOUBLE = "double"  # Comillas inglesas dobles ("")
+    SINGLE = "single"  # Comillas simples ('')
+    NONE = "none"  # No usar comillas
+    AUTO = "auto"  # Detectar automáticamente del documento
 
     @property
     def chars(self) -> tuple[str, str]:
@@ -73,7 +76,7 @@ class QuoteType(str, Enum):
         """Etiqueta para mostrar en UI."""
         return {
             QuoteType.ANGULAR: "Comillas angulares («»)",
-            QuoteType.DOUBLE: "Comillas inglesas ("")",
+            QuoteType.DOUBLE: "Comillas inglesas ()",
             QuoteType.SINGLE: "Comillas simples ('')",
             QuoteType.NONE: "No usar comillas",
             QuoteType.AUTO: "Detectar automáticamente",
@@ -82,17 +85,19 @@ class QuoteType(str, Enum):
 
 class MarkerDetectionMode(str, Enum):
     """Modo de detección de marcadores."""
-    AUTO = "auto"            # Detectar automáticamente del documento
-    PRESET = "preset"        # Usar un preset predefinido
-    CUSTOM = "custom"        # Configuración manual del usuario
+
+    AUTO = "auto"  # Detectar automáticamente del documento
+    PRESET = "preset"  # Usar un preset predefinido
+    CUSTOM = "custom"  # Configuración manual del usuario
 
 
 class MarkerPreset(str, Enum):
     """Presets de configuración de marcadores."""
+
     SPANISH_TRADITIONAL = "spanish_traditional"  # Raya + angulares (RAE)
-    ANGLO_SAXON = "anglo_saxon"                  # Comillas dobles
-    SPANISH_QUOTES = "spanish_quotes"            # Comillas angulares (sin raya)
-    DETECT = "detect"                            # Detectar del documento
+    ANGLO_SAXON = "anglo_saxon"  # Comillas dobles
+    SPANISH_QUOTES = "spanish_quotes"  # Comillas angulares (sin raya)
+    DETECT = "detect"  # Detectar del documento
 
 
 @dataclass
@@ -102,9 +107,10 @@ class ParameterValue:
 
     Permite saber de dónde viene cada valor para mostrarlo en la UI.
     """
+
     value: Any
     source: InheritanceSource
-    source_name: Optional[str] = None  # "Infantil", "Middle Grade", etc.
+    source_name: str | None = None  # "Infantil", "Middle Grade", etc.
 
     def to_dict(self) -> dict:
         return {
@@ -118,6 +124,7 @@ class ParameterValue:
 # Configuraciones por categoría
 # =============================================================================
 
+
 @dataclass
 class DialogConfig:
     """
@@ -126,6 +133,7 @@ class DialogConfig:
     Soporta configuración por función (diálogo hablado, pensamientos, citas)
     con detección automática y presets predefinidos.
     """
+
     # ===== Modo de configuración =====
     # Cómo se determinan los marcadores
     detection_mode: MarkerDetectionMode = MarkerDetectionMode.PRESET
@@ -175,14 +183,14 @@ class DialogConfig:
 
     def _get_dash_char(self, dash) -> str:
         """Helper para obtener carácter de guión (enum o string)."""
-        if hasattr(dash, 'char'):
+        if hasattr(dash, "char"):
             return dash.char
         # Es un string, convertir manualmente
         return {"em_dash": "—", "en_dash": "–", "hyphen": "-"}.get(dash, "")
 
     def _get_quote_chars(self, quote) -> tuple[str, str]:
         """Helper para obtener comillas (enum o string)."""
-        if hasattr(quote, 'chars'):
+        if hasattr(quote, "chars"):
             return quote.chars
         # Es un string, convertir manualmente
         return {
@@ -227,7 +235,7 @@ class DialogConfig:
 
     def _get_value(self, field) -> str:
         """Helper para obtener valor de un campo que puede ser enum o string."""
-        if hasattr(field, 'value'):
+        if hasattr(field, "value"):
             return field.value
         return field
 
@@ -236,7 +244,6 @@ class DialogConfig:
             # Modo y preset
             "detection_mode": self._get_value(self.detection_mode),
             "preset": self._get_value(self.preset),
-
             # Marcadores por función
             "spoken_dialogue_dash": self._get_value(self.spoken_dialogue_dash),
             "spoken_dialogue_quote": self._get_value(self.spoken_dialogue_quote),
@@ -244,18 +251,15 @@ class DialogConfig:
             "thoughts_use_italics": self.thoughts_use_italics,
             "nested_dialogue_quote": self._get_value(self.nested_dialogue_quote),
             "textual_quote": self._get_value(self.textual_quote),
-
             # Detección
             "auto_detected": self.auto_detected,
             "detection_confidence": self.detection_confidence,
-
             # Consistencia y análisis
             "flag_inconsistent_markers": self.flag_inconsistent_markers,
             "analyze_dialog_tags": self.analyze_dialog_tags,
             "dialog_tag_variation_min": self.dialog_tag_variation_min,
             "flag_consecutive_same_tag": self.flag_consecutive_same_tag,
             "enabled": self.enabled,
-
             # Legacy (deprecated pero mantenido para compatibilidad)
             "dialog_markers": self.get_accepted_markers(),
             "preferred_marker": self.preferred_marker,
@@ -267,6 +271,7 @@ class RepetitionConfig:
     """
     Configuración de detección de repeticiones.
     """
+
     # Tolerancia: cuántas ocurrencias antes de alertar
     # very_high = 5+, high = 4+, medium = 3+, low = 2+
     tolerance: Literal["very_high", "high", "medium", "low"] = "medium"
@@ -312,11 +317,12 @@ class SentenceConfig:
     """
     Configuración de análisis de oraciones.
     """
+
     # Longitud máxima en palabras (None = sin límite)
-    max_length_words: Optional[int] = None
+    max_length_words: int | None = None
 
     # Longitud recomendada (soft warning)
-    recommended_length_words: Optional[int] = 25
+    recommended_length_words: int | None = 25
 
     # ¿Analizar complejidad sintáctica?
     analyze_complexity: bool = True
@@ -346,6 +352,7 @@ class StyleConfig:
     """
     Configuración de análisis de estilo general.
     """
+
     # ¿Analizar variación de inicios de oración?
     analyze_sentence_starts: bool = True
 
@@ -380,6 +387,7 @@ class StructureConfig:
     """
     Configuración de análisis estructural.
     """
+
     # ¿Analizar timeline/cronología?
     timeline_enabled: bool = True
 
@@ -414,15 +422,16 @@ class ReadabilityConfig:
     """
     Configuración de legibilidad (especialmente para infantil).
     """
+
     # Rango de edad objetivo
-    target_age_min: Optional[int] = None
-    target_age_max: Optional[int] = None
+    target_age_min: int | None = None
+    target_age_max: int | None = None
 
     # ¿Analizar vocabulario por edad?
     analyze_vocabulary_age: bool = False
 
     # Vocabulario máximo (número de palabras únicas esperadas)
-    max_vocabulary_size: Optional[int] = None
+    max_vocabulary_size: int | None = None
 
     # ¿Habilitar análisis de legibilidad?
     enabled: bool = False
@@ -441,6 +450,7 @@ class ReadabilityConfig:
 # Reglas Editoriales
 # =============================================================================
 
+
 @dataclass
 class EditorialRule:
     """
@@ -449,6 +459,7 @@ class EditorialRule:
     Las reglas pueden heredarse del tipo/subtipo y ser habilitadas/deshabilitadas
     o sobreescritas a nivel de documento.
     """
+
     # Identificador único de la regla
     id: str = ""
 
@@ -462,7 +473,7 @@ class EditorialRule:
     source: InheritanceSource = InheritanceSource.CUSTOM
 
     # Nombre del origen (para mostrar en UI)
-    source_name: Optional[str] = None
+    source_name: str | None = None
 
     # ¿Ha sido modificada respecto al origen?
     overridden: bool = False
@@ -501,6 +512,7 @@ class EditorialRulesConfig:
     - Añadir nuevas reglas
     - Modificar reglas heredadas (crea copia local)
     """
+
     rules: list[EditorialRule] = field(default_factory=list)
 
     def to_dict(self) -> dict:
@@ -512,9 +524,12 @@ class EditorialRulesConfig:
         """Devuelve solo las reglas habilitadas."""
         return [r for r in self.rules if r.enabled]
 
-    def add_rule(self, text: str, source: InheritanceSource = InheritanceSource.CUSTOM) -> EditorialRule:
+    def add_rule(
+        self, text: str, source: InheritanceSource = InheritanceSource.CUSTOM
+    ) -> EditorialRule:
         """Añade una nueva regla."""
         import uuid
+
         rule = EditorialRule(
             id=str(uuid.uuid4())[:8],
             text=text,
@@ -546,6 +561,7 @@ class EditorialRulesConfig:
 # Configuración completa
 # =============================================================================
 
+
 @dataclass
 class CorrectionConfig:
     """
@@ -554,11 +570,12 @@ class CorrectionConfig:
     Agrupa todas las categorías de configuración con soporte
     para herencia tipo → subtipo → personalización.
     """
+
     # Metadatos
     type_code: str = "FIC"
     type_name: str = "Ficción"
-    subtype_code: Optional[str] = None
-    subtype_name: Optional[str] = None
+    subtype_code: str | None = None
+    subtype_name: str | None = None
 
     # Configuraciones por categoría
     dialog: DialogConfig = field(default_factory=DialogConfig)
@@ -596,7 +613,9 @@ class CorrectionConfig:
         key = f"{category}.{param}"
         return self._inheritance_info.get(key, InheritanceSource.DEFAULT)
 
-    def set_inheritance_info(self, category: str, param: str, source: InheritanceSource, source_name: str = None):
+    def set_inheritance_info(
+        self, category: str, param: str, source: InheritanceSource, source_name: str = None
+    ):
         """Registra información de herencia de un parámetro."""
         key = f"{category}.{param}"
         self._inheritance_info[key] = {

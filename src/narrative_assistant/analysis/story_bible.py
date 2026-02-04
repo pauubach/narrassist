@@ -18,7 +18,6 @@ Inspirado en Sudowrite's Story Bible y Scrivener's Character Sheets.
 
 import logging
 from dataclasses import dataclass, field
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +25,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class EntityBibleEntry:
     """Entrada de la biblia para una entidad."""
+
     # Datos básicos
     entity_id: int = 0
     canonical_name: str = ""
@@ -36,8 +36,8 @@ class EntityBibleEntry:
 
     # Presencia en el texto
     mention_count: int = 0
-    first_chapter: Optional[int] = None
-    last_chapter: Optional[int] = None
+    first_chapter: int | None = None
+    last_chapter: int | None = None
     chapters_present: list[int] = field(default_factory=list)
 
     # Atributos agrupados por categoría
@@ -47,16 +47,16 @@ class EntityBibleEntry:
     relationships: list[dict] = field(default_factory=list)
 
     # Estado vital
-    vital_status: Optional[dict] = None
+    vital_status: dict | None = None
 
     # Perfil de voz (solo personajes)
-    voice_profile: Optional[dict] = None
+    voice_profile: dict | None = None
 
     # Arco emocional resumido
-    emotional_arc: Optional[dict] = None
+    emotional_arc: dict | None = None
 
     # Conocimiento inter-personaje
-    knowledge_summary: Optional[dict] = None
+    knowledge_summary: dict | None = None
 
     # Notas del usuario (manual)
     user_notes: str = ""
@@ -86,6 +86,7 @@ class EntityBibleEntry:
 @dataclass
 class StoryBible:
     """Biblia completa de la historia."""
+
     project_id: int = 0
     project_name: str = ""
     entries: list[EntityBibleEntry] = field(default_factory=list)
@@ -129,7 +130,7 @@ class StoryBibleBuilder:
         include_emotions: bool = True,
         include_knowledge: bool = True,
         include_vital: bool = True,
-        entity_id: Optional[int] = None,
+        entity_id: int | None = None,
     ) -> StoryBible:
         """
         Construye la Story Bible completa o para una entidad.
@@ -184,11 +185,13 @@ class StoryBibleBuilder:
 
         # Ordenar: personajes primero, luego por importancia y menciones
         importance_order = {"protagonist": 0, "main": 1, "secondary": 2, "minor": 3, "mentioned": 4}
-        bible.entries.sort(key=lambda e: (
-            0 if e.entity_type.upper() in ("CHARACTER", "PERSON", "PER") else 1,
-            importance_order.get(e.importance.lower(), 5),
-            -e.mention_count,
-        ))
+        bible.entries.sort(
+            key=lambda e: (
+                0 if e.entity_type.upper() in ("CHARACTER", "PERSON", "PER") else 1,
+                importance_order.get(e.importance.lower(), 5),
+                -e.mention_count,
+            )
+        )
 
         return bible
 
@@ -198,8 +201,8 @@ class StoryBibleBuilder:
         mentions: list,
         attributes: list,
         relationships: list,
-        voice_profile: Optional[dict],
-        vital_status: Optional[dict],
+        voice_profile: dict | None,
+        vital_status: dict | None,
     ) -> EntityBibleEntry:
         """Construye una entrada de la biblia para una entidad."""
         entry = EntityBibleEntry(
@@ -213,10 +216,13 @@ class StoryBibleBuilder:
         )
 
         # Capítulos donde aparece
-        chapters = sorted(set(
-            m.chapter_id for m in mentions
-            if hasattr(m, "chapter_id") and m.chapter_id is not None
-        ))
+        chapters = sorted(
+            {
+                m.chapter_id
+                for m in mentions
+                if hasattr(m, "chapter_id") and m.chapter_id is not None
+            }
+        )
         entry.chapters_present = chapters
         if chapters:
             entry.first_chapter = chapters[0]
@@ -228,13 +234,17 @@ class StoryBibleBuilder:
             cat = str(getattr(attr, "category", "other"))
             if cat not in grouped_attrs:
                 grouped_attrs[cat] = []
-            grouped_attrs[cat].append({
-                "key": getattr(attr, "key", ""),
-                "value": getattr(attr, "value", ""),
-                "confidence": getattr(attr, "confidence", 0.5),
-                "chapter": getattr(attr, "chapter", None),
-                "source_text": getattr(attr, "source_text", "")[:100] if getattr(attr, "source_text", "") else "",
-            })
+            grouped_attrs[cat].append(
+                {
+                    "key": getattr(attr, "key", ""),
+                    "value": getattr(attr, "value", ""),
+                    "confidence": getattr(attr, "confidence", 0.5),
+                    "chapter": getattr(attr, "chapter", None),
+                    "source_text": getattr(attr, "source_text", "")[:100]
+                    if getattr(attr, "source_text", "")
+                    else "",
+                }
+            )
         entry.attributes = grouped_attrs
 
         # Relaciones (filtrar las que incluyen esta entidad)
@@ -244,25 +254,31 @@ class StoryBibleBuilder:
             target_id = rel.get("target_entity_id") or rel.get("entity_b_id", 0)
 
             if source_id == entity.id:
-                entity_rels.append({
-                    "related_entity_id": target_id,
-                    "related_entity_name": rel.get("target_name") or rel.get("entity_b_name", ""),
-                    "relation_type": rel.get("relation_type", ""),
-                    "strength": rel.get("strength", ""),
-                    "valence": rel.get("valence", ""),
-                    "description": rel.get("description", ""),
-                    "direction": "outgoing",
-                })
+                entity_rels.append(
+                    {
+                        "related_entity_id": target_id,
+                        "related_entity_name": rel.get("target_name")
+                        or rel.get("entity_b_name", ""),
+                        "relation_type": rel.get("relation_type", ""),
+                        "strength": rel.get("strength", ""),
+                        "valence": rel.get("valence", ""),
+                        "description": rel.get("description", ""),
+                        "direction": "outgoing",
+                    }
+                )
             elif target_id == entity.id:
-                entity_rels.append({
-                    "related_entity_id": source_id,
-                    "related_entity_name": rel.get("source_name") or rel.get("entity_a_name", ""),
-                    "relation_type": rel.get("relation_type", ""),
-                    "strength": rel.get("strength", ""),
-                    "valence": rel.get("valence", ""),
-                    "description": rel.get("description", ""),
-                    "direction": "incoming",
-                })
+                entity_rels.append(
+                    {
+                        "related_entity_id": source_id,
+                        "related_entity_name": rel.get("source_name")
+                        or rel.get("entity_a_name", ""),
+                        "relation_type": rel.get("relation_type", ""),
+                        "strength": rel.get("strength", ""),
+                        "valence": rel.get("valence", ""),
+                        "description": rel.get("description", ""),
+                        "direction": "incoming",
+                    }
+                )
         entry.relationships = entity_rels
 
         # Vital status
@@ -275,10 +291,11 @@ class StoryBibleBuilder:
 
         return entry
 
-    def _load_entities(self, entity_id: Optional[int] = None) -> list:
+    def _load_entities(self, entity_id: int | None = None) -> list:
         """Carga entidades del proyecto."""
         try:
             from ..entities.repository import get_entity_repository
+
             repo = get_entity_repository()
             if entity_id:
                 entity = repo.get_entity(entity_id)
@@ -288,11 +305,12 @@ class StoryBibleBuilder:
             logger.warning(f"Error loading entities: {e}")
             return []
 
-    def _load_all_mentions(self, entity_id: Optional[int] = None) -> dict:
+    def _load_all_mentions(self, entity_id: int | None = None) -> dict:
         """Carga menciones agrupadas por entity_id."""
         result: dict[int, list] = {}
         try:
             from ..entities.repository import get_entity_repository
+
             repo = get_entity_repository()
             if entity_id:
                 mentions = repo.get_mentions_by_entity(entity_id)
@@ -306,17 +324,19 @@ class StoryBibleBuilder:
             logger.warning(f"Error loading mentions: {e}")
         return result
 
-    def _load_all_attributes(self, entity_id: Optional[int] = None) -> dict:
+    def _load_all_attributes(self, entity_id: int | None = None) -> dict:
         """Carga atributos agrupados por entity_id."""
         result: dict[int, list] = {}
         try:
             from ..nlp.attributes import get_attribute_extractor
+
             extractor = get_attribute_extractor()
             if entity_id:
                 attrs = extractor.get_attributes_for_entity(entity_id)
                 result[entity_id] = attrs
             else:
                 from ..entities.repository import get_entity_repository
+
                 repo = get_entity_repository()
                 entities = repo.get_entities_by_project(self.project_id, active_only=True)
                 for entity in entities:
@@ -330,6 +350,7 @@ class StoryBibleBuilder:
         """Carga relaciones del proyecto."""
         try:
             from ..analysis.relationship_clustering import RelationshipClusteringEngine
+
             engine = RelationshipClusteringEngine(self.project_id)
             relations = engine.get_all_relations()
             return [r.to_dict() if hasattr(r, "to_dict") else r for r in relations]
@@ -342,7 +363,8 @@ class StoryBibleBuilder:
         profiles: dict[int, dict] = {}
         try:
             from ..voice.profiles import VoiceProfiler
-            profiler = VoiceProfiler()
+
+            VoiceProfiler()
             # El profiler necesita datos de diálogo, simplificar
             # Retornar dict vacío si no hay datos pre-calculados
         except Exception as e:
@@ -354,6 +376,7 @@ class StoryBibleBuilder:
         vital: dict[int, dict] = {}
         try:
             from ..analysis.vital_status import VitalStatusAnalyzer
+
             analyzer = VitalStatusAnalyzer(self.project_id)
             reports = analyzer.get_all_reports()
             for report in reports:

@@ -12,7 +12,6 @@ garantizando que las posiciones siempre correspondan al texto que se usa.
 
 import logging
 from dataclasses import dataclass
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +27,7 @@ class TextSpan:
         paragraph_index: Índice del párrafo original (incluyendo vacíos)
         text: Texto del span
     """
+
     start: int
     end: int
     paragraph_index: int
@@ -91,21 +91,20 @@ class TextCoordinateSystem:
 
         for orig_idx, para in enumerate(self._original_paragraphs):
             # Verificar si filtrar
-            is_empty = getattr(para, 'is_empty', not para.text.strip()) if hasattr(para, 'text') else True
+            is_empty = (
+                getattr(para, "is_empty", not para.text.strip()) if hasattr(para, "text") else True
+            )
 
             if self._filter_empty and is_empty:
                 self._original_to_filtered[orig_idx] = -1
                 continue
 
             # Obtener texto
-            text = para.text if hasattr(para, 'text') else str(para)
+            text = para.text if hasattr(para, "text") else str(para)
 
             # Crear span
             span = TextSpan(
-                start=offset,
-                end=offset + len(text),
-                paragraph_index=orig_idx,
-                text=text
+                start=offset, end=offset + len(text), paragraph_index=orig_idx, text=text
             )
             self._paragraph_spans.append(span)
 
@@ -139,7 +138,7 @@ class TextCoordinateSystem:
         """Número total de párrafos originales (incluyendo vacíos)."""
         return len(self._original_paragraphs)
 
-    def get_paragraph_span(self, filtered_index: int) -> Optional[TextSpan]:
+    def get_paragraph_span(self, filtered_index: int) -> TextSpan | None:
         """
         Obtiene el span de un párrafo por su índice filtrado.
 
@@ -153,7 +152,7 @@ class TextCoordinateSystem:
             return self._paragraph_spans[filtered_index]
         return None
 
-    def get_paragraph_span_by_original_index(self, original_index: int) -> Optional[TextSpan]:
+    def get_paragraph_span_by_original_index(self, original_index: int) -> TextSpan | None:
         """
         Obtiene el span de un párrafo por su índice original.
 
@@ -235,11 +234,8 @@ class TextCoordinateSystem:
         return span.start + para_offset
 
     def find_text_in_paragraph(
-        self,
-        original_para_index: int,
-        search_text: str,
-        start_offset: int = 0
-    ) -> Optional[tuple[int, int]]:
+        self, original_para_index: int, search_text: str, start_offset: int = 0
+    ) -> tuple[int, int] | None:
         """
         Busca texto dentro de un párrafo y retorna posiciones en full_text.
 

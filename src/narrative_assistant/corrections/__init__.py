@@ -8,9 +8,9 @@ aspectos lingüísticos que complementan el análisis narrativo.
 from .base import BaseDetector, CorrectionIssue
 from .config import CorrectionConfig
 from .types import (
-    TypographyIssueType,
-    RepetitionIssueType,
     AgreementIssueType,
+    RepetitionIssueType,
+    TypographyIssueType,
 )
 
 __all__ = [

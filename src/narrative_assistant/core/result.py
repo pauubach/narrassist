@@ -10,10 +10,11 @@ Ejemplo de uso:
             print(f"Advertencia: {error.user_message}")
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable, Generic, TypeVar, Optional
+from typing import Generic, TypeVar
 
-from .errors import NarrativeError, ErrorSeverity
+from .errors import ErrorSeverity, NarrativeError
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -30,7 +31,7 @@ class Result(Generic[T]):
         warnings: Advertencias que no son errores
     """
 
-    value: Optional[T] = None
+    value: T | None = None
     errors: list[NarrativeError] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
 
@@ -65,7 +66,7 @@ class Result(Generic[T]):
         return [e for e in self.errors if e.severity == ErrorSeverity.RECOVERABLE]
 
     @property
-    def error(self) -> Optional[NarrativeError]:
+    def error(self) -> NarrativeError | None:
         """Retorna el primer error (fatal o cualquiera) si existe."""
         if self.fatal_errors:
             return self.fatal_errors[0]
@@ -145,7 +146,9 @@ class Result(Generic[T]):
                     warnings=self.warnings.copy(),
                 )
             except Exception as e:
-                new_result: Result[U] = Result(errors=self.errors.copy(), warnings=self.warnings.copy())
+                new_result: Result[U] = Result(
+                    errors=self.errors.copy(), warnings=self.warnings.copy()
+                )
                 new_result.add_error(
                     NarrativeError(
                         message=str(e),

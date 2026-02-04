@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Agregador de resultados con votación ponderada multicapa.
 
@@ -27,16 +26,15 @@ La votación considera:
 
 import logging
 from collections import defaultdict
-from dataclasses import dataclass, field
-from typing import Optional
+from dataclasses import dataclass
 from enum import Enum
 
 from .base import (
-    ExtractionMethod,
-    ExtractionResult,
-    ExtractedAttribute,
     AggregatedAttribute,
     AttributeType,
+    ExtractedAttribute,
+    ExtractionMethod,
+    ExtractionResult,
 )
 
 logger = logging.getLogger(__name__)
@@ -44,9 +42,10 @@ logger = logging.getLogger(__name__)
 
 class ExtractionLayer(Enum):
     """Capas de extracción por costo computacional."""
-    SYNTACTIC = "syntactic"    # Regex, Dependency
-    SEMANTIC = "semantic"      # Embeddings
-    LLM = "llm"               # LLM local
+
+    SYNTACTIC = "syntactic"  # Regex, Dependency
+    SEMANTIC = "semantic"  # Embeddings
+    LLM = "llm"  # LLM local
 
 
 # Mapeo de métodos a capas
@@ -61,9 +60,10 @@ METHOD_TO_LAYER = {
 @dataclass
 class MethodMetrics:
     """Métricas de rendimiento esperado por método."""
-    precision: float    # Probabilidad de que un positivo sea correcto
-    recall: float       # Probabilidad de detectar un positivo
-    cost: float         # Costo relativo (0-1, mayor = más costoso)
+
+    precision: float  # Probabilidad de que un positivo sea correcto
+    recall: float  # Probabilidad de detectar un positivo
+    cost: float  # Costo relativo (0-1, mayor = más costoso)
     layer: ExtractionLayer
 
 
@@ -71,27 +71,27 @@ class MethodMetrics:
 METHOD_METRICS = {
     ExtractionMethod.REGEX: MethodMetrics(
         precision=0.95,  # Muy preciso pero solo para patrones conocidos
-        recall=0.40,     # Bajo recall, muchos casos no cubiertos
+        recall=0.40,  # Bajo recall, muchos casos no cubiertos
         cost=0.1,
-        layer=ExtractionLayer.SYNTACTIC
+        layer=ExtractionLayer.SYNTACTIC,
     ),
     ExtractionMethod.DEPENDENCY: MethodMetrics(
         precision=0.85,  # Buena precisión general
-        recall=0.70,     # Buen recall para estructuras gramaticales
+        recall=0.70,  # Buen recall para estructuras gramaticales
         cost=0.3,
-        layer=ExtractionLayer.SYNTACTIC
+        layer=ExtractionLayer.SYNTACTIC,
     ),
     ExtractionMethod.EMBEDDINGS: MethodMetrics(
         precision=0.70,  # Precisión media, puede confundir semejanzas
-        recall=0.80,     # Alto recall, detecta muchos casos
+        recall=0.80,  # Alto recall, detecta muchos casos
         cost=0.4,
-        layer=ExtractionLayer.SEMANTIC
+        layer=ExtractionLayer.SEMANTIC,
     ),
     ExtractionMethod.SEMANTIC_LLM: MethodMetrics(
         precision=0.90,  # Alta precisión con buen contexto
-        recall=0.85,     # Alto recall
-        cost=1.0,        # Más costoso
-        layer=ExtractionLayer.LLM
+        recall=0.85,  # Alto recall
+        cost=1.0,  # Más costoso
+        layer=ExtractionLayer.LLM,
     ),
 }
 
@@ -210,7 +210,7 @@ class ResultAggregator:
         entity_name: str,
         attr_type: AttributeType,
         attrs: list[ExtractedAttribute],
-    ) -> Optional[AggregatedAttribute]:
+    ) -> AggregatedAttribute | None:
         """
         Resuelve un grupo de atributos usando votación multicapa.
 
@@ -306,7 +306,10 @@ class ResultAggregator:
             consensus = "contested"
             # Verificar si el ganador incluye método de alta precisión
             has_high_precision = any(
-                METHOD_METRICS.get(attr.extraction_method, MethodMetrics(0.5, 0.5, 0.5, ExtractionLayer.SYNTACTIC)).precision >= 0.85
+                METHOD_METRICS.get(
+                    attr.extraction_method, MethodMetrics(0.5, 0.5, 0.5, ExtractionLayer.SYNTACTIC)
+                ).precision
+                >= 0.85
                 for attr, _ in best_attrs
             )
             if has_high_precision:
@@ -337,10 +340,7 @@ class ResultAggregator:
                 is_negated = attr.is_negated
 
         # Crear lista de fuentes
-        sources = [
-            (attr.extraction_method, conf)
-            for attr, conf in best_attrs
-        ]
+        sources = [(attr.extraction_method, conf) for attr, conf in best_attrs]
 
         return AggregatedAttribute(
             entity_name=original_entity,
@@ -373,11 +373,13 @@ class ResultAggregator:
                 values[attr.value.lower()].append(attr.extraction_method.value)
 
             if len(values) > 1:
-                conflicts.append({
-                    "entity": entity,
-                    "attribute_type": attr_type.value,
-                    "values": {v: methods for v, methods in values.items()},
-                })
+                conflicts.append(
+                    {
+                        "entity": entity,
+                        "attribute_type": attr_type.value,
+                        "values": dict(values.items()),
+                    }
+                )
 
         return conflicts
 

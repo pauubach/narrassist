@@ -14,16 +14,14 @@ Estrategias de detección:
 
 import logging
 import threading
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
 
+from ..core.errors import ErrorSeverity, NarrativeError
 from ..core.result import Result
-from ..core.errors import NarrativeError, ErrorSeverity
 from ..nlp.attributes import (
-    ExtractedAttribute,
     AttributeKey,
-    AttributeCategory,
+    ExtractedAttribute,
 )
 
 logger = logging.getLogger(__name__)
@@ -65,7 +63,7 @@ ATTRIBUTE_KEY_TRANSLATIONS = {k: v[0] for k, v in ATTRIBUTE_KEY_INFO.items()}
 
 def get_attribute_display_name(attr_key: "AttributeKey") -> str:
     """Obtiene el nombre traducido de un atributo."""
-    key_value = attr_key.value if hasattr(attr_key, 'value') else str(attr_key)
+    key_value = attr_key.value if hasattr(attr_key, "value") else str(attr_key)
     info = ATTRIBUTE_KEY_INFO.get(key_value)
     if info:
         return info[0]
@@ -74,7 +72,7 @@ def get_attribute_display_name(attr_key: "AttributeKey") -> str:
 
 def get_attribute_gender(attr_key: "AttributeKey") -> str:
     """Obtiene el género gramatical de un atributo ('m' o 'f')."""
-    key_value = attr_key.value if hasattr(attr_key, 'value') else str(attr_key)
+    key_value = attr_key.value if hasattr(attr_key, "value") else str(attr_key)
     info = ATTRIBUTE_KEY_INFO.get(key_value)
     return info[1] if info else "m"  # masculino por defecto
 
@@ -114,10 +112,10 @@ class AttributeInconsistency:
     entity_id: int
     attribute_key: AttributeKey
     value1: str
-    value1_chapter: Optional[int]
+    value1_chapter: int | None
     value1_excerpt: str
     value2: str
-    value2_chapter: Optional[int]
+    value2_chapter: int | None
     value2_excerpt: str
     value1_position: int = 0
     value2_position: int = 0
@@ -152,15 +150,14 @@ class ConsistencyCheckError(NarrativeError):
     original_error: str = ""
     message: str = ""
     severity: ErrorSeverity = ErrorSeverity.RECOVERABLE
-    user_message: Optional[str] = None
+    user_message: str | None = None
 
     def __post_init__(self):
         if not self.message:
             self.message = f"Consistency check error: {self.original_error}"
         if not self.user_message:
             self.user_message = (
-                "Error al verificar consistencia. "
-                "Se continuará con los resultados parciales."
+                "Error al verificar consistencia. Se continuará con los resultados parciales."
             )
         super().__post_init__()
 
@@ -177,14 +174,24 @@ class ConsistencyCheckError(NarrativeError):
 # Solo los casos más comunes - spaCy es preferible
 _FALLBACK_LEMMAS: dict[str, str] = {
     # Build - femeninos y plurales comunes
-    "alta": "alto", "altas": "alto", "altos": "alto",
-    "baja": "bajo", "bajas": "bajo", "bajos": "bajo",
-    "bajita": "bajito", "bajitas": "bajito", "bajitos": "bajito",
+    "alta": "alto",
+    "altas": "alto",
+    "altos": "alto",
+    "baja": "bajo",
+    "bajas": "bajo",
+    "bajos": "bajo",
+    "bajita": "bajito",
+    "bajitas": "bajito",
+    "bajitos": "bajito",
     # Colores - plurales
-    "verdes": "verde", "azules": "azul", "marrones": "marrón",
-    "negros": "negro", "negras": "negro",
+    "verdes": "verde",
+    "azules": "azul",
+    "marrones": "marrón",
+    "negros": "negro",
+    "negras": "negro",
     # Personalidad
-    "valientes": "valiente", "cobardes": "cobarde",
+    "valientes": "valiente",
+    "cobardes": "cobarde",
 }
 
 # Cache de lemas para evitar recalcular
@@ -200,6 +207,7 @@ def _get_spacy_for_lemmas():
         _spacy_checked = True
         try:
             from ..nlp.spacy_gpu import load_spacy_model
+
             _spacy_nlp = load_spacy_model()
             logger.debug("spaCy cargado para lematización")
         except Exception as e:
@@ -299,12 +307,12 @@ def is_temporal_attribute(attr_key: AttributeKey, value: str) -> bool:
 
     # Atributos que son inherentemente permanentes
     permanent_keys = {
-        AttributeKey.EYE_COLOR,    # Color de ojos no cambia (excepto lentillas)
-        AttributeKey.HAIR_COLOR,   # El color natural es relevante
-        AttributeKey.HEIGHT,       # La altura no cambia
-        AttributeKey.BUILD,        # La constitución puede cambiar pero lentamente
-        AttributeKey.AGE,          # La edad es permanente en un momento dado
-        AttributeKey.SKIN,         # Color de piel
+        AttributeKey.EYE_COLOR,  # Color de ojos no cambia (excepto lentillas)
+        AttributeKey.HAIR_COLOR,  # El color natural es relevante
+        AttributeKey.HEIGHT,  # La altura no cambia
+        AttributeKey.BUILD,  # La constitución puede cambiar pero lentamente
+        AttributeKey.AGE,  # La edad es permanente en un momento dado
+        AttributeKey.SKIN,  # Color de piel
         AttributeKey.DISTINCTIVE_FEATURE,  # Cicatrices, tatuajes, lunares
     }
 
@@ -390,9 +398,7 @@ def _are_synonyms(v1: str, v2: str, attr_key: AttributeKey) -> bool:
     # Check both directions
     if v1 in synonyms and v2 in synonyms.get(v1, set()):
         return True
-    if v2 in synonyms and v1 in synonyms.get(v2, set()):
-        return True
-    return False
+    return bool(v2 in synonyms and v1 in synonyms.get(v2, set()))
 
 
 # =============================================================================
@@ -541,6 +547,7 @@ class AttributeConsistencyChecker:
         if self._embeddings_model is None and self.use_embeddings:
             try:
                 from ..nlp.embeddings import get_embeddings_model
+
                 self._embeddings_model = get_embeddings_model()
             except Exception as e:
                 logger.warning(f"No se pudo cargar modelo de embeddings: {e}")
@@ -561,7 +568,7 @@ class AttributeConsistencyChecker:
         entidad (uno es prefijo del otro Y ambos aparecen en el mismo contexto).
         """
         # Extraer todos los nombres únicos
-        all_names = set(attr.entity_name.lower() for attr in attributes)
+        all_names = {attr.entity_name.lower() for attr in attributes}
 
         # Crear mapeo - cada nombre se mapea a sí mismo por defecto
         mapping: dict[str, str] = {name: name for name in all_names}
@@ -588,8 +595,7 @@ class AttributeConsistencyChecker:
                     # Verificar que no haya OTRO nombre completo que empiece con este primer nombre
                     # Ej: Si hay "Juan Pérez" y "Juan García", no agrupar "Juan" con ninguno
                     conflicting_names = [
-                        n for n in all_names
-                        if n != full_name and n.startswith(first_word + " ")
+                        n for n in all_names if n != full_name and n.startswith(first_word + " ")
                     ]
 
                     if not conflicting_names:
@@ -669,24 +675,30 @@ class AttributeConsistencyChecker:
 
             for attr in attributes:
                 # Usar nombre normalizado para agrupar
-                entity_key = normalized_names.get(attr.entity_name.lower(), attr.entity_name.lower())
+                entity_key = normalized_names.get(
+                    attr.entity_name.lower(), attr.entity_name.lower()
+                )
                 key = (entity_key, attr.key)
                 if key not in grouped:
                     grouped[key] = []
                 grouped[key].append(attr)
 
-            logger.debug(f"Grouped {len(attributes)} attributes into {len(grouped)} entity-attribute pairs")
+            logger.debug(
+                f"Grouped {len(attributes)} attributes into {len(grouped)} entity-attribute pairs"
+            )
 
             # Buscar inconsistencias en cada grupo
             for (entity_name, attr_key), attrs in grouped.items():
                 if len(attrs) < 2:
                     continue
 
-                logger.debug(f"Checking {entity_name}.{attr_key.value}: {len(attrs)} values - {[a.value for a in attrs]}")
+                logger.debug(
+                    f"Checking {entity_name}.{attr_key.value}: {len(attrs)} values - {[a.value for a in attrs]}"
+                )
 
                 # Comparar cada par de atributos
                 for i, attr1 in enumerate(attrs):
-                    for attr2 in attrs[i + 1:]:
+                    for attr2 in attrs[i + 1 :]:
                         # Saltar si son el mismo valor
                         if attr1.value.lower() == attr2.value.lower():
                             logger.debug(f"  Skipping {attr1.value} == {attr2.value} (same value)")
@@ -694,31 +706,41 @@ class AttributeConsistencyChecker:
 
                         # Saltar si ambos están negados (no son afirmaciones)
                         if attr1.is_negated and attr2.is_negated:
-                            logger.debug(f"  Skipping {attr1.value} vs {attr2.value} (both negated)")
+                            logger.debug(
+                                f"  Skipping {attr1.value} vs {attr2.value} (both negated)"
+                            )
                             continue
 
                         # Saltar atributos temporales que pueden cambiar
-                        if is_temporal_attribute(attr_key, attr1.value) or is_temporal_attribute(attr_key, attr2.value):
-                            logger.debug(f"  Skipping {attr1.value} vs {attr2.value} (temporal attribute)")
+                        if is_temporal_attribute(attr_key, attr1.value) or is_temporal_attribute(
+                            attr_key, attr2.value
+                        ):
+                            logger.debug(
+                                f"  Skipping {attr1.value} vs {attr2.value} (temporal attribute)"
+                            )
                             continue
 
                         # Calcular confianza de inconsistencia
-                        confidence, inc_type = self._calculate_inconsistency(
-                            attr1, attr2, attr_key
-                        )
+                        confidence, inc_type = self._calculate_inconsistency(attr1, attr2, attr_key)
 
-                        logger.debug(f"  Comparing {attr1.value} vs {attr2.value}: confidence={confidence:.2f}, type={inc_type.value}")
+                        logger.debug(
+                            f"  Comparing {attr1.value} vs {attr2.value}: confidence={confidence:.2f}, type={inc_type.value}"
+                        )
 
                         if confidence >= self.min_confidence:
                             explanation = self._generate_explanation(
                                 attr_key, attr1, attr2, inc_type, confidence
                             )
 
-                            logger.info(f"INCONSISTENCY DETECTED: {entity_name}.{attr_key.value} '{attr1.value}' vs '{attr2.value}' (confidence: {confidence:.2f})")
+                            logger.info(
+                                f"INCONSISTENCY DETECTED: {entity_name}.{attr_key.value} '{attr1.value}' vs '{attr2.value}' (confidence: {confidence:.2f})"
+                            )
 
                             # Usar el nombre canónico para que coincida con entity_map
                             # attr1.entity_name podría ser "María" pero entity_name es "maría sánchez"
-                            canonical_name = self._get_canonical_name(entity_name, attr1.entity_name, attr2.entity_name)
+                            canonical_name = self._get_canonical_name(
+                                entity_name, attr1.entity_name, attr2.entity_name
+                            )
                             inconsistencies.append(
                                 AttributeInconsistency(
                                     entity_name=canonical_name,
@@ -842,7 +864,7 @@ class AttributeConsistencyChecker:
         self,
         text1: str,
         text2: str,
-    ) -> Optional[float]:
+    ) -> float | None:
         """
         Calcula similitud semántica usando embeddings.
 
@@ -858,6 +880,7 @@ class AttributeConsistencyChecker:
 
             # Similitud coseno
             import numpy as np
+
             dot_product = np.dot(embeddings[0], embeddings[1])
             norm1 = np.linalg.norm(embeddings[0])
             norm2 = np.linalg.norm(embeddings[1])
@@ -930,10 +953,7 @@ class AttributeConsistencyChecker:
             Lista de inconsistencias encontradas
         """
         # Filtrar atributos de la entidad
-        entity_attrs = [
-            a for a in attributes
-            if a.entity_name.lower() == entity_name.lower()
-        ]
+        entity_attrs = [a for a in attributes if a.entity_name.lower() == entity_name.lower()]
 
         result = self.check_consistency(entity_attrs)
         return result.value if result.is_success else []
@@ -942,6 +962,7 @@ class AttributeConsistencyChecker:
 # =============================================================================
 # Funciones de conveniencia
 # =============================================================================
+
 
 def check_attribute_consistency(
     attributes: list[ExtractedAttribute],
@@ -964,7 +985,7 @@ def check_attribute_consistency(
 # =============================================================================
 
 _checker_lock = threading.Lock()
-_consistency_checker: Optional[AttributeConsistencyChecker] = None
+_consistency_checker: AttributeConsistencyChecker | None = None
 
 
 def get_consistency_checker(

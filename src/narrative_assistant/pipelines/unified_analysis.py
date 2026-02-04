@@ -42,15 +42,14 @@ FASE 6 - CONSISTENCIA Y ALERTAS:
 import logging
 import threading
 import unicodedata
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from types import MappingProxyType
-from typing import Any, Callable, Optional
 
-from ..core.errors import NarrativeError, ErrorSeverity, PhaseError, PhasePreconditionError
+from ..core.errors import ErrorSeverity, NarrativeError, PhaseError, PhasePreconditionError
 from ..core.memory_monitor import MemoryMonitor
 from ..core.result import Result
 
@@ -70,6 +69,7 @@ def _normalize_key(text: str) -> str:
 
 class AnalysisPhase(Enum):
     """Fases del análisis."""
+
     PARSING = "parsing"
     STRUCTURE = "structure"
     BASE_EXTRACTION = "base_extraction"
@@ -87,9 +87,12 @@ class UnifiedConfig:
 
     Cada fase puede habilitarse/deshabilitarse independientemente.
     """
+
     # Fases principales
     run_structure: bool = True
-    run_document_classification: bool = True  # Clasificar tipo de documento (ficción/ensayo/técnico)
+    run_document_classification: bool = (
+        True  # Clasificar tipo de documento (ficción/ensayo/técnico)
+    )
     run_dialogue_detection: bool = True
     run_ner: bool = True
     run_coreference: bool = True
@@ -157,26 +160,17 @@ class UnifiedConfig:
 
         # entity_fusion requiere NER
         if self.run_entity_fusion and not self.run_ner:
-            logger.warning(
-                "run_entity_fusion requiere run_ner. "
-                "Desactivando run_entity_fusion."
-            )
+            logger.warning("run_entity_fusion requiere run_ner. Desactivando run_entity_fusion.")
             self.run_entity_fusion = False
 
         # coreference requiere NER
         if self.run_coreference and not self.run_ner:
-            logger.warning(
-                "run_coreference requiere run_ner. "
-                "Desactivando run_coreference."
-            )
+            logger.warning("run_coreference requiere run_ner. Desactivando run_coreference.")
             self.run_coreference = False
 
         # attributes requiere NER
         if self.run_attributes and not self.run_ner:
-            logger.warning(
-                "run_attributes requiere run_ner. "
-                "Desactivando run_attributes."
-            )
+            logger.warning("run_attributes requiere run_ner. Desactivando run_attributes.")
             self.run_attributes = False
 
         # relationships requiere coreference o NER
@@ -189,18 +183,12 @@ class UnifiedConfig:
 
         # knowledge requiere NER y relationships
         if self.run_knowledge and not self.run_ner:
-            logger.warning(
-                "run_knowledge requiere run_ner. "
-                "Desactivando run_knowledge."
-            )
+            logger.warning("run_knowledge requiere run_ner. Desactivando run_knowledge.")
             self.run_knowledge = False
 
         # consistency requiere attributes
         if self.run_consistency and not self.run_attributes:
-            logger.warning(
-                "run_consistency requiere run_attributes. "
-                "Desactivando run_consistency."
-            )
+            logger.warning("run_consistency requiere run_attributes. Desactivando run_consistency.")
             self.run_consistency = False
 
         # temporal_consistency requiere run_temporal
@@ -224,9 +212,7 @@ class UnifiedConfig:
         if not self.use_llm:
             # Knowledge analysis depende mucho del LLM
             if self.run_knowledge:
-                logger.info(
-                    "run_knowledge sin LLM tendrá calidad reducida (~30% menos)."
-                )
+                logger.info("run_knowledge sin LLM tendrá calidad reducida (~30% menos).")
 
     @classmethod
     def express(cls) -> "UnifiedConfig":
@@ -355,6 +341,7 @@ class AnalysisContext:
 
     Permite que cada fase acceda a los resultados de fases anteriores.
     """
+
     # IDs
     project_id: int = 0
     session_id: int = 0
@@ -363,7 +350,7 @@ class AnalysisContext:
     document_path: str = ""
     full_text: str = ""
     fingerprint: str = ""
-    raw_document: Optional[any] = None  # RawDocument parseado
+    raw_document: any | None = None  # RawDocument parseado
     document_type: str = "unknown"  # Tipo de documento detectado
     document_classification: dict = field(default_factory=dict)  # Clasificación completa
 
@@ -433,7 +420,7 @@ class AnalysisContext:
     start_time: datetime = field(default_factory=datetime.now)
     phase_times: dict = field(default_factory=dict)
 
-    def get_entity_id(self, name: str) -> Optional[int]:
+    def get_entity_id(self, name: str) -> int | None:
         """Acceso thread-safe a entity_map."""
         with self._entity_map_lock:
             return self.entity_map.get(name.lower())
@@ -486,7 +473,7 @@ class UnifiedReport:
 
     # Timing
     start_time: datetime = field(default_factory=datetime.now)
-    end_time: Optional[datetime] = None
+    end_time: datetime | None = None
     phase_times: dict = field(default_factory=dict)
 
     @property
@@ -507,7 +494,7 @@ class UnifiedAnalysisPipeline:
     - Fases opcionales para flexibilidad
     """
 
-    def __init__(self, config: Optional[UnifiedConfig] = None):
+    def __init__(self, config: UnifiedConfig | None = None):
         self.config = config or UnifiedConfig()
         self._executor = None
         self._is_low_vram = False
@@ -518,15 +505,15 @@ class UnifiedAnalysisPipeline:
 
         # Detectar si estamos en un sistema con poca VRAM
         self._detect_hardware_limits()
-    
+
     def _detect_hardware_limits(self) -> None:
         """Detecta limitaciones de hardware y ajusta configuración."""
         try:
-            from ..core.device import get_device_detector, MIN_SAFE_VRAM_GB
-            
+            from ..core.device import MIN_SAFE_VRAM_GB, get_device_detector
+
             detector = get_device_detector()
             device = detector.detect_best_device("auto")
-            
+
             if device.is_low_vram:
                 self._is_low_vram = True
                 # Reducir workers paralelos para evitar saturación de GPU
@@ -538,12 +525,13 @@ class UnifiedAnalysisPipeline:
                     self.config.max_workers = 2
         except Exception as e:
             logger.debug(f"Error detecting hardware limits: {e}")
-    
+
     def _clear_gpu_memory_if_needed(self) -> None:
         """Limpia memoria GPU en sistemas con poca VRAM."""
         if self._is_low_vram:
             try:
                 from ..core.device import clear_gpu_memory
+
                 clear_gpu_memory()
                 logger.debug("GPU memory cleared between phases")
             except Exception as e:
@@ -552,8 +540,8 @@ class UnifiedAnalysisPipeline:
     def analyze(
         self,
         document_path: str | Path,
-        project_name: Optional[str] = None,
-        progress_callback: Optional[Callable[[float, str], None]] = None,
+        project_name: str | None = None,
+        progress_callback: Callable[[float, str], None] | None = None,
     ) -> Result[UnifiedReport]:
         """
         Ejecuta el análisis completo unificado.
@@ -580,7 +568,9 @@ class UnifiedAnalysisPipeline:
                 progress_callback(0.0, "Parseando documento...")
 
             phase_result = self._run_phase(
-                "parsing", self._phase_1_parsing, context,
+                "parsing",
+                self._phase_1_parsing,
+                context,
                 args=(path, project_name, context),
                 is_fatal=True,
             )
@@ -598,7 +588,9 @@ class UnifiedAnalysisPipeline:
                 context.errors.append(precondition.error)
             else:
                 self._run_phase(
-                    "base_extraction", self._phase_2_base_extraction, context,
+                    "base_extraction",
+                    self._phase_2_base_extraction,
+                    context,
                     args=(context,),
                 )
             self._clear_gpu_memory_if_needed()
@@ -612,7 +604,9 @@ class UnifiedAnalysisPipeline:
                 context.errors.append(precondition.error)
             else:
                 self._run_phase(
-                    "resolution", self._phase_3_resolution, context,
+                    "resolution",
+                    self._phase_3_resolution,
+                    context,
                     args=(context,),
                 )
             self._clear_gpu_memory_if_needed()
@@ -626,7 +620,9 @@ class UnifiedAnalysisPipeline:
                 context.errors.append(precondition.error)
             else:
                 self._run_phase(
-                    "deep_extraction", self._phase_4_deep_extraction, context,
+                    "deep_extraction",
+                    self._phase_4_deep_extraction,
+                    context,
                     args=(context,),
                 )
             self._clear_gpu_memory_if_needed()
@@ -641,7 +637,9 @@ class UnifiedAnalysisPipeline:
                 context.errors.append(precondition.error)
             else:
                 self._run_phase(
-                    "quality", self._phase_5_quality, context,
+                    "quality",
+                    self._phase_5_quality,
+                    context,
                     args=(context,),
                 )
             self._clear_gpu_memory_if_needed()
@@ -655,7 +653,9 @@ class UnifiedAnalysisPipeline:
                 context.errors.append(precondition.error)
             else:
                 self._run_phase(
-                    "consistency", self._phase_6_consistency, context,
+                    "consistency",
+                    self._phase_6_consistency,
+                    context,
                     args=(context,),
                 )
 
@@ -780,9 +780,7 @@ class UnifiedAnalysisPipeline:
                 return Result.failure(phase_error)
             return Result.failure(phase_error)
 
-    def _check_precondition_text(
-        self, context: AnalysisContext, phase_name: str
-    ) -> Result[None]:
+    def _check_precondition_text(self, context: AnalysisContext, phase_name: str) -> Result[None]:
         """Verifica que el texto del documento existe."""
         if not context.full_text or len(context.full_text.strip()) == 0:
             error = PhasePreconditionError(
@@ -830,18 +828,14 @@ class UnifiedAnalysisPipeline:
     def _summarize_phase_output(self, context: AnalysisContext, phase_name: str) -> str:
         """Resumen de datos de salida tras una fase (para diagnóstico)."""
         summaries = {
-            "parsing": (
-                f"text={len(context.full_text)} chars, "
-                f"chapters={len(context.chapters)}"
-            ),
+            "parsing": (f"text={len(context.full_text)} chars, chapters={len(context.chapters)}"),
             "base_extraction": f"entities={len(context.entities)}",
             "resolution": (
                 f"coref_chains={len(context.coreference_chains)}, "
                 f"entity_map={len(context.entity_map)} entries"
             ),
             "deep_extraction": (
-                f"attributes={len(context.attributes)}, "
-                f"relationships={len(context.relationships)}"
+                f"attributes={len(context.attributes)}, relationships={len(context.relationships)}"
             ),
             "quality": (
                 f"spelling={len(context.spelling_issues)}, "
@@ -871,8 +865,7 @@ class UnifiedAnalysisPipeline:
 
         if skipped:
             logger.warning(
-                f"Skipped phases: {skipped}. "
-                "Results may be incomplete. Check errors for details."
+                f"Skipped phases: {skipped}. Results may be incomplete. Check errors for details."
             )
 
         for phase, elapsed in sorted(context.phase_times.items()):
@@ -899,10 +892,7 @@ class UnifiedAnalysisPipeline:
     # =========================================================================
 
     def _phase_1_parsing(
-        self,
-        path: Path,
-        project_name: Optional[str],
-        context: AnalysisContext
+        self, path: Path, project_name: str | None, context: AnalysisContext
     ) -> Result[None]:
         """
         Fase 1: Parsing, estructura y detección de diálogos.
@@ -916,13 +906,12 @@ class UnifiedAnalysisPipeline:
 
         # 1.1 Validar y parsear
         if not path.exists():
-            return Result.failure(NarrativeError(
-                message=f"Document not found: {path}",
-                severity=ErrorSeverity.FATAL
-            ))
+            return Result.failure(
+                NarrativeError(message=f"Document not found: {path}", severity=ErrorSeverity.FATAL)
+            )
 
         try:
-            from ..parsers.base import get_parser, detect_format
+            from ..parsers.base import detect_format, get_parser
             from ..persistence.document_fingerprint import generate_fingerprint
             from ..persistence.project import ProjectManager
             from ..persistence.session import SessionManager
@@ -984,10 +973,9 @@ class UnifiedAnalysisPipeline:
             return Result.success(None)
 
         except Exception as e:
-            return Result.failure(NarrativeError(
-                message=f"Parsing failed: {str(e)}",
-                severity=ErrorSeverity.FATAL
-            ))
+            return Result.failure(
+                NarrativeError(message=f"Parsing failed: {str(e)}", severity=ErrorSeverity.FATAL)
+            )
 
     def _detect_structure(self, context: AnalysisContext) -> None:
         """Detectar capítulos y escenas."""
@@ -997,17 +985,19 @@ class UnifiedAnalysisPipeline:
             detector = StructureDetector()
             result = detector.detect(context.raw_document)
 
-            if result.is_success and hasattr(result.value, 'chapters'):
+            if result.is_success and hasattr(result.value, "chapters"):
                 for ch in result.value.chapters:
                     content = ch.get_text(context.full_text)
-                    context.chapters.append({
-                        "number": ch.number,
-                        "title": ch.title,
-                        "content": content,
-                        "start_char": ch.start_char,
-                        "end_char": ch.end_char,
-                        "word_count": len(content.split()),
-                    })
+                    context.chapters.append(
+                        {
+                            "number": ch.number,
+                            "title": ch.title,
+                            "content": content,
+                            "start_char": ch.start_char,
+                            "end_char": ch.end_char,
+                            "word_count": len(content.split()),
+                        }
+                    )
                 context.stats["chapters"] = len(context.chapters)
 
         except Exception as e:
@@ -1094,13 +1084,17 @@ class UnifiedAnalysisPipeline:
 
             if result.is_success and result.value.dialogues:
                 for dialogue in result.value.dialogues:
-                    context.dialogues.append({
-                        "text": dialogue.text,
-                        "start_char": dialogue.start_char,
-                        "end_char": dialogue.end_char,
-                        "type": dialogue.dialogue_type.value if hasattr(dialogue.dialogue_type, 'value') else str(dialogue.dialogue_type),
-                        "speaker_hint": dialogue.speaker_hint,
-                    })
+                    context.dialogues.append(
+                        {
+                            "text": dialogue.text,
+                            "start_char": dialogue.start_char,
+                            "end_char": dialogue.end_char,
+                            "type": dialogue.dialogue_type.value
+                            if hasattr(dialogue.dialogue_type, "value")
+                            else str(dialogue.dialogue_type),
+                            "speaker_hint": dialogue.speaker_hint,
+                        }
+                    )
 
                     # Extraer speaker hints para NER
                     if dialogue.speaker_hint:
@@ -1108,7 +1102,9 @@ class UnifiedAnalysisPipeline:
 
                 context.stats["dialogues"] = len(context.dialogues)
                 context.stats["speaker_hints"] = len(context.speaker_hints)
-                logger.info(f"Detected {len(context.dialogues)} dialogues, {len(context.speaker_hints)} speaker hints")
+                logger.info(
+                    f"Detected {len(context.dialogues)} dialogues, {len(context.speaker_hints)} speaker hints"
+                )
 
         except Exception as e:
             logger.warning(f"Dialogue detection failed: {e}")
@@ -1136,10 +1132,11 @@ class UnifiedAnalysisPipeline:
             return Result.success(None)
 
         except Exception as e:
-            return Result.failure(NarrativeError(
-                message=f"Base extraction failed: {str(e)}",
-                severity=ErrorSeverity.RECOVERABLE
-            ))
+            return Result.failure(
+                NarrativeError(
+                    message=f"Base extraction failed: {str(e)}", severity=ErrorSeverity.RECOVERABLE
+                )
+            )
 
     def _run_enhanced_ner(self, context: AnalysisContext) -> None:
         """
@@ -1161,9 +1158,9 @@ class UnifiedAnalysisPipeline:
         - Capítulos muy grandes (>max_chapter_chars_for_chunking): usa chunk_for_spacy()
         """
         try:
-            from ..nlp.ner import NERExtractor
+            from ..entities.models import Entity, EntityImportance, EntityMention, EntityType
             from ..entities.repository import get_entity_repository
-            from ..entities.models import Entity, EntityType, EntityImportance, EntityMention
+            from ..nlp.ner import NERExtractor
             from ..persistence.chapter import ChapterRepository
 
             entity_repo = get_entity_repository()
@@ -1177,9 +1174,7 @@ class UnifiedAnalysisPipeline:
             extractor = NERExtractor()
 
             # Decidir estrategia de procesamiento
-            extracted_mentions = self._extract_ner_with_chunking(
-                extractor, context
-            )
+            extracted_mentions = self._extract_ner_with_chunking(extractor, context)
 
             if not extracted_mentions:
                 logger.info("No entities extracted from NER")
@@ -1200,13 +1195,16 @@ class UnifiedAnalysisPipeline:
                 # Agrupar menciones por nombre canónico (case-insensitive)
                 # Cada grupo tendrá: label, todas las menciones, confianza máxima
                 from collections import defaultdict
-                entity_groups: dict[str, dict] = defaultdict(lambda: {
-                    "label": None,
-                    "mentions": [],
-                    "max_confidence": 0.0,
-                    "canonical_text": None,  # Texto original más largo/completo
-                    "surface_variants": set(),  # Variantes observadas para aliases
-                })
+
+                entity_groups: dict[str, dict] = defaultdict(
+                    lambda: {
+                        "label": None,
+                        "mentions": [],
+                        "max_confidence": 0.0,
+                        "canonical_text": None,  # Texto original más largo/completo
+                        "surface_variants": set(),  # Variantes observadas para aliases
+                    }
+                )
 
                 for mention in extracted_mentions:
                     raw_canonical = mention.canonical_form or mention.text.strip().lower()
@@ -1220,7 +1218,9 @@ class UnifiedAnalysisPipeline:
 
                     # Guardar el texto original (preferir el más largo/completo)
                     surface = mention.text.strip()
-                    if group["canonical_text"] is None or len(surface) > len(group["canonical_text"]):
+                    if group["canonical_text"] is None or len(surface) > len(
+                        group["canonical_text"]
+                    ):
                         group["canonical_text"] = surface
 
                     # Registrar variante de superficie para aliases
@@ -1230,22 +1230,26 @@ class UnifiedAnalysisPipeline:
                     group["max_confidence"] = max(group["max_confidence"], mention.confidence)
 
                     # Añadir la mención con su posición
-                    group["mentions"].append({
-                        "surface_form": surface,
-                        "start_char": mention.start_char,
-                        "end_char": mention.end_char,
-                        "confidence": mention.confidence,
-                        "source": mention.source,
-                    })
+                    group["mentions"].append(
+                        {
+                            "surface_form": surface,
+                            "start_char": mention.start_char,
+                            "end_char": mention.end_char,
+                            "confidence": mention.confidence,
+                            "source": mention.source,
+                        }
+                    )
 
                 # Boost de confianza para entidades confirmadas por diálogos
-                for position, speaker in context.speaker_hints.items():
+                for _position, speaker in context.speaker_hints.items():
                     speaker_key = _normalize_key(speaker)
                     if speaker_key in entity_groups:
                         entity_groups[speaker_key]["max_confidence"] = min(
                             1.0, entity_groups[speaker_key]["max_confidence"] + 0.1
                         )
-                        logger.debug(f"Boosted confidence for '{speaker}' from dialogue attribution")
+                        logger.debug(
+                            f"Boosted confidence for '{speaker}' from dialogue attribution"
+                        )
 
                 # Convertir y persistir entidades
                 persisted = []
@@ -1255,7 +1259,7 @@ class UnifiedAnalysisPipeline:
                 for canonical_name, group in entity_groups.items():
                     # Convertir label a EntityType
                     label = group["label"]
-                    label_str = str(label.value if hasattr(label, 'value') else label).upper()
+                    label_str = str(label.value if hasattr(label, "value") else label).upper()
                     # Heurística para MISC: si parece nombre propio (2-3 palabras capitalizadas), es CHARACTER
                     canonical_text = group.get("canonical_text") or canonical_name
                     if label_str == "PER":
@@ -1276,10 +1280,7 @@ class UnifiedAnalysisPipeline:
 
                     # Construir aliases a partir de variantes de superficie observadas
                     final_canonical = group["canonical_text"] or canonical_name
-                    aliases = sorted(
-                        v for v in group["surface_variants"]
-                        if v != final_canonical
-                    )
+                    aliases = sorted(v for v in group["surface_variants"] if v != final_canonical)
 
                     # Crear Entity object con el nombre canónico más completo
                     entity = Entity(
@@ -1288,7 +1289,9 @@ class UnifiedAnalysisPipeline:
                         entity_type=entity_type,
                         canonical_name=final_canonical,
                         aliases=aliases,
-                        importance=EntityImportance.PRIMARY if group["max_confidence"] > 0.8 else EntityImportance.SECONDARY,
+                        importance=EntityImportance.PRIMARY
+                        if group["max_confidence"] > 0.8
+                        else EntityImportance.SECONDARY,
                     )
 
                     try:
@@ -1305,8 +1308,8 @@ class UnifiedAnalysisPipeline:
                                 # Extraer contexto (50 chars antes y después)
                                 context_start = max(0, m["start_char"] - 50)
                                 context_end = min(len(context.full_text), m["end_char"] + 50)
-                                context_before = context.full_text[context_start:m["start_char"]]
-                                context_after = context.full_text[m["end_char"]:context_end]
+                                context_before = context.full_text[context_start : m["start_char"]]
+                                context_after = context.full_text[m["end_char"] : context_end]
 
                                 mention = EntityMention(
                                     entity_id=entity_id,
@@ -1326,9 +1329,13 @@ class UnifiedAnalysisPipeline:
                                 saved_count = entity_repo.create_mentions_batch(mentions_to_save)
                                 total_mentions_saved += saved_count
                                 if saved_count:
-                                    mention_increments[entity_id] = mention_increments.get(entity_id, 0) + saved_count
+                                    mention_increments[entity_id] = (
+                                        mention_increments.get(entity_id, 0) + saved_count
+                                    )
                                     entity.mention_count = (entity.mention_count or 0) + saved_count
-                                    logger.debug(f"Saved {saved_count} mentions for entity '{entity.canonical_name}'")
+                                    logger.debug(
+                                        f"Saved {saved_count} mentions for entity '{entity.canonical_name}'"
+                                    )
 
                     except Exception as e:
                         logger.debug(f"Failed to persist entity '{canonical_name}': {e}")
@@ -1338,21 +1345,24 @@ class UnifiedAnalysisPipeline:
                         try:
                             entity_repo.increment_mention_count(entity_id, delta)
                         except Exception as inc_err:
-                            logger.warning(f"Failed to increment mention_count for entity {entity_id}: {inc_err}")
+                            logger.warning(
+                                f"Failed to increment mention_count for entity {entity_id}: {inc_err}"
+                            )
 
                 context.entities = persisted
                 context.entity_map = {e.canonical_name.lower(): e.id for e in persisted}
                 context.stats["entities_detected"] = len(persisted)
                 context.stats["mentions_saved"] = total_mentions_saved
 
-                logger.info(f"NER: {len(persisted)} entities, {total_mentions_saved} mentions saved")
+                logger.info(
+                    f"NER: {len(persisted)} entities, {total_mentions_saved} mentions saved"
+                )
 
         except Exception as e:
             logger.warning(f"Enhanced NER failed: {e}")
-            context.errors.append(NarrativeError(
-                message=f"NER failed: {str(e)}",
-                severity=ErrorSeverity.RECOVERABLE
-            ))
+            context.errors.append(
+                NarrativeError(message=f"NER failed: {str(e)}", severity=ErrorSeverity.RECOVERABLE)
+            )
 
     def _extract_ner_with_chunking(self, extractor, context: AnalysisContext) -> list:
         """
@@ -1378,7 +1388,7 @@ class UnifiedAnalysisPipeline:
             logger.info(f"NER: processing full text ({total_chars} chars)")
             result = extractor.extract_entities(context.full_text)
             if result.is_success:
-                return result.value.entities if hasattr(result.value, 'entities') else []
+                return result.value.entities if hasattr(result.value, "entities") else []
             return []
 
         # Documentos grandes con capítulos: procesar capítulo por capítulo
@@ -1400,7 +1410,9 @@ class UnifiedAnalysisPipeline:
             result = extractor.extract_entities(chapter_content)
 
             if result.is_success:
-                chapter_entities = result.value.entities if hasattr(result.value, 'entities') else []
+                chapter_entities = (
+                    result.value.entities if hasattr(result.value, "entities") else []
+                )
 
                 # Ajustar posiciones al texto completo (global offsets)
                 for entity in chapter_entities:
@@ -1460,8 +1472,7 @@ class UnifiedAnalysisPipeline:
                 all_markers = extractor.extract(context.full_text)
 
             context.temporal_markers = [
-                m.to_dict() if hasattr(m, "to_dict") else m
-                for m in all_markers
+                m.to_dict() if hasattr(m, "to_dict") else m for m in all_markers
             ]
 
             context.stats["temporal_markers"] = len(context.temporal_markers)
@@ -1500,15 +1511,16 @@ class UnifiedAnalysisPipeline:
             return Result.success(None)
 
         except Exception as e:
-            return Result.failure(NarrativeError(
-                message=f"Resolution failed: {str(e)}",
-                severity=ErrorSeverity.RECOVERABLE
-            ))
+            return Result.failure(
+                NarrativeError(
+                    message=f"Resolution failed: {str(e)}", severity=ErrorSeverity.RECOVERABLE
+                )
+            )
 
     def _run_coreference(self, context: AnalysisContext) -> None:
         """Ejecutar resolución de correferencias."""
         try:
-            from ..nlp.coreference_resolver import resolve_coreferences_voting, CorefConfig
+            from ..nlp.coreference_resolver import CorefConfig, resolve_coreferences_voting
 
             # Preparar datos de capítulos para correferencia
             chapters_data = None
@@ -1545,7 +1557,7 @@ class UnifiedAnalysisPipeline:
                 context.stats["coreference_chains"] = len(result.chains)
 
                 # Almacenar detalles de votación para exposición en API
-                if hasattr(result, 'voting_details') and result.voting_details:
+                if hasattr(result, "voting_details") and result.voting_details:
                     context.coref_voting_details = result.voting_details
 
         except Exception as e:
@@ -1558,8 +1570,9 @@ class UnifiedAnalysisPipeline:
 
         try:
             import json
-            from ..entities.repository import get_entity_repository
+
             from ..entities.models import EntityMention
+            from ..entities.repository import get_entity_repository
 
             entity_repo = get_entity_repository()
 
@@ -1567,13 +1580,13 @@ class UnifiedAnalysisPipeline:
             entity_name_to_id: dict[str, int] = {}
             for entity in context.entities:
                 entity_name_to_id[entity.canonical_name.lower()] = entity.id
-                for alias in (entity.aliases or []):
+                for alias in entity.aliases or []:
                     entity_name_to_id[alias.lower()] = entity.id
 
             mentions_to_save = []
             saved_count = 0
             mention_increments: dict[int, int] = {}
-            entity_lookup = {e.id: e for e in context.entities if getattr(e, 'id', None)}
+            entity_lookup = {e.id: e for e in context.entities if getattr(e, "id", None)}
 
             for (start, end), detail in context.coref_voting_details.items():
                 # Buscar entity_id del antecedente resuelto
@@ -1618,7 +1631,9 @@ class UnifiedAnalysisPipeline:
                 saved_count = entity_repo.create_mentions_batch(mentions_to_save)
                 if saved_count:
                     for mention in mentions_to_save:
-                        mention_increments[mention.entity_id] = mention_increments.get(mention.entity_id, 0) + 1
+                        mention_increments[mention.entity_id] = (
+                            mention_increments.get(mention.entity_id, 0) + 1
+                        )
                         entity_obj = entity_lookup.get(mention.entity_id)
                         if entity_obj:
                             entity_obj.mention_count = (entity_obj.mention_count or 0) + 1
@@ -1629,7 +1644,9 @@ class UnifiedAnalysisPipeline:
                     try:
                         entity_repo.increment_mention_count(entity_id, delta)
                     except Exception as inc_err:
-                        logger.warning(f"Failed to increment mention_count after coref for entity {entity_id}: {inc_err}")
+                        logger.warning(
+                            f"Failed to increment mention_count after coref for entity {entity_id}: {inc_err}"
+                        )
 
         except Exception as e:
             logger.warning(f"Failed to persist coref voting details: {e}")
@@ -1642,7 +1659,7 @@ class UnifiedAnalysisPipeline:
             # Pasar cadenas de correferencia para mejorar las sugerencias de fusión
             # Esto permite fusionar casos como "el Magistral" ↔ "Fermín" que
             # tienen baja similaridad textual pero son la misma persona según correferencia
-            coref_chains = getattr(context, 'coreference_chains', None)
+            coref_chains = getattr(context, "coreference_chains", None)
 
             result = run_automatic_fusion(
                 context.project_id,
@@ -1657,6 +1674,7 @@ class UnifiedAnalysisPipeline:
                 # Recargar entidades
                 if merged_count > 0:
                     from ..entities.repository import get_entity_repository
+
                     entity_repo = get_entity_repository()
                     context.entities = entity_repo.get_entities_by_project(context.project_id)
                     context.entity_map = {e.canonical_name.lower(): e.id for e in context.entities}
@@ -1674,15 +1692,22 @@ class UnifiedAnalysisPipeline:
         """
         try:
             from types import SimpleNamespace
-            from ..voice.speaker_attribution import SpeakerAttributor
+
             from ..entities.repository import get_entity_repository
+            from ..voice.speaker_attribution import SpeakerAttributor
 
             # Filtrar entidades de tipo personaje
             character_entities = [
-                e for e in context.entities
-                if hasattr(e, "entity_type") and (
-                    (e.entity_type.value if hasattr(e.entity_type, 'value') else str(e.entity_type))
-                    .upper() in ("CHARACTER", "PERSON", "PER")
+                e
+                for e in context.entities
+                if hasattr(e, "entity_type")
+                and (
+                    (
+                        e.entity_type.value
+                        if hasattr(e.entity_type, "value")
+                        else str(e.entity_type)
+                    ).upper()
+                    in ("CHARACTER", "PERSON", "PER")
                 )
             ]
 
@@ -1700,22 +1725,22 @@ class UnifiedAnalysisPipeline:
                 for entity in character_entities:
                     mentions = entity_repo.get_mentions_by_entity(entity.id)
                     for mention in mentions:
-                        entity_mentions.append(
-                            (entity.id, mention.start_char, mention.end_char)
-                        )
+                        entity_mentions.append((entity.id, mention.start_char, mention.end_char))
             except Exception as e:
                 logger.debug(f"Could not load entity mentions: {e}")
 
             # Convertir diálogos dict a objetos para compatibilidad con getattr()
             dialogue_objects = []
             for d in context.dialogues:
-                dialogue_objects.append(SimpleNamespace(
-                    text=d.get("text", ""),
-                    start_char=d.get("start_char", 0),
-                    end_char=d.get("end_char", 0),
-                    chapter=d.get("chapter", 1),
-                    speaker_hint=d.get("speaker_hint", ""),
-                ))
+                dialogue_objects.append(
+                    SimpleNamespace(
+                        text=d.get("text", ""),
+                        start_char=d.get("start_char", 0),
+                        end_char=d.get("end_char", 0),
+                        chapter=d.get("chapter", 1),
+                        speaker_hint=d.get("speaker_hint", ""),
+                    )
+                )
 
             # Atribuir diálogos
             attributions = attributor.attribute_dialogues(
@@ -1813,8 +1838,8 @@ class UnifiedAnalysisPipeline:
     def _extract_attributes(self, context: AnalysisContext) -> None:
         """Extraer atributos de entidades usando el sistema multi-método con votación."""
         try:
-            from ..nlp.attributes import get_attribute_extractor
             from ..entities.repository import get_entity_repository
+            from ..nlp.attributes import get_attribute_extractor
 
             # Cargar menciones de todas las entidades para resolución de pronombres
             entity_mentions = []
@@ -1896,17 +1921,21 @@ class UnifiedAnalysisPipeline:
     def _extract_relationships(self, context: AnalysisContext) -> None:
         """Extraer relaciones entre personajes usando clustering multi-técnica."""
         logger.info("[RELATIONSHIPS] Iniciando extracción de relaciones...")
-        logger.info(f"[RELATIONSHIPS] Entidades disponibles: {len(context.entities) if context.entities else 0}")
-        logger.info(f"[RELATIONSHIPS] Capítulos disponibles: {len(context.chapters) if context.chapters else 0}")
-        
+        logger.info(
+            f"[RELATIONSHIPS] Entidades disponibles: {len(context.entities) if context.entities else 0}"
+        )
+        logger.info(
+            f"[RELATIONSHIPS] Capítulos disponibles: {len(context.chapters) if context.chapters else 0}"
+        )
+
         if not context.entities:
             logger.warning("[RELATIONSHIPS] Sin entidades - abortando extracción de relaciones")
             return
-            
+
         if not context.chapters:
             logger.warning("[RELATIONSHIPS] Sin capítulos - abortando extracción de relaciones")
             return
-        
+
         try:
             from ..analysis.relationship_clustering import (
                 RelationshipClusteringEngine,
@@ -1933,17 +1962,27 @@ class UnifiedAnalysisPipeline:
                 entity_mentions = []
                 entities_with_mentions = 0
                 for entity in context.entities:
-                    if hasattr(entity, 'mentions') and entity.mentions:
+                    if hasattr(entity, "mentions") and entity.mentions:
                         entities_with_mentions += 1
                         for mention in entity.mentions:
-                            entity_mentions.append({
-                                "entity_id": entity.id,
-                                "entity_name": entity.canonical_name,
-                                "start_char": mention.start_char if hasattr(mention, 'start_char') else 0,
-                                "end_char": mention.end_char if hasattr(mention, 'end_char') else 0,
-                            })
-                logger.info(f"[RELATIONSHIPS] Entidades con menciones: {entities_with_mentions}/{len(context.entities)}")
-                logger.info(f"[RELATIONSHIPS] Total menciones para co-ocurrencia: {len(entity_mentions)}")
+                            entity_mentions.append(
+                                {
+                                    "entity_id": entity.id,
+                                    "entity_name": entity.canonical_name,
+                                    "start_char": mention.start_char
+                                    if hasattr(mention, "start_char")
+                                    else 0,
+                                    "end_char": mention.end_char
+                                    if hasattr(mention, "end_char")
+                                    else 0,
+                                }
+                            )
+                logger.info(
+                    f"[RELATIONSHIPS] Entidades con menciones: {entities_with_mentions}/{len(context.entities)}"
+                )
+                logger.info(
+                    f"[RELATIONSHIPS] Total menciones para co-ocurrencia: {len(entity_mentions)}"
+                )
 
                 # Preparar datos de capítulos
                 chapters_data = [
@@ -1965,8 +2004,14 @@ class UnifiedAnalysisPipeline:
                 # Añadir co-ocurrencias al engine
                 logger.info(f"[RELATIONSHIPS] Co-ocurrencias encontradas: {len(cooccurrences)}")
                 for cooc in cooccurrences:
-                    e1_name = next((e.canonical_name for e in context.entities if e.id == cooc.entity1_id), str(cooc.entity1_id))
-                    e2_name = next((e.canonical_name for e in context.entities if e.id == cooc.entity2_id), str(cooc.entity2_id))
+                    e1_name = next(
+                        (e.canonical_name for e in context.entities if e.id == cooc.entity1_id),
+                        str(cooc.entity1_id),
+                    )
+                    e2_name = next(
+                        (e.canonical_name for e in context.entities if e.id == cooc.entity2_id),
+                        str(cooc.entity2_id),
+                    )
                     engine.add_cooccurrence(
                         entity1_id=cooc.entity1_id,
                         entity2_id=cooc.entity2_id,
@@ -1983,9 +2028,11 @@ class UnifiedAnalysisPipeline:
             context.relationships = result.get("relations", [])
             context.stats["relationships_found"] = len(context.relationships)
             context.stats["character_clusters"] = len(result.get("clusters", []))
-            
+
             logger.info(f"[RELATIONSHIPS] Relaciones detectadas: {len(context.relationships)}")
-            logger.info(f"[RELATIONSHIPS] Clusters de personajes: {context.stats.get('character_clusters', 0)}")
+            logger.info(
+                f"[RELATIONSHIPS] Clusters de personajes: {context.stats.get('character_clusters', 0)}"
+            )
 
         except Exception as e:
             logger.error(f"[RELATIONSHIPS] Error en extracción: {e}", exc_info=True)
@@ -2011,8 +2058,10 @@ class UnifiedAnalysisPipeline:
 
             # Crear lista de personajes conocidos
             character_names = [
-                e.canonical_name for e in context.entities
-                if hasattr(e, "entity_type") and str(e.entity_type).upper() in ("CHARACTER", "PERSON", "PER")
+                e.canonical_name
+                for e in context.entities
+                if hasattr(e, "entity_type")
+                and str(e.entity_type).upper() in ("CHARACTER", "PERSON", "PER")
             ]
 
             # Añadir aliases
@@ -2047,8 +2096,7 @@ class UnifiedAnalysisPipeline:
 
             # Convertir a diccionarios
             context.interactions = [
-                i.to_dict() if hasattr(i, "to_dict") else i
-                for i in all_interactions
+                i.to_dict() if hasattr(i, "to_dict") else i for i in all_interactions
             ]
 
             # Analizar patrones de interacción
@@ -2060,8 +2108,7 @@ class UnifiedAnalysisPipeline:
 
                 patterns = pattern_analyzer.analyze()
                 context.interaction_patterns = [
-                    p.to_dict() if hasattr(p, "to_dict") else p
-                    for p in patterns
+                    p.to_dict() if hasattr(p, "to_dict") else p for p in patterns
                 ]
 
             context.stats["interactions_found"] = len(context.interactions)
@@ -2095,12 +2142,10 @@ class UnifiedAnalysisPipeline:
             # Registrar entidades con sus alias
             for entity in context.entities:
                 aliases = []
-                if hasattr(entity, 'aliases') and entity.aliases:
+                if hasattr(entity, "aliases") and entity.aliases:
                     aliases = entity.aliases
                 analyzer.register_entity(
-                    entity_id=entity.id,
-                    name=entity.canonical_name,
-                    aliases=aliases
+                    entity_id=entity.id, name=entity.canonical_name, aliases=aliases
                 )
 
             # Analizar diálogos
@@ -2113,7 +2158,11 @@ class UnifiedAnalysisPipeline:
                         # Determinar capítulo del diálogo
                         chapter = 1
                         for ch in context.chapters:
-                            if ch.get("start_char", 0) <= dialogue.get("start_char", 0) <= ch.get("end_char", float("inf")):
+                            if (
+                                ch.get("start_char", 0)
+                                <= dialogue.get("start_char", 0)
+                                <= ch.get("end_char", float("inf"))
+                            ):
                                 chapter = ch["number"]
                                 break
 
@@ -2153,7 +2202,9 @@ class UnifiedAnalysisPipeline:
                             "target_name": e2.canonical_name,
                             "mentions_count": report.a_mentions_b_count,
                             "knowledge_facts": [k.to_dict() for k in report.a_knows_about_b],
-                            "opinion": report.a_opinion_of_b.to_dict() if report.a_opinion_of_b else None,
+                            "opinion": report.a_opinion_of_b.to_dict()
+                            if report.a_opinion_of_b
+                            else None,
                             "intentions": [i.to_dict() for i in report.a_intentions_toward_b],
                         }
 
@@ -2188,11 +2239,13 @@ class UnifiedAnalysisPipeline:
             # Configurar métodos según disponibilidad
             enabled_methods = [InferenceMethod.RULE_BASED]
             if self.config.use_llm:
-                enabled_methods.extend([
-                    InferenceMethod.LLAMA3_2,
-                    InferenceMethod.MISTRAL,
-                    InferenceMethod.QWEN2_5,
-                ])
+                enabled_methods.extend(
+                    [
+                        InferenceMethod.LLAMA3_2,
+                        InferenceMethod.MISTRAL,
+                        InferenceMethod.QWEN2_5,
+                    ]
+                )
             enabled_methods.append(InferenceMethod.EMBEDDINGS)
 
             config = InferenceConfig(
@@ -2210,8 +2263,9 @@ class UnifiedAnalysisPipeline:
 
             # Filtrar entidades de tipo PERSON
             person_entities = [
-                e for e in context.entities
-                if hasattr(e, 'entity_type') and str(e.entity_type).upper() == "PERSON"
+                e
+                for e in context.entities
+                if hasattr(e, "entity_type") and str(e.entity_type).upper() == "PERSON"
             ]
 
             for entity in person_entities:
@@ -2227,7 +2281,8 @@ class UnifiedAnalysisPipeline:
                     if entity_name.lower() in content.lower():
                         # Extraer contexto alrededor de las menciones
                         import re
-                        sentences = re.split(r'[.!?]+', content)
+
+                        sentences = re.split(r"[.!?]+", content)
                         for sent in sentences:
                             if entity_name.lower() in sent.lower():
                                 text_samples.append(sent.strip())
@@ -2243,9 +2298,9 @@ class UnifiedAnalysisPipeline:
                 # Obtener atributos existentes del personaje
                 existing_attrs = {}
                 for attr in context.attributes:
-                    if hasattr(attr, 'entity_name') and attr.entity_name == entity.canonical_name:
-                        key = attr.key.value if hasattr(attr.key, 'value') else str(attr.key)
-                        existing_attrs[key] = attr.value if hasattr(attr, 'value') else str(attr)
+                    if hasattr(attr, "entity_name") and attr.entity_name == entity.canonical_name:
+                        key = attr.key.value if hasattr(attr.key, "value") else str(attr.key)
+                        existing_attrs[key] = attr.value if hasattr(attr, "value") else str(attr)
 
                 # Analizar personaje
                 profile = engine.analyze_character(
@@ -2337,7 +2392,8 @@ class UnifiedAnalysisPipeline:
             if result.is_success:
                 # Filtrar por confianza
                 context.spelling_issues = [
-                    issue for issue in result.value.issues
+                    issue
+                    for issue in result.value.issues
                     if issue.confidence >= self.config.spelling_min_confidence
                 ]
                 context.stats["spelling_issues"] = len(context.spelling_issues)
@@ -2358,7 +2414,8 @@ class UnifiedAnalysisPipeline:
 
             if result.is_success:
                 context.grammar_issues = [
-                    issue for issue in result.value.issues
+                    issue
+                    for issue in result.value.issues
                     if issue.confidence >= self.config.grammar_min_confidence
                 ]
                 context.stats["grammar_issues"] = len(context.grammar_issues)
@@ -2373,8 +2430,7 @@ class UnifiedAnalysisPipeline:
 
             detector = get_repetition_detector()
             result = detector.detect_lexical(
-                context.full_text,
-                min_distance=self.config.repetition_min_distance
+                context.full_text, min_distance=self.config.repetition_min_distance
             )
 
             if result.is_success:
@@ -2394,8 +2450,7 @@ class UnifiedAnalysisPipeline:
 
             detector = get_repetition_detector()
             result = detector.detect_semantic(
-                context.full_text,
-                min_distance=self.config.repetition_min_distance
+                context.full_text, min_distance=self.config.repetition_min_distance
             )
 
             if result.is_success:
@@ -2454,8 +2509,8 @@ class UnifiedAnalysisPipeline:
         """
         try:
             from ..voice.register import (
-                RegisterChangeDetector,
                 RegisterAnalyzer,
+                RegisterChangeDetector,
             )
 
             detector = RegisterChangeDetector()
@@ -2510,9 +2565,7 @@ class UnifiedAnalysisPipeline:
             context.stats["register_distribution"] = summary.get("distribution", {})
             context.stats["dominant_register"] = summary.get("dominant_register")
 
-            logger.info(
-                f"Register analysis: {len(changes)} changes in {len(analyses)} segments"
-            )
+            logger.info(f"Register analysis: {len(changes)} changes in {len(analyses)} segments")
 
         except ImportError as e:
             logger.debug(f"Register analyzer not available: {e}")
@@ -2546,7 +2599,9 @@ class UnifiedAnalysisPipeline:
             context.stats["pacing_issues"] = len(result.issues)
             if result.summary:
                 context.stats["avg_chapter_words"] = result.summary.get("avg_chapter_words", 0)
-                context.stats["chapter_word_variance"] = result.summary.get("chapter_word_variance", 0)
+                context.stats["chapter_word_variance"] = result.summary.get(
+                    "chapter_word_variance", 0
+                )
                 context.stats["avg_dialogue_ratio"] = result.summary.get("avg_dialogue_ratio", 0)
 
             logger.info(
@@ -2567,8 +2622,8 @@ class UnifiedAnalysisPipeline:
 
             all_sticky = []
             for ch in context.chapters:
-                ch_num = ch.chapter_number if hasattr(ch, 'chapter_number') else 0
-                ch_content = ch.content if hasattr(ch, 'content') else str(ch)
+                ch_num = ch.chapter_number if hasattr(ch, "chapter_number") else 0
+                ch_content = ch.content if hasattr(ch, "content") else str(ch)
                 result = detector.analyze(ch_content, chapter=ch_num)
                 if result.is_success:
                     all_sticky.extend(result.value.sticky_sentences)
@@ -2613,10 +2668,12 @@ class UnifiedAnalysisPipeline:
             return Result.success(None)
 
         except Exception as e:
-            return Result.failure(NarrativeError(
-                message=f"Consistency check failed: {str(e)}",
-                severity=ErrorSeverity.RECOVERABLE
-            ))
+            return Result.failure(
+                NarrativeError(
+                    message=f"Consistency check failed: {str(e)}",
+                    severity=ErrorSeverity.RECOVERABLE,
+                )
+            )
 
     def _run_attribute_consistency(self, context: AnalysisContext) -> None:
         """Verificar consistencia de atributos."""
@@ -2639,18 +2696,15 @@ class UnifiedAnalysisPipeline:
             return
 
         try:
+            from ..temporal.inconsistencies import (
+                TemporalDetectionConfig,
+                VotingTemporalChecker,
+            )
             from ..temporal.markers import TemporalMarker
             from ..temporal.timeline import TimelineBuilder
-            from ..temporal.inconsistencies import (
-                VotingTemporalChecker,
-                TemporalDetectionConfig,
-            )
 
             # Filtrar solo TemporalMarker objects (no dicts)
-            markers = [
-                m for m in context.temporal_markers
-                if isinstance(m, TemporalMarker)
-            ]
+            markers = [m for m in context.temporal_markers if isinstance(m, TemporalMarker)]
             if not markers:
                 logger.debug("No TemporalMarker objects available for consistency check")
                 return
@@ -2659,9 +2713,15 @@ class UnifiedAnalysisPipeline:
             builder = TimelineBuilder()
             chapter_data = [
                 {
-                    "number": ch.get("number", i + 1) if isinstance(ch, dict) else getattr(ch, "chapter_number", i + 1),
-                    "title": ch.get("title", "") if isinstance(ch, dict) else getattr(ch, "title", ""),
-                    "start_position": ch.get("start_char", 0) if isinstance(ch, dict) else getattr(ch, "start_char", 0),
+                    "number": ch.get("number", i + 1)
+                    if isinstance(ch, dict)
+                    else getattr(ch, "chapter_number", i + 1),
+                    "title": ch.get("title", "")
+                    if isinstance(ch, dict)
+                    else getattr(ch, "title", ""),
+                    "start_position": ch.get("start_char", 0)
+                    if isinstance(ch, dict)
+                    else getattr(ch, "start_char", 0),
                 }
                 for i, ch in enumerate(context.chapters)
             ]
@@ -2764,17 +2824,23 @@ class UnifiedAnalysisPipeline:
                     )
 
                     for violation in violations:
-                        context.voice_deviations.append({
-                            "entity_id": entity.id,
-                            "entity_name": entity.canonical_name,
-                            "chapter": ch["number"],
-                            "violation_text": violation.violation_text,
-                            "explanation": violation.explanation,
-                            "severity": violation.severity.value if hasattr(violation.severity, 'value') else str(violation.severity),
-                            "expectation": violation.expectation.to_dict() if hasattr(violation.expectation, 'to_dict') else str(violation.expectation),
-                            "consensus_score": violation.consensus_score,
-                            "detection_methods": violation.detection_methods,
-                        })
+                        context.voice_deviations.append(
+                            {
+                                "entity_id": entity.id,
+                                "entity_name": entity.canonical_name,
+                                "chapter": ch["number"],
+                                "violation_text": violation.violation_text,
+                                "explanation": violation.explanation,
+                                "severity": violation.severity.value
+                                if hasattr(violation.severity, "value")
+                                else str(violation.severity),
+                                "expectation": violation.expectation.to_dict()
+                                if hasattr(violation.expectation, "to_dict")
+                                else str(violation.expectation),
+                                "consensus_score": violation.consensus_score,
+                                "detection_methods": violation.detection_methods,
+                            }
+                        )
 
             context.stats["voice_deviations"] = len(context.voice_deviations)
 
@@ -2833,25 +2899,27 @@ class UnifiedAnalysisPipeline:
                 )
 
                 # Manejar tanto Result como list directa
-                if hasattr(result, 'is_success'):
+                if hasattr(result, "is_success"):
                     incoherences = result.value if result.is_success else []
                 else:
                     incoherences = result if isinstance(result, list) else []
 
                 if incoherences:
                     for incoherence in incoherences:
-                        all_incoherences.append({
-                            "entity_name": incoherence.entity_name,
-                            "incoherence_type": incoherence.incoherence_type.value,
-                            "declared_emotion": incoherence.declared_emotion,
-                            "actual_behavior": incoherence.actual_behavior,
-                            "declared_text": incoherence.declared_text,
-                            "behavior_text": incoherence.behavior_text,
-                            "confidence": incoherence.confidence,
-                            "explanation": incoherence.explanation,
-                            "suggestion": incoherence.suggestion,
-                            "chapter_id": incoherence.chapter_id,
-                        })
+                        all_incoherences.append(
+                            {
+                                "entity_name": incoherence.entity_name,
+                                "incoherence_type": incoherence.incoherence_type.value,
+                                "declared_emotion": incoherence.declared_emotion,
+                                "actual_behavior": incoherence.actual_behavior,
+                                "declared_text": incoherence.declared_text,
+                                "behavior_text": incoherence.behavior_text,
+                                "confidence": incoherence.confidence,
+                                "explanation": incoherence.explanation,
+                                "suggestion": incoherence.suggestion,
+                                "chapter_id": incoherence.chapter_id,
+                            }
+                        )
 
             if all_incoherences:
                 context.emotional_incoherences = all_incoherences
@@ -2898,30 +2966,36 @@ class UnifiedAnalysisPipeline:
 
                 if arc_result.is_success and arc_result.value:
                     arc = arc_result.value
-                    sentiment_arcs.append({
-                        "chapter": chapter_num,
-                        "overall_sentiment": arc.overall_sentiment.value,
-                        "overall_confidence": arc.overall_confidence,
-                        "dominant_emotion": arc.dominant_emotion.value if arc.dominant_emotion else "neutral",
-                        "emotion_variance": arc.emotion_variance,
-                        "sentiment_shifts": arc.sentiment_shifts,
-                        "segments": [
-                            {
-                                "position": seg.start_char,
-                                "sentiment": seg.sentiment.value,
-                                "emotion": seg.primary_emotion.value,
-                                "confidence": seg.sentiment_confidence,
-                            }
-                            for seg in arc.segments[:10]  # Limitar a 10 segmentos
-                        ],
-                    })
+                    sentiment_arcs.append(
+                        {
+                            "chapter": chapter_num,
+                            "overall_sentiment": arc.overall_sentiment.value,
+                            "overall_confidence": arc.overall_confidence,
+                            "dominant_emotion": arc.dominant_emotion.value
+                            if arc.dominant_emotion
+                            else "neutral",
+                            "emotion_variance": arc.emotion_variance,
+                            "sentiment_shifts": arc.sentiment_shifts,
+                            "segments": [
+                                {
+                                    "position": seg.start_char,
+                                    "sentiment": seg.sentiment.value,
+                                    "emotion": seg.primary_emotion.value,
+                                    "confidence": seg.sentiment_confidence,
+                                }
+                                for seg in arc.segments[:10]  # Limitar a 10 segmentos
+                            ],
+                        }
+                    )
 
             if sentiment_arcs:
                 context.sentiment_arcs = sentiment_arcs
                 context.stats["chapters_with_sentiment"] = len(sentiment_arcs)
 
                 # Estadísticas agregadas
-                avg_variance = sum(a["emotion_variance"] for a in sentiment_arcs) / len(sentiment_arcs)
+                avg_variance = sum(a["emotion_variance"] for a in sentiment_arcs) / len(
+                    sentiment_arcs
+                )
                 context.stats["avg_emotional_variance"] = round(avg_variance, 3)
 
                 total_shifts = sum(a["sentiment_shifts"] for a in sentiment_arcs)
@@ -2949,7 +3023,11 @@ class UnifiedAnalysisPipeline:
             # Alertas de inconsistencias de atributos
             for inc in context.inconsistencies:
                 # Convertir attribute_key enum a string para la API
-                attr_key_str = inc.attribute_key.value if hasattr(inc.attribute_key, 'value') else str(inc.attribute_key)
+                attr_key_str = (
+                    inc.attribute_key.value
+                    if hasattr(inc.attribute_key, "value")
+                    else str(inc.attribute_key)
+                )
                 result = engine.create_from_attribute_inconsistency(
                     project_id=context.project_id,
                     entity_name=inc.entity_name,
@@ -2961,13 +3039,17 @@ class UnifiedAnalysisPipeline:
                         "chapter": inc.value1_chapter,
                         "excerpt": inc.value1_excerpt,
                         "start_char": inc.value1_position,
-                        "end_char": inc.value1_position + len(inc.value1_excerpt) if inc.value1_excerpt else 0,
+                        "end_char": inc.value1_position + len(inc.value1_excerpt)
+                        if inc.value1_excerpt
+                        else 0,
                     },
                     value2_source={
                         "chapter": inc.value2_chapter,
                         "excerpt": inc.value2_excerpt,
                         "start_char": inc.value2_position,
-                        "end_char": inc.value2_position + len(inc.value2_excerpt) if inc.value2_excerpt else 0,
+                        "end_char": inc.value2_position + len(inc.value2_excerpt)
+                        if inc.value2_excerpt
+                        else 0,
                     },
                     explanation=inc.explanation,
                     confidence=inc.confidence,
@@ -2977,7 +3059,11 @@ class UnifiedAnalysisPipeline:
 
             # Alertas de inconsistencias temporales
             for tinc in context.temporal_inconsistencies:
-                inc_type = tinc.inconsistency_type.value if hasattr(tinc.inconsistency_type, 'value') else str(tinc.inconsistency_type)
+                inc_type = (
+                    tinc.inconsistency_type.value
+                    if hasattr(tinc.inconsistency_type, "value")
+                    else str(tinc.inconsistency_type)
+                )
                 result = engine.create_from_temporal_inconsistency(
                     project_id=context.project_id,
                     inconsistency_type=inc_type,
@@ -2991,7 +3077,9 @@ class UnifiedAnalysisPipeline:
                     extra_data={
                         "expected": tinc.expected,
                         "found": tinc.found,
-                        "severity": tinc.severity.value if hasattr(tinc.severity, 'value') else str(tinc.severity),
+                        "severity": tinc.severity.value
+                        if hasattr(tinc.severity, "value")
+                        else str(tinc.severity),
                         "methods_agreed": tinc.methods_agreed,
                     },
                 )
@@ -3033,16 +3121,20 @@ class UnifiedAnalysisPipeline:
 
             # Alertas de repeticiones léxicas (word echo)
             for rep in context.lexical_repetitions:
-                word = rep.word if hasattr(rep, 'word') else str(rep)
+                word = rep.word if hasattr(rep, "word") else str(rep)
                 occurrences = []
-                if hasattr(rep, 'occurrences'):
+                if hasattr(rep, "occurrences"):
                     for occ in rep.occurrences:
-                        if hasattr(occ, 'start_char'):
-                            occurrences.append({
-                                "start_char": occ.start_char,
-                                "end_char": occ.end_char,
-                                "context": occ.context[:100] if hasattr(occ, 'context') and occ.context else "",
-                            })
+                        if hasattr(occ, "start_char"):
+                            occurrences.append(
+                                {
+                                    "start_char": occ.start_char,
+                                    "end_char": occ.end_char,
+                                    "context": occ.context[:100]
+                                    if hasattr(occ, "context") and occ.context
+                                    else "",
+                                }
+                            )
                         elif isinstance(occ, dict):
                             occurrences.append(occ)
 
@@ -3051,16 +3143,16 @@ class UnifiedAnalysisPipeline:
                     word=word,
                     occurrences=occurrences,
                     min_distance=self.config.repetition_min_distance,
-                    chapter=rep.chapter if hasattr(rep, 'chapter') else None,
-                    confidence=rep.confidence if hasattr(rep, 'confidence') else 0.7,
+                    chapter=rep.chapter if hasattr(rep, "chapter") else None,
+                    confidence=rep.confidence if hasattr(rep, "confidence") else 0.7,
                 )
                 if result.is_success:
                     context.alerts.append(result.value)
 
             # Alertas de repeticiones semánticas
             for rep in context.semantic_repetitions:
-                word = rep.word if hasattr(rep, 'word') else str(rep)
-                count = rep.count if hasattr(rep, 'count') else 0
+                word = rep.word if hasattr(rep, "word") else str(rep)
+                count = rep.count if hasattr(rep, "count") else 0
                 result = engine.create_alert(
                     project_id=context.project_id,
                     alert_type="style_semantic_repetition",
@@ -3071,11 +3163,11 @@ class UnifiedAnalysisPipeline:
                     explanation=f"Se detectó repetición semántica de '{word}' y palabras similares. Esto puede indicar sobrecarga conceptual en el texto.",
                     extra_data={
                         "word": word,
-                        "similar_words": rep.similar_words if hasattr(rep, 'similar_words') else [],
+                        "similar_words": rep.similar_words if hasattr(rep, "similar_words") else [],
                         "count": count,
                         "repetition_type": "semantic",
                     },
-                    confidence=rep.confidence if hasattr(rep, 'confidence') else 0.6,
+                    confidence=rep.confidence if hasattr(rep, "confidence") else 0.6,
                 )
                 if result.is_success:
                     context.alerts.append(result.value)
@@ -3087,7 +3179,10 @@ class UnifiedAnalysisPipeline:
                     "medium": AlertSeverity.INFO,
                     "low": AlertSeverity.HINT,
                 }
-                severity = severity_map.get(brk.severity.value if hasattr(brk.severity, 'value') else brk.severity, AlertSeverity.INFO)
+                severity = severity_map.get(
+                    brk.severity.value if hasattr(brk.severity, "value") else brk.severity,
+                    AlertSeverity.INFO,
+                )
 
                 result = engine.create_alert(
                     project_id=context.project_id,
@@ -3095,10 +3190,12 @@ class UnifiedAnalysisPipeline:
                     category=AlertCategory.STYLE,
                     severity=severity,
                     title=f"Salto de coherencia: {brk.break_type.value if hasattr(brk.break_type, 'value') else brk.break_type}",
-                    description=f"Posible discontinuidad narrativa entre segmentos",
+                    description="Posible discontinuidad narrativa entre segmentos",
                     explanation=brk.explanation,
                     extra_data={
-                        "break_type": brk.break_type.value if hasattr(brk.break_type, 'value') else str(brk.break_type),
+                        "break_type": brk.break_type.value
+                        if hasattr(brk.break_type, "value")
+                        else str(brk.break_type),
                         "similarity_score": brk.similarity_score,
                         "expected_similarity": brk.expected_similarity,
                         "text_before": brk.text_before[:100] if brk.text_before else "",
@@ -3117,7 +3214,7 @@ class UnifiedAnalysisPipeline:
                 entity_name = deviation.get("entity_name", "Personaje")
                 severity_str = deviation.get("severity", "medium").upper()
                 severity = getattr(AlertSeverity, severity_str, AlertSeverity.MEDIUM)
-                explanation = deviation.get('explanation', 'Comportamiento fuera de carácter')
+                explanation = deviation.get("explanation", "Comportamiento fuera de carácter")
 
                 result = engine.create_alert(
                     project_id=context.project_id,
@@ -3164,16 +3261,18 @@ class UnifiedAnalysisPipeline:
 
             # Alertas de oraciones pesadas (sticky sentences)
             for sent in context.sticky_sentences:
-                severity_val = sent.severity.value if hasattr(sent.severity, 'value') else str(sent.severity)
+                severity_val = (
+                    sent.severity.value if hasattr(sent.severity, "value") else str(sent.severity)
+                )
                 # Solo alertar a partir de severidad medium
                 if severity_val in ("medium", "high", "critical"):
                     result = engine.create_from_sticky_sentence(
                         project_id=context.project_id,
                         sentence=sent.text[:200] if len(sent.text) > 200 else sent.text,
                         glue_percentage=sent.glue_percentage,
-                        chapter=sent.chapter if hasattr(sent, 'chapter') else None,
-                        start_char=sent.start_char if hasattr(sent, 'start_char') else None,
-                        end_char=sent.end_char if hasattr(sent, 'end_char') else None,
+                        chapter=sent.chapter if hasattr(sent, "chapter") else None,
+                        start_char=sent.start_char if hasattr(sent, "start_char") else None,
+                        end_char=sent.end_char if hasattr(sent, "end_char") else None,
                         severity_level=severity_val,
                         confidence=0.75,
                     )
@@ -3210,9 +3309,7 @@ class UnifiedAnalysisPipeline:
     # =========================================================================
 
     def _run_parallel_tasks(
-        self,
-        tasks: list[tuple[str, Callable]],
-        context: AnalysisContext
+        self, tasks: list[tuple[str, Callable]], context: AnalysisContext
     ) -> None:
         """
         Ejecutar tareas en paralelo con tracking de errores.
@@ -3223,10 +3320,7 @@ class UnifiedAnalysisPipeline:
         failed_tasks = []
 
         with ThreadPoolExecutor(max_workers=self.config.max_workers) as executor:
-            futures = {
-                executor.submit(func, context): name
-                for name, func in tasks
-            }
+            futures = {executor.submit(func, context): name for name, func in tasks}
 
             for future in as_completed(futures):
                 name = futures[future]
@@ -3235,14 +3329,11 @@ class UnifiedAnalysisPipeline:
                 except Exception as e:
                     failed_tasks.append(name)
                     logger.warning(f"Parallel task '{name}' failed: {e}", exc_info=True)
-                    context.warnings.append(
-                        f"Sub-tarea '{name}' falló: {e}"
-                    )
+                    context.warnings.append(f"Sub-tarea '{name}' falló: {e}")
 
         if failed_tasks:
             logger.warning(
-                f"Parallel execution: {len(failed_tasks)}/{len(tasks)} tasks failed: "
-                f"{failed_tasks}"
+                f"Parallel execution: {len(failed_tasks)}/{len(tasks)} tasks failed: {failed_tasks}"
             )
 
     def _persist_attributes(self, context: AnalysisContext) -> None:
@@ -3262,8 +3353,17 @@ class UnifiedAnalysisPipeline:
                     continue
 
                 # Determinar categoría del atributo para la columna attribute_type
-                attr_key = attr.key.value if hasattr(attr.key, 'value') else str(attr.key)
-                _PHYSICAL_ATTRS = {"eye_color", "hair_color", "hair_type", "height", "build", "age", "skin", "distinctive_feature"}
+                attr_key = attr.key.value if hasattr(attr.key, "value") else str(attr.key)
+                _PHYSICAL_ATTRS = {
+                    "eye_color",
+                    "hair_color",
+                    "hair_type",
+                    "height",
+                    "build",
+                    "age",
+                    "skin",
+                    "distinctive_feature",
+                }
                 _PSYCHOLOGICAL_ATTRS = {"personality"}
                 _SOCIAL_ATTRS = {"profession"}
                 if attr_key in _PHYSICAL_ATTRS:
@@ -3278,17 +3378,20 @@ class UnifiedAnalysisPipeline:
                     attr_category = "other"
 
                 with db.connection() as conn:
-                    conn.execute("""
+                    conn.execute(
+                        """
                         INSERT INTO entity_attributes
                         (entity_id, attribute_type, attribute_key, attribute_value, confidence)
                         VALUES (?, ?, ?, ?, ?)
-                    """, (
-                        entity_id,
-                        attr_category,
-                        attr_key,
-                        attr.value,
-                        attr.confidence if hasattr(attr, 'confidence') else 0.8,
-                    ))
+                    """,
+                        (
+                            entity_id,
+                            attr_category,
+                            attr_key,
+                            attr.value,
+                            attr.confidence if hasattr(attr, "confidence") else 0.8,
+                        ),
+                    )
                     persisted += 1
 
             context.stats["attributes_persisted"] = persisted
@@ -3304,7 +3407,10 @@ class UnifiedAnalysisPipeline:
             db = get_database()
             with db.connection() as conn:
                 conn.execute("DELETE FROM alerts WHERE project_id = ?", (project_id,))
-                conn.execute("DELETE FROM entity_attributes WHERE entity_id IN (SELECT id FROM entities WHERE project_id = ?)", (project_id,))
+                conn.execute(
+                    "DELETE FROM entity_attributes WHERE entity_id IN (SELECT id FROM entities WHERE project_id = ?)",
+                    (project_id,),
+                )
                 conn.execute("DELETE FROM entities WHERE project_id = ?", (project_id,))
 
         except Exception as e:
@@ -3378,7 +3484,9 @@ class UnifiedAnalysisPipeline:
             register_changes=context.register_changes,
             emotional_incoherences=context.emotional_incoherences,
             voice_profiles=list(context.voice_profiles.values()) if context.voice_profiles else [],
-            knowledge_relations=list(context.knowledge_matrix.values()) if context.knowledge_matrix else [],
+            knowledge_relations=list(context.knowledge_matrix.values())
+            if context.knowledge_matrix
+            else [],
             sentiment_arcs=context.sentiment_arcs,
             pacing_analysis=context.pacing_analysis,
             stats=context.stats,
@@ -3394,11 +3502,12 @@ class UnifiedAnalysisPipeline:
 # Funciones de conveniencia
 # =============================================================================
 
+
 def run_unified_analysis(
     document_path: str | Path,
-    project_name: Optional[str] = None,
-    config: Optional[UnifiedConfig] = None,
-    progress_callback: Optional[Callable[[float, str], None]] = None,
+    project_name: str | None = None,
+    config: UnifiedConfig | None = None,
+    progress_callback: Callable[[float, str], None] | None = None,
 ) -> Result[UnifiedReport]:
     """
     Ejecutar análisis unificado con configuración por defecto.

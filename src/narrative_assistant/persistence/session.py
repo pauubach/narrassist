@@ -9,10 +9,9 @@ Permite:
 """
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 from .database import Database, get_database
 
@@ -47,16 +46,16 @@ class Session:
         notes: Notas del revisor
     """
 
-    id: Optional[int] = None
+    id: int | None = None
     project_id: int = 0
-    started_at: Optional[datetime] = None
-    ended_at: Optional[datetime] = None
+    started_at: datetime | None = None
+    ended_at: datetime | None = None
     duration_seconds: int = 0
     alerts_reviewed: int = 0
     alerts_resolved: int = 0
     entities_merged: int = 0
-    last_position_char: Optional[int] = None
-    last_chapter_id: Optional[int] = None
+    last_position_char: int | None = None
+    last_chapter_id: int | None = None
     notes: str = ""
 
     @property
@@ -100,13 +99,13 @@ class SessionManager:
         manager.end()
     """
 
-    def __init__(self, project_id: int, db: Optional[Database] = None):
+    def __init__(self, project_id: int, db: Database | None = None):
         self.project_id = project_id
         self.db = db or get_database()
-        self._current_session: Optional[Session] = None
+        self._current_session: Session | None = None
 
     @property
-    def current_session(self) -> Optional[Session]:
+    def current_session(self) -> Session | None:
         """Sesión actual activa."""
         return self._current_session
 
@@ -167,9 +166,7 @@ class SessionManager:
         self._current_session.duration_seconds = duration
         if notes:
             self._current_session.notes = (
-                self._current_session.notes + notes
-                if self._current_session.notes
-                else notes
+                self._current_session.notes + notes if self._current_session.notes else notes
             )
 
         logger.info(f"Sesión finalizada: {self._current_session.id} ({duration}s)")
@@ -231,8 +228,8 @@ class SessionManager:
 
     def update_position(
         self,
-        chapter_id: Optional[int] = None,
-        char_position: Optional[int] = None,
+        chapter_id: int | None = None,
+        char_position: int | None = None,
     ) -> None:
         """
         Actualiza la última posición visitada.
@@ -262,7 +259,7 @@ class SessionManager:
                 tuple(params),
             )
 
-    def get_last_position(self) -> tuple[Optional[int], Optional[int]]:
+    def get_last_position(self) -> tuple[int | None, int | None]:
         """
         Obtiene la última posición de la sesión más reciente.
 

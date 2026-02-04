@@ -67,7 +67,7 @@ def export_report_json(report: AnalysisReport, output_path: str | Path) -> Resul
         return Result.success(None)
 
     except Exception as e:
-        from ..core.errors import NarrativeError, ErrorSeverity
+        from ..core.errors import ErrorSeverity, NarrativeError
 
         error = NarrativeError(
             message=f"Failed to export JSON: {str(e)}",
@@ -76,9 +76,7 @@ def export_report_json(report: AnalysisReport, output_path: str | Path) -> Resul
         return Result.failure(error)
 
 
-def export_report_markdown(
-    report: AnalysisReport, output_path: str | Path
-) -> Result[None]:
+def export_report_markdown(report: AnalysisReport, output_path: str | Path) -> Result[None]:
     """
     Exporta informe de análisis a Markdown.
 
@@ -111,12 +109,8 @@ def export_report_markdown(
         lines.append(f"- **Caracteres:** {report.stats.get('total_characters', 0):,}")
         lines.append(f"- **Capítulos:** {report.stats.get('chapters', 0)}")
         lines.append(f"- **Entidades detectadas:** {len(report.entities)}")
-        lines.append(
-            f"- **Atributos extraídos:** {report.stats.get('attributes_extracted', 0)}"
-        )
-        lines.append(
-            f"- **Inconsistencias:** {report.stats.get('inconsistencies_found', 0)}"
-        )
+        lines.append(f"- **Atributos extraídos:** {report.stats.get('attributes_extracted', 0)}")
+        lines.append(f"- **Inconsistencias:** {report.stats.get('inconsistencies_found', 0)}")
         lines.append("")
 
         # Entidades por tipo
@@ -212,7 +206,7 @@ def export_report_markdown(
         return Result.success(None)
 
     except Exception as e:
-        from ..core.errors import NarrativeError, ErrorSeverity
+        from ..core.errors import ErrorSeverity, NarrativeError
 
         error = NarrativeError(
             message=f"Failed to export Markdown: {str(e)}",
@@ -249,7 +243,7 @@ def export_alerts_json(alerts: list[Alert], output_path: str | Path) -> Result[N
         return Result.success(None)
 
     except Exception as e:
-        from ..core.errors import NarrativeError, ErrorSeverity
+        from ..core.errors import ErrorSeverity, NarrativeError
 
         error = NarrativeError(
             message=f"Failed to export alerts JSON: {str(e)}",

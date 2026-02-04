@@ -6,18 +6,17 @@ establecido, lo cual puede indicar un error del autor o un cambio intencional.
 """
 
 import logging
-from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Tuple
+from dataclasses import dataclass
 from enum import Enum
-from statistics import mean
 
-from .profiles import VoiceProfile, VoiceMetrics, VoiceProfileBuilder
+from .profiles import VoiceProfile, VoiceProfileBuilder
 
 logger = logging.getLogger(__name__)
 
 
 class DeviationType(Enum):
     """Tipos de desviación de voz."""
+
     FORMALITY_SHIFT = "formality_shift"  # Cambio de registro formal/informal
     LENGTH_ANOMALY = "length_anomaly"  # Intervención inusualmente larga/corta
     VOCABULARY_SHIFT = "vocabulary_shift"  # Uso de vocabulario atípico
@@ -29,6 +28,7 @@ class DeviationType(Enum):
 
 class DeviationSeverity(Enum):
     """Severidad de la desviación."""
+
     LOW = "low"  # Desviación menor, probablemente aceptable
     MEDIUM = "medium"  # Desviación notable, revisar
     HIGH = "high"  # Desviación significativa, posible error
@@ -56,7 +56,7 @@ class VoiceDeviation:
     # Confianza en la detección
     confidence: float = 0.5
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Convierte la desviación a diccionario."""
         return {
             "entity_id": self.entity_id,
@@ -99,9 +99,9 @@ class VoiceDeviationDetector:
 
     def detect_deviations(
         self,
-        profiles: List[VoiceProfile],
-        dialogues: List[Dict],
-    ) -> List[VoiceDeviation]:
+        profiles: list[VoiceProfile],
+        dialogues: list[dict],
+    ) -> list[VoiceDeviation]:
         """
         Detecta desviaciones de voz en diálogos.
 
@@ -137,27 +137,19 @@ class VoiceDeviationDetector:
             position = dialogue.get("position", 0)
 
             # Detectar cada tipo de desviación
-            deviation = self._check_length_deviation(
-                profile, text, chapter, position
-            )
+            deviation = self._check_length_deviation(profile, text, chapter, position)
             if deviation:
                 deviations.append(deviation)
 
-            deviation = self._check_formality_deviation(
-                profile, text, chapter, position
-            )
+            deviation = self._check_formality_deviation(profile, text, chapter, position)
             if deviation:
                 deviations.append(deviation)
 
-            deviation = self._check_filler_deviation(
-                profile, text, chapter, position
-            )
+            deviation = self._check_filler_deviation(profile, text, chapter, position)
             if deviation:
                 deviations.append(deviation)
 
-            deviation = self._check_punctuation_deviation(
-                profile, text, chapter, position
-            )
+            deviation = self._check_punctuation_deviation(profile, text, chapter, position)
             if deviation:
                 deviations.append(deviation)
 
@@ -170,7 +162,7 @@ class VoiceDeviationDetector:
         text: str,
         chapter: int,
         position: int,
-    ) -> Optional[VoiceDeviation]:
+    ) -> VoiceDeviation | None:
         """Verifica si la longitud de la intervención es anómala."""
         words = self._tokenize(text)
         length = len(words)
@@ -213,7 +205,7 @@ class VoiceDeviationDetector:
         text: str,
         chapter: int,
         position: int,
-    ) -> Optional[VoiceDeviation]:
+    ) -> VoiceDeviation | None:
         """Verifica si hay un cambio de registro formal/informal."""
         from .profiles import FORMAL_MARKERS, INFORMAL_MARKERS
 
@@ -261,7 +253,7 @@ class VoiceDeviationDetector:
         text: str,
         chapter: int,
         position: int,
-    ) -> Optional[VoiceDeviation]:
+    ) -> VoiceDeviation | None:
         """Verifica si hay un cambio en el uso de muletillas."""
         from .profiles import FILLERS
 
@@ -310,7 +302,7 @@ class VoiceDeviationDetector:
         text: str,
         chapter: int,
         position: int,
-    ) -> Optional[VoiceDeviation]:
+    ) -> VoiceDeviation | None:
         """Verifica si hay un cambio en patrones de puntuación."""
         exclamations = text.count("!")
         questions = text.count("?")
@@ -325,30 +317,36 @@ class VoiceDeviationDetector:
 
         # Verificar exclamaciones
         if expected_exc < 0.5 and exclamations >= 3:
-            deviations.append((
-                "exclamaciones",
-                expected_exc,
-                exclamations,
-                f"Uso inusual de exclamaciones ({exclamations}!) para un personaje que normalmente usa ~{expected_exc:.1f} por intervención"
-            ))
+            deviations.append(
+                (
+                    "exclamaciones",
+                    expected_exc,
+                    exclamations,
+                    f"Uso inusual de exclamaciones ({exclamations}!) para un personaje que normalmente usa ~{expected_exc:.1f} por intervención",
+                )
+            )
 
         # Verificar preguntas
         if expected_q < 0.5 and questions >= 3:
-            deviations.append((
-                "preguntas",
-                expected_q,
-                questions,
-                f"Uso inusual de preguntas ({questions}?) para un personaje que normalmente usa ~{expected_q:.1f} por intervención"
-            ))
+            deviations.append(
+                (
+                    "preguntas",
+                    expected_q,
+                    questions,
+                    f"Uso inusual de preguntas ({questions}?) para un personaje que normalmente usa ~{expected_q:.1f} por intervención",
+                )
+            )
 
         # Verificar puntos suspensivos
         if expected_ell < 0.3 and ellipsis >= 3:
-            deviations.append((
-                "puntos suspensivos",
-                expected_ell,
-                ellipsis,
-                f"Uso inusual de puntos suspensivos ({ellipsis}) para un personaje que normalmente usa ~{expected_ell:.1f} por intervención"
-            ))
+            deviations.append(
+                (
+                    "puntos suspensivos",
+                    expected_ell,
+                    ellipsis,
+                    f"Uso inusual de puntos suspensivos ({ellipsis}) para un personaje que normalmente usa ~{expected_ell:.1f} por intervención",
+                )
+            )
 
         if not deviations:
             return None
@@ -370,10 +368,11 @@ class VoiceDeviationDetector:
             confidence=min(0.7, profile.confidence),
         )
 
-    def _tokenize(self, text: str) -> List[str]:
+    def _tokenize(self, text: str) -> list[str]:
         """Tokeniza texto en palabras."""
         import re
-        text = re.sub(r'[^\w\sáéíóúüñ]', ' ', text.lower())
+
+        text = re.sub(r"[^\w\sáéíóúüñ]", " ", text.lower())
         words = text.split()
         return [w for w in words if len(w) > 1]
 
@@ -387,10 +386,7 @@ class VoiceDeviationDetector:
             return DeviationSeverity.LOW
 
     def _severity_from_diff(
-        self,
-        diff: float,
-        medium_threshold: float,
-        high_threshold: float
+        self, diff: float, medium_threshold: float, high_threshold: float
     ) -> DeviationSeverity:
         """Determina severidad basada en diferencia."""
         if diff > high_threshold:
@@ -402,10 +398,10 @@ class VoiceDeviationDetector:
 
 
 def detect_voice_deviations(
-    chapters: List[Dict],
-    entities: List[Dict],
-    profiles: Optional[List[VoiceProfile]] = None,
-) -> Tuple[List[VoiceProfile], List[VoiceDeviation]]:
+    chapters: list[dict],
+    entities: list[dict],
+    profiles: list[VoiceProfile] | None = None,
+) -> tuple[list[VoiceProfile], list[VoiceDeviation]]:
     """
     Función de conveniencia para detectar desviaciones de voz.
 
@@ -422,12 +418,14 @@ def detect_voice_deviations(
     for chapter in chapters:
         chapter_dialogues = chapter.get("dialogues", [])
         for d in chapter_dialogues:
-            dialogues.append({
-                "text": d.get("text", ""),
-                "speaker_id": d.get("speaker_id"),
-                "chapter": chapter.get("number", 0),
-                "position": d.get("position", 0),
-            })
+            dialogues.append(
+                {
+                    "text": d.get("text", ""),
+                    "speaker_id": d.get("speaker_id"),
+                    "chapter": chapter.get("number", 0),
+                    "position": d.get("position", 0),
+                }
+            )
 
     # Construir perfiles si no se proporcionan
     if profiles is None:

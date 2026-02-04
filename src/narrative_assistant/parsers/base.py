@@ -7,12 +7,12 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Optional, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from .coordinates import TextCoordinateSystem
 
-from ..core.errors import UnsupportedFormatError, NarrativeError, ErrorSeverity
+from ..core.errors import ErrorSeverity, NarrativeError, UnsupportedFormatError
 from ..core.result import Result
 
 logger = logging.getLogger(__name__)
@@ -69,7 +69,7 @@ class RawParagraph:
     index: int = 0
     style_name: str = "Normal"
     is_heading: bool = False
-    heading_level: Optional[int] = None
+    heading_level: int | None = None
     start_char: int = 0
     end_char: int = 0
     metadata: dict = field(default_factory=dict)
@@ -102,7 +102,7 @@ class RawDocument:
 
     paragraphs: list[RawParagraph] = field(default_factory=list)
     metadata: dict = field(default_factory=dict)
-    source_path: Optional[Path] = None
+    source_path: Path | None = None
     source_format: DocumentFormat = DocumentFormat.UNKNOWN
     warnings: list[str] = field(default_factory=list)
     _coordinate_system: Optional["TextCoordinateSystem"] = field(default=None, repr=False)
@@ -115,6 +115,7 @@ class RawDocument:
     def _build_coordinate_system(self) -> None:
         """Construye el sistema de coordenadas y actualiza posiciones de párrafos."""
         from .coordinates import TextCoordinateSystem
+
         self._coordinate_system = TextCoordinateSystem(self.paragraphs, filter_empty=True)
         # Actualizar posiciones de párrafos para que coincidan con full_text
         self._coordinate_system.recalculate_paragraph_positions(self.paragraphs)
@@ -174,7 +175,7 @@ class DocumentParser(ABC):
         Returns:
             Result con path validado o error
         """
-        from .sanitization import validate_file_path, get_allowed_document_extensions
+        from .sanitization import get_allowed_document_extensions, validate_file_path
 
         # Validar path (incluye check de existencia y path traversal)
         try:
@@ -299,7 +300,7 @@ def detect_format(path: Path) -> DocumentFormat:
 
         # Texto plano (heurística)
         try:
-            with open(path, "r", encoding="utf-8") as f:
+            with open(path, encoding="utf-8") as f:
                 f.read(1000)
             return DocumentFormat.TXT
         except UnicodeDecodeError:
@@ -311,7 +312,7 @@ def detect_format(path: Path) -> DocumentFormat:
     return DocumentFormat.UNKNOWN
 
 
-def get_parser(format_or_path: Union[DocumentFormat, Path, str]) -> DocumentParser:
+def get_parser(format_or_path: DocumentFormat | Path | str) -> DocumentParser:
     """
     Obtiene el parser apropiado para un formato o archivo.
 
@@ -347,30 +348,39 @@ def get_parser(format_or_path: Union[DocumentFormat, Path, str]) -> DocumentPars
     if fmt == DocumentFormat.PDF:
         try:
             from .pdf_parser import PdfParser
+
             parsers[DocumentFormat.PDF] = PdfParser
         except ImportError:
             raise UnsupportedFormatError(
-                file_path=str(format_or_path) if not isinstance(format_or_path, DocumentFormat) else "",
+                file_path=str(format_or_path)
+                if not isinstance(format_or_path, DocumentFormat)
+                else "",
                 detected_format="PDF (requiere: pip install pdfplumber)",
             )
 
     if fmt == DocumentFormat.EPUB:
         try:
             from .epub_parser import EpubParser
+
             parsers[DocumentFormat.EPUB] = EpubParser
         except ImportError:
             raise UnsupportedFormatError(
-                file_path=str(format_or_path) if not isinstance(format_or_path, DocumentFormat) else "",
+                file_path=str(format_or_path)
+                if not isinstance(format_or_path, DocumentFormat)
+                else "",
                 detected_format="EPUB (requiere: pip install ebooklib)",
             )
 
     if fmt == DocumentFormat.ODT:
         try:
             from .odt_parser import OdtParser
+
             parsers[DocumentFormat.ODT] = OdtParser
         except ImportError:
             raise UnsupportedFormatError(
-                file_path=str(format_or_path) if not isinstance(format_or_path, DocumentFormat) else "",
+                file_path=str(format_or_path)
+                if not isinstance(format_or_path, DocumentFormat)
+                else "",
                 detected_format="ODT (requiere: pip install odfpy)",
             )
 
@@ -384,9 +394,7 @@ def get_parser(format_or_path: Union[DocumentFormat, Path, str]) -> DocumentPars
 
 
 def calculate_page_and_line(
-    start_char: int,
-    raw_document: RawDocument,
-    words_per_page: int = 300
+    start_char: int, raw_document: RawDocument, words_per_page: int = 300
 ) -> tuple[int, int]:
     """
     Calcula número de página y línea desde posición de carácter.
@@ -414,14 +422,12 @@ def calculate_page_and_line(
 
     # Validar que start_char está dentro del documento
     if start_char < 0 or start_char > len(full_text):
-        logger.warning(
-            f"start_char {start_char} fuera de rango [0, {len(full_text)}]"
-        )
+        logger.warning(f"start_char {start_char} fuera de rango [0, {len(full_text)}]")
         return 1, 1  # Default: página 1, línea 1
 
     # Calcular línea: contar saltos de línea hasta start_char
     text_until_position = full_text[:start_char]
-    line_number = text_until_position.count('\n') + 1
+    line_number = text_until_position.count("\n") + 1
 
     # Calcular página: heurística basada en palabras
     # Contar palabras hasta la posición

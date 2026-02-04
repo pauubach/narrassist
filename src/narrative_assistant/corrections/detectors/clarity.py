@@ -8,7 +8,6 @@ Detecta:
 """
 
 import re
-from typing import Optional
 
 from ..base import BaseDetector, CorrectionIssue
 from ..config import ClarityConfig
@@ -38,14 +37,13 @@ class ClarityDetector(BaseDetector):
 
     # Patrón para detectar subordinadas
     SUBORDINATE_PATTERN = re.compile(
-        r'\b(que|quien|cual|cuyo|donde|cuando|como|aunque|mientras|porque)\b',
-        re.IGNORECASE
+        r"\b(que|quien|cual|cuyo|donde|cuando|como|aunque|mientras|porque)\b", re.IGNORECASE
     )
 
     # Patrón para pausas internas
-    PAUSE_PATTERN = re.compile(r'[,;:]')
+    PAUSE_PATTERN = re.compile(r"[,;:]")
 
-    def __init__(self, config: Optional[ClarityConfig] = None):
+    def __init__(self, config: ClarityConfig | None = None):
         self.config = config or ClarityConfig()
 
     @property
@@ -59,7 +57,7 @@ class ClarityDetector(BaseDetector):
     def detect(
         self,
         text: str,
-        chapter_index: Optional[int] = None,
+        chapter_index: int | None = None,
         **kwargs,
     ) -> list[CorrectionIssue]:
         """
@@ -117,11 +115,9 @@ class ClarityDetector(BaseDetector):
 
     def _count_words(self, text: str) -> int:
         """Cuenta palabras en un texto."""
-        return len(re.findall(r'\b\w+\b', text))
+        return len(re.findall(r"\b\w+\b", text))
 
-    def _check_sentence_length(
-        self, text: str, chapter_index: Optional[int]
-    ) -> list[CorrectionIssue]:
+    def _check_sentence_length(self, text: str, chapter_index: int | None) -> list[CorrectionIssue]:
         """Verifica la longitud de las oraciones."""
         issues = []
         sentences = self._split_sentences(text)
@@ -131,13 +127,14 @@ class ClarityDetector(BaseDetector):
             char_count = len(sentence_text)
 
             # Oración demasiado larga (error)
-            if word_count > self.config.max_sentence_words or \
-               char_count > self.config.max_sentence_chars:
-
+            if (
+                word_count > self.config.max_sentence_words
+                or char_count > self.config.max_sentence_chars
+            ):
                 # Calcular confianza basada en cuánto excede el límite
                 excess_ratio = max(
                     word_count / self.config.max_sentence_words,
-                    char_count / self.config.max_sentence_chars
+                    char_count / self.config.max_sentence_chars,
                 )
                 confidence = min(0.95, self.config.base_confidence + (excess_ratio - 1) * 0.1)
 
@@ -147,7 +144,9 @@ class ClarityDetector(BaseDetector):
                         issue_type=ClarityIssueType.SENTENCE_TOO_LONG,
                         start_char=start,
                         end_char=end,
-                        text=sentence_text[:100] + "..." if len(sentence_text) > 100 else sentence_text,
+                        text=sentence_text[:100] + "..."
+                        if len(sentence_text) > 100
+                        else sentence_text,
                         explanation=(
                             f"Oración muy larga: {word_count} palabras, "
                             f"{char_count} caracteres. Considere dividirla en oraciones "
@@ -174,7 +173,9 @@ class ClarityDetector(BaseDetector):
                         issue_type=ClarityIssueType.SENTENCE_LONG_WARNING,
                         start_char=start,
                         end_char=end,
-                        text=sentence_text[:100] + "..." if len(sentence_text) > 100 else sentence_text,
+                        text=sentence_text[:100] + "..."
+                        if len(sentence_text) > 100
+                        else sentence_text,
                         explanation=(
                             f"Oración larga: {word_count} palabras. "
                             f"Considere si podría simplificarse."
@@ -193,9 +194,7 @@ class ClarityDetector(BaseDetector):
 
         return issues
 
-    def _check_subordination(
-        self, text: str, chapter_index: Optional[int]
-    ) -> list[CorrectionIssue]:
+    def _check_subordination(self, text: str, chapter_index: int | None) -> list[CorrectionIssue]:
         """Verifica subordinadas encadenadas."""
         issues = []
         sentences = self._split_sentences(text)
@@ -212,10 +211,12 @@ class ClarityDetector(BaseDetector):
                         issue_type=ClarityIssueType.TOO_MANY_SUBORDINATES,
                         start_char=start,
                         end_char=end,
-                        text=sentence_text[:100] + "..." if len(sentence_text) > 100 else sentence_text,
+                        text=sentence_text[:100] + "..."
+                        if len(sentence_text) > 100
+                        else sentence_text,
                         explanation=(
                             f"Demasiadas subordinadas encadenadas: {count} conectores "
-                            f"({', '.join(set(s.lower() for s in subordinates))}). "
+                            f"({', '.join({s.lower() for s in subordinates})}). "
                             f"Esto puede dificultar la lectura."
                         ),
                         suggestion="Divida la oración en oraciones independientes más simples.",
@@ -225,7 +226,7 @@ class ClarityDetector(BaseDetector):
                         rule_id="CLARITY_SUBORDINATION",
                         extra_data={
                             "subordinate_count": count,
-                            "subordinates": list(set(s.lower() for s in subordinates)),
+                            "subordinates": list({s.lower() for s in subordinates}),
                         },
                     )
                 )
@@ -233,13 +234,13 @@ class ClarityDetector(BaseDetector):
         return issues
 
     def _check_paragraph_pauses(
-        self, text: str, chapter_index: Optional[int]
+        self, text: str, chapter_index: int | None
     ) -> list[CorrectionIssue]:
         """Verifica que los párrafos tengan suficientes pausas."""
         issues = []
 
         # Dividir en párrafos
-        paragraphs = re.split(r'\n\s*\n', text)
+        paragraphs = re.split(r"\n\s*\n", text)
         current_pos = 0
 
         for paragraph in paragraphs:

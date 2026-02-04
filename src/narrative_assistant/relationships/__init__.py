@@ -8,49 +8,45 @@ Componentes:
 - analyzer: Verificación de coherencia relacional
 """
 
-from .models import (
-    # Enums
-    RelationType,
-    RelationCategory,
-    RelationValence,
-    # Dataclasses
-    RelationshipType,
-    EntityRelationship,
-    RelationshipChange,
-    RelationshipEvidence,
-    TextReference,
-    InferredExpectations,
-    EntityContext,
-    CoherenceAlert,
+from .analyzer import (
+    InteractionCoherenceChecker,
+    RelationshipAnalyzer,
 )
-
 from .detector import (
-    # Basic detector
-    RelationshipDetector,
     DetectedRelation,
-    detect_relationships_from_text,
-    # Voting system
-    VotingRelationshipDetector,
     RelationDetectionConfig,
     RelationDetectionMethod,
     RelationDetectionResult,
+    # Basic detector
+    RelationshipDetector,
+    # Voting system
+    VotingRelationshipDetector,
+    detect_relationships_from_text,
     detect_relationships_voting,
     get_voting_relationship_detector,
     reset_voting_detector,
 )
-
-from .repository import (
-    RelationshipRepository,
-)
-
-from .analyzer import (
-    RelationshipAnalyzer,
-    InteractionCoherenceChecker,
-)
-
 from .inference import (
     ExpectationInferenceEngine,
     get_expectation_inference_engine,
+)
+from .models import (
+    CoherenceAlert,
+    EntityContext,
+    EntityRelationship,
+    InferredExpectations,
+    RelationCategory,
+    RelationshipChange,
+    RelationshipEvidence,
+    # Dataclasses
+    RelationshipType,
+    # Enums
+    RelationType,
+    RelationValence,
+    TextReference,
+)
+from .repository import (
+    RelationshipRepository,
 )
 
 __all__ = [

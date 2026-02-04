@@ -14,22 +14,22 @@ si una palabra es realmente un error.
 import logging
 import re
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional, Callable
+from typing import Optional
 
+from ...core.errors import ErrorSeverity, NLPError
 from ...core.result import Result
-from ...core.errors import NLPError, ErrorSeverity
 from .base import (
-    SpellingIssue,
-    SpellingReport,
-    SpellingErrorType,
-    SpellingSeverity,
-    DetectionMethod,
     COMMON_ACCENT_ERRORS,
     COMMON_HOMOPHONES,
     COMMONLY_CONFUSED,
-    OCR_CONFUSIONS,
+    DetectionMethod,
+    SpellingErrorType,
+    SpellingIssue,
+    SpellingReport,
+    SpellingSeverity,
 )
 
 logger = logging.getLogger(__name__)
@@ -65,6 +65,7 @@ def reset_spelling_checker() -> None:
 # Error personalizado
 # =============================================================================
 
+
 @dataclass
 class SpellingCheckError(NLPError):
     """Error durante el análisis ortográfico."""
@@ -73,13 +74,11 @@ class SpellingCheckError(NLPError):
     original_error: str = ""
     message: str = field(init=False)
     severity: ErrorSeverity = field(default=ErrorSeverity.RECOVERABLE, init=False)
-    user_message: Optional[str] = field(default=None, init=False)
+    user_message: str | None = field(default=None, init=False)
 
     def __post_init__(self):
         self.message = f"Spelling check error: {self.original_error}"
-        self.user_message = (
-            "Error al verificar ortografía. Continuando con resultados parciales."
-        )
+        self.user_message = "Error al verificar ortografía. Continuando con resultados parciales."
         super().__post_init__()
 
 
@@ -90,60 +89,276 @@ class SpellingCheckError(NLPError):
 # Palabras muy comunes que NO son errores (para evitar falsos positivos)
 COMMON_SPANISH_WORDS = {
     # Artículos y preposiciones
-    "el", "la", "los", "las", "un", "una", "unos", "unas",
-    "de", "del", "al", "a", "en", "con", "por", "para", "sin",
-    "sobre", "bajo", "entre", "hacia", "hasta", "desde", "durante",
+    "el",
+    "la",
+    "los",
+    "las",
+    "un",
+    "una",
+    "unos",
+    "unas",
+    "de",
+    "del",
+    "al",
+    "a",
+    "en",
+    "con",
+    "por",
+    "para",
+    "sin",
+    "sobre",
+    "bajo",
+    "entre",
+    "hacia",
+    "hasta",
+    "desde",
+    "durante",
     # Pronombres
-    "yo", "tú", "él", "ella", "nosotros", "vosotros", "ellos", "ellas",
-    "me", "te", "se", "nos", "os", "le", "les", "lo", "la", "los", "las",
-    "mi", "tu", "su", "nuestro", "vuestro", "mío", "tuyo", "suyo",
-    "este", "esta", "esto", "estos", "estas", "ese", "esa", "eso",
-    "aquel", "aquella", "aquello", "que", "quien", "cual", "cuyo",
+    "yo",
+    "tú",
+    "él",
+    "ella",
+    "nosotros",
+    "vosotros",
+    "ellos",
+    "ellas",
+    "me",
+    "te",
+    "se",
+    "nos",
+    "os",
+    "le",
+    "les",
+    "lo",
+    "mi",
+    "tu",
+    "su",
+    "nuestro",
+    "vuestro",
+    "mío",
+    "tuyo",
+    "suyo",
+    "este",
+    "esta",
+    "esto",
+    "estos",
+    "estas",
+    "ese",
+    "esa",
+    "eso",
+    "aquel",
+    "aquella",
+    "aquello",
+    "que",
+    "quien",
+    "cual",
+    "cuyo",
     # Verbos comunes (infinitivos)
-    "ser", "estar", "tener", "hacer", "poder", "decir", "ir", "ver",
-    "dar", "saber", "querer", "llegar", "pasar", "deber", "poner",
-    "parecer", "quedar", "creer", "hablar", "llevar", "dejar", "seguir",
-    "encontrar", "llamar", "venir", "pensar", "salir", "volver", "tomar",
+    "ser",
+    "estar",
+    "tener",
+    "hacer",
+    "poder",
+    "decir",
+    "ir",
+    "ver",
+    "dar",
+    "saber",
+    "querer",
+    "llegar",
+    "pasar",
+    "deber",
+    "poner",
+    "parecer",
+    "quedar",
+    "creer",
+    "hablar",
+    "llevar",
+    "dejar",
+    "seguir",
+    "encontrar",
+    "llamar",
+    "venir",
+    "pensar",
+    "salir",
+    "volver",
+    "tomar",
     # Conjugaciones comunes
-    "es", "era", "fue", "sido", "soy", "eres", "somos", "son", "eran",
-    "está", "estaba", "estuvo", "estoy", "estás", "estamos", "están",
-    "tiene", "tenía", "tuvo", "tengo", "tienes", "tenemos", "tienen",
-    "hace", "hacía", "hizo", "hago", "haces", "hacemos", "hacen",
-    "puede", "podía", "pudo", "puedo", "puedes", "podemos", "pueden",
-    "dice", "decía", "dijo", "digo", "dices", "decimos", "dicen",
-    "va", "iba", "fue", "voy", "vas", "vamos", "van",
-    "hay", "había", "hubo", "habrá",
+    "es",
+    "era",
+    "fue",
+    "sido",
+    "soy",
+    "eres",
+    "somos",
+    "son",
+    "eran",
+    "está",
+    "estaba",
+    "estuvo",
+    "estoy",
+    "estás",
+    "estamos",
+    "están",
+    "tiene",
+    "tenía",
+    "tuvo",
+    "tengo",
+    "tienes",
+    "tenemos",
+    "tienen",
+    "hace",
+    "hacía",
+    "hizo",
+    "hago",
+    "haces",
+    "hacemos",
+    "hacen",
+    "puede",
+    "podía",
+    "pudo",
+    "puedo",
+    "puedes",
+    "podemos",
+    "pueden",
+    "dice",
+    "decía",
+    "dijo",
+    "digo",
+    "dices",
+    "decimos",
+    "dicen",
+    "va",
+    "iba",
+    "voy",
+    "vas",
+    "vamos",
+    "van",
+    "hay",
+    "había",
+    "hubo",
+    "habrá",
     # Adverbios
-    "no", "sí", "ya", "más", "muy", "bien", "mal", "siempre", "nunca",
-    "también", "tampoco", "ahora", "después", "antes", "aquí", "allí",
-    "hoy", "ayer", "mañana", "luego", "pronto", "tarde", "apenas",
+    "no",
+    "sí",
+    "ya",
+    "más",
+    "muy",
+    "bien",
+    "mal",
+    "siempre",
+    "nunca",
+    "también",
+    "tampoco",
+    "ahora",
+    "después",
+    "antes",
+    "aquí",
+    "allí",
+    "hoy",
+    "ayer",
+    "mañana",
+    "luego",
+    "pronto",
+    "tarde",
+    "apenas",
     # Conjunciones
-    "y", "e", "o", "u", "pero", "sino", "porque", "aunque", "si",
-    "como", "cuando", "donde", "mientras", "pues", "que", "ni",
+    "y",
+    "e",
+    "o",
+    "u",
+    "pero",
+    "sino",
+    "porque",
+    "aunque",
+    "si",
+    "como",
+    "cuando",
+    "donde",
+    "mientras",
+    "pues",
+    "ni",
     # Adjetivos comunes
-    "todo", "toda", "todos", "todas", "otro", "otra", "otros", "otras",
-    "mismo", "misma", "mismos", "mismas", "nuevo", "nueva", "bueno",
-    "malo", "grande", "pequeño", "primero", "último", "mejor", "peor",
+    "todo",
+    "toda",
+    "todos",
+    "todas",
+    "otro",
+    "otra",
+    "otros",
+    "otras",
+    "mismo",
+    "misma",
+    "mismos",
+    "mismas",
+    "nuevo",
+    "nueva",
+    "bueno",
+    "malo",
+    "grande",
+    "pequeño",
+    "primero",
+    "último",
+    "mejor",
+    "peor",
     # Números
-    "uno", "dos", "tres", "cuatro", "cinco", "seis", "siete", "ocho",
-    "nueve", "diez", "cien", "mil", "primero", "segundo", "tercero",
+    "uno",
+    "dos",
+    "tres",
+    "cuatro",
+    "cinco",
+    "seis",
+    "siete",
+    "ocho",
+    "nueve",
+    "diez",
+    "cien",
+    "mil",
+    "segundo",
+    "tercero",
     # Otras palabras muy comunes
-    "cosa", "vez", "día", "año", "tiempo", "vida", "mundo", "hombre",
-    "mujer", "parte", "caso", "momento", "forma", "manera", "lugar",
-    "punto", "noche", "agua", "mano", "ojo", "casa", "gente", "país",
-    "nombre", "hijo", "hija", "padre", "madre", "familia", "trabajo",
+    "cosa",
+    "vez",
+    "día",
+    "año",
+    "tiempo",
+    "vida",
+    "mundo",
+    "hombre",
+    "mujer",
+    "parte",
+    "caso",
+    "momento",
+    "forma",
+    "manera",
+    "lugar",
+    "punto",
+    "noche",
+    "agua",
+    "mano",
+    "ojo",
+    "casa",
+    "gente",
+    "país",
+    "nombre",
+    "hijo",
+    "hija",
+    "padre",
+    "madre",
+    "familia",
+    "trabajo",
 }
 
 # Patrones regex para detectar errores
 SPELLING_PATTERNS = [
     # Letras repetidas (más de 2 veces), excluyendo números romanos (III, VIII, etc.)
-    (r'(?<![IVXLCDM])(\w)\1{2,}(?![IVXLCDM])', SpellingErrorType.REPEATED_CHAR, "Letras repetidas"),
+    (r"(?<![IVXLCDM])(\w)\1{2,}(?![IVXLCDM])", SpellingErrorType.REPEATED_CHAR, "Letras repetidas"),
     # Espacios múltiples en la misma línea (NO saltos de párrafo \n\n)
-    (r'[^\S\n]{2,}', SpellingErrorType.TYPO, "Espacios múltiples"),
+    (r"[^\S\n]{2,}", SpellingErrorType.TYPO, "Espacios múltiples"),
     # Puntuación duplicada
-    (r'([.!?])\1+', SpellingErrorType.TYPO, "Puntuación duplicada"),
+    (r"([.!?])\1+", SpellingErrorType.TYPO, "Puntuación duplicada"),
     # Coma o punto seguido de letra sin espacio
-    (r'[,.](?=[a-záéíóúñ])', SpellingErrorType.TYPO, "Falta espacio después de puntuación"),
+    (r"[,.](?=[a-záéíóúñ])", SpellingErrorType.TYPO, "Falta espacio después de puntuación"),
 ]
 
 
@@ -168,6 +383,7 @@ class SpellingChecker:
         """Intentar cargar hunspell si está disponible."""
         try:
             import hunspell
+
             # Buscar diccionario español
             dict_paths = [
                 "/usr/share/hunspell/es_ES",
@@ -195,9 +411,9 @@ class SpellingChecker:
     def check(
         self,
         text: str,
-        known_entities: Optional[list[str]] = None,
+        known_entities: list[str] | None = None,
         use_llm: bool = False,
-        progress_callback: Optional[Callable[[float, str], None]] = None,
+        progress_callback: Callable[[float, str], None] | None = None,
     ) -> Result[SpellingReport]:
         """
         Analizar texto en busca de errores ortográficos.
@@ -263,10 +479,7 @@ class SpellingChecker:
                         report.add_issue(issue)
                 except Exception as e:
                     logger.warning(f"Error en análisis LLM: {e}")
-                    errors.append(SpellingCheckError(
-                        text_sample=text[:100],
-                        original_error=str(e)
-                    ))
+                    errors.append(SpellingCheckError(text_sample=text[:100], original_error=str(e)))
 
             # Fase 5: Deduplicar y consolidar (0.95 - 1.0)
             if progress_callback:
@@ -283,25 +496,20 @@ class SpellingChecker:
 
         except Exception as e:
             logger.error(f"Error en análisis ortográfico: {e}")
-            errors.append(SpellingCheckError(
-                text_sample=text[:100] if text else "",
-                original_error=str(e)
-            ))
+            errors.append(
+                SpellingCheckError(text_sample=text[:100] if text else "", original_error=str(e))
+            )
 
         if errors:
             return Result.partial(report, errors)
         return Result.success(report)
 
-    def _check_dictionary(
-        self,
-        text: str,
-        known_words: set[str]
-    ) -> list[SpellingIssue]:
+    def _check_dictionary(self, text: str, known_words: set[str]) -> list[SpellingIssue]:
         """Verificar palabras contra diccionario."""
         issues: list[SpellingIssue] = []
 
         # Tokenizar texto
-        word_pattern = re.compile(r'\b([a-záéíóúüñA-ZÁÉÍÓÚÜÑ]+)\b')
+        word_pattern = re.compile(r"\b([a-záéíóúüñA-ZÁÉÍÓÚÜÑ]+)\b")
 
         for match in word_pattern.finditer(text):
             word = match.group(1)
@@ -319,7 +527,7 @@ class SpellingChecker:
 
             # Ignorar si parece nombre propio (mayúscula inicial) y no está
             # al inicio de oración
-            if word[0].isupper() and start > 0 and text[start-1] not in '.!?\n':
+            if word[0].isupper() and start > 0 and text[start - 1] not in ".!?\n":
                 continue
 
             # Verificar con hunspell si disponible
@@ -340,18 +548,20 @@ class SpellingChecker:
                 # Obtener contexto (oración)
                 sentence = self._extract_sentence(text, start)
 
-                issues.append(SpellingIssue(
-                    word=word,
-                    start_char=start,
-                    end_char=end,
-                    sentence=sentence,
-                    error_type=SpellingErrorType.MISSPELLING,
-                    severity=SpellingSeverity.WARNING,
-                    suggestions=suggestions,
-                    confidence=0.7 if self._hunspell else 0.5,
-                    detection_method=DetectionMethod.DICTIONARY,
-                    explanation=f"Palabra no encontrada en diccionario"
-                ))
+                issues.append(
+                    SpellingIssue(
+                        word=word,
+                        start_char=start,
+                        end_char=end,
+                        sentence=sentence,
+                        error_type=SpellingErrorType.MISSPELLING,
+                        severity=SpellingSeverity.WARNING,
+                        suggestions=suggestions,
+                        confidence=0.7 if self._hunspell else 0.5,
+                        detection_method=DetectionMethod.DICTIONARY,
+                        explanation="Palabra no encontrada en diccionario",
+                    )
+                )
 
         return issues
 
@@ -369,33 +579,31 @@ class SpellingChecker:
                 # Generar sugerencia según el tipo
                 suggestion = self._fix_pattern_error(word, error_type)
 
-                issues.append(SpellingIssue(
-                    word=word,
-                    start_char=start,
-                    end_char=end,
-                    sentence=sentence,
-                    error_type=error_type,
-                    severity=SpellingSeverity.WARNING,
-                    suggestions=[suggestion] if suggestion else [],
-                    confidence=0.9,
-                    detection_method=DetectionMethod.REGEX,
-                    explanation=explanation
-                ))
+                issues.append(
+                    SpellingIssue(
+                        word=word,
+                        start_char=start,
+                        end_char=end,
+                        sentence=sentence,
+                        error_type=error_type,
+                        severity=SpellingSeverity.WARNING,
+                        suggestions=[suggestion] if suggestion else [],
+                        confidence=0.9,
+                        detection_method=DetectionMethod.REGEX,
+                        explanation=explanation,
+                    )
+                )
 
         return issues
 
-    def _check_common_errors(
-        self,
-        text: str,
-        known_words: set[str]
-    ) -> list[SpellingIssue]:
+    def _check_common_errors(self, text: str, known_words: set[str]) -> list[SpellingIssue]:
         """Buscar errores comunes en español."""
         issues: list[SpellingIssue] = []
 
         # Verificar errores de tildes
         for wrong, correct in COMMON_ACCENT_ERRORS.items():
             # Buscar la palabra sin tilde en contextos donde debería llevarla
-            pattern = rf'\b{re.escape(wrong)}\b'
+            pattern = rf"\b{re.escape(wrong)}\b"
             for match in re.finditer(pattern, text, re.IGNORECASE):
                 word = match.group(0)
                 start = match.start()
@@ -404,22 +612,24 @@ class SpellingChecker:
                 # Analizar contexto para determinar si es error
                 if self._needs_accent_in_context(text, start, wrong, correct):
                     sentence = self._extract_sentence(text, start)
-                    issues.append(SpellingIssue(
-                        word=word,
-                        start_char=start,
-                        end_char=end,
-                        sentence=sentence,
-                        error_type=SpellingErrorType.ACCENT,
-                        severity=SpellingSeverity.WARNING,
-                        suggestions=[correct],
-                        confidence=0.6,  # Requiere verificación contextual
-                        detection_method=DetectionMethod.CONTEXT,
-                        explanation=f"Posible falta de tilde: '{wrong}' → '{correct}'"
-                    ))
+                    issues.append(
+                        SpellingIssue(
+                            word=word,
+                            start_char=start,
+                            end_char=end,
+                            sentence=sentence,
+                            error_type=SpellingErrorType.ACCENT,
+                            severity=SpellingSeverity.WARNING,
+                            suggestions=[correct],
+                            confidence=0.6,  # Requiere verificación contextual
+                            detection_method=DetectionMethod.CONTEXT,
+                            explanation=f"Posible falta de tilde: '{wrong}' → '{correct}'",
+                        )
+                    )
 
         # Verificar confusiones de homófonos
         for word, alternatives in COMMON_HOMOPHONES.items():
-            pattern = rf'\b{re.escape(word)}\b'
+            pattern = rf"\b{re.escape(word)}\b"
             for match in re.finditer(pattern, text, re.IGNORECASE):
                 start = match.start()
                 end = match.end()
@@ -427,47 +637,49 @@ class SpellingChecker:
                 # Solo marcar si el contexto sugiere confusión
                 if self._suggests_homophone_confusion(text, start, word):
                     sentence = self._extract_sentence(text, start)
-                    issues.append(SpellingIssue(
-                        word=match.group(0),
-                        start_char=start,
-                        end_char=end,
-                        sentence=sentence,
-                        error_type=SpellingErrorType.HOMOPHONE,
-                        severity=SpellingSeverity.INFO,
-                        suggestions=alternatives,
-                        confidence=0.4,  # Baja confianza, requiere revisión
-                        detection_method=DetectionMethod.CONTEXT,
-                        explanation=f"Verificar: ¿'{word}' o '{alternatives[0]}'?"
-                    ))
+                    issues.append(
+                        SpellingIssue(
+                            word=match.group(0),
+                            start_char=start,
+                            end_char=end,
+                            sentence=sentence,
+                            error_type=SpellingErrorType.HOMOPHONE,
+                            severity=SpellingSeverity.INFO,
+                            suggestions=alternatives,
+                            confidence=0.4,  # Baja confianza, requiere revisión
+                            detection_method=DetectionMethod.CONTEXT,
+                            explanation=f"Verificar: ¿'{word}' o '{alternatives[0]}'?",
+                        )
+                    )
 
         # Verificar palabras comúnmente confundidas
         for word, alternatives in COMMONLY_CONFUSED.items():
-            pattern = rf'\b{re.escape(word)}\b'
+            pattern = rf"\b{re.escape(word)}\b"
             for match in re.finditer(pattern, text, re.IGNORECASE):
                 start = match.start()
                 # Solo sugerir si el contexto indica posible confusión
-                context = text[max(0, start-30):min(len(text), start+len(word)+30)]
+                context = text[max(0, start - 30) : min(len(text), start + len(word) + 30)]
                 if self._context_suggests_confusion(context, word, alternatives):
                     sentence = self._extract_sentence(text, start)
-                    issues.append(SpellingIssue(
-                        word=match.group(0),
-                        start_char=start,
-                        end_char=match.end(),
-                        sentence=sentence,
-                        error_type=SpellingErrorType.HOMOPHONE,
-                        severity=SpellingSeverity.INFO,
-                        suggestions=alternatives[:3],
-                        confidence=0.3,
-                        detection_method=DetectionMethod.CONTEXT,
-                        explanation=f"Verificar uso de '{word}'"
-                    ))
+                    issues.append(
+                        SpellingIssue(
+                            word=match.group(0),
+                            start_char=start,
+                            end_char=match.end(),
+                            sentence=sentence,
+                            error_type=SpellingErrorType.HOMOPHONE,
+                            severity=SpellingSeverity.INFO,
+                            suggestions=alternatives[:3],
+                            confidence=0.3,
+                            detection_method=DetectionMethod.CONTEXT,
+                            explanation=f"Verificar uso de '{word}'",
+                        )
+                    )
 
         return issues
 
     def _check_with_llm(
-        self,
-        text: str,
-        existing_issues: list[SpellingIssue]
+        self, text: str, existing_issues: list[SpellingIssue]
     ) -> list[SpellingIssue]:
         """Usar LLM para análisis contextual avanzado."""
         try:
@@ -481,7 +693,7 @@ class SpellingChecker:
             existing_words = {i.word for i in existing_issues}
 
             prompt = f"""Analiza el siguiente texto en español y encuentra errores ortográficos que no estén ya detectados.
-NO incluyas estas palabras ya detectadas: {', '.join(existing_words)}
+NO incluyas estas palabras ya detectadas: {", ".join(existing_words)}
 
 Texto:
 {text[:2000]}
@@ -499,9 +711,10 @@ Si no hay errores adicionales, responde con un array vacío: []"""
 
             # Parsear respuesta
             import json
+
             try:
                 # Buscar JSON en la respuesta
-                json_match = re.search(r'\[.*\]', response, re.DOTALL)
+                json_match = re.search(r"\[.*\]", response, re.DOTALL)
                 if json_match:
                     errors = json.loads(json_match.group())
                     issues = []
@@ -511,18 +724,20 @@ Si no hay errores adicionales, responde con un array vacío: []"""
                             # Encontrar posición en texto
                             pos = text.find(word)
                             if pos >= 0:
-                                issues.append(SpellingIssue(
-                                    word=word,
-                                    start_char=pos,
-                                    end_char=pos + len(word),
-                                    sentence=self._extract_sentence(text, pos),
-                                    error_type=SpellingErrorType.MISSPELLING,
-                                    severity=SpellingSeverity.WARNING,
-                                    suggestions=[err.get("suggestion", "")],
-                                    confidence=0.6,
-                                    detection_method=DetectionMethod.LLM,
-                                    explanation=err.get("explanation", "Detectado por LLM")
-                                ))
+                                issues.append(
+                                    SpellingIssue(
+                                        word=word,
+                                        start_char=pos,
+                                        end_char=pos + len(word),
+                                        sentence=self._extract_sentence(text, pos),
+                                        error_type=SpellingErrorType.MISSPELLING,
+                                        severity=SpellingSeverity.WARNING,
+                                        suggestions=[err.get("suggestion", "")],
+                                        confidence=0.6,
+                                        detection_method=DetectionMethod.LLM,
+                                        explanation=err.get("explanation", "Detectado por LLM"),
+                                    )
+                                )
                     return issues
             except json.JSONDecodeError:
                 pass
@@ -550,15 +765,15 @@ Si no hay errores adicionales, responde con un array vacío: []"""
         """Extraer la oración que contiene la posición dada."""
         # Buscar inicio de oración
         start = position
-        while start > 0 and text[start-1] not in '.!?\n':
+        while start > 0 and text[start - 1] not in ".!?\n":
             start -= 1
 
         # Buscar fin de oración
         end = position
-        while end < len(text) and text[end] not in '.!?\n':
+        while end < len(text) and text[end] not in ".!?\n":
             end += 1
 
-        sentence = text[start:end+1].strip()
+        sentence = text[start : end + 1].strip()
         # Limitar longitud
         if len(sentence) > 200:
             # Centrar en la palabra
@@ -575,32 +790,28 @@ Si no hay errores adicionales, responde con un array vacío: []"""
 
         # Patrones que sugieren error
         error_patterns = [
-            r'(.)\1{2,}',           # Más de 2 letras repetidas
-            r'[qwx]{2,}',          # Combinaciones raras
-            r'^[^aeiouáéíóú]+$',   # Sin vocales (>3 letras)
-            r'[bcdfghjklmnñpqrstvwxyz]{4,}',  # 4+ consonantes seguidas
+            r"(.)\1{2,}",  # Más de 2 letras repetidas
+            r"[qwx]{2,}",  # Combinaciones raras
+            r"^[^aeiouáéíóú]+$",  # Sin vocales (>3 letras)
+            r"[bcdfghjklmnñpqrstvwxyz]{4,}",  # 4+ consonantes seguidas
         ]
 
-        if len(word) > 3 and not any(c in word_lower for c in 'aeiouáéíóú'):
+        if len(word) > 3 and not any(c in word_lower for c in "aeiouáéíóú"):
             return True
 
-        for pattern in error_patterns:
-            if re.search(pattern, word_lower):
-                return True
-
-        return False
+        return any(re.search(pattern, word_lower) for pattern in error_patterns)
 
     def _generate_suggestions(self, word: str) -> list[str]:
         """Generar sugerencias para una palabra."""
         suggestions = []
 
         # Sugerencia 1: Quitar letras repetidas
-        deduped = re.sub(r'(.)\1+', r'\1\1', word)
+        deduped = re.sub(r"(.)\1+", r"\1\1", word)
         if deduped != word:
-            suggestions.append(re.sub(r'(.)\1+', r'\1', word))
+            suggestions.append(re.sub(r"(.)\1+", r"\1", word))
 
         # Sugerencia 2: Añadir/quitar tilde común
-        accent_map = {'a': 'á', 'e': 'é', 'i': 'í', 'o': 'ó', 'u': 'ú'}
+        accent_map = {"a": "á", "e": "é", "i": "í", "o": "ó", "u": "ú"}
         for plain, accented in accent_map.items():
             if plain in word.lower():
                 suggestions.append(word.lower().replace(plain, accented, 1))
@@ -610,21 +821,15 @@ Si no hay errores adicionales, responde con un array vacío: []"""
     def _fix_pattern_error(self, word: str, error_type: SpellingErrorType) -> str:
         """Generar corrección para error de patrón."""
         if error_type == SpellingErrorType.REPEATED_CHAR:
-            return re.sub(r'(.)\1{2,}', r'\1\1', word)
+            return re.sub(r"(.)\1{2,}", r"\1\1", word)
         elif error_type == SpellingErrorType.TYPO:
-            if '  ' in word:
-                return ' '
-            if re.match(r'([.!?])\1+', word):
+            if "  " in word:
+                return " "
+            if re.match(r"([.!?])\1+", word):
                 return word[0]
         return ""
 
-    def _needs_accent_in_context(
-        self,
-        text: str,
-        position: int,
-        word: str,
-        accented: str
-    ) -> bool:
+    def _needs_accent_in_context(self, text: str, position: int, word: str, accented: str) -> bool:
         """Determinar si la palabra necesita tilde según contexto."""
         # Obtener contexto
         context_start = max(0, position - 20)
@@ -635,7 +840,7 @@ Si no hay errores adicionales, responde con un array vacío: []"""
         rules = {
             "mas": lambda c: "pero" not in c and "sin embargo" not in c,
             "si": lambda c: "?" in c or "!" in c or "claro" in c or "por supuesto" in c,
-            "el": lambda c: position > 0 and text[position-1] in '.,;:',
+            "el": lambda c: position > 0 and text[position - 1] in ".,;:",
             "tu": lambda c: "?" in c or "eres" in c or "tienes" in c,
             "mi": lambda c: "para" in c or "a" in c[:10],
         }
@@ -645,12 +850,7 @@ Si no hay errores adicionales, responde con un array vacío: []"""
 
         return False
 
-    def _suggests_homophone_confusion(
-        self,
-        text: str,
-        position: int,
-        word: str
-    ) -> bool:
+    def _suggests_homophone_confusion(self, text: str, position: int, word: str) -> bool:
         """Determinar si el contexto sugiere confusión de homófonos."""
         # Por ahora, solo marcar casos muy específicos
         context_start = max(0, position - 30)
@@ -661,23 +861,13 @@ Si no hay errores adicionales, responde con un array vacío: []"""
         if word.lower() == "haber":
             if "vamos" in context or "veamos" in context:
                 return True
-        elif word.lower() == "a ver":
-            if "podido" in context or "debido" in context:
-                return True
+        elif word.lower() == "a ver" and ("podido" in context or "debido" in context):
+            return True
 
         # "hay" vs "ahí" vs "ay"
-        if word.lower() == "hay":
-            if "allí" in context or "aquí" in context:
-                return True
+        return bool(word.lower() == "hay" and ("allí" in context or "aquí" in context))
 
-        return False
-
-    def _context_suggests_confusion(
-        self,
-        context: str,
-        word: str,
-        alternatives: list[str]
-    ) -> bool:
+    def _context_suggests_confusion(self, context: str, word: str, alternatives: list[str]) -> bool:
         """Determinar si el contexto sugiere confusión entre palabras."""
         # Solo retornar True para casos muy claros
         # Por defecto, no marcar para evitar demasiados falsos positivos

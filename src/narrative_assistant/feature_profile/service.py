@@ -3,16 +3,14 @@ Servicio de gestión de perfiles de features.
 """
 
 import logging
-from typing import Optional
 
 from ..persistence.database import get_database
 from .models import (
+    DOCUMENT_SUBTYPES,
+    DOCUMENT_TYPES,
     DocumentType,
     FeatureProfile,
-    FeatureAvailability,
     create_feature_profile,
-    DOCUMENT_TYPES,
-    DOCUMENT_SUBTYPES,
 )
 
 logger = logging.getLogger(__name__)
@@ -60,17 +58,19 @@ class FeatureProfileService:
         for doc_type in DocumentType:
             info = DOCUMENT_TYPES.get(doc_type, {})
             subtypes = DOCUMENT_SUBTYPES.get(doc_type, [])
-            result.append({
-                "code": doc_type.value,
-                "name": info.get("name", doc_type.value),
-                "description": info.get("description", ""),
-                "icon": info.get("icon", "pi-file"),
-                "color": info.get("color", "#6b7280"),
-                "subtypes": subtypes,
-            })
+            result.append(
+                {
+                    "code": doc_type.value,
+                    "name": info.get("name", doc_type.value),
+                    "description": info.get("description", ""),
+                    "icon": info.get("icon", "pi-file"),
+                    "color": info.get("color", "#6b7280"),
+                    "subtypes": subtypes,
+                }
+            )
         return result
 
-    def get_document_type_info(self, type_code: str) -> Optional[dict]:
+    def get_document_type_info(self, type_code: str) -> dict | None:
         """
         Obtiene información de un tipo de documento específico.
 
@@ -99,7 +99,7 @@ class FeatureProfileService:
     # Perfil de features
     # =========================================================================
 
-    def get_project_profile(self, project_id: int) -> Optional[FeatureProfile]:
+    def get_project_profile(self, project_id: int) -> FeatureProfile | None:
         """
         Obtiene el perfil de features para un proyecto.
 
@@ -126,7 +126,7 @@ class FeatureProfileService:
 
         return create_feature_profile(doc_type, doc_subtype)
 
-    def get_project_document_type(self, project_id: int) -> Optional[dict]:
+    def get_project_document_type(self, project_id: int) -> dict | None:
         """
         Obtiene el tipo de documento actual de un proyecto.
 
@@ -168,8 +168,8 @@ class FeatureProfileService:
             "confirmed": bool(row["document_type_confirmed"]),
             "detected_type": row["detected_document_type"],
             "has_mismatch": (
-                row["detected_document_type"] is not None and
-                row["detected_document_type"] != doc_type_str
+                row["detected_document_type"] is not None
+                and row["detected_document_type"] != doc_type_str
             ),
         }
 
@@ -177,7 +177,7 @@ class FeatureProfileService:
         self,
         project_id: int,
         document_type: str,
-        document_subtype: Optional[str] = None,
+        document_subtype: str | None = None,
         confirmed: bool = True,
     ) -> bool:
         """
@@ -327,7 +327,7 @@ class FeatureProfileService:
     # Detección automática (placeholder para futuro ML)
     # =========================================================================
 
-    def detect_document_type(self, project_id: int) -> Optional[str]:
+    def detect_document_type(self, project_id: int) -> str | None:
         """
         Detecta el tipo de documento basándose en el contenido.
 

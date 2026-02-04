@@ -18,9 +18,8 @@ Tipos detectados:
 
 import logging
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +27,7 @@ logger = logging.getLogger(__name__)
 try:
     import spacy
     from spacy.tokens import Doc
+
     SPACY_AVAILABLE = True
 except ImportError:
     SPACY_AVAILABLE = False
@@ -69,19 +69,19 @@ class TemporalMarker:
     marker_type: MarkerType
     start_char: int
     end_char: int
-    chapter: Optional[int] = None
-    paragraph: Optional[int] = None
+    chapter: int | None = None
+    paragraph: int | None = None
     # Para marcadores relativos
-    direction: Optional[str] = None  # 'past', 'future'
-    magnitude: Optional[str] = None  # 'día', 'mes', 'año'
-    quantity: Optional[int] = None
+    direction: str | None = None  # 'past', 'future'
+    magnitude: str | None = None  # 'día', 'mes', 'año'
+    quantity: int | None = None
     # Para edades
-    entity_id: Optional[int] = None
-    age: Optional[int] = None
+    entity_id: int | None = None
+    age: int | None = None
     # Metadata adicional
-    year: Optional[int] = None
-    month: Optional[int] = None
-    day: Optional[int] = None
+    year: int | None = None
+    month: int | None = None
+    day: int | None = None
     # Confianza
     confidence: float = 1.0
 
@@ -168,9 +168,15 @@ TEMPORAL_PATTERNS: dict[MarkerType, list[tuple[str, float]]] = {
             0.95,
         ),
         # "aquella noche", "esa mañana", "aquella mañana de martes"
-        (r"\b(aquel|aquella|ese|esa)\s+(noche|mañana|tarde|día)(\s+de\s+(lunes|martes|miércoles|jueves|viernes|sábado|domingo))?\b", 0.8),
+        (
+            r"\b(aquel|aquella|ese|esa)\s+(noche|mañana|tarde|día)(\s+de\s+(lunes|martes|miércoles|jueves|viernes|sábado|domingo))?\b",
+            0.8,
+        ),
         # "aquella mañana de martes" (captura día de la semana con contexto temporal)
-        (r"\b(aquel|aquella|ese|esa)\s+(lunes|martes|miércoles|jueves|viernes|sábado|domingo)\b", 0.8),
+        (
+            r"\b(aquel|aquella|ese|esa)\s+(lunes|martes|miércoles|jueves|viernes|sábado|domingo)\b",
+            0.8,
+        ),
         # "más tarde", "poco después"
         (
             r"\b(más\s+tarde|poco\s+después|mucho\s+después|tiempo\s+después|horas\s+después|minutos\s+después)\b",
@@ -182,7 +188,10 @@ TEMPORAL_PATTERNS: dict[MarkerType, list[tuple[str, float]]] = {
             0.9,
         ),
         # "mañana de martes", "noche del viernes" (sin demostrativo)
-        (r"\b(la\s+)?(mañana|noche|tarde)\s+del?\s+(lunes|martes|miércoles|jueves|viernes|sábado|domingo)\b", 0.75),
+        (
+            r"\b(la\s+)?(mañana|noche|tarde)\s+del?\s+(lunes|martes|miércoles|jueves|viernes|sábado|domingo)\b",
+            0.75,
+        ),
     ],
     MarkerType.SEASON_EPOCH: [
         # "aquel verano", "ese invierno"
@@ -266,16 +275,44 @@ class TemporalMarkerExtractor:
 
     # Palabras clave temporales para detección NLP
     TEMPORAL_KEYWORDS = {
-        "después", "antes", "siguiente", "anterior", "pasado", "futuro",
-        "ayer", "hoy", "mañana", "anoche", "ahora", "entonces", "luego",
-        "pronto", "tarde", "temprano", "siempre", "nunca", "jamás",
-        "mientras", "cuando", "hasta", "desde", "durante",
+        "después",
+        "antes",
+        "siguiente",
+        "anterior",
+        "pasado",
+        "futuro",
+        "ayer",
+        "hoy",
+        "mañana",
+        "anoche",
+        "ahora",
+        "entonces",
+        "luego",
+        "pronto",
+        "tarde",
+        "temprano",
+        "siempre",
+        "nunca",
+        "jamás",
+        "mientras",
+        "cuando",
+        "hasta",
+        "desde",
+        "durante",
     }
 
     # Palabras que indican tiempo relativo
     RELATIVE_INDICATORS = {
-        "después", "antes", "siguiente", "anterior", "más tarde", "atrás",
-        "pasado", "último", "próximo", "al cabo",
+        "después",
+        "antes",
+        "siguiente",
+        "anterior",
+        "más tarde",
+        "atrás",
+        "pasado",
+        "último",
+        "próximo",
+        "al cabo",
     }
 
     def __init__(self, use_nlp: bool = True):
@@ -298,6 +335,7 @@ class TemporalMarkerExtractor:
         if self.use_nlp:
             try:
                 from narrative_assistant.nlp.spacy_gpu import load_spacy_model
+
                 self.nlp = load_spacy_model()
                 logger.debug("spaCy cargado para extracción temporal")
             except Exception as e:
@@ -308,7 +346,7 @@ class TemporalMarkerExtractor:
     def extract(
         self,
         text: str,
-        chapter: Optional[int] = None,
+        chapter: int | None = None,
     ) -> list[TemporalMarker]:
         """
         Extrae todos los marcadores temporales del texto.
@@ -339,9 +377,7 @@ class TemporalMarkerExtractor:
                         continue
 
                     # Verificar que no se solape con un span ya extraído
-                    overlaps = any(
-                        self._spans_overlap(span, existing) for existing in seen_spans
-                    )
+                    overlaps = any(self._spans_overlap(span, existing) for existing in seen_spans)
                     if overlaps:
                         continue
 
@@ -363,16 +399,14 @@ class TemporalMarkerExtractor:
 
         return markers
 
-    def _spans_overlap(
-        self, span1: tuple[int, int], span2: tuple[int, int]
-    ) -> bool:
+    def _spans_overlap(self, span1: tuple[int, int], span2: tuple[int, int]) -> bool:
         """Verifica si dos spans se solapan."""
         return not (span1[1] <= span2[0] or span2[1] <= span1[0])
 
     def _extract_with_nlp(
         self,
         text: str,
-        chapter: Optional[int],
+        chapter: int | None,
         seen_spans: set[tuple[int, int]],
     ) -> list[TemporalMarker]:
         """
@@ -407,9 +441,7 @@ class TemporalMarkerExtractor:
                     # Verificar que no se solape con spans existentes
                     if span in seen_spans:
                         continue
-                    overlaps = any(
-                        self._spans_overlap(span, existing) for existing in seen_spans
-                    )
+                    overlaps = any(self._spans_overlap(span, existing) for existing in seen_spans)
                     if overlaps:
                         continue
 
@@ -455,14 +487,16 @@ class TemporalMarkerExtractor:
                         if span in seen_spans:
                             continue
 
-                        markers.append(TemporalMarker(
-                            text=expanded_text,
-                            marker_type=MarkerType.RELATIVE_TIME,
-                            start_char=expanded_start,
-                            end_char=expanded_end,
-                            chapter=chapter,
-                            confidence=0.65,
-                        ))
+                        markers.append(
+                            TemporalMarker(
+                                text=expanded_text,
+                                marker_type=MarkerType.RELATIVE_TIME,
+                                start_char=expanded_start,
+                                end_char=expanded_end,
+                                chapter=chapter,
+                                confidence=0.65,
+                            )
+                        )
 
         except Exception as e:
             logger.debug(f"Error en extracción NLP temporal: {e}")
@@ -476,7 +510,7 @@ class TemporalMarkerExtractor:
         # Detectar fechas absolutas
         if re.search(r"\d{4}", text_lower):  # Contiene año
             return MarkerType.ABSOLUTE_DATE
-        if any(month in text_lower for month in MONTHS.keys()):
+        if any(month in text_lower for month in MONTHS):
             return MarkerType.ABSOLUTE_DATE
 
         # Detectar expresiones relativas
@@ -506,14 +540,23 @@ class TemporalMarkerExtractor:
             marker.direction = "past"
 
         # Intentar detectar cantidad y magnitud
-        for token in doc[ent.start:ent.end]:
+        for token in doc[ent.start : ent.end]:
             if token.like_num or token.text.lower() in WORD_TO_NUM:
                 if token.text.isdigit():
                     marker.quantity = int(token.text)
                 else:
                     marker.quantity = WORD_TO_NUM.get(token.text.lower())
 
-            if token.text.lower() in ["día", "días", "semana", "semanas", "mes", "meses", "año", "años"]:
+            if token.text.lower() in [
+                "día",
+                "días",
+                "semana",
+                "semanas",
+                "mes",
+                "meses",
+                "año",
+                "años",
+            ]:
                 marker.magnitude = token.text.lower().rstrip("s")
 
         return marker
@@ -547,7 +590,7 @@ class TemporalMarkerExtractor:
         match: re.Match,
         marker_type: MarkerType,
         confidence: float,
-        chapter: Optional[int],
+        chapter: int | None,
     ) -> TemporalMarker:
         """Crea un marcador con información extraída."""
         marker = TemporalMarker(
@@ -580,9 +623,7 @@ class TemporalMarkerExtractor:
         text_lower = marker.text.lower()
 
         # Dirección
-        if any(
-            w in text_lower for w in ["después", "siguiente", "más tarde", "al cabo"]
-        ):
+        if any(w in text_lower for w in ["después", "siguiente", "más tarde", "al cabo"]):
             marker.direction = "future"
         elif any(w in text_lower for w in ["antes", "anterior", "atrás"]):
             marker.direction = "past"
@@ -681,7 +722,7 @@ class TemporalMarkerExtractor:
         self,
         text: str,
         entity_mentions: list[tuple[int, int, int]],  # (entity_id, start, end)
-        chapter: Optional[int] = None,
+        chapter: int | None = None,
     ) -> list[TemporalMarker]:
         """
         Extrae marcadores y los asocia con entidades cercanas.
@@ -703,7 +744,7 @@ class TemporalMarkerExtractor:
                 closest_entity = None
                 min_distance = float("inf")
 
-                for entity_id, start, end in entity_mentions:
+                for entity_id, _start, end in entity_mentions:
                     if end <= marker.start_char:
                         distance = marker.start_char - end
                         # Máximo 200 caracteres de distancia

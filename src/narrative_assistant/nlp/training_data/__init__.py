@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Módulo de datos de entrenamiento para votación ponderada.
 

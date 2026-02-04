@@ -8,7 +8,7 @@ aplicar o ignorar cada sugerencia.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Optional, Any
+from typing import Any
 
 from .types import CorrectionCategory
 
@@ -42,11 +42,11 @@ class CorrectionIssue:
     end_char: int
     text: str
     explanation: str
-    suggestion: Optional[str] = None
+    suggestion: str | None = None
     confidence: float = 0.8
     context: str = ""
-    chapter_index: Optional[int] = None
-    rule_id: Optional[str] = None
+    chapter_index: int | None = None
+    rule_id: str | None = None
     extra_data: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -83,7 +83,7 @@ class BaseDetector(ABC):
     def detect(
         self,
         text: str,
-        chapter_index: Optional[int] = None,
+        chapter_index: int | None = None,
     ) -> list[CorrectionIssue]:
         """
         Detecta problemas en el texto.
@@ -108,9 +108,7 @@ class BaseDetector(ABC):
         """Si el detector necesita análisis de spaCy."""
         return False
 
-    def _extract_context(
-        self, text: str, start: int, end: int, window: int = 40
-    ) -> str:
+    def _extract_context(self, text: str, start: int, end: int, window: int = 40) -> str:
         """
         Extrae contexto alrededor de una posición.
 

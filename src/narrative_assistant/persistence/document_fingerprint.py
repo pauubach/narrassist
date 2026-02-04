@@ -12,7 +12,6 @@ import logging
 import re
 import unicodedata
 from dataclasses import dataclass
-from typing import Optional
 
 from ..core.config import get_config
 
@@ -78,7 +77,7 @@ class FingerprintGenerator:
 
     def __init__(
         self,
-        sample_size: Optional[int] = None,
+        sample_size: int | None = None,
         ngram_size: int = DEFAULT_NGRAM_SIZE,
     ):
         """
@@ -200,9 +199,9 @@ class FingerprintMatch:
     is_exact_match: bool  # Mismo documento exacto
     is_similar: bool  # Versión modificada probable
     similarity_score: float  # 0.0 - 1.0
-    existing_fingerprint: Optional[DocumentFingerprint]
-    existing_project_id: Optional[int]
-    existing_project_name: Optional[str]
+    existing_fingerprint: DocumentFingerprint | None
+    existing_project_id: int | None
+    existing_project_name: str | None
 
     @property
     def match_type(self) -> str:
@@ -218,15 +217,13 @@ class FingerprintMatch:
 class FingerprintMatcher:
     """Busca documentos similares en la base de datos."""
 
-    def __init__(self, similarity_threshold: Optional[float] = None):
+    def __init__(self, similarity_threshold: float | None = None):
         """
         Args:
             similarity_threshold: Umbral para considerar documentos similares.
         """
         config = get_config()
-        self.threshold = (
-            similarity_threshold or config.persistence.similarity_threshold_same_doc
-        )
+        self.threshold = similarity_threshold or config.persistence.similarity_threshold_same_doc
         self.generator = FingerprintGenerator()
 
     def jaccard_similarity(self, set1: frozenset, set2: frozenset) -> float:
@@ -254,28 +251,20 @@ class FingerprintMatcher:
             Score combinado 0.0 - 1.0
         """
         # Jaccard de palabras
-        word_jaccard = self.jaccard_similarity(
-            fp1.unique_words_sample, fp2.unique_words_sample
-        )
+        word_jaccard = self.jaccard_similarity(fp1.unique_words_sample, fp2.unique_words_sample)
 
         # Jaccard de n-gramas (más peso porque considera orden)
-        ngram_jaccard = self.jaccard_similarity(
-            fp1.ngram_shingles, fp2.ngram_shingles
-        )
+        ngram_jaccard = self.jaccard_similarity(fp1.ngram_shingles, fp2.ngram_shingles)
 
         # Ratio de longitud
-        word_ratio = min(fp1.word_count, fp2.word_count) / max(
-            fp1.word_count, fp2.word_count, 1
-        )
+        word_ratio = min(fp1.word_count, fp2.word_count) / max(fp1.word_count, fp2.word_count, 1)
 
         # Ponderación: n-gramas tienen más peso
         combined = (word_jaccard * 0.3) + (ngram_jaccard * 0.5) + (word_ratio * 0.2)
 
         return combined
 
-    def find_match(
-        self, fingerprint: DocumentFingerprint, db
-    ) -> FingerprintMatch:
+    def find_match(self, fingerprint: DocumentFingerprint, db) -> FingerprintMatch:
         """
         Busca documentos similares en la base de datos.
 
@@ -359,9 +348,9 @@ class FingerprintMatcher:
             # Necesitamos recalcular el fingerprint del proyecto existente
             # para comparar unique_words_sample
             # Por ahora, usamos heurística basada en word_count
-            word_ratio = min(
+            word_ratio = min(project["word_count"], fingerprint.word_count) / max(
                 project["word_count"], fingerprint.word_count
-            ) / max(project["word_count"], fingerprint.word_count)
+            )
 
             if word_ratio > best_score:
                 best_score = word_ratio

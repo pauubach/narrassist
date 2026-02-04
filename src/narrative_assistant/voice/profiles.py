@@ -6,11 +6,10 @@ incluyendo métricas como longitud de intervención, riqueza léxica (TTR),
 formalidad, muletillas y patrones de puntuación.
 """
 
-import re
 import logging
-from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Set, Tuple
+import re
 from collections import Counter
+from dataclasses import dataclass, field
 from statistics import mean, stdev
 
 logger = logging.getLogger(__name__)
@@ -19,36 +18,100 @@ logger = logging.getLogger(__name__)
 # Palabras de registro formal vs informal en español
 FORMAL_MARKERS = {
     # Pronombres y tratamiento
-    "usted", "ustedes", "senor", "senora", "don", "dona",
+    "usted",
+    "ustedes",
+    "senor",
+    "senora",
+    "don",
+    "dona",
     # Verbos formales
-    "desearia", "permitiria", "solicitaria", "agradeceria",
+    "desearia",
+    "permitiria",
+    "solicitaria",
+    "agradeceria",
     # Expresiones formales
-    "sin embargo", "no obstante", "por consiguiente", "asimismo",
-    "en efecto", "ciertamente", "efectivamente", "indudablemente",
+    "sin embargo",
+    "no obstante",
+    "por consiguiente",
+    "asimismo",
+    "en efecto",
+    "ciertamente",
+    "efectivamente",
+    "indudablemente",
     # Vocabulario culto
-    "menester", "acaecer", "deparar", "suscitar", "denotar",
+    "menester",
+    "acaecer",
+    "deparar",
+    "suscitar",
+    "denotar",
 }
 
 INFORMAL_MARKERS = {
     # Pronombres y tratamiento
-    "tu", "vos", "tio", "tia", "colega", "chaval", "chavala",
+    "tu",
+    "vos",
+    "tio",
+    "tia",
+    "colega",
+    "chaval",
+    "chavala",
     # Muletillas
-    "bueno", "pues", "vale", "venga", "vamos", "mira", "oye",
-    "eh", "ey", "jo", "jolin", "joder", "hostia",
+    "bueno",
+    "pues",
+    "vale",
+    "venga",
+    "vamos",
+    "mira",
+    "oye",
+    "eh",
+    "ey",
+    "jo",
+    "jolin",
+    "joder",
+    "hostia",
     # Expresiones coloquiales
-    "mogollon", "mola", "flipar", "currar", "molar", "flipante",
-    "guay", "genial", "pasada", "rollo", "chungo",
+    "mogollon",
+    "mola",
+    "flipar",
+    "currar",
+    "molar",
+    "flipante",
+    "guay",
+    "genial",
+    "pasada",
+    "rollo",
+    "chungo",
     # Contracciones y elisiones tipicas
-    "pa", "pal", "mu",
+    "pa",
+    "pal",
+    "mu",
 }
 
 # Muletillas comunes en español
 FILLERS = {
-    "bueno", "pues", "eh", "este", "o sea", "es decir",
-    "sabes", "entiendes", "me explico", "verdad",
-    "la verdad", "en plan", "tipo", "como que", "basicamente",
-    "literalmente", "sinceramente", "francamente", "obviamente",
-    "claramente", "realmente", "practicamente", "exactamente",
+    "bueno",
+    "pues",
+    "eh",
+    "este",
+    "o sea",
+    "es decir",
+    "sabes",
+    "entiendes",
+    "me explico",
+    "verdad",
+    "la verdad",
+    "en plan",
+    "tipo",
+    "como que",
+    "basicamente",
+    "literalmente",
+    "sinceramente",
+    "francamente",
+    "obviamente",
+    "claramente",
+    "realmente",
+    "practicamente",
+    "exactamente",
 }
 
 
@@ -73,7 +136,7 @@ class VoiceMetrics:
 
     # Muletillas
     filler_ratio: float = 0.0  # Proporción de palabras que son muletillas
-    top_fillers: List[Tuple[str, int]] = field(default_factory=list)
+    top_fillers: list[tuple[str, int]] = field(default_factory=list)
 
     # Puntuación
     exclamation_ratio: float = 0.0  # Exclamaciones por intervención
@@ -98,15 +161,15 @@ class VoiceProfile:
     metrics: VoiceMetrics = field(default_factory=VoiceMetrics)
 
     # Vocabulario característico
-    characteristic_words: List[Tuple[str, float]] = field(default_factory=list)  # (palabra, tf-idf)
+    characteristic_words: list[tuple[str, float]] = field(default_factory=list)  # (palabra, tf-idf)
 
     # Patrones detectados
-    speech_patterns: List[str] = field(default_factory=list)  # Patrones frecuentes
+    speech_patterns: list[str] = field(default_factory=list)  # Patrones frecuentes
 
     # Nivel de confianza del perfil
     confidence: float = 0.0  # Basado en cantidad de muestras
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Convierte el perfil a diccionario."""
         return {
             "entity_id": self.entity_id,
@@ -149,13 +212,13 @@ class VoiceProfileBuilder:
         """
         self.min_interventions = min_interventions
         self._all_words: Counter = Counter()  # Para calcular TF-IDF
-        self._entity_words: Dict[int, Counter] = {}  # Palabras por entidad
+        self._entity_words: dict[int, Counter] = {}  # Palabras por entidad
 
     def build_profiles(
         self,
-        dialogues: List[Dict],
-        entities: List[Dict],
-    ) -> List[VoiceProfile]:
+        dialogues: list[dict],
+        entities: list[dict],
+    ) -> list[VoiceProfile]:
         """
         Construye perfiles de voz para todos los personajes.
 
@@ -175,12 +238,11 @@ class VoiceProfileBuilder:
         """
         # Filtrar solo personajes
         character_ids = {
-            e["id"] for e in entities
-            if e.get("type") in ("PERSON", "CHARACTER", "PER")
+            e["id"] for e in entities if e.get("type") in ("PERSON", "CHARACTER", "PER")
         }
 
         # Agrupar diálogos por speaker
-        dialogues_by_speaker: Dict[int, List[str]] = {}
+        dialogues_by_speaker: dict[int, list[str]] = {}
         for dialogue in dialogues:
             speaker_id = dialogue.get("speaker_id")
             if speaker_id and speaker_id in character_ids:
@@ -197,18 +259,13 @@ class VoiceProfileBuilder:
 
         for entity_id, interventions in dialogues_by_speaker.items():
             entity_name = entity_map.get(entity_id, f"Entity_{entity_id}")
-            profile = self._build_single_profile(
-                entity_id, entity_name, interventions
-            )
+            profile = self._build_single_profile(entity_id, entity_name, interventions)
             profiles.append(profile)
 
         logger.info(f"Construidos {len(profiles)} perfiles de voz")
         return profiles
 
-    def _collect_vocabulary(
-        self,
-        dialogues_by_speaker: Dict[int, List[str]]
-    ) -> None:
+    def _collect_vocabulary(self, dialogues_by_speaker: dict[int, list[str]]) -> None:
         """Recolecta vocabulario de todos los diálogos."""
         self._all_words.clear()
         self._entity_words.clear()
@@ -224,17 +281,14 @@ class VoiceProfileBuilder:
         self,
         entity_id: int,
         entity_name: str,
-        interventions: List[str],
+        interventions: list[str],
     ) -> VoiceProfile:
         """Construye perfil para un personaje."""
         metrics = VoiceMetrics()
 
         if not interventions:
             return VoiceProfile(
-                entity_id=entity_id,
-                entity_name=entity_name,
-                metrics=metrics,
-                confidence=0.0
+                entity_id=entity_id, entity_name=entity_name, metrics=metrics, confidence=0.0
             )
 
         # Calcular métricas de longitud
@@ -289,7 +343,9 @@ class VoiceProfileBuilder:
                     filler_counts[filler] += count
                     total_filler_count += count
 
-        metrics.filler_ratio = total_filler_count / metrics.total_words if metrics.total_words > 0 else 0
+        metrics.filler_ratio = (
+            total_filler_count / metrics.total_words if metrics.total_words > 0 else 0
+        )
         metrics.top_fillers = filler_counts.most_common(5)
 
         # Calcular patrones de puntuación
@@ -304,7 +360,7 @@ class VoiceProfileBuilder:
         # Calcular complejidad sintáctica
         sentence_lengths = []
         for text in interventions:
-            sentences = re.split(r'[.!?]+', text)
+            sentences = re.split(r"[.!?]+", text)
             for sent in sentences:
                 words = self._tokenize(sent)
                 if words:
@@ -314,13 +370,22 @@ class VoiceProfileBuilder:
 
         # Detectar oraciones subordinadas (aproximación)
         subordinate_markers = [
-            "que", "quien", "donde", "cuando", "como", "porque",
-            "aunque", "si", "mientras", "antes", "despues"
+            "que",
+            "quien",
+            "donde",
+            "cuando",
+            "como",
+            "porque",
+            "aunque",
+            "si",
+            "mientras",
+            "antes",
+            "despues",
         ]
         subordinate_count = 0
         total_sentences = 0
         for text in interventions:
-            sentences = re.split(r'[.!?]+', text)
+            sentences = re.split(r"[.!?]+", text)
             for sent in sentences:
                 if sent.strip():
                     total_sentences += 1
@@ -328,7 +393,9 @@ class VoiceProfileBuilder:
                     if any(marker in sent_lower for marker in subordinate_markers):
                         subordinate_count += 1
 
-        metrics.subordinate_clause_ratio = subordinate_count / total_sentences if total_sentences > 0 else 0
+        metrics.subordinate_clause_ratio = (
+            subordinate_count / total_sentences if total_sentences > 0 else 0
+        )
 
         # Calcular palabras características (TF-IDF simplificado)
         characteristic_words = self._calculate_characteristic_words(entity_id)
@@ -348,19 +415,17 @@ class VoiceProfileBuilder:
             confidence=confidence,
         )
 
-    def _tokenize(self, text: str) -> List[str]:
+    def _tokenize(self, text: str) -> list[str]:
         """Tokeniza texto en palabras."""
         # Eliminar puntuación y convertir a minúsculas
-        text = re.sub(r'[^\w\s]', ' ', text.lower())
+        text = re.sub(r"[^\w\s]", " ", text.lower())
         words = text.split()
         # Filtrar palabras muy cortas
         return [w for w in words if len(w) > 1]
 
     def _calculate_characteristic_words(
-        self,
-        entity_id: int,
-        top_n: int = 20
-    ) -> List[Tuple[str, float]]:
+        self, entity_id: int, top_n: int = 20
+    ) -> list[tuple[str, float]]:
         """
         Calcula palabras características usando TF-IDF simplificado.
 
@@ -399,10 +464,8 @@ class VoiceProfileBuilder:
         return scores[:top_n]
 
     def _detect_speech_patterns(
-        self,
-        interventions: List[str],
-        min_occurrences: int = 2
-    ) -> List[str]:
+        self, interventions: list[str], min_occurrences: int = 2
+    ) -> list[str]:
         """Detecta patrones frecuentes en el habla del personaje."""
         patterns = []
 
@@ -421,7 +484,7 @@ class VoiceProfileBuilder:
         ends = Counter()
         for text in interventions:
             # Buscar patrones antes de puntuación final
-            match = re.search(r'(\w+\s+\w+)[.!?]+\s*$', text)
+            match = re.search(r"(\w+\s+\w+)[.!?]+\s*$", text)
             if match:
                 ends[match.group(1)] += 1
 
@@ -435,7 +498,7 @@ class VoiceProfileBuilder:
             # Buscar bigramas y trigramas frecuentes
             words = self._tokenize(text)
             for i in range(len(words) - 1):
-                bigram = f"{words[i]} {words[i+1]}"
+                bigram = f"{words[i]} {words[i + 1]}"
                 expressions[bigram] += 1
 
         for pattern, count in expressions.most_common(5):
@@ -446,9 +509,9 @@ class VoiceProfileBuilder:
 
 
 def build_voice_profiles_from_chapters(
-    chapters: List[Dict],
-    entities: List[Dict],
-) -> List[VoiceProfile]:
+    chapters: list[dict],
+    entities: list[dict],
+) -> list[VoiceProfile]:
     """
     Función de conveniencia para construir perfiles desde capítulos.
 
@@ -464,12 +527,14 @@ def build_voice_profiles_from_chapters(
     for chapter in chapters:
         chapter_dialogues = chapter.get("dialogues", [])
         for d in chapter_dialogues:
-            dialogues.append({
-                "text": d.get("text", ""),
-                "speaker_id": d.get("speaker_id"),
-                "chapter": chapter.get("number", 0),
-                "position": d.get("position", 0),
-            })
+            dialogues.append(
+                {
+                    "text": d.get("text", ""),
+                    "speaker_id": d.get("speaker_id"),
+                    "chapter": chapter.get("number", 0),
+                    "position": d.get("position", 0),
+                }
+            )
 
     builder = VoiceProfileBuilder()
     return builder.build_profiles(dialogues, entities)

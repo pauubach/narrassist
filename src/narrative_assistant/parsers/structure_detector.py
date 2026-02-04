@@ -14,10 +14,9 @@ import logging
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
+from ..core.errors import ErrorSeverity, NarrativeError
 from ..core.result import Result
-from ..core.errors import NarrativeError, ErrorSeverity
 from .base import RawDocument, RawParagraph
 
 logger = logging.getLogger(__name__)
@@ -176,7 +175,7 @@ class Scene:
     number: int
     start_char: int
     end_char: int
-    separator_type: Optional[str] = None  # Tipo de separador que la precede
+    separator_type: str | None = None  # Tipo de separador que la precede
 
     @property
     def char_count(self) -> int:
@@ -206,13 +205,13 @@ class Chapter:
     """
 
     number: int
-    title: Optional[str]
+    title: str | None
     start_char: int
     end_char: int
     scenes: list[Scene] = field(default_factory=list)
     sections: list[Section] = field(default_factory=list)
     structure_type: StructureType = StructureType.CHAPTER
-    heading_level: Optional[int] = None
+    heading_level: int | None = None
     detected_by: str = "pattern"
 
     @property
@@ -263,13 +262,13 @@ class Chapter:
             return chapter_text
 
         # Excluir la primera línea (título del capítulo) del contenido
-        first_newline = chapter_text.find('\n')
+        first_newline = chapter_text.find("\n")
         if first_newline == -1:
             # Solo hay una línea (el título), retornar vacío
             return ""
 
         # Saltar la primera línea y cualquier línea vacía siguiente
-        content = chapter_text[first_newline:].lstrip('\n')
+        content = chapter_text[first_newline:].lstrip("\n")
         return content
 
 
@@ -299,7 +298,7 @@ class DocumentStructure:
         """Número de capítulos."""
         return len(self.chapters)
 
-    def get_chapter(self, number: int) -> Optional[Chapter]:
+    def get_chapter(self, number: int) -> Chapter | None:
         """Obtiene un capítulo por número."""
         for chapter in self.chapters:
             if chapter.number == number:
@@ -320,7 +319,7 @@ class StructureDetectionError(NarrativeError):
     original_error: str = ""
     message: str = field(init=False)
     severity: ErrorSeverity = field(default=ErrorSeverity.RECOVERABLE, init=False)
-    user_message: Optional[str] = field(default=None, init=False)
+    user_message: str | None = field(default=None, init=False)
 
     def __post_init__(self):
         self.message = f"Structure detection error: {self.original_error}"
@@ -354,8 +353,8 @@ class StructureDetector:
         prefer_styles: bool = True,
         detect_scenes: bool = True,
         min_chapter_words: int = 100,
-        custom_chapter_patterns: Optional[list[str]] = None,
-        custom_scene_patterns: Optional[list[str]] = None,
+        custom_chapter_patterns: list[str] | None = None,
+        custom_scene_patterns: list[str] | None = None,
     ):
         """
         Inicializa el detector.
@@ -386,13 +385,10 @@ class StructureDetector:
                 re.compile(p, re.IGNORECASE) for p in custom_chapter_patterns
             )
         if custom_scene_patterns:
-            self.scene_patterns.extend(
-                re.compile(p, re.MULTILINE) for p in custom_scene_patterns
-            )
+            self.scene_patterns.extend(re.compile(p, re.MULTILINE) for p in custom_scene_patterns)
 
         logger.debug(
-            f"StructureDetector inicializado "
-            f"(styles={prefer_styles}, scenes={detect_scenes})"
+            f"StructureDetector inicializado (styles={prefer_styles}, scenes={detect_scenes})"
         )
 
     def detect(self, document: RawDocument) -> Result[DocumentStructure]:
@@ -474,7 +470,8 @@ class StructureDetector:
         # de capítulo, no marcadores de capítulo), párrafos vacíos, y párrafos
         # con start_char=-1 (no tienen posición válida en el documento)
         headings = [
-            p for p in document.paragraphs
+            p
+            for p in document.paragraphs
             if p.is_heading
             and p.heading_level
             and not p.metadata.get("is_chapter_title")
@@ -492,7 +489,7 @@ class StructureDetector:
                 if any(s in style for s in ("heading", "título", "titulo", "chapter", "capítulo")):
                     if p.heading_level is None:
                         # Inferir nivel del nombre del estilo
-                        match = re.search(r'(\d)', p.style_name)
+                        match = re.search(r"(\d)", p.style_name)
                         p.heading_level = int(match.group(1)) if match else 1
                         p.is_heading = True
                         headings.append(p)
@@ -551,9 +548,7 @@ class StructureDetector:
                 end_char = self._get_document_end(document)
 
             # Detectar tipo y número
-            struct_type, number, title = self._parse_chapter_heading(
-                heading.text, i + 1
-            )
+            struct_type, number, title = self._parse_chapter_heading(heading.text, i + 1)
 
             # Usar título del metadata si está disponible (detectado por docx_parser)
             if heading.metadata.get("chapter_title"):
@@ -579,7 +574,7 @@ class StructureDetector:
     def _detect_by_patterns(self, document: RawDocument) -> list[Chapter]:
         """Detecta capítulos usando patrones regex."""
         chapters: list[Chapter] = []
-        chapter_paragraphs: list[tuple[RawParagraph, StructureType, int, Optional[str]]] = []
+        chapter_paragraphs: list[tuple[RawParagraph, StructureType, int, str | None]] = []
 
         for para in document.paragraphs:
             if para.is_empty:
@@ -595,9 +590,7 @@ class StructureDetector:
             # Verificar prólogo
             for pattern in self.prologue_patterns:
                 if pattern.match(text):
-                    chapter_paragraphs.append(
-                        (para, StructureType.PROLOGUE, 0, "Prólogo")
-                    )
+                    chapter_paragraphs.append((para, StructureType.PROLOGUE, 0, "Prólogo"))
                     break
             else:
                 # Verificar epílogo
@@ -614,9 +607,7 @@ class StructureDetector:
                         if match:
                             number = self._parse_number(match.group(1))
                             title = match.group(2) if match.lastindex >= 2 else None
-                            chapter_paragraphs.append(
-                                (para, StructureType.CHAPTER, number, title)
-                            )
+                            chapter_paragraphs.append((para, StructureType.CHAPTER, number, title))
                             break
 
         # Construir capítulos
@@ -642,9 +633,7 @@ class StructureDetector:
 
         return chapters
 
-    def _detect_sections_in_chapters(
-        self, document: RawDocument, chapters: list[Chapter]
-    ) -> None:
+    def _detect_sections_in_chapters(self, document: RawDocument, chapters: list[Chapter]) -> None:
         """
         Detecta secciones (subniveles H2, H3, H4...) dentro de cada capítulo.
 
@@ -656,7 +645,8 @@ class StructureDetector:
 
         # Obtener todos los headings de subnivel (H2+)
         subheadings = [
-            p for p in document.paragraphs
+            p
+            for p in document.paragraphs
             if p.is_heading
             and p.heading_level
             and p.heading_level > 1  # Solo H2, H3, H4, etc.
@@ -671,26 +661,21 @@ class StructureDetector:
         # Asignar cada subheading a su capítulo correspondiente
         for chapter in chapters:
             chapter_subheadings = [
-                h for h in subheadings
-                if chapter.start_char <= h.start_char < chapter.end_char
+                h for h in subheadings if chapter.start_char <= h.start_char < chapter.end_char
             ]
 
             if not chapter_subheadings:
                 continue
 
             # Construir árbol de secciones jerárquicamente
-            chapter.sections = self._build_section_tree(
-                chapter_subheadings, chapter.end_char
-            )
+            chapter.sections = self._build_section_tree(chapter_subheadings, chapter.end_char)
 
             logger.debug(
                 f"Capítulo {chapter.number}: {len(chapter.sections)} secciones "
                 f"({sum(1 for s in chapter.get_all_sections())} total con subsecciones)"
             )
 
-    def _build_section_tree(
-        self, headings: list[RawParagraph], chapter_end: int
-    ) -> list[Section]:
+    def _build_section_tree(self, headings: list[RawParagraph], chapter_end: int) -> list[Section]:
         """
         Construye un árbol de secciones a partir de los headings.
 
@@ -743,9 +728,7 @@ class StructureDetector:
 
         return sections
 
-    def _detect_scenes_in_chapter(
-        self, chapter: Chapter, full_text: str
-    ) -> list[Scene]:
+    def _detect_scenes_in_chapter(self, chapter: Chapter, full_text: str) -> list[Scene]:
         """Detecta escenas dentro de un capítulo."""
         scenes: list[Scene] = []
         chapter_text = full_text[chapter.start_char : chapter.end_char]
@@ -755,9 +738,7 @@ class StructureDetector:
 
         for pattern in self.scene_patterns:
             for match in pattern.finditer(chapter_text):
-                separator_positions.append(
-                    (match.start(), match.end(), pattern.pattern)
-                )
+                separator_positions.append((match.start(), match.end(), pattern.pattern))
 
         # Ordenar por posición
         separator_positions.sort(key=lambda x: x[0])
@@ -786,7 +767,9 @@ class StructureDetector:
                 continue
 
             # El tipo de separador es el que precede a esta escena (no aplica para la primera)
-            separator_type = filtered_separators[i - 1][2] if 0 < i <= len(filtered_separators) else None
+            separator_type = (
+                filtered_separators[i - 1][2] if 0 < i <= len(filtered_separators) else None
+            )
 
             scene = Scene(
                 number=len(scenes) + 1,
@@ -829,7 +812,7 @@ class StructureDetector:
 
     def _parse_chapter_heading(
         self, text: str, default_number: int
-    ) -> tuple[StructureType, int, Optional[str]]:
+    ) -> tuple[StructureType, int, str | None]:
         """Parsea el texto de un heading para extraer tipo, número y título."""
         text = text.strip()
 
@@ -873,19 +856,51 @@ class StructureDetector:
 
         # Intentar como número escrito en español
         spanish_numbers = {
-            "uno": 1, "una": 1, "primero": 1, "primera": 1,
-            "dos": 2, "segundo": 2, "segunda": 2,
-            "tres": 3, "tercero": 3, "tercera": 3,
-            "cuatro": 4, "cuarto": 4, "cuarta": 4,
-            "cinco": 5, "quinto": 5, "quinta": 5,
-            "seis": 6, "sexto": 6, "sexta": 6,
-            "siete": 7, "séptimo": 7, "séptima": 7, "septimo": 7,
-            "ocho": 8, "octavo": 8, "octava": 8,
-            "nueve": 9, "noveno": 9, "novena": 9,
-            "diez": 10, "décimo": 10, "décima": 10, "decimo": 10,
-            "once": 11, "doce": 12, "trece": 13, "catorce": 14, "quince": 15,
-            "dieciséis": 16, "diecisiete": 17, "dieciocho": 18, "diecinueve": 19,
-            "veinte": 20, "veintiuno": 21, "veintidós": 22,
+            "uno": 1,
+            "una": 1,
+            "primero": 1,
+            "primera": 1,
+            "dos": 2,
+            "segundo": 2,
+            "segunda": 2,
+            "tres": 3,
+            "tercero": 3,
+            "tercera": 3,
+            "cuatro": 4,
+            "cuarto": 4,
+            "cuarta": 4,
+            "cinco": 5,
+            "quinto": 5,
+            "quinta": 5,
+            "seis": 6,
+            "sexto": 6,
+            "sexta": 6,
+            "siete": 7,
+            "séptimo": 7,
+            "séptima": 7,
+            "septimo": 7,
+            "ocho": 8,
+            "octavo": 8,
+            "octava": 8,
+            "nueve": 9,
+            "noveno": 9,
+            "novena": 9,
+            "diez": 10,
+            "décimo": 10,
+            "décima": 10,
+            "decimo": 10,
+            "once": 11,
+            "doce": 12,
+            "trece": 13,
+            "catorce": 14,
+            "quince": 15,
+            "dieciséis": 16,
+            "diecisiete": 17,
+            "dieciocho": 18,
+            "diecinueve": 19,
+            "veinte": 20,
+            "veintiuno": 21,
+            "veintidós": 22,
         }
         if num_lower in spanish_numbers:
             return spanish_numbers[num_lower]
@@ -918,11 +933,7 @@ class StructureDetector:
     def _renumber_chapters(self, chapters: list[Chapter]) -> None:
         """Renumera capítulos si hay inconsistencias."""
         # Separar prólogo/epílogo de capítulos normales
-        regular_chapters = [
-            c
-            for c in chapters
-            if c.structure_type == StructureType.CHAPTER
-        ]
+        regular_chapters = [c for c in chapters if c.structure_type == StructureType.CHAPTER]
 
         # Verificar si los números son consecutivos
         numbers = [c.number for c in regular_chapters]
@@ -937,27 +948,22 @@ class StructureDetector:
         for chapter in structure.chapters:
             if chapter.char_count < self.min_chapter_words * AVG_CHARS_PER_WORD:
                 structure.add_warning(
-                    f"Capítulo {chapter.number} es muy corto "
-                    f"({chapter.char_count} caracteres)"
+                    f"Capítulo {chapter.number} es muy corto ({chapter.char_count} caracteres)"
                 )
 
         # Verificar capítulos sin escenas
         for chapter in structure.chapters:
             if not chapter.scenes:
-                structure.add_warning(
-                    f"Capítulo {chapter.number} no tiene escenas detectadas"
-                )
+                structure.add_warning(f"Capítulo {chapter.number} no tiene escenas detectadas")
 
         # Verificar saltos en numeración
         numbers = [
-            c.number
-            for c in structure.chapters
-            if c.structure_type == StructureType.CHAPTER
+            c.number for c in structure.chapters if c.structure_type == StructureType.CHAPTER
         ]
         for i in range(len(numbers) - 1):
             if numbers[i + 1] - numbers[i] > 1:
                 structure.add_warning(
-                    f"Posible capítulo faltante entre {numbers[i]} y {numbers[i+1]}"
+                    f"Posible capítulo faltante entre {numbers[i]} y {numbers[i + 1]}"
                 )
 
 

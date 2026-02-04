@@ -19,7 +19,6 @@ import threading
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +30,7 @@ _CACHE_TTL_SECONDS = 60  # 1 minuto
 
 class AnalysisMode(str, Enum):
     """Modos de análisis disponibles."""
+
     BASIC = "basic"  # Sin LLM, solo patrones
     STANDARD = "standard"  # LLM con modelo rápido
     DEEP = "deep"  # Multi-modelo con votación
@@ -38,6 +38,7 @@ class AnalysisMode(str, Enum):
 
 class EventType(str, Enum):
     """Tipos de eventos narrativos detectables."""
+
     # Eventos básicos (detección por patrones)
     FIRST_APPEARANCE = "first_appearance"
     RETURN = "return"
@@ -87,6 +88,7 @@ DECISION_PATTERNS = [
 @dataclass
 class NarrativeEvent:
     """Un evento narrativo detectado en el capítulo."""
+
     event_type: EventType
     description: str
     characters_involved: list[str] = field(default_factory=list)
@@ -112,6 +114,7 @@ class NarrativeEvent:
 @dataclass
 class CharacterPresence:
     """Presencia de un personaje en un capítulo."""
+
     entity_id: int
     name: str
     mention_count: int = 0
@@ -125,7 +128,7 @@ class CharacterPresence:
     actions_count: int = 0
     interactions_with: list[str] = field(default_factory=list)
 
-    dominant_emotion: Optional[str] = None
+    dominant_emotion: str | None = None
     emotional_trajectory: str = "stable"
 
     def to_dict(self) -> dict:
@@ -149,18 +152,19 @@ class CharacterPresence:
 @dataclass
 class ChekhovElement:
     """Elemento narrativo tipo Chekhov's Gun (setup sin payoff)."""
-    entity_id: Optional[int]
+
+    entity_id: int | None
     name: str
     element_type: str  # object, detail, foreshadowing
     setup_chapter: int
     setup_position: int
     setup_context: str
-    payoff_chapter: Optional[int] = None
-    payoff_position: Optional[int] = None
-    payoff_context: Optional[str] = None
+    payoff_chapter: int | None = None
+    payoff_position: int | None = None
+    payoff_context: str | None = None
     is_fired: bool = False  # True si tiene payoff
     confidence: float = 0.5
-    llm_analysis: Optional[str] = None
+    llm_analysis: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -182,6 +186,7 @@ class ChekhovElement:
 @dataclass
 class CharacterArc:
     """Arco narrativo de un personaje."""
+
     character_id: int
     character_name: str
     arc_type: str  # growth, fall, redemption, static, circular
@@ -193,7 +198,7 @@ class CharacterArc:
     total_mentions: int = 0
     max_absence_gap: int = 0
     trajectory: str = "stable"  # rising, declining, stable
-    llm_notes: Optional[str] = None
+    llm_notes: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -215,12 +220,13 @@ class CharacterArc:
 @dataclass
 class AbandonedThread:
     """Trama o hilo narrativo abandonado."""
+
     description: str
     introduced_chapter: int
     last_mention_chapter: int
     characters_involved: list[str] = field(default_factory=list)
     entities_involved: list[str] = field(default_factory=list)
-    suggestion: Optional[str] = None
+    suggestion: str | None = None
     confidence: float = 0.5
 
     def to_dict(self) -> dict:
@@ -238,8 +244,9 @@ class AbandonedThread:
 @dataclass
 class ChapterSummary:
     """Resumen completo de un capítulo."""
+
     chapter_number: int
-    chapter_title: Optional[str] = None
+    chapter_title: str | None = None
     word_count: int = 0
 
     characters_present: list[CharacterPresence] = field(default_factory=list)
@@ -261,7 +268,7 @@ class ChapterSummary:
     location_changes: int = 0
 
     auto_summary: str = ""
-    llm_summary: Optional[str] = None  # Resumen generado por LLM
+    llm_summary: str | None = None  # Resumen generado por LLM
 
     def to_dict(self) -> dict:
         return {
@@ -289,6 +296,7 @@ class ChapterSummary:
 @dataclass
 class ChapterProgressReport:
     """Informe completo de avance narrativo."""
+
     project_id: int
     analysis_mode: str = "basic"
     total_chapters: int = 0
@@ -302,7 +310,7 @@ class ChapterProgressReport:
     chekhov_elements: list[ChekhovElement] = field(default_factory=list)
     abandoned_threads: list[AbandonedThread] = field(default_factory=list)
 
-    structural_notes: Optional[str] = None  # Análisis LLM de estructura
+    structural_notes: str | None = None  # Análisis LLM de estructura
 
     def to_dict(self) -> dict:
         return {
@@ -419,11 +427,12 @@ class ChapterSummaryAnalyzer:
 
     def __init__(
         self,
-        db_path: Optional[str] = None,
+        db_path: str | None = None,
         mode: AnalysisMode = AnalysisMode.BASIC,
         llm_model: str = "llama3.2",
     ):
         from ..persistence.database import get_database
+
         self.db = get_database(db_path)
         self.mode = mode
         self.llm_model = llm_model
@@ -436,6 +445,7 @@ class ChapterSummaryAnalyzer:
         if self._ollama_client is None and self.mode != AnalysisMode.BASIC:
             try:
                 from ..llm.ollama_client import OllamaClient
+
                 self._ollama_client = OllamaClient()
             except Exception as e:
                 logger.warning(f"No se pudo inicializar Ollama: {e}")
@@ -447,6 +457,7 @@ class ChapterSummaryAnalyzer:
         if self._embeddings_model is None:
             try:
                 from ..nlp.embeddings import EmbeddingsModel
+
                 self._embeddings_model = EmbeddingsModel()
             except Exception as e:
                 logger.warning(f"No se pudo inicializar embeddings: {e}")
@@ -487,10 +498,9 @@ class ChapterSummaryAnalyzer:
 
         # Detectar personajes dormidos
         if report.total_chapters >= 3:
-            recent_chapters = set(range(
-                max(1, report.total_chapters - 2),
-                report.total_chapters + 1
-            ))
+            recent_chapters = set(
+                range(max(1, report.total_chapters - 2), report.total_chapters + 1)
+            )
             for char_id, char_name in all_characters.items():
                 last_ch = last_appearances.get(char_id, 0)
                 if last_ch not in recent_chapters and last_ch > 0:
@@ -500,9 +510,7 @@ class ChapterSummaryAnalyzer:
             report.active_characters = report.total_characters
 
         # Calcular arcos de personajes (básico)
-        report.character_arcs = self._calculate_character_arcs(
-            report.chapters, all_characters
-        )
+        report.character_arcs = self._calculate_character_arcs(report.chapters, all_characters)
 
         # Análisis avanzado con LLM
         if self.mode != AnalysisMode.BASIC:
@@ -523,7 +531,7 @@ class ChapterSummaryAnalyzer:
                 WHERE project_id = ?
                 ORDER BY chapter_number
                 """,
-                (project_id,)
+                (project_id,),
             )
             return [dict(row) for row in cursor.fetchall()]
 
@@ -536,7 +544,7 @@ class ChapterSummaryAnalyzer:
                 FROM entities
                 WHERE project_id = ? AND entity_type = 'character' AND is_active = 1
                 """,
-                (project_id,)
+                (project_id,),
             )
             return {row["id"]: row["canonical_name"] for row in cursor.fetchall()}
 
@@ -552,13 +560,11 @@ class ChapterSummaryAnalyzer:
                 WHERE e.project_id = ? AND e.entity_type = 'character'
                 GROUP BY e.id
                 """,
-                (project_id,)
+                (project_id,),
             )
             return {row["id"]: row["first_chapter"] for row in cursor.fetchall()}
 
-    def _get_mentions_by_chapter(
-        self, project_id: int, chapter_id: int
-    ) -> dict[int, list[dict]]:
+    def _get_mentions_by_chapter(self, project_id: int, chapter_id: int) -> dict[int, list[dict]]:
         """Obtiene menciones agrupadas por entidad para un capítulo."""
         with self.db.connection() as conn:
             cursor = conn.execute(
@@ -570,7 +576,7 @@ class ChapterSummaryAnalyzer:
                 WHERE em.chapter_id = ? AND e.project_id = ?
                 ORDER BY em.start_char
                 """,
-                (chapter_id, project_id)
+                (chapter_id, project_id),
             )
 
             mentions_by_entity: dict[int, list[dict]] = {}
@@ -596,7 +602,7 @@ class ChapterSummaryAnalyzer:
                 WHERE i.project_id = ? AND i.chapter_id = ?
                 ORDER BY i.position
                 """,
-                (project_id, chapter_id)
+                (project_id, chapter_id),
             )
             return [dict(row) for row in cursor.fetchall()]
 
@@ -611,7 +617,7 @@ class ChapterSummaryAnalyzer:
                 WHERE em.chapter_id = ? AND e.project_id = ?
                   AND e.entity_type IN ('location', 'building', 'region')
                 """,
-                (chapter_id, project_id)
+                (chapter_id, project_id),
             )
             return [row["canonical_name"] for row in cursor.fetchall()]
 
@@ -670,13 +676,15 @@ class ChapterSummaryAnalyzer:
             if first_appearances.get(entity_id) == chapter_num:
                 presence.is_first_appearance = True
                 summary.new_characters.append(char_name)
-                summary.key_events.append(NarrativeEvent(
-                    event_type=EventType.FIRST_APPEARANCE,
-                    description=f"Primera aparición de {char_name}",
-                    characters_involved=[char_name],
-                    chapter_number=chapter_num,
-                    position=presence.first_mention_position,
-                ))
+                summary.key_events.append(
+                    NarrativeEvent(
+                        event_type=EventType.FIRST_APPEARANCE,
+                        description=f"Primera aparición de {char_name}",
+                        characters_involved=[char_name],
+                        chapter_number=chapter_num,
+                        position=presence.first_mention_position,
+                    )
+                )
 
             last_seen = last_appearances.get(entity_id, 0)
             if last_seen > 0 and chapter_num - last_seen > 1:
@@ -684,13 +692,15 @@ class ChapterSummaryAnalyzer:
                 presence.chapters_absent = chapter_num - last_seen - 1
                 summary.returning_characters.append(char_name)
                 if presence.chapters_absent >= 2:
-                    summary.key_events.append(NarrativeEvent(
-                        event_type=EventType.RETURN,
-                        description=f"{char_name} regresa después de {presence.chapters_absent} capítulos",
-                        characters_involved=[char_name],
-                        chapter_number=chapter_num,
-                        position=presence.first_mention_position,
-                    ))
+                    summary.key_events.append(
+                        NarrativeEvent(
+                            event_type=EventType.RETURN,
+                            description=f"{char_name} regresa después de {presence.chapters_absent} capítulos",
+                            characters_involved=[char_name],
+                            chapter_number=chapter_num,
+                            position=presence.first_mention_position,
+                        )
+                    )
 
             summary.characters_present.append(presence)
 
@@ -716,14 +726,16 @@ class ChapterSummaryAnalyzer:
 
             tone = interaction.get("tone", "neutral")
             if tone == "hostile" and to_name:
-                summary.key_events.append(NarrativeEvent(
-                    event_type=EventType.CONFLICT,
-                    description=f"Conflicto entre {from_name} y {to_name}",
-                    characters_involved=[from_name, to_name],
-                    chapter_number=chapter_num,
-                    position=interaction.get("position", 0),
-                    source_text=interaction.get("text_excerpt", "")[:100],
-                ))
+                summary.key_events.append(
+                    NarrativeEvent(
+                        event_type=EventType.CONFLICT,
+                        description=f"Conflicto entre {from_name} y {to_name}",
+                        characters_involved=[from_name, to_name],
+                        chapter_number=chapter_num,
+                        position=interaction.get("position", 0),
+                        source_text=interaction.get("text_excerpt", "")[:100],
+                    )
+                )
 
         # Detectar eventos por patrones en el texto
         chapter_text = chapter.get("content", "")
@@ -736,8 +748,7 @@ class ChapterSummaryAnalyzer:
             if first_ch < chapter_num and char_id not in characters_in_chapter:
                 with self.db.connection() as conn:
                     cursor = conn.execute(
-                        "SELECT mention_count FROM entities WHERE id = ?",
-                        (char_id,)
+                        "SELECT mention_count FROM entities WHERE id = ?", (char_id,)
                     )
                     row = cursor.fetchone()
                     if row and row["mention_count"] >= 5:
@@ -748,10 +759,14 @@ class ChapterSummaryAnalyzer:
         # Calcular tono
         if summary.conflict_interactions > summary.positive_interactions:
             summary.dominant_tone = "tense"
-            summary.tone_intensity = min(1.0, summary.conflict_interactions / max(1, summary.total_interactions))
+            summary.tone_intensity = min(
+                1.0, summary.conflict_interactions / max(1, summary.total_interactions)
+            )
         elif summary.positive_interactions > summary.conflict_interactions:
             summary.dominant_tone = "positive"
-            summary.tone_intensity = min(1.0, summary.positive_interactions / max(1, summary.total_interactions))
+            summary.tone_intensity = min(
+                1.0, summary.positive_interactions / max(1, summary.total_interactions)
+            )
         else:
             summary.dominant_tone = "neutral"
             summary.tone_intensity = 0.5
@@ -764,55 +779,57 @@ class ChapterSummaryAnalyzer:
 
         return summary
 
-    def _detect_pattern_events(
-        self, summary: ChapterSummary, text: str, chapter_num: int
-    ) -> None:
+    def _detect_pattern_events(self, summary: ChapterSummary, text: str, chapter_num: int) -> None:
         """Detecta eventos usando patrones regex."""
         # Revelaciones
         for pattern in REVELATION_PATTERNS:
             for match in pattern.finditer(text):
-                summary.key_events.append(NarrativeEvent(
-                    event_type=EventType.REVELATION,
-                    description="Posible revelación detectada",
-                    chapter_number=chapter_num,
-                    position=match.start(),
-                    source_text=text[max(0, match.start()-50):match.end()+50],
-                    confidence=0.6,
-                    detected_by="pattern",
-                ))
+                summary.key_events.append(
+                    NarrativeEvent(
+                        event_type=EventType.REVELATION,
+                        description="Posible revelación detectada",
+                        chapter_number=chapter_num,
+                        position=match.start(),
+                        source_text=text[max(0, match.start() - 50) : match.end() + 50],
+                        confidence=0.6,
+                        detected_by="pattern",
+                    )
+                )
                 break  # Solo una revelación por patrón
 
         # Muertes
         for pattern in DEATH_PATTERNS:
             for match in pattern.finditer(text):
-                summary.key_events.append(NarrativeEvent(
-                    event_type=EventType.DEATH,
-                    description="Posible muerte detectada",
-                    chapter_number=chapter_num,
-                    position=match.start(),
-                    source_text=text[max(0, match.start()-50):match.end()+50],
-                    confidence=0.7,
-                    detected_by="pattern",
-                ))
+                summary.key_events.append(
+                    NarrativeEvent(
+                        event_type=EventType.DEATH,
+                        description="Posible muerte detectada",
+                        chapter_number=chapter_num,
+                        position=match.start(),
+                        source_text=text[max(0, match.start() - 50) : match.end() + 50],
+                        confidence=0.7,
+                        detected_by="pattern",
+                    )
+                )
                 break
 
         # Decisiones
         for pattern in DECISION_PATTERNS:
             for match in pattern.finditer(text):
-                summary.key_events.append(NarrativeEvent(
-                    event_type=EventType.DECISION,
-                    description="Posible decisión importante detectada",
-                    chapter_number=chapter_num,
-                    position=match.start(),
-                    source_text=text[max(0, match.start()-50):match.end()+50],
-                    confidence=0.5,
-                    detected_by="pattern",
-                ))
+                summary.key_events.append(
+                    NarrativeEvent(
+                        event_type=EventType.DECISION,
+                        description="Posible decisión importante detectada",
+                        chapter_number=chapter_num,
+                        position=match.start(),
+                        source_text=text[max(0, match.start() - 50) : match.end() + 50],
+                        confidence=0.5,
+                        detected_by="pattern",
+                    )
+                )
                 break
 
-    def _analyze_chapter_with_llm(
-        self, summary: ChapterSummary, chapter_text: str
-    ) -> None:
+    def _analyze_chapter_with_llm(self, summary: ChapterSummary, chapter_text: str) -> None:
         """Analiza el capítulo con LLM para extraer eventos significativos."""
         if not self.ollama_client:
             return
@@ -841,6 +858,7 @@ class ChapterSummaryAnalyzer:
 
             if response:
                 import json
+
                 # Limpiar respuesta de markdown
                 clean_response = response.strip()
                 if clean_response.startswith("```"):
@@ -857,14 +875,16 @@ class ChapterSummaryAnalyzer:
                     except ValueError:
                         event_type = EventType.REVELATION
 
-                    summary.llm_events.append(NarrativeEvent(
-                        event_type=event_type,
-                        description=event_data.get("description", ""),
-                        characters_involved=event_data.get("characters", []),
-                        chapter_number=summary.chapter_number,
-                        confidence=event_data.get("importance", 3) / 5.0,
-                        detected_by="llm",
-                    ))
+                    summary.llm_events.append(
+                        NarrativeEvent(
+                            event_type=event_type,
+                            description=event_data.get("description", ""),
+                            characters_involved=event_data.get("characters", []),
+                            chapter_number=summary.chapter_number,
+                            confidence=event_data.get("importance", 3) / 5.0,
+                            detected_by="llm",
+                        )
+                    )
 
                 # Guardar resumen LLM
                 summary.llm_summary = data.get("summary")
@@ -882,7 +902,9 @@ class ChapterSummaryAnalyzer:
             if len(char_names) == 1:
                 parts.append(f"Protagonizado por {char_names[0]}")
             else:
-                parts.append(f"Personajes principales: {', '.join(char_names[:-1])} y {char_names[-1]}")
+                parts.append(
+                    f"Personajes principales: {', '.join(char_names[:-1])} y {char_names[-1]}"
+                )
 
         if summary.new_characters:
             if len(summary.new_characters) == 1:
@@ -937,8 +959,8 @@ class ChapterSummaryAnalyzer:
 
             presences.sort(key=lambda x: x[0])
             mentions = [p[1] for p in presences]
-            first_half = sum(mentions[:len(mentions)//2]) if mentions else 0
-            second_half = sum(mentions[len(mentions)//2:]) if mentions else 0
+            first_half = sum(mentions[: len(mentions) // 2]) if mentions else 0
+            second_half = sum(mentions[len(mentions) // 2 :]) if mentions else 0
 
             if second_half > first_half * 1.5:
                 trajectory = "rising"
@@ -950,7 +972,7 @@ class ChapterSummaryAnalyzer:
             chapters_present = [p[0] for p in presences]
             max_gap = 0
             for i in range(1, len(chapters_present)):
-                gap = chapters_present[i] - chapters_present[i-1] - 1
+                gap = chapters_present[i] - chapters_present[i - 1] - 1
                 max_gap = max(max_gap, gap)
 
             arc = CharacterArc(
@@ -996,6 +1018,7 @@ class ChapterSummaryAnalyzer:
 
             if response:
                 import json
+
                 clean_response = response.strip()
                 if clean_response.startswith("```"):
                     clean_response = re.sub(r"^```(?:json)?\n?", "", clean_response)
@@ -1017,14 +1040,16 @@ class ChapterSummaryAnalyzer:
 
                 # Procesar tramas abandonadas
                 for thread_data in data.get("abandoned_threads", []):
-                    report.abandoned_threads.append(AbandonedThread(
-                        description=thread_data.get("description", ""),
-                        introduced_chapter=thread_data.get("introduced_chapter", 0),
-                        last_mention_chapter=thread_data.get("last_chapter", 0),
-                        characters_involved=thread_data.get("characters", []),
-                        suggestion=thread_data.get("suggestion"),
-                        confidence=0.7,
-                    ))
+                    report.abandoned_threads.append(
+                        AbandonedThread(
+                            description=thread_data.get("description", ""),
+                            introduced_chapter=thread_data.get("introduced_chapter", 0),
+                            last_mention_chapter=thread_data.get("last_chapter", 0),
+                            characters_involved=thread_data.get("characters", []),
+                            suggestion=thread_data.get("suggestion"),
+                            confidence=0.7,
+                        )
+                    )
 
                 report.structural_notes = data.get("structural_notes")
 
@@ -1058,7 +1083,7 @@ class ChapterSummaryAnalyzer:
                 GROUP BY e.id
                 HAVING MIN(c.chapter_number) <= 3
                 """,
-                (project_id,)
+                (project_id,),
             )
 
             for row in cursor.fetchall():
@@ -1081,14 +1106,16 @@ class ChapterSummaryAnalyzer:
                     ORDER BY em.start_char
                     LIMIT 1
                     """,
-                    (entity_id, first_ch)
+                    (entity_id, first_ch),
                 )
                 ctx_row = ctx_cursor.fetchone()
 
                 setup_context = ""
                 setup_position = 0
                 if ctx_row:
-                    setup_context = f"{ctx_row['context_before'] or ''} {name} {ctx_row['context_after'] or ''}"
+                    setup_context = (
+                        f"{ctx_row['context_before'] or ''} {name} {ctx_row['context_after'] or ''}"
+                    )
                     setup_position = ctx_row["start_char"]
 
                 # Determinar si es "unfired" (sin payoff claro)
@@ -1115,7 +1142,7 @@ class ChapterSummaryAnalyzer:
 
 def analyze_chapter_progress(
     project_id: int,
-    db_path: Optional[str] = None,
+    db_path: str | None = None,
     mode: str = "basic",
     llm_model: str = "llama3.2",
 ) -> ChapterProgressReport:
@@ -1160,7 +1187,7 @@ def analyze_chapter_progress(
     return report
 
 
-def invalidate_chapter_progress_cache(project_id: Optional[int] = None) -> None:
+def invalidate_chapter_progress_cache(project_id: int | None = None) -> None:
     """
     Invalidar caché de analyze_chapter_progress.
 

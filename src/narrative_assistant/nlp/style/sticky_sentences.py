@@ -24,8 +24,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
 
+from ...core.errors import ErrorSeverity, NLPError
 from ...core.result import Result
-from ...core.errors import NLPError, ErrorSeverity
 
 logger = logging.getLogger(__name__)
 
@@ -60,12 +60,14 @@ def reset_sticky_sentence_detector() -> None:
 # Tipos
 # =============================================================================
 
+
 class StickinessSeverity(Enum):
     """Severidad del problema de pegajosidad."""
-    CRITICAL = "critical"   # >60% glue words - muy difícil de leer
-    HIGH = "high"           # 50-60% glue words - problemático
-    MEDIUM = "medium"       # 45-50% glue words - mejorable
-    LOW = "low"             # 40-45% glue words - aceptable pero denso
+
+    CRITICAL = "critical"  # >60% glue words - muy difícil de leer
+    HIGH = "high"  # 50-60% glue words - problemático
+    MEDIUM = "medium"  # 45-50% glue words - mejorable
+    LOW = "low"  # 40-45% glue words - aceptable pero denso
 
 
 @dataclass
@@ -145,7 +147,7 @@ class StickyReport:
     by_severity: dict[str, int] = field(default_factory=dict)
 
     # Distribución
-    clean_sentences: int = 0      # <40% glue
+    clean_sentences: int = 0  # <40% glue
     borderline_sentences: int = 0  # 40-45%
     sticky_sentences_count: int = 0  # >45%
 
@@ -219,79 +221,292 @@ class StickyReport:
 
 # Artículos
 ARTICLES = {
-    "el", "la", "los", "las",
-    "un", "una", "unos", "unas",
-    "al", "del",
+    "el",
+    "la",
+    "los",
+    "las",
+    "un",
+    "una",
+    "unos",
+    "unas",
+    "al",
+    "del",
 }
 
 # Preposiciones
 PREPOSITIONS = {
-    "a", "ante", "bajo", "cabe", "con", "contra", "de", "desde",
-    "durante", "en", "entre", "hacia", "hasta", "mediante", "para",
-    "por", "según", "sin", "so", "sobre", "tras", "versus", "vía",
+    "a",
+    "ante",
+    "bajo",
+    "cabe",
+    "con",
+    "contra",
+    "de",
+    "desde",
+    "durante",
+    "en",
+    "entre",
+    "hacia",
+    "hasta",
+    "mediante",
+    "para",
+    "por",
+    "según",
+    "sin",
+    "so",
+    "sobre",
+    "tras",
+    "versus",
+    "vía",
 }
 
 # Conjunciones
 CONJUNCTIONS = {
-    "y", "e", "ni", "o", "u", "pero", "sino", "mas", "aunque",
-    "porque", "pues", "como", "que", "si", "cuando", "donde",
-    "mientras", "luego", "conque", "así",
+    "y",
+    "e",
+    "ni",
+    "o",
+    "u",
+    "pero",
+    "sino",
+    "mas",
+    "aunque",
+    "porque",
+    "pues",
+    "como",
+    "que",
+    "si",
+    "cuando",
+    "donde",
+    "mientras",
+    "luego",
+    "conque",
+    "así",
 }
 
 # Pronombres átonos y relativos
 PRONOUNS = {
-    "me", "te", "se", "nos", "os", "le", "les", "lo", "la", "los", "las",
-    "yo", "tú", "él", "ella", "ello", "nosotros", "nosotras",
-    "vosotros", "vosotras", "ellos", "ellas",
-    "mi", "mis", "tu", "tus", "su", "sus", "nuestro", "nuestra",
-    "nuestros", "nuestras", "vuestro", "vuestra", "vuestros", "vuestras",
-    "este", "esta", "esto", "estos", "estas",
-    "ese", "esa", "eso", "esos", "esas",
-    "aquel", "aquella", "aquello", "aquellos", "aquellas",
-    "quien", "quienes", "cual", "cuales", "cuyo", "cuya", "cuyos", "cuyas",
-    "qué", "quién", "cuál", "cuánto", "cuánta", "cuántos", "cuántas",
+    "me",
+    "te",
+    "se",
+    "nos",
+    "os",
+    "le",
+    "les",
+    "lo",
+    "la",
+    "los",
+    "las",
+    "yo",
+    "tú",
+    "él",
+    "ella",
+    "ello",
+    "nosotros",
+    "nosotras",
+    "vosotros",
+    "vosotras",
+    "ellos",
+    "ellas",
+    "mi",
+    "mis",
+    "tu",
+    "tus",
+    "su",
+    "sus",
+    "nuestro",
+    "nuestra",
+    "nuestros",
+    "nuestras",
+    "vuestro",
+    "vuestra",
+    "vuestros",
+    "vuestras",
+    "este",
+    "esta",
+    "esto",
+    "estos",
+    "estas",
+    "ese",
+    "esa",
+    "eso",
+    "esos",
+    "esas",
+    "aquel",
+    "aquella",
+    "aquello",
+    "aquellos",
+    "aquellas",
+    "quien",
+    "quienes",
+    "cual",
+    "cuales",
+    "cuyo",
+    "cuya",
+    "cuyos",
+    "cuyas",
+    "qué",
+    "quién",
+    "cuál",
+    "cuánto",
+    "cuánta",
+    "cuántos",
+    "cuántas",
 }
 
 # Verbos auxiliares muy comunes (formas conjugadas)
 AUXILIARY_VERBS = {
     # Ser
-    "soy", "eres", "es", "somos", "sois", "son",
-    "era", "eras", "éramos", "erais", "eran",
-    "fui", "fuiste", "fue", "fuimos", "fuisteis", "fueron",
-    "seré", "serás", "será", "seremos", "seréis", "serán",
-    "sería", "serías", "seríamos", "seríais", "serían",
-    "sea", "seas", "seamos", "seáis", "sean",
-    "fuera", "fueras", "fuéramos", "fuerais", "fueran",
-    "fuese", "fueses", "fuésemos", "fueseis", "fuesen",
+    "soy",
+    "eres",
+    "es",
+    "somos",
+    "sois",
+    "son",
+    "era",
+    "eras",
+    "éramos",
+    "erais",
+    "eran",
+    "fui",
+    "fuiste",
+    "fue",
+    "fuimos",
+    "fuisteis",
+    "fueron",
+    "seré",
+    "serás",
+    "será",
+    "seremos",
+    "seréis",
+    "serán",
+    "sería",
+    "serías",
+    "seríamos",
+    "seríais",
+    "serían",
+    "sea",
+    "seas",
+    "seamos",
+    "seáis",
+    "sean",
+    "fuera",
+    "fueras",
+    "fuéramos",
+    "fuerais",
+    "fueran",
+    "fuese",
+    "fueses",
+    "fuésemos",
+    "fueseis",
+    "fuesen",
     # Estar
-    "estoy", "estás", "está", "estamos", "estáis", "están",
-    "estaba", "estabas", "estábamos", "estabais", "estaban",
-    "estuve", "estuviste", "estuvo", "estuvimos", "estuvisteis", "estuvieron",
-    "estaré", "estarás", "estará", "estaremos", "estaréis", "estarán",
+    "estoy",
+    "estás",
+    "está",
+    "estamos",
+    "estáis",
+    "están",
+    "estaba",
+    "estabas",
+    "estábamos",
+    "estabais",
+    "estaban",
+    "estuve",
+    "estuviste",
+    "estuvo",
+    "estuvimos",
+    "estuvisteis",
+    "estuvieron",
+    "estaré",
+    "estarás",
+    "estará",
+    "estaremos",
+    "estaréis",
+    "estarán",
     # Haber
-    "he", "has", "ha", "hemos", "habéis", "han",
-    "había", "habías", "habíamos", "habíais", "habían",
-    "hube", "hubiste", "hubo", "hubimos", "hubisteis", "hubieron",
-    "habré", "habrás", "habrá", "habremos", "habréis", "habrán",
-    "hay", "hubo",
-    "haya", "hayas", "hayamos", "hayáis", "hayan",
+    "he",
+    "has",
+    "ha",
+    "hemos",
+    "habéis",
+    "han",
+    "había",
+    "habías",
+    "habíamos",
+    "habíais",
+    "habían",
+    "hube",
+    "hubiste",
+    "hubo",
+    "hubimos",
+    "hubisteis",
+    "hubieron",
+    "habré",
+    "habrás",
+    "habrá",
+    "habremos",
+    "habréis",
+    "habrán",
+    "hay",
+    "haya",
+    "hayas",
+    "hayamos",
+    "hayáis",
+    "hayan",
     # Tener (auxiliar)
-    "tengo", "tienes", "tiene", "tenemos", "tenéis", "tienen",
+    "tengo",
+    "tienes",
+    "tiene",
+    "tenemos",
+    "tenéis",
+    "tienen",
 }
 
 # Adverbios muy comunes
 COMMON_ADVERBS = {
-    "no", "sí", "ya", "muy", "más", "menos", "tan", "tanto",
-    "bien", "mal", "así", "también", "tampoco",
-    "ahora", "entonces", "después", "antes", "luego",
-    "aquí", "allí", "allá", "acá", "ahí",
-    "siempre", "nunca", "jamás", "todavía", "aún",
-    "solo", "sólo", "solamente",
+    "no",
+    "sí",
+    "ya",
+    "muy",
+    "más",
+    "menos",
+    "tan",
+    "tanto",
+    "bien",
+    "mal",
+    "así",
+    "también",
+    "tampoco",
+    "ahora",
+    "entonces",
+    "después",
+    "antes",
+    "luego",
+    "aquí",
+    "allí",
+    "allá",
+    "acá",
+    "ahí",
+    "siempre",
+    "nunca",
+    "jamás",
+    "todavía",
+    "aún",
+    "solo",
+    "sólo",
+    "solamente",
 }
 
 # Palabras muy cortas funcionales
 SHORT_FUNCTIONAL = {
-    "al", "del", "a", "e", "o", "u", "y",
+    "al",
+    "del",
+    "a",
+    "e",
+    "o",
+    "u",
+    "y",
 }
 
 # Conjunto completo de glue words
@@ -309,6 +524,7 @@ GLUE_WORDS = (
 # =============================================================================
 # Detector
 # =============================================================================
+
 
 class StickySentenceDetector:
     """
@@ -339,21 +555,15 @@ class StickySentenceDetector:
         self.min_words = min_words
 
         # Patrón para dividir en oraciones
-        self._sentence_pattern = re.compile(
-            r'[.!?]+(?:\s+|$)|[\n]{2,}',
-            re.UNICODE
-        )
+        self._sentence_pattern = re.compile(r"[.!?]+(?:\s+|$)|[\n]{2,}", re.UNICODE)
 
         # Patrón para extraer palabras
-        self._word_pattern = re.compile(
-            r'\b([a-záéíóúüñA-ZÁÉÍÓÚÜÑ]+)\b',
-            re.UNICODE
-        )
+        self._word_pattern = re.compile(r"\b([a-záéíóúüñA-ZÁÉÍÓÚÜÑ]+)\b", re.UNICODE)
 
     def analyze(
         self,
         text: str,
-        threshold: Optional[float] = None,
+        threshold: float | None = None,
         chapter: int = 0,
     ) -> Result[StickyReport]:
         """
@@ -496,11 +706,13 @@ class StickySentenceDetector:
             word_lower = word.lower()
             is_glue = word_lower in GLUE_WORDS
 
-            analysis["words"].append({
-                "word": word,
-                "is_glue": is_glue,
-                "category": self._get_glue_category(word_lower) if is_glue else "content",
-            })
+            analysis["words"].append(
+                {
+                    "word": word,
+                    "is_glue": is_glue,
+                    "category": self._get_glue_category(word_lower) if is_glue else "content",
+                }
+            )
 
             if is_glue:
                 analysis["glue_words"] += 1
@@ -588,7 +800,7 @@ class StickySentenceDetector:
         # Recomendaciones según proporción de oraciones pegajosas
         if sticky_ratio > 0.30:
             recommendations.append(
-                f"El {sticky_ratio*100:.0f}% de las oraciones son pegajosas. "
+                f"El {sticky_ratio * 100:.0f}% de las oraciones son pegajosas. "
                 "Considere una revisión general del estilo."
             )
         elif sticky_ratio > 0.15:
@@ -615,7 +827,7 @@ class StickySentenceDetector:
         # Promedio global
         if report.avg_glue_percentage > 0.35:
             recommendations.append(
-                f"El promedio de glue words ({report.avg_glue_percentage*100:.0f}%) es alto. "
+                f"El promedio de glue words ({report.avg_glue_percentage * 100:.0f}%) es alto. "
                 "El texto podría beneficiarse de un estilo más directo."
             )
 
@@ -632,6 +844,7 @@ class StickySentenceDetector:
 # =============================================================================
 # Funciones de utilidad
 # =============================================================================
+
 
 def is_glue_word(word: str) -> bool:
     """Verificar si una palabra es una glue word."""

@@ -8,18 +8,18 @@ Proporciona herramientas para:
 """
 
 from .declaration import (
-    FocalizationType,
     FocalizationDeclaration,
-    FocalizationScope,
     FocalizationDeclarationService,
+    FocalizationScope,
+    FocalizationType,
 )
 from .violations import (
-    ViolationType,
-    ViolationSeverity,
+    MENTAL_ACCESS_PATTERNS,
+    MENTAL_ACCESS_VERBS,
     FocalizationViolation,
     FocalizationViolationDetector,
-    MENTAL_ACCESS_VERBS,
-    MENTAL_ACCESS_PATTERNS,
+    ViolationSeverity,
+    ViolationType,
 )
 
 __all__ = [

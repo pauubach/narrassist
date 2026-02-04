@@ -13,11 +13,10 @@ import logging
 import threading
 from dataclasses import dataclass
 from difflib import SequenceMatcher
-from typing import Optional
 
+from ..core.errors import ErrorSeverity, NarrativeError
 from ..core.result import Result
-from ..core.errors import NarrativeError, ErrorSeverity
-from .models import Entity, EntityType, MergeHistory, MergeSuggestion
+from .models import Entity, EntityType, MergeSuggestion
 from .repository import EntityRepository, get_entity_repository
 
 logger = logging.getLogger(__name__)
@@ -40,7 +39,6 @@ LOCATION_SYNONYMS = {
     "jardín": ["parque", "parques", "huerto", "vergel", "patio"],
     "bosque": ["arboleda", "monte", "selva", "espesura", "floresta"],
     "playa": ["costa", "orilla", "litoral", "ribera"],
-
     # Edificios
     "casa": ["hogar", "vivienda", "residencia", "domicilio", "morada", "mansión", "chalet"],
     "edificio": ["inmueble", "construcción", "bloque", "torre"],
@@ -51,10 +49,8 @@ LOCATION_SYNONYMS = {
     "universidad": ["facultad", "campus", "ateneo"],
     "tienda": ["comercio", "local", "negocio", "almacén", "bazar"],
     "restaurante": ["bar", "cafetería", "mesón", "taberna", "cantina", "bistró"],
-
     # Vías
     "calle": ["avenida", "paseo", "vía", "camino", "carretera", "callejón", "bulevar"],
-
     # Zonas
     "barrio": ["vecindario", "zona", "distrito", "colonia", "sector"],
     "ciudad": ["urbe", "metrópoli", "población", "localidad", "municipio"],
@@ -63,6 +59,7 @@ LOCATION_SYNONYMS = {
 
 # Combinamos todos en un diccionario bidireccional
 _SYNONYM_LOOKUP: dict[str, set[str]] = {}
+
 
 def _build_synonym_lookup():
     """Construye lookup bidireccional de sinónimos."""
@@ -80,6 +77,7 @@ def _build_synonym_lookup():
                 _SYNONYM_LOOKUP[syn_lower] = set()
             _SYNONYM_LOOKUP[syn_lower].add(key_lower)
 
+
 _build_synonym_lookup()
 
 
@@ -91,7 +89,7 @@ class FusionError(NarrativeError):
     original_error: str = ""
     message: str = ""
     severity: ErrorSeverity = ErrorSeverity.RECOVERABLE
-    user_message: Optional[str] = None
+    user_message: str | None = None
 
     def __post_init__(self):
         if not self.message:
@@ -119,7 +117,7 @@ class FusionResult:
     """
 
     success: bool = False
-    result_entity_id: Optional[int] = None
+    result_entity_id: int | None = None
     merged_count: int = 0
     aliases_added: list[str] = None
     mentions_moved: int = 0
@@ -147,7 +145,7 @@ class EntityFusionService:
 
     def __init__(
         self,
-        repository: Optional[EntityRepository] = None,
+        repository: EntityRepository | None = None,
         similarity_threshold: float = DEFAULT_SIMILARITY_THRESHOLD,
         use_semantic_fusion: bool = True,
     ):
@@ -168,7 +166,7 @@ class EntityFusionService:
         project_id: int,
         entity_ids: list[int],
         canonical_name: str,
-        note: Optional[str] = None,
+        note: str | None = None,
     ) -> Result[FusionResult]:
         """
         Fusiona múltiples entidades en una sola.
@@ -221,7 +219,7 @@ class EntityFusionService:
             entities.append(entity)
 
         # Verificar que sean del mismo tipo (o advertir)
-        types = set(e.entity_type for e in entities)
+        types = {e.entity_type for e in entities}
         if len(types) > 1:
             logger.warning(
                 f"Fusionando entidades de diferentes tipos: {types}. "
@@ -339,7 +337,7 @@ class EntityFusionService:
     def suggest_merges(
         self,
         project_id: int,
-        entity_type: Optional[EntityType] = None,
+        entity_type: EntityType | None = None,
         max_suggestions: int = MAX_SUGGESTIONS,
     ) -> list[MergeSuggestion]:
         """
@@ -406,8 +404,9 @@ class EntityFusionService:
             # Si uno es CHARACTER y otro es CONCEPT, verificar que parecen nombres
             if {type1, type2} == {EntityType.CHARACTER, EntityType.CONCEPT}:
                 # Solo permitir fusión si ambos parecen nombres propios
-                return self._looks_like_person_name(e1.canonical_name) and \
-                       self._looks_like_person_name(e2.canonical_name)
+                return self._looks_like_person_name(
+                    e1.canonical_name
+                ) and self._looks_like_person_name(e2.canonical_name)
             return True
 
         return False
@@ -423,8 +422,19 @@ class EntityFusionService:
 
         # No debe ser una frase genérica
         generic_patterns = [
-            "algo ", "lo ", "eso ", "esto ", "la ", "el ", "un ", "una ",
-            "cualquier ", "ningún ", "algún ", "todo ", "nada ",
+            "algo ",
+            "lo ",
+            "eso ",
+            "esto ",
+            "la ",
+            "el ",
+            "un ",
+            "una ",
+            "cualquier ",
+            "ningún ",
+            "algún ",
+            "todo ",
+            "nada ",
         ]
         name_lower = name.lower()
         for pattern in generic_patterns:
@@ -466,15 +476,9 @@ class EntityFusionService:
             {EntityType.CHARACTER, EntityType.CONCEPT},
         ]
 
-        for group in compatible_groups:
-            if type1 in group and type2 in group:
-                return True
+        return any(type1 in group and type2 in group for group in compatible_groups)
 
-        return False
-
-    def _compute_similarity(
-        self, e1: Entity, e2: Entity
-    ) -> tuple[float, str, list[str]]:
+    def _compute_similarity(self, e1: Entity, e2: Entity) -> tuple[float, str, list[str]]:
         """
         Calcula similaridad entre dos entidades.
 
@@ -540,9 +544,7 @@ class EntityFusionService:
 
         return max_similarity, reason, evidence
 
-    def _check_synonym_match(
-        self, e1: Entity, e2: Entity
-    ) -> tuple[float, str]:
+    def _check_synonym_match(self, e1: Entity, e2: Entity) -> tuple[float, str]:
         """
         Verifica si dos entidades son sinónimos conocidos.
 
@@ -555,8 +557,8 @@ class EntityFusionService:
 
         def normalize(text: str) -> str:
             """Normaliza texto quitando acentos y pasando a minúsculas."""
-            nfkd = unicodedata.normalize('NFKD', text.lower())
-            return ''.join(c for c in nfkd if not unicodedata.combining(c))
+            nfkd = unicodedata.normalize("NFKD", text.lower())
+            return "".join(c for c in nfkd if not unicodedata.combining(c))
 
         # Extraer palabras clave de los nombres (normalizadas)
         words1 = set(normalize(e1.canonical_name).split())
@@ -571,7 +573,7 @@ class EntityFusionService:
         for w1 in words1:
             # Buscar en el lookup (keys tienen acentos originales)
             lookup_key = None
-            for key in _SYNONYM_LOOKUP.keys():
+            for key in _SYNONYM_LOOKUP:
                 if normalize(key) == w1:
                     lookup_key = key
                     break
@@ -614,9 +616,7 @@ class EntityFusionService:
         # SequenceMatcher estándar
         return SequenceMatcher(None, n1, n2).ratio()
 
-    def _get_similarity_reason(
-        self, name1: str, name2: str, similarity: float
-    ) -> str:
+    def _get_similarity_reason(self, name1: str, name2: str, similarity: float) -> str:
         """Genera razón legible para la sugerencia."""
         n1 = name1.lower().strip()
         n2 = name2.lower().strip()
@@ -675,11 +675,11 @@ class EntityFusionService:
 # =============================================================================
 
 _fusion_lock = threading.Lock()
-_fusion_service: Optional[EntityFusionService] = None
+_fusion_service: EntityFusionService | None = None
 
 
 def get_fusion_service(
-    repository: Optional[EntityRepository] = None,
+    repository: EntityRepository | None = None,
     similarity_threshold: float = DEFAULT_SIMILARITY_THRESHOLD,
     use_semantic_fusion: bool = True,
 ) -> EntityFusionService:
@@ -717,8 +717,8 @@ def reset_fusion_service() -> None:
 
 def run_automatic_fusion(
     project_id: int,
-    session_id: Optional[int] = None,
-    coreference_chains: Optional[list] = None,
+    session_id: int | None = None,
+    coreference_chains: list | None = None,
     auto_merge_threshold: float = 0.90,
 ) -> Result[int]:
     """
@@ -751,9 +751,7 @@ def run_automatic_fusion(
                 project_id, coreference_chains, service.repo
             )
             # Añadir sin duplicados
-            existing_pairs = {
-                (s.entity1.id, s.entity2.id) for s in suggestions
-            }
+            existing_pairs = {(s.entity1.id, s.entity2.id) for s in suggestions}
             for cs in coref_suggestions:
                 pair = (cs.entity1.id, cs.entity2.id)
                 if pair not in existing_pairs:
@@ -817,8 +815,10 @@ def _get_coreference_merge_suggestions(
     for chain in coreference_chains:
         # chain.main_mention = nombre canónico (ej: "Fermín de Pas")
         # chain.mentions = lista de menciones (ej: ["el Magistral", "don Fermín", ...])
-        representative = getattr(chain, 'main_mention', None) or getattr(chain, 'representative', None)
-        mentions = getattr(chain, 'mentions', [])
+        representative = getattr(chain, "main_mention", None) or getattr(
+            chain, "representative", None
+        )
+        mentions = getattr(chain, "mentions", [])
 
         if not representative or not mentions:
             continue
@@ -831,7 +831,7 @@ def _get_coreference_merge_suggestions(
 
         # Para cada mención, buscar si hay una entidad diferente
         for mention in mentions:
-            mention_text = getattr(mention, 'text', str(mention))
+            mention_text = getattr(mention, "text", str(mention))
             mention_entity = entity_by_name.get(mention_text.lower())
 
             # Si la mención corresponde a una entidad diferente, sugerir fusión

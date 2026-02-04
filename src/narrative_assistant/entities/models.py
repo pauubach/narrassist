@@ -8,11 +8,11 @@ Define las estructuras para:
 - Sugerencias de fusión
 """
 
+import contextlib
 import json
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 
 class EntityType(Enum):
@@ -106,17 +106,17 @@ class EntityMention:
         source: Origen de la detección (ner, coref, manual, gazetteer)
     """
 
-    id: Optional[int] = None
+    id: int | None = None
     entity_id: int = 0
     surface_form: str = ""
     start_char: int = 0
     end_char: int = 0
-    chapter_id: Optional[int] = None
-    context_before: Optional[str] = None
-    context_after: Optional[str] = None
+    chapter_id: int | None = None
+    context_before: str | None = None
+    context_after: str | None = None
     confidence: float = 1.0
     source: str = "ner"
-    metadata: Optional[str] = None  # JSON con datos adicionales (voting_detail para coref)
+    metadata: str | None = None  # JSON con datos adicionales (voting_detail para coref)
 
     @property
     def char_span(self) -> tuple[int, int]:
@@ -124,12 +124,13 @@ class EntityMention:
         return (self.start_char, self.end_char)
 
     @property
-    def metadata_dict(self) -> Optional[dict]:
+    def metadata_dict(self) -> dict | None:
         """Deserializa metadata JSON a diccionario."""
         if not self.metadata:
             return None
         try:
             import json
+
             return json.loads(self.metadata)
         except (json.JSONDecodeError, TypeError):
             return None
@@ -155,10 +156,8 @@ class EntityMention:
         """Crea instancia desde fila de SQLite."""
         # Acceso seguro a 'metadata' (puede no existir en BD antiguas)
         metadata = None
-        try:
+        with contextlib.suppress(IndexError, KeyError):
             metadata = row["metadata"]
-        except (IndexError, KeyError):
-            pass
         return cls(
             id=row["id"],
             entity_id=row["entity_id"],
@@ -195,19 +194,19 @@ class Entity:
         updated_at: Fecha de última actualización
     """
 
-    id: Optional[int] = None
+    id: int | None = None
     project_id: int = 0
     entity_type: EntityType = EntityType.CHARACTER
     canonical_name: str = ""
     aliases: list[str] = field(default_factory=list)
     importance: EntityImportance = EntityImportance.MEDIUM
-    description: Optional[str] = None
-    first_appearance_char: Optional[int] = None
+    description: str | None = None
+    first_appearance_char: int | None = None
     mention_count: int = 0
     merged_from_ids: list[int] = field(default_factory=list)
     is_active: bool = True
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
     @property
     def all_names(self) -> list[str]:
@@ -278,12 +277,8 @@ class Entity:
             mention_count=row["mention_count"],
             merged_from_ids=merged_from,
             is_active=bool(row["is_active"]),
-            created_at=datetime.fromisoformat(row["created_at"])
-            if row["created_at"]
-            else None,
-            updated_at=datetime.fromisoformat(row["updated_at"])
-            if row["updated_at"]
-            else None,
+            created_at=datetime.fromisoformat(row["created_at"]) if row["created_at"] else None,
+            updated_at=datetime.fromisoformat(row["updated_at"]) if row["updated_at"] else None,
         )
 
 
@@ -305,16 +300,16 @@ class MergeHistory:
         note: Nota del usuario
     """
 
-    id: Optional[int] = None
+    id: int | None = None
     project_id: int = 0
     result_entity_id: int = 0
     source_entity_ids: list[int] = field(default_factory=list)
     source_snapshots: list[dict] = field(default_factory=list)
     canonical_name_before: list[str] = field(default_factory=list)
-    merged_at: Optional[datetime] = None
+    merged_at: datetime | None = None
     merged_by: str = "user"
-    undone_at: Optional[datetime] = None
-    note: Optional[str] = None
+    undone_at: datetime | None = None
+    note: str | None = None
 
     @property
     def is_undone(self) -> bool:

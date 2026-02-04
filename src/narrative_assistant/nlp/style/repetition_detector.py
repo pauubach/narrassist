@@ -18,8 +18,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
 
+from ...core.errors import ErrorSeverity, NLPError
 from ...core.result import Result
-from ...core.errors import NLPError, ErrorSeverity
 
 logger = logging.getLogger(__name__)
 
@@ -54,30 +54,34 @@ def reset_repetition_detector() -> None:
 # Tipos
 # =============================================================================
 
+
 class RepetitionType(Enum):
     """Tipos de repeticiones detectadas."""
-    LEXICAL = "lexical"              # Misma palabra exacta
-    LEMMA = "lemma"                  # Mismo lema (conjugaciones)
-    SEMANTIC = "semantic"            # Mismo concepto/significado
-    PHONETIC = "phonetic"            # Sonido similar (cacofonía)
-    STRUCTURAL = "structural"        # Estructura sintáctica repetida
+
+    LEXICAL = "lexical"  # Misma palabra exacta
+    LEMMA = "lemma"  # Mismo lema (conjugaciones)
+    SEMANTIC = "semantic"  # Mismo concepto/significado
+    PHONETIC = "phonetic"  # Sonido similar (cacofonía)
+    STRUCTURAL = "structural"  # Estructura sintáctica repetida
 
 
 class RepetitionSeverity(Enum):
     """Severidad de la repetición."""
-    HIGH = "high"          # Muy cercanas, muy evidentes
-    MEDIUM = "medium"      # Moderadamente cercanas
-    LOW = "low"            # Lejanas pero notables
+
+    HIGH = "high"  # Muy cercanas, muy evidentes
+    MEDIUM = "medium"  # Moderadamente cercanas
+    LOW = "low"  # Lejanas pero notables
 
 
 @dataclass
 class RepetitionOccurrence:
     """Una ocurrencia de una palabra repetida."""
-    text: str              # Texto exacto
-    start_char: int        # Posición inicio
-    end_char: int          # Posición fin
-    sentence: str          # Oración de contexto
-    word_position: int     # Posición en número de palabras
+
+    text: str  # Texto exacto
+    start_char: int  # Posición inicio
+    end_char: int  # Posición fin
+    sentence: str  # Oración de contexto
+    word_position: int  # Posición en número de palabras
 
 
 @dataclass
@@ -85,8 +89,8 @@ class Repetition:
     """Una repetición detectada."""
 
     # Palabra/concepto repetido
-    word: str                          # Palabra o lema
-    lemma: str = ""                    # Lema (si aplica)
+    word: str  # Palabra o lema
+    lemma: str = ""  # Lema (si aplica)
 
     # Tipo y severidad
     repetition_type: RepetitionType = RepetitionType.LEXICAL
@@ -94,15 +98,15 @@ class Repetition:
 
     # Ocurrencias
     occurrences: list[RepetitionOccurrence] = field(default_factory=list)
-    count: int = 0                     # Número de repeticiones
+    count: int = 0  # Número de repeticiones
 
     # Métricas
-    min_distance: int = 0              # Distancia mínima entre ocurrencias (palabras)
-    max_distance: int = 0              # Distancia máxima
-    avg_distance: float = 0.0          # Distancia promedio
+    min_distance: int = 0  # Distancia mínima entre ocurrencias (palabras)
+    max_distance: int = 0  # Distancia máxima
+    avg_distance: float = 0.0  # Distancia promedio
 
     # Confianza
-    confidence: float = 0.8            # 0.0-1.0
+    confidence: float = 0.8  # 0.0-1.0
 
     def __post_init__(self):
         if not self.count:
@@ -188,40 +192,170 @@ class RepetitionReport:
 
 SPANISH_STOP_WORDS = {
     # Artículos
-    "el", "la", "los", "las", "un", "una", "unos", "unas",
+    "el",
+    "la",
+    "los",
+    "las",
+    "un",
+    "una",
+    "unos",
+    "unas",
     # Preposiciones
-    "a", "ante", "bajo", "con", "contra", "de", "del", "desde",
-    "en", "entre", "hacia", "hasta", "para", "por", "según",
-    "sin", "sobre", "tras",
+    "a",
+    "ante",
+    "bajo",
+    "con",
+    "contra",
+    "de",
+    "del",
+    "desde",
+    "en",
+    "entre",
+    "hacia",
+    "hasta",
+    "para",
+    "por",
+    "según",
+    "sin",
+    "sobre",
+    "tras",
     # Conjunciones
-    "y", "e", "ni", "o", "u", "pero", "sino", "porque", "que",
-    "si", "aunque", "como", "cuando", "donde", "mientras",
+    "y",
+    "e",
+    "ni",
+    "o",
+    "u",
+    "pero",
+    "sino",
+    "porque",
+    "que",
+    "si",
+    "aunque",
+    "como",
+    "cuando",
+    "donde",
+    "mientras",
     # Pronombres
-    "yo", "tú", "él", "ella", "nosotros", "vosotros", "ellos", "ellas",
-    "me", "te", "se", "nos", "os", "le", "les", "lo", "la",
-    "mi", "tu", "su", "nuestro", "vuestro",
-    "este", "esta", "esto", "estos", "estas",
-    "ese", "esa", "eso", "esos", "esas",
-    "aquel", "aquella", "aquello", "aquellos", "aquellas",
-    "quien", "quienes", "cual", "cuales", "cuyo", "cuya",
+    "yo",
+    "tú",
+    "él",
+    "ella",
+    "nosotros",
+    "vosotros",
+    "ellos",
+    "ellas",
+    "me",
+    "te",
+    "se",
+    "nos",
+    "os",
+    "le",
+    "les",
+    "lo",
+    "mi",
+    "tu",
+    "su",
+    "nuestro",
+    "vuestro",
+    "este",
+    "esta",
+    "esto",
+    "estos",
+    "estas",
+    "ese",
+    "esa",
+    "eso",
+    "esos",
+    "esas",
+    "aquel",
+    "aquella",
+    "aquello",
+    "aquellos",
+    "aquellas",
+    "quien",
+    "quienes",
+    "cual",
+    "cuales",
+    "cuyo",
+    "cuya",
     # Verbos muy comunes
-    "ser", "estar", "tener", "haber", "hacer", "ir", "poder",
-    "es", "está", "son", "están", "era", "fue", "ha", "han",
-    "hay", "había", "tiene", "tienen", "hace", "hacen",
+    "ser",
+    "estar",
+    "tener",
+    "haber",
+    "hacer",
+    "ir",
+    "poder",
+    "es",
+    "está",
+    "son",
+    "están",
+    "era",
+    "fue",
+    "ha",
+    "han",
+    "hay",
+    "había",
+    "tiene",
+    "tienen",
+    "hace",
+    "hacen",
     # Adverbios
-    "no", "sí", "ya", "más", "muy", "bien", "mal", "así",
-    "también", "tampoco", "ahora", "después", "antes",
-    "aquí", "allí", "siempre", "nunca", "solo", "todavía",
+    "no",
+    "sí",
+    "ya",
+    "más",
+    "muy",
+    "bien",
+    "mal",
+    "así",
+    "también",
+    "tampoco",
+    "ahora",
+    "después",
+    "antes",
+    "aquí",
+    "allí",
+    "siempre",
+    "nunca",
+    "solo",
+    "todavía",
     # Otros
-    "todo", "toda", "todos", "todas", "otro", "otra", "otros", "otras",
-    "mismo", "misma", "mismos", "mismas", "cada", "mucho", "poco",
-    "tanto", "tan", "algo", "nada", "alguien", "nadie",
+    "todo",
+    "toda",
+    "todos",
+    "todas",
+    "otro",
+    "otra",
+    "otros",
+    "otras",
+    "mismo",
+    "misma",
+    "mismos",
+    "mismas",
+    "cada",
+    "mucho",
+    "poco",
+    "tanto",
+    "tan",
+    "algo",
+    "nada",
+    "alguien",
+    "nadie",
 }
 
 # Palabras que pueden repetirse sin problema en narrativa
 NARRATIVE_ALLOWED = {
-    "dijo", "preguntó", "respondió", "contestó", "exclamó",
-    "pensó", "sintió", "miró", "vio", "oyó",
+    "dijo",
+    "preguntó",
+    "respondió",
+    "contestó",
+    "exclamó",
+    "pensó",
+    "sintió",
+    "miró",
+    "vio",
+    "oyó",
 }
 
 
@@ -257,12 +391,14 @@ class RepetitionDetector:
         """Cargar recursos NLP si están disponibles."""
         try:
             from ..spacy_gpu import load_spacy_model
+
             self._nlp = load_spacy_model()
         except Exception as e:
             logger.warning(f"spaCy not available for repetition detection: {e}")
 
         try:
             from ..embeddings import get_embeddings_model
+
             self._embeddings = get_embeddings_model()
         except Exception as e:
             logger.warning(f"Embeddings not available for semantic repetitions: {e}")
@@ -326,7 +462,7 @@ class RepetitionDetector:
                 # Calcular distancias entre ocurrencias consecutivas
                 distances = []
                 for i in range(1, len(occurrences)):
-                    dist = occurrences[i][3] - occurrences[i-1][3]
+                    dist = occurrences[i][3] - occurrences[i - 1][3]
                     distances.append(dist)
 
                 if not distances:
@@ -417,9 +553,9 @@ class RepetitionDetector:
                 if len(lemma) < 3:
                     continue
 
-                lemma_occurrences[lemma].append((
-                    word, token.idx, token.idx + len(word), word_idx, lemma
-                ))
+                lemma_occurrences[lemma].append(
+                    (word, token.idx, token.idx + len(word), word_idx, lemma)
+                )
                 word_idx += 1
 
             report.processed_words = word_idx
@@ -430,14 +566,14 @@ class RepetitionDetector:
                     continue
 
                 # Verificar que hay variación de formas (no solo repetición exacta)
-                unique_forms = set(occ[0].lower() for occ in occurrences)
+                unique_forms = {occ[0].lower() for occ in occurrences}
                 if len(unique_forms) == 1:
                     # Es repetición léxica, no de lema
                     continue
 
                 distances = []
                 for i in range(1, len(occurrences)):
-                    dist = occurrences[i][3] - occurrences[i-1][3]
+                    dist = occurrences[i][3] - occurrences[i - 1][3]
                     distances.append(dist)
 
                 if not distances:
@@ -510,7 +646,7 @@ class RepetitionDetector:
             # Comparar pares de palabras cercanas
             semantic_groups: dict[str, list] = defaultdict(list)
 
-            for i, (word1, start1, end1, pos1) in enumerate(content_words):
+            for i, (word1, _start1, _end1, pos1) in enumerate(content_words):
                 for j, (word2, start2, end2, pos2) in enumerate(content_words):
                     if i >= j:
                         continue
@@ -526,13 +662,15 @@ class RepetitionDetector:
                     if sim >= similarity_threshold and word1.lower() != word2.lower():
                         # Agrupar por el primer término encontrado
                         key = word1.lower()
-                        semantic_groups[key].append({
-                            "word": word2,
-                            "similarity": sim,
-                            "position": pos2,
-                            "start": start2,
-                            "end": end2,
-                        })
+                        semantic_groups[key].append(
+                            {
+                                "word": word2,
+                                "similarity": sim,
+                                "position": pos2,
+                                "start": start2,
+                                "end": end2,
+                            }
+                        )
 
             # Crear repeticiones semánticas
             for base_word, related in semantic_groups.items():
@@ -555,13 +693,15 @@ class RepetitionDetector:
                 ]
 
                 for rel in related:
-                    occ_list.append(RepetitionOccurrence(
-                        text=rel["word"],
-                        start_char=rel["start"],
-                        end_char=rel["end"],
-                        sentence=self._extract_sentence(text, rel["start"]),
-                        word_position=rel["position"],
-                    ))
+                    occ_list.append(
+                        RepetitionOccurrence(
+                            text=rel["word"],
+                            start_char=rel["start"],
+                            end_char=rel["end"],
+                            sentence=self._extract_sentence(text, rel["start"]),
+                            word_position=rel["position"],
+                        )
+                    )
 
                 rep = Repetition(
                     word=base_word,
@@ -618,13 +758,10 @@ class RepetitionDetector:
     # Helpers
     # =========================================================================
 
-    def _tokenize_with_positions(
-        self,
-        text: str
-    ) -> list[tuple[str, int, int, int]]:
+    def _tokenize_with_positions(self, text: str) -> list[tuple[str, int, int, int]]:
         """Tokenizar texto preservando posiciones."""
         tokens = []
-        word_pattern = re.compile(r'\b([a-záéíóúüñA-ZÁÉÍÓÚÜÑ]+)\b')
+        word_pattern = re.compile(r"\b([a-záéíóúüñA-ZÁÉÍÓÚÜÑ]+)\b")
         word_idx = 0
 
         for match in word_pattern.finditer(text):
@@ -637,22 +774,22 @@ class RepetitionDetector:
     def _remove_dialogues(self, text: str) -> str:
         """Eliminar contenido de diálogos del texto."""
         # Remover texto entre comillas y guiones de diálogo
-        text = re.sub(r'«[^»]*»', '', text)
-        text = re.sub(r'"[^"]*"', '', text)
-        text = re.sub(r'—[^—\n]*(?:—|\n)', '', text)
+        text = re.sub(r"«[^»]*»", "", text)
+        text = re.sub(r'"[^"]*"', "", text)
+        text = re.sub(r"—[^—\n]*(?:—|\n)", "", text)
         return text
 
     def _extract_sentence(self, text: str, position: int) -> str:
         """Extraer oración que contiene la posición."""
         start = position
-        while start > 0 and text[start-1] not in '.!?\n':
+        while start > 0 and text[start - 1] not in ".!?\n":
             start -= 1
 
         end = position
-        while end < len(text) and text[end] not in '.!?\n':
+        while end < len(text) and text[end] not in ".!?\n":
             end += 1
 
-        sentence = text[start:end+1].strip()
+        sentence = text[start : end + 1].strip()
         if len(sentence) > 150:
             word_pos = position - start
             context_start = max(0, word_pos - 60)
@@ -661,10 +798,7 @@ class RepetitionDetector:
 
         return sentence
 
-    def _extract_content_words(
-        self,
-        text: str
-    ) -> list[tuple[str, int, int, int]]:
+    def _extract_content_words(self, text: str) -> list[tuple[str, int, int, int]]:
         """Extraer palabras de contenido (sustantivos, verbos, adjetivos)."""
         content_words = []
 
@@ -676,10 +810,9 @@ class RepetitionDetector:
                     continue
                 if token.pos_ in ["NOUN", "VERB", "ADJ", "ADV"]:
                     if not token.is_stop and len(token.text) >= 3:
-                        content_words.append((
-                            token.text, token.idx,
-                            token.idx + len(token.text), word_idx
-                        ))
+                        content_words.append(
+                            (token.text, token.idx, token.idx + len(token.text), word_idx)
+                        )
                 word_idx += 1
         else:
             # Fallback: usar todas las palabras largas
@@ -692,6 +825,7 @@ class RepetitionDetector:
     def _cosine_similarity(self, vec1, vec2) -> float:
         """Calcular similitud coseno entre dos vectores."""
         import numpy as np
+
         dot = np.dot(vec1, vec2)
         norm1 = np.linalg.norm(vec1)
         norm2 = np.linalg.norm(vec2)

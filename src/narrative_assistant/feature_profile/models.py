@@ -2,25 +2,25 @@
 Modelos para el sistema de perfiles de features por tipo de documento.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
 
 
 class DocumentType(str, Enum):
     """Tipos principales de documento."""
-    FICTION = "FIC"           # Ficción narrativa
-    MEMOIR = "MEM"            # Memorias y autobiografías
-    BIOGRAPHY = "BIO"         # Biografías
-    CELEBRITY = "CEL"         # Libros de famosos/influencers
-    DIVULGATION = "DIV"       # Divulgación científica/histórica
-    ESSAY = "ENS"             # Ensayo académico/literario
-    SELF_HELP = "AUT"         # Autoayuda y desarrollo personal
-    TECHNICAL = "TEC"         # Manuales técnicos
-    PRACTICAL = "PRA"         # Libros prácticos (cocina, DIY, etc.)
-    GRAPHIC = "GRA"           # Novela gráfica y cómic
-    CHILDREN = "INF"          # Literatura infantil/juvenil
-    DRAMA = "DRA"             # Teatro/guion
+
+    FICTION = "FIC"  # Ficción narrativa
+    MEMOIR = "MEM"  # Memorias y autobiografías
+    BIOGRAPHY = "BIO"  # Biografías
+    CELEBRITY = "CEL"  # Libros de famosos/influencers
+    DIVULGATION = "DIV"  # Divulgación científica/histórica
+    ESSAY = "ENS"  # Ensayo académico/literario
+    SELF_HELP = "AUT"  # Autoayuda y desarrollo personal
+    TECHNICAL = "TEC"  # Manuales técnicos
+    PRACTICAL = "PRA"  # Libros prácticos (cocina, DIY, etc.)
+    GRAPHIC = "GRA"  # Novela gráfica y cómic
+    CHILDREN = "INF"  # Literatura infantil/juvenil
+    DRAMA = "DRA"  # Teatro/guion
 
 
 # Mapeo bidireccional entre códigos cortos (BD) y largos (clasificador/frontend)
@@ -91,9 +91,10 @@ def type_long_to_code(long_name: str) -> str:
 
 class FeatureAvailability(str, Enum):
     """Niveles de disponibilidad de una feature."""
-    ENABLED = "enabled"       # Activa por defecto
-    OPTIONAL = "optional"     # Disponible pero desactivada
-    DISABLED = "disabled"     # No disponible para este tipo
+
+    ENABLED = "enabled"  # Activa por defecto
+    OPTIONAL = "optional"  # Disponible pero desactivada
+    DISABLED = "disabled"  # No disponible para este tipo
 
 
 # Información de tipos de documento
@@ -255,8 +256,9 @@ class FeatureProfile:
     Define qué herramientas de análisis están disponibles
     según el tipo de manuscrito.
     """
+
     document_type: DocumentType
-    document_subtype: Optional[str] = None
+    document_subtype: str | None = None
 
     # Features de estructura narrativa
     characters: FeatureAvailability = FeatureAvailability.ENABLED
@@ -274,17 +276,31 @@ class FeatureProfile:
     sentence_variation: FeatureAvailability = FeatureAvailability.ENABLED
     emotional_analysis: FeatureAvailability = FeatureAvailability.ENABLED
     age_readability: FeatureAvailability = FeatureAvailability.DISABLED  # Solo para INF
-    sensory_report: FeatureAvailability = FeatureAvailability.ENABLED  # Reporte sensorial (5 sentidos)
+    sensory_report: FeatureAvailability = (
+        FeatureAvailability.ENABLED
+    )  # Reporte sensorial (5 sentidos)
     sentence_energy: FeatureAvailability = FeatureAvailability.ENABLED  # Energía de oraciones
-    narrative_templates: FeatureAvailability = FeatureAvailability.ENABLED  # Plantillas narrativas (diagnóstico)
-    narrative_health: FeatureAvailability = FeatureAvailability.ENABLED  # Salud narrativa (12 dimensiones)
-    character_archetypes: FeatureAvailability = FeatureAvailability.ENABLED  # Arquetipos Jung/Campbell
+    narrative_templates: FeatureAvailability = (
+        FeatureAvailability.ENABLED
+    )  # Plantillas narrativas (diagnóstico)
+    narrative_health: FeatureAvailability = (
+        FeatureAvailability.ENABLED
+    )  # Salud narrativa (12 dimensiones)
+    character_archetypes: FeatureAvailability = (
+        FeatureAvailability.ENABLED
+    )  # Arquetipos Jung/Campbell
     vital_status: FeatureAvailability = FeatureAvailability.ENABLED  # Muertes y reapariciones
-    character_location: FeatureAvailability = FeatureAvailability.ENABLED  # Seguimiento de ubicaciones
-    chapter_progress: FeatureAvailability = FeatureAvailability.ENABLED  # Resumen de avance por capítulo
+    character_location: FeatureAvailability = (
+        FeatureAvailability.ENABLED
+    )  # Seguimiento de ubicaciones
+    chapter_progress: FeatureAvailability = (
+        FeatureAvailability.ENABLED
+    )  # Resumen de avance por capítulo
     duplicate_content: FeatureAvailability = FeatureAvailability.ENABLED  # Detección de duplicados
     narrative_structure: FeatureAvailability = FeatureAvailability.ENABLED  # Prolepsis/analepsis
-    dialogue_validation: FeatureAvailability = FeatureAvailability.ENABLED  # Validación de diálogos (huérfanos, atribución)
+    dialogue_validation: FeatureAvailability = (
+        FeatureAvailability.ENABLED
+    )  # Validación de diálogos (huérfanos, atribución)
 
     # Features de consistencia
     attribute_consistency: FeatureAvailability = FeatureAvailability.ENABLED
@@ -335,7 +351,7 @@ class FeatureProfile:
                 "glossary": self.glossary.value,
                 "terminology": self.terminology.value,
                 "editorial_rules": self.editorial_rules.value,
-            }
+            },
         }
 
     def is_enabled(self, feature: str) -> bool:
@@ -351,6 +367,7 @@ class FeatureProfile:
 
 # Perfiles predefinidos por tipo de documento
 # Basados en el análisis con expertos editoriales
+
 
 def _create_fiction_profile() -> FeatureProfile:
     """Perfil para ficción narrativa - todas las features activadas."""
@@ -549,8 +566,7 @@ PROFILE_CREATORS = {
 
 
 def create_feature_profile(
-    document_type: DocumentType,
-    document_subtype: Optional[str] = None
+    document_type: DocumentType, document_subtype: str | None = None
 ) -> FeatureProfile:
     """
     Crea un perfil de features para un tipo de documento.

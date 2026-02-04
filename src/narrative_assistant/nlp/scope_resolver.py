@@ -20,7 +20,6 @@ Uso:
 import logging
 import re
 from dataclasses import dataclass
-from typing import Optional
 
 from . import morpho_utils
 
@@ -42,6 +41,7 @@ _COPULAR_LEMMAS = frozenset({"ser", "estar", "parecer", "resultar"})
 @dataclass
 class ScopeSpan:
     """Rango de caracteres de un scope lingüístico."""
+
     start: int
     end: int
     scope_type: str  # "sentence", "paragraph", "chapter"
@@ -119,7 +119,7 @@ class ScopeResolver:
                     spans.append((rc_start, rc_end, token.head.i))
         return spans
 
-    def is_in_relative_clause(self, char_position: int) -> tuple[bool, Optional[int]]:
+    def is_in_relative_clause(self, char_position: int) -> tuple[bool, int | None]:
         """
         Verifica si una posición de caracteres cae dentro de una cláusula relativa.
 
@@ -135,9 +135,7 @@ class ScopeResolver:
                 return (True, antecedent_idx)
         return (False, None)
 
-    def sentence_scope(
-        self, position: int, window: int = SENTENCE_WINDOW
-    ) -> ScopeSpan:
+    def sentence_scope(self, position: int, window: int = SENTENCE_WINDOW) -> ScopeSpan:
         """
         Retorna el scope de oración actual + N oraciones previas.
 
@@ -189,15 +187,13 @@ class ScopeResolver:
                 return ScopeSpan(start=start, end=end, scope_type="paragraph")
 
         # Fallback: todo el texto
-        return ScopeSpan(
-            start=0, end=len(self.text), scope_type="paragraph"
-        )
+        return ScopeSpan(start=0, end=len(self.text), scope_type="paragraph")
 
     # =========================================================================
     # Resolución de sujeto gramatical
     # =========================================================================
 
-    def find_subject_for_predicate(self, predicate_token) -> Optional[str]:
+    def find_subject_for_predicate(self, predicate_token) -> str | None:
         """
         Dado un token predicativo (adjetivo, participio), encuentra el sujeto.
 
@@ -216,7 +212,7 @@ class ScopeResolver:
         text, _ = self._find_subject_token(predicate_token)
         return text
 
-    def _find_subject_token(self, predicate_token) -> tuple[Optional[str], Optional[object]]:
+    def _find_subject_token(self, predicate_token) -> tuple[str | None, object | None]:
         """
         Igual que find_subject_for_predicate pero retorna también el token del sujeto.
 
@@ -294,7 +290,7 @@ class ScopeResolver:
     # Identidad copulativa: "X era Y"
     # =========================================================================
 
-    def _find_copular_identity(self, subject_token) -> Optional[str]:
+    def _find_copular_identity(self, subject_token) -> str | None:
         """
         Busca identidad copulativa para un sujeto.
 
@@ -381,10 +377,7 @@ class ScopeResolver:
 
         if n1_stripped == n2_stripped:
             return True
-        if n1_stripped == n2 or n1 == n2_stripped:
-            return True
-
-        return False
+        return bool(n1_stripped == n2 or n1 == n2_stripped)
 
     # =========================================================================
     # Filtrado de entidades en cláusulas relativas
@@ -440,7 +433,7 @@ class ScopeResolver:
         position: int,
         entity_mentions: list[tuple[str, int, int, str]],
         prefer_subject: bool = True,
-    ) -> Optional[tuple[str, float]]:
+    ) -> tuple[str, float] | None:
         """
         Encuentra la entidad más relevante para una posición usando scope gramatical.
 
@@ -474,7 +467,7 @@ class ScopeResolver:
                 if subject_text:
                     # 1a: Matching flexible con entity_mentions
                     subject_match = None
-                    for name, start, end, etype in entity_mentions:
+                    for name, _start, _end, _etype in entity_mentions:
                         if self._names_match_flexible(subject_text, name):
                             subject_match = name
                             break
@@ -485,7 +478,7 @@ class ScopeResolver:
                     if subject_token is not None:
                         identity = self._find_copular_identity(subject_token)
                         if identity:
-                            for name, start, end, etype in entity_mentions:
+                            for name, _start, _end, _etype in entity_mentions:
                                 if self._names_match_flexible(identity, name):
                                     identity_match = name
                                     break
@@ -495,8 +488,7 @@ class ScopeResolver:
                     # entidades, preferir el nombre propio.
                     if identity_match:
                         is_descriptive_noun = (
-                            subject_token is not None
-                            and subject_token.pos_ == "NOUN"
+                            subject_token is not None and subject_token.pos_ == "NOUN"
                         )
                         if is_descriptive_noun or not subject_match:
                             logger.debug(
@@ -584,7 +576,7 @@ class ScopeResolver:
         return None
 
 
-def find_subject_in_scope(doc, token) -> Optional[str]:
+def find_subject_in_scope(doc, token) -> str | None:
     """
     Función de conveniencia: dado un token, busca su sujeto gramatical.
 

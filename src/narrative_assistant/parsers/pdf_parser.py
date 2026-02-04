@@ -8,7 +8,6 @@ Detecta estructura de capítulos basada en formato de texto (fuente, tamaño).
 import logging
 import re
 from pathlib import Path
-from typing import Optional
 
 from ..core.errors import CorruptedDocumentError, EmptyDocumentError
 from ..core.result import Result
@@ -49,11 +48,10 @@ class PdfParser(DocumentParser):
         """Verifica que pdfplumber está disponible."""
         try:
             import pdfplumber
+
             return True
         except ImportError:
-            logger.warning(
-                "pdfplumber no instalado. Instalar con: pip install pdfplumber"
-            )
+            logger.warning("pdfplumber no instalado. Instalar con: pip install pdfplumber")
             return False
 
     def parse(self, path: Path) -> Result[RawDocument]:
@@ -74,7 +72,7 @@ class PdfParser(DocumentParser):
         path = validation_result.value
 
         if not self._pdfplumber_available:
-            from ..core.errors import NarrativeError, ErrorSeverity
+            from ..core.errors import ErrorSeverity, NarrativeError
 
             return Result.failure(
                 NarrativeError(
@@ -172,15 +170,17 @@ class PdfParser(DocumentParser):
 
         try:
             if pdf.metadata:
-                metadata.update({
-                    "title": pdf.metadata.get("Title", ""),
-                    "author": pdf.metadata.get("Author", ""),
-                    "subject": pdf.metadata.get("Subject", ""),
-                    "creator": pdf.metadata.get("Creator", ""),
-                    "producer": pdf.metadata.get("Producer", ""),
-                    "created": pdf.metadata.get("CreationDate", ""),
-                    "modified": pdf.metadata.get("ModDate", ""),
-                })
+                metadata.update(
+                    {
+                        "title": pdf.metadata.get("Title", ""),
+                        "author": pdf.metadata.get("Author", ""),
+                        "subject": pdf.metadata.get("Subject", ""),
+                        "creator": pdf.metadata.get("Creator", ""),
+                        "producer": pdf.metadata.get("Producer", ""),
+                        "created": pdf.metadata.get("CreationDate", ""),
+                        "modified": pdf.metadata.get("ModDate", ""),
+                    }
+                )
         except Exception as e:
             logger.debug(f"Error extrayendo metadatos PDF: {e}")
 
@@ -201,8 +201,8 @@ class PdfParser(DocumentParser):
         page_num: int,
         start_index: int,
         start_char_pos: int,
-        base_font_size: Optional[float],
-    ) -> tuple[list[RawParagraph], Optional[float]]:
+        base_font_size: float | None,
+    ) -> tuple[list[RawParagraph], float | None]:
         """
         Extrae párrafos de una página.
 
@@ -244,9 +244,7 @@ class PdfParser(DocumentParser):
                 continue
 
             # Detectar si es heading
-            is_heading, heading_level = self._detect_heading(
-                para_text, chars, base_font_size
-            )
+            is_heading, heading_level = self._detect_heading(para_text, chars, base_font_size)
 
             para = RawParagraph(
                 text=para_text,
@@ -288,8 +286,8 @@ class PdfParser(DocumentParser):
         self,
         text: str,
         chars: list,
-        base_font_size: Optional[float],
-    ) -> tuple[bool, Optional[int]]:
+        base_font_size: float | None,
+    ) -> tuple[bool, int | None]:
         """
         Detecta si un texto es un heading.
 
@@ -313,8 +311,10 @@ class PdfParser(DocumentParser):
             # Buscar caracteres que correspondan a este texto
             text_start = text_stripped[:20]  # Primeros caracteres
             matching_chars = [
-                c for c in chars
-                if c.get("text", "").strip() and text_start.startswith(c.get("text", "").strip()[:5])
+                c
+                for c in chars
+                if c.get("text", "").strip()
+                and text_start.startswith(c.get("text", "").strip()[:5])
             ]
 
             if matching_chars:
@@ -377,10 +377,26 @@ class PdfParser(DocumentParser):
     def _is_narrative_start(self, text: str) -> bool:
         """Verifica si el texto comienza con conectores narrativos."""
         narrative_starters = [
-            'cuando', 'mientras', 'entonces', 'sin embargo', 'no obstante',
-            'de pronto', 'aquella', 'aquel', 'aquellos', 'aquellas',
-            'había', 'era', 'fue', 'estaba', 'tenía', 'hacía',
-            'el día', 'la noche', 'esa mañana', 'aquella tarde',
+            "cuando",
+            "mientras",
+            "entonces",
+            "sin embargo",
+            "no obstante",
+            "de pronto",
+            "aquella",
+            "aquel",
+            "aquellos",
+            "aquellas",
+            "había",
+            "era",
+            "fue",
+            "estaba",
+            "tenía",
+            "hacía",
+            "el día",
+            "la noche",
+            "esa mañana",
+            "aquella tarde",
         ]
         text_lower = text.lower()
         return any(text_lower.startswith(starter) for starter in narrative_starters)

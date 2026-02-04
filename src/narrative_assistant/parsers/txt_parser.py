@@ -10,7 +10,6 @@ Incluye:
 import logging
 import re
 from pathlib import Path
-from typing import Optional
 
 from ..core.errors import CorruptedDocumentError, EmptyDocumentError
 from ..core.result import Result
@@ -36,13 +35,30 @@ CHAPTER_PATTERNS = [
 
 # Palabras que NO deben tratarse como headings aunque estén en mayúsculas
 NOT_HEADING_WORDS = {
-    "fin", "the end", "end", "finis",
-    "continuará", "continuara", "to be continued",
-    "nota", "notas", "notes", "note",
-    "agradecimientos", "acknowledgments", "acknowledgements",
-    "dedicatoria", "dedication",
-    "índice", "indice", "index", "contents",
-    "bibliografía", "bibliografia", "bibliography", "references",
+    "fin",
+    "the end",
+    "end",
+    "finis",
+    "continuará",
+    "continuara",
+    "to be continued",
+    "nota",
+    "notas",
+    "notes",
+    "note",
+    "agradecimientos",
+    "acknowledgments",
+    "acknowledgements",
+    "dedicatoria",
+    "dedication",
+    "índice",
+    "indice",
+    "index",
+    "contents",
+    "bibliografía",
+    "bibliografia",
+    "bibliography",
+    "references",
 }
 
 
@@ -95,7 +111,7 @@ class TxtParser(DocumentParser):
             return Result.failure(
                 CorruptedDocumentError(
                     file_path=str(path),
-                    original_error=f"No se pudo detectar encoding válido",
+                    original_error="No se pudo detectar encoding válido",
                 )
             )
 
@@ -127,7 +143,7 @@ class TxtParser(DocumentParser):
 
         return Result.success(raw_doc)
 
-    def _read_with_encoding_detection(self, path: Path) -> tuple[Optional[str], str]:
+    def _read_with_encoding_detection(self, path: Path) -> tuple[str | None, str]:
         """
         Lee archivo con detección automática de encoding.
 
@@ -157,14 +173,14 @@ class TxtParser(DocumentParser):
 
         # Fallback: UTF-8
         try:
-            with open(path, "r", encoding="utf-8") as f:
+            with open(path, encoding="utf-8") as f:
                 return f.read(), "utf-8"
         except UnicodeDecodeError:
             pass
 
         # Fallback final: Latin-1 (nunca falla)
         try:
-            with open(path, "r", encoding="latin-1") as f:
+            with open(path, encoding="latin-1") as f:
                 return f.read(), "latin-1"
         except Exception as e:
             logger.error(f"Error leyendo {path}: {e}")
@@ -207,7 +223,7 @@ class TxtParser(DocumentParser):
 
         return paragraphs
 
-    def _detect_heading(self, text: str) -> tuple[bool, Optional[int]]:
+    def _detect_heading(self, text: str) -> tuple[bool, int | None]:
         """
         Detecta si un párrafo es un heading.
 

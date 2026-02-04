@@ -10,11 +10,11 @@ Usar preferentemente:
 
 # Re-exportar desde el módulo principal
 from ...analysis.pacing import (
-    PacingAnalyzer,
     PacingAnalysisResult,
-    PacingMetrics,
+    PacingAnalyzer,
     PacingIssue,
     PacingIssueType,
+    PacingMetrics,
     PacingSeverity,
     analyze_pacing,
     get_pacing_analyzer,

@@ -7,9 +7,8 @@ y filtrar falsos positivos antes de mostrarlas al usuario.
 
 import logging
 from dataclasses import dataclass
-from typing import Optional
 
-from ..llm.client import get_llm_client, LLMClientError
+from ..llm.client import LLMClientError, get_llm_client
 
 logger = logging.getLogger(__name__)
 
@@ -17,10 +16,11 @@ logger = logging.getLogger(__name__)
 @dataclass
 class AlertReviewResult:
     """Resultado de la revisión de una alerta."""
+
     is_valid: bool  # True si la alerta es válida
     confidence: float  # Confianza en la decisión (0.0-1.0)
     reason: str  # Explicación de la decisión
-    suggested_severity: Optional[str] = None  # Severidad sugerida si es válida
+    suggested_severity: str | None = None  # Severidad sugerida si es válida
 
 
 class LLMAlertReviewer:
@@ -87,7 +87,7 @@ IMPORTANTE: Sé conservador. Si no estás seguro, marca como válido (is_valid: 
         text: str,
         explanation: str,
         context: str,
-        suggestion: Optional[str] = None,
+        suggestion: str | None = None,
     ) -> AlertReviewResult:
         """
         Revisa una alerta individual.
@@ -150,7 +150,7 @@ IMPORTANTE: Sé conservador. Si no estás seguro, marca como válido (is_valid: 
         # Intentar extraer JSON de la respuesta
         try:
             # Buscar JSON en la respuesta
-            json_match = re.search(r'\{[^{}]*\}', response, re.DOTALL)
+            json_match = re.search(r"\{[^{}]*\}", response, re.DOTALL)
             if json_match:
                 data = json.loads(json_match.group())
 
@@ -233,8 +233,7 @@ IMPORTANTE: Sé conservador. Si no estás seguro, marca como válido (is_valid: 
             True si la alerta debe filtrarse (falso positivo con alta confianza)
         """
         return (
-            not review_result.is_valid
-            and review_result.confidence >= self.min_confidence_to_filter
+            not review_result.is_valid and review_result.confidence >= self.min_confidence_to_filter
         )
 
 

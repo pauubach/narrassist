@@ -18,38 +18,50 @@ Uso:
 import logging
 import re
 import unicodedata
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 # Pequeño override set para errores conocidos de spaCy en español.
 # spaCy clasifica incorrectamente algunas formas como NOUN o PROPN.
 # Solo incluir casos comprobados donde spaCy falla consistentemente.
-_SPACY_VERB_OVERRIDES = frozenset({
-    # Participios que spaCy a veces clasifica como ADJ/NOUN
-    # pero que en contexto de inicio de oración son claramente verbos
-    "sabiendo", "siendo", "teniendo", "habiendo",
-    # Formas de voseo que spaCy no reconoce bien
-    "hablás", "tenés", "podés", "querés", "sabés", "venís", "salís",
-})
+_SPACY_VERB_OVERRIDES = frozenset(
+    {
+        # Participios que spaCy a veces clasifica como ADJ/NOUN
+        # pero que en contexto de inicio de oración son claramente verbos
+        "sabiendo",
+        "siendo",
+        "teniendo",
+        "habiendo",
+        # Formas de voseo que spaCy no reconoce bien
+        "hablás",
+        "tenés",
+        "podés",
+        "querés",
+        "sabés",
+        "venís",
+        "salís",
+    }
+)
 
 # Formas que spaCy marca como VERB pero que en español son nombres propios
 # o sustantivos comunes (falsos positivos de spaCy).
-_SPACY_NOT_VERB_OVERRIDES = frozenset({
-    "mercedes",  # Nombre propio
-    "dolores",   # Nombre propio
-    "mar",       # Sustantivo/nombre propio
-    "cruz",      # Sustantivo/nombre propio
-    "rosa",      # Sustantivo/nombre propio
-    "iris",      # Sustantivo/nombre propio
-    "alba",      # Nombre propio
-    "aurora",    # Nombre propio
-    "esperanza", # Nombre propio
-    "pilar",     # Nombre propio
-    "amparo",    # Nombre propio
-    "consuelo",  # Nombre propio
-    "sol",       # Nombre propio
-})
+_SPACY_NOT_VERB_OVERRIDES = frozenset(
+    {
+        "mercedes",  # Nombre propio
+        "dolores",  # Nombre propio
+        "mar",  # Sustantivo/nombre propio
+        "cruz",  # Sustantivo/nombre propio
+        "rosa",  # Sustantivo/nombre propio
+        "iris",  # Sustantivo/nombre propio
+        "alba",  # Nombre propio
+        "aurora",  # Nombre propio
+        "esperanza",  # Nombre propio
+        "pilar",  # Nombre propio
+        "amparo",  # Nombre propio
+        "consuelo",  # Nombre propio
+        "sol",  # Nombre propio
+    }
+)
 
 
 def is_verb(token) -> bool:
@@ -80,10 +92,7 @@ def is_verb(token) -> bool:
         return True
 
     # Criterio secundario: tag_ (más específico que pos_)
-    if hasattr(token, "tag_") and token.tag_ and token.tag_.startswith("V"):
-        return True
-
-    return False
+    return bool(hasattr(token, "tag_") and token.tag_ and token.tag_.startswith("V"))
 
 
 def is_auxiliary(token) -> bool:
@@ -124,7 +133,7 @@ def is_determiner(token) -> bool:
     return token.pos_ == "DET"
 
 
-def get_gender(token) -> Optional[str]:
+def get_gender(token) -> str | None:
     """
     Obtiene el género gramatical de un token.
 
@@ -135,7 +144,7 @@ def get_gender(token) -> Optional[str]:
     return gender[0] if gender else None
 
 
-def get_number(token) -> Optional[str]:
+def get_number(token) -> str | None:
     """
     Obtiene el número gramatical de un token.
 
@@ -146,7 +155,7 @@ def get_number(token) -> Optional[str]:
     return number[0] if number else None
 
 
-def get_person(token) -> Optional[str]:
+def get_person(token) -> str | None:
     """
     Obtiene la persona gramatical de un verbo conjugado.
 
@@ -157,7 +166,7 @@ def get_person(token) -> Optional[str]:
     return person[0] if person else None
 
 
-def get_verb_mood(token) -> Optional[str]:
+def get_verb_mood(token) -> str | None:
     """
     Obtiene el modo verbal de un token.
 
@@ -169,7 +178,7 @@ def get_verb_mood(token) -> Optional[str]:
     return mood[0] if mood else None
 
 
-def get_verb_tense(token) -> Optional[str]:
+def get_verb_tense(token) -> str | None:
     """
     Obtiene el tiempo verbal de un token.
 
@@ -180,7 +189,7 @@ def get_verb_tense(token) -> Optional[str]:
     return tense[0] if tense else None
 
 
-def get_verb_form(token) -> Optional[str]:
+def get_verb_form(token) -> str | None:
     """
     Obtiene la forma verbal: finito, infinitivo, gerundio, participio.
 
@@ -264,12 +273,28 @@ def names_match(name1: str, name2: str) -> bool:
 # =========================================================================
 
 # Tokens que preceden a un topónimo/local, NO a una persona
-_LOCATION_CONTEXT_TOKENS = frozenset({
-    "calle", "avenida", "barrio", "zona", "plaza", "paseo",
-    "carretera", "camino", "vía", "distrito", "pueblo",
-    "bar", "restaurante", "tienda", "hotel", "taberna",
-    "los", "las",  # "los García" (familia/lugar) — requiere contexto adicional
-})
+_LOCATION_CONTEXT_TOKENS = frozenset(
+    {
+        "calle",
+        "avenida",
+        "barrio",
+        "zona",
+        "plaza",
+        "paseo",
+        "carretera",
+        "camino",
+        "vía",
+        "distrito",
+        "pueblo",
+        "bar",
+        "restaurante",
+        "tienda",
+        "hotel",
+        "taberna",
+        "los",
+        "las",  # "los García" (familia/lugar) — requiere contexto adicional
+    }
+)
 
 # Preposiciones que indican ubicación (no persona)
 _LOCATION_PREPOSITIONS = frozenset({"en", "desde", "hacia", "hasta", "por"})
@@ -346,13 +371,10 @@ def has_explicit_subject(verb_token) -> bool:
     Returns:
         True si tiene nsubj explícito, False si es candidato a pro-drop
     """
-    for child in verb_token.children:
-        if child.dep_ in ("nsubj", "nsubj:pass"):
-            return True
-    return False
+    return any(child.dep_ in ("nsubj", "nsubj:pass") for child in verb_token.children)
 
 
-def detect_pro_drop_person(verb_token) -> Optional[tuple[str, str]]:
+def detect_pro_drop_person(verb_token) -> tuple[str, str] | None:
     """
     Detecta la persona/número de un verbo conjugado sin sujeto explícito (pro-drop).
 
@@ -414,9 +436,7 @@ def is_comparison_como(token) -> bool:
     # dep_ == "advmod" → adverbio de manera ("como lo hizo")
     if token.dep_ == "advmod":
         # Verificar si modifica un verbo (manera) o un adjetivo (comparación)
-        if token.head.pos_ == "VERB":
-            return False
-        return True
+        return token.head.pos_ != "VERB"
 
     # dep_ == "case" → preposición/marcador de caso
     if token.dep_ == "case":

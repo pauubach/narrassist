@@ -18,9 +18,10 @@ import json
 import logging
 import os
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Literal, Optional
+from typing import Any, Literal, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ _client: Optional["LocalLLMClient"] = None
 LLMBackend = Literal["ollama", "transformers", "none"]
 
 # Callback para solicitar instalación de Ollama
-_installation_prompt_callback: Optional[Callable[[], bool]] = None
+_installation_prompt_callback: Callable[[], bool] | None = None
 
 
 @dataclass
@@ -46,7 +47,7 @@ class LocalLLMConfig:
     ollama_model: str = "llama3.2"  # Modelo por defecto (3B params, funciona en CPU)
 
     # Transformers config (modelos locales)
-    transformers_model_path: Optional[Path] = None
+    transformers_model_path: Path | None = None
     transformers_model_name: str = "meta-llama/Llama-3.2-3B-Instruct"
 
     # Parámetros de generación
@@ -89,9 +90,8 @@ class LocalLLMClient:
     def _initialize_backend(self) -> None:
         """Inicializa el backend de LLM."""
         # Intentar Ollama primero
-        if self._config.backend in ("ollama", "auto"):
-            if self._try_init_ollama():
-                return
+        if self._config.backend in ("ollama", "auto") and self._try_init_ollama():
+            return
 
         # Fallback a Transformers
         if self._config.backend in ("transformers", "auto"):
@@ -114,7 +114,7 @@ class LocalLLMClient:
         3. Si está instalado pero no corriendo, intenta iniciarlo
         4. Verifica que el modelo esté disponible
         """
-        from .ollama_manager import get_ollama_manager, OllamaStatus
+        from .ollama_manager import OllamaStatus, get_ollama_manager
 
         manager = get_ollama_manager()
         status = manager.status
@@ -161,25 +161,18 @@ class LocalLLMClient:
         try:
             import httpx
 
-            response = httpx.get(
-                f"{self._config.ollama_host}/api/tags",
-                timeout=5.0
-            )
+            response = httpx.get(f"{self._config.ollama_host}/api/tags", timeout=5.0)
 
             if response.status_code == 200:
                 data = response.json()
                 models = [m.get("name", "") for m in data.get("models", [])]
 
                 # Verificar que el modelo está disponible
-                model_available = any(
-                    self._config.ollama_model in m for m in models
-                )
+                model_available = any(self._config.ollama_model in m for m in models)
 
                 if model_available:
                     self._backend = "ollama"
-                    logger.info(
-                        f"Ollama inicializado con modelo: {self._config.ollama_model}"
-                    )
+                    logger.info(f"Ollama inicializado con modelo: {self._config.ollama_model}")
                     return True
                 else:
                     logger.warning(
@@ -191,7 +184,9 @@ class LocalLLMClient:
                         best_model = self._select_best_available_model(models)
                         self._config.ollama_model = best_model
                         self._backend = "ollama"
-                        logger.info(f"Usando modelo óptimo para tu hardware: {self._config.ollama_model}")
+                        logger.info(
+                            f"Usando modelo óptimo para tu hardware: {self._config.ollama_model}"
+                        )
                         return True
                     else:
                         logger.warning("No hay modelos descargados en Ollama")
@@ -219,6 +214,7 @@ class LocalLLMClient:
 
         try:
             from ..core.device import get_gpu_device
+
             gpu = get_gpu_device()
             if gpu:
                 has_gpu = True
@@ -261,16 +257,21 @@ class LocalLLMClient:
     def _try_init_transformers(self) -> bool:
         """Intenta inicializar Transformers con modelo local."""
         try:
-            from transformers import pipeline, AutoModelForCausalLM, AutoTokenizer
             import torch
+            from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 
             model_path = self._config.transformers_model_path
             if model_path is None:
                 # Buscar en directorio de modelos del proyecto
                 from narrative_assistant.core.config import get_config
+
                 config = get_config()
                 if config.models_dir:
-                    model_path = config.models_dir / "llm" / self._config.transformers_model_name.replace("/", "_")
+                    model_path = (
+                        config.models_dir
+                        / "llm"
+                        / self._config.transformers_model_name.replace("/", "_")
+                    )
 
             if model_path and model_path.exists():
                 logger.info(f"Cargando modelo local desde: {model_path}")
@@ -324,10 +325,10 @@ class LocalLLMClient:
     def complete(
         self,
         prompt: str,
-        system: Optional[str] = None,
-        max_tokens: Optional[int] = None,
-        temperature: Optional[float] = None,
-    ) -> Optional[str]:
+        system: str | None = None,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
+    ) -> str | None:
         """
         Genera una respuesta usando el LLM local.
 
@@ -357,10 +358,10 @@ class LocalLLMClient:
     def _complete_ollama(
         self,
         prompt: str,
-        system: Optional[str] = None,
-        max_tokens: Optional[int] = None,
-        temperature: Optional[float] = None,
-    ) -> Optional[str]:
+        system: str | None = None,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
+    ) -> str | None:
         """Genera respuesta usando Ollama."""
         try:
             import httpx
@@ -387,7 +388,7 @@ class LocalLLMClient:
                     "options": {
                         "num_predict": max_tokens or self._config.max_tokens,
                         "temperature": temperature or self._config.temperature,
-                    }
+                    },
                 },
                 timeout=timeout_config,
             )
@@ -406,10 +407,10 @@ class LocalLLMClient:
     def _complete_transformers(
         self,
         prompt: str,
-        system: Optional[str] = None,
-        max_tokens: Optional[int] = None,
-        temperature: Optional[float] = None,
-    ) -> Optional[str]:
+        system: str | None = None,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
+    ) -> str | None:
         """Genera respuesta usando Transformers."""
         try:
             # Construir prompt con sistema si existe
@@ -433,7 +434,7 @@ class LocalLLMClient:
                 response = generated_text.split("<|assistant|>")[-1].strip()
                 return response
 
-            return generated_text[len(full_prompt):].strip()
+            return generated_text[len(full_prompt) :].strip()
 
         except Exception as e:
             logger.error(f"Error en Transformers: {e}")
@@ -442,9 +443,9 @@ class LocalLLMClient:
     def analyze_json(
         self,
         prompt: str,
-        system: Optional[str] = None,
-        schema_hint: Optional[str] = None,
-    ) -> Optional[dict]:
+        system: str | None = None,
+        schema_hint: str | None = None,
+    ) -> dict | None:
         """
         Genera una respuesta estructurada en JSON.
 
@@ -457,8 +458,9 @@ class LocalLLMClient:
             Diccionario parseado o None si hay error
         """
         json_system = (
-            system or ""
-        ) + "\n\nResponde SIEMPRE en formato JSON válido. Sin markdown, sin explicaciones adicionales, solo el JSON."
+            (system or "")
+            + "\n\nResponde SIEMPRE en formato JSON válido. Sin markdown, sin explicaciones adicionales, solo el JSON."
+        )
 
         if schema_hint:
             json_system += f"\n\nEsquema esperado: {schema_hint}"
@@ -518,7 +520,7 @@ def _load_config() -> LocalLLMConfig:
     return config
 
 
-def get_llm_client() -> Optional[LocalLLMClient]:
+def get_llm_client() -> LocalLLMClient | None:
     """
     Obtiene el cliente LLM singleton (thread-safe).
 
@@ -535,9 +537,7 @@ def get_llm_client() -> Optional[LocalLLMClient]:
                 if config.backend != "none":
                     _client = LocalLLMClient(config)
                 else:
-                    logger.info(
-                        "LLM deshabilitado. Configure NA_LLM_BACKEND para habilitar."
-                    )
+                    logger.info("LLM deshabilitado. Configure NA_LLM_BACKEND para habilitar.")
 
     return _client
 
@@ -559,7 +559,7 @@ def reset_client() -> None:
 get_claude_client = get_llm_client  # Deprecated, usar get_llm_client
 
 
-def set_installation_prompt_callback(callback: Optional[Callable[[], bool]]) -> None:
+def set_installation_prompt_callback(callback: Callable[[], bool] | None) -> None:
     """
     Establece un callback para solicitar instalación de Ollama al usuario.
 
@@ -610,7 +610,7 @@ def get_ollama_status() -> dict[str, Any]:
 
 def install_ollama_if_needed(
     force: bool = False,
-    progress_callback: Optional[Callable[[Any], None]] = None,
+    progress_callback: Callable[[Any], None] | None = None,
 ) -> tuple[bool, str]:
     """
     Instala Ollama si no está instalado.
@@ -634,7 +634,7 @@ def install_ollama_if_needed(
 
 def download_ollama_model(
     model_name: str,
-    progress_callback: Optional[Callable[[Any], None]] = None,
+    progress_callback: Callable[[Any], None] | None = None,
 ) -> tuple[bool, str]:
     """
     Descarga un modelo de Ollama.
@@ -687,7 +687,10 @@ def ensure_llm_ready(
             if not success:
                 return False, f"Error instalando Ollama: {msg}"
         else:
-            return False, "Ollama no está instalado. Usa install_ollama_if_needed() para instalarlo."
+            return (
+                False,
+                "Ollama no está instalado. Usa install_ollama_if_needed() para instalarlo.",
+            )
 
     # Verificar servicio
     if not manager.is_running:
@@ -702,6 +705,9 @@ def ensure_llm_ready(
             if not success:
                 return False, f"Error descargando modelo: {msg}"
         else:
-            return False, "No hay modelos descargados. Usa download_ollama_model() para descargar uno."
+            return (
+                False,
+                "No hay modelos descargados. Usa download_ollama_model() para descargar uno.",
+            )
 
     return True, "Sistema LLM listo"

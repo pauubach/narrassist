@@ -14,10 +14,9 @@ import re
 import threading
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional, Any
 
+from ..core.errors import ErrorSeverity, NarrativeError
 from ..core.result import Result
-from ..core.errors import NarrativeError, ErrorSeverity
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +26,7 @@ _lock = threading.Lock()
 
 class Emotion(Enum):
     """Emociones básicas detectables."""
+
     JOY = "joy"
     SADNESS = "sadness"
     ANGER = "anger"
@@ -39,6 +39,7 @@ class Emotion(Enum):
 
 class Sentiment(Enum):
     """Clasificación de sentimiento general."""
+
     POSITIVE = "positive"
     NEGATIVE = "negative"
     NEUTRAL = "neutral"
@@ -47,28 +48,67 @@ class Sentiment(Enum):
 # Mapeo de emociones declaradas en español a Emotion
 EMOTION_KEYWORDS = {
     Emotion.JOY: [
-        "feliz", "contento", "alegre", "dichoso", "radiante", "eufórico",
-        "entusiasmado", "encantado", "satisfecho", "gozoso", "jubiloso"
+        "feliz",
+        "contento",
+        "alegre",
+        "dichoso",
+        "radiante",
+        "eufórico",
+        "entusiasmado",
+        "encantado",
+        "satisfecho",
+        "gozoso",
+        "jubiloso",
     ],
     Emotion.SADNESS: [
-        "triste", "deprimido", "melancólico", "abatido", "desolado",
-        "devastado", "hundido", "afligido", "apenado", "desconsolado"
+        "triste",
+        "deprimido",
+        "melancólico",
+        "abatido",
+        "desolado",
+        "devastado",
+        "hundido",
+        "afligido",
+        "apenado",
+        "desconsolado",
     ],
     Emotion.ANGER: [
-        "furioso", "enfadado", "enojado", "iracundo", "rabioso", "colérico",
-        "indignado", "irritado", "enfurecido", "airado", "exasperado"
+        "furioso",
+        "enfadado",
+        "enojado",
+        "iracundo",
+        "rabioso",
+        "colérico",
+        "indignado",
+        "irritado",
+        "enfurecido",
+        "airado",
+        "exasperado",
     ],
     Emotion.FEAR: [
-        "asustado", "aterrado", "temeroso", "aterrorizado", "espantado",
-        "miedoso", "horrorizado", "alarmado", "inquieto", "ansioso"
+        "asustado",
+        "aterrado",
+        "temeroso",
+        "aterrorizado",
+        "espantado",
+        "miedoso",
+        "horrorizado",
+        "alarmado",
+        "inquieto",
+        "ansioso",
     ],
     Emotion.SURPRISE: [
-        "sorprendido", "asombrado", "estupefacto", "atónito", "pasmado",
-        "perplejo", "desconcertado", "boquiabierto", "impactado"
+        "sorprendido",
+        "asombrado",
+        "estupefacto",
+        "atónito",
+        "pasmado",
+        "perplejo",
+        "desconcertado",
+        "boquiabierto",
+        "impactado",
     ],
-    Emotion.DISGUST: [
-        "asqueado", "disgustado", "repugnado", "nauseabundo", "hastiado"
-    ],
+    Emotion.DISGUST: ["asqueado", "disgustado", "repugnado", "nauseabundo", "hastiado"],
 }
 
 # Mapeo inverso para búsqueda rápida
@@ -81,14 +121,15 @@ for emotion, keywords in EMOTION_KEYWORDS.items():
 @dataclass
 class EmotionalState:
     """Estado emocional detectado en un segmento de texto."""
+
     text: str
     sentiment: Sentiment
     sentiment_confidence: float
     primary_emotion: Emotion
     emotion_confidence: float
     emotion_probabilities: dict[str, float] = field(default_factory=dict)
-    speaker: Optional[str] = None
-    chapter_id: Optional[int] = None
+    speaker: str | None = None
+    chapter_id: int | None = None
     start_char: int = 0
     end_char: int = 0
 
@@ -96,24 +137,26 @@ class EmotionalState:
 @dataclass
 class DeclaredEmotionalState:
     """Estado emocional declarado explícitamente en el texto."""
+
     entity_name: str
     emotion: Emotion
     emotion_keyword: str  # La palabra exacta encontrada
     context: str  # Fragmento de texto donde se declara
-    chapter_id: Optional[int] = None
+    chapter_id: int | None = None
     position: int = 0
 
 
 @dataclass
 class EmotionalInconsistency:
     """Inconsistencia entre estado emocional declarado y conducta."""
+
     entity_name: str
     declared_state: DeclaredEmotionalState
     detected_state: EmotionalState
     inconsistency_type: str  # "emotion_dialogue_mismatch", "abrupt_change", etc.
     explanation: str
     confidence: float
-    chapter_id: Optional[int] = None
+    chapter_id: int | None = None
     start_char: int = 0
     end_char: int = 0
 
@@ -131,13 +174,14 @@ class SentimentAnalyzer:
         self._sentiment_model = None
         self._emotion_model = None
         self._models_loaded = False
-        self._load_error: Optional[str] = None
+        self._load_error: str | None = None
 
     @property
     def is_available(self) -> bool:
         """Verifica si pysentimiento está disponible."""
         try:
             import pysentimiento
+
             return True
         except ImportError:
             return False
@@ -165,16 +209,10 @@ class SentimentAnalyzer:
                 logger.info("Cargando modelos de análisis de sentimiento...")
 
                 # Modelo de sentimiento (POS/NEG/NEU)
-                self._sentiment_model = create_analyzer(
-                    task="sentiment",
-                    lang="es"
-                )
+                self._sentiment_model = create_analyzer(task="sentiment", lang="es")
 
                 # Modelo de emociones (joy, sadness, anger, fear, surprise, disgust, others)
-                self._emotion_model = create_analyzer(
-                    task="emotion",
-                    lang="es"
-                )
+                self._emotion_model = create_analyzer(task="emotion", lang="es")
 
                 self._models_loaded = True
                 logger.info("Modelos de sentimiento cargados correctamente")
@@ -192,8 +230,8 @@ class SentimentAnalyzer:
     def analyze_text(
         self,
         text: str,
-        speaker: Optional[str] = None,
-        chapter_id: Optional[int] = None,
+        speaker: str | None = None,
+        chapter_id: int | None = None,
         start_char: int = 0,
         end_char: int = 0,
     ) -> Result[EmotionalState]:
@@ -211,18 +249,18 @@ class SentimentAnalyzer:
             Result con EmotionalState
         """
         if not text or not text.strip():
-            return Result.failure(NarrativeError(
-                message="Empty text for sentiment analysis",
-                severity=ErrorSeverity.RECOVERABLE,
-                user_message="Texto vacío para análisis de sentimiento"
-            ))
+            return Result.failure(
+                NarrativeError(
+                    message="Empty text for sentiment analysis",
+                    severity=ErrorSeverity.RECOVERABLE,
+                    user_message="Texto vacío para análisis de sentimiento",
+                )
+            )
 
         # Intentar cargar modelos
         if not self._load_models():
             # Fallback a análisis basado en reglas
-            return self._analyze_with_rules(
-                text, speaker, chapter_id, start_char, end_char
-            )
+            return self._analyze_with_rules(text, speaker, chapter_id, start_char, end_char)
 
         try:
             # Análisis con pysentimiento
@@ -230,11 +268,12 @@ class SentimentAnalyzer:
             emotion_result = self._emotion_model.analyze(text)
 
             # Mapear resultados
-            sentiment_map = {"pos": Sentiment.POSITIVE, "neg": Sentiment.NEGATIVE, "neu": Sentiment.NEUTRAL}
-            sentiment = sentiment_map.get(
-                sent_result.output.lower(),
-                Sentiment.NEUTRAL
-            )
+            sentiment_map = {
+                "pos": Sentiment.POSITIVE,
+                "neg": Sentiment.NEGATIVE,
+                "neu": Sentiment.NEUTRAL,
+            }
+            sentiment = sentiment_map.get(sent_result.output.lower(), Sentiment.NEUTRAL)
             sentiment_confidence = sent_result.probas.get(sent_result.output, 0.5)
 
             # Mapear emoción
@@ -247,10 +286,7 @@ class SentimentAnalyzer:
                 "disgust": Emotion.DISGUST,
                 "others": Emotion.OTHERS,
             }
-            primary_emotion = emotion_map.get(
-                emotion_result.output.lower(),
-                Emotion.NEUTRAL
-            )
+            primary_emotion = emotion_map.get(emotion_result.output.lower(), Emotion.NEUTRAL)
             emotion_confidence = emotion_result.probas.get(emotion_result.output, 0.5)
 
             state = EmotionalState(
@@ -270,17 +306,19 @@ class SentimentAnalyzer:
 
         except Exception as e:
             logger.error(f"Error en análisis de sentimiento: {e}", exc_info=True)
-            return Result.failure(NarrativeError(
-                message=f"Sentiment analysis failed: {e}",
-                severity=ErrorSeverity.RECOVERABLE,
-                user_message=f"Error en análisis de sentimiento: {e}"
-            ))
+            return Result.failure(
+                NarrativeError(
+                    message=f"Sentiment analysis failed: {e}",
+                    severity=ErrorSeverity.RECOVERABLE,
+                    user_message=f"Error en análisis de sentimiento: {e}",
+                )
+            )
 
     def _analyze_with_rules(
         self,
         text: str,
-        speaker: Optional[str],
-        chapter_id: Optional[int],
+        speaker: str | None,
+        chapter_id: int | None,
         start_char: int,
         end_char: int,
     ) -> Result[EmotionalState]:
@@ -293,14 +331,43 @@ class SentimentAnalyzer:
 
         # Palabras positivas/negativas básicas
         positive_words = [
-            "feliz", "contento", "alegre", "bien", "encantado", "gracias",
-            "perfecto", "maravilloso", "excelente", "genial", "fantástico",
-            "amor", "cariño", "querido", "dulce", "bonito", "hermoso"
+            "feliz",
+            "contento",
+            "alegre",
+            "bien",
+            "encantado",
+            "gracias",
+            "perfecto",
+            "maravilloso",
+            "excelente",
+            "genial",
+            "fantástico",
+            "amor",
+            "cariño",
+            "querido",
+            "dulce",
+            "bonito",
+            "hermoso",
         ]
         negative_words = [
-            "triste", "mal", "enfadado", "furioso", "odio", "terrible",
-            "horrible", "espantoso", "miedo", "temor", "dolor", "sufrir",
-            "morir", "muerte", "llorar", "lágrimas", "fracaso", "culpa"
+            "triste",
+            "mal",
+            "enfadado",
+            "furioso",
+            "odio",
+            "terrible",
+            "horrible",
+            "espantoso",
+            "miedo",
+            "temor",
+            "dolor",
+            "sufrir",
+            "morir",
+            "muerte",
+            "llorar",
+            "lágrimas",
+            "fracaso",
+            "culpa",
         ]
 
         pos_count = sum(1 for word in positive_words if word in text_lower)
@@ -345,7 +412,7 @@ class SentimentAnalyzer:
         dialogue_text: str,
         speaker: str,
         context_before: str = "",
-        chapter_id: Optional[int] = None,
+        chapter_id: int | None = None,
         start_char: int = 0,
         end_char: int = 0,
     ) -> Result[EmotionalState]:
@@ -375,7 +442,7 @@ class SentimentAnalyzer:
         self,
         text: str,
         entity_names: list[str],
-        chapter_id: Optional[int] = None,
+        chapter_id: int | None = None,
     ) -> list[DeclaredEmotionalState]:
         """
         Extrae estados emocionales declarados explícitamente en el texto.
@@ -430,14 +497,16 @@ class SentimentAnalyzer:
                         end = min(len(text), match.end() + 50)
                         context = text[start:end]
 
-                        declared_states.append(DeclaredEmotionalState(
-                            entity_name=matched_name,
-                            emotion=emotion,
-                            emotion_keyword=emotion_word,
-                            context=context,
-                            chapter_id=chapter_id,
-                            position=match.start(),
-                        ))
+                        declared_states.append(
+                            DeclaredEmotionalState(
+                                entity_name=matched_name,
+                                emotion=emotion,
+                                emotion_keyword=emotion_word,
+                                context=context,
+                                chapter_id=chapter_id,
+                                position=match.start(),
+                            )
+                        )
 
         return declared_states
 
@@ -488,10 +557,7 @@ class SentimentAnalyzer:
                     continue
 
                 # Verificar inconsistencia
-                expected_sentiment = emotion_to_expected_sentiment.get(
-                    declared.emotion,
-                    Sentiment.NEUTRAL
-                )
+                emotion_to_expected_sentiment.get(declared.emotion, Sentiment.NEUTRAL)
 
                 # Inconsistencia: emoción negativa declarada pero diálogo positivo
                 is_inconsistent = False
@@ -519,17 +585,19 @@ class SentimentAnalyzer:
                     # Calcular confianza de la inconsistencia
                     confidence = min(dialogue.sentiment_confidence, 0.8)
 
-                    inconsistencies.append(EmotionalInconsistency(
-                        entity_name=declared.entity_name,
-                        declared_state=declared,
-                        detected_state=dialogue,
-                        inconsistency_type="emotion_dialogue_mismatch",
-                        explanation=explanation,
-                        confidence=confidence,
-                        chapter_id=declared.chapter_id,
-                        start_char=min(declared.position, dialogue.start_char),
-                        end_char=max(declared.position, dialogue.end_char),
-                    ))
+                    inconsistencies.append(
+                        EmotionalInconsistency(
+                            entity_name=declared.entity_name,
+                            declared_state=declared,
+                            detected_state=dialogue,
+                            inconsistency_type="emotion_dialogue_mismatch",
+                            explanation=explanation,
+                            confidence=confidence,
+                            chapter_id=declared.chapter_id,
+                            start_char=min(declared.position, dialogue.start_char),
+                            end_char=max(declared.position, dialogue.end_char),
+                        )
+                    )
 
         return inconsistencies
 
@@ -553,7 +621,7 @@ class SentimentAnalyzer:
         # Filtrar diálogos del personaje y ordenar por posición
         entity_dialogues = sorted(
             [d for d in dialogue_states if d.speaker and d.speaker.lower() == entity_name.lower()],
-            key=lambda x: (x.chapter_id or 0, x.start_char)
+            key=lambda x: (x.chapter_id or 0, x.start_char),
         )
 
         if len(entity_dialogues) < 2:
@@ -567,42 +635,47 @@ class SentimentAnalyzer:
             # Mismo capítulo y cambio de sentimiento extremo
             if prev.chapter_id == curr.chapter_id:
                 # De muy positivo a muy negativo o viceversa
-                if (prev.sentiment == Sentiment.POSITIVE and
-                    curr.sentiment == Sentiment.NEGATIVE and
-                    prev.sentiment_confidence > 0.7 and
-                    curr.sentiment_confidence > 0.7):
-
+                if (
+                    prev.sentiment == Sentiment.POSITIVE
+                    and curr.sentiment == Sentiment.NEGATIVE
+                    and prev.sentiment_confidence > 0.7
+                    and curr.sentiment_confidence > 0.7
+                ):
                     # Verificar que no haya mucha distancia
                     if curr.start_char - prev.end_char < 2000:
-                        inconsistencies.append(EmotionalInconsistency(
-                            entity_name=entity_name,
-                            declared_state=DeclaredEmotionalState(
+                        inconsistencies.append(
+                            EmotionalInconsistency(
                                 entity_name=entity_name,
-                                emotion=prev.primary_emotion,
-                                emotion_keyword=prev.sentiment.value,
-                                context=prev.text[:100],
-                                chapter_id=prev.chapter_id,
-                                position=prev.start_char,
-                            ),
-                            detected_state=curr,
-                            inconsistency_type="abrupt_emotional_change",
-                            explanation=(
-                                f"{entity_name} pasa de un estado emocional "
-                                f"{prev.sentiment.value} ({prev.primary_emotion.value}) "
-                                f"a {curr.sentiment.value} ({curr.primary_emotion.value}) "
-                                f"de forma abrupta sin transición aparente."
-                            ),
-                            confidence=min(prev.sentiment_confidence, curr.sentiment_confidence),
-                            chapter_id=curr.chapter_id,
-                            start_char=prev.start_char,
-                            end_char=curr.end_char,
-                        ))
+                                declared_state=DeclaredEmotionalState(
+                                    entity_name=entity_name,
+                                    emotion=prev.primary_emotion,
+                                    emotion_keyword=prev.sentiment.value,
+                                    context=prev.text[:100],
+                                    chapter_id=prev.chapter_id,
+                                    position=prev.start_char,
+                                ),
+                                detected_state=curr,
+                                inconsistency_type="abrupt_emotional_change",
+                                explanation=(
+                                    f"{entity_name} pasa de un estado emocional "
+                                    f"{prev.sentiment.value} ({prev.primary_emotion.value}) "
+                                    f"a {curr.sentiment.value} ({curr.primary_emotion.value}) "
+                                    f"de forma abrupta sin transición aparente."
+                                ),
+                                confidence=min(
+                                    prev.sentiment_confidence, curr.sentiment_confidence
+                                ),
+                                chapter_id=curr.chapter_id,
+                                start_char=prev.start_char,
+                                end_char=curr.end_char,
+                            )
+                        )
 
         return inconsistencies
 
 
 # Singleton
-_analyzer_instance: Optional[SentimentAnalyzer] = None
+_analyzer_instance: SentimentAnalyzer | None = None
 _analyzer_lock = threading.Lock()
 
 

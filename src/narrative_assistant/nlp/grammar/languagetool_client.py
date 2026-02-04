@@ -25,13 +25,12 @@ Uso:
             print(f"Sugerencia: {match.replacements}")
 """
 
+import json
 import logging
 import threading
 from dataclasses import dataclass, field
-from typing import Optional
-import json
 
-from ...core.errors import NLPError, ErrorSeverity
+from ...core.errors import ErrorSeverity, NLPError
 from ...core.result import Result
 
 logger = logging.getLogger(__name__)
@@ -46,16 +45,16 @@ DEFAULT_TIMEOUT = 30  # segundos
 class LTMatch:
     """Un error detectado por LanguageTool."""
 
-    message: str                          # Mensaje de error
-    short_message: str = ""               # Mensaje corto
-    offset: int = 0                       # Posición de inicio en el texto
-    length: int = 0                       # Longitud del error
+    message: str  # Mensaje de error
+    short_message: str = ""  # Mensaje corto
+    offset: int = 0  # Posición de inicio en el texto
+    length: int = 0  # Longitud del error
     replacements: list[str] = field(default_factory=list)  # Sugerencias
-    rule_id: str = ""                     # ID de la regla (ej: "DEQUEISMO")
-    rule_description: str = ""            # Descripción de la regla
-    rule_category: str = ""               # Categoría (Grammar, Typos, etc.)
-    context_text: str = ""                # Texto de contexto
-    context_offset: int = 0               # Offset en el contexto
+    rule_id: str = ""  # ID de la regla (ej: "DEQUEISMO")
+    rule_description: str = ""  # Descripción de la regla
+    rule_category: str = ""  # Categoría (Grammar, Typos, etc.)
+    context_text: str = ""  # Texto de contexto
+    context_offset: int = 0  # Offset en el contexto
 
     def to_dict(self) -> dict:
         """Convertir a diccionario."""
@@ -140,7 +139,7 @@ class LanguageToolClient:
         self.url = url.rstrip("/")
         self.language = language
         self.timeout = timeout
-        self._available: Optional[bool] = None
+        self._available: bool | None = None
 
     def is_available(self, force_check: bool = False) -> bool:
         """
@@ -156,8 +155,8 @@ class LanguageToolClient:
             return self._available
 
         try:
-            import urllib.request
             import urllib.error
+            import urllib.request
 
             # Intentar conectar al endpoint de información
             url = f"{self.url}/languages"
@@ -185,9 +184,9 @@ class LanguageToolClient:
     def check(
         self,
         text: str,
-        language: Optional[str] = None,
-        disabled_rules: Optional[list[str]] = None,
-        enabled_rules: Optional[list[str]] = None,
+        language: str | None = None,
+        disabled_rules: list[str] | None = None,
+        enabled_rules: list[str] | None = None,
         enabled_only: bool = False,
     ) -> Result[LTCheckResult]:
         """
@@ -207,14 +206,12 @@ class LanguageToolClient:
             return Result.success(LTCheckResult())
 
         if not self.is_available():
-            return Result.failure(
-                LTClientError(original_error="LanguageTool server not available")
-            )
+            return Result.failure(LTClientError(original_error="LanguageTool server not available"))
 
         try:
-            import urllib.request
-            import urllib.parse
             import urllib.error
+            import urllib.parse
+            import urllib.request
 
             # Construir datos del request
             data = {
@@ -281,18 +278,12 @@ class LanguageToolClient:
 
         except urllib.error.URLError as e:
             self._available = False
-            return Result.failure(
-                LTClientError(original_error=f"Connection error: {e}")
-            )
+            return Result.failure(LTClientError(original_error=f"Connection error: {e}"))
         except json.JSONDecodeError as e:
-            return Result.failure(
-                LTClientError(original_error=f"Invalid JSON response: {e}")
-            )
+            return Result.failure(LTClientError(original_error=f"Invalid JSON response: {e}"))
         except Exception as e:
             logger.error(f"LanguageTool check error: {e}")
-            return Result.failure(
-                LTClientError(original_error=str(e))
-            )
+            return Result.failure(LTClientError(original_error=str(e)))
 
     def check_chunked(
         self,
@@ -348,10 +339,12 @@ class LanguageToolClient:
                     match.offset += current_offset
                     all_matches.append(match)
 
-        return Result.success(LTCheckResult(
-            matches=all_matches,
-            language_code=self.language,
-        ))
+        return Result.success(
+            LTCheckResult(
+                matches=all_matches,
+                language_code=self.language,
+            )
+        )
 
     def get_available_rules(self) -> Result[list[dict]]:
         """
@@ -361,13 +354,11 @@ class LanguageToolClient:
             Result con lista de diccionarios de reglas
         """
         if not self.is_available():
-            return Result.failure(
-                LTClientError(original_error="LanguageTool server not available")
-            )
+            return Result.failure(LTClientError(original_error="LanguageTool server not available"))
 
         try:
-            import urllib.request
             import urllib.parse
+            import urllib.request
 
             data = urllib.parse.urlencode({"language": self.language}).encode("utf-8")
             url = f"{self.url}/rules"
@@ -386,13 +377,11 @@ class LanguageToolClient:
             return Result.success(rules)
 
         except Exception as e:
-            return Result.failure(
-                LTClientError(original_error=str(e))
-            )
+            return Result.failure(LTClientError(original_error=str(e)))
 
 
 # Singleton thread-safe
-_lt_client: Optional[LanguageToolClient] = None
+_lt_client: LanguageToolClient | None = None
 _lt_lock = threading.Lock()
 
 

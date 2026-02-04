@@ -31,7 +31,6 @@ Referencias:
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -40,8 +39,10 @@ logger = logging.getLogger(__name__)
 # Tipos
 # =============================================================================
 
+
 class ArchetypeId(str, Enum):
     """Arquetipos de personaje."""
+
     HERO = "hero"
     SHADOW = "shadow"
     MENTOR = "mentor"
@@ -164,13 +165,14 @@ ARCHETYPE_INFO: dict[ArchetypeId, dict] = {
 @dataclass
 class ArchetypeScore:
     """Puntuación de un arquetipo para un personaje."""
+
     archetype: ArchetypeId
     name: str
     description: str
     icon: str
     color: str
-    score: float          # 0-100
-    confidence: float     # 0-1
+    score: float  # 0-100
+    confidence: float  # 0-1
     signals: list[str] = field(default_factory=list)  # Señales que apoyan este arquetipo
 
     def to_dict(self) -> dict:
@@ -189,11 +191,12 @@ class ArchetypeScore:
 @dataclass
 class CharacterArchetypeProfile:
     """Perfil arquetípico de un personaje."""
+
     character_id: int
     character_name: str
-    importance: str           # protagonist, secondary, minor
-    primary_archetype: Optional[ArchetypeScore] = None
-    secondary_archetype: Optional[ArchetypeScore] = None
+    importance: str  # protagonist, secondary, minor
+    primary_archetype: ArchetypeScore | None = None
+    secondary_archetype: ArchetypeScore | None = None
     all_scores: list[ArchetypeScore] = field(default_factory=list)
     summary: str = ""
 
@@ -203,8 +206,12 @@ class CharacterArchetypeProfile:
             "character_id": self.character_id,
             "character_name": self.character_name,
             "importance": self.importance,
-            "primary_archetype": self.primary_archetype.to_dict() if self.primary_archetype else None,
-            "secondary_archetype": self.secondary_archetype.to_dict() if self.secondary_archetype else None,
+            "primary_archetype": self.primary_archetype.to_dict()
+            if self.primary_archetype
+            else None,
+            "secondary_archetype": self.secondary_archetype.to_dict()
+            if self.secondary_archetype
+            else None,
             "top_archetypes": [s.to_dict() for s in top_scores],
             "summary": self.summary,
         }
@@ -213,6 +220,7 @@ class CharacterArchetypeProfile:
 @dataclass
 class ArchetypeReport:
     """Informe completo de arquetipos del manuscrito."""
+
     characters: list[CharacterArchetypeProfile] = field(default_factory=list)
     archetype_distribution: dict[str, int] = field(default_factory=dict)
     ensemble_notes: list[str] = field(default_factory=list)
@@ -232,19 +240,29 @@ class ArchetypeReport:
 # Mapeo de arc_type a arquetipos probables
 ARC_TYPE_SIGNALS: dict[str, dict[ArchetypeId, float]] = {
     "growth": {
-        ArchetypeId.HERO: 30, ArchetypeId.EXPLORER: 15, ArchetypeId.INNOCENT: 10,
+        ArchetypeId.HERO: 30,
+        ArchetypeId.EXPLORER: 15,
+        ArchetypeId.INNOCENT: 10,
     },
     "fall": {
-        ArchetypeId.SHADOW: 25, ArchetypeId.REBEL: 15, ArchetypeId.RULER: 10,
+        ArchetypeId.SHADOW: 25,
+        ArchetypeId.REBEL: 15,
+        ArchetypeId.RULER: 10,
     },
     "redemption": {
-        ArchetypeId.HERO: 20, ArchetypeId.SHAPESHIFTER: 15, ArchetypeId.REBEL: 10,
+        ArchetypeId.HERO: 20,
+        ArchetypeId.SHAPESHIFTER: 15,
+        ArchetypeId.REBEL: 10,
     },
     "static": {
-        ArchetypeId.SAGE: 15, ArchetypeId.MENTOR: 15, ArchetypeId.THRESHOLD_GUARDIAN: 10,
+        ArchetypeId.SAGE: 15,
+        ArchetypeId.MENTOR: 15,
+        ArchetypeId.THRESHOLD_GUARDIAN: 10,
     },
     "circular": {
-        ArchetypeId.TRICKSTER: 15, ArchetypeId.JESTER: 10, ArchetypeId.SHAPESHIFTER: 10,
+        ArchetypeId.TRICKSTER: 15,
+        ArchetypeId.JESTER: 10,
+        ArchetypeId.SHAPESHIFTER: 10,
     },
 }
 
@@ -274,6 +292,7 @@ SUBTYPE_SIGNALS: dict[str, dict[ArchetypeId, float]] = {
 # =============================================================================
 # Analizador
 # =============================================================================
+
 
 class CharacterArchetypeAnalyzer:
     """
@@ -357,7 +376,7 @@ class CharacterArchetypeAnalyzer:
     def _analyze_character(
         self,
         char: dict,
-        arc: Optional[dict],
+        arc: dict | None,
         relations: list[dict],
         interactions: list[dict],
         total_chapters: int,
@@ -368,7 +387,7 @@ class CharacterArchetypeAnalyzer:
         importance = char.get("importance", "secondary")
 
         # Inicializar scores
-        scores: dict[ArchetypeId, float] = {a: 0.0 for a in ArchetypeId}
+        scores: dict[ArchetypeId, float] = dict.fromkeys(ArchetypeId, 0.0)
         signals: dict[ArchetypeId, list[str]] = {a: [] for a in ArchetypeId}
 
         # --- Señal 1: Importancia ---
@@ -410,16 +429,18 @@ class CharacterArchetypeAnalyzer:
                 confidence = 0.1 + raw / 40
             else:
                 confidence = 0.0
-            all_scores.append(ArchetypeScore(
-                archetype=archetype_id,
-                name=info["name"],
-                description=info["description"],
-                icon=info["icon"],
-                color=info["color"],
-                score=score,
-                confidence=confidence,
-                signals=signals[archetype_id],
-            ))
+            all_scores.append(
+                ArchetypeScore(
+                    archetype=archetype_id,
+                    name=info["name"],
+                    description=info["description"],
+                    icon=info["icon"],
+                    color=info["color"],
+                    score=score,
+                    confidence=confidence,
+                    signals=signals[archetype_id],
+                )
+            )
 
         all_scores.sort(key=lambda s: s.score, reverse=True)
 
@@ -443,7 +464,8 @@ class CharacterArchetypeAnalyzer:
     # =========================================================================
 
     def _score_importance(
-        self, importance: str,
+        self,
+        importance: str,
         scores: dict[ArchetypeId, float],
         signals: dict[ArchetypeId, list[str]],
     ) -> None:
@@ -467,7 +489,8 @@ class CharacterArchetypeAnalyzer:
             scores[ArchetypeId.JESTER] += 5
 
     def _score_arc(
-        self, arc: dict,
+        self,
+        arc: dict,
         scores: dict[ArchetypeId, float],
         signals: dict[ArchetypeId, list[str]],
     ) -> None:
@@ -480,9 +503,21 @@ class CharacterArchetypeAnalyzer:
         arc_signals = {
             "growth": {ArchetypeId.HERO: 25, ArchetypeId.EXPLORER: 12, ArchetypeId.INNOCENT: 8},
             "fall": {ArchetypeId.SHADOW: 20, ArchetypeId.REBEL: 12, ArchetypeId.RULER: 8},
-            "redemption": {ArchetypeId.HERO: 18, ArchetypeId.SHAPESHIFTER: 12, ArchetypeId.REBEL: 8},
-            "static": {ArchetypeId.SAGE: 12, ArchetypeId.MENTOR: 12, ArchetypeId.THRESHOLD_GUARDIAN: 8},
-            "circular": {ArchetypeId.TRICKSTER: 12, ArchetypeId.JESTER: 8, ArchetypeId.SHAPESHIFTER: 8},
+            "redemption": {
+                ArchetypeId.HERO: 18,
+                ArchetypeId.SHAPESHIFTER: 12,
+                ArchetypeId.REBEL: 8,
+            },
+            "static": {
+                ArchetypeId.SAGE: 12,
+                ArchetypeId.MENTOR: 12,
+                ArchetypeId.THRESHOLD_GUARDIAN: 8,
+            },
+            "circular": {
+                ArchetypeId.TRICKSTER: 12,
+                ArchetypeId.JESTER: 8,
+                ArchetypeId.SHAPESHIFTER: 8,
+            },
         }
 
         if arc_type in arc_signals:
@@ -508,7 +543,9 @@ class CharacterArchetypeAnalyzer:
             signals[ArchetypeId.HERO].append(f"Arco completo ({completeness:.0%})")
 
     def _score_relations(
-        self, relations: list[dict], char_id: int,
+        self,
+        relations: list[dict],
+        char_id: int,
         scores: dict[ArchetypeId, float],
         signals: dict[ArchetypeId, list[str]],
     ) -> None:
@@ -520,7 +557,11 @@ class CharacterArchetypeAnalyzer:
             # Señales por tipo de relación
             rel_signals = {
                 "HIERARCHICAL": {ArchetypeId.RULER: 15, ArchetypeId.MENTOR: 8},
-                "RIVALRY": {ArchetypeId.SHADOW: 15, ArchetypeId.REBEL: 10, ArchetypeId.THRESHOLD_GUARDIAN: 8},
+                "RIVALRY": {
+                    ArchetypeId.SHADOW: 15,
+                    ArchetypeId.REBEL: 10,
+                    ArchetypeId.THRESHOLD_GUARDIAN: 8,
+                },
                 "ROMANTIC": {ArchetypeId.LOVER: 20, ArchetypeId.INNOCENT: 5},
                 "FRIENDSHIP": {ArchetypeId.CAREGIVER: 8, ArchetypeId.JESTER: 5},
                 "FAMILY": {ArchetypeId.CAREGIVER: 8, ArchetypeId.INNOCENT: 5},
@@ -548,7 +589,9 @@ class CharacterArchetypeAnalyzer:
                 signals[ArchetypeId.RULER].append(f"Subtipo de relación: {subtype}")
 
     def _score_interactions(
-        self, interactions: list[dict], char_id: int,
+        self,
+        interactions: list[dict],
+        char_id: int,
         scores: dict[ArchetypeId, float],
         signals: dict[ArchetypeId, list[str]],
     ) -> None:
@@ -608,7 +651,9 @@ class CharacterArchetypeAnalyzer:
             signals[ArchetypeId.HERO].append(f"{high_intensity} interacciones de alta intensidad")
 
     def _score_presence(
-        self, char: dict, total_chapters: int,
+        self,
+        char: dict,
+        total_chapters: int,
         scores: dict[ArchetypeId, float],
         signals: dict[ArchetypeId, list[str]],
     ) -> None:
@@ -645,9 +690,10 @@ class CharacterArchetypeAnalyzer:
     # =========================================================================
 
     def _generate_character_summary(
-        self, name: str,
-        primary: Optional[ArchetypeScore],
-        secondary: Optional[ArchetypeScore],
+        self,
+        name: str,
+        primary: ArchetypeScore | None,
+        secondary: ArchetypeScore | None,
     ) -> str:
         """Generar resumen del perfil arquetípico de un personaje."""
         if not primary or primary.score < 5:
@@ -665,9 +711,7 @@ class CharacterArchetypeAnalyzer:
 
         return "".join(parts) + "."
 
-    def _analyze_ensemble(
-        self, characters: list[CharacterArchetypeProfile]
-    ) -> list[str]:
+    def _analyze_ensemble(self, characters: list[CharacterArchetypeProfile]) -> list[str]:
         """Analizar el elenco como conjunto. Detectar ausencias y equilibrios."""
         notes = []
 

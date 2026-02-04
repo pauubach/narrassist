@@ -42,10 +42,10 @@ class SuppressionRule:
     """Regla de supresión definida por el usuario."""
 
     id: int
-    project_id: Optional[int]  # None = global
+    project_id: int | None  # None = global
     rule_type: str  # alert_type, category, entity, source_module
     pattern: str
-    entity_name: Optional[str]
+    entity_name: str | None
     reason: str
     is_active: bool
     created_at: datetime
@@ -324,7 +324,7 @@ class DismissalRepository:
     # =========================================================================
 
     def get_suppression_rules(
-        self, project_id: Optional[int] = None, active_only: bool = True
+        self, project_id: int | None = None, active_only: bool = True
     ) -> Result[list[SuppressionRule]]:
         """
         Obtiene reglas de supresión.
@@ -364,7 +364,9 @@ class DismissalRepository:
                     entity_name=r["entity_name"],
                     reason=r["reason"] or "",
                     is_active=bool(r["is_active"]),
-                    created_at=datetime.fromisoformat(r["created_at"]) if r["created_at"] else datetime.now(),
+                    created_at=datetime.fromisoformat(r["created_at"])
+                    if r["created_at"]
+                    else datetime.now(),
                 )
                 for r in rows
             ]
@@ -380,8 +382,8 @@ class DismissalRepository:
         self,
         rule_type: str,
         pattern: str,
-        project_id: Optional[int] = None,
-        entity_name: Optional[str] = None,
+        project_id: int | None = None,
+        entity_name: str | None = None,
         reason: str = "",
     ) -> Result[int]:
         """
@@ -481,12 +483,11 @@ class DismissalRepository:
             elif rule.rule_type == "source_module":
                 if fnmatch.fnmatch(source_module, rule.pattern):
                     return True
-            elif rule.rule_type == "entity":
-                if rule.entity_name and entity_name:
-                    if rule.entity_name.lower() == entity_name.lower():
-                        # Check alert_type pattern too if provided
-                        if rule.pattern == "*" or fnmatch.fnmatch(alert_type, rule.pattern):
-                            return True
+            elif rule.rule_type == "entity" and rule.entity_name and entity_name:
+                if rule.entity_name.lower() == entity_name.lower():
+                    # Check alert_type pattern too if provided
+                    if rule.pattern == "*" or fnmatch.fnmatch(alert_type, rule.pattern):
+                        return True
 
         return False
 

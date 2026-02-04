@@ -13,32 +13,32 @@ Estructura:
 """
 
 from .base import (
+    MAX_FILE_SIZE_BYTES,
     DocumentFormat,
+    DocumentParser,
     RawDocument,
     RawParagraph,
-    DocumentParser,
     detect_format,
     get_parser,
 )
 from .docx_parser import DocxParser
-from .txt_parser import TxtParser
 from .sanitization import (
     InputSanitizer,
+    get_allowed_document_extensions,
     sanitize_filename,
     validate_file_path,
-    get_allowed_document_extensions,
 )
 from .structure_detector import (
-    StructureType,
-    Section,
-    Scene,
     Chapter,
     DocumentStructure,
+    Scene,
+    Section,
     StructureDetector,
-    detect_structure,
+    StructureType,
     detect_chapters,
+    detect_structure,
 )
-from .base import MAX_FILE_SIZE_BYTES
+from .txt_parser import TxtParser
 
 __all__ = [
     # Base

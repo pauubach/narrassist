@@ -16,10 +16,10 @@ y se guardan en ~/.narrative_assistant/models/ para uso offline posterior.
 
 import logging
 import threading
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from ..core.config import get_config
-from ..core.device import get_device_detector, DeviceType
+from ..core.device import DeviceType, get_device_detector
 from ..core.errors import ModelNotLoadedError
 from ..core.model_manager import ModelType, ensure_spacy_model, get_model_manager
 
@@ -87,8 +87,7 @@ def setup_spacy_gpu() -> bool:
 
             except ImportError:
                 logger.warning(
-                    "CuPy no instalado. spaCy usará CPU. "
-                    "Para GPU instale: pip install cupy-cuda12x"
+                    "CuPy no instalado. spaCy usará CPU. Para GPU instale: pip install cupy-cuda12x"
                 )
             except Exception as e:
                 logger.warning(f"Error configurando CUDA para spaCy: {e}")
@@ -115,11 +114,11 @@ def setup_spacy_gpu() -> bool:
 
 
 def load_spacy_model(
-    model_name: Optional[str] = None,
-    enable_gpu: Optional[bool] = None,
-    disable_components: Optional[list[str]] = None,
+    model_name: str | None = None,
+    enable_gpu: bool | None = None,
+    disable_components: list[str] | None = None,
     auto_download: bool = True,
-    progress_callback: Optional[Callable[[str, float], None]] = None,
+    progress_callback: Callable[[str, float], None] | None = None,
 ):
     """
     Carga modelo spaCy con configuración de GPU.
@@ -166,10 +165,8 @@ def load_spacy_model(
             model_path = existing_path
         elif auto_download:
             # Descargar modelo
-            logger.info(f"Modelo spaCy no encontrado. Iniciando descarga...")
-            result = ensure_spacy_model(
-                force_download=False, progress_callback=progress_callback
-            )
+            logger.info("Modelo spaCy no encontrado. Iniciando descarga...")
+            result = ensure_spacy_model(force_download=False, progress_callback=progress_callback)
             if result.is_failure:
                 error = result.error
                 raise ModelNotLoadedError(

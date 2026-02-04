@@ -38,7 +38,7 @@ import re
 import threading
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional, Protocol
+from typing import Protocol
 
 logger = logging.getLogger(__name__)
 
@@ -47,18 +47,21 @@ logger = logging.getLogger(__name__)
 # Enums y Constantes
 # =============================================================================
 
+
 class MentionType(Enum):
     """Tipo de mención en el texto."""
-    PROPER_NOUN = "proper_noun"      # Nombre propio: "Juan", "María García"
-    PRONOUN = "pronoun"              # Pronombre: "él", "ella", "ellos"
-    DEFINITE_NP = "definite_np"      # SN definido: "el doctor", "la mujer"
+
+    PROPER_NOUN = "proper_noun"  # Nombre propio: "Juan", "María García"
+    PRONOUN = "pronoun"  # Pronombre: "él", "ella", "ellos"
+    DEFINITE_NP = "definite_np"  # SN definido: "el doctor", "la mujer"
     DEMONSTRATIVE = "demonstrative"  # Demostrativo: "este", "aquella"
-    POSSESSIVE = "possessive"        # Posesivo: "su hermano", "sus ojos"
-    ZERO = "zero"                    # Sujeto omitido (pro-drop)
+    POSSESSIVE = "possessive"  # Posesivo: "su hermano", "sus ojos"
+    ZERO = "zero"  # Sujeto omitido (pro-drop)
 
 
 class Gender(Enum):
     """Género gramatical."""
+
     MASCULINE = "masculine"
     FEMININE = "feminine"
     NEUTRAL = "neutral"
@@ -67,6 +70,7 @@ class Gender(Enum):
 
 class Number(Enum):
     """Número gramatical."""
+
     SINGULAR = "singular"
     PLURAL = "plural"
     UNKNOWN = "unknown"
@@ -74,11 +78,12 @@ class Number(Enum):
 
 class CorefMethod(Enum):
     """Métodos de resolución de correferencias."""
-    EMBEDDINGS = "embeddings"        # Similitud semántica
-    LLM = "llm"                      # LLM local (Ollama)
-    MORPHO = "morpho"                # Análisis morfosintáctico
-    HEURISTICS = "heuristics"        # Heurísticas narrativas
-    TRANSFORMER = "transformer"      # Modelo transformer fine-tuned (futuro)
+
+    EMBEDDINGS = "embeddings"  # Similitud semántica
+    LLM = "llm"  # LLM local (Ollama)
+    MORPHO = "morpho"  # Análisis morfosintáctico
+    HEURISTICS = "heuristics"  # Heurísticas narrativas
+    TRANSFORMER = "transformer"  # Modelo transformer fine-tuned (futuro)
 
 
 # Pesos por defecto para votación
@@ -166,34 +171,34 @@ SPANISH_DEMONSTRATIVES = {
 # IMPORTANTE: El género del poseedor se determina por el ANTECEDENTE, no por el posesivo.
 SPANISH_POSSESSIVES = {
     # Primera persona
-    "mi": (Gender.NEUTRAL, Number.SINGULAR),     # átono
-    "mis": (Gender.NEUTRAL, Number.PLURAL),      # átono plural
+    "mi": (Gender.NEUTRAL, Number.SINGULAR),  # átono
+    "mis": (Gender.NEUTRAL, Number.PLURAL),  # átono plural
     "mío": (Gender.MASCULINE, Number.SINGULAR),  # tónico
-    "mía": (Gender.FEMININE, Number.SINGULAR),   # tónico
-    "míos": (Gender.MASCULINE, Number.PLURAL),   # tónico
-    "mías": (Gender.FEMININE, Number.PLURAL),    # tónico
+    "mía": (Gender.FEMININE, Number.SINGULAR),  # tónico
+    "míos": (Gender.MASCULINE, Number.PLURAL),  # tónico
+    "mías": (Gender.FEMININE, Number.PLURAL),  # tónico
     "nuestro": (Gender.MASCULINE, Number.SINGULAR),
     "nuestra": (Gender.FEMININE, Number.SINGULAR),
     "nuestros": (Gender.MASCULINE, Number.PLURAL),
     "nuestras": (Gender.FEMININE, Number.PLURAL),
     # Segunda persona
-    "tu": (Gender.NEUTRAL, Number.SINGULAR),     # átono
-    "tus": (Gender.NEUTRAL, Number.PLURAL),      # átono plural
-    "tuyo": (Gender.MASCULINE, Number.SINGULAR), # tónico
+    "tu": (Gender.NEUTRAL, Number.SINGULAR),  # átono
+    "tus": (Gender.NEUTRAL, Number.PLURAL),  # átono plural
+    "tuyo": (Gender.MASCULINE, Number.SINGULAR),  # tónico
     "tuya": (Gender.FEMININE, Number.SINGULAR),  # tónico
     "tuyos": (Gender.MASCULINE, Number.PLURAL),  # tónico
-    "tuyas": (Gender.FEMININE, Number.PLURAL),   # tónico
+    "tuyas": (Gender.FEMININE, Number.PLURAL),  # tónico
     "vuestro": (Gender.MASCULINE, Number.SINGULAR),
     "vuestra": (Gender.FEMININE, Number.SINGULAR),
     "vuestros": (Gender.MASCULINE, Number.PLURAL),
     "vuestras": (Gender.FEMININE, Number.PLURAL),
     # Tercera persona (de él/ella/ellos/ellas/usted/ustedes)
-    "su": (Gender.NEUTRAL, Number.SINGULAR),     # átono (más común)
-    "sus": (Gender.NEUTRAL, Number.PLURAL),      # átono plural
-    "suyo": (Gender.MASCULINE, Number.SINGULAR), # tónico
+    "su": (Gender.NEUTRAL, Number.SINGULAR),  # átono (más común)
+    "sus": (Gender.NEUTRAL, Number.PLURAL),  # átono plural
+    "suyo": (Gender.MASCULINE, Number.SINGULAR),  # tónico
     "suya": (Gender.FEMININE, Number.SINGULAR),  # tónico
     "suyos": (Gender.MASCULINE, Number.PLURAL),  # tónico
-    "suyas": (Gender.FEMININE, Number.PLURAL),   # tónico
+    "suyas": (Gender.FEMININE, Number.PLURAL),  # tónico
 }
 
 # =============================================================================
@@ -212,50 +217,208 @@ DEFINITE_ARTICLES = {
 # Organizados por género para validación
 PERSON_NOUNS_MASCULINE = {
     # Relaciones familiares
-    "padre", "papá", "abuelo", "hijo", "nieto", "hermano", "tío", "sobrino",
-    "primo", "cuñado", "suegro", "yerno", "marido", "esposo", "novio",
+    "padre",
+    "papá",
+    "abuelo",
+    "hijo",
+    "nieto",
+    "hermano",
+    "tío",
+    "sobrino",
+    "primo",
+    "cuñado",
+    "suegro",
+    "yerno",
+    "marido",
+    "esposo",
+    "novio",
     # Edades/roles genéricos
-    "hombre", "joven", "chico", "muchacho", "niño", "anciano", "viejo",
-    "adolescente", "bebé", "adulto",
+    "hombre",
+    "joven",
+    "chico",
+    "muchacho",
+    "niño",
+    "anciano",
+    "viejo",
+    "adolescente",
+    "bebé",
+    "adulto",
     # Profesiones/roles (masculino)
-    "médico", "doctor", "abogado", "juez", "profesor", "maestro",
-    "conductor", "chofer", "taxista", "piloto", "capitán", "general",
-    "coronel", "teniente", "sargento", "soldado", "policía", "guardia",
-    "jefe", "director", "gerente", "presidente", "ministro", "rey", "príncipe",
-    "camarero", "cocinero", "portero", "conserje", "jardinero", "obrero",
-    "empleado", "secretario", "asistente", "ayudante",
-    "sacerdote", "cura", "fraile", "monje", "rabino", "imán",
-    "escritor", "pintor", "escultor", "músico", "cantante", "actor",
-    "detective", "inspector", "comisario", "fiscal", "testigo", "acusado",
+    "médico",
+    "doctor",
+    "abogado",
+    "juez",
+    "profesor",
+    "maestro",
+    "conductor",
+    "chofer",
+    "taxista",
+    "piloto",
+    "capitán",
+    "general",
+    "coronel",
+    "teniente",
+    "sargento",
+    "soldado",
+    "policía",
+    "guardia",
+    "jefe",
+    "director",
+    "gerente",
+    "presidente",
+    "ministro",
+    "rey",
+    "príncipe",
+    "camarero",
+    "cocinero",
+    "portero",
+    "conserje",
+    "jardinero",
+    "obrero",
+    "empleado",
+    "secretario",
+    "asistente",
+    "ayudante",
+    "sacerdote",
+    "cura",
+    "fraile",
+    "monje",
+    "rabino",
+    "imán",
+    "escritor",
+    "pintor",
+    "escultor",
+    "músico",
+    "cantante",
+    "actor",
+    "detective",
+    "inspector",
+    "comisario",
+    "fiscal",
+    "testigo",
+    "acusado",
     # Descriptivos
-    "desconocido", "extraño", "intruso", "visitante", "huésped", "invitado",
-    "vecino", "amigo", "enemigo", "rival", "compañero", "colega",
-    "líder", "guía", "mentor", "discípulo", "alumno", "estudiante",
+    "desconocido",
+    "extraño",
+    "intruso",
+    "visitante",
+    "huésped",
+    "invitado",
+    "vecino",
+    "amigo",
+    "enemigo",
+    "rival",
+    "compañero",
+    "colega",
+    "líder",
+    "guía",
+    "mentor",
+    "discípulo",
+    "alumno",
+    "estudiante",
 }
 
 PERSON_NOUNS_FEMININE = {
     # Relaciones familiares
-    "madre", "mamá", "abuela", "hija", "nieta", "hermana", "tía", "sobrina",
-    "prima", "cuñada", "suegra", "nuera", "esposa", "mujer", "novia",
+    "madre",
+    "mamá",
+    "abuela",
+    "hija",
+    "nieta",
+    "hermana",
+    "tía",
+    "sobrina",
+    "prima",
+    "cuñada",
+    "suegra",
+    "nuera",
+    "esposa",
+    "mujer",
+    "novia",
     # Edades/roles genéricos
-    "joven", "chica", "muchacha", "niña", "anciana", "vieja",
-    "adolescente", "adulta",
+    "joven",
+    "chica",
+    "muchacha",
+    "niña",
+    "anciana",
+    "vieja",
+    "adolescente",
+    "adulta",
     # Profesiones/roles (femenino)
-    "médica", "doctora", "abogada", "jueza", "profesora", "maestra",
-    "conductora", "pilota", "capitana", "generala", "coronela",
-    "teniente", "sargenta", "soldada", "policía", "guardia",
-    "jefa", "directora", "gerenta", "presidenta", "ministra", "reina", "princesa",
-    "camarera", "cocinera", "portera", "conserja", "jardinera", "obrera",
-    "empleada", "secretaria", "asistenta", "ayudante",
-    "monja", "religiosa", "rabina",
-    "escritora", "pintora", "escultora", "música", "cantante", "actriz",
-    "detective", "inspectora", "comisaria", "fiscal", "testigo", "acusada",
+    "médica",
+    "doctora",
+    "abogada",
+    "jueza",
+    "profesora",
+    "maestra",
+    "conductora",
+    "pilota",
+    "capitana",
+    "generala",
+    "coronela",
+    "teniente",
+    "sargenta",
+    "soldada",
+    "policía",
+    "guardia",
+    "jefa",
+    "directora",
+    "gerenta",
+    "presidenta",
+    "ministra",
+    "reina",
+    "princesa",
+    "camarera",
+    "cocinera",
+    "portera",
+    "conserja",
+    "jardinera",
+    "obrera",
+    "empleada",
+    "secretaria",
+    "asistenta",
+    "ayudante",
+    "monja",
+    "religiosa",
+    "rabina",
+    "escritora",
+    "pintora",
+    "escultora",
+    "música",
+    "cantante",
+    "actriz",
+    "detective",
+    "inspectora",
+    "comisaria",
+    "fiscal",
+    "testigo",
+    "acusada",
     # Descriptivos
-    "desconocida", "extraña", "intrusa", "visitante", "huésped", "invitada",
-    "vecina", "amiga", "enemiga", "rival", "compañera", "colega",
-    "líder", "guía", "mentora", "discípula", "alumna", "estudiante",
+    "desconocida",
+    "extraña",
+    "intrusa",
+    "visitante",
+    "huésped",
+    "invitada",
+    "vecina",
+    "amiga",
+    "enemiga",
+    "rival",
+    "compañera",
+    "colega",
+    "líder",
+    "guía",
+    "mentora",
+    "discípula",
+    "alumna",
+    "estudiante",
     # Específicos femeninos
-    "dama", "señora", "señorita", "doncella", "criada", "sirvienta",
+    "dama",
+    "señora",
+    "señorita",
+    "doncella",
+    "criada",
+    "sirvienta",
 }
 
 # Todos los sustantivos de persona (para búsqueda rápida)
@@ -263,9 +426,23 @@ ALL_PERSON_NOUNS = PERSON_NOUNS_MASCULINE | PERSON_NOUNS_FEMININE
 
 # Pronombres de primera persona (para detectar narrador)
 FIRST_PERSON_PRONOUNS = {
-    "yo", "me", "mí", "mi", "mis", "conmigo",
-    "mío", "mía", "míos", "mías",
-    "nosotros", "nosotras", "nos", "nuestro", "nuestra", "nuestros", "nuestras",
+    "yo",
+    "me",
+    "mí",
+    "mi",
+    "mis",
+    "conmigo",
+    "mío",
+    "mía",
+    "míos",
+    "mías",
+    "nosotros",
+    "nosotras",
+    "nos",
+    "nuestro",
+    "nuestra",
+    "nuestros",
+    "nuestras",
 }
 
 # Patrones para detectar auto-identificación del narrador
@@ -285,6 +462,7 @@ NARRATOR_PATTERNS = [
 # Estructuras de Datos
 # =============================================================================
 
+
 @dataclass
 class Mention:
     """
@@ -300,6 +478,7 @@ class Mention:
         sentence_idx: Índice de la oración
         chapter_idx: Índice del capítulo (opcional)
     """
+
     text: str
     start_char: int
     end_char: int
@@ -307,9 +486,9 @@ class Mention:
     gender: Gender = Gender.UNKNOWN
     number: Number = Number.UNKNOWN
     sentence_idx: int = 0
-    chapter_idx: Optional[int] = None
-    head_text: Optional[str] = None  # Cabeza sintáctica
-    context: Optional[str] = None    # Contexto circundante
+    chapter_idx: int | None = None
+    head_text: str | None = None  # Cabeza sintáctica
+    context: str | None = None  # Contexto circundante
 
     def __hash__(self):
         return hash((self.text, self.start_char, self.end_char))
@@ -317,9 +496,11 @@ class Mention:
     def __eq__(self, other):
         if not isinstance(other, Mention):
             return False
-        return (self.text == other.text and
-                self.start_char == other.start_char and
-                self.end_char == other.end_char)
+        return (
+            self.text == other.text
+            and self.start_char == other.start_char
+            and self.end_char == other.end_char
+        )
 
 
 @dataclass
@@ -334,6 +515,7 @@ class CorefCandidate:
         final_score: Score final ponderado
         is_coreferent: Si se considera correferenciales
     """
+
     antecedent: Mention
     anaphor: Mention
     scores: dict[CorefMethod, float] = field(default_factory=dict)
@@ -354,9 +536,10 @@ class CoreferenceChain:
         confidence: Confianza promedio de la cadena
         methods_agreed: Métodos que contribuyeron
     """
+
     mentions: list[Mention] = field(default_factory=list)
-    main_mention: Optional[str] = None
-    entity_id: Optional[int] = None
+    main_mention: str | None = None
+    entity_id: int | None = None
     confidence: float = 0.0
     methods_agreed: list[CorefMethod] = field(default_factory=list)
 
@@ -385,7 +568,8 @@ class CoreferenceChain:
 
         # Filtrar pronombres y menciones cero - nunca pueden ser la mención principal
         non_pronoun_mentions = [
-            m for m in self.mentions
+            m
+            for m in self.mentions
             if m.mention_type not in (MentionType.PRONOUN, MentionType.ZERO)
         ]
 
@@ -397,7 +581,7 @@ class CoreferenceChain:
         sorted_mentions = sorted(
             non_pronoun_mentions,
             key=lambda m: (priority.get(m.mention_type, 0), len(m.text)),
-            reverse=True
+            reverse=True,
         )
         return sorted_mentions[0].text
 
@@ -422,6 +606,7 @@ class MentionVotingDetail:
         final_score: Score ponderado final
         method_votes: Votos de cada método {method: {score, reasoning}}
     """
+
     anaphor_text: str = ""
     anaphor_start: int = 0
     anaphor_end: int = 0
@@ -465,6 +650,7 @@ class CorefResult:
         voting_details: Detalle de votación por mención {(start, end): MentionVotingDetail}
         processing_time_ms: Tiempo de procesamiento
     """
+
     chains: list[CoreferenceChain] = field(default_factory=list)
     unresolved: list[Mention] = field(default_factory=list)
     method_contributions: dict[CorefMethod, int] = field(default_factory=dict)
@@ -489,6 +675,7 @@ def _get_default_coref_methods() -> list[CorefMethod]:
     """
     try:
         from ..core.device import get_device_config
+
         device_config = get_device_config()
         has_gpu = device_config.device_type in ("cuda", "mps")
     except Exception:
@@ -509,8 +696,11 @@ def _get_default_coref_methods() -> list[CorefMethod]:
 @dataclass
 class CorefConfig:
     """Configuración del sistema de correferencias."""
+
     enabled_methods: list[CorefMethod] = field(default_factory=_get_default_coref_methods)
-    method_weights: dict[CorefMethod, float] = field(default_factory=lambda: DEFAULT_COREF_WEIGHTS.copy())
+    method_weights: dict[CorefMethod, float] = field(
+        default_factory=lambda: DEFAULT_COREF_WEIGHTS.copy()
+    )
     min_confidence: float = 0.5
     consensus_threshold: float = 0.6  # Mínimo % de métodos que deben acordar
     max_antecedent_distance: int = 5  # Máx oraciones hacia atrás
@@ -536,6 +726,7 @@ class CorefConfig:
 # =============================================================================
 # Interfaces de Métodos
 # =============================================================================
+
 
 class CorefMethodInterface(Protocol):
     """Interfaz para métodos de resolución."""
@@ -564,6 +755,7 @@ class CorefMethodInterface(Protocol):
 # Implementación de Métodos
 # =============================================================================
 
+
 class EmbeddingsCorefMethod:
     """
     Resolución basada en embeddings semánticos.
@@ -584,6 +776,7 @@ class EmbeddingsCorefMethod:
                 if self._embeddings_model is None:
                     try:
                         from ..nlp.embeddings import get_embeddings_model
+
                         self._embeddings_model = get_embeddings_model()
                         logger.info("Modelo de embeddings cargado para correferencias")
                     except Exception as e:
@@ -611,20 +804,21 @@ class EmbeddingsCorefMethod:
 
             # Calcular similitud
             try:
-                similarity = self.embeddings.similarity(
-                    anaphor_context,
-                    candidate_context
-                )
+                similarity = self.embeddings.similarity(anaphor_context, candidate_context)
 
                 # Boost si hay concordancia de género/número
-                if (anaphor.gender != Gender.UNKNOWN and
-                    candidate.gender != Gender.UNKNOWN and
-                    anaphor.gender == candidate.gender):
+                if (
+                    anaphor.gender != Gender.UNKNOWN
+                    and candidate.gender != Gender.UNKNOWN
+                    and anaphor.gender == candidate.gender
+                ):
                     similarity *= 1.1
 
-                if (anaphor.number != Number.UNKNOWN and
-                    candidate.number != Number.UNKNOWN and
-                    anaphor.number == candidate.number):
+                if (
+                    anaphor.number != Number.UNKNOWN
+                    and candidate.number != Number.UNKNOWN
+                    and anaphor.number == candidate.number
+                ):
                     similarity *= 1.1
 
                 # Normalizar a [0, 1]
@@ -662,6 +856,7 @@ class LLMCorefMethod:
                 if self._client is None:
                     try:
                         from ..llm.client import get_llm_client
+
                         self._client = get_llm_client()
                         if self._client:
                             logger.info(f"Cliente LLM conectado para correferencias: {self.model}")
@@ -680,10 +875,12 @@ class LLMCorefMethod:
             return []
 
         # Construir prompt para el LLM
-        candidates_text = "\n".join([
-            f"  {i+1}. \"{c.text}\" (posición: {c.start_char})"
-            for i, c in enumerate(candidates[:5])  # Limitar candidatos
-        ])
+        candidates_text = "\n".join(
+            [
+                f'  {i + 1}. "{c.text}" (posición: {c.start_char})'
+                for i, c in enumerate(candidates[:5])  # Limitar candidatos
+            ]
+        )
 
         prompt = f"""Analiza la siguiente correferencia en español.
 
@@ -722,17 +919,15 @@ RAZÓN: [explicación breve]"""
             return []
 
     def _parse_llm_response(
-        self,
-        response: str,
-        candidates: list[Mention]
+        self, response: str, candidates: list[Mention]
     ) -> list[tuple[Mention, float, str]]:
         """Parsea la respuesta del LLM."""
         results = []
 
         # Buscar número de candidato
-        candidate_match = re.search(r'CANDIDATO:\s*(\d+)', response, re.IGNORECASE)
-        confidence_match = re.search(r'CONFIANZA:\s*(alta|media|baja)', response, re.IGNORECASE)
-        reason_match = re.search(r'RAZ[OÓ]N:\s*(.+?)(?:\n|$)', response, re.IGNORECASE)
+        candidate_match = re.search(r"CANDIDATO:\s*(\d+)", response, re.IGNORECASE)
+        confidence_match = re.search(r"CONFIANZA:\s*(alta|media|baja)", response, re.IGNORECASE)
+        reason_match = re.search(r"RAZ[OÓ]N:\s*(.+?)(?:\n|$)", response, re.IGNORECASE)
 
         if candidate_match:
             try:
@@ -741,8 +936,7 @@ RAZÓN: [explicación breve]"""
                     # Mapear confianza
                     conf_map = {"alta": 0.9, "media": 0.7, "baja": 0.5}
                     confidence = conf_map.get(
-                        confidence_match.group(1).lower() if confidence_match else "media",
-                        0.7
+                        confidence_match.group(1).lower() if confidence_match else "media", 0.7
                     )
 
                     reason = reason_match.group(1).strip() if reason_match else "LLM selection"
@@ -773,6 +967,7 @@ class MorphoCorefMethod:
                 if self._nlp is None:
                     try:
                         from ..nlp.spacy_gpu import load_spacy_model
+
                         self._nlp = load_spacy_model()
                         logger.info("Modelo spaCy cargado para correferencias")
                     except Exception as e:
@@ -866,11 +1061,9 @@ class HeuristicsCorefMethod:
 
         # Para posesivos, calcular quién es el candidato más reciente en misma/anterior oración
         # Este candidato recibe un bonus muy alto
-        most_recent_in_scope: Optional[Mention] = None
+        most_recent_in_scope: Mention | None = None
         if anaphor.mention_type == MentionType.POSSESSIVE:
-            most_recent_in_scope = self._find_most_recent_subject_candidate(
-                anaphor, candidates
-            )
+            most_recent_in_scope = self._find_most_recent_subject_candidate(anaphor, candidates)
 
         for candidate in candidates:
             score = 0.0
@@ -899,7 +1092,10 @@ class HeuristicsCorefMethod:
             anaphor_lower = anaphor.text.lower()
 
             # "él/ella" típicamente refiere al sujeto de la oración anterior
-            if anaphor_lower in ["él", "ella"] and candidate.mention_type == MentionType.PROPER_NOUN:
+            if (
+                anaphor_lower in ["él", "ella"]
+                and candidate.mention_type == MentionType.PROPER_NOUN
+            ):
                 score += 0.2
                 reasons.append("pronombre personal → nombre propio")
 
@@ -933,9 +1129,11 @@ class HeuristicsCorefMethod:
                         reasons.append("2 oraciones atrás")
 
             # Mismo capítulo bonus
-            if (anaphor.chapter_idx is not None and
-                candidate.chapter_idx is not None and
-                anaphor.chapter_idx == candidate.chapter_idx):
+            if (
+                anaphor.chapter_idx is not None
+                and candidate.chapter_idx is not None
+                and anaphor.chapter_idx == candidate.chapter_idx
+            ):
                 score += 0.1
                 reasons.append("mismo capítulo")
 
@@ -951,7 +1149,7 @@ class HeuristicsCorefMethod:
         self,
         anaphor: Mention,
         candidates: list[Mention],
-    ) -> Optional[Mention]:
+    ) -> Mention | None:
         """
         Encuentra el candidato más reciente que pueda ser el sujeto referido por el posesivo.
 
@@ -986,6 +1184,7 @@ class HeuristicsCorefMethod:
 # Sistema Principal de Votación
 # =============================================================================
 
+
 class CoreferenceVotingResolver:
     """
     Sistema de resolución de correferencias con votación multi-método.
@@ -1000,7 +1199,7 @@ class CoreferenceVotingResolver:
         ...     print(f"{chain.main_mention}: {len(chain.mentions)} menciones")
     """
 
-    def __init__(self, config: Optional[CorefConfig] = None):
+    def __init__(self, config: CorefConfig | None = None):
         """
         Inicializa el resolutor.
 
@@ -1023,8 +1222,7 @@ class CoreferenceVotingResolver:
         method_classes = {
             CorefMethod.EMBEDDINGS: EmbeddingsCorefMethod,
             CorefMethod.LLM: lambda: LLMCorefMethod(
-                model=self.config.ollama_model,
-                timeout=self.config.ollama_timeout
+                model=self.config.ollama_model, timeout=self.config.ollama_timeout
             ),
             CorefMethod.MORPHO: MorphoCorefMethod,
             CorefMethod.HEURISTICS: HeuristicsCorefMethod,
@@ -1041,7 +1239,7 @@ class CoreferenceVotingResolver:
     def resolve_document(
         self,
         text: str,
-        chapters: Optional[list[dict]] = None,
+        chapters: list[dict] | None = None,
     ) -> CorefResult:
         """
         Resuelve correferencias en un documento completo.
@@ -1054,6 +1252,7 @@ class CoreferenceVotingResolver:
             CorefResult con cadenas y estadísticas
         """
         import time
+
         start_time = time.time()
 
         result = CorefResult()
@@ -1076,9 +1275,7 @@ class CoreferenceVotingResolver:
         if narrator_info:
             narrator_name, narrator_gender = narrator_info
             # Buscar si ya existe en antecedentes
-            narrator_exists = any(
-                m.text == narrator_name for m in potential_antecedents
-            )
+            narrator_exists = any(m.text == narrator_name for m in potential_antecedents)
             if not narrator_exists:
                 for pattern in NARRATOR_PATTERNS:
                     match = re.search(pattern, text, re.IGNORECASE)
@@ -1095,15 +1292,15 @@ class CoreferenceVotingResolver:
                         potential_antecedents.append(narrator_mention)
                         break
 
-        logger.info(f"Anáforas: {len(anaphors)}, Antecedentes potenciales: {len(potential_antecedents)}")
+        logger.info(
+            f"Anáforas: {len(anaphors)}, Antecedentes potenciales: {len(potential_antecedents)}"
+        )
 
         # Si hay narrador, resolver primero los pronombres de primera persona
         # y excluirlos de la resolución normal
         first_person_already_resolved: set[int] = set()
         if narrator_info:
-            first_person_resolved = self._resolve_first_person(
-                text, mentions, narrator_info
-            )
+            first_person_resolved = self._resolve_first_person(text, mentions, narrator_info)
             for anaphor, antecedent, score in first_person_resolved:
                 first_person_already_resolved.add(anaphor.start_char)
 
@@ -1148,50 +1345,48 @@ class CoreferenceVotingResolver:
 
                 # Registrar contribución de métodos
                 for score, method, _ in all_votes.get(best_candidate, []):
-                    result.method_contributions[method] = \
+                    result.method_contributions[method] = (
                         result.method_contributions.get(method, 0) + 1
+                    )
 
                 # Almacenar detalle de votación para esta mención
-                result.voting_details[(anaphor.start_char, anaphor.end_char)] = \
-                    MentionVotingDetail(
-                        anaphor_text=anaphor.text,
-                        anaphor_start=anaphor.start_char,
-                        anaphor_end=anaphor.end_char,
-                        resolved_to=best_candidate.text,
-                        final_score=round(final_score, 3),
-                        method_votes=method_detail,
-                    )
+                result.voting_details[(anaphor.start_char, anaphor.end_char)] = MentionVotingDetail(
+                    anaphor_text=anaphor.text,
+                    anaphor_start=anaphor.start_char,
+                    anaphor_end=anaphor.end_char,
+                    resolved_to=best_candidate.text,
+                    final_score=round(final_score, 3),
+                    method_votes=method_detail,
+                )
             else:
                 result.unresolved.append(anaphor)
 
         # Añadir resoluciones de primera persona al narrador
         if narrator_info and first_person_already_resolved:
-            first_person_resolved = self._resolve_first_person(
-                text, mentions, narrator_info
-            )
+            first_person_resolved = self._resolve_first_person(text, mentions, narrator_info)
             for anaphor, antecedent, score in first_person_resolved:
                 resolved_pairs.append((anaphor, antecedent, score))
                 # Marcar como contribución del narrador (usamos HEURISTICS como indicador)
-                result.method_contributions[CorefMethod.HEURISTICS] = \
+                result.method_contributions[CorefMethod.HEURISTICS] = (
                     result.method_contributions.get(CorefMethod.HEURISTICS, 0) + 1
+                )
 
                 # Detalle de votación para primera persona -> narrador
-                result.voting_details[(anaphor.start_char, anaphor.end_char)] = \
-                    MentionVotingDetail(
-                        anaphor_text=anaphor.text,
-                        anaphor_start=anaphor.start_char,
-                        anaphor_end=anaphor.end_char,
-                        resolved_to=antecedent.text,
-                        final_score=round(score, 3),
-                        method_votes={
-                            "heuristics": {
-                                "score": round(score, 3),
-                                "reasoning": f"Pronombre 1ª persona → narrador '{antecedent.text}'",
-                                "weight": 1.0,
-                                "weighted_score": round(score, 3),
-                            }
-                        },
-                    )
+                result.voting_details[(anaphor.start_char, anaphor.end_char)] = MentionVotingDetail(
+                    anaphor_text=anaphor.text,
+                    anaphor_start=anaphor.start_char,
+                    anaphor_end=anaphor.end_char,
+                    resolved_to=antecedent.text,
+                    final_score=round(score, 3),
+                    method_votes={
+                        "heuristics": {
+                            "score": round(score, 3),
+                            "reasoning": f"Pronombre 1ª persona → narrador '{antecedent.text}'",
+                            "weight": 1.0,
+                            "weighted_score": round(score, 3),
+                        }
+                    },
+                )
 
         # Construir cadenas de correferencia
         result.chains = self._build_chains(resolved_pairs, potential_antecedents)
@@ -1209,13 +1404,14 @@ class CoreferenceVotingResolver:
     def _extract_mentions(
         self,
         text: str,
-        chapters: Optional[list[dict]] = None,
+        chapters: list[dict] | None = None,
     ) -> list[Mention]:
         """Extrae menciones del texto usando spaCy."""
         mentions = []
 
         try:
             from ..nlp.spacy_gpu import load_spacy_model
+
             nlp = load_spacy_model()
         except Exception as e:
             logger.warning(f"No se pudo cargar spaCy para extracción: {e}")
@@ -1225,7 +1421,7 @@ class CoreferenceVotingResolver:
         doc = nlp(text)
 
         # Mapear posición a capítulo
-        def get_chapter_idx(char_pos: int) -> Optional[int]:
+        def get_chapter_idx(char_pos: int) -> int | None:
             if not chapters:
                 return None
             for i, ch in enumerate(chapters):
@@ -1240,7 +1436,7 @@ class CoreferenceVotingResolver:
 
         def get_sentence_idx(token_or_span) -> int:
             """Obtiene el índice real de la oración (0, 1, 2, ...)."""
-            sent = token_or_span.sent if hasattr(token_or_span, 'sent') else None
+            sent = token_or_span.sent if hasattr(token_or_span, "sent") else None
             if sent is None:
                 return 0
             return sentence_to_idx.get(sent.start, 0)
@@ -1254,18 +1450,21 @@ class CoreferenceVotingResolver:
                     continue
 
                 gender, number = self._infer_gender_number(ent.text, doc[ent.start])
-                mentions.append(Mention(
-                    text=ent.text,
-                    start_char=ent.start_char,
-                    end_char=ent.end_char,
-                    mention_type=MentionType.PROPER_NOUN,
-                    gender=gender,
-                    number=number,
-                    sentence_idx=get_sentence_idx(doc[ent.start]),
-                    chapter_idx=get_chapter_idx(ent.start_char),
-                    context=self._get_context(text, None, window=50,
-                                             start=ent.start_char, end=ent.end_char),
-                ))
+                mentions.append(
+                    Mention(
+                        text=ent.text,
+                        start_char=ent.start_char,
+                        end_char=ent.end_char,
+                        mention_type=MentionType.PROPER_NOUN,
+                        gender=gender,
+                        number=number,
+                        sentence_idx=get_sentence_idx(doc[ent.start]),
+                        chapter_idx=get_chapter_idx(ent.start_char),
+                        context=self._get_context(
+                            text, None, window=50, start=ent.start_char, end=ent.end_char
+                        ),
+                    )
+                )
 
         # Extraer pronombres
         for token in doc:
@@ -1274,49 +1473,57 @@ class CoreferenceVotingResolver:
             # Pronombres personales
             if text_lower in SPANISH_PRONOUNS:
                 gender, number = SPANISH_PRONOUNS[text_lower]
-                mentions.append(Mention(
-                    text=token.text,
-                    start_char=token.idx,
-                    end_char=token.idx + len(token.text),
-                    mention_type=MentionType.PRONOUN,
-                    gender=gender,
-                    number=number,
-                    sentence_idx=get_sentence_idx(token),
-                    chapter_idx=get_chapter_idx(token.idx),
-                    context=self._get_context(text, None, window=50,
-                                             start=token.idx, end=token.idx + len(token.text)),
-                ))
+                mentions.append(
+                    Mention(
+                        text=token.text,
+                        start_char=token.idx,
+                        end_char=token.idx + len(token.text),
+                        mention_type=MentionType.PRONOUN,
+                        gender=gender,
+                        number=number,
+                        sentence_idx=get_sentence_idx(token),
+                        chapter_idx=get_chapter_idx(token.idx),
+                        context=self._get_context(
+                            text, None, window=50, start=token.idx, end=token.idx + len(token.text)
+                        ),
+                    )
+                )
 
             # Demostrativos
             elif text_lower in SPANISH_DEMONSTRATIVES:
                 gender, number = SPANISH_DEMONSTRATIVES[text_lower]
-                mentions.append(Mention(
-                    text=token.text,
-                    start_char=token.idx,
-                    end_char=token.idx + len(token.text),
-                    mention_type=MentionType.DEMONSTRATIVE,
-                    gender=gender,
-                    number=number,
-                    sentence_idx=get_sentence_idx(token),
-                    chapter_idx=get_chapter_idx(token.idx),
-                ))
+                mentions.append(
+                    Mention(
+                        text=token.text,
+                        start_char=token.idx,
+                        end_char=token.idx + len(token.text),
+                        mention_type=MentionType.DEMONSTRATIVE,
+                        gender=gender,
+                        number=number,
+                        sentence_idx=get_sentence_idx(token),
+                        chapter_idx=get_chapter_idx(token.idx),
+                    )
+                )
 
             # Posesivos (su, sus, mi, mis, tu, tus, etc.)
             # IMPORTANTE: Clasificados como POSSESSIVE, no PRONOUN
             elif text_lower in SPANISH_POSSESSIVES:
                 gender, number = SPANISH_POSSESSIVES[text_lower]
-                mentions.append(Mention(
-                    text=token.text,
-                    start_char=token.idx,
-                    end_char=token.idx + len(token.text),
-                    mention_type=MentionType.POSSESSIVE,
-                    gender=gender,
-                    number=number,
-                    sentence_idx=get_sentence_idx(token),
-                    chapter_idx=get_chapter_idx(token.idx),
-                    context=self._get_context(text, None, window=50,
-                                             start=token.idx, end=token.idx + len(token.text)),
-                ))
+                mentions.append(
+                    Mention(
+                        text=token.text,
+                        start_char=token.idx,
+                        end_char=token.idx + len(token.text),
+                        mention_type=MentionType.POSSESSIVE,
+                        gender=gender,
+                        number=number,
+                        sentence_idx=get_sentence_idx(token),
+                        chapter_idx=get_chapter_idx(token.idx),
+                        context=self._get_context(
+                            text, None, window=50, start=token.idx, end=token.idx + len(token.text)
+                        ),
+                    )
+                )
 
         # Extraer sintagmas nominales definidos (DEFINITE_NP)
         # Patrones como "el padre", "la niña", "el conductor del autobús"
@@ -1332,7 +1539,9 @@ class CoreferenceVotingResolver:
         n_zero = len(zero_mentions)
         logger.info(
             "Menciones extraídas: %d total, %d ZERO/pro-drop (%.0f%%)",
-            n_total, n_zero, (n_zero / n_total * 100) if n_total else 0,
+            n_total,
+            n_zero,
+            (n_zero / n_total * 100) if n_total else 0,
         )
 
         # Ordenar por posición
@@ -1343,36 +1552,40 @@ class CoreferenceVotingResolver:
     def _extract_mentions_simple(
         self,
         text: str,
-        chapters: Optional[list[dict]] = None,
+        chapters: list[dict] | None = None,
     ) -> list[Mention]:
         """Extracción simple de menciones sin spaCy."""
         mentions = []
 
         # Buscar pronombres con regex
         for pronoun, (gender, number) in SPANISH_PRONOUNS.items():
-            pattern = rf'\b{re.escape(pronoun)}\b'
+            pattern = rf"\b{re.escape(pronoun)}\b"
             for match in re.finditer(pattern, text, re.IGNORECASE):
-                mentions.append(Mention(
-                    text=match.group(),
-                    start_char=match.start(),
-                    end_char=match.end(),
-                    mention_type=MentionType.PRONOUN,
-                    gender=gender,
-                    number=number,
-                ))
+                mentions.append(
+                    Mention(
+                        text=match.group(),
+                        start_char=match.start(),
+                        end_char=match.end(),
+                        mention_type=MentionType.PRONOUN,
+                        gender=gender,
+                        number=number,
+                    )
+                )
 
         # Buscar posesivos con regex
         for possessive, (gender, number) in SPANISH_POSSESSIVES.items():
-            pattern = rf'\b{re.escape(possessive)}\b'
+            pattern = rf"\b{re.escape(possessive)}\b"
             for match in re.finditer(pattern, text, re.IGNORECASE):
-                mentions.append(Mention(
-                    text=match.group(),
-                    start_char=match.start(),
-                    end_char=match.end(),
-                    mention_type=MentionType.POSSESSIVE,
-                    gender=gender,
-                    number=number,
-                ))
+                mentions.append(
+                    Mention(
+                        text=match.group(),
+                        start_char=match.start(),
+                        end_char=match.end(),
+                        mention_type=MentionType.POSSESSIVE,
+                        gender=gender,
+                        number=number,
+                    )
+                )
 
         mentions.sort(key=lambda m: m.start_char)
         return mentions
@@ -1440,19 +1653,22 @@ class CoreferenceVotingResolver:
             # Número del artículo
             _, number = DEFINITE_ARTICLES.get(first_word, (Gender.UNKNOWN, Number.UNKNOWN))
 
-            mentions.append(Mention(
-                text=chunk_text,
-                start_char=chunk.start_char,
-                end_char=chunk.end_char,
-                mention_type=MentionType.DEFINITE_NP,
-                gender=gender,
-                number=number,
-                sentence_idx=get_sentence_idx(head),
-                chapter_idx=get_chapter_idx(chunk.start_char),
-                head_text=head.text,
-                context=self._get_context(text, None, window=50,
-                                         start=chunk.start_char, end=chunk.end_char),
-            ))
+            mentions.append(
+                Mention(
+                    text=chunk_text,
+                    start_char=chunk.start_char,
+                    end_char=chunk.end_char,
+                    mention_type=MentionType.DEFINITE_NP,
+                    gender=gender,
+                    number=number,
+                    sentence_idx=get_sentence_idx(head),
+                    chapter_idx=get_chapter_idx(chunk.start_char),
+                    head_text=head.text,
+                    context=self._get_context(
+                        text, None, window=50, start=chunk.start_char, end=chunk.end_char
+                    ),
+                )
+            )
 
         # Estrategia 2: Regex para patrones no capturados por chunks
         # Patrones como "el conductor del autobús"
@@ -1460,7 +1676,7 @@ class CoreferenceVotingResolver:
             # Patrón: artículo + (adjetivo?) + sustantivo_persona + (complemento?)
             for noun in ALL_PERSON_NOUNS:
                 # Patrón simple: "el padre", "la niña"
-                pattern = rf'\b{article}\s+{noun}\b'
+                pattern = rf"\b{article}\s+{noun}\b"
                 for match in re.finditer(pattern, text, re.IGNORECASE):
                     span_key = (match.start(), match.end())
                     if span_key in seen_spans:
@@ -1468,8 +1684,7 @@ class CoreferenceVotingResolver:
 
                     # Verificar que no está dentro de un span ya detectado
                     is_subspan = any(
-                        s <= match.start() and e >= match.end()
-                        for (s, e) in seen_spans
+                        s <= match.start() and e >= match.end() for (s, e) in seen_spans
                     )
                     if is_subspan:
                         continue
@@ -1484,15 +1699,17 @@ class CoreferenceVotingResolver:
                     else:
                         gender = art_gender
 
-                    mentions.append(Mention(
-                        text=match.group(),
-                        start_char=match.start(),
-                        end_char=match.end(),
-                        mention_type=MentionType.DEFINITE_NP,
-                        gender=gender,
-                        number=art_number,
-                        head_text=noun,
-                    ))
+                    mentions.append(
+                        Mention(
+                            text=match.group(),
+                            start_char=match.start(),
+                            end_char=match.end(),
+                            mention_type=MentionType.DEFINITE_NP,
+                            gender=gender,
+                            number=art_number,
+                            head_text=noun,
+                        )
+                    )
 
         return mentions
 
@@ -1555,37 +1772,104 @@ class CoreferenceVotingResolver:
             # Representación textual: verbo entre corchetes (ASCII-safe)
             zero_text = f"[PRO {token.text}]"
 
-            mentions.append(Mention(
-                text=zero_text,
-                start_char=token.idx,
-                end_char=token.idx + len(token.text),
-                mention_type=MentionType.ZERO,
-                gender=gender,
-                number=number,
-                sentence_idx=get_sentence_idx(token),
-                chapter_idx=get_chapter_idx(token.idx),
-                context=self._get_context(text, None, window=50,
-                                         start=token.idx, end=token.idx + len(token.text)),
-            ))
+            mentions.append(
+                Mention(
+                    text=zero_text,
+                    start_char=token.idx,
+                    end_char=token.idx + len(token.text),
+                    mention_type=MentionType.ZERO,
+                    gender=gender,
+                    number=number,
+                    sentence_idx=get_sentence_idx(token),
+                    chapter_idx=get_chapter_idx(token.idx),
+                    context=self._get_context(
+                        text, None, window=50, start=token.idx, end=token.idx + len(token.text)
+                    ),
+                )
+            )
 
         logger.debug(f"Extraídas {len(mentions)} menciones pro-drop (ZERO)")
         return mentions
 
     # Nombres españoles comunes por género (para inferencia cuando spaCy no detecta)
     FEMININE_NAMES = {
-        "maría", "maria", "ana", "carmen", "laura", "marta", "elena", "sara",
-        "paula", "lucía", "lucia", "sofía", "sofia", "isabel", "rosa", "pilar",
-        "teresa", "julia", "clara", "alicia", "beatriz", "andrea", "cristina",
-        "diana", "eva", "irene", "lorena", "nuria", "olga", "patricia", "raquel",
-        "silvia", "susana", "verónica", "veronica", "virginia", "inés", "ines",
+        "maría",
+        "maria",
+        "ana",
+        "carmen",
+        "laura",
+        "marta",
+        "elena",
+        "sara",
+        "paula",
+        "lucía",
+        "lucia",
+        "sofía",
+        "sofia",
+        "isabel",
+        "rosa",
+        "pilar",
+        "teresa",
+        "julia",
+        "clara",
+        "alicia",
+        "beatriz",
+        "andrea",
+        "cristina",
+        "diana",
+        "eva",
+        "irene",
+        "lorena",
+        "nuria",
+        "olga",
+        "patricia",
+        "raquel",
+        "silvia",
+        "susana",
+        "verónica",
+        "veronica",
+        "virginia",
+        "inés",
+        "ines",
     }
 
     MASCULINE_NAMES = {
-        "juan", "pedro", "carlos", "miguel", "josé", "jose", "antonio", "manuel",
-        "francisco", "david", "jorge", "pablo", "andrés", "andres", "luis",
-        "javier", "sergio", "fernando", "alejandro", "alberto", "daniel", "diego",
-        "enrique", "felipe", "gabriel", "héctor", "hector", "ignacio", "jaime",
-        "mario", "rafael", "ramón", "ramon", "roberto", "víctor", "victor",
+        "juan",
+        "pedro",
+        "carlos",
+        "miguel",
+        "josé",
+        "jose",
+        "antonio",
+        "manuel",
+        "francisco",
+        "david",
+        "jorge",
+        "pablo",
+        "andrés",
+        "andres",
+        "luis",
+        "javier",
+        "sergio",
+        "fernando",
+        "alejandro",
+        "alberto",
+        "daniel",
+        "diego",
+        "enrique",
+        "felipe",
+        "gabriel",
+        "héctor",
+        "hector",
+        "ignacio",
+        "jaime",
+        "mario",
+        "rafael",
+        "ramón",
+        "ramon",
+        "roberto",
+        "víctor",
+        "victor",
     }
 
     def _infer_gender_number(self, text: str, token) -> tuple[Gender, Number]:
@@ -1641,7 +1925,7 @@ class CoreferenceVotingResolver:
             return False
 
         text_stripped = text.strip()
-        text_lower = text_stripped.lower()
+        text_stripped.lower()
         words = text_stripped.split()
 
         # Filtrar entidades muy largas (probablemente error de segmentación)
@@ -1655,10 +1939,36 @@ class CoreferenceVotingResolver:
 
         # Filtrar frases que contienen verbos o pronombres clíticos
         verb_indicators = {
-            "se", "me", "te", "le", "lo", "la", "nos", "os", "les",
-            "acerco", "acercó", "dijo", "respondió", "preguntó", "miró", "vio",
-            "saludo", "saludó", "entró", "salió", "llegó", "fue", "era", "estaba",
-            "tenía", "había", "hizo", "quería", "podía", "sabía",
+            "se",
+            "me",
+            "te",
+            "le",
+            "lo",
+            "la",
+            "nos",
+            "os",
+            "les",
+            "acerco",
+            "acercó",
+            "dijo",
+            "respondió",
+            "preguntó",
+            "miró",
+            "vio",
+            "saludo",
+            "saludó",
+            "entró",
+            "salió",
+            "llegó",
+            "fue",
+            "era",
+            "estaba",
+            "tenía",
+            "había",
+            "hizo",
+            "quería",
+            "podía",
+            "sabía",
         }
         if len(words) >= 3:
             words_lower = [w.lower() for w in words]
@@ -1666,10 +1976,7 @@ class CoreferenceVotingResolver:
                 return False
 
         # Filtrar errores de segmentación (saltos de línea, puntuación final)
-        if '\n' in text or (text_stripped and text_stripped[-1] in '.,:;!?'):
-            return False
-
-        return True
+        return not ("\n" in text or text_stripped and text_stripped[-1] in ".,:;!?")
 
     def _is_anaphor(self, mention: Mention) -> bool:
         """Determina si una mención es anafórica."""
@@ -1690,7 +1997,7 @@ class CoreferenceVotingResolver:
         self,
         text: str,
         mentions: list[Mention],
-    ) -> Optional[tuple[str, Gender]]:
+    ) -> tuple[str, Gender] | None:
         """
         Detecta el nombre del narrador en primera persona usando LLM.
 
@@ -1702,8 +2009,7 @@ class CoreferenceVotingResolver:
         """
         # Verificar si hay pronombres de primera persona (indicador de narrador)
         has_first_person = any(
-            word in text.lower()
-            for word in ["yo", " me ", " mi ", " mis ", "mí"]
+            word in text.lower() for word in ["yo", " me ", " mi ", " mis ", "mí"]
         )
 
         if not has_first_person:
@@ -1722,7 +2028,7 @@ class CoreferenceVotingResolver:
         self,
         text: str,
         llm_client,
-    ) -> Optional[tuple[str, Gender]]:
+    ) -> tuple[str, Gender] | None:
         """Detecta el narrador usando LLM para análisis semántico."""
         # Tomar solo los primeros 2000 caracteres para eficiencia
         text_sample = text[:2000] if len(text) > 2000 else text
@@ -1752,16 +2058,16 @@ EVIDENCIA: [frase donde se identifica, si existe]"""
                 return None
 
             # Parsear respuesta
-            is_first_person = "sí" in response.lower() and "NARRADOR_PRIMERA_PERSONA:" in response.upper()
+            is_first_person = (
+                "sí" in response.lower() and "NARRADOR_PRIMERA_PERSONA:" in response.upper()
+            )
 
             if not is_first_person:
                 return None
 
             # Extraer nombre
             name_match = re.search(
-                r"NOMBRE_NARRADOR:\s*([A-ZÁÉÍÓÚÑa-záéíóúñ]+)",
-                response,
-                re.IGNORECASE
+                r"NOMBRE_NARRADOR:\s*([A-ZÁÉÍÓÚÑa-záéíóúñ]+)", response, re.IGNORECASE
             )
             if name_match:
                 name = name_match.group(1).strip()
@@ -1788,7 +2094,7 @@ EVIDENCIA: [frase donde se identifica, si existe]"""
         self,
         text: str,
         mentions: list[Mention],
-    ) -> Optional[tuple[str, Gender]]:
+    ) -> tuple[str, Gender] | None:
         """Fallback: detecta narrador con patrones regex."""
         for pattern in NARRATOR_PATTERNS:
             match = re.search(pattern, text, re.IGNORECASE)
@@ -1861,7 +2167,9 @@ EVIDENCIA: [frase donde se identifica, si existe]"""
         else:
             line_start += 1
 
-        line_text = text[line_start:end_char + 50] if end_char + 50 < len(text) else text[line_start:]
+        line_text = (
+            text[line_start : end_char + 50] if end_char + 50 < len(text) else text[line_start:]
+        )
 
         # Posición relativa dentro de la línea
         rel_pos = start_char - line_start
@@ -1888,16 +2196,13 @@ EVIDENCIA: [frase donde se identifica, si existe]"""
         open_spanish = quotes_before.count("«") - quotes_before.count("»")
         open_english = quotes_before.count('"') % 2  # Alternancia abrir/cerrar
 
-        if open_spanish > 0 or open_english > 0:
-            return True
-
-        return False
+        return bool(open_spanish > 0 or open_english > 0)
 
     def _resolve_first_person(
         self,
         text: str,
         mentions: list[Mention],
-        narrator_info: Optional[tuple[str, Gender]],
+        narrator_info: tuple[str, Gender] | None,
     ) -> list[tuple[Mention, Mention, float]]:
         """
         Resuelve menciones de primera persona al narrador.
@@ -1969,9 +2274,11 @@ EVIDENCIA: [frase donde se identifica, si existe]"""
 
             # Respetar límites de capítulo si está configurado
             if self.config.use_chapter_boundaries:
-                if (anaphor.chapter_idx is not None and
-                    candidate.chapter_idx is not None and
-                    anaphor.chapter_idx != candidate.chapter_idx):
+                if (
+                    anaphor.chapter_idx is not None
+                    and candidate.chapter_idx is not None
+                    and anaphor.chapter_idx != candidate.chapter_idx
+                ):
                     continue
 
             # Distancia máxima en oraciones
@@ -1986,10 +2293,10 @@ EVIDENCIA: [frase donde se identifica, si existe]"""
     def _get_context(
         self,
         text: str,
-        mention: Optional[Mention],
+        mention: Mention | None,
         window: int = 100,
-        start: Optional[int] = None,
-        end: Optional[int] = None,
+        start: int | None = None,
+        end: int | None = None,
     ) -> str:
         """Obtiene el contexto alrededor de una mención."""
         if mention:
@@ -2007,7 +2314,7 @@ EVIDENCIA: [frase donde se identifica, si existe]"""
     def _weighted_vote(
         self,
         votes: dict[Mention, list[tuple[float, CorefMethod, str]]],
-    ) -> tuple[Optional[Mention], float, dict[str, dict]]:
+    ) -> tuple[Mention | None, float, dict[str, dict]]:
         """
         Realiza votación ponderada entre candidatos.
 
@@ -2105,8 +2412,7 @@ EVIDENCIA: [frase donde se identifica, si existe]"""
 
             # Calcular confianza promedio
             relevant_scores = [
-                score for a, ant, score in resolved_pairs
-                if a in members or ant in members
+                score for a, ant, score in resolved_pairs if a in members or ant in members
             ]
             if relevant_scores:
                 chain.confidence = sum(relevant_scores) / len(relevant_scores)
@@ -2121,10 +2427,10 @@ EVIDENCIA: [frase donde se identifica, si existe]"""
 # =============================================================================
 
 _resolver_lock = threading.Lock()
-_resolver: Optional[CoreferenceVotingResolver] = None
+_resolver: CoreferenceVotingResolver | None = None
 
 
-def get_coref_resolver(config: Optional[CorefConfig] = None) -> CoreferenceVotingResolver:
+def get_coref_resolver(config: CorefConfig | None = None) -> CoreferenceVotingResolver:
     """
     Obtiene el singleton del resolutor de correferencias.
 
@@ -2153,8 +2459,8 @@ def reset_coref_resolver() -> None:
 
 def resolve_coreferences_voting(
     text: str,
-    chapters: Optional[list[dict]] = None,
-    config: Optional[CorefConfig] = None,
+    chapters: list[dict] | None = None,
+    config: CorefConfig | None = None,
 ) -> CorefResult:
     """
     Función de conveniencia para resolver correferencias.
@@ -2216,9 +2522,7 @@ def build_pronoun_resolution_map(coref_result: CorefResult) -> dict[tuple[int, i
                 key = (mention.start_char, mention.end_char)
                 resolution_map[key] = main_name
 
-    logger.debug(
-        f"Mapa de resolución construido: {len(resolution_map)} pronombres mapeados"
-    )
+    logger.debug(f"Mapa de resolución construido: {len(resolution_map)} pronombres mapeados")
     return resolution_map
 
 
@@ -2244,12 +2548,37 @@ def resolve_entity_name(
     """
     # Pronombres comunes en español
     PRONOUNS = {
-        "él", "ella", "ellos", "ellas",
-        "este", "esta", "esto", "estos", "estas",
-        "ese", "esa", "eso", "esos", "esas",
-        "aquel", "aquella", "aquello", "aquellos", "aquellas",
-        "su", "sus", "suyo", "suya", "suyos", "suyas",
-        "lo", "la", "los", "las", "le", "les",
+        "él",
+        "ella",
+        "ellos",
+        "ellas",
+        "este",
+        "esta",
+        "esto",
+        "estos",
+        "estas",
+        "ese",
+        "esa",
+        "eso",
+        "esos",
+        "esas",
+        "aquel",
+        "aquella",
+        "aquello",
+        "aquellos",
+        "aquellas",
+        "su",
+        "sus",
+        "suyo",
+        "suya",
+        "suyos",
+        "suyas",
+        "lo",
+        "la",
+        "los",
+        "las",
+        "le",
+        "les",
     }
 
     # Si es un pronombre conocido, intentar resolver

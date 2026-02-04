@@ -13,14 +13,14 @@ y se guardan en ~/.narrative_assistant/models/ para uso offline posterior.
 """
 
 import logging
-import os
 import threading
-from typing import Callable, Optional, Union
+from collections.abc import Callable
+from typing import Optional
 
 import numpy as np
 
 from ..core.config import get_config
-from ..core.device import get_device_detector, get_torch_device_string, DeviceType
+from ..core.device import get_device_detector, get_torch_device_string
 from ..core.errors import ModelNotLoadedError
 from ..core.model_manager import ModelType, ensure_embeddings_model, get_model_manager
 
@@ -48,11 +48,11 @@ class EmbeddingsModel:
 
     def __init__(
         self,
-        model_name: Optional[str] = None,
-        device: Optional[str] = None,
-        batch_size: Optional[int] = None,
+        model_name: str | None = None,
+        device: str | None = None,
+        batch_size: int | None = None,
         auto_download: bool = True,
-        progress_callback: Optional[Callable[[str, float], None]] = None,
+        progress_callback: Callable[[str, float], None] | None = None,
     ):
         """
         Inicializa modelo de embeddings.
@@ -65,7 +65,8 @@ class EmbeddingsModel:
             progress_callback: Función para reportar progreso de descarga (mensaje, porcentaje)
         """
         from sentence_transformers import SentenceTransformer
-        from ..core.device import get_safe_batch_size, get_device_detector
+
+        from ..core.device import get_device_detector, get_safe_batch_size
 
         config = get_config()
         self.model_name = model_name or config.nlp.embeddings_model
@@ -73,7 +74,7 @@ class EmbeddingsModel:
         # Detectar dispositivo y verificar VRAM
         detector = get_device_detector()
         device_info = detector.detect_best_device(config.gpu.device_preference)
-        
+
         if device is None:
             if config.gpu.embeddings_gpu_enabled:
                 # En GPUs con poca VRAM, usar CPU para embeddings
@@ -113,7 +114,7 @@ class EmbeddingsModel:
                 model_path = existing_path
             elif auto_download:
                 # Descargar modelo
-                logger.info(f"Modelo embeddings no encontrado. Iniciando descarga...")
+                logger.info("Modelo embeddings no encontrado. Iniciando descarga...")
                 result = ensure_embeddings_model(
                     force_download=False, progress_callback=progress_callback
                 )
@@ -155,14 +156,11 @@ class EmbeddingsModel:
         # Dimensión de los embeddings
         self.embedding_dim = self.model.get_sentence_embedding_dimension()
 
-        logger.info(
-            f"Modelo cargado en {self.device} "
-            f"(dim={self.embedding_dim})"
-        )
+        logger.info(f"Modelo cargado en {self.device} (dim={self.embedding_dim})")
 
     def encode(
         self,
-        sentences: Union[str, list[str]],
+        sentences: str | list[str],
         normalize: bool = True,
         show_progress: bool = False,
         clear_cache: bool = False,
@@ -180,7 +178,7 @@ class EmbeddingsModel:
             Array numpy de embeddings [n_sentences, embedding_dim]
         """
         from ..core.device import clear_gpu_memory
-        
+
         if isinstance(sentences, str):
             sentences = [sentences]
 
@@ -196,12 +194,10 @@ class EmbeddingsModel:
             # Detectar OOM y hacer fallback a CPU
             error_msg = str(e).lower()
             if "out of memory" in error_msg or "cuda" in error_msg:
-                logger.warning(
-                    f"GPU OOM detectado, limpiando memoria y reintentando en CPU"
-                )
+                logger.warning("GPU OOM detectado, limpiando memoria y reintentando en CPU")
                 # Limpiar memoria GPU
                 clear_gpu_memory()
-                
+
                 # Reducir batch size y forzar CPU
                 fallback_batch_size = max(4, self.batch_size // 4)
                 embeddings = self.model.encode(
@@ -214,7 +210,7 @@ class EmbeddingsModel:
                 )
             else:
                 raise
-        
+
         # Limpiar caché si se solicita (importante en sistemas con poca VRAM)
         if clear_cache and self.device != "cpu":
             clear_gpu_memory()
@@ -223,9 +219,9 @@ class EmbeddingsModel:
 
     def similarity(
         self,
-        text1: Union[str, list[str]],
-        text2: Union[str, list[str]],
-    ) -> Union[float, np.ndarray]:
+        text1: str | list[str],
+        text2: str | list[str],
+    ) -> float | np.ndarray:
         """
         Calcula similitud coseno entre textos.
 
@@ -278,7 +274,7 @@ class EmbeddingsModel:
 
         # Filtrar por umbral y ordenar
         results = []
-        for idx, (text, sim) in enumerate(zip(candidates, similarities)):
+        for idx, (text, sim) in enumerate(zip(candidates, similarities, strict=False)):
             if sim >= threshold:
                 results.append((idx, text, float(sim)))
 
@@ -309,8 +305,8 @@ class EmbeddingsModel:
 
 
 def get_embeddings_model(
-    model_name: Optional[str] = None,
-    device: Optional[str] = None,
+    model_name: str | None = None,
+    device: str | None = None,
 ) -> EmbeddingsModel:
     """
     Obtiene el modelo de embeddings singleton (thread-safe).
@@ -334,7 +330,7 @@ def get_embeddings_model(
 
 
 def encode_texts(
-    texts: Union[str, list[str]],
+    texts: str | list[str],
     normalize: bool = True,
 ) -> np.ndarray:
     """

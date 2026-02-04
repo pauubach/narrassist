@@ -10,9 +10,9 @@ Basado en el estudio: docs/research/ESTUDIO_REDUNDANCIA_SEMANTICA.md
 import logging
 import re
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, Any
+from typing import Any
 
 import numpy as np
 
@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 # Intentar importar FAISS
 try:
     import faiss
+
     FAISS_AVAILABLE = True
 except ImportError:
     FAISS_AVAILABLE = False
@@ -31,21 +32,24 @@ except ImportError:
 
 class DuplicateType(Enum):
     """Tipo de duplicado semántico."""
-    TEXTUAL = "textual"       # Casi idéntico, mismo texto reformulado
-    THEMATIC = "thematic"     # Mismo tema/idea
-    ACTION = "action"         # Misma acción de personaje
+
+    TEXTUAL = "textual"  # Casi idéntico, mismo texto reformulado
+    THEMATIC = "thematic"  # Mismo tema/idea
+    ACTION = "action"  # Misma acción de personaje
 
 
 class RedundancyMode(Enum):
     """Modo de detección."""
-    FAST = "fast"           # LSH/top-100, ~5 seg para 10K oraciones
-    BALANCED = "balanced"   # FAISS IVF/top-500, ~30 seg
-    THOROUGH = "thorough"   # Exhaustivo, ~5 min
+
+    FAST = "fast"  # LSH/top-100, ~5 seg para 10K oraciones
+    BALANCED = "balanced"  # FAISS IVF/top-500, ~30 seg
+    THOROUGH = "thorough"  # Exhaustivo, ~5 min
 
 
 @dataclass
 class SemanticDuplicate:
     """Par de textos semánticamente similares."""
+
     text1: str
     text2: str
     chapter1: int
@@ -76,6 +80,7 @@ class SemanticDuplicate:
 @dataclass
 class RedundancyReport:
     """Reporte de redundancias detectadas."""
+
     duplicates: list[SemanticDuplicate]
     sentences_analyzed: int
     chapters_analyzed: int
@@ -107,6 +112,7 @@ class RedundancyReport:
 @dataclass
 class SentenceInfo:
     """Información de una oración."""
+
     text: str
     chapter: int
     position: int  # Índice en el documento
@@ -123,18 +129,34 @@ class SemanticRedundancyDetector:
 
     # Frases comunes que no deben marcarse como duplicados
     COMMON_PHRASES = {
-        "dijo que", "se levantó", "miró a", "pensó en", "volvió a",
-        "al día siguiente", "en ese momento", "por la noche", "al final",
-        "sin embargo", "por otra parte", "de repente", "poco después",
-        "mientras tanto", "a pesar de", "por supuesto", "de pronto",
-        "una vez más", "al mismo tiempo", "en realidad", "de nuevo",
+        "dijo que",
+        "se levantó",
+        "miró a",
+        "pensó en",
+        "volvió a",
+        "al día siguiente",
+        "en ese momento",
+        "por la noche",
+        "al final",
+        "sin embargo",
+        "por otra parte",
+        "de repente",
+        "poco después",
+        "mientras tanto",
+        "a pesar de",
+        "por supuesto",
+        "de pronto",
+        "una vez más",
+        "al mismo tiempo",
+        "en realidad",
+        "de nuevo",
     }
 
     # Patrones de diálogo (no comparar diálogos cortos)
     DIALOGUE_PATTERNS = [
-        r'^—[^—]{1,50}—?$',  # Diálogo corto con raya
-        r'^"[^"]{1,50}"$',   # Diálogo corto con comillas
-        r'^«[^»]{1,50}»$',   # Diálogo corto con guillemets
+        r"^—[^—]{1,50}—?$",  # Diálogo corto con raya
+        r'^"[^"]{1,50}"$',  # Diálogo corto con comillas
+        r"^«[^»]{1,50}»$",  # Diálogo corto con guillemets
     ]
 
     def __init__(
@@ -142,7 +164,7 @@ class SemanticRedundancyDetector:
         model_name: str = "paraphrase-multilingual-MiniLM-L12-v2",
         similarity_threshold: float = 0.85,
         mode: RedundancyMode = RedundancyMode.BALANCED,
-        use_gpu: Optional[bool] = None,
+        use_gpu: bool | None = None,
         min_sentence_length: int = 20,
         max_sentence_length: int = 500,
     ):
@@ -184,6 +206,7 @@ class SemanticRedundancyDetector:
         """Obtiene el modelo de embeddings (lazy loading)."""
         if self._model is None:
             from narrative_assistant.nlp.embeddings import EmbeddingsModel
+
             self._model = EmbeddingsModel(
                 model_name=self.model_name,
                 use_gpu=self.use_gpu,
@@ -212,14 +235,16 @@ class SemanticRedundancyDetector:
             sentences = self._extract_sentences(chapters)
 
             if len(sentences) < 2:
-                return Result.success(RedundancyReport(
-                    duplicates=[],
-                    sentences_analyzed=len(sentences),
-                    chapters_analyzed=len(chapters),
-                    processing_time_seconds=time.time() - start_time,
-                    mode=self.mode.value,
-                    threshold=self.similarity_threshold,
-                ))
+                return Result.success(
+                    RedundancyReport(
+                        duplicates=[],
+                        sentences_analyzed=len(sentences),
+                        chapters_analyzed=len(chapters),
+                        processing_time_seconds=time.time() - start_time,
+                        mode=self.mode.value,
+                        threshold=self.similarity_threshold,
+                    )
+                )
 
             logger.info(f"Analizando {len(sentences)} oraciones en modo {self.mode.value}")
 
@@ -233,13 +258,9 @@ class SemanticRedundancyDetector:
 
             # Encontrar duplicados usando FAISS o búsqueda lineal
             if FAISS_AVAILABLE and len(sentences) > 100:
-                duplicates = self._find_duplicates_faiss(
-                    sentences, embeddings, max_duplicates
-                )
+                duplicates = self._find_duplicates_faiss(sentences, embeddings, max_duplicates)
             else:
-                duplicates = self._find_duplicates_linear(
-                    sentences, embeddings, max_duplicates
-                )
+                duplicates = self._find_duplicates_linear(sentences, embeddings, max_duplicates)
 
             # Contar por tipo
             textual = sum(1 for d in duplicates if d.duplicate_type == DuplicateType.TEXTUAL)
@@ -252,17 +273,19 @@ class SemanticRedundancyDetector:
                 f"en {processing_time:.2f}s"
             )
 
-            return Result.success(RedundancyReport(
-                duplicates=duplicates,
-                sentences_analyzed=len(sentences),
-                chapters_analyzed=len(chapters),
-                processing_time_seconds=processing_time,
-                mode=self.mode.value,
-                threshold=self.similarity_threshold,
-                textual_count=textual,
-                thematic_count=thematic,
-                action_count=action,
-            ))
+            return Result.success(
+                RedundancyReport(
+                    duplicates=duplicates,
+                    sentences_analyzed=len(sentences),
+                    chapters_analyzed=len(chapters),
+                    processing_time_seconds=processing_time,
+                    mode=self.mode.value,
+                    threshold=self.similarity_threshold,
+                    textual_count=textual,
+                    thematic_count=thematic,
+                    action_count=action,
+                )
+            )
 
         except Exception as e:
             logger.error(f"Error en detección de redundancia: {e}", exc_info=True)
@@ -283,7 +306,7 @@ class SemanticRedundancyDetector:
 
             # Dividir en oraciones
             # Patrón simple: separar por .!? seguido de espacio y mayúscula
-            raw_sentences = re.split(r'(?<=[.!?])\s+(?=[A-ZÁÉÍÓÚÑ])', content)
+            raw_sentences = re.split(r"(?<=[.!?])\s+(?=[A-ZÁÉÍÓÚÑ])", content)
 
             current_pos = 0
             for sent in raw_sentences:
@@ -296,7 +319,7 @@ class SemanticRedundancyDetector:
 
                 if len(sent) > self.max_sentence_length:
                     # Truncar oraciones muy largas
-                    sent = sent[:self.max_sentence_length] + "..."
+                    sent = sent[: self.max_sentence_length] + "..."
 
                 # Filtrar diálogos cortos
                 if self._is_short_dialogue(sent):
@@ -308,12 +331,14 @@ class SemanticRedundancyDetector:
                     current_pos += len(sent) + 1
                     continue
 
-                sentences.append(SentenceInfo(
-                    text=sent,
-                    chapter=ch_num,
-                    position=position,
-                    start_char=ch_start + current_pos,
-                ))
+                sentences.append(
+                    SentenceInfo(
+                        text=sent,
+                        chapter=ch_num,
+                        position=position,
+                        start_char=ch_start + current_pos,
+                    )
+                )
 
                 position += 1
                 current_pos += len(sent) + 1
@@ -322,18 +347,12 @@ class SemanticRedundancyDetector:
 
     def _is_short_dialogue(self, text: str) -> bool:
         """Verifica si es un diálogo corto."""
-        for pattern in self._compiled_dialogue:
-            if pattern.match(text):
-                return True
-        return False
+        return any(pattern.match(text) for pattern in self._compiled_dialogue)
 
     def _is_common_phrase(self, text: str) -> bool:
         """Verifica si contiene principalmente frases comunes."""
         text_lower = text.lower()
-        for phrase in self.COMMON_PHRASES:
-            if phrase in text_lower and len(text) < 100:
-                return True
-        return False
+        return any(phrase in text_lower and len(text) < 100 for phrase in self.COMMON_PHRASES)
 
     def _find_duplicates_faiss(
         self,
@@ -424,7 +443,7 @@ class SemanticRedundancyDetector:
                 break
 
             # Calcular similitudes con todas las oraciones posteriores
-            similarities = np.dot(normalized[i], normalized[i+1:].T)
+            similarities = np.dot(normalized[i], normalized[i + 1 :].T)
 
             for j_offset, similarity in enumerate(similarities):
                 j = i + 1 + j_offset
@@ -452,7 +471,7 @@ class SemanticRedundancyDetector:
         sent1: SentenceInfo,
         sent2: SentenceInfo,
         similarity: float,
-    ) -> Optional[SemanticDuplicate]:
+    ) -> SemanticDuplicate | None:
         """Crea un objeto SemanticDuplicate con clasificación de tipo."""
         # Ajustar peso si es mismo capítulo (menos relevante)
         adjusted_sim = similarity
@@ -495,9 +514,24 @@ class SemanticRedundancyDetector:
 
         # Detectar acciones de personajes
         action_verbs = {
-            "caminó", "corrió", "saltó", "miró", "observó", "dijo",
-            "pensó", "sintió", "tomó", "dejó", "abrió", "cerró",
-            "entró", "salió", "subió", "bajó", "se levantó", "se sentó",
+            "caminó",
+            "corrió",
+            "saltó",
+            "miró",
+            "observó",
+            "dijo",
+            "pensó",
+            "sintió",
+            "tomó",
+            "dejó",
+            "abrió",
+            "cerró",
+            "entró",
+            "salió",
+            "subió",
+            "bajó",
+            "se levantó",
+            "se sentó",
         }
         text1_lower = text1.lower()
         text2_lower = text2.lower()

@@ -19,56 +19,54 @@ Instalación bajo demanda:
 - Ver ollama_manager.py para la gestión de instalación
 """
 
-from .expectation_inference import (
-    # Tipos
-    BehavioralExpectation,
-    ExpectationType,
-    ExpectationViolation,
-    CharacterBehaviorProfile,
-    # Clase principal
-    ExpectationInferenceEngine,
-    # Funciones de conveniencia
-    infer_expectations,
-    detect_expectation_violations,
-)
-
 from .client import (
     # Cliente
     LocalLLMClient,
     LocalLLMConfig,
-    # Funciones - cliente
-    get_llm_client,
-    is_llm_available,
-    reset_client,
-    # Funciones - instalación bajo demanda
-    set_installation_prompt_callback,
-    get_ollama_status,
-    install_ollama_if_needed,
     download_ollama_model,
     ensure_llm_ready,
     # Alias deprecated
     get_claude_client,
+    # Funciones - cliente
+    get_llm_client,
+    get_ollama_status,
+    install_ollama_if_needed,
+    is_llm_available,
+    reset_client,
+    # Funciones - instalación bajo demanda
+    set_installation_prompt_callback,
 )
-
-from .ollama_manager import (
-    # Gestor principal
-    OllamaManager,
-    OllamaConfig,
+from .expectation_inference import (
     # Tipos
-    OllamaStatus,
-    OllamaModel,
-    DownloadProgress,
-    InstallationPlatform,
+    BehavioralExpectation,
+    CharacterBehaviorProfile,
+    # Clase principal
+    ExpectationInferenceEngine,
+    ExpectationType,
+    ExpectationViolation,
+    detect_expectation_violations,
+    # Funciones de conveniencia
+    infer_expectations,
+)
+from .ollama_manager import (
     # Constantes
     AVAILABLE_MODELS,
-    # Funciones singleton
-    get_ollama_manager,
-    reset_ollama_manager,
-    # Funciones de conveniencia
-    is_ollama_available,
+    DownloadProgress,
+    InstallationPlatform,
+    OllamaConfig,
+    # Gestor principal
+    OllamaManager,
+    OllamaModel,
+    # Tipos
+    OllamaStatus,
+    download_llm_model,
     ensure_ollama_ready,
     get_available_llm_models,
-    download_llm_model,
+    # Funciones singleton
+    get_ollama_manager,
+    # Funciones de conveniencia
+    is_ollama_available,
+    reset_ollama_manager,
 )
 
 __all__ = [

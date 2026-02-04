@@ -11,17 +11,18 @@ El sistema usa votación ponderada para combinar resultados.
 """
 
 import logging
+from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
+
 import numpy as np
-from collections import defaultdict
 
 logger = logging.getLogger(__name__)
 
 
 class RelationStrength(Enum):
     """Fuerza de la relación inferida."""
+
     NONE = 0
     WEAK = 1
     MODERATE = 2
@@ -31,6 +32,7 @@ class RelationStrength(Enum):
 
 class RelationValence(Enum):
     """Valencia emocional de la relación."""
+
     NEGATIVE = -1
     NEUTRAL = 0
     POSITIVE = 1
@@ -40,10 +42,11 @@ class RelationValence(Enum):
 @dataclass
 class CoOccurrence:
     """Registro de co-ocurrencia entre dos entidades."""
+
     entity1_id: int
     entity2_id: int
     chapter: int
-    scene: Optional[int] = None
+    scene: int | None = None
     distance_chars: int = 0  # Distancia en caracteres
     context: str = ""  # Contexto textual
 
@@ -51,6 +54,7 @@ class CoOccurrence:
 @dataclass
 class InferredRelation:
     """Relación inferida entre dos entidades."""
+
     entity1_id: int
     entity2_id: int
     entity1_name: str
@@ -61,8 +65,8 @@ class InferredRelation:
 
     # Evidencias de cada técnica
     cooccurrence_score: float = 0.0
-    hierarchical_cluster: Optional[int] = None
-    community_id: Optional[int] = None
+    hierarchical_cluster: int | None = None
+    community_id: int | None = None
     embedding_similarity: float = 0.0
 
     # Votos de cada técnica (True si sugieren relación)
@@ -80,14 +84,15 @@ class InferredRelation:
 @dataclass
 class CharacterCluster:
     """Grupo de personajes relacionados."""
+
     id: int
     name: str  # Nombre descriptivo del grupo (autogenerado)
     entity_ids: list[int]
     entity_names: list[str]
-    centroid_entity_id: Optional[int] = None  # Personaje central (más conectado)
-    centroid_entity_name: Optional[str] = None  # Nombre del personaje central
+    centroid_entity_id: int | None = None  # Personaje central (más conectado)
+    centroid_entity_name: str | None = None  # Nombre del personaje central
     cohesion_score: float = 0.0  # Qué tan cohesivo es el grupo
-    custom_name: Optional[str] = None  # Nombre personalizado por el usuario
+    custom_name: str | None = None  # Nombre personalizado por el usuario
 
     # Metadatos
     detection_method: str = ""  # "hierarchical", "louvain", "voting"
@@ -102,6 +107,7 @@ class CharacterCluster:
 @dataclass
 class KnowledgeAsymmetry:
     """Asimetría de conocimiento: qué sabe A de B vs B de A."""
+
     entity_a_id: int
     entity_b_id: int
     entity_a_name: str
@@ -140,13 +146,13 @@ class RelationshipClusteringEngine:
 
     # Umbrales
     COOCCURRENCE_THRESHOLD = 3  # Mínimo co-ocurrencias para considerar relación
-    DISTANCE_THRESHOLD = 500   # Caracteres máximos para considerar "cerca"
+    DISTANCE_THRESHOLD = 500  # Caracteres máximos para considerar "cerca"
     RELATION_CONFIDENCE_THRESHOLD = 0.5  # Confianza mínima para reportar
 
     def __init__(
         self,
         use_embeddings: bool = True,
-        embedding_model = None,
+        embedding_model=None,
     ):
         """
         Inicializa el motor de clustering.
@@ -175,7 +181,7 @@ class RelationshipClusteringEngine:
         entity1_name: str,
         entity2_name: str,
         chapter: int,
-        scene: Optional[int] = None,
+        scene: int | None = None,
         distance_chars: int = 0,
         context: str = "",
     ) -> None:
@@ -185,14 +191,16 @@ class RelationshipClusteringEngine:
             entity1_id, entity2_id = entity2_id, entity1_id
             entity1_name, entity2_name = entity2_name, entity1_name
 
-        self._cooccurrences.append(CoOccurrence(
-            entity1_id=entity1_id,
-            entity2_id=entity2_id,
-            chapter=chapter,
-            scene=scene,
-            distance_chars=distance_chars,
-            context=context,
-        ))
+        self._cooccurrences.append(
+            CoOccurrence(
+                entity1_id=entity1_id,
+                entity2_id=entity2_id,
+                chapter=chapter,
+                scene=scene,
+                distance_chars=distance_chars,
+                context=context,
+            )
+        )
 
         # Guardar nombres y contextos
         self._entity_names[entity1_id] = entity1_name
@@ -275,7 +283,7 @@ class RelationshipClusteringEngine:
             entity_set.add(cooc.entity1_id)
             entity_set.add(cooc.entity2_id)
 
-        entity_ids = sorted(list(entity_set))
+        entity_ids = sorted(entity_set)
         n = len(entity_ids)
         id_to_idx = {eid: i for i, eid in enumerate(entity_ids)}
 
@@ -332,7 +340,7 @@ class RelationshipClusteringEngine:
             - Datos para visualizar dendrograma
         """
         try:
-            from scipy.cluster.hierarchy import linkage, fcluster, dendrogram
+            from scipy.cluster.hierarchy import dendrogram, fcluster, linkage
             from scipy.spatial.distance import squareform
         except ImportError:
             logger.warning("scipy no disponible, omitiendo clustering jerárquico")
@@ -359,18 +367,15 @@ class RelationshipClusteringEngine:
             condensed = squareform(distance)
 
             # Linkage (ward, complete, average, single)
-            Z = linkage(condensed, method='ward')
+            Z = linkage(condensed, method="ward")
 
             # Cortar en clusters (criterio: distancia máxima)
             # Usar criterio adaptativo basado en la estructura
             max_d = 0.7 * Z[:, 2].max()  # 70% de la distancia máxima
-            clusters_arr = fcluster(Z, max_d, criterion='distance')
+            clusters_arr = fcluster(Z, max_d, criterion="distance")
 
             # Mapear a dict
-            cluster_map = {
-                entity_ids[i]: int(clusters_arr[i])
-                for i in range(n)
-            }
+            cluster_map = {entity_ids[i]: int(clusters_arr[i]) for i in range(n)}
 
             # Datos para dendrograma
             dendrogram_data = {
@@ -421,7 +426,7 @@ class RelationshipClusteringEngine:
 
         try:
             # Detectar comunidades
-            communities = louvain_communities(G, weight='weight', seed=42)
+            communities = louvain_communities(G, weight="weight", seed=42)
 
             # Mapear a dict
             community_map = {}
@@ -470,7 +475,7 @@ class RelationshipClusteringEngine:
 
         eids_with_emb = list(entity_embeddings.keys())
         for i, eid1 in enumerate(eids_with_emb):
-            for eid2 in eids_with_emb[i + 1:]:
+            for eid2 in eids_with_emb[i + 1 :]:
                 emb1 = entity_embeddings[eid1]
                 emb2 = entity_embeddings[eid2]
 
@@ -534,8 +539,7 @@ class RelationshipClusteringEngine:
 
             # Calcular confianza ponderada
             confidence = sum(
-                self.WEIGHTS[method] * (1.0 if vote else 0.0)
-                for method, vote in votes.items()
+                self.WEIGHTS[method] * (1.0 if vote else 0.0) for method, vote in votes.items()
             )
 
             # Solo reportar si supera umbral
@@ -550,33 +554,39 @@ class RelationshipClusteringEngine:
 
             # Recopilar evidencias
             evidence = [
-                c.context for c in self._cooccurrences
-                if (c.entity1_id == eid1 and c.entity2_id == eid2) or
-                   (c.entity1_id == eid2 and c.entity2_id == eid1)
+                c.context
+                for c in self._cooccurrences
+                if (c.entity1_id == eid1 and c.entity2_id == eid2)
+                or (c.entity1_id == eid2 and c.entity2_id == eid1)
             ][:5]  # Máximo 5 evidencias
 
-            chapters = list(set(
-                c.chapter for c in self._cooccurrences
-                if (c.entity1_id == eid1 and c.entity2_id == eid2) or
-                   (c.entity1_id == eid2 and c.entity2_id == eid1)
-            ))
+            chapters = list(
+                {
+                    c.chapter
+                    for c in self._cooccurrences
+                    if (c.entity1_id == eid1 and c.entity2_id == eid2)
+                    or (c.entity1_id == eid2 and c.entity2_id == eid1)
+                }
+            )
 
-            relations.append(InferredRelation(
-                entity1_id=eid1,
-                entity2_id=eid2,
-                entity1_name=self._entity_names.get(eid1, str(eid1)),
-                entity2_name=self._entity_names.get(eid2, str(eid2)),
-                strength=strength,
-                valence=valence,
-                confidence=confidence,
-                cooccurrence_score=cooc_score,
-                hierarchical_cluster=hierarchical_clusters.get(eid1),
-                community_id=communities.get(eid1),
-                embedding_similarity=emb_score,
-                votes=votes,
-                evidence_contexts=evidence,
-                chapters_together=sorted(chapters),
-            ))
+            relations.append(
+                InferredRelation(
+                    entity1_id=eid1,
+                    entity2_id=eid2,
+                    entity1_name=self._entity_names.get(eid1, str(eid1)),
+                    entity2_name=self._entity_names.get(eid2, str(eid2)),
+                    strength=strength,
+                    valence=valence,
+                    confidence=confidence,
+                    cooccurrence_score=cooc_score,
+                    hierarchical_cluster=hierarchical_clusters.get(eid1),
+                    community_id=communities.get(eid1),
+                    embedding_similarity=emb_score,
+                    votes=votes,
+                    evidence_contexts=evidence,
+                    chapters_together=sorted(chapters),
+                )
+            )
 
         # Ordenar por confianza
         relations.sort(key=lambda r: r.confidence, reverse=True)
@@ -648,21 +658,23 @@ class RelationshipClusteringEngine:
             # Generar nombre descriptivo usando el centroide
             cluster_name = self._generate_cluster_name(names, centroid_name)
 
-            clusters.append(CharacterCluster(
-                id=cid,
-                name=cluster_name,
-                entity_ids=members,
-                entity_names=names,
-                centroid_entity_id=centroid,
-                centroid_entity_name=centroid_name,
-                cohesion_score=cohesion,
-                detection_method="louvain" if communities else "hierarchical",
-                chapters_active=sorted(list(chapters)),
-            ))
+            clusters.append(
+                CharacterCluster(
+                    id=cid,
+                    name=cluster_name,
+                    entity_ids=members,
+                    entity_names=names,
+                    centroid_entity_id=centroid,
+                    centroid_entity_name=centroid_name,
+                    cohesion_score=cohesion,
+                    detection_method="louvain" if communities else "hierarchical",
+                    chapters_active=sorted(chapters),
+                )
+            )
 
         return clusters
 
-    def _find_centroid(self, members: list[int]) -> Optional[int]:
+    def _find_centroid(self, members: list[int]) -> int | None:
         """Encuentra la entidad más conectada del grupo."""
         if not members:
             return None
@@ -697,11 +709,7 @@ class RelationshipClusteringEngine:
 
         return min(1.0, existing / possible) if possible > 0 else 0.0
 
-    def _generate_cluster_name(
-        self,
-        names: list[str],
-        centroid_name: Optional[str] = None
-    ) -> str:
+    def _generate_cluster_name(self, names: list[str], centroid_name: str | None = None) -> str:
         """
         Genera un nombre descriptivo para el cluster.
 
@@ -826,7 +834,11 @@ def extract_cooccurrences_from_chapters(
     for mention in entity_mentions:
         # Determinar capítulo basado en posición
         for chapter in chapters:
-            if chapter.get("start_char", 0) <= mention["start_char"] <= chapter.get("end_char", float("inf")):
+            if (
+                chapter.get("start_char", 0)
+                <= mention["start_char"]
+                <= chapter.get("end_char", float("inf"))
+            ):
                 mentions_by_chapter[chapter["chapter_number"]].append(mention)
                 break
 
@@ -836,7 +848,7 @@ def extract_cooccurrences_from_chapters(
         mentions.sort(key=lambda m: m["start_char"])
 
         for i, m1 in enumerate(mentions):
-            for m2 in mentions[i + 1:]:
+            for m2 in mentions[i + 1 :]:
                 # Calcular distancia
                 distance = m2["start_char"] - m1["end_char"]
 
@@ -849,18 +861,20 @@ def extract_cooccurrences_from_chapters(
                 # Extraer contexto
                 chapter_content = next(
                     (c.get("content", "") for c in chapters if c["chapter_number"] == chapter_num),
-                    ""
+                    "",
                 )
                 context_start = max(0, m1["start_char"] - 50)
                 context_end = min(len(chapter_content), m2["end_char"] + 50)
                 context = chapter_content[context_start:context_end] if chapter_content else ""
 
-                cooccurrences.append(CoOccurrence(
-                    entity1_id=min(m1["entity_id"], m2["entity_id"]),
-                    entity2_id=max(m1["entity_id"], m2["entity_id"]),
-                    chapter=chapter_num,
-                    distance_chars=distance,
-                    context=context,
-                ))
+                cooccurrences.append(
+                    CoOccurrence(
+                        entity1_id=min(m1["entity_id"], m2["entity_id"]),
+                        entity2_id=max(m1["entity_id"], m2["entity_id"]),
+                        chapter=chapter_num,
+                        distance_chars=distance,
+                        context=context,
+                    )
+                )
 
     return cooccurrences

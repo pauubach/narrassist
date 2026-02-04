@@ -14,14 +14,13 @@ import logging
 import threading
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
 from ..core.config import get_config
+from ..core.errors import ErrorSeverity, NLPError
 from ..core.result import Result
-from ..core.errors import NLPError, ErrorSeverity
-from .spacy_gpu import load_spacy_model
-from .entity_validator import get_entity_validator, ValidationResult
 from . import morpho_utils
+from .entity_validator import get_entity_validator
+from .spacy_gpu import load_spacy_model
 
 logger = logging.getLogger(__name__)
 
@@ -59,13 +58,13 @@ class ExtractedEntity:
     end_char: int
     confidence: float = 0.8
     source: str = "spacy"
-    canonical_form: Optional[str] = None
+    canonical_form: str | None = None
 
     def __post_init__(self):
         """Normaliza el texto y la forma canónica."""
         # Puntuación que no debería aparecer en bordes de entidades
         # Include typographic quotes to avoid leaving entities like “María as lowercase words.
-        BOUNDARY_PUNCT = '–—-,.;:!?¿¡\'\"()[]{}«»""'' “”‘’'
+        BOUNDARY_PUNCT = '–—-,.;:!?¿¡\'"()[]{}«»"" “”‘’'
 
         # Limpiar puntuación al final del texto (errores de segmentación)
         clean_text = self.text.rstrip(BOUNDARY_PUNCT)
@@ -155,13 +154,12 @@ class NERExtractionError(NLPError):
     original_error: str = ""
     message: str = field(init=False)
     severity: ErrorSeverity = field(default=ErrorSeverity.RECOVERABLE, init=False)
-    user_message: Optional[str] = field(default=None, init=False)
+    user_message: str | None = field(default=None, init=False)
 
     def __post_init__(self):
         self.message = f"NER extraction error: {self.original_error}"
         self.user_message = (
-            f"Error al extraer entidades del texto. "
-            f"Se continuará con los resultados parciales."
+            "Error al extraer entidades del texto. Se continuará con los resultados parciales."
         )
         super().__post_init__()
 
@@ -254,7 +252,6 @@ class NERExtractor:
         "le",
         "les",
         "lo",
-        "la",
         "nos",
         "os",
         "me",
@@ -289,41 +286,158 @@ class NERExtractor:
     # a personajes específicos ("El Rey ordenó...").
     HEURISTIC_FALSE_POSITIVES = {
         # Expresiones temporales (nunca son personajes/lugares)
-        "lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo",
-        "enero", "febrero", "marzo", "abril", "mayo", "junio",
-        "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
-        "primavera", "verano", "otoño", "invierno",
-        "mañana", "tarde", "noche", "mediodía", "madrugada",
-        "ayer", "hoy", "anoche", "ahora", "entonces", "después", "antes",
+        "lunes",
+        "martes",
+        "miércoles",
+        "jueves",
+        "viernes",
+        "sábado",
+        "domingo",
+        "enero",
+        "febrero",
+        "marzo",
+        "abril",
+        "mayo",
+        "junio",
+        "julio",
+        "agosto",
+        "septiembre",
+        "octubre",
+        "noviembre",
+        "diciembre",
+        "primavera",
+        "verano",
+        "otoño",
+        "invierno",
+        "mañana",
+        "tarde",
+        "noche",
+        "mediodía",
+        "madrugada",
+        "ayer",
+        "hoy",
+        "anoche",
+        "ahora",
+        "entonces",
+        "después",
+        "antes",
         # Términos narrativos/estructura (metadatos, no contenido)
-        "capítulo", "prólogo", "epílogo", "parte", "libro", "volumen",
-        "escena", "acto", "fin", "final", "principio", "inicio",
+        "capítulo",
+        "prólogo",
+        "epílogo",
+        "parte",
+        "libro",
+        "volumen",
+        "escena",
+        "acto",
+        "fin",
+        "final",
+        "principio",
+        "inicio",
         # Pronombres/determinantes (nunca son entidades)
-        "algo", "alguien", "nadie", "nada", "todo", "todos",
-        "otro", "otra", "otros", "otras",
-        "mismo", "misma", "mismos", "mismas",
-        "cada", "cualquier", "cualquiera",
+        "algo",
+        "alguien",
+        "nadie",
+        "nada",
+        "todo",
+        "todos",
+        "otro",
+        "otra",
+        "otros",
+        "otras",
+        "mismo",
+        "misma",
+        "mismos",
+        "mismas",
+        "cada",
+        "cualquier",
+        "cualquiera",
         # Adverbios (nunca son entidades)
-        "bien", "mal", "aquí", "allí", "allá", "acá",
-        "sí", "no", "quizá", "quizás",
-        "ahora", "entonces", "luego", "después", "antes", "siempre", "nunca",
+        "bien",
+        "mal",
+        "aquí",
+        "allí",
+        "allá",
+        "acá",
+        "sí",
+        "no",
+        "quizá",
+        "quizás",
+        "luego",
+        "siempre",
+        "nunca",
         # Interjecciones
-        "oh", "ah", "ay", "eh", "uf", "bah", "ja",
+        "oh",
+        "ah",
+        "ay",
+        "eh",
+        "uf",
+        "bah",
+        "ja",
         # Atributos físicos (descripciones, no entidades)
-        "cabello", "pelo", "ojos", "rostro", "cara", "manos", "piel",
-        "negro", "blanco", "rubio", "moreno", "rojo", "azul", "verde",
-        "alto", "bajo", "gordo", "flaco", "grande", "pequeño",
+        "cabello",
+        "pelo",
+        "ojos",
+        "rostro",
+        "cara",
+        "manos",
+        "piel",
+        "negro",
+        "blanco",
+        "rubio",
+        "moreno",
+        "rojo",
+        "azul",
+        "verde",
+        "alto",
+        "bajo",
+        "gordo",
+        "flaco",
+        "grande",
+        "pequeño",
         # Adjetivos comunes
-        "extraño", "raro", "imposible", "increíble", "horrible", "terrible",
-        "hermoso", "bello", "feo", "viejo", "nuevo", "joven", "antiguo",
+        "extraño",
+        "raro",
+        "imposible",
+        "increíble",
+        "horrible",
+        "terrible",
+        "hermoso",
+        "bello",
+        "feo",
+        "viejo",
+        "nuevo",
+        "joven",
+        "antiguo",
         # Palabras de test/desarrollo
-        "test", "fresh", "prueba", "ejemplo", "demo",
+        "test",
+        "fresh",
+        "prueba",
+        "ejemplo",
+        "demo",
         # Pronombres interrogativos y frases de diálogo
-        "quién", "quien", "qué", "que", "cómo", "como",
-        "dónde", "donde", "cuándo", "cuando", "cuánto", "cuanto",
+        "quién",
+        "quien",
+        "qué",
+        "que",
+        "cómo",
+        "como",
+        "dónde",
+        "donde",
+        "cuándo",
+        "cuando",
+        "cuánto",
+        "cuanto",
         # Términos científicos/biológicos genéricos
-        "endorfinas", "endorfina", "adrenalina", "serotonina", "dopamina",
-        "hormona", "hormonas", "neurotransmisor", "neurotransmisores",
+        "endorfinas",
+        "endorfina",
+        "adrenalina",
+        "serotonina",
+        "dopamina",
+        "hormona",
+        "hormonas",
+        "neurotransmisor",
+        "neurotransmisores",
     }
 
     # Longitud mínima para considerar una entidad válida
@@ -333,7 +447,7 @@ class NERExtractor:
         self,
         enable_gazetteer: bool = True,
         min_entity_confidence: float = 0.5,
-        enable_gpu: Optional[bool] = None,
+        enable_gpu: bool | None = None,
         use_llm_preprocessing: bool = True,
     ):
         """
@@ -351,7 +465,8 @@ class NERExtractor:
         config = get_config()
         # Usar 'is None' para permitir 0.0 como valor válido
         self.min_entity_confidence = (
-            min_entity_confidence if min_entity_confidence is not None
+            min_entity_confidence
+            if min_entity_confidence is not None
             else config.nlp.min_entity_confidence
         )
 
@@ -382,45 +497,117 @@ class NERExtractor:
                 "La extracción de entidades puede ser limitada."
             )
 
-        logger.info(f"NERExtractor inicializado (gazetteer={enable_gazetteer}, llm={use_llm_preprocessing})")
+        logger.info(
+            f"NERExtractor inicializado (gazetteer={enable_gazetteer}, llm={use_llm_preprocessing})"
+        )
 
     # Frases comunes que nunca son entidades (saludos, expresiones, etc.)
     COMMON_PHRASES_NOT_ENTITIES = {
         # Saludos
-        "buenos días", "buenas tardes", "buenas noches", "buen día",
-        "hola", "adiós", "hasta luego", "hasta pronto",
+        "buenos días",
+        "buenas tardes",
+        "buenas noches",
+        "buen día",
+        "hola",
+        "adiós",
+        "hasta luego",
+        "hasta pronto",
         # Expresiones comunes
-        "por favor", "muchas gracias", "de nada", "lo siento",
-        "por supuesto", "sin embargo", "no obstante", "en cambio",
-        "por cierto", "de hecho", "en realidad", "al parecer",
-        "tal vez", "quizás", "a veces", "de vez en cuando",
+        "por favor",
+        "muchas gracias",
+        "de nada",
+        "lo siento",
+        "por supuesto",
+        "sin embargo",
+        "no obstante",
+        "en cambio",
+        "por cierto",
+        "de hecho",
+        "en realidad",
+        "al parecer",
+        "tal vez",
+        "quizás",
+        "a veces",
+        "de vez en cuando",
         # Frases narrativas que empiezan con mayúscula pero no son entidades
-        "capítulo", "prólogo", "epílogo", "parte",
+        "capítulo",
+        "prólogo",
+        "epílogo",
+        "parte",
         # Descripciones físicas que no son entidades
-        "cabello negro", "cabello rubio", "cabello castaño", "pelo negro",
-        "ojos azules", "ojos verdes", "ojos negros", "ojos marrones",
+        "cabello negro",
+        "cabello rubio",
+        "cabello castaño",
+        "pelo negro",
+        "ojos azules",
+        "ojos verdes",
+        "ojos negros",
+        "ojos marrones",
         # Descripciones con posesivos
-        "sus ojos", "sus ojos verdes", "sus ojos azules", "sus ojos negros",
-        "su cabello", "su pelo", "su rostro", "su cara", "su mirada",
-        "mis ojos", "mis manos", "mi cabello", "mi pelo",
-        "tus ojos", "tu cabello", "tu pelo", "tu rostro",
+        "sus ojos",
+        "sus ojos verdes",
+        "sus ojos azules",
+        "sus ojos negros",
+        "su cabello",
+        "su pelo",
+        "su rostro",
+        "su cara",
+        "su mirada",
+        "mis ojos",
+        "mis manos",
+        "mi cabello",
+        "mi pelo",
+        "tus ojos",
+        "tu cabello",
+        "tu pelo",
+        "tu rostro",
         # Títulos de capítulos comunes
-        "la contradicción", "el encuentro", "el principio", "el final",
+        "la contradicción",
+        "el encuentro",
+        "el principio",
+        "el final",
         # Expresiones que parecen ser detectadas como MISC
-        "hola juan", "fresh test do", "imposible",
+        "hola juan",
+        "fresh test do",
+        "imposible",
         # Preguntas y frases interrogativas (diálogo)
-        "quién eres", "quien eres", "qué eres", "que eres",
-        "quién es", "quien es", "qué es", "que es",
-        "cómo estás", "como estas", "qué tal", "que tal",
-        "dónde estás", "donde estas", "dónde está", "donde esta",
-        "por qué", "porque", "para qué", "para que",
+        "quién eres",
+        "quien eres",
+        "qué eres",
+        "que eres",
+        "quién es",
+        "quien es",
+        "qué es",
+        "que es",
+        "cómo estás",
+        "como estas",
+        "qué tal",
+        "que tal",
+        "dónde estás",
+        "donde estas",
+        "dónde está",
+        "donde esta",
+        "por qué",
+        "porque",
+        "para qué",
+        "para que",
         # Sustantivos genéricos que a veces se detectan erróneamente
-        "las endorfinas", "la endorfina", "endorfinas", "endorfina",
-        "la adrenalina", "adrenalina", "la serotonina", "serotonina",
-        "la dopamina", "dopamina",
+        "las endorfinas",
+        "la endorfina",
+        "endorfinas",
+        "endorfina",
+        "la adrenalina",
+        "adrenalina",
+        "la serotonina",
+        "serotonina",
+        "la dopamina",
+        "dopamina",
         # NUEVOS (iter9): frases detectadas como MISC incorrectamente
-        "feliz cumpleaños", "me gusta tu perfume", "tengo",
-        "extrañaba su pelo negro natural", "esos ojos verdes que tanto le gustaban",
+        "feliz cumpleaños",
+        "me gusta tu perfume",
+        "tengo",
+        "extrañaba su pelo negro natural",
+        "esos ojos verdes que tanto le gustaban",
     }
 
     # Patrones regex para detectar descripciones físicas que NO son entidades
@@ -431,9 +618,20 @@ class NERExtractor:
 
     # Palabras sueltas que spaCy a veces detecta erróneamente como MISC
     SPACY_FALSE_POSITIVE_WORDS = {
-        "imposible", "increíble", "horrible", "terrible", "extraño",
-        "cabello", "pelo", "ojos", "negro", "rubio", "moreno",
-        "fresh", "test", "hola",
+        "imposible",
+        "increíble",
+        "horrible",
+        "terrible",
+        "extraño",
+        "cabello",
+        "pelo",
+        "ojos",
+        "negro",
+        "rubio",
+        "moreno",
+        "fresh",
+        "test",
+        "hola",
     }
 
     def _is_false_positive_by_morphology(
@@ -493,7 +691,10 @@ class NERExtractor:
 
                 # 1.1 Detectar VERBOS mal clasificados
                 if first_token.pos_ == "VERB":
-                    return True, f"Detectado como verbo (POS={first_token.pos_}, morfología={first_token.morph})"
+                    return (
+                        True,
+                        f"Detectado como verbo (POS={first_token.pos_}, morfología={first_token.morph})",
+                    )
 
                 # 1.2 Detectar ADJETIVOS/ADVERBIOS mal clasificados
                 if first_token.pos_ in ("ADJ", "ADV") and len(entity_tokens) == 1:
@@ -503,12 +704,16 @@ class NERExtractor:
                 # Si es un sustantivo común (no PROPN) y está al inicio de oración
                 if first_token.pos_ == "NOUN":
                     # Verificar si está al inicio de oración
-                    if first_token.i == 0 or (first_token.i > 0 and doc[first_token.i - 1].text in ".!?¿¡\n"):
+                    if first_token.i == 0 or (
+                        first_token.i > 0 and doc[first_token.i - 1].text in ".!?¿¡\n"
+                    ):
                         # Verificar si es un sustantivo que aparece en minúsculas en otras partes
                         # del texto (indicando que no es nombre propio)
-                        lowercase_pattern = r'\b' + re.escape(text_lower) + r'\b'
+                        lowercase_pattern = r"\b" + re.escape(text_lower) + r"\b"
                         lowercase_matches = len(re.findall(lowercase_pattern, context.lower()))
-                        uppercase_matches = len(re.findall(r'\b' + re.escape(entity_text) + r'\b', context))
+                        uppercase_matches = len(
+                            re.findall(r"\b" + re.escape(entity_text) + r"\b", context)
+                        )
 
                         # Si aparece más veces en minúsculas que con mayúscula, es sustantivo común
                         if lowercase_matches > uppercase_matches:
@@ -519,7 +724,7 @@ class NERExtractor:
                     # "El público", "La luna", etc.
                     second_token = entity_tokens[1] if len(entity_tokens) > 1 else None
                     if second_token and second_token.pos_ == "NOUN":
-                        return True, f"Frase nominal genérica: DET + NOUN"
+                        return True, "Frase nominal genérica: DET + NOUN"
 
         except Exception as e:
             logger.debug(f"Error en análisis morfológico: {e}")
@@ -527,8 +732,8 @@ class NERExtractor:
         # 2. PATRONES GENÉRICOS (sin spaCy disponible)
 
         # 2.1 Detectar verbos por terminaciones típicas del español
-        verb_endings_preterite = ('ó', 'ió', 'aron', 'ieron', 'aste', 'iste')
-        verb_endings_imperative = ('ate', 'ete', 'ite')
+        verb_endings_preterite = ("ó", "ió", "aron", "ieron", "aste", "iste")
+        verb_endings_imperative = ("ate", "ete", "ite")
         if len(words) == 1 and len(text_lower) > 3:
             if text_lower.endswith(verb_endings_preterite):
                 return True, f"Terminación verbal (pretérito): -{text_lower[-2:]}"
@@ -537,35 +742,71 @@ class NERExtractor:
 
         # 2.2 Detectar fragmentos de oración (más de 3 palabras con preposiciones/artículos)
         if len(words) >= 3:
-            function_words = {'el', 'la', 'los', 'las', 'un', 'una', 'de', 'del', 'en', 'con', 'por', 'para', 'a', 'al'}
+            function_words = {
+                "el",
+                "la",
+                "los",
+                "las",
+                "un",
+                "una",
+                "de",
+                "del",
+                "en",
+                "con",
+                "por",
+                "para",
+                "a",
+                "al",
+            }
             function_count = sum(1 for w in words if w.lower() in function_words)
             if function_count >= 2:
-                return True, f"Fragmento de oración (muchas palabras funcionales)"
+                return True, "Fragmento de oración (muchas palabras funcionales)"
 
         # 2.3 Detectar cuantificadores/adverbios como entidad
-        quantifiers = {'tanto', 'tanta', 'tantos', 'tantas', 'mucho', 'mucha', 'poco', 'poca'}
+        quantifiers = {"tanto", "tanta", "tantos", "tantas", "mucho", "mucha", "poco", "poca"}
         if text_lower in quantifiers:
             return True, "Cuantificador/adverbio, no entidad"
 
         # 2.4 Para LOC: Verificar si es dirección cardinal sin contexto geográfico
         if entity_label == EntityLabel.LOC:
-            cardinal_directions = {'norte', 'sur', 'este', 'oeste', 'noroeste', 'noreste', 'suroeste', 'sureste'}
+            cardinal_directions = {
+                "norte",
+                "sur",
+                "este",
+                "oeste",
+                "noroeste",
+                "noreste",
+                "suroeste",
+                "sureste",
+            }
             if text_lower in cardinal_directions:
                 # Solo es falso positivo si no va acompañado de nombre de lugar
                 # "al Norte" vs "Norte de España"
-                if not re.search(r'(de|del)\s+[A-ZÁÉÍÓÚÑ]', context[position:position+50]):
+                if not re.search(r"(de|del)\s+[A-ZÁÉÍÓÚÑ]", context[position : position + 50]):
                     return True, "Dirección cardinal sin nombre de lugar"
 
         # 2.5 Para ORG: Verificar si es término temporal
         if entity_label == EntityLabel.ORG:
             # Los meses como organización son casi siempre falsos positivos
-            months = {'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
-                     'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'}
+            months = {
+                "enero",
+                "febrero",
+                "marzo",
+                "abril",
+                "mayo",
+                "junio",
+                "julio",
+                "agosto",
+                "septiembre",
+                "octubre",
+                "noviembre",
+                "diciembre",
+            }
             if text_lower in months:
                 return True, "Mes del año, no organización"
 
             # Términos técnicos que no son organizaciones
-            technical_terms = {'escotillón', 'escotilla', 'prensa', 'iglesia'}
+            technical_terms = {"escotillón", "escotilla", "prensa", "iglesia"}
             if text_lower in technical_terms:
                 return True, "Término técnico/genérico, no organización"
 
@@ -573,10 +814,19 @@ class NERExtractor:
         if entity_label == EntityLabel.PER:
             # Adjetivos comunes que spaCy detecta como PER
             common_adjectives = {
-                'hermoso', 'hermosa', 'hermosos', 'hermosas',
-                'influido', 'influida', 'influidos', 'influidas',
-                'natural', 'naturales', 'naturalismo',
-                'picaresca', 'picaresco',
+                "hermoso",
+                "hermosa",
+                "hermosos",
+                "hermosas",
+                "influido",
+                "influida",
+                "influidos",
+                "influidas",
+                "natural",
+                "naturales",
+                "naturalismo",
+                "picaresca",
+                "picaresco",
             }
             if text_lower in common_adjectives:
                 return True, "Adjetivo común, no nombre de persona"
@@ -584,16 +834,28 @@ class NERExtractor:
         # 2.7 Para LOC: Sustantivos comunes de la naturaleza/edificios
         if entity_label == EntityLabel.LOC:
             common_nature_nouns = {
-                'luna', 'sol', 'cielo', 'tierra', 'mar', 'río',
-                'yerba', 'hierba', 'bosque', 'jardín', 'campo',
-                'catedral', 'iglesia', 'casino', 'obispo',
+                "luna",
+                "sol",
+                "cielo",
+                "tierra",
+                "mar",
+                "río",
+                "yerba",
+                "hierba",
+                "bosque",
+                "jardín",
+                "campo",
+                "catedral",
+                "iglesia",
+                "casino",
+                "obispo",
             }
             if text_lower in common_nature_nouns:
                 return True, "Sustantivo común de lugar/naturaleza"
 
             # Frases con artículo + sustantivo común
-            if text_lower.startswith(('la ', 'el ', 'las ', 'los ')):
-                rest = text_lower.split(' ', 1)[1] if ' ' in text_lower else ''
+            if text_lower.startswith(("la ", "el ", "las ", "los ")):
+                rest = text_lower.split(" ", 1)[1] if " " in text_lower else ""
                 if rest in common_nature_nouns:
                     return True, "Artículo + sustantivo común"
 
@@ -601,9 +863,17 @@ class NERExtractor:
         if entity_label == EntityLabel.MISC:
             # Expresiones comunes que no son entidades
             common_expressions = {
-                'sin duda', 'por mi parte', 'por su parte', 'en efecto',
-                'tanta', 'tanto', 'tantas', 'tantos',
-                'el nuestro', 'la nuestra', 'lo nuestro',
+                "sin duda",
+                "por mi parte",
+                "por su parte",
+                "en efecto",
+                "tanta",
+                "tanto",
+                "tantas",
+                "tantos",
+                "el nuestro",
+                "la nuestra",
+                "lo nuestro",
             }
             if text_lower in common_expressions:
                 return True, "Expresión común, no entidad"
@@ -615,6 +885,7 @@ class NERExtractor:
         if self._llm_client is None:
             try:
                 from ..llm.client import get_llm_client
+
                 self._llm_client = get_llm_client()
                 if self._llm_client and self._llm_client.is_available:
                     logger.info(f"LLM disponible para NER: {self._llm_client.model_name}")
@@ -641,8 +912,6 @@ class NERExtractor:
         Returns:
             Lista de entidades detectadas por LLM
         """
-        import json
-        import re
 
         llm = self._get_llm_client()
         if not llm:
@@ -746,7 +1015,7 @@ JSON:"""
 
         return entities
 
-    def _parse_llm_json_ner(self, response: str) -> Optional[dict]:
+    def _parse_llm_json_ner(self, response: str) -> dict | None:
         """Parsea respuesta JSON del LLM con limpieza."""
         import json
 
@@ -786,7 +1055,7 @@ JSON:"""
             return pos
 
         # Búsqueda case-insensitive con word boundaries
-        pattern = r'\b' + re.escape(entity_text) + r'\b'
+        pattern = r"\b" + re.escape(entity_text) + r"\b"
         match = re.search(pattern, text, re.IGNORECASE)
         if match:
             return match.start()
@@ -796,7 +1065,7 @@ JSON:"""
         if len(words) > 1:
             # Buscar la última palabra (normalmente el apellido)
             last_word = words[-1]
-            match = re.search(r'\b' + re.escape(last_word) + r'\b', text, re.IGNORECASE)
+            match = re.search(r"\b" + re.escape(last_word) + r"\b", text, re.IGNORECASE)
             if match:
                 return match.start()
 
@@ -852,12 +1121,14 @@ JSON:"""
             end = min(len(full_text), ent.end_char + 100)
             context = full_text[start:end]
 
-            entities_to_verify.append({
-                "text": ent.text,
-                "type": ent.label.value,
-                "context": context,
-                "entity": ent,
-            })
+            entities_to_verify.append(
+                {
+                    "text": ent.text,
+                    "type": ent.label.value,
+                    "context": context,
+                    "entity": ent,
+                }
+            )
 
         if not entities_to_verify:
             return entities
@@ -942,9 +1213,7 @@ JSON:"""
             # En caso de error, mantener todas las entidades
             return entities
 
-    def _postprocess_misc_entities(
-        self, entities: list[ExtractedEntity]
-    ) -> list[ExtractedEntity]:
+    def _postprocess_misc_entities(self, entities: list[ExtractedEntity]) -> list[ExtractedEntity]:
         """
         Post-procesa entidades MISC para filtrar errores y reclasificar.
 
@@ -960,35 +1229,77 @@ JSON:"""
         """
         # Pseudónimos literarios y apodos -> PER
         LITERARY_PSEUDONYMS = {
-            "clarín", "azorín", "el greco", "el cid", "la regenta",
-            "el magistral", "la dama", "el caballero",
-            "tirso de molina", "fernán caballero", "benito el garbancero",
+            "clarín",
+            "azorín",
+            "el greco",
+            "el cid",
+            "la regenta",
+            "el magistral",
+            "la dama",
+            "el caballero",
+            "tirso de molina",
+            "fernán caballero",
+            "benito el garbancero",
         }
 
         # Lugares ficticios conocidos -> LOC
         FICTIONAL_PLACES = {
-            "vetusta", "orbajosa", "marineda", "ficóbriga", "pilares",
-            "castroforte", "villabajo", "macondo",
+            "vetusta",
+            "orbajosa",
+            "marineda",
+            "ficóbriga",
+            "pilares",
+            "castroforte",
+            "villabajo",
+            "macondo",
         }
 
         # Palabras MISC que son claramente errores y deben filtrarse
         MISC_ERRORS = {
             # Verbos imperativos que spaCy confunde
-            "levántate", "levantate", "siéntate", "sientate", "ven", "vete",
+            "levántate",
+            "levantate",
+            "siéntate",
+            "sientate",
+            "ven",
+            "vete",
             # Adverbios/expresiones comunes
-            "tanta", "tanto", "más", "menos", "bien", "mal",
+            "tanta",
+            "tanto",
+            "más",
+            "menos",
+            "bien",
+            "mal",
             # Artículos/preposiciones que escapan
-            "y al", "el", "la", "los", "las",
+            "y al",
+            "el",
+            "la",
+            "los",
+            "las",
             # Palabras genéricas
-            "naturaleza", "diccionario", "dios",
+            "naturaleza",
+            "diccionario",
+            "dios",
         }
 
         # MISC que son probablemente apellidos -> PER
         # (apellidos comunes españoles que aparecen solos)
         COMMON_SURNAMES_AS_PER = {
-            "ozores", "garcía", "martínez", "lópez", "fernández",
-            "rodríguez", "pérez", "sánchez", "romero", "navarro",
-            "gonzález", "díaz", "hernández", "moreno", "muñoz",
+            "ozores",
+            "garcía",
+            "martínez",
+            "lópez",
+            "fernández",
+            "rodríguez",
+            "pérez",
+            "sánchez",
+            "romero",
+            "navarro",
+            "gonzález",
+            "díaz",
+            "hernández",
+            "moreno",
+            "muñoz",
         }
 
         result = []
@@ -1017,7 +1328,7 @@ JSON:"""
                 continue
 
             # Filtrar si contiene guiones bajos (metadatos)
-            if '_' in entity.text:
+            if "_" in entity.text:
                 logger.debug(f"MISC filtrado (guion bajo): '{entity.text}'")
                 filtered_count += 1
                 continue
@@ -1029,7 +1340,9 @@ JSON:"""
                 continue
 
             # Filtrar si empieza con artículo + solo 1-2 palabras más (ej: "El público")
-            if word_count <= 3 and text_lower.startswith(("el ", "la ", "los ", "las ", "un ", "una ")):
+            if word_count <= 3 and text_lower.startswith(
+                ("el ", "la ", "los ", "las ", "un ", "una ")
+            ):
                 # Excepto si es pseudónimo conocido
                 if text_lower not in LITERARY_PSEUDONYMS:
                     logger.debug(f"MISC filtrado (artículo + frase): '{entity.text}'")
@@ -1042,15 +1355,13 @@ JSON:"""
                 # Verificar contexto si tenemos acceso al doc de spaCy
                 is_person = True
                 try:
-                    if hasattr(self, 'nlp') and self.nlp:
+                    if hasattr(self, "nlp") and self.nlp:
                         # Pequeño contexto alrededor de la entidad para analizar
                         ctx_text = entity.text
                         ctx_doc = self.nlp(ctx_text)
                         # Heurística simple: si el propio texto empieza con mayúscula
                         # y no tiene indicadores de lugar, asumir persona
-                        is_person = morpho_utils.is_person_context(
-                            ctx_doc, 0, len(ctx_text)
-                        )
+                        is_person = morpho_utils.is_person_context(ctx_doc, 0, len(ctx_text))
                 except Exception:
                     is_person = True  # Default: asumir persona
 
@@ -1060,9 +1371,7 @@ JSON:"""
                     logger.debug(f"MISC reclasificado a PER (apellido): '{entity.text}'")
                     reclassified_count += 1
                 else:
-                    logger.debug(
-                        f"MISC no reclasificado (contexto no es persona): '{entity.text}'"
-                    )
+                    logger.debug(f"MISC no reclasificado (contexto no es persona): '{entity.text}'")
                 result.append(entity)
                 continue
 
@@ -1133,7 +1442,7 @@ JSON:"""
             return False
 
         # Filtrar errores de segmentación obvios
-        if '\n' in text or len(text_stripped) > 100:
+        if "\n" in text or len(text_stripped) > 100:
             logger.debug(f"Entidad spaCy filtrada (segmentación): '{text[:50]}...'")
             return False
 
@@ -1153,23 +1462,15 @@ JSON:"""
                         )
                         return False
                     if token.pos_ == "ADV":
-                        logger.debug(
-                            f"Entidad filtrada por POS (adverbio): '{text}'"
-                        )
+                        logger.debug(f"Entidad filtrada por POS (adverbio): '{text}'")
                         return False
             elif len(words) >= 2:
                 # Entidad multi-palabra: verificar si contiene verbos
-                verb_count = sum(
-                    1 for t in spacy_span if morpho_utils.is_verb(t)
-                )
-                propn_count = sum(
-                    1 for t in spacy_span if morpho_utils.is_proper_noun(t)
-                )
+                verb_count = sum(1 for t in spacy_span if morpho_utils.is_verb(t))
+                propn_count = sum(1 for t in spacy_span if morpho_utils.is_proper_noun(t))
                 # Si hay más verbos que nombres propios → probablemente no es entidad
                 if verb_count > 0 and propn_count == 0:
-                    logger.debug(
-                        f"Entidad filtrada por POS (frase con verbos sin PROPN): '{text}'"
-                    )
+                    logger.debug(f"Entidad filtrada por POS (frase con verbos sin PROPN): '{text}'")
                     return False
                 # Si el último token es verbo y lowercase → segmentación errónea
                 last_token = spacy_span[-1] if len(spacy_span) > 0 else None
@@ -1178,14 +1479,12 @@ JSON:"""
                     and morpho_utils.is_verb(last_token)
                     and last_token.text[0].islower()
                 ):
-                    logger.debug(
-                        f"Entidad filtrada por POS (termina en verbo): '{text}'"
-                    )
+                    logger.debug(f"Entidad filtrada por POS (termina en verbo): '{text}'")
                     return False
 
         # Puntuación que no debería aparecer en bordes de entidades
         # Incluye signos de apertura españoles ¿¡ y otros símbolos comunes
-        BOUNDARY_PUNCTUATION = '.,:;!?¿¡–—-\'\"()[]{}«»""'''
+        BOUNDARY_PUNCTUATION = '.,:;!?¿¡–—-\'"()[]{}«»""'
 
         # Filtrar entidades que terminan en puntuación (error de segmentación)
         if text_stripped and text_stripped[-1] in BOUNDARY_PUNCTUATION:
@@ -1198,7 +1497,7 @@ JSON:"""
             return False
 
         # Limpiar guiones y puntuación al final y verificar si queda algo válido
-        text_clean = text_stripped.rstrip('–—-,.;:!?¿¡ ')
+        text_clean = text_stripped.rstrip("–—-,.;:!?¿¡ ")
         if text_clean != text_stripped:
             # Si había caracteres finales que limpiar, verificar el resultado
             if len(text_clean) < self.MIN_ENTITY_LENGTH:
@@ -1212,16 +1511,48 @@ JSON:"""
         # Nota: "Papa" puede ser padre (familia) o Papa de Roma (iglesia)
         # El contexto lo resuelve la correferencia, no el NER
         FAMILY_TERMS = {
-            "hijo", "hija", "hijos", "hijas",
-            "padre", "madre", "padres", "madres",
-            "hermano", "hermana", "hermanos", "hermanas",
-            "abuelo", "abuela", "abuelos", "abuelas",
-            "tío", "tía", "tíos", "tías", "tio", "tia",
-            "primo", "prima", "primos", "primas",
-            "sobrino", "sobrina", "sobrinos", "sobrinas",
-            "nieto", "nieta", "nietos", "nietas",
-            "esposo", "esposa", "marido", "mujer",
-            "novio", "novia", "novios", "novias",
+            "hijo",
+            "hija",
+            "hijos",
+            "hijas",
+            "padre",
+            "madre",
+            "padres",
+            "madres",
+            "hermano",
+            "hermana",
+            "hermanos",
+            "hermanas",
+            "abuelo",
+            "abuela",
+            "abuelos",
+            "abuelas",
+            "tío",
+            "tía",
+            "tíos",
+            "tías",
+            "tio",
+            "tia",
+            "primo",
+            "prima",
+            "primos",
+            "primas",
+            "sobrino",
+            "sobrina",
+            "sobrinos",
+            "sobrinas",
+            "nieto",
+            "nieta",
+            "nietos",
+            "nietas",
+            "esposo",
+            "esposa",
+            "marido",
+            "mujer",
+            "novio",
+            "novia",
+            "novios",
+            "novias",
         }
         if text_lower in FAMILY_TERMS:
             logger.debug(f"Entidad spaCy filtrada (término familiar): '{text}'")
@@ -1231,18 +1562,59 @@ JSON:"""
         # Los pronombres deben resolverse mediante correferencia, no extraerse como entidades
         PRONOUNS = {
             # Pronombres personales sujeto
-            "él", "ella", "ellos", "ellas", "yo", "tú", "usted", "ustedes",
-            "nosotros", "nosotras", "vosotros", "vosotras",
+            "él",
+            "ella",
+            "ellos",
+            "ellas",
+            "yo",
+            "tú",
+            "usted",
+            "ustedes",
+            "nosotros",
+            "nosotras",
+            "vosotros",
+            "vosotras",
             # Pronombres átonos
-            "le", "les", "lo", "la", "los", "las", "nos", "os", "me", "te", "se",
+            "le",
+            "les",
+            "lo",
+            "la",
+            "los",
+            "las",
+            "nos",
+            "os",
+            "me",
+            "te",
+            "se",
             # Pronombres reflexivos y recíprocos
-            "sí", "consigo",
+            "sí",
+            "consigo",
             # Pronombres demostrativos que pueden confundirse con personas
-            "éste", "ésta", "éstos", "éstas", "ése", "ésa", "ésos", "ésas",
-            "aquél", "aquélla", "aquéllos", "aquéllas",
+            "éste",
+            "ésta",
+            "éstos",
+            "éstas",
+            "ése",
+            "ésa",
+            "ésos",
+            "ésas",
+            "aquél",
+            "aquélla",
+            "aquéllos",
+            "aquéllas",
             # Formas sin tilde (ortografía moderna)
-            "este", "esta", "estos", "estas", "ese", "esa", "esos", "esas",
-            "aquel", "aquella", "aquellos", "aquellas",
+            "este",
+            "esta",
+            "estos",
+            "estas",
+            "ese",
+            "esa",
+            "esos",
+            "esas",
+            "aquel",
+            "aquella",
+            "aquellos",
+            "aquellas",
         }
         if text_lower in PRONOUNS:
             logger.debug(f"Entidad spaCy filtrada (pronombre): '{text}'")
@@ -1263,42 +1635,185 @@ JSON:"""
         # Incluye versiones con y sin tilde para textos sin acentos
         VERBS_AT_SENTENCE_START = {
             # Pretérito perfecto simple (3ra persona singular)
-            "supo", "trajo", "traía", "dijo", "penso", "pensó", "miro", "miró", "vio", "sintió",
-            "llegó", "entró", "salió", "pasó", "siguió", "encontró",
-            "oyó", "notó", "recordó", "olvidó", "decidió", "intentó",
-            "logró", "consiguió", "empezó", "terminó", "continuó",
-            "preguntó", "respondió", "contestó", "exclamó", "susurró",
-            "gritó", "murmuró", "añadió", "explicó", "comentó",
-            "saludo", "saludó",  # verbo saludar
-            "abrio", "abrió", "bajo", "bajó", "compro", "compró",
-            "preparo", "preparó", "recibio", "recibió", "tomo", "tomó",
-            "tuvo", "pudo", "hizo", "fue", "dio", "vino",
-            "sentaron", "elaboraron", "contacto", "contactó",
+            "supo",
+            "trajo",
+            "traía",
+            "dijo",
+            "penso",
+            "pensó",
+            "miro",
+            "miró",
+            "vio",
+            "sintió",
+            "llegó",
+            "entró",
+            "salió",
+            "pasó",
+            "siguió",
+            "encontró",
+            "oyó",
+            "notó",
+            "recordó",
+            "olvidó",
+            "decidió",
+            "intentó",
+            "logró",
+            "consiguió",
+            "empezó",
+            "terminó",
+            "continuó",
+            "preguntó",
+            "respondió",
+            "contestó",
+            "exclamó",
+            "susurró",
+            "gritó",
+            "murmuró",
+            "añadió",
+            "explicó",
+            "comentó",
+            "saludo",
+            "saludó",  # verbo saludar
+            "abrio",
+            "abrió",
+            "bajo",
+            "bajó",
+            "compro",
+            "compró",
+            "preparo",
+            "preparó",
+            "recibio",
+            "recibió",
+            "tomo",
+            "tomó",
+            "tuvo",
+            "pudo",
+            "hizo",
+            "fue",
+            "dio",
+            "vino",
+            "sentaron",
+            "elaboraron",
+            "contacto",
+            "contactó",
             # Verbos frecuentes en narrativa (iter7)
-            "camino", "caminó", "corrio", "corrió", "beso", "besó",
-            "abrazo", "abrazó", "cerro", "cerró", "colgo", "colgó",
-            "espero", "esperó", "escucho", "escuchó", "marco", "marcó",
-            "reviso", "revisó", "suspiro", "suspiró",
-            "desperto", "despertó", "levanto", "levantó", "sono", "sonó",
-            "nacio", "nació", "murio", "murió", "vivio", "vivió",
-            "conocio", "conoció", "aprendio", "aprendió", "escribio", "escribió",
-            "leyo", "leyó", "cayo", "cayó", "mudo", "mudó",
-            "trabajo", "trabajó", "caso", "casó", "graduo", "graduó",
+            "camino",
+            "caminó",
+            "corrio",
+            "corrió",
+            "beso",
+            "besó",
+            "abrazo",
+            "abrazó",
+            "cerro",
+            "cerró",
+            "colgo",
+            "colgó",
+            "espero",
+            "esperó",
+            "escucho",
+            "escuchó",
+            "marco",
+            "marcó",
+            "reviso",
+            "revisó",
+            "suspiro",
+            "suspiró",
+            "desperto",
+            "despertó",
+            "levanto",
+            "levantó",
+            "sono",
+            "sonó",
+            "nacio",
+            "nació",
+            "murio",
+            "murió",
+            "vivio",
+            "vivió",
+            "conocio",
+            "conoció",
+            "aprendio",
+            "aprendió",
+            "escribio",
+            "escribió",
+            "leyo",
+            "leyó",
+            "cayo",
+            "cayó",
+            "mudo",
+            "mudó",
+            "trabajo",
+            "trabajó",
+            "caso",
+            "casó",
+            "graduo",
+            "graduó",
             # Imperfecto (con y sin tilde)
-            "sabía", "tenía", "había", "quería", "podía", "debía",
-            "sabia", "tenia", "habia", "queria", "podia", "debia",
-            "decia", "decía", "creia", "creía", "vivia", "vivía",
-            "estaba", "era", "iba", "hacia", "hacía",
+            "sabía",
+            "tenía",
+            "había",
+            "quería",
+            "podía",
+            "debía",
+            "sabia",
+            "tenia",
+            "habia",
+            "queria",
+            "podia",
+            "debia",
+            "decia",
+            "decía",
+            "creia",
+            "creía",
+            "vivia",
+            "vivía",
+            "estaba",
+            "era",
+            "iba",
+            "hacia",
+            "hacía",
             # Condicional / Futuro
-            "contactarian", "contactarían", "iria", "iría",
-            "diria", "diría", "seria", "sería", "tendria", "tendría",
-            "podria", "podría", "deberia", "debería", "haria", "haría",
-            "usaria", "usaría", "volveria", "volvería",
+            "contactarian",
+            "contactarían",
+            "iria",
+            "iría",
+            "diria",
+            "diría",
+            "seria",
+            "sería",
+            "tendria",
+            "tendría",
+            "podria",
+            "podría",
+            "deberia",
+            "debería",
+            "haria",
+            "haría",
+            "usaria",
+            "usaría",
+            "volveria",
+            "volvería",
             # Imperativo/subjuntivo
-            "diga", "venga", "salga", "haga", "ponga", "traiga",
+            "diga",
+            "venga",
+            "salga",
+            "haga",
+            "ponga",
+            "traiga",
             # Verbos en 2da persona (diálogo)
-            "sigues", "tienes", "tengo", "quieres", "puedes", "debes",
-            "sabes", "haces", "vas", "vienes", "dices", "ves",
+            "sigues",
+            "tienes",
+            "tengo",
+            "quieres",
+            "puedes",
+            "debes",
+            "sabes",
+            "haces",
+            "vas",
+            "vienes",
+            "dices",
+            "ves",
         }
         if text_lower in VERBS_AT_SENTENCE_START:
             logger.debug(f"Entidad spaCy filtrada (verbo al inicio de oración): '{text}'")
@@ -1307,49 +1822,166 @@ JSON:"""
         # ===== NUEVO: Filtrar palabras comunes capitalizadas (falsos positivos) =====
         COMMON_WORDS_CAPITALIZED = {
             # Palabras comunes que aparecen capitalizadas por error o como ejemplo
-            "correcto", "incorrecto", "habemos", "hubieron", "haiga",
-            "mejor", "peor", "mayor", "menor", "más", "menos",
+            "correcto",
+            "incorrecto",
+            "habemos",
+            "hubieron",
+            "haiga",
+            "mejor",
+            "peor",
+            "mayor",
+            "menor",
+            "más",
+            "menos",
             # Términos lingüísticos/gramaticales
-            "dequeísmo", "queísmo", "laísmo", "leísmo", "loísmo",
-            "concordancia", "redundancia", "redundancias", "pleonasmo",
-            "solecismo", "anacoluto", "gramática", "sintaxis",
+            "dequeísmo",
+            "queísmo",
+            "laísmo",
+            "leísmo",
+            "loísmo",
+            "concordancia",
+            "redundancia",
+            "redundancias",
+            "pleonasmo",
+            "solecismo",
+            "anacoluto",
+            "gramática",
+            "sintaxis",
             # Palabras de sección/documento
-            "notas", "ejemplo", "error", "observación", "nota",
+            "notas",
+            "ejemplo",
+            "error",
+            "observación",
+            "nota",
             # Pronombres indefinidos
-            "alguien", "nadie", "cualquiera", "quienquiera",
+            "alguien",
+            "nadie",
+            "cualquiera",
+            "quienquiera",
             # Adverbios de cantidad/grado
-            "demasiado", "demasiada", "demasiados", "demasiadas",
-            "bastante", "bastantes", "suficiente", "suficientes",
+            "demasiado",
+            "demasiada",
+            "demasiados",
+            "demasiadas",
+            "bastante",
+            "bastantes",
+            "suficiente",
+            "suficientes",
             # Sustantivos abstractos comunes (títulos de sección)
-            "revelaciones", "revelación", "explicaciones", "explicación",
-            "decisiones", "decisión", "secretos", "verdad", "verdades",
-            "origenes", "orígenes", "comienzo", "comienzos",
-            "encuentro", "encuentros", "viaje", "viajes",
-            "despertar", "carta", "cartas", "plan", "planes",
+            "revelaciones",
+            "revelación",
+            "explicaciones",
+            "explicación",
+            "decisiones",
+            "decisión",
+            "secretos",
+            "verdad",
+            "verdades",
+            "origenes",
+            "orígenes",
+            "comienzo",
+            "comienzos",
+            "encuentro",
+            "encuentros",
+            "viaje",
+            "viajes",
+            "despertar",
+            "carta",
+            "cartas",
+            "plan",
+            "planes",
             # Adjetivos usados como titulo
-            "urgente", "urgentes", "importante", "importantes",
-            "dificiles", "difíciles", "faciles", "fáciles",
+            "urgente",
+            "urgentes",
+            "importante",
+            "importantes",
+            "dificiles",
+            "difíciles",
+            "faciles",
+            "fáciles",
             # Palabras de estructura de documento
-            "resumen", "estructura", "esperada", "formatos",
-            "incluidos", "incluidas", "formato", "cronologico", "cronológico",
+            "resumen",
+            "estructura",
+            "esperada",
+            "formatos",
+            "incluidos",
+            "incluidas",
+            "formato",
+            "cronologico",
+            "cronológico",
             # Ordinales que aparecen como títulos
-            "primera", "primero", "segunda", "segundo", "tercera", "tercero",
-            "cuarta", "cuarto", "quinta", "quinto",
+            "primera",
+            "primero",
+            "segunda",
+            "segundo",
+            "tercera",
+            "tercero",
+            "cuarta",
+            "cuarto",
+            "quinta",
+            "quinto",
             # NUEVOS (iter8): sustantivos abstractos de eventos/títulos
-            "graduacion", "graduación", "nacimiento", "nacimientos",
-            "infancia", "adolescencia", "universidad", "adulta", "adulto",
-            "comienzo", "final", "inicio", "eventos", "temporales",
-            "boda", "bodas", "muerte", "muertes", "trabajo", "trabajos",
+            "graduacion",
+            "graduación",
+            "nacimiento",
+            "nacimientos",
+            "infancia",
+            "adolescencia",
+            "universidad",
+            "adulta",
+            "adulto",
+            "final",
+            "inicio",
+            "eventos",
+            "temporales",
+            "boda",
+            "bodas",
+            "muerte",
+            "muertes",
+            "trabajo",
+            "trabajos",
             # NUEVOS (iter9): falsos positivos detectados en evaluación NER
-            "inconsistencias", "intencionadas", "intencionados", "personaje",
-            "postre", "barba", "ojos", "pelo", "estatura", "edad", "profesion", "profesión",
-            "cabello", "bebida", "perfume", "aroma",
-            "ahora", "feliz", "martes", "miércoles", "jueves", "viernes",
+            "inconsistencias",
+            "intencionadas",
+            "intencionados",
+            "personaje",
+            "postre",
+            "barba",
+            "ojos",
+            "pelo",
+            "estatura",
+            "edad",
+            "profesion",
+            "profesión",
+            "cabello",
+            "bebida",
+            "perfume",
+            "aroma",
+            "ahora",
+            "feliz",
+            "martes",
+            "miércoles",
+            "jueves",
+            "viernes",
             # Adverbios temporales
-            "antes", "después", "despues", "luego", "pronto", "tarde", "temprano",
+            "antes",
+            "después",
+            "despues",
+            "luego",
+            "pronto",
+            "tarde",
+            "temprano",
             # NUEVOS (iter11): sustantivos abstractos que aparecen como MISC
-            "conflictos", "resoluciones", "problemas", "situaciones", "circunstancias",
-            "consecuencias", "motivos", "razones", "causas", "efectos",
+            "conflictos",
+            "resoluciones",
+            "problemas",
+            "situaciones",
+            "circunstancias",
+            "consecuencias",
+            "motivos",
+            "razones",
+            "causas",
+            "efectos",
         }
         if text_lower in COMMON_WORDS_CAPITALIZED:
             logger.debug(f"Entidad spaCy filtrada (palabra común capitalizada): '{text}'")
@@ -1383,6 +2015,7 @@ JSON:"""
 
         # Filtrar descripciones físicas usando patrones regex
         import re
+
         for pattern in self.PHYSICAL_DESCRIPTION_PATTERNS:
             if re.match(pattern, text_lower, re.IGNORECASE):
                 logger.debug(f"Entidad spaCy filtrada (descripción física): '{text}'")
@@ -1402,9 +2035,25 @@ JSON:"""
         # Filtrar frases que parecen oraciones (tienen verbo conjugado típico)
         # Patrones: "Algo estaba", "Era un", "Había una", etc.
         sentence_starters = {
-            "algo", "era", "había", "fue", "es", "está", "estaba",
-            "tiene", "tenía", "hace", "hacía", "dice", "decía",
-            "va", "iba", "viene", "venía", "parece", "parecía",
+            "algo",
+            "era",
+            "había",
+            "fue",
+            "es",
+            "está",
+            "estaba",
+            "tiene",
+            "tenía",
+            "hace",
+            "hacía",
+            "dice",
+            "decía",
+            "va",
+            "iba",
+            "viene",
+            "venía",
+            "parece",
+            "parecía",
         }
         first_word = words[0].lower() if words else ""
         if first_word in sentence_starters and len(words) > 2:
@@ -1419,39 +2068,161 @@ JSON:"""
 
                 # Sustantivos/adjetivos genéricos
                 generic_words = {
-                    "otro", "otra", "mismo", "misma", "siguiente", "anterior",
-                    "hombre", "mujer", "persona", "gente", "cosa", "día", "noche",
-                    "vez", "tiempo", "momento", "lugar", "forma", "manera",
+                    "otro",
+                    "otra",
+                    "mismo",
+                    "misma",
+                    "siguiente",
+                    "anterior",
+                    "hombre",
+                    "mujer",
+                    "persona",
+                    "gente",
+                    "cosa",
+                    "día",
+                    "noche",
+                    "vez",
+                    "tiempo",
+                    "momento",
+                    "lugar",
+                    "forma",
+                    "manera",
                     # Sustantivos comunes de lugares/objetos
-                    "casa", "calle", "ciudad", "país", "mundo", "tierra",
-                    "mesa", "silla", "puerta", "ventana", "habitación", "cocina",
-                    "libro", "vaso", "copa", "plato", "cama", "pared",
+                    "casa",
+                    "calle",
+                    "ciudad",
+                    "país",
+                    "mundo",
+                    "tierra",
+                    "mesa",
+                    "silla",
+                    "puerta",
+                    "ventana",
+                    "habitación",
+                    "cocina",
+                    "libro",
+                    "vaso",
+                    "copa",
+                    "plato",
+                    "cama",
+                    "pared",
                     # Sustantivos abstractos
-                    "amor", "vida", "muerte", "verdad", "historia", "relación",
+                    "amor",
+                    "vida",
+                    "muerte",
+                    "verdad",
+                    "historia",
+                    "relación",
                     # NUEVO iter3: objetos/instrumentos
-                    "reloj", "telefono", "teléfono", "carta", "sobre", "llave",
-                    "coche", "tren", "avion", "avión", "autobus", "autobús",
+                    "reloj",
+                    "telefono",
+                    "teléfono",
+                    "carta",
+                    "sobre",
+                    "llave",
+                    "coche",
+                    "tren",
+                    "avion",
+                    "avión",
+                    "autobus",
+                    "autobús",
                     # NUEVO iter3: elementos naturales/descripciones
-                    "luz", "sol", "luna", "cielo", "aire", "viento", "mar",
-                    "corazon", "corazón", "mente", "alma", "cuerpo",
+                    "luz",
+                    "sol",
+                    "luna",
+                    "cielo",
+                    "aire",
+                    "viento",
+                    "mar",
+                    "corazon",
+                    "corazón",
+                    "mente",
+                    "alma",
+                    "cuerpo",
                     # NUEVO iter3: lugares genéricos
-                    "estacion", "estación", "aeropuerto", "hospital", "escuela",
-                    "cafe", "café", "bar", "restaurante", "tienda", "oficina",
+                    "estacion",
+                    "estación",
+                    "aeropuerto",
+                    "hospital",
+                    "escuela",
+                    "cafe",
+                    "café",
+                    "bar",
+                    "restaurante",
+                    "tienda",
+                    "oficina",
                     # NUEVO iter3: abstracciones
-                    "plan", "idea", "decision", "decisión", "problema", "solucion",
-                    "solución", "camino", "viaje", "mensaje", "padre", "madre",
+                    "plan",
+                    "idea",
+                    "decision",
+                    "decisión",
+                    "problema",
+                    "solucion",
+                    "solución",
+                    "camino",
+                    "viaje",
+                    "mensaje",
+                    "padre",
+                    "madre",
                     # NUEVO iter10: profesiones genéricas (plural)
-                    "medicos", "médicos", "doctores", "profesores", "estudiantes",
-                    "soldados", "policias", "policías", "abogados", "jueces",
+                    "medicos",
+                    "médicos",
+                    "doctores",
+                    "profesores",
+                    "estudiantes",
+                    "soldados",
+                    "policias",
+                    "policías",
+                    "abogados",
+                    "jueces",
                     # Términos anatómicos (no son nombres propios)
-                    "paladar", "laringe", "esofago", "esófago", "garganta",
-                    "lengua", "labio", "labios", "diente", "dientes", "muela",
-                    "nariz", "ojo", "ojos", "oreja", "orejas", "boca",
-                    "mano", "manos", "dedo", "dedos", "brazo", "brazos",
-                    "pierna", "piernas", "pie", "pies", "rodilla", "tobillo",
-                    "cabeza", "cara", "frente", "cuello", "hombro", "hombros",
-                    "espalda", "pecho", "estomago", "estómago", "vientre",
-                    "cerebro", "pulmon", "pulmón", "higado", "hígado", "riñon", "riñón",
+                    "paladar",
+                    "laringe",
+                    "esofago",
+                    "esófago",
+                    "garganta",
+                    "lengua",
+                    "labio",
+                    "labios",
+                    "diente",
+                    "dientes",
+                    "muela",
+                    "nariz",
+                    "ojo",
+                    "ojos",
+                    "oreja",
+                    "orejas",
+                    "boca",
+                    "mano",
+                    "manos",
+                    "dedo",
+                    "dedos",
+                    "brazo",
+                    "brazos",
+                    "pierna",
+                    "piernas",
+                    "pie",
+                    "pies",
+                    "rodilla",
+                    "tobillo",
+                    "cabeza",
+                    "cara",
+                    "frente",
+                    "cuello",
+                    "hombro",
+                    "hombros",
+                    "espalda",
+                    "pecho",
+                    "estomago",
+                    "estómago",
+                    "vientre",
+                    "cerebro",
+                    "pulmon",
+                    "pulmón",
+                    "higado",
+                    "hígado",
+                    "riñon",
+                    "riñón",
                 }
                 if second_word in generic_words:
                     logger.debug(f"Entidad spaCy filtrada (descripción genérica): '{text}'")
@@ -1459,10 +2230,30 @@ JSON:"""
 
                 # NUEVO: Verbos auxiliares/conjugados comunes después de artículo
                 common_verbs_after_article = {
-                    "había", "fue", "era", "es", "está", "estaba",
-                    "tiene", "tenía", "hace", "hacía", "puede", "podía",
-                    "debe", "debía", "va", "iba", "viene", "venía",
-                    "quiere", "quería", "sabe", "sabía", "dos", "tres",
+                    "había",
+                    "fue",
+                    "era",
+                    "es",
+                    "está",
+                    "estaba",
+                    "tiene",
+                    "tenía",
+                    "hace",
+                    "hacía",
+                    "puede",
+                    "podía",
+                    "debe",
+                    "debía",
+                    "va",
+                    "iba",
+                    "viene",
+                    "venía",
+                    "quiere",
+                    "quería",
+                    "sabe",
+                    "sabía",
+                    "dos",
+                    "tres",
                 }
                 if second_word in common_verbs_after_article:
                     logger.debug(f"Entidad spaCy filtrada (artículo + verbo): '{text}'")
@@ -1478,12 +2269,40 @@ JSON:"""
         # Filtrar frases que contienen verbos conjugados (son oraciones, no entidades)
         # "El se acerco a saludarla", "Hola Maria", etc.
         verb_indicators = {
-            "se", "me", "te", "le", "lo", "la", "nos", "os", "les", "los", "las",
+            "se",
+            "me",
+            "te",
+            "le",
+            "lo",
+            "la",
+            "nos",
+            "os",
+            "les",
+            "los",
+            "las",
             # Verbos comunes conjugados
-            "acerco", "acercó", "dijo", "respondió", "preguntó", "miró", "vio",
-            "saludo", "saludó", "entró", "salió", "llegó", "fue", "era", "estaba",
+            "acerco",
+            "acercó",
+            "dijo",
+            "respondió",
+            "preguntó",
+            "miró",
+            "vio",
+            "saludo",
+            "saludó",
+            "entró",
+            "salió",
+            "llegó",
+            "fue",
+            "era",
+            "estaba",
             # Infinitivos después de preposiciones
-            "para", "sin", "por", "con", "de", "a",
+            "para",
+            "sin",
+            "por",
+            "con",
+            "de",
+            "a",
         }
         words_lower = [w.lower() for w in words]
         if len(words) >= 3 and any(w in verb_indicators for w in words_lower[1:]):
@@ -1497,9 +2316,20 @@ JSON:"""
 
         # Filtrar frases interrogativas (quién eres, qué es, etc.)
         interrogative_starters = {
-            "quién", "quien", "qué", "que", "cómo", "como",
-            "dónde", "donde", "cuándo", "cuando", "cuánto", "cuanto",
-            "por qué", "para qué",
+            "quién",
+            "quien",
+            "qué",
+            "que",
+            "cómo",
+            "como",
+            "dónde",
+            "donde",
+            "cuándo",
+            "cuando",
+            "cuánto",
+            "cuanto",
+            "por qué",
+            "para qué",
         }
         if first_word in interrogative_starters:
             logger.debug(f"Entidad spaCy filtrada (interrogativa): '{text}'")
@@ -1507,10 +2337,19 @@ JSON:"""
 
         # Filtrar términos científicos/biológicos genéricos
         scientific_terms = {
-            "endorfinas", "endorfina", "adrenalina", "serotonina", "dopamina",
-            "hormona", "hormonas", "neurotransmisor", "neurotransmisores",
+            "endorfinas",
+            "endorfina",
+            "adrenalina",
+            "serotonina",
+            "dopamina",
+            "hormona",
+            "hormonas",
+            "neurotransmisor",
+            "neurotransmisores",
         }
-        if text_lower in scientific_terms or (len(words) > 1 and words[-1].lower() in scientific_terms):
+        if text_lower in scientific_terms or (
+            len(words) > 1 and words[-1].lower() in scientific_terms
+        ):
             logger.debug(f"Entidad spaCy filtrada (término científico): '{text}'")
             return False
 
@@ -1518,7 +2357,7 @@ JSON:"""
         # Ejemplo: "Camino corriendo" no es una entidad válida
         if len(words) > 1:
             last_word_lower = words[-1].lower()
-            if last_word_lower.endswith(('ando', 'endo', 'iendo')):
+            if last_word_lower.endswith(("ando", "endo", "iendo")):
                 logger.debug(f"Entidad spaCy filtrada (termina en gerundio): '{text}'")
                 return False
 
@@ -1527,7 +2366,14 @@ JSON:"""
         # Ejemplo: "su novio", "mi hermano miguel", "sus padres"
         # EXCEPCIÓN: Títulos formales como "Su Santidad", "Su Majestad", "Su Excelencia"
         POSSESSIVES = {"su", "sus", "mi", "mis", "tu", "tus", "nuestro", "nuestra"}
-        FORMAL_TITLES_AFTER_SU = {"santidad", "majestad", "excelencia", "alteza", "eminencia", "señoría"}
+        FORMAL_TITLES_AFTER_SU = {
+            "santidad",
+            "majestad",
+            "excelencia",
+            "alteza",
+            "eminencia",
+            "señoría",
+        }
         if first_word in POSSESSIVES and len(words) >= 2:
             second_word = words[1].lower() if len(words) > 1 else ""
             if second_word not in FORMAL_TITLES_AFTER_SU:
@@ -1538,39 +2384,94 @@ JSON:"""
         # Detectar verbos por sus terminaciones en lugar de lista específica
         VERB_ENDINGS = (
             # Pretérito imperfecto/indefinido
-            'aban', 'ían', 'eron', 'aron', 'ieron',
-            'aba', 'ía', 'ió', 'ó',
+            "aban",
+            "ían",
+            "eron",
+            "aron",
+            "ieron",
+            "aba",
+            "ía",
+            "ió",
+            "ó",
             # Futuro simple (-ás, -á, -án, -emos, -éis)
-            'arás', 'erás', 'irás', 'ará', 'erá', 'irá',
-            'arán', 'erán', 'irán', 'aremos', 'eremos', 'iremos',
+            "arás",
+            "erás",
+            "irás",
+            "ará",
+            "erá",
+            "irá",
+            "arán",
+            "erán",
+            "irán",
+            "aremos",
+            "eremos",
+            "iremos",
             # Condicional (-aría, -ería, -iría)
-            'aría', 'ería', 'iría', 'arían', 'erían', 'irían',
-            'aríamos', 'eríamos', 'iríamos',
+            "aría",
+            "ería",
+            "iría",
+            "arían",
+            "erían",
+            "irían",
+            "aríamos",
+            "eríamos",
+            "iríamos",
             # Subjuntivo presente (-es, -e, -emos, -en para -ar; -as, -a, -amos, -an para -er/-ir)
-            'ases', 'ieses', 'ase', 'iese', 'ásemos', 'iésemos',
-            'ara', 'iera', 'aras', 'ieras', 'áramos', 'iéramos',
+            "ases",
+            "ieses",
+            "ase",
+            "iese",
+            "ásemos",
+            "iésemos",
+            "ara",
+            "iera",
+            "aras",
+            "ieras",
+            "áramos",
+            "iéramos",
             # Subjuntivo futuro (raro pero existe)
-            'are', 'iere', 'aren', 'ieren',
+            "are",
+            "iere",
+            "aren",
+            "ieren",
             # Gerundio
-            'ando', 'iendo', 'endo',
+            "ando",
+            "iendo",
+            "endo",
             # Infinitivo (si son una sola palabra)
-            'ar', 'er', 'ir',
+            "ar",
+            "er",
+            "ir",
             # Presente simple 1ª/2ª persona plural
-            'amos', 'emos', 'imos',
+            "amos",
+            "emos",
+            "imos",
         )
 
         # Pronombres enclíticos que se añaden a verbos
-        ENCLITICS = ('me', 'te', 'se', 'lo', 'la', 'los', 'las', 'le', 'les', 'nos', 'os')
+        ENCLITICS = ("me", "te", "se", "lo", "la", "los", "las", "le", "les", "nos", "os")
         # Combinaciones dobles de enclíticos
         DOUBLE_ENCLITICS = (
-            'melo', 'mela', 'melos', 'melas',
-            'telo', 'tela', 'telos', 'telas',
-            'selo', 'sela', 'selos', 'selas',
-            'noslo', 'nosla', 'noslos', 'noslas',
+            "melo",
+            "mela",
+            "melos",
+            "melas",
+            "telo",
+            "tela",
+            "telos",
+            "telas",
+            "selo",
+            "sela",
+            "selos",
+            "selas",
+            "noslo",
+            "nosla",
+            "noslos",
+            "noslas",
         )
 
         # Vocales acentuadas (patrón típico de verbos con enclíticos en español)
-        ACCENTED_VOWELS = ('á', 'é', 'í', 'ó', 'ú')
+        ACCENTED_VOWELS = ("á", "é", "í", "ó", "ú")
 
         if len(words) == 1 and len(text_stripped) > 4:
             # Detectar verbos con pronombres enclíticos (tomármelos, dáselo, piénsalo)
@@ -1579,7 +2480,7 @@ JSON:"""
             for encl in DOUBLE_ENCLITICS + ENCLITICS:
                 if text_lower.endswith(encl) and len(text_lower) > len(encl) + 3:
                     # La raíz antes del enclítico
-                    stem = text_lower[:-len(encl)]
+                    stem = text_lower[: -len(encl)]
                     # Solo filtrar si la raíz CONTIENE una vocal acentuada
                     # (patrón de verbo + enclítico: tomár-melos, piéns-alo, dá-selo)
                     # Esto evita falsos positivos como "Carlos", "Marcos"
@@ -1593,15 +2494,30 @@ JSON:"""
                 # (ningún nombre propio en español termina así)
                 DEFINITE_VERB_ENDINGS = (
                     # Futuro 2ª persona
-                    'arás', 'erás', 'irás',
+                    "arás",
+                    "erás",
+                    "irás",
                     # Condicional
-                    'aría', 'ería', 'iría', 'arían', 'erían', 'irían',
+                    "aría",
+                    "ería",
+                    "iría",
+                    "arían",
+                    "erían",
+                    "irían",
                     # Pretérito plural
-                    'aban', 'aron', 'ieron', 'ían',
+                    "aban",
+                    "aron",
+                    "ieron",
+                    "ían",
                     # Subjuntivo
-                    'ases', 'ieses', 'áramos', 'iéramos',
+                    "ases",
+                    "ieses",
+                    "áramos",
+                    "iéramos",
                     # 1ª persona plural presente (Acabamos, Sonreímos)
-                    'amos', 'emos', 'imos',
+                    "amos",
+                    "emos",
+                    "imos",
                 )
                 # Filtrar si:
                 # 1. No empieza con mayúscula (claramente no es nombre)
@@ -1614,11 +2530,11 @@ JSON:"""
         # Patrones: termina en -es, -o (1ª/2ª persona singular presente)
         if len(words) == 1 and len(text_stripped) >= 4:
             # Presente 2ª persona singular: -es, -as
-            if text_lower.endswith(('ones', 'enes', 'ines', 'anes', 'unes')):
+            if text_lower.endswith(("ones", "enes", "ines", "anes", "unes")):
                 logger.debug(f"Entidad spaCy filtrada (verbo presente 2ª pers.): '{text}'")
                 return False
             # Presente 1ª persona singular con acento: -ío, -úo (sonrío, actúo)
-            if text_lower.endswith(('ío', 'úo')):
+            if text_lower.endswith(("ío", "úo")):
                 logger.debug(f"Entidad spaCy filtrada (verbo presente 1ª pers.): '{text}'")
                 return False
 
@@ -1632,14 +2548,14 @@ JSON:"""
             # 1. La última palabra empieza con minúscula (verbos, no apellidos)
             # 2. O termina en patrones verbales muy específicos
             if not words[-1][0].isupper():
-                if last_word.endswith(('ió', 'ó', 'aron', 'ieron', 'aba')):
+                if last_word.endswith(("ió", "ó", "aron", "ieron", "aba")):
                     logger.debug(f"Entidad spaCy filtrada (termina en verbo): '{text}'")
                     return False
             # Palabras que terminan en "io" sin tilde son típicamente verbos
             # Ejemplo: "asintio", "salio", "corrio"
-            if last_word.endswith('io') and not last_word.endswith(('lio', 'rio', 'nio')):
+            if last_word.endswith("io") and not last_word.endswith(("lio", "rio", "nio")):
                 # Excluir sufijos comunes de nombres: -ario, -erio, -orio
-                if not last_word.endswith(('ario', 'erio', 'orio')):
+                if not last_word.endswith(("ario", "erio", "orio")):
                     logger.debug(f"Entidad spaCy filtrada (termina en verbo -io): '{text}'")
                     return False
 
@@ -1677,10 +2593,7 @@ JSON:"""
             return False
 
         # Filtrar números y puntuación
-        if text.isdigit() or not any(c.isalpha() for c in text):
-            return False
-
-        return True
+        return not (text.isdigit() or not any(c.isalpha() for c in text))
 
     def _is_high_quality_entity(self, text: str, label: EntityLabel) -> bool:
         """
@@ -1712,8 +2625,7 @@ JSON:"""
         if len(words) >= 2:
             # Verificar que al menos una palabra sea significativa
             significant_words = [
-                w for w in words
-                if w.lower() not in self.STOP_TITLES and len(w) > 2
+                w for w in words if w.lower() not in self.STOP_TITLES and len(w) > 2
             ]
             if len(significant_words) >= 2:
                 return True
@@ -1730,8 +2642,8 @@ JSON:"""
     def extract_entities(
         self,
         text: str,
-        progress_callback: Optional[callable] = None,
-        project_id: Optional[int] = None,
+        progress_callback: callable | None = None,
+        project_id: int | None = None,
         enable_validation: bool = True,
     ) -> Result[NERResult]:
         """
@@ -1799,7 +2711,7 @@ JSON:"""
                 if not self._is_valid_spacy_entity(ent.text, spacy_span=ent):
                     # Intentar extraer sub-entidades de entidades mal segmentadas
                     # (ej: "María\n\nMaría Sánchez" -> "María Sánchez")
-                    if '\n' in ent.text:
+                    if "\n" in ent.text:
                         sub_entities = self._extract_sub_entities_from_malformed(
                             ent.text, ent.start_char, label, text
                         )
@@ -1819,8 +2731,7 @@ JSON:"""
                 overlaps_llm = False
                 for llm_ent in llm_entities:
                     if self._entities_overlap(
-                        ent.start_char, ent.end_char,
-                        llm_ent.start_char, llm_ent.end_char
+                        ent.start_char, ent.end_char, llm_ent.start_char, llm_ent.end_char
                     ):
                         overlaps_llm = True
                         break
@@ -1919,8 +2830,7 @@ JSON:"""
                 result.entities = validation_result.valid_entities
                 result.rejected_entities = validation_result.rejected_entities
                 result.validation_scores = {
-                    text: score.to_dict()
-                    for text, score in validation_result.scores.items()
+                    text: score.to_dict() for text, score in validation_result.scores.items()
                 }
                 result.validation_method = validation_result.validation_method
 
@@ -1992,10 +2902,11 @@ JSON:"""
             Lista de entidades válidas extraídas
         """
         import re
+
         entities = []
 
         # Separar por saltos de línea
-        parts = re.split(r'\n+', malformed_text)
+        parts = re.split(r"\n+", malformed_text)
 
         current_offset = start_offset
         for part in parts:
@@ -2047,7 +2958,7 @@ JSON:"""
 
         # Buscar patrón "X y Y" o "X e Y"
         # Solo dividir si ambas partes empiezan con mayúscula (nombres propios)
-        pattern = r'^([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)?)\s+[ye]\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)?)$'
+        pattern = r"^([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)?)\s+[ye]\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)?)$"
 
         match = re.match(pattern, text.strip())
         if match:
@@ -2067,8 +2978,10 @@ JSON:"""
 
     def _entities_overlap(
         self,
-        start1: int, end1: int,
-        start2: int, end2: int,
+        start1: int,
+        end1: int,
+        start2: int,
+        end2: int,
     ) -> bool:
         """Verifica si dos rangos de entidades se solapan."""
         return not (end1 <= start2 or end2 <= start1)
@@ -2107,7 +3020,9 @@ JSON:"""
                 continue
 
             # Buscar tokens en el span de la entidad
-            entity_tokens = [t for t in doc if t.idx >= entity.start_char and t.idx < entity.end_char]
+            entity_tokens = [
+                t for t in doc if t.idx >= entity.start_char and t.idx < entity.end_char
+            ]
 
             # Buscar la conjunción
             conj_token = None
@@ -2193,7 +3108,11 @@ JSON:"""
                 for next_token in doc:
                     if next_token.idx == end + 1:  # Token siguiente
                         # Incluir si es un nombre propio o parte del nombre
-                        if next_token.pos_ in ("PROPN", "NOUN") and next_token.dep_ in ("flat", "appos", "compound"):
+                        if next_token.pos_ in ("PROPN", "NOUN") and next_token.dep_ in (
+                            "flat",
+                            "appos",
+                            "compound",
+                        ):
                             end = next_token.idx + len(next_token.text)
                         else:
                             break
@@ -2227,7 +3146,9 @@ JSON:"""
                 unique_result.append(entity)
                 seen.add(key)
 
-        logger.debug(f"Separación de coordinados: {len(entities)} -> {len(unique_result)} entidades")
+        logger.debug(
+            f"Separación de coordinados: {len(entities)} -> {len(unique_result)} entidades"
+        )
         return unique_result
 
     # ==========================================================================
@@ -2238,46 +3159,138 @@ JSON:"""
     # Formato: "título Apellido" -> entidad PER
     PROFESSIONAL_TITLES = {
         # Médicos/Sanitarios
-        "doctor", "doctora", "dr", "dra",
+        "doctor",
+        "doctora",
+        "dr",
+        "dra",
         # Militares
-        "coronel", "general", "capitán", "capitan", "teniente", "sargento",
-        "almirante", "comandante", "mayor",
+        "coronel",
+        "general",
+        "capitán",
+        "capitan",
+        "teniente",
+        "sargento",
+        "almirante",
+        "comandante",
+        "mayor",
         # Policiales/Judiciales
-        "inspector", "inspectora", "comisario", "comisaria",
-        "juez", "jueza", "fiscal",
-        "subinspector", "subinspectora",
+        "inspector",
+        "inspectora",
+        "comisario",
+        "comisaria",
+        "juez",
+        "jueza",
+        "fiscal",
+        "subinspector",
+        "subinspectora",
         # Religiosos
-        "fray", "sor", "padre", "madre", "hermano", "hermana",
-        "rabino", "rabina", "imán", "iman",
+        "fray",
+        "sor",
+        "padre",
+        "madre",
+        "hermano",
+        "hermana",
+        "rabino",
+        "rabina",
+        "imán",
+        "iman",
         # Académicos
-        "profesor", "profesora", "catedrático", "catedratica",
+        "profesor",
+        "profesora",
+        "catedrático",
+        "catedratica",
         # Nobiliarios/Formales
-        "conde", "condesa", "duque", "duquesa", "marqués", "marques", "marquesa",
-        "barón", "baron", "baronesa", "sultán", "sultan", "sultana",
-        "rey", "reina", "príncipe", "principe", "princesa",
+        "conde",
+        "condesa",
+        "duque",
+        "duquesa",
+        "marqués",
+        "marques",
+        "marquesa",
+        "barón",
+        "baron",
+        "baronesa",
+        "sultán",
+        "sultan",
+        "sultana",
+        "rey",
+        "reina",
+        "príncipe",
+        "principe",
+        "princesa",
     }
 
     # Prefijos de lugares compuestos
     # Formato: "prefijo Nombre" -> entidad LOC
     LOCATION_PREFIXES = {
         # Geográficos
-        "monte", "sierra", "cordillera", "volcán", "volcan",
-        "valle", "cañón", "canon", "desfiladero",
-        "río", "rio", "lago", "laguna", "mar", "océano", "oceano",
-        "isla", "península", "peninsula", "cabo", "bahía", "bahia",
-        "desierto", "bosque", "selva", "pradera", "llanura",
+        "monte",
+        "sierra",
+        "cordillera",
+        "volcán",
+        "volcan",
+        "valle",
+        "cañón",
+        "canon",
+        "desfiladero",
+        "río",
+        "rio",
+        "lago",
+        "laguna",
+        "mar",
+        "océano",
+        "oceano",
+        "isla",
+        "península",
+        "peninsula",
+        "cabo",
+        "bahía",
+        "bahia",
+        "desierto",
+        "bosque",
+        "selva",
+        "pradera",
+        "llanura",
         # Urbanos
-        "plaza", "calle", "avenida", "paseo", "parque",
-        "barrio", "colonia", "urbanización", "urbanizacion",
-        "puerto", "aeropuerto", "estación", "estacion",
+        "plaza",
+        "calle",
+        "avenida",
+        "paseo",
+        "parque",
+        "barrio",
+        "colonia",
+        "urbanización",
+        "urbanizacion",
+        "puerto",
+        "aeropuerto",
+        "estación",
+        "estacion",
         # Construcciones
-        "palacio", "castillo", "torre", "fortaleza", "muralla",
-        "catedral", "iglesia", "monasterio", "convento",
-        "hospital", "universidad", "instituto", "colegio",
-        "base", "campo", "campamento",
+        "palacio",
+        "castillo",
+        "torre",
+        "fortaleza",
+        "muralla",
+        "catedral",
+        "iglesia",
+        "monasterio",
+        "convento",
+        "hospital",
+        "universidad",
+        "instituto",
+        "colegio",
+        "base",
+        "campo",
+        "campamento",
         # Políticos
-        "imperio", "reino", "república", "republica",
-        "provincia", "región", "region", "departamento",
+        "imperio",
+        "reino",
+        "república",
+        "republica",
+        "provincia",
+        "región",
+        "region",
+        "departamento",
     }
 
     def _detect_title_name_patterns(
@@ -2307,12 +3320,17 @@ JSON:"""
             Lista de NUEVAS entidades detectadas (que no extienden existentes)
         """
         import re
+
         new_entities = []
 
         # Buscar patrón: título (case-insensitive) + Nombre (MUST start with uppercase)
         # Usamos (?-i:...) para hacer los nombres case-sensitive mientras el título es case-insensitive
         # Esto evita capturar palabras como "nos", "ha" que siguen al nombre
-        title_pattern = r'\b(' + '|'.join(re.escape(t) for t in self.PROFESSIONAL_TITLES) + r')\s+(?-i:[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)(?:\s+(?-i:[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+))?\b'
+        title_pattern = (
+            r"\b("
+            + "|".join(re.escape(t) for t in self.PROFESSIONAL_TITLES)
+            + r")\s+(?-i:[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)(?:\s+(?-i:[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+))?\b"
+        )
 
         for match in re.finditer(title_pattern, full_text, re.IGNORECASE):
             full_match = match.group(0)
@@ -2334,11 +3352,12 @@ JSON:"""
             for i, ent in enumerate(existing_entities):
                 # El patrón debe contener la entidad existente
                 # y el patrón debe ser más largo (incluye título)
-                if (ent.start_char >= pattern_start and
-                    ent.end_char <= pattern_end and
-                    pattern_end - pattern_start > ent.end_char - ent.start_char and
-                    ent.label == EntityLabel.PER):
-
+                if (
+                    ent.start_char >= pattern_start
+                    and ent.end_char <= pattern_end
+                    and pattern_end - pattern_start > ent.end_char - ent.start_char
+                    and ent.label == EntityLabel.PER
+                ):
                     # Extender la entidad existente
                     logger.debug(
                         f"Extendiendo entidad '{ent.text}' a '{full_match}' "
@@ -2367,7 +3386,7 @@ JSON:"""
             if not extended:
                 # Solo agregar si no hay solapamiento
                 overlaps = False
-                for (s, e) in already_found:
+                for s, e in already_found:
                     if not (pattern_end <= s or pattern_start >= e):
                         overlaps = True
                         break
@@ -2413,11 +3432,16 @@ JSON:"""
             Lista de NUEVAS entidades detectadas (que no extienden existentes)
         """
         import re
+
         new_entities = []
 
         # Patrón 1: prefijo (case-insensitive) + Nombre (MUST start with uppercase)
         # Usamos (?-i:...) para hacer los nombres case-sensitive
-        prefix_pattern = r'\b(' + '|'.join(re.escape(p) for p in self.LOCATION_PREFIXES) + r')\s+(?-i:[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)(?:\s+(?-i:[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+))?\b'
+        prefix_pattern = (
+            r"\b("
+            + "|".join(re.escape(p) for p in self.LOCATION_PREFIXES)
+            + r")\s+(?-i:[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)(?:\s+(?-i:[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+))?\b"
+        )
 
         for match in re.finditer(prefix_pattern, full_text, re.IGNORECASE):
             full_match = match.group(0)
@@ -2433,11 +3457,12 @@ JSON:"""
             # Buscar si extiende una entidad LOC existente
             extended = False
             for i, ent in enumerate(existing_entities):
-                if (ent.start_char >= pattern_start and
-                    ent.end_char <= pattern_end and
-                    pattern_end - pattern_start > ent.end_char - ent.start_char and
-                    ent.label == EntityLabel.LOC):
-
+                if (
+                    ent.start_char >= pattern_start
+                    and ent.end_char <= pattern_end
+                    and pattern_end - pattern_start > ent.end_char - ent.start_char
+                    and ent.label == EntityLabel.LOC
+                ):
                     logger.debug(
                         f"Extendiendo ubicación '{ent.text}' a '{full_match}' "
                         f"(añadiendo prefijo '{prefix}')"
@@ -2461,7 +3486,7 @@ JSON:"""
 
             if not extended:
                 overlaps = False
-                for (s, e) in already_found:
+                for s, e in already_found:
                     if not (pattern_end <= s or pattern_start >= e):
                         overlaps = True
                         break
@@ -2481,7 +3506,7 @@ JSON:"""
 
         # Patrón 2: prefijo + de + Nombre (ej: "Palacio de Cristal")
         # NO usar IGNORECASE aquí - los nombres DEBEN empezar con mayúscula
-        compound_pattern = r'\b([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+(de|del|de la|de los|de las)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)?)\b'
+        compound_pattern = r"\b([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+(de|del|de la|de los|de las)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)?)\b"
 
         for match in re.finditer(compound_pattern, full_text):
             first_word = match.group(1).lower()
@@ -2500,11 +3525,12 @@ JSON:"""
             # Buscar si extiende una entidad existente
             extended = False
             for i, ent in enumerate(existing_entities):
-                if (ent.start_char >= pattern_start and
-                    ent.end_char <= pattern_end and
-                    pattern_end - pattern_start > ent.end_char - ent.start_char and
-                    ent.label == EntityLabel.LOC):
-
+                if (
+                    ent.start_char >= pattern_start
+                    and ent.end_char <= pattern_end
+                    and pattern_end - pattern_start > ent.end_char - ent.start_char
+                    and ent.label == EntityLabel.LOC
+                ):
                     old_pos = (ent.start_char, ent.end_char)
                     if old_pos in already_found:
                         already_found.discard(old_pos)
@@ -2523,7 +3549,7 @@ JSON:"""
 
             if not extended:
                 overlaps = False
-                for (s, e) in already_found:
+                for s, e in already_found:
                     if not (pattern_end <= s or pattern_start >= e):
                         overlaps = True
                         break
@@ -2545,18 +3571,62 @@ JSON:"""
 
     # Apellidos comunes en español para detección de partículas
     _COMMON_SURNAMES = {
-        "garcia", "martinez", "lopez", "fernandez", "rodriguez",
-        "perez", "sanchez", "romero", "navarro", "gonzalez",
-        "diaz", "hernandez", "moreno", "muñoz", "alvarez",
-        "jimenez", "ruiz", "torres", "dominguez", "ramos",
-        "vazquez", "castillo", "serrano", "ortiz", "marin",
-        "vega", "fuente", "cruz", "molina", "blanco",
-        "delgado", "ortega", "castro", "guerrero", "medina",
-        "flores", "campos", "herrera", "leon", "reyes",
+        "garcia",
+        "martinez",
+        "lopez",
+        "fernandez",
+        "rodriguez",
+        "perez",
+        "sanchez",
+        "romero",
+        "navarro",
+        "gonzalez",
+        "diaz",
+        "hernandez",
+        "moreno",
+        "muñoz",
+        "alvarez",
+        "jimenez",
+        "ruiz",
+        "torres",
+        "dominguez",
+        "ramos",
+        "vazquez",
+        "castillo",
+        "serrano",
+        "ortiz",
+        "marin",
+        "vega",
+        "fuente",
+        "cruz",
+        "molina",
+        "blanco",
+        "delgado",
+        "ortega",
+        "castro",
+        "guerrero",
+        "medina",
+        "flores",
+        "campos",
+        "herrera",
+        "leon",
+        "reyes",
         # Variantes con tilde
-        "garcía", "martínez", "lópez", "fernández", "rodríguez",
-        "pérez", "sánchez", "gonzález", "díaz", "hernández",
-        "álvarez", "jiménez", "vázquez", "domínguez", "marín",
+        "garcía",
+        "martínez",
+        "lópez",
+        "fernández",
+        "rodríguez",
+        "pérez",
+        "sánchez",
+        "gonzález",
+        "díaz",
+        "hernández",
+        "álvarez",
+        "jiménez",
+        "vázquez",
+        "domínguez",
+        "marín",
     }
 
     def _detect_compound_persons(
@@ -2583,24 +3653,25 @@ JSON:"""
             Lista de NUEVAS entidades detectadas
         """
         import re
+
         new_entities = []
 
         # Patrón: NombrePropio + partícula + NombrePropio
         # Partículas: de, del, de la, de los, de las
         compound_pattern = (
-            r'\b([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+'
-            r'(de|del|de la|de los|de las)\s+'
-            r'([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)?)\b'
+            r"\b([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+"
+            r"(de|del|de la|de los|de las)\s+"
+            r"([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)?)\b"
         )
 
         for match in re.finditer(compound_pattern, full_text):
             first_word = match.group(1)
-            particle = match.group(2)
+            match.group(2)
             last_part = match.group(3)
             full_match = match.group(0)
 
             first_lower = first_word.lower()
-            last_lower = last_part.split()[0].lower() if last_part else ""
+            last_part.split()[0].lower() if last_part else ""
 
             # Verificar que el PRIMER nombre sea un apellido o nombre propio.
             # El primer token DEBE ser un nombre/apellido, no un sustantivo
@@ -2617,7 +3688,7 @@ JSON:"""
                 continue
 
             # Excluir si el primer nombre es un prefijo de lugar
-            if first_lower in getattr(self, 'LOCATION_PREFIXES', set()):
+            if first_lower in getattr(self, "LOCATION_PREFIXES", set()):
                 continue
 
             pattern_start = match.start()
@@ -2630,11 +3701,12 @@ JSON:"""
             # Verificar si extiende una entidad PER existente
             extended = False
             for i, ent in enumerate(existing_entities):
-                if (ent.start_char >= pattern_start and
-                    ent.end_char <= pattern_end and
-                    pattern_end - pattern_start > ent.end_char - ent.start_char and
-                    ent.label == EntityLabel.PER):
-
+                if (
+                    ent.start_char >= pattern_start
+                    and ent.end_char <= pattern_end
+                    and pattern_end - pattern_start > ent.end_char - ent.start_char
+                    and ent.label == EntityLabel.PER
+                ):
                     old_pos = (ent.start_char, ent.end_char)
                     if old_pos in already_found:
                         already_found.discard(old_pos)
@@ -2655,7 +3727,7 @@ JSON:"""
             if not extended:
                 # Verificar que no solape con entidades existentes
                 overlaps = False
-                for (s, e) in already_found:
+                for s, e in already_found:
                     if not (pattern_end <= s or pattern_start >= e):
                         overlaps = True
                         break
@@ -2767,7 +3839,7 @@ JSON:"""
             if pos in already_found:
                 continue
 
-            canonical = token.text.lower().strip()
+            token.text.lower().strip()
 
             # Usar validación heurística (más estricta que spaCy)
             if not self._is_valid_heuristic_candidate(token.text):
@@ -2849,12 +3921,12 @@ JSON:"""
 # =============================================================================
 
 _ner_lock = threading.Lock()
-_ner_extractor: Optional[NERExtractor] = None
+_ner_extractor: NERExtractor | None = None
 
 
 def get_ner_extractor(
     enable_gazetteer: bool = True,
-    enable_gpu: Optional[bool] = None,
+    enable_gpu: bool | None = None,
 ) -> NERExtractor:
     """
     Obtiene el extractor NER singleton (thread-safe).
@@ -2889,7 +3961,7 @@ def reset_ner_extractor() -> None:
 
 def extract_entities(
     text: str,
-    project_id: Optional[int] = None,
+    project_id: int | None = None,
     enable_validation: bool = True,
 ) -> Result[NERResult]:
     """
@@ -2912,7 +3984,7 @@ def extract_entities(
 
 def extract_implicit_characters(
     text: str,
-    known_entities: Optional[list[str]] = None,
+    known_entities: list[str] | None = None,
 ) -> Result[list[ExtractedEntity]]:
     """
     Detecta personajes implícitos usando LLM.
@@ -2975,7 +4047,7 @@ Si no hay personajes implícitos, responde: NINGUNO"""
         import re
 
         for match in re.finditer(r"MENCION:\s*(.+?)(?:\n|$)", response, re.IGNORECASE):
-            mention_text = match.group(1).strip().strip('"\'')
+            mention_text = match.group(1).strip().strip("\"'")
 
             # Buscar la mención en el texto original para obtener posición
             text_lower = text.lower()
@@ -2989,7 +4061,7 @@ Si no hay personajes implícitos, responde: NINGUNO"""
                     break
 
                 entity = ExtractedEntity(
-                    text=text[pos:pos + len(mention_text)],  # Usar capitalización original
+                    text=text[pos : pos + len(mention_text)],  # Usar capitalización original
                     label=EntityLabel.PER,  # Personaje
                     start_char=pos,
                     end_char=pos + len(mention_text),
@@ -3004,7 +4076,9 @@ Si no hay personajes implícitos, responde: NINGUNO"""
 
     except Exception as e:
         logger.warning(f"Error detectando personajes implícitos: {e}")
-        return Result.failure(NLPError(
-            message=f"Error en detección de personajes implícitos: {e}",
-            severity=ErrorSeverity.WARNING,
-        ))
+        return Result.failure(
+            NLPError(
+                message=f"Error en detección de personajes implícitos: {e}",
+                severity=ErrorSeverity.WARNING,
+            )
+        )

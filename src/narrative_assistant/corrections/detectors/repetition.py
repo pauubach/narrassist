@@ -7,7 +7,6 @@ o deben variarse.
 """
 
 import re
-from typing import Optional
 
 from ..base import BaseDetector, CorrectionIssue
 from ..config import RepetitionConfig
@@ -25,38 +24,152 @@ class RepetitionDetector(BaseDetector):
     # Palabras funcionales a ignorar (artículos, preposiciones, etc.)
     IGNORE_WORDS = {
         # Artículos
-        "el", "la", "los", "las", "un", "una", "unos", "unas",
+        "el",
+        "la",
+        "los",
+        "las",
+        "un",
+        "una",
+        "unos",
+        "unas",
         # Preposiciones
-        "a", "ante", "bajo", "con", "contra", "de", "desde", "en",
-        "entre", "hacia", "hasta", "para", "por", "según", "sin",
-        "sobre", "tras",
+        "a",
+        "ante",
+        "bajo",
+        "con",
+        "contra",
+        "de",
+        "desde",
+        "en",
+        "entre",
+        "hacia",
+        "hasta",
+        "para",
+        "por",
+        "según",
+        "sin",
+        "sobre",
+        "tras",
         # Conjunciones
-        "y", "e", "ni", "o", "u", "pero", "sino", "mas", "aunque",
-        "porque", "pues", "que", "si", "como", "cuando", "donde",
+        "y",
+        "e",
+        "ni",
+        "o",
+        "u",
+        "pero",
+        "sino",
+        "mas",
+        "aunque",
+        "porque",
+        "pues",
+        "que",
+        "si",
+        "como",
+        "cuando",
+        "donde",
         # Pronombres
-        "yo", "tú", "él", "ella", "ello", "nosotros", "vosotros",
-        "ellos", "ellas", "me", "te", "se", "nos", "os", "le", "les",
-        "lo", "la", "los", "las", "mi", "tu", "su", "nuestro", "vuestro",
-        "este", "esta", "estos", "estas", "ese", "esa", "esos", "esas",
-        "aquel", "aquella", "aquellos", "aquellas", "esto", "eso", "aquello",
+        "yo",
+        "tú",
+        "él",
+        "ella",
+        "ello",
+        "nosotros",
+        "vosotros",
+        "ellos",
+        "ellas",
+        "me",
+        "te",
+        "se",
+        "nos",
+        "os",
+        "le",
+        "les",
+        "lo",
+        "mi",
+        "tu",
+        "su",
+        "nuestro",
+        "vuestro",
+        "este",
+        "esta",
+        "estos",
+        "estas",
+        "ese",
+        "esa",
+        "esos",
+        "esas",
+        "aquel",
+        "aquella",
+        "aquellos",
+        "aquellas",
+        "esto",
+        "eso",
+        "aquello",
         # Verbos auxiliares
-        "ser", "estar", "haber", "tener", "ir", "hacer", "poder",
-        "deber", "querer", "saber", "decir", "ver", "dar", "venir",
+        "ser",
+        "estar",
+        "haber",
+        "tener",
+        "ir",
+        "hacer",
+        "poder",
+        "deber",
+        "querer",
+        "saber",
+        "decir",
+        "ver",
+        "dar",
+        "venir",
         # Adverbios comunes
-        "no", "sí", "ya", "muy", "más", "menos", "bien", "mal",
-        "también", "tampoco", "además", "ahora", "antes", "después",
-        "aquí", "ahí", "allí", "así", "siempre", "nunca", "todavía",
+        "no",
+        "sí",
+        "ya",
+        "muy",
+        "más",
+        "menos",
+        "bien",
+        "mal",
+        "también",
+        "tampoco",
+        "además",
+        "ahora",
+        "antes",
+        "después",
+        "aquí",
+        "ahí",
+        "allí",
+        "así",
+        "siempre",
+        "nunca",
+        "todavía",
         # Otros
-        "todo", "nada", "algo", "alguien", "nadie", "cada", "otro",
-        "mismo", "tan", "tanto", "mucho", "poco", "bastante",
+        "todo",
+        "nada",
+        "algo",
+        "alguien",
+        "nadie",
+        "cada",
+        "otro",
+        "mismo",
+        "tan",
+        "tanto",
+        "mucho",
+        "poco",
+        "bastante",
     }
 
     # Palabras que pueden repetirse intencionalmente
     INTENTIONAL_REPETITION_WORDS = {
-        "sí", "no", "muy", "más", "nunca", "jamás", "siempre",
+        "sí",
+        "no",
+        "muy",
+        "más",
+        "nunca",
+        "jamás",
+        "siempre",
     }
 
-    def __init__(self, config: Optional[RepetitionConfig] = None):
+    def __init__(self, config: RepetitionConfig | None = None):
         self.config = config or RepetitionConfig()
         self._spacy_doc = None
 
@@ -78,7 +191,7 @@ class RepetitionDetector(BaseDetector):
     def detect(
         self,
         text: str,
-        chapter_index: Optional[int] = None,
+        chapter_index: int | None = None,
         spacy_doc=None,
     ) -> list[CorrectionIssue]:
         """
@@ -107,13 +220,11 @@ class RepetitionDetector(BaseDetector):
         return issues
 
     def _detect_lexical_repetitions(
-        self, text: str, chapter_index: Optional[int]
+        self, text: str, chapter_index: int | None
     ) -> list[CorrectionIssue]:
         """Detecta palabras repetidas en proximidad."""
         issues = []
-        distance = self._distance_map.get(
-            self.config.sensitivity, self.config.min_distance
-        )
+        distance = self._distance_map.get(self.config.sensitivity, self.config.min_distance)
 
         # Obtener tokens con posiciones
         if self._spacy_doc is not None:
@@ -123,7 +234,8 @@ class RepetitionDetector(BaseDetector):
 
         # Filtrar tokens de contenido
         content_tokens = [
-            t for t in tokens
+            t
+            for t in tokens
             if len(t["text"]) >= self.config.min_word_length
             and t["lemma"].lower() not in self.IGNORE_WORDS
             and t["pos"] in ("NOUN", "VERB", "ADJ", "ADV", None)  # None = sin spaCy
@@ -170,9 +282,7 @@ class RepetitionDetector(BaseDetector):
                             ),
                             suggestion=None,  # El corrector decide la variación
                             confidence=self._calculate_confidence(word_distance, distance),
-                            context=self._extract_context(
-                                text, token["start"], other["end"]
-                            ),
+                            context=self._extract_context(text, token["start"], other["end"]),
                             chapter_index=chapter_index,
                             rule_id="REP_LEXICAL",
                             extra_data={
@@ -188,7 +298,7 @@ class RepetitionDetector(BaseDetector):
         return issues
 
     def _detect_sentence_starts(
-        self, text: str, chapter_index: Optional[int]
+        self, text: str, chapter_index: int | None
     ) -> list[CorrectionIssue]:
         """Detecta oraciones consecutivas que empiezan igual."""
         issues = []
@@ -212,7 +322,7 @@ class RepetitionDetector(BaseDetector):
 
             # Comparar inicio
             common_start = []
-            for w1, w2 in zip(words1, words2):
+            for w1, w2 in zip(words1, words2, strict=False):
                 if w1.lower() == w2.lower():
                     common_start.append(w1)
                 else:
@@ -233,8 +343,7 @@ class RepetitionDetector(BaseDetector):
                         end_char=start_pos + len(" ".join(common_start)),
                         text=" ".join(common_start),
                         explanation=(
-                            f"Oraciones consecutivas empiezan igual: "
-                            f"'{' '.join(common_start)}...'"
+                            f"Oraciones consecutivas empiezan igual: '{' '.join(common_start)}...'"
                         ),
                         suggestion=None,
                         confidence=0.7,

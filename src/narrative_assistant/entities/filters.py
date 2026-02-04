@@ -19,7 +19,6 @@ import re
 import sqlite3
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
 
 from ..persistence.database import get_database
 
@@ -28,12 +27,14 @@ logger = logging.getLogger(__name__)
 
 class FilterAction(Enum):
     """Acciones posibles para un override de proyecto."""
+
     REJECT = "reject"
     FORCE_INCLUDE = "force_include"
 
 
 class PatternType(Enum):
     """Tipos de patrones soportados."""
+
     EXACT = "exact"
     REGEX = "regex"
     STARTSWITH = "startswith"
@@ -44,45 +45,49 @@ class PatternType(Enum):
 @dataclass
 class SystemPattern:
     """Patrón de falso positivo del sistema."""
+
     id: int
     pattern: str
     pattern_type: PatternType
-    entity_type: Optional[str]
+    entity_type: str | None
     language: str
-    category: Optional[str]
-    description: Optional[str]
+    category: str | None
+    description: str | None
     is_active: bool
 
 
 @dataclass
 class UserRejection:
     """Rechazo global del usuario."""
+
     id: int
     entity_name: str
-    entity_type: Optional[str]
-    reason: Optional[str]
+    entity_type: str | None
+    reason: str | None
     rejected_at: str
 
 
 @dataclass
 class ProjectOverride:
     """Override de entidad a nivel de proyecto."""
+
     id: int
     project_id: int
     entity_name: str
-    entity_type: Optional[str]
+    entity_type: str | None
     action: FilterAction
-    reason: Optional[str]
+    reason: str | None
     created_at: str
 
 
 @dataclass
 class FilterDecision:
     """Resultado de evaluar si una entidad debe filtrarse."""
+
     should_filter: bool
     reason: str
     level: str  # 'project', 'user', 'system', 'none'
-    rule_id: Optional[int] = None
+    rule_id: int | None = None
 
 
 # =============================================================================
@@ -109,7 +114,6 @@ SYSTEM_PATTERNS_ES = [
     ("Semanas después", "exact", None, "temporal", "Expresión temporal"),
     ("Meses después", "exact", None, "temporal", "Expresión temporal"),
     ("Años después", "exact", None, "temporal", "Expresión temporal"),
-
     # Artículos y determinantes como entidades
     ("El", "exact", None, "article", "Artículo determinado"),
     ("La", "exact", None, "article", "Artículo determinado"),
@@ -119,7 +123,6 @@ SYSTEM_PATTERNS_ES = [
     ("Una", "exact", None, "article", "Artículo indeterminado"),
     ("Unos", "exact", None, "article", "Artículo indeterminado"),
     ("Unas", "exact", None, "article", "Artículo indeterminado"),
-
     # Pronombres que a veces se detectan como entidades
     ("Él", "exact", None, "pronoun", "Pronombre personal"),
     ("Ella", "exact", None, "pronoun", "Pronombre personal"),
@@ -131,7 +134,6 @@ SYSTEM_PATTERNS_ES = [
     ("Nada", "exact", None, "pronoun", "Pronombre indefinido"),
     ("Todo", "exact", None, "pronoun", "Pronombre indefinido"),
     ("Todos", "exact", None, "pronoun", "Pronombre indefinido"),
-
     # Expresiones comunes que no son entidades
     ("Sin embargo", "exact", None, "connector", "Conector adversativo"),
     ("No obstante", "exact", None, "connector", "Conector adversativo"),
@@ -139,12 +141,16 @@ SYSTEM_PATTERNS_ES = [
     ("Además", "exact", None, "connector", "Conector aditivo"),
     ("Por otra parte", "exact", None, "connector", "Conector"),
     ("En cambio", "exact", None, "connector", "Conector"),
-
     # Números y cantidades
     (r"^\d+$", "regex", None, "numeric", "Solo números"),
     (r"^\d+[\.,]\d+$", "regex", None, "numeric", "Número decimal"),
-    (r"^\d+\s*(años|meses|días|horas|minutos|segundos)$", "regex", None, "numeric", "Cantidad temporal"),
-
+    (
+        r"^\d+\s*(años|meses|días|horas|minutos|segundos)$",
+        "regex",
+        None,
+        "numeric",
+        "Cantidad temporal",
+    ),
     # Patrones de lugares genéricos
     ("La casa", "exact", "location", "generic_location", "Lugar genérico"),
     ("El edificio", "exact", "location", "generic_location", "Lugar genérico"),
@@ -153,7 +159,6 @@ SYSTEM_PATTERNS_ES = [
     ("La cocina", "exact", "location", "generic_location", "Lugar genérico"),
     ("El salón", "exact", "location", "generic_location", "Lugar genérico"),
     ("La calle", "exact", "location", "generic_location", "Lugar genérico"),
-
     # Conceptos genéricos que no deberían ser entidades
     ("El tiempo", "exact", "concept", "generic_concept", "Concepto abstracto genérico"),
     ("La vida", "exact", "concept", "generic_concept", "Concepto abstracto genérico"),
@@ -190,20 +195,20 @@ class EntityFilterRepository:
                 self._load_system_patterns(conn, "es", SYSTEM_PATTERNS_ES)
 
     def _load_system_patterns(
-        self,
-        conn: sqlite3.Connection,
-        language: str,
-        patterns: list[tuple]
+        self, conn: sqlite3.Connection, language: str, patterns: list[tuple]
     ) -> None:
         """Carga patrones del sistema en la base de datos."""
         for pattern_data in patterns:
             pattern, pattern_type, entity_type, category, description = pattern_data
             try:
-                conn.execute("""
+                conn.execute(
+                    """
                     INSERT OR IGNORE INTO system_entity_patterns
                     (pattern, pattern_type, entity_type, language, category, description)
                     VALUES (?, ?, ?, ?, ?, ?)
-                """, (pattern, pattern_type, entity_type, language, category, description))
+                """,
+                    (pattern, pattern_type, entity_type, language, category, description),
+                )
             except sqlite3.Error as e:
                 logger.warning(f"Error insertando patrón '{pattern}': {e}")
 
@@ -215,10 +220,7 @@ class EntityFilterRepository:
     # =========================================================================
 
     def should_filter_entity(
-        self,
-        entity_name: str,
-        entity_type: Optional[str] = None,
-        project_id: Optional[int] = None
+        self, entity_name: str, entity_type: str | None = None, project_id: int | None = None
     ) -> FilterDecision:
         """
         Evalúa si una entidad debe filtrarse.
@@ -242,14 +244,14 @@ class EntityFilterRepository:
                         should_filter=False,
                         reason=f"Forzado a incluir en proyecto: {override.reason or 'Sin razón'}",
                         level="project",
-                        rule_id=override.id
+                        rule_id=override.id,
                     )
                 else:  # REJECT
                     return FilterDecision(
                         should_filter=True,
                         reason=f"Rechazado en proyecto: {override.reason or 'Sin razón'}",
                         level="project",
-                        rule_id=override.id
+                        rule_id=override.id,
                     )
 
         # 2. Verificar user rejection
@@ -259,7 +261,7 @@ class EntityFilterRepository:
                 should_filter=True,
                 reason=f"Rechazado globalmente: {user_rejection.reason or 'Sin razón'}",
                 level="user",
-                rule_id=user_rejection.id
+                rule_id=user_rejection.id,
             )
 
         # 3. Verificar system patterns
@@ -269,30 +271,28 @@ class EntityFilterRepository:
                 should_filter=True,
                 reason=f"Patrón del sistema: {system_match.description or system_match.pattern}",
                 level="system",
-                rule_id=system_match.id
+                rule_id=system_match.id,
             )
 
         # 4. No hay filtro
         return FilterDecision(
-            should_filter=False,
-            reason="No coincide con ningún filtro",
-            level="none"
+            should_filter=False, reason="No coincide con ningún filtro", level="none"
         )
 
     def _get_project_override(
-        self,
-        project_id: int,
-        entity_name: str,
-        entity_type: Optional[str]
-    ) -> Optional[ProjectOverride]:
+        self, project_id: int, entity_name: str, entity_type: str | None
+    ) -> ProjectOverride | None:
         """Busca un override a nivel de proyecto."""
         # Buscar coincidencia exacta con tipo
-        row = self.db.fetchone("""
+        row = self.db.fetchone(
+            """
             SELECT * FROM project_entity_overrides
             WHERE project_id = ? AND entity_name = ? AND (entity_type = ? OR entity_type IS NULL)
             ORDER BY CASE WHEN entity_type IS NOT NULL THEN 0 ELSE 1 END
             LIMIT 1
-        """, (project_id, entity_name, entity_type))
+        """,
+            (project_id, entity_name, entity_type),
+        )
 
         if row:
             return ProjectOverride(
@@ -302,22 +302,23 @@ class EntityFilterRepository:
                 entity_type=row["entity_type"],
                 action=FilterAction(row["action"]),
                 reason=row["reason"],
-                created_at=row["created_at"]
+                created_at=row["created_at"],
             )
         return None
 
     def _get_user_rejection(
-        self,
-        entity_name: str,
-        entity_type: Optional[str]
-    ) -> Optional[UserRejection]:
+        self, entity_name: str, entity_type: str | None
+    ) -> UserRejection | None:
         """Busca un rechazo global del usuario."""
-        row = self.db.fetchone("""
+        row = self.db.fetchone(
+            """
             SELECT * FROM user_rejected_entities
             WHERE entity_name = ? AND (entity_type = ? OR entity_type IS NULL)
             ORDER BY CASE WHEN entity_type IS NOT NULL THEN 0 ELSE 1 END
             LIMIT 1
-        """, (entity_name, entity_type))
+        """,
+            (entity_name, entity_type),
+        )
 
         if row:
             return UserRejection(
@@ -325,24 +326,25 @@ class EntityFilterRepository:
                 entity_name=row["entity_name"],
                 entity_type=row["entity_type"],
                 reason=row["reason"],
-                rejected_at=row["rejected_at"]
+                rejected_at=row["rejected_at"],
             )
         return None
 
     def _matches_system_pattern(
-        self,
-        entity_name: str,
-        entity_type: Optional[str]
-    ) -> Optional[SystemPattern]:
+        self, entity_name: str, entity_type: str | None
+    ) -> SystemPattern | None:
         """Verifica si una entidad coincide con algún patrón del sistema activo."""
-        patterns = self.db.fetchall("""
+        patterns = self.db.fetchall(
+            """
             SELECT * FROM system_entity_patterns
             WHERE is_active = 1
             AND (entity_type IS NULL OR entity_type = ?)
             ORDER BY
                 CASE WHEN entity_type IS NOT NULL THEN 0 ELSE 1 END,
                 pattern_type
-        """, (entity_type,))
+        """,
+            (entity_type,),
+        )
 
         for row in patterns:
             pattern = SystemPattern(
@@ -353,7 +355,7 @@ class EntityFilterRepository:
                 language=row["language"],
                 category=row["category"],
                 description=row["description"],
-                is_active=bool(row["is_active"])
+                is_active=bool(row["is_active"]),
             )
 
             if self._pattern_matches(pattern, entity_name):
@@ -392,8 +394,8 @@ class EntityFilterRepository:
         project_id: int,
         entity_name: str,
         action: FilterAction,
-        entity_type: Optional[str] = None,
-        reason: Optional[str] = None
+        entity_type: str | None = None,
+        reason: str | None = None,
     ) -> int:
         """
         Añade o actualiza un override a nivel de proyecto.
@@ -405,45 +407,48 @@ class EntityFilterRepository:
 
         with self.db.transaction() as conn:
             # Upsert
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO project_entity_overrides
                 (project_id, entity_name, entity_type, action, reason)
                 VALUES (?, ?, ?, ?, ?)
                 ON CONFLICT (project_id, entity_name, entity_type)
                 DO UPDATE SET action = excluded.action, reason = excluded.reason
-            """, (project_id, normalized_name, entity_type, action.value, reason))
+            """,
+                (project_id, normalized_name, entity_type, action.value, reason),
+            )
 
-            row = conn.execute("""
+            row = conn.execute(
+                """
                 SELECT id FROM project_entity_overrides
                 WHERE project_id = ? AND entity_name = ?
                 AND (entity_type = ? OR (entity_type IS NULL AND ? IS NULL))
-            """, (project_id, normalized_name, entity_type, entity_type)).fetchone()
+            """,
+                (project_id, normalized_name, entity_type, entity_type),
+            ).fetchone()
 
             return row[0] if row else 0
 
     def remove_project_override(
-        self,
-        project_id: int,
-        entity_name: str,
-        entity_type: Optional[str] = None
+        self, project_id: int, entity_name: str, entity_type: str | None = None
     ) -> bool:
         """Elimina un override de proyecto."""
         normalized_name = entity_name.strip().lower()
 
         with self.db.transaction() as conn:
-            cursor = conn.execute("""
+            cursor = conn.execute(
+                """
                 DELETE FROM project_entity_overrides
                 WHERE project_id = ? AND entity_name = ?
                 AND (entity_type = ? OR (entity_type IS NULL AND ? IS NULL))
-            """, (project_id, normalized_name, entity_type, entity_type))
+            """,
+                (project_id, normalized_name, entity_type, entity_type),
+            )
 
             return cursor.rowcount > 0
 
     def add_user_rejection(
-        self,
-        entity_name: str,
-        entity_type: Optional[str] = None,
-        reason: Optional[str] = None
+        self, entity_name: str, entity_type: str | None = None, reason: str | None = None
     ) -> int:
         """
         Añade un rechazo global del usuario.
@@ -454,45 +459,53 @@ class EntityFilterRepository:
         normalized_name = entity_name.strip().lower()
 
         with self.db.transaction() as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT OR REPLACE INTO user_rejected_entities
                 (entity_name, entity_type, reason)
                 VALUES (?, ?, ?)
-            """, (normalized_name, entity_type, reason))
+            """,
+                (normalized_name, entity_type, reason),
+            )
 
-            row = conn.execute("""
+            row = conn.execute(
+                """
                 SELECT id FROM user_rejected_entities
                 WHERE entity_name = ?
                 AND (entity_type = ? OR (entity_type IS NULL AND ? IS NULL))
-            """, (normalized_name, entity_type, entity_type)).fetchone()
+            """,
+                (normalized_name, entity_type, entity_type),
+            ).fetchone()
 
             return row[0] if row else 0
 
-    def remove_user_rejection(
-        self,
-        entity_name: str,
-        entity_type: Optional[str] = None
-    ) -> bool:
+    def remove_user_rejection(self, entity_name: str, entity_type: str | None = None) -> bool:
         """Elimina un rechazo global del usuario."""
         normalized_name = entity_name.strip().lower()
 
         with self.db.transaction() as conn:
-            cursor = conn.execute("""
+            cursor = conn.execute(
+                """
                 DELETE FROM user_rejected_entities
                 WHERE entity_name = ?
                 AND (entity_type = ? OR (entity_type IS NULL AND ? IS NULL))
-            """, (normalized_name, entity_type, entity_type))
+            """,
+                (normalized_name, entity_type, entity_type),
+            )
 
             return cursor.rowcount > 0
 
     def toggle_system_pattern(self, pattern_id: int, is_active: bool) -> bool:
         """Activa o desactiva un patrón del sistema."""
         with self.db.transaction() as conn:
-            cursor = conn.execute("""
+            cursor = conn.execute(
+                """
                 UPDATE system_entity_patterns
                 SET is_active = ?
                 WHERE id = ?
-            """, (1 if is_active else 0, pattern_id))
+            """,
+                (1 if is_active else 0, pattern_id),
+            )
 
             return cursor.rowcount > 0
 
@@ -501,9 +514,7 @@ class EntityFilterRepository:
     # =========================================================================
 
     def get_system_patterns(
-        self,
-        language: str = "es",
-        only_active: bool = False
+        self, language: str = "es", only_active: bool = False
     ) -> list[SystemPattern]:
         """Lista todos los patrones del sistema."""
         query = """
@@ -527,7 +538,7 @@ class EntityFilterRepository:
                 language=row["language"],
                 category=row["category"],
                 description=row["description"],
-                is_active=bool(row["is_active"])
+                is_active=bool(row["is_active"]),
             )
             for row in rows
         ]
@@ -544,18 +555,21 @@ class EntityFilterRepository:
                 entity_name=row["entity_name"],
                 entity_type=row["entity_type"],
                 reason=row["reason"],
-                rejected_at=row["rejected_at"]
+                rejected_at=row["rejected_at"],
             )
             for row in rows
         ]
 
     def get_project_overrides(self, project_id: int) -> list[ProjectOverride]:
         """Lista todos los overrides de un proyecto."""
-        rows = self.db.fetchall("""
+        rows = self.db.fetchall(
+            """
             SELECT * FROM project_entity_overrides
             WHERE project_id = ?
             ORDER BY created_at DESC
-        """, (project_id,))
+        """,
+            (project_id,),
+        )
         return [
             ProjectOverride(
                 id=row["id"],
@@ -564,12 +578,12 @@ class EntityFilterRepository:
                 entity_type=row["entity_type"],
                 action=FilterAction(row["action"]),
                 reason=row["reason"],
-                created_at=row["created_at"]
+                created_at=row["created_at"],
             )
             for row in rows
         ]
 
-    def get_filter_stats(self, project_id: Optional[int] = None) -> dict:
+    def get_filter_stats(self, project_id: int | None = None) -> dict:
         """Obtiene estadísticas de filtros."""
         stats = {
             "system_patterns_total": 0,
@@ -597,13 +611,16 @@ class EntityFilterRepository:
 
         # Project overrides
         if project_id is not None:
-            row = self.db.fetchone("""
+            row = self.db.fetchone(
+                """
                 SELECT
                     SUM(CASE WHEN action = 'reject' THEN 1 ELSE 0 END) as rejects,
                     SUM(CASE WHEN action = 'force_include' THEN 1 ELSE 0 END) as includes
                 FROM project_entity_overrides
                 WHERE project_id = ?
-            """, (project_id,))
+            """,
+                (project_id,),
+            )
             if row:
                 stats["project_overrides_reject"] = row["rejects"] or 0
                 stats["project_overrides_include"] = row["includes"] or 0
@@ -612,7 +629,7 @@ class EntityFilterRepository:
 
 
 # Singleton
-_filter_repository: Optional[EntityFilterRepository] = None
+_filter_repository: EntityFilterRepository | None = None
 _filter_lock = __import__("threading").Lock()
 
 

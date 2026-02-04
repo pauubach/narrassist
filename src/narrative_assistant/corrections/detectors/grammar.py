@@ -9,16 +9,13 @@ Incluye:
 - Expresiones redundantes
 """
 
-from typing import Optional
-
+from ...nlp.grammar.spanish_rules import (
+    SpanishRulesConfig,
+    apply_spanish_rules,
+)
 from ..base import BaseDetector, CorrectionIssue
 from ..config import GrammarConfig
 from ..types import CorrectionCategory, GrammarIssueType
-from ...nlp.grammar.spanish_rules import (
-    apply_spanish_rules,
-    SpanishRulesConfig,
-    GrammarSeverity,
-)
 
 
 class GrammarDetector(BaseDetector):
@@ -29,7 +26,7 @@ class GrammarDetector(BaseDetector):
     al formato CorrectionIssue del sistema de correcciones.
     """
 
-    def __init__(self, config: Optional[GrammarConfig] = None):
+    def __init__(self, config: GrammarConfig | None = None):
         self.config = config or GrammarConfig()
 
     @property
@@ -43,7 +40,7 @@ class GrammarDetector(BaseDetector):
     def detect(
         self,
         text: str,
-        chapter_index: Optional[int] = None,
+        chapter_index: int | None = None,
         spacy_doc=None,
         **kwargs,
     ) -> list[CorrectionIssue]:
@@ -104,7 +101,9 @@ class GrammarDetector(BaseDetector):
                     explanation=gi.explanation,
                     suggestion=gi.suggestion,
                     confidence=confidence,
-                    context=gi.sentence[:150] if gi.sentence else self._extract_context(text, gi.start_char, gi.end_char),
+                    context=gi.sentence[:150]
+                    if gi.sentence
+                    else self._extract_context(text, gi.start_char, gi.end_char),
                     chapter_index=chapter_index,
                     rule_id=gi.rule_id,
                     extra_data={

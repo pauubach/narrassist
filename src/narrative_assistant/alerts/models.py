@@ -6,10 +6,10 @@ Representa alertas generadas por diferentes detectores de inconsistencias.
 
 import hashlib
 import json
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 
 class AlertCategory(Enum):
@@ -80,13 +80,13 @@ class Alert:
     title: str  # Título breve (ej: "Color de ojos inconsistente")
     description: str  # Descripción corta (ej: "María: 'verdes' vs 'azules'")
     explanation: str  # Explicación detallada
-    suggestion: Optional[str] = None  # Sugerencia de corrección
+    suggestion: str | None = None  # Sugerencia de corrección
 
     # Ubicación en el manuscrito
-    chapter: Optional[int] = None  # Número de capítulo (1-indexed)
-    scene: Optional[int] = None  # Número de escena (1-indexed)
-    start_char: Optional[int] = None  # Posición de inicio (0-indexed)
-    end_char: Optional[int] = None  # Posición de fin (0-indexed)
+    chapter: int | None = None  # Número de capítulo (1-indexed)
+    scene: int | None = None  # Número de escena (1-indexed)
+    start_char: int | None = None  # Posición de inicio (0-indexed)
+    end_char: int | None = None  # Posición de fin (0-indexed)
     excerpt: str = ""  # Extracto del texto relevante
 
     # Entidades relacionadas
@@ -96,11 +96,11 @@ class Alert:
     confidence: float = 0.8  # Confianza del detector (0.0-1.0)
     source_module: str = ""  # Módulo que generó la alerta
     created_at: datetime = field(default_factory=datetime.now)
-    updated_at: Optional[datetime] = None
+    updated_at: datetime | None = None
 
     # Estado del ciclo de vida
     status: AlertStatus = AlertStatus.NEW
-    resolved_at: Optional[datetime] = None
+    resolved_at: datetime | None = None
     resolution_note: str = ""  # Nota del usuario sobre la resolución
 
     # Datos adicionales específicos del tipo de alerta
@@ -143,11 +143,13 @@ class Alert:
         if self.alert_type == "attribute_inconsistency":
             # Para inconsistencias de atributos: entidad + atributo + valores
             ed = self.extra_data
-            parts.extend([
-                ed.get("entity_name", ""),
-                ed.get("attribute_key", ""),
-                str(sorted([ed.get("value1", ""), ed.get("value2", "")])),
-            ])
+            parts.extend(
+                [
+                    ed.get("entity_name", ""),
+                    ed.get("attribute_key", ""),
+                    str(sorted([ed.get("value1", ""), ed.get("value2", "")])),
+                ]
+            )
         elif self.alert_type.startswith("spelling_"):
             # Para ortografía: palabra + posición aproximada
             ed = self.extra_data
@@ -160,11 +162,13 @@ class Alert:
             parts.append(ed.get("error_type", ""))
         elif self.alert_type == "deceased_reappearance":
             ed = self.extra_data
-            parts.extend([
-                ed.get("entity_name", ""),
-                str(ed.get("death_chapter", 0)),
-                str(ed.get("appearance_chapter", 0)),
-            ])
+            parts.extend(
+                [
+                    ed.get("entity_name", ""),
+                    str(ed.get("death_chapter", 0)),
+                    str(ed.get("appearance_chapter", 0)),
+                ]
+            )
         else:
             # Para otros tipos: título + descripción (primeros 100 chars)
             parts.append(self.title[:100])
@@ -181,15 +185,9 @@ class Alert:
         data["severity"] = self.severity.value
         data["status"] = self.status.value
         # Convertir datetimes a ISO format
-        data["created_at"] = (
-            self.created_at.isoformat() if self.created_at else None
-        )
-        data["updated_at"] = (
-            self.updated_at.isoformat() if self.updated_at else None
-        )
-        data["resolved_at"] = (
-            self.resolved_at.isoformat() if self.resolved_at else None
-        )
+        data["created_at"] = self.created_at.isoformat() if self.created_at else None
+        data["updated_at"] = self.updated_at.isoformat() if self.updated_at else None
+        data["resolved_at"] = self.resolved_at.isoformat() if self.resolved_at else None
         # Serializar extra_data como JSON
         data["extra_data"] = json.dumps(self.extra_data)
         return data
@@ -239,14 +237,14 @@ class AlertFilter:
     Permite filtrar por categoría, severidad, estado, ubicación, etc.
     """
 
-    categories: Optional[list[AlertCategory]] = None
-    severities: Optional[list[AlertSeverity]] = None
-    statuses: Optional[list[AlertStatus]] = None
-    chapters: Optional[list[int]] = None
-    scenes: Optional[list[int]] = None
-    entity_ids: Optional[list[int]] = None
-    alert_types: Optional[list[str]] = None
-    source_modules: Optional[list[str]] = None
+    categories: list[AlertCategory] | None = None
+    severities: list[AlertSeverity] | None = None
+    statuses: list[AlertStatus] | None = None
+    chapters: list[int] | None = None
+    scenes: list[int] | None = None
+    entity_ids: list[int] | None = None
+    alert_types: list[str] | None = None
+    source_modules: list[str] | None = None
     min_confidence: float = 0.0
     max_confidence: float = 1.0
 
@@ -262,9 +260,7 @@ class AlertFilter:
             return False
         if self.scenes and alert.scene not in self.scenes:
             return False
-        if self.entity_ids and not any(
-            eid in self.entity_ids for eid in alert.entity_ids
-        ):
+        if self.entity_ids and not any(eid in self.entity_ids for eid in alert.entity_ids):
             return False
         if self.alert_types and alert.alert_type not in self.alert_types:
             return False
@@ -272,6 +268,4 @@ class AlertFilter:
             return False
         if alert.confidence < self.min_confidence:
             return False
-        if alert.confidence > self.max_confidence:
-            return False
-        return True
+        return not alert.confidence > self.max_confidence

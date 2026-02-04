@@ -18,12 +18,11 @@ Detecta problemas en la coherencia temporal:
 import logging
 import threading
 from dataclasses import dataclass, field
-from datetime import date, timedelta
+from datetime import date
 from enum import Enum
-from typing import Optional
 
 from .markers import MarkerType, TemporalMarker
-from .timeline import Timeline, TimelineEvent, NarrativeOrder
+from .timeline import NarrativeOrder, Timeline
 
 logger = logging.getLogger(__name__)
 
@@ -32,11 +31,13 @@ logger = logging.getLogger(__name__)
 # Enums y Configuración del Sistema de Votación
 # =============================================================================
 
+
 class TemporalDetectionMethod(Enum):
     """Métodos de detección de inconsistencias temporales."""
-    DIRECT = "direct"          # Análisis directo de fechas/edades
+
+    DIRECT = "direct"  # Análisis directo de fechas/edades
     CONTEXTUAL = "contextual"  # Patrones de transición y contexto
-    LLM = "llm"                # LLM local para análisis semántico
+    LLM = "llm"  # LLM local para análisis semántico
     HEURISTICS = "heuristics"  # Heurísticas narrativas
 
 
@@ -56,6 +57,7 @@ def _get_default_temporal_methods() -> list[TemporalDetectionMethod]:
     """Retorna los métodos habilitados por defecto según el hardware."""
     try:
         from ..core.device import get_device_config
+
         device_config = get_device_config()
         has_gpu = device_config.device_type in ("cuda", "mps")
     except Exception:
@@ -74,6 +76,7 @@ def _get_default_temporal_methods() -> list[TemporalDetectionMethod]:
 @dataclass
 class TemporalDetectionConfig:
     """Configuración del sistema de detección temporal."""
+
     enabled_methods: list[TemporalDetectionMethod] = field(
         default_factory=_get_default_temporal_methods
     )
@@ -87,8 +90,8 @@ class TemporalDetectionConfig:
 
     # Umbrales para detección
     impossible_sequence_days: int = 7  # Días para considerar secuencia imposible
-    suspicious_jump_years: int = 5      # Años para considerar salto sospechoso
-    age_tolerance_years: float = 1.5    # Tolerancia en años para edades
+    suspicious_jump_years: int = 5  # Años para considerar salto sospechoso
+    age_tolerance_years: float = 1.5  # Tolerancia en años para edades
 
     def __post_init__(self):
         """Ajusta configuración según hardware si use_llm es None."""
@@ -148,9 +151,9 @@ class TemporalInconsistency:
     position: int
     events_involved: list[int] = field(default_factory=list)
     markers_involved: list[TemporalMarker] = field(default_factory=list)
-    expected: Optional[str] = None
-    found: Optional[str] = None
-    suggestion: Optional[str] = None
+    expected: str | None = None
+    found: str | None = None
+    suggestion: str | None = None
     confidence: float = 0.8
     methods_agreed: list[str] = field(default_factory=list)
     reasoning: dict[str, str] = field(default_factory=dict)
@@ -165,7 +168,7 @@ class TemporalConsistencyChecker:
         inconsistencies = checker.check(timeline, markers, character_ages)
     """
 
-    def __init__(self, config: Optional[TemporalDetectionConfig] = None):
+    def __init__(self, config: TemporalDetectionConfig | None = None):
         """
         Inicializa el verificador.
 
@@ -174,16 +177,14 @@ class TemporalConsistencyChecker:
         """
         self.config = config or TemporalDetectionConfig()
         self.inconsistencies: list[TemporalInconsistency] = []
-        self._llm_validator: Optional["LLMTemporalValidator"] = None
+        self._llm_validator: LLMTemporalValidator | None = None
         self._init_validators()
 
     def _init_validators(self) -> None:
         """Inicializa los validadores según la configuración."""
         if TemporalDetectionMethod.LLM in self.config.enabled_methods:
             try:
-                self._llm_validator = LLMTemporalValidator(
-                    model=self.config.ollama_model
-                )
+                self._llm_validator = LLMTemporalValidator(model=self.config.ollama_model)
             except Exception as e:
                 logger.warning(f"No se pudo inicializar validador LLM: {e}")
 
@@ -191,7 +192,7 @@ class TemporalConsistencyChecker:
         self,
         timeline: Timeline,
         markers: list[TemporalMarker],
-        character_ages: Optional[dict[int, list[tuple[int, int]]]] = None,
+        character_ages: dict[int, list[tuple[int, int]]] | None = None,
     ) -> list[TemporalInconsistency]:
         """
         Verifica consistencia temporal completa.
@@ -334,9 +335,7 @@ class TemporalConsistencyChecker:
         # Detectar fechas absolutas conflictivas entre capítulos
         self._check_cross_chapter_date_conflicts(markers)
 
-    def _check_cross_chapter_date_conflicts(
-        self, markers: list[TemporalMarker]
-    ) -> None:
+    def _check_cross_chapter_date_conflicts(self, markers: list[TemporalMarker]) -> None:
         """
         Detecta fechas absolutas que difieren entre capítulos para el mismo evento.
 
@@ -347,8 +346,7 @@ class TemporalConsistencyChecker:
         import re
 
         absolute = [
-            m for m in markers
-            if m.marker_type == MarkerType.ABSOLUTE_DATE and m.year and m.chapter
+            m for m in markers if m.marker_type == MarkerType.ABSOLUTE_DATE and m.year and m.chapter
         ]
         if len(absolute) < 2:
             return
@@ -358,7 +356,7 @@ class TemporalConsistencyChecker:
             """Extrae palabras significativas del texto del marcador."""
             text = marker.text or ""
             # Extraer palabras de más de 3 chars, excluyendo números y stopwords
-            words = re.findall(r'[A-ZÁÉÍÓÚÜÑa-záéíóúüñ]{4,}', text)
+            words = re.findall(r"[A-ZÁÉÍÓÚÜÑa-záéíóúüñ]{4,}", text)
             return {w.lower() for w in words}
 
         # Comparar pares de marcadores en distintos capítulos
@@ -437,7 +435,7 @@ class TemporalConsistencyChecker:
             sorted_mentions = sorted(age_mentions, key=lambda x: x[0])
 
             # Buscar fechas en los capítulos correspondientes
-            chapter_dates: dict[int, Optional[date]] = {}
+            chapter_dates: dict[int, date | None] = {}
             for event in timeline.events:
                 if event.story_date:
                     chapter_dates[event.chapter] = event.story_date
@@ -670,6 +668,7 @@ class TemporalConsistencyChecker:
 # Validador LLM para Inconsistencias Temporales
 # =============================================================================
 
+
 class LLMTemporalValidator:
     """
     Validador de inconsistencias temporales usando LLM.
@@ -692,6 +691,7 @@ class LLMTemporalValidator:
                 if self._client is None:
                     try:
                         from ..llm.client import get_llm_client
+
                         self._client = get_llm_client()
                     except Exception as e:
                         logger.warning(f"No se pudo conectar LLM: {e}")
@@ -727,8 +727,8 @@ class LLMTemporalValidator:
 INCONSISTENCIA DETECTADA:
 - Tipo: {inconsistency.inconsistency_type.value}
 - Descripción: {inconsistency.description}
-- Esperado: {inconsistency.expected or 'N/A'}
-- Encontrado: {inconsistency.found or 'N/A'}
+- Esperado: {inconsistency.expected or "N/A"}
+- Encontrado: {inconsistency.found or "N/A"}
 
 CONTEXTO NARRATIVO:
 {context[:1500]}
@@ -770,26 +770,20 @@ CONFIANZA_AJUSTADA: [0.0-1.0]"""
 
         # Buscar veredicto
         verdict_match = re.search(
-            r"VEREDICTO:\s*(CONFIRMADO|PROBABLE|DUDOSO|DESCARTADO)",
-            response,
-            re.IGNORECASE
+            r"VEREDICTO:\s*(CONFIRMADO|PROBABLE|DUDOSO|DESCARTADO)", response, re.IGNORECASE
         )
         verdict = verdict_match.group(1).upper() if verdict_match else "PROBABLE"
 
         # Buscar razonamiento
         reasoning_match = re.search(
-            r"RAZONAMIENTO:\s*(.+?)(?=CONFIANZA|$)",
-            response,
-            re.IGNORECASE | re.DOTALL
+            r"RAZONAMIENTO:\s*(.+?)(?=CONFIANZA|$)", response, re.IGNORECASE | re.DOTALL
         )
-        reasoning = reasoning_match.group(1).strip()[:200] if reasoning_match else "sin razonamiento"
+        reasoning = (
+            reasoning_match.group(1).strip()[:200] if reasoning_match else "sin razonamiento"
+        )
 
         # Buscar confianza ajustada
-        confidence_match = re.search(
-            r"CONFIANZA_AJUSTADA:\s*([\d.]+)",
-            response,
-            re.IGNORECASE
-        )
+        confidence_match = re.search(r"CONFIANZA_AJUSTADA:\s*([\d.]+)", response, re.IGNORECASE)
 
         # Ajustar según veredicto
         verdict_multipliers = {
@@ -814,6 +808,7 @@ CONFIANZA_AJUSTADA: [0.0-1.0]"""
 # Sistema de Votación y Funciones de Conveniencia
 # =============================================================================
 
+
 @dataclass
 class TemporalCheckResult:
     """
@@ -825,6 +820,7 @@ class TemporalCheckResult:
         processing_time_ms: Tiempo de procesamiento
         consensus_stats: Estadísticas de consenso entre métodos
     """
+
     inconsistencies: list[TemporalInconsistency] = field(default_factory=list)
     method_contributions: dict[str, int] = field(default_factory=dict)
     processing_time_ms: float = 0.0
@@ -836,10 +832,7 @@ class TemporalCheckResult:
 
     @property
     def critical_count(self) -> int:
-        return sum(
-            1 for i in self.inconsistencies
-            if i.severity == InconsistencySeverity.CRITICAL
-        )
+        return sum(1 for i in self.inconsistencies if i.severity == InconsistencySeverity.CRITICAL)
 
     @property
     def high_confidence_count(self) -> int:
@@ -867,7 +860,7 @@ class VotingTemporalChecker:
 
     def __init__(
         self,
-        config: Optional[TemporalDetectionConfig] = None,
+        config: TemporalDetectionConfig | None = None,
     ):
         """
         Inicializa el verificador con votación.
@@ -889,8 +882,8 @@ class VotingTemporalChecker:
         self,
         timeline: Timeline,
         markers: list[TemporalMarker],
-        character_ages: Optional[dict[int, list[tuple[int, int]]]] = None,
-        text: Optional[str] = None,
+        character_ages: dict[int, list[tuple[int, int]]] | None = None,
+        text: str | None = None,
     ) -> TemporalCheckResult:
         """
         Verifica consistencia temporal con votación multi-método.
@@ -905,15 +898,14 @@ class VotingTemporalChecker:
             TemporalCheckResult con inconsistencias y estadísticas
         """
         import time
+
         start_time = time.time()
 
         result = TemporalCheckResult()
 
         # Fase 1: Detección directa (rápida)
         # Estos métodos se ejecutan secuencialmente pero son muy rápidos
-        direct_inconsistencies = self._base_checker.check(
-            timeline, markers, character_ages
-        )
+        direct_inconsistencies = self._base_checker.check(timeline, markers, character_ages)
 
         # Marcar método de detección
         for inc in direct_inconsistencies:
@@ -944,17 +936,22 @@ class VotingTemporalChecker:
                     inc.confidence = min(1.0, inc.confidence * 1.05)
 
         # Fase 4: Validación LLM (solo para candidatos de alta prioridad)
-        if (TemporalDetectionMethod.LLM in self.config.enabled_methods
+        if (
+            TemporalDetectionMethod.LLM in self.config.enabled_methods
             and self._base_checker._llm_validator
             and self._base_checker._llm_validator.is_available
-            and text):
-
+            and text
+        ):
             # Solo validar inconsistencias de severidad MEDIUM o superior
             high_priority = [
-                inc for inc in direct_inconsistencies
-                if inc.severity in (InconsistencySeverity.CRITICAL,
-                                   InconsistencySeverity.HIGH,
-                                   InconsistencySeverity.MEDIUM)
+                inc
+                for inc in direct_inconsistencies
+                if inc.severity
+                in (
+                    InconsistencySeverity.CRITICAL,
+                    InconsistencySeverity.HIGH,
+                    InconsistencySeverity.MEDIUM,
+                )
             ]
 
             timeline_summary = self._get_timeline_summary(timeline)
@@ -984,16 +981,12 @@ class VotingTemporalChecker:
 
         # Fase 6: Filtrar por confianza mínima
         result.inconsistencies = [
-            inc for inc in direct_inconsistencies
-            if inc.confidence >= self.config.min_confidence
+            inc for inc in direct_inconsistencies if inc.confidence >= self.config.min_confidence
         ]
 
         # Ordenar por severidad y confianza
         result.inconsistencies.sort(
-            key=lambda i: (
-                list(InconsistencySeverity).index(i.severity),
-                -i.confidence
-            )
+            key=lambda i: (list(InconsistencySeverity).index(i.severity), -i.confidence)
         )
 
         # Calcular estadísticas
@@ -1023,14 +1016,17 @@ class VotingTemporalChecker:
         reasons = []
 
         # Verificar si hay marcadores de flashback/prolepsis cercanos
-        nearby_markers = [
-            m for m in markers
-            if abs(m.start_char - inc.position) < 500
-        ]
+        nearby_markers = [m for m in markers if abs(m.start_char - inc.position) < 500]
 
         # Buscar indicadores de salto temporal intencional
-        transition_words = ["más tarde", "años después", "tiempo atrás",
-                          "en aquel entonces", "cuando era", "de joven"]
+        transition_words = [
+            "más tarde",
+            "años después",
+            "tiempo atrás",
+            "en aquel entonces",
+            "cuando era",
+            "de joven",
+        ]
 
         for marker in nearby_markers:
             marker_lower = marker.text.lower()
@@ -1042,10 +1038,7 @@ class VotingTemporalChecker:
         # Verificar consistencia con eventos adyacentes
         if inc.events_involved:
             for event_id in inc.events_involved:
-                event = next(
-                    (e for e in timeline.events if e.id == event_id),
-                    None
-                )
+                event = next((e for e in timeline.events if e.id == event_id), None)
                 if event and event.narrative_order != NarrativeOrder.CHRONOLOGICAL:
                     score -= 0.3  # Es un flashback/prolepsis declarado
                     reasons.append("Evento marcado como no-cronológico")
@@ -1147,11 +1140,11 @@ class VotingTemporalChecker:
 # =============================================================================
 
 _voting_checker_lock = threading.Lock()
-_voting_checker: Optional[VotingTemporalChecker] = None
+_voting_checker: VotingTemporalChecker | None = None
 
 
 def get_voting_temporal_checker(
-    config: Optional[TemporalDetectionConfig] = None,
+    config: TemporalDetectionConfig | None = None,
 ) -> VotingTemporalChecker:
     """
     Obtiene el singleton del verificador temporal con votación.
@@ -1182,9 +1175,9 @@ def reset_voting_temporal_checker() -> None:
 def check_temporal_consistency_voting(
     timeline: Timeline,
     markers: list[TemporalMarker],
-    character_ages: Optional[dict[int, list[tuple[int, int]]]] = None,
-    text: Optional[str] = None,
-    config: Optional[TemporalDetectionConfig] = None,
+    character_ages: dict[int, list[tuple[int, int]]] | None = None,
+    text: str | None = None,
+    config: TemporalDetectionConfig | None = None,
 ) -> TemporalCheckResult:
     """
     Función de conveniencia para verificar consistencia temporal con votación.

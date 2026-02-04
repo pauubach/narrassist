@@ -11,7 +11,6 @@ También sugiere alternativas según la variante regional configurada.
 import json
 import logging
 from pathlib import Path
-from typing import Optional
 
 from ..base import BaseDetector, CorrectionIssue
 from ..config import RegionalConfig
@@ -28,7 +27,7 @@ class RegionalDictionary:
     de cada variante regional.
     """
 
-    def __init__(self, dictionaries_path: Optional[Path] = None):
+    def __init__(self, dictionaries_path: Path | None = None):
         """
         Inicializa el diccionario regional.
 
@@ -38,13 +37,14 @@ class RegionalDictionary:
         """
         if dictionaries_path is None:
             from pathlib import Path
+
             dictionaries_path = Path.home() / ".narrative_assistant" / "dictionaries"
 
         self.dictionaries_path = dictionaries_path
         self.dictionaries: dict[str, dict] = {}
         self._loaded = False
 
-    def load(self, regions: Optional[list[str]] = None) -> None:
+    def load(self, regions: list[str] | None = None) -> None:
         """
         Carga los diccionarios de las regiones especificadas.
 
@@ -67,7 +67,7 @@ class RegionalDictionary:
                 continue
 
             try:
-                with open(json_file, "r", encoding="utf-8") as f:
+                with open(json_file, encoding="utf-8") as f:
                     self.dictionaries[region_code] = json.load(f)
                 logger.info(f"Loaded regional dictionary: {region_code}")
             except Exception as e:
@@ -98,7 +98,7 @@ class RegionalDictionary:
 
         return result
 
-    def get_regional_alternative(self, term: str, target_region: str) -> Optional[str]:
+    def get_regional_alternative(self, term: str, target_region: str) -> str | None:
         """
         Obtiene la alternativa de un término en la región objetivo.
 
@@ -145,12 +145,21 @@ class RegionalDetector(BaseDetector):
     # Términos regionales comunes (fallback si no hay diccionarios)
     BUILTIN_REGIONAL_TERMS = {
         # España
-        "ordenador": {"region": "es_ES", "alternatives": {"es_MX": "computadora", "es_AR": "computadora"}},
+        "ordenador": {
+            "region": "es_ES",
+            "alternatives": {"es_MX": "computadora", "es_AR": "computadora"},
+        },
         "móvil": {"region": "es_ES", "alternatives": {"es_MX": "celular", "es_AR": "celular"}},
         "coche": {"region": "es_ES", "alternatives": {"es_MX": "carro", "es_AR": "auto"}},
-        "piso": {"region": "es_ES", "alternatives": {"es_MX": "departamento", "es_AR": "departamento"}},
+        "piso": {
+            "region": "es_ES",
+            "alternatives": {"es_MX": "departamento", "es_AR": "departamento"},
+        },
         "vale": {"region": "es_ES", "alternatives": {"es_MX": "ok", "es_AR": "dale"}},
-        "mola": {"region": "es_ES", "alternatives": {"es_MX": "está padre", "es_AR": "está copado"}},
+        "mola": {
+            "region": "es_ES",
+            "alternatives": {"es_MX": "está padre", "es_AR": "está copado"},
+        },
         "guay": {"region": "es_ES", "alternatives": {"es_MX": "chido", "es_AR": "copado"}},
         "tío": {"region": "es_ES", "alternatives": {"es_MX": "güey", "es_AR": "che"}},
         "gilipollas": {"region": "es_ES", "alternatives": {"es_MX": "pendejo", "es_AR": "boludo"}},
@@ -159,7 +168,6 @@ class RegionalDetector(BaseDetector):
         "tíos": {"region": "es_ES", "alternatives": {"es_MX": "güeyes", "es_AR": "pibes"}},
         "chaval": {"region": "es_ES", "alternatives": {"es_MX": "chamaco", "es_AR": "pibe"}},
         "majo": {"region": "es_ES", "alternatives": {"es_MX": "chido", "es_AR": "copado"}},
-
         # México
         "computadora": {"region": "es_MX", "alternatives": {"es_ES": "ordenador"}},
         "celular": {"region": "es_MX", "alternatives": {"es_ES": "móvil"}},
@@ -171,7 +179,6 @@ class RegionalDetector(BaseDetector):
         "lana": {"region": "es_MX", "alternatives": {"es_ES": "pasta"}},
         "chamaco": {"region": "es_MX", "alternatives": {"es_ES": "chaval"}},
         "padre": {"region": "es_MX", "alternatives": {"es_ES": "guay"}},  # como adjetivo
-
         # Argentina
         "laburo": {"region": "es_AR", "alternatives": {"es_ES": "curro", "es_MX": "chamba"}},
         "guita": {"region": "es_AR", "alternatives": {"es_ES": "pasta", "es_MX": "lana"}},
@@ -186,8 +193,8 @@ class RegionalDetector(BaseDetector):
 
     def __init__(
         self,
-        config: Optional[RegionalConfig] = None,
-        dictionary: Optional[RegionalDictionary] = None,
+        config: RegionalConfig | None = None,
+        dictionary: RegionalDictionary | None = None,
     ):
         self.config = config or RegionalConfig()
         self.dictionary = dictionary or RegionalDictionary()
@@ -199,7 +206,7 @@ class RegionalDetector(BaseDetector):
     def detect(
         self,
         text: str,
-        chapter_index: Optional[int] = None,
+        chapter_index: int | None = None,
         spacy_doc=None,
     ) -> list[CorrectionIssue]:
         """
@@ -221,12 +228,18 @@ class RegionalDetector(BaseDetector):
 
         # Obtener tokens
         if spacy_doc is not None:
-            tokens = [(token.text, token.idx, token.idx + len(token.text))
-                      for token in spacy_doc if token.is_alpha]
+            tokens = [
+                (token.text, token.idx, token.idx + len(token.text))
+                for token in spacy_doc
+                if token.is_alpha
+            ]
         else:
             import re
-            tokens = [(m.group(), m.start(), m.end())
-                      for m in re.finditer(r'\b[a-záéíóúüñA-ZÁÉÍÓÚÜÑ]+\b', text)]
+
+            tokens = [
+                (m.group(), m.start(), m.end())
+                for m in re.finditer(r"\b[a-záéíóúüñA-ZÁÉÍÓÚÜÑ]+\b", text)
+            ]
 
         # Detectar términos regionales
         found_regions = {}  # {region: [(term, start, end), ...]}
@@ -256,16 +269,12 @@ class RegionalDetector(BaseDetector):
         if len(found_regions) > 1 and self.config.detect_mixed_variants:
             # Hay mezcla de variantes
             issues.extend(
-                self._create_mixed_variant_issues(
-                    found_regions, target_region, text, chapter_index
-                )
+                self._create_mixed_variant_issues(found_regions, target_region, text, chapter_index)
             )
         elif self.config.suggest_regional_alternatives:
             # Sugerir alternativas si no es la región objetivo
             issues.extend(
-                self._create_alternative_issues(
-                    found_regions, target_region, text, chapter_index
-                )
+                self._create_alternative_issues(found_regions, target_region, text, chapter_index)
             )
 
         return issues
@@ -275,7 +284,7 @@ class RegionalDetector(BaseDetector):
         found_regions: dict,
         target_region: str,
         text: str,
-        chapter_index: Optional[int],
+        chapter_index: int | None,
     ) -> list[CorrectionIssue]:
         """Crea issues por mezcla de variantes regionales."""
         issues = []
@@ -293,7 +302,9 @@ class RegionalDetector(BaseDetector):
                 alternative = None
                 if isinstance(info, dict):
                     alternatives = info.get("alternatives", {})
-                    alternative = alternatives.get(target_region) or alternatives.get(dominant_region)
+                    alternative = alternatives.get(target_region) or alternatives.get(
+                        dominant_region
+                    )
 
                 issues.append(
                     CorrectionIssue(
@@ -327,7 +338,7 @@ class RegionalDetector(BaseDetector):
         found_regions: dict,
         target_region: str,
         text: str,
-        chapter_index: Optional[int],
+        chapter_index: int | None,
     ) -> list[CorrectionIssue]:
         """Crea issues sugiriendo alternativas para la región objetivo."""
         issues = []

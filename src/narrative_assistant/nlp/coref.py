@@ -19,11 +19,9 @@ import logging
 import threading
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
-from ..core.config import get_config
+from ..core.errors import ErrorSeverity, NLPError
 from ..core.result import Result
-from ..core.errors import NLPError, ErrorSeverity
 from .spacy_gpu import load_spacy_model
 
 logger = logging.getLogger(__name__)
@@ -112,8 +110,8 @@ class CoreferenceChain:
     """
 
     mentions: list[Mention] = field(default_factory=list)
-    main_mention: Optional[str] = None
-    entity_id: Optional[str] = None
+    main_mention: str | None = None
+    entity_id: str | None = None
     confidence: float = 0.5
 
     def __post_init__(self):
@@ -121,9 +119,7 @@ class CoreferenceChain:
         if self.mentions and self.main_mention is None:
             self.main_mention = self._find_main_mention()
         if self.mentions:
-            self.confidence = sum(m.confidence for m in self.mentions) / len(
-                self.mentions
-            )
+            self.confidence = sum(m.confidence for m in self.mentions) / len(self.mentions)
 
     def _find_main_mention(self) -> str:
         """
@@ -202,7 +198,7 @@ class CoreferenceResult:
             return 0.0
         return self.total_mentions / len(self.chains)
 
-    def get_chain_for_position(self, char_pos: int) -> Optional[CoreferenceChain]:
+    def get_chain_for_position(self, char_pos: int) -> CoreferenceChain | None:
         """Encuentra la cadena que contiene una posición de caracter."""
         for chain in self.chains:
             for mention in chain.mentions:
@@ -219,13 +215,12 @@ class CoreferenceError(NLPError):
     original_error: str = ""
     message: str = field(init=False)
     severity: ErrorSeverity = field(default=ErrorSeverity.RECOVERABLE, init=False)
-    user_message: Optional[str] = field(default=None, init=False)
+    user_message: str | None = field(default=None, init=False)
 
     def __post_init__(self):
         self.message = f"Coreference resolution error: {self.original_error}"
         self.user_message = (
-            "Error al resolver correferencias. "
-            "Se continuará con resultados parciales."
+            "Error al resolver correferencias. Se continuará con resultados parciales."
         )
         super().__post_init__()
 
@@ -297,7 +292,7 @@ class CoreferenceResolver:
     def __init__(
         self,
         use_heuristics: bool = True,
-        enable_gpu: Optional[bool] = None,
+        enable_gpu: bool | None = None,
     ):
         """
         Inicializa el resolutor de correferencias.
@@ -325,9 +320,7 @@ class CoreferenceResolver:
             self._coreferee_available = True
             logger.info("Coreferee configurado correctamente")
         except Exception as e:
-            logger.warning(
-                f"Coreferee no disponible, usando solo heurísticas: {e}"
-            )
+            logger.warning(f"Coreferee no disponible, usando solo heurísticas: {e}")
             self._coreferee_available = False
 
     def resolve(self, text: str) -> Result[CoreferenceResult]:
@@ -393,9 +386,7 @@ class CoreferenceResolver:
 
             for mention_idx in coref_chain:
                 # Coreferee puede dar índices individuales o listas
-                if hasattr(mention_idx, "__iter__") and not isinstance(
-                    mention_idx, int
-                ):
+                if hasattr(mention_idx, "__iter__") and not isinstance(mention_idx, int):
                     # Es una lista de índices (mención multi-token)
                     indices = list(mention_idx)
                     if not indices:
@@ -492,9 +483,7 @@ class CoreferenceResolver:
 
         return gender, number
 
-    def _find_unresolved_pronouns(
-        self, doc, chains: list[CoreferenceChain]
-    ) -> list[Mention]:
+    def _find_unresolved_pronouns(self, doc, chains: list[CoreferenceChain]) -> list[Mention]:
         """Encuentra pronombres que no están en ninguna cadena."""
         # Construir set de posiciones ya resueltas
         resolved_positions: set[tuple[int, int]] = set()
@@ -527,9 +516,7 @@ class CoreferenceResolver:
 
         return unresolved
 
-    def _apply_gender_number_heuristics(
-        self, doc, result: CoreferenceResult
-    ) -> None:
+    def _apply_gender_number_heuristics(self, doc, result: CoreferenceResult) -> None:
         """
         Aplica heurísticas de concordancia de género/número.
 
@@ -543,7 +530,7 @@ class CoreferenceResolver:
         still_unresolved: list[Mention] = []
 
         for pronoun in result.unresolved_pronouns:
-            best_chain: Optional[CoreferenceChain] = None
+            best_chain: CoreferenceChain | None = None
             best_score = 0.0
 
             for chain in result.chains:
@@ -565,9 +552,7 @@ class CoreferenceResolver:
 
         result.unresolved_pronouns = still_unresolved
 
-    def _compute_compatibility_score(
-        self, pronoun: Mention, chain: CoreferenceChain
-    ) -> float:
+    def _compute_compatibility_score(self, pronoun: Mention, chain: CoreferenceChain) -> float:
         """
         Calcula score de compatibilidad entre pronombre y cadena.
 
@@ -621,9 +606,7 @@ class CoreferenceResolver:
 
         for mention in chain.mentions:
             if mention.gender != GrammaticalGender.UNKNOWN:
-                gender_counts[mention.gender] = (
-                    gender_counts.get(mention.gender, 0) + 1
-                )
+                gender_counts[mention.gender] = gender_counts.get(mention.gender, 0) + 1
 
         if not gender_counts:
             return GrammaticalGender.UNKNOWN
@@ -636,9 +619,7 @@ class CoreferenceResolver:
 
         for mention in chain.mentions:
             if mention.number != GrammaticalNumber.UNKNOWN:
-                number_counts[mention.number] = (
-                    number_counts.get(mention.number, 0) + 1
-                )
+                number_counts[mention.number] = number_counts.get(mention.number, 0) + 1
 
         if not number_counts:
             return GrammaticalNumber.UNKNOWN
@@ -702,12 +683,12 @@ class CoreferenceResolver:
 # =============================================================================
 
 _coref_lock = threading.Lock()
-_coref_resolver: Optional[CoreferenceResolver] = None
+_coref_resolver: CoreferenceResolver | None = None
 
 
 def get_coref_resolver(
     use_heuristics: bool = True,
-    enable_gpu: Optional[bool] = None,
+    enable_gpu: bool | None = None,
 ) -> CoreferenceResolver:
     """
     Obtiene el singleton del resolutor de correferencias.

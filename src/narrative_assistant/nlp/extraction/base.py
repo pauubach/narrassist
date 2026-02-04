@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Interfaces base para el sistema de extracción de atributos.
 
@@ -9,11 +8,12 @@ así como las estructuras de datos compartidas.
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional, Protocol, Any
+from typing import Any, Protocol
 
 
 class ExtractionMethod(Enum):
     """Métodos de extracción disponibles."""
+
     REGEX = "regex"
     DEPENDENCY = "dependency"
     SEMANTIC_LLM = "semantic_llm"
@@ -22,6 +22,7 @@ class ExtractionMethod(Enum):
 
 class AttributeType(Enum):
     """Tipos de atributos que podemos extraer."""
+
     # Físicos
     EYE_COLOR = "eye_color"
     HAIR_COLOR = "hair_color"
@@ -58,16 +59,17 @@ class ExtractedAttribute:
         is_metaphor: Si es parte de una metáfora
         raw_evidence: Evidencia original sin procesar
     """
+
     entity_name: str
     attribute_type: AttributeType
     value: str
     confidence: float
     source_text: str
     extraction_method: ExtractionMethod
-    chapter: Optional[int] = None
+    chapter: int | None = None
     is_negated: bool = False
     is_metaphor: bool = False
-    raw_evidence: Optional[str] = None
+    raw_evidence: str | None = None
 
     def __post_init__(self):
         """Validar y normalizar valores."""
@@ -98,14 +100,15 @@ class ExtractionContext:
         genre_hint: Pista de género literario
         doc: Documento spaCy pre-procesado (opcional, para reutilizar)
     """
+
     text: str
     entity_names: list[str]
     # (name, start, end, entity_type) - entity_type puede ser "PER", "LOC", "ORG", None
-    entity_mentions: Optional[list[tuple[str, int, int, Optional[str]]]] = None
-    chapter: Optional[int] = None
-    previous_attributes: Optional[list[ExtractedAttribute]] = None
-    genre_hint: Optional[str] = None  # "fantasy", "sci-fi", "realistic"
-    doc: Optional[Any] = None  # spaCy Doc pre-procesado
+    entity_mentions: list[tuple[str, int, int, str | None]] | None = None
+    chapter: int | None = None
+    previous_attributes: list[ExtractedAttribute] | None = None
+    genre_hint: str | None = None  # "fantasy", "sci-fi", "realistic"
+    doc: Any | None = None  # spaCy Doc pre-procesado
 
     def __post_init__(self):
         """Inicializar valores por defecto."""
@@ -128,6 +131,7 @@ class ExtractionResult:
         errors: Errores ocurridos durante la extracción
         metadata: Metadatos adicionales del proceso
     """
+
     attributes: list[ExtractedAttribute]
     confidence: float
     method: ExtractionMethod
@@ -163,13 +167,14 @@ class AggregatedAttribute:
         chapter: Capítulo donde se encontró
         is_negated: Si está negado
     """
+
     entity_name: str
     attribute_type: AttributeType
     value: str
     final_confidence: float
     sources: list[tuple[ExtractionMethod, float]]
     consensus_level: str  # "unanimous", "majority", "contested", "single"
-    chapter: Optional[int] = None
+    chapter: int | None = None
     is_negated: bool = False
 
     @property
@@ -281,7 +286,7 @@ class BaseExtractor(ABC):
         value: str,
         confidence: float,
         source_text: str,
-        chapter: Optional[int] = None,
+        chapter: int | None = None,
         is_negated: bool = False,
         is_metaphor: bool = False,
     ) -> ExtractedAttribute:
@@ -305,8 +310,8 @@ class BaseExtractor(ABC):
     def _create_result(
         self,
         attributes: list[ExtractedAttribute],
-        errors: Optional[list[str]] = None,
-        metadata: Optional[dict[str, Any]] = None,
+        errors: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> ExtractionResult:
         """
         Helper para crear resultados.

@@ -11,7 +11,7 @@ import sys
 import threading
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Literal
 
 logger = logging.getLogger(__name__)
 
@@ -22,13 +22,13 @@ _config_lock = threading.Lock()
 def _get_default_data_dir() -> Path:
     """
     Determina el directorio de datos según el entorno.
-    
+
     - Producción (NA_EMBEDDED=1): usa LOCALAPPDATA/Narrative Assistant (Windows)
       o ~/.local/share/narrative-assistant (Linux/Mac)
     - Desarrollo: usa ~/.narrative_assistant
     """
     is_embedded = os.environ.get("NA_EMBEDDED") == "1"
-    
+
     if is_embedded:
         # Modo producción - usar rutas estándar del sistema
         if sys.platform == "win32":
@@ -41,9 +41,11 @@ def _get_default_data_dir() -> Path:
             # Linux
             xdg_data = os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local" / "share"))
             return Path(xdg_data) / "narrative-assistant"
-    
+
     # Modo desarrollo - ruta legacy
     return Path.home() / ".narrative_assistant"
+
+
 DevicePreference = Literal["auto", "cuda", "mps", "cpu"]
 
 
@@ -56,7 +58,7 @@ class GPUConfig:
 
     # spaCy específico
     spacy_gpu_enabled: bool = True
-    spacy_gpu_memory_limit: Optional[int] = None  # MB, None = sin límite
+    spacy_gpu_memory_limit: int | None = None  # MB, None = sin límite
 
     # sentence-transformers específico
     embeddings_gpu_enabled: bool = True
@@ -84,11 +86,11 @@ class NLPConfig:
 
     # spaCy
     spacy_model: str = "es_core_news_lg"
-    spacy_model_path: Optional[Path] = None  # Ruta local, None = usar default
+    spacy_model_path: Path | None = None  # Ruta local, None = usar default
 
     # Embeddings
     embeddings_model: str = "paraphrase-multilingual-MiniLM-L12-v2"
-    embeddings_model_path: Optional[Path] = None  # Ruta local, None = usar default
+    embeddings_model_path: Path | None = None  # Ruta local, None = usar default
 
     # Correferencia
     coreference_enabled: bool = True
@@ -214,7 +216,7 @@ class PersistenceConfig:
     similarity_threshold_same_doc: float = 0.95  # Umbral para considerar mismo doc
 
 
-def _find_project_root() -> Optional[Path]:
+def _find_project_root() -> Path | None:
     """Busca la raíz del proyecto (donde está pyproject.toml)."""
     current = Path.cwd()
     for parent in [current] + list(current.parents):
@@ -235,17 +237,13 @@ class AppConfig:
     persistence: PersistenceConfig = field(default_factory=PersistenceConfig)
 
     # Directorios
-    data_dir: Path = field(
-        default_factory=_get_default_data_dir
-    )
-    cache_dir: Path = field(
-        default_factory=lambda: _get_default_data_dir() / "cache"
-    )
-    models_dir: Optional[Path] = None  # Directorio de modelos locales
+    data_dir: Path = field(default_factory=_get_default_data_dir)
+    cache_dir: Path = field(default_factory=lambda: _get_default_data_dir() / "cache")
+    models_dir: Path | None = None  # Directorio de modelos locales
 
     # Logging
     log_level: str = "INFO"
-    log_file: Optional[Path] = None
+    log_file: Path | None = None
 
     def __post_init__(self):
         """Crea directorios si no existen y configura modelos locales."""
@@ -290,7 +288,7 @@ class AppConfig:
         return secrets
 
     @property
-    def spacy_model_path(self) -> Optional[Path]:
+    def spacy_model_path(self) -> Path | None:
         """Ruta al modelo spaCy local, si existe."""
         # Prioridad: config explícita > models_dir > None (usar HF cache)
         if self.nlp.spacy_model_path and self.nlp.spacy_model_path.exists():
@@ -304,7 +302,7 @@ class AppConfig:
         return None
 
     @property
-    def embeddings_model_path(self) -> Optional[Path]:
+    def embeddings_model_path(self) -> Path | None:
         """Ruta al modelo de embeddings local, si existe."""
         # Prioridad: config explícita > models_dir > None (usar HF cache)
         if self.nlp.embeddings_model_path and self.nlp.embeddings_model_path.exists():
@@ -318,7 +316,7 @@ class AppConfig:
         return None
 
     @classmethod
-    def load(cls, config_path: Optional[Path] = None) -> "AppConfig":
+    def load(cls, config_path: Path | None = None) -> "AppConfig":
         """
         Carga configuración desde archivo y/o variables de entorno.
 
@@ -379,9 +377,15 @@ class AppConfig:
                 if nlp_data := data.get("nlp"):
                     config.nlp = NLPConfig(
                         spacy_model=nlp_data.get("spacy_model", "es_core_news_lg"),
-                        spacy_model_path=Path(nlp_data["spacy_model_path"]) if nlp_data.get("spacy_model_path") else None,
-                        embeddings_model=nlp_data.get("embeddings_model", "paraphrase-multilingual-MiniLM-L12-v2"),
-                        embeddings_model_path=Path(nlp_data["embeddings_model_path"]) if nlp_data.get("embeddings_model_path") else None,
+                        spacy_model_path=Path(nlp_data["spacy_model_path"])
+                        if nlp_data.get("spacy_model_path")
+                        else None,
+                        embeddings_model=nlp_data.get(
+                            "embeddings_model", "paraphrase-multilingual-MiniLM-L12-v2"
+                        ),
+                        embeddings_model_path=Path(nlp_data["embeddings_model_path"])
+                        if nlp_data.get("embeddings_model_path")
+                        else None,
                         coreference_enabled=nlp_data.get("coreference_enabled", True),
                         min_entity_confidence=nlp_data.get("min_entity_confidence", 0.5),
                         context_window_chars=nlp_data.get("context_window_chars", 50),
@@ -401,7 +405,9 @@ class AppConfig:
                         check_punctuation=grammar_data.get("check_punctuation", True),
                         check_sentence_structure=grammar_data.get("check_sentence_structure", True),
                         use_languagetool=grammar_data.get("use_languagetool", True),
-                        languagetool_url=grammar_data.get("languagetool_url", "http://localhost:8081"),
+                        languagetool_url=grammar_data.get(
+                            "languagetool_url", "http://localhost:8081"
+                        ),
                         use_llm=grammar_data.get("use_llm", False),
                         min_confidence=grammar_data.get("min_confidence", 0.5),
                         use_spacy_analysis=grammar_data.get("use_spacy_analysis", True),
@@ -411,19 +417,27 @@ class AppConfig:
                 if alerts_data := data.get("alerts"):
                     config.alerts = AlertConfig(
                         show_hints=alerts_data.get("show_hints", True),
-                        auto_dismiss_low_confidence=alerts_data.get("auto_dismiss_low_confidence", False),
+                        auto_dismiss_low_confidence=alerts_data.get(
+                            "auto_dismiss_low_confidence", False
+                        ),
                         min_confidence_to_show=alerts_data.get("min_confidence_to_show", 0.3),
                     )
 
                 # Mapear Persistence config
                 if persistence_data := data.get("persistence"):
                     config.persistence = PersistenceConfig(
-                        autosave_interval_seconds=persistence_data.get("autosave_interval_seconds", 60),
+                        autosave_interval_seconds=persistence_data.get(
+                            "autosave_interval_seconds", 60
+                        ),
                         autosave_enabled=persistence_data.get("autosave_enabled", True),
                         max_history_entries=persistence_data.get("max_history_entries", 1000),
                         keep_dismissed_alerts=persistence_data.get("keep_dismissed_alerts", True),
-                        fingerprint_sample_size=persistence_data.get("fingerprint_sample_size", 10000),
-                        similarity_threshold_same_doc=persistence_data.get("similarity_threshold_same_doc", 0.95),
+                        fingerprint_sample_size=persistence_data.get(
+                            "fingerprint_sample_size", 10000
+                        ),
+                        similarity_threshold_same_doc=persistence_data.get(
+                            "similarity_threshold_same_doc", 0.95
+                        ),
                     )
 
                 # Mapear directorios y logging
@@ -443,7 +457,7 @@ class AppConfig:
 
         return cls()
 
-    def save(self, path: Optional[Path] = None) -> Path:
+    def save(self, path: Path | None = None) -> Path:
         """Guarda configuración a archivo TOML."""
         if path is None:
             path = self.data_dir / "config.toml"
@@ -464,9 +478,13 @@ class AppConfig:
             },
             "nlp": {
                 "spacy_model": self.nlp.spacy_model,
-                "spacy_model_path": str(self.nlp.spacy_model_path) if self.nlp.spacy_model_path else None,
+                "spacy_model_path": str(self.nlp.spacy_model_path)
+                if self.nlp.spacy_model_path
+                else None,
                 "embeddings_model": self.nlp.embeddings_model,
-                "embeddings_model_path": str(self.nlp.embeddings_model_path) if self.nlp.embeddings_model_path else None,
+                "embeddings_model_path": str(self.nlp.embeddings_model_path)
+                if self.nlp.embeddings_model_path
+                else None,
                 "coreference_enabled": self.nlp.coreference_enabled,
                 "min_entity_confidence": self.nlp.min_entity_confidence,
                 "context_window_chars": self.nlp.context_window_chars,
@@ -533,7 +551,7 @@ class AppConfig:
 
 
 # Singleton thread-safe
-_config: Optional[AppConfig] = None
+_config: AppConfig | None = None
 
 
 def get_config() -> AppConfig:

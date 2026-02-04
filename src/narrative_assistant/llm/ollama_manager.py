@@ -11,21 +11,22 @@ Este módulo proporciona:
 IMPORTANTE: Las descargas solo ocurren cuando el usuario las solicita explícitamente.
 """
 
+import contextlib
 import json
 import logging
 import os
 import platform
 import shutil
 import subprocess
-import sys
 import tempfile
 import threading
 import time
 import urllib.request
-from dataclasses import dataclass, field
+from collections.abc import Callable
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +74,7 @@ class DownloadProgress:
     total_bytes: int = 0
     percentage: float = 0.0
     status: str = "pending"
-    error: Optional[str] = None
+    error: str | None = None
 
     @property
     def is_complete(self) -> bool:
@@ -106,7 +107,7 @@ class OllamaConfig:
     retry_delay: float = 2.0
 
     # Directorio para persistir estado
-    state_dir: Optional[Path] = None
+    state_dir: Path | None = None
 
     # Forzar modo CPU
     force_cpu: bool = False
@@ -161,7 +162,7 @@ class OllamaManager:
     - Persistencia de estado
     """
 
-    def __init__(self, config: Optional[OllamaConfig] = None):
+    def __init__(self, config: OllamaConfig | None = None):
         """
         Inicializa el gestor.
 
@@ -173,7 +174,7 @@ class OllamaManager:
         self._status = OllamaStatus.NOT_INSTALLED
         self._downloaded_models: set[str] = set()
         self._platform = self._detect_platform()
-        self._state_file: Optional[Path] = None
+        self._state_file: Path | None = None
 
         # Configurar directorio de estado
         self._setup_state_dir()
@@ -203,6 +204,7 @@ class OllamaManager:
             # Usar directorio de datos de la aplicacion
             try:
                 from narrative_assistant.core.config import get_config
+
                 app_config = get_config()
                 state_dir = app_config.data_dir
             except Exception:
@@ -217,7 +219,7 @@ class OllamaManager:
             return
 
         try:
-            with open(self._state_file, "r", encoding="utf-8") as f:
+            with open(self._state_file, encoding="utf-8") as f:
                 data = json.load(f)
             self._downloaded_models = set(data.get("downloaded_models", []))
             logger.debug(f"Estado cargado: {len(self._downloaded_models)} modelos registrados")
@@ -301,9 +303,9 @@ class OllamaManager:
         """Verifica si el servidor Ollama esta corriendo."""
         try:
             import httpx
+
             response = httpx.get(
-                f"{self._config.host}/api/tags",
-                timeout=self._config.network_timeout
+                f"{self._config.host}/api/tags", timeout=self._config.network_timeout
             )
             return response.status_code == 200
         except ImportError:
@@ -350,9 +352,9 @@ class OllamaManager:
 
         try:
             import httpx
+
             response = httpx.get(
-                f"{self._config.host}/api/tags",
-                timeout=self._config.network_timeout
+                f"{self._config.host}/api/tags", timeout=self._config.network_timeout
             )
             if response.status_code == 200:
                 data = response.json()
@@ -376,7 +378,7 @@ class OllamaManager:
             return {"creationflags": subprocess.CREATE_NO_WINDOW}
         return {}
 
-    def get_version(self) -> Optional[str]:
+    def get_version(self) -> str | None:
         """Obtiene la version de Ollama instalada."""
         if not self.is_installed:
             return None
@@ -388,7 +390,7 @@ class OllamaManager:
                 capture_output=True,
                 text=True,
                 timeout=10.0,
-                **self._subprocess_kwargs()
+                **self._subprocess_kwargs(),
             )
             if result.returncode == 0:
                 # Parsear version del output
@@ -424,7 +426,7 @@ class OllamaManager:
 
     def install_ollama(
         self,
-        progress_callback: Optional[Callable[[DownloadProgress], None]] = None,
+        progress_callback: Callable[[DownloadProgress], None] | None = None,
         silent: bool = False,
     ) -> tuple[bool, str]:
         """
@@ -462,7 +464,7 @@ class OllamaManager:
 
     def _install_windows(
         self,
-        progress_callback: Optional[Callable[[DownloadProgress], None]],
+        progress_callback: Callable[[DownloadProgress], None] | None,
         silent: bool,
     ) -> tuple[bool, str]:
         """Instala Ollama en Windows."""
@@ -499,7 +501,10 @@ class OllamaManager:
                 logger.info("Ollama instalado correctamente")
                 return True, "Ollama instalado correctamente"
             else:
-                return False, "Instalacion completa pero 'ollama' no esta en PATH. Reinicia la terminal."
+                return (
+                    False,
+                    "Instalacion completa pero 'ollama' no esta en PATH. Reinicia la terminal.",
+                )
 
         except subprocess.TimeoutExpired:
             return False, "Timeout durante la instalacion"
@@ -507,14 +512,12 @@ class OllamaManager:
             return False, f"Error ejecutando instalador: {e}"
         finally:
             # Limpiar instalador
-            try:
+            with contextlib.suppress(Exception):
                 installer_path.unlink()
-            except Exception:
-                pass
 
     def _install_macos(
         self,
-        progress_callback: Optional[Callable[[DownloadProgress], None]],
+        progress_callback: Callable[[DownloadProgress], None] | None,
     ) -> tuple[bool, str]:
         """Instala Ollama en macOS."""
         # Intentar con Homebrew primero
@@ -525,7 +528,7 @@ class OllamaManager:
                     ["brew", "install", "ollama"],
                     capture_output=True,
                     text=True,
-                    timeout=600.0  # 10 minutos
+                    timeout=600.0,  # 10 minutos
                 )
                 if result.returncode == 0:
                     return True, "Ollama instalado via Homebrew"
@@ -543,7 +546,8 @@ class OllamaManager:
         try:
             # Extraer y mover a Applications
             import zipfile
-            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+
+            with zipfile.ZipFile(zip_path, "r") as zip_ref:
                 zip_ref.extractall(tempfile.gettempdir())
 
             # Mover a /Applications
@@ -559,14 +563,12 @@ class OllamaManager:
         except Exception as e:
             return False, f"Error instalando: {e}"
         finally:
-            try:
+            with contextlib.suppress(Exception):
                 zip_path.unlink()
-            except Exception:
-                pass
 
     def _install_linux(
         self,
-        progress_callback: Optional[Callable[[DownloadProgress], None]],
+        progress_callback: Callable[[DownloadProgress], None] | None,
     ) -> tuple[bool, str]:
         """Instala Ollama en Linux usando el script oficial."""
         try:
@@ -578,7 +580,7 @@ class OllamaManager:
                 ["curl", "-fsSL", "https://ollama.com/install.sh"],
                 capture_output=True,
                 text=True,
-                timeout=60.0
+                timeout=60.0,
             )
 
             if result.returncode != 0:
@@ -595,7 +597,7 @@ class OllamaManager:
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
-                text=True
+                text=True,
             )
 
             stdout, _ = process.communicate(input=install_script, timeout=600.0)
@@ -616,16 +618,17 @@ class OllamaManager:
         self,
         url: str,
         dest: Path,
-        progress_callback: Optional[Callable[[DownloadProgress], None]],
+        progress_callback: Callable[[DownloadProgress], None] | None,
     ) -> bool:
         """Descarga un archivo con reporte de progreso."""
         import ssl
-        
+
         progress = DownloadProgress(status="downloading")
-        
+
         # Crear contexto SSL con certifi para entornos embebidos
         try:
             import certifi
+
             ssl_ctx = ssl.create_default_context(cafile=certifi.where())
         except ImportError:
             try:
@@ -641,13 +644,13 @@ class OllamaManager:
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
                 }
                 req = urllib.request.Request(url, headers=headers)
-                
+
                 with urllib.request.urlopen(req, timeout=300, context=ssl_ctx) as response:
                     total_size = int(response.headers.get("Content-Length", 0))
                     progress.total_bytes = total_size
                     block_size = 8192
                     downloaded = 0
-                    
+
                     with open(dest, "wb") as f:
                         while True:
                             chunk = response.read(block_size)
@@ -655,19 +658,19 @@ class OllamaManager:
                                 break
                             f.write(chunk)
                             downloaded += len(chunk)
-                            
+
                             progress.current_bytes = downloaded
                             if total_size > 0:
                                 progress.percentage = min(100.0, downloaded * 100.0 / total_size)
                             if progress_callback:
                                 progress_callback(progress)
-                
+
                 progress.status = "complete"
                 progress.percentage = 100.0
                 if progress_callback:
                     progress_callback(progress)
                 return True
-                
+
             except Exception as e:
                 logger.debug(f"Intento {attempt + 1} fallido: {e}")
                 if dest.exists():
@@ -721,7 +724,7 @@ class OllamaManager:
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL,
                         env=env,
-                        creationflags=subprocess.CREATE_NO_WINDOW
+                        creationflags=subprocess.CREATE_NO_WINDOW,
                     )
                 else:
                     # Linux/macOS: iniciar en nueva sesion
@@ -730,7 +733,7 @@ class OllamaManager:
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL,
                         env=env,
-                        start_new_session=True
+                        start_new_session=True,
                     )
 
                 # Esperar a que inicie
@@ -744,7 +747,10 @@ class OllamaManager:
                         return True, "Servicio iniciado correctamente"
 
                 self._status = OllamaStatus.ERROR
-                return False, f"Timeout esperando que Ollama inicie ({self._config.service_start_timeout}s)"
+                return (
+                    False,
+                    f"Timeout esperando que Ollama inicie ({self._config.service_start_timeout}s)",
+                )
 
             except FileNotFoundError:
                 self._status = OllamaStatus.NOT_INSTALLED
@@ -777,7 +783,7 @@ class OllamaManager:
     def download_model(
         self,
         model_name: str,
-        progress_callback: Optional[Callable[[DownloadProgress], None]] = None,
+        progress_callback: Callable[[DownloadProgress], None] | None = None,
     ) -> tuple[bool, str]:
         """
         Descarga un modelo de Ollama.
@@ -814,7 +820,7 @@ class OllamaManager:
                 stderr=subprocess.STDOUT,
                 text=True,
                 bufsize=1,
-                **self._subprocess_kwargs()
+                **self._subprocess_kwargs(),
             )
 
             for line in process.stdout:
@@ -886,7 +892,7 @@ class OllamaManager:
                 capture_output=True,
                 text=True,
                 timeout=60.0,
-                **self._subprocess_kwargs()
+                **self._subprocess_kwargs(),
             )
 
             if result.returncode == 0:
@@ -899,7 +905,7 @@ class OllamaManager:
         except Exception as e:
             return False, f"Error: {e}"
 
-    def get_model_info(self, model_name: str) -> Optional[OllamaModel]:
+    def get_model_info(self, model_name: str) -> OllamaModel | None:
         """Obtiene informacion de un modelo."""
         for model in AVAILABLE_MODELS:
             if model.name == model_name:
@@ -914,7 +920,7 @@ class OllamaManager:
         return None
 
 
-def get_ollama_manager(config: Optional[OllamaConfig] = None) -> OllamaManager:
+def get_ollama_manager(config: OllamaConfig | None = None) -> OllamaManager:
     """
     Obtiene el gestor de Ollama singleton (thread-safe).
 
@@ -943,6 +949,7 @@ def reset_ollama_manager() -> None:
 
 
 # Funciones de conveniencia
+
 
 def is_ollama_available() -> bool:
     """Verifica si Ollama esta instalado y corriendo."""
@@ -997,7 +1004,7 @@ def get_available_llm_models() -> list[OllamaModel]:
 
 def download_llm_model(
     model_name: str,
-    progress_callback: Optional[Callable[[DownloadProgress], None]] = None,
+    progress_callback: Callable[[DownloadProgress], None] | None = None,
 ) -> tuple[bool, str]:
     """
     Descarga un modelo LLM.

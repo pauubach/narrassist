@@ -2,19 +2,19 @@
 Repositorio SQLite para escenas y etiquetas.
 """
 
+import contextlib
 import json
 import logging
-from typing import Optional
 from datetime import datetime
 
 from ..persistence.database import get_database
 from .models import (
-    Scene,
-    SceneTag,
-    SceneCustomTag,
     CustomTagCatalog,
-    SceneType,
+    Scene,
+    SceneCustomTag,
+    SceneTag,
     SceneTone,
+    SceneType,
 )
 
 logger = logging.getLogger(__name__)
@@ -127,7 +127,7 @@ class SceneRepository:
                 ids.append(cursor.lastrowid)
         return ids
 
-    def get_scene(self, scene_id: int) -> Optional[Scene]:
+    def get_scene(self, scene_id: int) -> Scene | None:
         """Obtiene una escena por ID."""
         row = self.db.fetchone(
             "SELECT * FROM scenes WHERE id = ?",
@@ -232,7 +232,7 @@ class SceneRepository:
             )
             return cursor.lastrowid
 
-    def get_scene_tags(self, scene_id: int) -> Optional[SceneTag]:
+    def get_scene_tags(self, scene_id: int) -> SceneTag | None:
         """Obtiene las etiquetas predefinidas de una escena."""
         row = self.db.fetchone(
             "SELECT * FROM scene_tags WHERE scene_id = ?",
@@ -253,7 +253,7 @@ class SceneRepository:
     # Custom Tags CRUD
     # =========================================================================
 
-    def add_custom_tag(self, scene_id: int, tag_name: str, tag_color: Optional[str] = None) -> int:
+    def add_custom_tag(self, scene_id: int, tag_name: str, tag_color: str | None = None) -> int:
         """
         Añade una etiqueta personalizada a una escena.
 
@@ -305,7 +305,7 @@ class SceneRepository:
     # Tag Catalog
     # =========================================================================
 
-    def add_to_catalog(self, project_id: int, tag_name: str, tag_color: Optional[str] = None) -> int:
+    def add_to_catalog(self, project_id: int, tag_name: str, tag_color: str | None = None) -> int:
         """Añade una etiqueta al catálogo del proyecto."""
         with self.db.transaction() as conn:
             cursor = conn.execute(
@@ -397,7 +397,7 @@ class SceneRepository:
               AND st.participant_ids LIKE ?
             ORDER BY s.chapter_id, s.scene_number
             """,
-            (project_id, f'%{entity_id}%'),  # Simple LIKE match on JSON
+            (project_id, f"%{entity_id}%"),  # Simple LIKE match on JSON
         )
         # Filter more precisely in Python
         result = []
@@ -431,10 +431,8 @@ class SceneRepository:
         """Convierte una fila de BD a objeto SceneTag."""
         participant_ids = []
         if row["participant_ids"]:
-            try:
+            with contextlib.suppress(json.JSONDecodeError):
                 participant_ids = json.loads(row["participant_ids"])
-            except json.JSONDecodeError:
-                pass
 
         return SceneTag(
             id=row["id"],

@@ -10,7 +10,6 @@ DOCX es el formato prioritario para el MVP:
 import logging
 import re
 from pathlib import Path
-from typing import Optional
 from zipfile import BadZipFile
 
 from ..core.errors import CorruptedDocumentError, EmptyDocumentError
@@ -26,7 +25,9 @@ CHAPTER_PATTERNS = [
     re.compile(r"^parte\s+\d+", re.IGNORECASE),
     # Numeración romana: Debe ser un número romano válido (no solo cualquier letra)
     # y estar solo o seguido de un título corto (no una oración larga)
-    re.compile(r"^(I{1,3}|IV|V|VI{0,3}|IX|X{1,3}|XI{0,3}|XIV|XV|XVI{0,3}|XIX|XX{0,3})\.\s*$", re.IGNORECASE),
+    re.compile(
+        r"^(I{1,3}|IV|V|VI{0,3}|IX|X{1,3}|XI{0,3}|XIV|XV|XVI{0,3}|XIX|XX{0,3})\.\s*$", re.IGNORECASE
+    ),
     re.compile(r"^\d+\.\s+[A-ZÁÉÍÓÚÑ]"),  # "1. Título"
 ]
 
@@ -35,12 +36,34 @@ CHAPTER_NUMBER_ONLY_PATTERN = re.compile(r"^(\d{1,3})\s*$")
 
 # Conectores narrativos que indican que un párrafo es contenido, no título
 NARRATIVE_STARTERS = [
-    'cuando', 'mientras', 'entonces', 'sin embargo', 'no obstante',
-    'de pronto', 'aquella', 'aquel', 'aquellos', 'aquellas',
-    'había', 'era', 'fue', 'estaba', 'tenía', 'hacía',
-    'el día', 'la noche', 'esa mañana', 'aquella tarde',
-    'después de', 'antes de', 'al cabo de', 'tras',
-    'a la mañana', 'por la noche', 'durante', 'desde que',
+    "cuando",
+    "mientras",
+    "entonces",
+    "sin embargo",
+    "no obstante",
+    "de pronto",
+    "aquella",
+    "aquel",
+    "aquellos",
+    "aquellas",
+    "había",
+    "era",
+    "fue",
+    "estaba",
+    "tenía",
+    "hacía",
+    "el día",
+    "la noche",
+    "esa mañana",
+    "aquella tarde",
+    "después de",
+    "antes de",
+    "al cabo de",
+    "tras",
+    "a la mañana",
+    "por la noche",
+    "durante",
+    "desde que",
 ]
 
 # Longitud máxima para considerar un texto como posible título
@@ -75,11 +98,7 @@ def is_likely_chapter_title(text: str) -> bool:
     text_lower = text.lower()
 
     # Verificar conectores narrativos
-    for starter in NARRATIVE_STARTERS:
-        if text_lower.startswith(starter):
-            return False
-
-    return True
+    return all(not text_lower.startswith(starter) for starter in NARRATIVE_STARTERS)
 
 
 class DocxParser(DocumentParser):
@@ -126,7 +145,7 @@ class DocxParser(DocumentParser):
         path = validation_result.value
 
         if not self._docx_available:
-            from ..core.errors import NarrativeError, ErrorSeverity
+            from ..core.errors import ErrorSeverity, NarrativeError
 
             return Result.failure(
                 NarrativeError(
@@ -171,7 +190,9 @@ class DocxParser(DocumentParser):
         # Verificar si hay Track Changes
         has_track_changes = self._has_track_changes(doc)
         if has_track_changes:
-            logger.info("Documento contiene revisiones (Track Changes). Se aceptarán automáticamente.")
+            logger.info(
+                "Documento contiene revisiones (Track Changes). Se aceptarán automáticamente."
+            )
 
         for idx, para in enumerate(doc.paragraphs):
             # Obtener texto LIMPIO (sin tachados, aceptando Track Changes)
@@ -246,7 +267,7 @@ class DocxParser(DocumentParser):
             "last_modified_by": props.last_modified_by or "",
         }
 
-    def _detect_heading(self, para) -> tuple[bool, Optional[int]]:
+    def _detect_heading(self, para) -> tuple[bool, int | None]:
         """
         Detecta si un párrafo es un heading.
 
@@ -316,7 +337,7 @@ class DocxParser(DocumentParser):
 
         return "".join(clean_parts)
 
-    def _get_text_with_track_changes(self, para) -> Optional[str]:
+    def _get_text_with_track_changes(self, para) -> str | None:
         """
         Extrae texto del párrafo procesando Track Changes via XML.
 
@@ -338,9 +359,8 @@ class DocxParser(DocumentParser):
             p_element = para._element
 
             # Verificar si hay elementos de revisión
-            has_revisions = (
-                p_element.findall('.//' + qn('w:del')) or
-                p_element.findall('.//' + qn('w:ins'))
+            has_revisions = p_element.findall(".//" + qn("w:del")) or p_element.findall(
+                ".//" + qn("w:ins")
             )
 
             if not has_revisions:
@@ -350,7 +370,7 @@ class DocxParser(DocumentParser):
             text_parts = []
             self._extract_text_from_element(p_element, text_parts, qn)
 
-            return ''.join(text_parts)
+            return "".join(text_parts)
 
         except Exception as e:
             logger.debug(f"Error procesando Track Changes: {e}")
@@ -366,7 +386,7 @@ class DocxParser(DocumentParser):
             qn: Función qn de docx.oxml.ns
         """
         # Tags a ignorar completamente (texto eliminado)
-        skip_tags = {qn('w:del'), qn('w:delText')}
+        skip_tags = {qn("w:del"), qn("w:delText")}
 
         for child in element:
             tag = child.tag
@@ -376,22 +396,22 @@ class DocxParser(DocumentParser):
                 continue
 
             # Texto normal o insertado
-            if tag == qn('w:t'):
+            if tag == qn("w:t"):
                 if child.text:
                     text_parts.append(child.text)
 
             # Texto insertado (w:ins) - procesar recursivamente
-            elif tag == qn('w:ins'):
+            elif tag == qn("w:ins"):
                 self._extract_text_from_element(child, text_parts, qn)
 
             # Run (w:r) - procesar recursivamente
-            elif tag == qn('w:r'):
+            elif tag == qn("w:r"):
                 # Verificar si el run tiene strikethrough
-                rpr = child.find(qn('w:rPr'))
+                rpr = child.find(qn("w:rPr"))
                 is_struck = False
                 if rpr is not None:
-                    strike = rpr.find(qn('w:strike'))
-                    dstrike = rpr.find(qn('w:dstrike'))
+                    strike = rpr.find(qn("w:strike"))
+                    dstrike = rpr.find(qn("w:dstrike"))
                     if strike is not None or dstrike is not None:
                         is_struck = True
 
@@ -422,7 +442,6 @@ class DocxParser(DocumentParser):
         try:
             # Los comentarios están en el namespace w:comments
             # Accedemos al XML subyacente
-            from docx.opc.constants import RELATIONSHIP_TYPE as RT
 
             # Buscar la parte de comentarios
             document_part = doc.part
@@ -435,17 +454,11 @@ class DocxParser(DocumentParser):
 
     def _has_bold(self, para) -> bool:
         """Verifica si el párrafo tiene texto en negrita."""
-        for run in para.runs:
-            if run.bold:
-                return True
-        return False
+        return any(run.bold for run in para.runs)
 
     def _has_italic(self, para) -> bool:
         """Verifica si el párrafo tiene texto en cursiva."""
-        for run in para.runs:
-            if run.italic:
-                return True
-        return False
+        return any(run.italic for run in para.runs)
 
     def _has_tables(self, doc) -> bool:
         """Verifica si el documento tiene tablas."""
@@ -453,10 +466,7 @@ class DocxParser(DocumentParser):
 
     def _has_images(self, doc) -> bool:
         """Verifica si el documento tiene imágenes."""
-        for rel in doc.part.rels.values():
-            if "image" in rel.reltype:
-                return True
-        return False
+        return any("image" in rel.reltype for rel in doc.part.rels.values())
 
     def _has_track_changes(self, doc) -> bool:
         """
@@ -467,8 +477,8 @@ class DocxParser(DocumentParser):
 
             # Buscar elementos w:del o w:ins en el body
             body = doc.element.body
-            has_del = body.findall('.//' + qn('w:del'))
-            has_ins = body.findall('.//' + qn('w:ins'))
+            has_del = body.findall(".//" + qn("w:del"))
+            has_ins = body.findall(".//" + qn("w:ins"))
             return bool(has_del or has_ins)
         except Exception:
             return False
@@ -479,9 +489,10 @@ class DocxParser(DocumentParser):
         """
         try:
             from docx.oxml.ns import qn
+
             p_element = para._element
-            has_del = p_element.findall('.//' + qn('w:del'))
-            has_ins = p_element.findall('.//' + qn('w:ins'))
+            has_del = p_element.findall(".//" + qn("w:del"))
+            has_ins = p_element.findall(".//" + qn("w:ins"))
             return bool(has_del or has_ins)
         except Exception:
             return False
@@ -530,8 +541,8 @@ class DocxParser(DocumentParser):
 
                         logger.debug(
                             f"Detectado capítulo {match.group(1)}: '{next_text[:50]}...'"
-                            if len(next_text) > 50 else
-                            f"Detectado capítulo {match.group(1)}: '{next_text}'"
+                            if len(next_text) > 50
+                            else f"Detectado capítulo {match.group(1)}: '{next_text}'"
                         )
 
             i += 1

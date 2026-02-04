@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Extractor basado en embeddings y similaridad semántica.
 
@@ -9,15 +8,15 @@ Este extractor usa sentence-transformers para:
 """
 
 import logging
-from typing import Optional, Any
+from typing import Any
 
 from ..base import (
-    BaseExtractor,
-    ExtractionMethod,
-    ExtractionContext,
-    ExtractionResult,
-    ExtractedAttribute,
     AttributeType,
+    BaseExtractor,
+    ExtractedAttribute,
+    ExtractionContext,
+    ExtractionMethod,
+    ExtractionResult,
 )
 
 logger = logging.getLogger(__name__)
@@ -65,25 +64,55 @@ ATTRIBUTE_TEMPLATES = {
 # Valores canónicos para cada tipo de atributo
 CANONICAL_VALUES = {
     AttributeType.EYE_COLOR: [
-        "azul", "verde", "marrón", "negro", "gris", "avellana", "ámbar", "violeta",
+        "azul",
+        "verde",
+        "marrón",
+        "negro",
+        "gris",
+        "avellana",
+        "ámbar",
+        "violeta",
     ],
     AttributeType.HAIR_COLOR: [
-        "negro", "rubio", "castaño", "pelirrojo", "canoso", "gris", "blanco",
+        "negro",
+        "rubio",
+        "castaño",
+        "pelirrojo",
+        "canoso",
+        "gris",
+        "blanco",
     ],
     AttributeType.HAIR_TYPE: [
-        "largo", "corto", "rizado", "liso", "ondulado",
+        "largo",
+        "corto",
+        "rizado",
+        "liso",
+        "ondulado",
     ],
     AttributeType.HEIGHT: [
-        "alto", "bajo", "mediano",
+        "alto",
+        "bajo",
+        "mediano",
     ],
     AttributeType.BUILD: [
-        "delgado", "fornido", "robusto", "atlético", "corpulento",
+        "delgado",
+        "fornido",
+        "robusto",
+        "atlético",
+        "corpulento",
     ],
     AttributeType.AGE: [
-        "joven", "mayor", "anciano", "adulto",
+        "joven",
+        "mayor",
+        "anciano",
+        "adulto",
     ],
     AttributeType.SKIN: [
-        "pálido", "moreno", "bronceado", "claro", "oscuro",
+        "pálido",
+        "moreno",
+        "bronceado",
+        "claro",
+        "oscuro",
     ],
 }
 
@@ -126,6 +155,7 @@ class EmbeddingsExtractor(BaseExtractor):
         """Lazy loading del modelo de embeddings."""
         if self._embeddings is None:
             from ...embeddings import get_embeddings_model
+
             self._embeddings = get_embeddings_model()
             self._precompute_embeddings()
         return self._embeddings
@@ -163,8 +193,8 @@ class EmbeddingsExtractor(BaseExtractor):
         import numpy as np
 
         # Aplanar si es necesario
-        e1 = emb1.flatten() if hasattr(emb1, 'flatten') else emb1
-        e2 = emb2.flatten() if hasattr(emb2, 'flatten') else emb2
+        e1 = emb1.flatten() if hasattr(emb1, "flatten") else emb1
+        e2 = emb2.flatten() if hasattr(emb2, "flatten") else emb2
 
         # Dot product de vectores normalizados = similitud coseno
         similarity = float(np.dot(e1, e2))
@@ -233,7 +263,7 @@ class EmbeddingsExtractor(BaseExtractor):
         self,
         text: str,
         entity_name: str,
-        chapter: Optional[int],
+        chapter: int | None,
     ) -> list[ExtractedAttribute]:
         """
         Extrae atributos para una entidad específica.
@@ -242,7 +272,6 @@ class EmbeddingsExtractor(BaseExtractor):
         la señal semántica. Una oración como "era alta, de cabello negro y
         ojos verdes" se divide en ["era alta", "de cabello negro", "ojos verdes"].
         """
-        import re
         attributes = []
 
         # Encontrar oraciones que mencionan la entidad
@@ -266,19 +295,24 @@ class EmbeddingsExtractor(BaseExtractor):
 
                         if similarity >= self.similarity_threshold:
                             # Verificar que el valor aparece en la sub-frase o la oración
-                            if value.lower() in subphrase.lower() or value.lower() in sentence.lower():
+                            if (
+                                value.lower() in subphrase.lower()
+                                or value.lower() in sentence.lower()
+                            ):
                                 # Verificar que la entidad es el sujeto
                                 if self._is_entity_subject(sentence, entity_name, value):
                                     # Validar body part context contra la oración completa
                                     if self._validate_body_part_context(attr_type, sentence):
-                                        attributes.append(self._create_attribute(
-                                            entity_name=entity_name,
-                                            attr_type=attr_type,
-                                            value=value,
-                                            confidence=float(similarity) * 0.85,
-                                            source_text=sentence,
-                                            chapter=chapter,
-                                        ))
+                                        attributes.append(
+                                            self._create_attribute(
+                                                entity_name=entity_name,
+                                                attr_type=attr_type,
+                                                value=value,
+                                                confidence=float(similarity) * 0.85,
+                                                source_text=sentence,
+                                                chapter=chapter,
+                                            )
+                                        )
 
         return attributes
 
@@ -293,8 +327,9 @@ class EmbeddingsExtractor(BaseExtractor):
         → ["era alta", "de cabello negro azabache", "ojos verdes"]
         """
         import re
+
         # Separar por comas, " y ", punto y coma, guiones largos
-        parts = re.split(r',\s*|\s+y\s+|;\s*|—', sentence)
+        parts = re.split(r",\s*|\s+y\s+|;\s*|—", sentence)
         subphrases = [p.strip() for p in parts if p.strip()]
 
         # También incluir la oración completa como fallback
@@ -330,8 +365,8 @@ class EmbeddingsExtractor(BaseExtractor):
         value_lower = attribute_value.lower()
 
         # Buscar posiciones
-        entity_match = re.search(rf'\b{re.escape(entity_lower)}\b', sentence_lower)
-        value_match = re.search(rf'\b{re.escape(value_lower)}\b', sentence_lower)
+        entity_match = re.search(rf"\b{re.escape(entity_lower)}\b", sentence_lower)
+        value_match = re.search(rf"\b{re.escape(value_lower)}\b", sentence_lower)
 
         if not entity_match or not value_match:
             return False
@@ -345,25 +380,29 @@ class EmbeddingsExtractor(BaseExtractor):
 
         # Si la entidad está DESPUÉS del atributo, verificar si es objeto
         # Patrones que indican que la entidad es objeto (no sujeto)
-        object_prepositions = ['a ', 'hacia ', 'para ', 'contra ', 'sobre ', 'con ']
+        object_prepositions = ["a ", "hacia ", "para ", "contra ", "sobre ", "con "]
 
         # Buscar si hay una preposición justo antes de la entidad
         text_before_entity = sentence_lower[:entity_pos].rstrip()
         for prep in object_prepositions:
             if text_before_entity.endswith(prep.strip()):
                 # La entidad es precedida por preposición -> es objeto
-                logger.debug(
-                    f"Entidad '{entity_name}' es objeto en: {sentence[:60]}..."
-                )
+                logger.debug(f"Entidad '{entity_name}' es objeto en: {sentence[:60]}...")
                 return False
 
         # Verificar patrones como "miraban a X", "observaba a X"
         verbs_with_object = [
-            'miraba', 'miraban', 'observaba', 'observaban',
-            'veía', 'veían', 'contemplaba', 'contemplaban',
+            "miraba",
+            "miraban",
+            "observaba",
+            "observaban",
+            "veía",
+            "veían",
+            "contemplaba",
+            "contemplaban",
         ]
         for verb in verbs_with_object:
-            pattern = rf'{verb}\s+(a\s+)?{re.escape(entity_lower)}'
+            pattern = rf"{verb}\s+(a\s+)?{re.escape(entity_lower)}"
             if re.search(pattern, sentence_lower):
                 logger.debug(
                     f"Entidad '{entity_name}' es objeto de '{verb}' en: {sentence[:60]}..."
@@ -394,19 +433,40 @@ class EmbeddingsExtractor(BaseExtractor):
 
         # Indicadores de partes del cuerpo por tipo de atributo
         eye_indicators = {
-            "ojo", "ojos", "mirada", "pupila", "pupilas",
-            "iris", "párpado", "párpados"
+            "ojo",
+            "ojos",
+            "mirada",
+            "pupila",
+            "pupilas",
+            "iris",
+            "párpado",
+            "párpados",
         }
 
         hair_indicators = {
-            "pelo", "cabello", "cabellera", "melena",
-            "trenza", "trenzas", "rizos", "mechón", "mechones",
-            "flequillo", "coleta", "moño"
+            "pelo",
+            "cabello",
+            "cabellera",
+            "melena",
+            "trenza",
+            "trenzas",
+            "rizos",
+            "mechón",
+            "mechones",
+            "flequillo",
+            "coleta",
+            "moño",
         }
 
         skin_indicators = {
-            "piel", "tez", "cutis", "rostro", "cara",
-            "mejillas", "mejilla", "frente"
+            "piel",
+            "tez",
+            "cutis",
+            "rostro",
+            "cara",
+            "mejillas",
+            "mejilla",
+            "frente",
         }
 
         # Verificar presencia de indicadores
@@ -421,9 +481,7 @@ class EmbeddingsExtractor(BaseExtractor):
                 return True
             # Rechazar si menciona pelo o piel pero no ojos
             if has_hair_indicator or has_skin_indicator:
-                logger.debug(
-                    f"Rechazando EYE_COLOR: oración menciona pelo/piel pero no ojos"
-                )
+                logger.debug("Rechazando EYE_COLOR: oración menciona pelo/piel pero no ojos")
                 return False
             # Si no hay ningún indicador, permitir (puede ser contexto implícito)
             return True
@@ -434,9 +492,7 @@ class EmbeddingsExtractor(BaseExtractor):
                 return True
             # Rechazar si menciona ojos pero no pelo
             if has_eye_indicator:
-                logger.debug(
-                    f"Rechazando {attr_type.value}: oración menciona ojos pero no pelo"
-                )
+                logger.debug(f"Rechazando {attr_type.value}: oración menciona ojos pero no pelo")
                 return False
             # Si no hay ningún indicador, permitir
             return True
@@ -447,9 +503,7 @@ class EmbeddingsExtractor(BaseExtractor):
                 return True
             # Rechazar si menciona otras partes específicamente
             if has_eye_indicator or has_hair_indicator:
-                logger.debug(
-                    f"Rechazando SKIN: oración menciona ojos/pelo pero no piel"
-                )
+                logger.debug("Rechazando SKIN: oración menciona ojos/pelo pero no piel")
                 return False
             return True
 
@@ -466,7 +520,7 @@ class EmbeddingsExtractor(BaseExtractor):
         """
         import re
 
-        sentences = re.split(r'[.!?]+', text)
+        sentences = re.split(r"[.!?]+", text)
         entity_sentences = []
 
         entity_lower = entity_name.lower()
@@ -481,7 +535,7 @@ class EmbeddingsExtractor(BaseExtractor):
         self,
         value: str,
         context_text: str,
-    ) -> Optional[AttributeType]:
+    ) -> AttributeType | None:
         """
         Clasifica un valor ambiguo en su tipo de atributo.
 
@@ -505,7 +559,7 @@ class EmbeddingsExtractor(BaseExtractor):
 
         # Comparar con cada tipo
         for attr_type, value_embs in self._value_embeddings.items():
-            for canonical_value, value_emb in value_embs.items():
+            for _canonical_value, value_emb in value_embs.items():
                 similarity = self._compute_similarity(context_emb, value_emb)
 
                 if similarity > best_similarity:
@@ -545,7 +599,7 @@ class EmbeddingsExtractor(BaseExtractor):
 
         # Comparar con valores canónicos del mismo tipo
         max_similarity = 0.0
-        for value, value_emb in self._value_embeddings[attr.attribute_type].items():
+        for _value, value_emb in self._value_embeddings[attr.attribute_type].items():
             similarity = self._compute_similarity(attr_emb, value_emb)
             max_similarity = max(max_similarity, float(similarity))
 

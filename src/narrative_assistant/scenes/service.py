@@ -3,17 +3,16 @@ Servicio de gestión de escenas y etiquetado.
 """
 
 import logging
-from typing import Optional
 from dataclasses import dataclass
 
+from ..parsers.structure_detector import Chapter
+from ..parsers.structure_detector import Scene as ParsedScene
 from ..persistence.database import get_database
-from ..parsers.structure_detector import Scene as ParsedScene, Chapter
 from .models import (
     Scene,
     SceneTag,
-    SceneCustomTag,
-    SceneType,
     SceneTone,
+    SceneType,
     SceneWithTags,
 )
 from .repository import SceneRepository
@@ -24,6 +23,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class SceneStats:
     """Estadísticas de escenas de un proyecto."""
+
     total_scenes: int
     chapters_with_scenes: int
     tagged_scenes: int
@@ -127,7 +127,7 @@ class SceneService:
     def _count_words(self, scene: ParsedScene, chapter_content: str) -> int:
         """Cuenta palabras en una escena."""
         # Ajustar offsets relativos al capítulo
-        text = chapter_content[scene.start_char:scene.end_char]
+        text = chapter_content[scene.start_char : scene.end_char]
         return len(text.split())
 
     # =========================================================================
@@ -169,16 +169,18 @@ class SceneService:
                     if name:
                         participant_names.append(name)
 
-            result.append(SceneWithTags(
-                scene=scene,
-                tags=tags,
-                custom_tags=custom_tags,
-                chapter_number=chapter_data.get("number"),
-                chapter_title=chapter_data.get("title"),
-                location_name=location_name,
-                participant_names=participant_names,
-                excerpt=self._get_excerpt(scene, chapter_data.get("content", "")),
-            ))
+            result.append(
+                SceneWithTags(
+                    scene=scene,
+                    tags=tags,
+                    custom_tags=custom_tags,
+                    chapter_number=chapter_data.get("number"),
+                    chapter_title=chapter_data.get("title"),
+                    location_name=location_name,
+                    participant_names=participant_names,
+                    excerpt=self._get_excerpt(scene, chapter_data.get("content", "")),
+                )
+            )
 
         return result
 
@@ -215,16 +217,18 @@ class SceneService:
                     if name:
                         participant_names.append(name)
 
-            result.append(SceneWithTags(
-                scene=scene,
-                tags=tags,
-                custom_tags=custom_tags,
-                chapter_number=chapter_number,
-                chapter_title=chapter_title,
-                location_name=location_name,
-                participant_names=participant_names,
-                excerpt=self._get_excerpt(scene, chapter_content),
-            ))
+            result.append(
+                SceneWithTags(
+                    scene=scene,
+                    tags=tags,
+                    custom_tags=custom_tags,
+                    chapter_number=chapter_number,
+                    chapter_title=chapter_title,
+                    location_name=location_name,
+                    participant_names=participant_names,
+                    excerpt=self._get_excerpt(scene, chapter_content),
+                )
+            )
 
         return result
 
@@ -250,8 +254,7 @@ class SceneService:
             (project_id,),
         )
         return {
-            row["id"]: {"name": row["canonical_name"], "type": row["entity_type"]}
-            for row in rows
+            row["id"]: {"name": row["canonical_name"], "type": row["entity_type"]} for row in rows
         }
 
     def _get_excerpt(self, scene: Scene, chapter_content: str, max_chars: int = 150) -> str:
@@ -260,7 +263,7 @@ class SceneService:
             return ""
 
         # Las posiciones de escena son relativas al capítulo
-        text = chapter_content[scene.start_char:scene.end_char]
+        text = chapter_content[scene.start_char : scene.end_char]
         text = text.strip()
 
         if len(text) <= max_chars:
@@ -268,7 +271,7 @@ class SceneService:
 
         # Truncar en el último espacio antes del límite
         truncated = text[:max_chars]
-        last_space = truncated.rfind(' ')
+        last_space = truncated.rfind(" ")
         if last_space > 0:
             truncated = truncated[:last_space]
 
@@ -281,12 +284,12 @@ class SceneService:
     def tag_scene(
         self,
         scene_id: int,
-        scene_type: Optional[SceneType] = None,
-        tone: Optional[SceneTone] = None,
-        location_entity_id: Optional[int] = None,
-        participant_ids: Optional[list[int]] = None,
-        summary: Optional[str] = None,
-        notes: Optional[str] = None,
+        scene_type: SceneType | None = None,
+        tone: SceneTone | None = None,
+        location_entity_id: int | None = None,
+        participant_ids: list[int] | None = None,
+        summary: str | None = None,
+        notes: str | None = None,
     ) -> bool:
         """
         Asigna etiquetas predefinidas a una escena.
@@ -317,7 +320,7 @@ class SceneService:
         self,
         scene_id: int,
         tag_name: str,
-        tag_color: Optional[str] = None,
+        tag_color: str | None = None,
     ) -> bool:
         """
         Añade una etiqueta personalizada a una escena.
@@ -369,7 +372,9 @@ class SceneService:
         chapters_with_multiple = set()
         chapter_scene_counts: dict[int, int] = {}
         for scene in scenes:
-            chapter_scene_counts[scene.chapter_id] = chapter_scene_counts.get(scene.chapter_id, 0) + 1
+            chapter_scene_counts[scene.chapter_id] = (
+                chapter_scene_counts.get(scene.chapter_id, 0) + 1
+            )
 
         for chapter_id, count in chapter_scene_counts.items():
             if count > 1:
@@ -430,11 +435,11 @@ class SceneService:
     def filter_scenes(
         self,
         project_id: int,
-        scene_type: Optional[SceneType] = None,
-        tone: Optional[SceneTone] = None,
-        custom_tag: Optional[str] = None,
-        location_id: Optional[int] = None,
-        participant_id: Optional[int] = None,
+        scene_type: SceneType | None = None,
+        tone: SceneTone | None = None,
+        custom_tag: str | None = None,
+        location_id: int | None = None,
+        participant_id: int | None = None,
     ) -> list[SceneWithTags]:
         """
         Filtra escenas por criterios.

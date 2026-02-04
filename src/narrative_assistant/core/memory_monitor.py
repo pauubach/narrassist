@@ -13,7 +13,6 @@ import threading
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +32,7 @@ def get_process_memory_mb() -> float:
     """
     try:
         import psutil
+
         process = psutil.Process(os.getpid())
         return process.memory_info().rss / (1024 * 1024)
     except ImportError:
@@ -41,10 +41,12 @@ def get_process_memory_mb() -> float:
     # Fallback: resource module (Unix only)
     try:
         import resource
+
         # maxrss en KB en Linux, bytes en macOS
         usage = resource.getrusage(resource.RUSAGE_SELF)
         maxrss = usage.ru_maxrss
         import platform
+
         if platform.system() == "Darwin":
             return maxrss / (1024 * 1024)  # bytes → MB
         else:
@@ -58,6 +60,7 @@ def get_process_memory_mb() -> float:
 @dataclass
 class MemorySnapshot:
     """Snapshot de memoria en un punto del pipeline."""
+
     phase_name: str
     timestamp: datetime
     memory_mb: float
@@ -68,6 +71,7 @@ class MemorySnapshot:
 @dataclass
 class MemoryReport:
     """Reporte de uso de memoria del pipeline completo."""
+
     snapshots: list[MemorySnapshot] = field(default_factory=list)
     peak_mb: float = 0.0
     warning_threshold_mb: float = DEFAULT_MEMORY_WARNING_MB
@@ -98,13 +102,17 @@ class MemoryReport:
         if not self.snapshots:
             return "No memory data collected"
 
-        lines = [f"Memory Report (peak: {self.peak_mb:.1f} MB, total delta: {self.total_delta_mb:+.1f} MB)"]
+        lines = [
+            f"Memory Report (peak: {self.peak_mb:.1f} MB, total delta: {self.total_delta_mb:+.1f} MB)"
+        ]
         for phase, delta in self.get_phase_deltas().items():
             sign = "+" if delta >= 0 else ""
             lines.append(f"  {phase}: {sign}{delta:.1f} MB")
 
         if self.warnings_emitted > 0:
-            lines.append(f"  Warnings: {self.warnings_emitted} (threshold: {self.warning_threshold_mb:.0f} MB)")
+            lines.append(
+                f"  Warnings: {self.warnings_emitted} (threshold: {self.warning_threshold_mb:.0f} MB)"
+            )
 
         return "\n".join(lines)
 
@@ -139,7 +147,7 @@ class MemoryMonitor:
     def enabled(self, value: bool):
         self._enabled = value
 
-    def snapshot(self, phase_name: str, label: str = "") -> Optional[MemorySnapshot]:
+    def snapshot(self, phase_name: str, label: str = "") -> MemorySnapshot | None:
         """
         Toma un snapshot de memoria.
 

@@ -21,7 +21,6 @@ arcos de personaje y tono emocional.
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -30,8 +29,10 @@ logger = logging.getLogger(__name__)
 # Tipos
 # =============================================================================
 
+
 class TemplateType(str, Enum):
     """Tipos de plantilla narrativa."""
+
     THREE_ACT = "three_act"
     HERO_JOURNEY = "hero_journey"
     SAVE_THE_CAT = "save_the_cat"
@@ -41,10 +42,11 @@ class TemplateType(str, Enum):
 
 class BeatStatus(str, Enum):
     """Estado de detección de un beat."""
-    DETECTED = "detected"       # Encontrado con confianza alta
-    POSSIBLE = "possible"       # Indicios parciales
-    MISSING = "missing"         # No encontrado
-    NOT_APPLICABLE = "n_a"      # No aplica (ej: pocos capítulos)
+
+    DETECTED = "detected"  # Encontrado con confianza alta
+    POSSIBLE = "possible"  # Indicios parciales
+    MISSING = "missing"  # No encontrado
+    NOT_APPLICABLE = "n_a"  # No aplica (ej: pocos capítulos)
 
 
 @dataclass
@@ -54,18 +56,19 @@ class TemplateBeat:
 
     Ejemplo: "Llamada a la aventura" en el Viaje del Héroe.
     """
-    beat_id: str                # ID único (ej: "call_to_adventure")
-    name: str                   # Nombre en español
-    description: str            # Descripción breve
-    expected_position: float    # Posición esperada normalizada 0-1 en el manuscrito
-    tolerance: float = 0.15     # Tolerancia de posición (±15% por defecto)
+
+    beat_id: str  # ID único (ej: "call_to_adventure")
+    name: str  # Nombre en español
+    description: str  # Descripción breve
+    expected_position: float  # Posición esperada normalizada 0-1 en el manuscrito
+    tolerance: float = 0.15  # Tolerancia de posición (±15% por defecto)
 
     # Resultado de la detección
     status: BeatStatus = BeatStatus.MISSING
-    detected_chapter: Optional[int] = None
+    detected_chapter: int | None = None
     detected_position: float = 0.0
     confidence: float = 0.0
-    evidence: str = ""          # Texto/razón de la detección
+    evidence: str = ""  # Texto/razón de la detección
 
     def to_dict(self) -> dict:
         return {
@@ -84,17 +87,18 @@ class TemplateBeat:
 @dataclass
 class TemplateMatch:
     """Resultado de comparar el manuscrito con una plantilla."""
+
     template_type: TemplateType
     template_name: str
     template_description: str
-    fit_score: float            # 0-100: qué tan bien encaja
+    fit_score: float  # 0-100: qué tan bien encaja
     beats: list[TemplateBeat] = field(default_factory=list)
     detected_count: int = 0
     possible_count: int = 0
     missing_count: int = 0
     total_beats: int = 0
-    gaps: list[str] = field(default_factory=list)       # Huecos detectados
-    strengths: list[str] = field(default_factory=list)   # Puntos fuertes
+    gaps: list[str] = field(default_factory=list)  # Huecos detectados
+    strengths: list[str] = field(default_factory=list)  # Puntos fuertes
     suggestions: list[str] = field(default_factory=list)  # Sugerencias
 
     def to_dict(self) -> dict:
@@ -117,7 +121,8 @@ class TemplateMatch:
 @dataclass
 class NarrativeTemplateReport:
     """Informe completo de análisis de plantillas narrativas."""
-    best_match: Optional[TemplateMatch] = None
+
+    best_match: TemplateMatch | None = None
     matches: list[TemplateMatch] = field(default_factory=list)
     total_chapters: int = 0
     manuscript_summary: str = ""  # Resumen de la estructura detectada
@@ -136,76 +141,195 @@ class NarrativeTemplateReport:
 # Definiciones de plantillas
 # =============================================================================
 
+
 def _three_act_beats() -> list[TemplateBeat]:
     """Estructura en Tres Actos (Syd Field)."""
     return [
-        TemplateBeat("setup", "Presentación", "Mundo ordinario, personajes y conflicto inicial", 0.05, 0.10),
-        TemplateBeat("inciting_incident", "Incidente detonante", "Evento que pone la historia en marcha", 0.10, 0.08),
-        TemplateBeat("first_plot_point", "Primer punto de giro", "El protagonista entra en el conflicto (fin Acto I)", 0.25, 0.08),
-        TemplateBeat("rising_action", "Acción creciente", "Complicaciones, alianzas, conflictos secundarios", 0.40, 0.15),
-        TemplateBeat("midpoint", "Punto medio", "Revelación o giro que cambia la perspectiva", 0.50, 0.08),
-        TemplateBeat("second_plot_point", "Segundo punto de giro", "Crisis máxima, todo parece perdido (fin Acto II)", 0.75, 0.08),
-        TemplateBeat("climax", "Clímax", "Enfrentamiento final, punto de máxima tensión", 0.88, 0.10),
-        TemplateBeat("resolution", "Resolución", "Nuevo equilibrio, consecuencias del clímax", 0.95, 0.08),
+        TemplateBeat(
+            "setup", "Presentación", "Mundo ordinario, personajes y conflicto inicial", 0.05, 0.10
+        ),
+        TemplateBeat(
+            "inciting_incident",
+            "Incidente detonante",
+            "Evento que pone la historia en marcha",
+            0.10,
+            0.08,
+        ),
+        TemplateBeat(
+            "first_plot_point",
+            "Primer punto de giro",
+            "El protagonista entra en el conflicto (fin Acto I)",
+            0.25,
+            0.08,
+        ),
+        TemplateBeat(
+            "rising_action",
+            "Acción creciente",
+            "Complicaciones, alianzas, conflictos secundarios",
+            0.40,
+            0.15,
+        ),
+        TemplateBeat(
+            "midpoint", "Punto medio", "Revelación o giro que cambia la perspectiva", 0.50, 0.08
+        ),
+        TemplateBeat(
+            "second_plot_point",
+            "Segundo punto de giro",
+            "Crisis máxima, todo parece perdido (fin Acto II)",
+            0.75,
+            0.08,
+        ),
+        TemplateBeat(
+            "climax", "Clímax", "Enfrentamiento final, punto de máxima tensión", 0.88, 0.10
+        ),
+        TemplateBeat(
+            "resolution", "Resolución", "Nuevo equilibrio, consecuencias del clímax", 0.95, 0.08
+        ),
     ]
 
 
 def _hero_journey_beats() -> list[TemplateBeat]:
     """El Viaje del Héroe (Campbell/Vogler, 12 etapas)."""
     return [
-        TemplateBeat("ordinary_world", "Mundo ordinario", "Vida cotidiana del héroe antes de la aventura", 0.04, 0.06),
-        TemplateBeat("call_to_adventure", "Llamada a la aventura", "El héroe recibe un desafío o llamada", 0.10, 0.06),
-        TemplateBeat("refusal", "Rechazo de la llamada", "Dudas, miedo, resistencia inicial", 0.14, 0.06),
-        TemplateBeat("mentor", "Encuentro con el mentor", "Un guía o aliado prepara al héroe", 0.18, 0.06),
-        TemplateBeat("crossing_threshold", "Cruce del umbral", "El héroe deja su mundo conocido", 0.25, 0.08),
-        TemplateBeat("tests_allies", "Pruebas, aliados, enemigos", "Retos y nuevas relaciones en el mundo especial", 0.40, 0.12),
-        TemplateBeat("approach_cave", "Acercamiento a la cueva", "Preparación para el desafío central", 0.50, 0.08),
+        TemplateBeat(
+            "ordinary_world",
+            "Mundo ordinario",
+            "Vida cotidiana del héroe antes de la aventura",
+            0.04,
+            0.06,
+        ),
+        TemplateBeat(
+            "call_to_adventure",
+            "Llamada a la aventura",
+            "El héroe recibe un desafío o llamada",
+            0.10,
+            0.06,
+        ),
+        TemplateBeat(
+            "refusal", "Rechazo de la llamada", "Dudas, miedo, resistencia inicial", 0.14, 0.06
+        ),
+        TemplateBeat(
+            "mentor", "Encuentro con el mentor", "Un guía o aliado prepara al héroe", 0.18, 0.06
+        ),
+        TemplateBeat(
+            "crossing_threshold", "Cruce del umbral", "El héroe deja su mundo conocido", 0.25, 0.08
+        ),
+        TemplateBeat(
+            "tests_allies",
+            "Pruebas, aliados, enemigos",
+            "Retos y nuevas relaciones en el mundo especial",
+            0.40,
+            0.12,
+        ),
+        TemplateBeat(
+            "approach_cave",
+            "Acercamiento a la cueva",
+            "Preparación para el desafío central",
+            0.50,
+            0.08,
+        ),
         TemplateBeat("ordeal", "Prueba suprema", "El mayor desafío, muerte simbólica", 0.60, 0.08),
         TemplateBeat("reward", "Recompensa", "El héroe obtiene lo que buscaba", 0.68, 0.06),
-        TemplateBeat("road_back", "Camino de regreso", "Vuelta al mundo ordinario con consecuencias", 0.78, 0.08),
-        TemplateBeat("resurrection", "Resurrección", "Prueba final, transformación definitiva", 0.88, 0.08),
-        TemplateBeat("return_elixir", "Regreso con el elixir", "El héroe vuelve transformado", 0.95, 0.06),
+        TemplateBeat(
+            "road_back",
+            "Camino de regreso",
+            "Vuelta al mundo ordinario con consecuencias",
+            0.78,
+            0.08,
+        ),
+        TemplateBeat(
+            "resurrection", "Resurrección", "Prueba final, transformación definitiva", 0.88, 0.08
+        ),
+        TemplateBeat(
+            "return_elixir", "Regreso con el elixir", "El héroe vuelve transformado", 0.95, 0.06
+        ),
     ]
 
 
 def _save_the_cat_beats() -> list[TemplateBeat]:
     """Save the Cat (Blake Snyder, 15 beats)."""
     return [
-        TemplateBeat("opening_image", "Imagen de apertura", "Primera impresión del tono y mundo", 0.02, 0.04),
-        TemplateBeat("theme_stated", "Tema enunciado", "Alguien dice la lección de la historia", 0.05, 0.05),
+        TemplateBeat(
+            "opening_image", "Imagen de apertura", "Primera impresión del tono y mundo", 0.02, 0.04
+        ),
+        TemplateBeat(
+            "theme_stated", "Tema enunciado", "Alguien dice la lección de la historia", 0.05, 0.05
+        ),
         TemplateBeat("setup_stc", "Set-up", "Presentación del protagonista y su mundo", 0.08, 0.06),
         TemplateBeat("catalyst", "Catalizador", "Evento que lo cambia todo", 0.10, 0.04),
         TemplateBeat("debate", "Debate", "¿Debería aceptar el desafío?", 0.15, 0.06),
-        TemplateBeat("break_into_two", "Entrada al Acto II", "Decisión de actuar, nuevo mundo", 0.25, 0.06),
+        TemplateBeat(
+            "break_into_two", "Entrada al Acto II", "Decisión de actuar, nuevo mundo", 0.25, 0.06
+        ),
         TemplateBeat("b_story", "Trama B", "Historia de amor o amistad paralela", 0.30, 0.08),
         TemplateBeat("fun_and_games", "Diversión y juegos", "La promesa de la premisa", 0.38, 0.10),
         TemplateBeat("midpoint_stc", "Punto medio", "Victoria falsa o derrota falsa", 0.50, 0.06),
-        TemplateBeat("bad_guys_close_in", "Los malos se acercan", "Presión externa e interna aumenta", 0.62, 0.08),
-        TemplateBeat("all_is_lost", "Todo está perdido", "El peor momento, muerte del mentor", 0.75, 0.06),
-        TemplateBeat("dark_night_soul", "Noche oscura del alma", "Reflexión, desesperanza", 0.80, 0.06),
-        TemplateBeat("break_into_three", "Entrada al Acto III", "El héroe encuentra la solución", 0.85, 0.05),
+        TemplateBeat(
+            "bad_guys_close_in",
+            "Los malos se acercan",
+            "Presión externa e interna aumenta",
+            0.62,
+            0.08,
+        ),
+        TemplateBeat(
+            "all_is_lost", "Todo está perdido", "El peor momento, muerte del mentor", 0.75, 0.06
+        ),
+        TemplateBeat(
+            "dark_night_soul", "Noche oscura del alma", "Reflexión, desesperanza", 0.80, 0.06
+        ),
+        TemplateBeat(
+            "break_into_three", "Entrada al Acto III", "El héroe encuentra la solución", 0.85, 0.05
+        ),
         TemplateBeat("finale", "Finale", "Ejecución del plan, enfrentamiento final", 0.90, 0.06),
-        TemplateBeat("final_image", "Imagen final", "Contraste con la imagen de apertura", 0.98, 0.04),
+        TemplateBeat(
+            "final_image", "Imagen final", "Contraste con la imagen de apertura", 0.98, 0.04
+        ),
     ]
 
 
 def _kishotenketsu_beats() -> list[TemplateBeat]:
     """Kishotenketsu (estructura narrativa japonesa, 4 actos)."""
     return [
-        TemplateBeat("ki_intro", "Ki (起) — Introducción", "Presentación de personajes y escenario", 0.12, 0.08),
-        TemplateBeat("sho_development", "Shō (承) — Desarrollo", "Profundización sin conflicto, vida cotidiana", 0.37, 0.08),
-        TemplateBeat("ten_twist", "Ten (転) — Giro", "Cambio inesperado, nueva perspectiva", 0.65, 0.08),
-        TemplateBeat("ketsu_conclusion", "Ketsu (結) — Conclusión", "Reconciliación de elementos, nuevo equilibrio", 0.90, 0.08),
+        TemplateBeat(
+            "ki_intro",
+            "Ki (起) — Introducción",
+            "Presentación de personajes y escenario",
+            0.12,
+            0.08,
+        ),
+        TemplateBeat(
+            "sho_development",
+            "Shō (承) — Desarrollo",
+            "Profundización sin conflicto, vida cotidiana",
+            0.37,
+            0.08,
+        ),
+        TemplateBeat(
+            "ten_twist", "Ten (転) — Giro", "Cambio inesperado, nueva perspectiva", 0.65, 0.08
+        ),
+        TemplateBeat(
+            "ketsu_conclusion",
+            "Ketsu (結) — Conclusión",
+            "Reconciliación de elementos, nuevo equilibrio",
+            0.90,
+            0.08,
+        ),
     ]
 
 
 def _five_act_beats() -> list[TemplateBeat]:
     """Estructura en 5 Actos (Pirámide de Freytag)."""
     return [
-        TemplateBeat("exposition", "Exposición", "Presentación del mundo y los personajes", 0.08, 0.08),
-        TemplateBeat("rising_action_5", "Acción ascendente", "Complicaciones y tensión creciente", 0.30, 0.12),
+        TemplateBeat(
+            "exposition", "Exposición", "Presentación del mundo y los personajes", 0.08, 0.08
+        ),
+        TemplateBeat(
+            "rising_action_5", "Acción ascendente", "Complicaciones y tensión creciente", 0.30, 0.12
+        ),
         TemplateBeat("climax_5", "Clímax", "Punto de máxima tensión narrativa", 0.50, 0.10),
-        TemplateBeat("falling_action", "Acción descendente", "Consecuencias del clímax", 0.72, 0.10),
+        TemplateBeat(
+            "falling_action", "Acción descendente", "Consecuencias del clímax", 0.72, 0.10
+        ),
         TemplateBeat("denouement", "Desenlace", "Resolución final de todos los hilos", 0.92, 0.08),
     ]
 
@@ -243,6 +367,7 @@ TEMPLATE_DEFINITIONS: dict[TemplateType, dict] = {
 # Analizador
 # =============================================================================
 
+
 class NarrativeTemplateAnalyzer:
     """
     Analiza un manuscrito contra plantillas narrativas conocidas.
@@ -260,7 +385,7 @@ class NarrativeTemplateAnalyzer:
         self,
         chapters_data: list[dict],
         total_chapters: int,
-        pacing_data: Optional[dict] = None,
+        pacing_data: dict | None = None,
     ) -> NarrativeTemplateReport:
         """
         Analizar manuscrito contra todas las plantillas.
@@ -323,7 +448,7 @@ class NarrativeTemplateAnalyzer:
         beats: list[TemplateBeat],
         chapters_data: list[dict],
         total_chapters: int,
-        pacing_data: Optional[dict],
+        pacing_data: dict | None,
     ) -> TemplateMatch:
         """Analizar un manuscrito contra una plantilla específica."""
 
@@ -374,14 +499,15 @@ class NarrativeTemplateAnalyzer:
                 pos_diff = abs(beat.detected_position - beat.expected_position)
                 if pos_diff <= beat.tolerance:
                     strengths.append(
-                        f'"{beat.name}" en capítulo {beat.detected_chapter} '
-                        f'(posición correcta)'
+                        f'"{beat.name}" en capítulo {beat.detected_chapter} (posición correcta)'
                     )
                 else:
-                    direction = "antes" if beat.detected_position < beat.expected_position else "después"
+                    direction = (
+                        "antes" if beat.detected_position < beat.expected_position else "después"
+                    )
                     suggestions.append(
                         f'"{beat.name}" detectado en capítulo {beat.detected_chapter}, '
-                        f'pero se espera {direction} (posición {beat.expected_position:.0%} del texto)'
+                        f"pero se espera {direction} (posición {beat.expected_position:.0%} del texto)"
                     )
 
         if missing > total * 0.5:
@@ -410,7 +536,7 @@ class NarrativeTemplateAnalyzer:
         beat: TemplateBeat,
         chapters_data: list[dict],
         total_chapters: int,
-        pacing_data: Optional[dict],
+        pacing_data: dict | None,
     ) -> None:
         """
         Detectar si un beat está presente en el manuscrito.
@@ -421,8 +547,14 @@ class NarrativeTemplateAnalyzer:
         bid = beat.beat_id
 
         # === SETUP / PRESENTACIÓN ===
-        if bid in ("setup", "ordinary_world", "opening_image", "setup_stc",
-                    "ki_intro", "exposition"):
+        if bid in (
+            "setup",
+            "ordinary_world",
+            "opening_image",
+            "setup_stc",
+            "ki_intro",
+            "exposition",
+        ):
             self._detect_setup(beat, chapters_data, total_chapters)
 
         # === INCIDENTE DETONANTE / CATALIZADOR ===
@@ -442,8 +574,14 @@ class NarrativeTemplateAnalyzer:
             self._detect_threshold(beat, chapters_data, total_chapters)
 
         # === DESARROLLO / PRUEBAS ===
-        elif bid in ("rising_action", "tests_allies", "fun_and_games",
-                      "sho_development", "rising_action_5", "b_story"):
+        elif bid in (
+            "rising_action",
+            "tests_allies",
+            "fun_and_games",
+            "sho_development",
+            "rising_action_5",
+            "b_story",
+        ):
             self._detect_development(beat, chapters_data, total_chapters)
 
         # === PUNTO MEDIO ===
@@ -455,8 +593,7 @@ class NarrativeTemplateAnalyzer:
             self._detect_ordeal(beat, chapters_data, total_chapters)
 
         # === TODO ESTÁ PERDIDO ===
-        elif bid in ("all_is_lost", "dark_night_soul",
-                      "second_plot_point"):
+        elif bid in ("all_is_lost", "dark_night_soul", "second_plot_point"):
             self._detect_all_is_lost(beat, chapters_data, total_chapters)
 
         # === RECOMPENSA ===
@@ -476,8 +613,13 @@ class NarrativeTemplateAnalyzer:
             self._detect_climax(beat, chapters_data, total_chapters, pacing_data)
 
         # === RESOLUCIÓN / DESENLACE ===
-        elif bid in ("resolution", "return_elixir", "final_image",
-                      "denouement", "ketsu_conclusion"):
+        elif bid in (
+            "resolution",
+            "return_elixir",
+            "final_image",
+            "denouement",
+            "ketsu_conclusion",
+        ):
             self._detect_resolution(beat, chapters_data, total_chapters)
 
         # === TEMA ENUNCIADO ===
@@ -521,7 +663,9 @@ class NarrativeTemplateAnalyzer:
             beat.confidence = 0.2
             beat.evidence = "Primer capítulo presente pero sin nuevos personajes detectados"
 
-    def _detect_inciting_incident(self, beat: TemplateBeat, chapters: list[dict], total: int) -> None:
+    def _detect_inciting_incident(
+        self, beat: TemplateBeat, chapters: list[dict], total: int
+    ) -> None:
         """Detectar incidente detonante: primer conflicto o evento disruptivo."""
         early_mid = [c for c in chapters if c["chapter_number"] <= max(3, total // 4)]
         conflict_events = {"conflict", "departure", "discovery", "plot_twist"}
@@ -550,8 +694,7 @@ class NarrativeTemplateAnalyzer:
 
     def _detect_refusal(self, beat: TemplateBeat, chapters: list[dict], total: int) -> None:
         """Detectar rechazo: cambio emocional negativo tras el incidente."""
-        zone = [c for c in chapters
-                if total * 0.08 <= c["chapter_number"] <= total * 0.25]
+        zone = [c for c in chapters if total * 0.08 <= c["chapter_number"] <= total * 0.25]
 
         # Buscar emotional_shift negativo (señal fuerte)
         for ch in zone:
@@ -565,8 +708,7 @@ class NarrativeTemplateAnalyzer:
                         beat.detected_position = ch["chapter_number"] / total
                         beat.confidence = 0.65
                         beat.evidence = (
-                            f"Cambio emocional con tono '{tone}' "
-                            f"en capítulo {ch['chapter_number']}"
+                            f"Cambio emocional con tono '{tone}' en capítulo {ch['chapter_number']}"
                         )
                         return
 
@@ -579,10 +721,7 @@ class NarrativeTemplateAnalyzer:
                 beat.detected_chapter = ch["chapter_number"]
                 beat.detected_position = ch["chapter_number"] / total
                 beat.confidence = 0.45
-                beat.evidence = (
-                    f"Tono '{tone}' con conflicto "
-                    f"en capítulo {ch['chapter_number']}"
-                )
+                beat.evidence = f"Tono '{tone}' con conflicto en capítulo {ch['chapter_number']}"
                 return
 
         # Solo tono negativo (señal débil)
@@ -598,8 +737,7 @@ class NarrativeTemplateAnalyzer:
 
     def _detect_mentor(self, beat: TemplateBeat, chapters: list[dict], total: int) -> None:
         """Detectar mentor: nuevo personaje con interacciones positivas o alianzas."""
-        zone = [c for c in chapters
-                if total * 0.10 <= c["chapter_number"] <= total * 0.30]
+        zone = [c for c in chapters if total * 0.10 <= c["chapter_number"] <= total * 0.30]
 
         # Buscar alianza o nuevo personaje con muchas interacciones positivas (señal fuerte)
         for ch in zone:
@@ -613,9 +751,7 @@ class NarrativeTemplateAnalyzer:
                 beat.detected_chapter = ch["chapter_number"]
                 beat.detected_position = ch["chapter_number"] / total
                 beat.confidence = 0.7
-                beat.evidence = (
-                    f"Alianza con nuevo personaje en cap. {ch['chapter_number']}"
-                )
+                beat.evidence = f"Alianza con nuevo personaje en cap. {ch['chapter_number']}"
                 return
 
             if has_new and pos_int >= 2:
@@ -637,16 +773,14 @@ class NarrativeTemplateAnalyzer:
                 beat.detected_position = ch["chapter_number"] / total
                 beat.confidence = 0.35
                 beat.evidence = (
-                    f"Nuevo personaje con interacción positiva "
-                    f"en cap. {ch['chapter_number']}"
+                    f"Nuevo personaje con interacción positiva en cap. {ch['chapter_number']}"
                 )
                 return
 
     def _detect_threshold(self, beat: TemplateBeat, chapters: list[dict], total: int) -> None:
         """Detectar cruce del umbral: cambio de ubicación o aumento brusco de conflicto ~25%."""
         target = max(1, round(total * 0.25))
-        zone = [c for c in chapters
-                if abs(c["chapter_number"] - target) <= max(2, total // 6)]
+        zone = [c for c in chapters if abs(c["chapter_number"] - target) <= max(2, total // 6)]
         transition_events = {"departure", "location_change", "decision", "crossing_threshold"}
 
         for ch in sorted(zone, key=lambda c: abs(c["chapter_number"] - target)):
@@ -670,14 +804,12 @@ class NarrativeTemplateAnalyzer:
 
     def _detect_development(self, beat: TemplateBeat, chapters: list[dict], total: int) -> None:
         """Detectar desarrollo: zona central con interacciones y eventos variados."""
-        zone = [c for c in chapters
-                if total * 0.25 <= c["chapter_number"] <= total * 0.55]
+        zone = [c for c in chapters if total * 0.25 <= c["chapter_number"] <= total * 0.55]
         if not zone:
             return
 
         total_events = sum(
-            len(c.get("key_events", [])) + len(c.get("llm_events", []))
-            for c in zone
+            len(c.get("key_events", [])) + len(c.get("llm_events", [])) for c in zone
         )
         total_interactions = sum(c.get("total_interactions", 0) for c in zone)
 
@@ -687,7 +819,9 @@ class NarrativeTemplateAnalyzer:
             beat.detected_chapter = mid_ch["chapter_number"]
             beat.detected_position = mid_ch["chapter_number"] / total
             beat.confidence = min(0.85, 0.4 + total_events * 0.08 + total_interactions * 0.03)
-            beat.evidence = f"{total_events} eventos y {total_interactions} interacciones en la zona central"
+            beat.evidence = (
+                f"{total_events} eventos y {total_interactions} interacciones en la zona central"
+            )
         elif total_events >= 1 or total_interactions >= 2:
             mid_ch = zone[len(zone) // 2]
             beat.status = BeatStatus.POSSIBLE
@@ -702,12 +836,12 @@ class NarrativeTemplateAnalyzer:
             beat.confidence = 0.2
             beat.evidence = "Capítulos centrales presentes pero con pocos eventos detectados"
 
-    def _detect_midpoint(self, beat: TemplateBeat, chapters: list[dict], total: int,
-                         pacing: Optional[dict]) -> None:
+    def _detect_midpoint(
+        self, beat: TemplateBeat, chapters: list[dict], total: int, pacing: dict | None
+    ) -> None:
         """Detectar punto medio: revelación, giro o cambio de tono ~50%."""
         target = max(1, round(total * 0.50))
-        zone = [c for c in chapters
-                if abs(c["chapter_number"] - target) <= max(2, total // 6)]
+        zone = [c for c in chapters if abs(c["chapter_number"] - target) <= max(2, total // 6)]
         midpoint_events = {"revelation", "discovery", "plot_twist", "emotional_shift", "betrayal"}
 
         for ch in sorted(zone, key=lambda c: abs(c["chapter_number"] - target)):
@@ -734,8 +868,7 @@ class NarrativeTemplateAnalyzer:
 
     def _detect_ordeal(self, beat: TemplateBeat, chapters: list[dict], total: int) -> None:
         """Detectar prueba suprema: pico de conflicto en la segunda mitad."""
-        zone = [c for c in chapters
-                if total * 0.50 <= c["chapter_number"] <= total * 0.75]
+        zone = [c for c in chapters if total * 0.50 <= c["chapter_number"] <= total * 0.75]
         crisis_events = {"conflict", "death", "betrayal", "sacrifice", "climax_moment"}
 
         best_conflict = None
@@ -748,7 +881,9 @@ class NarrativeTemplateAnalyzer:
                     beat.detected_chapter = ch["chapter_number"]
                     beat.detected_position = ch["chapter_number"] / total
                     beat.confidence = 0.7
-                    beat.evidence = f"Evento de crisis '{ev['event_type']}' en cap. {ch['chapter_number']}"
+                    beat.evidence = (
+                        f"Evento de crisis '{ev['event_type']}' en cap. {ch['chapter_number']}"
+                    )
                     return
 
             c_count = ch.get("conflict_interactions", 0)
@@ -766,8 +901,7 @@ class NarrativeTemplateAnalyzer:
     def _detect_all_is_lost(self, beat: TemplateBeat, chapters: list[dict], total: int) -> None:
         """Detectar 'todo está perdido': tono negativo intenso ~75%."""
         target = max(1, round(total * 0.75))
-        zone = [c for c in chapters
-                if abs(c["chapter_number"] - target) <= max(2, total // 5)]
+        zone = [c for c in chapters if abs(c["chapter_number"] - target) <= max(2, total // 5)]
         dark_events = {"death", "betrayal", "sacrifice"}
 
         for ch in sorted(zone, key=lambda c: abs(c["chapter_number"] - target)):
@@ -788,13 +922,14 @@ class NarrativeTemplateAnalyzer:
                 beat.detected_chapter = ch["chapter_number"]
                 beat.detected_position = ch["chapter_number"] / total
                 beat.confidence = 0.35
-                beat.evidence = f"Tono '{tone}' intenso ({intensity:.0%}) en cap. {ch['chapter_number']}"
+                beat.evidence = (
+                    f"Tono '{tone}' intenso ({intensity:.0%}) en cap. {ch['chapter_number']}"
+                )
                 return
 
     def _detect_reward(self, beat: TemplateBeat, chapters: list[dict], total: int) -> None:
         """Detectar recompensa: tono positivo tras la prueba suprema."""
-        zone = [c for c in chapters
-                if total * 0.60 <= c["chapter_number"] <= total * 0.75]
+        zone = [c for c in chapters if total * 0.60 <= c["chapter_number"] <= total * 0.75]
         for ch in zone:
             tone = ch.get("dominant_tone", "")
             if tone in ("positive", "hopeful", "triumphant"):
@@ -807,8 +942,7 @@ class NarrativeTemplateAnalyzer:
 
     def _detect_road_back(self, beat: TemplateBeat, chapters: list[dict], total: int) -> None:
         """Detectar camino de regreso: ubicación o dinámica que cambia ~80%."""
-        zone = [c for c in chapters
-                if total * 0.75 <= c["chapter_number"] <= total * 0.88]
+        zone = [c for c in chapters if total * 0.75 <= c["chapter_number"] <= total * 0.88]
         for ch in zone:
             if ch.get("location_changes", 0) >= 1:
                 beat.status = BeatStatus.POSSIBLE
@@ -826,8 +960,7 @@ class NarrativeTemplateAnalyzer:
         perspectiva, tono o información. Funciona sin conflicto.
         Zona esperada: 53-77% del manuscrito.
         """
-        zone = [c for c in chapters
-                if total * 0.53 <= c["chapter_number"] <= total * 0.77]
+        zone = [c for c in chapters if total * 0.53 <= c["chapter_number"] <= total * 0.77]
 
         twist_indicators = {"revelation", "twist", "surprise", "discovery", "transformation"}
 
@@ -854,14 +987,16 @@ class NarrativeTemplateAnalyzer:
                 beat.detected_chapter = ch["chapter_number"]
                 beat.detected_position = ch["chapter_number"] / total
                 beat.confidence = 0.35
-                beat.evidence = f"Cambio de tono ({prev_tone} → {curr_tone}) en cap. {ch['chapter_number']}"
+                beat.evidence = (
+                    f"Cambio de tono ({prev_tone} → {curr_tone}) en cap. {ch['chapter_number']}"
+                )
                 return
 
-    def _detect_climax(self, beat: TemplateBeat, chapters: list[dict], total: int,
-                       pacing: Optional[dict]) -> None:
+    def _detect_climax(
+        self, beat: TemplateBeat, chapters: list[dict], total: int, pacing: dict | None
+    ) -> None:
         """Detectar clímax: pico máximo de tensión/conflicto."""
-        zone = [c for c in chapters
-                if total * 0.75 <= c["chapter_number"] <= total * 0.95]
+        zone = [c for c in chapters if total * 0.75 <= c["chapter_number"] <= total * 0.95]
         climax_events = {"climax_moment", "conflict", "sacrifice", "death", "transformation"}
 
         # Buscar eventos de clímax
@@ -919,13 +1054,15 @@ class NarrativeTemplateAnalyzer:
             beat.detected_chapter = early[0]["chapter_number"]
             beat.detected_position = early[0]["chapter_number"] / total
             beat.confidence = 0.2
-            beat.evidence = "Posible enunciado temático en los primeros capítulos (requiere análisis LLM)"
+            beat.evidence = (
+                "Posible enunciado temático en los primeros capítulos (requiere análisis LLM)"
+            )
 
-    def _detect_falling_action(self, beat: TemplateBeat, chapters: list[dict], total: int,
-                               pacing: Optional[dict]) -> None:
+    def _detect_falling_action(
+        self, beat: TemplateBeat, chapters: list[dict], total: int, pacing: dict | None
+    ) -> None:
         """Detectar acción descendente: reducción de conflicto post-clímax."""
-        zone = [c for c in chapters
-                if total * 0.65 <= c["chapter_number"] <= total * 0.85]
+        zone = [c for c in chapters if total * 0.65 <= c["chapter_number"] <= total * 0.85]
         if not zone:
             return
 

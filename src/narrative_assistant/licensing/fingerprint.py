@@ -24,10 +24,9 @@ import subprocess
 import sys
 import uuid
 from dataclasses import dataclass
-from typing import Optional
 
+from ..core.errors import ErrorSeverity, NarrativeError
 from ..core.result import Result
-from ..core.errors import NarrativeError, ErrorSeverity
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +102,7 @@ class HardwareDetector:
     """Detecta informacion del hardware del sistema."""
 
     def __init__(self):
-        self._cached_info: Optional[HardwareInfo] = None
+        self._cached_info: HardwareInfo | None = None
 
     def detect(self) -> HardwareInfo:
         """
@@ -148,9 +147,9 @@ class HardwareDetector:
         try:
             if sys.platform == "win32":
                 import winreg
+
                 key = winreg.OpenKey(
-                    winreg.HKEY_LOCAL_MACHINE,
-                    r"HARDWARE\DESCRIPTION\System\CentralProcessor\0"
+                    winreg.HKEY_LOCAL_MACHINE, r"HARDWARE\DESCRIPTION\System\CentralProcessor\0"
                 )
                 value, _ = winreg.QueryValueEx(key, "ProcessorNameString")
                 return value.strip()
@@ -163,7 +162,7 @@ class HardwareDetector:
                 )
                 return result.stdout.strip()
             else:  # Linux
-                with open("/proc/cpuinfo", "r") as f:
+                with open("/proc/cpuinfo") as f:
                     for line in f:
                         if "model name" in line:
                             return line.split(":")[1].strip()
@@ -175,6 +174,7 @@ class HardwareDetector:
         """Obtiene el numero de nucleos fisicos."""
         try:
             import os
+
             # Nucleos fisicos, no threads
             if hasattr(os, "cpu_count"):
                 return os.cpu_count() // 2 or 1
@@ -186,6 +186,7 @@ class HardwareDetector:
         """Obtiene el numero de threads."""
         try:
             import os
+
             return os.cpu_count() or 1
         except Exception as e:
             logger.debug(f"No se pudo obtener threads CPU: {e}")
@@ -196,8 +197,10 @@ class HardwareDetector:
         try:
             if sys.platform == "win32":
                 import ctypes
+
                 kernel32 = ctypes.windll.kernel32
                 c_ulong = ctypes.c_ulong
+
                 class MEMORYSTATUS(ctypes.Structure):
                     _fields_ = [
                         ("dwLength", c_ulong),
@@ -209,6 +212,7 @@ class HardwareDetector:
                         ("dwTotalVirtual", c_ulong),
                         ("dwAvailVirtual", c_ulong),
                     ]
+
                 mem_status = MEMORYSTATUS()
                 mem_status.dwLength = ctypes.sizeof(MEMORYSTATUS)
                 kernel32.GlobalMemoryStatus(ctypes.byref(mem_status))
@@ -222,7 +226,7 @@ class HardwareDetector:
                 )
                 return round(int(result.stdout.strip()) / (1024**3), 1)
             else:  # Linux
-                with open("/proc/meminfo", "r") as f:
+                with open("/proc/meminfo") as f:
                     for line in f:
                         if "MemTotal" in line:
                             kb = int(line.split()[1])
@@ -285,7 +289,7 @@ class HardwareDetector:
         """
         try:
             mac = uuid.getnode()
-            mac_str = ":".join(f"{(mac >> i) & 0xff:02x}" for i in range(0, 48, 8))
+            mac_str = ":".join(f"{(mac >> i) & 0xFF:02x}" for i in range(0, 48, 8))
             # Solo ultimos 6 caracteres (2 octetos)
             return mac_str[-8:].replace(":", "")
         except Exception as e:
@@ -303,9 +307,9 @@ class HardwareDetector:
         try:
             if sys.platform == "win32":
                 import winreg
+
                 key = winreg.OpenKey(
-                    winreg.HKEY_LOCAL_MACHINE,
-                    r"SOFTWARE\Microsoft\Windows NT\CurrentVersion"
+                    winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows NT\CurrentVersion"
                 )
                 value, _ = winreg.QueryValueEx(key, "ProductId")
                 return value
@@ -324,10 +328,10 @@ class HardwareDetector:
                             return parts[3]
             else:  # Linux
                 try:
-                    with open("/etc/machine-id", "r") as f:
+                    with open("/etc/machine-id") as f:
                         return f.read().strip()
                 except FileNotFoundError:
-                    with open("/var/lib/dbus/machine-id", "r") as f:
+                    with open("/var/lib/dbus/machine-id") as f:
                         return f.read().strip()
         except Exception as e:
             logger.debug(f"No se pudo obtener machine ID: {e}")
@@ -362,9 +366,7 @@ class FingerprintGenerator:
         fingerprint_data = self.SALT + info.to_fingerprint_string()
 
         # Hash SHA-256
-        fingerprint_hash = hashlib.sha256(
-            fingerprint_data.encode("utf-8")
-        ).hexdigest()
+        fingerprint_hash = hashlib.sha256(fingerprint_data.encode("utf-8")).hexdigest()
 
         logger.debug(f"Fingerprint generado: {fingerprint_hash[:16]}...")
 
@@ -396,10 +398,7 @@ def get_hardware_fingerprint() -> Result[str]:
         generator = FingerprintGenerator()
         fingerprint, info = generator.generate()
 
-        logger.info(
-            f"Hardware fingerprint generado para {info.device_name}: "
-            f"{fingerprint[:16]}..."
-        )
+        logger.info(f"Hardware fingerprint generado para {info.device_name}: {fingerprint[:16]}...")
 
         return Result.success(fingerprint)
 
@@ -456,10 +455,7 @@ def verify_fingerprint(expected: str) -> Result[bool]:
     matches = current == expected
 
     if not matches:
-        logger.warning(
-            f"Fingerprint mismatch: expected {expected[:16]}..., "
-            f"got {current[:16]}..."
-        )
+        logger.warning(f"Fingerprint mismatch: expected {expected[:16]}..., got {current[:16]}...")
 
     return Result.success(matches)
 

@@ -15,12 +15,10 @@ heurísticas + feedback, manteniendo una precisión razonable.
 import logging
 import re
 import threading
-from dataclasses import dataclass, field
-from typing import Optional
 from collections import Counter
+from dataclasses import dataclass, field
 
-from ..core.config import get_config
-from ..entities.filters import get_filter_repository, FilterAction
+from ..entities.filters import get_filter_repository
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +26,7 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 # Configuración
 # =============================================================================
+
 
 @dataclass
 class EntityValidatorConfig:
@@ -56,6 +55,7 @@ class EntityValidatorConfig:
 # Dataclasses
 # =============================================================================
 
+
 @dataclass
 class EntityScore:
     """Score de validación de una entidad."""
@@ -72,11 +72,11 @@ class EntityScore:
     article_score: float = 0.0
     common_word_score: float = 0.0
     morphology_score: float = 1.0  # Penalización si parece verbo
-    llm_score: Optional[float] = None
+    llm_score: float | None = None
 
     # Metadata
     validation_method: str = "heuristic"  # "heuristic", "llm", "combined"
-    rejection_reason: Optional[str] = None
+    rejection_reason: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -192,11 +192,7 @@ def is_non_narrative_line(line: str) -> bool:
             return True
 
     # Verificar patrones de metadatos
-    for pattern in _METADATA_PATTERNS:
-        if pattern.match(line):
-            return True
-
-    return False
+    return any(pattern.match(line) for pattern in _METADATA_PATTERNS)
 
 
 def get_line_for_position(text: str, position: int) -> tuple[str, bool]:
@@ -216,11 +212,11 @@ def get_line_for_position(text: str, position: int) -> tuple[str, bool]:
         return "", False
 
     # Encontrar inicio de línea
-    line_start = text.rfind('\n', 0, position)
+    line_start = text.rfind("\n", 0, position)
     line_start = line_start + 1 if line_start != -1 else 0
 
     # Encontrar fin de línea
-    line_end = text.find('\n', position)
+    line_end = text.find("\n", position)
     line_end = line_end if line_end != -1 else len(text)
 
     line = text[line_start:line_end]
@@ -236,49 +232,246 @@ def get_line_for_position(text: str, position: int) -> tuple[str, bool]:
 # Palabras muy comunes en español que rara vez son entidades
 COMMON_SPANISH_WORDS = {
     # Artículos y determinantes
-    "el", "la", "los", "las", "un", "una", "unos", "unas",
-    "este", "esta", "estos", "estas", "ese", "esa", "esos", "esas",
-    "aquel", "aquella", "aquellos", "aquellas",
+    "el",
+    "la",
+    "los",
+    "las",
+    "un",
+    "una",
+    "unos",
+    "unas",
+    "este",
+    "esta",
+    "estos",
+    "estas",
+    "ese",
+    "esa",
+    "esos",
+    "esas",
+    "aquel",
+    "aquella",
+    "aquellos",
+    "aquellas",
     # Pronombres
-    "yo", "tú", "él", "ella", "nosotros", "vosotros", "ellos", "ellas",
-    "me", "te", "se", "nos", "os", "le", "les", "lo", "la", "los", "las",
-    "mí", "ti", "sí", "conmigo", "contigo", "consigo",
+    "yo",
+    "tú",
+    "él",
+    "ella",
+    "nosotros",
+    "vosotros",
+    "ellos",
+    "ellas",
+    "me",
+    "te",
+    "se",
+    "nos",
+    "os",
+    "le",
+    "les",
+    "lo",
+    "mí",
+    "ti",
+    "sí",
+    "conmigo",
+    "contigo",
+    "consigo",
     # Posesivos
-    "mi", "mis", "tu", "tus", "su", "sus", "nuestro", "nuestra",
-    "vuestro", "vuestra", "nuestros", "nuestras", "vuestros", "vuestras",
+    "mi",
+    "mis",
+    "tu",
+    "tus",
+    "su",
+    "sus",
+    "nuestro",
+    "nuestra",
+    "vuestro",
+    "vuestra",
+    "nuestros",
+    "nuestras",
+    "vuestros",
+    "vuestras",
     # Preposiciones
-    "a", "ante", "bajo", "con", "contra", "de", "desde", "en", "entre",
-    "hacia", "hasta", "para", "por", "según", "sin", "sobre", "tras",
+    "a",
+    "ante",
+    "bajo",
+    "con",
+    "contra",
+    "de",
+    "desde",
+    "en",
+    "entre",
+    "hacia",
+    "hasta",
+    "para",
+    "por",
+    "según",
+    "sin",
+    "sobre",
+    "tras",
     # Conjunciones
-    "y", "e", "o", "u", "ni", "que", "pero", "sino", "aunque", "porque",
-    "pues", "como", "cuando", "donde", "si", "mientras", "apenas",
+    "y",
+    "e",
+    "o",
+    "u",
+    "ni",
+    "que",
+    "pero",
+    "sino",
+    "aunque",
+    "porque",
+    "pues",
+    "como",
+    "cuando",
+    "donde",
+    "si",
+    "mientras",
+    "apenas",
     # Adverbios comunes
-    "no", "sí", "muy", "más", "menos", "tan", "tanto", "mucho", "poco",
-    "bien", "mal", "mejor", "peor", "siempre", "nunca", "también", "tampoco",
-    "aquí", "allí", "ahí", "acá", "allá", "cerca", "lejos", "dentro", "fuera",
-    "arriba", "abajo", "delante", "detrás", "encima", "debajo",
-    "antes", "después", "ahora", "luego", "entonces", "todavía", "ya",
-    "quizá", "quizás", "acaso", "tal vez",
+    "no",
+    "muy",
+    "más",
+    "menos",
+    "tan",
+    "tanto",
+    "mucho",
+    "poco",
+    "bien",
+    "mal",
+    "mejor",
+    "peor",
+    "siempre",
+    "nunca",
+    "también",
+    "tampoco",
+    "aquí",
+    "allí",
+    "ahí",
+    "acá",
+    "allá",
+    "cerca",
+    "lejos",
+    "dentro",
+    "fuera",
+    "arriba",
+    "abajo",
+    "delante",
+    "detrás",
+    "encima",
+    "debajo",
+    "antes",
+    "después",
+    "ahora",
+    "luego",
+    "entonces",
+    "todavía",
+    "ya",
+    "quizá",
+    "quizás",
+    "acaso",
+    "tal vez",
     # Interrogativos/exclamativos
-    "qué", "quién", "quiénes", "cuál", "cuáles", "cuánto", "cuánta",
-    "cuántos", "cuántas", "cómo", "dónde", "cuándo", "por qué",
+    "qué",
+    "quién",
+    "quiénes",
+    "cuál",
+    "cuáles",
+    "cuánto",
+    "cuánta",
+    "cuántos",
+    "cuántas",
+    "cómo",
+    "dónde",
+    "cuándo",
+    "por qué",
     # Verbos auxiliares comunes
-    "ser", "estar", "haber", "tener", "hacer", "poder", "deber", "ir",
-    "es", "está", "hay", "tiene", "hace", "puede", "debe", "va",
-    "era", "estaba", "había", "tenía", "hacía", "podía", "debía", "iba",
-    "fue", "estuvo", "hubo", "tuvo", "hizo", "pudo", "debió", "fue",
-    # Sustantivos muy genéricos
-    "cosa", "cosas", "algo", "nada", "todo", "parte", "vez", "veces",
-    "manera", "forma", "modo", "tipo", "clase", "especie",
-    "hombre", "mujer", "persona", "gente", "mundo", "vida", "tiempo",
-    "día", "días", "noche", "noches", "año", "años", "momento", "lugar",
+    "ser",
+    "estar",
+    "haber",
+    "tener",
+    "hacer",
+    "poder",
+    "deber",
+    "ir",
+    "es",
+    "está",
+    "hay",
+    "tiene",
+    "hace",
+    "puede",
+    "debe",
+    "va",
+    "era",
+    "estaba",
+    "había",
+    "tenía",
+    "hacía",
+    "podía",
+    "debía",
+    "iba",
+    "fue",
+    "estuvo",
+    "hubo",
+    "tuvo",
+    "hizo",
+    "pudo",
+    "debió",  # Sustantivos muy genéricos
+    "cosa",
+    "cosas",
+    "algo",
+    "nada",
+    "todo",
+    "parte",
+    "vez",
+    "veces",
+    "manera",
+    "forma",
+    "modo",
+    "tipo",
+    "clase",
+    "especie",
+    "hombre",
+    "mujer",
+    "persona",
+    "gente",
+    "mundo",
+    "vida",
+    "tiempo",
+    "día",
+    "días",
+    "noche",
+    "noches",
+    "año",
+    "años",
+    "momento",
+    "lugar",
     # Adjetivos muy comunes
-    "bueno", "malo", "grande", "pequeño", "nuevo", "viejo", "joven",
-    "alto", "bajo", "largo", "corto", "ancho", "estrecho",
-    "primero", "último", "siguiente", "anterior", "mismo", "otro", "demás",
+    "bueno",
+    "malo",
+    "grande",
+    "pequeño",
+    "nuevo",
+    "viejo",
+    "joven",
+    "alto",
+    "largo",
+    "corto",
+    "ancho",
+    "estrecho",
+    "primero",
+    "último",
+    "siguiente",
+    "anterior",
+    "mismo",
+    "otro",
+    "demás",
     # NUEVOS: Palabras que aparecen capitalizadas como ejemplos de errores
-    "correcto", "incorrecto", "habemos", "hubieron", "haiga",
-    "mejor", "peor", "mayor", "menor",
+    "correcto",
+    "incorrecto",
+    "habemos",
+    "hubieron",
+    "haiga",
+    "mayor",
+    "menor",
 }
 
 # Patrones que indican que NO es una entidad
@@ -377,6 +570,7 @@ CASE_SENSITIVE_NOT_ENTITY_PATTERNS = [
 # Validador principal
 # =============================================================================
 
+
 class EntityValidator:
     """
     Validador de entidades multi-capa.
@@ -395,7 +589,7 @@ class EntityValidator:
 
     def __init__(
         self,
-        config: Optional[EntityValidatorConfig] = None,
+        config: EntityValidatorConfig | None = None,
         db=None,
     ):
         """
@@ -421,14 +615,10 @@ class EntityValidator:
         self._cache_lock = threading.Lock()
 
         # Compilar patrones (case-insensitive)
-        self._not_entity_patterns = [
-            re.compile(p, re.IGNORECASE) for p in NOT_ENTITY_PATTERNS
-        ]
+        self._not_entity_patterns = [re.compile(p, re.IGNORECASE) for p in NOT_ENTITY_PATTERNS]
 
         # Compilar patrones case-sensitive (para mayúsculas literales)
-        self._case_sensitive_patterns = [
-            re.compile(p) for p in CASE_SENSITIVE_NOT_ENTITY_PATTERNS
-        ]
+        self._case_sensitive_patterns = [re.compile(p) for p in CASE_SENSITIVE_NOT_ENTITY_PATTERNS]
 
         logger.debug("EntityValidator inicializado")
 
@@ -436,7 +626,7 @@ class EntityValidator:
         self,
         entities: list,  # list[ExtractedEntity]
         full_text: str,
-        project_id: Optional[int] = None,
+        project_id: int | None = None,
     ) -> ValidationResult:
         """
         Valida un conjunto de entidades.
@@ -520,7 +710,7 @@ class EntityValidator:
         full_text: str,
         frequency: Counter,
         rejected_by_user: set[str],
-        project_id: Optional[int] = None,
+        project_id: int | None = None,
     ) -> EntityScore:
         """
         Calcula el score heurístico de una entidad.
@@ -533,13 +723,11 @@ class EntityValidator:
         words = text.split()
 
         # ===== NUEVO: Usar sistema híbrido de filtros de 3 niveles =====
-        entity_type = entity.label.value if hasattr(entity, 'label') else None
+        entity_type = entity.label.value if hasattr(entity, "label") else None
         try:
             filter_repo = get_filter_repository()
             filter_decision = filter_repo.should_filter_entity(
-                entity_name=text,
-                entity_type=entity_type,
-                project_id=project_id
+                entity_name=text, entity_type=entity_type, project_id=project_id
             )
 
             # Si hay force_include a nivel proyecto, aceptar directamente
@@ -584,7 +772,9 @@ class EntityValidator:
                 total_score=0.0,
                 is_valid=False,
                 validation_method="zone_rejected",
-                rejection_reason=f"En zona no-narrativa (título/metadato): '{line[:50]}...' " if len(line) > 50 else f"En zona no-narrativa: '{line}'",
+                rejection_reason=f"En zona no-narrativa (título/metadato): '{line[:50]}...' "
+                if len(line) > 50
+                else f"En zona no-narrativa: '{line}'",
             )
 
         # Verificar patrones que indican que NO es entidad (case-insensitive)
@@ -595,7 +785,7 @@ class EntityValidator:
                     total_score=0.0,
                     is_valid=False,
                     validation_method="pattern_rejected",
-                    rejection_reason=f"Coincide con patrón de no-entidad",
+                    rejection_reason="Coincide con patrón de no-entidad",
                 )
 
         # Verificar patrones case-sensitive (para texto en mayúsculas)
@@ -606,7 +796,7 @@ class EntityValidator:
                     total_score=0.0,
                     is_valid=False,
                     validation_method="pattern_rejected",
-                    rejection_reason=f"Coincide con patrón de no-entidad (mayúsculas)",
+                    rejection_reason="Coincide con patrón de no-entidad (mayúsculas)",
                 )
 
         # Calcular scores individuales
@@ -669,13 +859,13 @@ class EntityValidator:
         # Calcular score total ponderado
         cfg = self.config
         scores.total_score = (
-            scores.frequency_score * cfg.weight_frequency +
-            scores.capitalization_score * cfg.weight_capitalization +
-            scores.position_score * cfg.weight_position +
-            scores.length_score * cfg.weight_length +
-            scores.article_score * cfg.weight_no_article +
-            scores.common_word_score * cfg.weight_not_common +
-            scores.morphology_score * cfg.weight_morphology
+            scores.frequency_score * cfg.weight_frequency
+            + scores.capitalization_score * cfg.weight_capitalization
+            + scores.position_score * cfg.weight_position
+            + scores.length_score * cfg.weight_length
+            + scores.article_score * cfg.weight_no_article
+            + scores.common_word_score * cfg.weight_not_common
+            + scores.morphology_score * cfg.weight_morphology
         )
 
         # Determinar validez
@@ -713,7 +903,7 @@ class EntityValidator:
         """
         import re
 
-        pattern = r'\b' + re.escape(entity_text) + r'\b'
+        pattern = r"\b" + re.escape(entity_text) + r"\b"
         matches = list(re.finditer(pattern, full_text, re.IGNORECASE))
 
         if len(matches) == 0:
@@ -737,7 +927,7 @@ class EntityValidator:
         import re
 
         # Buscar todas las ocurrencias (case insensitive)
-        pattern = r'\b' + re.escape(entity_text) + r'\b'
+        pattern = r"\b" + re.escape(entity_text) + r"\b"
         matches = list(re.finditer(pattern, full_text, re.IGNORECASE))
 
         if len(matches) < 2:
@@ -765,7 +955,7 @@ class EntityValidator:
         import re
 
         # Buscar ocurrencias
-        pattern = r'\b' + re.escape(entity_text) + r'\b'
+        pattern = r"\b" + re.escape(entity_text) + r"\b"
         matches = list(re.finditer(pattern, full_text, re.IGNORECASE))
 
         if len(matches) < 2:
@@ -781,7 +971,7 @@ class EntityValidator:
             elif pos > 0:
                 # Buscar hacia atrás el caracter no-espacio más cercano
                 before = full_text[:pos].rstrip()
-                if before and before[-1] in '.!?¿¡\n':
+                if before and before[-1] in ".!?¿¡\n":
                     sentence_start_count += 1
 
         # Si menos del 50% están al inicio de oración, es válido
@@ -820,23 +1010,27 @@ class EntityValidator:
             return True  # LLM disponible, pero no necesario
 
         # Limitar batch
-        entities_to_validate = entities_to_validate[:self.config.llm_batch_size]
+        entities_to_validate = entities_to_validate[: self.config.llm_batch_size]
 
         # Extraer contexto para cada entidad
         entity_contexts = []
         for entity in entities_to_validate:
             context = self._extract_context(entity, full_text)
-            entity_contexts.append({
-                "text": entity.text,
-                "type": entity.label.value if hasattr(entity, 'label') else "UNKNOWN",
-                "context": context,
-            })
+            entity_contexts.append(
+                {
+                    "text": entity.text,
+                    "type": entity.label.value if hasattr(entity, "label") else "UNKNOWN",
+                    "context": context,
+                }
+            )
 
         # Construir prompt
-        entities_json = "\n".join([
-            f'  - "{ec["text"]}" (detectado como {ec["type"]}): "{ec["context"]}"'
-            for ec in entity_contexts
-        ])
+        entities_json = "\n".join(
+            [
+                f'  - "{ec["text"]}" (detectado como {ec["type"]}): "{ec["context"]}"'
+                for ec in entity_contexts
+            ]
+        )
 
         prompt = f"""Analiza estas posibles entidades extraídas de un texto narrativo en español.
 Para cada una, determina si es realmente una ENTIDAD NOMBRADA válida o un falso positivo.
@@ -951,6 +1145,7 @@ JSON:"""
 
         try:
             from ..llm.client import get_llm_client
+
             client = get_llm_client()
             if client and client.is_available:
                 self._llm_client = client
@@ -972,6 +1167,7 @@ JSON:"""
 
         try:
             from .spacy_gpu import load_spacy_model
+
             self._nlp = load_spacy_model()
             logger.debug("spaCy disponible para análisis morfológico")
         except Exception as e:
@@ -1038,7 +1234,7 @@ JSON:"""
         self,
         entity,
         full_text: str,
-    ) -> tuple[float, Optional[str]]:
+    ) -> tuple[float, str | None]:
         """
         Calcula el score morfológico de una entidad.
 
@@ -1073,33 +1269,106 @@ JSON:"""
         # Terminaciones de verbos conjugados en español
         verb_endings = {
             # Presente indicativo
-            'o', 'as', 'a', 'amos', 'áis', 'an',
-            'es', 'e', 'emos', 'éis', 'en',
-            'ís', 'imos',
+            "o",
+            "as",
+            "a",
+            "amos",
+            "áis",
+            "an",
+            "es",
+            "e",
+            "emos",
+            "éis",
+            "en",
+            "ís",
+            "imos",
             # Pretérito
-            'é', 'aste', 'ó', 'amos', 'asteis', 'aron',
-            'í', 'iste', 'ió', 'imos', 'isteis', 'ieron',
+            "é",
+            "aste",
+            "ó",
+            "asteis",
+            "aron",
+            "í",
+            "iste",
+            "ió",
+            "isteis",
+            "ieron",
             # Imperfecto
-            'aba', 'abas', 'ábamos', 'abais', 'aban',
-            'ía', 'ías', 'íamos', 'íais', 'ían',
+            "aba",
+            "abas",
+            "ábamos",
+            "abais",
+            "aban",
+            "ía",
+            "ías",
+            "íamos",
+            "íais",
+            "ían",
             # Futuro
-            'aré', 'arás', 'ará', 'aremos', 'aréis', 'arán',
-            'eré', 'erás', 'erá', 'eremos', 'eréis', 'erán',
-            'iré', 'irás', 'irá', 'iremos', 'iréis', 'irán',
+            "aré",
+            "arás",
+            "ará",
+            "aremos",
+            "aréis",
+            "arán",
+            "eré",
+            "erás",
+            "erá",
+            "eremos",
+            "eréis",
+            "erán",
+            "iré",
+            "irás",
+            "irá",
+            "iremos",
+            "iréis",
+            "irán",
             # Condicional
-            'aría', 'arías', 'aríamos', 'aríais', 'arían',
-            'ería', 'erías', 'eríamos', 'eríais', 'erían',
-            'iría', 'irías', 'iríamos', 'iríais', 'irían',
+            "aría",
+            "arías",
+            "aríamos",
+            "aríais",
+            "arían",
+            "ería",
+            "erías",
+            "eríamos",
+            "eríais",
+            "erían",
+            "iría",
+            "irías",
+            "iríamos",
+            "iríais",
+            "irían",
             # Subjuntivo
-            'ara', 'aras', 'áramos', 'arais', 'aran',
-            'iera', 'ieras', 'iéramos', 'ierais', 'ieran',
-            'ase', 'ases', 'ásemos', 'aseis', 'asen',
-            'iese', 'ieses', 'iésemos', 'ieseis', 'iesen',
+            "ara",
+            "aras",
+            "áramos",
+            "arais",
+            "aran",
+            "iera",
+            "ieras",
+            "iéramos",
+            "ierais",
+            "ieran",
+            "ase",
+            "ases",
+            "ásemos",
+            "aseis",
+            "asen",
+            "iese",
+            "ieses",
+            "iésemos",
+            "ieseis",
+            "iesen",
         }
 
         # Verificar si termina como verbo conjugado (pero no es nombre conocido)
         for ending in verb_endings:
-            if len(ending) >= 3 and text_lower.endswith(ending) and len(text_lower) > len(ending) + 2:
+            if (
+                len(ending) >= 3
+                and text_lower.endswith(ending)
+                and len(text_lower) > len(ending) + 2
+            ):
                 # Podría ser verbo, penalizar ligeramente
                 return 0.6, f"Termina en '{ending}' (posible verbo)"
 
@@ -1129,7 +1398,7 @@ JSON:"""
                     SELECT entity_text FROM rejected_entities
                     WHERE project_id = ?
                     """,
-                    (project_id,)
+                    (project_id,),
                 )
                 rejected = {row["entity_text"].lower() for row in rows}
             except Exception as e:
@@ -1168,7 +1437,7 @@ JSON:"""
                         INSERT OR IGNORE INTO rejected_entities (project_id, entity_text)
                         VALUES (?, ?)
                         """,
-                        (project_id, entity_lower)
+                        (project_id, entity_lower),
                     )
                 logger.debug(f"Entidad rechazada guardada: '{entity_text}' (proyecto {project_id})")
                 return True
@@ -1205,7 +1474,7 @@ JSON:"""
                         DELETE FROM rejected_entities
                         WHERE project_id = ? AND entity_text = ?
                         """,
-                        (project_id, entity_lower)
+                        (project_id, entity_lower),
                     )
                 return True
             except Exception as e:
@@ -1214,7 +1483,7 @@ JSON:"""
 
         return True
 
-    def clear_cache(self, project_id: Optional[int] = None) -> None:
+    def clear_cache(self, project_id: int | None = None) -> None:
         """
         Limpia el cache de entidades rechazadas.
 
@@ -1233,7 +1502,7 @@ JSON:"""
 # =============================================================================
 
 _validator_lock = threading.Lock()
-_validator: Optional[EntityValidator] = None
+_validator: EntityValidator | None = None
 
 
 def get_entity_validator(db=None) -> EntityValidator:
@@ -1259,7 +1528,7 @@ def get_entity_validator(db=None) -> EntityValidator:
 def validate_entities(
     entities: list,
     full_text: str,
-    project_id: Optional[int] = None,
+    project_id: int | None = None,
 ) -> ValidationResult:
     """
     Valida un conjunto de entidades (atajo).

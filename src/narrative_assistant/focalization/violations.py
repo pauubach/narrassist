@@ -7,16 +7,16 @@ Detecta cuando el texto viola la focalizacion declarada:
 - Cambios de focalizador sin marca
 """
 
-import re
 import logging
+import re
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Dict, Optional, Any, Set
+from typing import Any
 
 from .declaration import (
-    FocalizationType,
     FocalizationDeclaration,
     FocalizationDeclarationService,
+    FocalizationType,
 )
 
 logger = logging.getLogger(__name__)
@@ -25,40 +25,41 @@ logger = logging.getLogger(__name__)
 # Verbos que implican acceso mental
 MENTAL_ACCESS_VERBS = {
     # Pensamiento
-    'pensar': ['penso', 'pensaba', 'piensa', 'pensando'],
-    'creer': ['creyo', 'creia', 'cree', 'creyendo'],
-    'imaginar': ['imagino', 'imaginaba', 'imagina'],
-    'recordar': ['recordo', 'recordaba', 'recuerda'],
-    'olvidar': ['olvido', 'olvidaba', 'olvida'],
-    'saber': ['sabia', 'supo', 'sabe'],
-    'conocer': ['conocia', 'conocio', 'conoce'],
+    "pensar": ["penso", "pensaba", "piensa", "pensando"],
+    "creer": ["creyo", "creia", "cree", "creyendo"],
+    "imaginar": ["imagino", "imaginaba", "imagina"],
+    "recordar": ["recordo", "recordaba", "recuerda"],
+    "olvidar": ["olvido", "olvidaba", "olvida"],
+    "saber": ["sabia", "supo", "sabe"],
+    "conocer": ["conocia", "conocio", "conoce"],
     # Emociones internas
-    'sentir': ['sintio', 'sentia', 'siente'],
-    'temer': ['temio', 'temia', 'teme'],
-    'desear': ['deseo', 'deseaba', 'desea'],
-    'esperar': ['espero', 'esperaba', 'espera'],
-    'querer': ['quiso', 'queria', 'quiere'],
-    'odiar': ['odio', 'odiaba', 'odia'],
-    'amar': ['amo', 'amaba', 'ama'],
+    "sentir": ["sintio", "sentia", "siente"],
+    "temer": ["temio", "temia", "teme"],
+    "desear": ["deseo", "deseaba", "desea"],
+    "esperar": ["espero", "esperaba", "espera"],
+    "querer": ["quiso", "queria", "quiere"],
+    "odiar": ["odio", "odiaba", "odia"],
+    "amar": ["amo", "amaba", "ama"],
     # Percepcion interna
-    'comprender': ['comprendio', 'comprendia', 'comprende'],
-    'entender': ['entendio', 'entendia', 'entiende'],
-    'notar': ['noto', 'notaba', 'nota'],
+    "comprender": ["comprendio", "comprendia", "comprende"],
+    "entender": ["entendio", "entendia", "entiende"],
+    "notar": ["noto", "notaba", "nota"],
 }
 
 # Patrones que indican acceso mental
 MENTAL_ACCESS_PATTERNS = [
-    r'(\w+)\s+(penso|pensaba|creyo|creia|sabia|recordo|imagino|sintio|sentia|temia|deseaba)',
-    r'en\s+la\s+mente\s+de\s+(\w+)',
-    r'(\w+)\s+se\s+pregunt[oa]',
-    r'para\s+(\w+),?\s+(era|fue|parecia)\s+claro',
-    r'(\w+)\s+no\s+podia\s+creer',
-    r'(\w+)\s+se\s+dio\s+cuenta',
+    r"(\w+)\s+(penso|pensaba|creyo|creia|sabia|recordo|imagino|sintio|sentia|temia|deseaba)",
+    r"en\s+la\s+mente\s+de\s+(\w+)",
+    r"(\w+)\s+se\s+pregunt[oa]",
+    r"para\s+(\w+),?\s+(era|fue|parecia)\s+claro",
+    r"(\w+)\s+no\s+podia\s+creer",
+    r"(\w+)\s+se\s+dio\s+cuenta",
 ]
 
 
 class ViolationType(Enum):
     """Tipos de violacion de focalizacion."""
+
     FORBIDDEN_MIND_ACCESS = "forbidden_mind_access"  # Acceso a mente no permitida
     THOUGHT_IN_EXTERNAL = "thought_in_external"  # Pensamiento en focalizacion externa
     INCONSISTENT_PERCEPTION = "inconsistent_perception"  # Percepcion imposible
@@ -68,6 +69,7 @@ class ViolationType(Enum):
 
 class ViolationSeverity(Enum):
     """Severidad de la violacion."""
+
     HIGH = "high"
     MEDIUM = "medium"
     LOW = "low"
@@ -81,22 +83,22 @@ class FocalizationViolation:
     severity: ViolationSeverity
 
     chapter: int
-    scene: Optional[int]
+    scene: int | None
     position: int
 
     # Contexto
     text_excerpt: str
-    entity_involved: Optional[int] = None  # ID de entidad que causa la violacion
-    entity_name: Optional[str] = None
+    entity_involved: int | None = None  # ID de entidad que causa la violacion
+    entity_name: str | None = None
 
     # Explicacion
     explanation: str = ""
-    declared_focalizer: Optional[str] = None
+    declared_focalizer: str | None = None
     suggestion: str = ""
 
     confidence: float = 0.5
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Convierte a diccionario."""
         return {
             "violation_type": self.violation_type.value,
@@ -117,11 +119,7 @@ class FocalizationViolation:
 class FocalizationViolationDetector:
     """Detector de violaciones de focalizacion."""
 
-    def __init__(
-        self,
-        declaration_service: FocalizationDeclarationService,
-        entities: List[Any]
-    ):
+    def __init__(self, declaration_service: FocalizationDeclarationService, entities: list[Any]):
         """
         Inicializa el detector.
 
@@ -130,17 +128,17 @@ class FocalizationViolationDetector:
             entities: Lista de entidades del proyecto
         """
         self.declaration_service = declaration_service
-        self.entities: Dict[int, Any] = {}
-        self.entity_names: Dict[str, int] = {}
+        self.entities: dict[int, Any] = {}
+        self.entity_names: dict[str, int] = {}
 
         for e in entities:
-            entity_id = getattr(e, 'id', None)
+            entity_id = getattr(e, "id", None)
             if entity_id:
                 self.entities[entity_id] = e
-                name = getattr(e, 'canonical_name', getattr(e, 'name', '')).lower()
+                name = getattr(e, "canonical_name", getattr(e, "name", "")).lower()
                 self.entity_names[name] = entity_id
                 # Tambien agregar aliases
-                aliases = getattr(e, 'aliases', [])
+                aliases = getattr(e, "aliases", [])
                 for alias in aliases:
                     self.entity_names[alias.lower()] = entity_id
 
@@ -154,17 +152,13 @@ class FocalizationViolationDetector:
             self.mental_patterns.append(re.compile(pattern, re.IGNORECASE))
 
         # Todos los verbos de acceso mental
-        self.mental_verbs: Set[str] = set()
+        self.mental_verbs: set[str] = set()
         for verb_forms in MENTAL_ACCESS_VERBS.values():
             self.mental_verbs.update(v.lower() for v in verb_forms)
 
     def detect_violations(
-        self,
-        project_id: int,
-        text: str,
-        chapter: int,
-        scene: Optional[int] = None
-    ) -> List[FocalizationViolation]:
+        self, project_id: int, text: str, chapter: int, scene: int | None = None
+    ) -> list[FocalizationViolation]:
         """
         Detecta violaciones de focalizacion en un texto.
 
@@ -180,9 +174,7 @@ class FocalizationViolationDetector:
         violations = []
 
         # Obtener declaracion de focalizacion
-        declaration = self.declaration_service.get_focalization(
-            project_id, chapter, scene
-        )
+        declaration = self.declaration_service.get_focalization(project_id, chapter, scene)
 
         if not declaration:
             # Sin declaracion, no podemos detectar violaciones
@@ -191,65 +183,57 @@ class FocalizationViolationDetector:
 
         # Segun el tipo de focalizacion, aplicar diferentes reglas
         if declaration.focalization_type == FocalizationType.EXTERNAL:
-            violations.extend(self._check_external_violations(
-                text, chapter, scene, declaration
-            ))
+            violations.extend(self._check_external_violations(text, chapter, scene, declaration))
         elif declaration.focalization_type == FocalizationType.INTERNAL_FIXED:
-            violations.extend(self._check_internal_fixed_violations(
-                text, chapter, scene, declaration
-            ))
+            violations.extend(
+                self._check_internal_fixed_violations(text, chapter, scene, declaration)
+            )
         elif declaration.focalization_type == FocalizationType.INTERNAL_VARIABLE:
-            violations.extend(self._check_internal_variable_violations(
-                text, chapter, scene, declaration
-            ))
+            violations.extend(
+                self._check_internal_variable_violations(text, chapter, scene, declaration)
+            )
         # ZERO (omnisciente) no tiene violaciones por definicion
 
         logger.info(f"Detected {len(violations)} focalization violations in chapter {chapter}")
         return violations
 
     def _check_external_violations(
-        self,
-        text: str,
-        chapter: int,
-        scene: Optional[int],
-        declaration: FocalizationDeclaration
-    ) -> List[FocalizationViolation]:
+        self, text: str, chapter: int, scene: int | None, declaration: FocalizationDeclaration
+    ) -> list[FocalizationViolation]:
         """Detecta pensamientos en focalizacion externa."""
         violations = []
 
         # Buscar cualquier acceso mental
         for pattern in self.mental_patterns:
             for match in pattern.finditer(text):
-                violations.append(FocalizationViolation(
-                    violation_type=ViolationType.THOUGHT_IN_EXTERNAL,
-                    severity=ViolationSeverity.HIGH,
-                    chapter=chapter,
-                    scene=scene,
-                    position=match.start(),
-                    text_excerpt=match.group(0),
-                    entity_involved=None,
-                    entity_name=None,
-                    explanation=(
-                        "Focalizacion externa declarada pero se accede a pensamientos/emociones"
-                    ),
-                    declared_focalizer="Ninguno (externa)",
-                    suggestion=(
-                        "En focalizacion externa, solo se pueden describir acciones "
-                        "observables, no pensamientos. Considere reformular o cambiar "
-                        "la focalizacion."
-                    ),
-                    confidence=0.8
-                ))
+                violations.append(
+                    FocalizationViolation(
+                        violation_type=ViolationType.THOUGHT_IN_EXTERNAL,
+                        severity=ViolationSeverity.HIGH,
+                        chapter=chapter,
+                        scene=scene,
+                        position=match.start(),
+                        text_excerpt=match.group(0),
+                        entity_involved=None,
+                        entity_name=None,
+                        explanation=(
+                            "Focalizacion externa declarada pero se accede a pensamientos/emociones"
+                        ),
+                        declared_focalizer="Ninguno (externa)",
+                        suggestion=(
+                            "En focalizacion externa, solo se pueden describir acciones "
+                            "observables, no pensamientos. Considere reformular o cambiar "
+                            "la focalizacion."
+                        ),
+                        confidence=0.8,
+                    )
+                )
 
         return violations
 
     def _check_internal_fixed_violations(
-        self,
-        text: str,
-        chapter: int,
-        scene: Optional[int],
-        declaration: FocalizationDeclaration
-    ) -> List[FocalizationViolation]:
+        self, text: str, chapter: int, scene: int | None, declaration: FocalizationDeclaration
+    ) -> list[FocalizationViolation]:
         """Detecta acceso a mentes no permitidas en focalizacion interna fija."""
         violations = []
 
@@ -261,13 +245,12 @@ class FocalizationViolationDetector:
         focalizer_name = "?"
         if focalizer_entity:
             focalizer_name = getattr(
-                focalizer_entity, 'canonical_name',
-                getattr(focalizer_entity, 'name', '?')
+                focalizer_entity, "canonical_name", getattr(focalizer_entity, "name", "?")
             )
 
-        focalizer_names_lower: Set[str] = {focalizer_name.lower()}
+        focalizer_names_lower: set[str] = {focalizer_name.lower()}
         if focalizer_entity:
-            aliases = getattr(focalizer_entity, 'aliases', [])
+            aliases = getattr(focalizer_entity, "aliases", [])
             focalizer_names_lower.update(a.lower() for a in aliases)
 
         # Buscar acceso mental a otros personajes
@@ -291,53 +274,52 @@ class FocalizationViolationDetector:
                     other_name = character_name.title()
                     if other_entity:
                         other_name = getattr(
-                            other_entity, 'canonical_name',
-                            getattr(other_entity, 'name', character_name.title())
+                            other_entity,
+                            "canonical_name",
+                            getattr(other_entity, "name", character_name.title()),
                         )
 
-                    violations.append(FocalizationViolation(
-                        violation_type=ViolationType.FORBIDDEN_MIND_ACCESS,
-                        severity=ViolationSeverity.HIGH,
-                        chapter=chapter,
-                        scene=scene,
-                        position=match.start(),
-                        text_excerpt=match.group(0),
-                        entity_involved=other_id,
-                        entity_name=other_name,
-                        explanation=(
-                            f"Acceso a los pensamientos de '{other_name}' cuando "
-                            f"la focalizacion esta en '{focalizer_name}'"
-                        ),
-                        declared_focalizer=focalizer_name,
-                        suggestion=(
-                            f"Solo podemos conocer los pensamientos de {focalizer_name}. "
-                            f"Considere reformular como observacion externa de {other_name} "
-                            f"o mostrar lo que {focalizer_name} infiere de su comportamiento."
-                        ),
-                        confidence=0.85
-                    ))
+                    violations.append(
+                        FocalizationViolation(
+                            violation_type=ViolationType.FORBIDDEN_MIND_ACCESS,
+                            severity=ViolationSeverity.HIGH,
+                            chapter=chapter,
+                            scene=scene,
+                            position=match.start(),
+                            text_excerpt=match.group(0),
+                            entity_involved=other_id,
+                            entity_name=other_name,
+                            explanation=(
+                                f"Acceso a los pensamientos de '{other_name}' cuando "
+                                f"la focalizacion esta en '{focalizer_name}'"
+                            ),
+                            declared_focalizer=focalizer_name,
+                            suggestion=(
+                                f"Solo podemos conocer los pensamientos de {focalizer_name}. "
+                                f"Considere reformular como observacion externa de {other_name} "
+                                f"o mostrar lo que {focalizer_name} infiere de su comportamiento."
+                            ),
+                            confidence=0.85,
+                        )
+                    )
 
         return violations
 
     def _check_internal_variable_violations(
-        self,
-        text: str,
-        chapter: int,
-        scene: Optional[int],
-        declaration: FocalizationDeclaration
-    ) -> List[FocalizationViolation]:
+        self, text: str, chapter: int, scene: int | None, declaration: FocalizationDeclaration
+    ) -> list[FocalizationViolation]:
         """Detecta cambios no marcados de focalizador."""
         violations = []
 
         allowed_focalizers = set(declaration.focalizer_ids)
-        allowed_names: Set[str] = set()
+        allowed_names: set[str] = set()
 
         for fid in allowed_focalizers:
             entity = self.entities.get(fid)
             if entity:
-                name = getattr(entity, 'canonical_name', getattr(entity, 'name', ''))
+                name = getattr(entity, "canonical_name", getattr(entity, "name", ""))
                 allowed_names.add(name.lower())
-                aliases = getattr(entity, 'aliases', [])
+                aliases = getattr(entity, "aliases", [])
                 for alias in aliases:
                     allowed_names.add(alias.lower())
 
@@ -358,31 +340,32 @@ class FocalizationViolationDetector:
                     for fid in allowed_focalizers:
                         entity = self.entities.get(fid)
                         if entity:
-                            declared_names.append(getattr(
-                                entity, 'canonical_name',
-                                getattr(entity, 'name', str(fid))
-                            ))
+                            declared_names.append(
+                                getattr(entity, "canonical_name", getattr(entity, "name", str(fid)))
+                            )
 
-                    violations.append(FocalizationViolation(
-                        violation_type=ViolationType.FORBIDDEN_MIND_ACCESS,
-                        severity=ViolationSeverity.HIGH,
-                        chapter=chapter,
-                        scene=scene,
-                        position=match.start(),
-                        text_excerpt=match.group(0),
-                        entity_involved=other_id,
-                        entity_name=character_name.title(),
-                        explanation=(
-                            f"Acceso a mente de '{character_name}' que no esta en la "
-                            f"lista de focalizadores declarados"
-                        ),
-                        declared_focalizer=", ".join(declared_names),
-                        suggestion=(
-                            f"Anada '{character_name}' a la lista de focalizadores "
-                            f"o reformule como observacion externa."
-                        ),
-                        confidence=0.8
-                    ))
+                    violations.append(
+                        FocalizationViolation(
+                            violation_type=ViolationType.FORBIDDEN_MIND_ACCESS,
+                            severity=ViolationSeverity.HIGH,
+                            chapter=chapter,
+                            scene=scene,
+                            position=match.start(),
+                            text_excerpt=match.group(0),
+                            entity_involved=other_id,
+                            entity_name=character_name.title(),
+                            explanation=(
+                                f"Acceso a mente de '{character_name}' que no esta en la "
+                                f"lista de focalizadores declarados"
+                            ),
+                            declared_focalizer=", ".join(declared_names),
+                            suggestion=(
+                                f"Anada '{character_name}' a la lista de focalizadores "
+                                f"o reformule como observacion externa."
+                            ),
+                            confidence=0.8,
+                        )
+                    )
 
         return violations
 
@@ -391,8 +374,8 @@ class FocalizationViolationDetector:
         project_id: int,
         chapter: int,
         text: str,
-        scenes: Optional[List[tuple]] = None  # [(scene_num, text), ...]
-    ) -> Dict[str, Any]:
+        scenes: list[tuple] | None = None,  # [(scene_num, text), ...]
+    ) -> dict[str, Any]:
         """
         Valida un capitulo completo y devuelve resumen.
 
@@ -409,9 +392,7 @@ class FocalizationViolationDetector:
 
         if scenes:
             for scene_num, scene_text in scenes:
-                violations = self.detect_violations(
-                    project_id, scene_text, chapter, scene_num
-                )
+                violations = self.detect_violations(project_id, scene_text, chapter, scene_num)
                 all_violations.extend(violations)
         else:
             all_violations = self.detect_violations(project_id, text, chapter)
@@ -423,30 +404,24 @@ class FocalizationViolationDetector:
             declaration.is_validated = True
 
         return {
-            'chapter': chapter,
-            'total_violations': len(all_violations),
-            'by_type': self._count_by_type(all_violations),
-            'by_severity': self._count_by_severity(all_violations),
-            'violations': all_violations
+            "chapter": chapter,
+            "total_violations": len(all_violations),
+            "by_type": self._count_by_type(all_violations),
+            "by_severity": self._count_by_severity(all_violations),
+            "violations": all_violations,
         }
 
-    def _count_by_type(
-        self,
-        violations: List[FocalizationViolation]
-    ) -> Dict[str, int]:
+    def _count_by_type(self, violations: list[FocalizationViolation]) -> dict[str, int]:
         """Cuenta violaciones por tipo."""
-        counts: Dict[str, int] = {}
+        counts: dict[str, int] = {}
         for v in violations:
             key = v.violation_type.value
             counts[key] = counts.get(key, 0) + 1
         return counts
 
-    def _count_by_severity(
-        self,
-        violations: List[FocalizationViolation]
-    ) -> Dict[str, int]:
+    def _count_by_severity(self, violations: list[FocalizationViolation]) -> dict[str, int]:
         """Cuenta violaciones por severidad."""
-        counts: Dict[str, int] = {}
+        counts: dict[str, int] = {}
         for v in violations:
             key = v.severity.value
             counts[key] = counts.get(key, 0) + 1
@@ -454,9 +429,9 @@ class FocalizationViolationDetector:
 
 
 def detect_focalization_violations(
-    chapters: List[Dict],
-    entities: List[Any],
-    declarations: List[Dict],
+    chapters: list[dict],
+    entities: list[Any],
+    declarations: list[dict],
 ) -> tuple:
     """
     Funcion de conveniencia para detectar violaciones de focalizacion.

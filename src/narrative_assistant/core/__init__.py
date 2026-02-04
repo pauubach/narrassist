@@ -2,64 +2,64 @@
 Core module - Errores, configuración, dispositivos y resultados.
 """
 
-from .errors import (
-    NarrativeError,
-    ErrorSeverity,
-    ParsingError,
-    CorruptedDocumentError,
-    EmptyDocumentError,
-    UnsupportedFormatError,
-    ScannedPDFError,
-    NLPError,
-    ModelNotLoadedError,
-    ChapterProcessingError,
-    DatabaseError,
-    ProjectNotFoundError,
-    DocumentAlreadyExistsError,
-    ResourceError,
-    OutOfMemoryError,
-    # Licensing errors
-    LicensingError,
-    LicenseNotFoundError,
-    LicenseExpiredError,
-    LicenseOfflineError,
-    DeviceLimitError,
-    DeviceCooldownError,
-    QuotaExceededError,
-    ModuleNotLicensedError,
+from .config import (
+    AlertConfig,
+    AppConfig,
+    GPUConfig,
+    NLPConfig,
+    ParsingConfig,
+    PersistenceConfig,
+    get_config,
+    reset_config,
+    set_config,
 )
-from .result import Result
 from .device import (
-    DeviceType,
-    DeviceInfo,
     DeviceDetector,
+    DeviceInfo,
+    DeviceType,
     get_device,
     get_device_detector,
     get_torch_device_string,
     reset_device_detector,
 )
-from .config import (
-    GPUConfig,
-    NLPConfig,
-    ParsingConfig,
-    AlertConfig,
-    PersistenceConfig,
-    AppConfig,
-    get_config,
-    set_config,
-    reset_config,
+from .errors import (
+    ChapterProcessingError,
+    CorruptedDocumentError,
+    DatabaseError,
+    DeviceCooldownError,
+    DeviceLimitError,
+    DocumentAlreadyExistsError,
+    EmptyDocumentError,
+    ErrorSeverity,
+    LicenseExpiredError,
+    LicenseNotFoundError,
+    LicenseOfflineError,
+    # Licensing errors
+    LicensingError,
+    ModelNotLoadedError,
+    ModuleNotLicensedError,
+    NarrativeError,
+    NLPError,
+    OutOfMemoryError,
+    ParsingError,
+    ProjectNotFoundError,
+    QuotaExceededError,
+    ResourceError,
+    ScannedPDFError,
+    UnsupportedFormatError,
 )
+from .resource_manager import (
+    HeavyTaskSemaphore,
+    ResourceManager,
+    ResourceRecommendation,
+    ResourceTier,
+    SystemCapabilities,
+    get_resource_manager,
+)
+from .result import Result
 from .utils import (
     format_duration,
     format_duration_verbose,
-)
-from .resource_manager import (
-    ResourceManager,
-    ResourceTier,
-    SystemCapabilities,
-    ResourceRecommendation,
-    HeavyTaskSemaphore,
-    get_resource_manager,
 )
 
 __all__ = [

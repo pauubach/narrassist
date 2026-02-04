@@ -7,11 +7,17 @@ Componentes:
 - fusion: Servicio de fusión manual de entidades
 """
 
+from .fusion import (
+    EntityFusionService,
+    get_fusion_service,
+    reset_fusion_service,
+    run_automatic_fusion,
+)
 from .models import (
-    EntityType,
-    EntityImportance,
     Entity,
+    EntityImportance,
     EntityMention,
+    EntityType,
     MergeHistory,
     MergeSuggestion,
 )
@@ -20,20 +26,14 @@ from .repository import (
     get_entity_repository,
     reset_entity_repository,
 )
-from .fusion import (
-    EntityFusionService,
-    get_fusion_service,
-    reset_fusion_service,
-    run_automatic_fusion,
-)
 
 # Semantic fusion depends on NLP libraries (numpy, sentence-transformers).
 # These are NOT available in embedded Python (production) until the user
 # installs the full NLP stack. Gracefully degrade if missing.
 try:
     from .semantic_fusion import (
-        SemanticFusionService,
         SemanticFusionResult,
+        SemanticFusionService,
         get_semantic_fusion_service,
         reset_semantic_fusion_service,
         update_fusion_threshold,

@@ -5,8 +5,6 @@ Centraliza la lógica de formateo de texto para alertas,
 evitando duplicación en AlertEngine.
 """
 
-from typing import Optional
-
 
 class AlertFormatter:
     """
@@ -41,7 +39,7 @@ class AlertFormatter:
         text: str,
         prefix: str = "En contexto",
         max_length: int = DEFAULT_MAX_LENGTH,
-        use_quotes: bool = True
+        use_quotes: bool = True,
     ) -> str:
         """
         Formatea un texto como contexto con comillas tipográficas.
@@ -66,9 +64,7 @@ class AlertFormatter:
 
     @staticmethod
     def format_explanation_with_context(
-        base_explanation: str,
-        context: str,
-        max_length: int = DEFAULT_MAX_LENGTH
+        base_explanation: str, context: str, max_length: int = DEFAULT_MAX_LENGTH
     ) -> str:
         """
         Añade contexto a una explicación si está disponible.
@@ -93,8 +89,8 @@ class AlertFormatter:
     def format_excerpt(
         text: str,
         max_length: int = 200,
-        context_before: Optional[str] = None,
-        context_after: Optional[str] = None
+        context_before: str | None = None,
+        context_after: str | None = None,
     ) -> str:
         """
         Formatea un excerpt de texto, opcionalmente con contexto antes/después.
@@ -118,10 +114,7 @@ class AlertFormatter:
 
     @staticmethod
     def format_attribute_inconsistency(
-        attr_name: str,
-        value1: str,
-        value2: str,
-        entity_name: str
+        attr_name: str, value1: str, value2: str, entity_name: str
     ) -> dict:
         """
         Formatea el título y descripción para una inconsistencia de atributo.
@@ -137,16 +130,12 @@ class AlertFormatter:
         """
         return {
             "title": f"Inconsistencia en {attr_name}",
-            "description": f"{entity_name} tiene valores contradictorios: "
-                          f"«{value1}» vs «{value2}»"
+            "description": f"{entity_name} tiene valores contradictorios: «{value1}» vs «{value2}»",
         }
 
     @staticmethod
     def format_sources_for_extra_data(
-        value1: str,
-        value1_source: dict,
-        value2: str,
-        value2_source: dict
+        value1: str, value1_source: dict, value2: str, value2_source: dict
     ) -> list:
         """
         Formatea las fuentes para el extra_data de una alerta de inconsistencia.
@@ -160,6 +149,7 @@ class AlertFormatter:
         Returns:
             Lista de dicts con info de cada fuente
         """
+
         def get_excerpt(source: dict) -> str:
             return source.get("text", source.get("excerpt", ""))
 
@@ -180,7 +170,7 @@ class AlertFormatter:
 
 
 # Instancia singleton para uso conveniente
-_formatter: Optional[AlertFormatter] = None
+_formatter: AlertFormatter | None = None
 
 
 def get_alert_formatter() -> AlertFormatter:

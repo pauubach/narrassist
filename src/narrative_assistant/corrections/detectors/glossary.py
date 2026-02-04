@@ -9,12 +9,11 @@ Detecta usos inconsistentes de términos definidos en el glosario:
 
 import logging
 import re
-from typing import Optional
 
+from ...persistence.glossary import GlossaryEntry, GlossaryRepository
 from ..base import BaseDetector, CorrectionIssue
 from ..config import GlossaryConfig
 from ..types import CorrectionCategory, GlossaryIssueType
-from ...persistence.glossary import GlossaryEntry, GlossaryRepository
 
 logger = logging.getLogger(__name__)
 
@@ -31,8 +30,8 @@ class GlossaryDetector(BaseDetector):
 
     def __init__(
         self,
-        config: Optional[GlossaryConfig] = None,
-        glossary_repository: Optional[GlossaryRepository] = None,
+        config: GlossaryConfig | None = None,
+        glossary_repository: GlossaryRepository | None = None,
     ):
         self.config = config or GlossaryConfig()
         self._repository = glossary_repository or GlossaryRepository()
@@ -53,9 +52,7 @@ class GlossaryDetector(BaseDetector):
             self._entries_cache[project_id] = self._repository.list_by_project(project_id)
         return self._entries_cache[project_id]
 
-    def _get_patterns(
-        self, project_id: int
-    ) -> dict[str, tuple[re.Pattern, GlossaryEntry]]:
+    def _get_patterns(self, project_id: int) -> dict[str, tuple[re.Pattern, GlossaryEntry]]:
         """
         Compila patrones regex para las variantes del glosario.
 
@@ -73,18 +70,15 @@ class GlossaryDetector(BaseDetector):
                     # Evitar duplicados (si misma variante en múltiples entradas)
                     if variant_lower not in patterns:
                         patterns[variant_lower] = (
-                            re.compile(
-                                r"\b" + re.escape(variant) + r"\b",
-                                re.IGNORECASE
-                            ),
-                            entry
+                            re.compile(r"\b" + re.escape(variant) + r"\b", re.IGNORECASE),
+                            entry,
                         )
 
             self._patterns_cache[project_id] = patterns
 
         return self._patterns_cache[project_id]
 
-    def clear_cache(self, project_id: Optional[int] = None) -> None:
+    def clear_cache(self, project_id: int | None = None) -> None:
         """Limpia el caché de entradas (llamar cuando se modifica el glosario)."""
         if project_id is None:
             self._entries_cache.clear()
@@ -96,8 +90,8 @@ class GlossaryDetector(BaseDetector):
     def detect(
         self,
         text: str,
-        chapter_index: Optional[int] = None,
-        project_id: Optional[int] = None,
+        chapter_index: int | None = None,
+        project_id: int | None = None,
         spacy_doc=None,
         **kwargs,
     ) -> list[CorrectionIssue]:
@@ -124,9 +118,7 @@ class GlossaryDetector(BaseDetector):
 
         # Detectar uso de variantes
         if self.config.alert_on_variants:
-            issues.extend(
-                self._detect_variant_usage(text, project_id, chapter_index)
-            )
+            issues.extend(self._detect_variant_usage(text, project_id, chapter_index))
 
         # Actualizar estadísticas de uso si está habilitado
         if self.config.update_usage_stats:
@@ -138,13 +130,13 @@ class GlossaryDetector(BaseDetector):
         self,
         text: str,
         project_id: int,
-        chapter_index: Optional[int],
+        chapter_index: int | None,
     ) -> list[CorrectionIssue]:
         """Detecta cuando se usa una variante en lugar del término canónico."""
         issues = []
         patterns = self._get_patterns(project_id)
 
-        for variant_lower, (pattern, entry) in patterns.items():
+        for _variant_lower, (pattern, entry) in patterns.items():
             for match in pattern.finditer(text):
                 found_text = match.group()
                 start = match.start()
@@ -187,28 +179,22 @@ class GlossaryDetector(BaseDetector):
         self,
         text: str,
         project_id: int,
-        chapter_index: Optional[int],
+        chapter_index: int | None,
     ) -> None:
         """Actualiza las estadísticas de uso de los términos del glosario."""
         entries = self._get_entries(project_id)
-        text_lower = text.lower()
+        text.lower()
 
         for entry in entries:
             count = 0
 
             # Contar término principal
-            term_pattern = re.compile(
-                r"\b" + re.escape(entry.term) + r"\b",
-                re.IGNORECASE
-            )
+            term_pattern = re.compile(r"\b" + re.escape(entry.term) + r"\b", re.IGNORECASE)
             count += len(term_pattern.findall(text))
 
             # Contar variantes
             for variant in entry.variants:
-                variant_pattern = re.compile(
-                    r"\b" + re.escape(variant) + r"\b",
-                    re.IGNORECASE
-                )
+                variant_pattern = re.compile(r"\b" + re.escape(variant) + r"\b", re.IGNORECASE)
                 count += len(variant_pattern.findall(text))
 
             if count > 0:
@@ -250,60 +236,54 @@ class GlossaryDetector(BaseDetector):
             summary["by_category"][cat] += 1
 
         # Analizar uso en el texto
-        text_lower = text.lower()
+        text.lower()
         usage_data = []
 
         for entry in entries:
             count = 0
 
             # Buscar término principal
-            term_pattern = re.compile(
-                r"\b" + re.escape(entry.term) + r"\b",
-                re.IGNORECASE
-            )
+            term_pattern = re.compile(r"\b" + re.escape(entry.term) + r"\b", re.IGNORECASE)
             term_count = len(term_pattern.findall(text))
             count += term_count
 
             # Buscar variantes
             variant_counts = {}
             for variant in entry.variants:
-                variant_pattern = re.compile(
-                    r"\b" + re.escape(variant) + r"\b",
-                    re.IGNORECASE
-                )
+                variant_pattern = re.compile(r"\b" + re.escape(variant) + r"\b", re.IGNORECASE)
                 v_count = len(variant_pattern.findall(text))
                 if v_count > 0:
                     variant_counts[variant] = v_count
                     count += v_count
 
-            usage_data.append({
-                "term": entry.term,
-                "count": count,
-                "term_count": term_count,
-                "variant_counts": variant_counts,
-            })
+            usage_data.append(
+                {
+                    "term": entry.term,
+                    "count": count,
+                    "term_count": term_count,
+                    "variant_counts": variant_counts,
+                }
+            )
 
         # Ordenar por uso
         usage_data.sort(key=lambda x: x["count"], reverse=True)
 
         # Top 10 más usados
         summary["most_used"] = [
-            {"term": d["term"], "count": d["count"]}
-            for d in usage_data[:10]
-            if d["count"] > 0
+            {"term": d["term"], "count": d["count"]} for d in usage_data[:10] if d["count"] > 0
         ]
 
         # Términos sin usar
-        summary["unused"] = [
-            d["term"] for d in usage_data if d["count"] == 0
-        ]
+        summary["unused"] = [d["term"] for d in usage_data if d["count"] == 0]
 
         # Variantes encontradas
         for d in usage_data:
             if d["variant_counts"]:
-                summary["variants_found"].append({
-                    "canonical": d["term"],
-                    "variants": d["variant_counts"],
-                })
+                summary["variants_found"].append(
+                    {
+                        "canonical": d["term"],
+                        "variants": d["variant_counts"],
+                    }
+                )
 
         return summary

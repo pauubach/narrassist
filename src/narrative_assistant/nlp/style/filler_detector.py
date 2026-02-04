@@ -15,13 +15,13 @@ son apropiadas (diálogos informales, caracterización de personajes).
 import logging
 import re
 import threading
-from collections import Counter, defaultdict
+from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
 
+from ...core.errors import ErrorSeverity, NLPError
 from ...core.result import Result
-from ...core.errors import NLPError, ErrorSeverity
 
 logger = logging.getLogger(__name__)
 
@@ -56,30 +56,34 @@ def reset_filler_detector() -> None:
 # Tipos
 # =============================================================================
 
+
 class FillerType(Enum):
     """Tipos de muletillas detectadas."""
-    LINGUISTIC = "linguistic"          # Muletillas del habla: "o sea", "en realidad"
-    WEAK_ADVERB = "weak_adverb"       # Adverbios débiles: "muy", "bastante"
-    CONNECTOR = "connector"            # Conectores sobreusados: "entonces", "después"
-    INTENSIFIER = "intensifier"        # Intensificadores vacíos: "totalmente"
-    TAG_QUESTION = "tag_question"      # Coletillas: "¿sabes?", "¿no?"
-    HEDGE = "hedge"                    # Atenuadores: "quizás", "tal vez", "un poco"
+
+    LINGUISTIC = "linguistic"  # Muletillas del habla: "o sea", "en realidad"
+    WEAK_ADVERB = "weak_adverb"  # Adverbios débiles: "muy", "bastante"
+    CONNECTOR = "connector"  # Conectores sobreusados: "entonces", "después"
+    INTENSIFIER = "intensifier"  # Intensificadores vacíos: "totalmente"
+    TAG_QUESTION = "tag_question"  # Coletillas: "¿sabes?", "¿no?"
+    HEDGE = "hedge"  # Atenuadores: "quizás", "tal vez", "un poco"
 
 
 class FillerSeverity(Enum):
     """Severidad del uso de muletillas."""
-    HIGH = "high"          # Muy frecuente, debilita significativamente
-    MEDIUM = "medium"      # Frecuente, notable
-    LOW = "low"            # Presente pero no excesivo
+
+    HIGH = "high"  # Muy frecuente, debilita significativamente
+    MEDIUM = "medium"  # Frecuente, notable
+    LOW = "low"  # Presente pero no excesivo
 
 
 @dataclass
 class FillerOccurrence:
     """Una ocurrencia de una muletilla."""
-    text: str              # Texto exacto encontrado
-    start_char: int        # Posición inicio en el documento
-    end_char: int          # Posición fin
-    context: str           # Oración o contexto
+
+    text: str  # Texto exacto encontrado
+    start_char: int  # Posición inicio en el documento
+    end_char: int  # Posición fin
+    context: str  # Oración o contexto
     in_dialogue: bool = False  # Si está dentro de diálogo
 
 
@@ -88,8 +92,8 @@ class Filler:
     """Una muletilla detectada con sus estadísticas."""
 
     # Muletilla
-    phrase: str                         # La expresión/palabra
-    normalized: str = ""                # Forma normalizada
+    phrase: str  # La expresión/palabra
+    normalized: str = ""  # Forma normalizada
 
     # Tipo y severidad
     filler_type: FillerType = FillerType.LINGUISTIC
@@ -97,16 +101,16 @@ class Filler:
 
     # Ocurrencias
     occurrences: list[FillerOccurrence] = field(default_factory=list)
-    count: int = 0                      # Número total de apariciones
-    count_in_narrative: int = 0         # Apariciones fuera de diálogo
-    count_in_dialogue: int = 0          # Apariciones en diálogo
+    count: int = 0  # Número total de apariciones
+    count_in_narrative: int = 0  # Apariciones fuera de diálogo
+    count_in_dialogue: int = 0  # Apariciones en diálogo
 
     # Métricas
-    frequency_per_1000: float = 0.0     # Frecuencia por 1000 palabras
-    is_excessive: bool = False          # Si supera el umbral
+    frequency_per_1000: float = 0.0  # Frecuencia por 1000 palabras
+    is_excessive: bool = False  # Si supera el umbral
 
     # Sugerencia
-    suggestion: str = ""                # Sugerencia de mejora
+    suggestion: str = ""  # Sugerencia de mejora
 
     def __post_init__(self):
         if not self.count:
@@ -266,18 +270,19 @@ TAG_QUESTIONS = {
 
 # Umbrales por tipo (ocurrencias por 1000 palabras antes de ser excesivo)
 THRESHOLDS = {
-    FillerType.LINGUISTIC: 5.0,    # Más estricto
+    FillerType.LINGUISTIC: 5.0,  # Más estricto
     FillerType.WEAK_ADVERB: 10.0,  # Moderado
-    FillerType.INTENSIFIER: 3.0,   # Muy estricto
-    FillerType.CONNECTOR: 15.0,    # Más permisivo
-    FillerType.HEDGE: 8.0,         # Moderado
-    FillerType.TAG_QUESTION: 20.0, # Muy permisivo (común en diálogos)
+    FillerType.INTENSIFIER: 3.0,  # Muy estricto
+    FillerType.CONNECTOR: 15.0,  # Más permisivo
+    FillerType.HEDGE: 8.0,  # Moderado
+    FillerType.TAG_QUESTION: 20.0,  # Muy permisivo (común en diálogos)
 }
 
 
 # =============================================================================
 # Detector
 # =============================================================================
+
 
 class FillerDetector:
     """
@@ -290,7 +295,7 @@ class FillerDetector:
     def __init__(
         self,
         ignore_dialogues: bool = False,
-        custom_thresholds: Optional[dict[FillerType, float]] = None,
+        custom_thresholds: dict[FillerType, float] | None = None,
     ):
         """
         Inicializar detector.
@@ -332,21 +337,18 @@ class FillerDetector:
         # Ordenar por longitud descendente para capturar frases más largas primero
         sorted_phrases = sorted(self._filler_map.keys(), key=len, reverse=True)
         escaped_phrases = [re.escape(p) for p in sorted_phrases]
-        self._pattern = re.compile(
-            r'\b(' + '|'.join(escaped_phrases) + r')\b',
-            re.IGNORECASE
-        )
+        self._pattern = re.compile(r"\b(" + "|".join(escaped_phrases) + r")\b", re.IGNORECASE)
 
         # Patrón para detectar diálogos
         self._dialogue_pattern = re.compile(
             r"(?:^|\n)\s*[-\u2014].*?(?:\n|$)|\"[^\"]*\"|«[^»]*»|\u2018[^\u2019]*\u2019",
-            re.MULTILINE | re.DOTALL
+            re.MULTILINE | re.DOTALL,
         )
 
     def detect(
         self,
         text: str,
-        chapter_id: Optional[int] = None,
+        chapter_id: int | None = None,
     ) -> Result[FillerReport]:
         """
         Detectar muletillas en un texto.
@@ -381,10 +383,7 @@ class FillerDetector:
                 end = match.end()
 
                 # Determinar si está en diálogo
-                in_dialogue = any(
-                    d_start <= start < d_end
-                    for d_start, d_end in dialogue_regions
-                )
+                in_dialogue = any(d_start <= start < d_end for d_start, d_end in dialogue_regions)
 
                 # Obtener contexto
                 context = self._get_context(text, start, end)
@@ -511,9 +510,9 @@ class FillerDetector:
         context_end = min(len(text), end + window)
 
         # Ajustar a límites de palabra
-        while context_start > 0 and text[context_start - 1] not in ' \n':
+        while context_start > 0 and text[context_start - 1] not in " \n":
             context_start -= 1
-        while context_end < len(text) and text[context_end] not in ' \n':
+        while context_end < len(text) and text[context_end] not in " \n":
             context_end += 1
 
         return text[context_start:context_end].strip()

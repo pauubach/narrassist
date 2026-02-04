@@ -14,20 +14,20 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
-from ..core.result import Result
 from ..core.errors import NLPError
+from ..core.result import Result
 
 logger = logging.getLogger(__name__)
 
 
 class VitalStatus(Enum):
     """Estado vital de un personaje."""
-    ALIVE = "alive"          # Vivo (estado por defecto)
-    DEAD = "dead"            # Muerto confirmado
+
+    ALIVE = "alive"  # Vivo (estado por defecto)
+    DEAD = "dead"  # Muerto confirmado
     PRESUMED_DEAD = "presumed_dead"  # Presumiblemente muerto (no confirmado)
-    UNKNOWN = "unknown"      # Estado desconocido
+    UNKNOWN = "unknown"  # Estado desconocido
 
 
 @dataclass
@@ -37,13 +37,14 @@ class DeathEvent:
 
     Representa el momento en que un personaje muere o es declarado muerto.
     """
+
     entity_id: int
     entity_name: str
     chapter: int
     start_char: int
     end_char: int
-    excerpt: str              # Texto donde se menciona la muerte
-    death_type: str           # "direct", "narrated", "reported", "implied"
+    excerpt: str  # Texto donde se menciona la muerte
+    death_type: str  # "direct", "narrated", "reported", "implied"
     confidence: float = 0.8
 
     # Metadatos
@@ -71,6 +72,7 @@ class PostMortemAppearance:
     - Un error de continuidad (bug narrativo)
     - Referencia válida (recuerdo, fantasma, flashback)
     """
+
     entity_id: int
     entity_name: str
     death_chapter: int
@@ -78,8 +80,8 @@ class PostMortemAppearance:
     appearance_start_char: int
     appearance_end_char: int
     appearance_excerpt: str
-    appearance_type: str      # "dialogue", "action", "narration"
-    is_valid: bool = False    # True si es referencia válida (flashback, recuerdo)
+    appearance_type: str  # "dialogue", "action", "narration"
+    is_valid: bool = False  # True si es referencia válida (flashback, recuerdo)
     confidence: float = 0.8
 
     def to_dict(self) -> dict:
@@ -104,6 +106,7 @@ class VitalStatusReport:
 
     Contiene eventos de muerte detectados y apariciones post-mortem.
     """
+
     project_id: int
     death_events: list[DeathEvent] = field(default_factory=list)
     post_mortem_appearances: list[PostMortemAppearance] = field(default_factory=list)
@@ -208,7 +211,7 @@ class VitalStatusAnalyzer:
             for alias in aliases:
                 self._name_to_id[alias.lower()] = entity_id
 
-    def get_entity_id(self, name: str) -> Optional[int]:
+    def get_entity_id(self, name: str) -> int | None:
         """Obtiene el ID de entidad para un nombre."""
         return self._name_to_id.get(name.lower())
 
@@ -320,7 +323,7 @@ class VitalStatusAnalyzer:
                 continue
 
             entity_name = death_event.entity_name
-            name_lower = entity_name.lower()
+            entity_name.lower()
 
             # Buscar menciones activas del personaje
             for pattern in self.ACTIVE_ACTION_PATTERNS:
@@ -390,16 +393,18 @@ class VitalStatusAnalyzer:
 
         # Verificar marcadores de flashback en el contexto general
         flashback_markers = [
-            "años antes", "años atrás", "tiempo atrás",
-            "en el pasado", "recordaba", "recordó",
-            "aquella vez", "cuando vivía", "antes de morir",
+            "años antes",
+            "años atrás",
+            "tiempo atrás",
+            "en el pasado",
+            "recordaba",
+            "recordó",
+            "aquella vez",
+            "cuando vivía",
+            "antes de morir",
         ]
         context_lower = context.lower()
-        for marker in flashback_markers:
-            if marker in context_lower:
-                return True
-
-        return False
+        return any(marker in context_lower for marker in flashback_markers)
 
     def analyze_chapter(
         self,
@@ -488,9 +493,7 @@ def analyze_vital_status(
             if not text:
                 continue
 
-            death_events, appearances = analyzer.analyze_chapter(
-                text, chapter_num, start_offset
-            )
+            death_events, appearances = analyzer.analyze_chapter(text, chapter_num, start_offset)
 
             all_death_events.extend(death_events)
             all_appearances.extend(appearances)

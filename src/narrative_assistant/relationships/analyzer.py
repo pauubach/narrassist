@@ -9,17 +9,13 @@ import logging
 import re
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
 
 from .models import (
     CoherenceAlert,
-    EntityContext,
     EntityRelationship,
     InferredExpectations,
     RelationType,
-    RelationValence,
     TextReference,
-    RELATION_TYPE_VALENCE,
 )
 
 logger = logging.getLogger(__name__)
@@ -27,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 class InteractionTone(Enum):
     """Tono de una interacción."""
+
     HOSTILE = "hostile"
     COLD = "cold"
     NEUTRAL = "neutral"
@@ -37,6 +34,7 @@ class InteractionTone(Enum):
 @dataclass
 class EntityInteraction:
     """Una interacción específica entre entidades."""
+
     initiator_name: str
     receiver_name: str
     interaction_type: str  # dialogue, action, thought, observation
@@ -50,11 +48,19 @@ class EntityInteraction:
 
 # Mapeo de tipos de relación a tonos esperados
 EXPECTED_TONES = {
-    RelationType.FRIEND: [InteractionTone.WARM, InteractionTone.AFFECTIONATE, InteractionTone.NEUTRAL],
+    RelationType.FRIEND: [
+        InteractionTone.WARM,
+        InteractionTone.AFFECTIONATE,
+        InteractionTone.NEUTRAL,
+    ],
     RelationType.ENEMY: [InteractionTone.HOSTILE, InteractionTone.COLD],
     RelationType.LOVER: [InteractionTone.AFFECTIONATE, InteractionTone.WARM],
     RelationType.RIVAL: [InteractionTone.COLD, InteractionTone.HOSTILE, InteractionTone.NEUTRAL],
-    RelationType.PARENT: [InteractionTone.WARM, InteractionTone.NEUTRAL, InteractionTone.AFFECTIONATE],
+    RelationType.PARENT: [
+        InteractionTone.WARM,
+        InteractionTone.NEUTRAL,
+        InteractionTone.AFFECTIONATE,
+    ],
     RelationType.CHILD: [InteractionTone.WARM, InteractionTone.NEUTRAL],
     RelationType.MENTOR: [InteractionTone.WARM, InteractionTone.NEUTRAL],
     RelationType.FEARS: [InteractionTone.COLD, InteractionTone.HOSTILE],  # Receptor inspira miedo
@@ -67,20 +73,52 @@ EXPECTED_TONES = {
 # Palabras clave para detectar tono
 TONE_KEYWORDS = {
     InteractionTone.HOSTILE: [
-        "golpeó", "atacó", "gritó", "insultó", "amenazó", "odio", "maldijo",
-        "escupió", "empujó", "hirió", "furioso", "rabia", "desprecio",
+        "golpeó",
+        "atacó",
+        "gritó",
+        "insultó",
+        "amenazó",
+        "odio",
+        "maldijo",
+        "escupió",
+        "empujó",
+        "hirió",
+        "furioso",
+        "rabia",
+        "desprecio",
     ],
     InteractionTone.COLD: [
-        "ignoró", "evitó", "frialdad", "distante", "indiferente", "seco",
-        "cortante", "despectivo", "desdeñoso",
+        "ignoró",
+        "evitó",
+        "frialdad",
+        "distante",
+        "indiferente",
+        "seco",
+        "cortante",
+        "despectivo",
+        "desdeñoso",
     ],
     InteractionTone.WARM: [
-        "sonrió", "ayudó", "apoyó", "compartió", "alegró", "amable",
-        "cariño", "preocupó", "animó",
+        "sonrió",
+        "ayudó",
+        "apoyó",
+        "compartió",
+        "alegró",
+        "amable",
+        "cariño",
+        "preocupó",
+        "animó",
     ],
     InteractionTone.AFFECTIONATE: [
-        "abrazó", "besó", "acarició", "amor", "adoraba", "quería",
-        "ternura", "dulzura", "cariñosamente",
+        "abrazó",
+        "besó",
+        "acarició",
+        "amor",
+        "adoraba",
+        "quería",
+        "ternura",
+        "dulzura",
+        "cariñosamente",
     ],
 }
 
@@ -126,7 +164,7 @@ class InteractionCoherenceChecker:
         text_lower = text.lower()
 
         # Contar keywords por tono
-        scores = {tone: 0 for tone in InteractionTone}
+        scores = dict.fromkeys(InteractionTone, 0)
 
         for tone, keywords in TONE_KEYWORDS.items():
             for keyword in keywords:
@@ -167,7 +205,7 @@ class InteractionCoherenceChecker:
         self,
         interaction: EntityInteraction,
         relationship: EntityRelationship,
-    ) -> Optional[CoherenceAlert]:
+    ) -> CoherenceAlert | None:
         """
         Verifica si una interacción es coherente con la relación.
 
@@ -191,8 +229,7 @@ class InteractionCoherenceChecker:
         # Verificar si hay comportamiento explícitamente contradictorio
         contradicting = CONTRADICTING_BEHAVIORS.get(relationship.relation_type, [])
         has_explicit_contradiction = any(
-            c in interaction.text_excerpt.lower()
-            for c in contradicting
+            c in interaction.text_excerpt.lower() for c in contradicting
         )
 
         # Determinar severidad
@@ -230,8 +267,7 @@ class InteractionCoherenceChecker:
                 chapter=relationship.first_mention_chapter or 0,
             ),
             establishing_quote=(
-                relationship.evidence_texts[0]
-                if relationship.evidence_texts else ""
+                relationship.evidence_texts[0] if relationship.evidence_texts else ""
             ),
             contradicting_reference=TextReference(
                 chapter=interaction.chapter,
@@ -245,8 +281,8 @@ class InteractionCoherenceChecker:
                 f"tiene tono '{interaction.tone.value}'. Se esperaban tonos: {expected_tones_str}."
             ),
             suggestion=(
-                f"Verificar si existe un cambio de relación entre los personajes "
-                f"que justifique esta interacción, o si el tono detectado es incorrecto."
+                "Verificar si existe un cambio de relación entre los personajes "
+                "que justifique esta interacción, o si el tono detectado es incorrecto."
             ),
             confidence=0.7,
         )
@@ -258,7 +294,7 @@ class InteractionCoherenceChecker:
         chapter: int = 0,
         start_char: int = 0,
         end_char: int = 0,
-    ) -> Optional[CoherenceAlert]:
+    ) -> CoherenceAlert | None:
         """
         Verifica si el texto contiene comportamiento prohibido para la relación.
 
@@ -276,7 +312,7 @@ class InteractionCoherenceChecker:
         expectations = relationship.expectations
         if not expectations:
             # Usar expectativas basadas en reglas
-            if hasattr(relationship, 'relation_type'):
+            if hasattr(relationship, "relation_type"):
                 rel_type = relationship.relation_type
                 # Crear expectations desde reglas internas
                 forbidden = CONTRADICTING_BEHAVIORS.get(rel_type, [])
@@ -309,8 +345,7 @@ class InteractionCoherenceChecker:
                         chapter=relationship.first_mention_chapter or 0,
                     ),
                     establishing_quote=(
-                        relationship.evidence_texts[0]
-                        if relationship.evidence_texts else ""
+                        relationship.evidence_texts[0] if relationship.evidence_texts else ""
                     ),
                     contradicting_reference=TextReference(
                         chapter=chapter,
@@ -324,8 +359,8 @@ class InteractionCoherenceChecker:
                         f"lo cual contradice la relación de tipo '{relationship.relation_type.value}'."
                     ),
                     suggestion=(
-                        f"Verificar si hay una escena de cambio de relación que justifique "
-                        f"este comportamiento."
+                        "Verificar si hay una escena de cambio de relación que justifique "
+                        "este comportamiento."
                     ),
                     confidence=0.8,
                 )
@@ -337,7 +372,7 @@ class InteractionCoherenceChecker:
         scene_text: str,
         relationship: EntityRelationship,
         chapter: int = 0,
-    ) -> Optional[CoherenceAlert]:
+    ) -> CoherenceAlert | None:
         """
         Verifica si falta un comportamiento esperado en un encuentro.
 
@@ -382,8 +417,7 @@ class InteractionCoherenceChecker:
                 chapter=relationship.first_mention_chapter or 0,
             ),
             establishing_quote=(
-                relationship.evidence_texts[0]
-                if relationship.evidence_texts else ""
+                relationship.evidence_texts[0] if relationship.evidence_texts else ""
             ),
             contradicting_reference=TextReference(chapter=chapter),
             contradicting_quote="",
@@ -394,8 +428,8 @@ class InteractionCoherenceChecker:
                 f"'{relationship.relation_type.value}': {expected_str}."
             ),
             suggestion=(
-                f"Considerar añadir una reacción o comportamiento que refleje "
-                f"la naturaleza de la relación entre los personajes."
+                "Considerar añadir una reacción o comportamiento que refleje "
+                "la naturaleza de la relación entre los personajes."
             ),
             confidence=0.5,
         )
@@ -414,7 +448,7 @@ class RelationshipAnalyzer:
     def __init__(
         self,
         inference_engine=None,
-        coherence_checker: Optional[InteractionCoherenceChecker] = None,
+        coherence_checker: InteractionCoherenceChecker | None = None,
     ):
         """
         Inicializa el analizador.
@@ -480,7 +514,7 @@ class RelationshipAnalyzer:
         chapter: int = 0,
         start_char: int = 0,
         end_char: int = 0,
-    ) -> Optional[EntityInteraction]:
+    ) -> EntityInteraction | None:
         """
         Detecta una interacción entre dos entidades en un texto.
 
@@ -507,9 +541,9 @@ class RelationshipAnalyzer:
         interaction_type = "observation"  # Default
 
         # Patrones para tipos de interacción
-        dialogue_patterns = [r'—.*—', r'".*"', r'«.*»', r'dijo', r'respondió', r'preguntó']
-        action_patterns = [r'golpeó', r'abrazó', r'besó', r'empujó', r'ayudó', r'atacó']
-        thought_patterns = [r'pensó', r'recordó', r'imaginó', r'creyó']
+        dialogue_patterns = [r"—.*—", r'".*"', r"«.*»", r"dijo", r"respondió", r"preguntó"]
+        action_patterns = [r"golpeó", r"abrazó", r"besó", r"empujó", r"ayudó", r"atacó"]
+        thought_patterns = [r"pensó", r"recordó", r"imaginó", r"creyó"]
 
         for pattern in dialogue_patterns:
             if re.search(pattern, text):
@@ -558,7 +592,7 @@ class RelationshipAnalyzer:
         self,
         interaction: EntityInteraction,
         relationship: EntityRelationship,
-    ) -> Optional[CoherenceAlert]:
+    ) -> CoherenceAlert | None:
         """
         Analiza si una interacción es coherente con una relación.
 
@@ -645,31 +679,37 @@ class RelationshipAnalyzer:
             type_key = rel.relation_type.value
             if type_key not in by_type:
                 by_type[type_key] = []
-            by_type[type_key].append({
-                "source": rel.source_entity_name,
-                "target": rel.target_entity_name,
-                "intensity": rel.intensity,
-                "confidence": rel.confidence,
-            })
+            by_type[type_key].append(
+                {
+                    "source": rel.source_entity_name,
+                    "target": rel.target_entity_name,
+                    "intensity": rel.intensity,
+                    "confidence": rel.confidence,
+                }
+            )
 
             # Relaciones intensas
             if rel.intensity >= 0.8:
-                high_intensity.append({
-                    "source": rel.source_entity_name,
-                    "target": rel.target_entity_name,
-                    "type": rel.relation_type.value,
-                    "intensity": rel.intensity,
-                })
+                high_intensity.append(
+                    {
+                        "source": rel.source_entity_name,
+                        "target": rel.target_entity_name,
+                        "type": rel.relation_type.value,
+                        "intensity": rel.intensity,
+                    }
+                )
 
             # Relaciones sin confirmar
             if not rel.user_confirmed and not rel.user_rejected:
-                unconfirmed.append({
-                    "id": rel.id,
-                    "source": rel.source_entity_name,
-                    "target": rel.target_entity_name,
-                    "type": rel.relation_type.value,
-                    "confidence": rel.confidence,
-                })
+                unconfirmed.append(
+                    {
+                        "id": rel.id,
+                        "source": rel.source_entity_name,
+                        "target": rel.target_entity_name,
+                        "type": rel.relation_type.value,
+                        "confidence": rel.confidence,
+                    }
+                )
 
         return {
             "total_relationships": len(relationships),

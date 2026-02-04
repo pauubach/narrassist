@@ -13,9 +13,8 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 from enum import Enum
-from typing import Optional
 
-from .markers import MarkerType, TemporalMarker, WORD_TO_NUM, MONTHS
+from .markers import MONTHS, MarkerType, TemporalMarker
 
 logger = logging.getLogger(__name__)
 
@@ -67,19 +66,19 @@ class TimelineEvent:
     paragraph: int = 0
 
     # Tiempo de la historia (story time)
-    story_date: Optional[date] = None
+    story_date: date | None = None
     story_date_resolution: TimelineResolution = TimelineResolution.UNKNOWN
 
     # Para timelines sin fechas absolutas (Día 0, Día +1, etc.)
-    day_offset: Optional[int] = None  # Offset en días desde el Día 0
-    weekday: Optional[str] = None  # Día de la semana si se menciona (lunes, martes, etc.)
+    day_offset: int | None = None  # Offset en días desde el Día 0
+    weekday: str | None = None  # Día de la semana si se menciona (lunes, martes, etc.)
 
     # Tiempo del discurso (discourse time)
     discourse_position: int = 0
 
     # Relaciones temporales
-    relative_to: Optional[int] = None
-    relative_offset: Optional[timedelta] = None
+    relative_to: int | None = None
+    relative_offset: timedelta | None = None
 
     # Clasificación narrativa
     narrative_order: NarrativeOrder = NarrativeOrder.CHRONOLOGICAL
@@ -113,7 +112,7 @@ class Timeline:
         if event.story_date_resolution == TimelineResolution.EXACT_DATE:
             self.anchor_events.append(event.id)
 
-    def get_event_by_id(self, event_id: int) -> Optional[TimelineEvent]:
+    def get_event_by_id(self, event_id: int) -> TimelineEvent | None:
         """Obtiene un evento por su ID."""
         for event in self.events:
             if event.id == event_id:
@@ -144,7 +143,7 @@ class Timeline:
         """Devuelve eventos clasificados como prolepsis (flashforward)."""
         return [e for e in self.events if e.narrative_order == NarrativeOrder.PROLEPSIS]
 
-    def get_time_span(self) -> Optional[tuple[date, date]]:
+    def get_time_span(self) -> tuple[date, date] | None:
         """Devuelve el rango temporal de la historia (fecha mínima, fecha máxima)."""
         dated = [e for e in self.events if e.story_date]
         if not dated:
@@ -191,16 +190,12 @@ class TimelineBuilder:
             self._create_chapter_event(chapter)
 
         # 2. Procesar marcadores absolutos (anclas)
-        absolute_markers = [
-            m for m in markers if m.marker_type == MarkerType.ABSOLUTE_DATE
-        ]
+        absolute_markers = [m for m in markers if m.marker_type == MarkerType.ABSOLUTE_DATE]
         for marker in sorted(absolute_markers, key=lambda m: m.confidence, reverse=True):
             self._add_absolute_anchor(marker)
 
         # 3. Procesar marcadores relativos
-        relative_markers = [
-            m for m in markers if m.marker_type == MarkerType.RELATIVE_TIME
-        ]
+        relative_markers = [m for m in markers if m.marker_type == MarkerType.RELATIVE_TIME]
 
         # Si no hay anclas absolutas pero hay marcadores relativos,
         # crear una fecha sintética de referencia (Día 0)
@@ -297,9 +292,7 @@ class TimelineBuilder:
 
         # Buscar evento del capítulo para actualizar
         if marker.chapter:
-            chapter_events = [
-                e for e in self.timeline.events if e.chapter == marker.chapter
-            ]
+            chapter_events = [e for e in self.timeline.events if e.chapter == marker.chapter]
             if chapter_events:
                 event = chapter_events[0]
                 # Solo actualizar si no tiene fecha o la nueva es más precisa
@@ -327,7 +320,7 @@ class TimelineBuilder:
         )
         self.timeline.add_event(event)
 
-    def _parse_date_from_marker(self, marker: TemporalMarker) -> Optional[date]:
+    def _parse_date_from_marker(self, marker: TemporalMarker) -> date | None:
         """Extrae fecha de un marcador."""
         # Si ya tiene componentes parseados
         if marker.year:
@@ -381,7 +374,7 @@ class TimelineBuilder:
         sorted_markers = sorted(markers, key=lambda m: (m.chapter or 0, m.start_char))
 
         # Último evento de referencia (para encadenar relativos)
-        last_ref_event: Optional[TimelineEvent] = None
+        last_ref_event: TimelineEvent | None = None
 
         # Inicializar con el ancla si existe
         if self.timeline.anchor_events:
@@ -399,16 +392,13 @@ class TimelineBuilder:
 
             if not reference_event:
                 # Intentar con ancla
-                anchor = self._find_nearest_anchor(
-                    marker.chapter or 0, marker.start_char
-                )
+                anchor = self._find_nearest_anchor(marker.chapter or 0, marker.start_char)
                 reference_event = anchor
 
             if not reference_event:
                 # Usar el evento del capítulo como referencia
                 chapter_events = [
-                    e for e in self.timeline.events
-                    if e.chapter == (marker.chapter or 0)
+                    e for e in self.timeline.events if e.chapter == (marker.chapter or 0)
                 ]
                 if chapter_events:
                     reference_event = chapter_events[0]
@@ -448,10 +438,12 @@ class TimelineBuilder:
                 discourse_position=marker.start_char,
                 story_date=new_date,
                 day_offset=new_day_offset,
-                weekday=marker.weekday if hasattr(marker, 'weekday') else None,
+                weekday=marker.weekday if hasattr(marker, "weekday") else None,
                 story_date_resolution=(
-                    TimelineResolution.EXACT_DATE if new_date
-                    else TimelineResolution.RELATIVE if new_day_offset is not None
+                    TimelineResolution.EXACT_DATE
+                    if new_date
+                    else TimelineResolution.RELATIVE
+                    if new_day_offset is not None
                     else TimelineResolution.UNKNOWN
                 ),
                 relative_to=reference_event.id if reference_event else None,
@@ -467,18 +459,16 @@ class TimelineBuilder:
 
             # Actualizar último evento con fecha para encadenamiento
             if new_date:
-                last_dated_event = event
+                pass
 
     def _find_nearest_anchor(
         self,
         chapter: int,
         position: int,
-    ) -> Optional[TimelineEvent]:
+    ) -> TimelineEvent | None:
         """Encuentra el evento ancla más cercano."""
         anchors = [
-            e
-            for e in self.timeline.events
-            if e.id in self.timeline.anchor_events and e.story_date
+            e for e in self.timeline.events if e.id in self.timeline.anchor_events and e.story_date
         ]
 
         if not anchors:
@@ -499,7 +489,7 @@ class TimelineBuilder:
         # Devolver el primer ancla disponible
         return anchors[0]
 
-    def _calculate_offset(self, marker: TemporalMarker) -> Optional[timedelta]:
+    def _calculate_offset(self, marker: TemporalMarker) -> timedelta | None:
         """Calcula el offset temporal de un marcador relativo."""
         text_lower = marker.text.lower()
 
@@ -569,7 +559,9 @@ class TimelineBuilder:
         chronological = self.timeline.get_chronological_order()
         discourse = self.timeline.get_discourse_order()
 
-        logger.info(f"[TIMELINE] Total eventos: {len(chronological)} cronológicos, {len(discourse)} en discurso")
+        logger.info(
+            f"[TIMELINE] Total eventos: {len(chronological)} cronológicos, {len(discourse)} en discurso"
+        )
 
         # Eventos con tiempo conocido (fecha O day_offset)
         def has_time(e: TimelineEvent) -> bool:
@@ -588,7 +580,9 @@ class TimelineBuilder:
                 logger.info(f"[TIMELINE] Rango días: Día {min(offsets)} → Día +{max(offsets)}")
 
         if len(dated_chrono) < 2:
-            logger.info("[TIMELINE] Insuficientes eventos fechados para detectar analepsis/prolepsis")
+            logger.info(
+                "[TIMELINE] Insuficientes eventos fechados para detectar analepsis/prolepsis"
+            )
             return
 
         # Crear índice cronológico: evento.id -> posición en orden cronológico
@@ -620,7 +614,7 @@ class TimelineBuilder:
             # Calcular diferencia temporal con el high water
             time_diff_days = self._calculate_time_difference(
                 dated_chrono[chrono_high_water] if chrono_high_water < len(dated_chrono) else None,
-                event
+                event,
             )
 
             # ANALEPSIS: el evento actual está ANTES cronológicamente
@@ -671,7 +665,9 @@ class TimelineBuilder:
             # Actualizar marca de agua alta
             chrono_high_water = max(chrono_high_water, chrono_pos_current)
 
-        logger.info(f"[TIMELINE] Resultado: {analepsis_count} analepsis, {prolepsis_count} prolepsis")
+        logger.info(
+            f"[TIMELINE] Resultado: {analepsis_count} analepsis, {prolepsis_count} prolepsis"
+        )
 
     def _has_retrospective_evidence(self, event: TimelineEvent) -> bool:
         """
@@ -684,12 +680,29 @@ class TimelineBuilder:
         """
         # Verbos y expresiones que indican flashback
         retrospective_patterns = [
-            "recordó", "recordaba", "evocó", "evocaba", "rememoró", "rememoraba",
-            "vino a su mente", "le vino a la memoria", "pensó en aquel",
-            "años atrás", "tiempo atrás", "meses atrás", "días atrás",
-            "en el pasado", "en aquella época", "en aquel entonces",
-            "hacía tiempo", "hacía años", "hacía meses",
-            "cuando era", "de joven", "de niño", "de pequeño",
+            "recordó",
+            "recordaba",
+            "evocó",
+            "evocaba",
+            "rememoró",
+            "rememoraba",
+            "vino a su mente",
+            "le vino a la memoria",
+            "pensó en aquel",
+            "años atrás",
+            "tiempo atrás",
+            "meses atrás",
+            "días atrás",
+            "en el pasado",
+            "en aquella época",
+            "en aquel entonces",
+            "hacía tiempo",
+            "hacía años",
+            "hacía meses",
+            "cuando era",
+            "de joven",
+            "de niño",
+            "de pequeño",
         ]
 
         # Verificar descripción del evento
@@ -699,7 +712,7 @@ class TimelineBuilder:
 
         # Verificar marcadores asociados
         for marker in event.markers:
-            if hasattr(marker, 'direction') and marker.direction == "past":
+            if hasattr(marker, "direction") and marker.direction == "past":
                 return True
             # Verificar texto del marcador
             marker_lower = marker.text.lower()
@@ -718,10 +731,19 @@ class TimelineBuilder:
         - Expresiones prospectivas (años después, en el futuro)
         """
         prospective_patterns = [
-            "años después", "tiempo después", "meses después",
-            "en el futuro", "vendría", "ocurriría", "sucedería",
-            "presagiaba", "anticipaba", "no sabía que",
-            "llegaría el día", "algún día", "más adelante",
+            "años después",
+            "tiempo después",
+            "meses después",
+            "en el futuro",
+            "vendría",
+            "ocurriría",
+            "sucedería",
+            "presagiaba",
+            "anticipaba",
+            "no sabía que",
+            "llegaría el día",
+            "algún día",
+            "más adelante",
         ]
 
         desc_lower = event.description.lower()
@@ -729,14 +751,14 @@ class TimelineBuilder:
             return True
 
         for marker in event.markers:
-            if hasattr(marker, 'direction') and marker.direction == "future":
+            if hasattr(marker, "direction") and marker.direction == "future":
                 return True
 
         return False
 
     def _calculate_time_difference(
-        self, ref_event: Optional[TimelineEvent], target_event: TimelineEvent
-    ) -> Optional[int]:
+        self, ref_event: TimelineEvent | None, target_event: TimelineEvent
+    ) -> int | None:
         """
         Calcula diferencia en días entre dos eventos.
 
@@ -798,9 +820,7 @@ class TimelineBuilder:
                     "description": event.description,
                     "chapter": event.chapter,
                     "paragraph": event.paragraph,
-                    "story_date": (
-                        event.story_date.isoformat() if event.story_date else None
-                    ),
+                    "story_date": (event.story_date.isoformat() if event.story_date else None),
                     "story_date_resolution": event.story_date_resolution.value,
                     "discourse_position": event.discourse_position,
                     "narrative_order": event.narrative_order.value,

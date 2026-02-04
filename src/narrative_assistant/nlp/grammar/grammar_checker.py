@@ -25,27 +25,27 @@ Configuración:
 import logging
 import re
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Optional, Callable, Any, TYPE_CHECKING
+from typing import Any, Optional
 
+from ...core.config import GrammarConfig, get_config
+from ...core.errors import ErrorSeverity, NLPError
 from ...core.result import Result
-from ...core.errors import NLPError, ErrorSeverity
-from ...core.config import get_config, GrammarConfig
 from .base import (
-    GrammarIssue,
-    GrammarReport,
-    GrammarErrorType,
-    GrammarSeverity,
-    GrammarDetectionMethod,
     GRAMMAR_PATTERNS,
     REDUNDANT_EXPRESSIONS,
-    VERB_PREPOSITION_RULES,
-    VERBS_WITHOUT_DE_QUE,
     VERBS_WITH_DE_QUE,
+    VERBS_WITHOUT_DE_QUE,
+    GrammarDetectionMethod,
+    GrammarErrorType,
+    GrammarIssue,
+    GrammarReport,
+    GrammarSeverity,
 )
 from .spanish_rules import (
-    apply_spanish_rules,
     SpanishRulesConfig,
+    apply_spanish_rules,
 )
 
 logger = logging.getLogger(__name__)
@@ -81,6 +81,7 @@ def reset_grammar_checker() -> None:
 # Error personalizado
 # =============================================================================
 
+
 @dataclass
 class GrammarCheckError(NLPError):
     """Error durante el análisis gramatical."""
@@ -89,13 +90,11 @@ class GrammarCheckError(NLPError):
     original_error: str = ""
     message: str = field(init=False)
     severity: ErrorSeverity = field(default=ErrorSeverity.RECOVERABLE, init=False)
-    user_message: Optional[str] = field(default=None, init=False)
+    user_message: str | None = field(default=None, init=False)
 
     def __post_init__(self):
         self.message = f"Grammar check error: {self.original_error}"
-        self.user_message = (
-            "Error al verificar gramática. Continuando con resultados parciales."
-        )
+        self.user_message = "Error al verificar gramática. Continuando con resultados parciales."
         super().__post_init__()
 
 
@@ -113,7 +112,7 @@ class GrammarChecker:
     La configuración se lee de AppConfig.grammar o se puede pasar explícitamente.
     """
 
-    def __init__(self, config: Optional[GrammarConfig] = None):
+    def __init__(self, config: GrammarConfig | None = None):
         """
         Inicializar el corrector.
 
@@ -131,6 +130,7 @@ class GrammarChecker:
         """Cargar modelo spaCy si está disponible."""
         try:
             from ..spacy_gpu import load_spacy_model
+
             self._nlp = load_spacy_model()
             logger.info("spaCy cargado para análisis gramatical")
         except Exception as e:
@@ -155,7 +155,9 @@ class GrammarChecker:
                     else:
                         logger.warning("No se pudo iniciar LanguageTool automáticamente")
                 else:
-                    logger.info("LanguageTool no instalado. Ejecutar: python scripts/setup_languagetool.py")
+                    logger.info(
+                        "LanguageTool no instalado. Ejecutar: python scripts/setup_languagetool.py"
+                    )
 
             if self._lt_client.is_available():
                 logger.info("LanguageTool disponible para análisis gramatical avanzado")
@@ -185,10 +187,10 @@ class GrammarChecker:
     def check(
         self,
         text: str,
-        use_llm: Optional[bool] = None,
-        use_languagetool: Optional[bool] = None,
+        use_llm: bool | None = None,
+        use_languagetool: bool | None = None,
         check_style: bool = True,
-        progress_callback: Optional[Callable[[float, str], None]] = None,
+        progress_callback: Callable[[float, str], None] | None = None,
     ) -> Result[GrammarReport]:
         """
         Analizar texto en busca de errores gramaticales.
@@ -208,7 +210,9 @@ class GrammarChecker:
 
         # Usar valores de config si no se especifican
         use_llm = use_llm if use_llm is not None else self._config.use_llm
-        use_languagetool = use_languagetool if use_languagetool is not None else self._config.use_languagetool
+        use_languagetool = (
+            use_languagetool if use_languagetool is not None else self._config.use_languagetool
+        )
 
         report = GrammarReport()
         errors: list[NLPError] = []
@@ -251,10 +255,11 @@ class GrammarChecker:
                     logger.debug(f"LanguageTool detectó {len(lt_issues)} errores adicionales")
                 except Exception as e:
                     logger.warning(f"Error en análisis LanguageTool: {e}")
-                    errors.append(GrammarCheckError(
-                        text_sample=text[:100],
-                        original_error=f"LanguageTool: {e}"
-                    ))
+                    errors.append(
+                        GrammarCheckError(
+                            text_sample=text[:100], original_error=f"LanguageTool: {e}"
+                        )
+                    )
 
             # Fase 5: LLM contextual - OPCIONAL (0.8 - 0.95)
             if use_llm:
@@ -266,10 +271,7 @@ class GrammarChecker:
                         report.add_issue(issue)
                 except Exception as e:
                     logger.warning(f"Error en análisis LLM: {e}")
-                    errors.append(GrammarCheckError(
-                        text_sample=text[:100],
-                        original_error=str(e)
-                    ))
+                    errors.append(GrammarCheckError(text_sample=text[:100], original_error=str(e)))
 
             # Fase 6: Consolidar (0.95 - 1.0)
             if progress_callback:
@@ -311,7 +313,7 @@ class GrammarChecker:
 
             effective_min_confidence = min(
                 self._config.min_confidence + confidence_adjustment,
-                0.85  # Tope máximo para no filtrar todo
+                0.85,  # Tope máximo para no filtrar todo
             )
 
             if confidence_adjustment > 0:
@@ -321,10 +323,7 @@ class GrammarChecker:
                 )
 
             # Filtrar por confianza mínima
-            report.issues = [
-                i for i in report.issues
-                if i.confidence >= effective_min_confidence
-            ]
+            report.issues = [i for i in report.issues if i.confidence >= effective_min_confidence]
 
             # Estadísticas
             report.processed_chars = len(text)
@@ -335,10 +334,9 @@ class GrammarChecker:
 
         except Exception as e:
             logger.error(f"Error en análisis gramatical: {e}")
-            errors.append(GrammarCheckError(
-                text_sample=text[:100] if text else "",
-                original_error=str(e)
-            ))
+            errors.append(
+                GrammarCheckError(text_sample=text[:100] if text else "", original_error=str(e))
+            )
 
         if errors:
             return Result.partial(report, errors)
@@ -390,23 +388,23 @@ class GrammarChecker:
                     sentence = self._extract_sentence(text, start)
 
                     # Generar sugerencia
-                    suggestion = self._generate_suggestion(
-                        matched_text, error_type
-                    )
+                    suggestion = self._generate_suggestion(matched_text, error_type)
 
-                    issues.append(GrammarIssue(
-                        text=matched_text,
-                        start_char=start,
-                        end_char=end,
-                        sentence=sentence,
-                        error_type=error_type,
-                        severity=GrammarSeverity.WARNING,
-                        suggestion=suggestion,
-                        confidence=0.8,
-                        detection_method=GrammarDetectionMethod.REGEX,
-                        explanation=explanation,
-                        rule_id=f"REGEX_{error_type.value.upper()}"
-                    ))
+                    issues.append(
+                        GrammarIssue(
+                            text=matched_text,
+                            start_char=start,
+                            end_char=end,
+                            sentence=sentence,
+                            error_type=error_type,
+                            severity=GrammarSeverity.WARNING,
+                            suggestion=suggestion,
+                            confidence=0.8,
+                            detection_method=GrammarDetectionMethod.REGEX,
+                            explanation=explanation,
+                            rule_id=f"REGEX_{error_type.value.upper()}",
+                        )
+                    )
             except re.error as e:
                 logger.warning(f"Error en patrón regex: {e}")
 
@@ -418,26 +416,28 @@ class GrammarChecker:
         text_lower = text.lower()
 
         for redundant, correction in REDUNDANT_EXPRESSIONS.items():
-            pattern = rf'\b{re.escape(redundant)}\b'
+            pattern = rf"\b{re.escape(redundant)}\b"
             for match in re.finditer(pattern, text_lower, re.IGNORECASE):
                 start = match.start()
                 end = match.end()
                 original = text[start:end]  # Preservar mayúsculas originales
                 sentence = self._extract_sentence(text, start)
 
-                issues.append(GrammarIssue(
-                    text=original,
-                    start_char=start,
-                    end_char=end,
-                    sentence=sentence,
-                    error_type=GrammarErrorType.REDUNDANCY,
-                    severity=GrammarSeverity.STYLE,
-                    suggestion=correction,
-                    confidence=0.9,
-                    detection_method=GrammarDetectionMethod.RULE,
-                    explanation=f"Expresión redundante: '{redundant}' → '{correction}'",
-                    rule_id="REDUNDANCY"
-                ))
+                issues.append(
+                    GrammarIssue(
+                        text=original,
+                        start_char=start,
+                        end_char=end,
+                        sentence=sentence,
+                        error_type=GrammarErrorType.REDUNDANCY,
+                        severity=GrammarSeverity.STYLE,
+                        suggestion=correction,
+                        confidence=0.9,
+                        detection_method=GrammarDetectionMethod.RULE,
+                        explanation=f"Expresión redundante: '{redundant}' → '{correction}'",
+                        rule_id="REDUNDANCY",
+                    )
+                )
 
         return issues
 
@@ -468,7 +468,7 @@ class GrammarChecker:
     def _check_sentence_agreement(
         self,
         sent: Any,  # spacy.tokens.Span
-        full_text: str
+        full_text: str,
     ) -> list[GrammarIssue]:
         """Verificar concordancia en una oración."""
         issues: list[GrammarIssue] = []
@@ -494,22 +494,24 @@ class GrammarChecker:
                     end = noun.idx + len(noun.text)
                     sentence = self._extract_sentence(full_text, start)
 
-                    issues.append(GrammarIssue(
-                        text=full_text[start:end],
-                        start_char=start,
-                        end_char=end,
-                        sentence=sentence,
-                        error_type=GrammarErrorType.GENDER_AGREEMENT,
-                        severity=GrammarSeverity.ERROR,
-                        confidence=0.85,
-                        detection_method=GrammarDetectionMethod.SPACY_DEP,
-                        explanation=f"Discordancia de género: '{det.text}' ({det_gender}) + '{noun.text}' ({noun_gender})",
-                        affected_words=[det.text, noun.text],
-                        grammatical_context={
-                            "det_gender": det_gender,
-                            "noun_gender": noun_gender,
-                        }
-                    ))
+                    issues.append(
+                        GrammarIssue(
+                            text=full_text[start:end],
+                            start_char=start,
+                            end_char=end,
+                            sentence=sentence,
+                            error_type=GrammarErrorType.GENDER_AGREEMENT,
+                            severity=GrammarSeverity.ERROR,
+                            confidence=0.85,
+                            detection_method=GrammarDetectionMethod.SPACY_DEP,
+                            explanation=f"Discordancia de género: '{det.text}' ({det_gender}) + '{noun.text}' ({noun_gender})",
+                            affected_words=[det.text, noun.text],
+                            grammatical_context={
+                                "det_gender": det_gender,
+                                "noun_gender": noun_gender,
+                            },
+                        )
+                    )
 
                 # Verificar concordancia de número
                 if det_number and noun_number and det_number != noun_number:
@@ -517,22 +519,24 @@ class GrammarChecker:
                     end = noun.idx + len(noun.text)
                     sentence = self._extract_sentence(full_text, start)
 
-                    issues.append(GrammarIssue(
-                        text=full_text[start:end],
-                        start_char=start,
-                        end_char=end,
-                        sentence=sentence,
-                        error_type=GrammarErrorType.NUMBER_AGREEMENT,
-                        severity=GrammarSeverity.ERROR,
-                        confidence=0.85,
-                        detection_method=GrammarDetectionMethod.SPACY_DEP,
-                        explanation=f"Discordancia de número: '{det.text}' ({det_number}) + '{noun.text}' ({noun_number})",
-                        affected_words=[det.text, noun.text],
-                        grammatical_context={
-                            "det_number": det_number,
-                            "noun_number": noun_number,
-                        }
-                    ))
+                    issues.append(
+                        GrammarIssue(
+                            text=full_text[start:end],
+                            start_char=start,
+                            end_char=end,
+                            sentence=sentence,
+                            error_type=GrammarErrorType.NUMBER_AGREEMENT,
+                            severity=GrammarSeverity.ERROR,
+                            confidence=0.85,
+                            detection_method=GrammarDetectionMethod.SPACY_DEP,
+                            explanation=f"Discordancia de número: '{det.text}' ({det_number}) + '{noun.text}' ({noun_number})",
+                            affected_words=[det.text, noun.text],
+                            grammatical_context={
+                                "det_number": det_number,
+                                "noun_number": noun_number,
+                            },
+                        )
+                    )
 
             # Verificar concordancia sujeto-verbo
             if token.dep_ == "nsubj" and token.head.pos_ == "VERB":
@@ -552,29 +556,31 @@ class GrammarChecker:
                         end = max(subj.idx + len(subj.text), verb.idx + len(verb.text))
                         sentence = self._extract_sentence(full_text, start)
 
-                        issues.append(GrammarIssue(
-                            text=full_text[start:end],
-                            start_char=start,
-                            end_char=end,
-                            sentence=sentence,
-                            error_type=GrammarErrorType.SUBJECT_VERB_AGREEMENT,
-                            severity=GrammarSeverity.ERROR,
-                            confidence=0.75,
-                            detection_method=GrammarDetectionMethod.SPACY_DEP,
-                            explanation=f"Discordancia sujeto-verbo: '{subj.text}' ({subj_number}) + '{verb.text}' ({verb_number})",
-                            affected_words=[subj.text, verb.text],
-                            grammatical_context={
-                                "subj_number": subj_number,
-                                "verb_number": verb_number,
-                            }
-                        ))
+                        issues.append(
+                            GrammarIssue(
+                                text=full_text[start:end],
+                                start_char=start,
+                                end_char=end,
+                                sentence=sentence,
+                                error_type=GrammarErrorType.SUBJECT_VERB_AGREEMENT,
+                                severity=GrammarSeverity.ERROR,
+                                confidence=0.75,
+                                detection_method=GrammarDetectionMethod.SPACY_DEP,
+                                explanation=f"Discordancia sujeto-verbo: '{subj.text}' ({subj_number}) + '{verb.text}' ({verb_number})",
+                                affected_words=[subj.text, verb.text],
+                                grammatical_context={
+                                    "subj_number": subj_number,
+                                    "verb_number": verb_number,
+                                },
+                            )
+                        )
 
         return issues
 
     def _check_pronouns(
         self,
         doc: Any,  # spacy.tokens.Doc
-        full_text: str
+        full_text: str,
     ) -> list[GrammarIssue]:
         """Verificar uso correcto de pronombres (leísmo, laísmo, loísmo)."""
         issues: list[GrammarIssue] = []
@@ -594,19 +600,21 @@ class GrammarChecker:
 
                     sentence = self._extract_sentence(full_text, token.idx)
 
-                    issues.append(GrammarIssue(
-                        text=token.text,
-                        start_char=token.idx,
-                        end_char=token.idx + len(token.text),
-                        sentence=sentence,
-                        error_type=error_type,
-                        severity=GrammarSeverity.WARNING,
-                        suggestion=suggestion,
-                        confidence=0.6,  # Requiere verificación
-                        detection_method=GrammarDetectionMethod.SPACY_DEP,
-                        explanation=f"Posible {error_type.value}: usar '{suggestion}' para complemento indirecto",
-                        affected_words=[token.text],
-                    ))
+                    issues.append(
+                        GrammarIssue(
+                            text=token.text,
+                            start_char=token.idx,
+                            end_char=token.idx + len(token.text),
+                            sentence=sentence,
+                            error_type=error_type,
+                            severity=GrammarSeverity.WARNING,
+                            suggestion=suggestion,
+                            confidence=0.6,  # Requiere verificación
+                            detection_method=GrammarDetectionMethod.SPACY_DEP,
+                            explanation=f"Posible {error_type.value}: usar '{suggestion}' para complemento indirecto",
+                            affected_words=[token.text],
+                        )
+                    )
 
         return issues
 
@@ -616,7 +624,7 @@ class GrammarChecker:
 
         # Dequeísmo: verbos que NO llevan "de" antes de "que"
         for verb in VERBS_WITHOUT_DE_QUE:
-            pattern = rf'\b{verb}\s+de\s+que\b'
+            pattern = rf"\b{verb}\s+de\s+que\b"
             for match in re.finditer(pattern, text, re.IGNORECASE):
                 start = match.start()
                 end = match.end()
@@ -624,50 +632,54 @@ class GrammarChecker:
 
                 # Sugerencia: quitar "de"
                 original = match.group(0)
-                suggestion = re.sub(r'\s+de\s+', ' ', original)
+                suggestion = re.sub(r"\s+de\s+", " ", original)
 
-                issues.append(GrammarIssue(
-                    text=original,
-                    start_char=start,
-                    end_char=end,
-                    sentence=sentence,
-                    error_type=GrammarErrorType.DEQUEISMO,
-                    severity=GrammarSeverity.ERROR,
-                    suggestion=suggestion,
-                    confidence=0.9,
-                    detection_method=GrammarDetectionMethod.RULE,
-                    explanation=f"Dequeísmo: '{verb}' no lleva 'de' antes de 'que'",
-                    rule_id="DEQUEISMO"
-                ))
+                issues.append(
+                    GrammarIssue(
+                        text=original,
+                        start_char=start,
+                        end_char=end,
+                        sentence=sentence,
+                        error_type=GrammarErrorType.DEQUEISMO,
+                        severity=GrammarSeverity.ERROR,
+                        suggestion=suggestion,
+                        confidence=0.9,
+                        detection_method=GrammarDetectionMethod.RULE,
+                        explanation=f"Dequeísmo: '{verb}' no lleva 'de' antes de 'que'",
+                        rule_id="DEQUEISMO",
+                    )
+                )
 
         # Queísmo: verbos que SÍ llevan "de" antes de "que"
         for verb in VERBS_WITH_DE_QUE:
             # Buscar verbo seguido de "que" sin "de"
-            pattern = rf'\b{verb}\s+que\b(?!\s*de)'
+            pattern = rf"\b{verb}\s+que\b(?!\s*de)"
             for match in re.finditer(pattern, text, re.IGNORECASE):
                 start = match.start()
                 end = match.end()
                 sentence = self._extract_sentence(text, start)
 
                 # Verificar que no haya ya un "de" antes
-                context_before = text[max(0, start-10):start].lower()
+                context_before = text[max(0, start - 10) : start].lower()
                 if "de" not in context_before:
                     original = match.group(0)
                     suggestion = original.replace(" que", " de que")
 
-                    issues.append(GrammarIssue(
-                        text=original,
-                        start_char=start,
-                        end_char=end,
-                        sentence=sentence,
-                        error_type=GrammarErrorType.QUEISMO,
-                        severity=GrammarSeverity.WARNING,
-                        suggestion=suggestion,
-                        confidence=0.7,
-                        detection_method=GrammarDetectionMethod.RULE,
-                        explanation=f"Queísmo: '{verb}' requiere 'de' antes de 'que'",
-                        rule_id="QUEISMO"
-                    ))
+                    issues.append(
+                        GrammarIssue(
+                            text=original,
+                            start_char=start,
+                            end_char=end,
+                            sentence=sentence,
+                            error_type=GrammarErrorType.QUEISMO,
+                            severity=GrammarSeverity.WARNING,
+                            suggestion=suggestion,
+                            confidence=0.7,
+                            detection_method=GrammarDetectionMethod.RULE,
+                            explanation=f"Queísmo: '{verb}' requiere 'de' antes de 'que'",
+                            rule_id="QUEISMO",
+                        )
+                    )
 
         return issues
 
@@ -678,43 +690,52 @@ class GrammarChecker:
 
         # Lemas de verbos copulativos y auxiliares que inician oraciones válidas
         # Usar lemas permite cubrir todas las formas conjugadas automáticamente
-        copulative_lemmas = {'ser', 'estar', 'parecer', 'haber', 'tener'}
+        copulative_lemmas = {"ser", "estar", "parecer", "haber", "tener"}
 
         for sent_start, sent_end, sentence in sentences:
             word_count = len(sentence.split())
 
             # Oraciones muy largas (>60 palabras)
             if word_count > 60:
-                issues.append(GrammarIssue(
-                    text=sentence[:50] + "...",
-                    start_char=sent_start,
-                    end_char=sent_end,
-                    sentence=sentence,
-                    error_type=GrammarErrorType.RUN_ON_SENTENCE,
-                    severity=GrammarSeverity.STYLE,
-                    confidence=0.7,
-                    detection_method=GrammarDetectionMethod.HEURISTIC,
-                    explanation=f"Oración muy larga ({word_count} palabras). Considerar dividirla.",
-                    rule_id="LONG_SENTENCE"
-                ))
+                issues.append(
+                    GrammarIssue(
+                        text=sentence[:50] + "...",
+                        start_char=sent_start,
+                        end_char=sent_end,
+                        sentence=sentence,
+                        error_type=GrammarErrorType.RUN_ON_SENTENCE,
+                        severity=GrammarSeverity.STYLE,
+                        confidence=0.7,
+                        detection_method=GrammarDetectionMethod.HEURISTIC,
+                        explanation=f"Oración muy larga ({word_count} palabras). Considerar dividirla.",
+                        rule_id="LONG_SENTENCE",
+                    )
+                )
 
             # Oraciones sin verbo principal (fragmentos)
             # Ignorar texto entre comillas (diálogos, descripciones, citas)
             sentence_stripped = sentence.strip()
             is_quoted = (
-                (sentence_stripped.startswith('"') or sentence_stripped.startswith("'") or
-                 sentence_stripped.startswith('«') or sentence_stripped.startswith('"')) or
-                (sentence_stripped.endswith('"') or sentence_stripped.endswith("'") or
-                 sentence_stripped.endswith('»') or sentence_stripped.endswith('"'))
+                sentence_stripped.startswith('"')
+                or sentence_stripped.startswith("'")
+                or sentence_stripped.startswith("«")
+                or sentence_stripped.startswith('"')
+            ) or (
+                sentence_stripped.endswith('"')
+                or sentence_stripped.endswith("'")
+                or sentence_stripped.endswith("»")
+                or sentence_stripped.endswith('"')
             )
 
             # Ignorar listas descriptivas (secuencias de adjetivos/sustantivos separados por comas)
             # Patrón: "Cabello negro, ojos azules, piel morena" - típico de descripciones de personajes
             is_descriptive_list = (
-                sentence.count(',') >= 1 and
-                word_count < 15 and
-                not any(word.lower() in ['que', 'pero', 'porque', 'cuando', 'donde', 'como', 'si']
-                       for word in sentence.split())
+                sentence.count(",") >= 1
+                and word_count < 15
+                and not any(
+                    word.lower() in ["que", "pero", "porque", "cuando", "donde", "como", "si"]
+                    for word in sentence.split()
+                )
             )
 
             # Necesitamos spaCy para análisis de lemas y estructura
@@ -725,16 +746,15 @@ class GrammarChecker:
                     # Verificar si empieza con verbo copulativo (usando lema)
                     first_token = doc[0] if len(doc) > 0 else None
                     starts_with_copulative = (
-                        first_token is not None and
-                        first_token.lemma_.lower() in copulative_lemmas
+                        first_token is not None and first_token.lemma_.lower() in copulative_lemmas
                     )
 
                     # Ignorar construcciones literarias con adjetivos yuxtapuestos después de coma
                     # "Era un hombre muy alto, delgado como un junco."
                     has_literary_adjective_pattern = (
-                        starts_with_copulative and
-                        ',' in sentence and
-                        self._has_adjective_after_comma(doc)
+                        starts_with_copulative
+                        and "," in sentence
+                        and self._has_adjective_after_comma(doc)
                     )
 
                     # Si empieza con copulativo o tiene patrón literario, no es fragmento
@@ -744,52 +764,52 @@ class GrammarChecker:
                     # Buscar verbo principal: VERB con dep ROOT/ccomp/xcomp
                     # O AUX con dep ROOT (verbos copulativos como "era", "estaba")
                     has_main_verb = any(
-                        (t.pos_ == "VERB" and t.dep_ in ["ROOT", "ccomp", "xcomp"]) or
-                        (t.pos_ == "AUX" and t.dep_ == "ROOT")
+                        (t.pos_ == "VERB" and t.dep_ in ["ROOT", "ccomp", "xcomp"])
+                        or (t.pos_ == "AUX" and t.dep_ == "ROOT")
                         for t in doc
                     )
                     if not has_main_verb:
-                        issues.append(GrammarIssue(
-                            text=sentence[:50] + "..." if len(sentence) > 50 else sentence,
-                            start_char=sent_start,
-                            end_char=sent_end,
-                            sentence=sentence,
-                            error_type=GrammarErrorType.SENTENCE_FRAGMENT,
-                            severity=GrammarSeverity.WARNING,
-                            confidence=0.5,
-                            detection_method=GrammarDetectionMethod.SPACY_DEP,
-                            explanation="Posible fragmento de oración (sin verbo principal)",
-                            rule_id="FRAGMENT"
-                        ))
+                        issues.append(
+                            GrammarIssue(
+                                text=sentence[:50] + "..." if len(sentence) > 50 else sentence,
+                                start_char=sent_start,
+                                end_char=sent_end,
+                                sentence=sentence,
+                                error_type=GrammarErrorType.SENTENCE_FRAGMENT,
+                                severity=GrammarSeverity.WARNING,
+                                confidence=0.5,
+                                detection_method=GrammarDetectionMethod.SPACY_DEP,
+                                explanation="Posible fragmento de oración (sin verbo principal)",
+                                rule_id="FRAGMENT",
+                            )
+                        )
                 except Exception:
                     pass
 
             # Coma-splice: coma donde debería ir punto
-            comma_splice_pattern = r'[a-záéíóúñ]+,\s+[a-záéíóúñ]+\s+[a-záéíóúñ]+,'
+            comma_splice_pattern = r"[a-záéíóúñ]+,\s+[a-záéíóúñ]+\s+[a-záéíóúñ]+,"
             for match in re.finditer(comma_splice_pattern, sentence):
                 # Verificar que no sea una enumeración
-                context = sentence[max(0, match.start()-20):match.end()+20]
-                if not re.search(r',\s*y\s*', context):
-                    issues.append(GrammarIssue(
-                        text=match.group(0),
-                        start_char=sent_start + match.start(),
-                        end_char=sent_start + match.end(),
-                        sentence=sentence,
-                        error_type=GrammarErrorType.COMMA_SPLICE,
-                        severity=GrammarSeverity.INFO,
-                        confidence=0.4,
-                        detection_method=GrammarDetectionMethod.HEURISTIC,
-                        explanation="Posible coma-splice: considerar usar punto o conjunción",
-                        rule_id="COMMA_SPLICE"
-                    ))
+                context = sentence[max(0, match.start() - 20) : match.end() + 20]
+                if not re.search(r",\s*y\s*", context):
+                    issues.append(
+                        GrammarIssue(
+                            text=match.group(0),
+                            start_char=sent_start + match.start(),
+                            end_char=sent_start + match.end(),
+                            sentence=sentence,
+                            error_type=GrammarErrorType.COMMA_SPLICE,
+                            severity=GrammarSeverity.INFO,
+                            confidence=0.4,
+                            detection_method=GrammarDetectionMethod.HEURISTIC,
+                            explanation="Posible coma-splice: considerar usar punto o conjunción",
+                            rule_id="COMMA_SPLICE",
+                        )
+                    )
 
         return issues
 
-    def _check_with_llm(
-        self,
-        text: str,
-        existing_issues: list[GrammarIssue]
-    ) -> list[GrammarIssue]:
+    def _check_with_llm(self, text: str, existing_issues: list[GrammarIssue]) -> list[GrammarIssue]:
         """Usar LLM para análisis contextual avanzado."""
         try:
             from ...llm.client import get_llm_client
@@ -802,7 +822,7 @@ class GrammarChecker:
             existing_texts = {i.text for i in existing_issues}
 
             prompt = f"""Analiza el siguiente texto en español y encuentra errores gramaticales que no estén ya detectados.
-Errores ya detectados (NO incluir): {', '.join(list(existing_texts)[:10])}
+Errores ya detectados (NO incluir): {", ".join(list(existing_texts)[:10])}
 
 Texto:
 {text[:2000]}
@@ -824,8 +844,9 @@ Si no hay errores adicionales, responde: []"""
 
             # Parsear respuesta
             import json
+
             try:
-                json_match = re.search(r'\[.*\]', response, re.DOTALL)
+                json_match = re.search(r"\[.*\]", response, re.DOTALL)
                 if json_match:
                     errors = json.loads(json_match.group())
                     issues = []
@@ -835,22 +856,22 @@ Si no hay errores adicionales, responde: []"""
                             pos = text.find(err_text)
                             if pos >= 0:
                                 # Mapear tipo de error
-                                error_type = self._map_llm_error_type(
-                                    err.get("type", "")
-                                )
+                                error_type = self._map_llm_error_type(err.get("type", ""))
 
-                                issues.append(GrammarIssue(
-                                    text=err_text,
-                                    start_char=pos,
-                                    end_char=pos + len(err_text),
-                                    sentence=self._extract_sentence(text, pos),
-                                    error_type=error_type,
-                                    severity=GrammarSeverity.WARNING,
-                                    suggestion=err.get("correction"),
-                                    confidence=0.6,
-                                    detection_method=GrammarDetectionMethod.LLM,
-                                    explanation=err.get("explanation", "Detectado por LLM")
-                                ))
+                                issues.append(
+                                    GrammarIssue(
+                                        text=err_text,
+                                        start_char=pos,
+                                        end_char=pos + len(err_text),
+                                        sentence=self._extract_sentence(text, pos),
+                                        error_type=error_type,
+                                        severity=GrammarSeverity.WARNING,
+                                        suggestion=err.get("correction"),
+                                        confidence=0.6,
+                                        detection_method=GrammarDetectionMethod.LLM,
+                                        explanation=err.get("explanation", "Detectado por LLM"),
+                                    )
+                                )
                     return issues
             except json.JSONDecodeError:
                 pass
@@ -861,9 +882,7 @@ Si no hay errores adicionales, responde: []"""
         return []
 
     def _check_with_languagetool(
-        self,
-        text: str,
-        existing_issues: list[GrammarIssue]
+        self, text: str, existing_issues: list[GrammarIssue]
     ) -> list[GrammarIssue]:
         """
         Usar LanguageTool para análisis gramatical avanzado.
@@ -887,10 +906,7 @@ Si no hay errores adicionales, responde: []"""
         issues: list[GrammarIssue] = []
 
         # Posiciones ya detectadas por otros métodos
-        existing_positions = {
-            (issue.start_char, issue.end_char)
-            for issue in existing_issues
-        }
+        existing_positions = {(issue.start_char, issue.end_char) for issue in existing_issues}
 
         # Usar check_chunked para manejar textos largos
         result = self._lt_client.check_chunked(text)
@@ -914,7 +930,7 @@ Si no hay errores adicionales, responde: []"""
             severity = self._map_lt_severity(match.rule_category)
 
             # Extraer texto del error
-            error_text = text[match.offset:match.offset + match.length]
+            error_text = text[match.offset : match.offset + match.length]
 
             # Primera sugerencia como corrección
             suggestion = match.replacements[0] if match.replacements else None
@@ -922,19 +938,21 @@ Si no hay errores adicionales, responde: []"""
             # Extraer oración de contexto
             sentence = self._extract_sentence(text, match.offset)
 
-            issues.append(GrammarIssue(
-                text=error_text,
-                start_char=match.offset,
-                end_char=match.offset + match.length,
-                sentence=sentence,
-                error_type=error_type,
-                severity=severity,
-                suggestion=suggestion,
-                confidence=0.85,  # Alta confianza en LT
-                detection_method=GrammarDetectionMethod.LANGUAGETOOL,
-                explanation=match.message,
-                rule_id=match.rule_id,
-            ))
+            issues.append(
+                GrammarIssue(
+                    text=error_text,
+                    start_char=match.offset,
+                    end_char=match.offset + match.length,
+                    sentence=sentence,
+                    error_type=error_type,
+                    severity=severity,
+                    suggestion=suggestion,
+                    confidence=0.85,  # Alta confianza en LT
+                    detection_method=GrammarDetectionMethod.LANGUAGETOOL,
+                    explanation=match.message,
+                    rule_id=match.rule_id,
+                )
+            )
 
             # Marcar posición como usada
             existing_positions.add(pos_key)
@@ -1015,7 +1033,7 @@ Si no hay errores adicionales, responde: []"""
     def _split_sentences(self, text: str) -> list[tuple[int, int, str]]:
         """Dividir texto en oraciones con posiciones."""
         sentences = []
-        pattern = r'[.!?]+\s*'
+        pattern = r"[.!?]+\s*"
 
         last_end = 0
         for match in re.finditer(pattern, text):
@@ -1037,15 +1055,15 @@ Si no hay errores adicionales, responde: []"""
         """Extraer la oración que contiene la posición dada."""
         # Buscar inicio
         start = position
-        while start > 0 and text[start-1] not in '.!?\n':
+        while start > 0 and text[start - 1] not in ".!?\n":
             start -= 1
 
         # Buscar fin
         end = position
-        while end < len(text) and text[end] not in '.!?\n':
+        while end < len(text) and text[end] not in ".!?\n":
             end += 1
 
-        sentence = text[start:end+1].strip()
+        sentence = text[start : end + 1].strip()
 
         # Limitar longitud
         if len(sentence) > 200:
@@ -1056,23 +1074,18 @@ Si no hay errores adicionales, responde: []"""
 
         return sentence
 
-    def _generate_suggestion(
-        self,
-        text: str,
-        error_type: GrammarErrorType
-    ) -> Optional[str]:
+    def _generate_suggestion(self, text: str, error_type: GrammarErrorType) -> str | None:
         """Generar sugerencia de corrección."""
         text_lower = text.lower()
 
         if error_type == GrammarErrorType.DEQUEISMO:
-            return re.sub(r'\s+de\s+que', ' que', text, flags=re.IGNORECASE)
+            return re.sub(r"\s+de\s+que", " que", text, flags=re.IGNORECASE)
 
         if error_type == GrammarErrorType.QUEISMO:
-            return re.sub(r'\s+que\b', ' de que', text, flags=re.IGNORECASE)
+            return re.sub(r"\s+que\b", " de que", text, flags=re.IGNORECASE)
 
-        if error_type == GrammarErrorType.INFINITIVE_ERROR:
-            if "habemos" in text_lower:
-                return text.replace("habemos", "hay").replace("Habemos", "Hay")
+        if error_type == GrammarErrorType.INFINITIVE_ERROR and "habemos" in text_lower:
+            return text.replace("habemos", "hay").replace("Habemos", "Hay")
 
         if error_type == GrammarErrorType.GENDER_AGREEMENT:
             # Intentar corregir artículo
@@ -1101,9 +1114,9 @@ Si no hay errores adicionales, responde: []"""
         comma_found = False
 
         for token in doc:
-            if token.text == ',':
+            if token.text == ",":
                 comma_found = True
-            elif comma_found and token.pos_ == 'ADJ':
+            elif comma_found and token.pos_ == "ADJ":
                 return True
 
         return False

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Sistema Genérico de Resolución de Alias.
 
@@ -28,7 +27,6 @@ import re
 import threading
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -37,18 +35,20 @@ logger = logging.getLogger(__name__)
 # Enums y Constantes
 # =============================================================================
 
+
 class AliasType(Enum):
     """Tipo de alias detectado."""
-    NICKNAME = "nickname"           # Mote/apodo: "el Gordo", "la Regenta"
-    HONORIFIC_TITLE = "honorific"   # Don/doña, señor/señora
-    PROFESSIONAL = "professional"   # Doctor, maestro, licenciado
-    ECCLESIASTIC = "ecclesiastic"   # Padre, fray, canónigo, obispo
-    NOBLE = "noble"                 # Conde, duque, marqués
-    MILITARY = "military"           # General, coronel, capitán
-    FAMILY = "family"               # Padre, madre, hermano (en contexto)
-    ROLE = "role"                   # El protagonista, el narrador
-    PSEUDONYM = "pseudonym"         # Seudónimo literario/artístico
-    DESCRIPTIVE = "descriptive"     # "el hombre alto", "la mujer del vestido rojo"
+
+    NICKNAME = "nickname"  # Mote/apodo: "el Gordo", "la Regenta"
+    HONORIFIC_TITLE = "honorific"  # Don/doña, señor/señora
+    PROFESSIONAL = "professional"  # Doctor, maestro, licenciado
+    ECCLESIASTIC = "ecclesiastic"  # Padre, fray, canónigo, obispo
+    NOBLE = "noble"  # Conde, duque, marqués
+    MILITARY = "military"  # General, coronel, capitán
+    FAMILY = "family"  # Padre, madre, hermano (en contexto)
+    ROLE = "role"  # El protagonista, el narrador
+    PSEUDONYM = "pseudonym"  # Seudónimo literario/artístico
+    DESCRIPTIVE = "descriptive"  # "el hombre alto", "la mujer del vestido rojo"
 
 
 # =============================================================================
@@ -56,105 +56,168 @@ class AliasType(Enum):
 # =============================================================================
 
 # Artículos que preceden títulos/apodos
-ALIAS_ARTICLES = {'el', 'la', 'los', 'las'}
+ALIAS_ARTICLES = {"el", "la", "los", "las"}
 
 # Títulos honoríficos (sin artículo)
 HONORIFIC_PATTERNS = {
     # Tratamientos de respeto
-    r'^don\s+\w+',
-    r'^doña\s+\w+',
-    r'^señor\s+\w+',
-    r'^señora\s+\w+',
-    r'^señorita\s+\w+',
+    r"^don\s+\w+",
+    r"^doña\s+\w+",
+    r"^señor\s+\w+",
+    r"^señora\s+\w+",
+    r"^señorita\s+\w+",
     # Abreviaturas
-    r'^sr\.?\s+\w+',
-    r'^sra\.?\s+\w+',
-    r'^srta\.?\s+\w+',
-    r'^d\.?\s+\w+',
-    r'^dña\.?\s+\w+',
+    r"^sr\.?\s+\w+",
+    r"^sra\.?\s+\w+",
+    r"^srta\.?\s+\w+",
+    r"^d\.?\s+\w+",
+    r"^dña\.?\s+\w+",
 }
 
 # Patrones de títulos profesionales
 PROFESSIONAL_TITLES = {
-    'doctor', 'doctora', 'dr', 'dra',
-    'licenciado', 'licenciada', 'lic',
-    'ingeniero', 'ingeniera', 'ing',
-    'arquitecto', 'arquitecta', 'arq',
-    'maestro', 'maestra',
-    'profesor', 'profesora', 'prof',
-    'abogado', 'abogada',
+    "doctor",
+    "doctora",
+    "dr",
+    "dra",
+    "licenciado",
+    "licenciada",
+    "lic",
+    "ingeniero",
+    "ingeniera",
+    "ing",
+    "arquitecto",
+    "arquitecta",
+    "arq",
+    "maestro",
+    "maestra",
+    "profesor",
+    "profesora",
+    "prof",
+    "abogado",
+    "abogada",
 }
 
 # Patrones de títulos eclesiásticos
 ECCLESIASTIC_TITLES = {
-    'padre', 'fray', 'sor',
-    'monseñor', 'obispo', 'arzobispo',
-    'cardenal', 'canónigo', 'magistral',
-    'prior', 'priora', 'abad', 'abadesa',
-    'párroco', 'vicario', 'deán',
-    'hermano', 'hermana',  # religioso/a
+    "padre",
+    "fray",
+    "sor",
+    "monseñor",
+    "obispo",
+    "arzobispo",
+    "cardenal",
+    "canónigo",
+    "magistral",
+    "prior",
+    "priora",
+    "abad",
+    "abadesa",
+    "párroco",
+    "vicario",
+    "deán",
+    "hermano",
+    "hermana",  # religioso/a
 }
 
 # Patrones de títulos nobiliarios
 NOBLE_TITLES = {
-    'rey', 'reina', 'príncipe', 'princesa',
-    'infante', 'infanta',
-    'duque', 'duquesa',
-    'marqués', 'marquesa',
-    'conde', 'condesa',
-    'vizconde', 'vizcondesa',
-    'barón', 'baronesa',
-    'lord', 'lady', 'sir',
+    "rey",
+    "reina",
+    "príncipe",
+    "princesa",
+    "infante",
+    "infanta",
+    "duque",
+    "duquesa",
+    "marqués",
+    "marquesa",
+    "conde",
+    "condesa",
+    "vizconde",
+    "vizcondesa",
+    "barón",
+    "baronesa",
+    "lord",
+    "lady",
+    "sir",
 }
 
 # Patrones de títulos militares
 MILITARY_TITLES = {
-    'general', 'coronel', 'comandante',
-    'capitán', 'capitana',
-    'teniente', 'alférez',
-    'sargento', 'cabo', 'soldado',
-    'almirante', 'vicealmirante',
+    "general",
+    "coronel",
+    "comandante",
+    "capitán",
+    "capitana",
+    "teniente",
+    "alférez",
+    "sargento",
+    "cabo",
+    "soldado",
+    "almirante",
+    "vicealmirante",
 }
 
 # Relaciones familiares (requieren contexto para resolución)
 FAMILY_RELATIONS = {
-    'padre', 'madre', 'papá', 'mamá',
-    'hijo', 'hija', 'niño', 'niña',
-    'hermano', 'hermana',
-    'abuelo', 'abuela',
-    'tío', 'tía', 'tio', 'tia',
-    'primo', 'prima',
-    'sobrino', 'sobrina',
-    'nieto', 'nieta',
-    'esposo', 'esposa', 'marido', 'mujer',
-    'novio', 'novia',
-    'suegro', 'suegra',
-    'cuñado', 'cuñada',
-    'yerno', 'nuera',
+    "padre",
+    "madre",
+    "papá",
+    "mamá",
+    "hijo",
+    "hija",
+    "niño",
+    "niña",
+    "hermano",
+    "hermana",
+    "abuelo",
+    "abuela",
+    "tío",
+    "tía",
+    "tio",
+    "tia",
+    "primo",
+    "prima",
+    "sobrino",
+    "sobrina",
+    "nieto",
+    "nieta",
+    "esposo",
+    "esposa",
+    "marido",
+    "mujer",
+    "novio",
+    "novia",
+    "suegro",
+    "suegra",
+    "cuñado",
+    "cuñada",
+    "yerno",
+    "nuera",
 }
 
 # Todos los títulos combinados para detección rápida
-ALL_TITLES = (
-    PROFESSIONAL_TITLES | ECCLESIASTIC_TITLES |
-    NOBLE_TITLES | MILITARY_TITLES
-)
+ALL_TITLES = PROFESSIONAL_TITLES | ECCLESIASTIC_TITLES | NOBLE_TITLES | MILITARY_TITLES
 
 
 # =============================================================================
 # Dataclasses
 # =============================================================================
 
+
 @dataclass
 class DetectedAlias:
     """Alias detectado en el texto."""
-    text: str                       # Texto del alias: "el Magistral"
-    alias_type: AliasType           # Tipo de alias
-    base_form: str                  # Forma base: "Magistral"
-    start_char: int                 # Posición inicio
-    end_char: int                   # Posición fin
-    confidence: float = 0.7         # Confianza de detección
-    resolved_to: Optional[str] = None  # Entidad resuelta si se conoce
-    context: str = ""               # Contexto circundante
+
+    text: str  # Texto del alias: "el Magistral"
+    alias_type: AliasType  # Tipo de alias
+    base_form: str  # Forma base: "Magistral"
+    start_char: int  # Posición inicio
+    end_char: int  # Posición fin
+    confidence: float = 0.7  # Confianza de detección
+    resolved_to: str | None = None  # Entidad resuelta si se conoce
+    context: str = ""  # Contexto circundante
 
     def __hash__(self):
         return hash((self.text, self.start_char, self.end_char))
@@ -163,10 +226,11 @@ class DetectedAlias:
 @dataclass
 class AliasCluster:
     """Cluster de alias que refieren a la misma entidad."""
-    canonical_name: str             # Nombre canónico: "Fermín de Pas"
+
+    canonical_name: str  # Nombre canónico: "Fermín de Pas"
     aliases: list[DetectedAlias] = field(default_factory=list)
-    confidence: float = 0.0         # Confianza agregada
-    source: str = "unknown"         # Fuente de resolución
+    confidence: float = 0.0  # Confianza agregada
+    source: str = "unknown"  # Fuente de resolución
 
     def add_alias(self, alias: DetectedAlias):
         """Añade un alias al cluster."""
@@ -178,6 +242,7 @@ class AliasCluster:
 @dataclass
 class AliasResolutionResult:
     """Resultado de la resolución de alias."""
+
     clusters: list[AliasCluster] = field(default_factory=list)
     unresolved: list[DetectedAlias] = field(default_factory=list)
     method_used: str = "unknown"
@@ -187,6 +252,7 @@ class AliasResolutionResult:
 # =============================================================================
 # Detector de Alias
 # =============================================================================
+
 
 class AliasDetector:
     """
@@ -214,6 +280,7 @@ class AliasDetector:
         if not self._nlp_loaded:
             try:
                 from .spacy_gpu import load_spacy_model
+
                 self._nlp = load_spacy_model()
             except Exception as e:
                 logger.warning(f"spaCy no disponible para alias detector: {e}")
@@ -261,9 +328,9 @@ class AliasDetector:
         aliases = []
 
         # Patrón: artículo + título (profesional, eclesiástico, noble, militar)
-        pattern = r'\b(el|la|los|las)\s+(' + '|'.join(ALL_TITLES) + r')\b'
+        pattern = r"\b(el|la|los|las)\s+(" + "|".join(ALL_TITLES) + r")\b"
         for match in re.finditer(pattern, text, re.IGNORECASE):
-            article = match.group(1).lower()
+            match.group(1).lower()
             title = match.group(2).lower()
 
             # Determinar tipo de alias
@@ -300,12 +367,16 @@ class AliasDetector:
         aliases = []
 
         # Títulos que van directamente antes del nombre (sin artículo)
-        direct_titles = {'don', 'doña', 'fray', 'sor', 'san', 'santa'}
+        direct_titles = {"don", "doña", "fray", "sor", "san", "santa"}
 
         # Patrón: título + nombre propio (capitalizado)
-        pattern = r'\b(' + '|'.join(direct_titles) + r')\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)*)\b'
+        pattern = (
+            r"\b("
+            + "|".join(direct_titles)
+            + r")\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)*)\b"
+        )
         for match in re.finditer(pattern, text, re.IGNORECASE):
-            title = match.group(1).lower()
+            match.group(1).lower()
             name = match.group(2)
 
             alias_type = AliasType.HONORIFIC_TITLE
@@ -338,7 +409,7 @@ class AliasDetector:
         aliases = []
 
         # Patrón: artículo + palabra capitalizada (no título conocido)
-        pattern = r'\b(el|la)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\b'
+        pattern = r"\b(el|la)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\b"
 
         for match in re.finditer(pattern, text):
             word = match.group(2).lower()
@@ -359,19 +430,16 @@ class AliasDetector:
 
             # Indicadores de que es referencia a persona
             person_indicators = [
-                r'dijo\s+' + re.escape(full_text),
-                r'preguntó\s+' + re.escape(full_text),
-                re.escape(full_text) + r'\s+dijo',
-                re.escape(full_text) + r'\s+respondió',
-                re.escape(full_text) + r'\s+se\s+',
-                re.escape(full_text) + r'\s+había',
-                re.escape(full_text) + r'\s+era',
+                r"dijo\s+" + re.escape(full_text),
+                r"preguntó\s+" + re.escape(full_text),
+                re.escape(full_text) + r"\s+dijo",
+                re.escape(full_text) + r"\s+respondió",
+                re.escape(full_text) + r"\s+se\s+",
+                re.escape(full_text) + r"\s+había",
+                re.escape(full_text) + r"\s+era",
             ]
 
-            is_person_ref = any(
-                re.search(pat, context, re.IGNORECASE)
-                for pat in person_indicators
-            )
+            is_person_ref = any(re.search(pat, context, re.IGNORECASE) for pat in person_indicators)
 
             if is_person_ref:
                 alias = DetectedAlias(
@@ -392,9 +460,13 @@ class AliasDetector:
         aliases = []
 
         # Patrón 1: posesivo + relación familiar
-        poss_pattern = r'\b(mi|tu|su|mis|tus|sus|nuestro|nuestra|vuestro|vuestra)\s+(' + '|'.join(FAMILY_RELATIONS) + r')\b'
+        poss_pattern = (
+            r"\b(mi|tu|su|mis|tus|sus|nuestro|nuestra|vuestro|vuestra)\s+("
+            + "|".join(FAMILY_RELATIONS)
+            + r")\b"
+        )
         for match in re.finditer(poss_pattern, text, re.IGNORECASE):
-            possessive = match.group(1).lower()
+            match.group(1).lower()
             relation = match.group(2).lower()
 
             ctx_start = max(0, match.start() - 50)
@@ -412,7 +484,9 @@ class AliasDetector:
             aliases.append(alias)
 
         # Patrón 2: artículo + relación familiar + de + nombre
-        art_pattern = r'\b(el|la)\s+(' + '|'.join(FAMILY_RELATIONS) + r')\s+de\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\b'
+        art_pattern = (
+            r"\b(el|la)\s+(" + "|".join(FAMILY_RELATIONS) + r")\s+de\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\b"
+        )
         for match in re.finditer(art_pattern, text, re.IGNORECASE):
             relation = match.group(2).lower()
             name = match.group(3)
@@ -437,6 +511,7 @@ class AliasDetector:
 # =============================================================================
 # Resolutor de Alias
 # =============================================================================
+
 
 class AliasResolver:
     """
@@ -465,8 +540,8 @@ class AliasResolver:
         self,
         aliases: list[DetectedAlias],
         text: str,
-        known_entities: Optional[list] = None,
-        coref_chains: Optional[list] = None,
+        known_entities: list | None = None,
+        coref_chains: list | None = None,
     ) -> AliasResolutionResult:
         """
         Resuelve alias a sus entidades canónicas.
@@ -481,6 +556,7 @@ class AliasResolver:
             Resultado con clusters de alias resueltos
         """
         import time
+
         start_time = time.time()
 
         result = AliasResolutionResult()
@@ -490,9 +566,7 @@ class AliasResolver:
             resolved = self._resolve_by_context(alias, text, known_entities)
             if resolved:
                 # Crear o añadir a cluster
-                cluster = self._find_or_create_cluster(
-                    result.clusters, resolved
-                )
+                cluster = self._find_or_create_cluster(result.clusters, resolved)
                 cluster.add_alias(alias)
                 cluster.confidence = max(cluster.confidence, alias.confidence)
                 cluster.source = "context"
@@ -501,23 +575,17 @@ class AliasResolver:
 
         # 2. Intentar resolver los no resueltos con LLM
         if result.unresolved and self._llm_client:
-            llm_resolved = self._resolve_with_llm(
-                result.unresolved, text, known_entities
-            )
+            self._resolve_with_llm(result.unresolved, text, known_entities)
             newly_resolved = []
             for alias in result.unresolved:
                 if alias.resolved_to:
-                    cluster = self._find_or_create_cluster(
-                        result.clusters, alias.resolved_to
-                    )
+                    cluster = self._find_or_create_cluster(result.clusters, alias.resolved_to)
                     cluster.add_alias(alias)
                     cluster.source = "llm"
                     newly_resolved.append(alias)
 
             # Quitar los resueltos de la lista de no resueltos
-            result.unresolved = [
-                a for a in result.unresolved if a not in newly_resolved
-            ]
+            result.unresolved = [a for a in result.unresolved if a not in newly_resolved]
 
         result.method_used = "context+llm" if self._llm_client else "context"
         result.processing_time = time.time() - start_time
@@ -528,8 +596,8 @@ class AliasResolver:
         self,
         alias: DetectedAlias,
         text: str,
-        known_entities: Optional[list],
-    ) -> Optional[str]:
+        known_entities: list | None,
+    ) -> str | None:
         """
         Intenta resolver un alias por contexto local.
 
@@ -551,7 +619,7 @@ class AliasResolver:
         candidates = []
         for entity in known_entities:
             # Buscar la entidad en la ventana de contexto
-            entity_text = getattr(entity, 'text', str(entity))
+            entity_text = getattr(entity, "text", str(entity))
             pos = text.find(entity_text, ctx_start, ctx_end)
             if pos >= 0:
                 distance = abs(pos - alias.start_char)
@@ -568,7 +636,7 @@ class AliasResolver:
         self,
         aliases: list[DetectedAlias],
         text: str,
-        known_entities: Optional[list],
+        known_entities: list | None,
     ) -> list[DetectedAlias]:
         """
         Usa LLM para resolver alias complejos.
@@ -577,9 +645,7 @@ class AliasResolver:
             return aliases
 
         # Preparar prompt
-        entities_str = ", ".join(
-            getattr(e, 'text', str(e)) for e in (known_entities or [])[:20]
-        )
+        entities_str = ", ".join(getattr(e, "text", str(e)) for e in (known_entities or [])[:20])
         aliases_str = "\n".join(
             f"- {a.text} ({a.alias_type.value}): contexto '{a.context[:100]}...'"
             for a in aliases[:10]
@@ -611,6 +677,7 @@ JSON:"""
 
             if response:
                 import json
+
                 # Limpiar respuesta
                 cleaned = response.strip()
                 if cleaned.startswith("```"):
@@ -659,8 +726,8 @@ JSON:"""
 # Funciones de Conveniencia
 # =============================================================================
 
-_detector: Optional[AliasDetector] = None
-_resolver: Optional[AliasResolver] = None
+_detector: AliasDetector | None = None
+_resolver: AliasResolver | None = None
 _lock = threading.Lock()
 
 
@@ -686,7 +753,7 @@ def get_alias_resolver() -> AliasResolver:
 
 def detect_and_resolve_aliases(
     text: str,
-    known_entities: Optional[list] = None,
+    known_entities: list | None = None,
 ) -> AliasResolutionResult:
     """
     Función de conveniencia para detectar y resolver alias.

@@ -13,30 +13,31 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 
 class RelationCategory(Enum):
     """Categorías de relaciones."""
-    FAMILY = "family"              # Relaciones familiares
-    SOCIAL = "social"              # Amistad, enemistad, conocidos
-    ROMANTIC = "romantic"          # Amor, pareja, ex
+
+    FAMILY = "family"  # Relaciones familiares
+    SOCIAL = "social"  # Amistad, enemistad, conocidos
+    ROMANTIC = "romantic"  # Amor, pareja, ex
     PROFESSIONAL = "professional"  # Trabajo, jefe, empleado
-    OWNERSHIP = "ownership"        # Posesión, pertenencia
-    EMOTIONAL = "emotional"        # Miedo, odio, admiración
-    SPATIAL = "spatial"            # Vive en, está en, trabaja en
-    MEMBERSHIP = "membership"      # Miembro de, fundador de
+    OWNERSHIP = "ownership"  # Posesión, pertenencia
+    EMOTIONAL = "emotional"  # Miedo, odio, admiración
+    SPATIAL = "spatial"  # Vive en, está en, trabaja en
+    MEMBERSHIP = "membership"  # Miembro de, fundador de
     SUPERNATURAL = "supernatural"  # Maldito por, bendecido por
     OTHER = "other"
 
 
 class RelationType(Enum):
     """Tipos específicos de relación."""
+
     # Familia
-    PARENT = "parent"              # X es padre/madre de Y
-    CHILD = "child"                # X es hijo/a de Y
-    SIBLING = "sibling"            # X es hermano/a de Y
-    SPOUSE = "spouse"              # X es esposo/a de Y
+    PARENT = "parent"  # X es padre/madre de Y
+    CHILD = "child"  # X es hijo/a de Y
+    SIBLING = "sibling"  # X es hermano/a de Y
+    SPOUSE = "spouse"  # X es esposo/a de Y
     GRANDPARENT = "grandparent"
     GRANDCHILD = "grandchild"
     UNCLE_AUNT = "uncle_aunt"
@@ -113,6 +114,7 @@ class RelationType(Enum):
 
 class RelationValence(Enum):
     """Valencia emocional de la relación."""
+
     VERY_NEGATIVE = -2
     NEGATIVE = -1
     NEUTRAL = 0
@@ -194,11 +196,12 @@ SYMMETRIC_RELATIONS = {
 @dataclass
 class TextReference:
     """Referencia precisa a ubicación en el texto."""
+
     chapter: int
-    chapter_title: Optional[str] = None
-    page: Optional[int] = None
-    paragraph: Optional[int] = None
-    sentence: Optional[int] = None
+    chapter_title: str | None = None
+    page: int | None = None
+    paragraph: int | None = None
+    sentence: int | None = None
     char_start: int = 0
     char_end: int = 0
 
@@ -231,10 +234,11 @@ class TextReference:
 @dataclass
 class RelationshipEvidence:
     """Evidencia textual de una relación."""
+
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     relationship_id: str = ""
     text: str = ""
-    reference: Optional[TextReference] = None
+    reference: TextReference | None = None
     behavior_type: str = "other"  # expected, forbidden, consequence, other
     confidence: float = 0.5
     created_at: datetime = field(default_factory=datetime.now)
@@ -255,6 +259,7 @@ class RelationshipEvidence:
 @dataclass
 class InferredExpectations:
     """Expectativas inferidas por IA para una relación."""
+
     expected_behaviors: list[str] = field(default_factory=list)
     forbidden_behaviors: list[str] = field(default_factory=list)
     expected_consequences: list[str] = field(default_factory=list)
@@ -292,6 +297,7 @@ class RelationshipType:
     Tipo de relación extraído automáticamente del texto.
     Define categoría, valencia y expectativas de comportamiento.
     """
+
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     project_id: int = 0
     name: str = ""
@@ -306,10 +312,10 @@ class RelationshipType:
     # Valencia
     default_valence: RelationValence = RelationValence.NEUTRAL
     is_bidirectional: bool = False
-    inverse_type_id: Optional[str] = None
+    inverse_type_id: str | None = None
 
     # Expectativas (inferidas o definidas)
-    expectations: Optional[InferredExpectations] = None
+    expectations: InferredExpectations | None = None
 
     # Metadatos
     created_at: datetime = field(default_factory=datetime.now)
@@ -327,7 +333,7 @@ class RelationshipType:
         if self.relation_type in SYMMETRIC_RELATIONS:
             self.is_bidirectional = True
 
-    def get_expectations(self) -> Optional[InferredExpectations]:
+    def get_expectations(self) -> InferredExpectations | None:
         """Obtiene expectativas, creándolas desde reglas si no existen."""
         if self.expectations:
             return self.expectations
@@ -416,6 +422,7 @@ class RelationshipType:
 @dataclass
 class EntityRelationship:
     """Relación entre dos entidades específicas."""
+
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     project_id: int = 0
     source_entity_id: str = ""
@@ -425,7 +432,7 @@ class EntityRelationship:
 
     # Tipo de relación
     relation_type: RelationType = RelationType.UNKNOWN
-    relationship_type_id: Optional[str] = None  # FK a RelationshipType si existe
+    relationship_type_id: str | None = None  # FK a RelationshipType si existe
 
     # Metadatos
     bidirectional: bool = False
@@ -433,8 +440,8 @@ class EntityRelationship:
     sentiment: float = 0.0  # -1.0 (negativo) a 1.0 (positivo)
 
     # Temporalidad
-    first_mention_chapter: Optional[int] = None
-    last_mention_chapter: Optional[int] = None
+    first_mention_chapter: int | None = None
+    last_mention_chapter: int | None = None
     is_active: bool = True
 
     # Evidencia
@@ -443,7 +450,7 @@ class EntityRelationship:
     confidence: float = 0.5
 
     # Expectativas inferidas
-    expectations: Optional[InferredExpectations] = None
+    expectations: InferredExpectations | None = None
 
     # Auditoría
     created_at: datetime = field(default_factory=datetime.now)
@@ -459,7 +466,7 @@ class EntityRelationship:
         """Obtiene la valencia de la relación."""
         return RELATION_TYPE_VALENCE.get(self.relation_type, RelationValence.NEUTRAL)
 
-    def get_inverse_type(self) -> Optional[RelationType]:
+    def get_inverse_type(self) -> RelationType | None:
         """Obtiene el tipo inverso de la relación."""
         return INVERSE_RELATIONS.get(self.relation_type)
 
@@ -492,16 +499,17 @@ class EntityRelationship:
 @dataclass
 class RelationshipChange:
     """Cambio en una relación a lo largo de la narrativa."""
+
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     relationship_id: str = ""
     chapter: int = 0
     change_type: str = "created"  # created, intensified, weakened, ended, transformed
-    old_relation_type: Optional[RelationType] = None
-    new_relation_type: Optional[RelationType] = None
-    old_intensity: Optional[float] = None
-    new_intensity: Optional[float] = None
+    old_relation_type: RelationType | None = None
+    new_relation_type: RelationType | None = None
+    old_intensity: float | None = None
+    new_intensity: float | None = None
     trigger_text: str = ""
-    reference: Optional[TextReference] = None
+    reference: TextReference | None = None
     notes: str = ""
     created_at: datetime = field(default_factory=datetime.now)
 
@@ -526,6 +534,7 @@ class RelationshipChange:
 @dataclass
 class EntityContext:
     """Contexto conocido de una entidad para inferencia de expectativas."""
+
     entity_id: str = ""
     entity_name: str = ""
     entity_type: str = "PERSON"
@@ -551,6 +560,7 @@ class EntityContext:
 @dataclass
 class CoherenceAlert:
     """Alerta de inconsistencia relacional con referencias precisas."""
+
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     code: str = ""
     alert_type: str = ""  # Tipo legible para el editor
@@ -562,11 +572,11 @@ class CoherenceAlert:
     relationship_type: str = ""
 
     # Referencia donde se establece la relación/expectativa
-    establishing_reference: Optional[TextReference] = None
+    establishing_reference: TextReference | None = None
     establishing_quote: str = ""
 
     # Referencia donde se contradice
-    contradicting_reference: Optional[TextReference] = None
+    contradicting_reference: TextReference | None = None
     contradicting_quote: str = ""
 
     # Explicación
@@ -588,13 +598,11 @@ class CoherenceAlert:
             "target_entity": self.target_entity,
             "relationship_type": self.relationship_type,
             "establishing_reference": (
-                self.establishing_reference.to_dict()
-                if self.establishing_reference else None
+                self.establishing_reference.to_dict() if self.establishing_reference else None
             ),
             "establishing_quote": self.establishing_quote,
             "contradicting_reference": (
-                self.contradicting_reference.to_dict()
-                if self.contradicting_reference else None
+                self.contradicting_reference.to_dict() if self.contradicting_reference else None
             ),
             "contradicting_quote": self.contradicting_quote,
             "explanation": self.explanation,

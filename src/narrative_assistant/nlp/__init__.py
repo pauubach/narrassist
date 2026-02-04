@@ -31,10 +31,10 @@ _logger = _logging.getLogger(__name__)
 
 try:
     from .spacy_gpu import (
-        setup_spacy_gpu,
-        load_spacy_model,
         get_spacy_gpu_status,
+        load_spacy_model,
         reset_gpu_config,
+        setup_spacy_gpu,
     )
 except ImportError as _e:
     _logger.debug(f"spacy_gpu not available: {_e}")
@@ -42,8 +42,8 @@ except ImportError as _e:
 try:
     from .embeddings import (
         EmbeddingsModel,
-        get_embeddings_model,
         encode_texts,
+        get_embeddings_model,
         reset_embeddings_model,
     )
 except ImportError as _e:
@@ -63,20 +63,20 @@ try:
     from .ner import (
         EntityLabel,
         ExtractedEntity,
-        NERResult,
         NERExtractor,
+        NERResult,
+        extract_entities,
         get_ner_extractor,
         reset_ner_extractor,
-        extract_entities,
     )
 except ImportError as _e:
     _logger.debug(f"ner not available: {_e}")
 
 try:
     from .dialogue import (
-        DialogueType,
-        DialogueSpan,
         DialogueResult,
+        DialogueSpan,
+        DialogueType,
         detect_dialogues,
         get_dialogue_density,
     )
@@ -85,13 +85,13 @@ except ImportError as _e:
 
 try:
     from .coref import (
-        MentionType,
+        CoreferenceChain,
+        CoreferenceResolver,
+        CoreferenceResult,
         GrammaticalGender,
         GrammaticalNumber,
         Mention,
-        CoreferenceChain,
-        CoreferenceResult,
-        CoreferenceResolver,
+        MentionType,
         get_coref_resolver,
         reset_coref_resolver,
         resolve_coreferences,
@@ -102,13 +102,13 @@ except ImportError as _e:
 try:
     from .attributes import (
         AttributeCategory,
-        AttributeKey,
-        ExtractedAttribute,
         AttributeExtractionResult,
         AttributeExtractor,
+        AttributeKey,
+        ExtractedAttribute,
+        extract_attributes,
         get_attribute_extractor,
         reset_attribute_extractor,
-        extract_attributes,
     )
 except ImportError as _e:
     _logger.debug(f"attributes not available: {_e}")
@@ -126,11 +126,11 @@ except ImportError as _e:
 
 try:
     from .orthography import (
+        SpellingChecker,
+        SpellingErrorType,
         SpellingIssue,
         SpellingReport,
-        SpellingErrorType,
         SpellingSeverity,
-        SpellingChecker,
         get_spelling_checker,
         reset_spelling_checker,
     )
@@ -139,11 +139,11 @@ except ImportError as _e:
 
 try:
     from .grammar import (
+        GrammarChecker,
+        GrammarErrorType,
         GrammarIssue,
         GrammarReport,
-        GrammarErrorType,
         GrammarSeverity,
-        GrammarChecker,
         get_grammar_checker,
         reset_grammar_checker,
     )
@@ -152,11 +152,11 @@ except ImportError as _e:
 
 try:
     from .sentiment import (
-        Sentiment,
-        Emotion,
-        EmotionalState,
         DeclaredEmotionalState,
+        Emotion,
         EmotionalInconsistency,
+        EmotionalState,
+        Sentiment,
         SentimentAnalyzer,
         get_sentiment_analyzer,
     )
@@ -165,11 +165,11 @@ except ImportError as _e:
 
 try:
     from .title_preprocessor import (
-        TitleType,
-        ProcessedParagraph,
         ProcessedDocument,
+        ProcessedParagraph,
         TitleDetector,
         TitlePreprocessor,
+        TitleType,
         is_title,
         preprocess_text_for_spacy,
         split_by_titles,
@@ -179,14 +179,14 @@ except ImportError as _e:
 
 try:
     from .spacy_title_integration import (
-        TitleAwareDoc,
         TitleAwareAnalysisResult,
-        analyze_with_title_handling,
+        TitleAwareDoc,
         analyze_paragraphs_separately,
-        extract_entities_by_title,
-        extract_dependencies_by_title,
-        get_parsing_quality_metrics,
+        analyze_with_title_handling,
         debug_parsing,
+        extract_dependencies_by_title,
+        extract_entities_by_title,
+        get_parsing_quality_metrics,
     )
 except ImportError as _e:
     _logger.debug(f"spacy_title_integration not available: {_e}")

@@ -7,7 +7,6 @@ Gestiona el almacenamiento y recuperación de capítulos detectados en documento
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
 
 from .database import Database, get_database
 
@@ -18,34 +17,34 @@ logger = logging.getLogger(__name__)
 class ChapterData:
     """Datos de un capítulo almacenado."""
 
-    id: Optional[int]
+    id: int | None
     project_id: int
     chapter_number: int
-    title: Optional[str]
+    title: str | None
     content: str
     start_char: int
     end_char: int
     word_count: int
     structure_type: str = "chapter"
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
+    created_at: str | None = None
+    updated_at: str | None = None
 
     # --- Métricas de enriquecimiento (computadas post-análisis) ---
     # Pacing & estructura
-    dialogue_ratio: Optional[float] = None  # Porcentaje de diálogo (0.0-1.0)
-    avg_sentence_length: Optional[float] = None  # Longitud media de oración (palabras)
-    scene_count: Optional[int] = None  # Número de escenas detectadas
+    dialogue_ratio: float | None = None  # Porcentaje de diálogo (0.0-1.0)
+    avg_sentence_length: float | None = None  # Longitud media de oración (palabras)
+    scene_count: int | None = None  # Número de escenas detectadas
 
     # Personajes
-    characters_present_count: Optional[int] = None  # Personajes únicos presentes
-    pov_character: Optional[str] = None  # Personaje POV principal (si detectado)
+    characters_present_count: int | None = None  # Personajes únicos presentes
+    pov_character: str | None = None  # Personaje POV principal (si detectado)
 
     # Tono emocional
-    dominant_tone: Optional[str] = None  # "positive", "negative", "neutral", "tense", etc.
-    tone_intensity: Optional[float] = None  # Intensidad emocional (0.0-1.0)
+    dominant_tone: str | None = None  # "positive", "negative", "neutral", "tense", etc.
+    tone_intensity: float | None = None  # Intensidad emocional (0.0-1.0)
 
     # Legibilidad
-    reading_time_minutes: Optional[int] = None  # Tiempo estimado de lectura
+    reading_time_minutes: int | None = None  # Tiempo estimado de lectura
 
     def to_dict(self) -> dict:
         """Convierte a diccionario para serialización JSON."""
@@ -95,13 +94,19 @@ class ChapterData:
             updated_at=row["updated_at"],
             # Métricas (pueden no existir en esquemas antiguos)
             dialogue_ratio=row["dialogue_ratio"] if "dialogue_ratio" in keys else None,
-            avg_sentence_length=row["avg_sentence_length"] if "avg_sentence_length" in keys else None,
+            avg_sentence_length=row["avg_sentence_length"]
+            if "avg_sentence_length" in keys
+            else None,
             scene_count=row["scene_count"] if "scene_count" in keys else None,
-            characters_present_count=row["characters_present_count"] if "characters_present_count" in keys else None,
+            characters_present_count=row["characters_present_count"]
+            if "characters_present_count" in keys
+            else None,
             pov_character=row["pov_character"] if "pov_character" in keys else None,
             dominant_tone=row["dominant_tone"] if "dominant_tone" in keys else None,
             tone_intensity=row["tone_intensity"] if "tone_intensity" in keys else None,
-            reading_time_minutes=row["reading_time_minutes"] if "reading_time_minutes" in keys else None,
+            reading_time_minutes=row["reading_time_minutes"]
+            if "reading_time_minutes" in keys
+            else None,
         )
 
 
@@ -112,7 +117,7 @@ class ChapterRepository:
     Permite crear, leer, actualizar y eliminar capítulos de un proyecto.
     """
 
-    def __init__(self, db: Optional[Database] = None):
+    def __init__(self, db: Database | None = None):
         """
         Inicializa el repositorio.
 
@@ -206,10 +211,12 @@ class ChapterRepository:
                 chapter.updated_at = now
                 created.append(chapter)
 
-        logger.info(f"Creados {len(created)} capítulos para proyecto {chapters[0].project_id if chapters else 'N/A'}")
+        logger.info(
+            f"Creados {len(created)} capítulos para proyecto {chapters[0].project_id if chapters else 'N/A'}"
+        )
         return created
 
-    def get_by_id(self, chapter_id: int) -> Optional[ChapterData]:
+    def get_by_id(self, chapter_id: int) -> ChapterData | None:
         """
         Obtiene un capítulo por su ID.
 
@@ -219,10 +226,7 @@ class ChapterRepository:
         Returns:
             Capítulo encontrado o None
         """
-        row = self.db.fetchone(
-            "SELECT * FROM chapters WHERE id = ?",
-            (chapter_id,)
-        )
+        row = self.db.fetchone("SELECT * FROM chapters WHERE id = ?", (chapter_id,))
         return ChapterData.from_row(row) if row else None
 
     def get_by_project(self, project_id: int) -> list[ChapterData]:
@@ -241,7 +245,7 @@ class ChapterRepository:
             WHERE project_id = ?
             ORDER BY chapter_number ASC
             """,
-            (project_id,)
+            (project_id,),
         )
         return [ChapterData.from_row(row) for row in rows]
 
@@ -256,10 +260,7 @@ class ChapterRepository:
             Número de capítulos eliminados
         """
         with self.db.connection() as conn:
-            cursor = conn.execute(
-                "DELETE FROM chapters WHERE project_id = ?",
-                (project_id,)
-            )
+            cursor = conn.execute("DELETE FROM chapters WHERE project_id = ?", (project_id,))
             count = cursor.rowcount
 
         logger.info(f"Eliminados {count} capítulos del proyecto {project_id}")
@@ -280,9 +281,14 @@ class ChapterRepository:
             True si se actualizó, False si no existe o no hay métricas
         """
         valid_keys = {
-            "dialogue_ratio", "avg_sentence_length", "scene_count",
-            "characters_present_count", "pov_character", "dominant_tone",
-            "tone_intensity", "reading_time_minutes",
+            "dialogue_ratio",
+            "avg_sentence_length",
+            "scene_count",
+            "characters_present_count",
+            "pov_character",
+            "dominant_tone",
+            "tone_intensity",
+            "reading_time_minutes",
         }
         filtered = {k: v for k, v in metrics.items() if k in valid_keys}
         if not filtered:
@@ -320,13 +326,13 @@ class ChapterRepository:
                 SET content = ?, word_count = ?, updated_at = ?
                 WHERE id = ?
                 """,
-                (content, word_count, now, chapter_id)
+                (content, word_count, now, chapter_id),
             )
             return cursor.rowcount > 0
 
 
 # Función de conveniencia para obtener instancia
-def get_chapter_repository(db: Optional[Database] = None) -> ChapterRepository:
+def get_chapter_repository(db: Database | None = None) -> ChapterRepository:
     """Obtiene una instancia del repositorio de capítulos."""
     return ChapterRepository(db)
 
@@ -335,16 +341,16 @@ def get_chapter_repository(db: Optional[Database] = None) -> ChapterRepository:
 class SectionData:
     """Datos de una sección (H2, H3, H4) dentro de un capítulo."""
 
-    id: Optional[int]
+    id: int | None
     project_id: int
     chapter_id: int
-    parent_section_id: Optional[int]  # None si es sección de nivel superior
+    parent_section_id: int | None  # None si es sección de nivel superior
     section_number: int
-    title: Optional[str]
+    title: str | None
     heading_level: int  # 2=H2, 3=H3, 4=H4
     start_char: int
     end_char: int
-    created_at: Optional[str] = None
+    created_at: str | None = None
     # Campo calculado para hijos (no persistido)
     subsections: list["SectionData"] = None
 
@@ -392,7 +398,7 @@ class SectionRepository:
     Las secciones son subdivisiones dentro de capítulos (H2, H3, H4).
     """
 
-    def __init__(self, db: Optional[Database] = None):
+    def __init__(self, db: Database | None = None):
         """
         Inicializa el repositorio.
 
@@ -499,7 +505,7 @@ class SectionRepository:
             WHERE chapter_id = ?
             ORDER BY start_char ASC
             """,
-            (chapter_id,)
+            (chapter_id,),
         )
         return [SectionData.from_row(row) for row in rows]
 
@@ -546,7 +552,7 @@ class SectionRepository:
             WHERE project_id = ?
             ORDER BY chapter_id ASC, start_char ASC
             """,
-            (project_id,)
+            (project_id,),
         )
         return [SectionData.from_row(row) for row in rows]
 
@@ -561,10 +567,7 @@ class SectionRepository:
             Número de secciones eliminadas
         """
         with self.db.connection() as conn:
-            cursor = conn.execute(
-                "DELETE FROM sections WHERE project_id = ?",
-                (project_id,)
-            )
+            cursor = conn.execute("DELETE FROM sections WHERE project_id = ?", (project_id,))
             count = cursor.rowcount
 
         logger.info(f"Eliminadas {count} secciones del proyecto {project_id}")
@@ -581,17 +584,14 @@ class SectionRepository:
             Número de secciones eliminadas
         """
         with self.db.connection() as conn:
-            cursor = conn.execute(
-                "DELETE FROM sections WHERE chapter_id = ?",
-                (chapter_id,)
-            )
+            cursor = conn.execute("DELETE FROM sections WHERE chapter_id = ?", (chapter_id,))
             count = cursor.rowcount
 
         logger.debug(f"Eliminadas {count} secciones del capítulo {chapter_id}")
         return count
 
 
-def get_section_repository(db: Optional[Database] = None) -> SectionRepository:
+def get_section_repository(db: Database | None = None) -> SectionRepository:
     """Obtiene una instancia del repositorio de secciones."""
     return SectionRepository(db)
 
@@ -605,27 +605,28 @@ _WPM_READING = 200
 
 # Patrones para detección de diálogo
 import re
+
 _DIALOGUE_PATTERN = re.compile(
-    r'(?:'
-    r'[—–]\s*.+?(?=[—–\n]|$)'  # Raya o semi-raya seguida de texto
-    r'|'
+    r"(?:"
+    r"[—–]\s*.+?(?=[—–\n]|$)"  # Raya o semi-raya seguida de texto
+    r"|"
     r'"[^"]*"'  # Comillas dobles
-    r'|'
-    r'«[^»]*»'  # Comillas angulares
-    r')',
+    r"|"
+    r"«[^»]*»"  # Comillas angulares
+    r")",
     re.MULTILINE,
 )
 
 # Patrones para cambio de escena
 _SCENE_BREAK_PATTERNS = [
-    re.compile(r'^\s*\*\s*\*\s*\*\s*$', re.MULTILINE),  # ***
-    re.compile(r'^\s*#\s*$', re.MULTILINE),  # Markdown scene break
-    re.compile(r'^\s*[-–—]{3,}\s*$', re.MULTILINE),  # ---
-    re.compile(r'\n\s*\n\s*\n', re.MULTILINE),  # Triple newline
+    re.compile(r"^\s*\*\s*\*\s*\*\s*$", re.MULTILINE),  # ***
+    re.compile(r"^\s*#\s*$", re.MULTILINE),  # Markdown scene break
+    re.compile(r"^\s*[-–—]{3,}\s*$", re.MULTILINE),  # ---
+    re.compile(r"\n\s*\n\s*\n", re.MULTILINE),  # Triple newline
 ]
 
 
-def compute_chapter_metrics(content: str, entity_names: Optional[list[str]] = None) -> dict:
+def compute_chapter_metrics(content: str, entity_names: list[str] | None = None) -> dict:
     """
     Computa métricas de enriquecimiento para un capítulo.
 
@@ -662,7 +663,7 @@ def compute_chapter_metrics(content: str, entity_names: Optional[list[str]] = No
 
     # --- Longitud media de oración ---
     # Aproximación rápida: dividir por puntos finales (. ! ?)
-    sentences = re.split(r'[.!?]+', content)
+    sentences = re.split(r"[.!?]+", content)
     sentences = [s.strip() for s in sentences if s.strip()]
     if sentences:
         total_words_in_sentences = sum(len(s.split()) for s in sentences)
@@ -691,21 +692,66 @@ def _compute_tone_metrics(content: str, metrics: dict) -> None:
 
     # Palabras de tensión/conflicto
     tension_words = {
-        "muerte", "matar", "sangre", "gritó", "grito", "golpe", "pelea",
-        "amenaza", "peligro", "miedo", "terror", "huir", "arma", "violencia",
-        "guerra", "enemigo", "odio", "destruir", "herida", "dolor", "trampa",
+        "muerte",
+        "matar",
+        "sangre",
+        "gritó",
+        "grito",
+        "golpe",
+        "pelea",
+        "amenaza",
+        "peligro",
+        "miedo",
+        "terror",
+        "huir",
+        "arma",
+        "violencia",
+        "guerra",
+        "enemigo",
+        "odio",
+        "destruir",
+        "herida",
+        "dolor",
+        "trampa",
     }
     # Palabras positivas
     positive_words = {
-        "amor", "feliz", "alegría", "risa", "sonrisa", "abrazo", "beso",
-        "esperanza", "paz", "tranquilo", "amable", "cariño", "ternura",
-        "amistad", "celebrar", "fiesta", "victoria", "triunfo",
+        "amor",
+        "feliz",
+        "alegría",
+        "risa",
+        "sonrisa",
+        "abrazo",
+        "beso",
+        "esperanza",
+        "paz",
+        "tranquilo",
+        "amable",
+        "cariño",
+        "ternura",
+        "amistad",
+        "celebrar",
+        "fiesta",
+        "victoria",
+        "triunfo",
     }
     # Palabras melancólicas
     melancholy_words = {
-        "triste", "tristeza", "llorar", "lágrima", "soledad", "nostalgia",
-        "melancolía", "vacío", "ausencia", "pérdida", "recuerdo", "añoranza",
-        "abandono", "silencio", "olvido",
+        "triste",
+        "tristeza",
+        "llorar",
+        "lágrima",
+        "soledad",
+        "nostalgia",
+        "melancolía",
+        "vacío",
+        "ausencia",
+        "pérdida",
+        "recuerdo",
+        "añoranza",
+        "abandono",
+        "silencio",
+        "olvido",
     }
 
     words = content_lower.split()

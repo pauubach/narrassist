@@ -12,11 +12,10 @@ import re
 import urllib.parse
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional, Union
 
 from ..core.config import get_config
+from ..core.errors import ErrorSeverity, NLPError
 from ..core.result import Result
-from ..core.errors import NLPError, ErrorSeverity
 
 logger = logging.getLogger(__name__)
 
@@ -223,7 +222,7 @@ def sanitize_chapter_content(content: str) -> str:
 def validate_file_path(
     path: Path,
     must_exist: bool = True,
-    allowed_extensions: Optional[set[str]] = None,
+    allowed_extensions: set[str] | None = None,
 ) -> Path:
     """
     Valida y resuelve una ruta de archivo.
@@ -273,9 +272,7 @@ def validate_file_path(
 
     # Verificar que el archivo está en algún directorio seguro
     # o es un path absoluto explícito
-    is_safe = any(
-        _is_path_under(resolved, safe_dir) for safe_dir in safe_dirs
-    )
+    is_safe = any(_is_path_under(resolved, safe_dir) for safe_dir in safe_dirs)
 
     # Bloquear path traversal: si tiene ".." y no está bajo directorio seguro
     # NOTA: Removido el "and" - ahora basta con no estar en directorio seguro
@@ -324,18 +321,21 @@ class PathValidationError(NLPError):
     """Error de validación de ruta de archivo."""
 
     message: str = "Error de validación de ruta"
-    severity: ErrorSeverity = field(default=ErrorSeverity.FATAL, init=False)  # Path errors are security-critical
+    severity: ErrorSeverity = field(
+        default=ErrorSeverity.FATAL, init=False
+    )  # Path errors are security-critical
 
 
-def validate_file_path(
-    path: Union[str, Path],
-    allowed_dir: Optional[Path] = None,
+def validate_file_path_safe(
+    path: str | Path,
+    allowed_dir: Path | None = None,
     must_exist: bool = False,
 ) -> Result[Path]:
     """
     Valida una ruta de archivo contra path traversal y otros ataques.
 
-    Esta versión retorna Result para manejo seguro de errores.
+    Versión que retorna Result para manejo seguro de errores.
+    Ver también: validate_file_path() que lanza excepciones.
 
     Args:
         path: Ruta a validar (string o Path)
@@ -367,7 +367,11 @@ def validate_file_path(
         # Detectar path traversal en versiones encoded
         traversal_patterns = ["..", "%2e%2e", "%252e", "%c0%af"]
         for pattern in traversal_patterns:
-            if pattern in path_str.lower() or pattern in decoded.lower() or pattern in decoded2.lower():
+            if (
+                pattern in path_str.lower()
+                or pattern in decoded.lower()
+                or pattern in decoded2.lower()
+            ):
                 return Result.failure(
                     PathValidationError(
                         message=f"Path traversal detectado en ruta: {path_str[:50]}"
@@ -419,6 +423,4 @@ def validate_file_path(
             return Result.success(resolved)
 
     except Exception as e:
-        return Result.failure(
-            PathValidationError(message=f"Error validando ruta: {e}")
-        )
+        return Result.failure(PathValidationError(message=f"Error validando ruta: {e}"))

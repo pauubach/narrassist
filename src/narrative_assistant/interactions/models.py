@@ -9,28 +9,29 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 
 class InteractionType(Enum):
     """Tipos de interacción entre entidades."""
-    DIALOGUE = "dialogue"           # Conversación directa
-    ACTION_TOWARDS = "action"       # Acción de uno hacia otro
-    THOUGHT_ABOUT = "thought"       # Pensamiento sobre otro
-    OBSERVATION = "observation"     # Observación de uno sobre otro
-    PHYSICAL_CONTACT = "physical"   # Contacto físico
-    GIFT_EXCHANGE = "gift"          # Intercambio de objetos
-    MENTION = "mention"             # Mención de uno por otro
-    REACTION = "reaction"           # Reacción a acciones del otro
+
+    DIALOGUE = "dialogue"  # Conversación directa
+    ACTION_TOWARDS = "action"  # Acción de uno hacia otro
+    THOUGHT_ABOUT = "thought"  # Pensamiento sobre otro
+    OBSERVATION = "observation"  # Observación de uno sobre otro
+    PHYSICAL_CONTACT = "physical"  # Contacto físico
+    GIFT_EXCHANGE = "gift"  # Intercambio de objetos
+    MENTION = "mention"  # Mención de uno por otro
+    REACTION = "reaction"  # Reacción a acciones del otro
 
 
 class InteractionTone(Enum):
     """Tono emocional de la interacción."""
-    HOSTILE = "hostile"             # Hostil, agresivo
-    COLD = "cold"                   # Frío, distante
-    NEUTRAL = "neutral"             # Neutral, sin carga emocional
-    WARM = "warm"                   # Cálido, amigable
-    AFFECTIONATE = "affectionate"   # Afectuoso, cariñoso
+
+    HOSTILE = "hostile"  # Hostil, agresivo
+    COLD = "cold"  # Frío, distante
+    NEUTRAL = "neutral"  # Neutral, sin carga emocional
+    WARM = "warm"  # Cálido, amigable
+    AFFECTIONATE = "affectionate"  # Afectuoso, cariñoso
 
     @classmethod
     def from_score(cls, score: float) -> "InteractionTone":
@@ -69,6 +70,7 @@ class InteractionTone(Enum):
 @dataclass
 class EntityInteraction:
     """Una interacción específica entre entidades."""
+
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     project_id: int = 0
 
@@ -84,18 +86,18 @@ class EntityInteraction:
 
     # Ubicación
     chapter: int = 0
-    scene_index: Optional[int] = None
+    scene_index: int | None = None
     text_excerpt: str = ""
     start_char: int = 0
     end_char: int = 0
 
     # Análisis
-    sentiment_score: float = 0.0   # -1 a 1
-    intensity: float = 0.5         # 0 a 1 (qué tan intensa es la interacción)
+    sentiment_score: float = 0.0  # -1 a 1
+    intensity: float = 0.5  # 0 a 1 (qué tan intensa es la interacción)
 
     # Coherencia con relación
-    relationship_id: Optional[str] = None
-    expected_tone: Optional[InteractionTone] = None
+    relationship_id: str | None = None
+    expected_tone: InteractionTone | None = None
     is_coherent: bool = True
     coherence_note: str = ""
 
@@ -156,8 +158,7 @@ class EntityInteraction:
             intensity=data.get("intensity", 0.5),
             relationship_id=data.get("relationship_id"),
             expected_tone=(
-                InteractionTone(data["expected_tone"])
-                if data.get("expected_tone") else None
+                InteractionTone(data["expected_tone"]) if data.get("expected_tone") else None
             ),
             is_coherent=data.get("is_coherent", True),
             coherence_note=data.get("coherence_note", ""),
@@ -170,6 +171,7 @@ class EntityInteraction:
 @dataclass
 class InteractionPattern:
     """Patrón de interacción entre dos entidades a lo largo del texto."""
+
     entity1_id: str = ""
     entity2_id: str = ""
     entity1_name: str = ""
@@ -226,6 +228,7 @@ class InteractionPattern:
 @dataclass
 class InteractionAlert:
     """Alerta generada por análisis de interacciones."""
+
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     code: str = ""
     alert_type: str = ""  # Tipo legible
@@ -237,7 +240,7 @@ class InteractionAlert:
     relationship_type: str = ""
 
     # Interacción problemática
-    interaction_id: Optional[str] = None
+    interaction_id: str | None = None
     chapter: int = 0
     text_excerpt: str = ""
 
@@ -289,31 +292,82 @@ INTERACTION_TYPE_INTENSITY = {
 
 # Verbos que indican tipos de interacción
 DIALOGUE_VERBS = [
-    "dijo", "respondió", "preguntó", "exclamó", "susurró", "gritó",
-    "murmuró", "contestó", "añadió", "interrumpió", "declaró",
+    "dijo",
+    "respondió",
+    "preguntó",
+    "exclamó",
+    "susurró",
+    "gritó",
+    "murmuró",
+    "contestó",
+    "añadió",
+    "interrumpió",
+    "declaró",
 ]
 
 ACTION_VERBS_POSITIVE = [
-    "abrazó", "besó", "acarició", "ayudó", "protegió", "salvó",
-    "defendió", "cuidó", "consoló", "animó", "apoyó",
+    "abrazó",
+    "besó",
+    "acarició",
+    "ayudó",
+    "protegió",
+    "salvó",
+    "defendió",
+    "cuidó",
+    "consoló",
+    "animó",
+    "apoyó",
 ]
 
 ACTION_VERBS_NEGATIVE = [
-    "golpeó", "atacó", "empujó", "insultó", "amenazó", "hirió",
-    "traicionó", "abandonó", "ignoró", "rechazó", "humilló",
+    "golpeó",
+    "atacó",
+    "empujó",
+    "insultó",
+    "amenazó",
+    "hirió",
+    "traicionó",
+    "abandonó",
+    "ignoró",
+    "rechazó",
+    "humilló",
 ]
 
 ACTION_VERBS_NEUTRAL = [
-    "miró", "observó", "siguió", "esperó", "encontró", "buscó",
-    "llamó", "tocó", "cogió", "dejó",
+    "miró",
+    "observó",
+    "siguió",
+    "esperó",
+    "encontró",
+    "buscó",
+    "llamó",
+    "tocó",
+    "cogió",
+    "dejó",
 ]
 
 THOUGHT_VERBS = [
-    "pensó", "recordó", "imaginó", "soñó", "creyó", "dudó",
-    "temió", "esperó", "deseó", "planeó",
+    "pensó",
+    "recordó",
+    "imaginó",
+    "soñó",
+    "creyó",
+    "dudó",
+    "temió",
+    "esperó",
+    "deseó",
+    "planeó",
 ]
 
 PHYSICAL_CONTACT_VERBS = [
-    "abrazó", "besó", "golpeó", "empujó", "acarició", "tocó",
-    "cogió", "sujetó", "soltó", "arrastró",
+    "abrazó",
+    "besó",
+    "golpeó",
+    "empujó",
+    "acarició",
+    "tocó",
+    "cogió",
+    "sujetó",
+    "soltó",
+    "arrastró",
 ]

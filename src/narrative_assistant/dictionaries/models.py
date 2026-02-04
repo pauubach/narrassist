@@ -8,7 +8,6 @@ sinónimos, relaciones entre palabras, etc.
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
 
 class DictionarySource(Enum):
@@ -51,12 +50,12 @@ class Definition:
     """Una definición de una palabra."""
 
     text: str  # Texto de la definición
-    category: Optional[GrammaticalCategory] = None  # Categoría gramatical
-    domain: Optional[str] = None  # Dominio/campo (medicina, derecho, etc.)
-    register: Optional[str] = None  # Registro (formal, coloquial, etc.)
-    region: Optional[str] = None  # Región (España, México, etc.)
+    category: GrammaticalCategory | None = None  # Categoría gramatical
+    domain: str | None = None  # Dominio/campo (medicina, derecho, etc.)
+    register: str | None = None  # Registro (formal, coloquial, etc.)
+    region: str | None = None  # Región (España, México, etc.)
     examples: list[str] = field(default_factory=list)  # Ejemplos de uso
-    notes: Optional[str] = None  # Notas adicionales
+    notes: str | None = None  # Notas adicionales
 
 
 @dataclass
@@ -66,17 +65,17 @@ class WordRelation:
     word: str  # Palabra relacionada
     relation_type: WordRelationType  # Tipo de relación
     confidence: float = 1.0  # Confianza en la relación (0.0-1.0)
-    context: Optional[str] = None  # Contexto en que aplica
+    context: str | None = None  # Contexto en que aplica
 
 
 @dataclass
 class Etymology:
     """Información etimológica de una palabra."""
 
-    origin_language: Optional[str] = None  # Idioma de origen
-    original_word: Optional[str] = None  # Palabra original
-    meaning: Optional[str] = None  # Significado original
-    notes: Optional[str] = None  # Notas adicionales
+    origin_language: str | None = None  # Idioma de origen
+    original_word: str | None = None  # Palabra original
+    meaning: str | None = None  # Significado original
+    notes: str | None = None  # Notas adicionales
 
 
 @dataclass
@@ -93,12 +92,12 @@ class DictionaryEntry:
     synonyms: list[str] = field(default_factory=list)
     antonyms: list[str] = field(default_factory=list)
     relations: list[WordRelation] = field(default_factory=list)
-    etymology: Optional[Etymology] = None
-    pronunciation: Optional[str] = None  # Pronunciación IPA
-    syllables: Optional[str] = None  # División silábica
-    frequency: Optional[float] = None  # Frecuencia de uso (0.0-1.0)
+    etymology: Etymology | None = None
+    pronunciation: str | None = None  # Pronunciación IPA
+    syllables: str | None = None  # División silábica
+    frequency: float | None = None  # Frecuencia de uso (0.0-1.0)
     sources: list[DictionarySource] = field(default_factory=list)
-    last_updated: Optional[datetime] = None
+    last_updated: datetime | None = None
 
     def has_definitions(self) -> bool:
         """Verifica si tiene definiciones."""
@@ -108,7 +107,7 @@ class DictionaryEntry:
         """Verifica si tiene sinónimos."""
         return len(self.synonyms) > 0
 
-    def get_primary_definition(self) -> Optional[str]:
+    def get_primary_definition(self) -> str | None:
         """Obtiene la definición principal."""
         if self.definitions:
             return self.definitions[0].text
@@ -155,7 +154,9 @@ class DictionaryEntry:
                 "original_word": self.etymology.original_word,
                 "meaning": self.etymology.meaning,
                 "notes": self.etymology.notes,
-            } if self.etymology else None,
+            }
+            if self.etymology
+            else None,
             "pronunciation": self.pronunciation,
             "syllables": self.syllables,
             "frequency": self.frequency,
@@ -187,6 +188,7 @@ class ExternalDictionaryLink:
     def get_word_url(self, word: str) -> str:
         """Genera URL para una palabra específica."""
         import urllib.parse
+
         encoded_word = urllib.parse.quote(word)
         return self.word_url_template.format(base=self.base_url, word=encoded_word)
 

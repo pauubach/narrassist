@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Extractor basado en análisis de dependencias de spaCy.
 
@@ -12,16 +11,16 @@ Ventajas sobre regex:
 """
 
 import logging
-from typing import Optional, Any
+from typing import Any
 
 from ...title_preprocessor import preprocess_text_for_spacy
 from ..base import (
-    BaseExtractor,
-    ExtractionMethod,
-    ExtractionContext,
-    ExtractionResult,
-    ExtractedAttribute,
     AttributeType,
+    BaseExtractor,
+    ExtractedAttribute,
+    ExtractionContext,
+    ExtractionMethod,
+    ExtractionResult,
 )
 
 logger = logging.getLogger(__name__)
@@ -30,36 +29,116 @@ logger = logging.getLogger(__name__)
 # Vocabularios para clasificación semántica
 PHYSICAL_DESCRIPTORS = {
     "eye_color": {
-        "azul", "azules", "verde", "verdes", "marrón", "marrones",
-        "negro", "negros", "gris", "grises", "avellana", "miel",
-        "castaño", "castaños", "ámbar", "violeta", "violetas",
+        "azul",
+        "azules",
+        "verde",
+        "verdes",
+        "marrón",
+        "marrones",
+        "negro",
+        "negros",
+        "gris",
+        "grises",
+        "avellana",
+        "miel",
+        "castaño",
+        "castaños",
+        "ámbar",
+        "violeta",
+        "violetas",
     },
     "hair_color": {
-        "negro", "rubio", "castaño", "pelirrojo", "canoso", "blanco",
-        "moreno", "gris", "rojizo", "dorado", "oscuro", "claro",
-        "platino", "cobrizo", "azabache",
+        "negro",
+        "rubio",
+        "castaño",
+        "pelirrojo",
+        "canoso",
+        "blanco",
+        "moreno",
+        "gris",
+        "rojizo",
+        "dorado",
+        "oscuro",
+        "claro",
+        "platino",
+        "cobrizo",
+        "azabache",
     },
     "hair_type": {
-        "largo", "corto", "liso", "rizado", "ondulado", "recogido",
-        "suelto", "trenzado", "rapado", "calvo", "espeso", "fino",
+        "largo",
+        "corto",
+        "liso",
+        "rizado",
+        "ondulado",
+        "recogido",
+        "suelto",
+        "trenzado",
+        "rapado",
+        "calvo",
+        "espeso",
+        "fino",
     },
     "height": {
-        "alto", "alta", "bajo", "baja", "muy alto", "muy alta",
-        "bajito", "bajita", "gigante", "enano", "enana",
+        "alto",
+        "alta",
+        "bajo",
+        "baja",
+        "muy alto",
+        "muy alta",
+        "bajito",
+        "bajita",
+        "gigante",
+        "enano",
+        "enana",
     },
     "build": {
-        "delgado", "delgada", "gordo", "gorda", "fornido", "fornida",
-        "esbelto", "esbelta", "robusto", "robusta", "musculoso", "musculosa",
-        "atlético", "atlética", "corpulento", "corpulenta", "flaco", "flaca",
+        "delgado",
+        "delgada",
+        "gordo",
+        "gorda",
+        "fornido",
+        "fornida",
+        "esbelto",
+        "esbelta",
+        "robusto",
+        "robusta",
+        "musculoso",
+        "musculosa",
+        "atlético",
+        "atlética",
+        "corpulento",
+        "corpulenta",
+        "flaco",
+        "flaca",
     },
     "age": {
-        "joven", "viejo", "vieja", "anciano", "anciana", "niño", "niña",
-        "adolescente", "adulto", "adulta", "mayor",
+        "joven",
+        "viejo",
+        "vieja",
+        "anciano",
+        "anciana",
+        "niño",
+        "niña",
+        "adolescente",
+        "adulto",
+        "adulta",
+        "mayor",
     },
     "skin": {
-        "pálido", "pálida", "moreno", "morena", "bronceado", "bronceada",
-        "claro", "clara", "oscuro", "oscura", "pecoso", "pecosa",
-        "escamosa", "escamoso",  # Para fantasy/sci-fi
+        "pálido",
+        "pálida",
+        "moreno",
+        "morena",
+        "bronceado",
+        "bronceada",
+        "claro",
+        "clara",
+        "oscuro",
+        "oscura",
+        "pecoso",
+        "pecosa",
+        "escamosa",
+        "escamoso",  # Para fantasy/sci-fi
     },
 }
 
@@ -118,6 +197,7 @@ class DependencyExtractor(BaseExtractor):
         """Lazy loading del modelo spaCy."""
         if self._nlp is None:
             from ...spacy_gpu import load_spacy_model
+
             self._nlp = load_spacy_model()
         return self._nlp
 
@@ -179,34 +259,22 @@ class DependencyExtractor(BaseExtractor):
             entity_names_lower = {name.lower() for name in context.entity_names}
 
             # Estrategia 1: Estructuras copulativas (ser/estar + ADJ)
-            attributes.extend(
-                self._extract_copulative(doc, entity_names_lower, context.chapter)
-            )
+            attributes.extend(self._extract_copulative(doc, entity_names_lower, context.chapter))
 
             # Estrategia 2: Estructuras posesivas (tener + NOUN + ADJ)
-            attributes.extend(
-                self._extract_possession(doc, entity_names_lower, context.chapter)
-            )
+            attributes.extend(self._extract_possession(doc, entity_names_lower, context.chapter))
 
             # Estrategia 3: "ADJ de ENTIDAD" (los ojos verdes de María)
-            attributes.extend(
-                self._extract_adjective_of(doc, entity_names_lower, context.chapter)
-            )
+            attributes.extend(self._extract_adjective_of(doc, entity_names_lower, context.chapter))
 
             # Estrategia 4: Posesivos pronominales (sus ojos azules)
-            attributes.extend(
-                self._extract_possessive(doc, entity_names_lower, context.chapter)
-            )
+            attributes.extend(self._extract_possessive(doc, entity_names_lower, context.chapter))
 
             # Estrategia 5: Enumeraciones de adjetivos
-            attributes.extend(
-                self._extract_enumerations(doc, entity_names_lower, context.chapter)
-            )
+            attributes.extend(self._extract_enumerations(doc, entity_names_lower, context.chapter))
 
             # Estrategia 6: Patrones preposicionales (con ojos marrones)
-            attributes.extend(
-                self._extract_prepositional(doc, entity_names_lower, context.chapter)
-            )
+            attributes.extend(self._extract_prepositional(doc, entity_names_lower, context.chapter))
 
             # Estrategia 7: Fragmentos nominales (Cabello negro y largo, ojos azules)
             attributes.extend(
@@ -231,7 +299,7 @@ class DependencyExtractor(BaseExtractor):
         self,
         doc: Any,
         entity_names: set[str],
-        chapter: Optional[int],
+        chapter: int | None,
     ) -> list[ExtractedAttribute]:
         """
         Extrae atributos de estructuras copulativas.
@@ -247,7 +315,7 @@ class DependencyExtractor(BaseExtractor):
         attributes = []
 
         # Mapear cada oración a su sujeto
-        sentence_subjects: dict[int, Optional[str]] = {}
+        sentence_subjects: dict[int, str | None] = {}
         last_subject = None
 
         for sent in doc.sents:
@@ -262,7 +330,10 @@ class DependencyExtractor(BaseExtractor):
 
             for token in sent:
                 # Buscar verbos copulativos
-                if token.lemma_ not in {"ser", "estar", "parecer"} or token.pos_ not in {"AUX", "VERB"}:
+                if token.lemma_ not in {"ser", "estar", "parecer"} or token.pos_ not in {
+                    "AUX",
+                    "VERB",
+                }:
                     continue
 
                 # Buscar sujeto explícito primero
@@ -295,31 +366,39 @@ class DependencyExtractor(BaseExtractor):
                     if child.pos_ == "ADJ":
                         # Extraer este adjetivo y cualquier anidado (coordinados O modificadores)
                         # "alto, delgado" -> delgado puede ser conj o amod de alto
-                        for adj_token in [child] + [gc for gc in child.children if gc.dep_ in {"conj", "amod"} and gc.pos_ == "ADJ"]:
+                        for adj_token in [child] + [
+                            gc
+                            for gc in child.children
+                            if gc.dep_ in {"conj", "amod"} and gc.pos_ == "ADJ"
+                        ]:
                             attr_type = self._classify_attribute(adj_token.text)
                             if attr_type:
-                                attributes.append(self._create_attribute(
-                                    entity_name=entity_name,
-                                    attr_type=attr_type,
-                                    value=adj_token.text.lower(),
-                                    confidence=0.85,
-                                    source_text=sent.text,
-                                    chapter=chapter,
-                                ))
+                                attributes.append(
+                                    self._create_attribute(
+                                        entity_name=entity_name,
+                                        attr_type=attr_type,
+                                        value=adj_token.text.lower(),
+                                        confidence=0.85,
+                                        source_text=sent.text,
+                                        chapter=chapter,
+                                    )
+                                )
                     # Buscar en "era un hombre alto y fornido"
                     elif child.pos_ == "NOUN":
                         # Usar _collect_adjectives para obtener coordinados
                         for adj_token in self._collect_adjectives(child):
                             attr_type = self._classify_attribute(adj_token.text)
                             if attr_type:
-                                attributes.append(self._create_attribute(
-                                    entity_name=entity_name,
-                                    attr_type=attr_type,
-                                    value=adj_token.text.lower(),
-                                    confidence=0.80,
-                                    source_text=sent.text,
-                                    chapter=chapter,
-                                ))
+                                attributes.append(
+                                    self._create_attribute(
+                                        entity_name=entity_name,
+                                        attr_type=attr_type,
+                                        value=adj_token.text.lower(),
+                                        confidence=0.80,
+                                        source_text=sent.text,
+                                        chapter=chapter,
+                                    )
+                                )
 
         return attributes
 
@@ -327,7 +406,7 @@ class DependencyExtractor(BaseExtractor):
         self,
         doc: Any,
         entity_names: set[str],
-        chapter: Optional[int],
+        chapter: int | None,
     ) -> list[ExtractedAttribute]:
         """
         Extrae atributos de estructuras posesivas.
@@ -343,7 +422,7 @@ class DependencyExtractor(BaseExtractor):
         attributes = []
 
         # Mapear cada oración a su sujeto (igual que _extract_possessive)
-        sentence_subjects: dict[int, Optional[str]] = {}
+        sentence_subjects: dict[int, str | None] = {}
         last_subject = None
 
         for sent in doc.sents:
@@ -408,14 +487,16 @@ class DependencyExtractor(BaseExtractor):
                         else:
                             attr_type = base_attr_type
 
-                        attributes.append(self._create_attribute(
-                            entity_name=entity_name,
-                            attr_type=attr_type,
-                            value=adj_lower,
-                            confidence=0.90,
-                            source_text=sent.text,
-                            chapter=chapter,
-                        ))
+                        attributes.append(
+                            self._create_attribute(
+                                entity_name=entity_name,
+                                attr_type=attr_type,
+                                value=adj_lower,
+                                confidence=0.90,
+                                source_text=sent.text,
+                                chapter=chapter,
+                            )
+                        )
 
         return attributes
 
@@ -423,7 +504,7 @@ class DependencyExtractor(BaseExtractor):
         self,
         doc: Any,
         entity_names: set[str],
-        chapter: Optional[int],
+        chapter: int | None,
     ) -> list[ExtractedAttribute]:
         """
         Extrae atributos de estructuras "X de ENTIDAD".
@@ -461,14 +542,16 @@ class DependencyExtractor(BaseExtractor):
                     # Buscar adjetivo que modifica la parte del cuerpo
                     for child in parent.children:
                         if child.pos_ == "ADJ":
-                            attributes.append(self._create_attribute(
-                                entity_name=entity_name,
-                                attr_type=base_attr_type,
-                                value=child.text.lower(),
-                                confidence=0.85,
-                                source_text=token.sent.text,
-                                chapter=chapter,
-                            ))
+                            attributes.append(
+                                self._create_attribute(
+                                    entity_name=entity_name,
+                                    attr_type=base_attr_type,
+                                    value=child.text.lower(),
+                                    confidence=0.85,
+                                    source_text=token.sent.text,
+                                    chapter=chapter,
+                                )
+                            )
 
         return attributes
 
@@ -476,7 +559,7 @@ class DependencyExtractor(BaseExtractor):
         self,
         sent: Any,
         entity_names: set[str],
-    ) -> Optional[str]:
+    ) -> str | None:
         """
         Encuentra el sujeto de una oración que sea una entidad conocida.
 
@@ -513,7 +596,7 @@ class DependencyExtractor(BaseExtractor):
 
         if root_verb:
             # Buscar el nombre propio más cercano antes del verbo
-            for token in reversed(list(sent[:root_verb.i - sent.start])):
+            for token in reversed(list(sent[: root_verb.i - sent.start])):
                 if token.pos_ == "PROPN":
                     if token.text.lower() in entity_names:
                         return token.text
@@ -553,7 +636,7 @@ class DependencyExtractor(BaseExtractor):
         self,
         doc: Any,
         entity_names: set[str],
-        chapter: Optional[int],
+        chapter: int | None,
     ) -> list[ExtractedAttribute]:
         """
         Extrae atributos de pronombres posesivos usando análisis sintáctico.
@@ -573,7 +656,7 @@ class DependencyExtractor(BaseExtractor):
         attributes = []
 
         # Mapear cada oración a su sujeto
-        sentence_subjects: dict[int, Optional[str]] = {}
+        sentence_subjects: dict[int, str | None] = {}
         last_subject = None
 
         for sent in doc.sents:
@@ -603,7 +686,9 @@ class DependencyExtractor(BaseExtractor):
 
                 # Usar el sujeto de la oración (no last_entity global)
                 if not sent_subject:
-                    logger.debug(f"No subject found for possessive '{token.text}' in: {sent.text[:50]}...")
+                    logger.debug(
+                        f"No subject found for possessive '{token.text}' in: {sent.text[:50]}..."
+                    )
                     continue
 
                 base_attr_type = BODY_PARTS_TO_ATTR[noun.lemma_.lower()]
@@ -611,14 +696,16 @@ class DependencyExtractor(BaseExtractor):
                 # Buscar adjetivo que modifica el sustantivo
                 for child in noun.children:
                     if child.pos_ == "ADJ":
-                        attributes.append(self._create_attribute(
-                            entity_name=sent_subject,
-                            attr_type=base_attr_type,
-                            value=child.text.lower(),
-                            confidence=0.75,  # Mayor confianza con análisis sintáctico
-                            source_text=sent.text,
-                            chapter=chapter,
-                        ))
+                        attributes.append(
+                            self._create_attribute(
+                                entity_name=sent_subject,
+                                attr_type=base_attr_type,
+                                value=child.text.lower(),
+                                confidence=0.75,  # Mayor confianza con análisis sintáctico
+                                source_text=sent.text,
+                                chapter=chapter,
+                            )
+                        )
 
         return attributes
 
@@ -626,7 +713,7 @@ class DependencyExtractor(BaseExtractor):
         self,
         doc: Any,
         entity_names: set[str],
-        chapter: Optional[int],
+        chapter: int | None,
     ) -> list[ExtractedAttribute]:
         """
         Extrae atributos de enumeraciones de adjetivos.
@@ -649,9 +736,7 @@ class DependencyExtractor(BaseExtractor):
                 coordinated_adjs = [head]
 
                 for child in head.children:
-                    if child.pos_ == "ADJ":
-                        coordinated_adjs.append(child)
-                    elif child.dep_ == "conj" and child.pos_ == "ADJ":
+                    if child.pos_ == "ADJ" or child.dep_ == "conj" and child.pos_ == "ADJ":
                         coordinated_adjs.append(child)
 
                 if len(coordinated_adjs) < 2:
@@ -667,14 +752,16 @@ class DependencyExtractor(BaseExtractor):
                 for adj in coordinated_adjs:
                     attr_type = self._classify_attribute(adj.text)
                     if attr_type:
-                        attributes.append(self._create_attribute(
-                            entity_name=entity_name,
-                            attr_type=attr_type,
-                            value=adj.text.lower(),
-                            confidence=0.75,
-                            source_text=head.sent.text,
-                            chapter=chapter,
-                        ))
+                        attributes.append(
+                            self._create_attribute(
+                                entity_name=entity_name,
+                                attr_type=attr_type,
+                                value=adj.text.lower(),
+                                confidence=0.75,
+                                source_text=head.sent.text,
+                                chapter=chapter,
+                            )
+                        )
 
         return attributes
 
@@ -682,7 +769,7 @@ class DependencyExtractor(BaseExtractor):
         self,
         doc: Any,
         entity_names: set[str],
-        chapter: Optional[int],
+        chapter: int | None,
     ) -> list[ExtractedAttribute]:
         """
         Extrae atributos de estructuras preposicionales.
@@ -697,7 +784,7 @@ class DependencyExtractor(BaseExtractor):
         attributes = []
 
         # Mapear cada oración a su sujeto
-        sentence_subjects: dict[int, Optional[str]] = {}
+        sentence_subjects: dict[int, str | None] = {}
         last_subject = None
 
         for sent in doc.sents:
@@ -739,14 +826,16 @@ class DependencyExtractor(BaseExtractor):
                     else:
                         attr_type = base_attr_type
 
-                    attributes.append(self._create_attribute(
-                        entity_name=sent_subject,
-                        attr_type=attr_type,
-                        value=adj_lower,
-                        confidence=0.75,
-                        source_text=sent.text,
-                        chapter=chapter,
-                    ))
+                    attributes.append(
+                        self._create_attribute(
+                            entity_name=sent_subject,
+                            attr_type=attr_type,
+                            value=adj_lower,
+                            confidence=0.75,
+                            source_text=sent.text,
+                            chapter=chapter,
+                        )
+                    )
 
                 # Buscar también sustantivos coordinados (y ojos marrones)
                 for child in noun.children:
@@ -754,14 +843,16 @@ class DependencyExtractor(BaseExtractor):
                         if child.lemma_.lower() in BODY_PARTS_TO_ATTR:
                             conj_attr_type = BODY_PARTS_TO_ATTR[child.lemma_.lower()]
                             for adj in self._collect_adjectives(child):
-                                attributes.append(self._create_attribute(
-                                    entity_name=sent_subject,
-                                    attr_type=conj_attr_type,
-                                    value=adj.text.lower(),
-                                    confidence=0.70,
-                                    source_text=sent.text,
-                                    chapter=chapter,
-                                ))
+                                attributes.append(
+                                    self._create_attribute(
+                                        entity_name=sent_subject,
+                                        attr_type=conj_attr_type,
+                                        value=adj.text.lower(),
+                                        confidence=0.70,
+                                        source_text=sent.text,
+                                        chapter=chapter,
+                                    )
+                                )
 
         return attributes
 
@@ -769,7 +860,7 @@ class DependencyExtractor(BaseExtractor):
         self,
         doc: Any,
         entity_names: set[str],
-        chapter: Optional[int],
+        chapter: int | None,
     ) -> list[ExtractedAttribute]:
         """
         Extrae atributos de fragmentos nominales sin verbo.
@@ -785,7 +876,7 @@ class DependencyExtractor(BaseExtractor):
         attributes = []
 
         # Mapear cada oración a su sujeto
-        sentence_subjects: dict[int, Optional[str]] = {}
+        sentence_subjects: dict[int, str | None] = {}
         last_subject = None
 
         for sent in doc.sents:
@@ -846,14 +937,16 @@ class DependencyExtractor(BaseExtractor):
                     else:
                         attr_type = base_attr_type
 
-                    attributes.append(self._create_attribute(
-                        entity_name=sent_subject,
-                        attr_type=attr_type,
-                        value=adj_lower,
-                        confidence=0.65,  # Menor confianza por ser inferencia de contexto
-                        source_text=sent.text,
-                        chapter=chapter,
-                    ))
+                    attributes.append(
+                        self._create_attribute(
+                            entity_name=sent_subject,
+                            attr_type=attr_type,
+                            value=adj_lower,
+                            confidence=0.65,  # Menor confianza por ser inferencia de contexto
+                            source_text=sent.text,
+                            chapter=chapter,
+                        )
+                    )
 
         return attributes
 
@@ -881,7 +974,7 @@ class DependencyExtractor(BaseExtractor):
 
         return adjectives
 
-    def _find_subject(self, verb_token: Any) -> Optional[Any]:
+    def _find_subject(self, verb_token: Any) -> Any | None:
         """Encuentra el sujeto de un verbo."""
         # Buscar en hijos directos
         for child in verb_token.children:
@@ -901,7 +994,7 @@ class DependencyExtractor(BaseExtractor):
         doc: Any,
         pronoun_token: Any,
         entity_names: set[str],
-    ) -> Optional[str]:
+    ) -> str | None:
         """
         Resuelve un pronombre a la última entidad mencionada.
 
@@ -929,7 +1022,7 @@ class DependencyExtractor(BaseExtractor):
                 pronoun_gender = "Fem"
 
         # Buscar hacia atrás la última entidad que coincida con el género
-        for token in reversed(list(doc[:pronoun_token.i])):
+        for token in reversed(list(doc[: pronoun_token.i])):
             token_lower = token.text.lower()
 
             # Verificar si el token es una entidad conocida
@@ -948,7 +1041,11 @@ class DependencyExtractor(BaseExtractor):
                 if pronoun_gender and token.pos_ in {"PROPN", "NOUN"}:
                     token_gender_list = token.morph.get("Gender") if token.morph else None
                     if token_gender_list:
-                        token_gender = token_gender_list[0] if isinstance(token_gender_list, list) else token_gender_list
+                        token_gender = (
+                            token_gender_list[0]
+                            if isinstance(token_gender_list, list)
+                            else token_gender_list
+                        )
                         # Solo aceptar si los géneros coinciden o si no sabemos
                         if token_gender != pronoun_gender:
                             continue
@@ -962,7 +1059,7 @@ class DependencyExtractor(BaseExtractor):
         adj_token: Any,
         entity_names: set[str],
         doc: Any,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Encuentra la entidad a la que se refieren los adjetivos."""
         # Buscar en el contexto cercano
         for token in adj_token.sent:
@@ -974,7 +1071,7 @@ class DependencyExtractor(BaseExtractor):
 
         return None
 
-    def _classify_attribute(self, value: str) -> Optional[AttributeType]:
+    def _classify_attribute(self, value: str) -> AttributeType | None:
         """
         Clasifica un valor de atributo en su tipo correspondiente.
         """
@@ -1002,7 +1099,7 @@ class DependencyExtractor(BaseExtractor):
 
         for attr in attributes:
             # Buscar patrón "X y Y"
-            match = re.search(r'(\w+)\s+y\s+(\w+)', attr.value, re.IGNORECASE)
+            match = re.search(r"(\w+)\s+y\s+(\w+)", attr.value, re.IGNORECASE)
 
             if match:
                 val1 = match.group(1).lower()
@@ -1024,22 +1121,26 @@ class DependencyExtractor(BaseExtractor):
 
                 if type1 and type2 and type1 != type2:
                     # Separar
-                    result.append(self._create_attribute(
-                        entity_name=attr.entity_name,
-                        attr_type=type1,
-                        value=val1,
-                        confidence=attr.confidence * 0.95,
-                        source_text=attr.source_text,
-                        chapter=attr.chapter,
-                    ))
-                    result.append(self._create_attribute(
-                        entity_name=attr.entity_name,
-                        attr_type=type2,
-                        value=val2,
-                        confidence=attr.confidence * 0.95,
-                        source_text=attr.source_text,
-                        chapter=attr.chapter,
-                    ))
+                    result.append(
+                        self._create_attribute(
+                            entity_name=attr.entity_name,
+                            attr_type=type1,
+                            value=val1,
+                            confidence=attr.confidence * 0.95,
+                            source_text=attr.source_text,
+                            chapter=attr.chapter,
+                        )
+                    )
+                    result.append(
+                        self._create_attribute(
+                            entity_name=attr.entity_name,
+                            attr_type=type2,
+                            value=val2,
+                            confidence=attr.confidence * 0.95,
+                            source_text=attr.source_text,
+                            chapter=attr.chapter,
+                        )
+                    )
                 else:
                     result.append(attr)
             else:

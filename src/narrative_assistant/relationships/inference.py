@@ -7,7 +7,6 @@ para relaciones entre entidades basándose en el contexto narrativo.
 
 import json
 import logging
-from typing import Optional
 
 from .models import (
     EntityContext,
@@ -50,6 +49,7 @@ class ExpectationInferenceEngine:
         if self.use_llm and self.llm_client is None:
             try:
                 from ..llm import get_llm_client
+
                 self.llm_client = get_llm_client()
                 self.use_llm = self.llm_client is not None
             except Exception as e:
@@ -302,8 +302,8 @@ Responde directamente con el JSON, sin texto adicional."""
     def enrich_relationship(
         self,
         relationship: EntityRelationship,
-        source_context: Optional[EntityContext] = None,
-        target_context: Optional[EntityContext] = None,
+        source_context: EntityContext | None = None,
+        target_context: EntityContext | None = None,
     ) -> EntityRelationship:
         """
         Enriquece una relación con expectativas inferidas.

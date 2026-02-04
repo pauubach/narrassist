@@ -17,8 +17,8 @@ from difflib import SequenceMatcher
 from enum import Enum
 from typing import Optional
 
+from ..core.errors import ErrorSeverity, NarrativeError
 from ..core.result import Result
-from ..core.errors import NarrativeError, ErrorSeverity
 
 logger = logging.getLogger(__name__)
 
@@ -53,26 +53,30 @@ def reset_duplicate_detector() -> None:
 # Tipos
 # =============================================================================
 
+
 class DuplicateType(Enum):
     """Tipos de duplicados detectados."""
-    EXACT_SENTENCE = "exact_sentence"      # Frase idéntica
-    NEAR_SENTENCE = "near_sentence"        # Frase casi idéntica (>90% similar)
-    EXACT_PARAGRAPH = "exact_paragraph"    # Párrafo idéntico
-    NEAR_PARAGRAPH = "near_paragraph"      # Párrafo muy similar
-    SEMANTIC_PARAGRAPH = "semantic"        # Párrafo con mismo significado
+
+    EXACT_SENTENCE = "exact_sentence"  # Frase idéntica
+    NEAR_SENTENCE = "near_sentence"  # Frase casi idéntica (>90% similar)
+    EXACT_PARAGRAPH = "exact_paragraph"  # Párrafo idéntico
+    NEAR_PARAGRAPH = "near_paragraph"  # Párrafo muy similar
+    SEMANTIC_PARAGRAPH = "semantic"  # Párrafo con mismo significado
 
 
 class DuplicateSeverity(Enum):
     """Severidad del duplicado."""
-    CRITICAL = "critical"    # Mismo contenido exacto
-    HIGH = "high"            # >95% similitud
-    MEDIUM = "medium"        # 85-95% similitud
-    LOW = "low"              # 75-85% similitud
+
+    CRITICAL = "critical"  # Mismo contenido exacto
+    HIGH = "high"  # >95% similitud
+    MEDIUM = "medium"  # 85-95% similitud
+    LOW = "low"  # 75-85% similitud
 
 
 @dataclass
 class DuplicateLocation:
     """Ubicación de un duplicado."""
+
     chapter: int
     paragraph: int
     start_char: int
@@ -179,6 +183,7 @@ class DuplicateDetectionError(NarrativeError):
 # Detector
 # =============================================================================
 
+
 class DuplicateDetector:
     """
     Detector de contenido duplicado.
@@ -198,6 +203,7 @@ class DuplicateDetector:
         """Cargar modelo de embeddings si está disponible."""
         try:
             from ..nlp.embeddings import get_embeddings_model
+
             self._embeddings = get_embeddings_model()
         except Exception as e:
             logger.warning(f"Embeddings not available for semantic duplicate detection: {e}")
@@ -207,7 +213,7 @@ class DuplicateDetector:
         text: str,
         min_sentence_length: int = 30,
         similarity_threshold: float = 0.90,
-        chapters: Optional[list[dict]] = None,
+        chapters: list[dict] | None = None,
     ) -> Result[DuplicateReport]:
         """
         Detectar frases duplicadas.
@@ -413,8 +419,8 @@ class DuplicateDetector:
     def detect_all(
         self,
         text: str,
-        paragraphs: Optional[list[dict]] = None,
-        chapters: Optional[list[dict]] = None,
+        paragraphs: list[dict] | None = None,
+        chapters: list[dict] | None = None,
         sentence_threshold: float = 0.90,
         paragraph_threshold: float = 0.85,
     ) -> Result[DuplicateReport]:
@@ -435,9 +441,7 @@ class DuplicateDetector:
 
         # Detectar frases duplicadas
         sentence_result = self.detect_sentence_duplicates(
-            text,
-            similarity_threshold=sentence_threshold,
-            chapters=chapters
+            text, similarity_threshold=sentence_threshold, chapters=chapters
         )
         if sentence_result.is_success:
             combined.sentences_analyzed = sentence_result.value.sentences_analyzed
@@ -447,8 +451,7 @@ class DuplicateDetector:
         # Detectar párrafos duplicados
         if paragraphs:
             para_result = self.detect_paragraph_duplicates(
-                paragraphs,
-                similarity_threshold=paragraph_threshold
+                paragraphs, similarity_threshold=paragraph_threshold
             )
             if para_result.is_success:
                 combined.paragraphs_analyzed = para_result.value.paragraphs_analyzed
@@ -466,22 +469,24 @@ class DuplicateDetector:
         sentences = []
 
         # Patrón para detectar fin de oración
-        sentence_pattern = re.compile(r'[^.!?]+[.!?]+')
+        sentence_pattern = re.compile(r"[^.!?]+[.!?]+")
 
         para_num = 0
-        for para_match in re.finditer(r'[^\n]+', text):
+        for para_match in re.finditer(r"[^\n]+", text):
             para_text = para_match.group()
             para_start = para_match.start()
 
             for sent_match in sentence_pattern.finditer(para_text):
                 sent_text = sent_match.group().strip()
                 if sent_text:
-                    sentences.append({
-                        "text": sent_text,
-                        "start": para_start + sent_match.start(),
-                        "end": para_start + sent_match.end(),
-                        "paragraph": para_num,
-                    })
+                    sentences.append(
+                        {
+                            "text": sent_text,
+                            "start": para_start + sent_match.start(),
+                            "end": para_start + sent_match.end(),
+                            "paragraph": para_num,
+                        }
+                    )
 
             para_num += 1
 
@@ -492,9 +497,9 @@ class DuplicateDetector:
         # Lowercase
         text = text.lower()
         # Eliminar espacios múltiples
-        text = re.sub(r'\s+', ' ', text)
+        text = re.sub(r"\s+", " ", text)
         # Eliminar puntuación extra
-        text = re.sub(r'[.,;:!?]+', ' ', text)
+        text = re.sub(r"[.,;:!?]+", " ", text)
         # Strip
         text = text.strip()
         return text
@@ -506,6 +511,7 @@ class DuplicateDetector:
     def _cosine_similarity(self, vec1, vec2) -> float:
         """Calcular similitud coseno."""
         import numpy as np
+
         dot = np.dot(vec1, vec2)
         norm1 = np.linalg.norm(vec1)
         norm2 = np.linalg.norm(vec2)
@@ -513,11 +519,7 @@ class DuplicateDetector:
             return 0.0
         return float(dot / (norm1 * norm2))
 
-    def _find_chapter(
-        self,
-        position: int,
-        chapters: Optional[list[dict]]
-    ) -> int:
+    def _find_chapter(self, position: int, chapters: list[dict] | None) -> int:
         """Encontrar número de capítulo para una posición."""
         if not chapters:
             return 0

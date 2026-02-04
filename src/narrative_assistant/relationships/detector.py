@@ -20,7 +20,6 @@ import re
 import threading
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
 from .models import (
     EntityRelationship,
@@ -36,12 +35,14 @@ logger = logging.getLogger(__name__)
 # Enums y Configuración del Sistema de Votación
 # =============================================================================
 
+
 class RelationDetectionMethod(Enum):
     """Métodos de detección de relaciones."""
-    PATTERNS = "patterns"          # Patrones regex explícitos
-    DEPENDENCY = "dependency"      # Análisis de dependencias sintácticas
-    LLM = "llm"                    # LLM local (Ollama)
-    EMBEDDINGS = "embeddings"      # Similitud semántica
+
+    PATTERNS = "patterns"  # Patrones regex explícitos
+    DEPENDENCY = "dependency"  # Análisis de dependencias sintácticas
+    LLM = "llm"  # LLM local (Ollama)
+    EMBEDDINGS = "embeddings"  # Similitud semántica
 
 
 # Pesos por defecto para votación
@@ -65,6 +66,7 @@ def _get_default_relation_methods() -> list[RelationDetectionMethod]:
     """
     try:
         from ..core.device import get_device_config
+
         device_config = get_device_config()
         has_gpu = device_config.device_type in ("cuda", "mps")
     except Exception:
@@ -83,6 +85,7 @@ def _get_default_relation_methods() -> list[RelationDetectionMethod]:
 @dataclass
 class RelationDetectionConfig:
     """Configuración del sistema de detección de relaciones."""
+
     enabled_methods: list[RelationDetectionMethod] = field(
         default_factory=_get_default_relation_methods
     )
@@ -109,9 +112,11 @@ class RelationDetectionConfig:
 # Estructuras de Datos
 # =============================================================================
 
+
 @dataclass
 class DetectedRelation:
     """Relación detectada antes de ser confirmada."""
+
     source_name: str
     target_name: str
     relation_type: RelationType
@@ -128,6 +133,7 @@ class DetectedRelation:
 # =============================================================================
 # Implementaciones de Métodos de Detección
 # =============================================================================
+
 
 class DependencyRelationMethod:
     """
@@ -181,6 +187,7 @@ class DependencyRelationMethod:
                 if self._nlp is None:
                     try:
                         from ..nlp.spacy_gpu import load_spacy_model
+
                         self._nlp = load_spacy_model()
                     except Exception as e:
                         logger.warning(f"No se pudo cargar spaCy para dependencias: {e}")
@@ -190,7 +197,7 @@ class DependencyRelationMethod:
         self,
         text: str,
         chapter: int = 0,
-        entities: Optional[list[str]] = None,
+        entities: list[str] | None = None,
     ) -> list[tuple[DetectedRelation, float, str]]:
         """
         Detecta relaciones usando análisis de dependencias.
@@ -202,7 +209,7 @@ class DependencyRelationMethod:
             return []
 
         results = []
-        entity_set = set(e.lower() for e in (entities or []))
+        entity_set = {e.lower() for e in (entities or [])}
 
         try:
             doc = self.nlp(text)
@@ -259,7 +266,7 @@ class DependencyRelationMethod:
         chapter: int,
         entity_set: set[str],
         full_text: str,
-    ) -> Optional[tuple[DetectedRelation, float, str]]:
+    ) -> tuple[DetectedRelation, float, str] | None:
         """Extrae relación de un verbo emocional/relacional."""
         source = None
         target = None
@@ -311,7 +318,7 @@ class DependencyRelationMethod:
         chapter: int,
         entity_set: set[str],
         full_text: str,
-    ) -> Optional[tuple[DetectedRelation, float, str]]:
+    ) -> tuple[DetectedRelation, float, str] | None:
         """Extrae relación de construcción 'X es Y de Z'."""
         source = None
         attribute = None
@@ -331,9 +338,15 @@ class DependencyRelationMethod:
                         for subsubchild in child.children:
                             if subsubchild.dep_ == "nmod":
                                 for nmod_child in subsubchild.children:
-                                    if nmod_child.ent_type_ in ("PER", "PERSON") or nmod_child.text[0].isupper():
+                                    if (
+                                        nmod_child.ent_type_ in ("PER", "PERSON")
+                                        or nmod_child.text[0].isupper()
+                                    ):
                                         target = nmod_child.text
-                                if not target and (subsubchild.ent_type_ in ("PER", "PERSON") or subsubchild.text[0].isupper()):
+                                if not target and (
+                                    subsubchild.ent_type_ in ("PER", "PERSON")
+                                    or subsubchild.text[0].isupper()
+                                ):
                                     target = subsubchild.text
 
         # Mapear atributo a tipo de relación
@@ -393,6 +406,7 @@ class LLMRelationMethod:
                 if self._client is None:
                     try:
                         from ..llm.client import get_llm_client
+
                         self._client = get_llm_client()
                     except Exception as e:
                         logger.warning(f"No se pudo conectar LLM para relaciones: {e}")
@@ -402,7 +416,7 @@ class LLMRelationMethod:
         self,
         text: str,
         chapter: int = 0,
-        entities: Optional[list[str]] = None,
+        entities: list[str] | None = None,
     ) -> list[tuple[DetectedRelation, float, str]]:
         """
         Detecta relaciones usando LLM.
@@ -477,7 +491,7 @@ Lista todas las relaciones encontradas:"""
         # Patrones para parsear respuesta
         relation_pattern = re.compile(
             r"RELACION:\s*(?P<source>[^->]+?)\s*->\s*(?P<type>\w+)\s*->\s*(?P<target>[^->]+)",
-            re.IGNORECASE
+            re.IGNORECASE,
         )
         evidence_pattern = re.compile(r'EVIDENCIA:\s*["\']?([^"\']+)["\']?', re.IGNORECASE)
         confidence_pattern = re.compile(r"CONFIANZA:\s*(alta|media|baja)", re.IGNORECASE)
@@ -506,10 +520,7 @@ Lista todas las relaciones encontradas:"""
             # Obtener confianza
             conf_match = confidence_pattern.search(block)
             conf_map = {"alta": 0.9, "media": 0.7, "baja": 0.5}
-            confidence = conf_map.get(
-                conf_match.group(1).lower() if conf_match else "media",
-                0.7
-            )
+            confidence = conf_map.get(conf_match.group(1).lower() if conf_match else "media", 0.7)
 
             # Buscar posición en texto original
             start_char = original_text.find(source)
@@ -531,7 +542,7 @@ Lista todas las relaciones encontradas:"""
 
         return results
 
-    def _map_relation_type(self, type_str: str) -> Optional[RelationType]:
+    def _map_relation_type(self, type_str: str) -> RelationType | None:
         """Mapea string a RelationType."""
         mapping = {
             "PARENT": RelationType.PARENT,
@@ -571,36 +582,16 @@ class EmbeddingsRelationMethod:
 
     # Frases prototipo para cada tipo de relación
     RELATION_PROTOTYPES = {
-        RelationType.PARENT: [
-            "es el padre de", "es la madre de", "su padre", "su madre"
-        ],
-        RelationType.CHILD: [
-            "es el hijo de", "es la hija de", "su hijo", "su hija"
-        ],
-        RelationType.SIBLING: [
-            "es hermano de", "es hermana de", "son hermanos"
-        ],
-        RelationType.SPOUSE: [
-            "es esposo de", "es esposa de", "están casados"
-        ],
-        RelationType.FRIEND: [
-            "son amigos", "es amigo de", "amistad", "mejor amigo"
-        ],
-        RelationType.ENEMY: [
-            "son enemigos", "es enemigo de", "lo odia", "lo detesta"
-        ],
-        RelationType.HATES: [
-            "odia a", "detesta a", "no soporta a", "aborrece"
-        ],
-        RelationType.LOVER: [
-            "ama a", "está enamorado de", "quiere a", "amor"
-        ],
-        RelationType.FEARS: [
-            "teme a", "tiene miedo de", "le asusta"
-        ],
-        RelationType.TRUSTS: [
-            "confía en", "se fía de", "tiene confianza"
-        ],
+        RelationType.PARENT: ["es el padre de", "es la madre de", "su padre", "su madre"],
+        RelationType.CHILD: ["es el hijo de", "es la hija de", "su hijo", "su hija"],
+        RelationType.SIBLING: ["es hermano de", "es hermana de", "son hermanos"],
+        RelationType.SPOUSE: ["es esposo de", "es esposa de", "están casados"],
+        RelationType.FRIEND: ["son amigos", "es amigo de", "amistad", "mejor amigo"],
+        RelationType.ENEMY: ["son enemigos", "es enemigo de", "lo odia", "lo detesta"],
+        RelationType.HATES: ["odia a", "detesta a", "no soporta a", "aborrece"],
+        RelationType.LOVER: ["ama a", "está enamorado de", "quiere a", "amor"],
+        RelationType.FEARS: ["teme a", "tiene miedo de", "le asusta"],
+        RelationType.TRUSTS: ["confía en", "se fía de", "tiene confianza"],
     }
 
     def __init__(self):
@@ -616,6 +607,7 @@ class EmbeddingsRelationMethod:
                 if self._embeddings is None:
                     try:
                         from ..nlp.embeddings import get_embeddings_model
+
                         self._embeddings = get_embeddings_model()
                     except Exception as e:
                         logger.warning(f"No se pudo cargar embeddings para relaciones: {e}")
@@ -636,6 +628,7 @@ class EmbeddingsRelationMethod:
                         pass
                 if embeddings_list:
                     import numpy as np
+
                     self._prototype_embeddings[rel_type] = np.mean(embeddings_list, axis=0)
         return self._prototype_embeddings or {}
 
@@ -707,155 +700,311 @@ class RelationshipDetector:
     # Patrones para relaciones familiares
     FAMILY_PATTERNS = [
         # "María, madre de Juan" o "María, la madre de Juan"
-        (r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+(?:la\s+)?madre\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
-         RelationType.PARENT, 0.9),
-        (r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+(?:el\s+)?padre\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
-         RelationType.PARENT, 0.9),
+        (
+            r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+(?:la\s+)?madre\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
+            RelationType.PARENT,
+            0.9,
+        ),
+        (
+            r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+(?:el\s+)?padre\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
+            RelationType.PARENT,
+            0.9,
+        ),
         # "el hijo de María" - captura inversa
-        (r"(?:el\s+)?hijo\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)(?:,\s*(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+))?",
-         RelationType.CHILD, 0.85),
-        (r"(?:la\s+)?hija\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)(?:,\s*(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+))?",
-         RelationType.CHILD, 0.85),
+        (
+            r"(?:el\s+)?hijo\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)(?:,\s*(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+))?",
+            RelationType.CHILD,
+            0.85,
+        ),
+        (
+            r"(?:la\s+)?hija\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)(?:,\s*(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+))?",
+            RelationType.CHILD,
+            0.85,
+        ),
         # Hermanos
-        (r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+(?:el\s+)?hermano\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
-         RelationType.SIBLING, 0.9),
-        (r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+(?:la\s+)?hermana\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
-         RelationType.SIBLING, 0.9),
+        (
+            r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+(?:el\s+)?hermano\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
+            RelationType.SIBLING,
+            0.9,
+        ),
+        (
+            r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+(?:la\s+)?hermana\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
+            RelationType.SIBLING,
+            0.9,
+        ),
         # "X y su madre/padre"
-        (r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+y\s+su\s+(?P<rel>madre|padre|hermano|hermana|hijo|hija)",
-         None, 0.7),  # None = se determina por grupo rel
+        (
+            r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+y\s+su\s+(?P<rel>madre|padre|hermano|hermana|hijo|hija)",
+            None,
+            0.7,
+        ),  # None = se determina por grupo rel
         # Abuelos
-        (r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+(?:el\s+)?abuelo\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
-         RelationType.GRANDPARENT, 0.9),
-        (r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+(?:la\s+)?abuela\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
-         RelationType.GRANDPARENT, 0.9),
+        (
+            r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+(?:el\s+)?abuelo\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
+            RelationType.GRANDPARENT,
+            0.9,
+        ),
+        (
+            r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+(?:la\s+)?abuela\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
+            RelationType.GRANDPARENT,
+            0.9,
+        ),
         # Esposos
-        (r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+(?:el\s+)?esposo\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
-         RelationType.SPOUSE, 0.9),
-        (r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+(?:la\s+)?esposa\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
-         RelationType.SPOUSE, 0.9),
-        (r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+(?:el\s+)?marido\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
-         RelationType.SPOUSE, 0.9),
-        (r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+(?:la\s+)?mujer\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
-         RelationType.SPOUSE, 0.85),
+        (
+            r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+(?:el\s+)?esposo\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
+            RelationType.SPOUSE,
+            0.9,
+        ),
+        (
+            r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+(?:la\s+)?esposa\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
+            RelationType.SPOUSE,
+            0.9,
+        ),
+        (
+            r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+(?:el\s+)?marido\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
+            RelationType.SPOUSE,
+            0.9,
+        ),
+        (
+            r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+(?:la\s+)?mujer\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
+            RelationType.SPOUSE,
+            0.85,
+        ),
         # Tíos/primos
-        (r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+(?:el\s+)?tío\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
-         RelationType.UNCLE_AUNT, 0.9),
-        (r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+(?:la\s+)?tía\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
-         RelationType.UNCLE_AUNT, 0.9),
-        (r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+(?:el\s+)?primo\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
-         RelationType.COUSIN, 0.9),
-        (r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+(?:la\s+)?prima\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
-         RelationType.COUSIN, 0.9),
+        (
+            r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+(?:el\s+)?tío\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
+            RelationType.UNCLE_AUNT,
+            0.9,
+        ),
+        (
+            r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+(?:la\s+)?tía\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
+            RelationType.UNCLE_AUNT,
+            0.9,
+        ),
+        (
+            r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+(?:el\s+)?primo\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
+            RelationType.COUSIN,
+            0.9,
+        ),
+        (
+            r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+(?:la\s+)?prima\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
+            RelationType.COUSIN,
+            0.9,
+        ),
     ]
 
     # Patrones para relaciones sociales
     SOCIAL_PATTERNS = [
         # Amigos
-        (r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+(?:el\s+)?amigo\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
-         RelationType.FRIEND, 0.85),
-        (r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+(?:la\s+)?amiga\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
-         RelationType.FRIEND, 0.85),
-        (r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+y\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+eran\s+(?:los\s+)?mejores\s+amigos",
-         RelationType.FRIEND, 0.9),
-        (r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+y\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+eran\s+amigos",
-         RelationType.FRIEND, 0.85),
+        (
+            r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+(?:el\s+)?amigo\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
+            RelationType.FRIEND,
+            0.85,
+        ),
+        (
+            r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+(?:la\s+)?amiga\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
+            RelationType.FRIEND,
+            0.85,
+        ),
+        (
+            r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+y\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+eran\s+(?:los\s+)?mejores\s+amigos",
+            RelationType.FRIEND,
+            0.9,
+        ),
+        (
+            r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+y\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+eran\s+amigos",
+            RelationType.FRIEND,
+            0.85,
+        ),
         # Enemigos
-        (r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+(?:el\s+)?enemigo\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
-         RelationType.ENEMY, 0.85),
-        (r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+y\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+eran\s+enemigos",
-         RelationType.ENEMY, 0.85),
+        (
+            r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+(?:el\s+)?enemigo\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
+            RelationType.ENEMY,
+            0.85,
+        ),
+        (
+            r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+y\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+eran\s+enemigos",
+            RelationType.ENEMY,
+            0.85,
+        ),
         # Rivales
-        (r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+(?:el\s+)?rival\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
-         RelationType.RIVAL, 0.85),
+        (
+            r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+(?:el\s+)?rival\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
+            RelationType.RIVAL,
+            0.85,
+        ),
         # Mentor
-        (r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+(?:el\s+)?mentor\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
-         RelationType.MENTOR, 0.85),
-        (r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+(?:el\s+)?maestro\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
-         RelationType.MENTOR, 0.8),
+        (
+            r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+(?:el\s+)?mentor\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
+            RelationType.MENTOR,
+            0.85,
+        ),
+        (
+            r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+(?:el\s+)?maestro\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
+            RelationType.MENTOR,
+            0.8,
+        ),
     ]
 
     # Patrones para relaciones emocionales (verbos)
     EMOTIONAL_PATTERNS = [
         # Odio
-        (r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+odiaba\s+(?:a\s+)?(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
-         RelationType.HATES, 0.85),
-        (r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+detestaba\s+(?:a\s+)?(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
-         RelationType.HATES, 0.8),
-        (r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+aborrecía\s+(?:a\s+)?(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
-         RelationType.HATES, 0.85),
+        (
+            r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+odiaba\s+(?:a\s+)?(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
+            RelationType.HATES,
+            0.85,
+        ),
+        (
+            r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+detestaba\s+(?:a\s+)?(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
+            RelationType.HATES,
+            0.8,
+        ),
+        (
+            r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+aborrecía\s+(?:a\s+)?(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
+            RelationType.HATES,
+            0.85,
+        ),
         # Miedo
-        (r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+temía\s+(?:a\s+)?(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+|el\s+\w+|la\s+\w+)",
-         RelationType.FEARS, 0.8),
-        (r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+tenía\s+miedo\s+(?:de\s+)?(?:a\s+)?(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+|el\s+\w+|la\s+\w+)",
-         RelationType.FEARS, 0.85),
+        (
+            r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+temía\s+(?:a\s+)?(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+|el\s+\w+|la\s+\w+)",
+            RelationType.FEARS,
+            0.8,
+        ),
+        (
+            r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+tenía\s+miedo\s+(?:de\s+)?(?:a\s+)?(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+|el\s+\w+|la\s+\w+)",
+            RelationType.FEARS,
+            0.85,
+        ),
         # Amor
-        (r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+amaba\s+(?:a\s+)?(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
-         RelationType.LOVER, 0.85),
-        (r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+(?:estaba\s+)?enamorad[oa]\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
-         RelationType.LOVER, 0.9),
-        (r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+quería\s+(?:a\s+)?(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
-         RelationType.LOVER, 0.6),  # Menor confianza, "querer" es ambiguo
+        (
+            r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+amaba\s+(?:a\s+)?(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
+            RelationType.LOVER,
+            0.85,
+        ),
+        (
+            r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+(?:estaba\s+)?enamorad[oa]\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
+            RelationType.LOVER,
+            0.9,
+        ),
+        (
+            r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+quería\s+(?:a\s+)?(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
+            RelationType.LOVER,
+            0.6,
+        ),  # Menor confianza, "querer" es ambiguo
         # Admiración
-        (r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+admiraba\s+(?:a\s+)?(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
-         RelationType.ADMIRES, 0.85),
+        (
+            r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+admiraba\s+(?:a\s+)?(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
+            RelationType.ADMIRES,
+            0.85,
+        ),
         # Confianza/Desconfianza
-        (r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+confiaba\s+(?:en\s+)?(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
-         RelationType.TRUSTS, 0.8),
-        (r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+desconfiaba\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
-         RelationType.DISTRUSTS, 0.8),
+        (
+            r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+confiaba\s+(?:en\s+)?(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
+            RelationType.TRUSTS,
+            0.8,
+        ),
+        (
+            r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+desconfiaba\s+de\s+(?P<target>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
+            RelationType.DISTRUSTS,
+            0.8,
+        ),
     ]
 
     # Patrones para posesión
     POSSESSION_PATTERNS = [
         # "la espada de Juan", "el anillo de María"
-        (r"(?:el|la)\s+(?P<object>\w+)\s+de\s+(?P<owner>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
-         RelationType.OWNED_BY, 0.6),
+        (
+            r"(?:el|la)\s+(?P<object>\w+)\s+de\s+(?P<owner>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
+            RelationType.OWNED_BY,
+            0.6,
+        ),
         # "Juan tenía una espada"
-        (r"(?P<owner>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+tenía\s+(?:un|una)\s+(?P<object>\w+)",
-         RelationType.OWNS, 0.7),
+        (
+            r"(?P<owner>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+tenía\s+(?:un|una)\s+(?P<object>\w+)",
+            RelationType.OWNS,
+            0.7,
+        ),
         # "Juan poseía"
-        (r"(?P<owner>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+poseía\s+(?:el|la|un|una)\s+(?P<object>\w+)",
-         RelationType.OWNS, 0.8),
+        (
+            r"(?P<owner>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+poseía\s+(?:el|la|un|una)\s+(?P<object>\w+)",
+            RelationType.OWNS,
+            0.8,
+        ),
     ]
 
     # Patrones espaciales
     SPATIAL_PATTERNS = [
-        (r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+vivía\s+en\s+(?P<place>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+|\w+)",
-         RelationType.LIVES_IN, 0.85),
-        (r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+trabajaba\s+en\s+(?P<place>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+|\w+)",
-         RelationType.WORKS_IN, 0.8),
-        (r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+nació\s+en\s+(?P<place>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+|\w+)",
-         RelationType.BORN_IN, 0.9),
-        (r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+murió\s+en\s+(?P<place>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+|\w+)",
-         RelationType.DIED_IN, 0.9),
-        (r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+evitaba\s+(?P<place>el\s+\w+|la\s+\w+)",
-         RelationType.AVOIDS, 0.75),
-        (r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+nunca\s+(?:se\s+)?acercaba\s+(?:a\s+)?(?P<place>el\s+\w+|la\s+\w+)",
-         RelationType.AVOIDS, 0.8),
+        (
+            r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+vivía\s+en\s+(?P<place>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+|\w+)",
+            RelationType.LIVES_IN,
+            0.85,
+        ),
+        (
+            r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+trabajaba\s+en\s+(?P<place>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+|\w+)",
+            RelationType.WORKS_IN,
+            0.8,
+        ),
+        (
+            r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+nació\s+en\s+(?P<place>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+|\w+)",
+            RelationType.BORN_IN,
+            0.9,
+        ),
+        (
+            r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+murió\s+en\s+(?P<place>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+|\w+)",
+            RelationType.DIED_IN,
+            0.9,
+        ),
+        (
+            r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+evitaba\s+(?P<place>el\s+\w+|la\s+\w+)",
+            RelationType.AVOIDS,
+            0.75,
+        ),
+        (
+            r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+nunca\s+(?:se\s+)?acercaba\s+(?:a\s+)?(?P<place>el\s+\w+|la\s+\w+)",
+            RelationType.AVOIDS,
+            0.8,
+        ),
     ]
 
     # Patrones para membresía
     MEMBERSHIP_PATTERNS = [
-        (r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+miembro\s+de\s+(?:la\s+)?(?P<org>\w+)",
-         RelationType.MEMBER_OF, 0.85),
-        (r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+fundador\s+de\s+(?:la\s+)?(?P<org>\w+)",
-         RelationType.FOUNDER_OF, 0.9),
-        (r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+líder\s+de\s+(?:la\s+)?(?P<org>\w+)",
-         RelationType.LEADER_OF, 0.85),
+        (
+            r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+miembro\s+de\s+(?:la\s+)?(?P<org>\w+)",
+            RelationType.MEMBER_OF,
+            0.85,
+        ),
+        (
+            r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+fundador\s+de\s+(?:la\s+)?(?P<org>\w+)",
+            RelationType.FOUNDER_OF,
+            0.9,
+        ),
+        (
+            r"(?P<source>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+),?\s+líder\s+de\s+(?:la\s+)?(?P<org>\w+)",
+            RelationType.LEADER_OF,
+            0.85,
+        ),
     ]
 
     # Patrones sobrenaturales
     SUPERNATURAL_PATTERNS = [
-        (r"(?:la\s+)?(?P<object>\w+)\s+maldita?\s+(?:de\s+)?(?P<entity>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
-         RelationType.CURSED_BY, 0.75),
-        (r"(?P<entity>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+(?:estaba\s+)?maldito\s+por\s+(?P<source>\w+)",
-         RelationType.CURSED_BY, 0.8),
-        (r"(?P<object>\w+)\s+bendecid[oa]\s+por\s+(?P<entity>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
-         RelationType.BLESSED_BY, 0.8),
+        (
+            r"(?:la\s+)?(?P<object>\w+)\s+maldita?\s+(?:de\s+)?(?P<entity>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
+            RelationType.CURSED_BY,
+            0.75,
+        ),
+        (
+            r"(?P<entity>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+(?:estaba\s+)?maldito\s+por\s+(?P<source>\w+)",
+            RelationType.CURSED_BY,
+            0.8,
+        ),
+        (
+            r"(?P<object>\w+)\s+bendecid[oa]\s+por\s+(?P<entity>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
+            RelationType.BLESSED_BY,
+            0.8,
+        ),
     ]
 
-    def __init__(self, known_entities: Optional[list[str]] = None):
+    def __init__(self, known_entities: list[str] | None = None):
         """
         Inicializa el detector.
 
@@ -871,13 +1020,13 @@ class RelationshipDetector:
         self._compiled_patterns = []
 
         all_patterns = (
-            self.FAMILY_PATTERNS +
-            self.SOCIAL_PATTERNS +
-            self.EMOTIONAL_PATTERNS +
-            self.POSSESSION_PATTERNS +
-            self.SPATIAL_PATTERNS +
-            self.MEMBERSHIP_PATTERNS +
-            self.SUPERNATURAL_PATTERNS
+            self.FAMILY_PATTERNS
+            + self.SOCIAL_PATTERNS
+            + self.EMOTIONAL_PATTERNS
+            + self.POSSESSION_PATTERNS
+            + self.SPATIAL_PATTERNS
+            + self.MEMBERSHIP_PATTERNS
+            + self.SUPERNATURAL_PATTERNS
         )
 
         for pattern_tuple in all_patterns:
@@ -892,7 +1041,7 @@ class RelationshipDetector:
         self,
         text: str,
         chapter: int = 0,
-        entities: Optional[list[str]] = None,
+        entities: list[str] | None = None,
     ) -> list[DetectedRelation]:
         """
         Detecta relaciones en un texto.
@@ -940,22 +1089,24 @@ class RelationshipDetector:
                         adjusted_confidence += 0.1
                     adjusted_confidence = min(1.0, adjusted_confidence)
 
-                detected.append(DetectedRelation(
-                    source_name=source.strip(),
-                    target_name=target.strip(),
-                    relation_type=actual_rel_type,
-                    evidence_text=match.group(0),
-                    chapter=chapter,
-                    start_char=match.start(),
-                    end_char=match.end(),
-                    confidence=adjusted_confidence,
-                    detection_method="pattern",
-                ))
+                detected.append(
+                    DetectedRelation(
+                        source_name=source.strip(),
+                        target_name=target.strip(),
+                        relation_type=actual_rel_type,
+                        evidence_text=match.group(0),
+                        chapter=chapter,
+                        start_char=match.start(),
+                        end_char=match.end(),
+                        confidence=adjusted_confidence,
+                        detection_method="pattern",
+                    )
+                )
 
         # Eliminar duplicados (misma relación detectada por múltiples patrones)
         return self._deduplicate_relations(detected)
 
-    def _get_relation_from_word(self, word: str) -> Optional[RelationType]:
+    def _get_relation_from_word(self, word: str) -> RelationType | None:
         """Determina tipo de relación desde palabra clave."""
         word = word.lower()
         mapping = {
@@ -1036,23 +1187,31 @@ class RelationshipDetector:
 
             for pattern, rel_type, confidence in dialogue_patterns:
                 if re.search(pattern, dialogue, re.IGNORECASE):
-                    detected.append(DetectedRelation(
-                        source_name=speaker,
-                        target_name=receiver,
-                        relation_type=rel_type,
-                        evidence_text=dialogue,
-                        chapter=chapter,
-                        confidence=confidence,
-                        detection_method="dialogue",
-                    ))
+                    detected.append(
+                        DetectedRelation(
+                            source_name=speaker,
+                            target_name=receiver,
+                            relation_type=rel_type,
+                            evidence_text=dialogue,
+                            chapter=chapter,
+                            confidence=confidence,
+                            detection_method="dialogue",
+                        )
+                    )
 
         # Detectar menciones a terceros
         # "Mi hermano Juan..."
         third_person_patterns = [
-            (r"mi\s+(?P<rel>hermano|hermana|padre|madre|hijo|hija)\s+(?P<name>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
-             None, 0.85),
-            (r"(?P<name>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+es\s+mi\s+(?P<rel>hermano|hermana|padre|madre|amigo|amiga|enemigo)",
-             None, 0.85),
+            (
+                r"mi\s+(?P<rel>hermano|hermana|padre|madre|hijo|hija)\s+(?P<name>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
+                None,
+                0.85,
+            ),
+            (
+                r"(?P<name>[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+es\s+mi\s+(?P<rel>hermano|hermana|padre|madre|amigo|amiga|enemigo)",
+                None,
+                0.85,
+            ),
         ]
 
         for pattern, _, confidence in third_person_patterns:
@@ -1064,15 +1223,17 @@ class RelationshipDetector:
 
                 rel_type = self._get_relation_from_word(rel_word)
                 if rel_type and name:
-                    detected.append(DetectedRelation(
-                        source_name=speaker,
-                        target_name=name,
-                        relation_type=rel_type,
-                        evidence_text=match.group(0),
-                        chapter=chapter,
-                        confidence=confidence,
-                        detection_method="dialogue",
-                    ))
+                    detected.append(
+                        DetectedRelation(
+                            source_name=speaker,
+                            target_name=name,
+                            relation_type=rel_type,
+                            evidence_text=match.group(0),
+                            chapter=chapter,
+                            confidence=confidence,
+                            detection_method="dialogue",
+                        )
+                    )
 
         return detected
 
@@ -1080,7 +1241,7 @@ class RelationshipDetector:
         self,
         detected: list[DetectedRelation],
         project_id: int = 0,
-        entity_id_map: Optional[dict[str, str]] = None,
+        entity_id_map: dict[str, str] | None = None,
     ) -> list[EntityRelationship]:
         """
         Convierte relaciones detectadas a EntityRelationship.
@@ -1133,7 +1294,7 @@ class RelationshipDetector:
 def detect_relationships_from_text(
     text: str,
     chapter: int = 0,
-    known_entities: Optional[list[str]] = None,
+    known_entities: list[str] | None = None,
 ) -> list[DetectedRelation]:
     """
     Función de conveniencia para detectar relaciones (solo patrones).
@@ -1154,6 +1315,7 @@ def detect_relationships_from_text(
 # Sistema de Votación Multi-Método
 # =============================================================================
 
+
 @dataclass
 class RelationDetectionResult:
     """
@@ -1165,6 +1327,7 @@ class RelationDetectionResult:
         processing_time_ms: Tiempo de procesamiento
         consensus_stats: Estadísticas de consenso entre métodos
     """
+
     relations: list[DetectedRelation] = field(default_factory=list)
     method_contributions: dict[str, int] = field(default_factory=dict)
     processing_time_ms: float = 0.0
@@ -1201,8 +1364,8 @@ class VotingRelationshipDetector:
 
     def __init__(
         self,
-        config: Optional[RelationDetectionConfig] = None,
-        known_entities: Optional[list[str]] = None,
+        config: RelationDetectionConfig | None = None,
+        known_entities: list[str] | None = None,
     ):
         """
         Inicializa el detector con votación.
@@ -1216,9 +1379,9 @@ class VotingRelationshipDetector:
 
         # Inicializar métodos
         self._pattern_detector = RelationshipDetector(known_entities)
-        self._dependency_method: Optional[DependencyRelationMethod] = None
-        self._llm_method: Optional[LLMRelationMethod] = None
-        self._embeddings_method: Optional[EmbeddingsRelationMethod] = None
+        self._dependency_method: DependencyRelationMethod | None = None
+        self._llm_method: LLMRelationMethod | None = None
+        self._embeddings_method: EmbeddingsRelationMethod | None = None
 
         self._init_methods()
 
@@ -1235,8 +1398,7 @@ class VotingRelationshipDetector:
                     self._dependency_method = DependencyRelationMethod()
                 elif method == RelationDetectionMethod.LLM:
                     self._llm_method = LLMRelationMethod(
-                        model=self.config.ollama_model,
-                        timeout=self.config.ollama_timeout
+                        model=self.config.ollama_model, timeout=self.config.ollama_timeout
                     )
                 elif method == RelationDetectionMethod.EMBEDDINGS:
                     self._embeddings_method = EmbeddingsRelationMethod()
@@ -1248,7 +1410,7 @@ class VotingRelationshipDetector:
         self,
         text: str,
         chapter: int = 0,
-        entities: Optional[list[str]] = None,
+        entities: list[str] | None = None,
     ) -> RelationDetectionResult:
         """
         Detecta relaciones usando votación multi-método.
@@ -1262,6 +1424,7 @@ class VotingRelationshipDetector:
             RelationDetectionResult con relaciones y estadísticas
         """
         import time
+
         start_time = time.time()
 
         result = RelationDetectionResult()
@@ -1270,7 +1433,7 @@ class VotingRelationshipDetector:
         # Recolectar candidatos de cada método
         all_candidates: dict[
             tuple[str, str, RelationType],
-            list[tuple[DetectedRelation, float, str, RelationDetectionMethod]]
+            list[tuple[DetectedRelation, float, str, RelationDetectionMethod]],
         ] = {}
 
         # 1. Detección por patrones (siempre activo)
@@ -1282,39 +1445,38 @@ class VotingRelationshipDetector:
                 key = (rel.source_name.lower(), rel.target_name.lower(), rel.relation_type)
                 if key not in all_candidates:
                     all_candidates[key] = []
-                all_candidates[key].append((
-                    rel, rel.confidence, "patrón explícito", RelationDetectionMethod.PATTERNS
-                ))
+                all_candidates[key].append(
+                    (rel, rel.confidence, "patrón explícito", RelationDetectionMethod.PATTERNS)
+                )
             result.method_contributions["patterns"] = len(pattern_results)
 
         # 2. Detección por dependencias
-        if (RelationDetectionMethod.DEPENDENCY in self.config.enabled_methods
-            and self._dependency_method):
+        if (
+            RelationDetectionMethod.DEPENDENCY in self.config.enabled_methods
+            and self._dependency_method
+        ):
             try:
                 dep_results = self._dependency_method.detect(text, chapter, working_entities)
                 for rel, score, reasoning in dep_results:
                     key = (rel.source_name.lower(), rel.target_name.lower(), rel.relation_type)
                     if key not in all_candidates:
                         all_candidates[key] = []
-                    all_candidates[key].append((
-                        rel, score, reasoning, RelationDetectionMethod.DEPENDENCY
-                    ))
+                    all_candidates[key].append(
+                        (rel, score, reasoning, RelationDetectionMethod.DEPENDENCY)
+                    )
                 result.method_contributions["dependency"] = len(dep_results)
             except Exception as e:
                 logger.debug(f"Error en detección por dependencias: {e}")
 
         # 3. Detección por LLM
-        if (RelationDetectionMethod.LLM in self.config.enabled_methods
-            and self._llm_method):
+        if RelationDetectionMethod.LLM in self.config.enabled_methods and self._llm_method:
             try:
                 llm_results = self._llm_method.detect(text, chapter, working_entities)
                 for rel, score, reasoning in llm_results:
                     key = (rel.source_name.lower(), rel.target_name.lower(), rel.relation_type)
                     if key not in all_candidates:
                         all_candidates[key] = []
-                    all_candidates[key].append((
-                        rel, score, reasoning, RelationDetectionMethod.LLM
-                    ))
+                    all_candidates[key].append((rel, score, reasoning, RelationDetectionMethod.LLM))
                 result.method_contributions["llm"] = len(llm_results)
             except Exception as e:
                 logger.debug(f"Error en detección LLM: {e}")
@@ -1323,8 +1485,10 @@ class VotingRelationshipDetector:
         result.relations = self._vote_and_consolidate(all_candidates, text)
 
         # 5. Validación con embeddings (ajusta confianza)
-        if (RelationDetectionMethod.EMBEDDINGS in self.config.enabled_methods
-            and self._embeddings_method):
+        if (
+            RelationDetectionMethod.EMBEDDINGS in self.config.enabled_methods
+            and self._embeddings_method
+        ):
             result.relations = self._validate_with_embeddings(result.relations, text)
 
         # Calcular estadísticas
@@ -1356,7 +1520,7 @@ class VotingRelationshipDetector:
         """
         consolidated = []
 
-        for key, votes in candidates.items():
+        for _key, votes in candidates.items():
             if not votes:
                 continue
 
@@ -1366,7 +1530,7 @@ class VotingRelationshipDetector:
             methods_agreed = []
             reasoning_parts = {}
 
-            for rel, score, reasoning, method in votes:
+            for _rel, score, reasoning, method in votes:
                 weight = self.config.method_weights.get(method, 0.1)
                 weighted_sum += score * weight
                 total_weight += weight
@@ -1431,9 +1595,7 @@ class VotingRelationshipDetector:
             context = text[context_start:context_end]
 
             # Validar con embeddings
-            new_confidence, reasoning = self._embeddings_method.validate_relation(
-                rel, context
-            )
+            new_confidence, reasoning = self._embeddings_method.validate_relation(rel, context)
 
             # Actualizar relación
             rel.confidence = new_confidence
@@ -1471,12 +1633,12 @@ class VotingRelationshipDetector:
 # =============================================================================
 
 _voting_detector_lock = threading.Lock()
-_voting_detector: Optional[VotingRelationshipDetector] = None
+_voting_detector: VotingRelationshipDetector | None = None
 
 
 def get_voting_relationship_detector(
-    config: Optional[RelationDetectionConfig] = None,
-    known_entities: Optional[list[str]] = None,
+    config: RelationDetectionConfig | None = None,
+    known_entities: list[str] | None = None,
 ) -> VotingRelationshipDetector:
     """
     Obtiene el singleton del detector de relaciones con votación.
@@ -1508,8 +1670,8 @@ def reset_voting_detector() -> None:
 def detect_relationships_voting(
     text: str,
     chapter: int = 0,
-    entities: Optional[list[str]] = None,
-    config: Optional[RelationDetectionConfig] = None,
+    entities: list[str] | None = None,
+    config: RelationDetectionConfig | None = None,
 ) -> RelationDetectionResult:
     """
     Función de conveniencia para detectar relaciones con votación multi-método.

@@ -23,8 +23,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
 
+from ...core.errors import ErrorSeverity, NLPError
 from ...core.result import Result
-from ...core.errors import NLPError, ErrorSeverity
 
 logger = logging.getLogger(__name__)
 
@@ -59,58 +59,178 @@ def reset_readability_analyzer() -> None:
 # Tipos
 # =============================================================================
 
+
 class ReadabilityLevel(Enum):
     """Nivel de legibilidad según la escala INFLESZ."""
-    VERY_EASY = "very_easy"           # Muy fácil (>80)
-    EASY = "easy"                      # Fácil (66-80)
-    FAIRLY_EASY = "fairly_easy"        # Algo fácil (56-65)
-    NORMAL = "normal"                  # Normal (40-55)
+
+    VERY_EASY = "very_easy"  # Muy fácil (>80)
+    EASY = "easy"  # Fácil (66-80)
+    FAIRLY_EASY = "fairly_easy"  # Algo fácil (56-65)
+    NORMAL = "normal"  # Normal (40-55)
     FAIRLY_DIFFICULT = "fairly_difficult"  # Algo difícil (26-39)
-    DIFFICULT = "difficult"            # Difícil (11-25)
+    DIFFICULT = "difficult"  # Difícil (11-25)
     VERY_DIFFICULT = "very_difficult"  # Muy difícil (0-10)
 
 
 class AgeGroup(Enum):
     """Grupos de edad para literatura infantil/juvenil."""
-    BOARD_BOOK = "board_book"          # INF_BB: 0-3 años
-    PICTURE_BOOK = "picture_book"      # INF_PB: 3-5 años
-    EARLY_READER = "early_reader"      # INF_ER: 5-8 años
-    CHAPTER_BOOK = "chapter_book"      # INF_CB: 6-10 años
-    MIDDLE_GRADE = "middle_grade"      # INF_MG: 8-12 años
-    YOUNG_ADULT = "young_adult"        # INF_YA: 12+ años
-    ADULT = "adult"                    # Adulto
+
+    BOARD_BOOK = "board_book"  # INF_BB: 0-3 años
+    PICTURE_BOOK = "picture_book"  # INF_PB: 3-5 años
+    EARLY_READER = "early_reader"  # INF_ER: 5-8 años
+    CHAPTER_BOOK = "chapter_book"  # INF_CB: 6-10 años
+    MIDDLE_GRADE = "middle_grade"  # INF_MG: 8-12 años
+    YOUNG_ADULT = "young_adult"  # INF_YA: 12+ años
+    ADULT = "adult"  # Adulto
 
 
 # Palabras de alta frecuencia en español para primeros lectores
 # Basado en listas de vocabulario básico español
 SPANISH_SIGHT_WORDS = {
     # Artículos
-    "el", "la", "los", "las", "un", "una", "unos", "unas",
+    "el",
+    "la",
+    "los",
+    "las",
+    "un",
+    "una",
+    "unos",
+    "unas",
     # Pronombres
-    "yo", "tú", "él", "ella", "nosotros", "ellos", "ellas", "me", "te", "se", "nos",
+    "yo",
+    "tú",
+    "él",
+    "ella",
+    "nosotros",
+    "ellos",
+    "ellas",
+    "me",
+    "te",
+    "se",
+    "nos",
     # Verbos básicos
-    "es", "está", "son", "hay", "tiene", "va", "ve", "come", "bebe", "duerme",
-    "juega", "corre", "salta", "lee", "escribe", "habla", "quiere", "puede",
-    "hace", "dice", "sabe", "viene", "sale", "entra", "mira", "oye",
+    "es",
+    "está",
+    "son",
+    "hay",
+    "tiene",
+    "va",
+    "ve",
+    "come",
+    "bebe",
+    "duerme",
+    "juega",
+    "corre",
+    "salta",
+    "lee",
+    "escribe",
+    "habla",
+    "quiere",
+    "puede",
+    "hace",
+    "dice",
+    "sabe",
+    "viene",
+    "sale",
+    "entra",
+    "mira",
+    "oye",
     # Conectores simples
-    "y", "o", "pero", "que", "si", "no", "sí", "con", "sin", "para",
+    "y",
+    "o",
+    "pero",
+    "que",
+    "si",
+    "no",
+    "sí",
+    "con",
+    "sin",
+    "para",
     # Preposiciones
-    "de", "a", "en", "por", "sobre", "bajo", "entre", "hasta", "desde",
+    "de",
+    "a",
+    "en",
+    "por",
+    "sobre",
+    "bajo",
+    "entre",
+    "hasta",
+    "desde",
     # Adverbios básicos
-    "muy", "más", "menos", "bien", "mal", "aquí", "allí", "ahora", "hoy",
-    "ya", "también", "siempre", "nunca", "después", "antes",
+    "muy",
+    "más",
+    "menos",
+    "bien",
+    "mal",
+    "aquí",
+    "allí",
+    "ahora",
+    "hoy",
+    "ya",
+    "también",
+    "siempre",
+    "nunca",
+    "después",
+    "antes",
     # Adjetivos básicos
-    "grande", "pequeño", "bueno", "malo", "bonito", "feo", "nuevo", "viejo",
-    "alto", "bajo", "largo", "corto", "gordo", "flaco", "feliz", "triste",
+    "grande",
+    "pequeño",
+    "bueno",
+    "malo",
+    "bonito",
+    "feo",
+    "nuevo",
+    "viejo",
+    "alto",
+    "largo",
+    "corto",
+    "gordo",
+    "flaco",
+    "feliz",
+    "triste",
     # Sustantivos básicos
-    "casa", "mamá", "papá", "niño", "niña", "perro", "gato", "agua",
-    "sol", "luna", "día", "noche", "amigo", "escuela", "libro",
+    "casa",
+    "mamá",
+    "papá",
+    "niño",
+    "niña",
+    "perro",
+    "gato",
+    "agua",
+    "sol",
+    "luna",
+    "día",
+    "noche",
+    "amigo",
+    "escuela",
+    "libro",
     # Números
-    "uno", "dos", "tres", "cuatro", "cinco", "seis", "siete", "ocho", "nueve", "diez",
+    "uno",
+    "dos",
+    "tres",
+    "cuatro",
+    "cinco",
+    "seis",
+    "siete",
+    "ocho",
+    "nueve",
+    "diez",
     # Colores
-    "rojo", "azul", "verde", "amarillo", "blanco", "negro", "rosa",
+    "rojo",
+    "azul",
+    "verde",
+    "amarillo",
+    "blanco",
+    "negro",
+    "rosa",
     # Preguntas
-    "qué", "quién", "cómo", "dónde", "cuándo", "por qué", "cuánto",
+    "qué",
+    "quién",
+    "cómo",
+    "dónde",
+    "cuándo",
+    "por qué",
+    "cuánto",
 }
 
 
@@ -170,6 +290,7 @@ AGE_GROUP_THRESHOLDS = {
 @dataclass
 class SentenceStats:
     """Estadísticas de una oración."""
+
     text: str
     word_count: int
     syllable_count: int
@@ -182,8 +303,8 @@ class ReadabilityReport:
     """Reporte completo de legibilidad."""
 
     # Métricas principales
-    flesch_szigriszt: float = 0.0      # Índice Flesch-Szigriszt (0-100)
-    fernandez_huerta: float = 0.0       # Índice Fernández-Huerta (0-100)
+    flesch_szigriszt: float = 0.0  # Índice Flesch-Szigriszt (0-100)
+    fernandez_huerta: float = 0.0  # Índice Fernández-Huerta (0-100)
 
     # Nivel de legibilidad
     level: ReadabilityLevel = ReadabilityLevel.NORMAL
@@ -197,16 +318,16 @@ class ReadabilityReport:
     total_paragraphs: int = 0
 
     # Promedios
-    avg_word_length: float = 0.0       # Caracteres por palabra
+    avg_word_length: float = 0.0  # Caracteres por palabra
     avg_syllables_per_word: float = 0.0
     avg_words_per_sentence: float = 0.0
     avg_sentences_per_paragraph: float = 0.0
 
     # Distribución de longitud de oraciones
-    short_sentences: int = 0           # < 10 palabras
-    medium_sentences: int = 0          # 10-20 palabras
-    long_sentences: int = 0            # 21-35 palabras
-    very_long_sentences: int = 0       # > 35 palabras
+    short_sentences: int = 0  # < 10 palabras
+    medium_sentences: int = 0  # 10-20 palabras
+    long_sentences: int = 0  # 21-35 palabras
+    very_long_sentences: int = 0  # > 35 palabras
 
     # Oraciones problemáticas (muy largas)
     problematic_sentences: list[SentenceStats] = field(default_factory=list)
@@ -276,11 +397,11 @@ class AgeReadabilityReport:
     sight_word_ratio: float = 0.0
     unique_words: int = 0
     vocabulary_diversity: float = 0.0  # unique_words / total_words
-    simple_words_ratio: float = 0.0    # Palabras de 1-2 sílabas
-    complex_words_ratio: float = 0.0   # Palabras de 4+ sílabas
+    simple_words_ratio: float = 0.0  # Palabras de 1-2 sílabas
+    complex_words_ratio: float = 0.0  # Palabras de 4+ sílabas
 
     # Repetición (importante para primeros lectores)
-    repetition_score: float = 0.0      # Mayor = más repetición (bueno para niños pequeños)
+    repetition_score: float = 0.0  # Mayor = más repetición (bueno para niños pequeños)
     most_repeated_words: list[tuple[str, int]] = field(default_factory=list)
 
     # Evaluación de adecuación
@@ -290,7 +411,7 @@ class AgeReadabilityReport:
     recommendations: list[str] = field(default_factory=list)
 
     # Comparación con grupo objetivo (si se especifica)
-    target_age_group: Optional[AgeGroup] = None
+    target_age_group: AgeGroup | None = None
     target_comparison: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
@@ -317,8 +438,7 @@ class AgeReadabilityReport:
             "repetition": {
                 "score": round(self.repetition_score, 2),
                 "most_repeated": [
-                    {"word": w, "count": c}
-                    for w, c in self.most_repeated_words[:10]
+                    {"word": w, "count": c} for w, c in self.most_repeated_words[:10]
                 ],
             },
             "evaluation": {
@@ -343,20 +463,48 @@ class AgeReadabilityReport:
 # =============================================================================
 
 INFLESZ_SCALE = [
-    (80, ReadabilityLevel.VERY_EASY, "Muy fácil",
-     "Lectura muy fácil. Apto para todo público, incluyendo niños."),
-    (66, ReadabilityLevel.EASY, "Fácil",
-     "Lectura fácil. Apto para público general sin formación específica."),
-    (56, ReadabilityLevel.FAIRLY_EASY, "Algo fácil",
-     "Lectura normal-fácil. Apropiado para educación secundaria."),
-    (40, ReadabilityLevel.NORMAL, "Normal",
-     "Lectura normal. Apropiado para público adulto con educación media."),
-    (26, ReadabilityLevel.FAIRLY_DIFFICULT, "Algo difícil",
-     "Lectura algo difícil. Requiere atención y cierta formación."),
-    (11, ReadabilityLevel.DIFFICULT, "Difícil",
-     "Lectura difícil. Apropiado para público especializado o académico."),
-    (0, ReadabilityLevel.VERY_DIFFICULT, "Muy difícil",
-     "Lectura muy difícil. Requiere alto nivel de formación."),
+    (
+        80,
+        ReadabilityLevel.VERY_EASY,
+        "Muy fácil",
+        "Lectura muy fácil. Apto para todo público, incluyendo niños.",
+    ),
+    (
+        66,
+        ReadabilityLevel.EASY,
+        "Fácil",
+        "Lectura fácil. Apto para público general sin formación específica.",
+    ),
+    (
+        56,
+        ReadabilityLevel.FAIRLY_EASY,
+        "Algo fácil",
+        "Lectura normal-fácil. Apropiado para educación secundaria.",
+    ),
+    (
+        40,
+        ReadabilityLevel.NORMAL,
+        "Normal",
+        "Lectura normal. Apropiado para público adulto con educación media.",
+    ),
+    (
+        26,
+        ReadabilityLevel.FAIRLY_DIFFICULT,
+        "Algo difícil",
+        "Lectura algo difícil. Requiere atención y cierta formación.",
+    ),
+    (
+        11,
+        ReadabilityLevel.DIFFICULT,
+        "Difícil",
+        "Lectura difícil. Apropiado para público especializado o académico.",
+    ),
+    (
+        0,
+        ReadabilityLevel.VERY_DIFFICULT,
+        "Muy difícil",
+        "Lectura muy difícil. Requiere alto nivel de formación.",
+    ),
 ]
 
 
@@ -373,9 +521,9 @@ def get_readability_level(score: float) -> tuple[ReadabilityLevel, str, str]:
 # =============================================================================
 
 # Vocales en español
-VOWELS = set('aeiouáéíóúüAEIOUÁÉÍÓÚÜ')
-STRONG_VOWELS = set('aeoáéó')
-WEAK_VOWELS = set('iuíúü')
+VOWELS = set("aeiouáéíóúüAEIOUÁÉÍÓÚÜ")
+STRONG_VOWELS = set("aeoáéó")
+WEAK_VOWELS = set("iuíúü")
 
 
 def count_syllables_spanish(word: str) -> int:
@@ -396,7 +544,7 @@ def count_syllables_spanish(word: str) -> int:
         return 0
 
     # Eliminar caracteres no alfabéticos
-    word = re.sub(r'[^a-záéíóúüñ]', '', word)
+    word = re.sub(r"[^a-záéíóúüñ]", "", word)
     if not word:
         return 0
 
@@ -404,7 +552,7 @@ def count_syllables_spanish(word: str) -> int:
     prev_was_vowel = False
     prev_vowel_strong = False
 
-    for i, char in enumerate(word):
+    for _i, char in enumerate(word):
         is_vowel = char in VOWELS
         is_strong = char in STRONG_VOWELS
 
@@ -433,7 +581,7 @@ def count_syllables_text(text: str) -> tuple[int, int]:
     Returns:
         (total_syllables, total_words)
     """
-    words = re.findall(r'\b[a-záéíóúüñA-ZÁÉÍÓÚÜÑ]+\b', text)
+    words = re.findall(r"\b[a-záéíóúüñA-ZÁÉÍÓÚÜÑ]+\b", text)
     total_syllables = sum(count_syllables_spanish(word) for word in words)
     return total_syllables, len(words)
 
@@ -441,6 +589,7 @@ def count_syllables_text(text: str) -> tuple[int, int]:
 # =============================================================================
 # Analizador
 # =============================================================================
+
 
 class ReadabilityAnalyzer:
     """
@@ -453,12 +602,9 @@ class ReadabilityAnalyzer:
     def __init__(self):
         """Inicializar analizador."""
         # Patrón para dividir en oraciones
-        self._sentence_pattern = re.compile(
-            r'[.!?]+(?:\s+|$)|[\n]{2,}',
-            re.UNICODE
-        )
+        self._sentence_pattern = re.compile(r"[.!?]+(?:\s+|$)|[\n]{2,}", re.UNICODE)
         # Patrón para dividir en párrafos
-        self._paragraph_pattern = re.compile(r'\n\s*\n')
+        self._paragraph_pattern = re.compile(r"\n\s*\n")
 
     def analyze(self, text: str) -> Result[ReadabilityReport]:
         """
@@ -475,7 +621,7 @@ class ReadabilityAnalyzer:
 
         try:
             # Estadísticas básicas
-            total_chars = len(text.replace(' ', '').replace('\n', ''))
+            total_chars = len(text.replace(" ", "").replace("\n", ""))
             paragraphs = [p.strip() for p in self._paragraph_pattern.split(text) if p.strip()]
             total_paragraphs = len(paragraphs)
 
@@ -484,32 +630,40 @@ class ReadabilityAnalyzer:
             total_sentences = len(sentences)
 
             if total_sentences == 0:
-                return Result.success(ReadabilityReport(
-                    total_chars=total_chars,
-                    total_paragraphs=total_paragraphs,
-                ))
+                return Result.success(
+                    ReadabilityReport(
+                        total_chars=total_chars,
+                        total_paragraphs=total_paragraphs,
+                    )
+                )
 
             # Contar palabras y sílabas
             total_syllables, total_words = count_syllables_text(text)
 
             if total_words == 0:
-                return Result.success(ReadabilityReport(
-                    total_chars=total_chars,
-                    total_sentences=total_sentences,
-                    total_paragraphs=total_paragraphs,
-                ))
+                return Result.success(
+                    ReadabilityReport(
+                        total_chars=total_chars,
+                        total_sentences=total_sentences,
+                        total_paragraphs=total_paragraphs,
+                    )
+                )
 
             # Calcular promedios
             avg_word_length = total_chars / total_words
             avg_syllables_per_word = total_syllables / total_words
             avg_words_per_sentence = total_words / total_sentences
-            avg_sentences_per_paragraph = total_sentences / total_paragraphs if total_paragraphs > 0 else 0
+            avg_sentences_per_paragraph = (
+                total_sentences / total_paragraphs if total_paragraphs > 0 else 0
+            )
 
             # Calcular índices de legibilidad
 
             # Índice Flesch-Szigriszt (adaptación española)
             # IFSZ = 206.84 - 62.3 * (sílabas/palabras) - 1.02 * (palabras/oraciones)
-            flesch_szigriszt = 206.84 - (62.3 * avg_syllables_per_word) - (1.02 * avg_words_per_sentence)
+            flesch_szigriszt = (
+                206.84 - (62.3 * avg_syllables_per_word) - (1.02 * avg_words_per_sentence)
+            )
             flesch_szigriszt = max(0, min(100, flesch_szigriszt))  # Limitar a 0-100
 
             # Índice Fernández-Huerta
@@ -650,7 +804,7 @@ class ReadabilityAnalyzer:
             sent = sent.strip()
             if sent and len(sent) > 1:
                 # Asegurar que tiene al menos una palabra
-                if re.search(r'\b[a-záéíóúüñA-ZÁÉÍÓÚÜÑ]+\b', sent):
+                if re.search(r"\b[a-záéíóúüñA-ZÁÉÍÓÚÜÑ]+\b", sent):
                     sentences.append(sent)
 
         return sentences
@@ -678,7 +832,7 @@ class ReadabilityAnalyzer:
     def analyze_for_age(
         self,
         text: str,
-        target_age_group: Optional[AgeGroup] = None,
+        target_age_group: AgeGroup | None = None,
     ) -> Result[AgeReadabilityReport]:
         """
         Analizar legibilidad orientada a grupos de edad infantil/juvenil.
@@ -708,7 +862,7 @@ class ReadabilityAnalyzer:
             base_report = base_result.value
 
             # Extraer palabras
-            words = re.findall(r'\b[a-záéíóúüñA-ZÁÉÍÓÚÜÑ]+\b', text.lower())
+            words = re.findall(r"\b[a-záéíóúüñA-ZÁÉÍÓÚÜÑ]+\b", text.lower())
             total_words = len(words)
 
             if total_words == 0:
@@ -748,15 +902,10 @@ class ReadabilityAnalyzer:
                 repetition_score = 0
 
             # Palabras más repetidas (excluyendo sight words básicas)
-            content_word_counts = {
-                w: c for w, c in word_counts.items()
-                if c > 1 and len(w) > 2
-            }
-            most_repeated = sorted(
-                content_word_counts.items(),
-                key=lambda x: x[1],
-                reverse=True
-            )[:15]
+            content_word_counts = {w: c for w, c in word_counts.items() if c > 1 and len(w) > 2}
+            most_repeated = sorted(content_word_counts.items(), key=lambda x: x[1], reverse=True)[
+                :15
+            ]
 
             # Estimar grupo de edad
             estimated_age_group = self._estimate_age_group(
@@ -806,9 +955,7 @@ class ReadabilityAnalyzer:
                             f"(promedio {base_report.avg_syllables_per_word:.2f} sílabas/palabra)"
                         )
                         appropriateness_score -= min(30, diff * 15)
-                        recommendations.append(
-                            "Usar palabras más cortas y sencillas."
-                        )
+                        recommendations.append("Usar palabras más cortas y sencillas.")
 
                     # Evaluar sight words
                     if sight_word_ratio < min_sight:
@@ -829,9 +976,7 @@ class ReadabilityAnalyzer:
                                 f"Demasiadas palabras complejas ({complex_words_ratio:.1%} con 4+ sílabas)"
                             )
                             appropriateness_score -= 20
-                            recommendations.append(
-                                "Evitar palabras de 4 o más sílabas."
-                            )
+                            recommendations.append("Evitar palabras de 4 o más sílabas.")
 
                     target_comparison = {
                         "target_max_words_per_sentence": max_wps,

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Router de complejidad para selección de extractores.
 
@@ -10,8 +9,8 @@ basándose en:
 - Complejidad gramatical
 """
 
-import re
 import logging
+import re
 from dataclasses import dataclass, field
 
 from .base import ExtractionMethod
@@ -30,6 +29,7 @@ class ComplexityScore:
         recommended_extractors: Extractores recomendados
         detected_genre: Género detectado si aplica
     """
+
     score: float
     reasons: list[str] = field(default_factory=list)
     recommended_extractors: list[ExtractionMethod] = field(default_factory=list)
@@ -72,49 +72,68 @@ class ComplexityRouter:
 
     # Indicadores de metáforas y comparaciones
     METAPHOR_PATTERNS = [
-        r'\bcomo\s+(?:un|una|el|la)\b',  # "ojos como el mar"
-        r'\bparec[ií]a\b',  # "parecía una estrella"
-        r'\bsemejante\s+a\b',
-        r'\btan\s+\w+\s+como\b',  # "tan azules como"
-        r'\bser\s+(?:un|una)\s+\w+\s+de\b',  # "era un pozo de"
-        r'\bbrillar\s+como\b',
-        r'\breflejar\b',
+        r"\bcomo\s+(?:un|una|el|la)\b",  # "ojos como el mar"
+        r"\bparec[ií]a\b",  # "parecía una estrella"
+        r"\bsemejante\s+a\b",
+        r"\btan\s+\w+\s+como\b",  # "tan azules como"
+        r"\bser\s+(?:un|una)\s+\w+\s+de\b",  # "era un pozo de"
+        r"\bbrillar\s+como\b",
+        r"\breflejar\b",
     ]
 
     # Estructuras gramaticales complejas
     COMPLEX_STRUCTURES = [
-        r',\s*(?:que|quien|cual|cuyo|donde)\b',  # Cláusulas relativas
-        r';\s*\w',  # Punto y coma
-        r'\b(?:aunque|mientras|cuando|si)\b.*,',  # Subordinadas
-        r',\s*y\s+(?:que|con)\b',  # Coordinadas complejas
-        r'—[^—]+—',  # Incisos con guiones largos
-        r'\([^)]{10,}\)',  # Paréntesis largos
+        r",\s*(?:que|quien|cual|cuyo|donde)\b",  # Cláusulas relativas
+        r";\s*\w",  # Punto y coma
+        r"\b(?:aunque|mientras|cuando|si)\b.*,",  # Subordinadas
+        r",\s*y\s+(?:que|con)\b",  # Coordinadas complejas
+        r"—[^—]+—",  # Incisos con guiones largos
+        r"\([^)]{10,}\)",  # Paréntesis largos
     ]
 
     # Indicadores de género literario
     GENRE_INDICATORS = {
         "fantasy": [
-            r'\belfo[s]?\b', r'\benano[s]?\b', r'\bdrag[oó]n(?:es)?\b',
-            r'\bmagia\b', r'\bhechiz', r'\brunas?\b', r'\borco[s]?\b',
-            r'\btroll[s]?\b', r'\bvampiro[s]?\b', r'\bhada[s]?\b',
-            r'\bbruj[oa]s?\b', r'\bconjuro[s]?\b', r'\bencantamiento\b',
-            r'\breino\s+de\b', r'\bespada\s+m[aá]gica\b',
+            r"\belfo[s]?\b",
+            r"\benano[s]?\b",
+            r"\bdrag[oó]n(?:es)?\b",
+            r"\bmagia\b",
+            r"\bhechiz",
+            r"\brunas?\b",
+            r"\borco[s]?\b",
+            r"\btroll[s]?\b",
+            r"\bvampiro[s]?\b",
+            r"\bhada[s]?\b",
+            r"\bbruj[oa]s?\b",
+            r"\bconjuro[s]?\b",
+            r"\bencantamiento\b",
+            r"\breino\s+de\b",
+            r"\bespada\s+m[aá]gica\b",
         ],
         "sci-fi": [
-            r'\bescamosa\b', r'\bextraterrestre[s]?\b', r'\bandroide[s]?\b',
-            r'\bciborg[s]?\b', r'\bespacial\b', r'\bgal[aá]ctic[oa]\b',
-            r'\bplaneta\b', r'\bnave\b', r'\blaser\b', r'\bteletransport',
-            r'\binteligencia\s+artificial\b', r'\brobot[s]?\b',
-            r'\balienigena\b', r'\bmutante[s]?\b',
+            r"\bescamosa\b",
+            r"\bextraterrestre[s]?\b",
+            r"\bandroide[s]?\b",
+            r"\bciborg[s]?\b",
+            r"\bespacial\b",
+            r"\bgal[aá]ctic[oa]\b",
+            r"\bplaneta\b",
+            r"\bnave\b",
+            r"\blaser\b",
+            r"\bteletransport",
+            r"\binteligencia\s+artificial\b",
+            r"\brobot[s]?\b",
+            r"\balienigena\b",
+            r"\bmutante[s]?\b",
         ],
         "realistic": [],  # Por defecto
     }
 
     # Enumeraciones de atributos
     ENUMERATION_PATTERNS = [
-        r'(?:\w+,\s*){2,}\w+\s+y\s+\w+',  # "alto, delgado, moreno y atractivo"
-        r'de\s+\w+\s+\w+,\s*(?:\w+\s+){0,2}y\s+\w+',  # "de pelo negro, largo y ondulado"
-        r'con\s+\w+\s+\w+\s+y\s+\w+\s+\w+',  # "con ojos azules y cabello rubio"
+        r"(?:\w+,\s*){2,}\w+\s+y\s+\w+",  # "alto, delgado, moreno y atractivo"
+        r"de\s+\w+\s+\w+,\s*(?:\w+\s+){0,2}y\s+\w+",  # "de pelo negro, largo y ondulado"
+        r"con\s+\w+\s+\w+\s+y\s+\w+\s+\w+",  # "con ojos azules y cabello rubio"
     ]
 
     def __init__(
@@ -130,15 +149,9 @@ class ComplexityRouter:
         self.llm_threshold = complexity_threshold_for_llm
 
         # Compilar patrones
-        self._metaphor_re = [
-            re.compile(p, re.IGNORECASE) for p in self.METAPHOR_PATTERNS
-        ]
-        self._complex_re = [
-            re.compile(p, re.IGNORECASE) for p in self.COMPLEX_STRUCTURES
-        ]
-        self._enum_re = [
-            re.compile(p, re.IGNORECASE) for p in self.ENUMERATION_PATTERNS
-        ]
+        self._metaphor_re = [re.compile(p, re.IGNORECASE) for p in self.METAPHOR_PATTERNS]
+        self._complex_re = [re.compile(p, re.IGNORECASE) for p in self.COMPLEX_STRUCTURES]
+        self._enum_re = [re.compile(p, re.IGNORECASE) for p in self.ENUMERATION_PATTERNS]
         self._genre_re = {
             genre: [re.compile(p, re.IGNORECASE) for p in patterns]
             for genre, patterns in self.GENRE_INDICATORS.items()
@@ -158,7 +171,7 @@ class ComplexityRouter:
         reasons = []
 
         # 1. Longitud de oraciones
-        sentences = re.split(r'[.!?]+', text)
+        sentences = re.split(r"[.!?]+", text)
         sentences = [s.strip() for s in sentences if s.strip()]
 
         if sentences:
@@ -201,13 +214,10 @@ class ComplexityRouter:
 
         # 6. Referencias pronominales (difíciles de resolver)
         pronoun_patterns = [
-            r'\b(?:él|ella|ellos|ellas)\s+(?:tenía|era|llevaba)',
-            r'\bsu[s]?\s+(?:ojos|pelo|cabello|rostro)',
+            r"\b(?:él|ella|ellos|ellas)\s+(?:tenía|era|llevaba)",
+            r"\bsu[s]?\s+(?:ojos|pelo|cabello|rostro)",
         ]
-        pronoun_count = sum(
-            len(re.findall(p, text, re.IGNORECASE))
-            for p in pronoun_patterns
-        )
+        pronoun_count = sum(len(re.findall(p, text, re.IGNORECASE)) for p in pronoun_patterns)
         if pronoun_count > 2:
             score += 0.1
             reasons.append(f"Referencias pronominales: {pronoun_count}")
@@ -219,8 +229,7 @@ class ComplexityRouter:
         recommended = self._recommend_extractors(score, genre)
 
         logger.debug(
-            f"Complexity analysis: score={score:.2f}, "
-            f"genre={genre}, reasons={len(reasons)}"
+            f"Complexity analysis: score={score:.2f}, genre={genre}, reasons={len(reasons)}"
         )
 
         return ComplexityScore(
@@ -302,9 +311,7 @@ class ComplexityRouter:
         Returns:
             Diccionario de método -> índices de textos
         """
-        result: dict[ExtractionMethod, list[int]] = {
-            method: [] for method in ExtractionMethod
-        }
+        result: dict[ExtractionMethod, list[int]] = {method: [] for method in ExtractionMethod}
 
         for i, text in enumerate(texts):
             analysis = self.analyze(text)

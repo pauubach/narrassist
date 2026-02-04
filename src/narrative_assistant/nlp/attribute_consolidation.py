@@ -11,11 +11,10 @@ en lugar de crear 5 atributos duplicados, se crea 1 atributo con 5 evidencias.
 import json
 import logging
 from collections import defaultdict
-from typing import Optional
 from dataclasses import dataclass
 
-from .attributes import ExtractedAttribute, AttributeCategory, AttributeKey
 from ..parsers.base import RawDocument, calculate_page_and_line
+from .attributes import AttributeKey, ExtractedAttribute
 
 logger = logging.getLogger(__name__)
 
@@ -28,10 +27,10 @@ class AttributeEvidence:
     Representa una ubicación específica donde se detectó el atributo.
     """
 
-    attribute_id: Optional[int]  # ID del atributo padre (se asigna al guardar)
+    attribute_id: int | None  # ID del atributo padre (se asigna al guardar)
     start_char: int
     end_char: int
-    chapter: Optional[int]
+    chapter: int | None
     page: int
     line: int
     excerpt: str
@@ -71,16 +70,14 @@ def consolidate_attributes(
         unique_key = (entity_name_norm, key_norm, value_norm)
         grouped[unique_key].append(attr)
 
-    logger.info(
-        f"Consolidados {len(attributes)} atributos en {len(grouped)} atributos únicos"
-    )
+    logger.info(f"Consolidados {len(attributes)} atributos en {len(grouped)} atributos únicos")
 
     return grouped
 
 
 def create_evidences_from_attributes(
     evidences_data: list[ExtractedAttribute],
-    raw_document: Optional[RawDocument] = None,
+    raw_document: RawDocument | None = None,
     words_per_page: int = 300,
 ) -> list[AttributeEvidence]:
     """
@@ -107,9 +104,7 @@ def create_evidences_from_attributes(
     for attr in evidences_data:
         # Calcular page/line si tenemos el documento
         if raw_document and attr.start_char >= 0:
-            page, line = calculate_page_and_line(
-                attr.start_char, raw_document, words_per_page
-            )
+            page, line = calculate_page_and_line(attr.start_char, raw_document, words_per_page)
         else:
             # Fallback si no tenemos documento
             page, line = 1, 1
@@ -136,9 +131,7 @@ def create_evidences_from_attributes(
 
         evidences.append(evidence)
 
-    logger.debug(
-        f"Creadas {len(evidences)} evidencias desde {len(evidences_data)} atributos"
-    )
+    logger.debug(f"Creadas {len(evidences)} evidencias desde {len(evidences_data)} atributos")
 
     return evidences
 
@@ -221,7 +214,7 @@ def extract_keywords(attr: ExtractedAttribute) -> list[str]:
     stopwords = {"el", "la", "los", "las", "de", "del", "un", "una", "y", "o", "a"}
     keywords = {kw for kw in keywords if kw not in stopwords}
 
-    return sorted(list(keywords))
+    return sorted(keywords)
 
 
 def get_max_confidence(evidences: list[ExtractedAttribute]) -> float:

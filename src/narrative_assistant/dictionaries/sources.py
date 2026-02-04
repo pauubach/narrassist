@@ -14,10 +14,9 @@ import json
 import logging
 import sqlite3
 import threading
+import unicodedata
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Optional
-import unicodedata
 
 from .models import (
     Definition,
@@ -25,7 +24,6 @@ from .models import (
     DictionarySource,
     Etymology,
     GrammaticalCategory,
-    SynonymEntry,
     WordRelation,
     WordRelationType,
 )
@@ -62,7 +60,7 @@ class BaseDictionarySource(ABC):
     """
 
     @abstractmethod
-    def lookup(self, word: str) -> Optional[DictionaryEntry]:
+    def lookup(self, word: str) -> DictionaryEntry | None:
         """
         Busca una palabra en esta fuente.
 
@@ -133,7 +131,7 @@ class WiktionarySource(BaseDictionarySource):
             db_path: Ruta a la base de datos SQLite
         """
         self.db_path = db_path
-        self._connection: Optional[sqlite3.Connection] = None
+        self._connection: sqlite3.Connection | None = None
         self._lock = threading.Lock()
 
     def _get_connection(self) -> sqlite3.Connection:
@@ -163,7 +161,7 @@ class WiktionarySource(BaseDictionarySource):
     def get_source_type(self) -> DictionarySource:
         return DictionarySource.WIKTIONARY
 
-    def lookup(self, word: str) -> Optional[DictionaryEntry]:
+    def lookup(self, word: str) -> DictionaryEntry | None:
         """Busca una palabra en Wiktionary."""
         if not self.is_available():
             return None
@@ -315,7 +313,7 @@ class SynonymSource(BaseDictionarySource):
             db_path: Ruta a la base de datos SQLite
         """
         self.db_path = db_path
-        self._connection: Optional[sqlite3.Connection] = None
+        self._connection: sqlite3.Connection | None = None
 
     def _get_connection(self) -> sqlite3.Connection:
         """Obtiene conexión a la BD."""
@@ -343,7 +341,7 @@ class SynonymSource(BaseDictionarySource):
     def get_source_type(self) -> DictionarySource:
         return DictionarySource.SYNONYMS
 
-    def lookup(self, word: str) -> Optional[DictionaryEntry]:
+    def lookup(self, word: str) -> DictionaryEntry | None:
         """Busca sinónimos/antónimos de una palabra."""
         if not self.is_available():
             return None
@@ -369,13 +367,9 @@ class SynonymSource(BaseDictionarySource):
             # Crear relaciones
             relations = []
             for syn in synonyms:
-                relations.append(
-                    WordRelation(word=syn, relation_type=WordRelationType.SYNONYM)
-                )
+                relations.append(WordRelation(word=syn, relation_type=WordRelationType.SYNONYM))
             for ant in antonyms:
-                relations.append(
-                    WordRelation(word=ant, relation_type=WordRelationType.ANTONYM)
-                )
+                relations.append(WordRelation(word=ant, relation_type=WordRelationType.ANTONYM))
 
             return DictionaryEntry(
                 word=word,
@@ -419,7 +413,7 @@ class CustomDictionarySource(BaseDictionarySource):
             dictionary_path: Ruta al archivo JSON del diccionario
         """
         self.dictionary_path = dictionary_path
-        self._data: Optional[dict] = None
+        self._data: dict | None = None
         self._lock = threading.Lock()
 
     def _load_data(self) -> dict:
@@ -436,7 +430,7 @@ class CustomDictionarySource(BaseDictionarySource):
                 return self._data
 
             try:
-                with open(self.dictionary_path, "r", encoding="utf-8") as f:
+                with open(self.dictionary_path, encoding="utf-8") as f:
                     self._data = json.load(f)
                 return self._data
             except Exception as e:
@@ -463,7 +457,7 @@ class CustomDictionarySource(BaseDictionarySource):
     def get_source_type(self) -> DictionarySource:
         return DictionarySource.CUSTOM
 
-    def lookup(self, word: str) -> Optional[DictionaryEntry]:
+    def lookup(self, word: str) -> DictionaryEntry | None:
         """Busca una palabra en el diccionario personalizado."""
         data = self._load_data()
         normalized = normalize_word(word)
@@ -506,9 +500,9 @@ class CustomDictionarySource(BaseDictionarySource):
         self,
         word: str,
         definition: str,
-        category: Optional[str] = None,
-        synonyms: Optional[list[str]] = None,
-        antonyms: Optional[list[str]] = None,
+        category: str | None = None,
+        synonyms: list[str] | None = None,
+        antonyms: list[str] | None = None,
     ) -> None:
         """
         Añade una palabra al diccionario personalizado.
@@ -529,10 +523,12 @@ class CustomDictionarySource(BaseDictionarySource):
         # Si ya existe, añadir definición
         if normalized in data["words"]:
             existing = data["words"][normalized]
-            existing["definitions"].append({
-                "text": definition,
-                "category": category,
-            })
+            existing["definitions"].append(
+                {
+                    "text": definition,
+                    "category": category,
+                }
+            )
             if synonyms:
                 existing["synonyms"] = list(set(existing.get("synonyms", []) + synonyms))
             if antonyms:

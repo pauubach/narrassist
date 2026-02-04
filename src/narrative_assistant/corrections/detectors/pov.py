@@ -10,7 +10,6 @@ Detecta inconsistencias en la perspectiva narrativa:
 
 import re
 from collections import Counter
-from typing import Optional
 
 from ..base import BaseDetector, CorrectionIssue
 from ..config import POVConfig
@@ -26,75 +25,62 @@ class POVDetector(BaseDetector):
     """
 
     # Pronombres de primera persona singular (solo pronombres, no verbos genéricos)
-    FIRST_PERSON_SINGULAR_PRONOUNS = re.compile(
-        r'\b(yo|me|mí|conmigo)\b',
-        re.IGNORECASE
-    )
+    FIRST_PERSON_SINGULAR_PRONOUNS = re.compile(r"\b(yo|me|mí|conmigo)\b", re.IGNORECASE)
 
     # Formas verbales específicas de primera persona singular
     # Lista explícita para evitar falsos positivos
     FIRST_PERSON_VERBS = re.compile(
-        r'\b(soy|estoy|tengo|hago|voy|digo|sé|veo|quiero|puedo|debo|'
-        r'pensé|sentí|miré|caminé|dije|vi|hice|fui|tuve|pude|quise|supe|'
-        r'pienso|siento|miro|camino|hablo|escribo|leo|vivo|trabajo|'
-        r'creí|sabía|recordé|noté|comprendí|percibí|imaginé|'
-        r'creo|noto|comprendo|percibo|imagino|recuerdo)\b',
-        re.IGNORECASE
+        r"\b(soy|estoy|tengo|hago|voy|digo|sé|veo|quiero|puedo|debo|"
+        r"pensé|sentí|miré|caminé|dije|vi|hice|fui|tuve|pude|quise|supe|"
+        r"pienso|siento|miro|camino|hablo|escribo|leo|vivo|trabajo|"
+        r"creí|sabía|recordé|noté|comprendí|percibí|imaginé|"
+        r"creo|noto|comprendo|percibo|imagino|recuerdo)\b",
+        re.IGNORECASE,
     )
 
     # Pronombres de primera persona plural
-    FIRST_PERSON_PLURAL_PRONOUNS = re.compile(
-        r'\b(nosotros|nosotras|nos)\b',
-        re.IGNORECASE
-    )
+    FIRST_PERSON_PLURAL_PRONOUNS = re.compile(r"\b(nosotros|nosotras|nos)\b", re.IGNORECASE)
 
     # Verbos de primera persona plural (lista explícita)
     FIRST_PERSON_PLURAL_VERBS = re.compile(
-        r'\b(somos|estamos|tenemos|hacemos|vamos|decimos|sabemos|vemos|'
-        r'queremos|podemos|debemos|pensamos|sentimos|miramos|caminamos|'
-        r'dijimos|vimos|hicimos|fuimos|tuvimos|pudimos|quisimos|supimos)\b',
-        re.IGNORECASE
+        r"\b(somos|estamos|tenemos|hacemos|vamos|decimos|sabemos|vemos|"
+        r"queremos|podemos|debemos|pensamos|sentimos|miramos|caminamos|"
+        r"dijimos|vimos|hicimos|fuimos|tuvimos|pudimos|quisimos|supimos)\b",
+        re.IGNORECASE,
     )
 
     # Pronombres de segunda persona (tú) - solo pronombres
-    SECOND_PERSON_TU_PRONOUNS = re.compile(
-        r'\b(tú|te|ti|contigo)\b',
-        re.IGNORECASE
-    )
+    SECOND_PERSON_TU_PRONOUNS = re.compile(r"\b(tú|te|ti|contigo)\b", re.IGNORECASE)
 
     # Verbos de segunda persona singular (tú) - lista explícita
     SECOND_PERSON_TU_VERBS = re.compile(
-        r'\b(eres|estás|tienes|haces|vas|dices|sabes|ves|quieres|puedes|debes|'
-        r'piensas|sientes|miras|caminas|dijiste|viste|hiciste|fuiste|'
-        r'tuviste|pudiste|quisiste|supiste|pensaste|sentiste|miraste)\b',
-        re.IGNORECASE
+        r"\b(eres|estás|tienes|haces|vas|dices|sabes|ves|quieres|puedes|debes|"
+        r"piensas|sientes|miras|caminas|dijiste|viste|hiciste|fuiste|"
+        r"tuviste|pudiste|quisiste|supiste|pensaste|sentiste|miraste)\b",
+        re.IGNORECASE,
     )
 
     # Pronombres de segunda persona (usted)
-    SECOND_PERSON_USTED = re.compile(
-        r'\b(usted|ustedes)\b',
-        re.IGNORECASE
-    )
+    SECOND_PERSON_USTED = re.compile(r"\b(usted|ustedes)\b", re.IGNORECASE)
 
     # Pronombres de tercera persona
     THIRD_PERSON = re.compile(
-        r'\b(él|ella|ellos|ellas|le|les|lo|la|los|las|se|sí|consigo)\b',
-        re.IGNORECASE
+        r"\b(él|ella|ellos|ellas|le|les|lo|la|los|las|se|sí|consigo)\b", re.IGNORECASE
     )
 
     # Verbos de percepción/pensamiento (para detectar focalizador)
     PERCEPTION_VERBS = re.compile(
-        r'\b(pensó|pensaba|sentía|sentido|creía|creyó|imaginó|imaginaba|'
-        r'sabía|supo|recordó|recordaba|veía|vio|oyó|oía|notó|notaba|'
-        r'comprendió|comprendía|percibió|percibía|'
-        r'piensa|siente|cree|imagina|sabe|recuerda|ve|oye|nota|comprende|percibe)\b',
-        re.IGNORECASE
+        r"\b(pensó|pensaba|sentía|sentido|creía|creyó|imaginó|imaginaba|"
+        r"sabía|supo|recordó|recordaba|veía|vio|oyó|oía|notó|notaba|"
+        r"comprendió|comprendía|percibió|percibía|"
+        r"piensa|siente|cree|imagina|sabe|recuerda|ve|oye|nota|comprende|percibe)\b",
+        re.IGNORECASE,
     )
 
     # Patrón para fin de párrafo
-    PARAGRAPH_END = re.compile(r'\n\s*\n')
+    PARAGRAPH_END = re.compile(r"\n\s*\n")
 
-    def __init__(self, config: Optional[POVConfig] = None):
+    def __init__(self, config: POVConfig | None = None):
         self.config = config or POVConfig()
         self._nlp = None
 
@@ -109,7 +95,7 @@ class POVDetector(BaseDetector):
     def detect(
         self,
         text: str,
-        chapter_index: Optional[int] = None,
+        chapter_index: int | None = None,
         **kwargs,
     ) -> list[CorrectionIssue]:
         """
@@ -137,36 +123,30 @@ class POVDetector(BaseDetector):
         paragraph_povs = []
         for para_text, start, end in paragraphs:
             pov = self._analyze_paragraph_pov(para_text)
-            paragraph_povs.append({
-                "text": para_text,
-                "start": start,
-                "end": end,
-                "pov": pov,
-            })
+            paragraph_povs.append(
+                {
+                    "text": para_text,
+                    "start": start,
+                    "end": end,
+                    "pov": pov,
+                }
+            )
 
         # Detectar cambios de persona
         if self.config.check_person_shift:
-            issues.extend(
-                self._check_person_shifts(paragraph_povs, chapter_index, text)
-            )
+            issues.extend(self._check_person_shifts(paragraph_povs, chapter_index, text))
 
         # Detectar mezcla tú/usted
         if self.config.check_tu_usted_mix:
-            issues.extend(
-                self._check_tu_usted_mix(paragraph_povs, chapter_index, text)
-            )
+            issues.extend(self._check_tu_usted_mix(paragraph_povs, chapter_index, text))
 
         # Detectar cambios de focalizador (si hay tercera persona)
         if self.config.check_focalizer_shift:
-            issues.extend(
-                self._check_focalizer_shifts(paragraph_povs, chapter_index, text)
-            )
+            issues.extend(self._check_focalizer_shifts(paragraph_povs, chapter_index, text))
 
         # Detectar omnisciencia inconsistente
         if self.config.check_inconsistent_omniscience:
-            issues.extend(
-                self._check_inconsistent_omniscience(paragraph_povs, chapter_index, text)
-            )
+            issues.extend(self._check_inconsistent_omniscience(paragraph_povs, chapter_index, text))
 
         return issues
 
@@ -202,17 +182,14 @@ class POVDetector(BaseDetector):
             dict con conteos de cada persona gramatical y POV dominante
         """
         # Contar ocurrencias de cada tipo (pronombres + verbos)
-        first_sing = (
-            len(self.FIRST_PERSON_SINGULAR_PRONOUNS.findall(text)) +
-            len(self.FIRST_PERSON_VERBS.findall(text))
+        first_sing = len(self.FIRST_PERSON_SINGULAR_PRONOUNS.findall(text)) + len(
+            self.FIRST_PERSON_VERBS.findall(text)
         )
-        first_plur = (
-            len(self.FIRST_PERSON_PLURAL_PRONOUNS.findall(text)) +
-            len(self.FIRST_PERSON_PLURAL_VERBS.findall(text))
+        first_plur = len(self.FIRST_PERSON_PLURAL_PRONOUNS.findall(text)) + len(
+            self.FIRST_PERSON_PLURAL_VERBS.findall(text)
         )
-        second_tu = (
-            len(self.SECOND_PERSON_TU_PRONOUNS.findall(text)) +
-            len(self.SECOND_PERSON_TU_VERBS.findall(text))
+        second_tu = len(self.SECOND_PERSON_TU_PRONOUNS.findall(text)) + len(
+            self.SECOND_PERSON_TU_VERBS.findall(text)
         )
         second_usted = len(self.SECOND_PERSON_USTED.findall(text))
         third = len(self.THIRD_PERSON.findall(text))
@@ -248,7 +225,7 @@ class POVDetector(BaseDetector):
     def _check_person_shifts(
         self,
         paragraphs: list[dict],
-        chapter_index: Optional[int],
+        chapter_index: int | None,
         full_text: str,
     ) -> list[CorrectionIssue]:
         """
@@ -273,7 +250,7 @@ class POVDetector(BaseDetector):
 
         # Buscar párrafos que cambien de POV
         prev_pov = None
-        for i, para in enumerate(paragraphs):
+        for _i, para in enumerate(paragraphs):
             current_pov = para["pov"]["dominant"]
 
             # Ignorar párrafos sin marcadores claros
@@ -283,16 +260,13 @@ class POVDetector(BaseDetector):
             if current_pov and prev_pov and current_pov != prev_pov:
                 # Verificar que es un cambio significativo (no dentro de diálogo)
                 text_snippet = para["text"][:100]
-                is_dialogue = text_snippet.strip().startswith((
-                    "—", "«", '"', "-"
-                ))
+                is_dialogue = text_snippet.strip().startswith(("—", "«", '"', "-"))
 
                 if not is_dialogue:
                     # Determinar la severidad del cambio
                     is_major_shift = (
-                        (current_pov.startswith("first") and prev_pov.startswith("third")) or
-                        (current_pov.startswith("third") and prev_pov.startswith("first"))
-                    )
+                        current_pov.startswith("first") and prev_pov.startswith("third")
+                    ) or (current_pov.startswith("third") and prev_pov.startswith("first"))
 
                     confidence = 0.85 if is_major_shift else 0.7
 
@@ -302,7 +276,9 @@ class POVDetector(BaseDetector):
                             issue_type=POVIssueType.PERSON_SHIFT.value,
                             start_char=para["start"],
                             end_char=para["end"],
-                            text=para["text"][:100] + "..." if len(para["text"]) > 100 else para["text"],
+                            text=para["text"][:100] + "..."
+                            if len(para["text"]) > 100
+                            else para["text"],
                             explanation=(
                                 f"Posible cambio de punto de vista: "
                                 f"el párrafo anterior usa {self._pov_name(prev_pov)}, "
@@ -332,7 +308,7 @@ class POVDetector(BaseDetector):
     def _check_tu_usted_mix(
         self,
         paragraphs: list[dict],
-        chapter_index: Optional[int],
+        chapter_index: int | None,
         full_text: str,
     ) -> list[CorrectionIssue]:
         """
@@ -352,7 +328,9 @@ class POVDetector(BaseDetector):
                         issue_type=POVIssueType.TU_USTED_MIX.value,
                         start_char=para["start"],
                         end_char=para["end"],
-                        text=para["text"][:100] + "..." if len(para["text"]) > 100 else para["text"],
+                        text=para["text"][:100] + "..."
+                        if len(para["text"]) > 100
+                        else para["text"],
                         explanation=(
                             f"Mezcla de tratamiento: se detectan {tu_count} usos de 'tú' "
                             f"y {usted_count} usos de 'usted' en el mismo párrafo. "
@@ -378,7 +356,7 @@ class POVDetector(BaseDetector):
     def _check_focalizer_shifts(
         self,
         paragraphs: list[dict],
-        chapter_index: Optional[int],
+        chapter_index: int | None,
         full_text: str,
     ) -> list[CorrectionIssue]:
         """
@@ -394,7 +372,8 @@ class POVDetector(BaseDetector):
 
         # Solo aplicar si hay tercera persona dominante
         third_person_paragraphs = [
-            p for p in paragraphs
+            p
+            for p in paragraphs
             if p["pov"]["dominant"] == "third" and len(p["pov"]["perception_verbs"]) > 0
         ]
 
@@ -404,11 +383,11 @@ class POVDetector(BaseDetector):
         # Patrones para extraer sujeto del verbo de percepción
         # "María pensó", "él sintió", "la mujer recordó"
         subject_pattern = re.compile(
-            r'([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+|[Éé]l|[Ee]lla)\s+'
-            r'(pensó|pensaba|sentía|creía|creyó|imaginó|imaginaba|'
-            r'sabía|supo|recordó|recordaba|veía|vio|oyó|oía|notó|notaba|'
-            r'comprendió|comprendía|percibió|percibía)',
-            re.IGNORECASE
+            r"([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+|[Éé]l|[Ee]lla)\s+"
+            r"(pensó|pensaba|sentía|creía|creyó|imaginó|imaginaba|"
+            r"sabía|supo|recordó|recordaba|veía|vio|oyó|oía|notó|notaba|"
+            r"comprendió|comprendía|percibió|percibía)",
+            re.IGNORECASE,
         )
 
         prev_para = None
@@ -435,14 +414,18 @@ class POVDetector(BaseDetector):
                     # Buscar si hay algún indicador de transición
                     para_start_lower = para["text"][:50].lower()
                     transition_markers = [
-                        "mientras tanto", "por su parte", "en cambio",
-                        "por otro lado", "sin embargo", "entretanto",
-                        "al mismo tiempo", "simultáneamente",
+                        "mientras tanto",
+                        "por su parte",
+                        "en cambio",
+                        "por otro lado",
+                        "sin embargo",
+                        "entretanto",
+                        "al mismo tiempo",
+                        "simultáneamente",
                     ]
 
                     has_transition = any(
-                        marker in para_start_lower
-                        for marker in transition_markers
+                        marker in para_start_lower for marker in transition_markers
                     )
 
                     if not has_transition:
@@ -452,7 +435,9 @@ class POVDetector(BaseDetector):
                                 issue_type=POVIssueType.FOCALIZER_SHIFT.value,
                                 start_char=para["start"],
                                 end_char=para["end"],
-                                text=para["text"][:100] + "..." if len(para["text"]) > 100 else para["text"],
+                                text=para["text"][:100] + "..."
+                                if len(para["text"]) > 100
+                                else para["text"],
                                 explanation=(
                                     f"Posible cambio de focalizador: el párrafo anterior "
                                     f"muestra percepciones de {', '.join(prev_named)}, "
@@ -464,7 +449,9 @@ class POVDetector(BaseDetector):
                                     "('Mientras tanto', 'Por su parte') o una separación de escena."
                                 ),
                                 confidence=0.65,  # Baja porque es heurística
-                                context=self._extract_context(full_text, para["start"], para["end"]),
+                                context=self._extract_context(
+                                    full_text, para["start"], para["end"]
+                                ),
                                 chapter_index=chapter_index,
                                 rule_id="POV_FOCALIZER_SHIFT",
                                 extra_data={
@@ -493,7 +480,7 @@ class POVDetector(BaseDetector):
     def _check_inconsistent_omniscience(
         self,
         paragraphs: list[dict],
-        chapter_index: Optional[int],
+        chapter_index: int | None,
         full_text: str,
     ) -> list[CorrectionIssue]:
         """
@@ -510,21 +497,18 @@ class POVDetector(BaseDetector):
         issues = []
 
         # Solo aplicar a tercera persona
-        third_person_paragraphs = [
-            p for p in paragraphs
-            if p["pov"]["dominant"] == "third"
-        ]
+        third_person_paragraphs = [p for p in paragraphs if p["pov"]["dominant"] == "third"]
 
         if len(third_person_paragraphs) < 3:
             return []
 
         # Patrones para detectar acceso a pensamientos internos
         internal_thoughts_pattern = re.compile(
-            r'([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+|[Éé]l|[Ee]lla)\s+'
-            r'(pensó|pensaba|sintió|sentía|se preguntó|se preguntaba|'
-            r'sabía que|no sabía|temía|esperaba|deseaba|creía|imaginó|'
-            r'recordó|comprendió|se dio cuenta)',
-            re.IGNORECASE
+            r"([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+|[Éé]l|[Ee]lla)\s+"
+            r"(pensó|pensaba|sintió|sentía|se preguntó|se preguntaba|"
+            r"sabía que|no sabía|temía|esperaba|deseaba|creía|imaginó|"
+            r"recordó|comprendió|se dio cuenta)",
+            re.IGNORECASE,
         )
 
         # Analizar patrones de focalización
@@ -535,11 +519,13 @@ class POVDetector(BaseDetector):
                 subject = match.group(1).lower()
                 if subject not in ("él", "ella"):  # Solo nombres propios
                     focalizers.add(subject)
-            para_focalizations.append({
-                "para": para,
-                "focalizers": focalizers,
-                "count": len(focalizers),
-            })
+            para_focalizations.append(
+                {
+                    "para": para,
+                    "focalizers": focalizers,
+                    "count": len(focalizers),
+                }
+            )
 
         # Detectar inconsistencias: si la mayoría de párrafos tienen 0-1 focalizadores
         # pero algunos tienen 2+, puede indicar inconsistencia
@@ -561,7 +547,9 @@ class POVDetector(BaseDetector):
                             issue_type=POVIssueType.INCONSISTENT_OMNISCIENCE.value,
                             start_char=para["start"],
                             end_char=para["end"],
-                            text=para["text"][:100] + "..." if len(para["text"]) > 100 else para["text"],
+                            text=para["text"][:100] + "..."
+                            if len(para["text"]) > 100
+                            else para["text"],
                             explanation=(
                                 f"Posible inconsistencia en la omnisciencia del narrador: "
                                 f"este párrafo muestra pensamientos internos de múltiples "
