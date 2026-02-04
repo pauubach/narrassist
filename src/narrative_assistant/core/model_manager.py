@@ -133,10 +133,10 @@ class DownloadProgress:
 _download_progress: dict[ModelType, DownloadProgress] = {}
 _progress_lock = threading.Lock()
 
-# Cache de tamaños de modelos (consultados dinámicamente de HuggingFace)
+# Cache de tamaños de modelos (consultados dinámicamente de HuggingFace/GitHub)
 _model_sizes_cache: dict[str, int] = {}
 _model_sizes_cache_time: float = 0.0
-_MODEL_SIZES_CACHE_TTL = 3600.0  # 1 hora de cache
+_MODEL_SIZES_CACHE_TTL = 7 * 24 * 3600.0  # 1 semana de cache (los tamaños cambian poco)
 
 
 @dataclass
