@@ -49,7 +49,7 @@ repos:
 
 # Configuración global
 default_language_version:
-  python: python3.11
+  python: python3
 
 # Excluir archivos
 exclude: |
