@@ -9,10 +9,14 @@ Previene:
 
 import logging
 import re
+import urllib.parse
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 
 from ..core.config import get_config
+from ..core.result import Result
+from ..core.errors import NLPError, ErrorSeverity
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +58,8 @@ class InputSanitizer:
     MAX_NOTE_LENGTH = 10000
     MAX_ENTITY_NAME_LENGTH = 200
     MAX_FILENAME_LENGTH = 255
+    MAX_TEXT_LENGTH = 10 * 1024 * 1024  # 10MB para texto general
+    MAX_CHAPTER_LENGTH = 5 * 1024 * 1024  # 5MB para capítulos
 
     @classmethod
     def sanitize_filename(cls, filename: str) -> str:
@@ -139,6 +145,7 @@ class InputSanitizer:
         - Strip whitespace
         - Limita longitud
         - Normaliza espacios múltiples
+        - Elimina caracteres SQL peligrosos
         """
         # Strip y normalizar espacios
         name = " ".join(name.split())
@@ -147,12 +154,70 @@ class InputSanitizer:
         if len(name) > cls.MAX_ENTITY_NAME_LENGTH:
             name = name[: cls.MAX_ENTITY_NAME_LENGTH]
 
+        # Eliminar secuencias SQL peligrosas
+        # (aunque el ORM usa queries parametrizadas, esto añade defensa en profundidad)
+        name = name.replace("--", "")
+        name = name.replace(";", "")
+
         return name or "Sin nombre"
+
+    @classmethod
+    def sanitize_text(cls, text: str) -> str:
+        """
+        Sanitiza texto genérico (contenido de manuscrito).
+
+        No modifica el contenido significativamente ya que puede ser
+        legítimamente cualquier cosa. Solo:
+        - Limita longitud
+        - Elimina bytes nulos
+        - Normaliza saltos de línea
+        """
+        if not text:
+            return ""
+
+        # Eliminar bytes nulos
+        text = text.replace("\x00", "")
+
+        # Normalizar saltos de línea
+        text = text.replace("\r\n", "\n").replace("\r", "\n")
+
+        # Limitar longitud
+        if len(text) > cls.MAX_TEXT_LENGTH:
+            text = text[: cls.MAX_TEXT_LENGTH]
+
+        return text
 
 
 def sanitize_filename(filename: str) -> str:
     """Atajo para sanitizar nombre de archivo."""
     return InputSanitizer.sanitize_filename(filename)
+
+
+def sanitize_chapter_content(content: str) -> str:
+    """
+    Sanitiza el contenido de un capítulo.
+
+    Args:
+        content: Contenido del capítulo
+
+    Returns:
+        Contenido sanitizado
+    """
+    if not content:
+        return ""
+
+    # Eliminar bytes nulos
+    content = content.replace("\x00", "")
+
+    # Normalizar saltos de línea
+    content = content.replace("\r\n", "\n").replace("\r", "\n")
+
+    # Limitar longitud
+    max_len = InputSanitizer.MAX_CHAPTER_LENGTH
+    if len(content) > max_len:
+        content = content[:max_len]
+
+    return content
 
 
 def validate_file_path(
@@ -252,3 +317,108 @@ def get_allowed_document_extensions() -> set[str]:
         extensions.update(format_to_ext.get(fmt, set()))
 
     return extensions
+
+
+@dataclass
+class PathValidationError(NLPError):
+    """Error de validación de ruta de archivo."""
+
+    message: str = "Error de validación de ruta"
+    severity: ErrorSeverity = field(default=ErrorSeverity.FATAL, init=False)  # Path errors are security-critical
+
+
+def validate_file_path(
+    path: Union[str, Path],
+    allowed_dir: Optional[Path] = None,
+    must_exist: bool = False,
+) -> Result[Path]:
+    """
+    Valida una ruta de archivo contra path traversal y otros ataques.
+
+    Esta versión retorna Result para manejo seguro de errores.
+
+    Args:
+        path: Ruta a validar (string o Path)
+        allowed_dir: Directorio permitido (si se especifica, el path debe estar dentro)
+        must_exist: Si True, verifica que el archivo existe
+
+    Returns:
+        Result con el Path resuelto o error
+    """
+    try:
+        # Convertir a string para análisis
+        path_str = str(path)
+
+        # Detectar null byte injection
+        if "\x00" in path_str:
+            return Result.failure(
+                PathValidationError(message="Null byte detectado en ruta - posible ataque")
+            )
+
+        # Decodificar URL encoding (detectar %2e%2e = ..)
+        try:
+            decoded = urllib.parse.unquote(path_str)
+            # Double decode
+            decoded2 = urllib.parse.unquote(decoded)
+        except Exception:
+            decoded = path_str
+            decoded2 = path_str
+
+        # Detectar path traversal en versiones encoded
+        traversal_patterns = ["..", "%2e%2e", "%252e", "%c0%af"]
+        for pattern in traversal_patterns:
+            if pattern in path_str.lower() or pattern in decoded.lower() or pattern in decoded2.lower():
+                return Result.failure(
+                    PathValidationError(
+                        message=f"Path traversal detectado en ruta: {path_str[:50]}"
+                    )
+                )
+
+        # Convertir a Path y resolver
+        path_obj = Path(path_str)
+
+        # Si es path absoluto fuera del allowed_dir, bloquear
+        if allowed_dir is not None:
+            allowed_resolved = allowed_dir.resolve()
+
+            # Resolver el path (esto expande .. y similares)
+            try:
+                resolved = path_obj.resolve()
+            except Exception as e:
+                return Result.failure(
+                    PathValidationError(message=f"No se puede resolver la ruta: {e}")
+                )
+
+            # Verificar que está dentro del directorio permitido
+            try:
+                resolved.relative_to(allowed_resolved)
+            except ValueError:
+                return Result.failure(
+                    PathValidationError(
+                        message=f"Ruta outside del directorio permitido: {path_str[:50]}"
+                    )
+                )
+
+            # Verificar existencia si requerido
+            if must_exist and not resolved.exists():
+                return Result.failure(
+                    PathValidationError(message=f"Archivo no encontrado: {path_str[:50]}")
+                )
+
+            return Result.success(resolved)
+
+        else:
+            # Sin directorio permitido, solo validar básico
+            resolved = path_obj.resolve()
+
+            if must_exist and not resolved.exists():
+                return Result.failure(
+                    PathValidationError(message=f"Archivo no encontrado: {path_str[:50]}")
+                )
+
+            return Result.success(resolved)
+
+    except Exception as e:
+        return Result.failure(
+            PathValidationError(message=f"Error validando ruta: {e}")
+        )

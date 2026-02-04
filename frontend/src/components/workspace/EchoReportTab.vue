@@ -259,6 +259,11 @@ async function analyze() {
     const response = await fetch(
       apiUrl(`/api/projects/${props.projectId}/echo-report?${params}`)
     )
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+    }
+
     const data = await response.json()
 
     if (data.success) {

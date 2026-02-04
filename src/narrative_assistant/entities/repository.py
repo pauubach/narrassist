@@ -388,8 +388,9 @@ class EntityRepository:
         ]
 
         with self.db.connection() as conn:
-            conn.executemany(sql, params)
-            return len(params)
+            cursor = conn.executemany(sql, params)
+            # Retorna el número real de filas insertadas (no las ignoradas)
+            return cursor.rowcount
 
     def get_mentions_by_entity(self, entity_id: int) -> list[EntityMention]:
         """Obtiene todas las menciones de una entidad."""

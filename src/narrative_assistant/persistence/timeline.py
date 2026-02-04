@@ -30,6 +30,9 @@ class TimelineEventData:
     narrative_order: str = "CHRONOLOGICAL"
     discourse_position: Optional[int] = None
     confidence: float = 0.5
+    # Para timelines sin fechas absolutas (Día 0, Día +1, etc.)
+    day_offset: Optional[int] = None
+    weekday: Optional[str] = None
     created_at: Optional[str] = None
 
     def to_dict(self) -> dict:
@@ -44,6 +47,9 @@ class TimelineEventData:
             "narrative_order": self.narrative_order,
             "discourse_position": self.discourse_position,
             "confidence": self.confidence,
+            "day_offset": self.day_offset,
+            "weekday": self.weekday,
+            "entity_ids": [],  # Placeholder - entities tracked separately
         }
 
     @classmethod
@@ -61,6 +67,8 @@ class TimelineEventData:
             narrative_order=row["narrative_order"] or "CHRONOLOGICAL",
             discourse_position=row["discourse_position"],
             confidence=row["confidence"] or 0.5,
+            day_offset=row.get("day_offset"),
+            weekday=row.get("weekday"),
             created_at=row["created_at"],
         )
 
@@ -190,8 +198,8 @@ class TimelineRepository:
                     INSERT INTO timeline_events (
                         project_id, event_id, chapter, paragraph, description,
                         story_date, story_date_resolution, narrative_order,
-                        discourse_position, confidence, created_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        discourse_position, confidence, day_offset, weekday, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         project_id,
@@ -204,6 +212,8 @@ class TimelineRepository:
                         event.narrative_order,
                         event.discourse_position,
                         event.confidence,
+                        event.day_offset,
+                        event.weekday,
                         now,
                     )
                 )

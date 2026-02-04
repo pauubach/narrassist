@@ -43,6 +43,9 @@ export interface FeatureProfile {
     vital_status: FeatureAvailability
     character_location: FeatureAvailability
     chapter_progress: FeatureAvailability
+    duplicate_content: FeatureAvailability
+    narrative_structure: FeatureAvailability
+    dialogue_validation: FeatureAvailability
     // Consistencia
     attribute_consistency: FeatureAvailability
     world_consistency: FeatureAvailability
@@ -76,6 +79,9 @@ const featureToTabMap: Record<string, string> = {
   vital_status: 'alerts',
   character_location: 'entities',
   chapter_progress: 'summary',
+  duplicate_content: 'style',
+  narrative_structure: 'style',
+  dialogue_validation: 'style',
   attribute_consistency: 'alerts',
   world_consistency: 'alerts',
   glossary: 'glossary',
@@ -95,7 +101,7 @@ const tabToFeaturesMap: Record<string, string[]> = {
     'voice_profiles', 'sticky_sentences', 'echo_repetitions',
     'sentence_variation', 'emotional_analysis', 'age_readability', 'editorial_rules',
     'sensory_report', 'sentence_energy',
-    'narrative_templates', 'narrative_health', 'character_archetypes'
+    'narrative_templates', 'narrative_health', 'character_archetypes', 'duplicate_content', 'narrative_structure', 'dialogue_validation'
   ],
   glossary: ['glossary', 'terminology'],
   summary: ['chapter_progress'], // chapter_progress + siempre visible como fallback

@@ -452,3 +452,39 @@ Ver: [docs/02-architecture/SECURITY.md](docs/02-architecture/SECURITY.md)
 - Considerar thread-safety en singletons
 - **NO añadir código que requiera internet** (excepto licencias)
 - **Verificar que no hay filtraciones de datos**
+
+---
+
+## Comité de Expertos para Auditorías
+
+Al realizar auditorías comprehensivas del proyecto, usar esta configuración:
+
+### Subagentes (5 en paralelo)
+
+| Subagente | Tipo | Foco |
+|-----------|------|------|
+| **Backend NLP** | Explore | Pipeline NLP, errores, enums, correferencias |
+| **Frontend Vue** | Explore | XSS, error handling, estado, componentes |
+| **Seguridad** | Explore | Path traversal, sanitización, aislamiento |
+| **Tests/Coverage** | Explore | Gaps en cobertura, edge cases, regresiones |
+| **Arquitectura** | Plan | Patrones, consistencia, SOLID, Result pattern |
+
+### Panel de Expertos Simulados (8 roles)
+
+| Rol | Perspectiva |
+|-----|-------------|
+| **QA Senior** | Testing, edge cases, regresiones, cobertura |
+| **Lingüista Computacional** | Modelos NLP, correferencias, POS tagging, español |
+| **Corrector Editorial** (15+ años) | Utilidad real de alertas, flujo de trabajo profesional |
+| **Arquitecto Python/FastAPI** | Patrones, performance, threading, APIs |
+| **AppSec Specialist** | XSS, path traversal, seguridad de manuscritos |
+| **Frontend Engineer** (Vue/Tauri) | Componentes, estado, performance, accesibilidad |
+| **Product Owner** | Priorización, ROI, valor para el usuario |
+| **UX Designer** | Flujos de trabajo, usabilidad, feedback |
+
+### Uso
+
+```bash
+# Ejemplo de auditoría paralela con 5 subagentes
+# Cada subagente adopta perspectivas relevantes del panel
+```

@@ -401,6 +401,30 @@ function getDistributionWidth(chapter: any, type: string): string {
 .stat-value {
   font-size: var(--ds-font-size-2xl);
   font-weight: var(--ds-font-weight-bold);
+  /* Ensure stat values have good contrast in both light and dark modes */
+  background: linear-gradient(135deg, transparent 0%, transparent 100%);
+  -webkit-background-clip: text;
+  padding: 2px 8px;
+  border-radius: var(--ds-radius-sm);
+}
+
+/* Provide subtle background tint for better readability */
+.stat-value.severity-critical {
+  background: #fef2f2;
+  -webkit-background-clip: padding-box;
+  background-clip: padding-box;
+}
+
+.stat-value.severity-high {
+  background: #fff7ed;
+  -webkit-background-clip: padding-box;
+  background-clip: padding-box;
+}
+
+.stat-value.severity-medium {
+  background: #fefce8;
+  -webkit-background-clip: padding-box;
+  background-clip: padding-box;
 }
 
 .stat-label {
@@ -409,11 +433,11 @@ function getDistributionWidth(chapter: any, type: string): string {
   margin-top: var(--ds-space-1);
 }
 
-/* Severity colors */
-.severity-critical { color: #ef4444; }
-.severity-high { color: #f97316; }
-.severity-medium { color: #eab308; }
-.severity-low { color: #6b7280; }
+/* Severity colors - WCAG AA compliant (contrast >= 4.5:1 on white) */
+.severity-critical { color: #b91c1c; }  /* red-700: 5.05:1 */
+.severity-high { color: #c2410c; }      /* orange-700: 4.78:1 */
+.severity-medium { color: #a16207; }    /* yellow-700: 4.54:1 */
+.severity-low { color: #4b5563; }       /* gray-600: 7.02:1 */
 
 /* Filter section */
 .filter-section {
@@ -518,19 +542,27 @@ function getDistributionWidth(chapter: any, type: string): string {
   padding: var(--ds-space-3);
   background: var(--ds-surface-hover);
   border-radius: var(--ds-radius-md);
-  border-left: 3px solid var(--ds-surface-border);
+  border-left: 4px solid var(--ds-surface-border);
 }
 
 .sticky-item.severity-critical {
-  border-left-color: #ef4444;
+  border-left-color: #b91c1c;
+  background: #fef2f2; /* red-50: light tint for visibility */
 }
 
 .sticky-item.severity-high {
-  border-left-color: #f97316;
+  border-left-color: #c2410c;
+  background: #fff7ed; /* orange-50 */
 }
 
 .sticky-item.severity-medium {
-  border-left-color: #eab308;
+  border-left-color: #a16207;
+  background: #fefce8; /* yellow-50 */
+}
+
+/* Ensure text inside sticky items is always readable (dark) */
+.sticky-item .sticky-text {
+  color: #1f2937; /* gray-800 - high contrast on all backgrounds */
 }
 
 .sticky-header {
@@ -538,6 +570,27 @@ function getDistributionWidth(chapter: any, type: string): string {
   align-items: center;
   gap: var(--ds-space-2);
   margin-bottom: var(--ds-space-2);
+}
+
+/* Fix Tag contrast - ensure white text on colored backgrounds */
+.sticky-header :deep(.p-tag) {
+  font-weight: 600;
+}
+
+.sticky-header :deep(.p-tag-danger) {
+  background: #b91c1c;  /* red-700 */
+  color: white;
+}
+
+.sticky-header :deep(.p-tag-warn),
+.sticky-header :deep(.p-tag-warning) {
+  background: #c2410c;  /* orange-700 */
+  color: white;
+}
+
+.sticky-header :deep(.p-tag-info) {
+  background: #a16207;  /* yellow-700 for medium */
+  color: white;
 }
 
 .sticky-stats {

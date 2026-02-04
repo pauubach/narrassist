@@ -280,9 +280,15 @@
           <div class="detail-grid">
             <div class="detail-item">
               <span class="label">Fecha en la historia:</span>
-              <span v-if="selectedEvent.storyDate">
+              <!-- Fecha absoluta -->
+              <span v-if="selectedEvent.storyDate && selectedEvent.storyDate.getFullYear() > 1">
                 {{ formatDateFull(selectedEvent.storyDate) }}
               </span>
+              <!-- Day offset (Día 0, Día +1, etc.) -->
+              <span v-else-if="selectedEvent.dayOffset !== null">
+                {{ formatDayOffset(selectedEvent.dayOffset, selectedEvent.weekday) }}
+              </span>
+              <!-- No determinada -->
               <span v-else class="unknown">No determinada</span>
             </div>
             <div class="detail-item">
@@ -476,10 +482,24 @@ const filteredEvents = computed(() => {
   // Ordenar
   if (sortOrder.value === 'chronological') {
     events.sort((a, b) => {
-      if (!a.storyDate && !b.storyDate) return 0
-      if (!a.storyDate) return 1
-      if (!b.storyDate) return -1
-      return a.storyDate.getTime() - b.storyDate.getTime()
+      // Prioridad: storyDate > dayOffset > sin tiempo
+      const aHasDate = a.storyDate && a.storyDate.getFullYear() > 1
+      const bHasDate = b.storyDate && b.storyDate.getFullYear() > 1
+      const aHasOffset = a.dayOffset !== null
+      const bHasOffset = b.dayOffset !== null
+
+      // Si ambos tienen fecha real
+      if (aHasDate && bHasDate) {
+        return a.storyDate!.getTime() - b.storyDate!.getTime()
+      }
+      // Si ambos tienen day_offset
+      if (aHasOffset && bHasOffset) {
+        return a.dayOffset! - b.dayOffset!
+      }
+      // Priorizar los que tienen tiempo conocido
+      if (aHasDate || aHasOffset) return -1
+      if (bHasDate || bHasOffset) return 1
+      return 0
     })
   } else {
     events.sort((a, b) => a.discoursePosition - b.discoursePosition)
@@ -528,18 +548,35 @@ const formatDateShort = (date: Date): string => {
 }
 
 const formatDateFull = (date: Date): string => {
-  // Para fechas sinteticas (ano 1), mostrar como "Dia X"
+  // Para fechas sinteticas (ano 1), no deberían llegar aquí
+  // pero por compatibilidad con datos antiguos
   if (date.getFullYear() === 1) {
-    const baseDate = new Date(1, 0, 1)
-    const diffTime = date.getTime() - baseDate.getTime()
-    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24))
-    return `Dia ${diffDays}`
+    return 'Fecha relativa'
   }
   return new Intl.DateTimeFormat('es-ES', {
     day: 'numeric',
     month: 'long',
     year: 'numeric'
   }).format(date)
+}
+
+// Formato para eventos con day_offset (Día 0, Día +1, etc.)
+const formatDayOffset = (offset: number, weekday: string | null): string => {
+  let result = ''
+  if (offset === 0) {
+    result = 'Día 0'
+  } else if (offset > 0) {
+    result = `Día +${offset}`
+  } else {
+    result = `Día ${offset}`
+  }
+
+  // Añadir día de la semana si está disponible
+  if (weekday) {
+    result += ` (${weekday})`
+  }
+
+  return result
 }
 
 // Formatear duración en días a texto legible
@@ -613,6 +650,7 @@ const getResolutionLabel = (resolution: TimelineResolution): string => {
     case 'month': return 'Mes'
     case 'year': return 'Ano'
     case 'season': return 'Estacion'
+    case 'partial': return 'Parcial (sin año)'
     case 'relative': return 'Relativa'
     case 'unknown': return 'Desconocida'
     default: return resolution

@@ -461,4 +461,7 @@ Extender ExportDialog con formato "Informe Editorial":
 ---
 
 *Documento creado: 2026-01-26*
+*Última actualización: 2026-02-04*
 *Basado en síntesis de: Arquitecto, PM, Tech Writer, Product Manager*
+
+> **Nota**: Para el estado detallado de implementación de sprints recientes, ver [research/ROADMAP_STATUS.md](research/ROADMAP_STATUS.md).

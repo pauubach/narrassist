@@ -30,6 +30,8 @@ import SentenceEnergyTab from './SentenceEnergyTab.vue'
 import NarrativeTemplatesTab from './NarrativeTemplatesTab.vue'
 import NarrativeHealthTab from './NarrativeHealthTab.vue'
 import CharacterArchetypesTab from './CharacterArchetypesTab.vue'
+import DuplicateContentTab from './DuplicateContentTab.vue'
+import ProlepisTab from './ProlepisTab.vue'
 import { apiUrl } from '@/config/api'
 
 type CategoryId = 'narrative' | 'style' | 'consistency'
@@ -82,6 +84,7 @@ const allSubTabs: SubTab[] = [
   { id: 'templates', label: 'Plantillas', icon: 'pi pi-sitemap', component: 'NarrativeTemplatesTab', featureKey: 'narrative_templates', category: 'narrative' },
   { id: 'health', label: 'Salud', icon: 'pi pi-heart-fill', component: 'NarrativeHealthTab', featureKey: 'narrative_health', category: 'narrative' },
   { id: 'archetypes', label: 'Arquetipos', icon: 'pi pi-users', component: 'CharacterArchetypesTab', featureKey: 'character_archetypes', category: 'narrative' },
+  { id: 'prolepsis', label: 'Prolepsis', icon: 'pi pi-clock', component: 'ProlepisTab', featureKey: 'narrative_structure', category: 'narrative' },
   // Estilo
   { id: 'sticky', label: 'Densidad', icon: 'pi pi-align-left', component: 'StickySentencesTab', featureKey: 'sticky_sentences', category: 'style' },
   { id: 'echo', label: 'Ecos', icon: 'pi pi-replay', component: 'EchoReportTab', featureKey: 'echo_repetitions', category: 'style' },
@@ -92,6 +95,7 @@ const allSubTabs: SubTab[] = [
   // Consistencia
   { id: 'vital', label: 'Estado vital', icon: 'pi pi-heart-fill', component: 'VitalStatusTab', featureKey: 'vital_status', category: 'consistency' },
   { id: 'locations', label: 'Ubicaciones', icon: 'pi pi-map-marker', component: 'CharacterLocationTab', featureKey: 'character_location', category: 'consistency' },
+  { id: 'duplicates', label: 'Duplicados', icon: 'pi pi-copy', component: 'DuplicateContentTab', featureKey: 'duplicate_content', category: 'consistency' },
 ]
 
 // Filtered sub-tabs based on feature availability
@@ -226,6 +230,8 @@ async function loadFeatureAvailability() {
       <NarrativeTemplatesTab v-if="activeTabId === 'templates'" :project-id="projectId" />
       <NarrativeHealthTab v-if="activeTabId === 'health'" :project-id="projectId" />
       <CharacterArchetypesTab v-if="activeTabId === 'archetypes'" :project-id="projectId" />
+      <ProlepisTab v-if="activeTabId === 'prolepsis'" :project-id="projectId" />
+      <DuplicateContentTab v-if="activeTabId === 'duplicates'" :project-id="projectId" />
     </div>
   </div>
 </template>

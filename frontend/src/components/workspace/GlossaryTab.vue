@@ -57,6 +57,20 @@ const props = defineProps<{
 const toast = useToast()
 const confirm = useConfirm()
 
+// Interfaces adicionales
+interface GlossarySuggestion {
+  term: string
+  reason: string
+  category_hint: string
+  confidence: number
+  frequency: number
+  first_chapter?: number
+  contexts: string[]
+  is_likely_invented: boolean
+  is_likely_technical: boolean
+  is_likely_proper_noun: boolean
+}
+
 // Estado
 const entries = ref<GlossaryEntry[]>([])
 const loading = ref(false)
@@ -65,6 +79,12 @@ const selectedCategory = ref<string | null>(null)
 const showEditDialog = ref(false)
 const editingEntry = ref<Partial<GlossaryEntry> | null>(null)
 const saving = ref(false)
+
+// Estado de sugerencias
+const suggestions = ref<GlossarySuggestion[]>([])
+const loadingSuggestions = ref(false)
+const showSuggestions = ref(false)
+const acceptingSuggestion = ref<string | null>(null)
 
 // Opciones de categoría
 const categoryOptions = [
@@ -325,6 +345,102 @@ async function exportForPublication() {
     })
   }
 }
+
+async function loadSuggestions() {
+  loadingSuggestions.value = true
+  showSuggestions.value = true
+  try {
+    const response = await fetch(
+      apiUrl(`/api/projects/${props.projectId}/glossary/suggestions?max_suggestions=30`)
+    )
+    const data = await response.json()
+
+    if (data.success) {
+      suggestions.value = data.data.suggestions
+      if (suggestions.value.length === 0) {
+        toast.add({
+          severity: 'info',
+          summary: 'Sin sugerencias',
+          detail: 'No se encontraron términos candidatos para el glosario',
+          life: 3000
+        })
+      }
+    } else {
+      throw new Error(data.error)
+    }
+  } catch (error: any) {
+    console.error('Error loading suggestions:', error)
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: error.message || 'No se pudieron cargar las sugerencias',
+      life: 3000
+    })
+  } finally {
+    loadingSuggestions.value = false
+  }
+}
+
+async function acceptSuggestion(suggestion: GlossarySuggestion) {
+  acceptingSuggestion.value = suggestion.term
+  try {
+    const response = await fetch(
+      apiUrl(`/api/projects/${props.projectId}/glossary/suggestions/accept`),
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          term: suggestion.term,
+          definition: '',
+          category: suggestion.category_hint,
+          is_technical: suggestion.is_likely_technical,
+          is_invented: suggestion.is_likely_invented,
+          is_proper_noun: suggestion.is_likely_proper_noun,
+        })
+      }
+    )
+    const data = await response.json()
+
+    if (data.success) {
+      toast.add({
+        severity: 'success',
+        summary: 'Añadido',
+        detail: `"${suggestion.term}" añadido al glosario`,
+        life: 3000
+      })
+      // Eliminar de sugerencias
+      suggestions.value = suggestions.value.filter(s => s.term !== suggestion.term)
+      // Recargar glosario
+      await loadEntries()
+      // Abrir editor para completar definición
+      const newEntry = entries.value.find(e => e.term === suggestion.term)
+      if (newEntry) {
+        openEditDialog(newEntry)
+      }
+    } else {
+      throw new Error(data.error)
+    }
+  } catch (error: any) {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: error.message || 'No se pudo añadir el término',
+      life: 3000
+    })
+  } finally {
+    acceptingSuggestion.value = null
+  }
+}
+
+function dismissSuggestion(suggestion: GlossarySuggestion) {
+  suggestions.value = suggestions.value.filter(s => s.term !== suggestion.term)
+}
+
+function getConfidenceColor(confidence: number): string {
+  if (confidence >= 0.8) return 'var(--ds-color-success)'
+  if (confidence >= 0.6) return 'var(--ds-color-info)'
+  return 'var(--ds-color-warning)'
+}
 </script>
 
 <template>
@@ -353,6 +469,15 @@ async function exportForPublication() {
       </div>
 
       <div class="glossary-tab__actions">
+        <Button
+          label="Sugerir términos"
+          icon="pi pi-sparkles"
+          severity="help"
+          size="small"
+          :loading="loadingSuggestions"
+          @click="loadSuggestions"
+          title="Extraer automáticamente términos candidatos del manuscrito"
+        />
         <Button
           v-if="stats.forPublication > 0"
           label="Exportar"
@@ -388,6 +513,76 @@ async function exportForPublication() {
         placeholder="Categoría"
         class="glossary-tab__category-filter"
       />
+    </div>
+
+    <!-- Panel de sugerencias -->
+    <div v-if="showSuggestions && suggestions.length > 0" class="glossary-tab__suggestions">
+      <div class="glossary-tab__suggestions-header">
+        <div class="glossary-tab__suggestions-title">
+          <i class="pi pi-sparkles" />
+          <span>Sugerencias automáticas</span>
+          <Tag :value="`${suggestions.length}`" severity="info" />
+        </div>
+        <Button
+          icon="pi pi-times"
+          severity="secondary"
+          text
+          rounded
+          size="small"
+          @click="showSuggestions = false; suggestions = []"
+          title="Cerrar sugerencias"
+        />
+      </div>
+      <div class="glossary-tab__suggestions-list">
+        <div
+          v-for="suggestion in suggestions"
+          :key="suggestion.term"
+          class="glossary-tab__suggestion-card"
+        >
+          <div class="glossary-tab__suggestion-main">
+            <span class="glossary-tab__suggestion-term">{{ suggestion.term }}</span>
+            <div class="glossary-tab__suggestion-meta">
+              <Tag
+                :value="categoryLabels[suggestion.category_hint] || suggestion.category_hint"
+                :severity="getCategoryTagSeverity(suggestion.category_hint)"
+                class="glossary-tab__suggestion-category"
+              />
+              <span class="glossary-tab__suggestion-freq">{{ suggestion.frequency }}×</span>
+              <span
+                class="glossary-tab__suggestion-confidence"
+                :style="{ color: getConfidenceColor(suggestion.confidence) }"
+                :title="`Confianza: ${Math.round(suggestion.confidence * 100)}%`"
+              >
+                {{ Math.round(suggestion.confidence * 100) }}%
+              </span>
+            </div>
+          </div>
+          <div class="glossary-tab__suggestion-reason">
+            {{ suggestion.reason }}
+          </div>
+          <div v-if="suggestion.contexts.length > 0" class="glossary-tab__suggestion-context">
+            <i class="pi pi-quote-left" />
+            <span>{{ suggestion.contexts[0] }}</span>
+          </div>
+          <div class="glossary-tab__suggestion-actions">
+            <Button
+              icon="pi pi-check"
+              label="Añadir"
+              size="small"
+              :loading="acceptingSuggestion === suggestion.term"
+              @click="acceptSuggestion(suggestion)"
+            />
+            <Button
+              icon="pi pi-times"
+              severity="secondary"
+              text
+              size="small"
+              title="Ignorar"
+              @click="dismissSuggestion(suggestion)"
+            />
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Lista de términos -->
@@ -818,5 +1013,108 @@ async function exportForPublication() {
 
 .w-full {
   width: 100%;
+}
+
+/* Suggestions panel styles */
+.glossary-tab__suggestions {
+  background: var(--ds-color-surface-secondary);
+  border: 1px solid var(--ds-color-border);
+  border-radius: var(--ds-radius-md);
+  padding: var(--ds-space-3);
+  max-height: 300px;
+  display: flex;
+  flex-direction: column;
+}
+
+.glossary-tab__suggestions-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--ds-space-3);
+}
+
+.glossary-tab__suggestions-title {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  font-weight: var(--ds-font-weight-semibold);
+  color: var(--ds-color-text-primary);
+}
+
+.glossary-tab__suggestions-title i {
+  color: var(--ds-color-help);
+}
+
+.glossary-tab__suggestions-list {
+  display: flex;
+  gap: var(--ds-space-2);
+  overflow-x: auto;
+  padding-bottom: var(--ds-space-2);
+}
+
+.glossary-tab__suggestion-card {
+  flex: 0 0 auto;
+  width: 280px;
+  background: var(--ds-color-surface-primary);
+  border: 1px solid var(--ds-color-border);
+  border-radius: var(--ds-radius-md);
+  padding: var(--ds-space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-2);
+}
+
+.glossary-tab__suggestion-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.glossary-tab__suggestion-term {
+  font-weight: var(--ds-font-weight-semibold);
+  font-size: var(--ds-font-size-md);
+}
+
+.glossary-tab__suggestion-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+}
+
+.glossary-tab__suggestion-freq {
+  font-size: var(--ds-font-size-xs);
+  color: var(--ds-color-text-tertiary);
+}
+
+.glossary-tab__suggestion-confidence {
+  font-size: var(--ds-font-size-xs);
+  font-weight: var(--ds-font-weight-semibold);
+}
+
+.glossary-tab__suggestion-reason {
+  font-size: var(--ds-font-size-sm);
+  color: var(--ds-color-text-secondary);
+}
+
+.glossary-tab__suggestion-context {
+  font-size: var(--ds-font-size-xs);
+  color: var(--ds-color-text-tertiary);
+  font-style: italic;
+  display: flex;
+  gap: var(--ds-space-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.glossary-tab__suggestion-context i {
+  flex-shrink: 0;
+  opacity: 0.5;
+}
+
+.glossary-tab__suggestion-actions {
+  display: flex;
+  gap: var(--ds-space-2);
+  margin-top: auto;
 }
 </style>

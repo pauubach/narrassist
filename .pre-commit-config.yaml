@@ -1,0 +1,63 @@
+# Pre-commit hooks para Narrative Assistant
+# Instalación: pre-commit install
+# Ejecutar manualmente: pre-commit run --all-files
+
+repos:
+  # Linting y formateo con Ruff
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.3.0
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+        types_or: [python, pyi]
+      - id: ruff-format
+        types_or: [python, pyi]
+
+  # Type checking con MyPy
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+      - id: mypy
+        args: [--ignore-missing-imports, --no-error-summary]
+        additional_dependencies: []
+        pass_filenames: false
+        entry: mypy src/narrative_assistant
+
+  # Checks básicos
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+        args: [--maxkb=1000]
+      - id: check-merge-conflict
+      - id: detect-private-key
+
+  # Tests unitarios (rápidos)
+  - repo: local
+    hooks:
+      - id: pytest-unit
+        name: pytest unit tests
+        entry: pytest tests/unit -v --tb=short -x -q
+        language: system
+        types: [python]
+        pass_filenames: false
+        # Solo ejecutar si hay cambios en src/ o tests/
+        files: ^(src/|tests/)
+
+# Configuración global
+default_language_version:
+  python: python3.11
+
+# Excluir archivos
+exclude: |
+  (?x)^(
+    \.venv/|
+    node_modules/|
+    src-tauri/target/|
+    src-tauri/binaries/python-embed/|
+    frontend/dist/|
+    .*\.min\.js$
+  )$

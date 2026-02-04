@@ -6,6 +6,31 @@
 
 ---
 
+## ⚡ Estado de Implementación (Verificado 2026-02-04)
+
+**Progreso global: 100% completado** ✅
+
+| Sprint/Solución | Estado | Notas |
+|-----------------|--------|-------|
+| **Sprint E: Hotfixes Críticos** | ✅ 5/5 | ErrorSeverity.MEDIUM era falsa alarma (ya usa RECOVERABLE) |
+| **Sprint F: Calidad Frontend** | ✅ 6/6 | `response.ok` añadido en EchoReportTab.vue |
+| **Sprint G: Lingüística Española** | ✅ 3/3 | - |
+| **S-1: Fail-Fast** | ✅ Completo | PhasePreconditionError ya implementado |
+| **S-2: morpho_utils.py** | ✅ Completo | - |
+| **S-3: scope_resolver.py** | ✅ Completo | - |
+
+### Correcciones adicionales (2026-02-04)
+
+| Fix | Archivo | Descripción |
+|-----|---------|-------------|
+| Menús Tauri | `useNativeMenu.ts` | Race condition corregido con `tauriReadyPromise` |
+| Panel responsive | `EntityInspector.vue`, `ProjectDetailView.vue` | `min-width: 0` para flexbox |
+| mention_count | `fusion.py`, `repository.py` | Reconciliación + `cursor.rowcount` |
+| Analepsis falsas | `timeline.py` | Algoritmo high-water mark |
+| Chat timeout | `useChat.ts` | 30s → 120s |
+
+---
+
 ## Paneles de Expertos Consultados
 
 | Panel | Expertos | Foco |

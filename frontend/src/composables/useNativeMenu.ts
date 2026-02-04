@@ -1,8 +1,26 @@
 /**
  * Composable para manejar eventos del menu nativo de Tauri
  */
-import { onMounted, onUnmounted } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+
+// Variable para guardar la función listen de Tauri
+let tauriListen: ((event: string, handler: (event: { payload: string }) => void) => Promise<() => void>) | null = null
+
+// Promise que resuelve cuando Tauri está listo
+let tauriReadyPromise: Promise<void> | null = null
+
+// Dynamic import for Tauri event API (to avoid errors when running in browser)
+const tauriReady = ref(false)
+if (typeof window !== 'undefined' && '__TAURI__' in window) {
+  tauriReadyPromise = import('@tauri-apps/api/event').then(module => {
+    tauriListen = module.listen as typeof tauriListen
+    tauriReady.value = true
+    console.log('[Menu] Tauri event API loaded successfully')
+  }).catch(error => {
+    console.warn('[Menu] Failed to load Tauri event API:', error)
+  })
+}
 
 interface MenuEventHandlers {
   onNewProject?: () => void
@@ -148,24 +166,23 @@ export function useNativeMenu(handlers: MenuEventHandlers = {}) {
 
   onMounted(async () => {
     // Solo configurar listener si estamos en Tauri
-    if (typeof window === 'undefined' || !('__TAURI__' in window)) {
-      console.log('[Menu] Not in Tauri environment, skipping menu listener setup')
-      return
-    }
+    if (typeof window !== 'undefined' && '__TAURI__' in window && tauriReadyPromise) {
+      try {
+        // Esperar a que el import asíncrono termine (sin timeout artificial)
+        await tauriReadyPromise
 
-    try {
-      // Import dinámico de la API de eventos de Tauri
-      const { listen } = await import('@tauri-apps/api/event')
-      console.log('[Menu] Tauri event API imported successfully')
-
-      // Configurar el listener
-      unlisten = await listen<string>('menu-event', (event) => {
-        console.log('[Menu] Received menu event:', event.payload)
-        handleMenuEvent(event.payload)
-      })
-      console.log('[Menu] Menu event listener setup successfully')
-    } catch (error) {
-      console.warn('[Menu] Failed to setup Tauri menu listener:', error)
+        if (tauriListen) {
+          unlisten = await tauriListen('menu-event', (event) => {
+            console.log('[Menu] Received menu event:', event.payload)
+            handleMenuEvent(event.payload)
+          })
+          console.log('[Menu] Listener setup successfully')
+        } else {
+          console.warn('[Menu] Tauri listen function not available after import')
+        }
+      } catch (error) {
+        console.warn('[Menu] Failed to setup Tauri menu listener:', error)
+      }
     }
   })
 

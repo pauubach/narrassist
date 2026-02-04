@@ -53,6 +53,14 @@ from .utils import (
     format_duration,
     format_duration_verbose,
 )
+from .resource_manager import (
+    ResourceManager,
+    ResourceTier,
+    SystemCapabilities,
+    ResourceRecommendation,
+    HeavyTaskSemaphore,
+    get_resource_manager,
+)
 
 __all__ = [
     # Errors
@@ -103,4 +111,11 @@ __all__ = [
     # Utils
     "format_duration",
     "format_duration_verbose",
+    # Resource Management
+    "ResourceManager",
+    "ResourceTier",
+    "SystemCapabilities",
+    "ResourceRecommendation",
+    "HeavyTaskSemaphore",
+    "get_resource_manager",
 ]

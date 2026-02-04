@@ -1598,6 +1598,7 @@ const startReanalysis = async () => {
 
 .inspector-content {
   flex: 1;
+  min-width: 0;
   overflow-y: auto;
   padding: 1rem;
 }

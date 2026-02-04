@@ -1,7 +1,7 @@
 # Roadmap - Narrative Assistant
 
-> **Última actualización**: 2026-01-29
-> **Versión actual**: 0.3.22
+> **Última actualización**: 2026-02-04
+> **Versión actual**: 0.3.37
 > **Estado actual**: Ver [PROJECT_STATUS.md](PROJECT_STATUS.md)
 > **Historial de cambios**: Ver [CHANGELOG.md](CHANGELOG.md)
 
@@ -9,58 +9,45 @@
 
 ## Resumen
 
-Este documento define las funcionalidades **pendientes de implementar**. Para el estado actual del proyecto, consultar [PROJECT_STATUS.md](PROJECT_STATUS.md).
+Este documento define las funcionalidades **pendientes de implementar**. El proyecto está funcionalmente completo para la funcionalidad core de correctores — solo queda infraestructura y mejoras de calidad.
+
+**Documentación detallada de estado**:
+- [research/ROADMAP_STATUS.md](research/ROADMAP_STATUS.md) - Estado detallado con auditorías
+- [research/AUDIT_DECISIONS_AND_ROADMAP.md](research/AUDIT_DECISIONS_AND_ROADMAP.md) - Decisiones de auditoría y sprints de calidad
+- [../EXPERT_REVIEW_FINDINGS.md](../EXPERT_REVIEW_FINDINGS.md) - Hallazgos de revisión multi-experto
 
 ---
 
-## Trabajo Pendiente por Prioridad
+## Estado Actual: Features Completas
 
-### P1 - Alta Prioridad
+Todas las features core están implementadas:
 
-#### Backend sin UI Completa
-
-| Feature | Backend | Completitud | Estado |
-|---------|---------|-------------|--------|
-| ~~Knowledge Tracking~~ | `character_knowledge.py` | 85% | ✅ Extracción rules + LLM funcional (v0.3.19) |
-| ~~Voice Profiles~~ | `voice/profiles.py` | 98% | ✅ Caché + invalidación (v0.3.22) |
-| ~~Register Analysis~~ | `voice/register.py` | 98% | ✅ Benchmarks por género (v0.3.22) |
-| ~~Speaker Attribution~~ | `voice/speaker_attribution.py` | 85% | ✅ Bug fix (v0.3.13) |
-| ~~Coreference Voting~~ | `coreference_resolver.py` | 95% | ✅ Razonamiento en API (v0.3.14) |
-| ~~Pacing Analysis~~ | `analysis/pacing.py` | 98% | ✅ Sugerencias por género (v0.3.22) |
-
-**Esfuerzo restante**: Mejoras menores (benchmarks Knowledge, comparación Voice Profiles)
-
-#### Funcionalidades Nuevas
-
-| Funcionalidad | Descripción | Complejidad | Origen |
-|---------------|-------------|-------------|--------|
-| Expansión gazetteer | +45,000 nombres propios | Media | Stilus |
-| Resumen por capítulo | LLM local (Ollama) | Media | MeaningCloud |
-| Inconsistencias factuales | LLM detecta contradicciones | Alta | Roadmap v1 |
-
-### P2 - Prioridad Media
-
-| Funcionalidad | Descripción | Complejidad | Origen |
-|---------------|-------------|-------------|--------|
-| Conjugador verbal | Consultar conjugaciones integrado | Media | Stilus |
-| Diccionario inverso | Buscar por terminación (rimas) | Media | Stilus |
-| Explicaciones didácticas | Bibliografía RAE/Martínez de Sousa | Media | Stilus |
-| Clasificación IPTC | Taxonomía temática estándar | Media | MeaningCloud |
-| Clustering de temas | Identificar temas dominantes | Media | MeaningCloud |
-| Ontología expandida | 200+ clases de entidades | Alta | MeaningCloud |
-
-### P3 - Prioridad Baja
-
-| Funcionalidad | Descripción | Complejidad |
-|---------------|-------------|-------------|
-| Generador morfosintáctico | Variantes de palabra | Alta |
-| Lematizador en UI | Herramienta para lematizar | Fácil |
-| Modo batch | Correcciones automáticas | Alta |
-| Diccionarios de dominio | Ontologías especializadas | Alta |
+| Área | Estado |
+|------|--------|
+| **Backend NLP** | ✅ 177 archivos Python, 9 fases completas |
+| **Frontend** | ✅ 83 componentes Vue, 6 vistas, 13 stores |
+| **API** | ✅ 170 endpoints FastAPI |
+| **Features Correctores** | ✅ 4 sprints (A-D) completados |
+| **Tests** | ✅ 966+ tests passing |
 
 ---
 
-## Infraestructura Pendiente
+## Trabajo Pendiente
+
+### Sprints de Calidad (Post-Auditoría)
+
+> Detalle: [AUDIT_DECISIONS_AND_ROADMAP.md](research/AUDIT_DECISIONS_AND_ROADMAP.md)
+
+| Sprint | Objetivo | Items | Días |
+|--------|----------|-------|------|
+| **E: Hotfix Crítico** | Crashes + XSS | 5 | <1 |
+| **F: Calidad Frontend** | Error handling, apiUrl, watch | 6 | 1-2 |
+| **G: Lingüística Española** | Pasiva refleja, estar, haber | 8 | 2-3 |
+| **H: Calibración Narrativa** | Tono diagnóstico, templates | 10 | 2-3 |
+| **I: Tests + Calibración** | Cobertura + umbrales | 15 | 3-4 |
+| **TOTAL** | | **44** | **~10 días** |
+
+### Infraestructura Pendiente
 
 | Tarea | Descripción | Coste/Tiempo |
 |-------|-------------|--------------|
@@ -71,19 +58,29 @@ Este documento define las funcionalidades **pendientes de implementar**. Para el
 | Landing page | Sitio web producto | 5-6 días |
 | Auto-updater | Tauri updater plugin | 3-4 días |
 
+### Features Futuras (P2-P3)
+
+| Funcionalidad | Descripción | Complejidad |
+|---------------|-------------|-------------|
+| Expansión gazetteer | +45,000 nombres propios | Media |
+| Resumen por capítulo | LLM local (Ollama) | Media |
+| Inconsistencias factuales | LLM detecta contradicciones | Alta |
+| Conjugador verbal | Consultar conjugaciones | Media |
+| Diccionario inverso | Buscar por terminación | Media |
+| Clasificación IPTC | Taxonomía temática | Media |
+
 ---
 
 ## Métricas Objetivo
 
-| Métrica | Actual (v0.3.22) | Objetivo v0.4.0 | Objetivo v1.0.0 |
-|---------|-------------------|-----------------|-----------------|
-| Detectores | 14 | 18 | 25 |
-| Gazetteer | ~5,000 | 50,000 | 100,000 |
-| Endpoints API | 180 | 185+ | 200+ |
-| Componentes Vue | 89 | 95+ | 110+ |
-| Tests | 966+ | 1,200+ | 2,000+ |
-| Idiomas UI | 1 (ES) | 1 (ES) | 3 (ES, EN, CA) |
-| Completitud módulos | 85-98% | 95% | 100% |
+| Métrica | Actual (v0.3.37) | Objetivo v1.0.0 |
+|---------|------------------|-----------------|
+| Detectores | 14 | 25 |
+| Gazetteer | ~5,000 | 100,000 |
+| Endpoints API | 170 | 200+ |
+| Componentes Vue | 83 | 110+ |
+| Tests | 966+ | 2,000+ |
+| Idiomas UI | 1 (ES) | 3 (ES, EN, CA) |
 
 ---
 
@@ -96,4 +93,4 @@ Este documento define las funcionalidades **pendientes de implementar**. Para el
 
 ---
 
-*Documento actualizado: 2026-01-29*
+*Documento actualizado: 2026-02-04*

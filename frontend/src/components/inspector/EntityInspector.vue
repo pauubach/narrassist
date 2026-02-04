@@ -629,6 +629,7 @@ const hasChapterData = computed(() => chapterAppearances.value.length > 1)
   display: flex;
   flex-wrap: wrap;
   gap: var(--ds-space-1);
+  min-width: 0;
 }
 
 .alias-tag {
@@ -641,8 +642,9 @@ const hasChapterData = computed(() => chapterAppearances.value.length > 1)
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
   gap: var(--ds-space-2);
+  min-width: 0;
 }
 
 .stat-item {
@@ -680,6 +682,9 @@ const hasChapterData = computed(() => chapterAppearances.value.length > 1)
   font-size: var(--ds-font-size-sm);
   font-weight: var(--ds-font-weight-medium);
   width: fit-content;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .importance-main {

@@ -34,6 +34,17 @@ CHAPTER_PATTERNS = [
     re.compile(r"^epilogue\s*$", re.IGNORECASE),
 ]
 
+# Palabras que NO deben tratarse como headings aunque estén en mayúsculas
+NOT_HEADING_WORDS = {
+    "fin", "the end", "end", "finis",
+    "continuará", "continuara", "to be continued",
+    "nota", "notas", "notes", "note",
+    "agradecimientos", "acknowledgments", "acknowledgements",
+    "dedicatoria", "dedication",
+    "índice", "indice", "index", "contents",
+    "bibliografía", "bibliografia", "bibliography", "references",
+}
+
 
 class TxtParser(DocumentParser):
     """
@@ -218,11 +229,13 @@ class TxtParser(DocumentParser):
                 return True, 1
 
         # Heurística: línea corta en mayúsculas podría ser título
+        # Pero excluir palabras comunes que no son headings (FIN, NOTAS, etc.)
         if (
             len(text) < 80
             and text.isupper()
             and not text.endswith(".")
             and len(text.split()) <= 10
+            and text.lower() not in NOT_HEADING_WORDS
         ):
             return True, 1
 

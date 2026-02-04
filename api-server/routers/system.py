@@ -996,6 +996,76 @@ async def get_data_location():
         return ApiResponse(success=False, error=str(e))
 
 
+@router.get("/api/system/resources", response_model=ApiResponse)
+async def get_resource_status():
+    """
+    Estado del gestor de recursos del sistema.
+
+    Retorna información detallada sobre:
+    - Capacidades del sistema (CPU, RAM, GPU, tier)
+    - Recomendaciones de configuración según recursos
+    - Tareas pesadas en ejecución
+    - Configuración de análisis semántico
+
+    Returns:
+        ApiResponse con estado completo de recursos
+    """
+    try:
+        from narrative_assistant.core import get_resource_manager, get_config
+
+        rm = get_resource_manager()
+        config = get_config()
+
+        # Refrescar capacidades
+        capabilities = rm.refresh_capabilities()
+
+        return ApiResponse(
+            success=True,
+            data={
+                "capabilities": {
+                    "cpu_cores_logical": capabilities.cpu_cores_logical,
+                    "cpu_cores_physical": capabilities.cpu_cores_physical,
+                    "ram_total_mb": capabilities.ram_total_mb,
+                    "ram_available_mb": capabilities.ram_available_mb,
+                    "gpu_available": capabilities.gpu_available,
+                    "gpu_vram_total_mb": capabilities.gpu_vram_total_mb,
+                    "gpu_is_low_vram": capabilities.gpu_is_low_vram,
+                    "tier": capabilities.tier.value,
+                },
+                "recommendation": {
+                    "max_workers": rm.recommendation.max_workers,
+                    "batch_size_embeddings": rm.recommendation.batch_size_embeddings,
+                    "use_gpu_for_embeddings": rm.recommendation.use_gpu_for_embeddings,
+                    "enable_semantic_redundancy": rm.recommendation.enable_semantic_redundancy,
+                    "max_concurrent_heavy_tasks": rm.recommendation.max_concurrent_heavy_tasks,
+                },
+                "heavy_tasks": {
+                    "running": list(rm._running_tasks),
+                    "semaphore_available": rm._heavy_task_semaphore.available,
+                    "semaphore_max": rm.recommendation.max_concurrent_heavy_tasks,
+                },
+                "semantic_redundancy": {
+                    "enabled": config.nlp.semantic_redundancy_enabled,
+                    "threshold": config.nlp.semantic_redundancy_threshold,
+                    "mode": config.nlp.semantic_redundancy_mode,
+                },
+            }
+        )
+    except ImportError as e:
+        logger.warning(f"ResourceManager not available: {e}")
+        return ApiResponse(
+            success=True,
+            data={
+                "capabilities": None,
+                "recommendation": None,
+                "message": "ResourceManager not available",
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error getting resource status: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/api/maintenance/data-location", response_model=ApiResponse)
 async def change_data_location(request: ChangeDataLocationRequest):
     """

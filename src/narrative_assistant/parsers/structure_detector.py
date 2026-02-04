@@ -501,10 +501,47 @@ class StructureDetector:
             return chapters
 
         # Determinar el nivel principal de capítulos
-        # (asumimos que el nivel más alto usado es para capítulos)
-        min_level = min(h.heading_level for h in headings if h.heading_level)
+        # Estrategia:
+        # 1. Buscar headings que coincidan con patrones de capítulo (Capítulo N, etc.)
+        # 2. Si los hay, usar ese nivel
+        # 3. Si no, usar el nivel mínimo SOLO si hay más de 1 heading a ese nivel
+        #    (un solo H1 suele ser el título del documento, no un capítulo)
 
-        chapter_headings = [h for h in headings if h.heading_level == min_level]
+        chapter_level = None
+
+        # Buscar headings que coincidan con patrones de capítulo
+        for h in headings:
+            text = h.text.strip()
+            # Eliminar prefijo Markdown si existe
+            md_match = re.match(r"^#{1,6}\s+(.+)$", text)
+            if md_match:
+                text = md_match.group(1).strip()
+
+            # Verificar si coincide con patrón de capítulo
+            for pattern in self.chapter_patterns:
+                if pattern.match(text):
+                    chapter_level = h.heading_level
+                    break
+            if chapter_level:
+                break
+
+        # Si no encontramos patrones, usar heurística de nivel mínimo
+        if chapter_level is None:
+            min_level = min(h.heading_level for h in headings if h.heading_level)
+            headings_at_min = [h for h in headings if h.heading_level == min_level]
+
+            # Si solo hay 1 heading al nivel mínimo, probablemente es título
+            # Usar el siguiente nivel si existe
+            if len(headings_at_min) == 1:
+                other_levels = [h.heading_level for h in headings if h.heading_level > min_level]
+                if other_levels:
+                    chapter_level = min(other_levels)
+                else:
+                    chapter_level = min_level
+            else:
+                chapter_level = min_level
+
+        chapter_headings = [h for h in headings if h.heading_level == chapter_level]
 
         for i, heading in enumerate(chapter_headings):
             # Calcular fin del capítulo

@@ -82,9 +82,9 @@ export function useChat(projectId: number) {
     isLoading.value = true
 
     try {
-      // Add timeout controller (30s for LLM response)
+      // Add timeout controller (120s for LLM response - CPU inference can be slow)
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 30000)
+      const timeoutId = setTimeout(() => controller.abort(), 120000)
 
       const response = await fetch(`${API_BASE}/api/projects/${projectId}/chat`, {
         method: 'POST',

@@ -282,6 +282,9 @@ class FeatureProfile:
     vital_status: FeatureAvailability = FeatureAvailability.ENABLED  # Muertes y reapariciones
     character_location: FeatureAvailability = FeatureAvailability.ENABLED  # Seguimiento de ubicaciones
     chapter_progress: FeatureAvailability = FeatureAvailability.ENABLED  # Resumen de avance por capítulo
+    duplicate_content: FeatureAvailability = FeatureAvailability.ENABLED  # Detección de duplicados
+    narrative_structure: FeatureAvailability = FeatureAvailability.ENABLED  # Prolepsis/analepsis
+    dialogue_validation: FeatureAvailability = FeatureAvailability.ENABLED  # Validación de diálogos (huérfanos, atribución)
 
     # Features de consistencia
     attribute_consistency: FeatureAvailability = FeatureAvailability.ENABLED
@@ -322,6 +325,9 @@ class FeatureProfile:
                 "vital_status": self.vital_status.value,
                 "character_location": self.character_location.value,
                 "chapter_progress": self.chapter_progress.value,
+                "duplicate_content": self.duplicate_content.value,
+                "narrative_structure": self.narrative_structure.value,
+                "dialogue_validation": self.dialogue_validation.value,
                 # Consistencia
                 "attribute_consistency": self.attribute_consistency.value,
                 "world_consistency": self.world_consistency.value,

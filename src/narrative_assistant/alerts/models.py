@@ -33,6 +33,7 @@ class AlertCategory(Enum):
     PUNCTUATION = "punctuation"  # Puntuación (raya de diálogo, puntos suspensivos)
     REPETITION = "repetition"  # Repeticiones léxicas cercanas
     AGREEMENT = "agreement"  # Concordancia gramatical (género, número)
+    DIALOGUE = "dialogue"  # Problemas de diálogos (huérfanos, atribución, contexto)
     OTHER = "other"  # Otras alertas no categorizadas
 
 

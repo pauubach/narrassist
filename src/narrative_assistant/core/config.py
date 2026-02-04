@@ -102,6 +102,11 @@ class NLPConfig:
     # Valor recomendado: 0.80-0.85 para evitar fusiones absurdas
     semantic_fusion_threshold: float = 0.82
 
+    # Redundancia semántica (HABILITADA POR DEFECTO)
+    semantic_redundancy_enabled: bool = True
+    semantic_redundancy_threshold: float = 0.85  # Umbral similitud (0.70-0.95)
+    semantic_redundancy_mode: str = "balanced"  # fast, balanced, thorough
+
     @classmethod
     def from_env(cls) -> "NLPConfig":
         """Crea configuración desde variables de entorno."""
@@ -112,6 +117,15 @@ class NLPConfig:
 
         if embeddings_path := os.getenv("NA_EMBEDDINGS_MODEL_PATH"):
             config.embeddings_model_path = Path(embeddings_path)
+
+        # Semantic redundancy config
+        config.semantic_redundancy_enabled = (
+            os.getenv("NA_SEMANTIC_REDUNDANCY_ENABLED", "true").lower() == "true"
+        )
+        if threshold := os.getenv("NA_SEMANTIC_REDUNDANCY_THRESHOLD"):
+            config.semantic_redundancy_threshold = float(threshold)
+        if mode := os.getenv("NA_SEMANTIC_REDUNDANCY_MODE"):
+            config.semantic_redundancy_mode = mode
 
         return config
 

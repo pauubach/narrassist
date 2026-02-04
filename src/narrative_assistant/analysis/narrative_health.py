@@ -284,7 +284,11 @@ class NarrativeHealthChecker:
         chapters_present = protagonist.get("chapters_present", 0)
         presence_ratio = chapters_present / total if total > 0 else 0
 
-        if mentions >= 10 and presence_ratio >= 0.6:
+        # Umbral adaptativo: 3+ menciones por capítulo o 10+ total
+        min_mentions = max(5, total * 2)  # Al menos 2 menciones por capítulo
+        has_enough_mentions = mentions >= min_mentions or mentions >= 10
+
+        if has_enough_mentions and presence_ratio >= 0.6:
             score = min(100, 60 + presence_ratio * 40)
             return DimensionScore(
                 dimension=HealthDimension.PROTAGONIST,
@@ -295,7 +299,19 @@ class NarrativeHealthChecker:
                 explanation=f"«{name}» es el protagonista claro con {mentions} menciones en {chapters_present} capítulos.",
                 evidence=f"Presencia en {presence_ratio:.0%} de los capítulos.",
             )
-        elif mentions >= 5:
+        elif mentions >= 3 and presence_ratio >= 0.6:
+            # Protagonista claro pero documento pequeño
+            score = 50 + min(30, presence_ratio * 40)
+            return DimensionScore(
+                dimension=HealthDimension.PROTAGONIST,
+                name=DIMENSION_NAMES[HealthDimension.PROTAGONIST],
+                icon=DIMENSION_ICONS[HealthDimension.PROTAGONIST],
+                score=score,
+                status=HealthStatus.OK,
+                explanation=f"«{name}» es el protagonista con {mentions} menciones en {chapters_present} de {total} capítulos.",
+                evidence=f"Presencia sostenida en {presence_ratio:.0%} de los capítulos.",
+            )
+        elif mentions >= 3:
             score = 40 + min(30, presence_ratio * 50)
             return DimensionScore(
                 dimension=HealthDimension.PROTAGONIST,

@@ -11,7 +11,8 @@ export type ApiTimelineResolution =
   | 'month'
   | 'year'
   | 'season'
-  | 'relative'
+  | 'partial'    // Fecha sin año
+  | 'relative'   // Día +N
   | 'unknown'
 
 /** Orden narrativo del evento */
@@ -28,6 +29,9 @@ export interface ApiTimelineEvent {
   paragraph: number
   story_date: string | null
   story_date_resolution: ApiTimelineResolution
+  // Para timelines sin fechas absolutas
+  day_offset: number | null  // Offset en días desde el Día 0
+  weekday: string | null     // Día de la semana si se menciona
   discourse_position: number
   narrative_order: ApiNarrativeOrder
   entity_ids: number[]

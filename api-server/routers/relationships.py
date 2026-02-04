@@ -116,6 +116,7 @@ async def get_project_relationships(project_id: int):
         # Extraer co-ocurrencias de menciones
         chapters_data = [
             {
+                "id": c.id,  # ID de BD para mapear menciones
                 "chapter_number": c.chapter_number,
                 "start_char": c.start_char,
                 "end_char": c.end_char,
@@ -124,25 +125,51 @@ async def get_project_relationships(project_id: int):
             for c in chapters
         ]
 
+        # Crear mapeo de chapter_id (BD) a chapter_number
+        chapter_id_to_number = {c["id"]: c["chapter_number"] for c in chapters_data}
+        chapter_id_to_data = {c["id"]: c for c in chapters_data}
+
         # Agrupar menciones por capítulo y buscar co-ocurrencias
         mentions_by_chapter = {}
+        unmatched_mentions = 0
         for m in all_mentions:
-            # Encontrar capítulo de esta mención
-            for ch in chapters_data:
-                if ch["start_char"] <= m["start_char"] <= ch["end_char"]:
-                    ch_num = ch["chapter_number"]
-                    if ch_num not in mentions_by_chapter:
-                        mentions_by_chapter[ch_num] = []
-                    mentions_by_chapter[ch_num].append(m)
-                    break
+            # Usar chapter_id de la mención (más fiable que buscar por posición)
+            ch_id = m.get("chapter_id")
+            ch_num = chapter_id_to_number.get(ch_id)
+
+            if ch_num is None:
+                # Fallback: buscar por posición si chapter_id no está o no existe
+                for ch in chapters_data:
+                    if ch["start_char"] <= m["start_char"] <= ch["end_char"]:
+                        ch_num = ch["chapter_number"]
+                        break
+
+            if ch_num is not None:
+                if ch_num not in mentions_by_chapter:
+                    mentions_by_chapter[ch_num] = []
+                mentions_by_chapter[ch_num].append(m)
+            else:
+                unmatched_mentions += 1
+
+        if unmatched_mentions > 0:
+            logger.warning(f"[RELATIONSHIPS-API] {unmatched_mentions} menciones no coinciden con ningún capítulo")
 
         # Detectar co-ocurrencias (menciones cercanas)
         WINDOW = 500  # caracteres
         cooccurrence_count = 0
         logger.info(f"[RELATIONSHIPS-API] Capítulos con menciones: {len(mentions_by_chapter)}")
+
+        # Crear lookup de chapter_number a chapter_data
+        chapter_by_number = {c["chapter_number"]: c for c in chapters_data}
+
         for ch_num, ch_mentions in mentions_by_chapter.items():
             logger.debug(f"[RELATIONSHIPS-API] Capítulo {ch_num}: {len(ch_mentions)} menciones")
             ch_mentions.sort(key=lambda x: x["start_char"])
+
+            # Obtener datos del capítulo
+            chapter_data = chapter_by_number.get(ch_num, {})
+            chapter_content = chapter_data.get("content", "")
+            chapter_start = chapter_data.get("start_char", 0)  # Offset del capítulo
 
             for i, m1 in enumerate(ch_mentions):
                 for m2 in ch_mentions[i+1:]:
@@ -153,14 +180,14 @@ async def get_project_relationships(project_id: int):
                     if distance > WINDOW:
                         break
 
-                    # Obtener contexto
-                    chapter_content = next(
-                        (c["content"] for c in chapters_data if c["chapter_number"] == ch_num),
-                        ""
-                    )
-                    context_start = max(0, m1["start_char"] - 50)
-                    context_end = min(len(chapter_content), m2["end_char"] + 50)
-                    context = chapter_content[context_start:context_end] if chapter_content else ""
+                    # Extraer contexto usando posiciones relativas al capítulo
+                    # Las menciones tienen posiciones absolutas, convertir a relativas
+                    rel_start = m1["start_char"] - chapter_start
+                    rel_end = m2["end_char"] - chapter_start
+
+                    context_start = max(0, rel_start - 50)
+                    context_end = min(len(chapter_content), rel_end + 50)
+                    context = chapter_content[context_start:context_end] if chapter_content and context_end > context_start else ""
 
                     clustering_engine.add_cooccurrence(
                         entity1_id=m1["entity_id"],
@@ -1427,9 +1454,19 @@ def get_character_archetypes(
         try:
             entities = deps.entity_repository.get_by_project(project_id)
             for ent in entities:
+                # Convertir entity_type enum a string
+                entity_type_raw = ent.entity_type if hasattr(ent, 'entity_type') else "character"
+                if hasattr(entity_type_raw, 'value'):
+                    entity_type_str = entity_type_raw.value
+                else:
+                    entity_type_str = str(entity_type_raw)
+                # Mapear PERSON -> character para compatibilidad
+                if entity_type_str.upper() == "PERSON":
+                    entity_type_str = "character"
+
                 ent_dict = {
                     "id": ent.id if hasattr(ent, 'id') else 0,
-                    "entity_type": ent.entity_type if hasattr(ent, 'entity_type') else "character",
+                    "entity_type": entity_type_str,
                     "name": ent.name if hasattr(ent, 'name') else ent.canonical_name if hasattr(ent, 'canonical_name') else "",
                     "canonical_name": ent.canonical_name if hasattr(ent, 'canonical_name') else "",
                     "importance": ent.importance if hasattr(ent, 'importance') else "secondary",

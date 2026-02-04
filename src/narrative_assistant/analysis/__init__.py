@@ -80,6 +80,18 @@ try:
 except ImportError:
     pass
 
+try:
+    from .semantic_redundancy import (
+        DuplicateType,
+        RedundancyMode,
+        SemanticDuplicate,
+        RedundancyReport,
+        SemanticRedundancyDetector,
+        get_semantic_redundancy_detector,
+    )
+except ImportError:
+    pass
+
 __all__ = [
     # Tipos - Consistency
     "AttributeInconsistency",
@@ -134,4 +146,14 @@ __all__ = [
     "VitalStatusAnalyzer",
     # Funciones - Vital Status
     "analyze_vital_status",
+    # Tipos - Semantic Redundancy
+    "DuplicateType",
+    "RedundancyMode",
+    # Dataclasses - Semantic Redundancy
+    "SemanticDuplicate",
+    "RedundancyReport",
+    # Clase - Semantic Redundancy
+    "SemanticRedundancyDetector",
+    # Funciones - Semantic Redundancy
+    "get_semantic_redundancy_detector",
 ]

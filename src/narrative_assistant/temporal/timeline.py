@@ -27,7 +27,8 @@ class TimelineResolution(Enum):
     MONTH = "month"  # marzo de 1985
     YEAR = "year"  # 1985
     SEASON = "season"  # verano de 1985
-    RELATIVE = "relative"  # 3 días después
+    PARTIAL = "partial"  # 15 de marzo (sin año), martes
+    RELATIVE = "relative"  # Día +3 (offset desde referencia)
     UNKNOWN = "unknown"  # sin fecha determinable
 
 
@@ -68,6 +69,10 @@ class TimelineEvent:
     # Tiempo de la historia (story time)
     story_date: Optional[date] = None
     story_date_resolution: TimelineResolution = TimelineResolution.UNKNOWN
+
+    # Para timelines sin fechas absolutas (Día 0, Día +1, etc.)
+    day_offset: Optional[int] = None  # Offset en días desde el Día 0
+    weekday: Optional[str] = None  # Día de la semana si se menciona (lunes, martes, etc.)
 
     # Tiempo del discurso (discourse time)
     discourse_position: int = 0
@@ -241,28 +246,37 @@ class TimelineBuilder:
 
         Usa el primer marcador temporal o el inicio del primer capítulo
         como "Día 0" para poder construir una línea temporal relativa.
+
+        NO crea fechas ficticias (año 1) - usa day_offset en su lugar.
         """
         if not chapters:
             return
-
-        # Usar una fecha sintética: 1 de enero del año 1 (ficticio)
-        # Esto permite calcular offsets relativos sin importar la fecha real
-        synthetic_date = date(1, 1, 1)
 
         # Encontrar el primer evento de capítulo
         first_chapter = min(chapters, key=lambda c: c.get("number", 0))
         first_chapter_num = first_chapter.get("number", 1)
 
+        # Extraer día de la semana si se menciona en los marcadores
+        weekday = None
+        for marker in relative_markers:
+            if marker.weekday:
+                weekday = marker.weekday
+                break
+
         # Buscar el evento del primer capítulo
         for event in self.timeline.events:
             if event.chapter == first_chapter_num:
-                event.story_date = synthetic_date
+                # Usar day_offset=0 en vez de fecha sintética
+                event.day_offset = 0
+                event.weekday = weekday
+                event.story_date = None  # NO crear fecha ficticia
                 event.story_date_resolution = TimelineResolution.RELATIVE
                 event.description = f"{event.description} (Día 0 - referencia)"
                 if event.id not in self.timeline.anchor_events:
                     self.timeline.anchor_events.append(event.id)
                 logger.debug(
-                    f"Created synthetic anchor at chapter {first_chapter_num}: {event.description}"
+                    f"Created synthetic anchor at chapter {first_chapter_num}: "
+                    f"day_offset=0, weekday={weekday}"
                 )
                 break
 
@@ -358,31 +372,33 @@ class TimelineBuilder:
         Resuelve marcadores relativos usando anclas o encadenándolos entre sí.
 
         Los marcadores se procesan en orden de aparición en el texto.
-        Cada marcador relativo usa el evento anterior con fecha como referencia,
+        Cada marcador relativo usa el evento anterior como referencia,
         permitiendo construir una cadena temporal incluso sin fechas absolutas.
+
+        Cuando no hay fechas absolutas, usa day_offset (Día 0, Día +1, etc.)
         """
         # Ordenar marcadores por posición en el texto
         sorted_markers = sorted(markers, key=lambda m: (m.chapter or 0, m.start_char))
 
-        # Último evento con fecha creado (para encadenar relativos)
-        last_dated_event: Optional[TimelineEvent] = None
+        # Último evento de referencia (para encadenar relativos)
+        last_ref_event: Optional[TimelineEvent] = None
 
         # Inicializar con el ancla si existe
         if self.timeline.anchor_events:
             for event in self.timeline.events:
-                if event.id in self.timeline.anchor_events and event.story_date:
-                    last_dated_event = event
+                if event.id in self.timeline.anchor_events:
+                    last_ref_event = event
                     break
 
         for marker in sorted_markers:
             # Prioridad para referencia:
-            # 1. Último evento con fecha (encadenamiento de relativos)
-            # 2. Ancla absoluta más cercana
+            # 1. Último evento de referencia (encadenamiento de relativos)
+            # 2. Ancla más cercana
             # 3. Evento del capítulo
-            reference_event = last_dated_event
+            reference_event = last_ref_event
 
             if not reference_event:
-                # Intentar con ancla absoluta
+                # Intentar con ancla
                 anchor = self._find_nearest_anchor(
                     marker.chapter or 0, marker.start_char
                 )
@@ -399,19 +415,28 @@ class TimelineBuilder:
 
             # Calcular offset
             offset = self._calculate_offset(marker)
+            offset_days = offset.days if offset else 1  # Default: +1 día
 
-            # Calcular nueva fecha basada en la referencia
+            # Calcular nueva fecha o day_offset
             new_date = None
-            if reference_event and reference_event.story_date and offset:
-                direction = marker.direction or "future"  # Default a futuro
-                if direction == "future":
-                    new_date = reference_event.story_date + offset
-                elif direction == "past":
-                    new_date = reference_event.story_date - offset
-            elif reference_event and reference_event.story_date and not offset:
-                # Sin offset explícito, asumir mismo día o día siguiente
-                # Depende del contexto del marcador
-                new_date = reference_event.story_date
+            new_day_offset = None
+            direction = marker.direction or "future"
+
+            if reference_event:
+                if reference_event.story_date and offset:
+                    # Hay fecha absoluta: calcular nueva fecha
+                    if direction == "future":
+                        new_date = reference_event.story_date + offset
+                    elif direction == "past":
+                        new_date = reference_event.story_date - offset
+                elif reference_event.day_offset is not None:
+                    # Sin fecha absoluta: usar day_offset
+                    if direction == "future":
+                        new_day_offset = reference_event.day_offset + offset_days
+                    elif direction == "past":
+                        new_day_offset = reference_event.day_offset - offset_days
+                    else:
+                        new_day_offset = reference_event.day_offset + offset_days
 
             # Crear evento
             self.event_counter += 1
@@ -422,9 +447,11 @@ class TimelineBuilder:
                 paragraph=marker.paragraph or 0,
                 discourse_position=marker.start_char,
                 story_date=new_date,
+                day_offset=new_day_offset,
+                weekday=marker.weekday if hasattr(marker, 'weekday') else None,
                 story_date_resolution=(
-                    TimelineResolution.RELATIVE
-                    if new_date
+                    TimelineResolution.EXACT_DATE if new_date
+                    else TimelineResolution.RELATIVE if new_day_offset is not None
                     else TimelineResolution.UNKNOWN
                 ),
                 relative_to=reference_event.id if reference_event else None,
@@ -433,6 +460,10 @@ class TimelineBuilder:
                 markers=[marker],
             )
             self.timeline.add_event(event)
+
+            # Actualizar evento de referencia para encadenamiento
+            if new_date or new_day_offset is not None:
+                last_ref_event = event
 
             # Actualizar último evento con fecha para encadenamiento
             if new_date:
@@ -520,59 +551,211 @@ class TimelineBuilder:
             self.timeline.add_event(event)
 
     def _detect_narrative_order(self) -> None:
-        """Detecta analepsis y prolepsis comparando orden cronológico vs discurso."""
+        """
+        Detecta analepsis y prolepsis comparando orden cronológico vs discurso.
+
+        Usa un algoritmo de "marca de agua alta" (high-water mark) para seguir
+        la pista cronológica global, no solo comparar con el evento anterior.
+
+        Una ANALEPSIS ocurre cuando:
+        1. El evento actual está ANTES cronológicamente que la marca de agua
+        2. Y hay evidencia adicional (marcadores retrospectivos o salto temporal significativo)
+
+        Esto evita falsos positivos cuando la narrativa simplemente salta en el tiempo
+        sin indicar explícitamente un flashback.
+
+        Soporta tanto fechas absolutas (story_date) como offsets relativos (day_offset).
+        """
         chronological = self.timeline.get_chronological_order()
         discourse = self.timeline.get_discourse_order()
-        
+
         logger.info(f"[TIMELINE] Total eventos: {len(chronological)} cronológicos, {len(discourse)} en discurso")
 
-        # Solo eventos con fecha conocida
-        dated_chrono = [e for e in chronological if e.story_date]
-        dated_discourse = [e for e in discourse if e.story_date]
-        
-        logger.info(f"[TIMELINE] Eventos con fecha: {len(dated_chrono)} de {len(chronological)}")
+        # Eventos con tiempo conocido (fecha O day_offset)
+        def has_time(e: TimelineEvent) -> bool:
+            return e.story_date is not None or e.day_offset is not None
+
+        dated_chrono = [e for e in chronological if has_time(e)]
+        dated_discourse = [e for e in discourse if has_time(e)]
+
+        logger.info(f"[TIMELINE] Eventos con tiempo: {len(dated_chrono)} de {len(chronological)}")
         if dated_chrono:
-            logger.info(f"[TIMELINE] Rango fechas: {min(e.story_date for e in dated_chrono)} → {max(e.story_date for e in dated_chrono)}")
+            dates = [e.story_date for e in dated_chrono if e.story_date]
+            offsets = [e.day_offset for e in dated_chrono if e.day_offset is not None]
+            if dates:
+                logger.info(f"[TIMELINE] Rango fechas: {min(dates)} → {max(dates)}")
+            if offsets:
+                logger.info(f"[TIMELINE] Rango días: Día {min(offsets)} → Día +{max(offsets)}")
 
         if len(dated_chrono) < 2:
             logger.info("[TIMELINE] Insuficientes eventos fechados para detectar analepsis/prolepsis")
             return
 
-        # Crear índice cronológico
+        # Crear índice cronológico: evento.id -> posición en orden cronológico
         chrono_index = {e.id: i for i, e in enumerate(dated_chrono)}
-        
+
         analepsis_count = 0
         prolepsis_count = 0
 
+        # High-water mark: máxima posición cronológica vista hasta ahora
+        # Esto permite detectar analepsis correctamente en secuencias lineales
+        chrono_high_water = -1
+
         # Comparar con orden del discurso
         for i, event in enumerate(dated_discourse):
+            chrono_pos_current = chrono_index.get(event.id, -1)
+
+            if chrono_pos_current == -1:
+                continue  # Evento no encontrado en el índice
+
             if i == 0:
+                # Primer evento: establecer marca de agua inicial
+                chrono_high_water = chrono_pos_current
                 continue
 
-            prev_event = dated_discourse[i - 1]
+            # Verificar evidencia de analepsis/prolepsis
+            has_retrospective_marker = self._has_retrospective_evidence(event)
+            has_prospective_marker = self._has_prospective_evidence(event)
 
-            chrono_pos_current = chrono_index.get(event.id, 0)
-            chrono_pos_prev = chrono_index.get(prev_event.id, 0)
+            # Calcular diferencia temporal con el high water
+            time_diff_days = self._calculate_time_difference(
+                dated_chrono[chrono_high_water] if chrono_high_water < len(dated_chrono) else None,
+                event
+            )
 
-            # El evento actual ocurrió antes cronológicamente
-            # pero aparece después en el discurso = analepsis
-            if chrono_pos_current < chrono_pos_prev:
-                event.narrative_order = NarrativeOrder.ANALEPSIS
-                analepsis_count += 1
-                logger.info(f"[TIMELINE] ANALEPSIS detectada: '{event.description[:50]}...' "
-                           f"(pos discurso={i}, pos crono={chrono_pos_current} < prev crono={chrono_pos_prev})")
-            # Salto grande hacia adelante podría ser prolepsis
-            elif chrono_pos_current > chrono_pos_prev + 3:
-                # Verificar si realmente es un salto significativo
-                if event.story_date and prev_event.story_date:
-                    delta = event.story_date - prev_event.story_date
-                    if delta.days > 365:  # Más de un año de salto
+            # ANALEPSIS: el evento actual está ANTES cronológicamente
+            if chrono_pos_current < chrono_high_water:
+                # Requiere evidencia adicional para clasificar como flashback:
+                # - Marcadores retrospectivos ("recordó", "años atrás", direction=past)
+                # - O un salto temporal muy significativo (>90 días hacia atrás)
+                if has_retrospective_marker:
+                    event.narrative_order = NarrativeOrder.ANALEPSIS
+                    analepsis_count += 1
+                    logger.info(
+                        f"[TIMELINE] ANALEPSIS detectada (con marcador): '{event.description[:50]}...' "
+                        f"(pos discurso={i}, pos crono={chrono_pos_current} < high_water={chrono_high_water})"
+                    )
+                elif time_diff_days is not None and time_diff_days < -90:
+                    # Salto muy significativo hacia el pasado (>3 meses)
+                    event.narrative_order = NarrativeOrder.ANALEPSIS
+                    analepsis_count += 1
+                    logger.info(
+                        f"[TIMELINE] ANALEPSIS detectada (por salto temporal): '{event.description[:50]}...' "
+                        f"(salto de {abs(time_diff_days)} días al pasado)"
+                    )
+                else:
+                    # Sin evidencia suficiente - podría ser solo la narrativa saltando
+                    logger.debug(
+                        f"[TIMELINE] Posible analepsis descartada (sin evidencia): '{event.description[:50]}...' "
+                        f"(pos crono={chrono_pos_current} < high_water={chrono_high_water}, diff={time_diff_days} días)"
+                    )
+
+            # PROLEPSIS: salto significativo hacia el futuro
+            elif chrono_pos_current > chrono_high_water + 3:
+                if time_diff_days is not None and time_diff_days > 365:  # Más de un año
+                    if has_prospective_marker:
                         event.narrative_order = NarrativeOrder.PROLEPSIS
                         prolepsis_count += 1
-                        logger.info(f"[TIMELINE] PROLEPSIS detectada: '{event.description[:50]}...' "
-                                   f"(salto de {delta.days} días)")
-                                   
+                        logger.info(
+                            f"[TIMELINE] PROLEPSIS detectada: '{event.description[:50]}...' "
+                            f"(salto de {time_diff_days} días)"
+                        )
+                    elif time_diff_days > 730:  # Más de 2 años sin marcador
+                        event.narrative_order = NarrativeOrder.PROLEPSIS
+                        prolepsis_count += 1
+                        logger.info(
+                            f"[TIMELINE] PROLEPSIS detectada (por salto temporal): '{event.description[:50]}...' "
+                            f"(salto de {time_diff_days} días)"
+                        )
+
+            # Actualizar marca de agua alta
+            chrono_high_water = max(chrono_high_water, chrono_pos_current)
+
         logger.info(f"[TIMELINE] Resultado: {analepsis_count} analepsis, {prolepsis_count} prolepsis")
+
+    def _has_retrospective_evidence(self, event: TimelineEvent) -> bool:
+        """
+        Verifica si el evento tiene evidencia de ser un flashback/analepsis.
+
+        Busca:
+        - Marcadores temporales con direction='past'
+        - Verbos de memoria en la descripción (recordó, evocó, rememoró)
+        - Expresiones retrospectivas (años atrás, tiempo antes)
+        """
+        # Verbos y expresiones que indican flashback
+        retrospective_patterns = [
+            "recordó", "recordaba", "evocó", "evocaba", "rememoró", "rememoraba",
+            "vino a su mente", "le vino a la memoria", "pensó en aquel",
+            "años atrás", "tiempo atrás", "meses atrás", "días atrás",
+            "en el pasado", "en aquella época", "en aquel entonces",
+            "hacía tiempo", "hacía años", "hacía meses",
+            "cuando era", "de joven", "de niño", "de pequeño",
+        ]
+
+        # Verificar descripción del evento
+        desc_lower = event.description.lower()
+        if any(pattern in desc_lower for pattern in retrospective_patterns):
+            return True
+
+        # Verificar marcadores asociados
+        for marker in event.markers:
+            if hasattr(marker, 'direction') and marker.direction == "past":
+                return True
+            # Verificar texto del marcador
+            marker_lower = marker.text.lower()
+            if any(pattern in marker_lower for pattern in ["antes", "atrás", "anterior", "pasado"]):
+                return True
+
+        return False
+
+    def _has_prospective_evidence(self, event: TimelineEvent) -> bool:
+        """
+        Verifica si el evento tiene evidencia de ser una prolepsis/flashforward.
+
+        Busca:
+        - Marcadores temporales con direction='future'
+        - Verbos de anticipación (presagiaba, vendría, ocurriría)
+        - Expresiones prospectivas (años después, en el futuro)
+        """
+        prospective_patterns = [
+            "años después", "tiempo después", "meses después",
+            "en el futuro", "vendría", "ocurriría", "sucedería",
+            "presagiaba", "anticipaba", "no sabía que",
+            "llegaría el día", "algún día", "más adelante",
+        ]
+
+        desc_lower = event.description.lower()
+        if any(pattern in desc_lower for pattern in prospective_patterns):
+            return True
+
+        for marker in event.markers:
+            if hasattr(marker, 'direction') and marker.direction == "future":
+                return True
+
+        return False
+
+    def _calculate_time_difference(
+        self, ref_event: Optional[TimelineEvent], target_event: TimelineEvent
+    ) -> Optional[int]:
+        """
+        Calcula diferencia en días entre dos eventos.
+
+        Returns:
+            Diferencia en días (negativo si target está antes de ref), o None si no se puede calcular.
+        """
+        if not ref_event:
+            return None
+
+        # Intentar con fechas absolutas
+        if ref_event.story_date and target_event.story_date:
+            delta = target_event.story_date - ref_event.story_date
+            return delta.days
+
+        # Intentar con day_offset
+        if ref_event.day_offset is not None and target_event.day_offset is not None:
+            return target_event.day_offset - ref_event.day_offset
+
+        return None
 
     def export_to_mermaid(self) -> str:
         """Exporta timeline a diagrama Mermaid (Gantt)."""

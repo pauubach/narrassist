@@ -974,6 +974,9 @@ class Database:
             ("chapters", "dominant_tone", "TEXT"),
             ("chapters", "tone_intensity", "REAL"),
             ("chapters", "reading_time_minutes", "INTEGER"),
+            # Timeline: soporte para day_offset (Día 0, Día +1, etc.)
+            ("timeline_events", "day_offset", "INTEGER"),
+            ("timeline_events", "weekday", "TEXT"),
         ]
         for table, column, col_def in migrations:
             try:

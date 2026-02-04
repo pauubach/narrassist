@@ -454,6 +454,198 @@ async def get_glossary_summary(project_id: str) -> ApiResponse:
         return ApiResponse(success=False, error=str(e))
 
 
+@router.get("/api/projects/{project_id}/glossary/suggestions", response_model=ApiResponse)
+async def get_glossary_suggestions(
+    project_id: str,
+    min_frequency: int = Query(2, ge=1, le=10, description="Frecuencia mínima"),
+    max_frequency: int = Query(50, ge=5, le=200, description="Frecuencia máxima"),
+    min_confidence: float = Query(0.5, ge=0.0, le=1.0, description="Confianza mínima"),
+    use_entities: bool = Query(True, description="Usar entidades del NER"),
+    max_suggestions: int = Query(50, ge=10, le=200, description="Máximo de sugerencias"),
+) -> ApiResponse:
+    """
+    Extrae automáticamente términos candidatos para el glosario.
+
+    Analiza el contenido del manuscrito para detectar:
+    - Nombres propios no comunes (posibles personajes/lugares inventados)
+    - Términos técnicos (acrónimos, terminología especializada)
+    - Neologismos (palabras no reconocidas por el diccionario)
+    - Entidades del NER con frecuencia significativa
+
+    Args:
+        project_id: ID del proyecto
+        min_frequency: Frecuencia mínima para considerar un término (default: 2)
+        max_frequency: Frecuencia máxima (términos muy comunes se ignoran) (default: 50)
+        min_confidence: Confianza mínima para incluir en sugerencias (default: 0.5)
+        use_entities: Usar entidades extraídas del NER (default: True)
+        max_suggestions: Máximo de sugerencias a devolver (default: 50)
+    """
+    try:
+        result = deps.project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail="Project not found")
+        project = result.value
+
+        # Obtener términos existentes en el glosario para excluirlos
+        from narrative_assistant.persistence.glossary import GlossaryRepository
+        from narrative_assistant.analysis.glossary_extractor import GlossaryExtractor
+
+        repo = GlossaryRepository()
+        existing_terms = repo.get_all_terms(int(project_id))
+
+        # Obtener capítulos del proyecto
+        chapters_result = project.get_chapters()
+        if chapters_result.is_failure:
+            return ApiResponse(
+                success=False,
+                error="No se pudieron obtener los capítulos del proyecto"
+            )
+        chapters = chapters_result.value
+
+        if not chapters:
+            return ApiResponse(
+                success=True,
+                data={
+                    "suggestions": [],
+                    "message": "El proyecto no tiene contenido para analizar",
+                }
+            )
+
+        # Preparar datos de capítulos
+        chapters_data = [
+            {"number": ch.number, "content": ch.content}
+            for ch in chapters
+            if ch.content and ch.content.strip()
+        ]
+
+        # Obtener entidades del NER si está habilitado
+        entities = None
+        if use_entities:
+            try:
+                entities_result = project.get_entities()
+                if entities_result.is_success:
+                    entities = [
+                        {
+                            "name": e.name,
+                            "type": e.entity_type,
+                            "mention_count": e.mention_count,
+                            "first_mention_chapter": e.first_mention_chapter,
+                        }
+                        for e in entities_result.value
+                    ]
+            except Exception as e:
+                logger.warning(f"No se pudieron obtener entidades: {e}")
+
+        # Ejecutar extractor
+        extractor = GlossaryExtractor(
+            min_frequency=min_frequency,
+            max_frequency=max_frequency,
+            min_confidence=min_confidence,
+            existing_terms=existing_terms,
+        )
+
+        extraction_result = extractor.extract(
+            chapters=chapters_data,
+            entities=entities,
+        )
+
+        if extraction_result.is_failure:
+            return ApiResponse(
+                success=False,
+                error=f"Error en extracción: {extraction_result.error}"
+            )
+
+        report = extraction_result.value
+
+        # Limitar sugerencias
+        limited_suggestions = report.suggestions[:max_suggestions]
+
+        return ApiResponse(
+            success=True,
+            data={
+                "suggestions": [s.to_dict() for s in limited_suggestions],
+                "total_suggestions": len(report.suggestions),
+                "returned_suggestions": len(limited_suggestions),
+                "total_unique_words": report.total_unique_words,
+                "chapters_analyzed": report.chapters_analyzed,
+                "proper_nouns_found": report.proper_nouns_found,
+                "technical_terms_found": report.technical_terms_found,
+                "potential_neologisms_found": report.potential_neologisms_found,
+                "existing_glossary_terms": len(existing_terms),
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error extracting glossary suggestions: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@router.post("/api/projects/{project_id}/glossary/suggestions/accept", response_model=ApiResponse)
+async def accept_glossary_suggestion(
+    project_id: str,
+    term: str = Body(..., embed=True),
+    definition: str = Body("", embed=True),
+    category: str = Body("general", embed=True),
+    is_technical: bool = Body(False, embed=True),
+    is_invented: bool = Body(False, embed=True),
+    is_proper_noun: bool = Body(False, embed=True),
+) -> ApiResponse:
+    """
+    Acepta una sugerencia y la añade al glosario.
+
+    Args:
+        project_id: ID del proyecto
+        term: Término a añadir
+        definition: Definición (puede estar vacía para completar después)
+        category: Categoría del término
+        is_technical: Es término técnico
+        is_invented: Es término inventado
+        is_proper_noun: Es nombre propio
+    """
+    try:
+        result = deps.project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail="Project not found")
+
+        from narrative_assistant.persistence.glossary import GlossaryEntry, GlossaryRepository
+
+        repo = GlossaryRepository()
+
+        # Verificar que no existe
+        existing = repo.get_by_term(int(project_id), term)
+        if existing:
+            return ApiResponse(
+                success=False,
+                error=f"El término '{term}' ya existe en el glosario"
+            )
+
+        entry = GlossaryEntry(
+            project_id=int(project_id),
+            term=term,
+            definition=definition or f"(Definición pendiente para '{term}')",
+            category=category,
+            is_technical=is_technical,
+            is_invented=is_invented,
+            is_proper_noun=is_proper_noun,
+        )
+
+        created = repo.create(entry)
+
+        return ApiResponse(
+            success=True,
+            data=created.to_dict(),
+            message=f"Término '{term}' añadido al glosario",
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error accepting glossary suggestion: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
 @router.get("/api/dictionary/lookup/{word}", response_model=ApiResponse)
 async def dictionary_lookup(word: str):
     """

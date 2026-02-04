@@ -67,6 +67,8 @@ Cada pieza de información extraída o inferida debe indicar exactamente de dón
 
 ## Siguiente Paso
 
-Si es tu primera vez, lee [Correcciones y Riesgos](./corrections-and-risks.md) antes de comenzar los STEPs.
+Si es tu primera vez, lee [Correcciones y Riesgos](./corrections-and-risks.md) para entender las limitaciones del NLP.
 
-Luego, ve directamente a [STEP 0.1: Configuración del Entorno](../../steps/phase-0/step-0.1-environment.md).
+Luego, consulta [PROJECT_STATUS.md](../PROJECT_STATUS.md) para ver el estado actual del proyecto.
+
+> **Nota**: Las especificaciones originales de implementación (STEPs) están archivadas en [docs/_archive/steps/](../_archive/steps/).

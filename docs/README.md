@@ -1,7 +1,7 @@
 # Narrative Assistant - Documentación
 
-**Última actualización**: 2026-01-26
-**Estado**: MVP completo, v0.2.9
+**Última actualización**: 2026-02-04
+**Estado**: MVP completo, v0.3.37
 
 ---
 
@@ -14,6 +14,7 @@
 | **[CHANGELOG.md](CHANGELOG.md)** | Historial de cambios por versión |
 | **[IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md)** | Plan de implementación detallado por fases |
 | **[CLAUDE.md](../CLAUDE.md)** | Instrucciones para Claude Code |
+| **[EXPERT_REVIEW_FINDINGS.md](../EXPERT_REVIEW_FINDINGS.md)** | Hallazgos de revisión multi-experto y soluciones priorizadas |
 
 ---
 
@@ -58,10 +59,18 @@ docs/
 ├── BUILD_AND_DEPLOY.md        # Instrucciones de build
 ├── COREFERENCE_RESOLUTION.md  # Sistema de correferencias
 │
+├── research/                  # Investigación y análisis
+│   ├── ROADMAP_STATUS.md      # Estado detallado del roadmap
+│   ├── AUDIT_DECISIONS_AND_ROADMAP.md  # Decisiones de auditoría
+│   ├── XFAIL_RESEARCH_ROADMAP.md  # Roadmap de I+D
+│   └── COMPETITIVE_ANALYSIS_2025.md  # Análisis competitivo
+│
+├── ux/                        # Documentos de UX
+│   └── *.md                   # Revisiones UX y deliberaciones
+│
 └── _archive/                  # Documentos históricos (no mantener)
     ├── planning/              # Planes de implementación archivados
     ├── steps/                 # Especificaciones originales
-    ├── research/              # Investigación
     └── obsolete/              # Docs supersedidos
 ```
 
@@ -88,14 +97,14 @@ docs/
 
 ---
 
-## Estadísticas del Proyecto (v0.2.9)
+## Estadísticas del Proyecto (v0.3.37)
 
-- **Backend**: 103 archivos Python, ~49,000 LoC
-- **Frontend**: 54 componentes Vue, 7 stores Pinia, ~30,000 LoC
-- **API**: 48+ endpoints FastAPI
-- **Tests**: 612+ passing
+- **Backend**: 177 archivos Python, ~80,000+ LoC
+- **Frontend**: 83 componentes Vue, 13 stores Pinia, ~60,000+ LoC
+- **API**: 170 endpoints FastAPI
+- **Tests**: 966+ passing
 - **Detectores**: 14 detectores editoriales
-- **Total**: ~79,000 LoC
+- **Total**: ~140,000+ LoC
 
 ---
 

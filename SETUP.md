@@ -338,10 +338,10 @@ Una vez completado el setup:
 
 - [CLAUDE.md](CLAUDE.md) - Instrucciones para desarrollo con Claude Code
 - [PROJECT_STATUS.md](docs/PROJECT_STATUS.md) - Estado del proyecto y arquitectura
+- [ROADMAP.md](docs/ROADMAP.md) - Trabajo pendiente y objetivos futuros
 - [Frontend README](frontend/README.md) - Documentación del frontend Vue 3
 - [API Server README](api-server/README.md) - Documentación del servidor FastAPI
 - [Tauri README](src-tauri/README.md) - Documentación de la app Tauri
-- [Backend Gaps Analysis](docs/05-ui-design/BACKEND_GAPS_ANALYSIS.md) - Mejoras implementadas
 
 ---
 

@@ -62,4 +62,6 @@ Esta carpeta contiene la documentación de referencia de todas las APIs, modelos
 
 ## Última actualización
 
-2026-01-12
+2026-02-04
+
+> **Nota**: La API cuenta con 170+ endpoints. Para el listado completo, ver [http-endpoints.md](http-endpoints.md).

@@ -272,9 +272,8 @@ class EntityFusionService:
                 # Desactivar la entidad fusionada (soft delete)
                 self.repo.delete_entity(entity.id, hard_delete=False)
 
-            # Actualizar conteo de menciones
-            total_mentions = sum(e.mention_count for e in entities)
-            self.repo.update_entity(result_entity_id)  # Trigger updated_at
+            # Reconciliar conteo de menciones (asegura consistencia)
+            self.repo.reconcile_mention_count(result_entity_id)
 
             # Registrar en historial
             self.repo.add_merge_history(

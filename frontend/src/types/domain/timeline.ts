@@ -10,7 +10,8 @@ export type TimelineResolution =
   | 'month'
   | 'year'
   | 'season'
-  | 'relative'
+  | 'partial'    // Fecha sin año (15 de marzo, martes)
+  | 'relative'   // Día +N (offset desde referencia)
   | 'unknown'
 
 /** Orden narrativo del evento */
@@ -30,6 +31,9 @@ export interface TimelineEvent {
   paragraph: number
   storyDate: Date | null
   storyDateResolution: TimelineResolution
+  // Para timelines sin fechas absolutas (Día 0, Día +1, etc.)
+  dayOffset: number | null  // Offset en días desde el Día 0
+  weekday: string | null    // Día de la semana si se menciona (lunes, martes, etc.)
   discoursePosition: number
   narrativeOrder: NarrativeOrder
   entityIds: number[]

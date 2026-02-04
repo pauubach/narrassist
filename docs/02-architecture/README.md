@@ -67,28 +67,29 @@ INPUT                    PROCESAMIENTO                    OUTPUT
 | Componente | Tecnología | Versión | Propósito |
 |------------|------------|---------|-----------|
 | Lenguaje | Python | 3.11+ | Backend, NLP |
-| NLP Base | spaCy | 3.x | Tokenización, POS, NER |
+| NLP Base | spaCy | 3.8+ | Tokenización, POS, NER |
 | Modelo NER | es_core_news_lg | - | Entidades nombradas español |
-| Correferencia | Coreferee | 1.4+ | Resolución de pronombres |
+| Correferencia | Sistema de votación (4 métodos) | - | Resolución de pronombres (embeddings, LLM, morpho, heuristics) |
 | Embeddings | sentence-transformers | - | Similitud semántica |
 | Modelo Emb. | paraphrase-multilingual-MiniLM | - | Embeddings multilingües |
 | Base de datos | SQLite | 3.x | Persistencia local |
 | Parser DOCX | python-docx | - | Lectura de manuscritos |
 
-### Opcional (LLM)
+### LLM Local (Integrado)
 
 | Componente | Tecnología | Propósito |
 |------------|------------|-----------|
-| LLM local | Llama 3.1 8B / Qwen2.5 7B | Desambiguación de coref |
-| Framework | llama.cpp / Ollama | Inferencia local |
+| LLM local | llama3.2, qwen2.5, mistral | Análisis semántico avanzado |
+| Framework | Ollama | Inferencia local 100% offline |
 
-### UI (Post-MVP)
+### UI (Implementada)
 
 | Componente | Tecnología | Propósito |
 |------------|------------|-----------|
-| Desktop | Tauri | App nativa |
-| Frontend | Vue 3 | Interfaz web |
-| Comunicación | IPC (Tauri commands) | Python ↔ Frontend |
+| Desktop | Tauri 2.0 | App nativa multiplataforma |
+| Frontend | Vue 3.4 + TypeScript 5.3 | Interfaz web |
+| Componentes | PrimeVue + Pinia | UI kit + state management |
+| Comunicación | FastAPI + IPC | Python ↔ Frontend |
 
 ---
 

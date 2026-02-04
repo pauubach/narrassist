@@ -1479,6 +1479,160 @@ class AlertEngine:
             },
         )
 
+    # ==========================================================================
+    # Alertas de diálogos
+    # ==========================================================================
+
+    def create_from_dialogue_issue(
+        self,
+        project_id: int,
+        issue_type: str,
+        severity_level: str,
+        chapter: int,
+        paragraph: int,
+        start_char: int,
+        end_char: int,
+        text: str,
+        description: str,
+        suggestion: str,
+        consecutive_count: int = 1,
+        confidence: float = 0.85,
+    ) -> Result[Alert]:
+        """
+        Crea alerta desde un problema de diálogo.
+
+        Args:
+            project_id: ID del proyecto
+            issue_type: Tipo de problema (orphan_no_attribution, consecutive_no_change, etc.)
+            severity_level: Nivel de severidad (high, medium, low)
+            chapter: Número de capítulo
+            paragraph: Número de párrafo
+            start_char: Posición inicio del diálogo
+            end_char: Posición fin del diálogo
+            text: Texto del diálogo problemático
+            description: Descripción del problema
+            suggestion: Sugerencia de corrección
+            consecutive_count: Cantidad de diálogos consecutivos (para secuencias)
+            confidence: Confianza de la detección (0.0-1.0)
+
+        Returns:
+            Result con la alerta creada
+        """
+        # Mapear severidad
+        severity_map = {
+            "high": AlertSeverity.WARNING,
+            "medium": AlertSeverity.INFO,
+            "low": AlertSeverity.HINT,
+        }
+        severity = severity_map.get(severity_level, AlertSeverity.INFO)
+
+        # Títulos según tipo de problema
+        title_map = {
+            "orphan_no_attribution": "Diálogo sin atribución de hablante",
+            "orphan_no_context": "Diálogo sin contexto de escena",
+            "consecutive_no_change": f"Secuencia de {consecutive_count} diálogos sin indicar cambio de hablante",
+            "chapter_start_dialogue": "Capítulo inicia con diálogo sin contexto",
+        }
+        title = title_map.get(issue_type, f"Problema de diálogo: {issue_type}")
+
+        # Limitar texto para excerpt
+        excerpt = text[:200] + "..." if len(text) > 200 else text
+
+        return self.create_alert(
+            project_id=project_id,
+            category=AlertCategory.DIALOGUE,
+            severity=severity,
+            alert_type=f"dialogue_{issue_type}",
+            title=title,
+            description=description,
+            explanation=(
+                f"Se detectó un problema de contexto en el diálogo del capítulo {chapter}, "
+                f"párrafo {paragraph}. {description}"
+            ),
+            suggestion=suggestion,
+            chapter=chapter,
+            start_char=start_char,
+            end_char=end_char,
+            excerpt=excerpt,
+            confidence=confidence,
+            source_module="dialogue_validator",
+            extra_data={
+                "issue_type": issue_type,
+                "paragraph": paragraph,
+                "consecutive_count": consecutive_count,
+                "dialogue_text": text[:500] if text else "",
+            },
+        )
+
+    def create_alerts_from_dialogue_report(
+        self,
+        project_id: int,
+        report: Any,  # DialogueValidationReport
+        min_severity: str = "low",
+    ) -> Result[list[Alert]]:
+        """
+        Crea alertas desde un DialogueValidationReport completo.
+
+        Args:
+            project_id: ID del proyecto
+            report: DialogueValidationReport con los issues
+            min_severity: Severidad mínima para crear alertas (high, medium, low)
+
+        Returns:
+            Result con lista de alertas creadas
+        """
+        severity_order = {"high": 3, "medium": 2, "low": 1}
+        min_severity_value = severity_order.get(min_severity, 1)
+
+        alerts_data = []
+
+        for issue in report.issues:
+            # Filtrar por severidad mínima
+            issue_severity_value = severity_order.get(issue.severity.value, 1)
+            if issue_severity_value < min_severity_value:
+                continue
+
+            alerts_data.append({
+                "category": AlertCategory.DIALOGUE,
+                "severity": {
+                    "high": AlertSeverity.WARNING,
+                    "medium": AlertSeverity.INFO,
+                    "low": AlertSeverity.HINT,
+                }.get(issue.severity.value, AlertSeverity.INFO),
+                "alert_type": f"dialogue_{issue.issue_type.value}",
+                "title": self._get_dialogue_issue_title(issue.issue_type.value, issue.consecutive_count),
+                "description": issue.description,
+                "explanation": (
+                    f"Se detectó un problema de contexto en el diálogo del capítulo "
+                    f"{issue.location.chapter}, párrafo {issue.location.paragraph}. "
+                    f"{issue.description}"
+                ),
+                "suggestion": issue.suggestion,
+                "chapter": issue.location.chapter,
+                "start_char": issue.location.start_char,
+                "end_char": issue.location.end_char,
+                "excerpt": issue.location.text[:200] if issue.location.text else "",
+                "confidence": 0.85 if issue.severity.value == "high" else 0.7,
+                "source_module": "dialogue_validator",
+                "extra_data": {
+                    "issue_type": issue.issue_type.value,
+                    "paragraph": issue.location.paragraph,
+                    "consecutive_count": issue.consecutive_count,
+                },
+            })
+
+        return self.create_alerts_batch(project_id, alerts_data)
+
+    def _get_dialogue_issue_title(self, issue_type: str, consecutive_count: int = 1) -> str:
+        """Genera título para problema de diálogo."""
+        title_map = {
+            "orphan_no_attribution": "Diálogo sin atribución de hablante",
+            "orphan_no_context": "Diálogo sin contexto de escena",
+            "consecutive_no_change": f"Secuencia de {consecutive_count} diálogos sin indicar cambio",
+            "chapter_start_dialogue": "Capítulo inicia con diálogo sin contexto",
+        }
+        return title_map.get(issue_type, f"Problema de diálogo: {issue_type}")
+
 
 def get_alert_engine() -> AlertEngine:
     """

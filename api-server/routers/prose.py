@@ -594,6 +594,367 @@ async def get_echo_report(
         return ApiResponse(success=False, error=str(e))
 
 
+@router.get("/api/projects/{project_id}/duplicate-content", response_model=ApiResponse)
+async def get_duplicate_content(
+    project_id: int,
+    sentence_threshold: float = Query(0.90, ge=0.5, le=1.0, description="Umbral de similitud para frases"),
+    paragraph_threshold: float = Query(0.85, ge=0.5, le=1.0, description="Umbral de similitud para párrafos"),
+    min_sentence_length: int = Query(30, ge=10, le=200, description="Longitud mínima de frase"),
+    chapter_number: Optional[int] = Query(None, description="Filtrar por número de capítulo"),
+):
+    """
+    Detecta contenido duplicado a nivel frase y párrafo.
+
+    Encuentra frases y párrafos repetidos o muy similares en el manuscrito,
+    útil para detectar copias/pegas accidentales.
+    """
+    try:
+        from narrative_assistant.analysis.duplicate_detector import get_duplicate_detector
+
+        result = deps.project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+
+        detector = get_duplicate_detector()
+        chapters = deps.chapter_repository.get_by_project(project_id)
+
+        # Construir texto completo y lista de capítulos
+        full_text = ""
+        chapters_info = []
+        paragraphs_data = []
+        para_counter = 0
+
+        for chapter in chapters:
+            if chapter_number is not None and chapter.chapter_number != chapter_number:
+                continue
+
+            chapter_text = chapter.content or ""
+            if not chapter_text.strip():
+                continue
+
+            chapter_start = len(full_text)
+            full_text += chapter_text + "\n\n"
+            chapter_end = len(full_text)
+
+            chapters_info.append({
+                "number": chapter.chapter_number,
+                "start_char": chapter_start,
+                "end_char": chapter_end,
+            })
+
+            # Extraer párrafos
+            for para in chapter_text.split("\n\n"):
+                para = para.strip()
+                if para and len(para) >= 30:
+                    paragraphs_data.append({
+                        "text": para,
+                        "chapter": chapter.chapter_number,
+                        "paragraph_number": para_counter,
+                        "start_char": chapter_start + chapter_text.find(para),
+                        "end_char": chapter_start + chapter_text.find(para) + len(para),
+                    })
+                    para_counter += 1
+
+        # Detectar duplicados
+        result = detector.detect_all(
+            text=full_text,
+            paragraphs=paragraphs_data,
+            chapters=chapters_info,
+            sentence_threshold=sentence_threshold,
+            paragraph_threshold=paragraph_threshold,
+        )
+
+        if result.is_failure:
+            return ApiResponse(success=False, error="Error en detección de duplicados")
+
+        report = result.value
+
+        # Agrupar por capítulo para el frontend
+        duplicates_by_chapter = {}
+        for dup in report.duplicates:
+            ch1 = dup.location1.chapter
+            ch2 = dup.location2.chapter
+
+            for ch in [ch1, ch2]:
+                if ch not in duplicates_by_chapter:
+                    duplicates_by_chapter[ch] = []
+
+            dup_dict = dup.to_dict()
+            if dup_dict not in duplicates_by_chapter.get(ch1, []):
+                duplicates_by_chapter[ch1].append(dup_dict)
+
+        # Recomendaciones
+        recommendations = []
+        critical_count = report.by_severity.get("critical", 0)
+        high_count = report.by_severity.get("high", 0)
+
+        if critical_count > 0:
+            recommendations.append(
+                f"Se encontraron {critical_count} duplicados exactos. "
+                "Revisa si son intencionales (leitmotiv) o accidentales (copy/paste)."
+            )
+        if high_count > 3:
+            recommendations.append(
+                f"Hay {high_count} fragmentos muy similares. "
+                "Considera variar el vocabulario o combinar las secciones repetidas."
+            )
+
+        return ApiResponse(
+            success=True,
+            data={
+                "global_stats": {
+                    "total_duplicates": len(report.duplicates),
+                    "sentences_analyzed": report.sentences_analyzed,
+                    "paragraphs_analyzed": report.paragraphs_analyzed,
+                    "by_type": report.by_type,
+                    "by_severity": report.by_severity,
+                },
+                "duplicates": [d.to_dict() for d in report.duplicates],
+                "by_chapter": duplicates_by_chapter,
+                "recommendations": recommendations,
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error analyzing duplicate content: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@router.get("/api/projects/{project_id}/narrative-structure", response_model=ApiResponse)
+async def get_narrative_structure(
+    project_id: int,
+    min_confidence: float = Query(0.7, ge=0.3, le=1.0, description="Confianza mínima para detección"),
+    chapter_number: Optional[int] = Query(None, description="Filtrar por número de capítulo"),
+):
+    """
+    Detecta anomalías en la estructura narrativa: prolepsis y analepsis.
+
+    Prolepsis: menciones de eventos futuros antes de que ocurran
+    (detectadas por condicional + marcadores temporales).
+    """
+    try:
+        from narrative_assistant.analysis.narrative_structure import get_narrative_structure_detector
+
+        result = deps.project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+
+        detector = get_narrative_structure_detector()
+        chapters = deps.chapter_repository.get_by_project(project_id)
+
+        # Construir texto completo y lista de capítulos
+        full_text = ""
+        chapters_info = []
+
+        for chapter in chapters:
+            if chapter_number is not None and chapter.chapter_number != chapter_number:
+                continue
+
+            chapter_text = chapter.content or ""
+            if not chapter_text.strip():
+                continue
+
+            chapter_start = len(full_text)
+            full_text += chapter_text + "\n\n"
+            chapter_end = len(full_text)
+
+            chapters_info.append({
+                "number": chapter.chapter_number,
+                "start_char": chapter_start,
+                "end_char": chapter_end,
+                "content": chapter_text,
+            })
+
+        # Detectar anomalías narrativas
+        report = detector.detect_all(
+            text=full_text,
+            chapters=chapters_info,
+            min_confidence=min_confidence,
+        )
+
+        # Recomendaciones
+        recommendations = []
+        if report.prolepsis_found:
+            high_count = sum(1 for p in report.prolepsis_found if p.severity.value == "high")
+            if high_count > 0:
+                recommendations.append(
+                    f"Se encontraron {high_count} prolepsis de alta severidad. "
+                    "Estas anticipaciones pueden reducir la tensión narrativa o revelar información prematuramente."
+                )
+
+            medium_count = sum(1 for p in report.prolepsis_found if p.severity.value == "medium")
+            if medium_count > 0:
+                recommendations.append(
+                    f"Hay {medium_count} prolepsis de severidad media. "
+                    "Evalúa si son intencionales (efecto narrativo) o accidentales."
+                )
+
+        return ApiResponse(
+            success=True,
+            data={
+                "global_stats": {
+                    "total_anomalies": report.total_anomalies,
+                    "prolepsis_count": len(report.prolepsis_found),
+                    "analepsis_count": len(report.analepsis_found),
+                    "chapters_analyzed": report.chapters_analyzed,
+                    "by_type": report.to_dict()["by_type"],
+                    "by_severity": report.to_dict()["by_severity"],
+                },
+                "prolepsis": [p.to_dict() for p in report.prolepsis_found],
+                "analepsis": [a.to_dict() for a in report.analepsis_found],
+                "recommendations": recommendations,
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error analyzing narrative structure: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@router.get("/api/projects/{project_id}/dialogue-validation", response_model=ApiResponse)
+async def get_dialogue_validation(
+    project_id: int,
+    max_unattributed: int = Query(3, ge=2, le=10, description="Máximo de diálogos consecutivos sin atribución"),
+    chapter_number: Optional[int] = Query(None, description="Filtrar por número de capítulo"),
+    create_alerts: bool = Query(False, description="Crear alertas en el sistema unificado"),
+    min_severity: str = Query("low", description="Severidad mínima para crear alertas: high, medium, low"),
+):
+    """
+    Valida el contexto de los diálogos en el manuscrito.
+
+    Detecta:
+    - Diálogos huérfanos (sin indicar quién habla)
+    - Secuencias largas sin atribución
+    - Diálogos al inicio de capítulo sin contexto
+    - Diálogos consecutivos sin indicar cambio de hablante
+
+    Si create_alerts=True, genera alertas en AlertsTab con categoría DIALOGUE.
+    """
+    try:
+        from narrative_assistant.nlp.dialogue_validator import (
+            DialogueContextValidator,
+            DialogueIssueType,
+            DialogueIssueSeverity,
+        )
+        from narrative_assistant.alerts.engine import get_alert_engine
+
+        result = deps.project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+
+        validator = DialogueContextValidator(
+            max_unattributed_consecutive=max_unattributed,
+        )
+        chapters = deps.chapter_repository.get_by_project(project_id)
+
+        # Construir lista de capítulos para validación
+        chapters_info = []
+        for chapter in chapters:
+            if chapter_number is not None and chapter.chapter_number != chapter_number:
+                continue
+
+            chapter_text = chapter.content or ""
+            if not chapter_text.strip():
+                continue
+
+            chapters_info.append({
+                "number": chapter.chapter_number,
+                "start_char": 0,  # Relativo al capítulo
+                "content": chapter_text,
+            })
+
+        # Validar diálogos
+        report = validator.validate_all(chapters_info)
+
+        # Agrupar issues por capítulo
+        issues_by_chapter: dict[int, list[dict[str, Any]]] = {}
+        for issue in report.issues:
+            ch = issue.location.chapter
+            if ch not in issues_by_chapter:
+                issues_by_chapter[ch] = []
+            issues_by_chapter[ch].append(issue.to_dict())
+
+        # Recomendaciones
+        recommendations = []
+        if report.attribution_ratio < 0.5:
+            recommendations.append(
+                f"Solo el {report.attribution_ratio:.0%} de los diálogos tienen atribución clara. "
+                "Considera añadir más indicaciones de quién habla."
+            )
+
+        high_count = sum(1 for i in report.issues if i.severity == DialogueIssueSeverity.HIGH)
+        if high_count > 0:
+            recommendations.append(
+                f"Se detectaron {high_count} problemas de alta severidad. "
+                "El lector podría perder el hilo de quién habla."
+            )
+
+        orphan_count = sum(
+            1 for i in report.issues
+            if i.issue_type == DialogueIssueType.ORPHAN_NO_ATTRIBUTION
+        )
+        if orphan_count > 3:
+            recommendations.append(
+                f"Hay {orphan_count} secuencias de diálogos sin atribución. "
+                "En conversaciones largas, añade recordatorios periódicos de quién habla."
+            )
+
+        chapter_start_count = sum(
+            1 for i in report.issues
+            if i.issue_type == DialogueIssueType.CHAPTER_START_DIALOGUE
+        )
+        if chapter_start_count > 0:
+            recommendations.append(
+                f"{chapter_start_count} capítulo(s) comienzan con diálogo sin contexto previo. "
+                "Considera añadir una breve introducción de la escena."
+            )
+
+        # Crear alertas si se solicita
+        alerts_created = 0
+        if create_alerts and report.issues:
+            alert_engine = get_alert_engine()
+            alerts_result = alert_engine.create_alerts_from_dialogue_report(
+                project_id=project_id,
+                report=report,
+                min_severity=min_severity,
+            )
+            if alerts_result.is_success:
+                alerts_created = len(alerts_result.value)
+                logger.info(f"Created {alerts_created} dialogue alerts for project {project_id}")
+            else:
+                logger.warning(f"Some dialogue alerts failed: {alerts_result.error}")
+
+        return ApiResponse(
+            success=True,
+            data={
+                "global_stats": {
+                    "total_issues": report.total_issues,
+                    "total_dialogues": report.total_dialogues,
+                    "dialogues_with_attribution": report.dialogues_with_attribution,
+                    "dialogues_without_attribution": report.dialogues_without_attribution,
+                    "attribution_ratio": round(report.attribution_ratio, 2),
+                    "chapters_analyzed": report.chapters_analyzed,
+                    "by_type": report.to_dict()["by_type"],
+                    "by_severity": report.to_dict()["by_severity"],
+                },
+                "issues": [i.to_dict() for i in report.issues],
+                "by_chapter": issues_by_chapter,
+                "recommendations": recommendations,
+                "alerts_created": alerts_created,
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error validating dialogues: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
 @router.get("/api/projects/{project_id}/sentence-variation", response_model=ApiResponse)
 async def get_sentence_variation(
     project_id: int,
@@ -733,7 +1094,11 @@ async def get_pacing_analysis(
             if not chapter_text.strip():
                 continue
 
-            result = analyzer.analyze(chapter_text)
+            result = analyzer.analyze([{
+                "number": chapter.chapter_number,
+                "title": chapter.title or "",
+                "content": chapter_text
+            }])
             if result.is_failure:
                 logger.warning(f"Failed to analyze chapter {chapter.chapter_number}: {result.error}")
                 continue
@@ -1426,5 +1791,162 @@ async def get_age_readability(
     except Exception as e:
         logger.error(f"Error analyzing age readability: {e}", exc_info=True)
         return ApiResponse(success=False, error=str(e))
+
+
+@router.get("/api/projects/{project_id}/semantic-redundancy", response_model=ApiResponse)
+async def get_semantic_redundancy(
+    project_id: int,
+    mode: str = Query("balanced", description="Modo de análisis: fast, balanced, thorough"),
+    threshold: float = Query(0.85, ge=0.70, le=0.95, description="Umbral de similitud semántica"),
+    max_duplicates: int = Query(100, ge=10, le=500, description="Máximo de duplicados a reportar"),
+    chapter_number: Optional[int] = Query(None, description="Filtrar por número de capítulo"),
+):
+    """
+    Detecta redundancia semántica en el manuscrito.
+
+    Encuentra contenido que se repite semánticamente aunque esté escrito
+    con palabras diferentes, usando embeddings y búsqueda ANN (FAISS).
+
+    Tipos de duplicados detectados:
+    - **Textual**: Casi idéntico, mismo texto reformulado
+    - **Temático**: Mismo tema o idea expresada de forma diferente
+    - **Acción**: Misma acción de personaje repetida
+
+    Modos de análisis:
+    - **fast**: ~5 segundos para 10K oraciones (k=50, IVF agresivo)
+    - **balanced**: ~30 segundos (k=100, IVF moderado) - RECOMENDADO
+    - **thorough**: ~5 minutos (k=500, búsqueda exhaustiva)
+    """
+    try:
+        from narrative_assistant.analysis.semantic_redundancy import (
+            get_semantic_redundancy_detector,
+            RedundancyMode,
+        )
+        from narrative_assistant.core import get_resource_manager
+
+        # Validar modo
+        valid_modes = ["fast", "balanced", "thorough"]
+        if mode not in valid_modes:
+            return ApiResponse(
+                success=False,
+                error=f"Modo inválido. Opciones: {', '.join(valid_modes)}"
+            )
+
+        result = deps.project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+
+        chapters = deps.chapter_repository.get_by_project(project_id)
+        if not chapters:
+            return ApiResponse(
+                success=True,
+                data={
+                    "duplicates": [],
+                    "sentences_analyzed": 0,
+                    "chapters_analyzed": 0,
+                    "message": "No hay capítulos para analizar",
+                }
+            )
+
+        # Construir lista de capítulos para el detector
+        chapters_data = []
+        for chapter in chapters:
+            if chapter_number is not None and chapter.chapter_number != chapter_number:
+                continue
+
+            chapter_text = chapter.content or ""
+            if not chapter_text.strip():
+                continue
+
+            chapters_data.append({
+                "number": chapter.chapter_number,
+                "content": chapter_text,
+                "start_char": chapter.start_char if hasattr(chapter, "start_char") else 0,
+            })
+
+        if not chapters_data:
+            return ApiResponse(
+                success=True,
+                data={
+                    "duplicates": [],
+                    "sentences_analyzed": 0,
+                    "chapters_analyzed": 0,
+                    "message": "No hay contenido para analizar",
+                }
+            )
+
+        # Ejecutar detección como tarea pesada
+        rm = get_resource_manager()
+        detector = get_semantic_redundancy_detector(mode=mode, threshold=threshold)
+
+        def run_detection():
+            return detector.detect(chapters_data, max_duplicates=max_duplicates)
+
+        detection_result = rm.run_heavy_task(
+            task_name="semantic_redundancy",
+            func=run_detection,
+            timeout=600,  # 10 minutos máximo
+        )
+
+        if detection_result.is_failure:
+            return ApiResponse(success=False, error=str(detection_result.error))
+
+        report = detection_result.value
+
+        # Agrupar duplicados por capítulo para el frontend
+        by_chapter: dict[int, list] = {}
+        for dup in report.duplicates:
+            ch1 = dup.chapter1
+            ch2 = dup.chapter2
+            for ch in [ch1, ch2]:
+                if ch not in by_chapter:
+                    by_chapter[ch] = []
+            dup_dict = dup.to_dict()
+            if ch1 not in by_chapter:
+                by_chapter[ch1] = []
+            by_chapter[ch1].append(dup_dict)
+
+        # Recomendaciones basadas en el análisis
+        recommendations = []
+        if report.textual_count > 5:
+            recommendations.append(
+                f"Se encontraron {report.textual_count} duplicados textuales (casi idénticos). "
+                "Revisa si son repeticiones accidentales o intencionales."
+            )
+        if report.thematic_count > 10:
+            recommendations.append(
+                f"Hay {report.thematic_count} redundancias temáticas. "
+                "El texto podría beneficiarse de consolidar ideas repetidas."
+            )
+        if report.action_count > 5:
+            recommendations.append(
+                f"Se detectaron {report.action_count} acciones repetidas de personajes. "
+                "Considera variar las acciones o eliminar repeticiones innecesarias."
+            )
+        if not report.duplicates:
+            recommendations.append("No se detectó redundancia semántica significativa. ¡Buen trabajo!")
+
+        return ApiResponse(
+            success=True,
+            data={
+                **report.to_dict(),
+                "by_chapter": by_chapter,
+                "recommendations": recommendations,
+                "faiss_available": True,  # Info for frontend
+            }
+        )
+
+    except HTTPException:
+        raise
+    except ImportError as e:
+        logger.error(f"Module import error: {e}")
+        return ApiResponse(
+            success=False,
+            error="Módulo de redundancia semántica no disponible. Verifique la instalación."
+        )
+    except Exception as e:
+        logger.error(f"Error analyzing semantic redundancy: {e}", exc_info=True)
+        user_msg = e.user_message if hasattr(e, 'user_message') and e.user_message else str(e)
+        return ApiResponse(success=False, error=user_msg)
 
 

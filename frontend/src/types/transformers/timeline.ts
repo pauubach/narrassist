@@ -27,6 +27,8 @@ export function transformTimelineEvent(apiEvent: ApiTimelineEvent): TimelineEven
     paragraph: apiEvent.paragraph,
     storyDate: apiEvent.story_date ? new Date(apiEvent.story_date) : null,
     storyDateResolution: apiEvent.story_date_resolution,
+    dayOffset: apiEvent.day_offset ?? null,
+    weekday: apiEvent.weekday ?? null,
     discoursePosition: apiEvent.discourse_position,
     narrativeOrder: apiEvent.narrative_order,
     entityIds: apiEvent.entity_ids || [],
