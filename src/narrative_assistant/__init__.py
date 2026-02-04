@@ -4,7 +4,12 @@ Asistente de Corrección Narrativa - TFM
 Herramienta offline de análisis narrativo para correctores profesionales.
 """
 
-__version__ = "0.3.34"
+try:
+    from importlib.metadata import version
+    __version__ = version("narrative-assistant")
+except Exception:
+    __version__ = None  # UI mostrará nombre sin versión
+
 __author__ = "Pau Ubach"
 
 
