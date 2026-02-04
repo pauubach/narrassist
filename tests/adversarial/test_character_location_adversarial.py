@@ -31,8 +31,9 @@ Categorías de prueba:
 20. Múltiples capítulos
 """
 
+from typing import Any, Dict, List, Tuple
+
 import pytest
-from typing import Dict, List, Any, Tuple
 
 from narrative_assistant.analysis.character_location import (
     CharacterLocationAnalyzer,
@@ -41,7 +42,6 @@ from narrative_assistant.analysis.character_location import (
     LocationInconsistency,
     analyze_character_locations,
 )
-
 
 # =============================================================================
 # Test Data: Adversary-Generated Cases
@@ -71,18 +71,21 @@ class TestArrivalPatterns:
     def analyzer(self):
         return CharacterLocationAnalyzer()
 
-    @pytest.mark.parametrize("text,expected_name,expected_loc", [
-        # Caso 1: Llegada simple
-        ("María llegó a la cafetería.", "María", "cafetería"),
-        # Caso 2: Llegada con entró
-        ("Juan entró en el hospital.", "Juan", "hospital"),
-        # Caso 3: Llegada con arribó
-        ("Pedro arribó a Madrid esa mañana.", "Pedro", "Madrid"),
-        # Caso 4: Apareció en
-        ("Isabel apareció en la oficina sin avisar.", "Isabel", "oficina"),
-        # Caso 5: Se presentó en
-        ("María se presentó en la casa de su madre.", "María", "casa"),
-    ])
+    @pytest.mark.parametrize(
+        "text,expected_name,expected_loc",
+        [
+            # Caso 1: Llegada simple
+            ("María llegó a la cafetería.", "María", "cafetería"),
+            # Caso 2: Llegada con entró
+            ("Juan entró en el hospital.", "Juan", "hospital"),
+            # Caso 3: Llegada con arribó
+            ("Pedro arribó a Madrid esa mañana.", "Pedro", "Madrid"),
+            # Caso 4: Apareció en
+            ("Isabel apareció en la oficina sin avisar.", "Isabel", "oficina"),
+            # Caso 5: Se presentó en
+            ("María se presentó en la casa de su madre.", "María", "casa"),
+        ],
+    )
     def test_simple_arrivals(self, analyzer, text, expected_name, expected_loc):
         """Verifica detección de llegadas simples."""
         chapters = [{"number": 1, "title": "Cap 1", "content": text}]
@@ -108,14 +111,17 @@ class TestComplexArrivals:
     def analyzer(self):
         return CharacterLocationAnalyzer()
 
-    @pytest.mark.parametrize("text,expected_name", [
-        # Caso 1: Cuando + llegada
-        ("Cuando María llegó a la cafetería, todos callaron.", "María"),
-        # Caso 2: Al + infinitivo
-        ("Al entrar Juan en la sala, las luces se apagaron.", "Juan"),
-        # Caso 3: Subordinada temporal
-        ("Mientras María entraba en el hospital, sonó su teléfono.", "María"),
-    ])
+    @pytest.mark.parametrize(
+        "text,expected_name",
+        [
+            # Caso 1: Cuando + llegada
+            ("Cuando María llegó a la cafetería, todos callaron.", "María"),
+            # Caso 2: Al + infinitivo
+            ("Al entrar Juan en la sala, las luces se apagaron.", "Juan"),
+            # Caso 3: Subordinada temporal
+            ("Mientras María entraba en el hospital, sonó su teléfono.", "María"),
+        ],
+    )
     def test_subordinate_arrivals(self, analyzer, text, expected_name):
         """Verifica detección de llegadas en cláusulas subordinadas."""
         chapters = [{"number": 1, "title": "Cap 1", "content": text}]
@@ -125,8 +131,9 @@ class TestComplexArrivals:
         events = result.value.location_events
 
         arrivals = [e for e in events if e.change_type == LocationChangeType.ARRIVAL]
-        assert any(expected_name in a.entity_name for a in arrivals), \
+        assert any(expected_name in a.entity_name for a in arrivals), (
             f"No se detectó {expected_name} en: {text}"
+        )
 
 
 class TestDeparturePatterns:
@@ -136,18 +143,21 @@ class TestDeparturePatterns:
     def analyzer(self):
         return CharacterLocationAnalyzer()
 
-    @pytest.mark.parametrize("text,expected_name,expected_loc", [
-        # Caso 1: Salió de
-        ("María salió de la cafetería.", "María", "cafetería"),
-        # Caso 2: Partió de
-        ("Juan partió de Madrid al amanecer.", "Juan", "Madrid"),
-        # Caso 3: Se fue de
-        ("Pedro se fue de la oficina temprano.", "Pedro", "oficina"),
-        # Caso 4: Abandonó
-        ("Isabel abandonó el hospital esa noche.", "Isabel", "hospital"),
-        # Caso 5: Dejó
-        ("María dejó la casa de su infancia.", "María", "casa"),
-    ])
+    @pytest.mark.parametrize(
+        "text,expected_name,expected_loc",
+        [
+            # Caso 1: Salió de
+            ("María salió de la cafetería.", "María", "cafetería"),
+            # Caso 2: Partió de
+            ("Juan partió de Madrid al amanecer.", "Juan", "Madrid"),
+            # Caso 3: Se fue de
+            ("Pedro se fue de la oficina temprano.", "Pedro", "oficina"),
+            # Caso 4: Abandonó
+            ("Isabel abandonó el hospital esa noche.", "Isabel", "hospital"),
+            # Caso 5: Dejó
+            ("María dejó la casa de su infancia.", "María", "casa"),
+        ],
+    )
     def test_simple_departures(self, analyzer, text, expected_name, expected_loc):
         """Verifica detección de salidas simples."""
         chapters = [{"number": 1, "title": "Cap 1", "content": text}]
@@ -167,16 +177,19 @@ class TestPresencePatterns:
     def analyzer(self):
         return CharacterLocationAnalyzer()
 
-    @pytest.mark.parametrize("text,expected_name,expected_loc", [
-        # Caso 1: Estaba en
-        ("María estaba en la cafetería desde temprano.", "María", "cafetería"),
-        # Caso 2: Se encontraba en
-        ("Juan se encontraba en el hospital visitando a su madre.", "Juan", "hospital"),
-        # Caso 3: Permanecía en
-        ("Pedro permanecía en la oficina hasta tarde.", "Pedro", "oficina"),
-        # Caso 4: Patrón invertido (en X, Nombre...)
-        ("En la cafetería, María esperaba pacientemente.", "María", "cafetería"),
-    ])
+    @pytest.mark.parametrize(
+        "text,expected_name,expected_loc",
+        [
+            # Caso 1: Estaba en
+            ("María estaba en la cafetería desde temprano.", "María", "cafetería"),
+            # Caso 2: Se encontraba en
+            ("Juan se encontraba en el hospital visitando a su madre.", "Juan", "hospital"),
+            # Caso 3: Permanecía en
+            ("Pedro permanecía en la oficina hasta tarde.", "Pedro", "oficina"),
+            # Caso 4: Patrón invertido (en X, Nombre...)
+            ("En la cafetería, María esperaba pacientemente.", "María", "cafetería"),
+        ],
+    )
     def test_presence_patterns(self, analyzer, text, expected_name, expected_loc):
         """Verifica detección de presencia."""
         chapters = [{"number": 1, "title": "Cap 1", "content": text}]
@@ -196,18 +209,21 @@ class TestTransitionPatterns:
     def analyzer(self):
         return CharacterLocationAnalyzer()
 
-    @pytest.mark.parametrize("text,expected_name,expected_loc", [
-        # Caso 1: Viajó a
-        ("María viajó a París esa primavera.", "María", "París"),
-        # Caso 2: Caminó hacia
-        ("Juan caminó hacia la cafetería.", "Juan", "cafetería"),
-        # Caso 3: Se dirigió a
-        ("Pedro se dirigió a la oficina con paso firme.", "Pedro", "oficina"),
-        # Caso 4: Cruzó
-        ("Isabel cruzó la plaza en silencio.", "Isabel", "plaza"),
-        # Caso 5: Fue de X a Y
-        ("María fue de la casa a la oficina.", "María", "oficina"),
-    ])
+    @pytest.mark.parametrize(
+        "text,expected_name,expected_loc",
+        [
+            # Caso 1: Viajó a
+            ("María viajó a París esa primavera.", "María", "París"),
+            # Caso 2: Caminó hacia
+            ("Juan caminó hacia la cafetería.", "Juan", "cafetería"),
+            # Caso 3: Se dirigió a
+            ("Pedro se dirigió a la oficina con paso firme.", "Pedro", "oficina"),
+            # Caso 4: Cruzó
+            ("Isabel cruzó la plaza en silencio.", "Isabel", "plaza"),
+            # Caso 5: Fue de X a Y
+            ("María fue de la casa a la oficina.", "María", "oficina"),
+        ],
+    )
     def test_transition_patterns(self, analyzer, text, expected_name, expected_loc):
         """Verifica detección de transiciones."""
         chapters = [{"number": 1, "title": "Cap 1", "content": text}]
@@ -218,8 +234,11 @@ class TestTransitionPatterns:
 
         transitions = [e for e in events if e.change_type == LocationChangeType.TRANSITION]
         # Las transiciones pueden detectarse también como llegadas
-        all_movements = [e for e in events
-                        if e.change_type in (LocationChangeType.TRANSITION, LocationChangeType.ARRIVAL)]
+        all_movements = [
+            e
+            for e in events
+            if e.change_type in (LocationChangeType.TRANSITION, LocationChangeType.ARRIVAL)
+        ]
         assert len(all_movements) >= 1, f"No se detectó movimiento en: {text}"
 
 
@@ -230,18 +249,21 @@ class TestMetaphoricalLocations:
     def analyzer(self):
         return CharacterLocationAnalyzer()
 
-    @pytest.mark.parametrize("text,description", [
-        # Caso 1: Llegó a una conclusión (no es ubicación física)
-        ("María llegó a una conclusión importante.", "conclusión - no ubicación"),
-        # Caso 2: Entró en cólera (estado emocional)
-        ("Juan entró en cólera al escucharlo.", "cólera - estado emocional"),
-        # Caso 3: Salió del paso (expresión idiomática)
-        ("Pedro salió del paso con una excusa.", "del paso - idiomático"),
-        # Caso 4: Fue a parar (resultado, no movimiento)
-        ("Todo fue a parar a la basura.", "a parar - resultado"),
-        # Caso 5: Estaba en lo cierto (estado mental)
-        ("María estaba en lo cierto, como siempre.", "en lo cierto - mental"),
-    ])
+    @pytest.mark.parametrize(
+        "text,description",
+        [
+            # Caso 1: Llegó a una conclusión (no es ubicación física)
+            ("María llegó a una conclusión importante.", "conclusión - no ubicación"),
+            # Caso 2: Entró en cólera (estado emocional)
+            ("Juan entró en cólera al escucharlo.", "cólera - estado emocional"),
+            # Caso 3: Salió del paso (expresión idiomática)
+            ("Pedro salió del paso con una excusa.", "del paso - idiomático"),
+            # Caso 4: Fue a parar (resultado, no movimiento)
+            ("Todo fue a parar a la basura.", "a parar - resultado"),
+            # Caso 5: Estaba en lo cierto (estado mental)
+            ("María estaba en lo cierto, como siempre.", "en lo cierto - mental"),
+        ],
+    )
     def test_metaphorical_should_not_detect(self, analyzer, text, description):
         """Verifica que no se detecten ubicaciones metafóricas."""
         chapters = [{"number": 1, "title": "Cap 1", "content": text}]
@@ -262,14 +284,17 @@ class TestCompoundNames:
     def analyzer(self):
         return CharacterLocationAnalyzer()
 
-    @pytest.mark.parametrize("text,expected_name", [
-        # Caso 1: Nombre compuesto
-        ("Ana María llegó a la cafetería.", "Ana María"),
-        # Caso 2: Título + nombre
-        ("Doctor García entró en el hospital.", "Doctor García"),
-        # Caso 3: Nombre con artículo informal
-        ("La María llegó a la plaza.", "María"),
-    ])
+    @pytest.mark.parametrize(
+        "text,expected_name",
+        [
+            # Caso 1: Nombre compuesto
+            ("Ana María llegó a la cafetería.", "Ana María"),
+            # Caso 2: Título + nombre
+            ("Doctor García entró en el hospital.", "Doctor García"),
+            # Caso 3: Nombre con artículo informal
+            ("La María llegó a la plaza.", "María"),
+        ],
+    )
     def test_compound_names(self, analyzer, text, expected_name):
         """Verifica detección con nombres compuestos."""
         chapters = [{"number": 1, "title": "Cap 1", "content": text}]
@@ -433,14 +458,17 @@ class TestTemporalLocations:
     def analyzer(self):
         return CharacterLocationAnalyzer()
 
-    @pytest.mark.parametrize("text,description", [
-        # Caso 1: Tiempo pasado
-        ("María había estado en París el año anterior.", "pluscuamperfecto"),
-        # Caso 2: Tiempo futuro
-        ("María iría a Madrid la próxima semana.", "condicional futuro"),
-        # Caso 3: Tiempo habitual
-        ("María solía ir a la cafetería cada mañana.", "imperfecto habitual"),
-    ])
+    @pytest.mark.parametrize(
+        "text,description",
+        [
+            # Caso 1: Tiempo pasado
+            ("María había estado en París el año anterior.", "pluscuamperfecto"),
+            # Caso 2: Tiempo futuro
+            ("María iría a Madrid la próxima semana.", "condicional futuro"),
+            # Caso 3: Tiempo habitual
+            ("María solía ir a la cafetería cada mañana.", "imperfecto habitual"),
+        ],
+    )
     def test_temporal_locations(self, analyzer, text, description):
         """Verifica manejo de ubicaciones con tiempos verbales especiales."""
         chapters = [{"number": 1, "title": "Cap 1", "content": text}]
@@ -487,14 +515,17 @@ class TestImplicitLocations:
     def analyzer(self):
         return CharacterLocationAnalyzer()
 
-    @pytest.mark.parametrize("text,description", [
-        # Caso 1: Ubicación por contexto
-        ("María pidió un café. El camarero asintió.", "cafetería implícita"),
-        # Caso 2: Ubicación por actividad
-        ("María operó al paciente durante horas.", "hospital implícito"),
-        # Caso 3: Ubicación por objeto
-        ("María dejó las maletas en el mostrador de facturación.", "aeropuerto implícito"),
-    ])
+    @pytest.mark.parametrize(
+        "text,description",
+        [
+            # Caso 1: Ubicación por contexto
+            ("María pidió un café. El camarero asintió.", "cafetería implícita"),
+            # Caso 2: Ubicación por actividad
+            ("María operó al paciente durante horas.", "hospital implícito"),
+            # Caso 3: Ubicación por objeto
+            ("María dejó las maletas en el mostrador de facturación.", "aeropuerto implícito"),
+        ],
+    )
     def test_implicit_locations(self, analyzer, text, description):
         """Verifica manejo de ubicaciones implícitas."""
         chapters = [{"number": 1, "title": "Cap 1", "content": text}]
@@ -546,14 +577,17 @@ class TestNestedLocations:
     def analyzer(self):
         return CharacterLocationAnalyzer()
 
-    @pytest.mark.parametrize("text,expected_locs", [
-        # Caso 1: Ciudad + lugar específico
-        ("María llegó a la cafetería de Madrid.", ["cafetería", "Madrid"]),
-        # Caso 2: Edificio + habitación
-        ("Juan entró en la habitación 305 del hospital.", ["habitación", "hospital"]),
-        # Caso 3: País + ciudad
-        ("Pedro arribó a París, Francia.", ["París", "Francia"]),
-    ])
+    @pytest.mark.parametrize(
+        "text,expected_locs",
+        [
+            # Caso 1: Ciudad + lugar específico
+            ("María llegó a la cafetería de Madrid.", ["cafetería", "Madrid"]),
+            # Caso 2: Edificio + habitación
+            ("Juan entró en la habitación 305 del hospital.", ["habitación", "hospital"]),
+            # Caso 3: País + ciudad
+            ("Pedro arribó a París, Francia.", ["París", "Francia"]),
+        ],
+    )
     def test_nested_locations(self, analyzer, text, expected_locs):
         """Verifica manejo de ubicaciones anidadas."""
         chapters = [{"number": 1, "title": "Cap 1", "content": text}]
@@ -570,14 +604,17 @@ class TestAmbiguousLocations:
     def analyzer(self):
         return CharacterLocationAnalyzer()
 
-    @pytest.mark.parametrize("text,description", [
-        # Caso 1: Nombre de persona que es también lugar
-        ("María visitó a Victoria en la estación.", "Victoria - persona o lugar?"),
-        # Caso 2: Nombre común
-        ("Juan fue a La Corona.", "Corona - bar o corona?"),
-        # Caso 3: Apellido que es lugar
-        ("Pedro llegó a casa de los León.", "León - familia o ciudad?"),
-    ])
+    @pytest.mark.parametrize(
+        "text,description",
+        [
+            # Caso 1: Nombre de persona que es también lugar
+            ("María visitó a Victoria en la estación.", "Victoria - persona o lugar?"),
+            # Caso 2: Nombre común
+            ("Juan fue a La Corona.", "Corona - bar o corona?"),
+            # Caso 3: Apellido que es lugar
+            ("Pedro llegó a casa de los León.", "León - familia o ciudad?"),
+        ],
+    )
     def test_ambiguous_locations(self, analyzer, text, description):
         """Verifica manejo de ubicaciones ambiguas."""
         chapters = [{"number": 1, "title": "Cap 1", "content": text}]
@@ -609,10 +646,14 @@ class TestMultipleChapters:
     def test_parallel_storylines(self, analyzer):
         """Historias paralelas con personajes en diferentes lugares."""
         chapters = [
-            {"number": 1, "title": "Cap 1", "content": """
+            {
+                "number": 1,
+                "title": "Cap 1",
+                "content": """
                 María llegó a París.
                 Mientras tanto, Juan estaba en Madrid.
-            """},
+            """,
+            },
         ]
         result = analyzer.analyze(1, chapters, ENTITIES)
 
@@ -657,10 +698,7 @@ class TestEdgeCases:
 
     def test_very_long_text(self, analyzer):
         """Texto muy largo con múltiples ubicaciones."""
-        paragraphs = [
-            f"María llegó a la ubicación{i}."
-            for i in range(100)
-        ]
+        paragraphs = [f"María llegó a la ubicación{i}." for i in range(100)]
         text = " ".join(paragraphs)
         chapters = [{"number": 1, "title": "Cap 1", "content": text}]
         result = analyzer.analyze(1, chapters, ENTITIES)
@@ -675,13 +713,16 @@ class TestArticleVariations:
     def analyzer(self):
         return CharacterLocationAnalyzer()
 
-    @pytest.mark.parametrize("text,description", [
-        ("María llegó a la cafetería.", "artículo definido femenino"),
-        ("María llegó al hospital.", "artículo contraído"),
-        ("María llegó a un bar.", "artículo indefinido"),
-        ("María llegó a cafetería.", "sin artículo"),
-        ("María entró en el gran salón.", "artículo + adjetivo"),
-    ])
+    @pytest.mark.parametrize(
+        "text,description",
+        [
+            ("María llegó a la cafetería.", "artículo definido femenino"),
+            ("María llegó al hospital.", "artículo contraído"),
+            ("María llegó a un bar.", "artículo indefinido"),
+            ("María llegó a cafetería.", "sin artículo"),
+            ("María entró en el gran salón.", "artículo + adjetivo"),
+        ],
+    )
     def test_article_variations(self, analyzer, text, description):
         """Verifica detección con diferentes artículos."""
         chapters = [{"number": 1, "title": "Cap 1", "content": text}]

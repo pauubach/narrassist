@@ -1,29 +1,31 @@
 """Tests para el modulo de atribucion de hablante."""
 
-import pytest
 from dataclasses import dataclass
 from typing import List, Optional
 
+import pytest
+
 from narrative_assistant.voice.speaker_attribution import (
+    SPEECH_VERBS,
     AttributionConfidence,
     AttributionMethod,
     DialogueAttribution,
     SpeakerAttributor,
-    SPEECH_VERBS,
     attribute_speakers,
 )
-
 
 # ============================================================================
 # Mock classes para tests
 # ============================================================================
 
+
 @dataclass
 class MockEntity:
     """Entidad mock para tests."""
+
     id: int
     canonical_name: str
-    aliases: List[str] = None
+    aliases: list[str] = None
 
     def __post_init__(self):
         if self.aliases is None:
@@ -33,6 +35,7 @@ class MockEntity:
 @dataclass
 class MockDialogue:
     """Dialogo mock para tests."""
+
     text: str
     start_char: int
     end_char: int
@@ -44,11 +47,12 @@ class MockDialogue:
 @dataclass
 class MockVoiceProfile:
     """Perfil de voz mock para tests."""
+
     entity_id: int
     uses_usted: bool = False
     uses_tu: bool = True
     avg_intervention_length: float = 10.0
-    filler_words: List[str] = None
+    filler_words: list[str] = None
 
     def __post_init__(self):
         if self.filler_words is None:
@@ -58,6 +62,7 @@ class MockVoiceProfile:
 # ============================================================================
 # Tests para SpeakerAttributor
 # ============================================================================
+
 
 class TestSpeakerAttributor:
     """Tests para SpeakerAttributor."""
@@ -94,7 +99,7 @@ class TestSpeakerAttributor:
                 start_char=100,
                 end_char=110,
                 chapter=1,
-                context_after=" —dijo Juan con una sonrisa."
+                context_after=" —dijo Juan con una sonrisa.",
             ),
         ]
 
@@ -121,7 +126,7 @@ class TestSpeakerAttributor:
                 end_char=110,
                 chapter=1,
                 context_before="Juan dijo:",
-                context_after=""
+                context_after="",
             ),
         ]
 
@@ -144,7 +149,7 @@ class TestSpeakerAttributor:
                 start_char=100,
                 end_char=110,
                 chapter=1,
-                context_after=" —respondio Juanito."
+                context_after=" —respondio Juanito.",
             ),
         ]
 
@@ -163,19 +168,21 @@ class TestSpeakerAttributor:
 
         dialogues = [
             MockDialogue(
-                text="¡Hola!",
-                start_char=100, end_char=110, chapter=1,
-                context_after=" —dijo Juan."
+                text="¡Hola!", start_char=100, end_char=110, chapter=1, context_after=" —dijo Juan."
             ),
             MockDialogue(
                 text="¿Como estas?",
-                start_char=200, end_char=220, chapter=1,
-                context_after=""  # Sin verbo explicito
+                start_char=200,
+                end_char=220,
+                chapter=1,
+                context_after="",  # Sin verbo explicito
             ),
             MockDialogue(
                 text="Muy bien, gracias.",
-                start_char=300, end_char=330, chapter=1,
-                context_after=" —respondio Maria."
+                start_char=300,
+                end_char=330,
+                chapter=1,
+                context_after=" —respondio Maria.",
             ),
         ]
 
@@ -198,7 +205,7 @@ class TestSpeakerAttributor:
         assert attributions[1].confidence in (
             AttributionConfidence.MEDIUM,
             AttributionConfidence.LOW,
-            AttributionConfidence.UNKNOWN
+            AttributionConfidence.UNKNOWN,
         )
 
         # Tercero es Maria (explicito)
@@ -214,8 +221,10 @@ class TestSpeakerAttributor:
 
         # Juan usa 'tu', Maria usa 'usted'
         voice_profiles = {
-            1: MockVoiceProfile(entity_id=1, uses_usted=False, uses_tu=True, filler_words=['bueno']),
-            2: MockVoiceProfile(entity_id=2, uses_usted=True, uses_tu=False, filler_words=['pues']),
+            1: MockVoiceProfile(
+                entity_id=1, uses_usted=False, uses_tu=True, filler_words=["bueno"]
+            ),
+            2: MockVoiceProfile(entity_id=2, uses_usted=True, uses_tu=False, filler_words=["pues"]),
         }
 
         attributor = SpeakerAttributor(entities, voice_profiles)
@@ -223,8 +232,7 @@ class TestSpeakerAttributor:
         # Dialogo que usa 'usted' - deberia matchear con Maria
         dialogues = [
             MockDialogue(
-                text="Bueno, ¿como esta usted hoy?",
-                start_char=100, end_char=130, chapter=1
+                text="Bueno, ¿como esta usted hoy?", start_char=100, end_char=130, chapter=1
             ),
         ]
 
@@ -242,10 +250,7 @@ class TestSpeakerAttributor:
         attributor = SpeakerAttributor(entities)
 
         dialogues = [
-            MockDialogue(
-                text="¡Hola!",
-                start_char=100, end_char=110, chapter=1
-            ),
+            MockDialogue(text="¡Hola!", start_char=100, end_char=110, chapter=1),
         ]
 
         attributions = attributor.attribute_dialogues(dialogues)
@@ -265,12 +270,16 @@ class TestSpeakerAttributor:
         dialogues = [
             MockDialogue(
                 text="Dialogo cap 1",
-                start_char=100, end_char=120, chapter=1,
-                context_after=" —dijo Juan."
+                start_char=100,
+                end_char=120,
+                chapter=1,
+                context_after=" —dijo Juan.",
             ),
             MockDialogue(
                 text="Dialogo cap 2",
-                start_char=100, end_char=120, chapter=2
+                start_char=100,
+                end_char=120,
+                chapter=2,
                 # Sin contexto, nuevo capitulo
             ),
         ]
@@ -282,7 +291,7 @@ class TestSpeakerAttributor:
         # El segundo puede ser UNKNOWN si no hay contexto
         assert attributions[1].confidence in (
             AttributionConfidence.LOW,
-            AttributionConfidence.UNKNOWN
+            AttributionConfidence.UNKNOWN,
         )
 
     def test_multiple_verbs_supported(self):
@@ -290,14 +299,16 @@ class TestSpeakerAttributor:
         entities = [MockEntity(1, "Juan")]
         attributor = SpeakerAttributor(entities)
 
-        test_verbs = ['dijo', 'respondio', 'grito', 'susurro', 'pregunto', 'exclamo']
+        test_verbs = ["dijo", "respondio", "grito", "susurro", "pregunto", "exclamo"]
 
         for verb in test_verbs:
             dialogues = [
                 MockDialogue(
                     text="Texto",
-                    start_char=100, end_char=110, chapter=1,
-                    context_after=f" —{verb} Juan."
+                    start_char=100,
+                    end_char=110,
+                    chapter=1,
+                    context_after=f" —{verb} Juan.",
                 ),
             ]
             attributions = attributor.attribute_dialogues(dialogues)
@@ -308,6 +319,7 @@ class TestSpeakerAttributor:
 # ============================================================================
 # Tests para DialogueAttribution
 # ============================================================================
+
 
 class TestDialogueAttribution:
     """Tests para DialogueAttribution."""
@@ -324,26 +336,20 @@ class TestDialogueAttribution:
             speaker_name="Juan",
             confidence=AttributionConfidence.HIGH,
             attribution_method=AttributionMethod.EXPLICIT_VERB,
-            speech_verb="dijo"
+            speech_verb="dijo",
         )
 
         d = attr.to_dict()
 
-        assert d['dialogue_id'] == 1
-        assert d['speaker_name'] == "Juan"
-        assert d['confidence'] == "high"
-        assert d['attribution_method'] == "explicit_verb"
-        assert d['speech_verb'] == "dijo"
+        assert d["dialogue_id"] == 1
+        assert d["speaker_name"] == "Juan"
+        assert d["confidence"] == "high"
+        assert d["attribution_method"] == "explicit_verb"
+        assert d["speech_verb"] == "dijo"
 
     def test_default_values(self):
         """Test valores por defecto."""
-        attr = DialogueAttribution(
-            dialogue_id=1,
-            text="Test",
-            start_char=0,
-            end_char=4,
-            chapter=1
-        )
+        attr = DialogueAttribution(dialogue_id=1, text="Test", start_char=0, end_char=4, chapter=1)
 
         assert attr.speaker_id is None
         assert attr.speaker_name is None
@@ -354,6 +360,7 @@ class TestDialogueAttribution:
 # ============================================================================
 # Tests para get_attribution_stats
 # ============================================================================
+
 
 class TestAttributionStats:
     """Tests para estadisticas de atribucion."""
@@ -375,23 +382,24 @@ class TestAttributionStats:
         attributions = attributor.attribute_dialogues(dialogues)
         stats = attributor.get_attribution_stats(attributions)
 
-        assert stats['total_dialogues'] == 3
-        assert stats['by_confidence']['high'] == 2
-        assert 'explicit_verb' in stats['by_method']
-        assert stats['attribution_rate'] >= 0.5
+        assert stats["total_dialogues"] == 3
+        assert stats["by_confidence"]["high"] == 2
+        assert "explicit_verb" in stats["by_method"]
+        assert stats["attribution_rate"] >= 0.5
 
     def test_stats_empty(self):
         """Test estadisticas con lista vacia."""
         attributor = SpeakerAttributor([])
         stats = attributor.get_attribution_stats([])
 
-        assert stats['total_dialogues'] == 0
-        assert stats['attribution_rate'] == 0.0
+        assert stats["total_dialogues"] == 0
+        assert stats["attribution_rate"] == 0.0
 
 
 # ============================================================================
 # Tests para funciones de filtrado
 # ============================================================================
+
 
 class TestFiltering:
     """Tests para funciones de filtrado."""
@@ -433,6 +441,7 @@ class TestFiltering:
 # Tests para funcion de conveniencia
 # ============================================================================
 
+
 class TestAttributeSpeakers:
     """Tests para attribute_speakers."""
 
@@ -451,7 +460,7 @@ class TestAttributeSpeakers:
         attributions, stats = attribute_speakers(dialogues, entities)
 
         assert len(attributions) == 2
-        assert stats['total_dialogues'] == 2
+        assert stats["total_dialogues"] == 2
         assert attributions[0].speaker_name == "Juan"
         assert attributions[1].speaker_name == "Maria"
 
@@ -459,6 +468,7 @@ class TestAttributeSpeakers:
 # ============================================================================
 # Tests de integracion
 # ============================================================================
+
 
 class TestSpeakerAttributionIntegration:
     """Tests de integracion."""
@@ -472,8 +482,8 @@ class TestSpeakerAttributionIntegration:
         ]
 
         voice_profiles = {
-            1: MockVoiceProfile(1, uses_tu=True, filler_words=['bueno', 'pues']),
-            2: MockVoiceProfile(2, uses_usted=True, filler_words=['mira']),
+            1: MockVoiceProfile(1, uses_tu=True, filler_words=["bueno", "pues"]),
+            2: MockVoiceProfile(2, uses_usted=True, filler_words=["mira"]),
         }
 
         attributor = SpeakerAttributor(entities, voice_profiles)
@@ -481,34 +491,28 @@ class TestSpeakerAttributionIntegration:
         dialogues = [
             # Juan inicia
             MockDialogue(
-                "¡Buenos dias a todos!",
-                0, 25, 1,
-                context_after=" —saludo Juan al entrar."
+                "¡Buenos dias a todos!", 0, 25, 1, context_after=" —saludo Juan al entrar."
             ),
             # Maria responde
             MockDialogue(
-                "Buenos dias. ¿Como esta usted?",
-                50, 85, 1,
-                context_after=" —pregunto Maria."
+                "Buenos dias. ¿Como esta usted?", 50, 85, 1, context_after=" —pregunto Maria."
             ),
             # Juan otra vez (alternancia)
             MockDialogue(
                 "Muy bien, gracias por preguntar.",
-                100, 140, 1,
-                context_after=""  # Sin verbo, deberia alternar
+                100,
+                140,
+                1,
+                context_after="",  # Sin verbo, deberia alternar
             ),
             # Alguien nuevo (Pedro) - explicito
-            MockDialogue(
-                "Yo tambien estoy bien.",
-                150, 180, 1,
-                context_after=" —anadio Pedro."
-            ),
+            MockDialogue("Yo tambien estoy bien.", 150, 180, 1, context_after=" —anadio Pedro."),
         ]
 
         entity_mentions = [
-            (1, 35, 39),   # Juan
+            (1, 35, 39),  # Juan
             (2, 95, 100),  # Maria
-            (3, 190, 195), # Pedro
+            (3, 190, 195),  # Pedro
         ]
 
         attributions = attributor.attribute_dialogues(dialogues, entity_mentions)
@@ -551,9 +555,7 @@ class TestSpeakerAttributionIntegration:
         ]
 
         attributions = attributor.attribute_dialogues(
-            dialogues,
-            entity_mentions=[],
-            full_text=full_text
+            dialogues, entity_mentions=[], full_text=full_text
         )
 
         assert len(attributions) == 2
@@ -564,18 +566,19 @@ class TestSpeakerAttributionIntegration:
 # Tests para SPEECH_VERBS
 # ============================================================================
 
+
 class TestSpeechVerbs:
     """Tests para la constante SPEECH_VERBS."""
 
     def test_contains_common_verbs(self):
         """Test que contiene verbos comunes."""
-        common = ['dijo', 'pregunto', 'respondio', 'grito', 'susurro']
+        common = ["dijo", "pregunto", "respondio", "grito", "susurro"]
         for verb in common:
             assert verb in SPEECH_VERBS, f"Falta verbo comun: {verb}"
 
     def test_contains_emotional_verbs(self):
         """Test que contiene verbos emocionales."""
-        emotional = ['grito', 'susurro', 'murmuro', 'exclamo']
+        emotional = ["grito", "susurro", "murmuro", "exclamo"]
         for verb in emotional:
             assert verb in SPEECH_VERBS, f"Falta verbo emocional: {verb}"
 

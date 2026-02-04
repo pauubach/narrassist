@@ -3,22 +3,23 @@ Tests para el modulo de focalizacion.
 """
 
 import pytest
+
 from narrative_assistant.focalization import (
-    FocalizationType,
     FocalizationDeclaration,
-    FocalizationScope,
     FocalizationDeclarationService,
-    ViolationType,
-    ViolationSeverity,
+    FocalizationScope,
+    FocalizationType,
     FocalizationViolation,
     FocalizationViolationDetector,
+    ViolationSeverity,
+    ViolationType,
 )
 from narrative_assistant.focalization.violations import detect_focalization_violations
-
 
 # =============================================================================
 # Tests de FocalizationDeclaration
 # =============================================================================
+
 
 class TestFocalizationDeclaration:
     """Tests para declaraciones de focalizacion."""
@@ -73,10 +74,7 @@ class TestFocalizationScope:
 
     def test_scope_with_scenes(self):
         """Alcance con escenas."""
-        scope = FocalizationScope(
-            start_chapter=1, start_scene=2,
-            end_chapter=1, end_scene=5
-        )
+        scope = FocalizationScope(start_chapter=1, start_scene=2, end_chapter=1, end_scene=5)
         assert scope.contains(1, 2)
         assert scope.contains(1, 3)
         assert scope.contains(1, 5)
@@ -87,6 +85,7 @@ class TestFocalizationScope:
 # =============================================================================
 # Tests de FocalizationDeclarationService
 # =============================================================================
+
 
 class TestFocalizationDeclarationService:
     """Tests para el servicio de declaraciones."""
@@ -103,7 +102,7 @@ class TestFocalizationDeclarationService:
             chapter=1,
             focalization_type=FocalizationType.INTERNAL_FIXED,
             focalizer_ids=[1],
-            notes="Desde el punto de vista de Juan"
+            notes="Desde el punto de vista de Juan",
         )
         assert dec.id == 1
         assert dec.focalization_type == FocalizationType.INTERNAL_FIXED
@@ -112,10 +111,7 @@ class TestFocalizationDeclarationService:
     def test_declare_zero(self, service):
         """Declarar focalizacion omnisciente."""
         dec = service.declare_focalization(
-            project_id=1,
-            chapter=2,
-            focalization_type=FocalizationType.ZERO,
-            focalizer_ids=[]
+            project_id=1, chapter=2, focalization_type=FocalizationType.ZERO, focalizer_ids=[]
         )
         assert dec.focalization_type == FocalizationType.ZERO
         assert dec.focalizer_ids == []
@@ -123,10 +119,7 @@ class TestFocalizationDeclarationService:
     def test_declare_external(self, service):
         """Declarar focalizacion externa."""
         dec = service.declare_focalization(
-            project_id=1,
-            chapter=3,
-            focalization_type=FocalizationType.EXTERNAL,
-            focalizer_ids=[]
+            project_id=1, chapter=3, focalization_type=FocalizationType.EXTERNAL, focalizer_ids=[]
         )
         assert dec.focalization_type == FocalizationType.EXTERNAL
 
@@ -136,7 +129,7 @@ class TestFocalizationDeclarationService:
             project_id=1,
             chapter=4,
             focalization_type=FocalizationType.INTERNAL_VARIABLE,
-            focalizer_ids=[1, 2]
+            focalizer_ids=[1, 2],
         )
         assert dec.focalization_type == FocalizationType.INTERNAL_VARIABLE
         assert len(dec.focalizer_ids) == 2
@@ -147,7 +140,7 @@ class TestFocalizationDeclarationService:
             project_id=1,
             chapter=5,
             focalization_type=FocalizationType.INTERNAL_MULTIPLE,
-            focalizer_ids=[1, 2, 3]
+            focalizer_ids=[1, 2, 3],
         )
         assert dec.focalization_type == FocalizationType.INTERNAL_MULTIPLE
         assert len(dec.focalizer_ids) == 3
@@ -159,7 +152,7 @@ class TestFocalizationDeclarationService:
                 project_id=1,
                 chapter=1,
                 focalization_type=FocalizationType.INTERNAL_FIXED,
-                focalizer_ids=[1, 2]
+                focalizer_ids=[1, 2],
             )
 
     def test_invalid_external_with_focalizers(self, service):
@@ -169,7 +162,7 @@ class TestFocalizationDeclarationService:
                 project_id=1,
                 chapter=1,
                 focalization_type=FocalizationType.EXTERNAL,
-                focalizer_ids=[1]
+                focalizer_ids=[1],
             )
 
     def test_invalid_internal_multiple_one_focalizer(self, service):
@@ -179,7 +172,7 @@ class TestFocalizationDeclarationService:
                 project_id=1,
                 chapter=1,
                 focalization_type=FocalizationType.INTERNAL_MULTIPLE,
-                focalizer_ids=[1]
+                focalizer_ids=[1],
             )
 
     def test_get_focalization(self, service):
@@ -188,7 +181,7 @@ class TestFocalizationDeclarationService:
             project_id=1,
             chapter=1,
             focalization_type=FocalizationType.INTERNAL_FIXED,
-            focalizer_ids=[1]
+            focalizer_ids=[1],
         )
         foc = service.get_focalization(project_id=1, chapter=1)
         assert foc is not None
@@ -202,19 +195,19 @@ class TestFocalizationDeclarationService:
     def test_get_all_declarations(self, service):
         """Obtener todas las declaraciones."""
         service.declare_focalization(
-            project_id=1, chapter=1,
+            project_id=1,
+            chapter=1,
             focalization_type=FocalizationType.INTERNAL_FIXED,
-            focalizer_ids=[1]
+            focalizer_ids=[1],
         )
         service.declare_focalization(
-            project_id=1, chapter=2,
-            focalization_type=FocalizationType.ZERO,
-            focalizer_ids=[]
+            project_id=1, chapter=2, focalization_type=FocalizationType.ZERO, focalizer_ids=[]
         )
         service.declare_focalization(
-            project_id=2, chapter=1,  # Otro proyecto
+            project_id=2,
+            chapter=1,  # Otro proyecto
             focalization_type=FocalizationType.EXTERNAL,
-            focalizer_ids=[]
+            focalizer_ids=[],
         )
 
         decs = service.get_all_declarations(project_id=1)
@@ -223,15 +216,14 @@ class TestFocalizationDeclarationService:
     def test_update_focalization(self, service):
         """Actualizar declaracion existente."""
         dec = service.declare_focalization(
-            project_id=1, chapter=1,
+            project_id=1,
+            chapter=1,
             focalization_type=FocalizationType.INTERNAL_FIXED,
-            focalizer_ids=[1]
+            focalizer_ids=[1],
         )
 
         updated = service.update_focalization(
-            declaration_id=dec.id,
-            focalizer_ids=[2],
-            notes="Cambiado a Maria"
+            declaration_id=dec.id, focalizer_ids=[2], notes="Cambiado a Maria"
         )
 
         assert updated.focalizer_ids == [2]
@@ -241,9 +233,7 @@ class TestFocalizationDeclarationService:
     def test_delete_focalization(self, service):
         """Eliminar declaracion."""
         dec = service.declare_focalization(
-            project_id=1, chapter=1,
-            focalization_type=FocalizationType.ZERO,
-            focalizer_ids=[]
+            project_id=1, chapter=1, focalization_type=FocalizationType.ZERO, focalizer_ids=[]
         )
 
         result = service.delete_focalization(dec.id)
@@ -255,14 +245,13 @@ class TestFocalizationDeclarationService:
     def test_generate_summary(self, service):
         """Generar resumen de focalizacion."""
         service.declare_focalization(
-            project_id=1, chapter=1,
+            project_id=1,
+            chapter=1,
             focalization_type=FocalizationType.INTERNAL_FIXED,
-            focalizer_ids=[1]
+            focalizer_ids=[1],
         )
         service.declare_focalization(
-            project_id=1, chapter=2,
-            focalization_type=FocalizationType.ZERO,
-            focalizer_ids=[]
+            project_id=1, chapter=2, focalization_type=FocalizationType.ZERO, focalizer_ids=[]
         )
 
         summary = service.generate_summary(project_id=1)
@@ -275,14 +264,16 @@ class TestFocalizationDeclarationService:
 # Tests de FocalizationViolationDetector
 # =============================================================================
 
+
 class MockEntity:
     """Entidad mock para tests."""
+
     def __init__(self, id, name, aliases=None):
         self.id = id
         self.canonical_name = name
         self.name = name
         self.aliases = aliases or []
-        self.entity_type = 'person'
+        self.entity_type = "person"
 
 
 class TestFocalizationViolationDetector:
@@ -302,9 +293,10 @@ class TestFocalizationViolationDetector:
         """Servicio con focalizacion interna fija en Juan."""
         service = FocalizationDeclarationService()
         service.declare_focalization(
-            project_id=1, chapter=1,
+            project_id=1,
+            chapter=1,
             focalization_type=FocalizationType.INTERNAL_FIXED,
-            focalizer_ids=[1]  # Juan
+            focalizer_ids=[1],  # Juan
         )
         return service
 
@@ -313,9 +305,7 @@ class TestFocalizationViolationDetector:
         """Servicio con focalizacion externa."""
         service = FocalizationDeclarationService()
         service.declare_focalization(
-            project_id=1, chapter=1,
-            focalization_type=FocalizationType.EXTERNAL,
-            focalizer_ids=[]
+            project_id=1, chapter=1, focalization_type=FocalizationType.EXTERNAL, focalizer_ids=[]
         )
         return service
 
@@ -324,9 +314,7 @@ class TestFocalizationViolationDetector:
         """Servicio con focalizacion omnisciente."""
         service = FocalizationDeclarationService()
         service.declare_focalization(
-            project_id=1, chapter=1,
-            focalization_type=FocalizationType.ZERO,
-            focalizer_ids=[]
+            project_id=1, chapter=1, focalization_type=FocalizationType.ZERO, focalizer_ids=[]
         )
         return service
 
@@ -420,10 +408,10 @@ class TestFocalizationViolationDetector:
         """
         result = detector.validate_chapter(project_id=1, chapter=1, text=text)
 
-        assert result['chapter'] == 1
-        assert result['total_violations'] >= 1
-        assert 'by_type' in result
-        assert 'by_severity' in result
+        assert result["chapter"] == 1
+        assert result["total_violations"] >= 1
+        assert "by_type" in result
+        assert "by_severity" in result
 
     def test_violation_to_dict(self, service_internal_fixed, entities):
         """Conversion de violacion a diccionario."""
@@ -434,9 +422,9 @@ class TestFocalizationViolationDetector:
 
         if violations:
             d = violations[0].to_dict()
-            assert 'violation_type' in d
-            assert 'severity' in d
-            assert 'explanation' in d
+            assert "violation_type" in d
+            assert "severity" in d
+            assert "explanation" in d
 
 
 class TestFocalizationInternalVariable:
@@ -455,9 +443,10 @@ class TestFocalizationInternalVariable:
         """Servicio con focalizacion variable (Juan y Maria)."""
         service = FocalizationDeclarationService()
         service.declare_focalization(
-            project_id=1, chapter=1,
+            project_id=1,
+            chapter=1,
             focalization_type=FocalizationType.INTERNAL_VARIABLE,
-            focalizer_ids=[1, 2]  # Juan y Maria
+            focalizer_ids=[1, 2],  # Juan y Maria
         )
         return service
 
@@ -488,18 +477,13 @@ class TestFocalizationInternalVariable:
 # Tests de integracion
 # =============================================================================
 
+
 class TestFocalizationIntegration:
     """Tests de integracion del modulo."""
 
     def test_detect_focalization_violations_helper(self):
         """Funcion helper de deteccion."""
-        chapters = [
-            {
-                "number": 1,
-                "project_id": 1,
-                "content": "Maria penso en Juan."
-            }
-        ]
+        chapters = [{"number": 1, "project_id": 1, "content": "Maria penso en Juan."}]
 
         entities = [
             MockEntity(1, "Juan"),
@@ -511,13 +495,11 @@ class TestFocalizationIntegration:
                 "project_id": 1,
                 "chapter": 1,
                 "focalization_type": "internal_fixed",
-                "focalizer_ids": [1]  # Juan
+                "focalizer_ids": [1],  # Juan
             }
         ]
 
-        service, violations = detect_focalization_violations(
-            chapters, entities, declarations
-        )
+        service, violations = detect_focalization_violations(chapters, entities, declarations)
 
         assert service is not None
         assert len(violations) >= 1
@@ -535,11 +517,8 @@ class TestFocalizationIntegration:
         text = "Juan penso que Maria era hermosa."
 
         suggestion = service.suggest_focalization(
-            project_id=1,
-            chapter=1,
-            text=text,
-            entities=entities
+            project_id=1, chapter=1, text=text, entities=entities
         )
 
-        assert suggestion['suggested_type'] is not None
-        assert suggestion['confidence'] > 0
+        assert suggestion["suggested_type"] is not None
+        assert suggestion["confidence"] > 0

@@ -26,19 +26,23 @@ Basado en:
 Autor: GAN-style Adversary Agent
 """
 
-import pytest
 from dataclasses import dataclass, field
 from typing import Optional
+
+import pytest
 
 
 @dataclass
 class KnowledgeTemporalTestCase:
     """Caso de test para anachronismos de conocimiento."""
+
     id: str
     category: str
     chapters: dict[int, str]  # {chapter_number: text}
     entities: list[dict]  # [{"id": 1, "name": "María", "aliases": []}]
-    expected_anachronisms: list[dict]  # [{"knower": "María", "fact": "...", "used_chapter": 2, "learned_chapter": 5}]
+    expected_anachronisms: list[
+        dict
+    ]  # [{"knower": "María", "fact": "...", "used_chapter": 2, "learned_chapter": 5}]
     expected_clean: bool = False  # True si no debe haber anachronismos
     difficulty: str = "medium"  # easy, medium, hard, adversarial
     linguistic_note: str = ""
@@ -61,12 +65,14 @@ ANACHRONISM_DIRECT_TESTS = [
             {"id": 1, "name": "María", "aliases": []},
             {"id": 2, "name": "Pedro", "aliases": []},
         ],
-        expected_anachronisms=[{
-            "knower": "María",
-            "fact_keyword": "cicatriz",
-            "used_chapter": 2,
-            "learned_chapter": 5,
-        }],
+        expected_anachronisms=[
+            {
+                "knower": "María",
+                "fact_keyword": "cicatriz",
+                "used_chapter": 2,
+                "learned_chapter": 5,
+            }
+        ],
         difficulty="easy",
         linguistic_note="Caso canónico: María referencia la cicatriz en cap. 2 pero la ve en cap. 5",
     ),
@@ -81,12 +87,14 @@ ANACHRONISM_DIRECT_TESTS = [
             {"id": 1, "name": "Ana", "aliases": []},
             {"id": 2, "name": "Luis", "aliases": []},
         ],
-        expected_anachronisms=[{
-            "knower": "Ana",
-            "fact_keyword": "secreto",
-            "used_chapter": 1,
-            "learned_chapter": 4,
-        }],
+        expected_anachronisms=[
+            {
+                "knower": "Ana",
+                "fact_keyword": "secreto",
+                "used_chapter": 1,
+                "learned_chapter": 4,
+            }
+        ],
         difficulty="easy",
         linguistic_note="Ana guarda el secreto en cap. 1, pero solo se lo cuentan en cap. 4",
     ),
@@ -101,12 +109,14 @@ ANACHRONISM_DIRECT_TESTS = [
             {"id": 1, "name": "Carlos", "aliases": []},
             {"id": 2, "name": "Elena", "aliases": []},
         ],
-        expected_anachronisms=[{
-            "knower": "Carlos",
-            "fact_keyword": "vivía",
-            "used_chapter": 3,
-            "learned_chapter": 7,
-        }],
+        expected_anachronisms=[
+            {
+                "knower": "Carlos",
+                "fact_keyword": "vivía",
+                "used_chapter": 3,
+                "learned_chapter": 7,
+            }
+        ],
         difficulty="medium",
         linguistic_note="Conocimiento de ubicación referenciado antes de ser comunicado",
     ),
@@ -183,12 +193,14 @@ DIALOGUE_REVELATION_TESTS = [
             {"id": 1, "name": "María", "aliases": []},
             {"id": 2, "name": "Juan", "aliases": []},
         ],
-        expected_anachronisms=[{
-            "knower": "María",
-            "fact_keyword": "médico",
-            "used_chapter": 2,
-            "learned_chapter": 6,
-        }],
+        expected_anachronisms=[
+            {
+                "knower": "María",
+                "fact_keyword": "médico",
+                "used_chapter": 2,
+                "learned_chapter": 6,
+            }
+        ],
         difficulty="medium",
         linguistic_note="María 'se da cuenta' de la profesión antes de que Juan se la diga",
     ),
@@ -203,12 +215,14 @@ DIALOGUE_REVELATION_TESTS = [
             {"id": 1, "name": "Ana", "aliases": []},
             {"id": 2, "name": "Pedro", "aliases": []},
         ],
-        expected_anachronisms=[{
-            "knower": "Ana",
-            "fact_keyword": "adoptado",
-            "used_chapter": 1,
-            "learned_chapter": 5,
-        }],
+        expected_anachronisms=[
+            {
+                "knower": "Ana",
+                "fact_keyword": "adoptado",
+                "used_chapter": 1,
+                "learned_chapter": 5,
+            }
+        ],
         difficulty="medium",
         linguistic_note="Ana sabe un hecho en cap. 1 que solo descubre al escucharlo en cap. 5",
     ),
@@ -230,12 +244,14 @@ SECRET_TESTS = [
             {"id": 1, "name": "Elena", "aliases": []},
             {"id": 2, "name": "Carlos", "aliases": []},
         ],
-        expected_anachronisms=[{
-            "knower": "Elena",
-            "fact_keyword": "secreto",
-            "used_chapter": 2,
-            "learned_chapter": 8,
-        }],
+        expected_anachronisms=[
+            {
+                "knower": "Elena",
+                "fact_keyword": "secreto",
+                "used_chapter": 2,
+                "learned_chapter": 8,
+            }
+        ],
         difficulty="easy",
         linguistic_note="Elena guarda un secreto en cap. 2 que solo le cuentan en cap. 8",
     ),
@@ -274,12 +290,14 @@ NEGATION_TESTS = [
             {"id": 1, "name": "María", "aliases": []},
             {"id": 2, "name": "Pedro", "aliases": []},
         ],
-        expected_anachronisms=[{
-            "knower": "María",
-            "fact_keyword": "espía",
-            "used_chapter": 3,
-            "learned_chapter": 6,
-        }],
+        expected_anachronisms=[
+            {
+                "knower": "María",
+                "fact_keyword": "espía",
+                "used_chapter": 3,
+                "learned_chapter": 6,
+            }
+        ],
         difficulty="hard",
         linguistic_note="Cap. 1: no sabe. Cap. 3: ya sabe. Cap. 6: se lo dicen. Error entre 3 y 6.",
     ),
@@ -318,12 +336,14 @@ IMPLICIT_TESTS = [
             {"id": 1, "name": "María", "aliases": []},
             {"id": 2, "name": "Pedro", "aliases": []},
         ],
-        expected_anachronisms=[{
-            "knower": "María",
-            "fact_keyword": "muerte",
-            "used_chapter": 2,
-            "learned_chapter": 6,
-        }],
+        expected_anachronisms=[
+            {
+                "knower": "María",
+                "fact_keyword": "muerte",
+                "used_chapter": 2,
+                "learned_chapter": 6,
+            }
+        ],
         difficulty="hard",
         linguistic_note="María observa la tristeza de Pedro por un hecho que él aún no sabe",
     ),
@@ -387,12 +407,14 @@ CHAIN_TESTS = [
             {"id": 2, "name": "Luis", "aliases": []},
             {"id": 3, "name": "Pedro", "aliases": []},
         ],
-        expected_anachronisms=[{
-            "knower": "Luis",
-            "fact_keyword": "ladrón",
-            "used_chapter": 1,
-            "learned_chapter": 5,
-        }],
+        expected_anachronisms=[
+            {
+                "knower": "Luis",
+                "fact_keyword": "ladrón",
+                "used_chapter": 1,
+                "learned_chapter": 5,
+            }
+        ],
         difficulty="medium",
         linguistic_note="Luis sabe en cap. 1 pero se lo cuentan en cap. 5",
     ),
@@ -481,6 +503,7 @@ ALL_TEMPORAL_TESTS = (
 # Test classes
 # =============================================================================
 
+
 class TestKnowledgeTemporalAnachronisms:
     """Tests para detección de anachronismos temporales de conocimiento."""
 
@@ -491,6 +514,7 @@ class TestKnowledgeTemporalAnachronisms:
             CharacterKnowledgeAnalyzer,
             KnowledgeExtractionMode,
         )
+
         return CharacterKnowledgeAnalyzer, KnowledgeExtractionMode
 
     @pytest.mark.parametrize(
@@ -502,8 +526,8 @@ class TestKnowledgeTemporalAnachronisms:
         """Verifica que se detectan los anachronismos esperados."""
         AnalyzerClass, ExtractionMode = analyzer
         from narrative_assistant.analysis.character_knowledge import (
-            detect_knowledge_anachronisms,
             KnowledgeFact,
+            detect_knowledge_anachronisms,
         )
 
         # Crear analizador con entidades del test
@@ -590,7 +614,8 @@ class TestKnowledgeTemporalSummary:
                 for chapter_num in sorted(case.chapters.keys()):
                     text = case.chapters[chapter_num]
                     facts = kb_analyzer.extract_knowledge_facts(
-                        text, chapter=chapter_num,
+                        text,
+                        chapter=chapter_num,
                         mode=KnowledgeExtractionMode.RULES,
                     )
                     all_facts.extend(facts)
@@ -616,42 +641,48 @@ class TestKnowledgeTemporalSummary:
                     passed += 1
                 else:
                     failed += 1
-                    errors.append({
-                        "id": case.id,
-                        "category": case.category,
-                        "difficulty": case.difficulty,
-                        "note": case.linguistic_note,
-                        "facts_found": len(all_facts),
-                        "anachronisms": len(anachronisms),
-                    })
+                    errors.append(
+                        {
+                            "id": case.id,
+                            "category": case.category,
+                            "difficulty": case.difficulty,
+                            "note": case.linguistic_note,
+                            "facts_found": len(all_facts),
+                            "anachronisms": len(anachronisms),
+                        }
+                    )
 
             except Exception as e:
                 failed += 1
-                errors.append({
-                    "id": case.id,
-                    "error": str(e),
-                })
+                errors.append(
+                    {
+                        "id": case.id,
+                        "error": str(e),
+                    }
+                )
 
         # Imprimir resumen
         total = len(ALL_TEMPORAL_TESTS)
-        print(f"\n{'='*60}")
-        print(f"KNOWLEDGE TEMPORAL ADVERSARIAL TEST SUMMARY")
-        print(f"{'='*60}")
+        print(f"\n{'=' * 60}")
+        print("KNOWLEDGE TEMPORAL ADVERSARIAL TEST SUMMARY")
+        print(f"{'=' * 60}")
         print(f"Total cases: {total}")
         print(f"Passed: {passed}")
         print(f"Failed: {failed}")
-        print(f"Pass rate: {passed/total*100:.1f}%")
-        print(f"{'='*60}")
+        print(f"Pass rate: {passed / total * 100:.1f}%")
+        print(f"{'=' * 60}")
 
         if errors:
-            print(f"\nFailed cases:")
+            print("\nFailed cases:")
             for err in errors[:15]:
-                print(f"  - {err['id']} ({err.get('difficulty', '?')}): "
-                      f"{err.get('note', err.get('error', 'Unknown'))[:80]}")
+                print(
+                    f"  - {err['id']} ({err.get('difficulty', '?')}): "
+                    f"{err.get('note', err.get('error', 'Unknown'))[:80]}"
+                )
 
         # Con el modo RULES, esperamos que al menos el 40% pase
         # (los tests difíciles fallarán con regex)
         assert passed >= total * 0.3, (
-            f"Solo pasaron {passed}/{total} tests ({passed/total*100:.1f}%). "
+            f"Solo pasaron {passed}/{total} tests ({passed / total * 100:.1f}%). "
             f"El umbral mínimo es 30%."
         )

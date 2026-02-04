@@ -1,15 +1,16 @@
 """Tests para el módulo de análisis de sentimiento."""
 
 import pytest
+
 from narrative_assistant.nlp.sentiment import (
-    SentimentAnalyzer,
-    Sentiment,
-    Emotion,
-    EmotionalState,
-    DeclaredEmotionalState,
-    EmotionalInconsistency,
-    get_sentiment_analyzer,
     KEYWORD_TO_EMOTION,
+    DeclaredEmotionalState,
+    Emotion,
+    EmotionalInconsistency,
+    EmotionalState,
+    Sentiment,
+    SentimentAnalyzer,
+    get_sentiment_analyzer,
 )
 
 
@@ -312,9 +313,7 @@ class TestSentimentAnalyzer:
             )
         ]
 
-        inconsistencies = analyzer.detect_inconsistencies(
-            declared, dialogues, proximity_chars=500
-        )
+        inconsistencies = analyzer.detect_inconsistencies(declared, dialogues, proximity_chars=500)
 
         assert len(inconsistencies) >= 1
         inc = inconsistencies[0]
@@ -349,9 +348,7 @@ class TestSentimentAnalyzer:
             )
         ]
 
-        inconsistencies = analyzer.detect_inconsistencies(
-            declared, dialogues, proximity_chars=500
-        )
+        inconsistencies = analyzer.detect_inconsistencies(declared, dialogues, proximity_chars=500)
 
         # No debería haber inconsistencia porque es otro personaje
         assert len(inconsistencies) == 0
@@ -383,9 +380,7 @@ class TestSentimentAnalyzer:
             )
         ]
 
-        inconsistencies = analyzer.detect_inconsistencies(
-            declared, dialogues, proximity_chars=500
-        )
+        inconsistencies = analyzer.detect_inconsistencies(declared, dialogues, proximity_chars=500)
 
         assert len(inconsistencies) == 0
 
@@ -416,9 +411,7 @@ class TestSentimentAnalyzer:
             )
         ]
 
-        inconsistencies = analyzer.detect_inconsistencies(
-            declared, dialogues, proximity_chars=500
-        )
+        inconsistencies = analyzer.detect_inconsistencies(declared, dialogues, proximity_chars=500)
 
         assert len(inconsistencies) == 0
 
@@ -519,9 +512,7 @@ class TestSentimentIntegration:
 
         # Extraer emociones declaradas
         declared = analyzer.extract_declared_emotions(
-            text,
-            entity_names=["Juan", "María"],
-            chapter_id=1
+            text, entity_names=["Juan", "María"], chapter_id=1
         )
 
         assert len(declared) >= 1
@@ -540,9 +531,7 @@ class TestSentimentIntegration:
 
         # Detectar inconsistencias
         dialogues = [dialogue_result.value]
-        inconsistencies = analyzer.detect_inconsistencies(
-            declared, dialogues, proximity_chars=1000
-        )
+        inconsistencies = analyzer.detect_inconsistencies(declared, dialogues, proximity_chars=1000)
 
         # Debería detectar inconsistencia si el diálogo es positivo
         # (depende del análisis de sentimiento)
@@ -556,9 +545,7 @@ class TestSentimentIntegration:
         """
 
         declared = analyzer.extract_declared_emotions(
-            text,
-            entity_names=["Juan", "María"],
-            chapter_id=1
+            text, entity_names=["Juan", "María"], chapter_id=1
         )
 
         juan_emotions = [d for d in declared if d.entity_name == "Juan"]

@@ -26,6 +26,7 @@ Referencias:
 """
 
 import pytest
+
 from narrative_assistant.nlp.attributes import AttributeExtractor
 
 
@@ -163,10 +164,10 @@ Sus ojos azules brillaban."""
         attrs = result.value.attributes
 
         # "pelo negro" está negado, no debería extraerse
-        hair_negro = [a for a in attrs if "hair" in str(a.key).lower() and "negro" in a.value.lower()]
-        assert len(hair_negro) == 0, (
-            f"Atributo negado extraído incorrectamente: {hair_negro}"
-        )
+        hair_negro = [
+            a for a in attrs if "hair" in str(a.key).lower() and "negro" in a.value.lower()
+        ]
+        assert len(hair_negro) == 0, f"Atributo negado extraído incorrectamente: {hair_negro}"
 
     def test_contrastive_sino_pattern(self, extractor):
         """
@@ -206,10 +207,14 @@ Sus ojos azules brillaban."""
         attrs = result.value.attributes
 
         # "pelo negro" es del pasado, debería tener menor confianza
-        hair_negro = [a for a in attrs if "hair" in str(a.key).lower() and "negro" in a.value.lower()]
+        hair_negro = [
+            a for a in attrs if "hair" in str(a.key).lower() and "negro" in a.value.lower()
+        ]
 
         # "canosa" es actual
-        hair_canoso = [a for a in attrs if "hair" in str(a.key).lower() and "canos" in a.value.lower()]
+        hair_canoso = [
+            a for a in attrs if "hair" in str(a.key).lower() and "canos" in a.value.lower()
+        ]
 
         # Si ambos se extraen, canoso debería tener mayor confianza
         if hair_negro and hair_canoso:

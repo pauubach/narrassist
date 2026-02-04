@@ -1,28 +1,29 @@
 """Tests para los modulos de exportacion."""
 
-import pytest
 from datetime import datetime
 
+import pytest
+
 from narrative_assistant.exporters.character_sheets import (
-    CharacterSheet,
+    AlertSummary,
     AttributeInfo,
+    CharacterSheet,
     MentionInfo,
     VoiceProfileSummary,
-    AlertSummary,
 )
 from narrative_assistant.exporters.style_guide import (
-    StyleGuide,
-    StyleAnalyzer,
-    SpellingDecision,
-    EntityListing,
     DialogueStyle,
+    EntityListing,
     NumberStyle,
+    SpellingDecision,
+    StyleAnalyzer,
+    StyleGuide,
 )
-
 
 # ============================================================================
 # Tests para CharacterSheet
 # ============================================================================
+
 
 class TestCharacterSheet:
     """Tests para fichas de personaje."""
@@ -44,7 +45,7 @@ class TestCharacterSheet:
                     confidence=0.9,
                     first_mentioned_chapter=1,
                     occurrences=3,
-                    excerpts=["sus ojos verdes brillaban"]
+                    excerpts=["sus ojos verdes brillaban"],
                 ),
                 AttributeInfo(
                     category="physical",
@@ -52,7 +53,7 @@ class TestCharacterSheet:
                     value="castano",
                     confidence=0.85,
                     first_mentioned_chapter=1,
-                )
+                ),
             ],
             psychological_attributes=[
                 AttributeInfo(
@@ -112,7 +113,7 @@ class TestCharacterSheet:
             uses_usted=True,
             uses_tu=False,
             characteristic_fillers=["bueno", "pues"],
-            predominant_register="formal"
+            predominant_register="formal",
         )
 
         md = sample_sheet.to_markdown()
@@ -129,10 +130,7 @@ class TestCharacterSheet:
             by_category={"consistency": 2, "style": 1},
             critical_count=1,
             warning_count=2,
-            descriptions=[
-                "Color de ojos inconsistente",
-                "Edad contradictoria"
-            ]
+            descriptions=["Color de ojos inconsistente", "Edad contradictoria"],
         )
 
         md = sample_sheet.to_markdown()
@@ -145,6 +143,7 @@ class TestCharacterSheet:
 # ============================================================================
 # Tests para StyleAnalyzer
 # ============================================================================
+
 
 class TestStyleAnalyzer:
     """Tests para el analizador de estilo."""
@@ -237,6 +236,7 @@ class TestStyleAnalyzer:
 # Tests para StyleGuide
 # ============================================================================
 
+
 class TestStyleGuide:
     """Tests para guia de estilo."""
 
@@ -253,7 +253,7 @@ class TestStyleGuide:
                     variants=["María"],
                     frequency={"Maria": 10, "María": 2},
                     recommendation="canonical",
-                    notes="Con acento grafico"
+                    notes="Con acento grafico",
                 )
             ],
             characters=[
@@ -304,7 +304,11 @@ class TestStyleGuide:
 
     def test_to_markdown_with_style_analysis(self, sample_guide):
         """Test Markdown con analisis estilistico."""
-        from narrative_assistant.exporters.style_guide import StyleAnalysis, TextStatistics, StylePattern
+        from narrative_assistant.exporters.style_guide import (
+            StyleAnalysis,
+            StylePattern,
+            TextStatistics,
+        )
 
         sample_guide.style_analysis = StyleAnalysis(
             dialogue_style="raya",
@@ -314,7 +318,7 @@ class TestStyleGuide:
                     description="Dialogos con raya",
                     frequency=50,
                     examples=["—Hola —dijo"],
-                    recommendation="Estilo correcto"
+                    recommendation="Estilo correcto",
                 )
             ],
             punctuation_patterns=[],
@@ -331,10 +335,10 @@ class TestStyleGuide:
                 total_words=5000,
                 total_sentences=250,
                 avg_sentence_length=20.0,
-                vocabulary_richness=0.45
+                vocabulary_richness=0.45,
             ),
             consistency_issues=[],
-            recommendations=["Uso correcto de raya"]
+            recommendations=["Uso correcto de raya"],
         )
 
         md = sample_guide.to_markdown()
@@ -347,6 +351,7 @@ class TestStyleGuide:
 # ============================================================================
 # Tests de integracion
 # ============================================================================
+
 
 class TestExportersIntegration:
     """Tests de integracion para exportadores."""
@@ -383,7 +388,7 @@ class TestExportersIntegration:
                 by_category={"consistency": 2},
                 critical_count=0,
                 warning_count=2,
-                descriptions=["Altura inconsistente"]
+                descriptions=["Altura inconsistente"],
             ),
             project_id=1,
             confidence_score=0.85,

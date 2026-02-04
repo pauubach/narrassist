@@ -2,14 +2,16 @@
 Tests unitarios para los parsers de documentos.
 """
 
-import pytest
 from pathlib import Path
+
+import pytest
+
 from narrative_assistant.parsers import (
-    get_parser,
-    TxtParser,
-    DocxParser,
-    detect_format,
     DocumentFormat,
+    DocxParser,
+    TxtParser,
+    detect_format,
+    get_parser,
 )
 
 

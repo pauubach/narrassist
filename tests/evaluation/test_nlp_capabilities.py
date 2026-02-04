@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Test de capacidades NLP: NER, Relaciones, Timeline.
 
@@ -20,18 +19,18 @@ java17_paths = [
 ]
 for java_path in java17_paths:
     if Path(java_path).exists():
-        os.environ['JAVA_HOME'] = java_path
-        bin_path = f"{java_path}\\bin" if os.name == 'nt' else f"{java_path}/bin"
-        os.environ['PATH'] = bin_path + os.pathsep + os.environ.get('PATH', '')
+        os.environ["JAVA_HOME"] = java_path
+        bin_path = f"{java_path}\\bin" if os.name == "nt" else f"{java_path}/bin"
+        os.environ["PATH"] = bin_path + os.pathsep + os.environ.get("PATH", "")
         break
 
-import sys
 import logging
-from dataclasses import dataclass, field
+import sys
 import time
+from dataclasses import dataclass, field
 
 # Configurar logging
-logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 # Añadir paths
@@ -42,6 +41,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 @dataclass
 class NERTestResult:
     """Resultado de evaluación NER."""
+
     method: str
     true_positives: int = 0
     false_positives: int = 0
@@ -77,8 +77,8 @@ def load_ner_gold_standard():
     entities = {}
     for e in gold.entities:
         entities[e.name.lower()] = {
-            'type': e.entity_type,
-            'mentions': [m.lower() for m in e.mentions],
+            "type": e.entity_type,
+            "mentions": [m.lower() for m in e.mentions],
         }
     return entities
 
@@ -98,13 +98,13 @@ def evaluate_spacy_ner(text: str, gold_entities: dict) -> NERTestResult:
         # Extraer entidades
         detected = set()
         for ent in doc.ents:
-            if ent.label_ in ['PER', 'PERSON', 'LOC', 'GPE', 'ORG']:
+            if ent.label_ in ["PER", "PERSON", "LOC", "GPE", "ORG"]:
                 detected.add(ent.text.lower())
 
         # Calcular métricas
         gold_mentions = set()
         for e_data in gold_entities.values():
-            gold_mentions.update(e_data['mentions'])
+            gold_mentions.update(e_data["mentions"])
 
         result.detected = list(detected)
         tp = detected & gold_mentions
@@ -145,13 +145,13 @@ def evaluate_transformers_ner(text: str, gold_entities: dict) -> NERTestResult:
         # Extraer entidades
         detected = set()
         for ent in entities:
-            if ent['entity_group'] in ['PER', 'LOC', 'ORG']:
-                detected.add(ent['word'].lower().strip())
+            if ent["entity_group"] in ["PER", "LOC", "ORG"]:
+                detected.add(ent["word"].lower().strip())
 
         # Calcular métricas
         gold_mentions = set()
         for e_data in gold_entities.values():
-            gold_mentions.update(e_data['mentions'])
+            gold_mentions.update(e_data["mentions"])
 
         result.detected = list(detected)
         tp = detected & gold_mentions
@@ -176,13 +176,18 @@ def run_ner_evaluation():
     print("=" * 70)
 
     # Cargar datos
-    test_file = Path(__file__).parent.parent.parent / "test_books" / "evaluation_tests" / "prueba_inconsistencias_personajes.txt"
+    test_file = (
+        Path(__file__).parent.parent.parent
+        / "test_books"
+        / "evaluation_tests"
+        / "prueba_inconsistencias_personajes.txt"
+    )
 
     if not test_file.exists():
         print(f"Archivo no encontrado: {test_file}")
         return
 
-    text = test_file.read_text(encoding='utf-8')
+    text = test_file.read_text(encoding="utf-8")
     gold_entities = load_ner_gold_standard()
 
     print(f"\n{len(gold_entities)} entidades en gold standard")
@@ -224,7 +229,9 @@ def run_ner_evaluation():
     print(f"{'Method':<25} {'Precision':>10} {'Recall':>10} {'F1':>10} {'Time':>10}")
     print("-" * 65)
     for r in results:
-        print(f"{r.method:<25} {r.precision:>10.1%} {r.recall:>10.1%} {r.f1:>10.1%} {r.time_seconds:>9.2f}s")
+        print(
+            f"{r.method:<25} {r.precision:>10.1%} {r.recall:>10.1%} {r.f1:>10.1%} {r.time_seconds:>9.2f}s"
+        )
 
     return results
 

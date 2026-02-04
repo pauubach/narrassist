@@ -12,6 +12,7 @@ Los modelos NER están entrenados en texto periodístico. Los nombres inventados
 
 import logging
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -2642,7 +2643,7 @@ JSON:"""
     def extract_entities(
         self,
         text: str,
-        progress_callback: callable | None = None,
+        progress_callback: Callable | None = None,
         project_id: int | None = None,
         enable_validation: bool = True,
     ) -> Result[NERResult]:

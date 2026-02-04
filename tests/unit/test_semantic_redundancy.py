@@ -9,17 +9,18 @@ Cubre:
 - Integración con ResourceManager
 """
 
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 import numpy as np
+import pytest
 
 from narrative_assistant.analysis.semantic_redundancy import (
-    SemanticRedundancyDetector,
-    RedundancyMode,
     DuplicateType,
-    SemanticDuplicate,
-    SentenceInfo,
+    RedundancyMode,
     RedundancyReport,
+    SemanticDuplicate,
+    SemanticRedundancyDetector,
+    SentenceInfo,
     get_semantic_redundancy_detector,
 )
 
@@ -29,6 +30,7 @@ from narrative_assistant.analysis.semantic_redundancy import (
 # =============================================================================
 # Fixtures
 # =============================================================================
+
 
 @pytest.fixture
 def detector():
@@ -43,15 +45,19 @@ def detector():
 @pytest.fixture
 def mock_embeddings():
     """Mock del modelo de embeddings."""
-    with patch("narrative_assistant.analysis.semantic_redundancy.SemanticRedundancyDetector._get_model") as mock:
+    with patch(
+        "narrative_assistant.analysis.semantic_redundancy.SemanticRedundancyDetector._get_model"
+    ) as mock:
         model = MagicMock()
         # Embeddings que producen alta similitud para oraciones 0 y 2
-        model.encode.return_value = np.array([
-            [1.0, 0.0, 0.0],  # Oración 1
-            [0.0, 1.0, 0.0],  # Oración 2 (diferente)
-            [0.99, 0.0, 0.1], # Oración 3 (similar a 1)
-            [0.0, 0.0, 1.0],  # Oración 4 (diferente)
-        ])
+        model.encode.return_value = np.array(
+            [
+                [1.0, 0.0, 0.0],  # Oración 1
+                [0.0, 1.0, 0.0],  # Oración 2 (diferente)
+                [0.99, 0.0, 0.1],  # Oración 3 (similar a 1)
+                [0.0, 0.0, 1.0],  # Oración 4 (diferente)
+            ]
+        )
         mock.return_value = model
         yield mock
 
@@ -79,13 +85,18 @@ def sample_chapters():
 # Tests de extracción de oraciones
 # =============================================================================
 
+
 class TestSentenceExtraction:
     """Tests para extracción y filtrado de oraciones."""
 
     def test_extracts_sentences_from_chapters(self, detector):
         """Extrae oraciones correctamente de capítulos."""
         chapters = [
-            {"number": 1, "content": "Primera oración larga suficiente. Segunda oración también larga.", "start_char": 0},
+            {
+                "number": 1,
+                "content": "Primera oración larga suficiente. Segunda oración también larga.",
+                "start_char": 0,
+            },
         ]
 
         sentences = detector._extract_sentences(chapters)
@@ -97,7 +108,11 @@ class TestSentenceExtraction:
     def test_filters_short_sentences(self, detector):
         """Filtra oraciones muy cortas."""
         chapters = [
-            {"number": 1, "content": "Sí. No. Esta es una oración suficientemente larga para el análisis.", "start_char": 0},
+            {
+                "number": 1,
+                "content": "Sí. No. Esta es una oración suficientemente larga para el análisis.",
+                "start_char": 0,
+            },
         ]
 
         sentences = detector._extract_sentences(chapters)
@@ -109,7 +124,11 @@ class TestSentenceExtraction:
     def test_filters_short_dialogues(self, detector):
         """Filtra diálogos cortos."""
         chapters = [
-            {"number": 1, "content": """—Sí señor—. Esta es una narración larga que debería incluirse en el análisis sin problemas.""", "start_char": 0},
+            {
+                "number": 1,
+                "content": """—Sí señor—. Esta es una narración larga que debería incluirse en el análisis sin problemas.""",
+                "start_char": 0,
+            },
         ]
 
         sentences = detector._extract_sentences(chapters)
@@ -122,7 +141,11 @@ class TestSentenceExtraction:
     def test_filters_common_phrases(self, detector):
         """Filtra oraciones con frases comunes."""
         chapters = [
-            {"number": 1, "content": "Dijo que vendría pronto. Esta es una narración significativa sin frases comunes.", "start_char": 0},
+            {
+                "number": 1,
+                "content": "Dijo que vendría pronto. Esta es una narración significativa sin frases comunes.",
+                "start_char": 0,
+            },
         ]
 
         # Con longitud mínima ajustada para capturar "dijo que"
@@ -150,6 +173,7 @@ class TestSentenceExtraction:
 # Tests de detección de duplicados
 # =============================================================================
 
+
 class TestDuplicateDetection:
     """Tests para detección de duplicados semánticos."""
 
@@ -158,9 +182,9 @@ class TestDuplicateDetection:
         chapters = [
             {
                 "number": 1,
-                "content": "La casa olía a humedad y memorias antiguas del pasado. " * 2 +
-                           "Pedro caminaba por el jardín sin prisa alguna. " +
-                           "La vieja casa tenía olor a humedad y recuerdos viejos.",
+                "content": "La casa olía a humedad y memorias antiguas del pasado. " * 2
+                + "Pedro caminaba por el jardín sin prisa alguna. "
+                + "La vieja casa tenía olor a humedad y recuerdos viejos.",
                 "start_char": 0,
             },
         ]
@@ -185,7 +209,11 @@ class TestDuplicateDetection:
         """Respeta el umbral de similitud configurado."""
         detector.similarity_threshold = 0.99  # Muy estricto
         chapters = [
-            {"number": 1, "content": "Oración A suficientemente larga. Oración B diferente. Oración A ligeramente similar.", "start_char": 0},
+            {
+                "number": 1,
+                "content": "Oración A suficientemente larga. Oración B diferente. Oración A ligeramente similar.",
+                "start_char": 0,
+            },
         ]
 
         result = detector.detect(chapters)
@@ -198,7 +226,11 @@ class TestDuplicateDetection:
         # El detector aplica un factor 0.9 a duplicados del mismo capítulo
         # y excluye oraciones muy cercanas (< 3 posiciones)
         chapters = [
-            {"number": 1, "content": "Oración A larga. Oración B. Oración C. Oración A similar.", "start_char": 0},
+            {
+                "number": 1,
+                "content": "Oración A larga. Oración B. Oración C. Oración A similar.",
+                "start_char": 0,
+            },
         ]
 
         result = detector.detect(chapters)
@@ -210,6 +242,7 @@ class TestDuplicateDetection:
 # Tests de clasificación de tipos
 # =============================================================================
 
+
 class TestDuplicateTypeClassification:
     """Tests para clasificación de tipos de duplicados."""
 
@@ -218,7 +251,7 @@ class TestDuplicateTypeClassification:
         dup_type = detector._classify_duplicate_type(
             "La casa olía a humedad y memorias.",
             "La casa olía a humedad y memorias.",
-            similarity=0.99
+            similarity=0.99,
         )
 
         assert dup_type == DuplicateType.TEXTUAL
@@ -228,7 +261,7 @@ class TestDuplicateTypeClassification:
         dup_type = detector._classify_duplicate_type(
             "María caminó hacia la puerta con paso decidido.",
             "Juan caminó hacia la ventana con paso firme.",
-            similarity=0.87
+            similarity=0.87,
         )
 
         assert dup_type == DuplicateType.ACTION
@@ -238,7 +271,7 @@ class TestDuplicateTypeClassification:
         dup_type = detector._classify_duplicate_type(
             "El atardecer pintaba el cielo de tonos rojizos.",
             "El ocaso teñía el horizonte de colores cálidos.",
-            similarity=0.86
+            similarity=0.86,
         )
 
         assert dup_type == DuplicateType.THEMATIC
@@ -247,6 +280,7 @@ class TestDuplicateTypeClassification:
 # =============================================================================
 # Tests de modos de detección
 # =============================================================================
+
 
 class TestDetectionModes:
     """Tests para diferentes modos de detección."""
@@ -276,6 +310,7 @@ class TestDetectionModes:
 # =============================================================================
 # Tests de reporte
 # =============================================================================
+
 
 class TestRedundancyReport:
     """Tests para el reporte de redundancia."""
@@ -330,6 +365,7 @@ class TestRedundancyReport:
 # Tests de factory function
 # =============================================================================
 
+
 class TestFactoryFunction:
     """Tests para la función factory."""
 
@@ -357,6 +393,7 @@ class TestFactoryFunction:
 # Tests de casos límite
 # =============================================================================
 
+
 class TestEdgeCases:
     """Tests para casos límite."""
 
@@ -375,7 +412,11 @@ class TestEdgeCases:
     def test_single_chapter(self, detector, mock_embeddings):
         """Maneja un solo capítulo."""
         chapters = [
-            {"number": 1, "content": "Una oración suficientemente larga para el análisis semántico.", "start_char": 0},
+            {
+                "number": 1,
+                "content": "Una oración suficientemente larga para el análisis semántico.",
+                "start_char": 0,
+            },
         ]
 
         result = detector.detect(chapters)
@@ -403,7 +444,11 @@ class TestEdgeCases:
     def test_handles_special_characters(self, detector):
         """Maneja caracteres especiales en el texto."""
         chapters = [
-            {"number": 1, "content": "¿Qué está pasando con todo esto que sucede? ¡No lo puedo creer ni entender! María preguntó directamente: «¿Dónde estás exactamente ahora mismo?»", "start_char": 0},
+            {
+                "number": 1,
+                "content": "¿Qué está pasando con todo esto que sucede? ¡No lo puedo creer ni entender! María preguntó directamente: «¿Dónde estás exactamente ahora mismo?»",
+                "start_char": 0,
+            },
         ]
 
         # Solo probar extracción de oraciones, no detección completa
@@ -418,12 +463,15 @@ class TestEdgeCases:
 # Tests de integración con ResourceManager
 # =============================================================================
 
+
 class TestResourceManagerIntegration:
     """Tests de integración con el gestor de recursos."""
 
     def test_uses_resource_manager_gpu_setting(self):
         """Usa configuración de GPU del ResourceManager."""
-        with patch("narrative_assistant.analysis.semantic_redundancy.get_resource_manager") as mock_rm:
+        with patch(
+            "narrative_assistant.analysis.semantic_redundancy.get_resource_manager"
+        ) as mock_rm:
             mock_rm.return_value.recommendation.use_gpu_for_embeddings = False
 
             detector = SemanticRedundancyDetector()
@@ -432,7 +480,9 @@ class TestResourceManagerIntegration:
 
     def test_overrides_gpu_setting(self):
         """Permite override de configuración de GPU."""
-        with patch("narrative_assistant.analysis.semantic_redundancy.get_resource_manager") as mock_rm:
+        with patch(
+            "narrative_assistant.analysis.semantic_redundancy.get_resource_manager"
+        ) as mock_rm:
             mock_rm.return_value.recommendation.use_gpu_for_embeddings = True
 
             detector = SemanticRedundancyDetector(use_gpu=False)
@@ -443,6 +493,7 @@ class TestResourceManagerIntegration:
 # =============================================================================
 # Tests de búsqueda lineal (fallback sin FAISS)
 # =============================================================================
+
 
 class TestLinearSearch:
     """Tests para búsqueda lineal sin FAISS."""
@@ -456,11 +507,13 @@ class TestLinearSearch:
         ]
 
         # Embeddings que hacen que 0 y 2 sean similares
-        embeddings = np.array([
-            [1.0, 0.0, 0.0],
-            [0.0, 1.0, 0.0],
-            [0.99, 0.1, 0.0],
-        ]).astype(np.float32)
+        embeddings = np.array(
+            [
+                [1.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0],
+                [0.99, 0.1, 0.0],
+            ]
+        ).astype(np.float32)
 
         duplicates = detector._find_duplicates_linear(sentences, embeddings, max_duplicates=10)
 
@@ -480,6 +533,7 @@ class TestLinearSearch:
 # =============================================================================
 # Tests de configuración
 # =============================================================================
+
 
 class TestConfiguration:
     """Tests para configuración del detector."""

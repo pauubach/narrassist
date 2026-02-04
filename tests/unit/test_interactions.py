@@ -8,36 +8,37 @@ Cubre:
 - Repositorio de persistencia (repository.py)
 """
 
-import pytest
 import tempfile
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
-from narrative_assistant.persistence.database import Database
+import pytest
+
 from narrative_assistant.interactions import (
-    # Modelos
-    InteractionType,
-    InteractionTone,
-    EntityInteraction,
-    InteractionPattern,
-    InteractionAlert,
-    INTERACTION_TYPE_INTENSITY,
-    DIALOGUE_VERBS,
-    ACTION_VERBS_POSITIVE,
     ACTION_VERBS_NEGATIVE,
+    ACTION_VERBS_POSITIVE,
+    DIALOGUE_VERBS,
+    INTERACTION_TYPE_INTENSITY,
+    EntityInteraction,
+    InteractionAlert,
     # Detector
     InteractionDetector,
-    detect_interactions_in_text,
+    InteractionPattern,
     # Analyzer
     InteractionPatternAnalyzer,
     # Repository
     InteractionRepository,
+    InteractionTone,
+    # Modelos
+    InteractionType,
+    detect_interactions_in_text,
 )
-
+from narrative_assistant.persistence.database import Database
 
 # ============================================================================
 # Tests de Modelos
 # ============================================================================
+
 
 class TestInteractionType:
     """Tests para InteractionType enum."""
@@ -45,8 +46,14 @@ class TestInteractionType:
     def test_all_interaction_types_exist(self):
         """Verifica que todos los tipos de interacción existen."""
         expected_types = [
-            "DIALOGUE", "ACTION_TOWARDS", "THOUGHT_ABOUT", "OBSERVATION",
-            "PHYSICAL_CONTACT", "GIFT_EXCHANGE", "MENTION", "REACTION"
+            "DIALOGUE",
+            "ACTION_TOWARDS",
+            "THOUGHT_ABOUT",
+            "OBSERVATION",
+            "PHYSICAL_CONTACT",
+            "GIFT_EXCHANGE",
+            "MENTION",
+            "REACTION",
         ]
         for type_name in expected_types:
             assert hasattr(InteractionType, type_name)
@@ -210,6 +217,7 @@ class TestInteractionPattern:
 # Tests de Detector
 # ============================================================================
 
+
 class TestInteractionDetector:
     """Tests para InteractionDetector."""
 
@@ -363,6 +371,7 @@ class TestDetectInteractionsInText:
 # Tests de Pattern Analyzer
 # ============================================================================
 
+
 class TestInteractionPatternAnalyzer:
     """Tests para InteractionPatternAnalyzer."""
 
@@ -411,8 +420,11 @@ class TestInteractionPatternAnalyzer:
 
     def test_analyze_pair_basic(self, analyzer, sample_interactions):
         """Analiza patrón entre un par de entidades."""
-        juan_maria = [i for i in sample_interactions
-                      if {i.initiator_name, i.receiver_name} == {"Juan", "María"}]
+        juan_maria = [
+            i
+            for i in sample_interactions
+            if {i.initiator_name, i.receiver_name} == {"Juan", "María"}
+        ]
 
         pattern = analyzer.analyze_pair("Juan", "María", juan_maria)
 
@@ -449,8 +461,11 @@ class TestInteractionPatternAnalyzer:
     def test_detect_anomaly_tone_shift(self, analyzer, sample_interactions):
         """Detecta anomalía por cambio brusco de tono."""
         # Patrón establecido: Juan-María son cálidos
-        juan_maria = [i for i in sample_interactions
-                      if {i.initiator_name, i.receiver_name} == {"Juan", "María"}]
+        juan_maria = [
+            i
+            for i in sample_interactions
+            if {i.initiator_name, i.receiver_name} == {"Juan", "María"}
+        ]
         pattern = analyzer.analyze_pair("Juan", "María", juan_maria)
 
         # Nueva interacción hostil - anómala
@@ -470,8 +485,11 @@ class TestInteractionPatternAnalyzer:
 
     def test_no_anomaly_for_consistent_interaction(self, analyzer, sample_interactions):
         """No genera alerta para interacción consistente."""
-        juan_maria = [i for i in sample_interactions
-                      if {i.initiator_name, i.receiver_name} == {"Juan", "María"}]
+        juan_maria = [
+            i
+            for i in sample_interactions
+            if {i.initiator_name, i.receiver_name} == {"Juan", "María"}
+        ]
         pattern = analyzer.analyze_pair("Juan", "María", juan_maria)
 
         # Nueva interacción cálida - consistente
@@ -501,12 +519,16 @@ class TestInteractionPatternAnalyzer:
         alerts = analyzer.detect_asymmetric_relationships(patterns, threshold=0.25)
 
         assert len(alerts) >= 1
-        assert "asimétrica" in alerts[0].explanation.lower() or "asymmetric" in alerts[0].explanation.lower()
+        assert (
+            "asimétrica" in alerts[0].explanation.lower()
+            or "asymmetric" in alerts[0].explanation.lower()
+        )
 
 
 # ============================================================================
 # Tests de Repository
 # ============================================================================
+
 
 class TestInteractionRepository:
     """Tests para InteractionRepository."""
@@ -521,7 +543,7 @@ class TestInteractionRepository:
             conn.execute(
                 """INSERT INTO projects (id, name, document_path, document_fingerprint, document_format)
                    VALUES (?, ?, ?, ?, ?)""",
-                (1, "Test Project", "/test/path.docx", "abc123fingerprint", "docx")
+                (1, "Test Project", "/test/path.docx", "abc123fingerprint", "docx"),
             )
         return database
 
@@ -580,12 +602,14 @@ class TestInteractionRepository:
     def test_get_interactions_by_chapter(self, repo):
         """Obtiene interacciones filtrando por capítulo."""
         for ch in [1, 1, 2, 3]:
-            repo.save_interaction(EntityInteraction(
-                project_id=1,
-                initiator_name="A",
-                receiver_name="B",
-                chapter=ch,
-            ))
+            repo.save_interaction(
+                EntityInteraction(
+                    project_id=1,
+                    initiator_name="A",
+                    receiver_name="B",
+                    chapter=ch,
+                )
+            )
 
         # Filtrar por capítulo en el método get_interactions_for_project
         all_interactions = repo.get_interactions_for_project(1)
@@ -597,20 +621,24 @@ class TestInteractionRepository:
         repo.save_interaction(sample_interaction)
 
         # Interacción inversa
-        repo.save_interaction(EntityInteraction(
-            project_id=1,
-            initiator_name="María",
-            receiver_name="Juan",
-            chapter=2,
-        ))
+        repo.save_interaction(
+            EntityInteraction(
+                project_id=1,
+                initiator_name="María",
+                receiver_name="Juan",
+                chapter=2,
+            )
+        )
 
         # Otra interacción diferente
-        repo.save_interaction(EntityInteraction(
-            project_id=1,
-            initiator_name="Pedro",
-            receiver_name="Ana",
-            chapter=1,
-        ))
+        repo.save_interaction(
+            EntityInteraction(
+                project_id=1,
+                initiator_name="Pedro",
+                receiver_name="Ana",
+                chapter=1,
+            )
+        )
 
         pair_interactions = repo.get_interactions_between(1, "Juan", "María")
         assert len(pair_interactions) == 2
@@ -632,8 +660,11 @@ class TestInteractionRepository:
 
         assert len(patterns) >= 1
         # Buscar el patrón Juan-María
-        juan_maria = [p for p in patterns if
-                      {p.entity1_name.lower(), p.entity2_name.lower()} == {"juan", "maría"}]
+        juan_maria = [
+            p
+            for p in patterns
+            if {p.entity1_name.lower(), p.entity2_name.lower()} == {"juan", "maría"}
+        ]
         assert len(juan_maria) == 1
         assert juan_maria[0].total_interactions == 5
 
@@ -660,7 +691,9 @@ class TestInteractionRepository:
     def test_batch_save_interactions(self, repo):
         """Guarda múltiples interacciones en batch."""
         interactions = [
-            EntityInteraction(project_id=1, initiator_name=f"E{i}", receiver_name=f"E{i+1}", chapter=1)
+            EntityInteraction(
+                project_id=1, initiator_name=f"E{i}", receiver_name=f"E{i + 1}", chapter=1
+            )
             for i in range(100)
         ]
 
@@ -672,18 +705,30 @@ class TestInteractionRepository:
     def test_get_interaction_statistics(self, repo):
         """Obtiene estadísticas de interacciones."""
         # Crear interacciones variadas
-        tones = [InteractionTone.WARM, InteractionTone.WARM, InteractionTone.HOSTILE, InteractionTone.NEUTRAL]
-        types = [InteractionType.DIALOGUE, InteractionType.DIALOGUE, InteractionType.ACTION_TOWARDS, InteractionType.THOUGHT_ABOUT]
+        tones = [
+            InteractionTone.WARM,
+            InteractionTone.WARM,
+            InteractionTone.HOSTILE,
+            InteractionTone.NEUTRAL,
+        ]
+        types = [
+            InteractionType.DIALOGUE,
+            InteractionType.DIALOGUE,
+            InteractionType.ACTION_TOWARDS,
+            InteractionType.THOUGHT_ABOUT,
+        ]
 
         for tone, itype in zip(tones, types):
-            repo.save_interaction(EntityInteraction(
-                project_id=1,
-                initiator_name="A",
-                receiver_name="B",
-                interaction_type=itype,
-                tone=tone,
-                chapter=1,
-            ))
+            repo.save_interaction(
+                EntityInteraction(
+                    project_id=1,
+                    initiator_name="A",
+                    receiver_name="B",
+                    interaction_type=itype,
+                    tone=tone,
+                    chapter=1,
+                )
+            )
 
         stats = repo.get_interaction_stats(1)
 
@@ -695,6 +740,7 @@ class TestInteractionRepository:
 # ============================================================================
 # Tests de Integración
 # ============================================================================
+
 
 class TestInteractionIntegration:
     """Tests de integración del módulo completo."""
@@ -726,7 +772,7 @@ class TestInteractionIntegration:
             conn.execute(
                 """INSERT INTO projects (id, name, document_path, document_fingerprint, document_format)
                    VALUES (?, ?, ?, ?, ?)""",
-                (1, "Integration Test", "/test/integration.docx", "integration123", "docx")
+                (1, "Integration Test", "/test/integration.docx", "integration123", "docx"),
             )
         repo = InteractionRepository(db)
 
@@ -774,6 +820,7 @@ class TestInteractionIntegration:
 # ============================================================================
 # Tests de Listas de Verbos
 # ============================================================================
+
 
 class TestVerbLists:
     """Tests para listas de verbos."""

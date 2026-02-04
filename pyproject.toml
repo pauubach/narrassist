@@ -167,7 +167,7 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401", "I001"]  # Re-exports in __init__.py
-"**/tests/**" = ["F401", "F841"]  # Unused imports/vars in tests
+"**/tests/**" = ["F401", "F841", "F601", "F811", "E712", "N801", "SIM115", "SIM118", "B905"]  # Relaxed rules for tests
 # Files with conditional imports for availability checking
 "**/nlp/*.py" = ["F401"]
 "**/analysis/*.py" = ["F401"]

@@ -10,6 +10,7 @@ Cada test crea un ground truth con atributos/entidades conocidos y mide
 que porcentaje detecta cada metodo (recall) y cuantos falsos positivos
 genera (precision).
 """
+
 import sys
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -25,9 +26,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 # METRICAS
 # =============================================================================
 
+
 @dataclass
 class MethodMetrics:
     """Metricas para un metodo individual."""
+
     method_name: str
     true_positives: int = 0
     false_positives: int = 0
@@ -51,8 +54,9 @@ class MethodMetrics:
 
     @property
     def accuracy(self) -> float:
-        total = (self.true_positives + self.true_negatives
-                 + self.false_positives + self.false_negatives)
+        total = (
+            self.true_positives + self.true_negatives + self.false_positives + self.false_negatives
+        )
         return (self.true_positives + self.true_negatives) / total if total > 0 else 0.0
 
     def __str__(self):
@@ -68,6 +72,7 @@ class MethodMetrics:
 @dataclass
 class EvaluationReport:
     """Reporte completo de evaluacion."""
+
     system_name: str
     method_metrics: dict = field(default_factory=dict)  # method_name -> MethodMetrics
     combined_metrics: Optional[MethodMetrics] = None
@@ -136,9 +141,7 @@ ATTRIBUTE_GROUND_TRUTH = [
         "unexpected_attributes": [],
     },
     {
-        "text": (
-            "Carlos era alto y moreno. Su hermana Lucia, en cambio, era bajita y rubia."
-        ),
+        "text": ("Carlos era alto y moreno. Su hermana Lucia, en cambio, era bajita y rubia."),
         "entities": ["Carlos", "Lucia"],
         "expected_attributes": [
             ("Carlos", "height", "alto"),
@@ -174,9 +177,7 @@ ATTRIBUTE_GROUND_TRUTH = [
         ],
     },
     {
-        "text": (
-            "—Soy muy timida —dijo Rosa—. Siempre he sido asi."
-        ),
+        "text": ("—Soy muy timida —dijo Rosa—. Siempre he sido asi."),
         "entities": ["Rosa"],
         "expected_attributes": [
             ("Rosa", "personality", "timida"),
@@ -184,9 +185,7 @@ ATTRIBUTE_GROUND_TRUTH = [
         "unexpected_attributes": [],
     },
     {
-        "text": (
-            "A diferencia de Juan, que era moreno, Pablo tenia el pelo pelirrojo."
-        ),
+        "text": ("A diferencia de Juan, que era moreno, Pablo tenia el pelo pelirrojo."),
         "entities": ["Juan", "Pablo"],
         "expected_attributes": [
             ("Juan", "hair_color", "moreno"),
@@ -232,9 +231,7 @@ NER_GROUND_TRUTH = [
         "unexpected_entities": [],
     },
     {
-        "text": (
-            "La Fundacion Cervantes organizo un congreso en la Universidad de Salamanca."
-        ),
+        "text": ("La Fundacion Cervantes organizo un congreso en la Universidad de Salamanca."),
         "expected_entities": [
             ("Fundacion Cervantes", "ORG"),
             ("Universidad de Salamanca", "LOC"),
@@ -250,9 +247,7 @@ NER_GROUND_TRUTH = [
         "unexpected_entities": [],
     },
     {
-        "text": (
-            "El comisario Torres interrogo al sospechoso en la comisaria de Vallecas."
-        ),
+        "text": ("El comisario Torres interrogo al sospechoso en la comisaria de Vallecas."),
         "expected_entities": [
             ("Torres", "PER"),
             ("Vallecas", "LOC"),
@@ -362,6 +357,7 @@ FUSION_GROUND_TRUTH = [
 # TESTS: ATTRIBUTE EXTRACTION PER-METHOD
 # =============================================================================
 
+
 @pytest.mark.slow
 class TestAttributeMethodEvaluation:
     """Evalua cada metodo de extraccion de atributos por separado."""
@@ -371,6 +367,7 @@ class TestAttributeMethodEvaluation:
         """Crea el extractor de atributos."""
         try:
             from narrative_assistant.nlp.attributes import AttributeExtractor
+
             return AttributeExtractor()
         except Exception as e:
             pytest.skip(f"No se pudo crear AttributeExtractor: {e}")
@@ -380,6 +377,7 @@ class TestAttributeMethodEvaluation:
         """Carga el modelo spaCy."""
         try:
             from narrative_assistant.nlp.spacy_gpu import load_spacy_model
+
             return load_spacy_model()
         except Exception as e:
             pytest.skip(f"No se pudo cargar spaCy: {e}")
@@ -485,7 +483,8 @@ class TestAttributeMethodEvaluation:
     def test_print_attribute_details(self, extractor, spacy_nlp):
         """Imprime cada caso de atributos con detalle para diagnostico."""
         import sys
-        sys.stdout.reconfigure(encoding='utf-8')
+
+        sys.stdout.reconfigure(encoding="utf-8")
 
         print("\n" + "=" * 70)
         print("DETALLE DE EXTRACCION POR CASO")
@@ -522,11 +521,11 @@ class TestAttributeMethodEvaluation:
                 else:
                     results = []
             except Exception as e:
-                print(f"\nCaso {i+1}: ERROR - {e}")
+                print(f"\nCaso {i + 1}: ERROR - {e}")
                 total_expected += len(expected)
                 continue
 
-            print(f"\nCaso {i+1}: \"{text[:60]}...\"")
+            print(f'\nCaso {i + 1}: "{text[:60]}..."')
             print(f"  Entidades: {entities}")
             print(f"  Esperados: {len(expected)}")
             print(f"  Encontrados: {len(results)}")
@@ -551,7 +550,7 @@ class TestAttributeMethodEvaluation:
                         marker = "WRONG_ENTITY"
                         total_wrong_entity += 1
 
-                print(f"    [{marker}] {entity}: {key_str}={value} (conf={conf:.2f}) src=\"{src}\"")
+                print(f'    [{marker}] {entity}: {key_str}={value} (conf={conf:.2f}) src="{src}"')
                 if is_correct:
                     total_correct += 1
 
@@ -559,16 +558,19 @@ class TestAttributeMethodEvaluation:
             total_expected += len(expected)
 
         print(f"\n{'=' * 70}")
-        print(f"TOTALES: {total_correct}/{total_expected} correctos, "
-              f"{total_wrong_entity} entidad incorrecta, "
-              f"{total_found} encontrados total")
-        print(f"Recall: {total_correct/total_expected*100:.1f}%")
+        print(
+            f"TOTALES: {total_correct}/{total_expected} correctos, "
+            f"{total_wrong_entity} entidad incorrecta, "
+            f"{total_found} encontrados total"
+        )
+        print(f"Recall: {total_correct / total_expected * 100:.1f}%")
         print(f"{'=' * 70}")
 
 
 # =============================================================================
 # TESTS: NER PER-METHOD
 # =============================================================================
+
 
 @pytest.mark.slow
 class TestNERMethodEvaluation:
@@ -578,6 +580,7 @@ class TestNERMethodEvaluation:
     def nlp(self):
         try:
             from narrative_assistant.nlp.spacy_gpu import load_spacy_model
+
             return load_spacy_model()
         except Exception as e:
             pytest.skip(f"No se pudo cargar spaCy: {e}")
@@ -597,8 +600,7 @@ class TestNERMethodEvaluation:
             for exp_text, exp_label in expected:
                 # Flexible matching
                 matched = any(
-                    exp_text.lower() in ft or ft in exp_text.lower()
-                    for ft in found_texts_lower
+                    exp_text.lower() in ft or ft in exp_text.lower() for ft in found_texts_lower
                 )
                 if matched:
                     metrics.true_positives += 1
@@ -612,6 +614,7 @@ class TestNERMethodEvaluation:
         """Evalua NER con NERExtractor completo (post-procesado + validacion)."""
         try:
             from narrative_assistant.nlp.ner import NERExtractor
+
             extractor = NERExtractor()
         except Exception as e:
             pytest.skip(f"No se pudo crear NERExtractor: {e}")
@@ -641,7 +644,8 @@ class TestNERMethodEvaluation:
 
             for exp_text, exp_label in expected:
                 matched = any(
-                    exp_text.lower() in fn or fn in exp_text.lower()
+                    exp_text.lower() in fn
+                    or fn in exp_text.lower()
                     or exp_text.lower().split()[-1] in fn
                     for fn in found_names
                 )
@@ -655,7 +659,8 @@ class TestNERMethodEvaluation:
     def test_ner_detail_per_case(self, nlp):
         """Detalle de NER por caso para diagnostico."""
         import sys
-        sys.stdout.reconfigure(encoding='utf-8')
+
+        sys.stdout.reconfigure(encoding="utf-8")
 
         print("\n" + "=" * 70)
         print("DETALLE NER POR CASO")
@@ -672,13 +677,12 @@ class TestNERMethodEvaluation:
             found_ents = [(ent.text, ent.label_) for ent in doc.ents]
             found_texts_lower = [e[0].lower() for e in found_ents]
 
-            print(f"\nCaso {i+1}: \"{text[:60]}\"")
+            print(f'\nCaso {i + 1}: "{text[:60]}"')
             print(f"  spaCy encontro: {found_ents}")
 
             for exp_text, exp_label in expected:
                 matched = any(
-                    exp_text.lower() in ft or ft in exp_text.lower()
-                    for ft in found_texts_lower
+                    exp_text.lower() in ft or ft in exp_text.lower() for ft in found_texts_lower
                 )
                 status = "OK" if matched else "MISS"
                 print(f"  [{status}] Esperado: ({exp_text}, {exp_label})")
@@ -687,13 +691,16 @@ class TestNERMethodEvaluation:
 
             total_expected += len(expected)
 
-        print(f"\nRecall total: {total_found}/{total_expected} = {total_found/total_expected*100:.1f}%")
+        print(
+            f"\nRecall total: {total_found}/{total_expected} = {total_found / total_expected * 100:.1f}%"
+        )
         print("=" * 70)
 
 
 # =============================================================================
 # TESTS: ENTITY FUSION PER-METHOD
 # =============================================================================
+
 
 @pytest.mark.slow
 class TestFusionMethodEvaluation:
@@ -703,6 +710,7 @@ class TestFusionMethodEvaluation:
     def fusion_service(self):
         try:
             from narrative_assistant.entities.semantic_fusion import SemanticFusionService
+
             return SemanticFusionService()
         except Exception as e:
             pytest.skip(f"No se pudo crear SemanticFusionService: {e}")
@@ -804,7 +812,8 @@ class TestFusionMethodEvaluation:
         }
 
         import sys
-        sys.stdout.reconfigure(encoding='utf-8')
+
+        sys.stdout.reconfigure(encoding="utf-8")
 
         print("\n" + "=" * 70)
         print("DETALLE FUSION POR CASO")
@@ -823,10 +832,12 @@ class TestFusionMethodEvaluation:
             majority_merge = sum(votes) > len(votes) / 2
 
             should = case["should_merge"]
-            print(f"  {case['name1']:25s} vs {case['name2']:25s} | "
-                  f"norm={norm_merge} sim={sim_merge:.2f} "
-                  f"any={any_merge} maj={majority_merge} | "
-                  f"should={should} ({case['reason']})")
+            print(
+                f"  {case['name1']:25s} vs {case['name2']:25s} | "
+                f"norm={norm_merge} sim={sim_merge:.2f} "
+                f"any={any_merge} maj={majority_merge} | "
+                f"should={should} ({case['reason']})"
+            )
 
             for mname, pred in [
                 ("normalization", norm_merge),
@@ -850,15 +861,18 @@ class TestFusionMethodEvaluation:
         print(f"{'Metodo':25s} | P     R     F1    Acc")
         print("-" * 70)
         for m in methods.values():
-            print(f"{m.method_name:25s} | {m.precision:.2f}  {m.recall:.2f}  "
-                  f"{m.f1:.2f}  {m.accuracy:.2f}  "
-                  f"(TP={m.true_positives} FP={m.false_positives} FN={m.false_negatives})")
+            print(
+                f"{m.method_name:25s} | {m.precision:.2f}  {m.recall:.2f}  "
+                f"{m.f1:.2f}  {m.accuracy:.2f}  "
+                f"(TP={m.true_positives} FP={m.false_positives} FN={m.false_negatives})"
+            )
         print("=" * 70)
 
 
 # =============================================================================
 # TEST: RESUMEN GENERAL
 # =============================================================================
+
 
 @pytest.mark.slow
 class TestOverallMethodComparison:
@@ -867,7 +881,8 @@ class TestOverallMethodComparison:
     def test_print_summary_table(self):
         """Imprime tabla resumen (ejecutar despues de los otros tests)."""
         import sys
-        sys.stdout.reconfigure(encoding='utf-8')
+
+        sys.stdout.reconfigure(encoding="utf-8")
 
         print("\n" + "=" * 70)
         print("RESUMEN DE METODOS Y RECOMENDACIONES")

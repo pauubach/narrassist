@@ -1,12 +1,13 @@
 """Tests para el módulo de ubicación de personajes."""
 
 import pytest
+
 from narrative_assistant.analysis.character_location import (
+    CharacterLocationAnalyzer,
+    CharacterLocationReport,
     LocationChangeType,
     LocationEvent,
     LocationInconsistency,
-    CharacterLocationReport,
-    CharacterLocationAnalyzer,
     analyze_character_locations,
 )
 
@@ -404,8 +405,7 @@ class TestCharacterLocationAnalyzer:
 
         # Verificar que detectó la llegada
         arrival_events = [
-            e for e in report.location_events
-            if e.change_type == LocationChangeType.ARRIVAL
+            e for e in report.location_events if e.change_type == LocationChangeType.ARRIVAL
         ]
         assert len(arrival_events) >= 1
 
@@ -433,8 +433,7 @@ class TestCharacterLocationAnalyzer:
         report = result.value
 
         departure_events = [
-            e for e in report.location_events
-            if e.change_type == LocationChangeType.DEPARTURE
+            e for e in report.location_events if e.change_type == LocationChangeType.DEPARTURE
         ]
         assert len(departure_events) >= 1
 
@@ -462,8 +461,7 @@ class TestCharacterLocationAnalyzer:
         report = result.value
 
         presence_events = [
-            e for e in report.location_events
-            if e.change_type == LocationChangeType.PRESENCE
+            e for e in report.location_events if e.change_type == LocationChangeType.PRESENCE
         ]
         assert len(presence_events) >= 1
 
@@ -491,8 +489,7 @@ class TestCharacterLocationAnalyzer:
         report = result.value
 
         transition_events = [
-            e for e in report.location_events
-            if e.change_type == LocationChangeType.TRANSITION
+            e for e in report.location_events if e.change_type == LocationChangeType.TRANSITION
         ]
         assert len(transition_events) >= 1
 
@@ -501,8 +498,7 @@ class TestCharacterLocationAnalyzer:
         chapters = [
             {
                 "number": 1,
-                "content": "Luis llegó a Roma por la mañana. "
-                          "Luis estaba en Londres por la tarde.",
+                "content": "Luis llegó a Roma por la mañana. Luis estaba en Londres por la tarde.",
             }
         ]
 
@@ -551,8 +547,7 @@ class TestCharacterLocationAnalyzer:
 
         # No debería haber inconsistencias porque es una transición
         transition_events = [
-            e for e in report.location_events
-            if e.change_type == LocationChangeType.TRANSITION
+            e for e in report.location_events if e.change_type == LocationChangeType.TRANSITION
         ]
         if transition_events:
             # Si detectó transición, no debe haber inconsistencia
@@ -871,8 +866,7 @@ class TestEdgeCases:
         chapters = [
             {
                 "number": 1,
-                "content": "Juan llegó a la casa. María llegó a la casa. "
-                          "Pedro estaba en la casa.",
+                "content": "Juan llegó a la casa. María llegó a la casa. Pedro estaba en la casa.",
             }
         ]
 

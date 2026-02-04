@@ -1,12 +1,13 @@
 """Tests para el módulo de estado vital de personajes."""
 
 import pytest
+
 from narrative_assistant.analysis.vital_status import (
-    VitalStatus,
     DeathEvent,
     PostMortemAppearance,
-    VitalStatusReport,
+    VitalStatus,
     VitalStatusAnalyzer,
+    VitalStatusReport,
     analyze_vital_status,
 )
 

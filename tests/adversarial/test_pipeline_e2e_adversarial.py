@@ -19,18 +19,20 @@ Inspirado en el bug real donde:
 Autor: GAN-style Adversary Agent
 """
 
-import pytest
 from dataclasses import dataclass, field
 from typing import Optional
 
+import pytest
 
 # =============================================================================
 # TEST DATA STRUCTURES
 # =============================================================================
 
+
 @dataclass
 class PipelineTestCase:
     """Caso de test end-to-end para el pipeline completo."""
+
     id: str
     category: str
     text: str
@@ -92,7 +94,6 @@ PIPELINE_CASES = [
             "atributos asignados a Juan por proximidad."
         ),
     ),
-
     PipelineTestCase(
         id="e2e_real_02_maria_fusion",
         category="bug_real",
@@ -122,7 +123,6 @@ PIPELINE_CASES = [
             "Atributos de ambas menciones van a la entidad fusionada."
         ),
     ),
-
     PipelineTestCase(
         id="e2e_real_03_no_alerts",
         category="bug_real",
@@ -146,7 +146,6 @@ PIPELINE_CASES = [
             "El pipeline debe detectar estos conflictos como alertas."
         ),
     ),
-
     # -------------------------------------------------------------------------
     # 2. MULTI-CHARACTER SCENES - Escenas con múltiples personajes
     # -------------------------------------------------------------------------
@@ -175,9 +174,8 @@ PIPELINE_CASES = [
             "Sergio": ["eye_color"],
         },
         difficulty="hard",
-        description="Tres personajes con descripciones entrelazadas."
+        description="Tres personajes con descripciones entrelazadas.",
     ),
-
     PipelineTestCase(
         id="e2e_multi_02_dialogue_scene",
         category="multi_personaje",
@@ -202,9 +200,8 @@ PIPELINE_CASES = [
             "Elena": ["hair_color_moreno"],
         },
         difficulty="hard",
-        description="Diálogo con descripciones intercaladas y fusión nombre/apellido."
+        description="Diálogo con descripciones intercaladas y fusión nombre/apellido.",
     ),
-
     # -------------------------------------------------------------------------
     # 3. TITLE + NAME FUSION - Personaje referido de múltiples formas
     # -------------------------------------------------------------------------
@@ -226,9 +223,8 @@ PIPELINE_CASES = [
             ["doctor Hernández", "Hernández"],
         ],
         difficulty="medium",
-        description="Personaje referido con y sin título profesional."
+        description="Personaje referido con y sin título profesional.",
     ),
-
     PipelineTestCase(
         id="e2e_title_02_don",
         category="titulos",
@@ -252,7 +248,6 @@ PIPELINE_CASES = [
             "Álvaro de Mendoza. Todas deberían fusionarse."
         ),
     ),
-
     PipelineTestCase(
         id="e2e_title_03_military",
         category="titulos",
@@ -271,9 +266,8 @@ PIPELINE_CASES = [
             ["capitán Morales", "Morales"],
         ],
         difficulty="medium",
-        description="Rango militar + apellido debe fusionarse con apellido solo."
+        description="Rango militar + apellido debe fusionarse con apellido solo.",
     ),
-
     # -------------------------------------------------------------------------
     # 4. FICTIONAL NAMES - Nombres inventados difíciles para NER
     # -------------------------------------------------------------------------
@@ -300,9 +294,8 @@ PIPELINE_CASES = [
             "Kael": ["hair_color_blanca"],
         },
         difficulty="hard",
-        description="Nombres de fantasía que spaCy no reconocerá como PER."
+        description="Nombres de fantasía que spaCy no reconocerá como PER.",
     ),
-
     PipelineTestCase(
         id="e2e_fiction_02_scifi",
         category="ficcion",
@@ -325,9 +318,8 @@ PIPELINE_CASES = [
             "Zara-7": ["height"],
         },
         difficulty="adversarial",
-        description="Nombres de ciencia ficción con guión y números."
+        description="Nombres de ciencia ficción con guión y números.",
     ),
-
     # -------------------------------------------------------------------------
     # 5. NON-FICTION ENTITIES - Entidades en textos de no ficción
     # -------------------------------------------------------------------------
@@ -351,7 +343,6 @@ PIPELINE_CASES = [
             "no personajes. El NER no debe clasificarlas como PER."
         ),
     ),
-
     PipelineTestCase(
         id="e2e_nonfic_02_self_help",
         category="no_ficcion",
@@ -368,9 +359,8 @@ PIPELINE_CASES = [
         expected_fusions=[],
         forbidden_entities=[],
         difficulty="medium",
-        description="Mezcla de personaje real y concepto abstracto."
+        description="Mezcla de personaje real y concepto abstracto.",
     ),
-
     # -------------------------------------------------------------------------
     # 6. COMPLEX NARRATIVES - Narrativas con dificultades combinadas
     # -------------------------------------------------------------------------
@@ -410,7 +400,6 @@ PIPELINE_CASES = [
             "y múltiples personajes con el mismo apellido."
         ),
     ),
-
     PipelineTestCase(
         id="e2e_complex_02_flashback",
         category="narrativa_compleja",
@@ -445,7 +434,6 @@ PIPELINE_CASES = [
             "la abuela no deben contaminar a la nieta y viceversa."
         ),
     ),
-
     PipelineTestCase(
         id="e2e_complex_03_crowd",
         category="narrativa_compleja",
@@ -482,7 +470,6 @@ PIPELINE_CASES = [
             "Cada atributo debe ir al personaje correcto."
         ),
     ),
-
     # -------------------------------------------------------------------------
     # 7. EDGE CASES - Casos extremos
     # -------------------------------------------------------------------------
@@ -494,9 +481,8 @@ PIPELINE_CASES = [
         expected_attributes={},
         expected_fusions=[],
         difficulty="easy",
-        description="Texto sin entidades nombradas. El pipeline no debe crashear."
+        description="Texto sin entidades nombradas. El pipeline no debe crashear.",
     ),
-
     PipelineTestCase(
         id="e2e_edge_02_entity_no_attrs",
         category="edge_case",
@@ -507,9 +493,8 @@ PIPELINE_CASES = [
         expected_attributes={},
         expected_fusions=[],
         difficulty="easy",
-        description="Entidad sin atributos descriptivos."
+        description="Entidad sin atributos descriptivos.",
     ),
-
     PipelineTestCase(
         id="e2e_edge_03_long_description",
         category="edge_case",
@@ -538,7 +523,6 @@ PIPELINE_CASES = [
             "encontrar los atributos reales entre la prosa literaria."
         ),
     ),
-
     PipelineTestCase(
         id="e2e_edge_04_same_name_different_people",
         category="edge_case",
@@ -556,11 +540,9 @@ PIPELINE_CASES = [
         forbidden_entities=[],
         difficulty="adversarial",
         description=(
-            "Dos personajes con el mismo nombre diferenciados por profesión. "
-            "NO deben fusionarse."
+            "Dos personajes con el mismo nombre diferenciados por profesión. NO deben fusionarse."
         ),
     ),
-
     PipelineTestCase(
         id="e2e_edge_05_narrator",
         category="edge_case",
@@ -583,7 +565,7 @@ PIPELINE_CASES = [
             "Marcos": ["hair_color_rubio"],
         },
         difficulty="hard",
-        description="Narración en primera persona con autodescripción."
+        description="Narración en primera persona con autodescripción.",
     ),
 ]
 
@@ -592,11 +574,13 @@ PIPELINE_CASES = [
 # FIXTURES
 # =============================================================================
 
+
 @pytest.fixture
 def ner_extractor():
     """Crea un NERExtractor."""
     try:
         from narrative_assistant.nlp.ner import NERExtractor
+
         return NERExtractor()
     except Exception:
         pytest.skip("NERExtractor no disponible (requiere spaCy)")
@@ -606,6 +590,7 @@ def ner_extractor():
 def attr_extractor():
     """Crea un AttributeExtractor sin LLM/embeddings."""
     from narrative_assistant.nlp.attributes import AttributeExtractor
+
     return AttributeExtractor(
         filter_metaphors=True,
         min_confidence=0.5,
@@ -621,6 +606,7 @@ def fusion_service():
     """Crea el servicio de fusión semántica."""
     try:
         from narrative_assistant.entities.semantic_fusion import SemanticFusionService
+
         return SemanticFusionService()
     except Exception:
         pytest.skip("SemanticFusionService no disponible")
@@ -659,6 +645,7 @@ def run_attributes(attr_extractor, text: str, entity_mentions: list) -> dict[str
 # =============================================================================
 # TEST CLASSES
 # =============================================================================
+
 
 class TestPipelineNER:
     """Tests end-to-end enfocados en la etapa NER."""
@@ -709,8 +696,10 @@ class TestPipelineAttributes:
             # Find entity in results (flexible matching)
             matching_entity = None
             for result_entity in attributes:
-                if (entity_name.lower() in result_entity.lower() or
-                        result_entity.lower() in entity_name.lower()):
+                if (
+                    entity_name.lower() in result_entity.lower()
+                    or result_entity.lower() in entity_name.lower()
+                ):
                     matching_entity = result_entity
                     break
 
@@ -747,8 +736,10 @@ class TestPipelineAttributes:
         for entity_name, forbidden_keys in case.forbidden_attributes.items():
             matching_entity = None
             for result_entity in attributes:
-                if (entity_name.lower() in result_entity.lower() or
-                        result_entity.lower() in entity_name.lower()):
+                if (
+                    entity_name.lower() in result_entity.lower()
+                    or result_entity.lower() in entity_name.lower()
+                ):
                     matching_entity = result_entity
                     break
 
@@ -795,14 +786,16 @@ class TestPipelineFusion:
         entities = []
         for i, (name, label, start, end) in enumerate(ner_entities):
             etype = label_map.get(label, EntityType.CONCEPT)
-            entities.append(Entity(
-                id=i + 1,
-                project_id=1,
-                entity_type=etype,
-                canonical_name=name,
-                mention_count=1,
-                is_active=True,
-            ))
+            entities.append(
+                Entity(
+                    id=i + 1,
+                    project_id=1,
+                    entity_type=etype,
+                    canonical_name=name,
+                    mention_count=1,
+                    is_active=True,
+                )
+            )
 
         # Stage 2: Check fusion decisions
         for fusion_group in case.expected_fusions:
@@ -810,8 +803,10 @@ class TestPipelineFusion:
             group_entities = []
             for group_name in fusion_group:
                 for ent in entities:
-                    if (group_name.lower() in ent.canonical_name.lower() or
-                            ent.canonical_name.lower() in group_name.lower()):
+                    if (
+                        group_name.lower() in ent.canonical_name.lower()
+                        or ent.canonical_name.lower() in group_name.lower()
+                    ):
                         group_entities.append(ent)
                         break
 
@@ -836,6 +831,7 @@ class TestPipelineFusion:
 # SUMMARY TEST
 # =============================================================================
 
+
 class TestPipelineSummary:
     """Test de resumen que ejecuta el pipeline completo."""
 
@@ -857,7 +853,8 @@ class TestPipelineSummary:
                 all_found = True
                 for expected_name in case.expected_entities:
                     found = any(
-                        expected_name.lower() in name.lower() or name.lower() in expected_name.lower()
+                        expected_name.lower() in name.lower()
+                        or name.lower() in expected_name.lower()
                         for name in detected_names
                     )
                     if not found:
@@ -876,7 +873,10 @@ class TestPipelineSummary:
                     for entity_name, expected_attrs in case.expected_attributes.items():
                         matching = None
                         for re_name in attributes:
-                            if entity_name.lower() in re_name.lower() or re_name.lower() in entity_name.lower():
+                            if (
+                                entity_name.lower() in re_name.lower()
+                                or re_name.lower() in entity_name.lower()
+                            ):
                                 matching = re_name
                                 break
                         if not matching:
@@ -895,7 +895,10 @@ class TestPipelineSummary:
                     for entity_name, forbidden_keys in case.forbidden_attributes.items():
                         matching = None
                         for re_name in attributes:
-                            if entity_name.lower() in re_name.lower() or re_name.lower() in entity_name.lower():
+                            if (
+                                entity_name.lower() in re_name.lower()
+                                or re_name.lower() in entity_name.lower()
+                            ):
                                 matching = re_name
                                 break
                         if matching:
@@ -907,16 +910,16 @@ class TestPipelineSummary:
                 ner_failed += 1
 
         # Report
-        print(f"\n{'='*70}")
-        print(f"END-TO-END PIPELINE ADVERSARIAL REPORT")
-        print(f"{'='*70}")
-        print(f"\nNER Stage:")
+        print(f"\n{'=' * 70}")
+        print("END-TO-END PIPELINE ADVERSARIAL REPORT")
+        print(f"{'=' * 70}")
+        print("\nNER Stage:")
         print(f"  Passed: {ner_passed}/{total_cases}")
         print(f"  Failed: {ner_failed}/{total_cases}")
         if total_cases > 0:
-            print(f"  Rate: {ner_passed/max(1,total_cases)*100:.1f}%")
-        print(f"\nAttribute Stage:")
+            print(f"  Rate: {ner_passed / max(1, total_cases) * 100:.1f}%")
+        print("\nAttribute Stage:")
         print(f"  Passed: {attr_passed}")
         print(f"  Failed: {attr_failed}")
         print(f"  Forbidden violations: {forbidden_violations}")
-        print(f"{'='*70}")
+        print(f"{'=' * 70}")

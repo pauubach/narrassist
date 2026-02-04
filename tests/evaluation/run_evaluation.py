@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Script unificado de evaluacion de precision para todas las capacidades NLP.
 
@@ -14,13 +13,13 @@ Uso:
     python tests/evaluation/run_evaluation.py [--capability CAPABILITY] [--verbose]
 """
 
+import argparse
+import json
 import re
 import sys
-import json
-import argparse
-from pathlib import Path
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 # Asegurar que el path del proyecto esta en sys.path
@@ -28,32 +27,33 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from gold_standards import (
-    ALL_GOLD_STANDARDS,
     ADVANCED_GOLD_STANDARDS,
-    GoldStandard,
-    GoldEntity,
-    GoldRelation,
-    GoldEvent,
-    GoldChapter,
-    GoldGrammarError,
-    GoldOrthographyError,
-    GoldCoreference,
-    GoldMuletilla,
-    GoldDialogue,
-    GoldFocalizationViolation,
-    GoldSentimentPoint,
-    GoldRegisterChange,
-    GOLD_MULETILLAS_DATA,
+    ALL_GOLD_STANDARDS,
     GOLD_DIALOGUES_DATA,
-    GOLD_REGISTER_CHANGES_DATA,
     GOLD_FOCALIZATION_VIOLATIONS_DATA,
+    GOLD_MULETILLAS_DATA,
+    GOLD_REGISTER_CHANGES_DATA,
     GOLD_SENTIMENT_ARC_DATA,
+    GoldChapter,
+    GoldCoreference,
+    GoldDialogue,
+    GoldEntity,
+    GoldEvent,
+    GoldFocalizationViolation,
+    GoldGrammarError,
+    GoldMuletilla,
+    GoldOrthographyError,
+    GoldRegisterChange,
+    GoldRelation,
+    GoldSentimentPoint,
+    GoldStandard,
 )
 
 
 @dataclass
 class EvaluationMetrics:
     """Metricas de evaluacion para una capacidad."""
+
     capability: str
     true_positives: int = 0
     false_positives: int = 0
@@ -80,6 +80,7 @@ class EvaluationMetrics:
 @dataclass
 class EvaluationReport:
     """Reporte completo de evaluacion."""
+
     timestamp: str
     gold_standard_name: str
     text_file: str
@@ -90,45 +91,112 @@ class EvaluationReport:
 def normalize_text(text: str) -> str:
     """Normaliza texto para comparacion."""
     import unicodedata
+
     # Quitar acentos
-    normalized = unicodedata.normalize('NFD', text)
-    result = ''.join(c for c in normalized if unicodedata.category(c) != 'Mn')
-    result = unicodedata.normalize('NFC', result)
-    return ' '.join(result.lower().split())
+    normalized = unicodedata.normalize("NFD", text)
+    result = "".join(c for c in normalized if unicodedata.category(c) != "Mn")
+    result = unicodedata.normalize("NFC", result)
+    return " ".join(result.lower().split())
 
 
 # Prefijos de título/parentesco que el NER puede incluir en el span de entidad
 # pero que no forman parte del nombre propio en sí.
 _ENTITY_PREFIXES = {
     # Tratamientos
-    "don", "dona", "doña", "señor", "señora", "senor", "senora",
-    "sr", "sra", "sr.", "sra.",
+    "don",
+    "dona",
+    "doña",
+    "señor",
+    "señora",
+    "senor",
+    "senora",
+    "sr",
+    "sra",
+    "sr.",
+    "sra.",
     # Parentesco
-    "hermano", "hermana", "hijo", "hija", "padre", "madre",
-    "abuelo", "abuela", "tio", "tia", "tío", "tía",
-    "primo", "prima", "sobrino", "sobrina", "nieto", "nieta",
-    "esposo", "esposa",
+    "hermano",
+    "hermana",
+    "hijo",
+    "hija",
+    "padre",
+    "madre",
+    "abuelo",
+    "abuela",
+    "tio",
+    "tia",
+    "tío",
+    "tía",
+    "primo",
+    "prima",
+    "sobrino",
+    "sobrina",
+    "nieto",
+    "nieta",
+    "esposo",
+    "esposa",
     # Profesionales
-    "doctor", "doctora", "dr", "dra", "dr.", "dra.",
-    "profesor", "profesora", "maestro", "maestra",
-    "capitan", "capitán", "coronel", "general", "teniente",
-    "inspector", "inspectora", "comisario", "comisaria",
-    "fiscal", "juez", "jueza",
-    "ingeniero", "ingeniera", "arquitecto", "arquitecta",
-    "enfermero", "enfermera",
+    "doctor",
+    "doctora",
+    "dr",
+    "dra",
+    "dr.",
+    "dra.",
+    "profesor",
+    "profesora",
+    "maestro",
+    "maestra",
+    "capitan",
+    "capitán",
+    "coronel",
+    "general",
+    "teniente",
+    "inspector",
+    "inspectora",
+    "comisario",
+    "comisaria",
+    "fiscal",
+    "juez",
+    "jueza",
+    "ingeniero",
+    "ingeniera",
+    "arquitecto",
+    "arquitecta",
+    "enfermero",
+    "enfermera",
     # Religiosos
-    "fray", "sor", "san", "santa", "santo",
+    "fray",
+    "sor",
+    "san",
+    "santa",
+    "santo",
     # Nobiliarios
-    "rey", "reina", "principe", "príncipe", "princesa",
-    "conde", "condesa", "duque", "duquesa",
-    "lord", "lady", "sir",
+    "rey",
+    "reina",
+    "principe",
+    "príncipe",
+    "princesa",
+    "conde",
+    "condesa",
+    "duque",
+    "duquesa",
+    "lord",
+    "lady",
+    "sir",
     # Militares
-    "sargento", "cabo", "almirante",
+    "sargento",
+    "cabo",
+    "almirante",
     # Académicos
-    "licenciado", "licenciada",
+    "licenciado",
+    "licenciada",
     # Exploradores/roles narrativos
-    "explorador", "exploradora", "mago", "maga",
-    "sacerdote", "sacerdotisa",
+    "explorador",
+    "exploradora",
+    "mago",
+    "maga",
+    "sacerdote",
+    "sacerdotisa",
 }
 
 
@@ -146,13 +214,14 @@ def _strip_entity_prefix(text_norm: str) -> str | None:
 def read_test_file(path: str) -> str:
     """Lee un archivo de texto de prueba."""
     full_path = PROJECT_ROOT / path
-    with open(full_path, 'r', encoding='utf-8') as f:
+    with open(full_path, encoding="utf-8") as f:
         return f.read()
 
 
 # =============================================================================
 # EVALUADORES POR CAPACIDAD
 # =============================================================================
+
 
 def evaluate_ner(text: str, gold: GoldStandard, verbose: bool = False) -> EvaluationMetrics:
     """Evalua NER contra gold standard."""
@@ -165,7 +234,7 @@ def evaluate_ner(text: str, gold: GoldStandard, verbose: bool = False) -> Evalua
         result = extractor.extract_entities(text)
 
         # extract_entities devuelve Result[NERResult]
-        if hasattr(result, 'is_success'):
+        if hasattr(result, "is_success"):
             if not result.is_success:
                 metrics.details["error"] = str(result.error)
                 return metrics
@@ -218,8 +287,12 @@ def evaluate_ner(text: str, gold: GoldStandard, verbose: bool = False) -> Evalua
         metrics.calculate()
 
         if verbose:
-            metrics.details["true_positives"] = [detected_original.get(x, x) for x in true_positives]
-            metrics.details["false_positives"] = [detected_original.get(x, x) for x in false_positives]
+            metrics.details["true_positives"] = [
+                detected_original.get(x, x) for x in true_positives
+            ]
+            metrics.details["false_positives"] = [
+                detected_original.get(x, x) for x in false_positives
+            ]
             metrics.details["false_negatives"] = [gold_original.get(x, x) for x in false_negatives]
 
     except Exception as e:
@@ -228,12 +301,14 @@ def evaluate_ner(text: str, gold: GoldStandard, verbose: bool = False) -> Evalua
     return metrics
 
 
-def evaluate_grammar(text: str, gold: GoldStandard, verbose: bool = False) -> dict[str, EvaluationMetrics]:
+def evaluate_grammar(
+    text: str, gold: GoldStandard, verbose: bool = False
+) -> dict[str, EvaluationMetrics]:
     """Evalua deteccion de errores gramaticales."""
     from narrative_assistant.nlp.grammar.spanish_rules import (
         check_dequeismo,
-        check_queismo,
         check_laismo,
+        check_queismo,
     )
     from narrative_assistant.nlp.spacy_gpu import load_spacy_model
 
@@ -291,24 +366,24 @@ def evaluate_grammar(text: str, gold: GoldStandard, verbose: bool = False) -> di
 
 def _filter_metadata_sections(text: str) -> str:
     """Filtra secciones de metadatos al final del texto (resumen, notas, etc.)."""
-    lines = text.split('\n')
+    lines = text.split("\n")
 
     # Patrones que indican inicio de seccion de metadatos (MUY especificos)
     metadata_start_markers = [
-        r'^RESUMEN\s+(DE\s+)?(ESTRUCTURA|CAPITULOS?|PERSONAJES|CRONOL[OÓ]GIC)',
-        r'^LISTA\s+DE\s+(INCONSISTENCIAS|PERSONAJES|CAPITULOS|EVENTOS)',
-        r'^FORMATOS?\s+(DE\s+)?(CAPITULO|ESTRUCTURA)',
-        r'^PERSONAJES\s*:?\s*$',
-        r'^INCONSISTENCIAS?\s+(INTENCIONADAS|DETECTADAS|ENCONTRADAS)',
-        r'^ESTRUCTURA\s+ESPERADA',
-        r'^NOTAS?\s+(DEL\s+)?(AUTOR|EDITOR)',
-        r'^CRONOLOG[IÍ]A\s*:?\s*$',
+        r"^RESUMEN\s+(DE\s+)?(ESTRUCTURA|CAPITULOS?|PERSONAJES|CRONOL[OÓ]GIC)",
+        r"^LISTA\s+DE\s+(INCONSISTENCIAS|PERSONAJES|CAPITULOS|EVENTOS)",
+        r"^FORMATOS?\s+(DE\s+)?(CAPITULO|ESTRUCTURA)",
+        r"^PERSONAJES\s*:?\s*$",
+        r"^INCONSISTENCIAS?\s+(INTENCIONADAS|DETECTADAS|ENCONTRADAS)",
+        r"^ESTRUCTURA\s+ESPERADA",
+        r"^NOTAS?\s+(DEL\s+)?(AUTOR|EDITOR)",
+        r"^CRONOLOG[IÍ]A\s*:?\s*$",
     ]
 
     # Buscar el "FIN" de la narrativa principal
     fin_line = -1
     for i in range(len(lines) - 1, -1, -1):
-        if lines[i].strip() == 'FIN':
+        if lines[i].strip() == "FIN":
             fin_line = i
             break
 
@@ -317,13 +392,13 @@ def _filter_metadata_sections(text: str) -> str:
         # Buscar marcadores de metadatos despues del FIN
         for i in range(fin_line + 1, len(lines)):
             line_stripped = lines[i].strip()
-            if not line_stripped or line_stripped == '---':
+            if not line_stripped or line_stripped == "---":
                 continue
 
             for pattern in metadata_start_markers:
                 if re.match(pattern, line_stripped, re.IGNORECASE):
                     # Confirmar que es metadatos y cortar en FIN
-                    return '\n'.join(lines[:fin_line + 1])
+                    return "\n".join(lines[: fin_line + 1])
 
     # Buscar marcadores de metadatos sin FIN previo
     for i, line in enumerate(lines):
@@ -334,10 +409,14 @@ def _filter_metadata_sections(text: str) -> str:
         for pattern in metadata_start_markers:
             if re.match(pattern, line_stripped, re.IGNORECASE):
                 # Verificar que hay contenido de metadatos despues (listas, etc.)
-                remaining_lines = lines[i:i+10]
-                list_count = sum(1 for l in remaining_lines if re.match(r'^[-*]\s+', l.strip()) or re.match(r'^\d+\.\s+"', l.strip()))
+                remaining_lines = lines[i : i + 10]
+                list_count = sum(
+                    1
+                    for l in remaining_lines
+                    if re.match(r"^[-*]\s+", l.strip()) or re.match(r'^\d+\.\s+"', l.strip())
+                )
                 if list_count >= 2:
-                    return '\n'.join(lines[:i])
+                    return "\n".join(lines[:i])
 
     # Si no hay metadatos claros, devolver todo el texto
     return text
@@ -353,25 +432,28 @@ def evaluate_chapters(text: str, gold: GoldStandard, verbose: bool = False) -> E
     # Patrones para detectar inicio de capitulo (deben estar al inicio de linea)
     chapter_patterns = [
         # CAPITULO + numero (arabigo o romano)
-        (r'^CAP[IÍ]TULO\s+(\d+|[IVXLCDM]+)\b', 'chapter_word'),
+        (r"^CAP[IÍ]TULO\s+(\d+|[IVXLCDM]+)\b", "chapter_word"),
         # Capitulo + numero + separador + titulo
-        (r'^Capitulo\s+(\d+|[IVXLCDM]+|\w+)\s*[-:]\s*\w+', 'chapter_title'),
+        (r"^Capitulo\s+(\d+|[IVXLCDM]+|\w+)\s*[-:]\s*\w+", "chapter_title"),
         # Capitulo + numero escrito (Uno, Dos, Cinco, etc.)
-        (r'^Capitulo\s+(Uno|Dos|Tres|Cuatro|Cinco|Seis|Siete|Ocho|Nueve|Diez)\b', 'chapter_written'),
+        (
+            r"^Capitulo\s+(Uno|Dos|Tres|Cuatro|Cinco|Seis|Siete|Ocho|Nueve|Diez)\b",
+            "chapter_written",
+        ),
         # Capitulo + numero simple al final de linea
-        (r'^Capitulo\s+(\d+)\s*$', 'chapter_simple'),
+        (r"^Capitulo\s+(\d+)\s*$", "chapter_simple"),
         # Solo numero romano + punto + espacio + texto (VII. Titulo)
-        (r'^([IVXLCDM]+)\.\s+[A-Z]', 'roman_dot'),
+        (r"^([IVXLCDM]+)\.\s+[A-Z]", "roman_dot"),
         # Solo numero + punto + espacio + texto (8. Titulo)
-        (r'^(\d{1,2})\.\s+[A-Z]', 'number_dot'),
+        (r"^(\d{1,2})\.\s+[A-Z]", "number_dot"),
         # EPILOGO o PROLOGO al inicio de linea
-        (r'^(EP[IÍ]LOGO|PR[OÓ]LOGO)\b', 'special'),
+        (r"^(EP[IÍ]LOGO|PR[OÓ]LOGO)\b", "special"),
     ]
 
     detected_chapters = set()
     detected_positions = set()  # Para evitar duplicados por posicion
 
-    for line in narrative_text.split('\n'):
+    for line in narrative_text.split("\n"):
         line_stripped = line.strip()
         if not line_stripped:
             continue
@@ -406,7 +488,7 @@ def evaluate_chapters(text: str, gold: GoldStandard, verbose: bool = False) -> E
         else:
             # Fallback: extraer numero/romano sin puntuacion
             # "VII." -> "VII", "8." -> "8"
-            cleaned = re.sub(r'[.\-:\s]+$', '', marker).upper()
+            cleaned = re.sub(r"[.\-:\s]+$", "", marker).upper()
             gold_markers.add(cleaned)
 
     # Calcular matches
@@ -451,7 +533,13 @@ def evaluate_relations(text: str, gold: GoldStandard, verbose: bool = False) -> 
         # colleague: patron mas restrictivo para evitar FP con "trabajo" generico
         "colleague": [r"\bcolega\b", r"\bcompañero\s+de\s+trabajo\b", r"\bcompa[nñ]er[oa]\s+de\b"],
         # parent_child
-        "parent_child": [r"\bpadre\b", r"\bmadre\b", r"\bhij[oa]\b", r"\bpadres\b", r"\bprogenitor"],
+        "parent_child": [
+            r"\bpadre\b",
+            r"\bmadre\b",
+            r"\bhij[oa]\b",
+            r"\bpadres\b",
+            r"\bprogenitor",
+        ],
     }
 
     detected_relations = set()
@@ -476,7 +564,9 @@ def evaluate_relations(text: str, gold: GoldStandard, verbose: bool = False) -> 
     if verbose:
         metrics.details["detected_types"] = list(detected_relations)
         metrics.details["gold_types"] = list(gold_types)
-        metrics.details["gold_relations"] = [(r.entity1, r.entity2, r.relation_type) for r in gold.relations]
+        metrics.details["gold_relations"] = [
+            (r.entity1, r.entity2, r.relation_type) for r in gold.relations
+        ]
 
     return metrics
 
@@ -491,45 +581,63 @@ def evaluate_timeline(text: str, gold: GoldStandard, verbose: bool = False) -> E
     # Numeros escritos en espanol: patron flexible que captura cualquier palabra
     # que parezca un numero (1-999+). Incluye unidades, decenas, centenas y compuestos.
     # Ejemplos: uno, veinte, treinta y cinco, ciento dos, doscientos, etc.
-    UNIDADES = r'un[oa]?|dos|tres|cuatro|cinco|seis|siete|ocho|nueve'
-    ESPECIALES = r'diez|once|doce|trece|catorce|quince'
-    DIECI = r'dieci(?:s[eé]is|siete|ocho|nueve)'
-    VEINTI = r'veinti(?:un[oa]?|d[oó]s|tr[eé]s|cuatro|cinco|s[eé]is|siete|ocho|nueve)|veinte'
-    DECENAS = r'treinta|cuarenta|cincuenta|sesenta|setenta|ochenta|noventa'
-    CENTENAS = r'cien(?:to)?|doscient[oa]s?|trescient[oa]s?|cuatrocient[oa]s?|quinient[oa]s?|seiscient[oa]s?|setecient[oa]s?|ochocient[oa]s?|novecient[oa]s?'
+    UNIDADES = r"un[oa]?|dos|tres|cuatro|cinco|seis|siete|ocho|nueve"
+    ESPECIALES = r"diez|once|doce|trece|catorce|quince"
+    DIECI = r"dieci(?:s[eé]is|siete|ocho|nueve)"
+    VEINTI = r"veinti(?:un[oa]?|d[oó]s|tr[eé]s|cuatro|cinco|s[eé]is|siete|ocho|nueve)|veinte"
+    DECENAS = r"treinta|cuarenta|cincuenta|sesenta|setenta|ochenta|noventa"
+    CENTENAS = r"cien(?:to)?|doscient[oa]s?|trescient[oa]s?|cuatrocient[oa]s?|quinient[oa]s?|seiscient[oa]s?|setecient[oa]s?|ochocient[oa]s?|novecient[oa]s?"
     # Patron compuesto: numero simple o "decena y unidad" o "centena (y) decena..."
-    NUMEROS_ESCRITOS = rf'(?:{CENTENAS}(?:\s+y?\s*(?:{DECENAS}(?:\s+y\s+(?:{UNIDADES}))?|{VEINTI}|{DIECI}|{ESPECIALES}|{UNIDADES}))?|{DECENAS}(?:\s+y\s+(?:{UNIDADES}))?|{VEINTI}|{DIECI}|{ESPECIALES}|{UNIDADES})'
+    NUMEROS_ESCRITOS = rf"(?:{CENTENAS}(?:\s+y?\s*(?:{DECENAS}(?:\s+y\s+(?:{UNIDADES}))?|{VEINTI}|{DIECI}|{ESPECIALES}|{UNIDADES}))?|{DECENAS}(?:\s+y\s+(?:{UNIDADES}))?|{VEINTI}|{DIECI}|{ESPECIALES}|{UNIDADES})"
 
     # Patrones ordenados por especificidad (más específicos primero)
     temporal_patterns = [
         # Fechas completas: "15 de enero de 1990"
-        (r'\d{1,2}\s+de\s+(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\s+de\s+\d{4}', "fecha_completa"),
+        (
+            r"\d{1,2}\s+de\s+(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\s+de\s+\d{4}",
+            "fecha_completa",
+        ),
         # Mes de año: "enero de 1990", "abril 1990"
-        (r'(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\s+(?:de\s+)?\d{4}', "mes_ano"),
+        (
+            r"(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\s+(?:de\s+)?\d{4}",
+            "mes_ano",
+        ),
         # Estacion de año: "verano de 1995"
-        (r'(?:verano|oto[nñ]o|invierno|primavera)\s+de\s+\d{4}', "estacion_ano"),
+        (r"(?:verano|oto[nñ]o|invierno|primavera)\s+de\s+\d{4}", "estacion_ano"),
         # Mes de ese mismo año: "septiembre de ese mismo año"
-        (r'(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\s+de\s+ese\s+(?:mismo\s+)?a[nñ]o', "relativo_mes"),
+        (
+            r"(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\s+de\s+ese\s+(?:mismo\s+)?a[nñ]o",
+            "relativo_mes",
+        ),
         # Referencias relativas con numeros escritos: "tres meses despues", "un año despues de"
-        (rf'(?:{NUMEROS_ESCRITOS})\s+(?:a[nñ]os?|meses?|d[ií]as?|semanas?)\s+(?:despu[eé]s|antes|m[aá]s\s+tarde)', "relativo_escrito"),
+        (
+            rf"(?:{NUMEROS_ESCRITOS})\s+(?:a[nñ]os?|meses?|d[ií]as?|semanas?)\s+(?:despu[eé]s|antes|m[aá]s\s+tarde)",
+            "relativo_escrito",
+        ),
         # Referencias relativas con digitos: "2 años despues"
-        (r'\d+\s+(?:a[nñ]os?|meses?|d[ií]as?|semanas?)\s+(?:despu[eé]s|antes|m[aá]s\s+tarde)', "relativo_num"),
+        (
+            r"\d+\s+(?:a[nñ]os?|meses?|d[ií]as?|semanas?)\s+(?:despu[eé]s|antes|m[aá]s\s+tarde)",
+            "relativo_num",
+        ),
         # "al año siguiente"
-        (r'al\s+a[nñ]o\s+siguiente', "relativo"),
+        (r"al\s+a[nñ]o\s+siguiente", "relativo"),
         # "un año después de graduarse"
-        (rf'(?:{NUMEROS_ESCRITOS})\s+a[nñ]o\s+(?:despu[eé]s|antes)\s+de\s+\w+', "relativo_evento"),
+        (rf"(?:{NUMEROS_ESCRITOS})\s+a[nñ]o\s+(?:despu[eé]s|antes)\s+de\s+\w+", "relativo_evento"),
         # Presente
-        (r'\b(?:actualmente|en\s+la\s+actualidad)\b', "presente"),
+        (r"\b(?:actualmente|en\s+la\s+actualidad)\b", "presente"),
         # Edades: "cinco años", "diez años" (sin "después/antes")
-        (rf'\b(?:{NUMEROS_ESCRITOS})\s+a[nñ]os?\b', "edad"),
+        (rf"\b(?:{NUMEROS_ESCRITOS})\s+a[nñ]os?\b", "edad"),
         # Ese mismo año
-        (r'ese\s+mismo\s+a[nñ]o|aquel\s+a[nñ]o|el\s+mismo\s+a[nñ]o', "relativo"),
+        (r"ese\s+mismo\s+a[nñ]o|aquel\s+a[nñ]o|el\s+mismo\s+a[nñ]o", "relativo"),
         # Cursos/periodos: "segundo curso"
-        (r'(?:primer|segundo|tercer|cuarto|quinto)\s+(?:curso|semestre|trimestre|a[nñ]o)', "periodo"),
+        (
+            r"(?:primer|segundo|tercer|cuarto|quinto)\s+(?:curso|semestre|trimestre|a[nñ]o)",
+            "periodo",
+        ),
         # Cumpleaños con numero escrito: "dieciocho cumpleaños"
-        (rf'(?:{NUMEROS_ESCRITOS})\s+cumplea[nñ]os', "cumpleanos"),
+        (rf"(?:{NUMEROS_ESCRITOS})\s+cumplea[nñ]os", "cumpleanos"),
         # Años solos: 1990, 2024 (solo si no estan ya capturados en patron anterior)
-        (r'\b(?:19|20)\d{2}\b', "ano"),
+        (r"\b(?:19|20)\d{2}\b", "ano"),
     ]
 
     # Detectar y clasificar marcadores, evitando duplicados por posición
@@ -584,8 +692,8 @@ def evaluate_timeline(text: str, gold: GoldStandard, verbose: bool = False) -> E
                 matched_detected.add(detected)
                 break
             # Match por año si ambos contienen el mismo año
-            detected_years = set(re.findall(r'\b(19\d{2}|20\d{2})\b', detected))
-            gold_years = set(re.findall(r'\b(19\d{2}|20\d{2})\b', gold_marker))
+            detected_years = set(re.findall(r"\b(19\d{2}|20\d{2})\b", detected))
+            gold_years = set(re.findall(r"\b(19\d{2}|20\d{2})\b", gold_marker))
             if detected_years and gold_years and detected_years == gold_years:
                 true_positives += 1
                 matched_gold.add(gold_marker)
@@ -656,12 +764,14 @@ def evaluate_fusion(text: str, gold: GoldStandard, verbose: bool = False) -> Eva
                 if verbose:
                     if "failed_pairs" not in metrics.details:
                         metrics.details["failed_pairs"] = []
-                    metrics.details["failed_pairs"].append({
-                        "pair": (name1, name2),
-                        "similarity": round(similarity, 3),
-                        "norm1": norm1,
-                        "norm2": norm2,
-                    })
+                    metrics.details["failed_pairs"].append(
+                        {
+                            "pair": (name1, name2),
+                            "similarity": round(similarity, 3),
+                            "norm1": norm1,
+                            "norm2": norm2,
+                        }
+                    )
 
         metrics.true_positives = correct
         metrics.false_negatives = incorrect
@@ -703,11 +813,11 @@ def evaluate_attributes(text: str, gold: GoldStandard, verbose: bool = False) ->
 
         # Extraer atributos del texto
         result = extractor.extract_attributes(text)
-        if hasattr(result, 'is_success') and not result.is_success:
+        if hasattr(result, "is_success") and not result.is_success:
             metrics.details["error"] = str(result.error)
             return metrics
 
-        extraction_result = result.value if hasattr(result, 'value') else result
+        extraction_result = result.value if hasattr(result, "value") else result
         detected_attrs = extraction_result.attributes if extraction_result else []
 
         # Mapeo de keys del extractor a keys del gold standard
@@ -737,11 +847,15 @@ def evaluate_attributes(text: str, gold: GoldStandard, verbose: bool = False) ->
         detected_raw = []
         for attr in detected_attrs:
             # entity_name es el campo correcto
-            entity_norm = normalize_text(attr.entity_name) if hasattr(attr, 'entity_name') else normalize_text(str(attr))
+            entity_norm = (
+                normalize_text(attr.entity_name)
+                if hasattr(attr, "entity_name")
+                else normalize_text(str(attr))
+            )
 
             # key puede ser un enum - extraer su value
-            if hasattr(attr, 'key'):
-                if hasattr(attr.key, 'value'):
+            if hasattr(attr, "key"):
+                if hasattr(attr.key, "value"):
                     key_raw = attr.key.value  # Enum value
                 else:
                     key_raw = str(attr.key)
@@ -751,7 +865,7 @@ def evaluate_attributes(text: str, gold: GoldStandard, verbose: bool = False) ->
             key_norm = normalize_text(key_raw)
 
             # value
-            value_norm = normalize_text(attr.value) if hasattr(attr, 'value') else ""
+            value_norm = normalize_text(attr.value) if hasattr(attr, "value") else ""
 
             detected_set.add((entity_norm, key_norm, value_norm))
             detected_raw.append((entity_norm, key_norm, value_norm))
@@ -780,7 +894,9 @@ def evaluate_attributes(text: str, gold: GoldStandard, verbose: bool = False) ->
                     key_match = det_key == gold_key or det_key in gold_key or gold_key in det_key
 
                 # Value match (parcial)
-                value_match = det_value in gold_value or gold_value in det_value or det_value == gold_value
+                value_match = (
+                    det_value in gold_value or gold_value in det_value or det_value == gold_value
+                )
 
                 if entity_match and key_match and value_match:
                     true_positives += 1
@@ -802,12 +918,15 @@ def evaluate_attributes(text: str, gold: GoldStandard, verbose: bool = False) ->
     except Exception as e:
         metrics.details["error"] = str(e)
         import traceback
+
         metrics.details["traceback"] = traceback.format_exc()
 
     return metrics
 
 
-def evaluate_inconsistencies(text: str, gold: GoldStandard, verbose: bool = False) -> EvaluationMetrics:
+def evaluate_inconsistencies(
+    text: str, gold: GoldStandard, verbose: bool = False
+) -> EvaluationMetrics:
     """Evalua deteccion de inconsistencias en atributos."""
     metrics = EvaluationMetrics(capability="inconsistencies")
 
@@ -855,21 +974,25 @@ def evaluate_inconsistencies(text: str, gold: GoldStandard, verbose: bool = Fals
 
         # Extraer atributos
         result = extractor.extract_attributes(text)
-        if hasattr(result, 'is_success') and not result.is_success:
+        if hasattr(result, "is_success") and not result.is_success:
             metrics.details["error"] = str(result.error)
             return metrics
 
-        extraction_result = result.value if hasattr(result, 'value') else result
+        extraction_result = result.value if hasattr(result, "value") else result
         detected_attrs = extraction_result.attributes if extraction_result else []
 
         # Agrupar por (entity, key)
         attr_groups = {}
         for attr in detected_attrs:
-            entity = normalize_text(attr.entity_name) if hasattr(attr, 'entity_name') else normalize_text(str(attr))
+            entity = (
+                normalize_text(attr.entity_name)
+                if hasattr(attr, "entity_name")
+                else normalize_text(str(attr))
+            )
 
             # Extraer key del enum si es necesario
-            if hasattr(attr, 'key'):
-                if hasattr(attr.key, 'value'):
+            if hasattr(attr, "key"):
+                if hasattr(attr.key, "value"):
                     key_raw = attr.key.value
                 else:
                     key_raw = str(attr.key)
@@ -877,7 +1000,7 @@ def evaluate_inconsistencies(text: str, gold: GoldStandard, verbose: bool = Fals
                 key_raw = "unknown"
 
             key = normalize_key(key_raw)
-            value = normalize_text(attr.value) if hasattr(attr, 'value') else ""
+            value = normalize_text(attr.value) if hasattr(attr, "value") else ""
 
             group_key = (entity, key)
             if group_key not in attr_groups:
@@ -923,6 +1046,7 @@ def evaluate_inconsistencies(text: str, gold: GoldStandard, verbose: bool = Fals
     except Exception as e:
         metrics.details["error"] = str(e)
         import traceback
+
         metrics.details["traceback"] = traceback.format_exc()
 
     return metrics
@@ -952,11 +1076,11 @@ def evaluate_orthography(text: str, gold: GoldStandard, verbose: bool = False) -
         )
         result = checker.check(narrative_text)
 
-        if hasattr(result, 'is_success') and not result.is_success:
+        if hasattr(result, "is_success") and not result.is_success:
             metrics.details["error"] = str(result.error)
             return metrics
 
-        report = result.value if hasattr(result, 'value') else result
+        report = result.value if hasattr(result, "value") else result
         detected_issues = report.issues if report else []
 
         # Crear conjunto de errores detectados (palabra normalizada)
@@ -995,6 +1119,7 @@ def evaluate_orthography(text: str, gold: GoldStandard, verbose: bool = False) -
     except Exception as e:
         metrics.details["error"] = str(e)
         import traceback
+
         metrics.details["traceback"] = traceback.format_exc()
 
     return metrics
@@ -1003,6 +1128,7 @@ def evaluate_orthography(text: str, gold: GoldStandard, verbose: bool = False) -
 # =============================================================================
 # EVALUADORES AVANZADOS
 # =============================================================================
+
 
 def evaluate_coreference(text: str, gold: GoldStandard, verbose: bool = False) -> EvaluationMetrics:
     """Evalua resolucion de correferencias."""
@@ -1017,11 +1143,11 @@ def evaluate_coreference(text: str, gold: GoldStandard, verbose: bool = False) -
 
         result = resolve_coreferences_voting(text)
 
-        if hasattr(result, 'is_failure') and result.is_failure:
+        if hasattr(result, "is_failure") and result.is_failure:
             metrics.details["error"] = str(result.error)
             return metrics
 
-        coref_result = result.value if hasattr(result, 'value') else result
+        coref_result = result.value if hasattr(result, "value") else result
         detected_chains = coref_result.chains if coref_result else []
 
         # Crear mapeo de menciones detectadas a entidades
@@ -1080,17 +1206,20 @@ def evaluate_coreference(text: str, gold: GoldStandard, verbose: bool = False) -
     except Exception as e:
         metrics.details["error"] = str(e)
         import traceback
+
         metrics.details["traceback"] = traceback.format_exc()
 
     return metrics
 
 
-def evaluate_dialogue_attribution(text: str, gold: GoldStandard, verbose: bool = False) -> EvaluationMetrics:
+def evaluate_dialogue_attribution(
+    text: str, gold: GoldStandard, verbose: bool = False
+) -> EvaluationMetrics:
     """Evalua atribucion de dialogos (quien dice cada linea)."""
     metrics = EvaluationMetrics(capability="dialogue")
 
     # Extraer dialogos del texto
-    dialogue_pattern = r'[-—]\s*(.+?)(?:\s*[-—]|$)'
+    dialogue_pattern = r"[-—]\s*(.+?)(?:\s*[-—]|$)"
     dialogues = re.findall(dialogue_pattern, text, re.MULTILINE)
 
     if not dialogues:
@@ -1103,11 +1232,11 @@ def evaluate_dialogue_attribution(text: str, gold: GoldStandard, verbose: bool =
         attributor = get_speaker_attribution()
         result = attributor.attribute_speakers(text)
 
-        if hasattr(result, 'is_failure') and result.is_failure:
+        if hasattr(result, "is_failure") and result.is_failure:
             metrics.details["error"] = str(result.error)
             return metrics
 
-        attribution_result = result.value if hasattr(result, 'value') else result
+        attribution_result = result.value if hasattr(result, "value") else result
 
         # Contar atribuciones exitosas
         attributed = 0
@@ -1149,9 +1278,26 @@ def evaluate_muletillas(text: str, gold_name: str, verbose: bool = False) -> Eva
 
     # Lista de muletillas comunes en espanol
     MULETILLAS = [
-        "pues", "o sea", "eh", "bueno", "vamos", "la verdad", "no se",
-        "vale", "viste", "ya", "ay", "mira", "oye", "sabes", "como",
-        "digamos", "en plan", "tipo", "entonces", "total"
+        "pues",
+        "o sea",
+        "eh",
+        "bueno",
+        "vamos",
+        "la verdad",
+        "no se",
+        "vale",
+        "viste",
+        "ya",
+        "ay",
+        "mira",
+        "oye",
+        "sabes",
+        "como",
+        "digamos",
+        "en plan",
+        "tipo",
+        "entonces",
+        "total",
     ]
 
     try:
@@ -1164,16 +1310,14 @@ def evaluate_muletillas(text: str, gold_name: str, verbose: bool = False) -> Eva
 
         for muletilla in MULETILLAS:
             # Contar ocurrencias (usando word boundaries para evitar matches parciales)
-            pattern = rf'\b{re.escape(muletilla)}\b'
+            pattern = rf"\b{re.escape(muletilla)}\b"
             count = len(re.findall(pattern, text_lower))
             if count > 0:
                 detected_muletillas[muletilla] = count
 
         # Contar total esperado vs detectado
         total_gold = sum(
-            count
-            for speaker_data in gold_data.values()
-            for count in speaker_data.values()
+            count for speaker_data in gold_data.values() for count in speaker_data.values()
         )
 
         total_detected = sum(detected_muletillas.values())
@@ -1204,6 +1348,7 @@ def evaluate_muletillas(text: str, gold_name: str, verbose: bool = False) -> Eva
     except Exception as e:
         metrics.details["error"] = str(e)
         import traceback
+
         metrics.details["traceback"] = traceback.format_exc()
 
     return metrics
@@ -1226,11 +1371,11 @@ def evaluate_focalization(text: str, gold_name: str, verbose: bool = False) -> E
 
             result = detect_focalization_violations(text)
 
-            if hasattr(result, 'is_failure') and result.is_failure:
+            if hasattr(result, "is_failure") and result.is_failure:
                 metrics.details["error"] = str(result.error)
                 return metrics
 
-            detected = result.value if hasattr(result, 'value') else result
+            detected = result.value if hasattr(result, "value") else result
             detected_violations = detected.violations if detected else []
 
             # Comparar con gold
@@ -1249,14 +1394,16 @@ def evaluate_focalization(text: str, gold_name: str, verbose: bool = False) -> E
 
         except ImportError:
             # Modulo no implementado - evaluacion basica por patrones
-            metrics.details["note"] = "Focalization module not implemented - using pattern-based detection"
+            metrics.details["note"] = (
+                "Focalization module not implemented - using pattern-based detection"
+            )
 
             # Patrones que indican cambio de POV
             pov_patterns = [
-                r'\bpensaba\s+que\b',  # Pensamientos internos
-                r'\bsabia\s+que\b',  # Conocimiento interno
-                r'\bsentia\s+(?:que|como)\b',  # Sentimientos
-                r'\bsin\s+saber\b',  # Lo que no sabe alguien
+                r"\bpensaba\s+que\b",  # Pensamientos internos
+                r"\bsabia\s+que\b",  # Conocimiento interno
+                r"\bsentia\s+(?:que|como)\b",  # Sentimientos
+                r"\bsin\s+saber\b",  # Lo que no sabe alguien
             ]
 
             narrative_text = _filter_metadata_sections(text)
@@ -1278,6 +1425,7 @@ def evaluate_focalization(text: str, gold_name: str, verbose: bool = False) -> E
     except Exception as e:
         metrics.details["error"] = str(e)
         import traceback
+
         metrics.details["traceback"] = traceback.format_exc()
 
     return metrics
@@ -1300,21 +1448,26 @@ def evaluate_sentiment_arc(text: str, gold_name: str, verbose: bool = False) -> 
 
             result = analyze_sentiment_arc(text)
 
-            if hasattr(result, 'is_failure') and result.is_failure:
+            if hasattr(result, "is_failure") and result.is_failure:
                 metrics.details["error"] = str(result.error)
                 return metrics
 
-            detected_arc = result.value if hasattr(result, 'value') else result
+            detected_arc = result.value if hasattr(result, "value") else result
 
             # Comparar puntos del arco
-            if detected_arc and hasattr(detected_arc, 'points'):
+            if detected_arc and hasattr(detected_arc, "points"):
                 # Verificar si la progresion general es correcta
                 gold_progression = [p.sentiment for p in gold_arc]
                 detected_progression = [p.sentiment for p in detected_arc.points]
 
                 # Match basico: misma direccion general
-                gold_trend = sum(1 if s == "positivo" else -1 if s == "negativo" else 0 for s in gold_progression)
-                det_trend = sum(1 if s == "positivo" else -1 if s == "negativo" else 0 for s in detected_progression)
+                gold_trend = sum(
+                    1 if s == "positivo" else -1 if s == "negativo" else 0 for s in gold_progression
+                )
+                det_trend = sum(
+                    1 if s == "positivo" else -1 if s == "negativo" else 0
+                    for s in detected_progression
+                )
 
                 # Si la tendencia coincide, es un match parcial
                 if (gold_trend > 0 and det_trend > 0) or (gold_trend < 0 and det_trend < 0):
@@ -1326,13 +1479,33 @@ def evaluate_sentiment_arc(text: str, gold_name: str, verbose: bool = False) -> 
 
         except ImportError:
             # Modulo no implementado - evaluacion basica por palabras clave
-            metrics.details["note"] = "Sentiment module not implemented - using keyword-based detection"
+            metrics.details["note"] = (
+                "Sentiment module not implemented - using keyword-based detection"
+            )
 
             narrative_text = _filter_metadata_sections(text)
 
             # Palabras clave de sentimiento
-            positive_words = ["alegr", "feliz", "paz", "esperanz", "sonri", "amor", "gratitud", "alivio"]
-            negative_words = ["dolor", "triste", "rabia", "miedo", "llorar", "sufr", "angust", "devastac"]
+            positive_words = [
+                "alegr",
+                "feliz",
+                "paz",
+                "esperanz",
+                "sonri",
+                "amor",
+                "gratitud",
+                "alivio",
+            ]
+            negative_words = [
+                "dolor",
+                "triste",
+                "rabia",
+                "miedo",
+                "llorar",
+                "sufr",
+                "angust",
+                "devastac",
+            ]
 
             pos_count = sum(1 for w in positive_words if w in narrative_text.lower())
             neg_count = sum(1 for w in negative_words if w in narrative_text.lower())
@@ -1357,12 +1530,15 @@ def evaluate_sentiment_arc(text: str, gold_name: str, verbose: bool = False) -> 
     except Exception as e:
         metrics.details["error"] = str(e)
         import traceback
+
         metrics.details["traceback"] = traceback.format_exc()
 
     return metrics
 
 
-def evaluate_register_changes(text: str, gold_name: str, verbose: bool = False) -> EvaluationMetrics:
+def evaluate_register_changes(
+    text: str, gold_name: str, verbose: bool = False
+) -> EvaluationMetrics:
     """Evalua deteccion de cambios de registro linguistico."""
     metrics = EvaluationMetrics(capability="register")
 
@@ -1379,13 +1555,13 @@ def evaluate_register_changes(text: str, gold_name: str, verbose: bool = False) 
 
             result = analyze_register(text)
 
-            if hasattr(result, 'is_failure') and result.is_failure:
+            if hasattr(result, "is_failure") and result.is_failure:
                 metrics.details["error"] = str(result.error)
                 return metrics
 
-            detected = result.value if hasattr(result, 'value') else result
+            detected = result.value if hasattr(result, "value") else result
 
-            if detected and hasattr(detected, 'changes'):
+            if detected and hasattr(detected, "changes"):
                 metrics.true_positives = len(detected.changes)
                 metrics.false_negatives = max(0, len(gold_changes) - len(detected.changes))
             else:
@@ -1393,7 +1569,9 @@ def evaluate_register_changes(text: str, gold_name: str, verbose: bool = False) 
 
         except ImportError:
             # Modulo no implementado - evaluacion basica
-            metrics.details["note"] = "Register analyzer not implemented - using heuristic detection"
+            metrics.details["note"] = (
+                "Register analyzer not implemented - using heuristic detection"
+            )
 
             narrative_text = _filter_metadata_sections(text)
 
@@ -1426,6 +1604,7 @@ def evaluate_register_changes(text: str, gold_name: str, verbose: bool = False) 
     except Exception as e:
         metrics.details["error"] = str(e)
         import traceback
+
         metrics.details["traceback"] = traceback.format_exc()
 
     return metrics
@@ -1435,10 +1614,9 @@ def evaluate_register_changes(text: str, gold_name: str, verbose: bool = False) 
 # EVALUACION PRINCIPAL
 # =============================================================================
 
+
 def run_evaluation(
-    gold_name: str,
-    capabilities: list[str] = None,
-    verbose: bool = False
+    gold_name: str, capabilities: list[str] = None, verbose: bool = False
 ) -> EvaluationReport:
     """Ejecuta evaluacion completa para un gold standard."""
 
@@ -1446,15 +1624,29 @@ def run_evaluation(
     all_standards = {**ALL_GOLD_STANDARDS, **ADVANCED_GOLD_STANDARDS}
 
     if gold_name not in all_standards:
-        raise ValueError(f"Gold standard '{gold_name}' not found. Available: {list(all_standards.keys())}")
+        raise ValueError(
+            f"Gold standard '{gold_name}' not found. Available: {list(all_standards.keys())}"
+        )
 
     gold = all_standards[gold_name]
     text = read_test_file(gold.text_file)
 
     all_capabilities = [
-        "ner", "chapters", "relations", "timeline", "fusion", "grammar",
-        "attributes", "inconsistencies", "orthography", "coreference", "dialogue",
-        "muletillas", "focalization", "sentiment", "register"
+        "ner",
+        "chapters",
+        "relations",
+        "timeline",
+        "fusion",
+        "grammar",
+        "attributes",
+        "inconsistencies",
+        "orthography",
+        "coreference",
+        "dialogue",
+        "muletillas",
+        "focalization",
+        "sentiment",
+        "register",
     ]
     if capabilities:
         selected = [c for c in capabilities if c in all_capabilities or c.startswith("grammar_")]
@@ -1465,39 +1657,39 @@ def run_evaluation(
 
     # NER
     if "ner" in selected and gold.entities:
-        print(f"  Evaluando NER...")
+        print("  Evaluando NER...")
         metrics["ner"] = evaluate_ner(text, gold, verbose)
 
     # Capitulos
     if "chapters" in selected and gold.chapters:
-        print(f"  Evaluando capitulos...")
+        print("  Evaluando capitulos...")
         metrics["chapters"] = evaluate_chapters(text, gold, verbose)
 
     # Relaciones
     if "relations" in selected and gold.relations:
-        print(f"  Evaluando relaciones...")
+        print("  Evaluando relaciones...")
         metrics["relations"] = evaluate_relations(text, gold, verbose)
 
     # Timeline
     if "timeline" in selected and gold.events:
-        print(f"  Evaluando timeline...")
+        print("  Evaluando timeline...")
         metrics["timeline"] = evaluate_timeline(text, gold, verbose)
 
     # Fusion
     if "fusion" in selected and gold.fusion_pairs:
-        print(f"  Evaluando fusion...")
+        print("  Evaluando fusion...")
         metrics["fusion"] = evaluate_fusion(text, gold, verbose)
 
     # Gramatica
     if "grammar" in selected and gold.grammar_errors:
-        print(f"  Evaluando gramatica...")
+        print("  Evaluando gramatica...")
         grammar_metrics = evaluate_grammar(text, gold, verbose)
         for error_type, m in grammar_metrics.items():
             metrics[f"grammar_{error_type}"] = m
 
     # Atributos
     if "attributes" in selected and gold.attributes:
-        print(f"  Evaluando atributos...")
+        print("  Evaluando atributos...")
         metrics["attributes"] = evaluate_attributes(text, gold, verbose)
 
     # Inconsistencias
@@ -1505,44 +1697,44 @@ def run_evaluation(
         # Verificar si hay inconsistencias marcadas
         has_inconsistencies = any(a.is_inconsistency for a in gold.attributes)
         if has_inconsistencies:
-            print(f"  Evaluando inconsistencias...")
+            print("  Evaluando inconsistencias...")
             metrics["inconsistencies"] = evaluate_inconsistencies(text, gold, verbose)
 
     # Ortografia
     if "orthography" in selected and gold.orthography_errors:
-        print(f"  Evaluando ortografia...")
+        print("  Evaluando ortografia...")
         metrics["orthography"] = evaluate_orthography(text, gold, verbose)
 
     # Correferencias
     if "coreference" in selected and gold.coreferences:
-        print(f"  Evaluando correferencias...")
+        print("  Evaluando correferencias...")
         metrics["coreference"] = evaluate_coreference(text, gold, verbose)
 
     # Dialogos
     if "dialogue" in selected:
         # Evaluar si el texto tiene dialogos (presencia de guiones)
-        if '—' in text or '--' in text or '- ' in text:
-            print(f"  Evaluando atribucion de dialogos...")
+        if "—" in text or "--" in text or "- " in text:
+            print("  Evaluando atribucion de dialogos...")
             metrics["dialogue"] = evaluate_dialogue_attribution(text, gold, verbose)
 
     # Muletillas
     if "muletillas" in selected and gold_name in GOLD_MULETILLAS_DATA:
-        print(f"  Evaluando muletillas...")
+        print("  Evaluando muletillas...")
         metrics["muletillas"] = evaluate_muletillas(text, gold_name, verbose)
 
     # Focalizacion
     if "focalization" in selected and gold_name in GOLD_FOCALIZATION_VIOLATIONS_DATA:
-        print(f"  Evaluando focalizacion...")
+        print("  Evaluando focalizacion...")
         metrics["focalization"] = evaluate_focalization(text, gold_name, verbose)
 
     # Sentimiento
     if "sentiment" in selected and gold_name in GOLD_SENTIMENT_ARC_DATA:
-        print(f"  Evaluando arco de sentimiento...")
+        print("  Evaluando arco de sentimiento...")
         metrics["sentiment"] = evaluate_sentiment_arc(text, gold_name, verbose)
 
     # Registro linguistico
     if "register" in selected and gold_name in GOLD_REGISTER_CHANGES_DATA:
-        print(f"  Evaluando cambios de registro...")
+        print("  Evaluando cambios de registro...")
         metrics["register"] = evaluate_register_changes(text, gold_name, verbose)
 
     # Resumen
@@ -1568,9 +1760,9 @@ def run_all_evaluations(verbose: bool = False) -> dict[str, EvaluationReport]:
     reports = {}
 
     for name in ALL_GOLD_STANDARDS:
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"Evaluando: {name}")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         try:
             reports[name] = run_evaluation(name, verbose=verbose)
@@ -1583,17 +1775,19 @@ def run_all_evaluations(verbose: bool = False) -> dict[str, EvaluationReport]:
 
 def print_report(report: EvaluationReport):
     """Imprime un reporte de evaluacion."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"REPORTE: {report.gold_standard_name}")
     print(f"Archivo: {report.text_file}")
     print(f"Timestamp: {report.timestamp}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     print("\n  Capacidad          | Precision | Recall | F1")
-    print("  " + "-"*50)
+    print("  " + "-" * 50)
 
     for cap, stats in report.summary.items():
-        print(f"  {cap:19} | {stats['precision']:8.1f}% | {stats['recall']:5.1f}% | {stats['f1']:.1f}%")
+        print(
+            f"  {cap:19} | {stats['precision']:8.1f}% | {stats['recall']:5.1f}% | {stats['f1']:.1f}%"
+        )
 
 
 def save_report(reports: dict[str, EvaluationReport], output_path: Path):
@@ -1608,7 +1802,7 @@ def save_report(reports: dict[str, EvaluationReport], output_path: Path):
             "summary": report.summary,
         }
 
-    with open(output_path, 'w', encoding='utf-8') as f:
+    with open(output_path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
     print(f"\nReporte guardado en: {output_path}")
@@ -1620,7 +1814,9 @@ def main():
     parser.add_argument("--capability", "-c", help="Capacidad especifica a evaluar")
     parser.add_argument("--verbose", "-v", action="store_true", help="Mostrar detalles")
     parser.add_argument("--output", "-o", help="Archivo JSON de salida")
-    parser.add_argument("--list", "-l", action="store_true", help="Listar gold standards disponibles")
+    parser.add_argument(
+        "--list", "-l", action="store_true", help="Listar gold standards disponibles"
+    )
 
     args = parser.parse_args()
 
@@ -1649,9 +1845,9 @@ def main():
             print_report(report)
 
         # Resumen global
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("RESUMEN GLOBAL")
-        print("="*60)
+        print("=" * 60)
 
         all_metrics = {}
         for report in reports.values():
@@ -1661,7 +1857,7 @@ def main():
                 all_metrics[cap].append(stats)
 
         print("\n  Capacidad          | Avg Precision | Avg Recall | Avg F1")
-        print("  " + "-"*56)
+        print("  " + "-" * 56)
 
         for cap, stats_list in sorted(all_metrics.items()):
             avg_p = sum(s["precision"] for s in stats_list) / len(stats_list)

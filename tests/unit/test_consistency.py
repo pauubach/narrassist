@@ -3,15 +3,16 @@ Tests unitarios para análisis de consistencia de atributos.
 """
 
 import pytest
+
 from narrative_assistant.analysis.attribute_consistency import (
     AttributeConsistencyChecker,
     AttributeInconsistency,
     InconsistencyType,
 )
 from narrative_assistant.nlp.attributes import (
-    ExtractedAttribute,
-    AttributeKey,
     AttributeCategory,
+    AttributeKey,
+    ExtractedAttribute,
 )
 
 
@@ -50,7 +51,9 @@ class TestAttributeConsistencyChecker:
             ),
         ]
 
-        result = checker.check_consistency(attributes, )
+        result = checker.check_consistency(
+            attributes,
+        )
 
         assert result.is_success
         inconsistencies = result.value
@@ -88,7 +91,9 @@ class TestAttributeConsistencyChecker:
             ),
         ]
 
-        result = checker.check_consistency(attributes, )
+        result = checker.check_consistency(
+            attributes,
+        )
 
         assert result.is_success
         inconsistencies = result.value
@@ -98,7 +103,9 @@ class TestAttributeConsistencyChecker:
 
     def test_empty_attributes(self, checker):
         """Maneja lista vacía de atributos."""
-        result = checker.check_consistency([], )
+        result = checker.check_consistency(
+            [],
+        )
 
         assert result.is_success
         inconsistencies = result.value
@@ -120,7 +127,9 @@ class TestAttributeConsistencyChecker:
             ),
         ]
 
-        result = checker.check_consistency(attributes, )
+        result = checker.check_consistency(
+            attributes,
+        )
 
         assert result.is_success
         inconsistencies = result.value
@@ -158,7 +167,9 @@ class TestAttributeConsistencyChecker:
             ),
         ]
 
-        result = checker.check_consistency(attributes, )
+        result = checker.check_consistency(
+            attributes,
+        )
 
         assert result.is_success
         inconsistencies = result.value
@@ -353,9 +364,11 @@ class TestHairConsistency:
         assert result.is_success
         inconsistencies = result.value
         # negro y oscuro son sinónimos, no debería haber inconsistencia de alta confianza
-        hair_incon = [i for i in inconsistencies
-                     if i.attribute_key == AttributeKey.HAIR_COLOR
-                     and i.confidence >= 0.5]
+        hair_incon = [
+            i
+            for i in inconsistencies
+            if i.attribute_key == AttributeKey.HAIR_COLOR and i.confidence >= 0.5
+        ]
         assert len(hair_incon) == 0
 
     def test_multiple_hair_changes_across_chapters(self, checker):

@@ -16,32 +16,35 @@ Cobertura:
 - Negaciones, metáforas, ironía
 - Atributos temporales y condicionales
 """
-import pytest
+
 import sys
-from pathlib import Path
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Set
 from enum import Enum
+from pathlib import Path
+from typing import Dict, List, Optional, Set
+
+import pytest
 
 # Añadir src al path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from narrative_assistant.nlp.attributes import (
-    AttributeExtractor,
-    ExtractedAttribute,
     AssignmentSource,
     AttributeCategory,
+    AttributeExtractor,
     AttributeKey,
+    ExtractedAttribute,
 )
-
 
 # ============================================================================
 # ESTRUCTURAS DE DATOS PARA TESTS
 # ============================================================================
 
+
 @dataclass
 class ExpectedAttribute:
     """Atributo esperado en un test."""
+
     entity: str
     key: str  # eye_color, hair_color, etc.
     value: str
@@ -51,12 +54,13 @@ class ExpectedAttribute:
 @dataclass
 class LinguisticTestCase:
     """Caso de prueba lingüística."""
+
     name: str
     category: str  # correferencia, sintaxis, semantica
     text: str
-    entities: List[str]  # Entidades que deben detectarse
-    aliases: Dict[str, List[str]]  # entidad -> lista de alias
-    expected_attributes: List[ExpectedAttribute]
+    entities: list[str]  # Entidades que deben detectarse
+    aliases: dict[str, list[str]]  # entidad -> lista de alias
+    expected_attributes: list[ExpectedAttribute]
     description: str
     risk: str  # Posible error del sistema
 
@@ -436,6 +440,7 @@ ALL_CASES = COREFERENCE_CASES + SYNTAX_CASES + SEMANTIC_CASES
 # FIXTURES
 # ============================================================================
 
+
 @pytest.fixture
 def extractor():
     """Crear extractor con configuración estándar."""
@@ -450,6 +455,7 @@ def extractor():
 # ============================================================================
 # TESTS PARAMETRIZADOS
 # ============================================================================
+
 
 @pytest.mark.parametrize("case", COREFERENCE_CASES, ids=[c.name for c in COREFERENCE_CASES])
 def test_coreference_cases(case: LinguisticTestCase, extractor):
@@ -472,7 +478,7 @@ def test_semantic_cases(case: LinguisticTestCase, extractor):
 def _run_linguistic_test(case: LinguisticTestCase, extractor):
     """
     Ejecuta un caso de prueba lingüística.
-    
+
     Por ahora, solo verifica la estructura. Los tests completos
     requieren integración con el pipeline completo de NLP.
     """
@@ -480,26 +486,26 @@ def _run_linguistic_test(case: LinguisticTestCase, extractor):
     assert case.text, f"Caso {case.name}: texto vacío"
     assert case.entities, f"Caso {case.name}: sin entidades"
     assert case.expected_attributes, f"Caso {case.name}: sin atributos esperados"
-    
+
     # Log para debugging
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"CASO: {case.name} ({case.category})")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"TEXTO: {case.text[:100]}...")
     print(f"ENTIDADES: {case.entities}")
     print(f"DESCRIPCIÓN: {case.description}")
     print(f"RIESGO: {case.risk}")
-    
+
     # Verificar atributos esperados
     should_extract = [a for a in case.expected_attributes if a.should_extract]
     should_not_extract = [a for a in case.expected_attributes if not a.should_extract]
-    
-    print(f"\nATRIBUTOS QUE DEBEN EXTRAERSE:")
+
+    print("\nATRIBUTOS QUE DEBEN EXTRAERSE:")
     for attr in should_extract:
         print(f"  ✓ {attr.entity} -> {attr.key}={attr.value}")
-    
+
     if should_not_extract:
-        print(f"\nATRIBUTOS QUE NO DEBEN EXTRAERSE:")
+        print("\nATRIBUTOS QUE NO DEBEN EXTRAERSE:")
         for attr in should_not_extract:
             print(f"  ✗ {attr.entity} -> {attr.key}={attr.value}")
 
@@ -508,9 +514,10 @@ def _run_linguistic_test(case: LinguisticTestCase, extractor):
 # TEST DE DEDUPLICACIÓN CESP
 # ============================================================================
 
+
 class TestCESPDeduplication:
     """Tests específicos para la deduplicación CESP."""
-    
+
     def test_genitivo_beats_proximity(self):
         """GENITIVO debe ganar sobre PROXIMITY."""
         extractor = AttributeExtractor(
@@ -519,7 +526,7 @@ class TestCESPDeduplication:
             use_dependency_extraction=False,
             use_patterns=False,
         )
-        
+
         # Simular: "ojos azules de Pedro" asignado a Pedro (genitivo) y Juan (proximity)
         attr_pedro = ExtractedAttribute(
             entity_name="Pedro",
@@ -533,7 +540,7 @@ class TestCESPDeduplication:
             assignment_source=AssignmentSource.GENITIVE,
             sentence_idx=1,
         )
-        
+
         attr_juan = ExtractedAttribute(
             entity_name="Juan",
             category=AttributeCategory.PHYSICAL,
@@ -546,13 +553,13 @@ class TestCESPDeduplication:
             assignment_source=AssignmentSource.PROXIMITY,
             sentence_idx=1,
         )
-        
+
         result = extractor._deduplicate([attr_pedro, attr_juan])
-        
+
         assert len(result) == 1, "Debe haber solo 1 atributo"
         assert result[0].entity_name == "Pedro", "Pedro debe ganar (genitivo)"
         assert result[0].assignment_source == AssignmentSource.GENITIVE
-    
+
     def test_explicit_subject_beats_proximity(self):
         """EXPLICIT_SUBJECT debe ganar sobre PROXIMITY."""
         extractor = AttributeExtractor(
@@ -561,7 +568,7 @@ class TestCESPDeduplication:
             use_dependency_extraction=False,
             use_patterns=False,
         )
-        
+
         attr_maria_subj = ExtractedAttribute(
             entity_name="María",
             category=AttributeCategory.PHYSICAL,
@@ -574,7 +581,7 @@ class TestCESPDeduplication:
             assignment_source=AssignmentSource.EXPLICIT_SUBJECT,
             sentence_idx=0,
         )
-        
+
         attr_juan_prox = ExtractedAttribute(
             entity_name="Juan",
             category=AttributeCategory.PHYSICAL,
@@ -587,13 +594,13 @@ class TestCESPDeduplication:
             assignment_source=AssignmentSource.PROXIMITY,
             sentence_idx=0,
         )
-        
+
         result = extractor._deduplicate([attr_maria_subj, attr_juan_prox])
-        
+
         assert len(result) == 1
         assert result[0].entity_name == "María"
         assert result[0].assignment_source == AssignmentSource.EXPLICIT_SUBJECT
-    
+
     def test_different_sentences_preserved(self):
         """Atributos en oraciones diferentes deben preservarse."""
         extractor = AttributeExtractor(
@@ -602,7 +609,7 @@ class TestCESPDeduplication:
             use_dependency_extraction=False,
             use_patterns=False,
         )
-        
+
         attr_sentence0 = ExtractedAttribute(
             entity_name="Juan",
             category=AttributeCategory.PHYSICAL,
@@ -615,7 +622,7 @@ class TestCESPDeduplication:
             assignment_source=AssignmentSource.EXPLICIT_SUBJECT,
             sentence_idx=0,
         )
-        
+
         attr_sentence1 = ExtractedAttribute(
             entity_name="Pedro",
             category=AttributeCategory.PHYSICAL,
@@ -628,13 +635,13 @@ class TestCESPDeduplication:
             assignment_source=AssignmentSource.EXPLICIT_SUBJECT,
             sentence_idx=1,
         )
-        
+
         result = extractor._deduplicate([attr_sentence0, attr_sentence1])
-        
+
         assert len(result) == 2, "Ambos atributos deben preservarse (oraciones diferentes)"
         entities = {a.entity_name for a in result}
         assert entities == {"Juan", "Pedro"}
-    
+
     def test_priority_order_complete(self):
         """Verificar orden completo de prioridades."""
         # Prioridades esperadas (de _deduplicate)
@@ -646,7 +653,7 @@ class TestCESPDeduplication:
             (AssignmentSource.EMBEDDINGS, 40),
             (AssignmentSource.PROXIMITY, 10),
         ]
-        
+
         # Verificar que las prioridades están en orden descendente
         for i in range(len(expected_order) - 1):
             source1, priority1 = expected_order[i]
@@ -658,13 +665,14 @@ class TestCESPDeduplication:
 # TESTS DE CASOS ESPECÍFICOS DEL BUG HISTÓRICO
 # ============================================================================
 
+
 class TestHistoricalBugFixes:
     """Tests para verificar que los bugs históricos están corregidos."""
-    
+
     def test_ojos_azules_de_pedro_not_assigned_to_juan(self):
         """
         BUG HISTÓRICO: 'ojos azules de Pedro' se asignaba a Juan.
-        
+
         Este fue el bug original que motivó la implementación de CESP.
         """
         extractor = AttributeExtractor(
@@ -673,7 +681,7 @@ class TestHistoricalBugFixes:
             use_dependency_extraction=False,
             use_patterns=False,
         )
-        
+
         # Simular exactamente el escenario del bug
         attr_correct = ExtractedAttribute(
             entity_name="Pedro",
@@ -687,7 +695,7 @@ class TestHistoricalBugFixes:
             assignment_source=AssignmentSource.GENITIVE,
             sentence_idx=1,
         )
-        
+
         attr_incorrect = ExtractedAttribute(
             entity_name="Juan",
             category=AttributeCategory.PHYSICAL,
@@ -700,14 +708,14 @@ class TestHistoricalBugFixes:
             assignment_source=AssignmentSource.PROXIMITY,
             sentence_idx=1,
         )
-        
+
         result = extractor._deduplicate([attr_correct, attr_incorrect])
-        
+
         # Verificaciones críticas
         assert len(result) == 1, "Solo debe haber 1 resultado"
         assert result[0].entity_name == "Pedro", "CESP debe asignar a Pedro, no a Juan"
         assert result[0].assignment_source == AssignmentSource.GENITIVE
-        
+
         # Verificar que Juan NO tiene el atributo
         juan_attrs = [a for a in result if a.entity_name == "Juan"]
         assert len(juan_attrs) == 0, "Juan NO debe tener ojos azules"
@@ -725,6 +733,6 @@ if __name__ == "__main__":
     print(f"  - Correferencia: {len(COREFERENCE_CASES)}")
     print(f"  - Sintaxis: {len(SYNTAX_CASES)}")
     print(f"  - Semántica: {len(SEMANTIC_CASES)}")
-    
+
     # Ejecutar con pytest
     pytest.main([__file__, "-v", "--tb=short"])

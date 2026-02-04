@@ -11,21 +11,20 @@ Cubre:
 Nota: Estos tests requieren sentence-transformers instalado.
 """
 
-import pytest
-import time
 import gc
 import sys
+import time
 from typing import Optional
 
+import pytest
 
 # =============================================================================
 # Fixtures para generación de documentos con redundancias
 # =============================================================================
 
+
 def generate_redundant_chapter(
-    chapter_num: int,
-    word_count: int = 5000,
-    redundancy_rate: float = 0.05
+    chapter_num: int, word_count: int = 5000, redundancy_rate: float = 0.05
 ) -> dict:
     """
     Genera un capítulo sintético con redundancias controladas.
@@ -81,8 +80,10 @@ def generate_redundant_chapter(
             base_idx = sentence_idx % len(base_sentences)
 
             # Decidir si insertar redundancia
-            if (redundancy_counter / max(1, sentence_idx + 1) < redundancy_rate and
-                    base_idx in redundant_variants):
+            if (
+                redundancy_counter / max(1, sentence_idx + 1) < redundancy_rate
+                and base_idx in redundant_variants
+            ):
                 para_sentences.append(redundant_variants[base_idx])
                 redundancy_counter += 1
             else:
@@ -104,9 +105,7 @@ def generate_redundant_chapter(
 
 
 def generate_manuscript_with_redundancy(
-    total_words: int,
-    words_per_chapter: int = 5000,
-    redundancy_rate: float = 0.05
+    total_words: int, words_per_chapter: int = 5000, redundancy_rate: float = 0.05
 ) -> tuple[str, list[dict]]:
     """
     Genera un manuscrito completo con redundancias controladas.
@@ -137,6 +136,7 @@ def generate_manuscript_with_redundancy(
 # Tests de rendimiento por tamaño
 # =============================================================================
 
+
 class TestSemanticRedundancyPerformance:
     """Tests de rendimiento para detección de redundancia semántica."""
 
@@ -147,6 +147,7 @@ class TestSemanticRedundancyPerformance:
             from narrative_assistant.analysis.semantic_redundancy import (
                 SemanticRedundancyDetector,
             )
+
             return SemanticRedundancyDetector()
         except ImportError:
             pytest.skip("sentence-transformers no disponible")
@@ -224,6 +225,7 @@ class TestSemanticRedundancyPerformance:
 # Tests de comparación de modos
 # =============================================================================
 
+
 class TestModeComparison:
     """Tests para comparar rendimiento entre modos."""
 
@@ -234,6 +236,7 @@ class TestModeComparison:
             from narrative_assistant.analysis.semantic_redundancy import (
                 SemanticRedundancyDetector,
             )
+
             return SemanticRedundancyDetector()
         except ImportError:
             pytest.skip("sentence-transformers no disponible")
@@ -280,6 +283,7 @@ class TestModeComparison:
 # Tests de uso de memoria
 # =============================================================================
 
+
 class TestMemoryUsage:
     """Tests para verificar uso razonable de memoria."""
 
@@ -290,6 +294,7 @@ class TestMemoryUsage:
             from narrative_assistant.analysis.semantic_redundancy import (
                 SemanticRedundancyDetector,
             )
+
             return SemanticRedundancyDetector()
         except ImportError:
             pytest.skip("sentence-transformers no disponible")
@@ -312,7 +317,7 @@ class TestMemoryUsage:
 
         # El reporte no debería ser desproporcionadamente grande
         report = result.value
-        report_dict = report.to_dict() if hasattr(report, 'to_dict') else str(report)
+        report_dict = report.to_dict() if hasattr(report, "to_dict") else str(report)
         report_size = len(str(report_dict))
 
         # El output no debería ser más de 20x el input
@@ -343,6 +348,7 @@ class TestMemoryUsage:
 # Tests de escalabilidad
 # =============================================================================
 
+
 class TestScalability:
     """Tests para verificar escalabilidad aproximadamente lineal."""
 
@@ -353,6 +359,7 @@ class TestScalability:
             from narrative_assistant.analysis.semantic_redundancy import (
                 SemanticRedundancyDetector,
             )
+
             return SemanticRedundancyDetector()
         except ImportError:
             pytest.skip("sentence-transformers no disponible")
@@ -399,8 +406,7 @@ class TestScalability:
             word_count = sentences_per_chapter * 15 * 5  # 5 capítulos
 
             text, chapters = generate_manuscript_with_redundancy(
-                word_count,
-                words_per_chapter=sentences_per_chapter * 15
+                word_count, words_per_chapter=sentences_per_chapter * 15
             )
 
             gc.collect()
@@ -411,10 +417,7 @@ class TestScalability:
 
             assert result.is_success
 
-            total_sentences = sum(
-                len(ch.get("content", "").split("."))
-                for ch in chapters
-            )
+            total_sentences = sum(len(ch.get("content", "").split(".")) for ch in chapters)
             results.append((total_sentences, elapsed))
 
         print("\nEscalabilidad por oraciones:")
@@ -426,6 +429,7 @@ class TestScalability:
 # Tests de detección de redundancias
 # =============================================================================
 
+
 class TestRedundancyDetection:
     """Tests para verificar que se detectan redundancias correctamente."""
 
@@ -436,6 +440,7 @@ class TestRedundancyDetection:
             from narrative_assistant.analysis.semantic_redundancy import (
                 SemanticRedundancyDetector,
             )
+
             return SemanticRedundancyDetector()
         except ImportError:
             pytest.skip("sentence-transformers no disponible")
@@ -446,7 +451,7 @@ class TestRedundancyDetection:
         # Generar con alta tasa de redundancia
         text, chapters = generate_manuscript_with_redundancy(
             20000,
-            redundancy_rate=0.15  # 15% de redundancias
+            redundancy_rate=0.15,  # 15% de redundancias
         )
 
         result = detector.detect(chapters, mode="balanced", threshold=0.80)
@@ -473,7 +478,7 @@ class TestRedundancyDetection:
         # Texto con cero redundancias
         text, chapters = generate_manuscript_with_redundancy(
             15000,
-            redundancy_rate=0.0  # Sin redundancias
+            redundancy_rate=0.0,  # Sin redundancias
         )
 
         result = detector.detect(chapters, mode="fast", threshold=0.95)  # Umbral alto
@@ -494,6 +499,7 @@ class TestRedundancyDetection:
 # Tests de threshold
 # =============================================================================
 
+
 class TestThresholdBehavior:
     """Tests para verificar comportamiento con diferentes umbrales."""
 
@@ -504,6 +510,7 @@ class TestThresholdBehavior:
             from narrative_assistant.analysis.semantic_redundancy import (
                 SemanticRedundancyDetector,
             )
+
             return SemanticRedundancyDetector()
         except ImportError:
             pytest.skip("sentence-transformers no disponible")
@@ -538,6 +545,7 @@ class TestThresholdBehavior:
 # Tests de FAISS vs lineal
 # =============================================================================
 
+
 class TestFAISSvsLinear:
     """Tests para comparar FAISS con búsqueda lineal."""
 
@@ -548,6 +556,7 @@ class TestFAISSvsLinear:
             from narrative_assistant.analysis.semantic_redundancy import (
                 SemanticRedundancyDetector,
             )
+
             return SemanticRedundancyDetector()
         except ImportError:
             pytest.skip("sentence-transformers no disponible")
@@ -567,9 +576,9 @@ class TestFAISSvsLinear:
         assert result_faiss.is_success
 
         # Verificar si FAISS fue usado
-        used_faiss = detector._faiss_available if hasattr(detector, '_faiss_available') else None
+        used_faiss = detector._faiss_available if hasattr(detector, "_faiss_available") else None
 
-        print(f"\n30K palabras:")
+        print("\n30K palabras:")
         print(f"  Tiempo: {time_faiss:.2f}s")
         print(f"  FAISS disponible: {used_faiss}")
         print(f"  Duplicados: {len(result_faiss.value.duplicates)}")
@@ -579,8 +588,7 @@ class TestFAISSvsLinear:
 # Marcador para tests lentos
 # =============================================================================
 
+
 def pytest_configure(config):
     """Registra el marcador 'slow' para tests lentos."""
-    config.addinivalue_line(
-        "markers", "slow: marca tests que tardan más de 10 segundos"
-    )
+    config.addinivalue_line("markers", "slow: marca tests que tardan más de 10 segundos")

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Tests unitarios para GoldenCorpusHarness.
 
@@ -6,35 +5,39 @@ Estos tests verifican la logica del harness sin ejecutar evaluaciones NLP costos
 """
 
 import json
+import sys
 import tempfile
 from pathlib import Path
 
 import pytest
 
-import sys
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 sys.path.insert(0, str(PROJECT_ROOT / "tests" / "evaluation"))
 
 from golden_corpus_harness import (
+    CapabilityScore,
     GoldenCorpusHarness,
     GoldStandardResult,
-    CapabilityScore,
-    RegressionInfo,
-    ImprovementInfo,
     HarnessReport,
+    ImprovementInfo,
+    RegressionInfo,
 )
-
 
 # ============================================================================
 # Helpers
 # ============================================================================
 
+
 def _make_score(cap: str, p: float, r: float, f1: float, tp=0, fp=0, fn=0):
     return CapabilityScore(
         capability=cap,
-        precision=p, recall=r, f1=f1,
-        true_positives=tp, false_positives=fp, false_negatives=fn,
+        precision=p,
+        recall=r,
+        f1=f1,
+        true_positives=tp,
+        false_positives=fp,
+        false_negatives=fn,
     )
 
 
@@ -46,9 +49,7 @@ def _make_result(name: str, scores: dict[str, CapabilityScore]):
 
 def _make_baseline(data: dict) -> Path:
     """Crea un archivo baseline temporal y retorna su path."""
-    tmp = tempfile.NamedTemporaryFile(
-        mode="w", suffix=".json", delete=False, encoding="utf-8"
-    )
+    tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8")
     json.dump(data, tmp, indent=2)
     tmp.close()
     return Path(tmp.name)
@@ -57,6 +58,7 @@ def _make_baseline(data: dict) -> Path:
 # ============================================================================
 # Tests
 # ============================================================================
+
 
 class TestCapabilityScore:
     """Tests para CapabilityScore."""
@@ -77,24 +79,33 @@ class TestGoldStandardResult:
     """Tests para GoldStandardResult."""
 
     def test_avg_f1_single(self):
-        result = _make_result("test", {
-            "ner": _make_score("ner", 80.0, 90.0, 84.7),
-        })
+        result = _make_result(
+            "test",
+            {
+                "ner": _make_score("ner", 80.0, 90.0, 84.7),
+            },
+        )
         assert abs(result.avg_f1 - 84.7) < 0.01
 
     def test_avg_f1_multiple(self):
-        result = _make_result("test", {
-            "ner": _make_score("ner", 80.0, 90.0, 84.7),
-            "chapters": _make_score("chapters", 100.0, 100.0, 100.0),
-        })
+        result = _make_result(
+            "test",
+            {
+                "ner": _make_score("ner", 80.0, 90.0, 84.7),
+                "chapters": _make_score("chapters", 100.0, 100.0, 100.0),
+            },
+        )
         expected = (84.7 + 100.0) / 2
         assert abs(result.avg_f1 - expected) < 0.01
 
     def test_avg_f1_with_zero(self):
-        result = _make_result("test", {
-            "ner": _make_score("ner", 80.0, 90.0, 84.7),
-            "chapters": _make_score("chapters", 0.0, 0.0, 0.0),
-        })
+        result = _make_result(
+            "test",
+            {
+                "ner": _make_score("ner", 80.0, 90.0, 84.7),
+                "chapters": _make_score("chapters", 0.0, 0.0, 0.0),
+            },
+        )
         # Solo cuenta scores con f1 > 0
         assert abs(result.avg_f1 - 84.7) < 0.01
 
@@ -173,9 +184,12 @@ class TestHarnessDetectRegressions:
         harness = self._make_harness_with_baseline(baseline)
 
         current = {
-            "test_gs": _make_result("test_gs", {
-                "ner": _make_score("ner", 90.0, 90.0, 90.0),
-            }),
+            "test_gs": _make_result(
+                "test_gs",
+                {
+                    "ner": _make_score("ner", 90.0, 90.0, 90.0),
+                },
+            ),
         }
         regressions, improvements = harness.detect_regressions(current)
         assert len(regressions) == 0
@@ -192,9 +206,12 @@ class TestHarnessDetectRegressions:
         harness = self._make_harness_with_baseline(baseline)
 
         current = {
-            "test_gs": _make_result("test_gs", {
-                "ner": _make_score("ner", 70.0, 70.0, 70.0),
-            }),
+            "test_gs": _make_result(
+                "test_gs",
+                {
+                    "ner": _make_score("ner", 70.0, 70.0, 70.0),
+                },
+            ),
         }
         regressions, improvements = harness.detect_regressions(current)
         assert len(regressions) == 1
@@ -210,9 +227,12 @@ class TestHarnessDetectRegressions:
         harness = self._make_harness_with_baseline(baseline)
 
         current = {
-            "test_gs": _make_result("test_gs", {
-                "ner": _make_score("ner", 76.0, 76.0, 76.0),
-            }),
+            "test_gs": _make_result(
+                "test_gs",
+                {
+                    "ner": _make_score("ner", 76.0, 76.0, 76.0),
+                },
+            ),
         }
         regressions, improvements = harness.detect_regressions(current)
         assert len(regressions) == 0
@@ -223,9 +243,12 @@ class TestHarnessDetectRegressions:
         harness = self._make_harness_with_baseline({})
 
         current = {
-            "test_gs": _make_result("test_gs", {
-                "ner": _make_score("ner", 50.0, 50.0, 50.0),
-            }),
+            "test_gs": _make_result(
+                "test_gs",
+                {
+                    "ner": _make_score("ner", 50.0, 50.0, 50.0),
+                },
+            ),
         }
         regressions, improvements = harness.detect_regressions(current)
         assert len(regressions) == 0
@@ -243,10 +266,13 @@ class TestHarnessDetectRegressions:
         harness = self._make_harness_with_baseline(baseline)
 
         current = {
-            "test_gs": _make_result("test_gs", {
-                "ner": _make_score("ner", 70.0, 70.0, 70.0),
-                "chapters": _make_score("chapters", 90.0, 90.0, 90.0),
-            }),
+            "test_gs": _make_result(
+                "test_gs",
+                {
+                    "ner": _make_score("ner", 70.0, 70.0, 70.0),
+                    "chapters": _make_score("chapters", 90.0, 90.0, 90.0),
+                },
+            ),
         }
         regressions, improvements = harness.detect_regressions(current)
         assert len(regressions) == 1
@@ -260,9 +286,12 @@ class TestHarnessComputeAggregate:
 
     def test_single_result(self):
         results = {
-            "gs1": _make_result("gs1", {
-                "ner": _make_score("ner", 0, 0, 0, tp=8, fp=2, fn=1),
-            }),
+            "gs1": _make_result(
+                "gs1",
+                {
+                    "ner": _make_score("ner", 0, 0, 0, tp=8, fp=2, fn=1),
+                },
+            ),
         }
         aggregate = GoldenCorpusHarness.compute_aggregate(results)
         assert "ner" in aggregate
@@ -272,12 +301,18 @@ class TestHarnessComputeAggregate:
 
     def test_aggregation_across_multiple(self):
         results = {
-            "gs1": _make_result("gs1", {
-                "ner": _make_score("ner", 0, 0, 0, tp=8, fp=2, fn=1),
-            }),
-            "gs2": _make_result("gs2", {
-                "ner": _make_score("ner", 0, 0, 0, tp=5, fp=1, fn=4),
-            }),
+            "gs1": _make_result(
+                "gs1",
+                {
+                    "ner": _make_score("ner", 0, 0, 0, tp=8, fp=2, fn=1),
+                },
+            ),
+            "gs2": _make_result(
+                "gs2",
+                {
+                    "ner": _make_score("ner", 0, 0, 0, tp=5, fp=1, fn=4),
+                },
+            ),
         }
         aggregate = GoldenCorpusHarness.compute_aggregate(results)
         # tp=13, fp=3, fn=5
@@ -309,9 +344,12 @@ class TestHarnessBaselineIO:
         report = HarnessReport(
             timestamp="2026-01-01T00:00:00",
             results={
-                "test_gs": _make_result("test_gs", {
-                    "ner": _make_score("ner", 80.0, 90.0, 84.7, tp=9, fp=2, fn=1),
-                }),
+                "test_gs": _make_result(
+                    "test_gs",
+                    {
+                        "ner": _make_score("ner", 80.0, 90.0, 84.7, tp=9, fp=2, fn=1),
+                    },
+                ),
             },
         )
 
@@ -360,7 +398,7 @@ class TestHarnessHistory:
         harness._append_history(report)
         assert tmp_history.exists()
 
-        with open(tmp_history, "r") as f:
+        with open(tmp_history) as f:
             history = json.load(f)
 
         assert len(history) == 1
@@ -372,7 +410,7 @@ class TestHarnessHistory:
         report.timestamp = "2026-01-02T00:00:00"
         harness._append_history(report)
 
-        with open(tmp_history, "r") as f:
+        with open(tmp_history) as f:
             history = json.load(f)
         assert len(history) == 2
 
@@ -419,9 +457,12 @@ class TestHarnessFormatReport:
         report = HarnessReport(
             timestamp="2026-01-01T00:00:00",
             results={
-                "gs1": _make_result("gs1", {
-                    "ner": _make_score("ner", 80.0, 90.0, 84.7),
-                }),
+                "gs1": _make_result(
+                    "gs1",
+                    {
+                        "ner": _make_score("ner", 80.0, 90.0, 84.7),
+                    },
+                ),
             },
             aggregate_scores={
                 "ner": _make_score("ner", 80.0, 90.0, 84.7, tp=9, fp=2, fn=1),

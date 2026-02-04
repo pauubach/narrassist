@@ -2,9 +2,11 @@
 Tests de integración para el pipeline completo.
 """
 
-import pytest
 from pathlib import Path
-from narrative_assistant.pipelines import run_full_analysis, PipelineConfig
+
+import pytest
+
+from narrative_assistant.pipelines import PipelineConfig, run_full_analysis
 
 
 class TestFullPipeline:
@@ -143,7 +145,9 @@ class TestFullPipeline:
         report = result.value
         assert len(report.entities) > 0
         # No debería haber atributos
-        assert "attributes_extracted" not in report.stats or report.stats["attributes_extracted"] == 0
+        assert (
+            "attributes_extracted" not in report.stats or report.stats["attributes_extracted"] == 0
+        )
 
     def test_pipeline_error_handling(self, tmp_path):
         """Maneja errores correctamente."""
@@ -239,6 +243,7 @@ class TestFullPipeline:
             pytest.skip("Test document not found")
 
         import time
+
         start = time.time()
 
         config = PipelineConfig(run_ner=True)

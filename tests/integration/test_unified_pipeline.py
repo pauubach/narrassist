@@ -5,10 +5,10 @@ Verifica que todas las fases del pipeline funcionan correctamente
 de forma integrada.
 """
 
-import pytest
 import tempfile
 from pathlib import Path
 
+import pytest
 
 # Texto de prueba con contenido narrativo completo
 SAMPLE_NARRATIVE = """
@@ -87,7 +87,7 @@ class TestUnifiedPipelineIntegration:
 
     def test_pipeline_runs_without_crash(self, sample_file):
         """Pipeline ejecuta sin errores fatales."""
-        from narrative_assistant.pipelines import run_unified_analysis, UnifiedConfig
+        from narrative_assistant.pipelines import UnifiedConfig, run_unified_analysis
 
         config = UnifiedConfig(
             run_ner=True,
@@ -110,7 +110,7 @@ class TestUnifiedPipelineIntegration:
 
     def test_pipeline_detects_chapters(self, sample_file):
         """Pipeline detecta capítulos correctamente."""
-        from narrative_assistant.pipelines import run_unified_analysis, UnifiedConfig
+        from narrative_assistant.pipelines import UnifiedConfig, run_unified_analysis
 
         config = UnifiedConfig(
             run_structure=True,
@@ -136,7 +136,7 @@ class TestUnifiedPipelineIntegration:
 
     def test_pipeline_detects_dialogues(self, sample_file):
         """Pipeline detecta diálogos."""
-        from narrative_assistant.pipelines import run_unified_analysis, UnifiedConfig
+        from narrative_assistant.pipelines import UnifiedConfig, run_unified_analysis
 
         config = UnifiedConfig(
             run_structure=True,
@@ -163,7 +163,7 @@ class TestUnifiedPipelineIntegration:
 
     def test_pipeline_detects_entities(self, sample_file):
         """Pipeline detecta entidades (NER)."""
-        from narrative_assistant.pipelines import run_unified_analysis, UnifiedConfig
+        from narrative_assistant.pipelines import UnifiedConfig, run_unified_analysis
 
         config = UnifiedConfig(
             run_structure=True,
@@ -192,7 +192,7 @@ class TestUnifiedPipelineIntegration:
 
     def test_pipeline_spelling_check(self, sample_file_with_errors):
         """Pipeline detecta errores ortográficos."""
-        from narrative_assistant.pipelines import run_unified_analysis, UnifiedConfig
+        from narrative_assistant.pipelines import UnifiedConfig, run_unified_analysis
 
         config = UnifiedConfig(
             run_structure=False,
@@ -221,7 +221,7 @@ class TestUnifiedPipelineIntegration:
 
     def test_pipeline_grammar_check(self, sample_file_with_errors):
         """Pipeline detecta errores gramaticales."""
-        from narrative_assistant.pipelines import run_unified_analysis, UnifiedConfig
+        from narrative_assistant.pipelines import UnifiedConfig, run_unified_analysis
 
         config = UnifiedConfig(
             run_structure=False,
@@ -249,7 +249,7 @@ class TestUnifiedPipelineIntegration:
 
     def test_pipeline_detects_specific_grammar_errors(self, sample_file_with_errors):
         """Pipeline detecta errores específicos: laísmo, dequeísmo, concordancia."""
-        from narrative_assistant.pipelines import run_unified_analysis, UnifiedConfig
+        from narrative_assistant.pipelines import UnifiedConfig, run_unified_analysis
 
         config = UnifiedConfig(
             run_structure=False,
@@ -302,7 +302,7 @@ class TestUnifiedPipelineIntegration:
 
     def test_pipeline_repetition_detection(self, sample_file):
         """Pipeline detecta repeticiones."""
-        from narrative_assistant.pipelines import run_unified_analysis, UnifiedConfig
+        from narrative_assistant.pipelines import UnifiedConfig, run_unified_analysis
 
         config = UnifiedConfig(
             run_structure=False,
@@ -331,7 +331,7 @@ class TestUnifiedPipelineIntegration:
 
     def test_pipeline_generates_alerts(self, sample_file):
         """Pipeline genera alertas."""
-        from narrative_assistant.pipelines import run_unified_analysis, UnifiedConfig
+        from narrative_assistant.pipelines import UnifiedConfig, run_unified_analysis
 
         config = UnifiedConfig(
             run_structure=True,
@@ -361,7 +361,7 @@ class TestUnifiedPipelineIntegration:
 
     def test_pipeline_statistics(self, sample_file):
         """Pipeline genera estadísticas."""
-        from narrative_assistant.pipelines import run_unified_analysis, UnifiedConfig
+        from narrative_assistant.pipelines import UnifiedConfig, run_unified_analysis
 
         config = UnifiedConfig(
             run_structure=True,
@@ -389,7 +389,7 @@ class TestUnifiedPipelineIntegration:
 
     def test_pipeline_timing(self, sample_file):
         """Pipeline registra tiempos."""
-        from narrative_assistant.pipelines import run_unified_analysis, UnifiedConfig
+        from narrative_assistant.pipelines import UnifiedConfig, run_unified_analysis
 
         config = UnifiedConfig(
             run_structure=True,
@@ -421,7 +421,7 @@ class TestUnifiedPipelineErrorHandling:
 
     def test_nonexistent_file(self, tmp_path):
         """Maneja archivo inexistente."""
-        from narrative_assistant.pipelines import run_unified_analysis, UnifiedConfig
+        from narrative_assistant.pipelines import UnifiedConfig, run_unified_analysis
 
         config = UnifiedConfig()
         nonexistent = tmp_path / "nonexistent.txt"
@@ -437,7 +437,7 @@ class TestUnifiedPipelineErrorHandling:
 
     def test_empty_file(self, tmp_path):
         """Maneja archivo vacío."""
-        from narrative_assistant.pipelines import run_unified_analysis, UnifiedConfig
+        from narrative_assistant.pipelines import UnifiedConfig, run_unified_analysis
 
         empty_file = tmp_path / "empty.txt"
         empty_file.write_text("", encoding="utf-8")
@@ -462,7 +462,7 @@ class TestUnifiedPipelineErrorHandling:
 
     def test_minimal_config(self, sample_file):
         """Pipeline con configuración mínima."""
-        from narrative_assistant.pipelines import run_unified_analysis, UnifiedConfig
+        from narrative_assistant.pipelines import UnifiedConfig, run_unified_analysis
 
         config = UnifiedConfig(
             run_structure=False,
@@ -496,7 +496,7 @@ class TestUnifiedPipelineProgressCallback:
 
     def test_progress_callback_called(self, sample_file):
         """Callback de progreso es llamado."""
-        from narrative_assistant.pipelines import run_unified_analysis, UnifiedConfig
+        from narrative_assistant.pipelines import UnifiedConfig, run_unified_analysis
 
         progress_calls = []
 
@@ -538,7 +538,8 @@ class TestUnifiedPipelinePerformance:
     def test_performance_acceptable(self, sample_file):
         """Pipeline completa en tiempo aceptable."""
         import time
-        from narrative_assistant.pipelines import run_unified_analysis, UnifiedConfig
+
+        from narrative_assistant.pipelines import UnifiedConfig, run_unified_analysis
 
         config = UnifiedConfig(
             run_structure=True,

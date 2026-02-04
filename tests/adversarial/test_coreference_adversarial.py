@@ -32,14 +32,16 @@ Basado en literatura lingüística:
 - Walker et al. (1998): Centering for Spanish
 """
 
-import pytest
 from dataclasses import dataclass
 from typing import Optional
+
+import pytest
 
 
 @dataclass
 class CorefTestCase:
     """Caso de test para correferencia."""
+
     id: str
     category: str
     text: str
@@ -60,7 +62,7 @@ PRONOUN_TESTS = [
         text="Juan entró en la habitación. Él estaba cansado.",
         expected_chains=[("Juan", ["Él"])],
         difficulty="easy",
-        linguistic_note="Pronombre sujeto simple, mismo párrafo"
+        linguistic_note="Pronombre sujeto simple, mismo párrafo",
     ),
     CorefTestCase(
         id="pron_02_simple_ella",
@@ -68,7 +70,7 @@ PRONOUN_TESTS = [
         text="María cerró la puerta. Ella suspiró aliviada.",
         expected_chains=[("María", ["Ella"])],
         difficulty="easy",
-        linguistic_note="Pronombre sujeto femenino simple"
+        linguistic_note="Pronombre sujeto femenino simple",
     ),
     CorefTestCase(
         id="pron_03_object_lo",
@@ -76,7 +78,7 @@ PRONOUN_TESTS = [
         text="Juan llegó a casa. María lo recibió con una sonrisa.",
         expected_chains=[("Juan", ["lo"])],
         difficulty="medium",
-        linguistic_note="Pronombre objeto directo masculino"
+        linguistic_note="Pronombre objeto directo masculino",
     ),
     CorefTestCase(
         id="pron_04_object_la",
@@ -84,7 +86,7 @@ PRONOUN_TESTS = [
         text="María estaba esperando. Juan la vio desde lejos.",
         expected_chains=[("María", ["la"])],
         difficulty="medium",
-        linguistic_note="Pronombre objeto directo femenino"
+        linguistic_note="Pronombre objeto directo femenino",
     ),
     CorefTestCase(
         id="pron_05_indirect_le",
@@ -92,7 +94,7 @@ PRONOUN_TESTS = [
         text="Pedro necesitaba ayuda. Ana le ofreció su apoyo.",
         expected_chains=[("Pedro", ["le"])],
         difficulty="medium",
-        linguistic_note="Pronombre objeto indirecto (ambiguo en género)"
+        linguistic_note="Pronombre objeto indirecto (ambiguo en género)",
     ),
     CorefTestCase(
         id="pron_06_two_entities_gender",
@@ -101,7 +103,7 @@ PRONOUN_TESTS = [
         expected_chains=[("Juan", ["Él"])],
         anti_chains=[("María", "Él")],
         difficulty="medium",
-        linguistic_note="Desambiguación por género"
+        linguistic_note="Desambiguación por género",
     ),
     CorefTestCase(
         id="pron_07_two_same_gender",
@@ -109,7 +111,7 @@ PRONOUN_TESTS = [
         text="Juan y Pedro discutieron. Él se fue enfadado.",
         expected_chains=[("Juan", ["Él"])],  # Centering: sujeto más prominente
         difficulty="hard",
-        linguistic_note="Ambigüedad de género - resolver por prominencia (Centering)"
+        linguistic_note="Ambigüedad de género - resolver por prominencia (Centering)",
     ),
     CorefTestCase(
         id="pron_08_plural_ellos",
@@ -117,7 +119,7 @@ PRONOUN_TESTS = [
         text="Los niños jugaban en el parque. Ellos reían sin parar.",
         expected_chains=[("Los niños", ["Ellos"])],
         difficulty="easy",
-        linguistic_note="Pronombre plural simple"
+        linguistic_note="Pronombre plural simple",
     ),
     CorefTestCase(
         id="pron_09_usted_formal",
@@ -125,7 +127,7 @@ PRONOUN_TESTS = [
         text="El doctor García entró. —¿Cómo se encuentra usted hoy?",
         expected_chains=[],  # "usted" es segunda persona, no correferente con el doctor
         difficulty="medium",
-        linguistic_note="Usted es 2ª persona, no correferencia con entidad 3ª"
+        linguistic_note="Usted es 2ª persona, no correferencia con entidad 3ª",
     ),
     CorefTestCase(
         id="pron_10_across_paragraph",
@@ -135,7 +137,7 @@ PRONOUN_TESTS = [
 Al día siguiente, ella llegó temprano.""",
         expected_chains=[("María", ["ella"])],
         difficulty="medium",
-        linguistic_note="Correferencia entre párrafos"
+        linguistic_note="Correferencia entre párrafos",
     ),
 ]
 
@@ -150,7 +152,7 @@ POSSESSIVE_TESTS = [
         text="María entró en la habitación. Su rostro mostraba preocupación.",
         expected_chains=[("María", ["Su"])],
         difficulty="easy",
-        linguistic_note="Posesivo simple, oración siguiente"
+        linguistic_note="Posesivo simple, oración siguiente",
     ),
     CorefTestCase(
         id="poss_02_sus_plural",
@@ -158,7 +160,7 @@ POSSESSIVE_TESTS = [
         text="Juan se sentó. Sus ojos azules brillaban.",
         expected_chains=[("Juan", ["Sus"])],
         difficulty="easy",
-        linguistic_note="Posesivo plural (objeto poseído plural)"
+        linguistic_note="Posesivo plural (objeto poseído plural)",
     ),
     CorefTestCase(
         id="poss_03_same_sentence",
@@ -166,7 +168,7 @@ POSSESSIVE_TESTS = [
         text="María peinaba su largo cabello negro.",
         expected_chains=[("María", ["su"])],
         difficulty="easy",
-        linguistic_note="Posesivo en misma oración"
+        linguistic_note="Posesivo en misma oración",
     ),
     CorefTestCase(
         id="poss_04_ambiguous_two_entities",
@@ -174,7 +176,7 @@ POSSESSIVE_TESTS = [
         text="Juan visitó a María. Su madre estaba enferma.",
         expected_chains=[("Juan", ["Su"])],  # Centering: sujeto es más prominente
         difficulty="hard",
-        linguistic_note="Ambigüedad posesiva - el poseedor es el sujeto (Centering)"
+        linguistic_note="Ambigüedad posesiva - el poseedor es el sujeto (Centering)",
     ),
     CorefTestCase(
         id="poss_05_object_possessor",
@@ -182,7 +184,7 @@ POSSESSIVE_TESTS = [
         text="María miró a Juan. Sus ojos marrones la observaban.",
         expected_chains=[("Juan", ["Sus", "la"])],  # "Sus ojos" de Juan, "la" es María
         difficulty="hard",
-        linguistic_note="Posesivo refiere al objeto cuando describe físico del objeto"
+        linguistic_note="Posesivo refiere al objeto cuando describe físico del objeto",
     ),
     CorefTestCase(
         id="poss_06_ojos_verdes_bug",
@@ -193,7 +195,7 @@ Juan entró poco después.""",
         expected_chains=[("María", ["Sus"])],
         anti_chains=[("Juan", "Sus")],
         difficulty="adversarial",
-        linguistic_note="BUG CONOCIDO: 'Sus' debe resolver a María, no a Juan"
+        linguistic_note="BUG CONOCIDO: 'Sus' debe resolver a María, no a Juan",
     ),
     CorefTestCase(
         id="poss_07_nested_possession",
@@ -201,7 +203,7 @@ Juan entró poco después.""",
         text="María vio a su hermana. Su vestido era azul.",
         expected_chains=[("su hermana", ["Su"])],  # El segundo "Su" refiere a la hermana
         difficulty="hard",
-        linguistic_note="Posesión anidada - entidad más reciente"
+        linguistic_note="Posesión anidada - entidad más reciente",
     ),
     CorefTestCase(
         id="poss_08_tonic_possessive",
@@ -209,7 +211,7 @@ Juan entró poco después.""",
         text="El libro era suyo. María lo había comprado ayer.",
         expected_chains=[("María", ["suyo"])],  # Catáfora: posesivo antes del nombre
         difficulty="hard",
-        linguistic_note="Posesivo tónico con catáfora"
+        linguistic_note="Posesivo tónico con catáfora",
     ),
     CorefTestCase(
         id="poss_09_multiple_possessives",
@@ -217,7 +219,7 @@ Juan entró poco después.""",
         text="Juan cuidaba de su madre. Su padre había fallecido hace años.",
         expected_chains=[("Juan", ["su", "Su"])],
         difficulty="medium",
-        linguistic_note="Múltiples posesivos del mismo poseedor"
+        linguistic_note="Múltiples posesivos del mismo poseedor",
     ),
     CorefTestCase(
         id="poss_10_possessive_in_dialogue",
@@ -225,7 +227,7 @@ Juan entró poco después.""",
         text='María dijo: "Mi hermano llegará pronto". Su voz temblaba.',
         expected_chains=[("María", ["Su"])],
         difficulty="medium",
-        linguistic_note="Posesivo después de diálogo - refiere al hablante"
+        linguistic_note="Posesivo después de diálogo - refiere al hablante",
     ),
 ]
 
@@ -240,7 +242,7 @@ DEMONSTRATIVE_TESTS = [
         text="Conocí a un hombre muy alto. Este me contó su historia.",
         expected_chains=[("un hombre muy alto", ["Este"])],
         difficulty="medium",
-        linguistic_note="Demostrativo proximal"
+        linguistic_note="Demostrativo proximal",
     ),
     CorefTestCase(
         id="demo_02_esa",
@@ -248,7 +250,7 @@ DEMONSTRATIVE_TESTS = [
         text="Vi a una mujer elegante. Esa llevaba un vestido rojo.",
         expected_chains=[("una mujer elegante", ["Esa"])],
         difficulty="medium",
-        linguistic_note="Demostrativo medial femenino"
+        linguistic_note="Demostrativo medial femenino",
     ),
     CorefTestCase(
         id="demo_03_aquellos",
@@ -256,7 +258,7 @@ DEMONSTRATIVE_TESTS = [
         text="Los soldados marchaban. Aquellos parecían exhaustos.",
         expected_chains=[("Los soldados", ["Aquellos"])],
         difficulty="medium",
-        linguistic_note="Demostrativo distal plural"
+        linguistic_note="Demostrativo distal plural",
     ),
     CorefTestCase(
         id="demo_04_contrast_este_aquel",
@@ -264,7 +266,7 @@ DEMONSTRATIVE_TESTS = [
         text="Juan y Pedro entraron. Este llevaba sombrero, aquel no.",
         expected_chains=[("Pedro", ["Este"]), ("Juan", ["aquel"])],
         difficulty="adversarial",
-        linguistic_note="Contraste este/aquel: este=más cercano textualmente, aquel=más lejano"
+        linguistic_note="Contraste este/aquel: este=más cercano textualmente, aquel=más lejano",
     ),
     CorefTestCase(
         id="demo_05_abstract_reference",
@@ -272,7 +274,7 @@ DEMONSTRATIVE_TESTS = [
         text="María ganó el premio. Esto la hizo muy feliz.",
         expected_chains=[],  # "Esto" refiere al evento, no a María
         difficulty="medium",
-        linguistic_note="'Esto' abstracto no es correferente con entidad"
+        linguistic_note="'Esto' abstracto no es correferente con entidad",
     ),
 ]
 
@@ -287,7 +289,7 @@ ZERO_ANAPHORA_TESTS = [
         text="María entró en la casa. Cerró la puerta con cuidado.",
         expected_chains=[("María", ["Ø"])],  # Sujeto implícito en "Cerró"
         difficulty="medium",
-        linguistic_note="Pro-drop simple: sujeto de oración anterior"
+        linguistic_note="Pro-drop simple: sujeto de oración anterior",
     ),
     CorefTestCase(
         id="zero_02_chain",
@@ -295,7 +297,7 @@ ZERO_ANAPHORA_TESTS = [
         text="Juan llegó tarde. Se quitó el abrigo. Encendió la luz.",
         expected_chains=[("Juan", ["Ø", "Ø"])],  # Dos sujetos implícitos
         difficulty="medium",
-        linguistic_note="Cadena de sujetos elípticos"
+        linguistic_note="Cadena de sujetos elípticos",
     ),
     CorefTestCase(
         id="zero_03_switch",
@@ -303,7 +305,7 @@ ZERO_ANAPHORA_TESTS = [
         text="María vio a Juan. Le saludó con la mano.",
         expected_chains=[("María", ["Ø"])],  # María es quien saluda
         difficulty="hard",
-        linguistic_note="Pro-drop con cambio de foco - sujeto mantiene prominencia"
+        linguistic_note="Pro-drop con cambio de foco - sujeto mantiene prominencia",
     ),
     CorefTestCase(
         id="zero_04_passive_like",
@@ -311,7 +313,7 @@ ZERO_ANAPHORA_TESTS = [
         text="Se abrió la puerta. María entró rápidamente.",
         expected_chains=[],  # "Se abrió" es impersonal
         difficulty="medium",
-        linguistic_note="'Se' impersonal, no correferencial"
+        linguistic_note="'Se' impersonal, no correferencial",
     ),
     CorefTestCase(
         id="zero_05_infinitive",
@@ -319,7 +321,7 @@ ZERO_ANAPHORA_TESTS = [
         text="María quería salir. Decidió esperar un poco más.",
         expected_chains=[("María", ["Ø"])],  # Sujeto de "Decidió"
         difficulty="medium",
-        linguistic_note="Pro-drop con infinitivo coordinado"
+        linguistic_note="Pro-drop con infinitivo coordinado",
     ),
 ]
 
@@ -334,7 +336,7 @@ REFLEXIVE_TESTS = [
         text="María se miró en el espejo.",
         expected_chains=[("María", ["se"])],
         difficulty="easy",
-        linguistic_note="Reflexivo simple"
+        linguistic_note="Reflexivo simple",
     ),
     CorefTestCase(
         id="refl_02_consigo",
@@ -342,7 +344,7 @@ REFLEXIVE_TESTS = [
         text="Juan hablaba consigo mismo.",
         expected_chains=[("Juan", ["consigo"])],
         difficulty="easy",
-        linguistic_note="Reflexivo tónico"
+        linguistic_note="Reflexivo tónico",
     ),
     CorefTestCase(
         id="refl_03_reciprocal",
@@ -350,7 +352,7 @@ REFLEXIVE_TESTS = [
         text="Juan y María se miraron.",
         expected_chains=[("Juan y María", ["se"])],  # Recíproco
         difficulty="medium",
-        linguistic_note="'Se' recíproco con sujeto coordinado"
+        linguistic_note="'Se' recíproco con sujeto coordinado",
     ),
     CorefTestCase(
         id="refl_04_impersonal_se",
@@ -358,7 +360,7 @@ REFLEXIVE_TESTS = [
         text="Se dice que María es muy inteligente.",
         expected_chains=[],  # "Se" impersonal, no correferencial
         difficulty="medium",
-        linguistic_note="'Se' impersonal, no correferencial"
+        linguistic_note="'Se' impersonal, no correferencial",
     ),
     CorefTestCase(
         id="refl_05_middle_se",
@@ -366,7 +368,7 @@ REFLEXIVE_TESTS = [
         text="La puerta se abrió. María entró.",
         expected_chains=[],  # "Se" de voz media
         difficulty="medium",
-        linguistic_note="'Se' de voz media, no correferencial"
+        linguistic_note="'Se' de voz media, no correferencial",
     ),
 ]
 
@@ -382,7 +384,7 @@ AGREEMENT_TESTS = [
         expected_chains=[],  # "Él" no puede referir a María
         anti_chains=[("María", "Él")],
         difficulty="easy",
-        linguistic_note="Discordancia de género bloquea correferencia"
+        linguistic_note="Discordancia de género bloquea correferencia",
     ),
     CorefTestCase(
         id="agree_02_number_mismatch",
@@ -391,7 +393,7 @@ AGREEMENT_TESTS = [
         expected_chains=[],  # "Ella" no puede referir a "Los niños"
         anti_chains=[("Los niños", "Ella")],
         difficulty="easy",
-        linguistic_note="Discordancia de número bloquea correferencia"
+        linguistic_note="Discordancia de número bloquea correferencia",
     ),
     CorefTestCase(
         id="agree_03_epicene_noun",
@@ -399,7 +401,7 @@ AGREEMENT_TESTS = [
         text="La víctima declaró. Él contó lo sucedido.",
         expected_chains=[("La víctima", ["Él"])],  # "víctima" es epiceno
         difficulty="hard",
-        linguistic_note="Sustantivo epiceno: género gramatical ≠ sexo del referente"
+        linguistic_note="Sustantivo epiceno: género gramatical ≠ sexo del referente",
     ),
     CorefTestCase(
         id="agree_04_collective_singular",
@@ -407,7 +409,7 @@ AGREEMENT_TESTS = [
         text="El grupo avanzaba. Ellos parecían cansados.",
         expected_chains=[("El grupo", ["Ellos"])],
         difficulty="hard",
-        linguistic_note="Colectivo singular con pronombre plural (silepsis)"
+        linguistic_note="Colectivo singular con pronombre plural (silepsis)",
     ),
     CorefTestCase(
         id="agree_05_hybrid_agreement",
@@ -415,7 +417,7 @@ AGREEMENT_TESTS = [
         text="Su Majestad el Rey entró. Él saludó a todos.",
         expected_chains=[("Su Majestad el Rey", ["Él"])],
         difficulty="medium",
-        linguistic_note="Concordancia por el referente, no por 'Majestad'"
+        linguistic_note="Concordancia por el referente, no por 'Majestad'",
     ),
 ]
 
@@ -430,7 +432,7 @@ AMBIGUOUS_TESTS = [
         text="Pedro le dio el libro a Juan. Él lo leyó esa noche.",
         expected_chains=[("Juan", ["Él"])],  # Receptor es más prominente
         difficulty="hard",
-        linguistic_note="Ambigüedad: receptor suele ser más prominente"
+        linguistic_note="Ambigüedad: receptor suele ser más prominente",
     ),
     CorefTestCase(
         id="ambig_02_parallelism",
@@ -438,7 +440,7 @@ AMBIGUOUS_TESTS = [
         text="Juan criticó a Pedro. María lo defendió.",
         expected_chains=[("Pedro", ["lo"])],  # Paralelismo: objeto→objeto
         difficulty="hard",
-        linguistic_note="Paralelismo gramatical favorece objeto→objeto"
+        linguistic_note="Paralelismo gramatical favorece objeto→objeto",
     ),
     CorefTestCase(
         id="ambig_03_topic_continuation",
@@ -446,7 +448,7 @@ AMBIGUOUS_TESTS = [
         text="Juan es profesor. Pedro es médico. Él trabaja en un hospital.",
         expected_chains=[("Pedro", ["Él"])],  # Tópico más reciente
         difficulty="hard",
-        linguistic_note="Continuación de tópico: entidad más reciente"
+        linguistic_note="Continuación de tópico: entidad más reciente",
     ),
     CorefTestCase(
         id="ambig_04_implicit_causality",
@@ -454,7 +456,7 @@ AMBIGUOUS_TESTS = [
         text="Juan asustó a Pedro. Él gritó de miedo.",
         expected_chains=[("Pedro", ["Él"])],  # Causalidad implícita del verbo
         difficulty="adversarial",
-        linguistic_note="Verbo de transferencia de estado: paciente es causa del resultado"
+        linguistic_note="Verbo de transferencia de estado: paciente es causa del resultado",
     ),
     CorefTestCase(
         id="ambig_05_admired",
@@ -462,7 +464,7 @@ AMBIGUOUS_TESTS = [
         text="Juan admiraba a Pedro. Él era muy talentoso.",
         expected_chains=[("Pedro", ["Él"])],  # "admirar" implica que el objeto es notable
         difficulty="adversarial",
-        linguistic_note="Causalidad implícita: objeto de 'admirar' es causa"
+        linguistic_note="Causalidad implícita: objeto de 'admirar' es causa",
     ),
 ]
 
@@ -481,7 +483,7 @@ Era la mejor enfermera del departamento. Todos la respetaban.
 Un día, ella decidió renunciar.""",
         expected_chains=[("María", ["ella", "la"])],
         difficulty="medium",
-        linguistic_note="Correferencia a través de múltiples párrafos"
+        linguistic_note="Correferencia a través de múltiples párrafos",
     ),
     CorefTestCase(
         id="dist_02_intervening_entity",
@@ -489,7 +491,7 @@ Un día, ella decidió renunciar.""",
         text="María entró. Juan la saludó. Pedro también la vio.",
         expected_chains=[("María", ["la", "la"])],
         difficulty="medium",
-        linguistic_note="Múltiples entidades intermedias, mismo referente"
+        linguistic_note="Múltiples entidades intermedias, mismo referente",
     ),
     CorefTestCase(
         id="dist_03_chapter_boundary",
@@ -501,7 +503,7 @@ Capítulo 2
 Ella nunca volvió.""",
         expected_chains=[("María", ["Ella"])],
         difficulty="hard",
-        linguistic_note="Correferencia cruzando límites de capítulo"
+        linguistic_note="Correferencia cruzando límites de capítulo",
     ),
 ]
 
@@ -516,7 +518,7 @@ CATAPHORA_TESTS = [
         text="Cuando él llegó, Juan parecía cansado.",
         expected_chains=[("Juan", ["él"])],
         difficulty="hard",
-        linguistic_note="Catáfora simple: pronombre antes del nombre"
+        linguistic_note="Catáfora simple: pronombre antes del nombre",
     ),
     CorefTestCase(
         id="cata_02_possessive",
@@ -524,7 +526,7 @@ CATAPHORA_TESTS = [
         text="Su madre lo esperaba. Juan la abrazó.",
         expected_chains=[("Juan", ["Su", "lo"])],
         difficulty="hard",
-        linguistic_note="Posesivo catafórico"
+        linguistic_note="Posesivo catafórico",
     ),
     CorefTestCase(
         id="cata_03_conditional",
@@ -532,7 +534,7 @@ CATAPHORA_TESTS = [
         text="Si ella quería, María podía quedarse.",
         expected_chains=[("María", ["ella"])],
         difficulty="hard",
-        linguistic_note="Catáfora en condicional"
+        linguistic_note="Catáfora en condicional",
     ),
 ]
 
@@ -548,7 +550,7 @@ EMBEDDED_TESTS = [
         expected_chains=[("El hombre", ["tenía"])],  # El sujeto de "tenía" es "El hombre"
         anti_chains=[("María", "tenía")],
         difficulty="hard",
-        linguistic_note="Entidad en cláusula relativa NO es antecedente del verbo principal"
+        linguistic_note="Entidad en cláusula relativa NO es antecedente del verbo principal",
     ),
     CorefTestCase(
         id="embed_02_complement_clause",
@@ -556,15 +558,15 @@ EMBEDDED_TESTS = [
         text="Juan pensaba que ella era inteligente. María se ruborizó.",
         expected_chains=[("María", ["ella"])],
         difficulty="hard",
-        linguistic_note="Pronombre en cláusula complementante"
+        linguistic_note="Pronombre en cláusula complementante",
     ),
     CorefTestCase(
         id="embed_03_reported_speech",
         category="clausulas_embebidas",
-        text='María dijo que él vendría. Juan llegó tarde.',
+        text="María dijo que él vendría. Juan llegó tarde.",
         expected_chains=[("Juan", ["él"])],
         difficulty="hard",
-        linguistic_note="Pronombre en discurso indirecto"
+        linguistic_note="Pronombre en discurso indirecto",
     ),
 ]
 
@@ -579,7 +581,7 @@ DEFINITE_NP_TESTS = [
         text="Juan García es cirujano. El doctor opera todos los días.",
         expected_chains=[("Juan García", ["El doctor"])],
         difficulty="medium",
-        linguistic_note="SN definido con rol/profesión"
+        linguistic_note="SN definido con rol/profesión",
     ),
     CorefTestCase(
         id="defnp_02_relation",
@@ -587,7 +589,7 @@ DEFINITE_NP_TESTS = [
         text="María presentó a su madre. La mujer saludó a todos.",
         expected_chains=[("su madre", ["La mujer"])],
         difficulty="medium",
-        linguistic_note="SN definido con relación"
+        linguistic_note="SN definido con relación",
     ),
     CorefTestCase(
         id="defnp_03_description",
@@ -595,7 +597,7 @@ DEFINITE_NP_TESTS = [
         text="Un hombre alto entró. El desconocido no dijo nada.",
         expected_chains=[("Un hombre alto", ["El desconocido"])],
         difficulty="medium",
-        linguistic_note="SN definido descriptivo"
+        linguistic_note="SN definido descriptivo",
     ),
     CorefTestCase(
         id="defnp_04_bridging",
@@ -603,7 +605,7 @@ DEFINITE_NP_TESTS = [
         text="El coche se detuvo. El conductor bajó rápidamente.",
         expected_chains=[],  # Bridging, no correferencia directa
         difficulty="hard",
-        linguistic_note="Bridging anaphora: inferencia, no correferencia"
+        linguistic_note="Bridging anaphora: inferencia, no correferencia",
     ),
 ]
 
@@ -618,7 +620,7 @@ SPLIT_ANTECEDENT_TESTS = [
         text="Juan habló con María. Ellos decidieron salir.",
         expected_chains=[("Juan", ["Ellos"]), ("María", ["Ellos"])],
         difficulty="hard",
-        linguistic_note="Pronombre plural con antecedentes separados"
+        linguistic_note="Pronombre plural con antecedentes separados",
     ),
     CorefTestCase(
         id="split_02_discourse",
@@ -626,7 +628,7 @@ SPLIT_ANTECEDENT_TESTS = [
         text="Pedro trabaja aquí. Ana también. Ellos son compañeros.",
         expected_chains=[("Pedro", ["Ellos"]), ("Ana", ["Ellos"])],
         difficulty="hard",
-        linguistic_note="Antecedentes en oraciones separadas"
+        linguistic_note="Antecedentes en oraciones separadas",
     ),
 ]
 
@@ -641,7 +643,7 @@ BOUND_ANAPHORA_TESTS = [
         text="Cada estudiante trajo su libro.",
         expected_chains=[],  # "su" está ligado a "cada estudiante", no es correferencia
         difficulty="adversarial",
-        linguistic_note="Posesivo ligado cuantificacionalmente, no correferencial"
+        linguistic_note="Posesivo ligado cuantificacionalmente, no correferencial",
     ),
     CorefTestCase(
         id="bound_02_nadie",
@@ -649,7 +651,7 @@ BOUND_ANAPHORA_TESTS = [
         text="Nadie cree que él sea culpable.",
         expected_chains=[],  # "él" puede estar ligado o ser libre
         difficulty="adversarial",
-        linguistic_note="Pronombre bajo cuantificador negativo"
+        linguistic_note="Pronombre bajo cuantificador negativo",
     ),
 ]
 
@@ -664,7 +666,7 @@ INTERFERENCE_TESTS = [
         text="María García y María López discutieron. Ella se fue enfadada.",
         expected_chains=[("María García", ["Ella"])],  # Primera mención = más prominente
         difficulty="adversarial",
-        linguistic_note="Nombres similares: primera mención más prominente"
+        linguistic_note="Nombres similares: primera mención más prominente",
     ),
     CorefTestCase(
         id="inter_02_same_role",
@@ -672,7 +674,7 @@ INTERFERENCE_TESTS = [
         text="El médico examinó al paciente. El doctor recetó medicinas.",
         expected_chains=[("El médico", ["El doctor"])],
         difficulty="hard",
-        linguistic_note="Diferentes SNs, mismo referente"
+        linguistic_note="Diferentes SNs, mismo referente",
     ),
     CorefTestCase(
         id="inter_03_title_name",
@@ -680,7 +682,7 @@ INTERFERENCE_TESTS = [
         text="Don José llegó tarde. José se disculpó.",
         expected_chains=[("Don José", ["José"])],
         difficulty="medium",
-        linguistic_note="Nombre con/sin título"
+        linguistic_note="Nombre con/sin título",
     ),
 ]
 
@@ -695,7 +697,7 @@ NARRATOR_TESTS = [
         text="Me llamo María. Soy profesora en este instituto.",
         expected_chains=[("María", ["Me", "Soy"])],
         difficulty="medium",
-        linguistic_note="Auto-identificación del narrador"
+        linguistic_note="Auto-identificación del narrador",
     ),
     CorefTestCase(
         id="narr_02_first_person",
@@ -703,7 +705,7 @@ NARRATOR_TESTS = [
         text="Yo entré en la habitación. Vi a Juan sentado.",
         expected_chains=[],  # "Yo" sin nombre explícito
         difficulty="medium",
-        linguistic_note="Primera persona sin identificación"
+        linguistic_note="Primera persona sin identificación",
     ),
     CorefTestCase(
         id="narr_03_switch_person",
@@ -711,7 +713,7 @@ NARRATOR_TESTS = [
         text="Me llamo Ana. María entró. Ella me miró.",
         expected_chains=[("María", ["Ella"]), ("Ana", ["Me", "me"])],
         difficulty="hard",
-        linguistic_note="Cambio entre primera y tercera persona"
+        linguistic_note="Cambio entre primera y tercera persona",
     ),
 ]
 
@@ -727,7 +729,7 @@ TOPIC_SHIFT_TESTS = [
         expected_chains=[("María", ["Ella"])],
         anti_chains=[("Juan", "Ella")],
         difficulty="medium",
-        linguistic_note="Cambio de tópico explícito"
+        linguistic_note="Cambio de tópico explícito",
     ),
     CorefTestCase(
         id="topic_02_paragraph",
@@ -737,7 +739,7 @@ TOPIC_SHIFT_TESTS = [
 María, por su parte, sufría en silencio. Ella no lo demostraba.""",
         expected_chains=[("María", ["Ella"])],
         difficulty="medium",
-        linguistic_note="Cambio de tópico por párrafo"
+        linguistic_note="Cambio de tópico por párrafo",
     ),
 ]
 
@@ -752,7 +754,7 @@ ELLIPSIS_TESTS = [
         text="Juan comió pasta y María, arroz.",
         expected_chains=[],  # No hay pronombres
         difficulty="medium",
-        linguistic_note="Gapping: elipsis verbal, no correferencia"
+        linguistic_note="Gapping: elipsis verbal, no correferencia",
     ),
     CorefTestCase(
         id="ellip_02_vp_ellipsis",
@@ -760,7 +762,7 @@ ELLIPSIS_TESTS = [
         text="Juan quiere ir al cine y María también.",
         expected_chains=[],  # Elipsis de SV
         difficulty="medium",
-        linguistic_note="Elipsis de SV"
+        linguistic_note="Elipsis de SV",
     ),
 ]
 
@@ -775,7 +777,7 @@ OBJECT_PRONOUN_TESTS = [
         text="Juan le dio el libro a María. Ella lo leyó.",
         expected_chains=[("el libro", ["lo"]), ("María", ["Ella"])],
         difficulty="medium",
-        linguistic_note="Doble objeto con pronombre posterior"
+        linguistic_note="Doble objeto con pronombre posterior",
     ),
     CorefTestCase(
         id="obj_02_clitic_doubling",
@@ -783,7 +785,7 @@ OBJECT_PRONOUN_TESTS = [
         text="A María la vi ayer. Ella estaba bien.",
         expected_chains=[("María", ["la", "Ella"])],
         difficulty="medium",
-        linguistic_note="Duplicación de clítico"
+        linguistic_note="Duplicación de clítico",
     ),
     CorefTestCase(
         id="obj_03_se_le_lo",
@@ -791,7 +793,7 @@ OBJECT_PRONOUN_TESTS = [
         text="Juan se lo dio a María.",
         expected_chains=[("María", ["se"])],  # "se" = le → a María
         difficulty="hard",
-        linguistic_note="Cambio le→se ante lo/la"
+        linguistic_note="Cambio le→se ante lo/la",
     ),
 ]
 
@@ -806,7 +808,7 @@ COORDINATION_TESTS = [
         text="Juan y María llegaron. Ellos traían regalos.",
         expected_chains=[("Juan y María", ["Ellos"])],
         difficulty="easy",
-        linguistic_note="SN coordinado como antecedente"
+        linguistic_note="SN coordinado como antecedente",
     ),
     CorefTestCase(
         id="coord_02_mixed_gender",
@@ -814,7 +816,7 @@ COORDINATION_TESTS = [
         text="Ana y Pedro vinieron. Ellos parecían contentos.",
         expected_chains=[("Ana y Pedro", ["Ellos"])],
         difficulty="medium",
-        linguistic_note="Coordinación mixta: masculino plural"
+        linguistic_note="Coordinación mixta: masculino plural",
     ),
     CorefTestCase(
         id="coord_03_each",
@@ -822,7 +824,7 @@ COORDINATION_TESTS = [
         text="Juan y Pedro llevaban cada uno su maleta.",
         expected_chains=[("Juan", ["su"]), ("Pedro", ["su"])],  # Distributivo
         difficulty="adversarial",
-        linguistic_note="'cada uno' distribuye el posesivo"
+        linguistic_note="'cada uno' distribuye el posesivo",
     ),
 ]
 
@@ -837,7 +839,7 @@ COMPARATIVE_TESTS = [
         text="María es tan alta como él. Juan mide dos metros.",
         expected_chains=[("Juan", ["él"])],
         difficulty="hard",
-        linguistic_note="Pronombre en comparativa"
+        linguistic_note="Pronombre en comparativa",
     ),
     CorefTestCase(
         id="comp_02_mejor_que",
@@ -845,7 +847,7 @@ COMPARATIVE_TESTS = [
         text="Pedro trabaja mejor que ella. Ana se esfuerza mucho.",
         expected_chains=[("Ana", ["ella"])],
         difficulty="hard",
-        linguistic_note="Pronombre en comparativa, catáfora"
+        linguistic_note="Pronombre en comparativa, catáfora",
     ),
 ]
 
@@ -855,26 +857,26 @@ COMPARATIVE_TESTS = [
 # =============================================================================
 
 ALL_COREF_TESTS = (
-    PRONOUN_TESTS +
-    POSSESSIVE_TESTS +
-    DEMONSTRATIVE_TESTS +
-    ZERO_ANAPHORA_TESTS +
-    REFLEXIVE_TESTS +
-    AGREEMENT_TESTS +
-    AMBIGUOUS_TESTS +
-    LONG_DISTANCE_TESTS +
-    CATAPHORA_TESTS +
-    EMBEDDED_TESTS +
-    DEFINITE_NP_TESTS +
-    SPLIT_ANTECEDENT_TESTS +
-    BOUND_ANAPHORA_TESTS +
-    INTERFERENCE_TESTS +
-    NARRATOR_TESTS +
-    TOPIC_SHIFT_TESTS +
-    ELLIPSIS_TESTS +
-    OBJECT_PRONOUN_TESTS +
-    COORDINATION_TESTS +
-    COMPARATIVE_TESTS
+    PRONOUN_TESTS
+    + POSSESSIVE_TESTS
+    + DEMONSTRATIVE_TESTS
+    + ZERO_ANAPHORA_TESTS
+    + REFLEXIVE_TESTS
+    + AGREEMENT_TESTS
+    + AMBIGUOUS_TESTS
+    + LONG_DISTANCE_TESTS
+    + CATAPHORA_TESTS
+    + EMBEDDED_TESTS
+    + DEFINITE_NP_TESTS
+    + SPLIT_ANTECEDENT_TESTS
+    + BOUND_ANAPHORA_TESTS
+    + INTERFERENCE_TESTS
+    + NARRATOR_TESTS
+    + TOPIC_SHIFT_TESTS
+    + ELLIPSIS_TESTS
+    + OBJECT_PRONOUN_TESTS
+    + COORDINATION_TESTS
+    + COMPARATIVE_TESTS
 )
 
 
@@ -885,10 +887,11 @@ class TestCoreferenceAdversarial:
     def resolver(self):
         """Crea resolver con métodos rápidos para tests."""
         from narrative_assistant.nlp.coreference_resolver import (
-            CoreferenceVotingResolver,
             CorefConfig,
+            CoreferenceVotingResolver,
             CorefMethod,
         )
+
         config = CorefConfig(
             enabled_methods=[CorefMethod.HEURISTICS, CorefMethod.MORPHO],
             min_confidence=0.3,
@@ -951,10 +954,11 @@ class TestCoreferenceByCategory:
     @pytest.fixture
     def resolver(self):
         from narrative_assistant.nlp.coreference_resolver import (
-            CoreferenceVotingResolver,
             CorefConfig,
+            CoreferenceVotingResolver,
             CorefMethod,
         )
+
         config = CorefConfig(
             enabled_methods=[CorefMethod.HEURISTICS, CorefMethod.MORPHO],
             min_confidence=0.3,
@@ -1014,10 +1018,10 @@ def get_test_summary():
     print("RESUMEN DE TESTS ADVERSARIALES DE CORREFERENCIA")
     print("=" * 60)
     print(f"\nTotal de casos: {len(ALL_COREF_TESTS)}")
-    print(f"\nPor categoría:")
+    print("\nPor categoría:")
     for cat, count in sorted(categories.items()):
         print(f"  {cat}: {count}")
-    print(f"\nPor dificultad:")
+    print("\nPor dificultad:")
     for diff, count in sorted(difficulties.items()):
         print(f"  {diff}: {count}")
     print("=" * 60)

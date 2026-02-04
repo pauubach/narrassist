@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Tests de sanitización XSS.
 
@@ -20,10 +19,10 @@ from narrative_assistant.parsers.sanitization import (
     validate_file_path,
 )
 
-
 # =============================================================================
 # XSS en manuscritos TXT
 # =============================================================================
+
 
 class TestXSSInManuscript:
     """Un manuscrito .txt con <script> no debe causar problemas."""
@@ -79,6 +78,7 @@ class TestXSSInManuscript:
 # =============================================================================
 # Sanitización de nombres
 # =============================================================================
+
 
 class TestSanitizeFilename:
     """Los nombres de archivo con caracteres peligrosos se neutralizan."""
@@ -145,6 +145,7 @@ class TestSanitizeUserNote:
 # =============================================================================
 # Path traversal con nombres XSS
 # =============================================================================
+
 
 class TestPathTraversalXSS:
     """Intentos de path traversal con nombres XSS se rechazan."""

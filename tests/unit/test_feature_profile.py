@@ -1,23 +1,23 @@
-# -*- coding: utf-8 -*-
 """
 Tests para el módulo de perfiles de features por tipo de documento.
 """
 
 import pytest
+
 from narrative_assistant.feature_profile.models import (
+    DOCUMENT_SUBTYPES,
+    DOCUMENT_TYPES,
+    PROFILE_CREATORS,
     DocumentType,
     FeatureAvailability,
     FeatureProfile,
-    DOCUMENT_TYPES,
-    DOCUMENT_SUBTYPES,
-    PROFILE_CREATORS,
     create_feature_profile,
 )
-
 
 # =============================================================================
 # Tests de Enums
 # =============================================================================
+
 
 class TestDocumentType:
     """Tests para DocumentType enum."""
@@ -25,9 +25,18 @@ class TestDocumentType:
     def test_all_document_types_defined(self):
         """Verifica que todos los tipos de documento están definidos."""
         expected_types = [
-            "FICTION", "MEMOIR", "BIOGRAPHY", "CELEBRITY",
-            "DIVULGATION", "ESSAY", "SELF_HELP", "TECHNICAL",
-            "PRACTICAL", "GRAPHIC", "CHILDREN", "DRAMA",
+            "FICTION",
+            "MEMOIR",
+            "BIOGRAPHY",
+            "CELEBRITY",
+            "DIVULGATION",
+            "ESSAY",
+            "SELF_HELP",
+            "TECHNICAL",
+            "PRACTICAL",
+            "GRAPHIC",
+            "CHILDREN",
+            "DRAMA",
         ]
         for type_name in expected_types:
             assert hasattr(DocumentType, type_name)
@@ -71,6 +80,7 @@ class TestFeatureAvailability:
 # =============================================================================
 # Tests de Constantes
 # =============================================================================
+
 
 class TestDocumentTypesInfo:
     """Tests para información de tipos de documento."""
@@ -120,8 +130,9 @@ class TestDocumentSubtypes:
                 assert "name" in subtype
                 # El código debería empezar con el código del tipo padre
                 type_prefix = doc_type.value
-                assert subtype["code"].startswith(type_prefix), \
+                assert subtype["code"].startswith(type_prefix), (
                     f"Subtipo {subtype['code']} no empieza con {type_prefix}"
+                )
 
     def test_fiction_subtypes(self):
         """Verifica subtipos de ficción."""
@@ -143,12 +154,13 @@ class TestDocumentSubtypes:
         assert "INF_PRI" in codes  # 5-8 años
         assert "INF_CAP" in codes  # 6-10 años
         assert "INF_MID" in codes  # 8-12 años
-        assert "INF_YA" in codes   # 12+ años
+        assert "INF_YA" in codes  # 12+ años
 
 
 # =============================================================================
 # Tests de FeatureProfile
 # =============================================================================
+
 
 class TestFeatureProfile:
     """Tests para FeatureProfile dataclass."""
@@ -220,6 +232,7 @@ class TestFeatureProfile:
 # =============================================================================
 # Tests de Profile Creators
 # =============================================================================
+
 
 class TestProfileCreators:
     """Tests para funciones de creación de perfiles."""
@@ -311,6 +324,7 @@ class TestProfileCreators:
 # Tests de create_feature_profile
 # =============================================================================
 
+
 class TestCreateFeatureProfile:
     """Tests para función create_feature_profile."""
 
@@ -336,6 +350,7 @@ class TestCreateFeatureProfile:
 # =============================================================================
 # Tests de Subtype Adjustments
 # =============================================================================
+
 
 class TestSubtypeAdjustments:
     """Tests para ajustes por subtipo."""
@@ -396,6 +411,7 @@ class TestSubtypeAdjustments:
 # Tests de Integración
 # =============================================================================
 
+
 class TestFeatureProfileIntegration:
     """Tests de integración para perfiles de features."""
 
@@ -411,11 +427,24 @@ class TestFeatureProfileIntegration:
     def test_profile_features_complete(self):
         """Verifica que todos los perfiles tienen todas las features."""
         expected_features = [
-            "characters", "relationships", "timeline", "scenes", "pov_focalization",
-            "pacing", "register_analysis", "voice_profiles", "sticky_sentences",
-            "echo_repetitions", "sentence_variation", "emotional_analysis",
-            "age_readability", "attribute_consistency", "world_consistency",
-            "glossary", "terminology", "editorial_rules",
+            "characters",
+            "relationships",
+            "timeline",
+            "scenes",
+            "pov_focalization",
+            "pacing",
+            "register_analysis",
+            "voice_profiles",
+            "sticky_sentences",
+            "echo_repetitions",
+            "sentence_variation",
+            "emotional_analysis",
+            "age_readability",
+            "attribute_consistency",
+            "world_consistency",
+            "glossary",
+            "terminology",
+            "editorial_rules",
         ]
         for doc_type in DocumentType:
             profile = create_feature_profile(doc_type)
@@ -456,7 +485,9 @@ class TestFeatureProfileIntegration:
         ]
         for doc_type in non_narrative:
             profile = create_feature_profile(doc_type)
-            assert not profile.is_enabled("characters"), f"{doc_type} should not have characters enabled"
+            assert not profile.is_enabled("characters"), (
+                f"{doc_type} should not have characters enabled"
+            )
 
 
 class TestFeatureProfileEdgeCases:

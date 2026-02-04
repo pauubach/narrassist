@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Tests adversariales GAN-style para clasificación de tipo de documento.
 
@@ -20,10 +19,11 @@ Cada caso incluye:
 - Razón de la dificultad
 """
 
-import pytest
 from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
+
+import pytest
 
 # Importar clasificador cuando esté disponible
 # from src.narrative_assistant.parsers.document_classifier import (
@@ -35,15 +35,17 @@ from typing import Optional
 
 class Difficulty(Enum):
     """Nivel de dificultad del caso de prueba."""
-    EASY = "easy"           # Debería clasificar correctamente
-    MEDIUM = "medium"       # Puede tener algo de ambigüedad
-    HARD = "hard"           # Casos límite difíciles
+
+    EASY = "easy"  # Debería clasificar correctamente
+    MEDIUM = "medium"  # Puede tener algo de ambigüedad
+    HARD = "hard"  # Casos límite difíciles
     ADVERSARIAL = "adversarial"  # Diseñado para engañar
 
 
 @dataclass
 class AdversarialCase:
     """Caso de prueba adversarial."""
+
     id: str
     text: str
     expected_type: str
@@ -524,19 +526,20 @@ SPECIAL_FORMAT_CASES = [
 # =============================================================================
 
 ALL_ADVERSARIAL_CASES = (
-    HYBRID_CASES +
-    SHORT_AMBIGUOUS_CASES +
-    FALSE_POSITIVE_CASES +
-    CULTURAL_EDGE_CASES +
-    FUZZY_BOUNDARY_CASES +
-    CHILDREN_AGE_CASES +
-    SPECIAL_FORMAT_CASES
+    HYBRID_CASES
+    + SHORT_AMBIGUOUS_CASES
+    + FALSE_POSITIVE_CASES
+    + CULTURAL_EDGE_CASES
+    + FUZZY_BOUNDARY_CASES
+    + CHILDREN_AGE_CASES
+    + SPECIAL_FORMAT_CASES
 )
 
 
 # =============================================================================
 # FIXTURES Y TESTS
 # =============================================================================
+
 
 @pytest.fixture
 def classifier():
@@ -568,9 +571,11 @@ class TestDocumentClassificationAdversarial:
             f"Confianza: {result.confidence:.2%}"
         )
 
-    @pytest.mark.parametrize("case", [c for c in ALL_ADVERSARIAL_CASES
-                                       if c.difficulty == Difficulty.EASY],
-                             ids=lambda c: c.id)
+    @pytest.mark.parametrize(
+        "case",
+        [c for c in ALL_ADVERSARIAL_CASES if c.difficulty == Difficulty.EASY],
+        ids=lambda c: c.id,
+    )
     def test_easy_cases_high_confidence(self, classifier, case: AdversarialCase):
         """Los casos fáciles deberían tener alta confianza."""
         result = classifier.classify(case.text)
@@ -580,9 +585,11 @@ class TestDocumentClassificationAdversarial:
             f"Obtenido: {result.confidence:.2%}"
         )
 
-    @pytest.mark.parametrize("case", [c for c in ALL_ADVERSARIAL_CASES
-                                       if c.difficulty == Difficulty.ADVERSARIAL],
-                             ids=lambda c: c.id)
+    @pytest.mark.parametrize(
+        "case",
+        [c for c in ALL_ADVERSARIAL_CASES if c.difficulty == Difficulty.ADVERSARIAL],
+        ids=lambda c: c.id,
+    )
     def test_adversarial_cases_tracked(self, classifier, case: AdversarialCase):
         """
         Los casos adversariales pueden fallar, pero debemos trackearlos.
@@ -676,6 +683,7 @@ class TestClassifierRobustness:
 # UTILIDADES PARA ANÁLISIS
 # =============================================================================
 
+
 def analyze_adversarial_results(classifier, cases=ALL_ADVERSARIAL_CASES):
     """
     Analiza resultados de casos adversariales para identificar patrones de fallo.
@@ -714,13 +722,15 @@ def analyze_adversarial_results(classifier, cases=ALL_ADVERSARIAL_CASES):
 
         # Registrar fallos
         if not is_correct:
-            results["failures"].append({
-                "id": case.id,
-                "expected": case.expected_type,
-                "got": result.document_type.value,
-                "confidence": result.confidence,
-                "reason": case.reason,
-            })
+            results["failures"].append(
+                {
+                    "id": case.id,
+                    "expected": case.expected_type,
+                    "got": result.document_type.value,
+                    "confidence": result.confidence,
+                    "reason": case.reason,
+                }
+            )
 
     return results
 

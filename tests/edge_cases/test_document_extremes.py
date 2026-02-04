@@ -11,13 +11,14 @@ Cubre:
 - Solo espacios en blanco
 """
 
-import pytest
 from pathlib import Path
 
+import pytest
 
 # =============================================================================
 # Tests de documentos vacíos y mínimos
 # =============================================================================
+
 
 class TestEmptyDocuments:
     """Tests para documentos vacíos o casi vacíos."""
@@ -80,6 +81,7 @@ class TestEmptyDocuments:
 # Tests de documentos sin estructura
 # =============================================================================
 
+
 class TestUnstructuredDocuments:
     """Tests para documentos sin estructura de capítulos."""
 
@@ -123,6 +125,7 @@ class TestUnstructuredDocuments:
 # Tests de documentos con muchos capítulos
 # =============================================================================
 
+
 class TestManyChapters:
     """Tests para documentos con muchos capítulos."""
 
@@ -163,6 +166,7 @@ class TestManyChapters:
 # Tests de contenido repetitivo extremo
 # =============================================================================
 
+
 class TestRepetitiveContent:
     """Tests para contenido extremadamente repetitivo."""
 
@@ -202,6 +206,7 @@ class TestRepetitiveContent:
 # =============================================================================
 # Tests de caracteres especiales
 # =============================================================================
+
 
 class TestSpecialCharacters:
     """Tests para caracteres especiales y Unicode."""
@@ -262,6 +267,7 @@ class TestSpecialCharacters:
 # Tests de líneas extremadamente largas
 # =============================================================================
 
+
 class TestExtremeLengths:
     """Tests para longitudes extremas."""
 
@@ -307,6 +313,7 @@ class TestExtremeLengths:
 # Tests de números de capítulo extremos
 # =============================================================================
 
+
 class TestChapterNumbers:
     """Tests para números de capítulo inusuales."""
 
@@ -333,9 +340,7 @@ class TestChapterNumbers:
         from narrative_assistant.analysis.narrative_structure import NarrativeStructureDetector
 
         detector = NarrativeStructureDetector()
-        chapters = [
-            {"number": 999999, "content": "Texto.", "start_char": 0}
-        ]
+        chapters = [{"number": 999999, "content": "Texto.", "start_char": 0}]
 
         report = detector.detect_all("Texto.", chapters)
         assert report is not None
@@ -344,6 +349,7 @@ class TestChapterNumbers:
 # =============================================================================
 # Tests de diálogos extremos
 # =============================================================================
+
 
 class TestDialogueExtremes:
     """Tests para casos extremos de diálogos."""

@@ -1,26 +1,27 @@
 """Tests para el módulo de detección de oraciones pesadas (Sticky Sentences)."""
 
 import pytest
+
 from narrative_assistant.nlp.style.sticky_sentences import (
-    # Tipos
-    StickinessSeverity,
-    StickySentence,
-    StickyReport,
-    # Clase principal
-    StickySentenceDetector,
-    # Singleton
-    get_sticky_sentence_detector,
-    reset_sticky_sentence_detector,
-    # Utilidades
-    is_glue_word,
-    get_glue_words,
-    calculate_glue_index,
+    ARTICLES,
+    CONJUNCTIONS,
     # Conjuntos de palabras
     GLUE_WORDS,
-    ARTICLES,
     PREPOSITIONS,
-    CONJUNCTIONS,
     PRONOUNS,
+    # Tipos
+    StickinessSeverity,
+    StickyReport,
+    StickySentence,
+    # Clase principal
+    StickySentenceDetector,
+    calculate_glue_index,
+    get_glue_words,
+    # Singleton
+    get_sticky_sentence_detector,
+    # Utilidades
+    is_glue_word,
+    reset_sticky_sentence_detector,
 )
 
 
@@ -478,15 +479,17 @@ class TestStickySentenceDetector:
 
         # Añadir 4 oraciones pegajosas (40%)
         for i in range(4):
-            report.add_sticky(StickySentence(
-                text=f"Test {i}",
-                start_char=0,
-                end_char=10,
-                total_words=10,
-                glue_words=5,
-                glue_percentage=0.5,
-                severity=StickinessSeverity.HIGH,
-            ))
+            report.add_sticky(
+                StickySentence(
+                    text=f"Test {i}",
+                    start_char=0,
+                    end_char=10,
+                    total_words=10,
+                    glue_words=5,
+                    glue_percentage=0.5,
+                    severity=StickinessSeverity.HIGH,
+                )
+            )
 
         recommendations = detector._generate_recommendations(report)
         assert len(recommendations) > 0
@@ -495,15 +498,17 @@ class TestStickySentenceDetector:
         """Test recomendaciones con severidad crítica."""
         report = StickyReport(total_sentences=10)
 
-        report.add_sticky(StickySentence(
-            text="Test",
-            start_char=0,
-            end_char=4,
-            total_words=10,
-            glue_words=7,
-            glue_percentage=0.7,
-            severity=StickinessSeverity.CRITICAL,
-        ))
+        report.add_sticky(
+            StickySentence(
+                text="Test",
+                start_char=0,
+                end_char=4,
+                total_words=10,
+                glue_words=7,
+                glue_percentage=0.7,
+                severity=StickinessSeverity.CRITICAL,
+            )
+        )
 
         recommendations = detector._generate_recommendations(report)
         assert any("crítica" in r.lower() for r in recommendations)

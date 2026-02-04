@@ -10,15 +10,16 @@ Cubre:
 Nota: Estos tests generan documentos sintéticos para medir rendimiento.
 """
 
-import pytest
-import time
 import gc
+import time
 from typing import Generator
 
+import pytest
 
 # =============================================================================
 # Fixtures para generación de documentos
 # =============================================================================
+
 
 def generate_chapter(chapter_num: int, word_count: int = 5000) -> dict:
     """
@@ -60,17 +61,13 @@ def generate_chapter(chapter_num: int, word_count: int = 5000) -> dict:
         # Alternar entre narración y diálogo
         if len(paragraphs) % 3 == 2:
             # Párrafo de diálogo
-            dialogue_lines = [
-                dialogues[i % len(dialogues)]
-                for i in range(3)
-            ]
+            dialogue_lines = [dialogues[i % len(dialogues)] for i in range(3)]
             para = "\n".join(dialogue_lines)
         else:
             # Párrafo narrativo (5-8 oraciones)
             num_sentences = 5 + (len(paragraphs) % 4)
             para_sentences = [
-                sentences[(len(paragraphs) + i) % len(sentences)]
-                for i in range(num_sentences)
+                sentences[(len(paragraphs) + i) % len(sentences)] for i in range(num_sentences)
             ]
             para = " ".join(para_sentences)
 
@@ -113,6 +110,7 @@ def generate_manuscript(total_words: int, words_per_chapter: int = 5000) -> tupl
 # =============================================================================
 # Tests de rendimiento para detector de duplicados
 # =============================================================================
+
 
 class TestDuplicateDetectorPerformance:
     """Tests de rendimiento para detección de duplicados."""
@@ -176,6 +174,7 @@ class TestDuplicateDetectorPerformance:
 # Tests de rendimiento para validador de diálogos
 # =============================================================================
 
+
 class TestDialogueValidatorPerformance:
     """Tests de rendimiento para validación de diálogos."""
 
@@ -218,6 +217,7 @@ class TestDialogueValidatorPerformance:
 # Tests de rendimiento para detector de estructura narrativa
 # =============================================================================
 
+
 class TestNarrativeStructurePerformance:
     """Tests de rendimiento para detección de estructura narrativa."""
 
@@ -243,6 +243,7 @@ class TestNarrativeStructurePerformance:
 # Tests de uso de memoria
 # =============================================================================
 
+
 class TestMemoryUsage:
     """Tests para verificar uso razonable de memoria."""
 
@@ -250,6 +251,7 @@ class TestMemoryUsage:
     def test_memory_not_excessive_50k(self):
         """Verifica que el uso de memoria sea razonable para 50K palabras."""
         import sys
+
         from narrative_assistant.analysis.duplicate_detector import DuplicateDetector
 
         text, chapters = generate_manuscript(50000)
@@ -295,6 +297,7 @@ class TestMemoryUsage:
 # Tests de escalabilidad lineal
 # =============================================================================
 
+
 class TestScalability:
     """Tests para verificar escalabilidad aproximadamente lineal."""
 
@@ -331,8 +334,7 @@ class TestScalability:
 # Marcador para tests lentos
 # =============================================================================
 
+
 def pytest_configure(config):
     """Registra el marcador 'slow' para tests lentos."""
-    config.addinivalue_line(
-        "markers", "slow: marca tests que tardan más de 10 segundos"
-    )
+    config.addinivalue_line("markers", "slow: marca tests que tardan más de 10 segundos")

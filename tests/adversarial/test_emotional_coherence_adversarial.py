@@ -29,14 +29,16 @@ Categorías de tests:
 Basado en patrones de escritura narrativa española.
 """
 
-import pytest
 from dataclasses import dataclass, field
 from typing import Optional
+
+import pytest
 
 
 @dataclass
 class EmotionalCoherenceTestCase:
     """Caso de test para coherencia emocional."""
+
     id: str
     category: str
     text: str
@@ -56,52 +58,52 @@ COHERENT_DIALOGUE_TESTS = [
     EmotionalCoherenceTestCase(
         id="coh_dial_01_feliz_positivo",
         category="dialogo_coherente",
-        text='María estaba feliz. —¡Qué maravilloso día! —exclamó con alegría.',
+        text="María estaba feliz. —¡Qué maravilloso día! —exclamó con alegría.",
         entity_name="María",
         declared_emotion="feliz",
         should_be_incoherent=False,
         difficulty="easy",
-        linguistic_note="Emoción positiva + diálogo positivo = coherente"
+        linguistic_note="Emoción positiva + diálogo positivo = coherente",
     ),
     EmotionalCoherenceTestCase(
         id="coh_dial_02_triste_negativo",
         category="dialogo_coherente",
-        text='Juan estaba triste. —Todo se ha perdido —murmuró abatido.',
+        text="Juan estaba triste. —Todo se ha perdido —murmuró abatido.",
         entity_name="Juan",
         declared_emotion="triste",
         should_be_incoherent=False,
         difficulty="easy",
-        linguistic_note="Emoción negativa + diálogo negativo = coherente"
+        linguistic_note="Emoción negativa + diálogo negativo = coherente",
     ),
     EmotionalCoherenceTestCase(
         id="coh_dial_03_enfadado_agresivo",
         category="dialogo_coherente",
-        text='Pedro estaba furioso. —¡Esto es inaceptable! —gritó golpeando la mesa.',
+        text="Pedro estaba furioso. —¡Esto es inaceptable! —gritó golpeando la mesa.",
         entity_name="Pedro",
         declared_emotion="furioso",
         should_be_incoherent=False,
         difficulty="easy",
-        linguistic_note="Furia + diálogo agresivo = coherente"
+        linguistic_note="Furia + diálogo agresivo = coherente",
     ),
     EmotionalCoherenceTestCase(
         id="coh_dial_04_asustado_temeroso",
         category="dialogo_coherente",
-        text='Ana estaba aterrada. —No... no puedo hacerlo —tartamudeó temblando.',
+        text="Ana estaba aterrada. —No... no puedo hacerlo —tartamudeó temblando.",
         entity_name="Ana",
         declared_emotion="aterrada",
         should_be_incoherent=False,
         difficulty="easy",
-        linguistic_note="Miedo + diálogo temeroso = coherente"
+        linguistic_note="Miedo + diálogo temeroso = coherente",
     ),
     EmotionalCoherenceTestCase(
         id="coh_dial_05_tranquilo_neutro",
         category="dialogo_coherente",
-        text='Carlos estaba sereno. —Veamos qué opciones tenemos —dijo con calma.',
+        text="Carlos estaba sereno. —Veamos qué opciones tenemos —dijo con calma.",
         entity_name="Carlos",
         declared_emotion="sereno",
         should_be_incoherent=False,
         difficulty="easy",
-        linguistic_note="Serenidad + diálogo neutro = coherente"
+        linguistic_note="Serenidad + diálogo neutro = coherente",
     ),
 ]
 
@@ -113,46 +115,46 @@ INCOHERENT_DIALOGUE_TESTS = [
     EmotionalCoherenceTestCase(
         id="inc_dial_01_triste_alegre",
         category="dialogo_incoherente",
-        text='María estaba devastada por la noticia. —¡Fantástico, esto es genial! —exclamó riendo.',
+        text="María estaba devastada por la noticia. —¡Fantástico, esto es genial! —exclamó riendo.",
         entity_name="María",
         declared_emotion="devastada",
         should_be_incoherent=True,
         incoherence_type="emotion_dialogue",
         difficulty="easy",
-        linguistic_note="Devastación + diálogo alegre = incoherente"
+        linguistic_note="Devastación + diálogo alegre = incoherente",
     ),
     EmotionalCoherenceTestCase(
         id="inc_dial_02_feliz_negativo",
         category="dialogo_incoherente",
-        text='Juan estaba eufórico. —Todo es horrible, nada tiene sentido —dijo con amargura.',
+        text="Juan estaba eufórico. —Todo es horrible, nada tiene sentido —dijo con amargura.",
         entity_name="Juan",
         declared_emotion="eufórico",
         should_be_incoherent=True,
         incoherence_type="emotion_dialogue",
         difficulty="easy",
-        linguistic_note="Euforia + diálogo amargo = incoherente"
+        linguistic_note="Euforia + diálogo amargo = incoherente",
     ),
     EmotionalCoherenceTestCase(
         id="inc_dial_03_asustado_valiente",
         category="dialogo_incoherente",
-        text='Pedro estaba aterrado. —¡Adelante, no les tengo miedo! —gritó con valentía.',
+        text="Pedro estaba aterrado. —¡Adelante, no les tengo miedo! —gritó con valentía.",
         entity_name="Pedro",
         declared_emotion="aterrado",
         should_be_incoherent=True,
         incoherence_type="emotion_dialogue",
         difficulty="medium",
-        linguistic_note="Terror + diálogo valiente = incoherente"
+        linguistic_note="Terror + diálogo valiente = incoherente",
     ),
     EmotionalCoherenceTestCase(
         id="inc_dial_04_furioso_amable",
         category="dialogo_incoherente",
-        text='Ana estaba furiosa. —Por supuesto, querido, como tú digas —respondió dulcemente.',
+        text="Ana estaba furiosa. —Por supuesto, querido, como tú digas —respondió dulcemente.",
         entity_name="Ana",
         declared_emotion="furiosa",
         should_be_incoherent=True,
         incoherence_type="emotion_dialogue",
         difficulty="medium",
-        linguistic_note="Furia + respuesta dulce = incoherente (o disimulo)"
+        linguistic_note="Furia + respuesta dulce = incoherente (o disimulo)",
     ),
 ]
 
@@ -169,7 +171,7 @@ COHERENT_ACTION_TESTS = [
         declared_emotion="feliz",
         should_be_incoherent=False,
         difficulty="easy",
-        linguistic_note="Felicidad + sonrisa = coherente"
+        linguistic_note="Felicidad + sonrisa = coherente",
     ),
     EmotionalCoherenceTestCase(
         id="coh_act_02_triste_llora",
@@ -179,7 +181,7 @@ COHERENT_ACTION_TESTS = [
         declared_emotion="destrozado",
         should_be_incoherent=False,
         difficulty="easy",
-        linguistic_note="Tristeza + llorar = coherente"
+        linguistic_note="Tristeza + llorar = coherente",
     ),
     EmotionalCoherenceTestCase(
         id="coh_act_03_nervioso_temblor",
@@ -189,7 +191,7 @@ COHERENT_ACTION_TESTS = [
         declared_emotion="nervioso",
         should_be_incoherent=False,
         difficulty="easy",
-        linguistic_note="Nerviosismo + temblor = coherente"
+        linguistic_note="Nerviosismo + temblor = coherente",
     ),
 ]
 
@@ -207,7 +209,7 @@ INCOHERENT_ACTION_TESTS = [
         should_be_incoherent=True,
         incoherence_type="emotion_action",
         difficulty="easy",
-        linguistic_note="Depresión + saltar de alegría = incoherente"
+        linguistic_note="Depresión + saltar de alegría = incoherente",
     ),
     EmotionalCoherenceTestCase(
         id="inc_act_02_sereno_violento",
@@ -218,7 +220,7 @@ INCOHERENT_ACTION_TESTS = [
         should_be_incoherent=True,
         incoherence_type="emotion_action",
         difficulty="easy",
-        linguistic_note="Serenidad + golpe furioso = incoherente"
+        linguistic_note="Serenidad + golpe furioso = incoherente",
     ),
 ]
 
@@ -230,32 +232,32 @@ IRONY_TESTS = [
     EmotionalCoherenceTestCase(
         id="irony_01_explicita",
         category="ironia",
-        text='María estaba furiosa. —¡Qué maravilla! —dijo con evidente sarcasmo.',
+        text="María estaba furiosa. —¡Qué maravilla! —dijo con evidente sarcasmo.",
         entity_name="María",
         declared_emotion="furiosa",
         should_be_incoherent=False,  # El sarcasmo explica la discrepancia
         difficulty="hard",
-        linguistic_note="Sarcasmo explícito hace coherente el contraste"
+        linguistic_note="Sarcasmo explícito hace coherente el contraste",
     ),
     EmotionalCoherenceTestCase(
         id="irony_02_mordaz",
         category="ironia",
-        text='Juan estaba irritado. —Claro, perfecto, genial —respondió mordazmente.',
+        text="Juan estaba irritado. —Claro, perfecto, genial —respondió mordazmente.",
         entity_name="Juan",
         declared_emotion="irritado",
         should_be_incoherent=False,
         difficulty="hard",
-        linguistic_note="Respuesta mordaz coherente con irritación"
+        linguistic_note="Respuesta mordaz coherente con irritación",
     ),
     EmotionalCoherenceTestCase(
         id="irony_03_burlona",
         category="ironia",
-        text='Ana estaba enfadada. —Qué inteligente —comentó con tono burlón.',
+        text="Ana estaba enfadada. —Qué inteligente —comentó con tono burlón.",
         entity_name="Ana",
         declared_emotion="enfadada",
         should_be_incoherent=False,
         difficulty="hard",
-        linguistic_note="Burla coherente con enfado"
+        linguistic_note="Burla coherente con enfado",
     ),
 ]
 
@@ -267,32 +269,32 @@ CONCEALMENT_TESTS = [
     EmotionalCoherenceTestCase(
         id="conc_01_explicito",
         category="disimulo",
-        text='María estaba aterrada, pero fingió serenidad. —Todo está bien —mintió.',
+        text="María estaba aterrada, pero fingió serenidad. —Todo está bien —mintió.",
         entity_name="María",
         declared_emotion="aterrada",
         should_be_incoherent=False,  # El fingimiento está explícito
         difficulty="hard",
-        linguistic_note="Fingimiento explícito hace coherente"
+        linguistic_note="Fingimiento explícito hace coherente",
     ),
     EmotionalCoherenceTestCase(
         id="conc_02_ocultando",
         category="disimulo",
-        text='Juan hervía de rabia por dentro, pero mantuvo la compostura. —Entiendo.',
+        text="Juan hervía de rabia por dentro, pero mantuvo la compostura. —Entiendo.",
         entity_name="Juan",
         declared_emotion="rabia",
         should_be_incoherent=False,
         difficulty="hard",
-        linguistic_note="'Por dentro' + 'mantuvo compostura' indica disimulo"
+        linguistic_note="'Por dentro' + 'mantuvo compostura' indica disimulo",
     ),
     EmotionalCoherenceTestCase(
         id="conc_03_mascara",
         category="disimulo",
-        text='Bajo su máscara de calma, Ana sentía pánico. —Procedamos —dijo con voz firme.',
+        text="Bajo su máscara de calma, Ana sentía pánico. —Procedamos —dijo con voz firme.",
         entity_name="Ana",
         declared_emotion="pánico",
         should_be_incoherent=False,
         difficulty="hard",
-        linguistic_note="'Máscara de calma' indica ocultamiento"
+        linguistic_note="'Máscara de calma' indica ocultamiento",
     ),
 ]
 
@@ -304,22 +306,22 @@ MIXED_EMOTION_TESTS = [
     EmotionalCoherenceTestCase(
         id="mixed_01_alegre_triste",
         category="emociones_mixtas",
-        text='María sentía una mezcla de alegría y tristeza. Sonrió con lágrimas en los ojos.',
+        text="María sentía una mezcla de alegría y tristeza. Sonrió con lágrimas en los ojos.",
         entity_name="María",
         declared_emotion="alegría y tristeza",
         should_be_incoherent=False,
         difficulty="hard",
-        linguistic_note="Emociones mixtas justifican conducta mixta"
+        linguistic_note="Emociones mixtas justifican conducta mixta",
     ),
     EmotionalCoherenceTestCase(
         id="mixed_02_alivio_culpa",
         category="emociones_mixtas",
-        text='Juan sentía alivio y culpa a partes iguales. No sabía si reír o llorar.',
+        text="Juan sentía alivio y culpa a partes iguales. No sabía si reír o llorar.",
         entity_name="Juan",
         declared_emotion="alivio y culpa",
         should_be_incoherent=False,
         difficulty="hard",
-        linguistic_note="Conflicto emocional interno"
+        linguistic_note="Conflicto emocional interno",
     ),
 ]
 
@@ -331,22 +333,22 @@ VALID_CHANGE_TESTS = [
     EmotionalCoherenceTestCase(
         id="valid_ch_01_gradual",
         category="cambio_valido",
-        text='María estaba preocupada. Tras escuchar las buenas noticias, su expresión se relajó y sonrió aliviada.',
+        text="María estaba preocupada. Tras escuchar las buenas noticias, su expresión se relajó y sonrió aliviada.",
         entity_name="María",
         declared_emotion="preocupada → aliviada",
         should_be_incoherent=False,
         difficulty="medium",
-        linguistic_note="Cambio gradual justificado por evento"
+        linguistic_note="Cambio gradual justificado por evento",
     ),
     EmotionalCoherenceTestCase(
         id="valid_ch_02_causa",
         category="cambio_valido",
-        text='Juan estaba tranquilo. Cuando vio la serpiente, el pánico lo invadió.',
+        text="Juan estaba tranquilo. Cuando vio la serpiente, el pánico lo invadió.",
         entity_name="Juan",
         declared_emotion="tranquilo → pánico",
         should_be_incoherent=False,
         difficulty="medium",
-        linguistic_note="Cambio abrupto pero justificado por estímulo"
+        linguistic_note="Cambio abrupto pero justificado por estímulo",
     ),
 ]
 
@@ -358,24 +360,24 @@ INVALID_CHANGE_TESTS = [
     EmotionalCoherenceTestCase(
         id="inv_ch_01_sin_causa",
         category="cambio_invalido",
-        text='María estaba destrozada, llorando sin consuelo. De pronto estaba radiante de felicidad.',
+        text="María estaba destrozada, llorando sin consuelo. De pronto estaba radiante de felicidad.",
         entity_name="María",
         declared_emotion="destrozada → feliz",
         should_be_incoherent=True,
         incoherence_type="temporal_jump",
         difficulty="medium",
-        linguistic_note="Cambio extremo sin justificación"
+        linguistic_note="Cambio extremo sin justificación",
     ),
     EmotionalCoherenceTestCase(
         id="inv_ch_02_instantaneo",
         category="cambio_invalido",
-        text='Juan reía a carcajadas. Un segundo después estaba sumido en profunda depresión.',
+        text="Juan reía a carcajadas. Un segundo después estaba sumido en profunda depresión.",
         entity_name="Juan",
         declared_emotion="riendo → deprimido",
         should_be_incoherent=True,
         incoherence_type="temporal_jump",
         difficulty="medium",
-        linguistic_note="Cambio instantáneo sin causa"
+        linguistic_note="Cambio instantáneo sin causa",
     ),
 ]
 
@@ -387,22 +389,22 @@ CULTURAL_TESTS = [
     EmotionalCoherenceTestCase(
         id="cult_01_estoico",
         category="cultural",
-        text='El samurái estaba devastado por la muerte de su señor. Mantuvo el rostro impasible.',
+        text="El samurái estaba devastado por la muerte de su señor. Mantuvo el rostro impasible.",
         entity_name="El samurái",
         declared_emotion="devastado",
         should_be_incoherent=False,
         difficulty="hard",
-        linguistic_note="Contexto cultural justifica contención emocional"
+        linguistic_note="Contexto cultural justifica contención emocional",
     ),
     EmotionalCoherenceTestCase(
         id="cult_02_protocolo",
         category="cultural",
-        text='La reina estaba furiosa. Sonrió con cortesía durante toda la ceremonia.',
+        text="La reina estaba furiosa. Sonrió con cortesía durante toda la ceremonia.",
         entity_name="La reina",
         declared_emotion="furiosa",
         should_be_incoherent=False,
         difficulty="hard",
-        linguistic_note="Protocolo social justifica disimulo"
+        linguistic_note="Protocolo social justifica disimulo",
     ),
 ]
 
@@ -414,22 +416,22 @@ GENRE_TESTS = [
     EmotionalCoherenceTestCase(
         id="genre_01_comedia",
         category="genero",
-        text='María estaba desesperada. Tropezó con la alfombra y cayó sobre el pastel de bodas.',
+        text="María estaba desesperada. Tropezó con la alfombra y cayó sobre el pastel de bodas.",
         entity_name="María",
         declared_emotion="desesperada",
         should_be_incoherent=False,
         difficulty="hard",
-        linguistic_note="En comedia, la acción cómica no invalida la emoción"
+        linguistic_note="En comedia, la acción cómica no invalida la emoción",
     ),
     EmotionalCoherenceTestCase(
         id="genre_02_melodrama",
         category="genero",
-        text='Juan sintió que su corazón se hacía añicos en mil pedazos de cristal roto.',
+        text="Juan sintió que su corazón se hacía añicos en mil pedazos de cristal roto.",
         entity_name="Juan",
         declared_emotion="destrozado",
         should_be_incoherent=False,
         difficulty="medium",
-        linguistic_note="Melodrama permite expresiones hiperbólicas"
+        linguistic_note="Melodrama permite expresiones hiperbólicas",
     ),
 ]
 
@@ -441,22 +443,22 @@ AMBIGUOUS_TESTS = [
     EmotionalCoherenceTestCase(
         id="ambig_01_confuso",
         category="ambiguo",
-        text='María no sabía qué sentir. Alternaba entre risas y sollozos.',
+        text="María no sabía qué sentir. Alternaba entre risas y sollozos.",
         entity_name="María",
         declared_emotion="confusión emocional",
         should_be_incoherent=False,
         difficulty="hard",
-        linguistic_note="Confusión emocional justifica conducta errática"
+        linguistic_note="Confusión emocional justifica conducta errática",
     ),
     EmotionalCoherenceTestCase(
         id="ambig_02_shock",
         category="ambiguo",
-        text='Juan estaba en shock. Su rostro no mostraba ninguna expresión.',
+        text="Juan estaba en shock. Su rostro no mostraba ninguna expresión.",
         entity_name="Juan",
         declared_emotion="shock",
         should_be_incoherent=False,
         difficulty="medium",
-        linguistic_note="Shock puede producir inexpresividad"
+        linguistic_note="Shock puede producir inexpresividad",
     ),
 ]
 
@@ -468,22 +470,22 @@ NARRATOR_VS_CHARACTER_TESTS = [
     EmotionalCoherenceTestCase(
         id="narr_01_omnisciente",
         category="narrador_personaje",
-        text='María sonreía, pero el narrador sabía que por dentro lloraba.',
+        text="María sonreía, pero el narrador sabía que por dentro lloraba.",
         entity_name="María",
         declared_emotion="tristeza interna",
         should_be_incoherent=False,
         difficulty="hard",
-        linguistic_note="Narrador omnisciente revela emoción oculta"
+        linguistic_note="Narrador omnisciente revela emoción oculta",
     ),
     EmotionalCoherenceTestCase(
         id="narr_02_interpretacion",
         category="narrador_personaje",
-        text='Juan parecía tranquilo, aunque cualquiera podía ver la tensión en sus hombros.',
+        text="Juan parecía tranquilo, aunque cualquiera podía ver la tensión en sus hombros.",
         entity_name="Juan",
         declared_emotion="tenso",
         should_be_incoherent=False,
         difficulty="medium",
-        linguistic_note="Apariencia vs realidad indicada"
+        linguistic_note="Apariencia vs realidad indicada",
     ),
 ]
 
@@ -495,22 +497,22 @@ GRADUAL_TESTS = [
     EmotionalCoherenceTestCase(
         id="grad_01_creciente",
         category="gradual",
-        text='La irritación de María fue creciendo. Primero frunció el ceño, luego apretó los puños, y finalmente explotó.',
+        text="La irritación de María fue creciendo. Primero frunció el ceño, luego apretó los puños, y finalmente explotó.",
         entity_name="María",
         declared_emotion="irritación creciente",
         should_be_incoherent=False,
         difficulty="medium",
-        linguistic_note="Escalada emocional gradual"
+        linguistic_note="Escalada emocional gradual",
     ),
     EmotionalCoherenceTestCase(
         id="grad_02_decreciente",
         category="gradual",
-        text='El enfado de Juan se fue disipando. Su respiración se calmó y sus hombros se relajaron.',
+        text="El enfado de Juan se fue disipando. Su respiración se calmó y sus hombros se relajaron.",
         entity_name="Juan",
         declared_emotion="enfado decreciente",
         should_be_incoherent=False,
         difficulty="medium",
-        linguistic_note="Desescalada emocional"
+        linguistic_note="Desescalada emocional",
     ),
 ]
 
@@ -522,22 +524,22 @@ CATHARSIS_TESTS = [
     EmotionalCoherenceTestCase(
         id="cath_01_llanto",
         category="catarsis",
-        text='María finalmente lloró. Después del llanto, se sintió más ligera.',
+        text="María finalmente lloró. Después del llanto, se sintió más ligera.",
         entity_name="María",
         declared_emotion="triste → aliviada",
         should_be_incoherent=False,
         difficulty="medium",
-        linguistic_note="Catarsis produce cambio emocional válido"
+        linguistic_note="Catarsis produce cambio emocional válido",
     ),
     EmotionalCoherenceTestCase(
         id="cath_02_grito",
         category="catarsis",
-        text='Juan gritó toda su frustración. Agotado pero liberado, se dejó caer en la silla.',
+        text="Juan gritó toda su frustración. Agotado pero liberado, se dejó caer en la silla.",
         entity_name="Juan",
         declared_emotion="frustración → liberación",
         should_be_incoherent=False,
         difficulty="medium",
-        linguistic_note="Liberación emocional tras descarga"
+        linguistic_note="Liberación emocional tras descarga",
     ),
 ]
 
@@ -549,22 +551,22 @@ SHOCK_TESTS = [
     EmotionalCoherenceTestCase(
         id="shock_01_paralisis",
         category="shock",
-        text='María acababa de recibir la terrible noticia. Permaneció inmóvil, sin reaccionar.',
+        text="María acababa de recibir la terrible noticia. Permaneció inmóvil, sin reaccionar.",
         entity_name="María",
         declared_emotion="shock",
         should_be_incoherent=False,
         difficulty="medium",
-        linguistic_note="Shock produce parálisis emocional"
+        linguistic_note="Shock produce parálisis emocional",
     ),
     EmotionalCoherenceTestCase(
         id="shock_02_risa_histerica",
         category="shock",
-        text='Juan, tras el accidente, comenzó a reír histéricamente.',
+        text="Juan, tras el accidente, comenzó a reír histéricamente.",
         entity_name="Juan",
         declared_emotion="shock traumático",
         should_be_incoherent=False,
         difficulty="hard",
-        linguistic_note="Risa histérica como respuesta al trauma"
+        linguistic_note="Risa histérica como respuesta al trauma",
     ),
 ]
 
@@ -576,12 +578,12 @@ DARK_HUMOR_TESTS = [
     EmotionalCoherenceTestCase(
         id="dark_01_funeral",
         category="humor_negro",
-        text='María estaba destrozada en el funeral. —Al menos ya no ronca —murmuró intentando una sonrisa.',
+        text="María estaba destrozada en el funeral. —Al menos ya no ronca —murmuró intentando una sonrisa.",
         entity_name="María",
         declared_emotion="destrozada",
         should_be_incoherent=False,
         difficulty="hard",
-        linguistic_note="Humor negro como mecanismo de defensa"
+        linguistic_note="Humor negro como mecanismo de defensa",
     ),
 ]
 
@@ -593,22 +595,22 @@ COMPLEX_EMOTION_TESTS = [
     EmotionalCoherenceTestCase(
         id="complex_01_nostalgia",
         category="emociones_complejas",
-        text='María sentía nostalgia. Sonreía mientras las lágrimas rodaban por su mejilla.',
+        text="María sentía nostalgia. Sonreía mientras las lágrimas rodaban por su mejilla.",
         entity_name="María",
         declared_emotion="nostalgia",
         should_be_incoherent=False,
         difficulty="hard",
-        linguistic_note="Nostalgia mezcla alegría del recuerdo y tristeza de la pérdida"
+        linguistic_note="Nostalgia mezcla alegría del recuerdo y tristeza de la pérdida",
     ),
     EmotionalCoherenceTestCase(
         id="complex_02_orgullo_herido",
         category="emociones_complejas",
-        text='Juan tenía el orgullo herido. Se negó a pedir ayuda aunque la necesitaba.',
+        text="Juan tenía el orgullo herido. Se negó a pedir ayuda aunque la necesitaba.",
         entity_name="Juan",
         declared_emotion="orgullo herido",
         should_be_incoherent=False,
         difficulty="medium",
-        linguistic_note="Orgullo herido produce conducta de rechazo"
+        linguistic_note="Orgullo herido produce conducta de rechazo",
     ),
 ]
 
@@ -620,22 +622,22 @@ DENIAL_TESTS = [
     EmotionalCoherenceTestCase(
         id="denial_01_explicita",
         category="negacion",
-        text='María estaba claramente asustada. —No tengo miedo —insistió con voz temblorosa.',
+        text="María estaba claramente asustada. —No tengo miedo —insistió con voz temblorosa.",
         entity_name="María",
         declared_emotion="asustada",
         should_be_incoherent=False,
         difficulty="hard",
-        linguistic_note="Negación verbal mientras el cuerpo revela la verdad"
+        linguistic_note="Negación verbal mientras el cuerpo revela la verdad",
     ),
     EmotionalCoherenceTestCase(
         id="denial_02_autoengano",
         category="negacion",
-        text='Juan estaba destrozado, pero se repetía que estaba bien. —Estoy bien —se mentía.',
+        text="Juan estaba destrozado, pero se repetía que estaba bien. —Estoy bien —se mentía.",
         entity_name="Juan",
         declared_emotion="destrozado",
         should_be_incoherent=False,
         difficulty="hard",
-        linguistic_note="Autoengaño explícito ('se mentía')"
+        linguistic_note="Autoengaño explícito ('se mentía')",
     ),
 ]
 
@@ -647,22 +649,22 @@ IDIOM_TESTS = [
     EmotionalCoherenceTestCase(
         id="idiom_01_subir_pared",
         category="expresiones",
-        text='María estaba que se subía por las paredes de la rabia.',
+        text="María estaba que se subía por las paredes de la rabia.",
         entity_name="María",
         declared_emotion="rabia",
         should_be_incoherent=False,
         difficulty="medium",
-        linguistic_note="Expresión idiomática de enfado extremo"
+        linguistic_note="Expresión idiomática de enfado extremo",
     ),
     EmotionalCoherenceTestCase(
         id="idiom_02_corazon_puño",
         category="expresiones",
-        text='Juan tenía el corazón en un puño esperando los resultados.',
+        text="Juan tenía el corazón en un puño esperando los resultados.",
         entity_name="Juan",
         declared_emotion="ansiedad",
         should_be_incoherent=False,
         difficulty="medium",
-        linguistic_note="Expresión idiomática de ansiedad"
+        linguistic_note="Expresión idiomática de ansiedad",
     ),
 ]
 
@@ -672,26 +674,26 @@ IDIOM_TESTS = [
 # =============================================================================
 
 ALL_EMOTIONAL_COHERENCE_TESTS = (
-    COHERENT_DIALOGUE_TESTS +
-    INCOHERENT_DIALOGUE_TESTS +
-    COHERENT_ACTION_TESTS +
-    INCOHERENT_ACTION_TESTS +
-    IRONY_TESTS +
-    CONCEALMENT_TESTS +
-    MIXED_EMOTION_TESTS +
-    VALID_CHANGE_TESTS +
-    INVALID_CHANGE_TESTS +
-    CULTURAL_TESTS +
-    GENRE_TESTS +
-    AMBIGUOUS_TESTS +
-    NARRATOR_VS_CHARACTER_TESTS +
-    GRADUAL_TESTS +
-    CATHARSIS_TESTS +
-    SHOCK_TESTS +
-    DARK_HUMOR_TESTS +
-    COMPLEX_EMOTION_TESTS +
-    DENIAL_TESTS +
-    IDIOM_TESTS
+    COHERENT_DIALOGUE_TESTS
+    + INCOHERENT_DIALOGUE_TESTS
+    + COHERENT_ACTION_TESTS
+    + INCOHERENT_ACTION_TESTS
+    + IRONY_TESTS
+    + CONCEALMENT_TESTS
+    + MIXED_EMOTION_TESTS
+    + VALID_CHANGE_TESTS
+    + INVALID_CHANGE_TESTS
+    + CULTURAL_TESTS
+    + GENRE_TESTS
+    + AMBIGUOUS_TESTS
+    + NARRATOR_VS_CHARACTER_TESTS
+    + GRADUAL_TESTS
+    + CATHARSIS_TESTS
+    + SHOCK_TESTS
+    + DARK_HUMOR_TESTS
+    + COMPLEX_EMOTION_TESTS
+    + DENIAL_TESTS
+    + IDIOM_TESTS
 )
 
 
@@ -702,16 +704,14 @@ class TestEmotionalCoherenceAdversarial:
     def analyzer(self):
         """Crea instancia del analizador de coherencia emocional."""
         from narrative_assistant.analysis.emotional_coherence import EmotionalCoherenceAnalyzer
+
         return EmotionalCoherenceAnalyzer()
 
     @pytest.mark.parametrize("test_case", ALL_EMOTIONAL_COHERENCE_TESTS, ids=lambda tc: tc.id)
     def test_emotional_coherence_case(self, analyzer, test_case: EmotionalCoherenceTestCase):
         """Ejecuta un caso de test de coherencia emocional."""
         # Analizar el texto
-        incoherences = analyzer.analyze_text(
-            test_case.text,
-            entity_name=test_case.entity_name
-        )
+        incoherences = analyzer.analyze_text(test_case.text, entity_name=test_case.entity_name)
 
         has_incoherence = len(incoherences) > 0
 
@@ -738,6 +738,7 @@ class TestEmotionalCoherenceByCategory:
     @pytest.fixture
     def analyzer(self):
         from narrative_assistant.analysis.emotional_coherence import EmotionalCoherenceAnalyzer
+
         return EmotionalCoherenceAnalyzer()
 
     @pytest.mark.parametrize("test_case", INCOHERENT_DIALOGUE_TESTS, ids=lambda tc: tc.id)
@@ -774,10 +775,10 @@ def get_test_summary():
     print(f"\nTotal de casos: {len(ALL_EMOTIONAL_COHERENCE_TESTS)}")
     print(f"  - Deben detectar incoherencia: {should_detect}")
     print(f"  - NO deben detectar: {should_not}")
-    print(f"\nPor categoría:")
+    print("\nPor categoría:")
     for cat, count in sorted(categories.items()):
         print(f"  {cat}: {count}")
-    print(f"\nPor dificultad:")
+    print("\nPor dificultad:")
     for diff, count in sorted(difficulties.items()):
         print(f"  {diff}: {count}")
     print("=" * 60)

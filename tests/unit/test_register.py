@@ -1,21 +1,22 @@
 """Tests para el modulo de analisis de registro."""
 
 import pytest
+
 from narrative_assistant.voice.register import (
-    RegisterType,
-    RegisterAnalysis,
-    RegisterChange,
-    RegisterAnalyzer,
-    RegisterChangeDetector,
-    FORMAL_INDICATORS,
     COLLOQUIAL_INDICATORS,
+    FORMAL_INDICATORS,
+    RegisterAnalysis,
+    RegisterAnalyzer,
+    RegisterChange,
+    RegisterChangeDetector,
+    RegisterType,
     analyze_register_changes,
 )
-
 
 # ============================================================================
 # Tests para RegisterAnalyzer
 # ============================================================================
+
 
 class TestRegisterAnalyzer:
     """Tests para RegisterAnalyzer."""
@@ -124,6 +125,7 @@ class TestRegisterAnalyzer:
 # Tests para RegisterChangeDetector
 # ============================================================================
 
+
 class TestRegisterChangeDetector:
     """Tests para RegisterChangeDetector."""
 
@@ -158,19 +160,29 @@ class TestRegisterChangeDetector:
         detector = RegisterChangeDetector()
         segments = [
             # Formal/literario
-            ("Contempló la vastedad del horizonte mientras la melancolía "
-             "se apoderaba de su alma. No obstante, mantuvo la compostura. "
-             "Asimismo, percibió que el transcurrir era inexorable.", 1, 0, False),
+            (
+                "Contempló la vastedad del horizonte mientras la melancolía "
+                "se apoderaba de su alma. No obstante, mantuvo la compostura. "
+                "Asimismo, percibió que el transcurrir era inexorable.",
+                1,
+                0,
+                False,
+            ),
             # Coloquial con lenguaje juvenil
-            ("Bro, eso mola mogollon, es una pasada guay chaval. "
-             "Flipante crack, tiene un flow brutal.", 1, 500, False),
+            (
+                "Bro, eso mola mogollon, es una pasada guay chaval. "
+                "Flipante crack, tiene un flow brutal.",
+                1,
+                500,
+                False,
+            ),
         ]
 
         detector.analyze_document(segments)
-        changes = detector.detect_changes(min_severity='high')
+        changes = detector.detect_changes(min_severity="high")
 
         assert len(changes) >= 1
-        assert changes[0].severity == 'high'
+        assert changes[0].severity == "high"
         assert changes[0].from_register == RegisterType.FORMAL_LITERARY
         assert changes[0].to_register == RegisterType.COLLOQUIAL
 
@@ -183,7 +195,7 @@ class TestRegisterChangeDetector:
         ]
 
         detector.analyze_document(segments)
-        changes = detector.detect_changes(min_severity='medium')
+        changes = detector.detect_changes(min_severity="medium")
 
         assert len(changes) >= 1
 
@@ -197,10 +209,10 @@ class TestRegisterChangeDetector:
         ]
 
         detector.analyze_document(segments)
-        changes = detector.detect_changes(min_severity='low')
+        changes = detector.detect_changes(min_severity="low")
 
         # No debe detectar cambio porque el coloquial es dialogo
-        high_changes = [c for c in changes if c.severity == 'high']
+        high_changes = [c for c in changes if c.severity == "high"]
         assert len(high_changes) == 0
 
     def test_no_changes_same_register(self):
@@ -213,7 +225,7 @@ class TestRegisterChangeDetector:
         ]
 
         detector.analyze_document(segments)
-        changes = detector.detect_changes(min_severity='low')
+        changes = detector.detect_changes(min_severity="low")
 
         # Todos son formales, no hay cambios
         assert len(changes) == 0
@@ -245,11 +257,11 @@ class TestRegisterChangeDetector:
         detector.analyze_document(segments)
         summary = detector.get_summary()
 
-        assert summary['total_segments'] == 3
-        assert summary['narrative_segments'] == 2
-        assert summary['dialogue_segments'] == 1
-        assert 'distribution' in summary
-        assert 'dominant_register' in summary
+        assert summary["total_segments"] == 3
+        assert summary["narrative_segments"] == 2
+        assert summary["dialogue_segments"] == 1
+        assert "distribution" in summary
+        assert "dominant_register" in summary
 
     def test_empty_document(self):
         """Test documento vacio."""
@@ -261,12 +273,13 @@ class TestRegisterChangeDetector:
 
         assert len(analyses) == 0
         assert len(changes) == 0
-        assert summary['total_segments'] == 0
+        assert summary["total_segments"] == 0
 
 
 # ============================================================================
 # Tests para RegisterAnalysis dataclass
 # ============================================================================
+
 
 class TestRegisterAnalysis:
     """Tests para RegisterAnalysis."""
@@ -281,22 +294,23 @@ class TestRegisterAnalysis:
             primary_register=RegisterType.FORMAL_LITERARY,
             register_scores={r: 0.2 for r in RegisterType},
             confidence=0.5,
-            formal_indicators=['contemplar'],
+            formal_indicators=["contemplar"],
             colloquial_indicators=[],
             technical_terms=[],
-            poetic_devices=[]
+            poetic_devices=[],
         )
 
         d = analysis.to_dict()
 
-        assert d['chapter'] == 1
-        assert d['primary_register'] == 'formal_literary'
-        assert 'formal_literary' in d['register_scores']
+        assert d["chapter"] == 1
+        assert d["primary_register"] == "formal_literary"
+        assert "formal_literary" in d["register_scores"]
 
 
 # ============================================================================
 # Tests para RegisterChange dataclass
 # ============================================================================
+
 
 class TestRegisterChange:
     """Tests para RegisterChange."""
@@ -310,20 +324,21 @@ class TestRegisterChange:
             position=100,
             context_before="Texto formal",
             context_after="Texto coloquial",
-            severity='high',
-            explanation="Cambio de registro"
+            severity="high",
+            explanation="Cambio de registro",
         )
 
         d = change.to_dict()
 
-        assert d['from_register'] == 'formal_literary'
-        assert d['to_register'] == 'colloquial'
-        assert d['severity'] == 'high'
+        assert d["from_register"] == "formal_literary"
+        assert d["to_register"] == "colloquial"
+        assert d["severity"] == "high"
 
 
 # ============================================================================
 # Tests para funcion de conveniencia
 # ============================================================================
+
 
 class TestAnalyzeRegisterChanges:
     """Tests para analyze_register_changes."""
@@ -345,6 +360,7 @@ class TestAnalyzeRegisterChanges:
 # Tests de integracion
 # ============================================================================
 
+
 class TestRegisterIntegration:
     """Tests de integracion del sistema de registro."""
 
@@ -354,27 +370,43 @@ class TestRegisterIntegration:
 
         segments = [
             # Cap 1: Formal literario
-            ("Contempló la vastedad del horizonte mientras la melancolía "
-             "se apoderaba de su alma. No obstante, mantuvo la compostura.", 1, 0, False),
-
+            (
+                "Contempló la vastedad del horizonte mientras la melancolía "
+                "se apoderaba de su alma. No obstante, mantuvo la compostura.",
+                1,
+                0,
+                False,
+            ),
             # Cap 1: Dialogo coloquial (no cuenta)
             ("—Bro, mola mogollon esto, chaval crack!", 1, 500, True),
-
             # Cap 2: Tecnico
-            ("El diagnóstico revelaba una patología compleja. "
-             "La etiología permanecía indeterminada.", 2, 0, False),
-
+            (
+                "El diagnóstico revelaba una patología compleja. "
+                "La etiología permanecía indeterminada.",
+                2,
+                0,
+                False,
+            ),
             # Cap 2: Poetico
-            ("El cielo sangraba carmesi mientras la luna danzaba susurraba "
-             "entre las nubes flotaba murmuraba.", 2, 300, False),
-
+            (
+                "El cielo sangraba carmesi mientras la luna danzaba susurraba "
+                "entre las nubes flotaba murmuraba.",
+                2,
+                300,
+                False,
+            ),
             # Cap 3: Formal otra vez
-            ("Asimismo, percibió que el transcurrir del tiempo era inexorable. "
-             "Por ende, decidió actuar no obstante.", 3, 0, False),
+            (
+                "Asimismo, percibió que el transcurrir del tiempo era inexorable. "
+                "Por ende, decidió actuar no obstante.",
+                3,
+                0,
+                False,
+            ),
         ]
 
         analyses = detector.analyze_document(segments)
-        changes = detector.detect_changes(min_severity='low')
+        changes = detector.detect_changes(min_severity="low")
 
         assert len(analyses) == 5
 
@@ -399,7 +431,7 @@ class TestRegisterIntegration:
         ]
 
         detector.analyze_document(segments)
-        changes = detector.detect_changes(min_severity='low')
+        changes = detector.detect_changes(min_severity="low")
 
         # No debe haber cambios significativos
         assert len(changes) == 0
@@ -421,5 +453,5 @@ class TestRegisterIntegration:
         detector.analyze_document(segments)
         summary = detector.get_summary()
 
-        assert summary['total_segments'] == 3
-        assert len(summary['distribution']) >= 2
+        assert summary["total_segments"] == 3
+        assert len(summary["distribution"]) >= 2

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Tests para el módulo de salud narrativa (narrative_health).
 
@@ -11,14 +10,15 @@ Cubre:
 """
 
 import pytest
+
 from narrative_assistant.analysis.narrative_health import (
-    NarrativeHealthChecker,
+    DIMENSION_NAMES,
+    DIMENSION_WEIGHTS,
+    DimensionScore,
     HealthDimension,
     HealthStatus,
-    DimensionScore,
+    NarrativeHealthChecker,
     NarrativeHealthReport,
-    DIMENSION_WEIGHTS,
-    DIMENSION_NAMES,
 )
 
 
@@ -61,10 +61,11 @@ def _make_entity(name: str, mention_count: int = 10, **kwargs) -> dict:
 # Smoke tests
 # =============================================================================
 
-class TestNarrativeHealthSmoke:
 
+class TestNarrativeHealthSmoke:
     def test_import(self):
         from narrative_assistant.analysis.narrative_health import NarrativeHealthChecker
+
         assert NarrativeHealthChecker is not None
 
     def test_create_checker(self, checker):
@@ -80,8 +81,12 @@ class TestNarrativeHealthSmoke:
 
     def test_core_dimensions_weighted_higher(self):
         """Dimensiones core (protagonist, conflict, goal, climax) pesan 1.5x."""
-        core = [HealthDimension.PROTAGONIST, HealthDimension.CONFLICT,
-                HealthDimension.GOAL, HealthDimension.CLIMAX]
+        core = [
+            HealthDimension.PROTAGONIST,
+            HealthDimension.CONFLICT,
+            HealthDimension.GOAL,
+            HealthDimension.CLIMAX,
+        ]
         for dim in core:
             assert DIMENSION_WEIGHTS[dim] == 1.5, f"{dim} debería pesar 1.5x"
 
@@ -90,8 +95,8 @@ class TestNarrativeHealthSmoke:
 # Manuscript mínimo
 # =============================================================================
 
-class TestMinimalManuscript:
 
+class TestMinimalManuscript:
     def test_less_than_2_chapters_critical(self, checker):
         """Menos de 2 capítulos → overall CRITICAL, score 0."""
         report = checker.check(
@@ -118,19 +123,32 @@ class TestMinimalManuscript:
 # Weighted scoring
 # =============================================================================
 
-class TestWeightedScoring:
 
+class TestWeightedScoring:
     def test_weighted_average_differs_from_simple(self, checker):
         """La media ponderada difiere de la simple cuando hay scores desiguales."""
         chapters = [
-            _make_chapter(1, new_characters=["Ana", "Luis"], positive_interactions=3,
-                          dominant_tone="positive", tone_intensity=0.7),
-            _make_chapter(2, new_characters=["Pedro"], conflict_interactions=2,
-                          dominant_tone="tense", tone_intensity=0.8),
-            _make_chapter(3, key_events=[{"event_type": "conflict"}],
-                          dominant_tone="negative", tone_intensity=0.9),
-            _make_chapter(4, key_events=[{"event_type": "revelation"}],
-                          dominant_tone="positive"),
+            _make_chapter(
+                1,
+                new_characters=["Ana", "Luis"],
+                positive_interactions=3,
+                dominant_tone="positive",
+                tone_intensity=0.7,
+            ),
+            _make_chapter(
+                2,
+                new_characters=["Pedro"],
+                conflict_interactions=2,
+                dominant_tone="tense",
+                tone_intensity=0.8,
+            ),
+            _make_chapter(
+                3,
+                key_events=[{"event_type": "conflict"}],
+                dominant_tone="negative",
+                tone_intensity=0.9,
+            ),
+            _make_chapter(4, key_events=[{"event_type": "revelation"}], dominant_tone="positive"),
             _make_chapter(5, dominant_tone="positive"),
         ]
         entities = [
@@ -148,17 +166,17 @@ class TestWeightedScoring:
         simple_avg = sum(d.score for d in scored) / len(scored)
         # El score ponderado puede ser mayor o menor que el simple
         # pero no debería ser exactamente igual (por la diferencia de pesos)
-        assert report.overall_score != pytest.approx(simple_avg, abs=0.01) or \
-            all(d.score == scored[0].score for d in scored), \
-            "La media ponderada solo coincide con la simple si todos los scores son iguales"
+        assert report.overall_score != pytest.approx(simple_avg, abs=0.01) or all(
+            d.score == scored[0].score for d in scored
+        ), "La media ponderada solo coincide con la simple si todos los scores son iguales"
 
 
 # =============================================================================
 # Dimensiones independientes
 # =============================================================================
 
-class TestDimensionIndependence:
 
+class TestDimensionIndependence:
     def test_all_12_dimensions_returned(self, checker):
         """El chequeo siempre devuelve 12 dimensiones."""
         chapters = [_make_chapter(i) for i in range(1, 6)]
@@ -181,8 +199,12 @@ class TestDimensionIndependence:
         for dim in report.dimensions:
             assert isinstance(dim.score, (int, float))
             assert 0 <= dim.score <= 100
-            assert dim.status in (HealthStatus.OK, HealthStatus.WARNING,
-                                  HealthStatus.CRITICAL, HealthStatus.NA)
+            assert dim.status in (
+                HealthStatus.OK,
+                HealthStatus.WARNING,
+                HealthStatus.CRITICAL,
+                HealthStatus.NA,
+            )
             assert isinstance(dim.explanation, str)
             assert len(dim.explanation) > 0
 
@@ -191,8 +213,8 @@ class TestDimensionIndependence:
 # Pacing thresholds
 # =============================================================================
 
-class TestPacingThresholds:
 
+class TestPacingThresholds:
     def test_moderate_variation_not_critical(self, checker):
         """Variación moderada (ratio ~3) no debería ser CRITICAL."""
         chapters = [
@@ -212,8 +234,8 @@ class TestPacingThresholds:
 # Coherence thresholds
 # =============================================================================
 
-class TestCoherenceThresholds:
 
+class TestCoherenceThresholds:
     def test_some_tone_shifts_not_critical(self, checker):
         """Hasta 35% de cambios tonales debería ser OK."""
         # 3 capítulos: pos → neg → pos = 2 shifts de 2 transiciones = 100%
@@ -238,8 +260,8 @@ class TestCoherenceThresholds:
 # Ghost character adaptive threshold
 # =============================================================================
 
-class TestGhostCharacterThreshold:
 
+class TestGhostCharacterThreshold:
     def test_few_characters_uses_2_pct(self, checker):
         """Con ≤10 personajes, umbral es 2%."""
         entities = [
@@ -249,7 +271,9 @@ class TestGhostCharacterThreshold:
         ]
         chapters = [_make_chapter(i) for i in range(1, 6)]
         report = checker.check(
-            chapters_data=chapters, total_chapters=5, entities_data=entities,
+            chapters_data=chapters,
+            total_chapters=5,
+            entities_data=entities,
         )
         cast = next(d for d in report.dimensions if d.dimension == HealthDimension.CAST_BALANCE)
         assert cast is not None
@@ -263,7 +287,9 @@ class TestGhostCharacterThreshold:
         ]
         chapters = [_make_chapter(i) for i in range(1, 6)]
         report = checker.check(
-            chapters_data=chapters, total_chapters=5, entities_data=entities,
+            chapters_data=chapters,
+            total_chapters=5,
+            entities_data=entities,
         )
         cast = next(d for d in report.dimensions if d.dimension == HealthDimension.CAST_BALANCE)
         # Con 0 ghosts y reasonable protag ratio → should be OK

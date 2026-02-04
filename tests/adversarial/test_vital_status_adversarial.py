@@ -29,21 +29,27 @@ Categorías de tests:
 Basado en patrones narrativos comunes en literatura española.
 """
 
-import pytest
 from dataclasses import dataclass, field
 from typing import Optional
+
+import pytest
 
 
 @dataclass
 class VitalStatusTestCase:
     """Caso de test para vital status."""
+
     id: str
     category: str
     text: str
     entities: list[str]  # Nombres de entidades a registrar
-    expected_deaths: list[str] = field(default_factory=list)  # Nombres que deben detectarse como muertos
+    expected_deaths: list[str] = field(
+        default_factory=list
+    )  # Nombres que deben detectarse como muertos
     not_deaths: list[str] = field(default_factory=list)  # NO deben detectarse como muertos
-    expected_valid_references: list[str] = field(default_factory=list)  # Referencias post-mortem válidas
+    expected_valid_references: list[str] = field(
+        default_factory=list
+    )  # Referencias post-mortem válidas
     chapter: int = 1
     difficulty: str = "medium"
     linguistic_note: str = ""
@@ -61,7 +67,7 @@ DIRECT_DEATH_TESTS = [
         entities=["Juan"],
         expected_deaths=["Juan"],
         difficulty="easy",
-        linguistic_note="Verbo 'morir' en pasado simple"
+        linguistic_note="Verbo 'morir' en pasado simple",
     ),
     VitalStatusTestCase(
         id="direct_02_fallecio",
@@ -70,7 +76,7 @@ DIRECT_DEATH_TESTS = [
         entities=["María"],
         expected_deaths=["María"],
         difficulty="easy",
-        linguistic_note="'Fallecer' - sinónimo formal"
+        linguistic_note="'Fallecer' - sinónimo formal",
     ),
     VitalStatusTestCase(
         id="direct_03_perecio",
@@ -79,7 +85,7 @@ DIRECT_DEATH_TESTS = [
         entities=["El capitán"],
         expected_deaths=["El capitán"],
         difficulty="medium",
-        linguistic_note="'Perecer' - estilo literario"
+        linguistic_note="'Perecer' - estilo literario",
     ),
     VitalStatusTestCase(
         id="direct_04_cayo_muerto",
@@ -88,7 +94,7 @@ DIRECT_DEATH_TESTS = [
         entities=["Pedro"],
         expected_deaths=["Pedro"],
         difficulty="easy",
-        linguistic_note="Expresión 'caer muerto'"
+        linguistic_note="Expresión 'caer muerto'",
     ),
     VitalStatusTestCase(
         id="direct_05_dejo_respirar",
@@ -97,7 +103,7 @@ DIRECT_DEATH_TESTS = [
         entities=["Ana"],
         expected_deaths=["Ana"],
         difficulty="medium",
-        linguistic_note="Perífrasis 'dejar de respirar'"
+        linguistic_note="Perífrasis 'dejar de respirar'",
     ),
     VitalStatusTestCase(
         id="direct_06_exhalo_aliento",
@@ -106,7 +112,7 @@ DIRECT_DEATH_TESTS = [
         entities=["El anciano"],
         expected_deaths=["El anciano"],
         difficulty="medium",
-        linguistic_note="Expresión literaria 'exhalar último aliento'"
+        linguistic_note="Expresión literaria 'exhalar último aliento'",
     ),
     VitalStatusTestCase(
         id="direct_07_multiple_verbs",
@@ -115,7 +121,7 @@ DIRECT_DEATH_TESTS = [
         entities=["Carlos"],
         expected_deaths=["Carlos"],
         difficulty="easy",
-        linguistic_note="Múltiples verbos, una sola muerte"
+        linguistic_note="Múltiples verbos, una sola muerte",
     ),
 ]
 
@@ -132,7 +138,7 @@ CAUSED_DEATH_TESTS = [
         expected_deaths=["Roberto"],
         not_deaths=["El asesino"],
         difficulty="easy",
-        linguistic_note="Verbo 'matar' con OD"
+        linguistic_note="Verbo 'matar' con OD",
     ),
     VitalStatusTestCase(
         id="caused_02_asesino",
@@ -141,7 +147,7 @@ CAUSED_DEATH_TESTS = [
         entities=["la condesa"],
         expected_deaths=["la condesa"],
         difficulty="easy",
-        linguistic_note="Verbo 'asesinar'"
+        linguistic_note="Verbo 'asesinar'",
     ),
     VitalStatusTestCase(
         id="caused_03_ejecutaron",
@@ -150,7 +156,7 @@ CAUSED_DEATH_TESTS = [
         entities=["al prisionero"],
         expected_deaths=["al prisionero"],
         difficulty="medium",
-        linguistic_note="'Ejecutar' - muerte formal"
+        linguistic_note="'Ejecutar' - muerte formal",
     ),
     VitalStatusTestCase(
         id="caused_04_disparo",
@@ -159,7 +165,7 @@ CAUSED_DEATH_TESTS = [
         entities=["Miguel"],
         expected_deaths=["Miguel"],
         difficulty="medium",
-        linguistic_note="Disparo con resultado implícito"
+        linguistic_note="Disparo con resultado implícito",
     ),
     VitalStatusTestCase(
         id="caused_05_envenenaron",
@@ -168,7 +174,7 @@ CAUSED_DEATH_TESTS = [
         entities=["la reina"],
         expected_deaths=["la reina"],
         difficulty="medium",
-        linguistic_note="Envenenamiento"
+        linguistic_note="Envenenamiento",
     ),
     VitalStatusTestCase(
         id="caused_06_pasiva",
@@ -177,7 +183,7 @@ CAUSED_DEATH_TESTS = [
         entities=["Teresa"],
         expected_deaths=["Teresa"],
         difficulty="easy",
-        linguistic_note="Voz pasiva"
+        linguistic_note="Voz pasiva",
     ),
 ]
 
@@ -193,7 +199,7 @@ REPORTED_DEATH_TESTS = [
         entities=["Luis"],
         expected_deaths=["Luis"],
         difficulty="easy",
-        linguistic_note="Pretérito perfecto en diálogo"
+        linguistic_note="Pretérito perfecto en diálogo",
     ),
     VitalStatusTestCase(
         id="reported_02_esta_muerto",
@@ -202,7 +208,7 @@ REPORTED_DEATH_TESTS = [
         entities=["Pablo"],
         expected_deaths=["Pablo"],
         difficulty="easy",
-        linguistic_note="Estado resultante"
+        linguistic_note="Estado resultante",
     ),
     VitalStatusTestCase(
         id="reported_03_se_enteraron",
@@ -211,7 +217,7 @@ REPORTED_DEATH_TESTS = [
         entities=["Marta"],
         expected_deaths=["Marta"],
         difficulty="medium",
-        linguistic_note="Noticia de muerte"
+        linguistic_note="Noticia de muerte",
     ),
     VitalStatusTestCase(
         id="reported_04_anunciaron",
@@ -220,7 +226,7 @@ REPORTED_DEATH_TESTS = [
         entities=["don Álvaro"],
         expected_deaths=["don Álvaro"],
         difficulty="medium",
-        linguistic_note="Anuncio formal"
+        linguistic_note="Anuncio formal",
     ),
     VitalStatusTestCase(
         id="reported_05_no_sobrevivio",
@@ -229,7 +235,7 @@ REPORTED_DEATH_TESTS = [
         entities=["El paciente"],
         expected_deaths=["El paciente"],
         difficulty="medium",
-        linguistic_note="'No sobrevivir'"
+        linguistic_note="'No sobrevivir'",
     ),
 ]
 
@@ -245,7 +251,7 @@ IMPLIED_DEATH_TESTS = [
         entities=["Fernando"],
         expected_deaths=["Fernando"],
         difficulty="easy",
-        linguistic_note="'Cadáver' implica muerte"
+        linguistic_note="'Cadáver' implica muerte",
     ),
     VitalStatusTestCase(
         id="implied_02_cuerpo_sin_vida",
@@ -254,7 +260,7 @@ IMPLIED_DEATH_TESTS = [
         entities=["Elena"],
         expected_deaths=["Elena"],
         difficulty="easy",
-        linguistic_note="'Cuerpo sin vida'"
+        linguistic_note="'Cuerpo sin vida'",
     ),
     VitalStatusTestCase(
         id="implied_03_tumba",
@@ -263,7 +269,7 @@ IMPLIED_DEATH_TESTS = [
         entities=["su padre"],
         expected_deaths=["su padre"],
         difficulty="medium",
-        linguistic_note="'Tumba' implica fallecimiento"
+        linguistic_note="'Tumba' implica fallecimiento",
     ),
     VitalStatusTestCase(
         id="implied_04_nunca_regreso",
@@ -272,7 +278,7 @@ IMPLIED_DEATH_TESTS = [
         entities=["Jorge"],
         expected_deaths=["Jorge"],
         difficulty="hard",
-        linguistic_note="Desaparición permanente (implica muerte)"
+        linguistic_note="Desaparición permanente (implica muerte)",
     ),
     VitalStatusTestCase(
         id="implied_05_en_memoria",
@@ -281,7 +287,7 @@ IMPLIED_DEATH_TESTS = [
         entities=["los caídos"],
         expected_deaths=["los caídos"],
         difficulty="medium",
-        linguistic_note="'En memoria de' sugiere fallecimiento"
+        linguistic_note="'En memoria de' sugiere fallecimiento",
     ),
 ]
 
@@ -298,7 +304,7 @@ FALSE_POSITIVE_TESTS = [
         expected_deaths=[],
         not_deaths=["María"],
         difficulty="hard",
-        linguistic_note="Expresión idiomática - no muerte real"
+        linguistic_note="Expresión idiomática - no muerte real",
     ),
     VitalStatusTestCase(
         id="fp_02_muero_hambre",
@@ -308,7 +314,7 @@ FALSE_POSITIVE_TESTS = [
         expected_deaths=[],
         not_deaths=["Pedro"],
         difficulty="hard",
-        linguistic_note="Hipérbole coloquial"
+        linguistic_note="Hipérbole coloquial",
     ),
     VitalStatusTestCase(
         id="fp_03_muerto_risa",
@@ -318,7 +324,7 @@ FALSE_POSITIVE_TESTS = [
         expected_deaths=[],
         not_deaths=["Juan"],
         difficulty="hard",
-        linguistic_note="'Muerto de risa' - expresión"
+        linguistic_note="'Muerto de risa' - expresión",
     ),
     VitalStatusTestCase(
         id="fp_04_muerto_cansancio",
@@ -327,7 +333,7 @@ FALSE_POSITIVE_TESTS = [
         entities=["Llegó"],  # Sin nombre explícito
         expected_deaths=[],
         difficulty="medium",
-        linguistic_note="'Muerto de cansancio'"
+        linguistic_note="'Muerto de cansancio'",
     ),
     VitalStatusTestCase(
         id="fp_05_matar_tiempo",
@@ -337,7 +343,7 @@ FALSE_POSITIVE_TESTS = [
         expected_deaths=[],
         not_deaths=["Ana"],
         difficulty="medium",
-        linguistic_note="'Matar el tiempo' - expresión"
+        linguistic_note="'Matar el tiempo' - expresión",
     ),
     VitalStatusTestCase(
         id="fp_06_punto_muerto",
@@ -346,7 +352,7 @@ FALSE_POSITIVE_TESTS = [
         entities=[],
         expected_deaths=[],
         difficulty="easy",
-        linguistic_note="'Punto muerto' - metáfora"
+        linguistic_note="'Punto muerto' - metáfora",
     ),
     VitalStatusTestCase(
         id="fp_07_naturaleza_muerta",
@@ -356,7 +362,7 @@ FALSE_POSITIVE_TESTS = [
         expected_deaths=[],
         not_deaths=["Carlos"],
         difficulty="medium",
-        linguistic_note="'Naturaleza muerta' - género artístico"
+        linguistic_note="'Naturaleza muerta' - género artístico",
     ),
     VitalStatusTestCase(
         id="fp_08_lengua_muerta",
@@ -365,7 +371,7 @@ FALSE_POSITIVE_TESTS = [
         entities=[],
         expected_deaths=[],
         difficulty="easy",
-        linguistic_note="'Lengua muerta'"
+        linguistic_note="'Lengua muerta'",
     ),
     VitalStatusTestCase(
         id="fp_09_ciudad_muerta",
@@ -375,7 +381,7 @@ FALSE_POSITIVE_TESTS = [
         expected_deaths=[],
         not_deaths=["Madrid"],
         difficulty="medium",
-        linguistic_note="'Ciudad muerta' - metáfora"
+        linguistic_note="'Ciudad muerta' - metáfora",
     ),
     VitalStatusTestCase(
         id="fp_10_mata_pasiones",
@@ -385,7 +391,7 @@ FALSE_POSITIVE_TESTS = [
         expected_deaths=[],
         not_deaths=["Rosa"],
         difficulty="hard",
-        linguistic_note="'Matar' metafórico"
+        linguistic_note="'Matar' metafórico",
     ),
 ]
 
@@ -402,7 +408,7 @@ VALID_REFERENCE_TESTS = [
         expected_deaths=["María"],
         expected_valid_references=["María"],
         difficulty="medium",
-        linguistic_note="Recuerdo de persona fallecida"
+        linguistic_note="Recuerdo de persona fallecida",
     ),
     VitalStatusTestCase(
         id="valid_02_fantasma",
@@ -412,7 +418,7 @@ VALID_REFERENCE_TESTS = [
         expected_deaths=["don Luis"],  # Ya debe estar muerto para ser fantasma
         expected_valid_references=["don Luis"],
         difficulty="medium",
-        linguistic_note="Aparición como fantasma"
+        linguistic_note="Aparición como fantasma",
     ),
     VitalStatusTestCase(
         id="valid_03_sono",
@@ -422,7 +428,7 @@ VALID_REFERENCE_TESTS = [
         expected_deaths=["su abuela"],
         expected_valid_references=["su abuela"],
         difficulty="medium",
-        linguistic_note="Aparición en sueño"
+        linguistic_note="Aparición en sueño",
     ),
     VitalStatusTestCase(
         id="valid_04_flashback",
@@ -432,7 +438,7 @@ VALID_REFERENCE_TESTS = [
         expected_deaths=[],  # No detectar muerte en flashback
         expected_valid_references=["Alberto"],
         difficulty="hard",
-        linguistic_note="Marcador temporal de flashback"
+        linguistic_note="Marcador temporal de flashback",
     ),
     VitalStatusTestCase(
         id="valid_05_pensaba",
@@ -442,7 +448,7 @@ VALID_REFERENCE_TESTS = [
         expected_deaths=["su difunto esposo"],
         expected_valid_references=["su difunto esposo"],
         difficulty="medium",
-        linguistic_note="Pensamiento sobre fallecido"
+        linguistic_note="Pensamiento sobre fallecido",
     ),
 ]
 
@@ -459,7 +465,7 @@ RESURRECTION_TESTS = [
         expected_deaths=[],
         not_deaths=["Juan"],
         difficulty="hard",
-        linguistic_note="'Casi morir' - no muerte real"
+        linguistic_note="'Casi morir' - no muerte real",
     ),
     VitalStatusTestCase(
         id="resur_02_por_poco",
@@ -469,7 +475,7 @@ RESURRECTION_TESTS = [
         expected_deaths=[],
         not_deaths=["María"],
         difficulty="hard",
-        linguistic_note="'Por poco' - negación implícita"
+        linguistic_note="'Por poco' - negación implícita",
     ),
     VitalStatusTestCase(
         id="resur_03_creyeron_muerto",
@@ -479,7 +485,7 @@ RESURRECTION_TESTS = [
         expected_deaths=[],
         not_deaths=["Pedro"],
         difficulty="adversarial",
-        linguistic_note="Muerte aparente desmentida"
+        linguistic_note="Muerte aparente desmentida",
     ),
     VitalStatusTestCase(
         id="resur_04_volvio_vida",
@@ -488,7 +494,7 @@ RESURRECTION_TESTS = [
         entities=["El mago"],
         expected_deaths=[],  # Resurrección anula la muerte
         difficulty="adversarial",
-        linguistic_note="Resurrección (fantasía)"
+        linguistic_note="Resurrección (fantasía)",
     ),
     VitalStatusTestCase(
         id="resur_05_dado_por_muerto",
@@ -498,7 +504,7 @@ RESURRECTION_TESTS = [
         expected_deaths=[],
         not_deaths=["Elena"],
         difficulty="adversarial",
-        linguistic_note="Presunción de muerte desmentida"
+        linguistic_note="Presunción de muerte desmentida",
     ),
 ]
 
@@ -514,7 +520,7 @@ GENRE_SPECIFIC_TESTS = [
         entities=["El conde"],
         expected_deaths=[],  # En fantasía, no-muerto ≠ muerto
         difficulty="adversarial",
-        linguistic_note="Transformación en no-muerto"
+        linguistic_note="Transformación en no-muerto",
     ),
     VitalStatusTestCase(
         id="genre_02_zombie",
@@ -523,7 +529,7 @@ GENRE_SPECIFIC_TESTS = [
         entities=["los aldeanos"],
         expected_deaths=["los aldeanos"],  # Sí murieron, aunque sean zombies
         difficulty="hard",
-        linguistic_note="Zombies = muertos reanimados"
+        linguistic_note="Zombies = muertos reanimados",
     ),
     VitalStatusTestCase(
         id="genre_03_inmortal",
@@ -532,7 +538,7 @@ GENRE_SPECIFIC_TESTS = [
         entities=["El elfo"],
         expected_deaths=[],
         difficulty="medium",
-        linguistic_note="Ser inmortal"
+        linguistic_note="Ser inmortal",
     ),
     VitalStatusTestCase(
         id="genre_04_reencarnacion",
@@ -541,7 +547,7 @@ GENRE_SPECIFIC_TESTS = [
         entities=["el monje"],
         expected_deaths=["el monje"],  # Sí murió, aunque reencarnó
         difficulty="hard",
-        linguistic_note="Muerte con reencarnación"
+        linguistic_note="Muerte con reencarnación",
     ),
 ]
 
@@ -557,7 +563,7 @@ AMBIGUOUS_TESTS = [
         entities=["Carlos"],
         expected_deaths=[],  # Ambiguo - no confirma muerte
         difficulty="hard",
-        linguistic_note="Desaparición ≠ muerte confirmada"
+        linguistic_note="Desaparición ≠ muerte confirmada",
     ),
     VitalStatusTestCase(
         id="ambig_02_no_volvio",
@@ -566,7 +572,7 @@ AMBIGUOUS_TESTS = [
         entities=["Rosa"],
         expected_deaths=[],  # Ambiguo
         difficulty="hard",
-        linguistic_note="Desaparición no confirma muerte"
+        linguistic_note="Desaparición no confirma muerte",
     ),
     VitalStatusTestCase(
         id="ambig_03_perdio_vida",
@@ -575,7 +581,7 @@ AMBIGUOUS_TESTS = [
         entities=["Muchos"],
         expected_deaths=["Muchos"],
         difficulty="medium",
-        linguistic_note="'Perder la vida' = morir"
+        linguistic_note="'Perder la vida' = morir",
     ),
     VitalStatusTestCase(
         id="ambig_04_ultimo_adios",
@@ -584,7 +590,7 @@ AMBIGUOUS_TESTS = [
         entities=["Miguel"],
         expected_deaths=["Miguel"],  # Funeral implícito
         difficulty="hard",
-        linguistic_note="'Último adiós' sugiere funeral"
+        linguistic_note="'Último adiós' sugiere funeral",
     ),
 ]
 
@@ -600,7 +606,7 @@ TEMPORAL_TESTS = [
         entities=["Juan"],
         expected_deaths=["Juan"],  # Implica que ya no vive
         difficulty="hard",
-        linguistic_note="'Cuando X vivía' implica que murió"
+        linguistic_note="'Cuando X vivía' implica que murió",
     ),
     VitalStatusTestCase(
         id="temp_02_antes_de_morir",
@@ -609,7 +615,7 @@ TEMPORAL_TESTS = [
         entities=["María"],
         expected_deaths=["María"],
         difficulty="medium",
-        linguistic_note="'Antes de morir' confirma muerte"
+        linguistic_note="'Antes de morir' confirma muerte",
     ),
     VitalStatusTestCase(
         id="temp_03_tras_muerte",
@@ -618,7 +624,7 @@ TEMPORAL_TESTS = [
         entities=["Pedro"],
         expected_deaths=["Pedro"],
         difficulty="easy",
-        linguistic_note="'Tras la muerte de'"
+        linguistic_note="'Tras la muerte de'",
     ),
     VitalStatusTestCase(
         id="temp_04_desde_fallecio",
@@ -627,7 +633,7 @@ TEMPORAL_TESTS = [
         entities=["Ana"],
         expected_deaths=["Ana"],
         difficulty="easy",
-        linguistic_note="'Desde que falleció'"
+        linguistic_note="'Desde que falleció'",
     ),
 ]
 
@@ -643,7 +649,7 @@ EUPHEMISM_TESTS = [
         entities=["Luis"],
         expected_deaths=["Luis"],
         difficulty="medium",
-        linguistic_note="'Descansar en paz'"
+        linguistic_note="'Descansar en paz'",
     ),
     VitalStatusTestCase(
         id="euph_02_mejor_vida",
@@ -652,7 +658,7 @@ EUPHEMISM_TESTS = [
         entities=["Doña Carmen"],
         expected_deaths=["Doña Carmen"],
         difficulty="medium",
-        linguistic_note="'Pasar a mejor vida'"
+        linguistic_note="'Pasar a mejor vida'",
     ),
     VitalStatusTestCase(
         id="euph_03_nos_dejo",
@@ -661,7 +667,7 @@ EUPHEMISM_TESTS = [
         entities=["El abuelo"],
         expected_deaths=["El abuelo"],
         difficulty="hard",
-        linguistic_note="'Nos dejó' - eufemismo de muerte"
+        linguistic_note="'Nos dejó' - eufemismo de muerte",
     ),
     VitalStatusTestCase(
         id="euph_04_se_fue",
@@ -670,7 +676,7 @@ EUPHEMISM_TESTS = [
         entities=["Don José"],
         expected_deaths=["Don José"],
         difficulty="hard",
-        linguistic_note="'Se fue para siempre'"
+        linguistic_note="'Se fue para siempre'",
     ),
     VitalStatusTestCase(
         id="euph_05_entrego_alma",
@@ -679,7 +685,7 @@ EUPHEMISM_TESTS = [
         entities=["El moribundo"],
         expected_deaths=["El moribundo"],
         difficulty="medium",
-        linguistic_note="'Entregar el alma'"
+        linguistic_note="'Entregar el alma'",
     ),
 ]
 
@@ -695,7 +701,7 @@ COLLECTIVE_TESTS = [
         entities=["los habitantes"],
         expected_deaths=["los habitantes"],
         difficulty="medium",
-        linguistic_note="Muerte masiva"
+        linguistic_note="Muerte masiva",
     ),
     VitalStatusTestCase(
         id="coll_02_familia",
@@ -704,7 +710,7 @@ COLLECTIVE_TESTS = [
         entities=["La familia García"],
         expected_deaths=["La familia García"],
         difficulty="medium",
-        linguistic_note="Muerte de grupo familiar"
+        linguistic_note="Muerte de grupo familiar",
     ),
     VitalStatusTestCase(
         id="coll_03_soldados",
@@ -713,7 +719,7 @@ COLLECTIVE_TESTS = [
         entities=["soldados"],
         expected_deaths=["soldados"],
         difficulty="medium",
-        linguistic_note="'Caer' en contexto militar = morir"
+        linguistic_note="'Caer' en contexto militar = morir",
     ),
 ]
 
@@ -730,7 +736,7 @@ ANIMAL_TESTS = [
         expected_deaths=["El perro"],  # Si se trackean animales
         not_deaths=["Juan"],
         difficulty="medium",
-        linguistic_note="Muerte de animal, no de humano"
+        linguistic_note="Muerte de animal, no de humano",
     ),
     VitalStatusTestCase(
         id="animal_02_mataron_caballo",
@@ -740,7 +746,7 @@ ANIMAL_TESTS = [
         expected_deaths=["al caballo"],
         not_deaths=["el general"],
         difficulty="medium",
-        linguistic_note="Posesivo no implica muerte del poseedor"
+        linguistic_note="Posesivo no implica muerte del poseedor",
     ),
 ]
 
@@ -756,7 +762,7 @@ PERSONIFICATION_TESTS = [
         entities=[],
         expected_deaths=[],
         difficulty="hard",
-        linguistic_note="Personificación de concepto abstracto"
+        linguistic_note="Personificación de concepto abstracto",
     ),
     VitalStatusTestCase(
         id="pers_02_amor",
@@ -765,7 +771,7 @@ PERSONIFICATION_TESTS = [
         entities=[],
         expected_deaths=[],
         difficulty="hard",
-        linguistic_note="Muerte de sentimiento"
+        linguistic_note="Muerte de sentimiento",
     ),
 ]
 
@@ -782,7 +788,7 @@ SYMBOLIC_TESTS = [
         expected_deaths=[],
         not_deaths=["Juan"],
         difficulty="hard",
-        linguistic_note="Muerte civil/social, no física"
+        linguistic_note="Muerte civil/social, no física",
     ),
     VitalStatusTestCase(
         id="symb_02_profesional",
@@ -791,7 +797,7 @@ SYMBOLIC_TESTS = [
         entities=[],
         expected_deaths=[],
         difficulty="medium",
-        linguistic_note="Muerte de carrera"
+        linguistic_note="Muerte de carrera",
     ),
 ]
 
@@ -807,7 +813,7 @@ NARRATIVE_LEVEL_TESTS = [
         entities=["el protagonista"],
         expected_deaths=[],  # Es ficción dentro de ficción
         difficulty="adversarial",
-        linguistic_note="Muerte en narrativa secundaria"
+        linguistic_note="Muerte en narrativa secundaria",
     ),
     VitalStatusTestCase(
         id="narr_02_pelicula",
@@ -816,7 +822,7 @@ NARRATIVE_LEVEL_TESTS = [
         entities=["el héroe"],
         expected_deaths=[],  # Es referencia a otra obra
         difficulty="adversarial",
-        linguistic_note="Muerte en película mencionada"
+        linguistic_note="Muerte en película mencionada",
     ),
     VitalStatusTestCase(
         id="narr_03_cuento",
@@ -825,7 +831,7 @@ NARRATIVE_LEVEL_TESTS = [
         entities=["el príncipe", "El dragón"],
         expected_deaths=[],  # Es cuento dentro de la historia
         difficulty="hard",
-        linguistic_note="Muerte en cuento narrado"
+        linguistic_note="Muerte en cuento narrado",
     ),
 ]
 
@@ -842,7 +848,7 @@ DREAM_TESTS = [
         expected_deaths=[],
         not_deaths=["su hermano"],
         difficulty="hard",
-        linguistic_note="Muerte en sueño - no real"
+        linguistic_note="Muerte en sueño - no real",
     ),
     VitalStatusTestCase(
         id="dream_02_alucino",
@@ -852,7 +858,7 @@ DREAM_TESTS = [
         expected_deaths=[],
         not_deaths=["Pedro"],
         difficulty="hard",
-        linguistic_note="Muerte en alucinación"
+        linguistic_note="Muerte en alucinación",
     ),
     VitalStatusTestCase(
         id="dream_03_imaginaba",
@@ -862,7 +868,7 @@ DREAM_TESTS = [
         expected_deaths=[],
         not_deaths=["Juan"],
         difficulty="hard",
-        linguistic_note="Muerte imaginada"
+        linguistic_note="Muerte imaginada",
     ),
 ]
 
@@ -878,7 +884,7 @@ UNRELIABLE_NARRATOR_TESTS = [
         entities=["Juan"],
         expected_deaths=[],  # Incertidumbre
         difficulty="adversarial",
-        linguistic_note="Narrador inseguro"
+        linguistic_note="Narrador inseguro",
     ),
     VitalStatusTestCase(
         id="unrel_02_dicen",
@@ -887,7 +893,7 @@ UNRELIABLE_NARRATOR_TESTS = [
         entities=["María"],
         expected_deaths=[],  # Información contradictoria
         difficulty="adversarial",
-        linguistic_note="Rumor no confirmado"
+        linguistic_note="Rumor no confirmado",
     ),
     VitalStatusTestCase(
         id="unrel_03_parecia",
@@ -896,7 +902,7 @@ UNRELIABLE_NARRATOR_TESTS = [
         entities=[],
         expected_deaths=[],
         difficulty="hard",
-        linguistic_note="Apariencia vs realidad"
+        linguistic_note="Apariencia vs realidad",
     ),
 ]
 
@@ -912,7 +918,7 @@ MULTIPLE_DEATHS_TESTS = [
         entities=["Juan", "Pedro"],
         expected_deaths=["Pedro", "Juan"],
         difficulty="medium",
-        linguistic_note="Dos muertes en una oración"
+        linguistic_note="Dos muertes en una oración",
     ),
     VitalStatusTestCase(
         id="multi_02_tres",
@@ -921,7 +927,7 @@ MULTIPLE_DEATHS_TESTS = [
         entities=["Ana", "Carlos", "Elena"],
         expected_deaths=["Ana", "Carlos", "Elena"],
         difficulty="medium",
-        linguistic_note="Múltiples muertes listadas"
+        linguistic_note="Múltiples muertes listadas",
     ),
 ]
 
@@ -938,7 +944,7 @@ INVERSE_TEMPORAL_TESTS = [
         expected_deaths=["Pedro"],
         chapter=2,
         difficulty="medium",
-        linguistic_note="Muerte anterior al tiempo narrativo"
+        linguistic_note="Muerte anterior al tiempo narrativo",
     ),
     VitalStatusTestCase(
         id="inv_02_habia_muerto",
@@ -947,7 +953,7 @@ INVERSE_TEMPORAL_TESTS = [
         entities=["María"],
         expected_deaths=["María"],
         difficulty="hard",
-        linguistic_note="Muerte previa a la narrativa"
+        linguistic_note="Muerte previa a la narrativa",
     ),
 ]
 
@@ -957,26 +963,26 @@ INVERSE_TEMPORAL_TESTS = [
 # =============================================================================
 
 ALL_VITAL_STATUS_TESTS = (
-    DIRECT_DEATH_TESTS +
-    CAUSED_DEATH_TESTS +
-    REPORTED_DEATH_TESTS +
-    IMPLIED_DEATH_TESTS +
-    FALSE_POSITIVE_TESTS +
-    VALID_REFERENCE_TESTS +
-    RESURRECTION_TESTS +
-    GENRE_SPECIFIC_TESTS +
-    AMBIGUOUS_TESTS +
-    TEMPORAL_TESTS +
-    EUPHEMISM_TESTS +
-    COLLECTIVE_TESTS +
-    ANIMAL_TESTS +
-    PERSONIFICATION_TESTS +
-    SYMBOLIC_TESTS +
-    NARRATIVE_LEVEL_TESTS +
-    DREAM_TESTS +
-    UNRELIABLE_NARRATOR_TESTS +
-    MULTIPLE_DEATHS_TESTS +
-    INVERSE_TEMPORAL_TESTS
+    DIRECT_DEATH_TESTS
+    + CAUSED_DEATH_TESTS
+    + REPORTED_DEATH_TESTS
+    + IMPLIED_DEATH_TESTS
+    + FALSE_POSITIVE_TESTS
+    + VALID_REFERENCE_TESTS
+    + RESURRECTION_TESTS
+    + GENRE_SPECIFIC_TESTS
+    + AMBIGUOUS_TESTS
+    + TEMPORAL_TESTS
+    + EUPHEMISM_TESTS
+    + COLLECTIVE_TESTS
+    + ANIMAL_TESTS
+    + PERSONIFICATION_TESTS
+    + SYMBOLIC_TESTS
+    + NARRATIVE_LEVEL_TESTS
+    + DREAM_TESTS
+    + UNRELIABLE_NARRATOR_TESTS
+    + MULTIPLE_DEATHS_TESTS
+    + INVERSE_TEMPORAL_TESTS
 )
 
 
@@ -987,6 +993,7 @@ class TestVitalStatusAdversarial:
     def analyzer(self):
         """Crea instancia del analizador."""
         from narrative_assistant.analysis.vital_status import VitalStatusAnalyzer
+
         return VitalStatusAnalyzer(project_id=1)
 
     def _register_entities(self, analyzer, entities: list[str]):
@@ -996,7 +1003,7 @@ class TestVitalStatusAdversarial:
             clean_name = name.strip()
             for prefix in ["el ", "la ", "los ", "las ", "El ", "La ", "Los ", "Las "]:
                 if clean_name.lower().startswith(prefix.lower()):
-                    clean_name = clean_name[len(prefix):]
+                    clean_name = clean_name[len(prefix) :]
                     break
             analyzer.register_entity(i, clean_name)
 
@@ -1015,10 +1022,7 @@ class TestVitalStatusAdversarial:
         self._register_entities(analyzer, test_case.entities)
 
         # Detectar muertes
-        deaths = analyzer.detect_death_events(
-            test_case.text,
-            chapter=test_case.chapter
-        )
+        deaths = analyzer.detect_death_events(test_case.text, chapter=test_case.chapter)
 
         # Verificar muertes esperadas
         for expected_death in test_case.expected_deaths:
@@ -1045,6 +1049,7 @@ class TestVitalStatusByCategory:
     @pytest.fixture
     def analyzer(self):
         from narrative_assistant.analysis.vital_status import VitalStatusAnalyzer
+
         return VitalStatusAnalyzer(project_id=1)
 
     @pytest.mark.parametrize("test_case", FALSE_POSITIVE_TESTS, ids=lambda tc: tc.id)
@@ -1068,7 +1073,7 @@ class TestVitalStatusByCategory:
             clean_name = name.strip()
             for prefix in ["el ", "la ", "los ", "las "]:
                 if clean_name.lower().startswith(prefix):
-                    clean_name = clean_name[len(prefix):]
+                    clean_name = clean_name[len(prefix) :]
                     break
             analyzer.register_entity(i, clean_name)
 
@@ -1090,10 +1095,10 @@ def get_test_summary():
     print("RESUMEN DE TESTS ADVERSARIALES DE VITAL STATUS")
     print("=" * 60)
     print(f"\nTotal de casos: {len(ALL_VITAL_STATUS_TESTS)}")
-    print(f"\nPor categoría:")
+    print("\nPor categoría:")
     for cat, count in sorted(categories.items()):
         print(f"  {cat}: {count}")
-    print(f"\nPor dificultad:")
+    print("\nPor dificultad:")
     for diff, count in sorted(difficulties.items()):
         print(f"  {diff}: {count}")
     print("=" * 60)

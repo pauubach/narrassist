@@ -8,20 +8,21 @@ Cubre:
 - Límites de tamaño
 """
 
-import pytest
 from pathlib import Path
 
+import pytest
+
+from narrative_assistant.core.result import Result
 from narrative_assistant.parsers.sanitization import (
     InputSanitizer,
-    validate_file_path,
     sanitize_chapter_content,
+    validate_file_path,
 )
-from narrative_assistant.core.result import Result
-
 
 # =============================================================================
 # Fixtures
 # =============================================================================
+
 
 @pytest.fixture
 def sanitizer():
@@ -38,6 +39,7 @@ def allowed_dir(tmp_path):
 # =============================================================================
 # Tests de inyección SQL
 # =============================================================================
+
 
 class TestSQLInjection:
     """Tests para prevención de inyección SQL."""
@@ -72,6 +74,7 @@ class TestSQLInjection:
 # Tests de Path Traversal
 # =============================================================================
 
+
 class TestPathTraversal:
     """Tests para prevención de path traversal."""
 
@@ -87,7 +90,10 @@ class TestPathTraversal:
         for path in malicious_paths:
             result = validate_file_path(path, allowed_dir)
             assert result.is_failure, f"Should block: {path}"
-            assert "traversal" in result.error.message.lower() or "outside" in result.error.message.lower()
+            assert (
+                "traversal" in result.error.message.lower()
+                or "outside" in result.error.message.lower()
+            )
 
     def test_blocks_absolute_path_outside_allowed(self, allowed_dir):
         """Bloquea rutas absolutas fuera del directorio permitido."""
@@ -142,6 +148,7 @@ class TestPathTraversal:
 # Tests de inputs malformados
 # =============================================================================
 
+
 class TestMalformedInputs:
     """Tests para manejo de inputs malformados."""
 
@@ -191,6 +198,7 @@ class TestMalformedInputs:
 # Tests de límites
 # =============================================================================
 
+
 class TestSizeLimits:
     """Tests para límites de tamaño."""
 
@@ -217,6 +225,7 @@ class TestSizeLimits:
 # =============================================================================
 # Tests específicos del validador de diálogos
 # =============================================================================
+
 
 class TestDialogueValidatorSecurity:
     """Tests de seguridad para el validador de diálogos."""
@@ -270,6 +279,7 @@ class TestDialogueValidatorSecurity:
 # Tests específicos del detector de duplicados
 # =============================================================================
 
+
 class TestDuplicateDetectorSecurity:
     """Tests de seguridad para el detector de duplicados."""
 
@@ -309,6 +319,7 @@ class TestDuplicateDetectorSecurity:
 # =============================================================================
 # Tests específicos del detector de estructura narrativa
 # =============================================================================
+
 
 class TestNarrativeStructureSecurity:
     """Tests de seguridad para el detector de estructura narrativa."""

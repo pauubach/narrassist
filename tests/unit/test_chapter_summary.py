@@ -1,19 +1,20 @@
 """Tests para el módulo de resumen de capítulos."""
 
 import pytest
+
 from narrative_assistant.analysis.chapter_summary import (
-    AnalysisMode,
-    EventType,
-    NarrativeEvent,
-    CharacterPresence,
-    ChekhovElement,
-    CharacterArc,
-    AbandonedThread,
-    ChapterSummary,
-    ChapterProgressReport,
-    REVELATION_PATTERNS,
     DEATH_PATTERNS,
     DECISION_PATTERNS,
+    REVELATION_PATTERNS,
+    AbandonedThread,
+    AnalysisMode,
+    ChapterProgressReport,
+    ChapterSummary,
+    CharacterArc,
+    CharacterPresence,
+    ChekhovElement,
+    EventType,
+    NarrativeEvent,
 )
 
 
@@ -777,18 +778,21 @@ class TestIntegration:
 # Tests para compute_chapter_metrics (S-6: Chapter Model Enrichment)
 # =============================================================================
 
+
 class TestComputeChapterMetrics:
     """Tests para la función de cómputo de métricas de capítulo."""
 
     def test_empty_content(self):
         """Texto vacío retorna diccionario vacío."""
         from narrative_assistant.persistence.chapter import compute_chapter_metrics
+
         assert compute_chapter_metrics("") == {}
         assert compute_chapter_metrics("   ") == {}
 
     def test_reading_time(self):
         """Calcula tiempo de lectura correctamente."""
         from narrative_assistant.persistence.chapter import compute_chapter_metrics
+
         # 200 palabras = 1 minuto
         text = " ".join(["palabra"] * 200)
         metrics = compute_chapter_metrics(text)
@@ -802,6 +806,7 @@ class TestComputeChapterMetrics:
     def test_dialogue_ratio_with_dashes(self):
         """Detecta diálogo con rayas."""
         from narrative_assistant.persistence.chapter import compute_chapter_metrics
+
         text = (
             "El sol brillaba.\n"
             "—Hola, ¿cómo estás? —preguntó Juan.\n"
@@ -815,6 +820,7 @@ class TestComputeChapterMetrics:
     def test_dialogue_ratio_no_dialogue(self):
         """Sin diálogo, ratio es bajo o cero."""
         from narrative_assistant.persistence.chapter import compute_chapter_metrics
+
         text = "El sol brillaba. Los pájaros cantaban. Todo era paz."
         metrics = compute_chapter_metrics(text)
         assert metrics.get("dialogue_ratio", 0) < 0.1
@@ -822,6 +828,7 @@ class TestComputeChapterMetrics:
     def test_avg_sentence_length(self):
         """Calcula longitud media de oración."""
         from narrative_assistant.persistence.chapter import compute_chapter_metrics
+
         # 3 oraciones de ~3 palabras cada una
         text = "Esto es corto. Muy breve también. Otra frase aquí."
         metrics = compute_chapter_metrics(text)
@@ -831,6 +838,7 @@ class TestComputeChapterMetrics:
     def test_scene_count_no_breaks(self):
         """Sin separadores de escena, cuenta 1."""
         from narrative_assistant.persistence.chapter import compute_chapter_metrics
+
         text = "Un párrafo de texto normal. Otro párrafo."
         metrics = compute_chapter_metrics(text)
         assert metrics["scene_count"] >= 1
@@ -838,6 +846,7 @@ class TestComputeChapterMetrics:
     def test_scene_count_with_breaks(self):
         """Detecta separadores de escena ***."""
         from narrative_assistant.persistence.chapter import compute_chapter_metrics
+
         text = "Primera escena.\n\n* * *\n\nSegunda escena.\n\n* * *\n\nTercera escena."
         metrics = compute_chapter_metrics(text)
         assert metrics["scene_count"] >= 2
@@ -845,6 +854,7 @@ class TestComputeChapterMetrics:
     def test_characters_present_count(self):
         """Cuenta personajes presentes."""
         from narrative_assistant.persistence.chapter import compute_chapter_metrics
+
         text = "Juan y María fueron al parque. Pedro se quedó en casa."
         metrics = compute_chapter_metrics(text, entity_names=["Juan", "María", "Pedro", "Ana"])
         assert metrics["characters_present_count"] == 3  # Juan, María, Pedro (no Ana)
@@ -852,6 +862,7 @@ class TestComputeChapterMetrics:
     def test_tone_tense(self):
         """Detecta tono tenso."""
         from narrative_assistant.persistence.chapter import compute_chapter_metrics
+
         text = (
             "La muerte acechaba. El miedo paralizaba a todos. "
             "Un grito resonó en la oscuridad. Sangre en el suelo."
@@ -863,6 +874,7 @@ class TestComputeChapterMetrics:
     def test_tone_positive(self):
         """Detecta tono positivo."""
         from narrative_assistant.persistence.chapter import compute_chapter_metrics
+
         text = (
             "El amor lo llenaba todo. Una sonrisa iluminaba la fiesta. "
             "La alegría era contagiosa. Un abrazo de esperanza."
@@ -873,6 +885,7 @@ class TestComputeChapterMetrics:
     def test_tone_neutral_for_plain_text(self):
         """Texto sin señales emocionales es neutral."""
         from narrative_assistant.persistence.chapter import compute_chapter_metrics
+
         text = "El hombre caminaba por la calle. Llevaba un paraguas. Llovía."
         metrics = compute_chapter_metrics(text)
         assert metrics["dominant_tone"] == "neutral"
@@ -880,6 +893,7 @@ class TestComputeChapterMetrics:
     def test_metrics_dict_has_all_keys(self):
         """Verifica que las métricas contienen todas las claves esperadas."""
         from narrative_assistant.persistence.chapter import compute_chapter_metrics
+
         text = "Juan era alto y moreno. María tenía ojos verdes."
         metrics = compute_chapter_metrics(text)
         assert "reading_time_minutes" in metrics
@@ -896,10 +910,19 @@ class TestChapterDataEnrichment:
     def test_to_dict_includes_metrics(self):
         """to_dict incluye métricas cuando están presentes."""
         from narrative_assistant.persistence.chapter import ChapterData
+
         ch = ChapterData(
-            id=1, project_id=1, chapter_number=1, title="Test",
-            content="Texto", start_char=0, end_char=5, word_count=1,
-            dialogue_ratio=0.25, dominant_tone="tense", tone_intensity=0.8,
+            id=1,
+            project_id=1,
+            chapter_number=1,
+            title="Test",
+            content="Texto",
+            start_char=0,
+            end_char=5,
+            word_count=1,
+            dialogue_ratio=0.25,
+            dominant_tone="tense",
+            tone_intensity=0.8,
         )
         d = ch.to_dict()
         assert "metrics" in d
@@ -910,9 +933,16 @@ class TestChapterDataEnrichment:
     def test_to_dict_empty_metrics_when_none(self):
         """to_dict retorna métricas vacías cuando no hay valores."""
         from narrative_assistant.persistence.chapter import ChapterData
+
         ch = ChapterData(
-            id=1, project_id=1, chapter_number=1, title="Test",
-            content="Texto", start_char=0, end_char=5, word_count=1,
+            id=1,
+            project_id=1,
+            chapter_number=1,
+            title="Test",
+            content="Texto",
+            start_char=0,
+            end_char=5,
+            word_count=1,
         )
         d = ch.to_dict()
         assert "metrics" in d

@@ -21,10 +21,11 @@ class TestPossessiveResolution:
     def resolver(self):
         """Obtiene el resolver de correferencias."""
         from narrative_assistant.nlp.coreference_resolver import (
-            CoreferenceVotingResolver,
             CorefConfig,
+            CoreferenceVotingResolver,
             CorefMethod,
         )
+
         # Usar solo heurísticas para tests rápidos
         config = CorefConfig(
             enabled_methods=[CorefMethod.HEURISTICS, CorefMethod.MORPHO],
@@ -44,10 +45,7 @@ class TestPossessiveResolution:
         result = resolver.resolve_document(text)
 
         # Debe haber al menos una cadena con María
-        maria_chains = [
-            c for c in result.chains
-            if c.main_mention and "María" in c.main_mention
-        ]
+        maria_chains = [c for c in result.chains if c.main_mention and "María" in c.main_mention]
 
         assert len(maria_chains) >= 1, "Debe haber una cadena con María"
 
@@ -90,10 +88,7 @@ María apareció en la cafetería. Sus ojos verdes brillaban."""
         result = resolver.resolve_document(text)
 
         # Debe haber una cadena con María
-        maria_chains = [
-            c for c in result.chains
-            if c.main_mention and "María" in c.main_mention
-        ]
+        maria_chains = [c for c in result.chains if c.main_mention and "María" in c.main_mention]
 
         # Si hay cadena de María, verificar que incluye "sus"
         if maria_chains:
@@ -117,10 +112,10 @@ María apareció en la cafetería. Sus ojos verdes brillaban."""
         Verifica que las heurísticas dan bonus al sujeto más reciente.
         """
         from narrative_assistant.nlp.coreference_resolver import (
+            Gender,
             HeuristicsCorefMethod,
             Mention,
             MentionType,
-            Gender,
             Number,
         )
 
@@ -179,8 +174,8 @@ class TestMentionExtraction:
     def test_possessive_extracted_as_possessive_type(self):
         """Verifica que los posesivos se extraen con tipo POSSESSIVE."""
         from narrative_assistant.nlp.coreference_resolver import (
-            CoreferenceVotingResolver,
             CorefConfig,
+            CoreferenceVotingResolver,
             CorefMethod,
             MentionType,
         )

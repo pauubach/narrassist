@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Tests de integración: validación de query parameters en endpoints API.
 
@@ -19,6 +18,7 @@ if _api_dir not in sys.path:
 
 try:
     from fastapi.testclient import TestClient
+
     HAS_FASTAPI = True
 except ImportError:
     HAS_FASTAPI = False
@@ -26,11 +26,17 @@ except ImportError:
 
 def _make_failure_result():
     """Result con is_failure=True (proyecto inexistente)."""
+    from narrative_assistant.core.errors import ErrorSeverity, NarrativeError
     from narrative_assistant.core.result import Result
-    from narrative_assistant.core.errors import NarrativeError, ErrorSeverity
-    return Result(errors=[NarrativeError(
-        message="Not found", severity=ErrorSeverity.FATAL,
-    )])
+
+    return Result(
+        errors=[
+            NarrativeError(
+                message="Not found",
+                severity=ErrorSeverity.FATAL,
+            )
+        ]
+    )
 
 
 @pytest.fixture

@@ -17,27 +17,29 @@ en vez de CHARACTER, y no fusionada con "María".
 Autor: GAN-style Adversary Agent
 """
 
-import pytest
 from dataclasses import dataclass, field
 from typing import Optional
 
+import pytest
+
 from narrative_assistant.entities.models import Entity, EntityType
 from narrative_assistant.entities.semantic_fusion import (
-    SemanticFusionService,
     SemanticFusionResult,
+    SemanticFusionService,
+    names_match_after_normalization,
     normalize_for_comparison,
     strip_accents,
-    names_match_after_normalization,
 )
-
 
 # =============================================================================
 # TEST DATA STRUCTURES
 # =============================================================================
 
+
 @dataclass
 class FusionTestCase:
     """Caso de test para fusión de entidades."""
+
     id: str
     category: str
     entity1_name: str
@@ -54,6 +56,7 @@ class FusionTestCase:
 @dataclass
 class ClassificationTestCase:
     """Caso de test para clasificación de tipo de entidad."""
+
     id: str
     category: str
     text: str
@@ -79,7 +82,7 @@ SHOULD_MERGE_TESTS = [
         entity2_type=EntityType.CHARACTER,
         should_fuse=True,
         difficulty="easy",
-        linguistic_note="Nombre completo vs nombre de pila. Caso más común en ficción."
+        linguistic_note="Nombre completo vs nombre de pila. Caso más común en ficción.",
     ),
     FusionTestCase(
         id="merge_02_full_vs_surname",
@@ -90,7 +93,7 @@ SHOULD_MERGE_TESTS = [
         entity2_type=EntityType.CHARACTER,
         should_fuse=True,
         difficulty="medium",
-        linguistic_note="Nombre completo vs apellido solo."
+        linguistic_note="Nombre completo vs apellido solo.",
     ),
     FusionTestCase(
         id="merge_03_three_names",
@@ -101,9 +104,8 @@ SHOULD_MERGE_TESTS = [
         entity2_type=EntityType.CHARACTER,
         should_fuse=True,
         difficulty="medium",
-        linguistic_note="Nombre compuesto con dos apellidos vs nombre compuesto."
+        linguistic_note="Nombre compuesto con dos apellidos vs nombre compuesto.",
     ),
-
     # --- 1b. Títulos y honoríficos ---
     FusionTestCase(
         id="merge_04_don_title",
@@ -114,7 +116,7 @@ SHOULD_MERGE_TESTS = [
         entity2_type=EntityType.CHARACTER,
         should_fuse=True,
         difficulty="easy",
-        linguistic_note="Tratamiento 'Don' + nombre = mismo personaje."
+        linguistic_note="Tratamiento 'Don' + nombre = mismo personaje.",
     ),
     FusionTestCase(
         id="merge_05_doctor_title",
@@ -125,7 +127,7 @@ SHOULD_MERGE_TESTS = [
         entity2_type=EntityType.CHARACTER,
         should_fuse=True,
         difficulty="easy",
-        linguistic_note="Título profesional + apellido = mismo personaje."
+        linguistic_note="Título profesional + apellido = mismo personaje.",
     ),
     FusionTestCase(
         id="merge_06_doña_title",
@@ -136,7 +138,7 @@ SHOULD_MERGE_TESTS = [
         entity2_type=EntityType.CHARACTER,
         should_fuse=True,
         difficulty="easy",
-        linguistic_note="Tratamiento 'Doña' + nombre."
+        linguistic_note="Tratamiento 'Doña' + nombre.",
     ),
     FusionTestCase(
         id="merge_07_nobility",
@@ -147,7 +149,7 @@ SHOULD_MERGE_TESTS = [
         entity2_type=EntityType.CHARACTER,
         should_fuse=True,
         difficulty="hard",
-        linguistic_note="Título nobiliario + topónimo. Difícil porque Villamediana podría ser un lugar."
+        linguistic_note="Título nobiliario + topónimo. Difícil porque Villamediana podría ser un lugar.",
     ),
     FusionTestCase(
         id="merge_08_military",
@@ -158,9 +160,8 @@ SHOULD_MERGE_TESTS = [
         entity2_type=EntityType.CHARACTER,
         should_fuse=True,
         difficulty="easy",
-        linguistic_note="Rango militar + apellido."
+        linguistic_note="Rango militar + apellido.",
     ),
-
     # --- 1c. Variaciones ortográficas ---
     FusionTestCase(
         id="merge_09_accent_variation",
@@ -171,7 +172,7 @@ SHOULD_MERGE_TESTS = [
         entity2_type=EntityType.CHARACTER,
         should_fuse=True,
         difficulty="easy",
-        linguistic_note="Con y sin tilde. Muy común en textos con erratas."
+        linguistic_note="Con y sin tilde. Muy común en textos con erratas.",
     ),
     FusionTestCase(
         id="merge_10_jose_accent",
@@ -182,7 +183,7 @@ SHOULD_MERGE_TESTS = [
         entity2_type=EntityType.CHARACTER,
         should_fuse=True,
         difficulty="easy",
-        linguistic_note="Acento faltante en nombre propio."
+        linguistic_note="Acento faltante en nombre propio.",
     ),
     FusionTestCase(
         id="merge_11_ñ_variation",
@@ -193,9 +194,8 @@ SHOULD_MERGE_TESTS = [
         entity2_type=EntityType.EVENT,
         should_fuse=True,
         difficulty="medium",
-        linguistic_note="Pérdida de ñ (posible error de encoding). NOTA: 'año' vs 'ano' son distintos en español pero en contexto de evento son claramente el mismo."
+        linguistic_note="Pérdida de ñ (posible error de encoding). NOTA: 'año' vs 'ano' son distintos en español pero en contexto de evento son claramente el mismo.",
     ),
-
     # --- 1d. Artículos y preposiciones ---
     FusionTestCase(
         id="merge_12_with_article",
@@ -206,7 +206,7 @@ SHOULD_MERGE_TESTS = [
         entity2_type=EntityType.LOCATION,
         should_fuse=True,
         difficulty="easy",
-        linguistic_note="Topónimo con artículo vs sin artículo."
+        linguistic_note="Topónimo con artículo vs sin artículo.",
     ),
     FusionTestCase(
         id="merge_13_de_la_preposition",
@@ -217,9 +217,8 @@ SHOULD_MERGE_TESTS = [
         entity2_type=EntityType.BUILDING,
         should_fuse=True,
         difficulty="easy",
-        linguistic_note="Edificio con artículo inicial."
+        linguistic_note="Edificio con artículo inicial.",
     ),
-
     # --- 1e. Apodos y aliases ---
     FusionTestCase(
         id="merge_14_nickname",
@@ -231,7 +230,7 @@ SHOULD_MERGE_TESTS = [
         should_fuse=True,
         entity1_aliases=["Paco"],
         difficulty="hard",
-        linguistic_note="Diminutivo/hipocorístico. Solo resoluble si el alias está registrado."
+        linguistic_note="Diminutivo/hipocorístico. Solo resoluble si el alias está registrado.",
     ),
     FusionTestCase(
         id="merge_15_the_nickname",
@@ -243,9 +242,8 @@ SHOULD_MERGE_TESTS = [
         should_fuse=True,
         entity2_aliases=["el Gordo"],
         difficulty="hard",
-        linguistic_note="Apodo descriptivo. Solo resoluble con alias registrado."
+        linguistic_note="Apodo descriptivo. Solo resoluble con alias registrado.",
     ),
-
     # --- 1f. Nombres con preposiciones ---
     FusionTestCase(
         id="merge_16_de_surname",
@@ -256,7 +254,7 @@ SHOULD_MERGE_TESTS = [
         entity2_type=EntityType.CHARACTER,
         should_fuse=True,
         difficulty="medium",
-        linguistic_note="Nombre completo vs apellido con preposición."
+        linguistic_note="Nombre completo vs apellido con preposición.",
     ),
     FusionTestCase(
         id="merge_17_del_surname",
@@ -267,9 +265,8 @@ SHOULD_MERGE_TESTS = [
         entity2_type=EntityType.CHARACTER,
         should_fuse=True,
         difficulty="medium",
-        linguistic_note="Nombre + apellido con 'del'."
+        linguistic_note="Nombre + apellido con 'del'.",
     ),
-
     # --- 1g. Misma entidad, distinto tipo NER ---
     FusionTestCase(
         id="merge_18_cross_type_person",
@@ -294,7 +291,7 @@ SHOULD_MERGE_TESTS = [
         entity2_type=EntityType.BUILDING,
         should_fuse=True,
         difficulty="easy",
-        linguistic_note="LOCATION y BUILDING son tipos compatibles para fusión."
+        linguistic_note="LOCATION y BUILDING son tipos compatibles para fusión.",
     ),
 ]
 
@@ -314,7 +311,7 @@ SHOULD_NOT_MERGE_TESTS = [
         entity2_type=EntityType.CHARACTER,
         should_fuse=False,
         difficulty="easy",
-        linguistic_note="Mismo nombre, distinto apellido = personas diferentes."
+        linguistic_note="Mismo nombre, distinto apellido = personas diferentes.",
     ),
     FusionTestCase(
         id="no_merge_02_same_surname",
@@ -325,9 +322,8 @@ SHOULD_NOT_MERGE_TESTS = [
         entity2_type=EntityType.CHARACTER,
         should_fuse=False,
         difficulty="easy",
-        linguistic_note="Mismo apellido, distinto nombre = personas diferentes (posiblemente familia)."
+        linguistic_note="Mismo apellido, distinto nombre = personas diferentes (posiblemente familia).",
     ),
-
     # --- 2b. Persona vs. Lugar ---
     FusionTestCase(
         id="no_merge_03_person_vs_place",
@@ -338,7 +334,7 @@ SHOULD_NOT_MERGE_TESTS = [
         entity2_type=EntityType.LOCATION,
         should_fuse=False,
         difficulty="hard",
-        linguistic_note="'Santiago' como persona y como ciudad. Son entidades completamente distintas."
+        linguistic_note="'Santiago' como persona y como ciudad. Son entidades completamente distintas.",
     ),
     FusionTestCase(
         id="no_merge_04_person_vs_org",
@@ -349,9 +345,8 @@ SHOULD_NOT_MERGE_TESTS = [
         entity2_type=EntityType.ORGANIZATION,
         should_fuse=False,
         difficulty="hard",
-        linguistic_note="Mercedes como persona vs Mercedes como marca de coches."
+        linguistic_note="Mercedes como persona vs Mercedes como marca de coches.",
     ),
-
     # --- 2c. Nombres parecidos pero diferentes ---
     FusionTestCase(
         id="no_merge_05_similar_names",
@@ -362,7 +357,7 @@ SHOULD_NOT_MERGE_TESTS = [
         entity2_type=EntityType.CHARACTER,
         should_fuse=False,
         difficulty="medium",
-        linguistic_note="Nombres similares fonéticamente pero son personajes distintos."
+        linguistic_note="Nombres similares fonéticamente pero son personajes distintos.",
     ),
     FusionTestCase(
         id="no_merge_06_diminutive_trap",
@@ -378,7 +373,6 @@ SHOULD_NOT_MERGE_TESTS = [
             "Sin contexto adicional, no fusionar."
         ),
     ),
-
     # --- 2d. Relación familiar, no identidad ---
     FusionTestCase(
         id="no_merge_07_parent_child",
@@ -389,9 +383,8 @@ SHOULD_NOT_MERGE_TESTS = [
         entity2_type=EntityType.CHARACTER,
         should_fuse=False,
         difficulty="medium",
-        linguistic_note="Padre e hijo con el mismo nombre. Explícitamente diferentes."
+        linguistic_note="Padre e hijo con el mismo nombre. Explícitamente diferentes.",
     ),
-
     # --- 2e. Conceptos vs. nombres ---
     FusionTestCase(
         id="no_merge_08_concept_vs_name",
@@ -402,7 +395,7 @@ SHOULD_NOT_MERGE_TESTS = [
         entity2_type=EntityType.CHARACTER,
         should_fuse=False,
         difficulty="easy",
-        linguistic_note="'La alta sensibilidad' es un concepto, 'Alta' es un nombre."
+        linguistic_note="'La alta sensibilidad' es un concepto, 'Alta' es un nombre.",
     ),
     FusionTestCase(
         id="no_merge_09_event_vs_place",
@@ -413,9 +406,8 @@ SHOULD_NOT_MERGE_TESTS = [
         entity2_type=EntityType.LOCATION,
         should_fuse=False,
         difficulty="easy",
-        linguistic_note="Nombres que comparten 'La Gran' pero son entidades totalmente diferentes."
+        linguistic_note="Nombres que comparten 'La Gran' pero son entidades totalmente diferentes.",
     ),
-
     # --- 2f. Profesión como apodo falso ---
     FusionTestCase(
         id="no_merge_10_profession_not_alias",
@@ -426,7 +418,7 @@ SHOULD_NOT_MERGE_TESTS = [
         entity2_type=EntityType.CHARACTER,
         should_fuse=False,
         difficulty="medium",
-        linguistic_note="Dos personajes referidos por su profesión. NO son la misma persona."
+        linguistic_note="Dos personajes referidos por su profesión. NO son la misma persona.",
     ),
 ]
 
@@ -460,7 +452,7 @@ CLASSIFICATION_TESTS = [
         expected_type=EntityType.CHARACTER,
         wrong_types=[EntityType.CONCEPT],
         difficulty="medium",
-        linguistic_note="Nombre con dos apellidos (patrón español) → CHARACTER."
+        linguistic_note="Nombre con dos apellidos (patrón español) → CHARACTER.",
     ),
     ClassificationTestCase(
         id="class_03_fictional_name",
@@ -470,7 +462,7 @@ CLASSIFICATION_TESTS = [
         expected_type=EntityType.CHARACTER,
         wrong_types=[EntityType.CONCEPT, EntityType.LOCATION],
         difficulty="hard",
-        linguistic_note="Nombre ficticio no presente en el léxico del NER."
+        linguistic_note="Nombre ficticio no presente en el léxico del NER.",
     ),
     ClassificationTestCase(
         id="class_04_de_la_surname",
@@ -480,9 +472,8 @@ CLASSIFICATION_TESTS = [
         expected_type=EntityType.CHARACTER,
         wrong_types=[EntityType.LOCATION, EntityType.CONCEPT],
         difficulty="medium",
-        linguistic_note="Apellido con preposición 'de la'. El NER puede fragmentar el nombre."
+        linguistic_note="Apellido con preposición 'de la'. El NER puede fragmentar el nombre.",
     ),
-
     # --- 3b. Lugares confundidos con personas ---
     ClassificationTestCase(
         id="class_05_place_as_person",
@@ -492,7 +483,7 @@ CLASSIFICATION_TESTS = [
         expected_type=EntityType.LOCATION,
         wrong_types=[EntityType.CHARACTER],
         difficulty="medium",
-        linguistic_note="Topónimo que contiene nombre de persona (Santiago)."
+        linguistic_note="Topónimo que contiene nombre de persona (Santiago).",
     ),
     ClassificationTestCase(
         id="class_06_building_vs_person",
@@ -502,9 +493,8 @@ CLASSIFICATION_TESTS = [
         expected_type=EntityType.BUILDING,
         wrong_types=[EntityType.CHARACTER],
         difficulty="hard",
-        linguistic_note="'San Fernando' como edificio (hospital), no como persona."
+        linguistic_note="'San Fernando' como edificio (hospital), no como persona.",
     ),
-
     # --- 3c. Organizaciones ---
     ClassificationTestCase(
         id="class_07_org",
@@ -514,7 +504,7 @@ CLASSIFICATION_TESTS = [
         expected_type=EntityType.ORGANIZATION,
         wrong_types=[EntityType.CHARACTER, EntityType.CONCEPT],
         difficulty="medium",
-        linguistic_note="Organización ficticia con nombre fantástico."
+        linguistic_note="Organización ficticia con nombre fantástico.",
     ),
     ClassificationTestCase(
         id="class_08_family",
@@ -524,9 +514,8 @@ CLASSIFICATION_TESTS = [
         expected_type=EntityType.FAMILY,
         wrong_types=[EntityType.CHARACTER],
         difficulty="hard",
-        linguistic_note="Apellido en plural = familia, no un solo personaje."
+        linguistic_note="Apellido en plural = familia, no un solo personaje.",
     ),
-
     # --- 3d. Conceptos abstractos ---
     ClassificationTestCase(
         id="class_09_concept",
@@ -536,7 +525,7 @@ CLASSIFICATION_TESTS = [
         expected_type=EntityType.CONCEPT,
         wrong_types=[EntityType.CHARACTER, EntityType.LOCATION],
         difficulty="medium",
-        linguistic_note="Concepto narrativo capitalizado que puede confundirse con nombre propio."
+        linguistic_note="Concepto narrativo capitalizado que puede confundirse con nombre propio.",
     ),
     ClassificationTestCase(
         id="class_10_magic",
@@ -546,9 +535,8 @@ CLASSIFICATION_TESTS = [
         expected_type=EntityType.MAGIC_SYSTEM,
         wrong_types=[EntityType.CHARACTER, EntityType.ORGANIZATION],
         difficulty="hard",
-        linguistic_note="Sistema mágico capitalizado. Parece un nombre pero es un concepto."
+        linguistic_note="Sistema mágico capitalizado. Parece un nombre pero es un concepto.",
     ),
-
     # --- 3e. Eventos ---
     ClassificationTestCase(
         id="class_11_event",
@@ -558,9 +546,8 @@ CLASSIFICATION_TESTS = [
         expected_type=EntityType.EVENT,
         wrong_types=[EntityType.LOCATION],
         difficulty="medium",
-        linguistic_note="Evento histórico que contiene un topónimo."
+        linguistic_note="Evento histórico que contiene un topónimo.",
     ),
-
     # --- 3f. Obras ---
     ClassificationTestCase(
         id="class_12_work",
@@ -607,12 +594,14 @@ NORMALIZATION_TESTS = [
 NORMALIZATION_BUG_TESTS = [
     # Interior prepositions should ideally be stripped for comparison
     pytest.param(
-        "Conde de Montecristo", "montecristo",
+        "Conde de Montecristo",
+        "montecristo",
         id="bug_interior_de_not_stripped",
         marks=pytest.mark.xfail(reason="normalize_for_comparison no strip 'de' interior"),
     ),
     pytest.param(
-        "Doña Isabel de Castilla", "isabel castilla",
+        "Doña Isabel de Castilla",
+        "isabel castilla",
         id="bug_interior_de_castilla",
         marks=pytest.mark.xfail(reason="normalize_for_comparison no strip 'de' interior"),
     ),
@@ -622,6 +611,7 @@ NORMALIZATION_BUG_TESTS = [
 # =============================================================================
 # FIXTURES
 # =============================================================================
+
 
 @pytest.fixture
 def fusion_service():
@@ -653,6 +643,7 @@ def _make_entity(
 # =============================================================================
 # TEST CLASSES
 # =============================================================================
+
 
 class TestShouldMerge:
     """Tests para entidades que DEBERÍAN fusionarse."""
@@ -716,7 +707,7 @@ class TestEntityClassification:
         se verifica solo que la entidad sea detectada.
         """
         try:
-            from narrative_assistant.nlp.ner import NERExtractor, EntityLabel
+            from narrative_assistant.nlp.ner import EntityLabel, NERExtractor
         except ImportError:
             pytest.skip("NER extractor no disponible")
 
@@ -732,7 +723,10 @@ class TestEntityClassification:
         # Find the entity in NER results
         found_entity = None
         for ent in entities:
-            if case.entity_name.lower() in ent.text.lower() or ent.text.lower() in case.entity_name.lower():
+            if (
+                case.entity_name.lower() in ent.text.lower()
+                or ent.text.lower() in case.entity_name.lower()
+            ):
                 found_entity = ent
                 break
 
@@ -810,7 +804,9 @@ class TestStripAccents:
         """ü → u es comportamiento correcto (diacrítico, no letra)."""
         assert strip_accents("pingüino") == "pinguino"
 
-    @pytest.mark.xfail(reason="BUG: strip_accents elimina ñ porque NFD la descompone en n + combining tilde (Mn)")
+    @pytest.mark.xfail(
+        reason="BUG: strip_accents elimina ñ porque NFD la descompone en n + combining tilde (Mn)"
+    )
     def test_strip_accents_preserves_ñ(self):
         """BUG: strip_accents debería preservar ñ pero no lo hace."""
         result = strip_accents("niño")
@@ -839,21 +835,28 @@ class TestNamesMatchAfterNormalization:
             ("La Casa", "El Casa", True),  # Ambos normalizan a "casa"
         ],
         ids=[
-            "don", "doctor", "article", "accent", "case",
-            "diff_surname", "diff_name", "diff_compound", "articles_both",
+            "don",
+            "doctor",
+            "article",
+            "accent",
+            "case",
+            "diff_surname",
+            "diff_name",
+            "diff_compound",
+            "articles_both",
         ],
     )
     def test_names_match(self, name1, name2, expected):
         result = names_match_after_normalization(name1, name2)
         assert result == expected, (
-            f"Nombres: '{name1}' vs '{name2}'\n"
-            f"Esperado: {expected}, Obtenido: {result}"
+            f"Nombres: '{name1}' vs '{name2}'\nEsperado: {expected}, Obtenido: {result}"
         )
 
 
 # =============================================================================
 # SUMMARY TEST
 # =============================================================================
+
 
 class TestFusionSummary:
     """Test de resumen que ejecuta todos los casos y reporta estadísticas."""
@@ -875,38 +878,42 @@ class TestFusionSummary:
                     passed += 1
                 else:
                     failed += 1
-                    errors.append({
-                        "id": case.id,
-                        "expected_merge": case.should_fuse,
-                        "got_merge": result.should_merge,
-                        "similarity": result.similarity,
-                        "method": result.method,
-                        "note": case.linguistic_note,
-                    })
+                    errors.append(
+                        {
+                            "id": case.id,
+                            "expected_merge": case.should_fuse,
+                            "got_merge": result.should_merge,
+                            "similarity": result.similarity,
+                            "method": result.method,
+                            "note": case.linguistic_note,
+                        }
+                    )
             except Exception as e:
                 failed += 1
                 errors.append({"id": case.id, "error": str(e)})
 
         # Report
-        print(f"\n{'='*70}")
-        print(f"ENTITY FUSION ADVERSARIAL REPORT")
-        print(f"{'='*70}")
+        print(f"\n{'=' * 70}")
+        print("ENTITY FUSION ADVERSARIAL REPORT")
+        print(f"{'=' * 70}")
         print(f"Total cases: {len(all_cases)}")
         print(f"  Should merge: {len(SHOULD_MERGE_TESTS)}")
         print(f"  Should NOT merge: {len(SHOULD_NOT_MERGE_TESTS)}")
         print(f"Passed: {passed}")
         print(f"Failed: {failed}")
-        print(f"Pass rate: {passed/len(all_cases)*100:.1f}%")
-        print(f"{'='*70}")
+        print(f"Pass rate: {passed / len(all_cases) * 100:.1f}%")
+        print(f"{'=' * 70}")
 
         if errors:
-            print(f"\nFailed cases:")
+            print("\nFailed cases:")
             for err in errors[:15]:
                 if "error" in err:
                     print(f"  - {err['id']}: ERROR - {err['error'][:80]}")
                 else:
                     action = "fusionarse" if err["expected_merge"] else "NO fusionarse"
-                    print(f"  - {err['id']}: Debería {action} (sim={err['similarity']:.3f}, method={err['method']})")
+                    print(
+                        f"  - {err['id']}: Debería {action} (sim={err['similarity']:.3f}, method={err['method']})"
+                    )
 
         # At least some should pass
         assert passed > 0, "No cases passed at all"

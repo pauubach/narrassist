@@ -1,25 +1,25 @@
-# -*- coding: utf-8 -*-
 """
 Tests para el módulo de análisis de ritmo narrativo (pacing).
 """
 
 import pytest
+
 from narrative_assistant.analysis.pacing import (
-    PacingAnalyzer,
+    ACTION_VERBS,
     PacingAnalysisResult,
-    PacingMetrics,
+    PacingAnalyzer,
     PacingIssue,
     PacingIssueType,
+    PacingMetrics,
     PacingSeverity,
     analyze_pacing,
     get_pacing_analyzer,
-    ACTION_VERBS,
 )
-
 
 # =============================================================================
 # Tests de Enums
 # =============================================================================
+
 
 class TestPacingIssueType:
     """Tests para PacingIssueType enum."""
@@ -68,6 +68,7 @@ class TestPacingSeverity:
 # =============================================================================
 # Tests de Dataclasses
 # =============================================================================
+
 
 class TestPacingMetrics:
     """Tests para PacingMetrics dataclass."""
@@ -223,6 +224,7 @@ class TestPacingAnalysisResult:
 # Tests de PacingAnalyzer
 # =============================================================================
 
+
 class TestPacingAnalyzerInit:
     """Tests para inicialización del analizador."""
 
@@ -316,8 +318,20 @@ Nadie más habló."""
         """Verifica agregación de métricas."""
         analyzer = PacingAnalyzer()
         metrics_list = [
-            PacingMetrics(segment_id=1, segment_type="chapter", word_count=1000, sentence_count=50, dialogue_words=300),
-            PacingMetrics(segment_id=2, segment_type="chapter", word_count=2000, sentence_count=100, dialogue_words=600),
+            PacingMetrics(
+                segment_id=1,
+                segment_type="chapter",
+                word_count=1000,
+                sentence_count=50,
+                dialogue_words=300,
+            ),
+            PacingMetrics(
+                segment_id=2,
+                segment_type="chapter",
+                word_count=2000,
+                sentence_count=100,
+                dialogue_words=600,
+            ),
         ]
         aggregated = analyzer._aggregate_metrics(metrics_list)
 
@@ -374,7 +388,9 @@ class TestPacingAnalyzerIssueDetection:
         """Verifica detección de poco diálogo."""
         analyzer = PacingAnalyzer(dialogue_ratio_range=(0.15, 0.60))
         metrics = [
-            PacingMetrics(segment_id=1, segment_type="chapter", word_count=1000, dialogue_ratio=0.05),
+            PacingMetrics(
+                segment_id=1, segment_type="chapter", word_count=1000, dialogue_ratio=0.05
+            ),
         ]
         issues = analyzer._check_dialogue_ratio(metrics)
 
@@ -385,7 +401,9 @@ class TestPacingAnalyzerIssueDetection:
         """Verifica detección de demasiado diálogo."""
         analyzer = PacingAnalyzer(dialogue_ratio_range=(0.15, 0.60))
         metrics = [
-            PacingMetrics(segment_id=1, segment_type="chapter", word_count=1000, dialogue_ratio=0.80),
+            PacingMetrics(
+                segment_id=1, segment_type="chapter", word_count=1000, dialogue_ratio=0.80
+            ),
         ]
         issues = analyzer._check_dialogue_ratio(metrics)
 
@@ -409,9 +427,7 @@ class TestPacingAnalyzerIssueDetection:
 
         # Texto sin diálogo con más de 100 palabras
         words = " ".join(["palabra"] * 150)
-        chapters = [
-            {"number": 1, "title": "Test", "content": words}
-        ]
+        chapters = [{"number": 1, "title": "Test", "content": words}]
         issues = analyzer._check_dense_blocks(chapters)
 
         assert len(issues) >= 1
@@ -433,7 +449,11 @@ class TestPacingAnalyzerFullAnalysis:
         """Verifica análisis con un solo capítulo."""
         analyzer = PacingAnalyzer()
         chapters = [
-            {"number": 1, "title": "Único", "content": "Este es el contenido del único capítulo. " * 100}
+            {
+                "number": 1,
+                "title": "Único",
+                "content": "Este es el contenido del único capítulo. " * 100,
+            }
         ]
         result = analyzer.analyze(chapters)
 
@@ -491,14 +511,13 @@ class TestPacingAnalyzerFullAnalysis:
 # Tests de Funciones de Conveniencia
 # =============================================================================
 
+
 class TestAnalyzePacing:
     """Tests para función analyze_pacing."""
 
     def test_basic_usage(self):
         """Verifica uso básico."""
-        chapters = [
-            {"number": 1, "title": "Test", "content": "Contenido de prueba. " * 50}
-        ]
+        chapters = [{"number": 1, "title": "Test", "content": "Contenido de prueba. " * 50}]
         result = analyze_pacing(chapters)
 
         assert isinstance(result, PacingAnalysisResult)
@@ -506,9 +525,7 @@ class TestAnalyzePacing:
 
     def test_with_custom_params(self):
         """Verifica uso con parámetros personalizados."""
-        chapters = [
-            {"number": 1, "title": "Corto", "content": "Texto. " * 10}
-        ]
+        chapters = [{"number": 1, "title": "Corto", "content": "Texto. " * 10}]
         result = analyze_pacing(chapters, min_chapter_words=1000)
 
         # Debería detectar capítulo muy corto
@@ -534,6 +551,7 @@ class TestGetPacingAnalyzer:
 # Tests de Constantes
 # =============================================================================
 
+
 class TestActionVerbs:
     """Tests para constantes de verbos de acción."""
 
@@ -556,6 +574,7 @@ class TestActionVerbs:
 # =============================================================================
 # Tests de Integración
 # =============================================================================
+
 
 class TestPacingIntegration:
     """Tests de integración con textos realistas."""
@@ -606,7 +625,11 @@ Un ruido en la cocina la sobresaltó. Se acercó con cautela.
         chapters = [
             {"number": 1, "title": "Prólogo", "content": "Texto corto. " * 50},
             {"number": 2, "title": "El viaje", "content": "Narración extensa. " * 500},
-            {"number": 3, "title": "El encuentro", "content": "—Diálogo —dijo uno.\n\n—Respuesta —contestó otro.\n\n" * 100},
+            {
+                "number": 3,
+                "title": "El encuentro",
+                "content": "—Diálogo —dijo uno.\n\n—Respuesta —contestó otro.\n\n" * 100,
+            },
             {"number": 4, "title": "Final", "content": "Conclusión. " * 100},
         ]
         result = analyze_pacing(chapters)

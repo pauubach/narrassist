@@ -16,15 +16,15 @@ Autor: GAN-style Adversary Agent
 Fecha: 2025-01
 """
 
-import pytest
 from typing import Optional
+
+import pytest
 
 from narrative_assistant.nlp.attributes import (
     AttributeExtractor,
     AttributeKey,
     ExtractedAttribute,
 )
-
 
 # =============================================================================
 # ADVERSARIAL TEST CASES
@@ -66,7 +66,6 @@ ADVERSARIAL_CASES = [
             "(no nombrada), no a Carlos. El regex puede asignar 'rubio' a Carlos."
         ),
     },
-
     # -------------------------------------------------------------------------
     # 2. ELLIPTICAL SUBJECTS - Sujetos elididos en espanol (pro-drop)
     # -------------------------------------------------------------------------
@@ -100,7 +99,6 @@ ADVERSARIAL_CASES = [
             "puede elegir Elena por ser sujeto de la oracion anterior."
         ),
     },
-
     # -------------------------------------------------------------------------
     # 3. POSSESSIVE AMBIGUITY - Posesivos ambiguos (su/sus)
     # -------------------------------------------------------------------------
@@ -131,7 +129,6 @@ ADVERSARIAL_CASES = [
             "ojos verdes, o solo uno. El algoritmo no puede decidir correctamente."
         ),
     },
-
     # -------------------------------------------------------------------------
     # 4. ARTICLES VS PRONOUNS - Articulos que parecen pronombres
     # -------------------------------------------------------------------------
@@ -163,7 +160,6 @@ ADVERSARIAL_CASES = [
             "'la estatua'. Maria esta cerca pero no es la poseedora."
         ),
     },
-
     # -------------------------------------------------------------------------
     # 5. MULTIPLE ENTITIES CLOSE TOGETHER - Varias entidades muy cercanas
     # -------------------------------------------------------------------------
@@ -194,7 +190,6 @@ ADVERSARIAL_CASES = [
             "no a Sofia ni a 'su madre'. El algoritmo puede confundirse con las entidades cercanas."
         ),
     },
-
     # -------------------------------------------------------------------------
     # 6. UNUSUAL WORD ORDER - Orden de palabras no estandar
     # -------------------------------------------------------------------------
@@ -225,7 +220,6 @@ ADVERSARIAL_CASES = [
             "pero perder la negacion y el valor correcto."
         ),
     },
-
     # -------------------------------------------------------------------------
     # 7. NEGATION EDGE CASES - Negaciones complejas
     # -------------------------------------------------------------------------
@@ -256,7 +250,6 @@ ADVERSARIAL_CASES = [
             "El algoritmo debe extraer el atributo correctamente a pesar del contexto."
         ),
     },
-
     # -------------------------------------------------------------------------
     # 8. METAPHORS AND FIGURATIVE LANGUAGE - Metaforas no filtradas
     # -------------------------------------------------------------------------
@@ -287,13 +280,12 @@ ADVERSARIAL_CASES = [
             "puede interpretarlo como material/color."
         ),
     },
-
     # -------------------------------------------------------------------------
     # 9. DIALOGUE EDGE CASES - Atributos dentro de dialogos
     # -------------------------------------------------------------------------
     {
         "id": "dialogue_01",
-        "text": '- Tienes los ojos mas verdes que he visto - dijo Pablo a Clara.',
+        "text": "- Tienes los ojos mas verdes que he visto - dijo Pablo a Clara.",
         "expected": {"Clara": {"eye_color": "verdes"}},
         "reason": (
             "Atributo mencionado en dialogo. El patron puede capturar 'ojos verdes' "
@@ -311,14 +303,13 @@ ADVERSARIAL_CASES = [
     },
     {
         "id": "dialogue_03",
-        "text": '- Soy rubio natural - mintio Carlos, que siempre se tenia el pelo.',
+        "text": "- Soy rubio natural - mintio Carlos, que siempre se tenia el pelo.",
         "expected": {"Carlos": {"hair_modification": "tenido"}},
         "reason": (
             "Atributo en dialogo contradice la narracion. El dialogo dice 'rubio natural' "
             "pero la narracion revela que es 'tenido'. El algoritmo debe preferir la narracion."
         ),
     },
-
     # -------------------------------------------------------------------------
     # 10. TEMPORAL/CONDITIONAL ATTRIBUTES - Atributos temporales o condicionales
     # -------------------------------------------------------------------------
@@ -349,7 +340,6 @@ ADVERSARIAL_CASES = [
             "pero el algoritmo extrae el patron literalmente."
         ),
     },
-
     # -------------------------------------------------------------------------
     # 11. COMPOUND ENTITIES - Entidades compuestas o grupos
     # -------------------------------------------------------------------------
@@ -380,7 +370,6 @@ ADVERSARIAL_CASES = [
             "como entidad unica y capturar solo 'Alvaro'."
         ),
     },
-
     # -------------------------------------------------------------------------
     # 12. IMPLICIT/INFERRED ATTRIBUTES - Atributos implicitos
     # -------------------------------------------------------------------------
@@ -411,7 +400,6 @@ ADVERSARIAL_CASES = [
             "y no reconoce adjetivos de edad."
         ),
     },
-
     # -------------------------------------------------------------------------
     # 13. PROFESSION/ROLE EDGE CASES - Profesiones y roles complejos
     # -------------------------------------------------------------------------
@@ -442,7 +430,6 @@ ADVERSARIAL_CASES = [
             "como profesion cuando es solo un sobrenombre."
         ),
     },
-
     # -------------------------------------------------------------------------
     # 14. ORTHOGRAPHIC VARIATIONS - Variaciones ortograficas
     # -------------------------------------------------------------------------
@@ -473,7 +460,6 @@ ADVERSARIAL_CASES = [
             "no reconoce la variante mal escrita."
         ),
     },
-
     # -------------------------------------------------------------------------
     # 15. LONG-DISTANCE DEPENDENCIES - Dependencias a larga distancia
     # -------------------------------------------------------------------------
@@ -513,7 +499,6 @@ ADVERSARIAL_CASES = [
             "y la estructura pueden confundir al algoritmo."
         ),
     },
-
     # -------------------------------------------------------------------------
     # 16. COORDINATION AND LISTS - Coordinacion y listas
     # -------------------------------------------------------------------------
@@ -550,16 +535,12 @@ ADVERSARIAL_CASES = [
             "'pelo largo' ignorando 'Ni...ni' que lo niega."
         ),
     },
-
     # -------------------------------------------------------------------------
     # 17. ANAPHORIC CHAINS - Cadenas anaforicas complejas
     # -------------------------------------------------------------------------
     {
         "id": "anaphor_01",
-        "text": (
-            "Jorge conocio a una mujer. Era morena. Tenia ojos claros. "
-            "Se llamaba Patricia."
-        ),
+        "text": ("Jorge conocio a una mujer. Era morena. Tenia ojos claros. Se llamaba Patricia."),
         "expected": {"Patricia": {"hair_color": "morena", "eye_color": "claros"}},
         "reason": (
             "Cadena anaforica: 'una mujer' -> 'Era' -> 'Tenia' -> 'Se llamaba Patricia'. "
@@ -569,8 +550,7 @@ ADVERSARIAL_CASES = [
     {
         "id": "anaphor_02",
         "text": (
-            "Conoci a dos personas: el era rubio y ella morena. "
-            "Ricardo y Sonia, respectivamente."
+            "Conoci a dos personas: el era rubio y ella morena. Ricardo y Sonia, respectivamente."
         ),
         "expected": {"Ricardo": {"hair_color": "rubio"}, "Sonia": {"hair_color": "morena"}},
         "reason": (
@@ -587,7 +567,6 @@ ADVERSARIAL_CASES = [
             "son atributos de Adriana, pero el algoritmo puede no inferirlo."
         ),
     },
-
     # -------------------------------------------------------------------------
     # 18. SEMANTIC ROLE CONFUSION - Confusion de roles semanticos
     # -------------------------------------------------------------------------
@@ -618,7 +597,6 @@ ADVERSARIAL_CASES = [
             "a su hijo, no un atributo real actual."
         ),
     },
-
     # -------------------------------------------------------------------------
     # 19. GENERIC/INDEFINITE REFERENCES - Referencias genericas o indefinidas
     # -------------------------------------------------------------------------
@@ -649,7 +627,6 @@ ADVERSARIAL_CASES = [
             "Victor sea 'muy alto', pero el algoritmo puede asignarlo."
         ),
     },
-
     # -------------------------------------------------------------------------
     # 20. CONTEXT-DEPENDENT INTERPRETATION - Interpretacion dependiente del contexto
     # -------------------------------------------------------------------------
@@ -690,6 +667,7 @@ ADVERSARIAL_CASES = [
 # TEST FIXTURES AND HELPERS
 # =============================================================================
 
+
 @pytest.fixture
 def extractor():
     """Crea una instancia del extractor de atributos."""
@@ -722,25 +700,59 @@ def extract_attributes_for_test(extractor: AttributeExtractor, text: str) -> dic
     # 1. Detectar menciones descriptivas de persona: "El hombre", "La mujer", etc.
     # En producción, el NER detecta estos como PER. El test helper debe aproximar esto.
     descriptor_pattern = (
-        r'\b((?:El|La)\s+'
-        r'(?:hombre|mujer|chico|chica|niño|niña|señor|señora|joven|anciano|anciana))\b'
+        r"\b((?:El|La)\s+"
+        r"(?:hombre|mujer|chico|chica|niño|niña|señor|señora|joven|anciano|anciana))\b"
     )
     for match in re.finditer(descriptor_pattern, text, re.IGNORECASE):
         name = match.group(1)
         span = (match.start(), match.end())
         if span not in seen_spans:
-            entity_mentions.append((name, match.start(), match.end(), 'PER'))
+            entity_mentions.append((name, match.start(), match.end(), "PER"))
             seen_spans.add(span)
 
     # 2. Detectar nombres propios capitalizados
-    name_pattern = r'\b([A-ZÁÉÍÓÚÜÑ][a-záéíóúüñ]+(?:\s+[A-ZÁÉÍÓÚÜÑ][a-záéíóúüñ]+)?)\b'
+    name_pattern = r"\b([A-ZÁÉÍÓÚÜÑ][a-záéíóúüñ]+(?:\s+[A-ZÁÉÍÓÚÜÑ][a-záéíóúüñ]+)?)\b"
     common_words = {
-        'El', 'La', 'Los', 'Las', 'Un', 'Una', 'Unos', 'Unas',
-        'De', 'En', 'Con', 'Por', 'Para', 'Sin', 'Sobre', 'Tras',
-        'Antes', 'Despues', 'Según', 'Durante', 'Mediante',
-        'Era', 'Tenía', 'Fue', 'Había', 'Dijo', 'Pensó',
-        'Verdes', 'Azules', 'Negros', 'Rubio', 'Moreno', 'Canoso',
-        'Alto', 'Bajo', 'Delgado', 'Gordo', 'Pero', 'Sino', 'Aunque',
+        "El",
+        "La",
+        "Los",
+        "Las",
+        "Un",
+        "Una",
+        "Unos",
+        "Unas",
+        "De",
+        "En",
+        "Con",
+        "Por",
+        "Para",
+        "Sin",
+        "Sobre",
+        "Tras",
+        "Antes",
+        "Despues",
+        "Según",
+        "Durante",
+        "Mediante",
+        "Era",
+        "Tenía",
+        "Fue",
+        "Había",
+        "Dijo",
+        "Pensó",
+        "Verdes",
+        "Azules",
+        "Negros",
+        "Rubio",
+        "Moreno",
+        "Canoso",
+        "Alto",
+        "Bajo",
+        "Delgado",
+        "Gordo",
+        "Pero",
+        "Sino",
+        "Aunque",
     }
 
     for match in re.finditer(name_pattern, text):
@@ -748,11 +760,10 @@ def extract_attributes_for_test(extractor: AttributeExtractor, text: str) -> dic
         span = (match.start(), match.end())
         # Evitar duplicados con menciones descriptivas
         overlap = any(
-            s[0] <= match.start() < s[1] or s[0] < match.end() <= s[1]
-            for s in seen_spans
+            s[0] <= match.start() < s[1] or s[0] < match.end() <= s[1] for s in seen_spans
         )
         if name not in common_words and not overlap:
-            entity_mentions.append((name, match.start(), match.end(), 'PER'))
+            entity_mentions.append((name, match.start(), match.end(), "PER"))
             seen_spans.add(span)
 
     extraction_result = extractor.extract_attributes(text, entity_mentions=entity_mentions)
@@ -778,10 +789,13 @@ def extract_attributes_for_test(extractor: AttributeExtractor, text: str) -> dic
 # TEST CLASSES
 # =============================================================================
 
+
 class TestAdversarialRelativeClauses:
     """Tests para clausulas relativas."""
 
-    @pytest.mark.parametrize("case", [c for c in ADVERSARIAL_CASES if c["id"].startswith("rel_clause")])
+    @pytest.mark.parametrize(
+        "case", [c for c in ADVERSARIAL_CASES if c["id"].startswith("rel_clause")]
+    )
     def test_relative_clause(self, extractor, case):
         """Verifica que las clausulas relativas se manejen correctamente."""
         result = extract_attributes_for_test(extractor, case["text"])
@@ -806,7 +820,9 @@ class TestAdversarialEllipsis:
     """Tests para sujetos elididos."""
 
     @pytest.mark.xfail(reason="Resolución de sujetos elididos (pro-drop) aún no implementada")
-    @pytest.mark.parametrize("case", [c for c in ADVERSARIAL_CASES if c["id"].startswith("ellipsis")])
+    @pytest.mark.parametrize(
+        "case", [c for c in ADVERSARIAL_CASES if c["id"].startswith("ellipsis")]
+    )
     def test_elliptical_subjects(self, extractor, case):
         """Verifica que los sujetos elididos se resuelvan correctamente."""
         result = extract_attributes_for_test(extractor, case["text"])
@@ -823,7 +839,9 @@ class TestAdversarialPossessives:
     """Tests para posesivos ambiguos."""
 
     @pytest.mark.xfail(reason="Resolución de posesivos ambiguos aún no implementada")
-    @pytest.mark.parametrize("case", [c for c in ADVERSARIAL_CASES if c["id"].startswith("possessive")])
+    @pytest.mark.parametrize(
+        "case", [c for c in ADVERSARIAL_CASES if c["id"].startswith("possessive")]
+    )
     def test_possessive_ambiguity(self, extractor, case):
         """Verifica que los posesivos ambiguos se resuelvan correctamente."""
         result = extract_attributes_for_test(extractor, case["text"])
@@ -847,7 +865,9 @@ class TestAdversarialPossessives:
 class TestAdversarialArticles:
     """Tests para articulos vs pronombres."""
 
-    @pytest.mark.parametrize("case", [c for c in ADVERSARIAL_CASES if c["id"].startswith("article")])
+    @pytest.mark.parametrize(
+        "case", [c for c in ADVERSARIAL_CASES if c["id"].startswith("article")]
+    )
     def test_article_pronoun_confusion(self, extractor, case):
         """Verifica que articulos y pronombres no se confundan."""
         result = extract_attributes_for_test(extractor, case["text"])
@@ -861,8 +881,12 @@ class TestAdversarialArticles:
 class TestAdversarialMultipleEntities:
     """Tests para multiples entidades cercanas."""
 
-    @pytest.mark.xfail(reason="Resolución de múltiples entidades cercanas parcialmente implementada")
-    @pytest.mark.parametrize("case", [c for c in ADVERSARIAL_CASES if c["id"].startswith("multiple")])
+    @pytest.mark.xfail(
+        reason="Resolución de múltiples entidades cercanas parcialmente implementada"
+    )
+    @pytest.mark.parametrize(
+        "case", [c for c in ADVERSARIAL_CASES if c["id"].startswith("multiple")]
+    )
     def test_multiple_entities(self, extractor, case):
         """Verifica que multiples entidades cercanas se manejen correctamente."""
         result = extract_attributes_for_test(extractor, case["text"])
@@ -879,7 +903,9 @@ class TestAdversarialWordOrder:
     """Tests para orden de palabras no estandar."""
 
     @pytest.mark.xfail(reason="Manejo de orden no estándar de palabras aún no implementado")
-    @pytest.mark.parametrize("case", [c for c in ADVERSARIAL_CASES if c["id"].startswith("word_order")])
+    @pytest.mark.parametrize(
+        "case", [c for c in ADVERSARIAL_CASES if c["id"].startswith("word_order")]
+    )
     def test_unusual_word_order(self, extractor, case):
         """Verifica que ordenes de palabras no estandar se manejen."""
         result = extract_attributes_for_test(extractor, case["text"])
@@ -896,7 +922,9 @@ class TestAdversarialNegation:
     """Tests para negaciones complejas."""
 
     @pytest.mark.xfail(reason="Manejo de negaciones complejas parcialmente implementado")
-    @pytest.mark.parametrize("case", [c for c in ADVERSARIAL_CASES if c["id"].startswith("negation")])
+    @pytest.mark.parametrize(
+        "case", [c for c in ADVERSARIAL_CASES if c["id"].startswith("negation")]
+    )
     def test_negation_handling(self, extractor, case):
         """Verifica que las negaciones se manejen correctamente."""
         result = extract_attributes_for_test(extractor, case["text"])
@@ -916,7 +944,9 @@ class TestAdversarialNegation:
 class TestAdversarialMetaphors:
     """Tests para metaforas no detectadas."""
 
-    @pytest.mark.parametrize("case", [c for c in ADVERSARIAL_CASES if c["id"].startswith("metaphor")])
+    @pytest.mark.parametrize(
+        "case", [c for c in ADVERSARIAL_CASES if c["id"].startswith("metaphor")]
+    )
     def test_metaphor_filtering(self, extractor, case):
         """Verifica que las metaforas se filtren correctamente."""
         result = extract_attributes_for_test(extractor, case["text"])
@@ -934,7 +964,9 @@ class TestAdversarialMetaphors:
 class TestAdversarialDialogue:
     """Tests para atributos en dialogos."""
 
-    @pytest.mark.parametrize("case", [c for c in ADVERSARIAL_CASES if c["id"].startswith("dialogue")])
+    @pytest.mark.parametrize(
+        "case", [c for c in ADVERSARIAL_CASES if c["id"].startswith("dialogue")]
+    )
     def test_dialogue_handling(self, extractor, case):
         """Verifica que los dialogos se manejen correctamente."""
         result = extract_attributes_for_test(extractor, case["text"])
@@ -947,7 +979,9 @@ class TestAdversarialTemporal:
     """Tests para atributos temporales/condicionales."""
 
     @pytest.mark.xfail(reason="Atributos temporales/condicionales parcialmente implementados")
-    @pytest.mark.parametrize("case", [c for c in ADVERSARIAL_CASES if c["id"].startswith("temporal")])
+    @pytest.mark.parametrize(
+        "case", [c for c in ADVERSARIAL_CASES if c["id"].startswith("temporal")]
+    )
     def test_temporal_attributes(self, extractor, case):
         """Verifica que los atributos temporales se manejen correctamente."""
         result = extract_attributes_for_test(extractor, case["text"])
@@ -965,15 +999,18 @@ class TestAdversarialCompound:
     """Tests para entidades compuestas."""
 
     @pytest.mark.xfail(reason="Manejo de entidades compuestas parcialmente implementado")
-    @pytest.mark.parametrize("case", [c for c in ADVERSARIAL_CASES if c["id"].startswith("compound")])
+    @pytest.mark.parametrize(
+        "case", [c for c in ADVERSARIAL_CASES if c["id"].startswith("compound")]
+    )
     def test_compound_entities(self, extractor, case):
         """Verifica que las entidades compuestas se manejen correctamente."""
         result = extract_attributes_for_test(extractor, case["text"])
 
         for entity, expected_attrs in case["expected"].items():
             # Nota: las entidades compuestas pueden necesitar match parcial
-            found = any(entity.lower() in e.lower() or e.lower() in entity.lower()
-                       for e in result.keys())
+            found = any(
+                entity.lower() in e.lower() or e.lower() in entity.lower() for e in result.keys()
+            )
             assert found, (
                 f"Caso {case['id']}: Entidad '{entity}' no encontrada.\n"
                 f"Razon: {case['reason']}\n"
@@ -985,7 +1022,9 @@ class TestAdversarialImplicit:
     """Tests para atributos implicitos."""
 
     @pytest.mark.xfail(reason="Inferencia de atributos implícitos aún no implementada")
-    @pytest.mark.parametrize("case", [c for c in ADVERSARIAL_CASES if c["id"].startswith("implicit")])
+    @pytest.mark.parametrize(
+        "case", [c for c in ADVERSARIAL_CASES if c["id"].startswith("implicit")]
+    )
     def test_implicit_attributes(self, extractor, case):
         """Verifica que los atributos implicitos se infieran correctamente."""
         result = extract_attributes_for_test(extractor, case["text"])
@@ -1005,7 +1044,9 @@ class TestAdversarialImplicit:
 class TestAdversarialProfession:
     """Tests para profesiones y roles complejos."""
 
-    @pytest.mark.parametrize("case", [c for c in ADVERSARIAL_CASES if c["id"].startswith("profession")])
+    @pytest.mark.parametrize(
+        "case", [c for c in ADVERSARIAL_CASES if c["id"].startswith("profession")]
+    )
     def test_profession_handling(self, extractor, case):
         """Verifica que las profesiones se manejen correctamente."""
         result = extract_attributes_for_test(extractor, case["text"])
@@ -1032,7 +1073,9 @@ class TestAdversarialLongDistance:
     """Tests para dependencias a larga distancia."""
 
     @pytest.mark.xfail(reason="Dependencias a larga distancia parcialmente implementadas")
-    @pytest.mark.parametrize("case", [c for c in ADVERSARIAL_CASES if c["id"].startswith("long_dist")])
+    @pytest.mark.parametrize(
+        "case", [c for c in ADVERSARIAL_CASES if c["id"].startswith("long_dist")]
+    )
     def test_long_distance_dependencies(self, extractor, case):
         """Verifica manejo de dependencias a larga distancia."""
         result = extract_attributes_for_test(extractor, case["text"])
@@ -1069,7 +1112,9 @@ class TestAdversarialAnaphor:
     """Tests para cadenas anaforicas."""
 
     @pytest.mark.xfail(reason="Resolución de cadenas anafóricas aún no implementada")
-    @pytest.mark.parametrize("case", [c for c in ADVERSARIAL_CASES if c["id"].startswith("anaphor")])
+    @pytest.mark.parametrize(
+        "case", [c for c in ADVERSARIAL_CASES if c["id"].startswith("anaphor")]
+    )
     def test_anaphoric_chains(self, extractor, case):
         """Verifica resolucion de cadenas anaforicas."""
         result = extract_attributes_for_test(extractor, case["text"])
@@ -1094,7 +1139,9 @@ class TestAdversarialSemanticRole:
 class TestAdversarialGeneric:
     """Tests para referencias genericas/indefinidas."""
 
-    @pytest.mark.parametrize("case", [c for c in ADVERSARIAL_CASES if c["id"].startswith("generic")])
+    @pytest.mark.parametrize(
+        "case", [c for c in ADVERSARIAL_CASES if c["id"].startswith("generic")]
+    )
     def test_generic_references(self, extractor, case):
         """Verifica manejo de referencias genericas."""
         result = extract_attributes_for_test(extractor, case["text"])
@@ -1104,7 +1151,9 @@ class TestAdversarialContext:
     """Tests para interpretacion dependiente del contexto."""
 
     @pytest.mark.xfail(reason="Interpretación dependiente del contexto parcialmente implementada")
-    @pytest.mark.parametrize("case", [c for c in ADVERSARIAL_CASES if c["id"].startswith("context")])
+    @pytest.mark.parametrize(
+        "case", [c for c in ADVERSARIAL_CASES if c["id"].startswith("context")]
+    )
     def test_context_dependent(self, extractor, case):
         """Verifica interpretacion correcta segun contexto."""
         result = extract_attributes_for_test(extractor, case["text"])
@@ -1120,6 +1169,7 @@ class TestAdversarialContext:
 # =============================================================================
 # SUMMARY TEST - Runs all cases and reports statistics
 # =============================================================================
+
 
 class TestAdversarialSummary:
     """Test de resumen que ejecuta todos los casos y reporta estadisticas."""
@@ -1155,32 +1205,36 @@ class TestAdversarialSummary:
                     passed += 1
                 else:
                     failed += 1
-                    errors.append({
-                        "id": case["id"],
-                        "reason": case["reason"],
-                        "expected": case["expected"],
-                        "got": result,
-                    })
+                    errors.append(
+                        {
+                            "id": case["id"],
+                            "reason": case["reason"],
+                            "expected": case["expected"],
+                            "got": result,
+                        }
+                    )
 
             except Exception as e:
                 failed += 1
-                errors.append({
-                    "id": case["id"],
-                    "error": str(e),
-                })
+                errors.append(
+                    {
+                        "id": case["id"],
+                        "error": str(e),
+                    }
+                )
 
         # Imprimir resumen
-        print(f"\n{'='*60}")
-        print(f"ADVERSARIAL TEST SUMMARY")
-        print(f"{'='*60}")
+        print(f"\n{'=' * 60}")
+        print("ADVERSARIAL TEST SUMMARY")
+        print(f"{'=' * 60}")
         print(f"Total cases: {len(ADVERSARIAL_CASES)}")
         print(f"Passed: {passed}")
         print(f"Failed: {failed}")
-        print(f"Pass rate: {passed/len(ADVERSARIAL_CASES)*100:.1f}%")
-        print(f"{'='*60}")
+        print(f"Pass rate: {passed / len(ADVERSARIAL_CASES) * 100:.1f}%")
+        print(f"{'=' * 60}")
 
         if errors:
-            print(f"\nFailed cases:")
+            print("\nFailed cases:")
             for err in errors[:10]:  # Mostrar primeros 10
                 print(f"  - {err['id']}: {err.get('reason', err.get('error', 'Unknown'))[:80]}")
 

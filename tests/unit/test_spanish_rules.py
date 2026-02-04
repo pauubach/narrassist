@@ -10,8 +10,9 @@ Verifica la detección de:
 - Puntuación
 """
 
-import pytest
 from typing import Optional
+
+import pytest
 
 # Importar después de que el módulo esté disponible
 pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
@@ -23,65 +24,81 @@ class TestSpanishRulesImports:
     def test_import_spanish_rules(self):
         """Verifica importación del módulo."""
         from narrative_assistant.nlp.grammar import spanish_rules
+
         assert spanish_rules is not None
 
     def test_import_apply_spanish_rules(self):
         """Verifica importación de apply_spanish_rules."""
         from narrative_assistant.nlp.grammar import apply_spanish_rules
+
         assert callable(apply_spanish_rules)
 
     def test_import_spanish_rules_config(self):
         """Verifica importación de SpanishRulesConfig."""
         from narrative_assistant.nlp.grammar import SpanishRulesConfig
+
         assert SpanishRulesConfig is not None
 
     def test_import_individual_checks(self):
         """Verifica importación de funciones de verificación individuales."""
         from narrative_assistant.nlp.grammar import (
             check_dequeismo,
-            check_queismo,
+            check_gender_agreement,
             check_laismo,
             check_loismo,
-            check_gender_agreement,
             check_number_agreement,
-            check_redundancy,
             check_punctuation,
+            check_queismo,
+            check_redundancy,
         )
-        assert all(callable(f) for f in [
-            check_dequeismo, check_queismo, check_laismo, check_loismo,
-            check_gender_agreement, check_number_agreement,
-            check_redundancy, check_punctuation,
-        ])
+
+        assert all(
+            callable(f)
+            for f in [
+                check_dequeismo,
+                check_queismo,
+                check_laismo,
+                check_loismo,
+                check_gender_agreement,
+                check_number_agreement,
+                check_redundancy,
+                check_punctuation,
+            ]
+        )
 
 
 @pytest.fixture(scope="module")
 def nlp():
     """Carga modelo spaCy para tests."""
     from narrative_assistant.nlp.spacy_gpu import load_spacy_model
+
     return load_spacy_model()
 
 
 class TestDequeismo:
     """Tests para detección de dequeísmo."""
 
-    @pytest.mark.parametrize("text,should_detect", [
-        # Casos de dequeísmo (deben detectarse)
-        ("Pienso de que vendrá mañana.", True),
-        ("Creo de que es verdad.", True),
-        ("Opino de que deberíamos ir.", True),
-        ("Me parece de que tienes razón.", True),
-        ("Supongo de que llegará tarde.", True),
-        ("Digo de que no es así.", True),
-        # Casos correctos (no deben detectarse)
-        ("Pienso que vendrá mañana.", False),
-        ("Creo que es verdad.", False),
-        ("Me alegro de que estés bien.", False),  # Esto es correcto
-        ("Estoy seguro de que vendrá.", False),  # Esto es correcto
-    ])
+    @pytest.mark.parametrize(
+        "text,should_detect",
+        [
+            # Casos de dequeísmo (deben detectarse)
+            ("Pienso de que vendrá mañana.", True),
+            ("Creo de que es verdad.", True),
+            ("Opino de que deberíamos ir.", True),
+            ("Me parece de que tienes razón.", True),
+            ("Supongo de que llegará tarde.", True),
+            ("Digo de que no es así.", True),
+            # Casos correctos (no deben detectarse)
+            ("Pienso que vendrá mañana.", False),
+            ("Creo que es verdad.", False),
+            ("Me alegro de que estés bien.", False),  # Esto es correcto
+            ("Estoy seguro de que vendrá.", False),  # Esto es correcto
+        ],
+    )
     def test_dequeismo_detection(self, nlp, text, should_detect):
         """Verifica detección de dequeísmo."""
-        from narrative_assistant.nlp.grammar.spanish_rules import check_dequeismo
         from narrative_assistant.nlp.grammar import GrammarErrorType
+        from narrative_assistant.nlp.grammar.spanish_rules import check_dequeismo
 
         doc = nlp(text)
         issues = check_dequeismo(doc)
@@ -107,23 +124,26 @@ class TestDequeismo:
 class TestQueismo:
     """Tests para detección de queísmo."""
 
-    @pytest.mark.parametrize("text,should_detect", [
-        # Casos de queísmo (deben detectarse)
-        ("Me acuerdo que fuimos al cine.", True),
-        ("Me alegro que estés bien.", True),
-        ("Estoy seguro que vendrá.", True),
-        ("Me olvidé que tenía cita.", True),
-        ("Me quejé que no funcionaba.", True),
-        # Casos correctos (no deben detectarse)
-        ("Me acuerdo de que fuimos al cine.", False),
-        ("Me alegro de que estés bien.", False),
-        ("Estoy seguro de que vendrá.", False),
-        ("Pienso que es correcto.", False),  # No lleva "de"
-    ])
+    @pytest.mark.parametrize(
+        "text,should_detect",
+        [
+            # Casos de queísmo (deben detectarse)
+            ("Me acuerdo que fuimos al cine.", True),
+            ("Me alegro que estés bien.", True),
+            ("Estoy seguro que vendrá.", True),
+            ("Me olvidé que tenía cita.", True),
+            ("Me quejé que no funcionaba.", True),
+            # Casos correctos (no deben detectarse)
+            ("Me acuerdo de que fuimos al cine.", False),
+            ("Me alegro de que estés bien.", False),
+            ("Estoy seguro de que vendrá.", False),
+            ("Pienso que es correcto.", False),  # No lleva "de"
+        ],
+    )
     def test_queismo_detection(self, nlp, text, should_detect):
         """Verifica detección de queísmo."""
-        from narrative_assistant.nlp.grammar.spanish_rules import check_queismo
         from narrative_assistant.nlp.grammar import GrammarErrorType
+        from narrative_assistant.nlp.grammar.spanish_rules import check_queismo
 
         doc = nlp(text)
         issues = check_queismo(doc)
@@ -139,21 +159,24 @@ class TestQueismo:
 class TestLaismo:
     """Tests para detección de laísmo."""
 
-    @pytest.mark.parametrize("text,should_detect", [
-        # Casos de laísmo (deben detectarse)
-        ("La dije que viniera.", True),
-        ("La di un regalo.", True),
-        ("La conté la historia.", True),
-        ("La pregunté su nombre.", True),
-        # Casos correctos (no deben detectarse)
-        ("Le dije que viniera.", False),
-        ("Le di un regalo.", False),
-        ("La vi en el parque.", False),  # Correcto: CD femenino
-    ])
+    @pytest.mark.parametrize(
+        "text,should_detect",
+        [
+            # Casos de laísmo (deben detectarse)
+            ("La dije que viniera.", True),
+            ("La di un regalo.", True),
+            ("La conté la historia.", True),
+            ("La pregunté su nombre.", True),
+            # Casos correctos (no deben detectarse)
+            ("Le dije que viniera.", False),
+            ("Le di un regalo.", False),
+            ("La vi en el parque.", False),  # Correcto: CD femenino
+        ],
+    )
     def test_laismo_detection(self, nlp, text, should_detect):
         """Verifica detección de laísmo."""
-        from narrative_assistant.nlp.grammar.spanish_rules import check_laismo
         from narrative_assistant.nlp.grammar import GrammarErrorType
+        from narrative_assistant.nlp.grammar.spanish_rules import check_laismo
 
         doc = nlp(text)
         issues = check_laismo(doc)
@@ -169,25 +192,28 @@ class TestLaismo:
 class TestGenderAgreement:
     """Tests para concordancia de género."""
 
-    @pytest.mark.parametrize("text,should_detect", [
-        # Errores de género (deben detectarse)
-        ("El casa es grande.", True),
-        ("La libro está aquí.", True),
-        ("Un mesa pequeña.", True),
-        ("Una coche rojo.", True),
-        # Casos correctos (no deben detectarse)
-        ("La casa es grande.", False),
-        ("El libro está aquí.", False),
-        ("Una mesa pequeña.", False),
-        ("Un coche rojo.", False),
-        # Casos especiales
-        ("El agua está fría.", False),  # Femenino con "el" por "a" tónica
-        ("El alma pura.", False),  # Femenino con "el" por "a" tónica
-    ])
+    @pytest.mark.parametrize(
+        "text,should_detect",
+        [
+            # Errores de género (deben detectarse)
+            ("El casa es grande.", True),
+            ("La libro está aquí.", True),
+            ("Un mesa pequeña.", True),
+            ("Una coche rojo.", True),
+            # Casos correctos (no deben detectarse)
+            ("La casa es grande.", False),
+            ("El libro está aquí.", False),
+            ("Una mesa pequeña.", False),
+            ("Un coche rojo.", False),
+            # Casos especiales
+            ("El agua está fría.", False),  # Femenino con "el" por "a" tónica
+            ("El alma pura.", False),  # Femenino con "el" por "a" tónica
+        ],
+    )
     def test_gender_agreement(self, nlp, text, should_detect):
         """Verifica detección de discordancia de género."""
-        from narrative_assistant.nlp.grammar.spanish_rules import check_gender_agreement
         from narrative_assistant.nlp.grammar import GrammarErrorType
+        from narrative_assistant.nlp.grammar.spanish_rules import check_gender_agreement
 
         doc = nlp(text)
         issues = check_gender_agreement(doc)
@@ -201,23 +227,26 @@ class TestGenderAgreement:
 class TestNumberAgreement:
     """Tests para concordancia de número."""
 
-    @pytest.mark.parametrize("text,should_detect", [
-        # Errores de número (deben detectarse)
-        ("El libros están aquí.", True),
-        ("Los casa es grande.", True),
-        # Casos correctos (no deben detectarse)
-        ("El libro está aquí.", False),
-        ("Los libros están aquí.", False),
-        ("La casa es grande.", False),
-        ("Las casas son grandes.", False),
-        # Excepciones (palabras que terminan en s pero son singular)
-        ("El lunes es festivo.", False),
-        ("La crisis es grave.", False),
-    ])
+    @pytest.mark.parametrize(
+        "text,should_detect",
+        [
+            # Errores de número (deben detectarse)
+            ("El libros están aquí.", True),
+            ("Los casa es grande.", True),
+            # Casos correctos (no deben detectarse)
+            ("El libro está aquí.", False),
+            ("Los libros están aquí.", False),
+            ("La casa es grande.", False),
+            ("Las casas son grandes.", False),
+            # Excepciones (palabras que terminan en s pero son singular)
+            ("El lunes es festivo.", False),
+            ("La crisis es grave.", False),
+        ],
+    )
     def test_number_agreement(self, nlp, text, should_detect):
         """Verifica detección de discordancia de número."""
-        from narrative_assistant.nlp.grammar.spanish_rules import check_number_agreement
         from narrative_assistant.nlp.grammar import GrammarErrorType
+        from narrative_assistant.nlp.grammar.spanish_rules import check_number_agreement
 
         doc = nlp(text)
         issues = check_number_agreement(doc)
@@ -231,19 +260,22 @@ class TestNumberAgreement:
 class TestRedundancy:
     """Tests para detección de redundancias."""
 
-    @pytest.mark.parametrize("text,redundancy,correction", [
-        ("Voy a subir arriba.", "subir arriba", "subir"),
-        ("Quiero bajar abajo.", "bajar abajo", "bajar"),
-        ("Vamos a salir afuera.", "salir afuera", "salir"),
-        ("Hay que entrar adentro.", "entrar adentro", "entrar"),
-        ("Lo voy a volver a repetir.", "volver a repetir", "repetir"),
-        ("En el lapso de tiempo actual.", "lapso de tiempo", "lapso"),
-        ("Es más mejor así.", "más mejor", "mejor"),
-    ])
+    @pytest.mark.parametrize(
+        "text,redundancy,correction",
+        [
+            ("Voy a subir arriba.", "subir arriba", "subir"),
+            ("Quiero bajar abajo.", "bajar abajo", "bajar"),
+            ("Vamos a salir afuera.", "salir afuera", "salir"),
+            ("Hay que entrar adentro.", "entrar adentro", "entrar"),
+            ("Lo voy a volver a repetir.", "volver a repetir", "repetir"),
+            ("En el lapso de tiempo actual.", "lapso de tiempo", "lapso"),
+            ("Es más mejor así.", "más mejor", "mejor"),
+        ],
+    )
     def test_redundancy_detection(self, nlp, text, redundancy, correction):
         """Verifica detección de redundancias."""
-        from narrative_assistant.nlp.grammar.spanish_rules import check_redundancy
         from narrative_assistant.nlp.grammar import GrammarErrorType
+        from narrative_assistant.nlp.grammar.spanish_rules import check_redundancy
 
         doc = nlp(text)
         issues = check_redundancy(doc)
@@ -252,14 +284,16 @@ class TestRedundancy:
 
         # Verificar que encontró la redundancia correcta
         redundancy_texts = [i.text.lower() for i in issues]
-        assert any(redundancy in t for t in redundancy_texts), \
+        assert any(redundancy in t for t in redundancy_texts), (
             f"Debería detectar '{redundancy}' en issues: {redundancy_texts}"
+        )
 
         # Verificar sugerencia
         for issue in issues:
             if redundancy in issue.text.lower():
-                assert issue.suggestion == correction, \
+                assert issue.suggestion == correction, (
                     f"Sugerencia debería ser '{correction}', no '{issue.suggestion}'"
+                )
 
     def test_no_false_positives(self, nlp):
         """Texto correcto no genera falsos positivos de redundancia."""
@@ -269,7 +303,7 @@ class TestRedundancy:
         doc = nlp(text)
         issues = check_redundancy(doc)
 
-        assert len(issues) == 0, f"No debería detectar redundancias en texto correcto"
+        assert len(issues) == 0, "No debería detectar redundancias en texto correcto"
 
 
 class TestHabemos:
@@ -277,8 +311,8 @@ class TestHabemos:
 
     def test_habemos_detection(self, nlp):
         """Detecta uso incorrecto de habemos."""
-        from narrative_assistant.nlp.grammar.spanish_rules import check_habemos
         from narrative_assistant.nlp.grammar import GrammarErrorType
+        from narrative_assistant.nlp.grammar.spanish_rules import check_habemos
 
         doc = nlp("Habemos muchos que pensamos así.")
         issues = check_habemos(doc)
@@ -291,14 +325,17 @@ class TestHabemos:
 class TestPunctuation:
     """Tests para detección de errores de puntuación."""
 
-    @pytest.mark.parametrize("text,should_detect", [
-        # Errores de puntuación
-        ("Hola , cómo estás.", True),  # Espacio antes de coma
-        ("Vamos;Siguiente paso.", True),  # Mayúscula después de punto y coma
-        # Casos correctos
-        ("Hola, cómo estás.", False),
-        ("Vamos; siguiente paso.", False),
-    ])
+    @pytest.mark.parametrize(
+        "text,should_detect",
+        [
+            # Errores de puntuación
+            ("Hola , cómo estás.", True),  # Espacio antes de coma
+            ("Vamos;Siguiente paso.", True),  # Mayúscula después de punto y coma
+            # Casos correctos
+            ("Hola, cómo estás.", False),
+            ("Vamos; siguiente paso.", False),
+        ],
+    )
     def test_punctuation_errors(self, nlp, text, should_detect):
         """Verifica detección de errores de puntuación."""
         from narrative_assistant.nlp.grammar.spanish_rules import check_punctuation
@@ -331,18 +368,19 @@ class TestApplySpanishRules:
 
         # Verificar tipos de errores detectados
         from narrative_assistant.nlp.grammar import GrammarErrorType
+
         error_types = {i.error_type for i in issues}
 
         # Al menos debería detectar dequeísmo y redundancia
         expected_types = {GrammarErrorType.DEQUEISMO, GrammarErrorType.REDUNDANCY}
         detected = expected_types & error_types
-        assert len(detected) >= 1, f"Debería detectar al menos dequeísmo o redundancia"
+        assert len(detected) >= 1, "Debería detectar al menos dequeísmo o redundancia"
 
     def test_apply_with_config(self, nlp):
         """Aplica reglas con configuración personalizada."""
         from narrative_assistant.nlp.grammar.spanish_rules import (
-            apply_spanish_rules,
             SpanishRulesConfig,
+            apply_spanish_rules,
         )
 
         text = "Pienso de que vendrá. Subir arriba es fácil."
@@ -365,15 +403,17 @@ class TestApplySpanishRules:
 
         # Solo debería encontrar redundancia
         from narrative_assistant.nlp.grammar import GrammarErrorType
+
         for issue in issues:
-            assert issue.error_type == GrammarErrorType.REDUNDANCY, \
+            assert issue.error_type == GrammarErrorType.REDUNDANCY, (
                 f"Solo debería detectar redundancias, no {issue.error_type}"
+            )
 
     def test_min_confidence_filter(self, nlp):
         """Verifica filtrado por confianza mínima."""
         from narrative_assistant.nlp.grammar.spanish_rules import (
-            apply_spanish_rules,
             SpanishRulesConfig,
+            apply_spanish_rules,
         )
 
         text = "Pienso de que vendrá mañana."
@@ -397,8 +437,8 @@ class TestGrammarCheckerIntegration:
     @pytest.fixture
     def checker(self):
         """Crea checker sin LanguageTool."""
-        from narrative_assistant.nlp.grammar import GrammarChecker
         from narrative_assistant.core.config import GrammarConfig
+        from narrative_assistant.nlp.grammar import GrammarChecker
 
         config = GrammarConfig(
             use_languagetool=False,
@@ -456,8 +496,8 @@ class TestGrammarCheckerIntegration:
 
     def test_config_disables_rules(self):
         """Verifica que la config puede deshabilitar reglas."""
-        from narrative_assistant.nlp.grammar import GrammarChecker
         from narrative_assistant.core.config import GrammarConfig
+        from narrative_assistant.nlp.grammar import GrammarChecker
 
         # Config con dequeísmo deshabilitado
         config = GrammarConfig(
@@ -472,8 +512,8 @@ class TestGrammarCheckerIntegration:
         assert result.is_success
         # No debería detectar dequeísmo
         from narrative_assistant.nlp.grammar import GrammarErrorType
+
         dequeismo_issues = [
-            i for i in result.value.issues
-            if i.error_type == GrammarErrorType.DEQUEISMO
+            i for i in result.value.issues if i.error_type == GrammarErrorType.DEQUEISMO
         ]
         # Puede que otros métodos (regex) lo detecten, pero las reglas españolas no

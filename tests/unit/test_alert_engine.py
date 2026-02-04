@@ -5,9 +5,10 @@ Estos tests verifican que AlertEngine crea alertas correctamente
 desde diferentes tipos de datos de entrada (inconsistencias, errores gramaticales, etc.)
 """
 
-import pytest
 from datetime import datetime
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
 
 from narrative_assistant.alerts.engine import AlertEngine, get_alert_engine
 from narrative_assistant.alerts.models import (
@@ -110,27 +111,30 @@ class TestAlertEngineCreateFromAttributeInconsistency:
         # El método NO debe aceptar un parámetro 'inconsistency'
         # Este test verifica que la firma del método es correcta
         import inspect
+
         sig = inspect.signature(engine.create_from_attribute_inconsistency)
         param_names = list(sig.parameters.keys())
 
-        assert 'inconsistency' not in param_names, \
+        assert "inconsistency" not in param_names, (
             "create_from_attribute_inconsistency no debe tener parámetro 'inconsistency'"
+        )
 
     def test_create_from_attribute_inconsistency_all_params_required(self, engine):
         """Verifica que todos los parámetros requeridos están presentes."""
         import inspect
+
         sig = inspect.signature(engine.create_from_attribute_inconsistency)
 
         required_params = [
-            'project_id',
-            'entity_name',
-            'entity_id',
-            'attribute_key',
-            'value1',
-            'value2',
-            'value1_source',
-            'value2_source',
-            'explanation',
+            "project_id",
+            "entity_name",
+            "entity_id",
+            "attribute_key",
+            "value1",
+            "value2",
+            "value1_source",
+            "value2_source",
+            "explanation",
         ]
 
         param_names = list(sig.parameters.keys())
@@ -231,7 +235,9 @@ class TestAlertEngineIntegrationWithInconsistency:
             "project_id": 1,  # Viene del contexto
             "entity_name": inc.entity_name,
             "entity_id": inc.entity_id,
-            "attribute_key": inc.attribute_key.value if hasattr(inc.attribute_key, 'value') else str(inc.attribute_key),
+            "attribute_key": inc.attribute_key.value
+            if hasattr(inc.attribute_key, "value")
+            else str(inc.attribute_key),
             "value1": inc.value1,
             "value2": inc.value2,
             "value1_source": {
@@ -249,9 +255,18 @@ class TestAlertEngineIntegrationWithInconsistency:
         }
 
         # Verificar que todos los campos requeridos están presentes
-        required = ['project_id', 'entity_name', 'entity_id', 'attribute_key',
-                    'value1', 'value2', 'value1_source', 'value2_source',
-                    'explanation', 'confidence']
+        required = [
+            "project_id",
+            "entity_name",
+            "entity_id",
+            "attribute_key",
+            "value1",
+            "value2",
+            "value1_source",
+            "value2_source",
+            "explanation",
+            "confidence",
+        ]
 
         for field in required:
             assert field in params, f"Falta campo: {field}"

@@ -12,16 +12,16 @@ import pytest
 
 from narrative_assistant.analysis.duplicate_detector import (
     DuplicateDetector,
-    DuplicateType,
     DuplicateSeverity,
+    DuplicateType,
     get_duplicate_detector,
     reset_duplicate_detector,
 )
 
-
 # =============================================================================
 # Fixtures
 # =============================================================================
+
 
 @pytest.fixture(autouse=True)
 def reset_singleton():
@@ -41,6 +41,7 @@ def detector():
 # Tests de frases duplicadas exactas
 # =============================================================================
 
+
 class TestExactSentenceDuplicates:
     """Tests para detección de frases duplicadas exactas."""
 
@@ -59,8 +60,9 @@ class TestExactSentenceDuplicates:
         assert len(report.duplicates) >= 1
 
         # Verificar que encontró la duplicación exacta
-        exact_dups = [d for d in report.duplicates
-                      if d.duplicate_type == DuplicateType.EXACT_SENTENCE]
+        exact_dups = [
+            d for d in report.duplicates if d.duplicate_type == DuplicateType.EXACT_SENTENCE
+        ]
         assert len(exact_dups) >= 1
         assert exact_dups[0].similarity == 1.0
         assert exact_dups[0].severity == DuplicateSeverity.CRITICAL
@@ -96,6 +98,7 @@ class TestExactSentenceDuplicates:
 # Tests de frases casi idénticas
 # =============================================================================
 
+
 class TestNearSentenceDuplicates:
     """Tests para frases casi idénticas (>90% similitud)."""
 
@@ -112,8 +115,9 @@ class TestNearSentenceDuplicates:
         assert result.is_success
         report = result.value
         # Debería detectar la similitud aunque hay un typo (olía vs olia)
-        near_dups = [d for d in report.duplicates
-                     if d.duplicate_type == DuplicateType.NEAR_SENTENCE]
+        near_dups = [
+            d for d in report.duplicates if d.duplicate_type == DuplicateType.NEAR_SENTENCE
+        ]
         assert len(near_dups) >= 1
         assert near_dups[0].similarity >= 0.90
 
@@ -136,6 +140,7 @@ class TestNearSentenceDuplicates:
 # =============================================================================
 # Tests de párrafos duplicados
 # =============================================================================
+
 
 class TestParagraphDuplicates:
     """Tests para detección de párrafos duplicados."""
@@ -170,8 +175,9 @@ class TestParagraphDuplicates:
 
         assert result.is_success
         report = result.value
-        exact_dups = [d for d in report.duplicates
-                      if d.duplicate_type == DuplicateType.EXACT_PARAGRAPH]
+        exact_dups = [
+            d for d in report.duplicates if d.duplicate_type == DuplicateType.EXACT_PARAGRAPH
+        ]
         assert len(exact_dups) >= 1
         assert exact_dups[0].severity == DuplicateSeverity.CRITICAL
 
@@ -208,6 +214,7 @@ class TestParagraphDuplicates:
 # Tests de detección combinada
 # =============================================================================
 
+
 class TestCombinedDetection:
     """Tests para detect_all que combina frases y párrafos."""
 
@@ -225,10 +232,7 @@ class TestCombinedDetection:
         ]
 
         result = detector.detect_all(
-            text=text,
-            paragraphs=paragraphs,
-            sentence_threshold=0.90,
-            paragraph_threshold=0.90
+            text=text, paragraphs=paragraphs, sentence_threshold=0.90, paragraph_threshold=0.90
         )
 
         assert result.is_success
@@ -245,11 +249,7 @@ class TestCombinedDetection:
             {"number": 2, "start_char": 40, "end_char": 100},
         ]
 
-        result = detector.detect_all(
-            text=text,
-            chapters=chapters,
-            sentence_threshold=0.90
-        )
+        result = detector.detect_all(text=text, chapters=chapters, sentence_threshold=0.90)
 
         assert result.is_success
         # Debería detectar duplicado entre cap 1 y cap 2
@@ -258,6 +258,7 @@ class TestCombinedDetection:
 # =============================================================================
 # Tests de estadísticas
 # =============================================================================
+
 
 class TestDuplicateStatistics:
     """Tests para estadísticas del reporte."""
@@ -278,9 +279,17 @@ class TestDuplicateStatistics:
     def test_report_counts_by_severity(self, detector):
         """El reporte cuenta por severidad."""
         paragraphs = [
-            {"text": "Texto idéntico para probar severidad crítica en duplicados.", "chapter": 1, "paragraph_number": 1},
+            {
+                "text": "Texto idéntico para probar severidad crítica en duplicados.",
+                "chapter": 1,
+                "paragraph_number": 1,
+            },
             {"text": "Otro párrafo diferente.", "chapter": 1, "paragraph_number": 2},
-            {"text": "Texto idéntico para probar severidad crítica en duplicados.", "chapter": 2, "paragraph_number": 3},
+            {
+                "text": "Texto idéntico para probar severidad crítica en duplicados.",
+                "chapter": 2,
+                "paragraph_number": 3,
+            },
         ]
 
         result = detector.detect_paragraph_duplicates(paragraphs)
@@ -294,6 +303,7 @@ class TestDuplicateStatistics:
 # =============================================================================
 # Tests de casos límite
 # =============================================================================
+
 
 class TestEdgeCases:
     """Tests para casos límite."""
@@ -335,6 +345,7 @@ class TestEdgeCases:
 # Tests de integración con test_document_rich
 # =============================================================================
 
+
 class TestWithRichDocument:
     """Tests usando el documento de test enriquecido."""
 
@@ -354,9 +365,7 @@ class TestWithRichDocument:
     def test_detects_known_duplicate_in_rich_doc(self, detector, rich_document_text):
         """Detecta el duplicado conocido del documento de test."""
         result = detector.detect_sentence_duplicates(
-            rich_document_text,
-            min_sentence_length=30,
-            similarity_threshold=0.90
+            rich_document_text, min_sentence_length=30, similarity_threshold=0.90
         )
 
         assert result.is_success

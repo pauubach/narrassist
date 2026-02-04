@@ -4,15 +4,16 @@ Tests unitarios para el sistema de alertas.
 Estos tests verifican los modelos, filtros y repositorio de alertas.
 """
 
-import pytest
 from datetime import datetime
+
+import pytest
 
 from narrative_assistant.alerts.models import (
     Alert,
     AlertCategory,
+    AlertFilter,
     AlertSeverity,
     AlertStatus,
-    AlertFilter,
 )
 from narrative_assistant.alerts.repository import AlertRepository, get_alert_repository
 
@@ -305,8 +306,9 @@ class TestAlertEngine:
     @pytest.fixture
     def engine(self):
         """Crea un motor de alertas para tests."""
-        from narrative_assistant.alerts.engine import AlertEngine
         from unittest.mock import MagicMock
+
+        from narrative_assistant.alerts.engine import AlertEngine
 
         # Mock del repositorio para evitar DB real
         mock_repo = MagicMock()
@@ -321,7 +323,7 @@ class TestAlertEngine:
                 title="Test",
                 description="Test",
                 explanation="Test",
-            )
+            ),
         )
         return AlertEngine(repository=mock_repo)
 
@@ -457,19 +459,40 @@ class TestAlertEngine:
         """Test priorizacion de alertas."""
         alerts = [
             Alert(
-                id=1, project_id=1, category=AlertCategory.CONSISTENCY,
-                severity=AlertSeverity.INFO, alert_type="test", title="A",
-                description="A", explanation="A", confidence=0.5, chapter=1
+                id=1,
+                project_id=1,
+                category=AlertCategory.CONSISTENCY,
+                severity=AlertSeverity.INFO,
+                alert_type="test",
+                title="A",
+                description="A",
+                explanation="A",
+                confidence=0.5,
+                chapter=1,
             ),
             Alert(
-                id=2, project_id=1, category=AlertCategory.CONSISTENCY,
-                severity=AlertSeverity.CRITICAL, alert_type="test", title="B",
-                description="B", explanation="B", confidence=0.9, chapter=2
+                id=2,
+                project_id=1,
+                category=AlertCategory.CONSISTENCY,
+                severity=AlertSeverity.CRITICAL,
+                alert_type="test",
+                title="B",
+                description="B",
+                explanation="B",
+                confidence=0.9,
+                chapter=2,
             ),
             Alert(
-                id=3, project_id=1, category=AlertCategory.CONSISTENCY,
-                severity=AlertSeverity.WARNING, alert_type="test", title="C",
-                description="C", explanation="C", confidence=0.95, chapter=1
+                id=3,
+                project_id=1,
+                category=AlertCategory.CONSISTENCY,
+                severity=AlertSeverity.WARNING,
+                alert_type="test",
+                title="C",
+                description="C",
+                explanation="C",
+                confidence=0.95,
+                chapter=1,
             ),
         ]
 

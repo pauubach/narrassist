@@ -3,26 +3,27 @@ Tests para el módulo de voz y perfiles.
 """
 
 import pytest
+
 from narrative_assistant.voice import (
-    VoiceProfile,
-    VoiceMetrics,
-    VoiceProfileBuilder,
-    VoiceDeviation,
     DeviationType,
+    VoiceDeviation,
     VoiceDeviationDetector,
-)
-from narrative_assistant.voice.profiles import (
-    FORMAL_MARKERS,
-    INFORMAL_MARKERS,
-    FILLERS,
-    build_voice_profiles_from_chapters,
+    VoiceMetrics,
+    VoiceProfile,
+    VoiceProfileBuilder,
 )
 from narrative_assistant.voice.deviations import detect_voice_deviations
-
+from narrative_assistant.voice.profiles import (
+    FILLERS,
+    FORMAL_MARKERS,
+    INFORMAL_MARKERS,
+    build_voice_profiles_from_chapters,
+)
 
 # =============================================================================
 # Tests de VoiceMetrics
 # =============================================================================
+
 
 class TestVoiceMetrics:
     """Tests para métricas de voz."""
@@ -54,6 +55,7 @@ class TestVoiceMetrics:
 # =============================================================================
 # Tests de VoiceProfile
 # =============================================================================
+
 
 class TestVoiceProfile:
     """Tests para perfiles de voz."""
@@ -91,6 +93,7 @@ class TestVoiceProfile:
 # =============================================================================
 # Tests de VoiceProfileBuilder
 # =============================================================================
+
 
 class TestVoiceProfileBuilder:
     """Tests para el constructor de perfiles."""
@@ -164,7 +167,10 @@ class TestVoiceProfileBuilder:
         dialogues = [
             {"text": "Una frase corta.", "speaker_id": 1},
             {"text": "Otra frase corta.", "speaker_id": 1},
-            {"text": "Esta es una frase mucho más larga con muchas más palabras para probar.", "speaker_id": 1},
+            {
+                "text": "Esta es una frase mucho más larga con muchas más palabras para probar.",
+                "speaker_id": 1,
+            },
         ]
         entities = [{"id": 1, "name": "Test", "type": "PERSON"}]
 
@@ -196,8 +202,14 @@ class TestVoiceProfileBuilder:
     def test_filler_detection(self):
         """Detección de muletillas."""
         dialogues = [
-            {"text": "Bueno, pues mira, o sea, es que básicamente es así, ¿sabes?", "speaker_id": 1},
-            {"text": "Pues bueno, la verdad, obviamente, es decir, claramente sí.", "speaker_id": 1},
+            {
+                "text": "Bueno, pues mira, o sea, es que básicamente es así, ¿sabes?",
+                "speaker_id": 1,
+            },
+            {
+                "text": "Pues bueno, la verdad, obviamente, es decir, claramente sí.",
+                "speaker_id": 1,
+            },
         ]
         entities = [{"id": 1, "name": "Muletillero", "type": "PERSON"}]
 
@@ -250,10 +262,7 @@ class TestVoiceProfileBuilder:
         ]
 
         # Muchos diálogos = alta confianza
-        many_dialogues = [
-            {"text": f"Intervención número {i}.", "speaker_id": 2}
-            for i in range(20)
-        ]
+        many_dialogues = [{"text": f"Intervención número {i}.", "speaker_id": 2} for i in range(20)]
 
         entities = [
             {"id": 1, "name": "Poco", "type": "PERSON"},
@@ -272,6 +281,7 @@ class TestVoiceProfileBuilder:
 # =============================================================================
 # Tests de VoiceDeviationDetector
 # =============================================================================
+
 
 class TestVoiceDeviationDetector:
     """Tests para el detector de desviaciones."""
@@ -321,12 +331,14 @@ class TestVoiceDeviationDetector:
         detector = VoiceDeviationDetector()
 
         # Intervención muy larga para el perfil
-        dialogues = [{
-            "text": " ".join(["palabra"] * 50),  # 50 palabras, esperado ~20
-            "speaker_id": 1,
-            "chapter": 1,
-            "position": 100,
-        }]
+        dialogues = [
+            {
+                "text": " ".join(["palabra"] * 50),  # 50 palabras, esperado ~20
+                "speaker_id": 1,
+                "chapter": 1,
+                "position": 100,
+            }
+        ]
 
         deviations = detector.detect_deviations([formal_profile], dialogues)
 
@@ -339,12 +351,14 @@ class TestVoiceDeviationDetector:
         detector = VoiceDeviationDetector()
 
         # Intervención muy corta para el perfil
-        dialogues = [{
-            "text": "Sí.",  # 1 palabra, esperado ~20
-            "speaker_id": 1,
-            "chapter": 1,
-            "position": 100,
-        }]
+        dialogues = [
+            {
+                "text": "Sí.",  # 1 palabra, esperado ~20
+                "speaker_id": 1,
+                "chapter": 1,
+                "position": 100,
+            }
+        ]
 
         deviations = detector.detect_deviations([formal_profile], dialogues)
 
@@ -357,16 +371,20 @@ class TestVoiceDeviationDetector:
         detector = VoiceDeviationDetector()
 
         # Personaje formal hablando informal
-        dialogues = [{
-            "text": "¡Eh, tío! ¡Qué pasa, colega! Mola mogollón esto, ¿sabes?",
-            "speaker_id": 1,
-            "chapter": 2,
-            "position": 200,
-        }]
+        dialogues = [
+            {
+                "text": "¡Eh, tío! ¡Qué pasa, colega! Mola mogollón esto, ¿sabes?",
+                "speaker_id": 1,
+                "chapter": 2,
+                "position": 200,
+            }
+        ]
 
         deviations = detector.detect_deviations([formal_profile], dialogues)
 
-        formality_devs = [d for d in deviations if d.deviation_type == DeviationType.FORMALITY_SHIFT]
+        formality_devs = [
+            d for d in deviations if d.deviation_type == DeviationType.FORMALITY_SHIFT
+        ]
         assert len(formality_devs) >= 1
         assert "más informal" in formality_devs[0].description
 
@@ -375,16 +393,20 @@ class TestVoiceDeviationDetector:
         detector = VoiceDeviationDetector()
 
         # Personaje informal hablando formal
-        dialogues = [{
-            "text": "Ciertamente, señor, agradecería que usted me permitiera expresar mi opinión.",
-            "speaker_id": 2,
-            "chapter": 3,
-            "position": 300,
-        }]
+        dialogues = [
+            {
+                "text": "Ciertamente, señor, agradecería que usted me permitiera expresar mi opinión.",
+                "speaker_id": 2,
+                "chapter": 3,
+                "position": 300,
+            }
+        ]
 
         deviations = detector.detect_deviations([informal_profile], dialogues)
 
-        formality_devs = [d for d in deviations if d.deviation_type == DeviationType.FORMALITY_SHIFT]
+        formality_devs = [
+            d for d in deviations if d.deviation_type == DeviationType.FORMALITY_SHIFT
+        ]
         assert len(formality_devs) >= 1
         assert "más formal" in formality_devs[0].description
 
@@ -393,12 +415,14 @@ class TestVoiceDeviationDetector:
         detector = VoiceDeviationDetector()
 
         # Personaje que no usa muletillas usando muchas
-        dialogues = [{
-            "text": "Bueno, pues mira, o sea, básicamente, la verdad es que sinceramente creo que obviamente tienes razón, ¿sabes?",
-            "speaker_id": 1,
-            "chapter": 4,
-            "position": 400,
-        }]
+        dialogues = [
+            {
+                "text": "Bueno, pues mira, o sea, básicamente, la verdad es que sinceramente creo que obviamente tienes razón, ¿sabes?",
+                "speaker_id": 1,
+                "chapter": 4,
+                "position": 400,
+            }
+        ]
 
         deviations = detector.detect_deviations([formal_profile], dialogues)
 
@@ -410,12 +434,14 @@ class TestVoiceDeviationDetector:
         detector = VoiceDeviationDetector()
 
         # Personaje tranquilo usando muchas exclamaciones
-        dialogues = [{
-            "text": "¡Increíble! ¡No puedo creerlo! ¡Es fantástico! ¡Maravilloso!",
-            "speaker_id": 1,
-            "chapter": 5,
-            "position": 500,
-        }]
+        dialogues = [
+            {
+                "text": "¡Increíble! ¡No puedo creerlo! ¡Es fantástico! ¡Maravilloso!",
+                "speaker_id": 1,
+                "chapter": 5,
+                "position": 500,
+            }
+        ]
 
         deviations = detector.detect_deviations([formal_profile], dialogues)
 
@@ -427,17 +453,21 @@ class TestVoiceDeviationDetector:
         detector = VoiceDeviationDetector()
 
         # Habla consistente con el perfil
-        dialogues = [{
-            "text": "Buenos días, señor. Le agradezco su atención en este asunto tan importante.",
-            "speaker_id": 1,
-            "chapter": 1,
-            "position": 100,
-        }]
+        dialogues = [
+            {
+                "text": "Buenos días, señor. Le agradezco su atención en este asunto tan importante.",
+                "speaker_id": 1,
+                "chapter": 1,
+                "position": 100,
+            }
+        ]
 
         deviations = detector.detect_deviations([formal_profile], dialogues)
 
         # Puede haber algunas desviaciones menores, pero no de formalidad
-        formality_devs = [d for d in deviations if d.deviation_type == DeviationType.FORMALITY_SHIFT]
+        formality_devs = [
+            d for d in deviations if d.deviation_type == DeviationType.FORMALITY_SHIFT
+        ]
         assert len(formality_devs) == 0
 
     def test_low_confidence_profile_ignored(self):
@@ -450,12 +480,14 @@ class TestVoiceDeviationDetector:
             confidence=0.2,  # Muy baja confianza
         )
 
-        dialogues = [{
-            "text": "¡Eh, tío! ¡Flipante!",
-            "speaker_id": 1,
-            "chapter": 1,
-            "position": 100,
-        }]
+        dialogues = [
+            {
+                "text": "¡Eh, tío! ¡Flipante!",
+                "speaker_id": 1,
+                "chapter": 1,
+                "position": 100,
+            }
+        ]
 
         deviations = detector.detect_deviations([low_conf_profile], dialogues)
         assert len(deviations) == 0
@@ -464,12 +496,14 @@ class TestVoiceDeviationDetector:
         """Diálogos sin speaker conocido son ignorados."""
         detector = VoiceDeviationDetector()
 
-        dialogues = [{
-            "text": "¡Eh, tío! ¡Flipante!",
-            "speaker_id": 999,  # No existe
-            "chapter": 1,
-            "position": 100,
-        }]
+        dialogues = [
+            {
+                "text": "¡Eh, tío! ¡Flipante!",
+                "speaker_id": 999,  # No existe
+                "chapter": 1,
+                "position": 100,
+            }
+        ]
 
         deviations = detector.detect_deviations([formal_profile], dialogues)
         assert len(deviations) == 0
@@ -478,6 +512,7 @@ class TestVoiceDeviationDetector:
 # =============================================================================
 # Tests de integración
 # =============================================================================
+
 
 class TestVoiceIntegration:
     """Tests de integración del módulo de voz."""
@@ -517,23 +552,67 @@ class TestVoiceIntegration:
                 "number": 1,
                 "dialogues": [
                     # Perfil formal establecido con muchos marcadores
-                    {"text": "Buenos dias, senor. Como esta usted hoy?", "speaker_id": 1, "position": 10},
-                    {"text": "Ciertamente, senor, es un placer verle.", "speaker_id": 1, "position": 50},
-                    {"text": "Sin embargo, debo comunicarle algo importante.", "speaker_id": 1, "position": 90},
-                    {"text": "Asimismo, usted debe saber que le agradezco.", "speaker_id": 1, "position": 130},
-                    {"text": "No obstante, senor, debo retirarme ahora.", "speaker_id": 1, "position": 170},
-                    {"text": "Ciertamente usted es muy amable, senor.", "speaker_id": 1, "position": 210},
-                    {"text": "Sin embargo usted sabe mejor que yo.", "speaker_id": 1, "position": 250},
-                    {"text": "Efectivamente, senor, es como usted dice.", "speaker_id": 1, "position": 290},
-                    {"text": "Indudablemente usted tiene toda la razon.", "speaker_id": 1, "position": 330},
-                    {"text": "Asimismo le agradezco su tiempo, senor.", "speaker_id": 1, "position": 370},
+                    {
+                        "text": "Buenos dias, senor. Como esta usted hoy?",
+                        "speaker_id": 1,
+                        "position": 10,
+                    },
+                    {
+                        "text": "Ciertamente, senor, es un placer verle.",
+                        "speaker_id": 1,
+                        "position": 50,
+                    },
+                    {
+                        "text": "Sin embargo, debo comunicarle algo importante.",
+                        "speaker_id": 1,
+                        "position": 90,
+                    },
+                    {
+                        "text": "Asimismo, usted debe saber que le agradezco.",
+                        "speaker_id": 1,
+                        "position": 130,
+                    },
+                    {
+                        "text": "No obstante, senor, debo retirarme ahora.",
+                        "speaker_id": 1,
+                        "position": 170,
+                    },
+                    {
+                        "text": "Ciertamente usted es muy amable, senor.",
+                        "speaker_id": 1,
+                        "position": 210,
+                    },
+                    {
+                        "text": "Sin embargo usted sabe mejor que yo.",
+                        "speaker_id": 1,
+                        "position": 250,
+                    },
+                    {
+                        "text": "Efectivamente, senor, es como usted dice.",
+                        "speaker_id": 1,
+                        "position": 290,
+                    },
+                    {
+                        "text": "Indudablemente usted tiene toda la razon.",
+                        "speaker_id": 1,
+                        "position": 330,
+                    },
+                    {
+                        "text": "Asimismo le agradezco su tiempo, senor.",
+                        "speaker_id": 1,
+                        "position": 370,
+                    },
                 ],
             },
             {
                 "number": 2,
                 "dialogues": [
                     # Cambio de registro: personaje formal hablando MUY informal
-                    {"text": "Eh, tio! Mola mogollon esto! Flipante, colega! Es guay, chaval!", "speaker_id": 1, "position": 500},
+                    {
+                        "text": "Eh, tio! Mola mogollon esto! Flipante, colega! Es guay, chaval!",
+                        "speaker_id": 1,
+                        "position": 500,
+                    },
                 ],
             },
         ]
@@ -548,7 +627,9 @@ class TestVoiceIntegration:
         # Debería detectar al menos alguna desviación
         assert len(deviations) >= 1
         # Verificar que la desviación de formalidad está presente
-        formality_devs = [d for d in deviations if d.deviation_type == DeviationType.FORMALITY_SHIFT]
+        formality_devs = [
+            d for d in deviations if d.deviation_type == DeviationType.FORMALITY_SHIFT
+        ]
         assert len(formality_devs) >= 1
 
     def test_deviation_to_dict(self):
@@ -569,6 +650,7 @@ class TestVoiceIntegration:
 
         # Corregir: severity debe ser DeviationSeverity
         from narrative_assistant.voice.deviations import DeviationSeverity
+
         deviation.severity = DeviationSeverity.MEDIUM
 
         d = deviation.to_dict()
@@ -582,6 +664,7 @@ class TestVoiceIntegration:
 # =============================================================================
 # Tests de marcadores y constantes
 # =============================================================================
+
 
 class TestVoiceConstants:
     """Tests para constantes del módulo."""

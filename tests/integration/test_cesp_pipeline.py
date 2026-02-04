@@ -5,23 +5,25 @@ Tests de integración para validar CESP con el pipeline completo de NLP.
 Estos tests ejecutan el extractor de atributos con texto real
 para verificar que la deduplicación CESP funciona end-to-end.
 """
-import pytest
+
 import sys
 from pathlib import Path
 from typing import List, Set
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from narrative_assistant.nlp.attributes import (
+    AssignmentSource,
     AttributeExtractor,
     ExtractedAttribute,
-    AssignmentSource,
 )
-
 
 # ============================================================================
 # FIXTURE: Extractor configurado para tests
 # ============================================================================
+
 
 @pytest.fixture
 def extractor_patterns_only():
@@ -38,33 +40,34 @@ def extractor_patterns_only():
 # TESTS DE INTEGRACIÓN CON TEXTO REAL
 # ============================================================================
 
+
 class TestRealTextExtraction:
     """Tests con texto narrativo real."""
-    
+
     @pytest.mark.integration
     def test_bug_historico_texto_completo(self, extractor_patterns_only):
         """
         Texto que causaba el bug histórico.
-        
+
         'ojos azules de Pedro' NO debe asignarse a Juan.
         """
         texto = """
-        Juan conversaba animadamente en la terraza del café. 
+        Juan conversaba animadamente en la terraza del café.
         Los ojos azules de Pedro brillaban bajo el sol de la tarde mientras escuchaba atentamente.
         María observaba la escena desde lejos con sus ojos marrones.
         """
-        
+
         # Entidades conocidas
         entidades = ["Juan", "Pedro", "María"]
-        
+
         # Extraer atributos
         # NOTA: Este test requiere el pipeline completo
         # Por ahora verificamos que el extractor se inicializa correctamente
         assert extractor_patterns_only is not None
-        
+
         print(f"\nTexto de prueba: {texto[:80]}...")
         print(f"Entidades: {entidades}")
-    
+
     @pytest.mark.integration
     def test_multiples_personajes_atributos_correctos(self, extractor_patterns_only):
         """
@@ -75,14 +78,14 @@ class TestRealTextExtraction:
         Andrés, en cambio, era bajo y tenía los ojos negros de su madre.
         Ambos compartían el pelo rizado característico de la familia.
         """
-        
+
         entidades = ["Miguel", "Andrés"]
-        
+
         # Verificar que no hay contaminación cruzada de atributos
         assert extractor_patterns_only is not None
         print(f"\nTexto: {texto[:80]}...")
-    
-    @pytest.mark.integration  
+
+    @pytest.mark.integration
     def test_diminutivos_y_alias(self, extractor_patterns_only):
         """
         Personaje con múltiples nombres/alias.
@@ -92,31 +95,31 @@ class TestRealTextExtraction:
         tenía el pelo negro azabache y una barba descuidada. El carpintero
         se sentó en su rincón habitual con sus ojos cansados.
         """
-        
+
         # Francisco = Paco = el carpintero (misma entidad)
         entidades = ["Francisco"]
         alias = {"Francisco": ["Paco", "el carpintero"]}
-        
+
         assert extractor_patterns_only is not None
         print(f"\nTexto con alias: {texto[:80]}...")
-    
+
     @pytest.mark.integration
     def test_negaciones_no_extraer(self, extractor_patterns_only):
         """
         Atributos negados NO deben extraerse.
         """
         texto = """
-        María no tenía los ojos verdes como su madre. 
+        María no tenía los ojos verdes como su madre.
         Sus ojos eran de un marrón oscuro, casi negro.
         Jamás fue rubia, siempre tuvo el pelo negro.
         """
-        
+
         # NO extraer: ojos verdes, rubia
         # SÍ extraer: ojos marrones, pelo negro
-        
+
         assert extractor_patterns_only is not None
         print(f"\nTexto con negaciones: {texto[:80]}...")
-    
+
     @pytest.mark.integration
     def test_atributos_temporales(self, extractor_patterns_only):
         """
@@ -127,10 +130,10 @@ class TestRealTextExtraction:
         tiene el pelo completamente canoso y una barriga considerable.
         Solo sus ojos azules siguen siendo los mismos.
         """
-        
+
         # Atributo actual: canoso, ojos azules
         # Atributo pasado (no extraer como actual): rubio, delgado
-        
+
         assert extractor_patterns_only is not None
         print(f"\nTexto temporal: {texto[:80]}...")
 
@@ -139,18 +142,20 @@ class TestRealTextExtraction:
 # TESTS DE DEDUPLICACIÓN CON ESCENARIOS COMPLEJOS
 # ============================================================================
 
+
 class TestComplexDeduplication:
     """Tests de deduplicación con escenarios complejos."""
-    
+
     def test_tres_personajes_mismo_atributo_diferente_oracion(self, extractor_patterns_only):
         """
         Tres personajes tienen ojos azules en diferentes oraciones.
         Todos deben conservarse (oraciones diferentes).
         """
         from narrative_assistant.nlp.attributes import (
-            ExtractedAttribute, AttributeCategory, AttributeKey
+            AttributeCategory,
+            AttributeKey,
         )
-        
+
         attrs = [
             ExtractedAttribute(
                 entity_name="Juan",
@@ -189,23 +194,24 @@ class TestComplexDeduplication:
                 sentence_idx=2,
             ),
         ]
-        
+
         result = extractor_patterns_only._deduplicate(attrs)
-        
+
         # Los 3 deben conservarse (diferentes oraciones)
         assert len(result) == 3
         entities = {a.entity_name for a in result}
         assert entities == {"Juan", "Pedro", "María"}
-    
+
     def test_conflicto_mismo_texto_multiple_asignacion(self, extractor_patterns_only):
         """
         El mismo texto 'ojos azules de Pedro' asignado a 3 personas.
         Solo Pedro debe conservarse (genitivo).
         """
         from narrative_assistant.nlp.attributes import (
-            ExtractedAttribute, AttributeCategory, AttributeKey
+            AttributeCategory,
+            AttributeKey,
         )
-        
+
         attrs = [
             ExtractedAttribute(
                 entity_name="Pedro",
@@ -244,23 +250,24 @@ class TestComplexDeduplication:
                 sentence_idx=1,
             ),
         ]
-        
+
         result = extractor_patterns_only._deduplicate(attrs)
-        
+
         # Solo Pedro debe conservarse
         assert len(result) == 1
         assert result[0].entity_name == "Pedro"
         assert result[0].assignment_source == AssignmentSource.GENITIVE
-    
+
     def test_multiples_atributos_mismo_personaje(self, extractor_patterns_only):
         """
         Un personaje con múltiples atributos diferentes.
         Todos deben conservarse (diferentes keys).
         """
         from narrative_assistant.nlp.attributes import (
-            ExtractedAttribute, AttributeCategory, AttributeKey
+            AttributeCategory,
+            AttributeKey,
         )
-        
+
         attrs = [
             ExtractedAttribute(
                 entity_name="María",
@@ -299,9 +306,9 @@ class TestComplexDeduplication:
                 sentence_idx=0,
             ),
         ]
-        
+
         result = extractor_patterns_only._deduplicate(attrs)
-        
+
         # Los 3 atributos de María deben conservarse (diferentes keys)
         assert len(result) == 3
         keys = {a.key for a in result}
@@ -312,15 +319,17 @@ class TestComplexDeduplication:
 # TESTS DE PRIORIDADES MIXTAS
 # ============================================================================
 
+
 class TestMixedPriorities:
     """Tests con mezcla de diferentes fuentes de asignación."""
-    
+
     def test_llm_vs_proximity(self, extractor_patterns_only):
         """LLM debe ganar sobre PROXIMITY."""
         from narrative_assistant.nlp.attributes import (
-            ExtractedAttribute, AttributeCategory, AttributeKey
+            AttributeCategory,
+            AttributeKey,
         )
-        
+
         attr_llm = ExtractedAttribute(
             entity_name="Pedro",
             category=AttributeCategory.PHYSICAL,
@@ -333,7 +342,7 @@ class TestMixedPriorities:
             assignment_source=AssignmentSource.LLM,
             sentence_idx=0,
         )
-        
+
         attr_prox = ExtractedAttribute(
             entity_name="Juan",
             category=AttributeCategory.PHYSICAL,
@@ -346,19 +355,20 @@ class TestMixedPriorities:
             assignment_source=AssignmentSource.PROXIMITY,
             sentence_idx=0,
         )
-        
+
         result = extractor_patterns_only._deduplicate([attr_llm, attr_prox])
-        
+
         assert len(result) == 1
         assert result[0].entity_name == "Pedro"
         assert result[0].assignment_source == AssignmentSource.LLM
-    
+
     def test_embeddings_vs_proximity(self, extractor_patterns_only):
         """EMBEDDINGS debe ganar sobre PROXIMITY."""
         from narrative_assistant.nlp.attributes import (
-            ExtractedAttribute, AttributeCategory, AttributeKey
+            AttributeCategory,
+            AttributeKey,
         )
-        
+
         attr_emb = ExtractedAttribute(
             entity_name="María",
             category=AttributeCategory.PHYSICAL,
@@ -371,7 +381,7 @@ class TestMixedPriorities:
             assignment_source=AssignmentSource.EMBEDDINGS,
             sentence_idx=0,
         )
-        
+
         attr_prox = ExtractedAttribute(
             entity_name="Ana",
             category=AttributeCategory.PHYSICAL,
@@ -384,18 +394,19 @@ class TestMixedPriorities:
             assignment_source=AssignmentSource.PROXIMITY,
             sentence_idx=0,
         )
-        
+
         result = extractor_patterns_only._deduplicate([attr_emb, attr_prox])
-        
+
         assert len(result) == 1
         assert result[0].entity_name == "María"
-    
+
     def test_genitivo_vs_llm(self, extractor_patterns_only):
         """GENITIVO debe ganar sobre LLM."""
         from narrative_assistant.nlp.attributes import (
-            ExtractedAttribute, AttributeCategory, AttributeKey
+            AttributeCategory,
+            AttributeKey,
         )
-        
+
         attr_gen = ExtractedAttribute(
             entity_name="Pedro",
             category=AttributeCategory.PHYSICAL,
@@ -408,7 +419,7 @@ class TestMixedPriorities:
             assignment_source=AssignmentSource.GENITIVE,
             sentence_idx=0,
         )
-        
+
         attr_llm = ExtractedAttribute(
             entity_name="Juan",
             category=AttributeCategory.PHYSICAL,
@@ -421,9 +432,9 @@ class TestMixedPriorities:
             assignment_source=AssignmentSource.LLM,
             sentence_idx=0,
         )
-        
+
         result = extractor_patterns_only._deduplicate([attr_gen, attr_llm])
-        
+
         # GENITIVO gana aunque LLM tenga mayor confianza
         assert len(result) == 1
         assert result[0].entity_name == "Pedro"

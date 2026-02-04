@@ -13,6 +13,7 @@ Categorías de problemas plantados:
 6. ESTRUCTURA: detección de capítulos
 7. CALIDAD: ortografía, gramática, repeticiones
 """
+
 import os
 import sys
 import tempfile
@@ -429,17 +430,27 @@ MANUSCRITO_COMPLEJO = textwrap.dedent("""\
 PROBLEMAS_FICCION = {
     "entidades_esperadas": {
         "personajes": [
-            "María García", "Pedro Hernández", "Antonio Ruiz",
-            "Ramírez", "Fernando Castillo", "Carlos Mendoza",
-            "Alejandro", "Borges",  # gato
+            "María García",
+            "Pedro Hernández",
+            "Antonio Ruiz",
+            "Ramírez",
+            "Fernando Castillo",
+            "Carlos Mendoza",
+            "Alejandro",
+            "Borges",  # gato
         ],
         "ubicaciones": [
-            "Salamanca", "Universidad de Salamanca", "Madrid",
-            "Universidad Complutense", "Gran Vía",
-            "Universidad Politécnica de Madrid", "Valencia",
+            "Salamanca",
+            "Universidad de Salamanca",
+            "Madrid",
+            "Universidad Complutense",
+            "Gran Vía",
+            "Universidad Politécnica de Madrid",
+            "Valencia",
         ],
         "organizaciones": [
-            "Fundación Cervantes", "Ministerio de Cultura",
+            "Fundación Cervantes",
+            "Ministerio de Cultura",
         ],
     },
     "inconsistencias_plantadas": [
@@ -510,14 +521,25 @@ PROBLEMAS_FICCION = {
 PROBLEMAS_NO_FICCION = {
     "entidades_esperadas": {
         "personajes": [
-            "Moctezuma", "Hernán Cortés", "Cristóbal Colón",
-            "Bernal Díaz del Castillo", "Coenraad van Houten",
-            "Joseph Fry", "Rodolphe Lindt", "Daniel Peter",
+            "Moctezuma",
+            "Hernán Cortés",
+            "Cristóbal Colón",
+            "Bernal Díaz del Castillo",
+            "Coenraad van Houten",
+            "Joseph Fry",
+            "Rodolphe Lindt",
+            "Daniel Peter",
             "Henri Nestlé",
         ],
         "ubicaciones": [
-            "México", "España", "Barcelona", "Zaragoza",
-            "Bristol", "Berna", "Ghana", "Costa de Marfil",
+            "México",
+            "España",
+            "Barcelona",
+            "Zaragoza",
+            "Bristol",
+            "Berna",
+            "Ghana",
+            "Costa de Marfil",
             "Suiza",
         ],
     },
@@ -537,15 +559,23 @@ PROBLEMAS_NO_FICCION = {
 PROBLEMAS_COMPLEJO = {
     "entidades_esperadas": {
         "personajes": [
-            "Javier Torres", "Elena Vidal", "Isabel Navarro",
-            "Carmen Soto", "Ricardo Garza", "Marcos Delgado",
+            "Javier Torres",
+            "Elena Vidal",
+            "Isabel Navarro",
+            "Carmen Soto",
+            "Ricardo Garza",
+            "Marcos Delgado",
         ],
         "ubicaciones": [
-            "Madrid", "Barcelona", "Valencia",
+            "Madrid",
+            "Barcelona",
+            "Valencia",
             "Paseo de la Castellana",
         ],
         "organizaciones": [
-            "Garza & Asociados", "Petroglobal", "Energex",
+            "Garza & Asociados",
+            "Petroglobal",
+            "Energex",
         ],
     },
     "inconsistencias_plantadas": [
@@ -584,17 +614,20 @@ PROBLEMAS_COMPLEJO = {
 # TEST: VERIFICAR QUE EL PIPELINE IMPORTA Y SE PUEDE CONFIGURAR
 # =============================================================================
 
+
 class TestPipelineSetup:
     """Verificar que el pipeline se importa y configura correctamente."""
 
     def test_import_pipeline(self):
         from narrative_assistant.pipelines import UnifiedAnalysisPipeline, UnifiedConfig
+
         config = UnifiedConfig()
         pipeline = UnifiedAnalysisPipeline(config)
         assert pipeline is not None
 
     def test_config_defaults(self):
         from narrative_assistant.pipelines import UnifiedConfig
+
         config = UnifiedConfig()
         assert config.run_ner is True
         assert config.run_structure is True
@@ -605,6 +638,7 @@ class TestPipelineSetup:
     def test_config_all_phases_on(self):
         """Config con todas las fases activadas."""
         from narrative_assistant.pipelines import UnifiedConfig
+
         config = UnifiedConfig(
             run_structure=True,
             run_dialogue_detection=True,
@@ -629,6 +663,7 @@ class TestPipelineSetup:
 # =============================================================================
 # HELPER: Ejecutar pipeline sobre texto
 # =============================================================================
+
 
 def run_pipeline_on_text(
     text: str,
@@ -669,13 +704,17 @@ def run_pipeline_on_text(
 
     # Crear archivo temporal
     with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".txt", prefix=filename.replace(".txt", "_"),
-        delete=False, encoding="utf-8"
+        mode="w",
+        suffix=".txt",
+        prefix=filename.replace(".txt", "_"),
+        delete=False,
+        encoding="utf-8",
     ) as f:
         f.write(text)
         tmp_path = f.name
 
     phases = []
+
     def progress_callback(progress, msg):
         phases.append((progress, msg))
 
@@ -728,6 +767,7 @@ def find_entity_by_name(entities, name_fragment):
 # TESTS E2E: MANUSCRITO DE FICCIÓN
 # =============================================================================
 
+
 @pytest.mark.slow
 class TestFiccionE2E:
     """Tests E2E para el manuscrito de ficción con inconsistencias plantadas."""
@@ -777,13 +817,13 @@ class TestFiccionE2E:
         names_lower = [n.lower() for n in names]
 
         # María García debe estar
-        maria_found = any("maría" in n or "maria" in n or "garcía" in n or "garcia" in n
-                          for n in names_lower)
+        maria_found = any(
+            "maría" in n or "maria" in n or "garcía" in n or "garcia" in n for n in names_lower
+        )
         assert maria_found, f"María García no encontrada en: {names}"
 
         # Pedro Hernández debe estar
-        pedro_found = any("pedro" in n or "hernández" in n or "hernandez" in n
-                          for n in names_lower)
+        pedro_found = any("pedro" in n or "hernández" in n or "hernandez" in n for n in names_lower)
         assert pedro_found, f"Pedro Hernández no encontrado en: {names}"
 
     def test_detect_secondary_characters(self, ficcion_result):
@@ -797,8 +837,7 @@ class TestFiccionE2E:
         secondary = ["ramírez", "ramirez", "antonio", "castillo", "mendoza", "alejandro"]
         found = sum(1 for s in secondary if any(s in n for n in names_lower))
         assert found >= 2, (
-            f"Solo {found} personajes secundarios encontrados de {secondary}. "
-            f"Entidades: {names}"
+            f"Solo {found} personajes secundarios encontrados de {secondary}. Entidades: {names}"
         )
 
     def test_detect_locations(self, ficcion_result):
@@ -811,8 +850,7 @@ class TestFiccionE2E:
         locations_expected = ["salamanca", "madrid"]
         found = sum(1 for loc in locations_expected if any(loc in n for n in names_lower))
         assert found >= 1, (
-            f"Ubicaciones no detectadas. Esperadas: {locations_expected}. "
-            f"Entidades: {names}"
+            f"Ubicaciones no detectadas. Esperadas: {locations_expected}. Entidades: {names}"
         )
 
     # --- DIÁLOGOS ---
@@ -839,7 +877,8 @@ class TestFiccionE2E:
 
         # Buscar atributos asociados a María
         maria_attrs = [
-            a for a in attributes
+            a
+            for a in attributes
             if "maría" in str(getattr(a, "entity_name", "")).lower()
             or "maria" in str(getattr(a, "entity_name", "")).lower()
             or "garcía" in str(getattr(a, "entity_name", "")).lower()
@@ -848,7 +887,8 @@ class TestFiccionE2E:
         # También puede estar bajo entity_id
         if not maria_attrs:
             maria_attrs = [
-                a for a in attributes
+                a
+                for a in attributes
                 if "maría" in str(getattr(a, "value", "")).lower()
                 or "profesora" in str(getattr(a, "value", "")).lower()
             ]
@@ -865,13 +905,16 @@ class TestFiccionE2E:
 
         # Buscar alertas de CONSISTENCIA específicamente (no spelling/repetition)
         consistency_alerts = [
-            a for a in report.alerts
+            a
+            for a in report.alerts
             if "consistency" in getattr(a, "category", object()).value
             or "inconsistencia" in str(getattr(a, "title", "")).lower()
         ]
         hair_alert = any(
-            "cabello" in str(a).lower() or "pelo" in str(a).lower()
-            or "hair" in str(a).lower() or "rubio" in str(a).lower()
+            "cabello" in str(a).lower()
+            or "pelo" in str(a).lower()
+            or "hair" in str(a).lower()
+            or "rubio" in str(a).lower()
             for a in consistency_alerts
         )
         if not hair_alert:
@@ -888,11 +931,11 @@ class TestFiccionE2E:
         report = result.value
 
         consistency_alerts = [
-            a for a in report.alerts
-            if "consistency" in getattr(a, "category", object()).value
+            a for a in report.alerts if "consistency" in getattr(a, "category", object()).value
         ]
         age_alert = any(
-            "edad" in str(a).lower() or "age" in str(a).lower()
+            "edad" in str(a).lower()
+            or "age" in str(a).lower()
             or ("32" in str(a) and "35" in str(a))
             for a in consistency_alerts
         )
@@ -909,12 +952,10 @@ class TestFiccionE2E:
         report = result.value
 
         consistency_alerts = [
-            a for a in report.alerts
-            if "consistency" in getattr(a, "category", object()).value
+            a for a in report.alerts if "consistency" in getattr(a, "category", object()).value
         ]
         floor_alert = any(
-            "piso" in str(a).lower() or "despacho" in str(a).lower()
-            for a in consistency_alerts
+            "piso" in str(a).lower() or "despacho" in str(a).lower() for a in consistency_alerts
         )
         if not floor_alert:
             pytest.xfail(
@@ -929,8 +970,7 @@ class TestFiccionE2E:
         report = result.value
 
         consistency_alerts = [
-            a for a in report.alerts
-            if "consistency" in getattr(a, "category", object()).value
+            a for a in report.alerts if "consistency" in getattr(a, "category", object()).value
         ]
         leg_alert = any(
             "pierna" in str(a).lower()
@@ -957,13 +997,17 @@ class TestFiccionE2E:
 
         # Nombres que NO deberían marcarse como error
         known_names = {
-            "maría", "pedro", "hernández", "ramírez", "salamanca",
-            "cervantes", "quevedo", "borges", "mendoza",
+            "maría",
+            "pedro",
+            "hernández",
+            "ramírez",
+            "salamanca",
+            "cervantes",
+            "quevedo",
+            "borges",
+            "mendoza",
         }
-        false_positives = [
-            s for s in spelling
-            if getattr(s, "word", "").lower() in known_names
-        ]
+        false_positives = [s for s in spelling if getattr(s, "word", "").lower() in known_names]
         assert len(false_positives) == 0, (
             f"Falsos positivos en ortografía para nombres propios: "
             f"{[getattr(s, 'word', s) for s in false_positives]}"
@@ -1017,7 +1061,8 @@ class TestFiccionE2E:
 
         # Check that hair_color is NOT assigned to "alta", "Dos semanas", etc.
         bad_assignments = [
-            a for a in report.attributes
+            a
+            for a in report.attributes
             if a.entity_name.lower() in ("alta", "dos semanas", "primero envenenada")
         ]
         if bad_assignments:
@@ -1037,10 +1082,14 @@ class TestFiccionE2E:
             pytest.skip("No se detectaron dialogos")
 
         with_speaker = [
-            d for d in dialogues
+            d
+            for d in dialogues
             if (d.get("speaker") if isinstance(d, dict) else getattr(d, "speaker", None))
-            or (d.get("resolved_speaker") if isinstance(d, dict)
-                else getattr(d, "resolved_speaker", None))
+            or (
+                d.get("resolved_speaker")
+                if isinstance(d, dict)
+                else getattr(d, "resolved_speaker", None)
+            )
         ]
         if len(with_speaker) == 0 and len(dialogues) > 5:
             pytest.xfail(
@@ -1052,6 +1101,7 @@ class TestFiccionE2E:
 # =============================================================================
 # TESTS E2E: MANUSCRITO NO-FICCIÓN
 # =============================================================================
+
 
 @pytest.mark.slow
 class TestNoFiccionE2E:
@@ -1084,10 +1134,7 @@ class TestNoFiccionE2E:
 
         expected = ["cortés", "cortes", "colón", "colon", "moctezuma", "lindt", "nestlé", "nestle"]
         found = sum(1 for e in expected if any(e in n for n in names_lower))
-        assert found >= 2, (
-            f"Solo {found} figuras históricas encontradas. "
-            f"Entidades: {names}"
-        )
+        assert found >= 2, f"Solo {found} figuras históricas encontradas. Entidades: {names}"
 
     def test_detect_locations(self, noficcion_result):
         """Debe detectar países y ciudades mencionados."""
@@ -1098,10 +1145,7 @@ class TestNoFiccionE2E:
 
         expected_locs = ["méxico", "mexico", "españa", "barcelona", "suiza", "ghana"]
         found = sum(1 for loc in expected_locs if any(loc in n for n in names_lower))
-        assert found >= 2, (
-            f"Solo {found} ubicaciones encontradas. "
-            f"Entidades: {names}"
-        )
+        assert found >= 2, f"Solo {found} ubicaciones encontradas. Entidades: {names}"
 
     def test_detect_temporal_inconsistency(self, noficcion_result):
         """INCONSISTENCIA PLANTADA: Cortes llego en 1521 vs 1519."""
@@ -1109,13 +1153,16 @@ class TestNoFiccionE2E:
         report = result.value
 
         consistency_alerts = [
-            a for a in report.alerts
+            a
+            for a in report.alerts
             if "consistency" in getattr(a, "category", object()).value
             or "temporal" in str(getattr(a, "alert_type", "")).lower()
         ]
         temporal_alert = any(
-            "1521" in str(a) or "1519" in str(a)
-            or "cortés" in str(a).lower() or "cortes" in str(a).lower()
+            "1521" in str(a)
+            or "1519" in str(a)
+            or "cortés" in str(a).lower()
+            or "cortes" in str(a).lower()
             for a in consistency_alerts
         )
         if not temporal_alert:
@@ -1129,6 +1176,7 @@ class TestNoFiccionE2E:
 # =============================================================================
 # TESTS E2E: MANUSCRITO COMPLEJO (POLICIACO)
 # =============================================================================
+
 
 @pytest.mark.slow
 class TestComplejoE2E:
@@ -1155,9 +1203,7 @@ class TestComplejoE2E:
 
         torres = any("torres" in n for n in names_lower)
         elena = any("elena" in n or "vidal" in n for n in names_lower)
-        assert torres or elena, (
-            f"Ni Torres ni Elena encontrados. Entidades: {names}"
-        )
+        assert torres or elena, f"Ni Torres ni Elena encontrados. Entidades: {names}"
 
     def test_detect_victim(self, complejo_result):
         """Debe detectar a Isabel Navarro como personaje."""
@@ -1180,10 +1226,7 @@ class TestComplejoE2E:
         found = sum(1 for o in orgs if any(o in n for n in names_lower))
         # Al menos una debería detectarse
         if found == 0:
-            pytest.xfail(
-                f"Ninguna organización detectada de {orgs}. "
-                f"Entidades: {names}"
-            )
+            pytest.xfail(f"Ninguna organización detectada de {orgs}. Entidades: {names}")
 
     def test_age_inconsistency_detected(self, complejo_result):
         """INCONSISTENCIA PLANTADA: edad de Isabel 40->35->38."""
@@ -1191,8 +1234,7 @@ class TestComplejoE2E:
         report = result.value
 
         consistency_alerts = [
-            a for a in report.alerts
-            if "consistency" in getattr(a, "category", object()).value
+            a for a in report.alerts if "consistency" in getattr(a, "category", object()).value
         ]
         age_alert = False
         for a in consistency_alerts:
@@ -1217,12 +1259,10 @@ class TestComplejoE2E:
         report = result.value
 
         consistency_alerts = [
-            a for a in report.alerts
-            if "consistency" in getattr(a, "category", object()).value
+            a for a in report.alerts if "consistency" in getattr(a, "category", object()).value
         ]
         children_alert = any(
-            "hijo" in str(a).lower() or "hijos" in str(a).lower()
-            for a in consistency_alerts
+            "hijo" in str(a).lower() or "hijos" in str(a).lower() for a in consistency_alerts
         )
         if not children_alert:
             pytest.xfail(
@@ -1237,8 +1277,7 @@ class TestComplejoE2E:
         report = result.value
 
         consistency_alerts = [
-            a for a in report.alerts
-            if "consistency" in getattr(a, "category", object()).value
+            a for a in report.alerts if "consistency" in getattr(a, "category", object()).value
         ]
         loc_alert = False
         for a in consistency_alerts:
@@ -1268,21 +1307,24 @@ class TestComplejoE2E:
 
         # Verificar que al menos algunos tienen speaker
         with_speaker = [
-            d for d in dialogues
+            d
+            for d in dialogues
             if (d.get("speaker") if isinstance(d, dict) else getattr(d, "speaker", None))
-            or (d.get("resolved_speaker") if isinstance(d, dict)
-                else getattr(d, "resolved_speaker", None))
+            or (
+                d.get("resolved_speaker")
+                if isinstance(d, dict)
+                else getattr(d, "resolved_speaker", None)
+            )
         ]
         # No es obligatorio que todos tengan speaker, pero al menos algunos
         if len(with_speaker) == 0 and len(dialogues) > 5:
-            pytest.xfail(
-                f"{len(dialogues)} diálogos detectados pero ninguno con speaker atribuido"
-            )
+            pytest.xfail(f"{len(dialogues)} diálogos detectados pero ninguno con speaker atribuido")
 
 
 # =============================================================================
 # TEST: MÉTRICAS Y RESUMEN
 # =============================================================================
+
 
 @pytest.mark.slow
 class TestMetricsReport:
@@ -1387,8 +1429,7 @@ class TestMetricsReport:
 
         # Al menos 50% de cobertura general
         assert total_coverage >= 30, (
-            f"Cobertura de entidades demasiado baja: {total_coverage:.0f}%. "
-            f"Se espera al menos 30%."
+            f"Cobertura de entidades demasiado baja: {total_coverage:.0f}%. Se espera al menos 30%."
         )
 
     def test_inconsistency_detection_rate(self, all_results):

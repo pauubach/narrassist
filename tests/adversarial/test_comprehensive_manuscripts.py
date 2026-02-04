@@ -20,6 +20,7 @@ Categorías de errores plantados:
 11. INTRODUCCIÓN INCORRECTA: elementos no presentados
 12. CHEKHOV: armas sin disparar / deus ex machina
 """
+
 import sys
 import textwrap
 from pathlib import Path
@@ -1076,9 +1077,11 @@ ERRORES_GRAMATICA = {
 # TEST HELPERS
 # =============================================================================
 
+
 def run_pipeline_on_text(text, filename="test_manuscript.txt", extra_config=None):
     """Ejecuta el pipeline completo sobre un texto y devuelve resultado."""
     import tempfile
+
     from narrative_assistant.pipelines.unified_analysis import (
         UnifiedAnalysisPipeline,
         UnifiedConfig,
@@ -1107,9 +1110,7 @@ def run_pipeline_on_text(text, filename="test_manuscript.txt", extra_config=None
     config = UnifiedConfig(**config_args)
     pipeline = UnifiedAnalysisPipeline(config=config)
 
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".txt", delete=False, encoding="utf-8"
-    ) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False, encoding="utf-8") as f:
         f.write(text)
         temp_path = f.name
 
@@ -1121,6 +1122,7 @@ def run_pipeline_on_text(text, filename="test_manuscript.txt", extra_config=None
             return None, result.error
     finally:
         import os
+
         os.unlink(temp_path)
 
 
@@ -1129,8 +1131,10 @@ def get_consistency_alerts(report):
     if not report or not hasattr(report, "alerts"):
         return []
     return [
-        a for a in report.alerts
-        if hasattr(a, "category") and hasattr(a.category, "value")
+        a
+        for a in report.alerts
+        if hasattr(a, "category")
+        and hasattr(a.category, "value")
         and "consistency" in a.category.value
     ]
 
@@ -1140,8 +1144,10 @@ def get_spelling_alerts(report):
     if not report or not hasattr(report, "alerts"):
         return []
     return [
-        a for a in report.alerts
-        if hasattr(a, "category") and hasattr(a.category, "value")
+        a
+        for a in report.alerts
+        if hasattr(a, "category")
+        and hasattr(a.category, "value")
         and "spelling" in a.category.value
     ]
 
@@ -1151,8 +1157,10 @@ def get_repetition_alerts(report):
     if not report or not hasattr(report, "alerts"):
         return []
     return [
-        a for a in report.alerts
-        if hasattr(a, "category") and hasattr(a.category, "value")
+        a
+        for a in report.alerts
+        if hasattr(a, "category")
+        and hasattr(a.category, "value")
         and "repetition" in a.category.value
     ]
 
@@ -1162,15 +1170,16 @@ def get_grammar_alerts(report):
     if not report or not hasattr(report, "alerts"):
         return []
     return [
-        a for a in report.alerts
-        if hasattr(a, "category") and hasattr(a.category, "value")
-        and "grammar" in a.category.value
+        a
+        for a in report.alerts
+        if hasattr(a, "category") and hasattr(a.category, "value") and "grammar" in a.category.value
     ]
 
 
 # =============================================================================
 # TEST: MANUSCRITO MISTERIO
 # =============================================================================
+
 
 class TestMisterioE2E:
     """Tests para la novela de misterio."""
@@ -1189,35 +1198,32 @@ class TestMisterioE2E:
         """Detecta a Elena Ríos como personaje principal."""
         entities = pipeline_result.entities
         names = [e.canonical_name.lower() for e in entities]
-        assert any("elena" in n for n in names), \
-            f"Elena no detectada en: {names}"
+        assert any("elena" in n for n in names), f"Elena no detectada en: {names}"
 
     def test_detect_daniel(self, pipeline_result):
         """Detecta a Daniel Vega."""
         entities = pipeline_result.entities
         names = [e.canonical_name.lower() for e in entities]
-        assert any("daniel" in n for n in names), \
-            f"Daniel no detectado en: {names}"
+        assert any("daniel" in n for n in names), f"Daniel no detectado en: {names}"
 
     def test_detect_ferran(self, pipeline_result):
         """Detecta a Gonzalo Ferrán."""
         entities = pipeline_result.entities
         names = [e.canonical_name.lower() for e in entities]
-        assert any("ferrán" in n or "ferran" in n or "gonzalo" in n for n in names), \
+        assert any("ferrán" in n or "ferran" in n or "gonzalo" in n for n in names), (
             f"Ferrán no detectado en: {names}"
+        )
 
     def test_detect_chapters(self, pipeline_result):
         """Detecta los 5 capítulos."""
         chapters = pipeline_result.chapters
-        assert len(chapters) >= 4, \
-            f"Esperados >=4 capítulos, detectados {len(chapters)}"
+        assert len(chapters) >= 4, f"Esperados >=4 capítulos, detectados {len(chapters)}"
 
     def test_detect_pelo_elena_inconsistency(self, pipeline_result):
         """Detecta que Elena cambia de castaño a rubio."""
         alerts = get_consistency_alerts(pipeline_result)
         alert_texts = " ".join(
-            str(getattr(a, "description", "")) + " " +
-            str(getattr(a, "details", ""))
+            str(getattr(a, "description", "")) + " " + str(getattr(a, "details", ""))
             for a in alerts
         ).lower()
 
@@ -1232,12 +1238,11 @@ class TestMisterioE2E:
         """Detecta que Elena tiene perro en cap.1 y gato en cap.3."""
         alerts = get_consistency_alerts(pipeline_result)
         alert_texts = " ".join(
-            str(getattr(a, "description", "")) + " " +
-            str(getattr(a, "details", ""))
+            str(getattr(a, "description", "")) + " " + str(getattr(a, "details", ""))
             for a in alerts
         ).lower()
 
-        found = ("perro" in alert_texts or "gato" in alert_texts or "kafka" in alert_texts)
+        found = "perro" in alert_texts or "gato" in alert_texts or "kafka" in alert_texts
         if not found:
             pytest.xfail(
                 "No se detecta cambio de mascota Elena (perro Kafka -> gato). "
@@ -1248,8 +1253,7 @@ class TestMisterioE2E:
         """Detecta cambio de dirección de Elena (Alcalá -> Serrano)."""
         alerts = get_consistency_alerts(pipeline_result)
         alert_texts = " ".join(
-            str(getattr(a, "description", "")) + " " +
-            str(getattr(a, "details", ""))
+            str(getattr(a, "description", "")) + " " + str(getattr(a, "details", ""))
             for a in alerts
         ).lower()
 
@@ -1262,27 +1266,25 @@ class TestMisterioE2E:
 
     def test_detect_dialogues(self, pipeline_result):
         """Detecta diálogos correctamente."""
-        assert len(pipeline_result.dialogues) >= 15, \
+        assert len(pipeline_result.dialogues) >= 15, (
             f"Esperados >=15 diálogos, detectados {len(pipeline_result.dialogues)}"
+        )
 
     def test_raya_tipografia(self, pipeline_result):
         """Detecta uso incorrecto de guión en vez de raya en diálogos."""
         # El cap.2 usa - en vez de — en un diálogo
         alerts = pipeline_result.alerts
-        alert_texts = " ".join(
-            str(getattr(a, "description", "")) for a in alerts
-        ).lower()
+        alert_texts = " ".join(str(getattr(a, "description", "")) for a in alerts).lower()
 
         found = "guión" in alert_texts or "raya" in alert_texts or "tipograf" in alert_texts
         if not found:
-            pytest.xfail(
-                "No se detecta uso de guión (-) en vez de raya (—) en diálogo cap.2"
-            )
+            pytest.xfail("No se detecta uso de guión (-) en vez de raya (—) en diálogo cap.2")
 
 
 # =============================================================================
 # TEST: MANUSCRITO ROMANCE (estilo y ritmo)
 # =============================================================================
+
 
 class TestRomanceE2E:
     """Tests para novela romántica con errores de estilo."""
@@ -1299,21 +1301,18 @@ class TestRomanceE2E:
     def test_detect_lucia(self, pipeline_result):
         entities = pipeline_result.entities
         names = [e.canonical_name.lower() for e in entities]
-        assert any("lucía" in n or "lucia" in n for n in names), \
-            f"Lucía no detectada en: {names}"
+        assert any("lucía" in n or "lucia" in n for n in names), f"Lucía no detectada en: {names}"
 
     def test_detect_gabriel(self, pipeline_result):
         entities = pipeline_result.entities
         names = [e.canonical_name.lower() for e in entities]
-        assert any("gabriel" in n for n in names), \
-            f"Gabriel no detectado en: {names}"
+        assert any("gabriel" in n for n in names), f"Gabriel no detectado en: {names}"
 
     def test_detect_ojos_lucia_inconsistency(self, pipeline_result):
         """Detecta que Lucía cambia ojos marrones a azules."""
         alerts = get_consistency_alerts(pipeline_result)
         alert_texts = " ".join(
-            str(getattr(a, "description", "")) + " " +
-            str(getattr(a, "details", ""))
+            str(getattr(a, "description", "")) + " " + str(getattr(a, "details", ""))
             for a in alerts
         ).lower()
 
@@ -1330,8 +1329,7 @@ class TestRomanceE2E:
 
         # Buscar en cualquier alerta de repetición la palabra 'pueblo'
         alert_texts = " ".join(
-            str(getattr(a, "description", "")) + " " +
-            str(getattr(a, "details", ""))
+            str(getattr(a, "description", "")) + " " + str(getattr(a, "details", ""))
             for a in rep_alerts
         ).lower()
 
@@ -1346,28 +1344,29 @@ class TestRomanceE2E:
         """Detecta que 'veintiseis' debería ser 'veintiséis'."""
         spelling = get_spelling_alerts(pipeline_result)
         alert_texts = " ".join(
-            str(getattr(a, "description", "")) + " " +
-            str(getattr(a, "details", "")) + " " +
-            str(getattr(a, "word", getattr(a, "extra_data", "")))
+            str(getattr(a, "description", ""))
+            + " "
+            + str(getattr(a, "details", ""))
+            + " "
+            + str(getattr(a, "word", getattr(a, "extra_data", "")))
             for a in spelling
         ).lower()
 
         found = "veintiseis" in alert_texts or "veintiséis" in alert_texts
         if not found:
             pytest.xfail(
-                f"No se detecta error ortográfico 'veintiseis'. "
-                f"Spelling alerts: {len(spelling)}"
+                f"No se detecta error ortográfico 'veintiseis'. Spelling alerts: {len(spelling)}"
             )
 
     def test_detect_chapters(self, pipeline_result):
         chapters = pipeline_result.chapters
-        assert len(chapters) >= 3, \
-            f"Esperados >=3 capítulos, detectados {len(chapters)}"
+        assert len(chapters) >= 3, f"Esperados >=3 capítulos, detectados {len(chapters)}"
 
 
 # =============================================================================
 # TEST: MANUSCRITO HISTÓRICO (anacronismos, desplazamientos)
 # =============================================================================
+
 
 class TestHistoricoE2E:
     """Tests para novela histórica con errores factuales."""
@@ -1384,21 +1383,22 @@ class TestHistoricoE2E:
     def test_detect_fray_tomas(self, pipeline_result):
         entities = pipeline_result.entities
         names = [e.canonical_name.lower() for e in entities]
-        assert any("tomás" in n or "tomas" in n or "fray" in n for n in names), \
+        assert any("tomás" in n or "tomas" in n or "fray" in n for n in names), (
             f"Fray Tomás no detectado en: {names}"
+        )
 
     def test_detect_colon(self, pipeline_result):
         entities = pipeline_result.entities
         names = [e.canonical_name.lower() for e in entities]
-        assert any("colón" in n or "colon" in n or "cristóbal" in n for n in names), \
+        assert any("colón" in n or "colon" in n or "cristóbal" in n for n in names), (
             f"Colón no detectado en: {names}"
+        )
 
     def test_detect_barba_inconsistency(self, pipeline_result):
         """Detecta que Fray Tomás cambia barba gris a negra."""
         alerts = get_consistency_alerts(pipeline_result)
         alert_texts = " ".join(
-            str(getattr(a, "description", "")) + " " +
-            str(getattr(a, "details", ""))
+            str(getattr(a, "description", "")) + " " + str(getattr(a, "details", ""))
             for a in alerts
         ).lower()
 
@@ -1411,17 +1411,18 @@ class TestHistoricoE2E:
 
     def test_detect_chapters(self, pipeline_result):
         chapters = pipeline_result.chapters
-        assert len(chapters) >= 2, \
-            f"Esperados >=2 capítulos, detectados {len(chapters)}"
+        assert len(chapters) >= 2, f"Esperados >=2 capítulos, detectados {len(chapters)}"
 
     def test_detect_dialogues(self, pipeline_result):
-        assert len(pipeline_result.dialogues) >= 10, \
+        assert len(pipeline_result.dialogues) >= 10, (
             f"Esperados >=10 diálogos, detectados {len(pipeline_result.dialogues)}"
+        )
 
 
 # =============================================================================
 # TEST: MANUSCRITO SCI-FI (worldbuilding, deus ex machina)
 # =============================================================================
+
 
 class TestSciFiE2E:
     """Tests para novela sci-fi con errores de worldbuilding."""
@@ -1438,25 +1439,24 @@ class TestSciFiE2E:
     def test_detect_vera(self, pipeline_result):
         entities = pipeline_result.entities
         names = [e.canonical_name.lower() for e in entities]
-        assert any("vera" in n for n in names), \
-            f"Vera no detectada en: {names}"
+        assert any("vera" in n for n in names), f"Vera no detectada en: {names}"
 
     def test_detect_dr_li(self, pipeline_result):
         entities = pipeline_result.entities
         names = [e.canonical_name.lower() for e in entities]
-        assert any("li" in n for n in names), \
-            f"Dr. Li no detectado en: {names}"
+        assert any("li" in n for n in names), f"Dr. Li no detectado en: {names}"
 
     def test_detect_pelo_vera_inconsistency(self, pipeline_result):
         """Detecta que Vera cambia de pelo corto negro a largo rizado."""
         alerts = get_consistency_alerts(pipeline_result)
         alert_texts = " ".join(
-            str(getattr(a, "description", "")) + " " +
-            str(getattr(a, "details", ""))
+            str(getattr(a, "description", "")) + " " + str(getattr(a, "details", ""))
             for a in alerts
         ).lower()
 
-        found = "vera" in alert_texts and ("corto" in alert_texts or "largo" in alert_texts or "rizado" in alert_texts)
+        found = "vera" in alert_texts and (
+            "corto" in alert_texts or "largo" in alert_texts or "rizado" in alert_texts
+        )
         if not found:
             pytest.xfail(
                 f"No se detecta cambio pelo Vera (corto negro->largo rizado). "
@@ -1465,13 +1465,13 @@ class TestSciFiE2E:
 
     def test_detect_chapters(self, pipeline_result):
         chapters = pipeline_result.chapters
-        assert len(chapters) >= 2, \
-            f"Esperados >=2 capítulos, detectados {len(chapters)}"
+        assert len(chapters) >= 2, f"Esperados >=2 capítulos, detectados {len(chapters)}"
 
 
 # =============================================================================
 # TEST: MANUSCRITO GRAMÁTICA (concordancia, dequeísmo)
 # =============================================================================
+
 
 class TestGramaticaE2E:
     """Tests para novela con errores gramaticales plantados."""
@@ -1479,8 +1479,7 @@ class TestGramaticaE2E:
     @pytest.fixture(scope="class")
     def pipeline_result(self):
         report, error = run_pipeline_on_text(
-            MANUSCRITO_GRAMATICA, "gramatica.txt",
-            extra_config={"run_grammar": True}
+            MANUSCRITO_GRAMATICA, "gramatica.txt", extra_config={"run_grammar": True}
         )
         assert report is not None, f"Pipeline failed: {error}"
         return report
@@ -1491,14 +1490,12 @@ class TestGramaticaE2E:
     def test_detect_comisario(self, pipeline_result):
         entities = pipeline_result.entities
         names = [e.canonical_name.lower() for e in entities]
-        assert any("ruiz" in n for n in names), \
-            f"Comisario Ruiz no detectado en: {names}"
+        assert any("ruiz" in n for n in names), f"Comisario Ruiz no detectado en: {names}"
 
     def test_detect_campos(self, pipeline_result):
         entities = pipeline_result.entities
         names = [e.canonical_name.lower() for e in entities]
-        assert any("campos" in n for n in names), \
-            f"Inspectora Campos no detectada en: {names}"
+        assert any("campos" in n for n in names), f"Inspectora Campos no detectada en: {names}"
 
     def test_detect_concordancia_clara(self, pipeline_result):
         """Detecta 'las noticias eran clara' (falta concordancia)."""
@@ -1507,9 +1504,11 @@ class TestGramaticaE2E:
         all_alerts = grammar + spelling
 
         alert_texts = " ".join(
-            str(getattr(a, "description", "")) + " " +
-            str(getattr(a, "details", "")) + " " +
-            str(getattr(a, "word", ""))
+            str(getattr(a, "description", ""))
+            + " "
+            + str(getattr(a, "details", ""))
+            + " "
+            + str(getattr(a, "word", ""))
             for a in all_alerts
         ).lower()
 
@@ -1525,27 +1524,23 @@ class TestGramaticaE2E:
         grammar = get_grammar_alerts(pipeline_result)
 
         alert_texts = " ".join(
-            str(getattr(a, "description", "")) + " " +
-            str(getattr(a, "details", ""))
+            str(getattr(a, "description", "")) + " " + str(getattr(a, "details", ""))
             for a in grammar
         ).lower()
 
         found = "deque" in alert_texts or "pienso de que" in alert_texts
         if not found:
-            pytest.xfail(
-                f"No se detecta dequeísmo 'pienso de que'. "
-                f"Grammar alerts: {len(grammar)}"
-            )
+            pytest.xfail(f"No se detecta dequeísmo 'pienso de que'. Grammar alerts: {len(grammar)}")
 
     def test_detect_chapters(self, pipeline_result):
         chapters = pipeline_result.chapters
-        assert len(chapters) >= 2, \
-            f"Esperados >=2 capítulos, detectados {len(chapters)}"
+        assert len(chapters) >= 2, f"Esperados >=2 capítulos, detectados {len(chapters)}"
 
 
 # =============================================================================
 # RESUMEN DE COBERTURA
 # =============================================================================
+
 
 class TestCoverageSummary:
     """Resumen de cobertura de detección de errores."""
@@ -1619,7 +1614,7 @@ class TestCoverageSummary:
             for err_id, err in gt.items():
                 total_categories.add(err["tipo"])
 
-        lines.append(f"\n--- TOTALES ---")
+        lines.append("\n--- TOTALES ---")
         lines.append(f"  Total errores plantados: {total_planted}")
         lines.append(f"  Categorias de error: {len(total_categories)}")
         lines.append(f"  Tipos: {sorted(total_categories)}")

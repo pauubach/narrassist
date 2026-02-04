@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Modulo de evaluacion de precision para capacidades NLP.
 

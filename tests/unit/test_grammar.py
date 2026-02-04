@@ -13,31 +13,37 @@ class TestGrammarImports:
     def test_import_grammar_module(self):
         """Verifica importación del módulo."""
         from narrative_assistant.nlp import grammar
+
         assert grammar is not None
 
     def test_import_grammar_checker(self):
         """Verifica importación de GrammarChecker."""
         from narrative_assistant.nlp.grammar import GrammarChecker
+
         assert GrammarChecker is not None
 
     def test_import_get_grammar_checker(self):
         """Verifica importación de get_grammar_checker."""
         from narrative_assistant.nlp.grammar import get_grammar_checker
+
         assert callable(get_grammar_checker)
 
     def test_import_grammar_issue(self):
         """Verifica importación de GrammarIssue."""
         from narrative_assistant.nlp.grammar import GrammarIssue
+
         assert GrammarIssue is not None
 
     def test_import_grammar_report(self):
         """Verifica importación de GrammarReport."""
         from narrative_assistant.nlp.grammar import GrammarReport
+
         assert GrammarReport is not None
 
     def test_import_enums(self):
         """Verifica importación de enums."""
         from narrative_assistant.nlp.grammar import GrammarErrorType, GrammarSeverity
+
         assert GrammarErrorType is not None
         assert GrammarSeverity is not None
 
@@ -85,8 +91,8 @@ class TestGrammarIssue:
     def test_create_issue(self):
         """Crea un issue gramatical."""
         from narrative_assistant.nlp.grammar import (
-            GrammarIssue,
             GrammarErrorType,
+            GrammarIssue,
             GrammarSeverity,
         )
 
@@ -124,9 +130,9 @@ class TestGrammarReport:
     def test_report_with_issues(self):
         """Crea reporte con issues."""
         from narrative_assistant.nlp.grammar import (
-            GrammarReport,
-            GrammarIssue,
             GrammarErrorType,
+            GrammarIssue,
+            GrammarReport,
             GrammarSeverity,
         )
 
@@ -193,15 +199,19 @@ class TestDequeismoDetection:
     def checker(self):
         """Checker para tests."""
         from narrative_assistant.nlp.grammar import get_grammar_checker, reset_grammar_checker
+
         reset_grammar_checker()
         return get_grammar_checker()
 
-    @pytest.mark.parametrize("text", [
-        "Pienso de que vendrá mañana.",
-        "Creo de que es verdad.",
-        "Me parece de que tienes razón.",
-        "Opino de que deberíamos ir.",
-    ])
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "Pienso de que vendrá mañana.",
+            "Creo de que es verdad.",
+            "Me parece de que tienes razón.",
+            "Opino de que deberíamos ir.",
+        ],
+    )
     def test_dequeismo_patterns(self, checker, text):
         """Verifica detección de dequeísmo."""
         result = checker.check(text)
@@ -209,9 +219,9 @@ class TestDequeismoDetection:
 
         # Buscar issues de dequeísmo
         from narrative_assistant.nlp.grammar import GrammarErrorType
+
         dequeismo_issues = [
-            i for i in result.value.issues
-            if i.error_type == GrammarErrorType.DEQUEISMO
+            i for i in result.value.issues if i.error_type == GrammarErrorType.DEQUEISMO
         ]
         # La detección depende de la implementación
 
@@ -223,14 +233,18 @@ class TestQueismoDetection:
     def checker(self):
         """Checker para tests."""
         from narrative_assistant.nlp.grammar import get_grammar_checker, reset_grammar_checker
+
         reset_grammar_checker()
         return get_grammar_checker()
 
-    @pytest.mark.parametrize("text", [
-        "Me acuerdo que fuimos al cine.",
-        "Me alegro que estés bien.",
-        "Estoy seguro que vendrá.",
-    ])
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "Me acuerdo que fuimos al cine.",
+            "Me alegro que estés bien.",
+            "Estoy seguro que vendrá.",
+        ],
+    )
     def test_queismo_patterns(self, checker, text):
         """Verifica detección de queísmo."""
         result = checker.check(text)
@@ -244,14 +258,18 @@ class TestLaismoDetection:
     def checker(self):
         """Checker para tests."""
         from narrative_assistant.nlp.grammar import get_grammar_checker, reset_grammar_checker
+
         reset_grammar_checker()
         return get_grammar_checker()
 
-    @pytest.mark.parametrize("text", [
-        "La dije que viniera.",
-        "La regalé flores.",
-        "La conté la historia.",
-    ])
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "La dije que viniera.",
+            "La regalé flores.",
+            "La conté la historia.",
+        ],
+    )
     def test_laismo_patterns(self, checker, text):
         """Verifica detección de laísmo."""
         result = checker.check(text)
@@ -265,14 +283,18 @@ class TestGenderAgreement:
     def checker(self):
         """Checker para tests."""
         from narrative_assistant.nlp.grammar import get_grammar_checker, reset_grammar_checker
+
         reset_grammar_checker()
         return get_grammar_checker()
 
-    @pytest.mark.parametrize("text", [
-        "La casa blanco.",
-        "El mesa grande.",
-        "Una libro interesante.",
-    ])
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "La casa blanco.",
+            "El mesa grande.",
+            "Una libro interesante.",
+        ],
+    )
     def test_gender_disagreement(self, checker, text):
         """Verifica detección de discordancia de género."""
         result = checker.check(text)
@@ -286,15 +308,19 @@ class TestRedundancy:
     def checker(self):
         """Checker para tests."""
         from narrative_assistant.nlp.grammar import get_grammar_checker, reset_grammar_checker
+
         reset_grammar_checker()
         return get_grammar_checker()
 
-    @pytest.mark.parametrize("text,redundancy", [
-        ("Subir arriba", "subir arriba"),
-        ("Bajar abajo", "bajar abajo"),
-        ("Salir afuera", "salir afuera"),
-        ("Entrar adentro", "entrar adentro"),
-    ])
+    @pytest.mark.parametrize(
+        "text,redundancy",
+        [
+            ("Subir arriba", "subir arriba"),
+            ("Bajar abajo", "bajar abajo"),
+            ("Salir afuera", "salir afuera"),
+            ("Entrar adentro", "entrar adentro"),
+        ],
+    )
     def test_redundancy_patterns(self, checker, text, redundancy):
         """Verifica detección de redundancias."""
         result = checker.check(text)

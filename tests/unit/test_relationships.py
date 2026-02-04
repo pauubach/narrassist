@@ -4,32 +4,32 @@ Tests para el módulo de relaciones entre entidades.
 
 import pytest
 
-from narrative_assistant.relationships.models import (
-    RelationType,
-    RelationCategory,
-    RelationValence,
-    RelationshipType,
-    EntityRelationship,
-    RelationshipChange,
-    RelationshipEvidence,
-    TextReference,
-    InferredExpectations,
-    CoherenceAlert,
-    RELATION_TYPE_VALENCE,
-    INVERSE_RELATIONS,
-    SYMMETRIC_RELATIONS,
+from narrative_assistant.relationships.analyzer import (
+    EXPECTED_TONES,
+    EntityInteraction,
+    InteractionCoherenceChecker,
+    InteractionTone,
+    RelationshipAnalyzer,
 )
 from narrative_assistant.relationships.detector import (
-    RelationshipDetector,
     DetectedRelation,
+    RelationshipDetector,
     detect_relationships_from_text,
 )
-from narrative_assistant.relationships.analyzer import (
-    InteractionCoherenceChecker,
-    RelationshipAnalyzer,
-    InteractionTone,
-    EntityInteraction,
-    EXPECTED_TONES,
+from narrative_assistant.relationships.models import (
+    INVERSE_RELATIONS,
+    RELATION_TYPE_VALENCE,
+    SYMMETRIC_RELATIONS,
+    CoherenceAlert,
+    EntityRelationship,
+    InferredExpectations,
+    RelationCategory,
+    RelationshipChange,
+    RelationshipEvidence,
+    RelationshipType,
+    RelationType,
+    RelationValence,
+    TextReference,
 )
 
 

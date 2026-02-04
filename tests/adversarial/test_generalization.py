@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Tests de generalizacion linguistica.
 
@@ -28,9 +27,11 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 # Helpers
 # ============================================================================
 
+
 def extract_ner_entities(text: str) -> list[tuple[str, str]]:
     """Extrae entidades (texto, label) del texto."""
     from narrative_assistant.nlp.ner import NERExtractor
+
     extractor = NERExtractor()
     result = extractor.extract_entities(text)
     if result.is_failure:
@@ -47,6 +48,7 @@ def get_per_names(text: str) -> set[str]:
 def extract_attributes(text: str) -> list[tuple[str, str, str]]:
     """Extrae atributos (entity, key, value) del texto."""
     from narrative_assistant.nlp.attributes import AttributeExtractor, reset_attribute_extractor
+
     reset_attribute_extractor()
     extractor = AttributeExtractor(
         use_llm=False,
@@ -56,16 +58,16 @@ def extract_attributes(text: str) -> list[tuple[str, str, str]]:
         min_confidence=0.3,
     )
     result = extractor.extract_attributes(text)
-    if hasattr(result, 'is_failure') and result.is_failure:
+    if hasattr(result, "is_failure") and result.is_failure:
         return []
-    extraction = result.value if hasattr(result, 'value') else result
+    extraction = result.value if hasattr(result, "value") else result
     if not extraction:
         return []
     attrs = []
     for a in extraction.attributes:
-        entity = a.entity_name.lower() if hasattr(a, 'entity_name') else ""
-        key = a.key.value if hasattr(a.key, 'value') else str(a.key)
-        value = a.value.lower() if hasattr(a, 'value') else ""
+        entity = a.entity_name.lower() if hasattr(a, "entity_name") else ""
+        key = a.key.value if hasattr(a.key, "value") else str(a.key)
+        value = a.value.lower() if hasattr(a, "value") else ""
         attrs.append((entity, key, value))
     return attrs
 
@@ -73,6 +75,7 @@ def extract_attributes(text: str) -> list[tuple[str, str, str]]:
 def check_spelling(text: str) -> set[str]:
     """Ejecuta el corrector ortografico y devuelve las palabras detectadas."""
     from narrative_assistant.nlp.orthography import get_voting_spelling_checker
+
     checker = get_voting_spelling_checker(
         use_pyspellchecker=True,
         use_hunspell=True,
@@ -81,9 +84,9 @@ def check_spelling(text: str) -> set[str]:
         use_llm_arbitration=False,
     )
     result = checker.check(text)
-    if hasattr(result, 'is_failure') and result.is_failure:
+    if hasattr(result, "is_failure") and result.is_failure:
         return set()
-    report = result.value if hasattr(result, 'value') else result
+    report = result.value if hasattr(result, "value") else result
     if not report:
         return set()
     return {issue.word.lower() for issue in report.issues}
@@ -92,6 +95,7 @@ def check_spelling(text: str) -> set[str]:
 # ============================================================================
 # 1. NER: Generalizacion de deteccion de entidades
 # ============================================================================
+
 
 class TestNERGeneralization:
     """
@@ -104,7 +108,9 @@ class TestNERGeneralization:
         """Nombres en vocativo (directamente interpelados) — estructura poco frecuente."""
         text = "¡Valentín, ven aquí! Necesito hablar contigo, Marisol."
         names = get_per_names(text)
-        assert "valentín" in names or "valentin" in names, f"No detectó 'Valentín' en vocativo. Detectados: {names}"
+        assert "valentín" in names or "valentin" in names, (
+            f"No detectó 'Valentín' en vocativo. Detectados: {names}"
+        )
         assert "marisol" in names, f"No detectó 'Marisol' en vocativo. Detectados: {names}"
 
     def test_names_in_enumeration(self):
@@ -167,14 +173,16 @@ class TestNERGeneralization:
         """Nombres extranjeros dentro de narrativa en español."""
         text = "Elizabeth llegó a la fiesta con Mohammed. Le presentaron a Yuki Tanaka."
         names = get_per_names(text)
-        found = sum(1 for n in ["elizabeth", "mohammed", "yuki", "tanaka"]
-                     if any(n in x for x in names))
+        found = sum(
+            1 for n in ["elizabeth", "mohammed", "yuki", "tanaka"] if any(n in x for x in names)
+        )
         assert found >= 2, f"Solo detectó {found}/3 nombres extranjeros: {names}"
 
 
 # ============================================================================
 # 2. Ortografia: Generalizacion a errores no vistos
 # ============================================================================
+
 
 class TestOrthographyGeneralization:
     """
@@ -241,6 +249,7 @@ class TestOrthographyGeneralization:
 # 3. Atributos: Generalizacion de extraccion
 # ============================================================================
 
+
 class TestAttributeGeneralization:
     """
     Verifica que la extraccion de atributos generaliza a estructuras
@@ -269,10 +278,7 @@ class TestAttributeGeneralization:
         attrs = extract_attributes(text)
         andres_attrs = [(e, k, v) for e, k, v in attrs if "andres" in e or "andres" in e]
         # Puede que no detecte la aposición, pero no debería asignar a otro personaje
-        wrong_entity = [
-            (e, k, v) for e, k, v in attrs
-            if "corpulento" in v and "andres" not in e
-        ]
+        wrong_entity = [(e, k, v) for e, k, v in attrs if "corpulento" in v and "andres" not in e]
         assert len(wrong_entity) == 0, (
             f"Atributo 'corpulento' asignado a entidad incorrecta: {wrong_entity}"
         )
@@ -294,10 +300,7 @@ class TestAttributeGeneralization:
         attrs = extract_attributes(text)
         miguel_attrs = [(e, k, v) for e, k, v in attrs if "miguel" in e]
         # Si detecta "alto" para Miguel, deberia tener marca de negacion o no detectarlo
-        alto_positive = [
-            (e, k, v) for e, k, v in miguel_attrs
-            if "alto" in v
-        ]
+        alto_positive = [(e, k, v) for e, k, v in miguel_attrs if "alto" in v]
         # Esto es un caso dificil — marcamos como xfail si falla
         if alto_positive:
             pytest.xfail("Atributo negado extraído como positivo (mejora futura)")
@@ -306,6 +309,7 @@ class TestAttributeGeneralization:
 # ============================================================================
 # 4. Scope resolution: Atribucion correcta de atributos a entidades
 # ============================================================================
+
 
 class TestScopeGeneralization:
     """
@@ -320,9 +324,8 @@ class TestScopeGeneralization:
         isabel_attrs = {v for e, k, v in attrs if "isabel" in e}
         gonzalo_attrs = {v for e, k, v in attrs if "gonzalo" in e}
         # Isabel NO deberia tener "rubio" y Gonzalo NO deberia tener "morena/moreno"
-        cross_contaminated = (
-            any("rubio" in v or "rubia" in v for v in isabel_attrs) or
-            any("moreno" in v or "morena" in v for v in gonzalo_attrs)
+        cross_contaminated = any("rubio" in v or "rubia" in v for v in isabel_attrs) or any(
+            "moreno" in v or "morena" in v for v in gonzalo_attrs
         )
         if cross_contaminated:
             pytest.xfail("Contaminación cruzada de atributos entre personajes (mejora futura)")
@@ -332,12 +335,12 @@ class TestScopeGeneralization:
         text = "Daniela, que era la mayor de las hermanas, tenía el pelo negro."
         attrs = extract_attributes(text)
         daniela_hair = [
-            (e, k, v) for e, k, v in attrs
-            if "daniela" in e and ("negro" in v or "pelo" in v)
+            (e, k, v) for e, k, v in attrs if "daniela" in e and ("negro" in v or "pelo" in v)
         ]
         # Puede que no lo detecte perfectamente, pero no debería asignar a otro personaje
         wrong = [
-            (e, k, v) for e, k, v in attrs
+            (e, k, v)
+            for e, k, v in attrs
             if "negro" in v and "daniela" not in e and "pelo" not in e
         ]
         assert len(wrong) == 0 or len(daniela_hair) >= 1, (
@@ -346,16 +349,10 @@ class TestScopeGeneralization:
 
     def test_dialogue_attribute_not_assigned_to_speaker(self):
         """Atributo mencionado en dialogo NO debe asignarse al hablante."""
-        text = (
-            '—Tu hermano es muy alto —dijo Sofía.\n'
-            '—Sí, mide casi dos metros —respondió Nicolás.'
-        )
+        text = "—Tu hermano es muy alto —dijo Sofía.\n—Sí, mide casi dos metros —respondió Nicolás."
         attrs = extract_attributes(text)
         # "alto" se refiere al hermano de Nicolás, NO a Sofía ni a Nicolás
-        sofia_alto = [
-            (e, k, v) for e, k, v in attrs
-            if "sofia" in e and "alto" in v
-        ]
+        sofia_alto = [(e, k, v) for e, k, v in attrs if "sofia" in e and "alto" in v]
         if sofia_alto:
             pytest.xfail("Atributo de diálogo asignado al hablante (mejora futura)")
 
@@ -363,6 +360,7 @@ class TestScopeGeneralization:
 # ============================================================================
 # 5. Robustez general
 # ============================================================================
+
 
 class TestRobustnessGeneralization:
     """
@@ -399,8 +397,7 @@ class TestRobustnessGeneralization:
     def test_text_with_numbers_and_dates(self):
         """Texto con cifras, fechas y numeros — no debe confundir NER."""
         text = (
-            "El 15 de enero de 1990, Alejandro cumplió 30 años. "
-            "Vivía en la calle 42, número 1508."
+            "El 15 de enero de 1990, Alejandro cumplió 30 años. Vivía en la calle 42, número 1508."
         )
         names = get_per_names(text)
         assert "alejandro" in names
@@ -409,6 +406,7 @@ class TestRobustnessGeneralization:
 # ============================================================================
 # 6. Normalizacion: variantes ortograficas → misma entidad
 # ============================================================================
+
 
 class TestNormalizationGeneralization:
     """

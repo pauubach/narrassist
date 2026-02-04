@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Tests de regresion contra golden corpus.
 
@@ -19,9 +18,9 @@ Uso:
     python tests/evaluation/golden_corpus_harness.py --update-baseline
 """
 
+import logging
 import os
 import sys
-import logging
 from pathlib import Path
 
 import pytest
@@ -44,7 +43,7 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 sys.path.insert(0, str(Path(__file__).parent))
 
-from golden_corpus_harness import GoldenCorpusHarness, DEFAULT_REGRESSION_THRESHOLD
+from golden_corpus_harness import DEFAULT_REGRESSION_THRESHOLD, GoldenCorpusHarness
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +51,7 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 # Fixtures
 # ============================================================================
+
 
 @pytest.fixture(scope="module")
 def harness():
@@ -90,6 +90,7 @@ def _build_test_params():
 # ============================================================================
 # Tests parametrizados: no-regresion por capacidad
 # ============================================================================
+
 
 @pytest.mark.evaluation
 class TestGoldenCorpusRegression:
@@ -147,9 +148,7 @@ class TestMinimumQuality:
     def test_minimum_f1(self, harness, capability, min_f1):
         """Verifica que el F1 agregado de {capability} supera {min_f1}%."""
         # Evaluar todos los gold standards que tienen esta capacidad
-        relevant = [
-            gs for gs, caps in GOLD_CAPABILITIES.items() if capability in caps
-        ]
+        relevant = [gs for gs, caps in GOLD_CAPABILITIES.items() if capability in caps]
         if not relevant:
             pytest.skip(f"No hay gold standards para {capability}")
 
@@ -176,14 +175,14 @@ class TestMinimumQuality:
             avg_f1 = aggregate[capability].f1
 
         assert avg_f1 >= min_f1, (
-            f"F1 agregado de {capability} ({avg_f1:.1f}%) "
-            f"por debajo del minimo ({min_f1:.1f}%)"
+            f"F1 agregado de {capability} ({avg_f1:.1f}%) por debajo del minimo ({min_f1:.1f}%)"
         )
 
 
 # ============================================================================
 # Test completo: reporte
 # ============================================================================
+
 
 @pytest.mark.evaluation
 @pytest.mark.slow
@@ -199,7 +198,7 @@ class TestFullHarnessReport:
 
         # No debe haber regresiones criticas (F1=0 o caida >20pp)
         assert not report.has_critical_regressions, (
-            f"Regresiones criticas detectadas: "
+            "Regresiones criticas detectadas: "
             + "; ".join(
                 f"{r.gold_standard}/{r.capability}: {r.baseline_f1:.1f}% -> {r.current_f1:.1f}%"
                 for r in report.regressions

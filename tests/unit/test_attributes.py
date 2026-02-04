@@ -3,6 +3,7 @@ Tests unitarios para extracción de atributos.
 """
 
 import pytest
+
 from narrative_assistant.nlp.attributes import AttributeExtractor
 
 
@@ -217,10 +218,7 @@ class TestAttributeExtractorIntegration:
         assert ner_result.is_success
 
         # Convertir a formato para AttributeExtractor
-        entities = [
-            (e.text, e.start_char, e.end_char)
-            for e in ner_result.value.entities
-        ]
+        entities = [(e.text, e.start_char, e.end_char) for e in ner_result.value.entities]
 
         # Extraer atributos
         extractor = AttributeExtractor()
@@ -313,7 +311,8 @@ class TestHairExtractionPatterns:
         extraction = result.value
         # No debería extraer atributos de pelo
         hair_attrs = [
-            a for a in extraction.attributes
+            a
+            for a in extraction.attributes
             if "pelo" in a.key.value or "cabello" in a.key.value or "hair" in a.key.value
         ]
         assert len(hair_attrs) == 0
@@ -326,6 +325,7 @@ class TestRegexExtractorPatterns:
     def regex_extractor(self):
         """Crea instancia del RegexExtractor."""
         from narrative_assistant.nlp.extraction.extractors.regex_extractor import RegexExtractor
+
         return RegexExtractor()
 
     def test_hair_color_pattern_negro(self, regex_extractor):

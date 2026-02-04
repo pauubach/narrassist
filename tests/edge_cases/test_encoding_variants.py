@@ -9,13 +9,14 @@ Cubre:
 - Caracteres de control
 """
 
-import pytest
 import unicodedata
 
+import pytest
 
 # =============================================================================
 # Tests de normalización de guiones
 # =============================================================================
+
 
 class TestDashNormalization:
     """Tests para normalización de diferentes tipos de guiones."""
@@ -64,6 +65,7 @@ class TestDashNormalization:
 # =============================================================================
 # Tests de variantes de comillas
 # =============================================================================
+
 
 class TestQuoteVariants:
     """Tests para diferentes tipos de comillas."""
@@ -121,6 +123,7 @@ class TestQuoteVariants:
 # Tests de BOM (Byte Order Mark)
 # =============================================================================
 
+
 class TestBOMHandling:
     """Tests para manejo de BOM."""
 
@@ -158,6 +161,7 @@ class TestBOMHandling:
 # =============================================================================
 # Tests de normalización Unicode
 # =============================================================================
+
 
 class TestUnicodeNormalization:
     """Tests para diferentes formas de normalización Unicode."""
@@ -198,6 +202,7 @@ class TestUnicodeNormalization:
 # =============================================================================
 # Tests de caracteres de control
 # =============================================================================
+
 
 class TestControlCharacters:
     """Tests para manejo de caracteres de control."""
@@ -249,12 +254,13 @@ class TestControlCharacters:
         sanitized = sanitize_chapter_content(text_with_null)
 
         assert "\x00" not in sanitized
-        assert "Textoconnulos." == sanitized
+        assert sanitized == "Textoconnulos."
 
 
 # =============================================================================
 # Tests de espacios especiales
 # =============================================================================
+
 
 class TestSpecialSpaces:
     """Tests para diferentes tipos de espacios."""
@@ -306,6 +312,7 @@ class TestSpecialSpaces:
 # =============================================================================
 # Tests de puntuación especial
 # =============================================================================
+
 
 class TestSpecialPunctuation:
     """Tests para puntuación especial."""

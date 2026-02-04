@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Tests para el módulo de plantillas narrativas (narrative_templates).
 
@@ -11,14 +10,15 @@ Cubre:
 """
 
 import pytest
+
 from narrative_assistant.analysis.narrative_templates import (
-    NarrativeTemplateAnalyzer,
-    TemplateType,
+    TEMPLATE_DEFINITIONS,
     BeatStatus,
+    NarrativeTemplateAnalyzer,
+    NarrativeTemplateReport,
     TemplateBeat,
     TemplateMatch,
-    NarrativeTemplateReport,
-    TEMPLATE_DEFINITIONS,
+    TemplateType,
 )
 
 
@@ -91,10 +91,11 @@ def _make_rich_manuscript(total: int = 12) -> list[dict]:
 # Smoke tests
 # =============================================================================
 
-class TestTemplateSmoke:
 
+class TestTemplateSmoke:
     def test_import(self):
         from narrative_assistant.analysis.narrative_templates import NarrativeTemplateAnalyzer
+
         assert NarrativeTemplateAnalyzer is not None
 
     def test_create_analyzer(self, analyzer):
@@ -104,8 +105,10 @@ class TestTemplateSmoke:
         """Hay 5 plantillas definidas."""
         assert len(TEMPLATE_DEFINITIONS) == 5
         expected = {
-            TemplateType.THREE_ACT, TemplateType.HERO_JOURNEY,
-            TemplateType.SAVE_THE_CAT, TemplateType.KISHOTENKETSU,
+            TemplateType.THREE_ACT,
+            TemplateType.HERO_JOURNEY,
+            TemplateType.SAVE_THE_CAT,
+            TemplateType.KISHOTENKETSU,
             TemplateType.FIVE_ACT,
         }
         assert set(TEMPLATE_DEFINITIONS.keys()) == expected
@@ -123,8 +126,8 @@ class TestTemplateSmoke:
 # Analysis
 # =============================================================================
 
-class TestTemplateAnalysis:
 
+class TestTemplateAnalysis:
     def test_analyze_returns_all_templates(self, analyzer):
         """El análisis devuelve matches para todas las plantillas."""
         chapters = _make_rich_manuscript(12)
@@ -152,14 +155,16 @@ class TestTemplateAnalysis:
 # Granularity normalization
 # =============================================================================
 
-class TestGranularityNormalization:
 
+class TestGranularityNormalization:
     def test_kishotenketsu_score_penalized(self, analyzer):
         """Kishotenketsu (4 beats) recibe penalización por granularidad."""
         chapters = _make_rich_manuscript(8)
         report = analyzer.analyze(chapters, total_chapters=8)
 
-        kish = next(m for m in report.matches if m.template_type == TemplateType.KISHOTENKETSU.value)
+        kish = next(
+            m for m in report.matches if m.template_type == TemplateType.KISHOTENKETSU.value
+        )
         # Si todos los beats se detectan, score debería estar por debajo del
         # máximo teórico debido a la penalización
         if kish.detected_count == kish.total_beats:
@@ -183,8 +188,8 @@ class TestGranularityNormalization:
 # Beat detection
 # =============================================================================
 
-class TestBeatDetection:
 
+class TestBeatDetection:
     def test_setup_requires_multiple_characters(self, analyzer):
         """Setup requiere ≥2 personajes para DETECTED."""
         # Solo 1 personaje nuevo → POSSIBLE
@@ -194,7 +199,9 @@ class TestBeatDetection:
             _make_chapter(3),
         ]
         report = analyzer.analyze(chapters, total_chapters=3)
-        three_act = next(m for m in report.matches if m.template_type == TemplateType.THREE_ACT.value)
+        three_act = next(
+            m for m in report.matches if m.template_type == TemplateType.THREE_ACT.value
+        )
         setup = next((b for b in three_act.beats if b.beat_id == "setup"), None)
         if setup:
             assert setup.status in (BeatStatus.POSSIBLE, BeatStatus.MISSING), (
@@ -211,7 +218,9 @@ class TestBeatDetection:
             _make_chapter(5),
         ]
         report = analyzer.analyze(chapters, total_chapters=5)
-        three_act = next(m for m in report.matches if m.template_type == TemplateType.THREE_ACT.value)
+        three_act = next(
+            m for m in report.matches if m.template_type == TemplateType.THREE_ACT.value
+        )
         setup = next((b for b in three_act.beats if b.beat_id == "setup"), None)
         if setup:
             assert setup.status == BeatStatus.DETECTED
@@ -227,13 +236,14 @@ class TestBeatDetection:
             _make_chapter(5),
         ]
         report = analyzer.analyze(chapters, total_chapters=5)
-        three_act = next(m for m in report.matches if m.template_type == TemplateType.THREE_ACT.value)
+        three_act = next(
+            m for m in report.matches if m.template_type == TemplateType.THREE_ACT.value
+        )
         dev = next((b for b in three_act.beats if b.beat_id == "development"), None)
         if dev and dev.status != BeatStatus.MISSING:
             # With only 1 event and 2 interactions, should be POSSIBLE
             assert dev.status == BeatStatus.POSSIBLE, (
-                f"Con 1 evento y 2 interacciones, development debería ser POSSIBLE, "
-                f"no {dev.status}"
+                f"Con 1 evento y 2 interacciones, development debería ser POSSIBLE, no {dev.status}"
             )
 
 
@@ -241,8 +251,8 @@ class TestBeatDetection:
 # Twist detection (Kishotenketsu)
 # =============================================================================
 
-class TestTwistDetection:
 
+class TestTwistDetection:
     def test_twist_detected_with_revelation(self, analyzer):
         """Ten/twist detectado con evento de revelación en zona correcta."""
         chapters = []
@@ -253,7 +263,9 @@ class TestTwistDetection:
             chapters.append(ch)
 
         report = analyzer.analyze(chapters, total_chapters=8)
-        kish = next(m for m in report.matches if m.template_type == TemplateType.KISHOTENKETSU.value)
+        kish = next(
+            m for m in report.matches if m.template_type == TemplateType.KISHOTENKETSU.value
+        )
         twist = next((b for b in kish.beats if b.beat_id == "ten_twist"), None)
         assert twist is not None
         assert twist.status in (BeatStatus.DETECTED, BeatStatus.POSSIBLE)
@@ -263,8 +275,8 @@ class TestTwistDetection:
 # Serialization
 # =============================================================================
 
-class TestTemplateSerialization:
 
+class TestTemplateSerialization:
     def test_report_to_dict(self, analyzer):
         """El report se serializa correctamente."""
         chapters = _make_rich_manuscript(6)

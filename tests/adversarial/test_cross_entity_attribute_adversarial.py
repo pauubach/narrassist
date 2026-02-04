@@ -21,16 +21,16 @@ siempre selecciona el masculino cuando LLM y embeddings fallan.
 Autor: GAN-style Adversary Agent
 """
 
-import pytest
 import re
 from typing import Optional
+
+import pytest
 
 from narrative_assistant.nlp.attributes import (
     AttributeExtractor,
     AttributeKey,
     ExtractedAttribute,
 )
-
 
 # =============================================================================
 # ADVERSARIAL TEST CASES - CROSS-ENTITY ATTRIBUTE ASSIGNMENT
@@ -106,7 +106,6 @@ CROSS_ENTITY_CASES = [
             "El extractor debe usar posición y sintaxis, no solo género."
         ),
     },
-
     # -------------------------------------------------------------------------
     # 2. GENDER MISMATCH - Género del pronombre no concuerda con asignación
     # -------------------------------------------------------------------------
@@ -135,9 +134,7 @@ CROSS_ENTITY_CASES = [
     },
     {
         "id": "gender_03_ambiguous_su",
-        "text": (
-            "Pedro y Marta cenaron juntos. Su pelo rubio le caía sobre los hombros."
-        ),
+        "text": ("Pedro y Marta cenaron juntos. Su pelo rubio le caía sobre los hombros."),
         "expected": {"Marta": {"hair_color": "rubio"}},
         "forbidden": {"Pedro": ["hair_color"]},
         "reason": (
@@ -175,7 +172,6 @@ CROSS_ENTITY_CASES = [
             "Roberto no recibe atributos."
         ),
     },
-
     # -------------------------------------------------------------------------
     # 3. DIALOGUE ATTRIBUTION - Atributos dichos EN diálogo vs DEL hablante
     # -------------------------------------------------------------------------
@@ -194,9 +190,7 @@ CROSS_ENTITY_CASES = [
     },
     {
         "id": "dialog_02_self_description",
-        "text": (
-            "—Soy alto y moreno —dijo Rafael—. Siempre me lo dicen."
-        ),
+        "text": ("—Soy alto y moreno —dijo Rafael—. Siempre me lo dicen."),
         "expected": {"Rafael": {"height": "alto", "hair_color": "moreno"}},
         "forbidden": {},
         "reason": (
@@ -230,16 +224,12 @@ CROSS_ENTITY_CASES = [
             "refiere a Sofía explícitamente."
         ),
     },
-
     # -------------------------------------------------------------------------
     # 4. SUBORDINATE CLAUSES - Atributos en cláusulas subordinadas
     # -------------------------------------------------------------------------
     {
         "id": "subord_01_while_clause",
-        "text": (
-            "Mientras Ana leía, Pedro se miraba al espejo. "
-            "Era rubio y de ojos claros."
-        ),
+        "text": ("Mientras Ana leía, Pedro se miraba al espejo. Era rubio y de ojos claros."),
         "expected": {"Pedro": {"hair_color": "rubio", "eye_color": "claros"}},
         "forbidden": {"Ana": ["hair_color", "eye_color"]},
         "reason": (
@@ -249,10 +239,7 @@ CROSS_ENTITY_CASES = [
     },
     {
         "id": "subord_02_because_clause",
-        "text": (
-            "Porque Laura se lo pidió, Manuel se cortó el pelo. "
-            "Antes era castaño y largo."
-        ),
+        "text": ("Porque Laura se lo pidió, Manuel se cortó el pelo. Antes era castaño y largo."),
         "expected": {"Manuel": {"hair_color": "castaño"}},
         "forbidden": {"Laura": ["hair_color"]},
         "reason": (
@@ -273,7 +260,6 @@ CROSS_ENTITY_CASES = [
             "refiere a Elena (la 'alta'), no a Jorge."
         ),
     },
-
     # -------------------------------------------------------------------------
     # 5. NEGATED ATTRIBUTES - Atributos negados confundidos con afirmativos
     # -------------------------------------------------------------------------
@@ -300,9 +286,7 @@ CROSS_ENTITY_CASES = [
     },
     {
         "id": "neg_03_contrast_negation",
-        "text": (
-            "Rosa no tenía el pelo negro como Eva; el suyo era cobrizo."
-        ),
+        "text": ("Rosa no tenía el pelo negro como Eva; el suyo era cobrizo."),
         "expected": {
             "Eva": {"hair_color": "negro"},
             "Rosa": {"hair_color": "cobrizo"},
@@ -313,7 +297,6 @@ CROSS_ENTITY_CASES = [
             "'cobrizo' → Rosa. El extractor debe separar ambos."
         ),
     },
-
     # -------------------------------------------------------------------------
     # 6. COMPARISONS - Comparaciones entre personajes confunden asignación
     # -------------------------------------------------------------------------
@@ -345,8 +328,7 @@ CROSS_ENTITY_CASES = [
     {
         "id": "comp_03_unlike",
         "text": (
-            "A diferencia de su hermano Ricardo, que era moreno, "
-            "Estela era rubia y de tez clara."
+            "A diferencia de su hermano Ricardo, que era moreno, Estela era rubia y de tez clara."
         ),
         "expected": {
             "Ricardo": {"hair_color": "moreno"},
@@ -371,7 +353,6 @@ CROSS_ENTITY_CASES = [
             "El extractor podría asignar solo a una."
         ),
     },
-
     # -------------------------------------------------------------------------
     # 7. ENUMERATIONS - Listas de personajes con atributos intercalados
     # -------------------------------------------------------------------------
@@ -408,7 +389,6 @@ CROSS_ENTITY_CASES = [
             "El extractor debe resolver referencias ordinales."
         ),
     },
-
     # -------------------------------------------------------------------------
     # 8. NARRATIVE FOCUS SHIFT - Cambio de foco narrativo
     # -------------------------------------------------------------------------
@@ -465,7 +445,6 @@ CROSS_ENTITY_CASES = [
             "El extractor no debe asignar 'grises' a Fernando."
         ),
     },
-
     # -------------------------------------------------------------------------
     # 9. REAL BUG REPRODUCTION - Replicas del error encontrado en producción
     # -------------------------------------------------------------------------
@@ -488,8 +467,7 @@ CROSS_ENTITY_CASES = [
     {
         "id": "real_bug_02_all_to_nearest",
         "text": (
-            "María era alta y delgada, con ojos verdes y pelo rubio. "
-            "Juan era bajo y robusto."
+            "María era alta y delgada, con ojos verdes y pelo rubio. Juan era bajo y robusto."
         ),
         "expected": {
             "María": {"height": "alta", "eye_color": "verdes", "hair_color": "rubio"},
@@ -505,8 +483,7 @@ CROSS_ENTITY_CASES = [
     {
         "id": "real_bug_03_compound_name_split",
         "text": (
-            "María Sánchez tenía los ojos azules. Su hijo pequeño, Juan, "
-            "había heredado esos ojos."
+            "María Sánchez tenía los ojos azules. Su hijo pequeño, Juan, había heredado esos ojos."
         ),
         "expected": {"María Sánchez": {"eye_color": "azules"}},
         "forbidden": {},
@@ -539,16 +516,12 @@ CROSS_ENTITY_CASES = [
             "proximidad."
         ),
     },
-
     # -------------------------------------------------------------------------
     # 10. POSSESSIVE CHAINS - Cadenas posesivas complejas
     # -------------------------------------------------------------------------
     {
         "id": "poss_01_de_chain",
-        "text": (
-            "Los ojos de Isabel eran del mismo color que los de su madre: "
-            "azul profundo."
-        ),
+        "text": ("Los ojos de Isabel eran del mismo color que los de su madre: azul profundo."),
         "expected": {"Isabel": {"eye_color": "azul profundo"}},
         "forbidden": {},
         "reason": (
@@ -577,16 +550,12 @@ CROSS_ENTITY_CASES = [
             "posesivo debe funcionar correctamente."
         ),
     },
-
     # -------------------------------------------------------------------------
     # 11. INDIRECT REFERENCES - Referencias indirectas a entidades
     # -------------------------------------------------------------------------
     {
         "id": "indirect_01_the_woman",
-        "text": (
-            "La mujer de ojos verdes se llamaba Sara. Juan no podía dejar "
-            "de mirarla."
-        ),
+        "text": ("La mujer de ojos verdes se llamaba Sara. Juan no podía dejar de mirarla."),
         "expected": {"Sara": {"eye_color": "verdes"}},
         "forbidden": {"Juan": ["eye_color"]},
         "reason": (
@@ -596,9 +565,7 @@ CROSS_ENTITY_CASES = [
     },
     {
         "id": "indirect_02_occupation",
-        "text": (
-            "El médico era calvo y usaba gafas. Se llamaba doctor Hernández."
-        ),
+        "text": ("El médico era calvo y usaba gafas. Se llamaba doctor Hernández."),
         "expected": {"Hernández": {"hair_color": "calvo"}},
         "forbidden": {},
         "reason": (
@@ -606,7 +573,6 @@ CROSS_ENTITY_CASES = [
             "El atributo 'calvo' debe asignarse a Hernández."
         ),
     },
-
     # -------------------------------------------------------------------------
     # 12. TEMPORAL DESCRIPTIONS - Atributos que cambian con el tiempo
     # -------------------------------------------------------------------------
@@ -626,8 +592,7 @@ CROSS_ENTITY_CASES = [
     {
         "id": "temp_02_young_vs_old",
         "text": (
-            "De joven, Pilar era rubia. Con los años se le oscureció el pelo "
-            "hasta quedar castaño."
+            "De joven, Pilar era rubia. Con los años se le oscureció el pelo hasta quedar castaño."
         ),
         "expected": {"Pilar": {"hair_color": "castaño"}},
         "forbidden": {},
@@ -636,7 +601,6 @@ CROSS_ENTITY_CASES = [
             "El extractor debe tomar el valor actual (castaño)."
         ),
     },
-
     # -------------------------------------------------------------------------
     # 13. COMPLEX MULTI-ENTITY SCENES - Escenas con muchos personajes
     # -------------------------------------------------------------------------
@@ -693,7 +657,6 @@ CROSS_ENTITY_CASES = [
             "'el primero coincidía con Ramón' → Ramón es alto y rubio."
         ),
     },
-
     # -------------------------------------------------------------------------
     # 14. APPEARANCE IN NARRATION vs. REALITY
     # -------------------------------------------------------------------------
@@ -709,10 +672,7 @@ CROSS_ENTITY_CASES = [
     },
     {
         "id": "appear_02_disguise",
-        "text": (
-            "Isabel se disfrazó con una peluca rubia, pero en realidad era "
-            "morena."
-        ),
+        "text": ("Isabel se disfrazó con una peluca rubia, pero en realidad era morena."),
         "expected": {"Isabel": {"hair_color": "morena"}},
         "forbidden": {},
         "reason": (
@@ -720,15 +680,13 @@ CROSS_ENTITY_CASES = [
             "'en realidad era morena' es el dato verdadero."
         ),
     },
-
     # -------------------------------------------------------------------------
     # 15. REPORTED SPEECH - Estilo indirecto
     # -------------------------------------------------------------------------
     {
         "id": "reported_01_said_that",
         "text": (
-            "Marcos dijo que Sonia tenía los ojos más bonitos del mundo. "
-            "Eran de color avellana."
+            "Marcos dijo que Sonia tenía los ojos más bonitos del mundo. Eran de color avellana."
         ),
         "expected": {"Sonia": {"eye_color": "avellana"}},
         "forbidden": {"Marcos": ["eye_color"]},
@@ -760,6 +718,7 @@ CROSS_ENTITY_CASES = [
 # TEST FIXTURES AND HELPERS
 # =============================================================================
 
+
 @pytest.fixture
 def extractor():
     """Crea una instancia del extractor de atributos sin LLM/embeddings."""
@@ -780,28 +739,75 @@ def extract_and_organize(extractor: AttributeExtractor, text: str) -> dict:
     Returns:
         Dict de entidad -> {key: value, ...}
     """
-    import re
 
-    name_pattern = r'\b([A-ZÁÉÍÓÚÜÑ][a-záéíóúüñ]+(?:\s+(?:de(?:l|\s+la|\s+los|\s+las)?\s+)?[A-ZÁÉÍÓÚÜÑ][a-záéíóúüñ]+)*)\b'
+    name_pattern = r"\b([A-ZÁÉÍÓÚÜÑ][a-záéíóúüñ]+(?:\s+(?:de(?:l|\s+la|\s+los|\s+las)?\s+)?[A-ZÁÉÍÓÚÜÑ][a-záéíóúüñ]+)*)\b"
     entity_mentions = []
 
     common_words = {
-        'El', 'La', 'Los', 'Las', 'Un', 'Una', 'Unos', 'Unas',
-        'De', 'En', 'Con', 'Por', 'Para', 'Sin', 'Sobre', 'Tras',
-        'Antes', 'Despues', 'Según', 'Durante', 'Mediante',
-        'Era', 'Tenia', 'Fue', 'Habia', 'Dijo', 'Pensó',
-        'Verdes', 'Azules', 'Negros', 'Rubio', 'Moreno', 'Canoso',
-        'Alto', 'Bajo', 'Delgado', 'Gordo', 'Pero', 'Sino', 'Aunque',
-        'Ella', 'Sí', 'Ahora', 'Solo', 'Antes', 'Mientras',
-        'Porque', 'Cuando', 'Donde', 'Tiene', 'Tenía', 'Eran',
-        'Soy', 'Siempre', 'También', 'Como', 'Medía', 'Sus',
+        "El",
+        "La",
+        "Los",
+        "Las",
+        "Un",
+        "Una",
+        "Unos",
+        "Unas",
+        "De",
+        "En",
+        "Con",
+        "Por",
+        "Para",
+        "Sin",
+        "Sobre",
+        "Tras",
+        "Antes",
+        "Despues",
+        "Según",
+        "Durante",
+        "Mediante",
+        "Era",
+        "Tenia",
+        "Fue",
+        "Habia",
+        "Dijo",
+        "Pensó",
+        "Verdes",
+        "Azules",
+        "Negros",
+        "Rubio",
+        "Moreno",
+        "Canoso",
+        "Alto",
+        "Bajo",
+        "Delgado",
+        "Gordo",
+        "Pero",
+        "Sino",
+        "Aunque",
+        "Ella",
+        "Sí",
+        "Ahora",
+        "Solo",
+        "Mientras",
+        "Porque",
+        "Cuando",
+        "Donde",
+        "Tiene",
+        "Tenía",
+        "Eran",
+        "Soy",
+        "Siempre",
+        "También",
+        "Como",
+        "Medía",
+        "Sus",
     }
 
     for match in re.finditer(name_pattern, text):
         name = match.group(1)
         words = name.split()
         if words[0] not in common_words and len(name) > 2:
-            entity_mentions.append((name, match.start(), match.end(), 'PER'))
+            entity_mentions.append((name, match.start(), match.end(), "PER"))
 
     extraction_result = extractor.extract_attributes(text, entity_mentions=entity_mentions)
 
@@ -823,6 +829,7 @@ def extract_and_organize(extractor: AttributeExtractor, text: str) -> dict:
 # =============================================================================
 # TEST CLASSES - Individual categories
 # =============================================================================
+
 
 class TestProximityBias:
     """Tests para sesgo de proximidad en asignación de atributos."""
@@ -1023,6 +1030,7 @@ class TestRealBugReproductions:
 # SUMMARY TEST - Estadísticas globales
 # =============================================================================
 
+
 class TestCrossEntitySummary:
     """Test de resumen que ejecuta todos los casos y reporta estadísticas."""
 
@@ -1060,31 +1068,33 @@ class TestCrossEntitySummary:
                     passed += 1
                 else:
                     failed += 1
-                    errors.append({
-                        "id": case["id"],
-                        "reason": case["reason"],
-                        "expected": case["expected"],
-                        "forbidden": case.get("forbidden", {}),
-                        "got": result,
-                    })
+                    errors.append(
+                        {
+                            "id": case["id"],
+                            "reason": case["reason"],
+                            "expected": case["expected"],
+                            "forbidden": case.get("forbidden", {}),
+                            "got": result,
+                        }
+                    )
 
             except Exception as e:
                 failed += 1
                 errors.append({"id": case["id"], "error": str(e)})
 
         # Report
-        print(f"\n{'='*70}")
-        print(f"CROSS-ENTITY ATTRIBUTE ASSIGNMENT ADVERSARIAL REPORT")
-        print(f"{'='*70}")
+        print(f"\n{'=' * 70}")
+        print("CROSS-ENTITY ATTRIBUTE ASSIGNMENT ADVERSARIAL REPORT")
+        print(f"{'=' * 70}")
         print(f"Total cases: {len(CROSS_ENTITY_CASES)}")
         print(f"Passed: {passed}")
         print(f"Failed: {failed}")
         print(f"Forbidden violations: {forbidden_violations}")
-        print(f"Pass rate: {passed/len(CROSS_ENTITY_CASES)*100:.1f}%")
-        print(f"{'='*70}")
+        print(f"Pass rate: {passed / len(CROSS_ENTITY_CASES) * 100:.1f}%")
+        print(f"{'=' * 70}")
 
         if errors:
-            print(f"\nFailed cases (first 15):")
+            print("\nFailed cases (first 15):")
             for err in errors[:15]:
                 print(f"  - {err['id']}: {err.get('reason', err.get('error', 'Unknown'))[:100]}")
 

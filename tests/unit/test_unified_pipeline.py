@@ -14,36 +14,43 @@ class TestUnifiedPipelineImports:
     def test_import_unified_analysis_module(self):
         """Verifica importación del módulo unified_analysis."""
         from narrative_assistant.pipelines import unified_analysis
+
         assert unified_analysis is not None
 
     def test_import_run_unified_analysis(self):
         """Verifica importación de run_unified_analysis."""
         from narrative_assistant.pipelines import run_unified_analysis
+
         assert callable(run_unified_analysis)
 
     def test_import_unified_config(self):
         """Verifica importación de UnifiedConfig."""
         from narrative_assistant.pipelines import UnifiedConfig
+
         assert UnifiedConfig is not None
 
     def test_import_unified_report(self):
         """Verifica importación de UnifiedReport."""
         from narrative_assistant.pipelines import UnifiedReport
+
         assert UnifiedReport is not None
 
     def test_import_unified_pipeline_class(self):
         """Verifica importación de UnifiedAnalysisPipeline."""
         from narrative_assistant.pipelines import UnifiedAnalysisPipeline
+
         assert UnifiedAnalysisPipeline is not None
 
     def test_import_analysis_phase(self):
         """Verifica importación de AnalysisPhase."""
         from narrative_assistant.pipelines import AnalysisPhase
+
         assert AnalysisPhase is not None
 
     def test_import_analysis_context(self):
         """Verifica importación de AnalysisContext."""
         from narrative_assistant.pipelines import AnalysisContext
+
         assert AnalysisContext is not None
 
 
@@ -240,8 +247,9 @@ class TestUnifiedReport:
 
     def test_report_duration(self):
         """Report calcula duración correctamente."""
-        from narrative_assistant.pipelines import UnifiedReport
         from datetime import datetime, timedelta
+
+        from narrative_assistant.pipelines import UnifiedReport
 
         start = datetime.now()
         end = start + timedelta(seconds=10)

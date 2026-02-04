@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Tests adversariales para los módulos de análisis avanzado.
 
@@ -12,25 +11,25 @@ Verifica comportamiento robusto ante inputs extremos:
 
 import pytest
 
+from narrative_assistant.analysis.character_archetypes import (
+    ArchetypeReport,
+    CharacterArchetypeAnalyzer,
+)
 from narrative_assistant.analysis.narrative_health import (
-    NarrativeHealthChecker,
     HealthStatus,
+    NarrativeHealthChecker,
     NarrativeHealthReport,
 )
 from narrative_assistant.analysis.narrative_templates import (
     NarrativeTemplateAnalyzer,
     NarrativeTemplateReport,
 )
-from narrative_assistant.analysis.character_archetypes import (
-    CharacterArchetypeAnalyzer,
-    ArchetypeReport,
-)
 from narrative_assistant.nlp.style.sentence_energy import SentenceEnergyDetector
-
 
 # =============================================================================
 # Helpers
 # =============================================================================
+
 
 def _make_chapter(number: int, **kwargs) -> dict:
     ch = {
@@ -67,8 +66,8 @@ def _make_entity(eid: int, name: str, **kwargs) -> dict:
 # Narrative Health - Adversarial
 # =============================================================================
 
-class TestNarrativeHealthAdversarial:
 
+class TestNarrativeHealthAdversarial:
     @pytest.fixture
     def checker(self):
         return NarrativeHealthChecker()
@@ -93,12 +92,18 @@ class TestNarrativeHealthAdversarial:
     def test_html_in_chapter_events(self, checker):
         """HTML embebido en eventos no causa crash."""
         chapters = [
-            _make_chapter(1, key_events=[
-                {"event_type": '<script>alert("xss")</script>'},
-            ]),
-            _make_chapter(2, key_events=[
-                {"event_type": '<img src=x onerror="alert(1)">'},
-            ]),
+            _make_chapter(
+                1,
+                key_events=[
+                    {"event_type": '<script>alert("xss")</script>'},
+                ],
+            ),
+            _make_chapter(
+                2,
+                key_events=[
+                    {"event_type": '<img src=x onerror="alert(1)">'},
+                ],
+            ),
             _make_chapter(3),
         ]
         report = checker.check(chapters_data=chapters, total_chapters=3)
@@ -108,14 +113,23 @@ class TestNarrativeHealthAdversarial:
     def test_html_in_entity_names(self, checker):
         """HTML en nombres de entidad no causa crash."""
         entities = [
-            {"entity_type": "character", "name": '<b>María</b>',
-             "mention_count": 30, "chapters_present": 5},
-            {"entity_type": "character", "name": '"><script>',
-             "mention_count": 10, "chapters_present": 2},
+            {
+                "entity_type": "character",
+                "name": "<b>María</b>",
+                "mention_count": 30,
+                "chapters_present": 5,
+            },
+            {
+                "entity_type": "character",
+                "name": '"><script>',
+                "mention_count": 10,
+                "chapters_present": 2,
+            },
         ]
         chapters = [_make_chapter(i) for i in range(1, 4)]
         report = checker.check(
-            chapters_data=chapters, total_chapters=3,
+            chapters_data=chapters,
+            total_chapters=3,
             entities_data=entities,
         )
         assert isinstance(report, NarrativeHealthReport)
@@ -132,9 +146,7 @@ class TestNarrativeHealthAdversarial:
 
     def test_all_same_tone(self, checker):
         """Todos los capítulos con el mismo tono: no crash, coherencia alta."""
-        chapters = [
-            _make_chapter(i, dominant_tone="positive") for i in range(1, 6)
-        ]
+        chapters = [_make_chapter(i, dominant_tone="positive") for i in range(1, 6)]
         report = checker.check(chapters_data=chapters, total_chapters=5)
         assert isinstance(report, NarrativeHealthReport)
 
@@ -143,8 +155,8 @@ class TestNarrativeHealthAdversarial:
 # Narrative Templates - Adversarial
 # =============================================================================
 
-class TestNarrativeTemplatesAdversarial:
 
+class TestNarrativeTemplatesAdversarial:
     @pytest.fixture
     def analyzer(self):
         return NarrativeTemplateAnalyzer()
@@ -182,9 +194,12 @@ class TestNarrativeTemplatesAdversarial:
     def test_html_in_events(self, analyzer):
         """HTML en eventos de capítulos no causa crash."""
         chapters = [
-            _make_chapter(1, key_events=[
-                {"event_type": '<script>alert(1)</script>'},
-            ]),
+            _make_chapter(
+                1,
+                key_events=[
+                    {"event_type": "<script>alert(1)</script>"},
+                ],
+            ),
             _make_chapter(2),
             _make_chapter(3),
             _make_chapter(4),
@@ -204,8 +219,8 @@ class TestNarrativeTemplatesAdversarial:
 # Character Archetypes - Adversarial
 # =============================================================================
 
-class TestCharacterArchetypesAdversarial:
 
+class TestCharacterArchetypesAdversarial:
     @pytest.fixture
     def analyzer(self):
         return CharacterArchetypeAnalyzer()
@@ -213,8 +228,11 @@ class TestCharacterArchetypesAdversarial:
     def test_zero_entities(self, analyzer):
         """0 entidades: report vacío sin crash."""
         report = analyzer.analyze(
-            entities=[], character_arcs=[], relationships=[],
-            interactions=[], total_chapters=5,
+            entities=[],
+            character_arcs=[],
+            relationships=[],
+            interactions=[],
+            total_chapters=5,
         )
         assert isinstance(report, ArchetypeReport)
         assert len(report.characters) == 0
@@ -223,8 +241,11 @@ class TestCharacterArchetypesAdversarial:
         """1 entidad sin arcos: report con 1 perfil."""
         entities = [_make_entity(1, "Ana", importance="protagonist")]
         report = analyzer.analyze(
-            entities=entities, character_arcs=[], relationships=[],
-            interactions=[], total_chapters=5,
+            entities=entities,
+            character_arcs=[],
+            relationships=[],
+            interactions=[],
+            total_chapters=5,
         )
         assert isinstance(report, ArchetypeReport)
         assert len(report.characters) == 1
@@ -232,27 +253,30 @@ class TestCharacterArchetypesAdversarial:
     def test_html_in_entity_name(self, analyzer):
         """HTML en nombre de entidad no causa crash."""
         entities = [
-            _make_entity(1, '<script>alert("xss")</script>',
-                         importance="protagonist"),
+            _make_entity(1, '<script>alert("xss")</script>', importance="protagonist"),
         ]
-        arcs = [{"character_id": 1, "arc_type": "growth",
-                 "trajectory": "rising", "completeness": 0.7}]
+        arcs = [
+            {"character_id": 1, "arc_type": "growth", "trajectory": "rising", "completeness": 0.7}
+        ]
         report = analyzer.analyze(
-            entities=entities, character_arcs=arcs,
-            relationships=[], interactions=[], total_chapters=5,
+            entities=entities,
+            character_arcs=arcs,
+            relationships=[],
+            interactions=[],
+            total_chapters=5,
         )
         assert isinstance(report, ArchetypeReport)
         assert len(report.characters) == 1
 
     def test_many_entities(self, analyzer):
         """50 entidades: no crash."""
-        entities = [
-            _make_entity(i, f"Personaje_{i}", mention_count=50 - i)
-            for i in range(1, 51)
-        ]
+        entities = [_make_entity(i, f"Personaje_{i}", mention_count=50 - i) for i in range(1, 51)]
         report = analyzer.analyze(
-            entities=entities, character_arcs=[], relationships=[],
-            interactions=[], total_chapters=10,
+            entities=entities,
+            character_arcs=[],
+            relationships=[],
+            interactions=[],
+            total_chapters=10,
         )
         assert isinstance(report, ArchetypeReport)
         assert len(report.characters) == 50
@@ -260,15 +284,20 @@ class TestCharacterArchetypesAdversarial:
     def test_relationship_with_nonexistent_entity(self, analyzer):
         """Relación con entity_id que no existe: no crash."""
         entities = [_make_entity(1, "Ana")]
-        relationships = [{
-            "entity1_id": 1,
-            "entity2_id": 999,  # No existe
-            "relation_type": "RIVALRY",
-            "subtype": "",
-        }]
+        relationships = [
+            {
+                "entity1_id": 1,
+                "entity2_id": 999,  # No existe
+                "relation_type": "RIVALRY",
+                "subtype": "",
+            }
+        ]
         report = analyzer.analyze(
-            entities=entities, character_arcs=[], relationships=relationships,
-            interactions=[], total_chapters=5,
+            entities=entities,
+            character_arcs=[],
+            relationships=relationships,
+            interactions=[],
+            total_chapters=5,
         )
         assert isinstance(report, ArchetypeReport)
 
@@ -277,8 +306,8 @@ class TestCharacterArchetypesAdversarial:
 # Sentence Energy - Adversarial
 # =============================================================================
 
-class TestSentenceEnergyAdversarial:
 
+class TestSentenceEnergyAdversarial:
     @pytest.fixture
     def detector(self):
         return SentenceEnergyDetector()

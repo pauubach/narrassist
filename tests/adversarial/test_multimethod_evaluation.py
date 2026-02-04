@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Evaluacion exhaustiva de metodos individuales y estrategias de combinacion.
 
@@ -19,6 +18,7 @@ Estrategias de combinacion evaluadas:
 
 Cada test imprime metricas P/R/F1 y genera tabla comparativa final.
 """
+
 import sys
 import time
 from collections import defaultdict
@@ -36,9 +36,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 # METRICAS
 # =============================================================================
 
+
 @dataclass
 class MethodMetrics:
     """Metricas P/R/F1 para un metodo."""
+
     method_name: str
     true_positives: int = 0
     false_positives: int = 0
@@ -63,8 +65,9 @@ class MethodMetrics:
 
     @property
     def accuracy(self) -> float:
-        total = (self.true_positives + self.true_negatives
-                 + self.false_positives + self.false_negatives)
+        total = (
+            self.true_positives + self.true_negatives + self.false_positives + self.false_negatives
+        )
         return (self.true_positives + self.true_negatives) / total if total > 0 else 0.0
 
     def __str__(self):
@@ -201,19 +204,64 @@ TOTAL_EXPECTED_ATTRS = sum(len(c["expected"]) for c in ATTRIBUTE_GROUND_TRUTH)
 FUSION_GROUND_TRUTH = [
     # Should merge
     {"name1": "Maria Garcia", "name2": "Maria", "should_merge": True, "reason": "nombre parcial"},
-    {"name1": "Don Fernando", "name2": "Fernando", "should_merge": True, "reason": "titulo + nombre"},
-    {"name1": "Doctor Ramirez", "name2": "Ramirez", "should_merge": True, "reason": "titulo + apellido"},
+    {
+        "name1": "Don Fernando",
+        "name2": "Fernando",
+        "should_merge": True,
+        "reason": "titulo + nombre",
+    },
+    {
+        "name1": "Doctor Ramirez",
+        "name2": "Ramirez",
+        "should_merge": True,
+        "reason": "titulo + apellido",
+    },
     {"name1": "Jose Garcia", "name2": "Jose Garcia", "should_merge": True, "reason": "identico"},
-    {"name1": "la profesora Garcia", "name2": "Maria Garcia", "should_merge": True, "reason": "titulo + nombre"},
+    {
+        "name1": "la profesora Garcia",
+        "name2": "Maria Garcia",
+        "should_merge": True,
+        "reason": "titulo + nombre",
+    },
     {"name1": "Paco", "name2": "Francisco", "should_merge": True, "reason": "diminutivo"},
     {"name1": "Jose Garcia", "name2": "José García", "should_merge": True, "reason": "acentos"},
-    {"name1": "Torres", "name2": "comisario Torres", "should_merge": True, "reason": "rango + apellido"},
-    {"name1": "Isabel", "name2": "Isabel Navarro", "should_merge": True, "reason": "nombre parcial"},
-    {"name1": "Carlos", "name2": "Carlos Mendoza", "should_merge": True, "reason": "nombre parcial"},
+    {
+        "name1": "Torres",
+        "name2": "comisario Torres",
+        "should_merge": True,
+        "reason": "rango + apellido",
+    },
+    {
+        "name1": "Isabel",
+        "name2": "Isabel Navarro",
+        "should_merge": True,
+        "reason": "nombre parcial",
+    },
+    {
+        "name1": "Carlos",
+        "name2": "Carlos Mendoza",
+        "should_merge": True,
+        "reason": "nombre parcial",
+    },
     # Should NOT merge
-    {"name1": "Maria Garcia", "name2": "Pedro Hernandez", "should_merge": False, "reason": "diferentes"},
-    {"name1": "Madrid", "name2": "Barcelona", "should_merge": False, "reason": "ciudades diferentes"},
-    {"name1": "Carlos", "name2": "Carolina", "should_merge": False, "reason": "parecido pero diferente"},
+    {
+        "name1": "Maria Garcia",
+        "name2": "Pedro Hernandez",
+        "should_merge": False,
+        "reason": "diferentes",
+    },
+    {
+        "name1": "Madrid",
+        "name2": "Barcelona",
+        "should_merge": False,
+        "reason": "ciudades diferentes",
+    },
+    {
+        "name1": "Carlos",
+        "name2": "Carolina",
+        "should_merge": False,
+        "reason": "parecido pero diferente",
+    },
     {"name1": "Ana", "name2": "Antonio", "should_merge": False, "reason": "distinto genero"},
 ]
 
@@ -287,6 +335,7 @@ SPELLING_GROUND_TRUTH = [
 # HELPERS
 # =============================================================================
 
+
 def _flexible_match(expected_entity, expected_value, found_entity, found_key, found_value):
     """Matching flexible para atributos."""
     ee, ev = expected_entity.lower(), expected_value.lower()
@@ -306,6 +355,7 @@ def _key_match(expected_key, found_key):
 # TEST: EXTRACTORES DE ATRIBUTOS INDIVIDUALES
 # =============================================================================
 
+
 @pytest.mark.slow
 class TestAttributeExtractorsIndividual:
     """Evalua cada extractor de atributos individualmente via extraction pipeline."""
@@ -314,6 +364,7 @@ class TestAttributeExtractorsIndividual:
     def spacy_nlp(self):
         try:
             from narrative_assistant.nlp.spacy_gpu import load_spacy_model
+
             return load_spacy_model()
         except Exception as e:
             pytest.skip(f"spaCy no disponible: {e}")
@@ -322,6 +373,7 @@ class TestAttributeExtractorsIndividual:
     def regex_extractor(self):
         try:
             from narrative_assistant.nlp.extraction.extractors.regex_extractor import RegexExtractor
+
             return RegexExtractor()
         except Exception as e:
             pytest.skip(f"RegexExtractor no disponible: {e}")
@@ -329,7 +381,10 @@ class TestAttributeExtractorsIndividual:
     @pytest.fixture(scope="class")
     def dependency_extractor(self):
         try:
-            from narrative_assistant.nlp.extraction.extractors.dependency_extractor import DependencyExtractor
+            from narrative_assistant.nlp.extraction.extractors.dependency_extractor import (
+                DependencyExtractor,
+            )
+
             return DependencyExtractor()
         except Exception as e:
             pytest.skip(f"DependencyExtractor no disponible: {e}")
@@ -337,7 +392,10 @@ class TestAttributeExtractorsIndividual:
     @pytest.fixture(scope="class")
     def embeddings_extractor(self):
         try:
-            from narrative_assistant.nlp.extraction.extractors.embeddings_extractor import EmbeddingsExtractor
+            from narrative_assistant.nlp.extraction.extractors.embeddings_extractor import (
+                EmbeddingsExtractor,
+            )
+
             return EmbeddingsExtractor()
         except Exception as e:
             pytest.skip(f"EmbeddingsExtractor no disponible: {e}")
@@ -345,6 +403,7 @@ class TestAttributeExtractorsIndividual:
     def _build_context(self, case, nlp):
         """Construye ExtractionContext desde un caso de ground truth."""
         from narrative_assistant.nlp.extraction.base import ExtractionContext
+
         text = case["text"]
         entities = case["entities"]
 
@@ -392,15 +451,13 @@ class TestAttributeExtractorsIndividual:
             # Check expected
             for entity, key, value in expected:
                 matched = any(
-                    _flexible_match(entity, value, fe, fk, fv)
-                    and _key_match(key, fk)
+                    _flexible_match(entity, value, fe, fk, fv) and _key_match(key, fk)
                     for fe, fk, fv in found_set
                 )
                 if not matched:
                     # Also accept key-agnostic match (value + entity only)
                     matched = any(
-                        _flexible_match(entity, value, fe, fk, fv)
-                        for fe, fk, fv in found_set
+                        _flexible_match(entity, value, fe, fk, fv) for fe, fk, fv in found_set
                     )
                 if matched:
                     metrics.true_positives += 1
@@ -435,10 +492,11 @@ class TestAttributeExtractorsIndividual:
         print(f"\n{m}")
         assert m.true_positives + m.false_negatives > 0
 
-    def test_all_extractors_comparison(self, regex_extractor, dependency_extractor,
-                                        embeddings_extractor, spacy_nlp):
+    def test_all_extractors_comparison(
+        self, regex_extractor, dependency_extractor, embeddings_extractor, spacy_nlp
+    ):
         """Tabla comparativa de todos los extractores individuales."""
-        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stdout.reconfigure(encoding="utf-8")
 
         extractors = [
             (regex_extractor, "regex"),
@@ -447,12 +505,16 @@ class TestAttributeExtractorsIndividual:
         ]
 
         print(f"\n{'=' * 80}")
-        print(f"COMPARACION EXTRACTORES INDIVIDUALES DE ATRIBUTOS")
-        print(f"Ground truth: {len(ATTRIBUTE_GROUND_TRUTH)} casos, "
-              f"{TOTAL_EXPECTED_ATTRS} atributos esperados")
+        print("COMPARACION EXTRACTORES INDIVIDUALES DE ATRIBUTOS")
+        print(
+            f"Ground truth: {len(ATTRIBUTE_GROUND_TRUTH)} casos, "
+            f"{TOTAL_EXPECTED_ATTRS} atributos esperados"
+        )
         print(f"{'=' * 80}")
-        print(f"{'Metodo':30s} | {'P':>5s} {'R':>5s} {'F1':>5s} | "
-              f"{'TP':>3s} {'FP':>3s} {'FN':>3s} | {'ms':>5s}")
+        print(
+            f"{'Metodo':30s} | {'P':>5s} {'R':>5s} {'F1':>5s} | "
+            f"{'TP':>3s} {'FP':>3s} {'FN':>3s} | {'ms':>5s}"
+        )
         print("-" * 80)
 
         all_metrics = []
@@ -476,6 +538,7 @@ class TestAttributeExtractorsIndividual:
 # TEST: ESTRATEGIAS DE COMBINACION (ATRIBUTOS)
 # =============================================================================
 
+
 @pytest.mark.slow
 class TestAttributeCombinationStrategies:
     """Evalua estrategias de combinacion para extractores de atributos."""
@@ -484,6 +547,7 @@ class TestAttributeCombinationStrategies:
     def spacy_nlp(self):
         try:
             from narrative_assistant.nlp.spacy_gpu import load_spacy_model
+
             return load_spacy_model()
         except Exception as e:
             pytest.skip(f"spaCy no disponible: {e}")
@@ -494,16 +558,23 @@ class TestAttributeCombinationStrategies:
         loaded = {}
         try:
             from narrative_assistant.nlp.extraction.extractors.regex_extractor import RegexExtractor
+
             loaded["regex"] = RegexExtractor()
         except Exception:
             pass
         try:
-            from narrative_assistant.nlp.extraction.extractors.dependency_extractor import DependencyExtractor
+            from narrative_assistant.nlp.extraction.extractors.dependency_extractor import (
+                DependencyExtractor,
+            )
+
             loaded["dependency"] = DependencyExtractor()
         except Exception:
             pass
         try:
-            from narrative_assistant.nlp.extraction.extractors.embeddings_extractor import EmbeddingsExtractor
+            from narrative_assistant.nlp.extraction.extractors.embeddings_extractor import (
+                EmbeddingsExtractor,
+            )
+
             loaded["embeddings"] = EmbeddingsExtractor()
         except Exception:
             pass
@@ -514,6 +585,7 @@ class TestAttributeCombinationStrategies:
     def _run_all_extractors(self, extractors, case, nlp):
         """Ejecuta todos los extractores y devuelve resultados por metodo."""
         from narrative_assistant.nlp.extraction.base import ExtractionContext
+
         text = case["text"]
         entities = case["entities"]
 
@@ -564,10 +636,7 @@ class TestAttributeCombinationStrategies:
             unexpected = case.get("unexpected", [])
 
             for entity, key, value in expected:
-                matched = any(
-                    _flexible_match(entity, value, fe, fk, fv)
-                    for fe, fk, fv in combined
-                )
+                matched = any(_flexible_match(entity, value, fe, fk, fv) for fe, fk, fv in combined)
                 if matched:
                     metrics.true_positives += 1
                 else:
@@ -584,6 +653,7 @@ class TestAttributeCombinationStrategies:
 
     def test_strategy_any_vote(self, extractors, spacy_nlp):
         """ANY: acepta atributo si al menos 1 extractor lo encontro."""
+
         def strategy(per_method):
             combined = set()
             for attrs in per_method.values():
@@ -595,6 +665,7 @@ class TestAttributeCombinationStrategies:
 
     def test_strategy_majority_vote(self, extractors, spacy_nlp):
         """MAJORITY: acepta atributo si >50% de extractores lo encontraron."""
+
         def strategy(per_method):
             all_attrs = defaultdict(int)
             for attrs in per_method.values():
@@ -608,6 +679,7 @@ class TestAttributeCombinationStrategies:
 
     def test_strategy_unanimous_vote(self, extractors, spacy_nlp):
         """UNANIMOUS: acepta solo si todos los extractores encontraron el atributo."""
+
         def strategy(per_method):
             if not per_method:
                 return set()
@@ -704,7 +776,9 @@ class TestAttributeCombinationStrategies:
                 if m in per_method:
                     for ent, key, val in per_method[m]:
                         # LLM overrides any existing value for same (ent, key)
-                        combined = {(e, k, v) for e, k, v in combined if not (e == ent and k == key)}
+                        combined = {
+                            (e, k, v) for e, k, v in combined if not (e == ent and k == key)
+                        }
                         combined.add((ent, key, val))
 
             return combined
@@ -748,7 +822,7 @@ class TestAttributeCombinationStrategies:
 
     def test_all_strategies_comparison(self, extractors, spacy_nlp):
         """TABLA COMPARATIVA de todas las estrategias de combinacion."""
-        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stdout.reconfigure(encoding="utf-8")
 
         weights = {"regex": 0.15, "dependency": 0.20, "embeddings": 0.25, "llm": 0.40}
         precision_order = ["regex", "dependency", "embeddings", "llm"]
@@ -758,17 +832,29 @@ class TestAttributeCombinationStrategies:
 
         strategies = {
             "any_vote": lambda pm: set().union(*pm.values()),
-            "majority_vote": lambda pm: {a for a, c in
-                {a: sum(1 for s in pm.values() if a in s) for a in set().union(*pm.values())}.items()
-                if c > len(pm) / 2},
-            "weighted(t=0.15)": lambda pm: {a for a, s in
-                {a: sum(weights.get(m, 0.15) for m, attrs in pm.items() if a in attrs)
-                 for a in set().union(*pm.values())}.items()
-                if s >= 0.15},
-            "weighted(t=0.30)": lambda pm: {a for a, s in
-                {a: sum(weights.get(m, 0.15) for m, attrs in pm.items() if a in attrs)
-                 for a in set().union(*pm.values())}.items()
-                if s >= 0.30},
+            "majority_vote": lambda pm: {
+                a
+                for a, c in {
+                    a: sum(1 for s in pm.values() if a in s) for a in set().union(*pm.values())
+                }.items()
+                if c > len(pm) / 2
+            },
+            "weighted(t=0.15)": lambda pm: {
+                a
+                for a, s in {
+                    a: sum(weights.get(m, 0.15) for m, attrs in pm.items() if a in attrs)
+                    for a in set().union(*pm.values())
+                }.items()
+                if s >= 0.15
+            },
+            "weighted(t=0.30)": lambda pm: {
+                a
+                for a, s in {
+                    a: sum(weights.get(m, 0.15) for m, attrs in pm.items() if a in attrs)
+                    for a in set().union(*pm.values())
+                }.items()
+                if s >= 0.30
+            },
         }
 
         # Sequential precision first
@@ -776,12 +862,14 @@ class TestAttributeCombinationStrategies:
             combined = set()
             seen = set()
             for m in precision_order:
-                if m not in pm: continue
+                if m not in pm:
+                    continue
                 for e, k, v in pm[m]:
                     if (e, k) not in seen:
                         combined.add((e, k, v))
                         seen.add((e, k))
             return combined
+
         strategies["seq_precision_first"] = seq_prec
 
         # Sequential recall first
@@ -789,19 +877,22 @@ class TestAttributeCombinationStrategies:
             combined = set()
             seen = set()
             for m in recall_order:
-                if m not in pm: continue
+                if m not in pm:
+                    continue
                 for e, k, v in pm[m]:
                     if (e, k) not in seen:
                         combined.add((e, k, v))
                         seen.add((e, k))
             return combined
+
         strategies["seq_recall_first"] = seq_rec
 
         # Multilayer
         def multilayer(pm):
             combined = set()
             for m in syntactic:
-                if m in pm: combined |= pm[m]
+                if m in pm:
+                    combined |= pm[m]
             l1_keys = {(e, k) for e, k, v in combined}
             for m in semantic:
                 if m in pm:
@@ -809,16 +900,20 @@ class TestAttributeCombinationStrategies:
                         if (e, k) not in l1_keys:
                             combined.add((e, k, v))
             return combined
+
         strategies["multilayer"] = multilayer
 
         print(f"\n{'=' * 85}")
-        print(f"COMPARACION ESTRATEGIAS DE COMBINACION (ATRIBUTOS)")
+        print("COMPARACION ESTRATEGIAS DE COMBINACION (ATRIBUTOS)")
         print(f"Extractores: {list(extractors.keys())}")
-        print(f"Ground truth: {len(ATTRIBUTE_GROUND_TRUTH)} casos, "
-              f"{TOTAL_EXPECTED_ATTRS} esperados")
+        print(
+            f"Ground truth: {len(ATTRIBUTE_GROUND_TRUTH)} casos, {TOTAL_EXPECTED_ATTRS} esperados"
+        )
         print(f"{'=' * 85}")
-        print(f"{'Estrategia':30s} | {'P':>5s} {'R':>5s} {'F1':>5s} | "
-              f"{'TP':>3s} {'FP':>3s} {'FN':>3s} | {'ms':>6s}")
+        print(
+            f"{'Estrategia':30s} | {'P':>5s} {'R':>5s} {'F1':>5s} | "
+            f"{'TP':>3s} {'FP':>3s} {'FN':>3s} | {'ms':>6s}"
+        )
         print("-" * 85)
 
         all_metrics = []
@@ -840,6 +935,7 @@ class TestAttributeCombinationStrategies:
 # TEST: METODOS DE FUSION INDIVIDUAL + COMBINADOS
 # =============================================================================
 
+
 @pytest.mark.slow
 class TestFusionMethodsComparison:
     """Evalua metodos de fusion de entidades."""
@@ -848,6 +944,7 @@ class TestFusionMethodsComparison:
     def fusion_service(self):
         try:
             from narrative_assistant.entities.semantic_fusion import SemanticFusionService
+
             return SemanticFusionService()
         except Exception as e:
             pytest.skip(f"SemanticFusionService no disponible: {e}")
@@ -911,6 +1008,7 @@ class TestFusionMethodsComparison:
 
     def test_string_similarity(self):
         """String similarity: SequenceMatcher >= 0.7."""
+
         def predict(n1, n2):
             return SequenceMatcher(None, n1.lower(), n2.lower()).ratio() >= 0.7
 
@@ -919,6 +1017,7 @@ class TestFusionMethodsComparison:
 
     def test_string_similarity_strict(self):
         """String similarity con umbral alto (0.85)."""
+
         def predict(n1, n2):
             return SequenceMatcher(None, n1.lower(), n2.lower()).ratio() >= 0.85
 
@@ -979,7 +1078,7 @@ class TestFusionMethodsComparison:
 
     def test_all_fusion_comparison(self, fusion_service):
         """TABLA COMPARATIVA de todos los metodos de fusion."""
-        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stdout.reconfigure(encoding="utf-8")
         try:
             from narrative_assistant.entities.semantic_fusion import normalize_for_comparison
         except ImportError:
@@ -992,11 +1091,13 @@ class TestFusionMethodsComparison:
             a = normalize_for_comparison(n1)
             b = normalize_for_comparison(n2)
             return a == b or a in b or b in a
+
         methods["normalization"] = norm_pred
 
         # Normalization + Hypocoristics
         try:
             from narrative_assistant.entities.semantic_fusion import names_match_after_normalization
+
             methods["norm+hypocoristics"] = names_match_after_normalization
         except ImportError:
             pass
@@ -1009,6 +1110,7 @@ class TestFusionMethodsComparison:
 
         # Semantic
         from narrative_assistant.entities.models import Entity, EntityType
+
         def sem_pred(n1, n2):
             try:
                 e1 = Entity(canonical_name=n1, entity_type=EntityType.CHARACTER)
@@ -1017,15 +1119,22 @@ class TestFusionMethodsComparison:
                 return r.should_merge if hasattr(r, "should_merge") else bool(r)
             except Exception:
                 return False
+
         methods["semantic"] = sem_pred
 
         # Combinations
         def any_ns(n1, n2):
             return norm_pred(n1, n2) or SequenceMatcher(None, n1.lower(), n2.lower()).ratio() >= 0.7
+
         methods["any(norm+sim0.7)"] = any_ns
 
         def any_all(n1, n2):
-            return norm_pred(n1, n2) or SequenceMatcher(None, n1.lower(), n2.lower()).ratio() >= 0.7 or sem_pred(n1, n2)
+            return (
+                norm_pred(n1, n2)
+                or SequenceMatcher(None, n1.lower(), n2.lower()).ratio() >= 0.7
+                or sem_pred(n1, n2)
+            )
+
         methods["any(norm+sim+sem)"] = any_all
 
         def maj_all(n1, n2):
@@ -1035,6 +1144,7 @@ class TestFusionMethodsComparison:
                 sem_pred(n1, n2),
             ]
             return sum(votes) >= 2
+
         methods["majority(norm+sim+sem)"] = maj_all
 
         # Sequential: norm -> sim -> sem
@@ -1044,16 +1154,21 @@ class TestFusionMethodsComparison:
             if SequenceMatcher(None, n1.lower(), n2.lower()).ratio() >= 0.8:
                 return True
             return sem_pred(n1, n2)
+
         methods["seq(norm->sim0.8->sem)"] = seq_norm_first
 
         print(f"\n{'=' * 85}")
-        print(f"COMPARACION METODOS DE FUSION")
-        print(f"Ground truth: {len(FUSION_GROUND_TRUTH)} pares "
-              f"({sum(1 for c in FUSION_GROUND_TRUTH if c['should_merge'])} merge, "
-              f"{sum(1 for c in FUSION_GROUND_TRUTH if not c['should_merge'])} no-merge)")
+        print("COMPARACION METODOS DE FUSION")
+        print(
+            f"Ground truth: {len(FUSION_GROUND_TRUTH)} pares "
+            f"({sum(1 for c in FUSION_GROUND_TRUTH if c['should_merge'])} merge, "
+            f"{sum(1 for c in FUSION_GROUND_TRUTH if not c['should_merge'])} no-merge)"
+        )
         print(f"{'=' * 85}")
-        print(f"{'Metodo':30s} | {'P':>5s} {'R':>5s} {'F1':>5s} | "
-              f"{'TP':>3s} {'FP':>3s} {'FN':>3s} {'TN':>3s} | {'ms':>6s}")
+        print(
+            f"{'Metodo':30s} | {'P':>5s} {'R':>5s} {'F1':>5s} | "
+            f"{'TP':>3s} {'FP':>3s} {'FN':>3s} {'TN':>3s} | {'ms':>6s}"
+        )
         print("-" * 85)
 
         all_metrics = []
@@ -1071,6 +1186,7 @@ class TestFusionMethodsComparison:
 # TEST: NER INDIVIDUAL + COMPARACION
 # =============================================================================
 
+
 @pytest.mark.slow
 class TestNERMethodsComparison:
     """Evalua NER base vs NER con post-procesado."""
@@ -1079,6 +1195,7 @@ class TestNERMethodsComparison:
     def nlp(self):
         try:
             from narrative_assistant.nlp.spacy_gpu import load_spacy_model
+
             return load_spacy_model()
         except Exception as e:
             pytest.skip(f"spaCy no disponible: {e}")
@@ -1100,7 +1217,8 @@ class TestNERMethodsComparison:
             found_lower = [n.lower() for n in found_names]
             for exp_text, exp_label in expected:
                 matched = any(
-                    exp_text.lower() in fn or fn in exp_text.lower()
+                    exp_text.lower() in fn
+                    or fn in exp_text.lower()
                     or exp_text.lower().split()[-1] in fn
                     for fn in found_lower
                 )
@@ -1114,6 +1232,7 @@ class TestNERMethodsComparison:
 
     def test_spacy_base(self, nlp):
         """spaCy NER base."""
+
         def extract(text):
             doc = nlp(text)
             return [ent.text for ent in doc.ents]
@@ -1125,6 +1244,7 @@ class TestNERMethodsComparison:
         """NERExtractor con post-procesado."""
         try:
             from narrative_assistant.nlp.ner import NERExtractor
+
             extractor = NERExtractor()
         except Exception as e:
             pytest.skip(f"NERExtractor no disponible: {e}")
@@ -1140,14 +1260,16 @@ class TestNERMethodsComparison:
                 entities = result.entities
             else:
                 entities = []
-            return [getattr(e, "text", None) or getattr(e, "canonical_form", str(e)) for e in entities]
+            return [
+                getattr(e, "text", None) or getattr(e, "canonical_form", str(e)) for e in entities
+            ]
 
         m = self._eval_ner("ner_extractor", extract)
         print(f"\n{m}")
 
     def test_ner_comparison(self, nlp):
         """Tabla comparativa NER."""
-        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stdout.reconfigure(encoding="utf-8")
 
         # spaCy base
         def spacy_extract(text):
@@ -1159,7 +1281,9 @@ class TestNERMethodsComparison:
         # NERExtractor
         try:
             from narrative_assistant.nlp.ner import NERExtractor
+
             extractor = NERExtractor()
+
             def ner_extract(text):
                 result = extractor.extract_entities(text)
                 if hasattr(result, "is_success") and result.is_success:
@@ -1169,15 +1293,21 @@ class TestNERMethodsComparison:
                     entities = getattr(result.value, "entities", [])
                 else:
                     entities = []
-                return [getattr(e, "text", None) or getattr(e, "canonical_form", str(e)) for e in entities]
+                return [
+                    getattr(e, "text", None) or getattr(e, "canonical_form", str(e))
+                    for e in entities
+                ]
+
             methods["ner_extractor"] = ner_extract
         except Exception:
             pass
 
         print(f"\n{'=' * 85}")
-        print(f"COMPARACION METODOS NER")
-        print(f"Ground truth: {len(NER_GROUND_TRUTH)} casos, "
-              f"{sum(len(c['expected']) for c in NER_GROUND_TRUTH)} entidades")
+        print("COMPARACION METODOS NER")
+        print(
+            f"Ground truth: {len(NER_GROUND_TRUTH)} casos, "
+            f"{sum(len(c['expected']) for c in NER_GROUND_TRUTH)} entidades"
+        )
         print(f"{'=' * 85}")
 
         for name, fn in methods.items():
@@ -1191,6 +1321,7 @@ class TestNERMethodsComparison:
 # TEST: SPELLING CHECKER POR VOTANTE
 # =============================================================================
 
+
 @pytest.mark.slow
 class TestSpellingVotersComparison:
     """Evalua votantes de ortografia individualmente y combinados."""
@@ -1199,6 +1330,7 @@ class TestSpellingVotersComparison:
     def checker(self):
         try:
             from narrative_assistant.nlp.orthography.voting_checker import VotingSpellingChecker
+
             return VotingSpellingChecker()
         except Exception as e:
             pytest.skip(f"VotingSpellingChecker no disponible: {e}")
@@ -1253,7 +1385,7 @@ class TestSpellingVotersComparison:
 
     def test_spelling_detail(self, checker):
         """Detalle por caso para diagnostico."""
-        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stdout.reconfigure(encoding="utf-8")
 
         print(f"\n{'=' * 85}")
         print("DETALLE SPELLING POR CASO")
@@ -1266,7 +1398,11 @@ class TestSpellingVotersComparison:
             try:
                 result = checker.check(text)
                 if hasattr(result, "value"):
-                    report = result.value if (hasattr(result, "is_success") and result.is_success) else None
+                    report = (
+                        result.value
+                        if (hasattr(result, "is_success") and result.is_success)
+                        else None
+                    )
                 else:
                     report = result
 
@@ -1277,7 +1413,7 @@ class TestSpellingVotersComparison:
                     if word:
                         found_words.add(word.lower())
 
-                print(f"\nCaso {i+1}: \"{text[:70]}\"")
+                print(f'\nCaso {i + 1}: "{text[:70]}"')
                 print(f"  Errores plantados: {[w for w, _ in errors]}")
                 print(f"  Detectados: {found_words}")
                 for wrong, correct in errors:
@@ -1285,7 +1421,7 @@ class TestSpellingVotersComparison:
                     print(f"  [{status}] {wrong} -> {correct}")
 
             except Exception as e:
-                print(f"\nCaso {i+1}: ERROR - {e}")
+                print(f"\nCaso {i + 1}: ERROR - {e}")
 
         print("=" * 85)
 
@@ -1293,6 +1429,7 @@ class TestSpellingVotersComparison:
 # =============================================================================
 # TEST: PIPELINE DE EXTRACCION COMPLETO
 # =============================================================================
+
 
 @pytest.mark.slow
 class TestExtractionPipelineIntegrated:
@@ -1305,6 +1442,7 @@ class TestExtractionPipelineIntegrated:
                 AttributeExtractionPipeline,
                 PipelineConfig,
             )
+
             config = PipelineConfig(
                 use_regex=True,
                 use_dependency=True,
@@ -1319,7 +1457,7 @@ class TestExtractionPipelineIntegrated:
 
     def test_pipeline_evaluation(self, pipeline):
         """Evalua el pipeline orquestado completo."""
-        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stdout.reconfigure(encoding="utf-8")
         metrics = MethodMetrics(method_name="extraction_pipeline")
         t0 = time.perf_counter()
 
@@ -1340,7 +1478,7 @@ class TestExtractionPipelineIntegrated:
                     chapter=1,
                 )
             except Exception as e:
-                print(f"Caso {i+1}: ERROR - {e}")
+                print(f"Caso {i + 1}: ERROR - {e}")
                 metrics.false_negatives += len(expected)
                 continue
 
@@ -1354,13 +1492,14 @@ class TestExtractionPipelineIntegrated:
                 conf = getattr(attr, "final_confidence", 0)
                 sources = getattr(attr, "sources", [])
                 found_set.add((ent, key_str.lower(), val))
-                print(f"  [{consensus:20s} conf={conf:.2f}] {ent}: {key_str}={val} "
-                      f"sources={[s[0].value if hasattr(s[0], 'value') else str(s[0]) for s in sources]}")
+                print(
+                    f"  [{consensus:20s} conf={conf:.2f}] {ent}: {key_str}={val} "
+                    f"sources={[s[0].value if hasattr(s[0], 'value') else str(s[0]) for s in sources]}"
+                )
 
             for entity, key, value in expected:
                 matched = any(
-                    _flexible_match(entity, value, fe, fk, fv)
-                    for fe, fk, fv in found_set
+                    _flexible_match(entity, value, fe, fk, fv) for fe, fk, fv in found_set
                 )
                 if matched:
                     metrics.true_positives += 1
@@ -1384,13 +1523,14 @@ class TestExtractionPipelineIntegrated:
 # TEST: RESUMEN FINAL CONSOLIDADO
 # =============================================================================
 
+
 @pytest.mark.slow
 class TestFinalSummary:
     """Genera tabla resumen consolidada de todos los sistemas."""
 
     def test_print_recommendations(self):
         """Tabla de recomendaciones basada en evaluaciones."""
-        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stdout.reconfigure(encoding="utf-8")
 
         print(f"\n{'=' * 85}")
         print("RESUMEN Y RECOMENDACIONES (basado en evaluaciones medidas)")

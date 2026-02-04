@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Golden Corpus Harness — marco unificado de evaluacion con deteccion de regresiones.
 
@@ -18,7 +17,7 @@ import json
 import logging
 import sys
 import time
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -28,7 +27,7 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 sys.path.insert(0, str(Path(__file__).parent))
 
-from gold_standards import ALL_GOLD_STANDARDS, ADVANCED_GOLD_STANDARDS
+from gold_standards import ADVANCED_GOLD_STANDARDS, ALL_GOLD_STANDARDS
 from run_evaluation import (
     EvaluationMetrics,
     EvaluationReport,
@@ -51,6 +50,7 @@ DEFAULT_REGRESSION_THRESHOLD = 5.0
 @dataclass
 class CapabilityScore:
     """Metricas de una capacidad en una evaluacion."""
+
     capability: str
     precision: float = 0.0
     recall: float = 0.0
@@ -63,6 +63,7 @@ class CapabilityScore:
 @dataclass
 class GoldStandardResult:
     """Resultado completo de un gold standard."""
+
     name: str
     text_file: str
     scores: dict[str, CapabilityScore] = field(default_factory=dict)
@@ -79,6 +80,7 @@ class GoldStandardResult:
 @dataclass
 class RegressionInfo:
     """Informacion de una regresion detectada."""
+
     gold_standard: str
     capability: str
     baseline_f1: float
@@ -94,6 +96,7 @@ class RegressionInfo:
 @dataclass
 class ImprovementInfo:
     """Informacion de una mejora detectada."""
+
     gold_standard: str
     capability: str
     baseline_f1: float
@@ -104,6 +107,7 @@ class ImprovementInfo:
 @dataclass
 class HarnessReport:
     """Reporte completo del harness."""
+
     timestamp: str
     results: dict[str, GoldStandardResult] = field(default_factory=dict)
     regressions: list[RegressionInfo] = field(default_factory=list)
@@ -133,6 +137,7 @@ class HarnessReport:
 # ============================================================================
 # GoldenCorpusHarness
 # ============================================================================
+
 
 class GoldenCorpusHarness:
     """
@@ -164,7 +169,7 @@ class GoldenCorpusHarness:
             return self._baseline
 
         if self.baseline_path.exists():
-            with open(self.baseline_path, "r", encoding="utf-8") as f:
+            with open(self.baseline_path, encoding="utf-8") as f:
                 self._baseline = json.load(f)
         else:
             self._baseline = {}
@@ -212,7 +217,7 @@ class GoldenCorpusHarness:
         history = []
         if self.history_path.exists():
             try:
-                with open(self.history_path, "r", encoding="utf-8") as f:
+                with open(self.history_path, encoding="utf-8") as f:
                     history = json.load(f)
             except (json.JSONDecodeError, IOError):
                 history = []
@@ -253,8 +258,7 @@ class GoldenCorpusHarness:
         all_standards = {**ALL_GOLD_STANDARDS, **ADVANCED_GOLD_STANDARDS}
         if name not in all_standards:
             raise ValueError(
-                f"Gold standard '{name}' no encontrado. "
-                f"Disponibles: {list(all_standards.keys())}"
+                f"Gold standard '{name}' no encontrado. Disponibles: {list(all_standards.keys())}"
             )
 
         gs = all_standards[name]
@@ -310,21 +314,25 @@ class GoldenCorpusHarness:
                 delta = current_f1 - baseline_f1
 
                 if delta < -self.regression_threshold:
-                    regressions.append(RegressionInfo(
-                        gold_standard=gs_name,
-                        capability=cap_name,
-                        baseline_f1=baseline_f1,
-                        current_f1=current_f1,
-                        delta=delta,
-                    ))
+                    regressions.append(
+                        RegressionInfo(
+                            gold_standard=gs_name,
+                            capability=cap_name,
+                            baseline_f1=baseline_f1,
+                            current_f1=current_f1,
+                            delta=delta,
+                        )
+                    )
                 elif delta > self.regression_threshold:
-                    improvements.append(ImprovementInfo(
-                        gold_standard=gs_name,
-                        capability=cap_name,
-                        baseline_f1=baseline_f1,
-                        current_f1=current_f1,
-                        delta=delta,
-                    ))
+                    improvements.append(
+                        ImprovementInfo(
+                            gold_standard=gs_name,
+                            capability=cap_name,
+                            baseline_f1=baseline_f1,
+                            current_f1=current_f1,
+                            delta=delta,
+                        )
+                    )
 
         return regressions, improvements
 
@@ -471,9 +479,7 @@ class GoldenCorpusHarness:
                     lines.append(f"  ERROR: {err}")
                 continue
 
-            lines.append(
-                f"  {'Capacidad':<22} | {'Precision':>9} | {'Recall':>7} | {'F1':>7}"
-            )
+            lines.append(f"  {'Capacidad':<22} | {'Precision':>9} | {'Recall':>7} | {'F1':>7}")
             lines.append("  " + "-" * 54)
             for cap_name, score in gs_result.scores.items():
                 lines.append(
@@ -485,9 +491,7 @@ class GoldenCorpusHarness:
         lines.append(f"\n{sep}")
         lines.append("METRICAS AGREGADAS (micro-averaged)")
         lines.append(sep)
-        lines.append(
-            f"  {'Capacidad':<22} | {'Precision':>9} | {'Recall':>7} | {'F1':>7}"
-        )
+        lines.append(f"  {'Capacidad':<22} | {'Precision':>9} | {'Recall':>7} | {'F1':>7}")
         lines.append("  " + "-" * 54)
         for cap_name, score in sorted(
             report.aggregate_scores.items(), key=lambda x: x[1].f1, reverse=True
@@ -502,9 +506,7 @@ class GoldenCorpusHarness:
         # Regresiones
         if report.regressions:
             lines.append(f"\n{sep}")
-            lines.append(
-                f"REGRESIONES DETECTADAS ({len(report.regressions)})"
-            )
+            lines.append(f"REGRESIONES DETECTADAS ({len(report.regressions)})")
             lines.append(sep)
             for reg in report.regressions:
                 marker = "CRITICA" if reg.is_critical else "WARNING"
@@ -519,9 +521,7 @@ class GoldenCorpusHarness:
         # Mejoras
         if report.improvements:
             lines.append(f"\n{sep}")
-            lines.append(
-                f"MEJORAS DETECTADAS ({len(report.improvements)})"
-            )
+            lines.append(f"MEJORAS DETECTADAS ({len(report.improvements)})")
             lines.append(sep)
             for imp in report.improvements:
                 lines.append(
@@ -537,6 +537,7 @@ class GoldenCorpusHarness:
 # CLI
 # ============================================================================
 
+
 def main():
     """Punto de entrada CLI del harness."""
     import argparse
@@ -545,27 +546,38 @@ def main():
         description="Golden Corpus Harness: evaluacion y deteccion de regresiones"
     )
     parser.add_argument(
-        "--gold", "-g", nargs="*",
+        "--gold",
+        "-g",
+        nargs="*",
         help="Gold standards especificos (default: todos los de desarrollo)",
     )
     parser.add_argument(
-        "--capability", "-c", nargs="*",
+        "--capability",
+        "-c",
+        nargs="*",
         help="Capacidades especificas a evaluar",
     )
     parser.add_argument(
-        "--include-advanced", action="store_true",
+        "--include-advanced",
+        action="store_true",
         help="Incluir gold standards avanzados",
     )
     parser.add_argument(
-        "--threshold", "-t", type=float, default=DEFAULT_REGRESSION_THRESHOLD,
+        "--threshold",
+        "-t",
+        type=float,
+        default=DEFAULT_REGRESSION_THRESHOLD,
         help=f"Umbral de regresion en pp de F1 (default: {DEFAULT_REGRESSION_THRESHOLD})",
     )
     parser.add_argument(
-        "--update-baseline", action="store_true",
+        "--update-baseline",
+        action="store_true",
         help="Actualizar baseline con los resultados actuales",
     )
     parser.add_argument(
-        "--verbose", "-v", action="store_true",
+        "--verbose",
+        "-v",
+        action="store_true",
         help="Mostrar detalles",
     )
 

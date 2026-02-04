@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Tests para el módulo de energía de oraciones (sentence_energy).
 
@@ -11,6 +10,7 @@ Cubre:
 """
 
 import pytest
+
 from narrative_assistant.nlp.style.sentence_energy import SentenceEnergyDetector
 
 
@@ -30,12 +30,14 @@ def _unwrap(result):
 # Smoke tests
 # =============================================================================
 
+
 class TestSentenceEnergySmoke:
     """Tests básicos de importación y creación."""
 
     def test_import(self):
         """El módulo se importa correctamente."""
         from narrative_assistant.nlp.style.sentence_energy import SentenceEnergyDetector
+
         assert SentenceEnergyDetector is not None
 
     def test_create_detector(self, detector):
@@ -51,6 +53,7 @@ class TestSentenceEnergySmoke:
 # =============================================================================
 # Happy path
 # =============================================================================
+
 
 class TestSentenceEnergyHappyPath:
     """Tests de análisis normal."""
@@ -86,6 +89,7 @@ class TestSentenceEnergyHappyPath:
 # Error path
 # =============================================================================
 
+
 class TestSentenceEnergyErrorPath:
     """Tests de manejo de errores."""
 
@@ -112,6 +116,7 @@ class TestSentenceEnergyErrorPath:
 # Calibración española
 # =============================================================================
 
+
 class TestSpanishCalibration:
     """Tests de calibración específica para español."""
 
@@ -137,8 +142,7 @@ class TestSpanishCalibration:
         result = _unwrap(detector.analyze(text))
         for s in result.sentences:
             weak_reasons = [
-                i for i in s.issues
-                if 'débil' in str(i).lower() or 'weak' in str(i).lower()
+                i for i in s.issues if "débil" in str(i).lower() or "weak" in str(i).lower()
             ]
             assert len(weak_reasons) == 0, f"Tiempos compuestos no deben penalizar: {weak_reasons}"
 
@@ -153,15 +157,16 @@ class TestSpanishCalibration:
         text = "La habitación estaba en silencio. La posición del ejército era estratégica."
         result = _unwrap(detector.analyze(text))
         for s in result.sentences:
-            nom_issues = [i for i in s.issues if 'nominal' in str(i).lower()]
+            nom_issues = [i for i in s.issues if "nominal" in str(i).lower()]
             for issue in nom_issues:
-                assert 'habitación' not in str(issue), "'habitación' es léxica, no nominalización"
-                assert 'posición' not in str(issue), "'posición' es léxica, no nominalización"
+                assert "habitación" not in str(issue), "'habitación' es léxica, no nominalización"
+                assert "posición" not in str(issue), "'posición' es léxica, no nominalización"
 
 
 # =============================================================================
 # Low threshold parameter
 # =============================================================================
+
 
 class TestLowThreshold:
     """Tests del parámetro low_threshold."""

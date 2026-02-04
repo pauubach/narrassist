@@ -1,18 +1,19 @@
 """Tests para el módulo de coherencia emocional."""
 
 import pytest
+
 from narrative_assistant.analysis.emotional_coherence import (
+    EMOTION_SENTIMENT_MAP,
+    OPPOSITE_EMOTIONS,
     EmotionalCoherenceChecker,
     EmotionalIncoherence,
     IncoherenceType,
     get_emotional_coherence_checker,
     reset_emotional_coherence_checker,
-    EMOTION_SENTIMENT_MAP,
-    OPPOSITE_EMOTIONS,
 )
 from narrative_assistant.nlp.sentiment import (
-    Sentiment,
     Emotion,
+    Sentiment,
     SentimentAnalyzer,
 )
 

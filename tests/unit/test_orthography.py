@@ -13,31 +13,37 @@ class TestOrthographyImports:
     def test_import_orthography_module(self):
         """Verifica importación del módulo."""
         from narrative_assistant.nlp import orthography
+
         assert orthography is not None
 
     def test_import_spelling_checker(self):
         """Verifica importación de SpellingChecker."""
         from narrative_assistant.nlp.orthography import SpellingChecker
+
         assert SpellingChecker is not None
 
     def test_import_get_spelling_checker(self):
         """Verifica importación de get_spelling_checker."""
         from narrative_assistant.nlp.orthography import get_spelling_checker
+
         assert callable(get_spelling_checker)
 
     def test_import_spelling_issue(self):
         """Verifica importación de SpellingIssue."""
         from narrative_assistant.nlp.orthography import SpellingIssue
+
         assert SpellingIssue is not None
 
     def test_import_spelling_report(self):
         """Verifica importación de SpellingReport."""
         from narrative_assistant.nlp.orthography import SpellingReport
+
         assert SpellingReport is not None
 
     def test_import_enums(self):
         """Verifica importación de enums."""
         from narrative_assistant.nlp.orthography import SpellingErrorType, SpellingSeverity
+
         assert SpellingErrorType is not None
         assert SpellingSeverity is not None
 
@@ -80,8 +86,8 @@ class TestSpellingIssue:
     def test_create_issue(self):
         """Crea un issue de ortografía."""
         from narrative_assistant.nlp.orthography import (
-            SpellingIssue,
             SpellingErrorType,
+            SpellingIssue,
             SpellingSeverity,
         )
 
@@ -118,9 +124,9 @@ class TestSpellingReport:
     def test_report_with_issues(self):
         """Crea reporte con issues."""
         from narrative_assistant.nlp.orthography import (
-            SpellingReport,
-            SpellingIssue,
             SpellingErrorType,
+            SpellingIssue,
+            SpellingReport,
             SpellingSeverity,
         )
 
@@ -222,21 +228,25 @@ class TestCommonAccentErrors:
     def checker(self):
         """Checker para tests."""
         from narrative_assistant.nlp.orthography import get_spelling_checker, reset_spelling_checker
+
         reset_spelling_checker()
         return get_spelling_checker()
 
-    @pytest.mark.parametrize("wrong,correct", [
-        ("habia", "había"),
-        ("tenia", "tenía"),
-        ("sabia", "sabía"),
-        ("decia", "decía"),
-        ("hacia", "hacía"),
-        ("queria", "quería"),
-        ("podia", "podía"),
-        ("debia", "debía"),
-        ("venia", "venía"),
-        ("sentia", "sentía"),
-    ])
+    @pytest.mark.parametrize(
+        "wrong,correct",
+        [
+            ("habia", "había"),
+            ("tenia", "tenía"),
+            ("sabia", "sabía"),
+            ("decia", "decía"),
+            ("hacia", "hacía"),
+            ("queria", "quería"),
+            ("podia", "podía"),
+            ("debia", "debía"),
+            ("venia", "venía"),
+            ("sentia", "sentía"),
+        ],
+    )
     def test_common_accent_patterns(self, checker, wrong, correct):
         """Verifica patrones comunes de errores de acentuación."""
         # Verificamos que el checker pueda procesar el texto sin errores
@@ -254,14 +264,18 @@ class TestHomophoneDetection:
     def checker(self):
         """Checker para tests."""
         from narrative_assistant.nlp.orthography import get_spelling_checker, reset_spelling_checker
+
         reset_spelling_checker()
         return get_spelling_checker()
 
-    @pytest.mark.parametrize("text,potential_homophone", [
-        ("Haber si vienes", "a ver"),
-        ("Valla que bien", "vaya"),
-        ("Ola que tal", "hola"),
-    ])
+    @pytest.mark.parametrize(
+        "text,potential_homophone",
+        [
+            ("Haber si vienes", "a ver"),
+            ("Valla que bien", "vaya"),
+            ("Ola que tal", "hola"),
+        ],
+    )
     def test_homophone_patterns(self, checker, text, potential_homophone):
         """Verifica detección de homófonos comunes."""
         result = checker.check(text)

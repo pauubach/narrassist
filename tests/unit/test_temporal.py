@@ -2,19 +2,20 @@
 Tests para el módulo de análisis temporal.
 """
 
-import pytest
 from datetime import date
 
+import pytest
+
 from narrative_assistant.temporal import (
-    TemporalMarkerExtractor,
+    InconsistencyType,
     MarkerType,
-    TemporalMarker,
-    TimelineBuilder,
-    Timeline,
-    TimelineResolution,
     NarrativeOrder,
     TemporalConsistencyChecker,
-    InconsistencyType,
+    TemporalMarker,
+    TemporalMarkerExtractor,
+    Timeline,
+    TimelineBuilder,
+    TimelineResolution,
 )
 
 
@@ -258,8 +259,8 @@ class TestTemporalConsistencyChecker:
         """Filtra inconsistencias por severidad."""
         # Crear una inconsistencia manualmente
         from narrative_assistant.temporal.inconsistencies import (
-            TemporalInconsistency,
             InconsistencySeverity,
+            TemporalInconsistency,
         )
 
         checker.inconsistencies = [

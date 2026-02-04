@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Tests de integración: proyecto inexistente devuelve 404.
 
@@ -14,7 +13,7 @@ Endpoints cubiertos:
 
 import sys
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -25,6 +24,7 @@ if _api_dir not in sys.path:
 
 try:
     from fastapi.testclient import TestClient
+
     HAS_FASTAPI = True
 except ImportError:
     HAS_FASTAPI = False
@@ -32,13 +32,17 @@ except ImportError:
 
 def _make_failure_result():
     """Crear un Result con is_failure=True."""
+    from narrative_assistant.core.errors import ErrorSeverity, NarrativeError
     from narrative_assistant.core.result import Result
-    from narrative_assistant.core.errors import NarrativeError, ErrorSeverity
 
-    return Result(errors=[NarrativeError(
-        message="Not found",
-        severity=ErrorSeverity.FATAL,
-    )])
+    return Result(
+        errors=[
+            NarrativeError(
+                message="Not found",
+                severity=ErrorSeverity.FATAL,
+            )
+        ]
+    )
 
 
 @pytest.fixture
@@ -69,33 +73,25 @@ class TestProjectNotFound404:
     def test_narrative_templates_404(self, api_client):
         """GET /api/projects/{id}/narrative-templates → 404."""
         resp = api_client.get(f"/api/projects/{NONEXISTENT_ID}/narrative-templates")
-        assert resp.status_code == 404, (
-            f"Esperado 404, recibido {resp.status_code}: {resp.text}"
-        )
+        assert resp.status_code == 404, f"Esperado 404, recibido {resp.status_code}: {resp.text}"
         assert "no encontrado" in resp.json()["detail"].lower()
 
     def test_narrative_health_404(self, api_client):
         """GET /api/projects/{id}/narrative-health → 404."""
         resp = api_client.get(f"/api/projects/{NONEXISTENT_ID}/narrative-health")
-        assert resp.status_code == 404, (
-            f"Esperado 404, recibido {resp.status_code}: {resp.text}"
-        )
+        assert resp.status_code == 404, f"Esperado 404, recibido {resp.status_code}: {resp.text}"
         assert "no encontrado" in resp.json()["detail"].lower()
 
     def test_character_archetypes_404(self, api_client):
         """GET /api/projects/{id}/character-archetypes → 404."""
         resp = api_client.get(f"/api/projects/{NONEXISTENT_ID}/character-archetypes")
-        assert resp.status_code == 404, (
-            f"Esperado 404, recibido {resp.status_code}: {resp.text}"
-        )
+        assert resp.status_code == 404, f"Esperado 404, recibido {resp.status_code}: {resp.text}"
         assert "no encontrado" in resp.json()["detail"].lower()
 
     def test_sentence_energy_404(self, api_client):
         """GET /api/projects/{id}/sentence-energy → 404."""
         resp = api_client.get(f"/api/projects/{NONEXISTENT_ID}/sentence-energy")
-        assert resp.status_code == 404, (
-            f"Esperado 404, recibido {resp.status_code}: {resp.text}"
-        )
+        assert resp.status_code == 404, f"Esperado 404, recibido {resp.status_code}: {resp.text}"
         assert "no encontrado" in resp.json()["detail"].lower()
 
 

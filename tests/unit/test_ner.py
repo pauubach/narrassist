@@ -3,7 +3,8 @@ Tests unitarios para extracción de entidades (NER).
 """
 
 import pytest
-from narrative_assistant.nlp.ner import NERExtractor, EntityLabel
+
+from narrative_assistant.nlp.ner import EntityLabel, NERExtractor
 
 
 class TestNERExtractor:

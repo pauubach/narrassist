@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Evaluación NER en datos NO VISTOS durante desarrollo.
 
@@ -17,18 +16,18 @@ java17_paths = [
 ]
 for java_path in java17_paths:
     if Path(java_path).exists():
-        os.environ['JAVA_HOME'] = java_path
-        bin_path = f"{java_path}\\bin" if os.name == 'nt' else f"{java_path}/bin"
-        os.environ['PATH'] = bin_path + os.pathsep + os.environ.get('PATH', '')
+        os.environ["JAVA_HOME"] = java_path
+        bin_path = f"{java_path}\\bin" if os.name == "nt" else f"{java_path}/bin"
+        os.environ["PATH"] = bin_path + os.pathsep + os.environ.get("PATH", "")
         break
 
-import sys
 import logging
-from dataclasses import dataclass, field
+import sys
 import time
+from dataclasses import dataclass, field
 
 # Configurar logging
-logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 # Añadir paths
@@ -39,6 +38,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 @dataclass
 class NERTestResult:
     """Resultado de evaluación NER."""
+
     test_name: str
     method: str
     true_positives: int = 0
@@ -71,6 +71,7 @@ class NERTestResult:
 def load_unseen_gold_standards():
     """Cargar gold standards de datos no vistos."""
     from gold_standards import UNSEEN_GOLD_STANDARDS
+
     return UNSEEN_GOLD_STANDARDS
 
 
@@ -122,6 +123,7 @@ def evaluate_spacy_ner_on_file(text: str, gold_entities: list, test_name: str) -
     except Exception as e:
         logger.warning(f"Error en spaCy NER para {test_name}: {e}")
         import traceback
+
         traceback.print_exc()
 
     return result
@@ -155,7 +157,7 @@ def run_unseen_data_evaluation():
             print(f"  ERROR: Archivo no encontrado: {test_file}")
             continue
 
-        text = test_file.read_text(encoding='utf-8')
+        text = test_file.read_text(encoding="utf-8")
 
         # Filtrar solo la parte narrativa (antes de GOLD STANDARD)
         if "GOLD STANDARD" in text:
@@ -169,7 +171,7 @@ def run_unseen_data_evaluation():
         r = evaluate_spacy_ner_on_file(text, gold.entities, name)
         results.append(r)
 
-        print(f"\n  Resultados:")
+        print("\n  Resultados:")
         print(f"    Precision: {r.precision:.1%}")
         print(f"    Recall:    {r.recall:.1%}")
         print(f"    F1:        {r.f1:.1%}")
@@ -196,7 +198,9 @@ def run_unseen_data_evaluation():
 
     total_tp, total_fp, total_fn = 0, 0, 0
     for r in results:
-        print(f"{r.test_name:<25} {r.precision:>10.1%} {r.recall:>10.1%} {r.f1:>10.1%} {r.time_seconds:>9.2f}s")
+        print(
+            f"{r.test_name:<25} {r.precision:>10.1%} {r.recall:>10.1%} {r.f1:>10.1%} {r.time_seconds:>9.2f}s"
+        )
         total_tp += r.true_positives
         total_fp += r.false_positives
         total_fn += r.false_negatives
@@ -231,7 +235,9 @@ def run_unseen_data_evaluation():
     print("  - Si F1 en datos NO VISTOS es mucho menor (>10%): HAY overfitting")
     print()
     print("Resultados previos en datos de desarrollo: P=100%, R=100%, F1=100%")
-    print(f"Resultados en datos NO VISTOS:            P={total_p:.1%}, R={total_r:.1%}, F1={total_f1:.1%}")
+    print(
+        f"Resultados en datos NO VISTOS:            P={total_p:.1%}, R={total_r:.1%}, F1={total_f1:.1%}"
+    )
     print()
 
     diff = 100.0 - (total_f1 * 100)

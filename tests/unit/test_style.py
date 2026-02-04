@@ -13,31 +13,37 @@ class TestStyleImports:
     def test_import_style_module(self):
         """Verifica importación del módulo."""
         from narrative_assistant.nlp import style
+
         assert style is not None
 
     def test_import_repetition_detector(self):
         """Verifica importación de RepetitionDetector."""
         from narrative_assistant.nlp.style import RepetitionDetector
+
         assert RepetitionDetector is not None
 
     def test_import_get_repetition_detector(self):
         """Verifica importación de get_repetition_detector."""
         from narrative_assistant.nlp.style import get_repetition_detector
+
         assert callable(get_repetition_detector)
 
     def test_import_repetition(self):
         """Verifica importación de Repetition."""
         from narrative_assistant.nlp.style import Repetition
+
         assert Repetition is not None
 
     def test_import_repetition_report(self):
         """Verifica importación de RepetitionReport."""
         from narrative_assistant.nlp.style import RepetitionReport
+
         assert RepetitionReport is not None
 
     def test_import_repetition_type(self):
         """Verifica importación de RepetitionType."""
         from narrative_assistant.nlp.style import RepetitionType
+
         assert RepetitionType is not None
 
 
@@ -59,7 +65,7 @@ class TestRepetition:
 
     def test_create_repetition(self):
         """Crea una repetición."""
-        from narrative_assistant.nlp.style import Repetition, RepetitionType, RepetitionSeverity
+        from narrative_assistant.nlp.style import Repetition, RepetitionSeverity, RepetitionType
 
         # La clase usa RepetitionOccurrence, no tuplas
         rep = Repetition(
@@ -79,7 +85,7 @@ class TestRepetition:
 
     def test_repetition_semantic_type(self):
         """Repetición semántica."""
-        from narrative_assistant.nlp.style import Repetition, RepetitionType, RepetitionSeverity
+        from narrative_assistant.nlp.style import Repetition, RepetitionSeverity, RepetitionType
 
         # La clase Repetition no tiene campo similar_words, usa occurrences
         rep = Repetition(
@@ -111,10 +117,10 @@ class TestRepetitionReport:
     def test_report_with_repetitions(self):
         """Crea reporte con repeticiones."""
         from narrative_assistant.nlp.style import (
-            RepetitionReport,
             Repetition,
-            RepetitionType,
+            RepetitionReport,
             RepetitionSeverity,
+            RepetitionType,
         )
 
         reps = [
@@ -179,6 +185,7 @@ class TestLexicalRepetitions:
     def detector(self):
         """Detector para tests."""
         from narrative_assistant.nlp.style import get_repetition_detector, reset_repetition_detector
+
         reset_repetition_detector()
         return get_repetition_detector()
 
@@ -234,6 +241,7 @@ class TestSemanticRepetitions:
     def detector(self):
         """Detector para tests."""
         from narrative_assistant.nlp.style import get_repetition_detector, reset_repetition_detector
+
         reset_repetition_detector()
         return get_repetition_detector()
 
@@ -262,6 +270,7 @@ class TestRepetitionIntegration:
     def detector(self):
         """Detector para tests."""
         from narrative_assistant.nlp.style import get_repetition_detector, reset_repetition_detector
+
         reset_repetition_detector()
         return get_repetition_detector()
 

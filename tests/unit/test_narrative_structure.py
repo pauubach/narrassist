@@ -11,17 +11,17 @@ Cubre:
 import pytest
 
 from narrative_assistant.analysis.narrative_structure import (
-    NarrativeStructureDetector,
     NarrativeAnomaly,
+    NarrativeStructureDetector,
     ProlepsisSeverity,
     get_narrative_structure_detector,
     reset_narrative_structure_detector,
 )
 
-
 # =============================================================================
 # Fixtures
 # =============================================================================
+
 
 @pytest.fixture(autouse=True)
 def reset_singleton():
@@ -100,6 +100,7 @@ def sample_chapters():
 # Tests de detección básica de prolepsis
 # =============================================================================
 
+
 class TestProlepisDetection:
     """Tests para detección de prolepsis."""
 
@@ -173,6 +174,7 @@ class TestProlepisDetection:
 # Tests de resolución de eventos
 # =============================================================================
 
+
 class TestEventResolution:
     """Tests para encontrar eventos anticipados en capítulos posteriores."""
 
@@ -183,10 +185,7 @@ class TestEventResolution:
         result = detector.detect_prolepsis(text, sample_chapters)
 
         # Buscar prolepsis que menciona la ceremonia
-        ceremony_prolepsis = [
-            p for p in result
-            if "ceremonia" in p.location.text.lower()
-        ]
+        ceremony_prolepsis = [p for p in result if "ceremonia" in p.location.text.lower()]
 
         assert len(ceremony_prolepsis) >= 1
         p = ceremony_prolepsis[0]
@@ -198,6 +197,7 @@ class TestEventResolution:
 # =============================================================================
 # Tests de severidad
 # =============================================================================
+
 
 class TestProlepsisSeverity:
     """Tests para evaluación de severidad."""
@@ -218,9 +218,7 @@ class TestProlepsisSeverity:
         text = chapters[0]["content"]
 
         # Forzar detección aunque confianza sea baja
-        detector._prolepsis_patterns.append(
-            (detector._prolepsis_patterns[0][0], 0.5)
-        )
+        detector._prolepsis_patterns.append((detector._prolepsis_patterns[0][0], 0.5))
 
         result = detector.detect_prolepsis(text, chapters, min_confidence=0.3)
 
@@ -242,6 +240,7 @@ class TestProlepsisSeverity:
 # =============================================================================
 # Tests de casos límite
 # =============================================================================
+
 
 class TestEdgeCases:
     """Tests para casos límite."""
@@ -277,6 +276,7 @@ class TestEdgeCases:
 # Tests de detect_all
 # =============================================================================
 
+
 class TestDetectAll:
     """Tests para el método detect_all."""
 
@@ -307,6 +307,7 @@ class TestDetectAll:
 # =============================================================================
 # Tests con documento real
 # =============================================================================
+
 
 class TestWithRichDocument:
     """Tests usando el documento test_document_rich.txt."""
@@ -382,9 +383,7 @@ class TestWithRichDocument:
         assert len(prolepsis_ch2) >= 1, "No se detectó la prolepsis en capítulo 2"
 
         # Verificar que menciona la ceremonia
-        found_ceremony = any(
-            "ceremonia" in p.location.text.lower() for p in prolepsis_ch2
-        )
+        found_ceremony = any("ceremonia" in p.location.text.lower() for p in prolepsis_ch2)
         assert found_ceremony, "No se encontró la mención de 'ceremonia'"
 
         # Verificar que se resolvió al capítulo 5

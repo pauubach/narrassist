@@ -11,16 +11,16 @@ import pytest
 
 from narrative_assistant.nlp.dialogue_validator import (
     DialogueContextValidator,
-    DialogueIssueType,
     DialogueIssueSeverity,
+    DialogueIssueType,
     get_dialogue_validator,
     reset_dialogue_validator,
 )
 
-
 # =============================================================================
 # Fixtures
 # =============================================================================
+
 
 @pytest.fixture(autouse=True)
 def reset_singleton():
@@ -40,6 +40,7 @@ def validator():
 # Tests de diálogos sin atribución
 # =============================================================================
 
+
 class TestOrphanDialogues:
     """Tests para detectar diálogos huérfanos."""
 
@@ -56,8 +57,10 @@ class TestOrphanDialogues:
         # Debería detectar secuencia sin atribución
         assert len(issues) >= 1
         orphan_issues = [
-            i for i in issues
-            if i.issue_type in [
+            i
+            for i in issues
+            if i.issue_type
+            in [
                 DialogueIssueType.ORPHAN_NO_ATTRIBUTION,
                 DialogueIssueType.CONSECUTIVE_NO_CHANGE,
             ]
@@ -85,6 +88,7 @@ class TestOrphanDialogues:
 # Tests de inicio de capítulo
 # =============================================================================
 
+
 class TestChapterStartContext:
     """Tests para diálogos al inicio de capítulo."""
 
@@ -98,8 +102,7 @@ class TestChapterStartContext:
 
         # Debería detectar inicio sin contexto
         start_issues = [
-            i for i in issues
-            if i.issue_type == DialogueIssueType.CHAPTER_START_DIALOGUE
+            i for i in issues if i.issue_type == DialogueIssueType.CHAPTER_START_DIALOGUE
         ]
         assert len(start_issues) >= 1
 
@@ -116,8 +119,7 @@ class TestChapterStartContext:
 
         # No debería haber problema de inicio sin contexto
         start_issues = [
-            i for i in issues
-            if i.issue_type == DialogueIssueType.CHAPTER_START_DIALOGUE
+            i for i in issues if i.issue_type == DialogueIssueType.CHAPTER_START_DIALOGUE
         ]
         assert len(start_issues) == 0
 
@@ -125,6 +127,7 @@ class TestChapterStartContext:
 # =============================================================================
 # Tests de secuencias largas
 # =============================================================================
+
 
 class TestLongSequences:
     """Tests para secuencias largas sin atribución."""
@@ -147,10 +150,7 @@ class TestLongSequences:
         issues = validator.validate_chapter(chapter_text, chapter_number=1)
 
         # Debería detectar la secuencia larga
-        seq_issues = [
-            i for i in issues
-            if i.issue_type == DialogueIssueType.ORPHAN_NO_ATTRIBUTION
-        ]
+        seq_issues = [i for i in issues if i.issue_type == DialogueIssueType.ORPHAN_NO_ATTRIBUTION]
         # Puede que detecte como secuencia o como múltiples consecutivos
         assert len(issues) >= 1
 
@@ -173,10 +173,12 @@ class TestLongSequences:
 
         # Debería haber al menos un issue de alta severidad
         high_issues = [
-            i for i in issues
+            i
+            for i in issues
             if i.severity == DialogueIssueSeverity.HIGH
-            or (i.issue_type == DialogueIssueType.ORPHAN_NO_ATTRIBUTION
-                and i.consecutive_count >= 5)
+            or (
+                i.issue_type == DialogueIssueType.ORPHAN_NO_ATTRIBUTION and i.consecutive_count >= 5
+            )
         ]
         # Puede ser HIGH o tener consecutive_count alto
         assert len(issues) >= 1
@@ -185,6 +187,7 @@ class TestLongSequences:
 # =============================================================================
 # Tests de validate_all
 # =============================================================================
+
 
 class TestValidateAll:
     """Tests para validación de múltiples capítulos."""
@@ -262,6 +265,7 @@ class TestValidateAll:
 # Tests de casos límite
 # =============================================================================
 
+
 class TestEdgeCases:
     """Tests para casos límite."""
 
@@ -297,6 +301,7 @@ class TestEdgeCases:
 # Tests con documento real
 # =============================================================================
 
+
 class TestWithRichDocument:
     """Tests usando patrones del documento test_document_rich.txt."""
 
@@ -318,7 +323,8 @@ class TestWithRichDocument:
         # Debería detectar los diálogos sin atribución
         assert len(issues) >= 1
         assert any(
-            i.issue_type in [
+            i.issue_type
+            in [
                 DialogueIssueType.ORPHAN_NO_ATTRIBUTION,
                 DialogueIssueType.CONSECUTIVE_NO_CHANGE,
             ]

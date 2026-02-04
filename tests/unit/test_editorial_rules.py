@@ -8,21 +8,22 @@ Verifica:
 """
 
 import pytest
+
+from narrative_assistant.nlp.grammar.base import GrammarSeverity
 from narrative_assistant.nlp.style.editorial_rules import (
-    EditorialRule,
-    EditorialRuleType,
-    EditorialRuleCategory,
+    PREDEFINED_RULES,
     EditorialIssue,
     EditorialReport,
+    EditorialRule,
+    EditorialRuleCategory,
     EditorialRulesChecker,
-    get_editorial_checker,
-    reset_editorial_checker,
-    PREDEFINED_RULES,
-    parse_user_rules,
-    check_with_user_rules,
+    EditorialRuleType,
     _make_word_pattern,
+    check_with_user_rules,
+    get_editorial_checker,
+    parse_user_rules,
+    reset_editorial_checker,
 )
-from narrative_assistant.nlp.grammar.base import GrammarSeverity
 
 
 class TestEditorialRuleImports:
@@ -57,7 +58,7 @@ class TestPredefinedRules:
     def test_predefined_rules_have_required_fields(self):
         """Cada regla debe tener los campos requeridos."""
         for rule in PREDEFINED_RULES:
-            assert rule.id, f"Regla sin ID"
+            assert rule.id, "Regla sin ID"
             assert rule.name, f"Regla {rule.id} sin nombre"
             assert rule.pattern, f"Regla {rule.id} sin patrón"
             assert rule.rule_type is not None
@@ -113,12 +114,17 @@ class TestEditorialRulesChecker:
         report = checker.check(text)
 
         # Buscar por el texto detectado o por el ID de la regla
-        issues = [i for i in report.issues if
-                  "nuestros corazones" in i.text.lower() or
-                  i.rule_id == "singular_body_parts" or
-                  "singular" in i.rule_name.lower() or
-                  "rgano" in i.rule_name.lower()]  # "órgano" sin tilde
-        assert len(issues) >= 1, f"No se detectó 'nuestros corazones'. Issues: {[i.text for i in report.issues]}"
+        issues = [
+            i
+            for i in report.issues
+            if "nuestros corazones" in i.text.lower()
+            or i.rule_id == "singular_body_parts"
+            or "singular" in i.rule_name.lower()
+            or "rgano" in i.rule_name.lower()
+        ]  # "órgano" sin tilde
+        assert len(issues) >= 1, (
+            f"No se detectó 'nuestros corazones'. Issues: {[i.text for i in report.issues]}"
+        )
         assert issues[0].replacement is not None
         assert "nuestro" in issues[0].replacement.lower()
 
@@ -127,7 +133,11 @@ class TestEditorialRulesChecker:
         text = "Quizás venga mañana."
         report = checker.check(text)
 
-        issues = [i for i in report.issues if "quizá" in i.rule_name.lower() or "quiza" in i.rule_name.lower()]
+        issues = [
+            i
+            for i in report.issues
+            if "quizá" in i.rule_name.lower() or "quiza" in i.rule_name.lower()
+        ]
         assert len(issues) >= 1
 
     def test_detect_periodo_with_accent(self, checker):
@@ -293,7 +303,7 @@ class TestCheckWithUserRules:
     def test_check_combines_both(self):
         """Debe combinar reglas predefinidas y del usuario."""
         text = "Quizás el sistema inmunológico falle."
-        user_rules = 'sistema inmunitario (no inmunológico)'
+        user_rules = "sistema inmunitario (no inmunológico)"
 
         report = check_with_user_rules(text, user_rules, include_predefined=True)
 
@@ -311,17 +321,19 @@ class TestEditorialReport:
     def test_report_to_dict(self):
         """to_dict() debe serializar correctamente."""
         report = EditorialReport()
-        report.issues.append(EditorialIssue(
-            rule_id="test",
-            rule_name="Test Rule",
-            text="foo",
-            replacement="bar",
-            start=0,
-            end=3,
-            severity=GrammarSeverity.STYLE,
-            explanation="Test explanation",
-            category=EditorialRuleCategory.LEXICON,
-        ))
+        report.issues.append(
+            EditorialIssue(
+                rule_id="test",
+                rule_name="Test Rule",
+                text="foo",
+                replacement="bar",
+                start=0,
+                end=3,
+                severity=GrammarSeverity.STYLE,
+                explanation="Test explanation",
+                category=EditorialRuleCategory.LEXICON,
+            )
+        )
         report.rules_applied = 1
 
         data = report.to_dict()
@@ -336,17 +348,19 @@ class TestEditorialReport:
         report = EditorialReport()
         assert report.issue_count == 0
 
-        report.issues.append(EditorialIssue(
-            rule_id="test",
-            rule_name="Test",
-            text="a",
-            replacement="b",
-            start=0,
-            end=1,
-            severity=GrammarSeverity.STYLE,
-            explanation="",
-            category=EditorialRuleCategory.LEXICON,
-        ))
+        report.issues.append(
+            EditorialIssue(
+                rule_id="test",
+                rule_name="Test",
+                text="a",
+                replacement="b",
+                start=0,
+                end=1,
+                severity=GrammarSeverity.STYLE,
+                explanation="",
+                category=EditorialRuleCategory.LEXICON,
+            )
+        )
 
         assert report.issue_count == 1
 

@@ -4,11 +4,12 @@ Configuración compartida para pytest.
 Define fixtures comunes y configuración de tests.
 """
 
-import pytest
-from pathlib import Path
-import tempfile
-import shutil
 import os
+import shutil
+import tempfile
+from pathlib import Path
+
+import pytest
 
 
 @pytest.fixture
@@ -37,7 +38,7 @@ def isolated_database(tmp_path):
     Se ejecuta automáticamente antes de cada test para asegurar
     que cada test tiene su propia BD limpia con el schema actual.
     """
-    from narrative_assistant.persistence.database import reset_database, get_database
+    from narrative_assistant.persistence.database import get_database, reset_database
 
     # Crear directorio temporal para la BD de este test
     test_db_dir = tmp_path / "narrative_assistant"
@@ -83,7 +84,7 @@ def sample_text():
 @pytest.fixture
 def sample_entities():
     """Entidades de prueba."""
-    from narrative_assistant.entities.models import Entity, EntityType, EntityImportance
+    from narrative_assistant.entities.models import Entity, EntityImportance, EntityType
 
     return [
         Entity(

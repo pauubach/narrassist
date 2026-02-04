@@ -31,31 +31,33 @@ Categorías de prueba:
 20. Casos ambiguos
 """
 
-import pytest
 from dataclasses import dataclass
-from typing import Dict, List, Any, Tuple, Optional
+from typing import Any, Dict, List, Optional, Tuple
+
+import pytest
 
 from narrative_assistant.voice.speaker_attribution import (
-    SpeakerAttributor,
-    DialogueAttribution,
+    SPEECH_VERBS,
     AttributionConfidence,
     AttributionMethod,
-    SPEECH_VERBS,
+    DialogueAttribution,
+    SpeakerAttributor,
     attribute_speakers,
 )
-
 
 # =============================================================================
 # Test Data: Mock Entities and Dialogues
 # =============================================================================
 
+
 @dataclass
 class MockEntity:
     """Entidad mock para tests."""
+
     id: int
     name: str
     canonical_name: str
-    aliases: List[str] = None
+    aliases: list[str] = None
 
     def __post_init__(self):
         if self.aliases is None:
@@ -65,6 +67,7 @@ class MockEntity:
 @dataclass
 class MockDialogue:
     """Diálogo mock para tests."""
+
     text: str
     start_char: int
     end_char: int
@@ -77,7 +80,9 @@ class MockDialogue:
 ENTITIES = [
     MockEntity(id=1, name="María", canonical_name="María García", aliases=["Mari", "la García"]),
     MockEntity(id=2, name="Juan", canonical_name="Juan Pérez", aliases=["Juanito", "el Pérez"]),
-    MockEntity(id=3, name="Doctor García", canonical_name="Doctor García", aliases=["el doctor", "García"]),
+    MockEntity(
+        id=3, name="Doctor García", canonical_name="Doctor García", aliases=["el doctor", "García"]
+    ),
     MockEntity(id=4, name="Ana María", canonical_name="Ana María López", aliases=["Anita"]),
     MockEntity(id=5, name="Pedro", canonical_name="Pedro Sánchez", aliases=["Pedrito"]),
     MockEntity(id=6, name="Isabel", canonical_name="Isabel Ruiz", aliases=["Isa"]),
@@ -91,30 +96,29 @@ class TestVerbNamePattern:
     def attributor(self):
         return SpeakerAttributor(ENTITIES)
 
-    @pytest.mark.parametrize("context_after,expected_speaker,expected_verb", [
-        # Caso 1: Patrón básico con dijo
-        ("—dijo María.", "María", "dijo"),
-        # Caso 2: Con respondió
-        ("—respondió Juan.", "Juan", "respondió"),
-        # Caso 3: Con preguntó
-        ("—preguntó Pedro.", "Pedro", "preguntó"),
-        # Caso 4: Con exclamó
-        ("—exclamó Isabel.", "Isabel", "exclamó"),
-        # Caso 5: Con susurró
-        ("—susurró María.", "María", "susurró"),
-        # Caso 6: Con gritó
-        ("—gritó Juan.", "Juan", "gritó"),
-        # Caso 7: Con murmuró
-        ("—murmuró Pedro.", "Pedro", "murmuró"),
-    ])
+    @pytest.mark.parametrize(
+        "context_after,expected_speaker,expected_verb",
+        [
+            # Caso 1: Patrón básico con dijo
+            ("—dijo María.", "María", "dijo"),
+            # Caso 2: Con respondió
+            ("—respondió Juan.", "Juan", "respondió"),
+            # Caso 3: Con preguntó
+            ("—preguntó Pedro.", "Pedro", "preguntó"),
+            # Caso 4: Con exclamó
+            ("—exclamó Isabel.", "Isabel", "exclamó"),
+            # Caso 5: Con susurró
+            ("—susurró María.", "María", "susurró"),
+            # Caso 6: Con gritó
+            ("—gritó Juan.", "Juan", "gritó"),
+            # Caso 7: Con murmuró
+            ("—murmuró Pedro.", "Pedro", "murmuró"),
+        ],
+    )
     def test_verb_name_patterns(self, attributor, context_after, expected_speaker, expected_verb):
         """Verifica detección del patrón —verbo Nombre."""
         dialogue = MockDialogue(
-            text="Buenos días",
-            start_char=0,
-            end_char=11,
-            chapter=1,
-            context_after=context_after
+            text="Buenos días", start_char=0, end_char=11, chapter=1, context_after=context_after
         )
 
         attributions = attributor.attribute_dialogues([dialogue])
@@ -136,18 +140,21 @@ class TestNameVerbPattern:
     def attributor(self):
         return SpeakerAttributor(ENTITIES)
 
-    @pytest.mark.parametrize("context_before,expected_speaker", [
-        # Caso 1: Patrón básico
-        ("María dijo:", "María"),
-        # Caso 2: Con preguntó
-        ("Juan preguntó:", "Juan"),
-        # Caso 3: Con añadió
-        ("Pedro añadió:", "Pedro"),
-        # Caso 4: Sin dos puntos
-        ("Isabel respondió", "Isabel"),
-        # Caso 5: Con guión después
-        ("María exclamó —", "María"),
-    ])
+    @pytest.mark.parametrize(
+        "context_before,expected_speaker",
+        [
+            # Caso 1: Patrón básico
+            ("María dijo:", "María"),
+            # Caso 2: Con preguntó
+            ("Juan preguntó:", "Juan"),
+            # Caso 3: Con añadió
+            ("Pedro añadió:", "Pedro"),
+            # Caso 4: Sin dos puntos
+            ("Isabel respondió", "Isabel"),
+            # Caso 5: Con guión después
+            ("María exclamó —", "María"),
+        ],
+    )
     def test_name_verb_patterns(self, attributor, context_before, expected_speaker):
         """Verifica detección del patrón Nombre verbo:."""
         dialogue = MockDialogue(
@@ -156,7 +163,7 @@ class TestNameVerbPattern:
             end_char=61,
             chapter=1,
             context_before=context_before,
-            context_after=""
+            context_after="",
         )
 
         attributions = attributor.attribute_dialogues([dialogue])
@@ -176,14 +183,17 @@ class TestCommaVerbPattern:
     def attributor(self):
         return SpeakerAttributor(ENTITIES)
 
-    @pytest.mark.parametrize("context_after,expected_speaker", [
-        # Caso 1: Coma + verbo
-        (", dijo María.", "María"),
-        # Caso 2: Coma + respondió
-        (", respondió Juan con calma.", "Juan"),
-        # Caso 3: Coma + añadió
-        (", añadió Pedro pensativo.", "Pedro"),
-    ])
+    @pytest.mark.parametrize(
+        "context_after,expected_speaker",
+        [
+            # Caso 1: Coma + verbo
+            (", dijo María.", "María"),
+            # Caso 2: Coma + respondió
+            (", respondió Juan con calma.", "Juan"),
+            # Caso 3: Coma + añadió
+            (", añadió Pedro pensativo.", "Pedro"),
+        ],
+    )
     def test_comma_verb_patterns(self, attributor, context_after, expected_speaker):
         """Verifica detección del patrón , verbo Nombre."""
         dialogue = MockDialogue(
@@ -191,7 +201,7 @@ class TestCommaVerbPattern:
             start_char=0,
             end_char=18,
             chapter=1,
-            context_after=context_after
+            context_after=context_after,
         )
 
         attributions = attributor.attribute_dialogues([dialogue])
@@ -212,18 +222,26 @@ class TestSpeechVerbsVariety:
         assert "dijo" in SPEECH_VERBS
         assert "respondió" in SPEECH_VERBS or "respondio" in SPEECH_VERBS
 
-    @pytest.mark.parametrize("verb", [
-        "dijo", "respondió", "preguntó", "exclamó", "gritó",
-        "susurró", "murmuró", "añadió", "afirmó", "negó",
-    ])
+    @pytest.mark.parametrize(
+        "verb",
+        [
+            "dijo",
+            "respondió",
+            "preguntó",
+            "exclamó",
+            "gritó",
+            "susurró",
+            "murmuró",
+            "añadió",
+            "afirmó",
+            "negó",
+        ],
+    )
     def test_verb_normalization(self, verb):
         """Verifica que los verbos comunes están en el diccionario."""
         # Normalizar quitando tildes para comparar
         verb_no_accent = verb.replace("ó", "o").replace("í", "i")
-        found = any(
-            v.replace("ó", "o").replace("í", "i") == verb_no_accent
-            for v in SPEECH_VERBS
-        )
+        found = any(v.replace("ó", "o").replace("í", "i") == verb_no_accent for v in SPEECH_VERBS)
         # Al menos la versión sin tilde debería estar
         assert found or verb_no_accent in SPEECH_VERBS
 
@@ -240,18 +258,26 @@ class TestAlternation:
         dialogues = [
             MockDialogue(
                 text="Hola, ¿cómo estás?",
-                start_char=0, end_char=18, chapter=1,
-                context_after="—dijo María."
+                start_char=0,
+                end_char=18,
+                chapter=1,
+                context_after="—dijo María.",
             ),
             MockDialogue(
                 text="Muy bien, gracias.",
-                start_char=50, end_char=68, chapter=1,
-                context_before="", context_after=""
+                start_char=50,
+                end_char=68,
+                chapter=1,
+                context_before="",
+                context_after="",
             ),
             MockDialogue(
                 text="Me alegro mucho.",
-                start_char=100, end_char=116, chapter=1,
-                context_before="", context_after=""
+                start_char=100,
+                end_char=116,
+                chapter=1,
+                context_before="",
+                context_after="",
             ),
         ]
 
@@ -269,16 +295,22 @@ class TestAlternation:
         """Con 3+ hablantes no aplica alternancia simple."""
         dialogues = [
             MockDialogue(
-                text="Empecemos", start_char=0, end_char=9, chapter=1,
-                context_after="—dijo María."
+                text="Empecemos", start_char=0, end_char=9, chapter=1, context_after="—dijo María."
             ),
             MockDialogue(
-                text="De acuerdo", start_char=50, end_char=60, chapter=1,
-                context_after="—añadió Juan."
+                text="De acuerdo",
+                start_char=50,
+                end_char=60,
+                chapter=1,
+                context_after="—añadió Juan.",
             ),
             MockDialogue(
-                text="¿Por dónde?", start_char=100, end_char=111, chapter=1,
-                context_before="", context_after=""
+                text="¿Por dónde?",
+                start_char=100,
+                end_char=111,
+                chapter=1,
+                context_before="",
+                context_after="",
             ),
         ]
 
@@ -301,9 +333,11 @@ class TestUnattributedDialogues:
         """Diálogo sin ninguna marca de hablante."""
         dialogue = MockDialogue(
             text="Esto no tiene hablante claro.",
-            start_char=0, end_char=29, chapter=1,
+            start_char=0,
+            end_char=29,
+            chapter=1,
             context_before="Había silencio.",
-            context_after="Nadie respondió."
+            context_after="Nadie respondió.",
         )
 
         attributions = attributor.attribute_dialogues([dialogue])
@@ -318,9 +352,11 @@ class TestUnattributedDialogues:
         """Atribución basada en proximidad de mención."""
         dialogue = MockDialogue(
             text="Buenos días a todos.",
-            start_char=100, end_char=120, chapter=1,
+            start_char=100,
+            end_char=120,
+            chapter=1,
             context_before="María se acercó al grupo.",
-            context_after="El grupo la miró."
+            context_after="El grupo la miró.",
         )
 
         # María mencionada justo antes
@@ -344,13 +380,17 @@ class TestInterruptedDialogues:
         dialogues = [
             MockDialogue(
                 text="Yo creo que...",
-                start_char=0, end_char=14, chapter=1,
-                context_after="—empezó María, pero Juan la interrumpió."
+                start_char=0,
+                end_char=14,
+                chapter=1,
+                context_after="—empezó María, pero Juan la interrumpió.",
             ),
             MockDialogue(
                 text="¡No digas tonterías!",
-                start_char=50, end_char=70, chapter=1,
-                context_after="—la cortó Juan."
+                start_char=50,
+                end_char=70,
+                chapter=1,
+                context_after="—la cortó Juan.",
             ),
         ]
 
@@ -374,8 +414,10 @@ class TestNestedDialogues:
         """Cita de otro personaje dentro del diálogo."""
         dialogue = MockDialogue(
             text='Y entonces Juan me dijo: "No vengas mañana".',
-            start_char=0, end_char=44, chapter=1,
-            context_after="—explicó María."
+            start_char=0,
+            end_char=44,
+            chapter=1,
+            context_after="—explicó María.",
         )
 
         attributions = attributor.attribute_dialogues([dialogue])
@@ -397,14 +439,18 @@ class TestActionIntercalated:
         dialogues = [
             MockDialogue(
                 text="Mira",
-                start_char=0, end_char=4, chapter=1,
-                context_after="—señaló María el libro—"
+                start_char=0,
+                end_char=4,
+                chapter=1,
+                context_after="—señaló María el libro—",
             ),
             MockDialogue(
                 text="esto es lo que buscaba.",
-                start_char=50, end_char=73, chapter=1,
+                start_char=50,
+                end_char=73,
+                chapter=1,
                 context_before="—señaló María el libro—",
-                context_after=""
+                context_after="",
             ),
         ]
 
@@ -425,8 +471,10 @@ class TestInternalMonologues:
         """Pensamiento atribuido."""
         dialogue = MockDialogue(
             text="¿Qué habré hecho mal?",
-            start_char=0, end_char=21, chapter=1,
-            context_after="—pensó María."
+            start_char=0,
+            end_char=21,
+            chapter=1,
+            context_after="—pensó María.",
         )
 
         attributions = attributor.attribute_dialogues([dialogue])
@@ -443,17 +491,18 @@ class TestPassiveAndImpersonal:
     def attributor(self):
         return SpeakerAttributor(ENTITIES)
 
-    @pytest.mark.parametrize("context_after,description", [
-        ("—se oyó decir.", "pasiva refleja"),
-        ("—se escuchó.", "impersonal"),
-        ("—resonó en la sala.", "voz impersonal"),
-    ])
+    @pytest.mark.parametrize(
+        "context_after,description",
+        [
+            ("—se oyó decir.", "pasiva refleja"),
+            ("—se escuchó.", "impersonal"),
+            ("—resonó en la sala.", "voz impersonal"),
+        ],
+    )
     def test_impersonal_attributions(self, attributor, context_after, description):
         """Verifica manejo de construcciones impersonales."""
         dialogue = MockDialogue(
-            text="¡Silencio!",
-            start_char=0, end_char=10, chapter=1,
-            context_after=context_after
+            text="¡Silencio!", start_char=0, end_char=10, chapter=1, context_after=context_after
         )
 
         attributions = attributor.attribute_dialogues([dialogue])
@@ -474,9 +523,11 @@ class TestFreeIndirectStyle:
         """Estilo indirecto libre (difícil de atribuir)."""
         dialogue = MockDialogue(
             text="¿Qué más daba ya todo aquello?",
-            start_char=50, end_char=80, chapter=1,
+            start_char=50,
+            end_char=80,
+            chapter=1,
             context_before="María miraba por la ventana.",
-            context_after="Las calles estaban vacías."
+            context_after="Las calles estaban vacías.",
         )
 
         entity_mentions = [(1, 0, 5)]  # María mencionada antes
@@ -493,17 +544,18 @@ class TestVoiceProfiles:
     @pytest.fixture
     def voice_profiles(self):
         """Perfiles de voz mock."""
+
         @dataclass
         class MockProfile:
             entity_id: int
             uses_usted: bool
             uses_tu: bool
             avg_intervention_length: float
-            filler_words: List[str]
+            filler_words: list[str]
 
         return {
             1: MockProfile(1, False, True, 10.0, ["bueno", "pues"]),  # María - informal
-            2: MockProfile(2, True, False, 15.0, ["verá", "mire"]),   # Juan - formal
+            2: MockProfile(2, True, False, 15.0, ["verá", "mire"]),  # Juan - formal
         }
 
     def test_voice_profile_matching(self, voice_profiles):
@@ -513,8 +565,11 @@ class TestVoiceProfiles:
         # Diálogo informal sin atribución explícita
         dialogue = MockDialogue(
             text="Bueno, pues yo creo que tú deberías ir.",
-            start_char=0, end_char=39, chapter=1,
-            context_before="", context_after=""
+            start_char=0,
+            end_char=39,
+            chapter=1,
+            context_before="",
+            context_after="",
         )
 
         # Ambos personajes mencionados cerca
@@ -532,8 +587,11 @@ class TestVoiceProfiles:
         # Diálogo formal
         dialogue = MockDialogue(
             text="Verá usted, mire, esto requiere paciencia.",
-            start_char=0, end_char=42, chapter=1,
-            context_before="", context_after=""
+            start_char=0,
+            end_char=42,
+            chapter=1,
+            context_before="",
+            context_after="",
         )
 
         entity_mentions = [(1, -50, -45), (2, -30, -26)]
@@ -551,16 +609,17 @@ class TestCompoundNames:
     def attributor(self):
         return SpeakerAttributor(ENTITIES)
 
-    @pytest.mark.parametrize("context_after,expected_name", [
-        ("—dijo Ana María.", "Ana María"),
-        ("—respondió Doctor García.", "Doctor García"),
-    ])
+    @pytest.mark.parametrize(
+        "context_after,expected_name",
+        [
+            ("—dijo Ana María.", "Ana María"),
+            ("—respondió Doctor García.", "Doctor García"),
+        ],
+    )
     def test_compound_names(self, attributor, context_after, expected_name):
         """Verifica detección con nombres compuestos."""
         dialogue = MockDialogue(
-            text="Entendido.",
-            start_char=0, end_char=10, chapter=1,
-            context_after=context_after
+            text="Entendido.", start_char=0, end_char=10, chapter=1, context_after=context_after
         )
 
         attributions = attributor.attribute_dialogues([dialogue])
@@ -576,17 +635,18 @@ class TestAliases:
     def attributor(self):
         return SpeakerAttributor(ENTITIES)
 
-    @pytest.mark.parametrize("context_after,expected_id", [
-        ("—dijo Mari.", 1),  # Alias de María
-        ("—respondió Juanito.", 2),  # Alias de Juan
-        ("—añadió el doctor.", 3),  # Alias de Doctor García
-    ])
+    @pytest.mark.parametrize(
+        "context_after,expected_id",
+        [
+            ("—dijo Mari.", 1),  # Alias de María
+            ("—respondió Juanito.", 2),  # Alias de Juan
+            ("—añadió el doctor.", 3),  # Alias de Doctor García
+        ],
+    )
     def test_alias_attribution(self, attributor, context_after, expected_id):
         """Verifica atribución usando aliases."""
         dialogue = MockDialogue(
-            text="Sí, claro.",
-            start_char=0, end_char=10, chapter=1,
-            context_after=context_after
+            text="Sí, claro.", start_char=0, end_char=10, chapter=1, context_after=context_after
         )
 
         attributions = attributor.attribute_dialogues([dialogue])
@@ -613,8 +673,10 @@ class TestLongDialogues:
         """
         dialogue = MockDialogue(
             text=long_text.strip(),
-            start_char=0, end_char=len(long_text.strip()), chapter=1,
-            context_after="—relató Juan con nostalgia."
+            start_char=0,
+            end_char=len(long_text.strip()),
+            chapter=1,
+            context_after="—relató Juan con nostalgia.",
         )
 
         attributions = attributor.attribute_dialogues([dialogue])
@@ -627,18 +689,26 @@ class TestLongDialogues:
         dialogues = [
             MockDialogue(
                 text="Primer párrafo de mi discurso.",
-                start_char=0, end_char=30, chapter=1,
-                context_after="—empezó María."
+                start_char=0,
+                end_char=30,
+                chapter=1,
+                context_after="—empezó María.",
             ),
             MockDialogue(
                 text="Segundo párrafo, continuando.",
-                start_char=50, end_char=79, chapter=1,
-                context_before="", context_after=""
+                start_char=50,
+                end_char=79,
+                chapter=1,
+                context_before="",
+                context_after="",
             ),
             MockDialogue(
                 text="Tercer párrafo, concluyendo.",
-                start_char=100, end_char=128, chapter=1,
-                context_before="", context_after="—concluyó."
+                start_char=100,
+                end_char=128,
+                chapter=1,
+                context_before="",
+                context_after="—concluyó.",
             ),
         ]
 
@@ -659,14 +729,15 @@ class TestSceneChanges:
         """El cambio de capítulo debe resetear el contexto."""
         dialogues = [
             MockDialogue(
-                text="Adiós.",
-                start_char=0, end_char=6, chapter=1,
-                context_after="—dijo María."
+                text="Adiós.", start_char=0, end_char=6, chapter=1, context_after="—dijo María."
             ),
             MockDialogue(
                 text="Hola.",
-                start_char=100, end_char=105, chapter=2,
-                context_before="", context_after=""
+                start_char=100,
+                end_char=105,
+                chapter=2,
+                context_before="",
+                context_after="",
             ),
         ]
 
@@ -681,13 +752,18 @@ class TestSceneChanges:
         dialogues = [
             MockDialogue(
                 text="Nos vemos.",
-                start_char=0, end_char=10, chapter=1,
-                context_after="—dijo María."
+                start_char=0,
+                end_char=10,
+                chapter=1,
+                context_after="—dijo María.",
             ),
             MockDialogue(
                 text="Buenos días.",
-                start_char=5000, end_char=5012, chapter=1,
-                context_before="", context_after=""
+                start_char=5000,
+                end_char=5012,
+                chapter=1,
+                context_before="",
+                context_after="",
             ),
         ]
 
@@ -710,9 +786,11 @@ class TestAmbiguousCases:
         """Múltiples nombres en el contexto."""
         dialogue = MockDialogue(
             text="Sí.",
-            start_char=50, end_char=53, chapter=1,
+            start_char=50,
+            end_char=53,
+            chapter=1,
             context_before="María miró a Juan.",
-            context_after="Juan sonrió."
+            context_after="Juan sonrió.",
         )
 
         attributions = attributor.attribute_dialogues([dialogue])
@@ -723,9 +801,7 @@ class TestAmbiguousCases:
     def test_pronoun_in_attribution(self, attributor):
         """Pronombre en lugar de nombre."""
         dialogue = MockDialogue(
-            text="De acuerdo.",
-            start_char=50, end_char=61, chapter=1,
-            context_after="—dijo él."
+            text="De acuerdo.", start_char=50, end_char=61, chapter=1, context_after="—dijo él."
         )
 
         attributions = attributor.attribute_dialogues([dialogue])
@@ -744,12 +820,20 @@ class TestAttributionStats:
     def test_stats_generation(self, attributor):
         """Verifica generación de estadísticas."""
         dialogues = [
-            MockDialogue(text="Uno", start_char=0, end_char=3, chapter=1,
-                        context_after="—dijo María."),
-            MockDialogue(text="Dos", start_char=20, end_char=23, chapter=1,
-                        context_after="—respondió Juan."),
-            MockDialogue(text="Tres", start_char=40, end_char=44, chapter=1,
-                        context_before="", context_after=""),
+            MockDialogue(
+                text="Uno", start_char=0, end_char=3, chapter=1, context_after="—dijo María."
+            ),
+            MockDialogue(
+                text="Dos", start_char=20, end_char=23, chapter=1, context_after="—respondió Juan."
+            ),
+            MockDialogue(
+                text="Tres",
+                start_char=40,
+                end_char=44,
+                chapter=1,
+                context_before="",
+                context_after="",
+            ),
         ]
 
         attributions = attributor.attribute_dialogues(dialogues)
@@ -764,10 +848,21 @@ class TestAttributionStats:
     def test_unattributed_dialogues_list(self, attributor):
         """Verifica lista de diálogos sin atribuir."""
         dialogues = [
-            MockDialogue(text="Con hablante", start_char=0, end_char=12, chapter=1,
-                        context_after="—dijo María."),
-            MockDialogue(text="Sin hablante", start_char=50, end_char=62, chapter=1,
-                        context_before="", context_after=""),
+            MockDialogue(
+                text="Con hablante",
+                start_char=0,
+                end_char=12,
+                chapter=1,
+                context_after="—dijo María.",
+            ),
+            MockDialogue(
+                text="Sin hablante",
+                start_char=50,
+                end_char=62,
+                chapter=1,
+                context_before="",
+                context_after="",
+            ),
         ]
 
         attributions = attributor.attribute_dialogues(dialogues)
@@ -792,9 +887,7 @@ class TestEdgeCases:
     def test_dialogue_empty_text(self, attributor):
         """Diálogo con texto vacío."""
         dialogue = MockDialogue(
-            text="",
-            start_char=0, end_char=0, chapter=1,
-            context_after="—dijo María."
+            text="", start_char=0, end_char=0, chapter=1, context_after="—dijo María."
         )
 
         attributions = attributor.attribute_dialogues([dialogue])
@@ -805,9 +898,7 @@ class TestEdgeCases:
         attributor = SpeakerAttributor([])
 
         dialogue = MockDialogue(
-            text="Hola",
-            start_char=0, end_char=4, chapter=1,
-            context_after="—dijo María."
+            text="Hola", start_char=0, end_char=4, chapter=1, context_after="—dijo María."
         )
 
         attributions = attributor.attribute_dialogues([dialogue])
@@ -818,8 +909,10 @@ class TestEdgeCases:
         """Nombres con caracteres Unicode."""
         dialogue = MockDialogue(
             text="Sí.",
-            start_char=0, end_char=3, chapter=1,
-            context_after="—dijo María."  # Con tilde
+            start_char=0,
+            end_char=3,
+            chapter=1,
+            context_after="—dijo María.",  # Con tilde
         )
 
         attributions = attributor.attribute_dialogues([dialogue])
@@ -832,8 +925,9 @@ class TestConvenienceFunction:
     def test_attribute_speakers_function(self):
         """Verifica la función de conveniencia."""
         dialogues = [
-            MockDialogue(text="Hola", start_char=0, end_char=4, chapter=1,
-                        context_after="—dijo María."),
+            MockDialogue(
+                text="Hola", start_char=0, end_char=4, chapter=1, context_after="—dijo María."
+            ),
         ]
 
         attributions, stats = attribute_speakers(dialogues, ENTITIES)
@@ -850,18 +944,19 @@ class TestSpecialPunctuation:
     def attributor(self):
         return SpeakerAttributor(ENTITIES)
 
-    @pytest.mark.parametrize("context_after,description", [
-        ("—dijo María—.", "guiones em-dash"),
-        ("-dijo María.", "guiones cortos"),
-        ("— dijo María.", "espacio después de guión"),
-        ("—dijo María —.", "guión al final"),
-    ])
+    @pytest.mark.parametrize(
+        "context_after,description",
+        [
+            ("—dijo María—.", "guiones em-dash"),
+            ("-dijo María.", "guiones cortos"),
+            ("— dijo María.", "espacio después de guión"),
+            ("—dijo María —.", "guión al final"),
+        ],
+    )
     def test_punctuation_variations(self, attributor, context_after, description):
         """Verifica detección con variaciones de puntuación."""
         dialogue = MockDialogue(
-            text="Sí",
-            start_char=0, end_char=2, chapter=1,
-            context_after=context_after
+            text="Sí", start_char=0, end_char=2, chapter=1, context_after=context_after
         )
 
         attributions = attributor.attribute_dialogues([dialogue])

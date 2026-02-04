@@ -5,14 +5,16 @@ Estos tests verifican el flujo completo de análisis,
 incluyendo el tracking de progreso y actualización de estados.
 """
 
-import pytest
 import time
-from unittest.mock import patch, Mock, MagicMock
 from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
 
 # Importar FastAPI test client si está disponible
 try:
     from fastapi.testclient import TestClient
+
     HAS_FASTAPI = True
 except ImportError:
     HAS_FASTAPI = False
@@ -56,12 +58,12 @@ class TestAnalysisAPIIntegration:
     def test_analysis_status_values(self):
         """Verifica todos los valores posibles de analysis_status."""
         valid_statuses = [
-            'pending',      # Inicial, sin análisis
-            'in_progress',  # Análisis en curso (alternativo)
-            'analyzing',    # Análisis en curso
-            'completed',    # Análisis completado
-            'error',        # Error durante análisis
-            'failed',       # Análisis falló
+            "pending",  # Inicial, sin análisis
+            "in_progress",  # Análisis en curso (alternativo)
+            "analyzing",  # Análisis en curso
+            "completed",  # Análisis completado
+            "error",  # Error durante análisis
+            "failed",  # Análisis falló
         ]
 
         # Este test documenta los estados válidos
@@ -85,20 +87,55 @@ class TestAnalysisProgressStorage:
             "current_phase": "Iniciando análisis...",
             "current_action": "Preparando documento",
             "phases": [
-                {"id": "parsing", "name": "Extracción de texto", "completed": False, "current": False},
-                {"id": "structure", "name": "Detección de estructura", "completed": False, "current": False},
-                {"id": "ner", "name": "Reconocimiento de entidades", "completed": False, "current": False},
-                {"id": "attributes", "name": "Extracción de atributos", "completed": False, "current": False},
-                {"id": "consistency", "name": "Análisis de consistencia", "completed": False, "current": False},
-                {"id": "grammar", "name": "Análisis gramatical", "completed": False, "current": False},
-                {"id": "alerts", "name": "Generación de alertas", "completed": False, "current": False}
+                {
+                    "id": "parsing",
+                    "name": "Extracción de texto",
+                    "completed": False,
+                    "current": False,
+                },
+                {
+                    "id": "structure",
+                    "name": "Detección de estructura",
+                    "completed": False,
+                    "current": False,
+                },
+                {
+                    "id": "ner",
+                    "name": "Reconocimiento de entidades",
+                    "completed": False,
+                    "current": False,
+                },
+                {
+                    "id": "attributes",
+                    "name": "Extracción de atributos",
+                    "completed": False,
+                    "current": False,
+                },
+                {
+                    "id": "consistency",
+                    "name": "Análisis de consistencia",
+                    "completed": False,
+                    "current": False,
+                },
+                {
+                    "id": "grammar",
+                    "name": "Análisis gramatical",
+                    "completed": False,
+                    "current": False,
+                },
+                {
+                    "id": "alerts",
+                    "name": "Generación de alertas",
+                    "completed": False,
+                    "current": False,
+                },
             ],
             "metrics": {},
             "estimated_seconds_remaining": 60,
         }
 
         # Verificar campos requeridos
-        required_fields = ['project_id', 'status', 'progress', 'current_phase', 'phases']
+        required_fields = ["project_id", "status", "progress", "current_phase", "phases"]
         for field in required_fields:
             assert field in expected_structure, f"Falta campo requerido: {field}"
 
@@ -108,16 +145,16 @@ class TestAnalysisProgressStorage:
         """
         # Transiciones válidas
         valid_transitions = {
-            'pending': ['running'],
-            'running': ['completed', 'failed', 'error'],
-            'completed': [],  # Estado final
-            'failed': [],     # Estado final
-            'error': [],      # Estado final
+            "pending": ["running"],
+            "running": ["completed", "failed", "error"],
+            "completed": [],  # Estado final
+            "failed": [],  # Estado final
+            "error": [],  # Estado final
         }
 
         # Verificar que completed y failed son estados finales
-        assert len(valid_transitions['completed']) == 0
-        assert len(valid_transitions['failed']) == 0
+        assert len(valid_transitions["completed"]) == 0
+        assert len(valid_transitions["failed"]) == 0
 
     def test_progress_response_format(self):
         """
@@ -134,7 +171,7 @@ class TestAnalysisProgressStorage:
                 "current_action": "Procesando capítulo 3",
                 "phases": [],
                 "estimated_seconds_remaining": 30,
-            }
+            },
         }
 
         # Verificar estructura
@@ -177,13 +214,15 @@ class TestProjectResponseFormat:
         }
 
         # Verificar campos críticos para el frontend
-        assert "analysis_status" in project_response, \
+        assert "analysis_status" in project_response, (
             "Falta analysis_status en respuesta de proyecto"
-        assert "analysis_progress" in project_response, \
+        )
+        assert "analysis_progress" in project_response, (
             "Falta analysis_progress en respuesta de proyecto"
+        )
 
         # Verificar valores válidos
-        valid_statuses = ['pending', 'in_progress', 'analyzing', 'completed', 'error', 'failed']
+        valid_statuses = ["pending", "in_progress", "analyzing", "completed", "error", "failed"]
         assert project_response["analysis_status"] in valid_statuses
 
     def test_project_fields_match_frontend_types(self):
@@ -195,45 +234,44 @@ class TestProjectResponseFormat:
         """
         # Campos que el frontend espera (snake_case de la API)
         expected_api_fields = [
-            'id',
-            'name',
-            'description',
-            'document_path',
-            'document_format',
-            'created_at',
-            'last_modified',
-            'last_opened',
-            'analysis_status',      # Añadido
-            'analysis_progress',
-            'word_count',
-            'chapter_count',
-            'entity_count',
-            'open_alerts_count',
-            'highest_alert_severity',
+            "id",
+            "name",
+            "description",
+            "document_path",
+            "document_format",
+            "created_at",
+            "last_modified",
+            "last_opened",
+            "analysis_status",  # Añadido
+            "analysis_progress",
+            "word_count",
+            "chapter_count",
+            "entity_count",
+            "open_alerts_count",
+            "highest_alert_severity",
         ]
 
         # Simular respuesta del backend
         mock_response = {
-            'id': 1,
-            'name': 'Test',
-            'description': 'Desc',
-            'document_path': '/path',
-            'document_format': 'docx',
-            'created_at': '2024-01-01T00:00:00Z',
-            'last_modified': '2024-01-01T00:00:00Z',
-            'last_opened': None,
-            'analysis_status': 'completed',
-            'analysis_progress': 100,
-            'word_count': 1000,
-            'chapter_count': 1,
-            'entity_count': 10,
-            'open_alerts_count': 0,
-            'highest_alert_severity': None,
+            "id": 1,
+            "name": "Test",
+            "description": "Desc",
+            "document_path": "/path",
+            "document_format": "docx",
+            "created_at": "2024-01-01T00:00:00Z",
+            "last_modified": "2024-01-01T00:00:00Z",
+            "last_opened": None,
+            "analysis_status": "completed",
+            "analysis_progress": 100,
+            "word_count": 1000,
+            "chapter_count": 1,
+            "entity_count": 10,
+            "open_alerts_count": 0,
+            "highest_alert_severity": None,
         }
 
         for field in expected_api_fields:
-            assert field in mock_response, \
-                f"Campo '{field}' falta en respuesta del backend"
+            assert field in mock_response, f"Campo '{field}' falta en respuesta del backend"
 
 
 class TestAlertResponseFormat:
@@ -267,12 +305,9 @@ class TestAlertResponseFormat:
             "resolved_at": None,
         }
 
-        assert "excerpt" in alert_response, \
-            "Falta excerpt en respuesta de alerta"
-        assert "start_char" in alert_response, \
-            "Falta start_char en respuesta de alerta"
-        assert "end_char" in alert_response, \
-            "Falta end_char en respuesta de alerta"
+        assert "excerpt" in alert_response, "Falta excerpt en respuesta de alerta"
+        assert "start_char" in alert_response, "Falta start_char en respuesta de alerta"
+        assert "end_char" in alert_response, "Falta end_char en respuesta de alerta"
 
 
 class TestEntityResponseFormat:
@@ -302,5 +337,4 @@ class TestEntityResponseFormat:
             "updated_at": "2024-01-15T12:00:00Z",
         }
 
-        assert "relevance_score" in entity_response, \
-            "Falta relevance_score en respuesta de entidad"
+        assert "relevance_score" in entity_response, "Falta relevance_score en respuesta de entidad"

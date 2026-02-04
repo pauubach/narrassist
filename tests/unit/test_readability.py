@@ -1,26 +1,27 @@
 """Tests para el módulo de análisis de legibilidad."""
 
 import pytest
+
 from narrative_assistant.nlp.style.readability import (
-    # Tipos
-    ReadabilityLevel,
+    AGE_GROUP_THRESHOLDS,
+    INFLESZ_SCALE,
+    # Constantes
+    SPANISH_SIGHT_WORDS,
     AgeGroup,
-    SentenceStats,
-    ReadabilityReport,
     AgeReadabilityReport,
     # Clase principal
     ReadabilityAnalyzer,
-    # Singleton
-    get_readability_analyzer,
-    reset_readability_analyzer,
+    # Tipos
+    ReadabilityLevel,
+    ReadabilityReport,
+    SentenceStats,
     # Utilidades
     count_syllables_spanish,
     count_syllables_text,
+    # Singleton
+    get_readability_analyzer,
     get_readability_level,
-    # Constantes
-    SPANISH_SIGHT_WORDS,
-    AGE_GROUP_THRESHOLDS,
-    INFLESZ_SCALE,
+    reset_readability_analyzer,
 )
 
 
@@ -490,7 +491,7 @@ class TestAgeReadabilityAnalysis:
         """
         result = analyzer.analyze_for_age(
             text,
-            target_age_group=AgeGroup.PICTURE_BOOK  # 3-5 años
+            target_age_group=AgeGroup.PICTURE_BOOK,  # 3-5 años
         )
 
         assert result.is_success

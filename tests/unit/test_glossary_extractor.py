@@ -5,9 +5,9 @@ Tests para el extractor automático de términos de glosario.
 import pytest
 
 from narrative_assistant.analysis.glossary_extractor import (
+    GlossaryExtractionReport,
     GlossaryExtractor,
     GlossarySuggestion,
-    GlossaryExtractionReport,
 )
 
 
@@ -30,11 +30,11 @@ class TestGlossaryExtractor:
         chapters = [
             {
                 "number": 1,
-                "content": "El mago Gandoriel caminaba por el bosque. Gandoriel era sabio."
+                "content": "El mago Gandoriel caminaba por el bosque. Gandoriel era sabio.",
             },
             {
                 "number": 2,
-                "content": "Gandoriel encontró a Elyndra en la cueva. Elyndra le saludó."
+                "content": "Gandoriel encontró a Elyndra en la cueva. Elyndra le saludó.",
             },
         ]
 
@@ -53,7 +53,7 @@ class TestGlossaryExtractor:
         chapters = [
             {
                 "number": 1,
-                "content": "María y Juan fueron al mercado. María compró frutas. Juan las llevó."
+                "content": "María y Juan fueron al mercado. María compró frutas. Juan las llevó.",
             },
         ]
 
@@ -73,7 +73,7 @@ class TestGlossaryExtractor:
         chapters = [
             {
                 "number": 1,
-                "content": "El protocolo HTTP es fundamental. Usamos HTTP para comunicación. También API REST."
+                "content": "El protocolo HTTP es fundamental. Usamos HTTP para comunicación. También API REST.",
             },
         ]
 
@@ -91,14 +91,8 @@ class TestGlossaryExtractor:
         """Detecta nombres que parecen inventados (fantasía)."""
         extractor = GlossaryExtractor(min_frequency=2, min_confidence=0.3)
         chapters = [
-            {
-                "number": 1,
-                "content": "El elfo Thranduil vivía en el bosque. Thranduil era el rey."
-            },
-            {
-                "number": 2,
-                "content": "Thranduil convocó a su consejo."
-            },
+            {"number": 1, "content": "El elfo Thranduil vivía en el bosque. Thranduil era el rey."},
+            {"number": 2, "content": "Thranduil convocó a su consejo."},
         ]
 
         result = extractor.extract(chapters=chapters)
@@ -113,15 +107,11 @@ class TestGlossaryExtractor:
     def test_exclude_existing_glossary_terms(self):
         """Excluye términos que ya están en el glosario."""
         existing = {"gandoriel", "elyndra"}
-        extractor = GlossaryExtractor(
-            min_frequency=2,
-            min_confidence=0.3,
-            existing_terms=existing
-        )
+        extractor = GlossaryExtractor(min_frequency=2, min_confidence=0.3, existing_terms=existing)
         chapters = [
             {
                 "number": 1,
-                "content": "El mago Gandoriel y Elyndra viajaban. Gandoriel era poderoso. Elyndra era sabia."
+                "content": "El mago Gandoriel y Elyndra viajaban. Gandoriel era poderoso. Elyndra era sabia.",
             },
         ]
 
@@ -168,7 +158,7 @@ class TestGlossaryExtractor:
         extractor = GlossaryExtractor(
             min_frequency=3,  # Mínimo 3 apariciones
             max_frequency=5,  # Máximo 5 apariciones
-            min_confidence=0.3
+            min_confidence=0.3,
         )
         chapters = [
             {
@@ -178,7 +168,7 @@ class TestGlossaryExtractor:
                 En Mordoria vivían trolls. La capital de Mordoria era Darkhold.
                 Darkhold tenía muros negros. Darkhold era impenetrable.
                 Darkhold resistió muchos asedios.
-                """
+                """,
             },
         ]
 
@@ -196,13 +186,10 @@ class TestGlossaryExtractor:
         """Solo devuelve sugerencias con confianza suficiente."""
         extractor = GlossaryExtractor(
             min_frequency=1,
-            min_confidence=0.8  # Alta confianza requerida
+            min_confidence=0.8,  # Alta confianza requerida
         )
         chapters = [
-            {
-                "number": 1,
-                "content": "Texto con palabras normales sin nombres propios claros."
-            },
+            {"number": 1, "content": "Texto con palabras normales sin nombres propios claros."},
         ]
 
         result = extractor.extract(chapters=chapters)
@@ -236,7 +223,7 @@ class TestGlossaryExtractor:
         chapters = [
             {
                 "number": 1,
-                "content": "El antiguo Drakonheim era una fortaleza. En Drakonheim se forjaban espadas."
+                "content": "El antiguo Drakonheim era una fortaleza. En Drakonheim se forjaban espadas.",
             },
         ]
 

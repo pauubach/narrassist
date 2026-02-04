@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Test individual de cada votante para ortografía.
 
@@ -23,20 +22,20 @@ java17_paths = [
 ]
 for java_path in java17_paths:
     if Path(java_path).exists():
-        os.environ['JAVA_HOME'] = java_path
-        bin_path = f"{java_path}\\bin" if os.name == 'nt' else f"{java_path}/bin"
-        os.environ['PATH'] = bin_path + os.pathsep + os.environ.get('PATH', '')
+        os.environ["JAVA_HOME"] = java_path
+        bin_path = f"{java_path}\\bin" if os.name == "nt" else f"{java_path}/bin"
+        os.environ["PATH"] = bin_path + os.pathsep + os.environ.get("PATH", "")
         break
 
-import sys
 import logging
+import re
+import sys
+import time
 from dataclasses import dataclass, field
 from typing import Optional
-import re
-import time
 
 # Configurar logging
-logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 # Añadir src al path
@@ -46,13 +45,14 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 @dataclass
 class VoterTestResult:
     """Resultado de evaluar un votante individual."""
+
     voter_name: str
 
     # Contadores
-    true_positives: int = 0   # Errores reales detectados correctamente
+    true_positives: int = 0  # Errores reales detectados correctamente
     false_positives: int = 0  # Palabras correctas marcadas como error
     false_negatives: int = 0  # Errores reales no detectados
-    true_negatives: int = 0   # Palabras correctas no marcadas
+    true_negatives: int = 0  # Palabras correctas no marcadas
 
     # Detalles
     tp_words: list[str] = field(default_factory=list)
@@ -109,9 +109,14 @@ def load_gold_standard_errors() -> dict[str, str]:
 
 def load_test_text() -> str:
     """Cargar texto de prueba de ortografía."""
-    test_file = Path(__file__).parent.parent.parent / "test_books" / "evaluation_tests" / "prueba_ortografia.txt"
+    test_file = (
+        Path(__file__).parent.parent.parent
+        / "test_books"
+        / "evaluation_tests"
+        / "prueba_ortografia.txt"
+    )
 
-    with open(test_file, 'r', encoding='utf-8') as f:
+    with open(test_file, encoding="utf-8") as f:
         return f.read()
 
 
@@ -126,7 +131,7 @@ def extract_words(text: str) -> list[tuple[str, int, int]]:
     if notes_start > 0:
         text = text[:notes_start]
 
-    word_pattern = re.compile(r'\b([a-záéíóúüñA-ZÁÉÍÓÚÜÑ]{2,})\b')
+    word_pattern = re.compile(r"\b([a-záéíóúüñA-ZÁÉÍÓÚÜÑ]{2,})\b")
     words = []
 
     for match in word_pattern.finditer(text):
@@ -338,11 +343,11 @@ def evaluate_beto_voter(text: str, words: list, gold_errors: dict) -> VoterTestR
     start_time = time.time()
 
     # Extraer oraciones como contexto
-    sentences = re.split(r'[.!?\n]+', text)
+    sentences = re.split(r"[.!?\n]+", text)
     sentence_map = {}  # word_pos -> sentence
     pos = 0
     for sent in sentences:
-        for match in re.finditer(r'\b\w+\b', sent):
+        for match in re.finditer(r"\b\w+\b", sent):
             sentence_map[pos + match.start()] = sent
         pos += len(sent) + 1
 
@@ -471,7 +476,9 @@ def run_individual_voter_tests():
     print("-" * 60)
 
     for r in results:
-        print(f"{r.voter_name:<20} {r.precision:>10.1%} {r.recall:>10.1%} {r.f1:>10.1%} {r.time_seconds:>9.2f}s")
+        print(
+            f"{r.voter_name:<20} {r.precision:>10.1%} {r.recall:>10.1%} {r.f1:>10.1%} {r.time_seconds:>9.2f}s"
+        )
 
     # Recomendaciones
     print("\n" + "=" * 70)
@@ -479,29 +486,27 @@ def run_individual_voter_tests():
     print("=" * 70)
 
     # Ordenar por precisión
-    by_precision = sorted([r for r in results if r.precision > 0],
-                          key=lambda x: x.precision, reverse=True)
+    by_precision = sorted(
+        [r for r in results if r.precision > 0], key=lambda x: x.precision, reverse=True
+    )
     print("\nMejores para PRECISIÓN (menos falsos positivos):")
     for r in by_precision[:3]:
         print(f"  - {r.voter_name}: {r.precision:.1%}")
 
     # Ordenar por recall
-    by_recall = sorted([r for r in results if r.recall > 0],
-                       key=lambda x: x.recall, reverse=True)
+    by_recall = sorted([r for r in results if r.recall > 0], key=lambda x: x.recall, reverse=True)
     print("\nMejores para RECALL (menos falsos negativos):")
     for r in by_recall[:3]:
         print(f"  - {r.voter_name}: {r.recall:.1%}")
 
     # Ordenar por F1
-    by_f1 = sorted([r for r in results if r.f1 > 0],
-                   key=lambda x: x.f1, reverse=True)
+    by_f1 = sorted([r for r in results if r.f1 > 0], key=lambda x: x.f1, reverse=True)
     print("\nMejores F1 (equilibrio):")
     for r in by_f1[:3]:
         print(f"  - {r.voter_name}: {r.f1:.1%}")
 
     # Más rápidos
-    by_speed = sorted([r for r in results if r.time_seconds > 0],
-                      key=lambda x: x.time_seconds)
+    by_speed = sorted([r for r in results if r.time_seconds > 0], key=lambda x: x.time_seconds)
     print("\nMás rápidos:")
     for r in by_speed[:3]:
         print(f"  - {r.voter_name}: {r.time_seconds:.2f}s")
