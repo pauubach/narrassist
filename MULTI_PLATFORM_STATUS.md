@@ -104,8 +104,8 @@ HTTP/1.1 200 OK - /api/models/status
 ## Próximos Pasos
 
 ### v0.3.1 (Testing + CI/CD)
-- [ ] Probar implementación macOS en hardware real
-- [ ] GitHub Actions workflow para builds multi-plataforma
+- [x] Probar implementación macOS en hardware real (validado v0.4.35)
+- [x] GitHub Actions workflow para builds multi-plataforma
 - [ ] Validar instaladores en sistemas limpios (sin Python)
 
 ### v0.4.0 (Producción)
