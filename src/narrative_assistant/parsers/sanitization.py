@@ -9,6 +9,7 @@ Previene:
 
 import logging
 import re
+import tempfile
 import urllib.parse
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -268,6 +269,7 @@ def validate_file_path(
         Path.cwd(),
         Path.home(),
         config.data_dir,
+        Path(tempfile.gettempdir()),  # Permitir archivos en directorio temporal del sistema
     ]
 
     # Añadir directorios adicionales configurados por el usuario
