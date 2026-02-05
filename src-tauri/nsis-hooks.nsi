@@ -10,18 +10,18 @@ Var CleanInstall
 !macro NSIS_HOOK_PREINSTALL
     ; Cerrar procesos de Narrative Assistant antes de instalar
     DetailPrint "Cerrando procesos existentes..."
-    
+
     ; Intentar cerrar la aplicación principal
     nsExec::Exec 'taskkill /F /IM "Narrative Assistant.exe" /T'
     Pop $0
-    
+
     ; Cerrar el servidor backend
     nsExec::Exec 'taskkill /F /IM "narrative-assistant-server.exe" /T'
     Pop $0
-    
+
     ; Esperar un momento para que los procesos se cierren
     Sleep 1000
-    
+
     ; Verificar si existe una instalación previa con datos
     ; Comprobar ruta de producción (LOCALAPPDATA) y ruta de desarrollo (~/.narrative_assistant)
     IfFileExists "$LOCALAPPDATA\Narrative Assistant\data\narrative_assistant.db" 0 check_dev_path
@@ -65,13 +65,42 @@ Var CleanInstall
         DetailPrint "Conservando datos existentes..."
 
     done_clean:
+    DetailPrint ""
+    DetailPrint "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     DetailPrint "Preparando instalacion..."
+    DetailPrint ""
+    DetailPrint "Se instalaran los siguientes componentes:"
+    DetailPrint "  [1/4] Aplicacion Narrative Assistant"
+    DetailPrint "  [2/4] Python 3.12 embebido"
+    DetailPrint "  [3/4] Backend FastAPI"
+    DetailPrint "  [4/4] Dependencias NLP (~1.8 GB):"
+    DetailPrint "        torch, spacy, transformers,"
+    DetailPrint "        sentence-transformers, numpy,"
+    DetailPrint "        pandas, scipy, scikit-learn"
+    DetailPrint ""
+    DetailPrint "Este proceso puede tardar varios minutos"
+    DetailPrint "dependiendo de la velocidad del disco."
+    DetailPrint "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    DetailPrint ""
 !macroend
 
 ; Hook: Called after files are installed
 !macro NSIS_HOOK_POSTINSTALL
-    DetailPrint "Instalacion completada."
-    DetailPrint "Los modelos NLP se descargaran automaticamente al iniciar la aplicacion."
+    DetailPrint ""
+    DetailPrint "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    DetailPrint "✓ INSTALACION COMPLETADA"
+    DetailPrint "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    DetailPrint ""
+    DetailPrint "Componentes instalados:"
+    DetailPrint "  ✓ Narrative Assistant"
+    DetailPrint "  ✓ Python 3.12 embebido"
+    DetailPrint "  ✓ Backend FastAPI"
+    DetailPrint "  ✓ Dependencias NLP (torch, spacy, etc.)"
+    DetailPrint ""
+    DetailPrint "Primer inicio:"
+    DetailPrint "  Se descargaran modelos NLP (~1 GB)."
+    DetailPrint "  Este proceso solo ocurre una vez."
+    DetailPrint ""
 !macroend
 
 ; Hook: Uninstall
