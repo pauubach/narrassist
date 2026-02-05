@@ -193,8 +193,9 @@ class TestGrammarChecker:
         assert result.is_success
 
 
+@pytest.mark.slow
 class TestDequeismoDetection:
-    """Tests para detección de dequeísmo."""
+    """Tests para detección de dequeísmo (carga modelo spaCy)."""
 
     @pytest.fixture
     def checker(self):
@@ -227,8 +228,9 @@ class TestDequeismoDetection:
         # La detección depende de la implementación
 
 
+@pytest.mark.slow
 class TestQueismoDetection:
-    """Tests para detección de queísmo."""
+    """Tests para detección de queísmo (carga modelo spaCy)."""
 
     @pytest.fixture
     def checker(self):
@@ -252,8 +254,9 @@ class TestQueismoDetection:
         assert result.is_success
 
 
+@pytest.mark.slow
 class TestLaismoDetection:
-    """Tests para detección de laísmo."""
+    """Tests para detección de laísmo (carga modelo spaCy)."""
 
     @pytest.fixture
     def checker(self):
@@ -277,8 +280,9 @@ class TestLaismoDetection:
         assert result.is_success
 
 
+@pytest.mark.slow
 class TestGenderAgreement:
-    """Tests para concordancia de género."""
+    """Tests para concordancia de género (carga modelo spaCy)."""
 
     @pytest.fixture
     def checker(self):
@@ -302,8 +306,9 @@ class TestGenderAgreement:
         assert result.is_success
 
 
+@pytest.mark.slow
 class TestRedundancy:
-    """Tests para detección de redundancias."""
+    """Tests para detección de redundancias (carga modelo spaCy)."""
 
     @pytest.fixture
     def checker(self):
