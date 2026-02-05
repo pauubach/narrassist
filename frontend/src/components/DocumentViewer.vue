@@ -570,7 +570,7 @@ const getTitleOffset = (content: string, title: string): number => {
     /^chapter\s+\d+/i.test(firstLine) ||
     /^parte\s+\d+/i.test(firstLine) ||
     // Numeración romana al inicio
-    /^[IVXLCDM]+[\.\:\s]/i.test(firstLine) ||
+    /^[IVXLCDM]+[.:\s]/i.test(firstLine) ||
     // Número seguido de punto y texto corto (ej: "1. El Despertar")
     /^\d+\.\s+\S/.test(firstLine)
 
@@ -784,7 +784,7 @@ function detectSectionHeading(text: string): { level: 'h2' | 'h3' | 'h4' | 'h5' 
   // - Todo en mayúsculas
   if (
     /^(PARTE|SECCIÓN|SECCION|LIBRO|ACTO|CAPÍTULO|CAPITULO)\s+/i.test(trimmed) ||
-    /^[IVXLCDM]+[\.\:\s]/i.test(trimmed) ||
+    /^[IVXLCDM]+[.:\s]/i.test(trimmed) ||
     (trimmed === trimmed.toUpperCase() && trimmed.length > 3 && /[A-Z]/.test(trimmed))
   ) {
     return { level: 'h2' }

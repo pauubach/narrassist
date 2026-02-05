@@ -241,7 +241,7 @@ class LlamaCppManager:
 
             if progress_callback:
                 progress_callback(
-                    {"status": "downloading", "message": f"Descargando llama-server...", "progress": 0}
+                    {"status": "downloading", "message": "Descargando llama-server...", "progress": 0}
                 )
 
             # Descargar con progreso

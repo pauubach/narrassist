@@ -143,7 +143,7 @@ class TestAvailableModels:
         from narrative_assistant.llm.llamacpp_manager import AVAILABLE_MODELS
 
         for model in AVAILABLE_MODELS:
-            assert model.name, f"Modelo sin nombre"
+            assert model.name, "Modelo sin nombre"
             assert model.display_name, f"Modelo {model.name} sin display_name"
             assert model.filename, f"Modelo {model.name} sin filename"
             assert model.filename.endswith(".gguf"), f"Modelo {model.name} no es GGUF"
