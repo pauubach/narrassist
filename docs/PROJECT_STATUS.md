@@ -24,6 +24,7 @@
 | **Diccionario Local** | Wiktionary, sinónimos, custom |
 | **Arco Emocional** | UI visual completa |
 | **Review Reports** | PDF/DOCX con estadísticas |
+| **Grammar Check** | LanguageTool 6.4 + OpenJDK 21 JRE (embebido) |
 | **CI/CD** | GitHub Actions (Windows + macOS) |
 
 ### LLM Backend (100% Offline)

@@ -50,6 +50,15 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 - Path traversal protection en model downloads
 - Removed sensitive data from error logs
 
+### Infrastructure
+- **LanguageTool embebido con JRE portable**
+  - Script `download_languagetool_jre.py` para descargar OpenJDK 21 + LanguageTool 6.4
+  - JRE portable (~50MB) para Windows y macOS
+  - LanguageTool JAR (~180MB) bundled en installer
+  - Scripts de inicio automático (`start_lt_embedded.sh/bat`)
+  - Workflow CI/CD actualizado para ambas plataformas
+  - Validaciones de binarios en build process
+
 ---
 
 ## [0.3.22] - 2026-01-29

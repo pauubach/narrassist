@@ -45,6 +45,9 @@ jobs:
           src-tauri\binaries\python-embed\python.exe -m pip install -r src-tauri\binaries\backend\requirements-nlp.txt --no-warn-script-location
         shell: cmd
 
+      - name: Download Java JRE & LanguageTool
+        run: python scripts/download_languagetool_jre.py
+
       - name: Validate binaries and python embed (Windows)
         shell: pwsh
         run: |
@@ -53,7 +56,7 @@ jobs:
 
           $pythonEmbed = "src-tauri/binaries/python-embed/python.exe"
           if (!(Test-Path $pythonEmbed)) {
-            Write-Host "Contenido de src-tauri/binaries/python-embed:" 
+            Write-Host "Contenido de src-tauri/binaries/python-embed:"
             if (Test-Path "src-tauri/binaries/python-embed") {
               Get-ChildItem -Path src-tauri/binaries/python-embed
             }
@@ -66,6 +69,14 @@ jobs:
 
           if (!(Test-Path "src-tauri/binaries/start-backend-x86_64-pc-windows-msvc.exe")) {
             throw "launcher start-backend-x86_64-pc-windows-msvc.exe no existe"
+          }
+
+          if (!(Test-Path "src-tauri/binaries/java-jre/bin/java.exe")) {
+            throw "Java JRE no encontrado en src-tauri/binaries/java-jre"
+          }
+
+          if (!(Test-Path "src-tauri/binaries/languagetool/languagetool-server.jar")) {
+            throw "LanguageTool no encontrado en src-tauri/binaries/languagetool"
           }
 
           Write-Host "Validaciones OK"
@@ -164,6 +175,9 @@ jobs:
           PYTHONHOME: ${{ github.workspace }}/src-tauri/binaries/python-embed/Python.framework/Versions/3.12
           DYLD_FRAMEWORK_PATH: ${{ github.workspace }}/src-tauri/binaries/python-embed
 
+      - name: Download Java JRE & LanguageTool
+        run: python3 scripts/download_languagetool_jre.py
+
       - name: Sign all Python binaries (macOS)
         run: python3 scripts/sign_macos_binaries.py src-tauri/binaries/python-embed
 
@@ -204,6 +218,16 @@ jobs:
 
           if [ ! -e "src-tauri/binaries/start-backend-aarch64-apple-darwin" ] || [ ! -e "src-tauri/binaries/start-backend-x86_64-apple-darwin" ]; then
             echo "Launchers de macOS no presentes" >&2
+            exit 1
+          fi
+
+          if [ ! -e "src-tauri/binaries/java-jre/bin/java" ]; then
+            echo "Java JRE no encontrado en src-tauri/binaries/java-jre" >&2
+            exit 1
+          fi
+
+          if [ ! -e "src-tauri/binaries/languagetool/languagetool-server.jar" ]; then
+            echo "LanguageTool no encontrado en src-tauri/binaries/languagetool" >&2
             exit 1
           fi
       
