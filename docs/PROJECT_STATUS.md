@@ -1,7 +1,7 @@
 # Estado del Proyecto - Narrative Assistant
 
 > **Última actualización**: 2026-02-04
-> **Versión**: 0.3.37
+> **Versión**: 0.4.43
 > **Changelog**: Ver [CHANGELOG.md](CHANGELOG.md)
 > **Roadmap**: Ver [ROADMAP.md](ROADMAP.md)
 > **Revisión experta**: Ver [EXPERT_REVIEW_FINDINGS.md](../EXPERT_REVIEW_FINDINGS.md)
@@ -17,14 +17,25 @@
 | Capa | Tecnología |
 |------|------------|
 | **Backend** | Python 3.11+, spaCy 3.8, sentence-transformers, PyTorch, SQLite |
-| **LLM Local** | Ollama (llama3.2, mistral, qwen2.5) - 100% offline |
+| **LLM Local** | Sistema multi-backend: llama.cpp (~150 tok/s) → Ollama → Transformers → Reglas |
 | **Frontend** | Vue 3.4, TypeScript 5.3, PrimeVue, Pinia, Vite |
 | **Desktop** | Tauri 2.0, Rust |
-| **API Bridge** | FastAPI, Uvicorn (170 endpoints) |
+| **API Bridge** | FastAPI, Uvicorn (176 endpoints) |
 | **Diccionario Local** | Wiktionary, sinónimos, custom |
 | **Arco Emocional** | UI visual completa |
 | **Review Reports** | PDF/DOCX con estadísticas |
 | **CI/CD** | GitHub Actions (Windows + macOS) |
+
+### LLM Backend (100% Offline)
+
+| Backend | Velocidad | Tamaño | Uso |
+|---------|-----------|--------|-----|
+| **llama.cpp** | ~150 tok/s | ~50MB + modelos | Recomendado (más rápido) |
+| **Ollama** | ~30 tok/s | ~500MB + modelos | Alternativa (fácil) |
+| **Transformers** | ~20 tok/s | Variable | Flexible |
+| **Reglas** | Instantáneo | 0 | Fallback garantizado |
+
+Modelos GGUF soportados: `llama-3.2-3b` (2GB), `qwen2.5-7b` (4.4GB), `mistral-7b` (4.1GB)
 
 ---
 

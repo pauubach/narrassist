@@ -514,23 +514,49 @@
               </div>
             </Message>
 
-            <!-- 2. Analizador Semántico (Ollama + modelos) -->
+            <!-- 2. Analizador Semántico (llama.cpp + Ollama) -->
             <div class="nlp-category">
               <div class="category-header">
                 <h4><i class="pi pi-microchip-ai"></i> Analizador Semántico</h4>
                 <span class="category-desc">Motor de análisis avanzado del significado y contexto</span>
               </div>
 
-              <!-- Estado del analizador compacto cuando está listo -->
-              <div v-if="systemCapabilities && ollamaState === 'ready'" class="ollama-ready-bar">
+              <!-- llama.cpp: Opción preferida (más rápido) -->
+              <div v-if="llamacppState === 'ready'" class="ollama-ready-bar" style="margin-bottom: 0.5rem;">
                 <div class="ollama-ready-info">
-                  <i class="pi pi-check-circle"></i>
-                  <span>Analizador listo · {{ systemCapabilities.ollama.models.length }} modelo(s)</span>
+                  <i class="pi pi-bolt"></i>
+                  <span>llama.cpp activo · {{ systemCapabilities?.llamacpp?.models.length || 0 }} modelo(s) · ~150 tok/s</span>
                 </div>
               </div>
 
-              <!-- Banner de acción cuando el analizador NO está listo -->
-              <div v-if="systemCapabilities && ollamaState !== 'ready'" class="ollama-action-card" :class="'ollama-state-' + ollamaState">
+              <div v-else class="ollama-action-card" :class="'ollama-state-' + (llamacppState === 'installing' ? 'no_models' : llamacppState === 'ready' ? 'ready' : 'not_installed')" style="margin-bottom: 0.5rem;">
+                <div class="ollama-action-content">
+                  <i :class="llamacppState === 'installing' ? 'pi pi-spin pi-spinner' : llamacppState === 'no_models' ? 'pi pi-info-circle' : 'pi pi-bolt'"></i>
+                  <div class="ollama-action-text">
+                    <strong>llama.cpp (Recomendado)</strong>
+                    <span>{{ llamacppStatusMessage }}</span>
+                  </div>
+                  <Button
+                    v-if="llamacppState !== 'installing'"
+                    :label="llamacppActionConfig.label"
+                    :icon="llamacppActionConfig.icon"
+                    :severity="llamacppActionConfig.severity"
+                    size="small"
+                    :loading="llamacppInstalling || llamacppStarting || llamacppDownloading"
+                    @click="llamacppActionConfig.action"
+                  />
+                </div>
+              </div>
+
+              <!-- Ollama: Alternativa -->
+              <div v-if="ollamaState === 'ready'" class="ollama-ready-bar">
+                <div class="ollama-ready-info">
+                  <i class="pi pi-check-circle"></i>
+                  <span>Ollama listo · {{ systemCapabilities?.ollama.models.length || 0 }} modelo(s)</span>
+                </div>
+              </div>
+
+              <div v-else-if="llamacppState !== 'ready'" class="ollama-action-card" :class="'ollama-state-' + ollamaState">
                 <div class="ollama-action-content">
                   <i
                     :class="[
@@ -538,11 +564,7 @@
                     ]"
                   ></i>
                   <div class="ollama-action-text">
-                    <strong>{{
-                      ollamaState === 'not_installed' ? 'Analizador no disponible' :
-                      ollamaState === 'not_running' ? 'Analizador no iniciado' :
-                      'Sin modelos de análisis'
-                    }}</strong>
+                    <strong>Ollama (Alternativa)</strong>
                     <span>{{ ollamaStatusMessage }}</span>
                   </div>
                   <Button
@@ -557,11 +579,11 @@
               </div>
 
               <!-- Selector de modelos -->
-              <div class="setting-item" :class="{ 'setting-disabled': ollamaState !== 'ready' }">
+              <div class="setting-item" :class="{ 'setting-disabled': llamacppState !== 'ready' && ollamaState !== 'ready' }">
                 <div class="setting-info">
                   <label class="setting-label">Modelos de análisis</label>
                   <p class="setting-description">
-                    Selecciona qué modelos usar para el análisis semántico.
+                    Selecciona qué modelos usar. Los modelos de llama.cpp son más rápidos.
                   </p>
                 </div>
                 <div class="setting-control wide">
@@ -573,7 +595,7 @@
                     placeholder="Seleccionar modelos"
                     display="chip"
                     :show-toggle-all="false"
-                    :disabled="ollamaState !== 'ready'"
+                    :disabled="llamacppState !== 'ready' && ollamaState !== 'ready'"
                     @change="onSettingChange"
                   >
                     <template #option="slotProps">
@@ -611,7 +633,7 @@
                 <div class="setting-control">
                   <ToggleSwitch
                     v-model="settings.prioritizeSpeed"
-                    :disabled="ollamaState !== 'ready'"
+                    :disabled="llamacppState !== 'ready' && ollamaState !== 'ready'"
                     @change="onSettingChange"
                   />
                 </div>
@@ -1236,7 +1258,7 @@ import {
   type FontFamily,
   type PresetInfo
 } from '@/stores/theme'
-import { useSystemStore, type LTInstallProgress, type LTState, type SystemCapabilities, type NLPMethod } from '@/stores/system'
+import { useSystemStore, type LTInstallProgress, type LTState, type LlamaCppState, type LlamaCppModel, type SystemCapabilities, type NLPMethod } from '@/stores/system'
 import type { CorrectionConfig } from '@/types'
 
 const router = useRouter()
@@ -1342,45 +1364,79 @@ const getFontFamilyLabel = (value: string): string => {
 }
 
 // Métodos de inferencia LLM disponibles (solo los avanzados, los básicos siempre están activos)
-const inferenceMethodOptions = [
+// Modelos de llama.cpp (más rápido, ligero ~50MB)
+const llamacppMethodOptions = [
   {
-    value: 'llama3.2',
-    label: 'Llama 3.2 (3B)',
+    value: 'llamacpp:llama-3.2-3b',
+    label: 'Llama 3.2 (3B) [llama.cpp]',
+    description: 'Más rápido (~150 tok/s), recomendado',
+    speed: 'fast',
+    quality: 'good',
+    backend: 'llamacpp'
+  },
+  {
+    value: 'llamacpp:qwen2.5-7b',
+    label: 'Qwen 2.5 (7B) [llama.cpp]',
+    description: 'Excelente español, requiere GPU',
+    speed: 'medium',
+    quality: 'high',
+    backend: 'llamacpp'
+  },
+  {
+    value: 'llamacpp:mistral-7b',
+    label: 'Mistral (7B) [llama.cpp]',
+    description: 'Alta calidad, requiere GPU',
+    speed: 'medium',
+    quality: 'high',
+    backend: 'llamacpp'
+  }
+]
+
+// Modelos de Ollama (alternativa)
+const ollamaMethodOptions = [
+  {
+    value: 'ollama:llama3.2',
+    label: 'Llama 3.2 (3B) [Ollama]',
     description: 'Rápido, buena calidad general',
     speed: 'fast',
-    quality: 'good'
+    quality: 'good',
+    backend: 'ollama'
   },
   {
-    value: 'mistral',
-    label: 'Mistral (7B)',
+    value: 'ollama:mistral',
+    label: 'Mistral (7B) [Ollama]',
     description: 'Mayor calidad, más lento',
     speed: 'medium',
-    quality: 'high'
+    quality: 'high',
+    backend: 'ollama'
   },
   {
-    value: 'gemma2',
-    label: 'Gemma 2 (9B)',
-    description: 'Alta calidad, requiere más recursos',
-    speed: 'slow',
-    quality: 'very_high'
-  },
-  {
-    value: 'qwen2.5',
-    label: 'Qwen 2.5 (7B)',
+    value: 'ollama:qwen2.5',
+    label: 'Qwen 2.5 (7B) [Ollama]',
     description: 'Excelente para español',
     speed: 'medium',
-    quality: 'high'
+    quality: 'high',
+    backend: 'ollama'
   }
 ]
 
 // Computed que combina opciones de LLM con información de modelos instalados
 const availableLLMOptions = computed(() => {
-  const installedModels = systemCapabilities.value?.ollama.models.map(m => m.name.split(':')[0]) || []
+  const llamacppModels = systemCapabilities.value?.llamacpp?.models || []
+  const ollamaModels = systemCapabilities.value?.ollama.models.map(m => m.name.split(':')[0]) || []
 
-  return inferenceMethodOptions.map(opt => ({
+  // Priorizar llama.cpp (más rápido)
+  const llamacppOptions = llamacppMethodOptions.map(opt => ({
     ...opt,
-    installed: installedModels.includes(opt.value)
+    installed: llamacppModels.includes(opt.value.replace('llamacpp:', ''))
   }))
+
+  const ollamaOptions = ollamaMethodOptions.map(opt => ({
+    ...opt,
+    installed: ollamaModels.includes(opt.value.replace('ollama:', ''))
+  }))
+
+  return [...llamacppOptions, ...ollamaOptions]
 })
 
 // NLPMethod y SystemCapabilities importados desde @/stores/system
@@ -1788,6 +1844,12 @@ async function removeUserRejection(rejection: UserRejection) {
 const ollamaStarting = ref(false)
 const modelDownloading = ref(false)
 
+// llama.cpp state - usar store centralizado
+const llamacppInstalling = computed(() => systemStore.llamacppInstalling)
+const llamacppStarting = computed(() => systemStore.llamacppStarting)
+const llamacppDownloading = computed(() => systemStore.llamacppDownloading)
+const llamacppState = computed<LlamaCppState>(() => systemStore.llamacppState)
+
 // ============================================================================
 // Sistema de Sensibilidad Unificado
 // ============================================================================
@@ -1964,6 +2026,90 @@ const ollamaStatusMessage = computed(() => {
   }
   return messages[ollamaState.value]
 })
+
+// llama.cpp action config - más rápido y ligero que Ollama
+const llamacppActionConfig = computed(() => {
+  const configs: Record<LlamaCppState, { label: string; icon: string; severity: string; action: () => void }> = {
+    not_installed: {
+      label: 'Instalar llama.cpp',
+      icon: 'pi pi-download',
+      severity: 'warning',
+      action: installLlamaCppFromSettings
+    },
+    installing: {
+      label: 'Instalando...',
+      icon: 'pi pi-spin pi-spinner',
+      severity: 'info',
+      action: () => {}
+    },
+    installed: {
+      label: 'Iniciar',
+      icon: 'pi pi-play',
+      severity: 'warning',
+      action: startLlamaCppFromSettings
+    },
+    no_models: {
+      label: 'Descargar modelo',
+      icon: 'pi pi-download',
+      severity: 'info',
+      action: downloadDefaultLlamaCppModel
+    },
+    ready: {
+      label: 'Listo',
+      icon: 'pi pi-check',
+      severity: 'success',
+      action: () => {}
+    }
+  }
+  return configs[llamacppState.value]
+})
+
+const llamacppStatusMessage = computed(() => {
+  const models = systemCapabilities.value?.llamacpp?.models || []
+  const messages: Record<LlamaCppState, string> = {
+    not_installed: 'Instala llama.cpp para análisis semántico rápido (~50MB)',
+    installing: 'Descargando e instalando llama.cpp...',
+    installed: 'llama.cpp instalado, descarga un modelo para comenzar',
+    no_models: 'Descarga un modelo GGUF para el análisis semántico',
+    ready: `${models.length} modelo(s) · llama.cpp activo`
+  }
+  return messages[llamacppState.value]
+})
+
+// llama.cpp install/start actions
+const installLlamaCppFromSettings = async () => {
+  toast.add({ severity: 'info', summary: 'Instalando llama.cpp', detail: 'Descargando binarios (~50MB)...', life: 5000 })
+  const success = await systemStore.installLlamaCpp()
+  if (success) {
+    await loadSystemCapabilities()
+    toast.add({ severity: 'success', summary: 'llama.cpp instalado', detail: 'Ahora descarga un modelo', life: 3000 })
+  } else {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo instalar llama.cpp', life: 5000 })
+  }
+}
+
+const downloadDefaultLlamaCppModel = async () => {
+  toast.add({ severity: 'info', summary: 'Descargando modelo', detail: 'Llama 3.2 (3B) ~2GB...', life: 5000 })
+  const success = await systemStore.downloadLlamaCppModel('llama-3.2-3b')
+  if (success) {
+    await loadSystemCapabilities()
+    toast.add({ severity: 'success', summary: 'Modelo descargado', detail: 'Iniciando servidor...', life: 3000 })
+    // Auto-start server
+    await startLlamaCppFromSettings()
+  } else {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo descargar el modelo', life: 5000 })
+  }
+}
+
+const startLlamaCppFromSettings = async () => {
+  const success = await systemStore.startLlamaCpp()
+  if (success) {
+    await loadSystemCapabilities()
+    toast.add({ severity: 'success', summary: 'llama.cpp activo', detail: 'Analizador semántico listo', life: 3000 })
+  } else {
+    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo iniciar llama.cpp', life: 5000 })
+  }
+}
 
 // LanguageTool state - usar store centralizado
 const ltInstalling = computed(() => systemStore.ltInstalling)

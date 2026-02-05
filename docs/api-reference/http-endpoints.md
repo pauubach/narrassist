@@ -320,19 +320,55 @@ Obtiene reporte de asimetría entre dos personajes.
 
 ## LLM / Expectativas
 
-### `GET /llm/status`
+### `GET /api/llm/status`
 
-Verifica disponibilidad de LLM.
+Verifica disponibilidad de todos los backends LLM.
 
 **Response data:**
 | Campo | Tipo | Descripción |
 |-------|------|-------------|
-| `available` | `boolean` | LLM disponible |
-| `backend` | `string` | "ollama" \| "transformers" \| "none" |
-| `model` | `string?` | Modelo configurado |
+| `available` | `boolean` | Algún LLM disponible |
+| `backend` | `string` | "llamacpp" \| "ollama" \| "transformers" \| "none" |
+| `model` | `string?` | Modelo activo |
 | `available_methods` | `string[]` | Métodos disponibles |
-| `ollama_models` | `string[]` | Modelos Ollama instalados |
+| `ollama_models` | `string[]` | Modelos Ollama |
+| `llamacpp_models` | `string[]` | Modelos llama.cpp |
+| `backends` | `object` | Estado de cada backend |
 | `message` | `string` | Mensaje descriptivo |
+
+### `GET /api/llamacpp/status`
+
+Estado detallado de llama.cpp.
+
+**Response data:**
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| `status` | `string` | "not_installed" \| "installed" \| "running" \| "error" |
+| `is_installed` | `boolean` | Binario instalado |
+| `is_running` | `boolean` | Servidor activo |
+| `host` | `string` | URL del servidor |
+| `port` | `number` | Puerto |
+| `downloaded_models` | `string[]` | Modelos descargados |
+| `available_models` | `LlamaCppModel[]` | Modelos disponibles para descargar |
+
+### `POST /api/llamacpp/install`
+
+Instala el binario llama-server (~50MB).
+
+### `POST /api/llamacpp/download/{model_name}`
+
+Descarga un modelo GGUF.
+
+**Path params:**
+- `model_name`: "llama-3.2-3b" | "qwen2.5-7b" | "mistral-7b"
+
+### `POST /api/llamacpp/start`
+
+Inicia el servidor llama.cpp.
+
+### `POST /api/llamacpp/stop`
+
+Detiene el servidor llama.cpp.
 
 ### `POST /projects/{project_id}/characters/{character_id}/analyze-behavior`
 

@@ -40,6 +40,26 @@ export interface ModelsStatus {
   python_error?: string | null
 }
 
+// llama.cpp install progress
+export interface LlamaCppInstallProgress {
+  status: string
+  message: string
+  progress: number
+}
+
+export type LlamaCppState = 'not_installed' | 'installing' | 'installed' | 'no_models' | 'ready'
+
+// llama.cpp model info
+export interface LlamaCppModel {
+  name: string
+  display_name: string
+  filename: string
+  size_gb: number
+  description: string
+  is_downloaded: boolean
+  is_default: boolean
+}
+
 export interface SystemCapabilities {
   hardware: {
     gpu: { type: string; name: string; memory_gb: number | null; device_id: number } | null
@@ -54,6 +74,12 @@ export interface SystemCapabilities {
     available: boolean
     models: Array<{ name: string; size: number; modified: string }>
     recommended_models: string[]
+  }
+  llamacpp?: {
+    installed: boolean
+    running: boolean
+    models: string[]
+    available_models: LlamaCppModel[]
   }
   languagetool?: {
     installed: boolean
@@ -112,6 +138,13 @@ export const useSystemStore = defineStore('system', () => {
   const ltInstallProgress = ref<LTInstallProgress | null>(null)
   let ltPollTimer: ReturnType<typeof setInterval> | null = null
 
+  // llama.cpp state (centralized)
+  const llamacppInstalling = ref(false)
+  const llamacppStarting = ref(false)
+  const llamacppDownloading = ref(false)
+  const llamacppInstallProgress = ref<LlamaCppInstallProgress | null>(null)
+  let llamacppPollTimer: ReturnType<typeof setInterval> | null = null
+
   // Computed: LanguageTool state
   const ltState = computed<LTState>(() => {
     const lt = systemCapabilities.value?.languagetool
@@ -120,6 +153,17 @@ export const useSystemStore = defineStore('system', () => {
     if (!lt.installed) return 'not_installed'
     if (!lt.running) return 'installed_not_running'
     return 'running'
+  })
+
+  // Computed: llama.cpp state
+  const llamacppState = computed<LlamaCppState>(() => {
+    if (llamacppInstalling.value) return 'installing'
+    const lc = systemCapabilities.value?.llamacpp
+    if (!lc) return 'not_installed'
+    if (!lc.installed) return 'not_installed'
+    if (lc.models.length === 0) return 'no_models'
+    if (!lc.running) return 'installed'
+    return 'ready'
   })
 
   // Computed: are all required models installed?
@@ -412,6 +456,151 @@ export const useSystemStore = defineStore('system', () => {
     }
   }
 
+  // =========================================================================
+  // llama.cpp actions (centralized) - Servidor ligero, más rápido que Ollama
+  // =========================================================================
+
+  /**
+   * Install llama.cpp binary (~50MB).
+   */
+  async function installLlamaCpp(): Promise<boolean> {
+    llamacppInstalling.value = true
+    llamacppInstallProgress.value = null
+
+    try {
+      const result = await api.postRaw<{ success: boolean; data?: { status: string; message: string } }>('/api/llamacpp/install')
+
+      if (!result.success) {
+        llamacppInstalling.value = false
+        return false
+      }
+
+      // Poll for completion
+      return new Promise((resolve) => {
+        let pollCount = 0
+        llamacppPollTimer = setInterval(async () => {
+          pollCount++
+          if (pollCount > 300) { // 5 minute timeout
+            stopLlamaCppPolling()
+            llamacppInstalling.value = false
+            resolve(false)
+            return
+          }
+
+          try {
+            const data = await api.get<{
+              status: string
+              is_installed?: boolean
+            }>('/api/llamacpp/status')
+
+            if (data?.is_installed) {
+              stopLlamaCppPolling()
+              await refreshCapabilities()
+              llamacppInstalling.value = false
+              resolve(true)
+              return
+            }
+          } catch {
+            // Ignore polling errors
+          }
+        }, 1000)
+      })
+    } catch {
+      llamacppInstalling.value = false
+      return false
+    }
+  }
+
+  /**
+   * Download a llama.cpp GGUF model.
+   */
+  async function downloadLlamaCppModel(modelName: string): Promise<boolean> {
+    llamacppDownloading.value = true
+
+    try {
+      const result = await api.postRaw<{ success: boolean }>(`/api/llamacpp/download/${modelName}`)
+
+      if (!result.success) {
+        llamacppDownloading.value = false
+        return false
+      }
+
+      // Poll for download completion
+      return new Promise((resolve) => {
+        let pollCount = 0
+        llamacppPollTimer = setInterval(async () => {
+          pollCount++
+          if (pollCount > 600) { // 10 minute timeout for large models
+            stopLlamaCppPolling()
+            llamacppDownloading.value = false
+            resolve(false)
+            return
+          }
+
+          try {
+            const data = await api.get<{
+              downloaded_models?: string[]
+            }>('/api/llamacpp/status')
+
+            if (data?.downloaded_models?.includes(modelName)) {
+              stopLlamaCppPolling()
+              await refreshCapabilities()
+              llamacppDownloading.value = false
+              resolve(true)
+              return
+            }
+          } catch {
+            // Ignore polling errors
+          }
+        }, 2000)
+      })
+    } catch {
+      llamacppDownloading.value = false
+      return false
+    }
+  }
+
+  /**
+   * Start llama.cpp server.
+   */
+  async function startLlamaCpp(): Promise<boolean> {
+    llamacppStarting.value = true
+    try {
+      await api.postRaw('/api/llamacpp/start')
+      // Dar tiempo a que inicie
+      await new Promise(r => setTimeout(r, 3000))
+      await refreshCapabilities()
+      return systemCapabilities.value?.llamacpp?.running ?? false
+    } catch {
+      return false
+    } finally {
+      llamacppStarting.value = false
+    }
+  }
+
+  /**
+   * Stop llama.cpp server.
+   */
+  async function stopLlamaCpp(): Promise<boolean> {
+    try {
+      await api.postRaw('/api/llamacpp/stop')
+      await refreshCapabilities()
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  /**
+   * Stop llama.cpp polling timer.
+   */
+  function stopLlamaCppPolling() {
+    if (llamacppPollTimer) {
+      clearInterval(llamacppPollTimer)
+      llamacppPollTimer = null
+    }
+  }
+
   return {
     // State
     backendConnected,
@@ -431,6 +620,13 @@ export const useSystemStore = defineStore('system', () => {
     ltStarting,
     ltInstallProgress,
     ltState,
+
+    // llama.cpp state
+    llamacppInstalling,
+    llamacppStarting,
+    llamacppDownloading,
+    llamacppInstallProgress,
+    llamacppState,
 
     // Computed
     modelsReady,
@@ -454,6 +650,13 @@ export const useSystemStore = defineStore('system', () => {
     // LanguageTool actions
     installLanguageTool,
     startLanguageTool,
-    stopLTPolling
+    stopLTPolling,
+
+    // llama.cpp actions
+    installLlamaCpp,
+    downloadLlamaCppModel,
+    startLlamaCpp,
+    stopLlamaCpp,
+    stopLlamaCppPolling
   }
 })

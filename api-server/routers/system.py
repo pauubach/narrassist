@@ -593,10 +593,38 @@ async def system_capabilities():
         except Exception:
             pass
 
+        # Verificar llama.cpp (servidor ligero, más rápido que Ollama)
+        llamacpp_installed = False
+        llamacpp_running = False
+        llamacpp_models = []
+        llamacpp_available_models = []
+        try:
+            from narrative_assistant.llm.llamacpp_manager import get_llamacpp_manager
+            lc_mgr = get_llamacpp_manager()
+            llamacpp_installed = lc_mgr.is_installed
+            llamacpp_running = lc_mgr.is_running
+            llamacpp_models = lc_mgr.downloaded_models
+            llamacpp_available_models = [
+                {
+                    "name": m.name,
+                    "display_name": m.display_name,
+                    "filename": m.filename,
+                    "size_gb": m.size_gb,
+                    "description": m.description,
+                    "is_downloaded": m.is_downloaded,
+                    "is_default": m.is_default,
+                }
+                for m in lc_mgr.available_models
+            ]
+        except Exception as e:
+            logger.debug(f"llama.cpp no disponible: {e}")
+
         # Definir métodos NLP disponibles
         # Basado en hardware, definir defaults recomendados
         has_gpu = gpu_type in ("cuda", "mps")
         has_high_vram = gpu_memory_gb and gpu_memory_gb >= 6.0
+        # LLM disponible si llama.cpp o Ollama están activos
+        llm_available = (llamacpp_running and len(llamacpp_models) > 0) or (ollama_available and len(ollama_models) > 0)
 
         nlp_methods = {
             "coreference": {
@@ -613,8 +641,8 @@ async def system_capabilities():
                     "name": "Analizador inteligente",
                     "description": "Comprende el contexto para resolver referencias complejas",
                     "weight": 0.35,
-                    "available": ollama_available and len(ollama_models) > 0,
-                    "default_enabled": ollama_available and (has_gpu or len(ollama_models) > 0),
+                    "available": llm_available,
+                    "default_enabled": llm_available and (has_gpu or llamacpp_running or len(ollama_models) > 0),
                     "requires_gpu": False,
                     "recommended_gpu": True,
                 },
@@ -657,8 +685,8 @@ async def system_capabilities():
                 "llm": {
                     "name": "Detección inteligente",
                     "description": "Usa contexto para identificar entidades ambiguas",
-                    "available": ollama_available,
-                    "default_enabled": ollama_available and has_gpu,
+                    "available": llm_available,
+                    "default_enabled": llm_available and has_gpu,
                     "requires_gpu": False,
                     "recommended_gpu": True,
                 },
@@ -809,6 +837,12 @@ async def system_capabilities():
                     "models": ollama_models,
                     "recommended_models": ollama_recommendations,
                 },
+                "llamacpp": {
+                    "installed": llamacpp_installed,
+                    "running": llamacpp_running,
+                    "models": llamacpp_models,
+                    "available_models": llamacpp_available_models,
+                },
                 "languagetool": {
                     "installed": lt_installed,
                     "running": lt_available,
@@ -821,12 +855,14 @@ async def system_capabilities():
                     "spacy_gpu_enabled": has_gpu and has_cupy,
                     "embeddings_gpu_enabled": has_gpu,
                     "batch_size": 64 if has_gpu else 16,
-                    # Detectores con validación LLM - solo recomendar si hay GPU o modelos rápidos
+                    # Detectores con validación LLM - preferir llama.cpp (más rápido)
                     "detectors": {
-                        "anacoluto_llm_validation": has_gpu and ollama_available,
-                        "pov_llm_validation": has_gpu and ollama_available,
-                        "use_llm_review": has_gpu and ollama_available,  # Revisión global LLM
+                        "anacoluto_llm_validation": has_gpu and llm_available,
+                        "pov_llm_validation": has_gpu and llm_available,
+                        "use_llm_review": has_gpu and llm_available,  # Revisión global LLM
                     },
+                    # Backend LLM recomendado
+                    "llm_backend": "llamacpp" if llamacpp_running else ("ollama" if ollama_available else "none"),
                 },
             },
         )

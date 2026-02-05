@@ -6,6 +6,52 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
+## [0.4.43] - 2026-02-04
+
+### Added
+- **Sistema multi-backend LLM con fallback automático**
+  - Cadena de prioridad: `llama.cpp → Ollama → Transformers → Reglas`
+  - llama.cpp como backend principal (~150 tok/s, ~50MB)
+  - Ollama como alternativa (~30 tok/s, más fácil de usar)
+  - Fallback a reglas si ningún LLM disponible
+
+- **Integración completa de llama.cpp**
+  - `LlamaCppManager`: Gestor del ciclo de vida del servidor
+  - Descarga automática de binarios desde GitHub releases
+  - Descarga de modelos GGUF desde HuggingFace
+  - API compatible con OpenAI (`/v1/chat/completions`)
+  - Modelos soportados: `llama-3.2-3b` (2GB), `qwen2.5-7b` (4.4GB), `mistral-7b` (4.1GB)
+
+- **Endpoints API para llama.cpp**
+  - `GET /api/llamacpp/status` - Estado del servidor y modelos
+  - `POST /api/llamacpp/install` - Instalar binario (~50MB)
+  - `POST /api/llamacpp/download/{model}` - Descargar modelo GGUF
+  - `POST /api/llamacpp/start` - Iniciar servidor
+  - `POST /api/llamacpp/stop` - Detener servidor
+
+- **Frontend Vue para llama.cpp**
+  - UI en Settings > Métodos de Análisis
+  - Estado centralizado en `system.ts` store
+  - Acciones: instalar, descargar modelo, iniciar/detener
+  - Selector de modelos unificado (llama.cpp + Ollama)
+
+- **Validaciones de seguridad LLM**
+  - Hosts LLM DEBEN ser localhost (protección de manuscritos)
+  - Validación de path traversal en rutas de modelos
+  - Logs sin datos sensibles (response.text eliminado)
+
+### Changed
+- `LocalLLMClient` ahora soporta múltiples backends con auto-detección
+- `SystemCapabilities` incluye estado de llama.cpp
+- Variables de entorno: `NA_LLM_BACKEND=auto|llamacpp|ollama|transformers|none`
+
+### Security
+- **Manuscritos 100% offline**: Validación localhost-only para todos los backends LLM
+- Path traversal protection en model downloads
+- Removed sensitive data from error logs
+
+---
+
 ## [0.3.22] - 2026-01-29
 
 ### Added
