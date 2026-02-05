@@ -42,8 +42,8 @@ def _make_failure_result():
 @pytest.fixture
 def api_client():
     """TestClient con project_manager que siempre devuelve failure."""
-    import main as api_main
     import deps
+    import main as api_main
 
     mock_pm = MagicMock()
     mock_pm.get.return_value = _make_failure_result()

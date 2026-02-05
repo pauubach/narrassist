@@ -27,7 +27,7 @@ export const useAppStore = defineStore('app', () => {
   const theme = ref<ThemeMode>('auto')
   const isDark = ref(false)
   let retryInterval: number | null = null
-  const _unlisten: (() => void) | null = null
+  let unlisten: (() => void) | null = null
 
   // Inicializar tema desde localStorage
   const savedTheme = localStorage.getItem('narrative_assistant_theme') as ThemeMode | null
