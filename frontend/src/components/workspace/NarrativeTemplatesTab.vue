@@ -92,7 +92,7 @@ async function analyze() {
   }
 }
 
-function getFitClass(score: number): string {
+function _getFitClass(score: number): string {
   if (score >= 60) return 'fit-high'
   if (score >= 35) return 'fit-medium'
   return 'fit-low'

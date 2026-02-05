@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { apiUrl } from '@/config/api'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
@@ -62,7 +62,7 @@ const toast = useToast()
 const router = useRouter()
 const route = useRoute()
 const workspaceStore = useWorkspaceStore()
-const selectionStore = useSelectionStore()
+const _selectionStore = useSelectionStore()
 const { getEntityIcon, getEntityLabel, getEntityColor } = useEntityUtils()
 const { formatChapterLabel } = useAlertUtils()
 
@@ -151,7 +151,7 @@ const typeOptions = computed(() => {
   ]
 })
 
-const importanceOptions = [
+const _importanceOptions = [
   { label: 'Todas', value: null },
   { label: 'Principal', value: 'main' },
   { label: 'Secundario', value: 'secondary' },
@@ -529,8 +529,8 @@ function exportEntities() {
   }
 }
 
-// Helpers para el sidebar
-function getTypeSeverity(type: string): string {
+// Helpers para el sidebar (reservado para uso futuro)
+function _getTypeSeverity(type: string): string {
   const severities: Record<string, string> = {
     'character': 'success',
     'location': 'danger',
@@ -543,7 +543,7 @@ function getTypeSeverity(type: string): string {
   return severities[type] || 'secondary'
 }
 
-function getImportanceSeverity(importance: string): string {
+function _getImportanceSeverity(importance: string): string {
   const severities: Record<string, string> = {
     'main': 'success',
     'secondary': 'info',
@@ -588,7 +588,7 @@ function getRelevanceClass(score: number): string {
   return 'relevance-very-low'
 }
 
-function getRelevanceTooltip(score: number): string {
+function _getRelevanceTooltip(score: number): string {
   if (score >= 0.5) return 'Alta relevancia: entidad muy mencionada'
   if (score >= 0.2) return 'Relevancia media: entidad mencionada regularmente'
   if (score >= 0.1) return 'Baja relevancia: pocas menciones en el documento'
@@ -664,9 +664,9 @@ function navigateToAttributeSource(attr: EntityAttribute) {
           Gestión de Entidades
         </h3>
         <p class="header-subtitle">
-          Lista técnica de personajes, lugares y conceptos detectados. 
+          Lista técnica de personajes, lugares y conceptos detectados.
           Fusiona duplicados, edita atributos y navega a menciones.
-          <span class="info-tip" v-tooltip.right="'Esta pestaña es para gestionar las entidades: fusionar duplicados, corregir tipos, editar atributos. Para una vista wiki consolidada, usa la pestaña Story Bible.'">
+          <span v-tooltip.right="'Esta pestaña es para gestionar las entidades: fusionar duplicados, corregir tipos, editar atributos. Para una vista wiki consolidada, usa la pestaña Story Bible.'" class="info-tip">
             <i class="pi pi-info-circle"></i>
           </span>
         </p>

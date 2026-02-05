@@ -140,7 +140,7 @@ const props = defineProps<{
   initialChapter?: number
 }>()
 
-const emit = defineEmits<{
+defineEmits<{
   'select-dialogue': [attribution: DialogueAttribution]
 }>()
 

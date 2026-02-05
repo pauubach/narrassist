@@ -237,7 +237,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useProjectsStore } from '@/stores/projects'
 import { useAnalysisStore } from '@/stores/analysis'
@@ -256,7 +256,7 @@ import Menu from 'primevue/menu'
 import Badge from 'primevue/badge'
 import { useToast } from 'primevue/usetoast'
 import type { Project } from '@/types'
-import { transformProjects, transformProject } from '@/types/transformers'
+// import { transformProjects, transformProject } from '@/types/transformers'  // Reserved
 import { apiUrl } from '@/config/api'
 
 const router = useRouter()

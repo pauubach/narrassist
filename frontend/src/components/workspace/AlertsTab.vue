@@ -227,7 +227,7 @@ function confirmResolveAll() {
   emit('resolve-all')
 }
 
-function handleReopen(alert: Alert) {
+function _handleReopen(alert: Alert) {
   emit('alert-reopen', alert)
 }
 
@@ -284,8 +284,8 @@ function exportAlerts() {
   }
 }
 
-// Helper para verificar si alerta está activa
-function isAlertActive(status: string): boolean {
+// Helper para verificar si alerta está activa (reservado para uso futuro)
+function _isAlertActive(status: string): boolean {
   return status === 'active'
 }
 

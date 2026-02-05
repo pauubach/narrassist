@@ -7,7 +7,7 @@
  * - doble-click → modal de detalle
  */
 
-import { ref, computed, type Ref } from 'vue'
+import { ref } from 'vue'
 import type { Entity, Alert, Chapter } from '@/types'
 
 export interface NavigationTarget {

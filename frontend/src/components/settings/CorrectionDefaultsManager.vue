@@ -301,7 +301,7 @@ const resetType = async (typeCode: string) => {
       })
       await loadData()
     }
-  } catch (err) {
+  } catch (_err) {
     toast.add({
       severity: 'error',
       summary: 'Error',
@@ -326,7 +326,7 @@ const resetSubtype = async (typeCode: string, subtypeCode: string) => {
       })
       await loadData()
     }
-  } catch (err) {
+  } catch (_err) {
     toast.add({
       severity: 'error',
       summary: 'Error',
@@ -357,7 +357,7 @@ const resetAll = async () => {
       showResetAllDialog.value = false
       await loadData()
     }
-  } catch (err) {
+  } catch (_err) {
     toast.add({
       severity: 'error',
       summary: 'Error',

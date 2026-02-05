@@ -399,7 +399,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useProjectsStore } from '@/stores/projects'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { useSelectionStore } from '@/stores/selection'
-import { useAnalysisStore, TAB_REQUIRED_PHASES, TAB_PHASE_DESCRIPTIONS, type WorkspaceTab as AnalysisWorkspaceTab } from '@/stores/analysis'
+import { useAnalysisStore, TAB_PHASE_DESCRIPTIONS } from '@/stores/analysis'
 import { useMentionNavigation } from '@/composables/useMentionNavigation'
 import Button from 'primevue/button'
 import ProgressSpinner from 'primevue/progressspinner'
@@ -500,7 +500,7 @@ const hasBeenAnalyzed = computed(() => {
   return (project.value.chapterCount || 0) > 0 || (project.value.entityCount || 0) > 0
 })
 
-const analysisProgress = computed(() => {
+const _analysisProgress = computed(() => {
   // Usar datos de polling si están disponibles
   if (analysisProgressData.value) {
     return analysisProgressData.value.progress
@@ -509,7 +509,7 @@ const analysisProgress = computed(() => {
   return Math.round((project.value.analysisProgress || 0) * 100)
 })
 
-const analysisPhase = computed(() => {
+const _analysisPhase = computed(() => {
   return analysisProgressData.value?.phase || 'Analizando...'
 })
 
@@ -673,8 +673,8 @@ const originalDocumentName = computed(() => {
 const entitiesCount = computed(() => entities.value.length)
 const alertsCount = computed(() => alerts.value.length)
 
-// Alertas agrupadas por severidad para sidebar
-const alertsBySeverity = computed(() => {
+// Alertas agrupadas por severidad para sidebar (reservado para uso futuro)
+const _alertsBySeverity = computed(() => {
   const counts: Record<string, number> = {}
   for (const alert of alerts.value) {
     if (alert.status === 'active') {
@@ -684,8 +684,8 @@ const alertsBySeverity = computed(() => {
   return counts
 })
 
-// Top personajes para sidebar
-const topCharacters = computed(() => {
+// Top personajes para sidebar (reservado para uso futuro)
+const _topCharacters = computed(() => {
   return entities.value
     .filter(e => e.type === 'character')
     .sort((a, b) => (b.mentionCount || 0) - (a.mentionCount || 0))
@@ -736,13 +736,13 @@ const rightPanelWidth = computed(() => {
 // Usar composable centralizado para alertas
 const { getSeverityConfig } = useAlertUtils()
 
-// Helper para label de severidad
-const getSeverityLabel = (severity: string) => {
+// Helper para label de severidad (reservado para uso futuro)
+const _getSeverityLabel = (severity: string) => {
   return getSeverityConfig(severity as any).label
 }
 
-// Helper para label de tipo de entidad
-const getEntityTypeLabel = (type: string) => {
+// Helper para label de tipo de entidad (reservado para uso futuro)
+const _getEntityTypeLabel = (type: string) => {
   const labels: Record<string, string> = {
     character: 'Personaje',
     location: 'Lugar',
@@ -755,7 +755,7 @@ const getEntityTypeLabel = (type: string) => {
   return labels[type] || type
 }
 
-const getEntityIcon = (type: string) => {
+const _getEntityIcon = (type: string) => {
   const icons: Record<string, string> = {
     character: 'pi pi-user',
     location: 'pi pi-map-marker',
@@ -840,7 +840,7 @@ onMounted(async () => {
     }
 
     loading.value = false
-  } catch (err) {
+  } catch (_err) {
     error.value = projectsStore.error || 'Error cargando proyecto'
     loading.value = false
   }
@@ -1232,7 +1232,7 @@ const onAnalysisCompleted = async () => {
   // Timeline y Style cargan sus propios datos
 }
 
-const onDocumentTypeChanged = async (type: string, subtype: string | null) => {
+const onDocumentTypeChanged = async (_type: string, _subtype: string | null) => {
   // Recargar el proyecto para obtener el nuevo perfil de features
   if (project.value) {
     await projectsStore.fetchProject(project.value.id)
@@ -1266,7 +1266,7 @@ const startReanalysis = async () => {
       await loadEntities(project.value.id)
       await loadAlerts(project.value.id)
     }
-  } catch (err) {
+  } catch (_err) {
     error.value = 'Error de conexión'
     // En caso de error, recargar los datos originales
     if (project.value) {

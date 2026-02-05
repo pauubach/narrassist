@@ -37,13 +37,13 @@ const props = defineProps<{
 }>()
 
 // Usar el composable para obtener configuración según tipo de documento
-const { config, isTabVisible, getTabLabel } = useDocumentTypeConfig(
+const { isTabVisible, getTabLabel } = useDocumentTypeConfig(
   computed(() => props.documentType),
   computed(() => props.recommendedAnalysis)
 )
 
-// Mapeo de tabs a sus keys de config
-const tabConfigMapping: Record<WorkspaceTab, string> = {
+// Mapeo de tabs a sus keys de config (reservado para uso futuro)
+const _tabConfigMapping: Record<WorkspaceTab, string> = {
   text: 'text',
   entities: 'entities',
   relationships: 'relations',

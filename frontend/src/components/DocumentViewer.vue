@@ -172,7 +172,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, nextTick, watchEffect } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import Drawer from 'primevue/drawer'
@@ -306,8 +306,8 @@ const showGrammarErrors = ref(true)   // Toggle para mostrar/ocultar errores de 
 const showDialoguePanel = ref(false)  // Toggle para panel de atribución de diálogos
 const showDialogueHighlights = ref(true)  // Mostrar highlights de diálogos cuando el panel está abierto
 
-// Computed para mantener compatibilidad con showAnnotations
-const showAnnotations = computed(() => showSpellingErrors.value || showGrammarErrors.value)
+// Computed para mantener compatibilidad con showAnnotations (reservado para uso futuro)
+const _showAnnotations = computed(() => showSpellingErrors.value || showGrammarErrors.value)
 
 // Configuración de apariencia desde settings
 const fontSize = ref<'small' | 'medium' | 'large'>('medium')

@@ -56,8 +56,8 @@ export interface FeatureProfile {
   }
 }
 
-// Mapeo de features a tabs del workspace
-const featureToTabMap: Record<string, string> = {
+// Mapeo de features a tabs del workspace (reservado para uso futuro)
+const _featureToTabMap: Record<string, string> = {
   characters: 'entities',
   relationships: 'relationships',
   timeline: 'timeline',

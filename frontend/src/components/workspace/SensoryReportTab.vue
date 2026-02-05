@@ -86,10 +86,10 @@
             <div
               v-for="sense in senseOrder"
               :key="sense"
+              v-tooltip.top="senseNames[sense] + ': ' + (report.sense_percentages?.[sense] || 0).toFixed(1) + '%'"
               class="balance-segment"
               :class="'sense-bg-' + sense"
               :style="{ width: (report.sense_percentages?.[sense] || 0) + '%' }"
-              v-tooltip.top="senseNames[sense] + ': ' + (report.sense_percentages?.[sense] || 0).toFixed(1) + '%'"
             />
           </div>
           <div class="balance-legend">

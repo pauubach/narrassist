@@ -19,14 +19,14 @@
  * - Escape: Salir
  */
 
-import { computed, ref, watch } from 'vue'
+import { computed } from 'vue'
 import Button from 'primevue/button'
 import ProgressBar from 'primevue/progressbar'
 import Tag from 'primevue/tag'
-import Divider from 'primevue/divider'
+// import Divider from 'primevue/divider'  // Reserved
 import ToggleSwitch from 'primevue/toggleswitch'
 import Message from 'primevue/message'
-import type { Alert, AlertSeverity, AlertCategory, AlertSource } from '@/types'
+import type { Alert, AlertSource } from '@/types'
 import { useAlertUtils } from '@/composables/useAlertUtils'
 
 interface ChapterInfo {
@@ -71,7 +71,7 @@ const emit = defineEmits<{
   (e: 'navigate-to-text', source?: AlertSource): void
 }>()
 
-const { getSeverityConfig, getCategoryLabel, formatChapterLabel } = useAlertUtils()
+const { getSeverityConfig, getCategoryLabel } = useAlertUtils()
 
 // Computed
 const severityConfig = computed(() =>

@@ -398,7 +398,6 @@ import InputText from 'primevue/inputtext'
 import { apiUrl } from '@/config/api'
 import {
   useRelationshipGraphStore,
-  type RelationshipStrength,
   type RelationshipValence,
   type RelationshipType
 } from '@/stores/relationshipGraph'
@@ -590,7 +589,7 @@ function expandHull(
  */
 function catmullRomSpline(
   points: Array<{ x: number; y: number }>,
-  tension: number = 0.5,
+  _tension: number = 0.5,
   segments: number = 20
 ): Array<{ x: number; y: number }> {
   if (points.length < 3) return points
@@ -1466,7 +1465,7 @@ const getEntityColor = (type: string): string => {
   return getComputedStyle(document.documentElement).getPropertyValue('--ds-entity-other').trim() || '#616161'
 }
 
-const getNodeSize = (importance: string): number => {
+const _getNodeSize = (importance: string): number => {
   const sizes: Record<string, number> = {
     'critical': 35,
     'high': 28,
@@ -1677,8 +1676,8 @@ const saveNodePositions = () => {
   }
 }
 
-// Restaurar posiciones guardadas a los nodos
-const applyNodePositions = (nodes: DataSet<Node>) => {
+// Restaurar posiciones guardadas a los nodos (reservado para uso futuro)
+const _applyNodePositions = (nodes: DataSet<Node>) => {
   if (nodePositions.value.size === 0) return
 
   nodes.forEach((node) => {

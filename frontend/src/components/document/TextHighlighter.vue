@@ -194,7 +194,7 @@ const segments = computed<TextSegment[]>(() => {
 
   const result: TextSegment[] = []
   const baseOffset = props.offsetBase || 0
-  let currentPos = 0
+  let _currentPos = 0
 
   // Crear puntos de corte únicos
   const breakpoints = new Set<number>()
@@ -383,7 +383,7 @@ function handleMouseUp() {
 
   // Calcular posiciones en el texto original
   // Esto es una simplificación; en producción necesitaría más lógica
-  const range = selection.getRangeAt(0)
+  const _range = selection.getRangeAt(0)
   const container = containerRef.value
 
   if (!container) return

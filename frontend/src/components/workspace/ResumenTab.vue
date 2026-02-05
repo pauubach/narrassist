@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
-import DsBadge from '@/components/ds/DsBadge.vue'
+// import DsBadge from '@/components/ds/DsBadge.vue'  // Reserved
 import type { Project, Entity, Alert, Chapter } from '@/types'
 import { useEntityUtils } from '@/composables/useEntityUtils'
 

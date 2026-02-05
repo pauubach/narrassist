@@ -385,12 +385,12 @@ const getAttributesBySection = (sectionIndex: number) => {
   return props.attributes.filter(attr => config.categories.includes(attr.category))
 }
 
-// Para compatibilidad con el código existente
-const physicalAttributes = computed(() => {
+// Para compatibilidad con el código existente (reservado para uso futuro)
+const _physicalAttributes = computed(() => {
   return props.attributes.filter(attr => attr.category === 'physical')
 })
 
-const psychologicalAttributes = computed(() => {
+const _psychologicalAttributes = computed(() => {
   return props.attributes.filter(attr => attr.category === 'psychological')
 })
 

@@ -14,21 +14,21 @@
       <div class="header-controls">
         <div class="view-toggle">
           <Button
+            v-tooltip.top="'Vista lista'"
             icon="pi pi-list"
             :text="viewMode !== 'list'"
             :outlined="viewMode === 'list'"
             size="small"
             severity="secondary"
-            v-tooltip.top="'Vista lista'"
             @click="viewMode = 'list'"
           />
           <Button
+            v-tooltip.top="'Vista tarjetas'"
             icon="pi pi-th-large"
             :text="viewMode !== 'cards'"
             :outlined="viewMode === 'cards'"
             size="small"
             severity="secondary"
-            v-tooltip.top="'Vista tarjetas'"
             @click="viewMode = 'cards'"
           />
         </div>

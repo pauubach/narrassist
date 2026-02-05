@@ -223,8 +223,8 @@
                 size="small"
                 severity="warning"
                 :loading="ollamaStarting"
-                @click="startOllama"
                 class="ml-2"
+                @click="startOllama"
               />
             </div>
             <div v-else class="ollama-unavailable">
@@ -235,8 +235,8 @@
                 size="small"
                 severity="warning"
                 :loading="ollamaInstalling"
-                @click="installOllama"
                 class="ml-2"
+                @click="installOllama"
               />
               <p>Análisis avanzado con IA local</p>
             </div>
@@ -257,8 +257,8 @@
                 size="small"
                 severity="warning"
                 :loading="ltStarting"
-                @click="startLanguageTool"
                 class="ml-2"
+                @click="startLanguageTool"
               />
             </div>
             <div v-else-if="ltInstallingState || ltInstalling" class="ollama-unavailable lt-installing">
@@ -268,9 +268,9 @@
                   <span class="lt-progress-label">{{ ltInstallProgress?.phase_label || 'Iniciando...' }}</span>
                   <span v-if="ltInstallProgress?.percentage" class="lt-progress-percent">{{ Math.round(ltInstallProgress.percentage) }}%</span>
                 </div>
-                <ProgressBar 
-                  :value="ltInstallProgress?.percentage || 0" 
-                  :showValue="false"
+                <ProgressBar
+                  :value="ltInstallProgress?.percentage || 0"
+                  :show-value="false"
                   class="lt-progress-bar"
                 />
                 <p class="lt-progress-detail">{{ ltInstallProgress?.detail || 'Descargando Java y LanguageTool...' }}</p>
@@ -284,8 +284,8 @@
                 size="small"
                 severity="info"
                 :loading="ltInstalling"
-                @click="installLanguageTool"
                 class="ml-2"
+                @click="installLanguageTool"
               />
               <p>Opcional: corrector gramatical avanzado (~300 MB)</p>
             </div>
@@ -383,7 +383,7 @@ import ProgressSpinner from 'primevue/progressspinner'
 import ProgressBar from 'primevue/progressbar'
 import { useToast } from 'primevue/usetoast'
 import { apiUrl } from '@/config/api'
-import { useSystemStore, type NLPMethod } from '@/stores/system'
+import { useSystemStore } from '@/stores/system'
 import { storeToRefs } from 'pinia'
 
 const systemStore = useSystemStore()
@@ -487,7 +487,7 @@ const downloadDefaultModel = async () => {
     } else {
       toast.add({ severity: 'error', summary: 'Error', detail: result.error || 'No se pudo descargar el modelo', life: 5000 })
     }
-  } catch (e) {
+  } catch (_e) {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Error de conexión descargando modelo', life: 5000 })
   } finally {
     modelDownloading.value = false

@@ -53,7 +53,7 @@ export default tseslint.config(
   {
     files: ['**/*.ts', '**/*.tsx', '**/*.vue'],
     rules: {
-      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/explicit-function-return-type': 'off',
       '@typescript-eslint/no-non-null-assertion': 'off',
@@ -72,7 +72,7 @@ export default tseslint.config(
   {
     files: ['**/*.js', '**/*.cjs', '**/*.mjs'],
     rules: {
-      'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }]
+      'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }]
     }
   }
 )

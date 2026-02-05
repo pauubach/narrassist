@@ -1,4 +1,4 @@
-import { ref, computed, watch, onUnmounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { defineStore } from 'pinia'
 import type { ThemeMode } from '@/types'
 import { api } from '@/services/apiClient'
@@ -27,7 +27,7 @@ export const useAppStore = defineStore('app', () => {
   const theme = ref<ThemeMode>('auto')
   const isDark = ref(false)
   let retryInterval: number | null = null
-  let unlisten: (() => void) | null = null
+  const _unlisten: (() => void) | null = null
 
   // Inicializar tema desde localStorage
   const savedTheme = localStorage.getItem('narrative_assistant_theme') as ThemeMode | null

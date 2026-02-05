@@ -199,7 +199,7 @@ const otherAlerts = computed(() => {
   return relatedAlerts.value.filter(a => a.category !== 'attribute')
 })
 
-const hasRelatedAlerts = computed(() => relatedAlerts.value.length > 0)
+const _hasRelatedAlerts = computed(() => relatedAlerts.value.length > 0)
 
 // ============================================================================
 // Mini Timeline

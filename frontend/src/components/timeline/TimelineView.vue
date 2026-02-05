@@ -604,8 +604,8 @@ const formatDuration = (days: number): string => {
   }
 }
 
-// Calcular duracion entre fechas (legacy, usado en otros lugares)
-const calculateDuration = (start: Date | null, end: Date | null): string => {
+// Calcular duracion entre fechas (legacy, reservado para uso futuro)
+const _calculateDuration = (start: Date | null, end: Date | null): string => {
   if (!start || !end) return ''
   const diffMs = end.getTime() - start.getTime()
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))

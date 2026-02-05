@@ -128,7 +128,7 @@ interface ChapterWithStats extends Chapter {
   alertsCount?: number
 }
 
-const props = defineProps<{
+defineProps<{
   chapters: ChapterWithStats[]
   loading?: boolean
   activeChapterId?: number | null

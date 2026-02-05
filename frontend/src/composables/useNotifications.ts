@@ -7,7 +7,7 @@
  * - Respeta las preferencias del usuario en Settings
  */
 
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 
 // Sonidos base64 (cortos, para evitar archivos externos)
 // Sonido de éxito: tono agradable ascendente
