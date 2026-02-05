@@ -804,16 +804,16 @@ class TestStripAccents:
         """ü → u es comportamiento correcto (diacrítico, no letra)."""
         assert strip_accents("pingüino") == "pinguino"
 
-    @pytest.mark.xfail(
-        reason="BUG: strip_accents elimina ñ porque NFD la descompone en n + combining tilde (Mn)"
-    )
     def test_strip_accents_preserves_ñ(self):
-        """BUG: strip_accents debería preservar ñ pero no lo hace."""
+        """strip_accents preserva ñ/Ñ (son letras, no acentos diacríticos)."""
         result = strip_accents("niño")
         assert result == "niño", (
             f"strip_accents('niño') = '{result}' pero debería ser 'niño'. "
             f"La ñ es una LETRA en español, no un acento diacrítico."
         )
+        # También probar mayúscula
+        assert strip_accents("ESPAÑA") == "ESPAÑA"
+        assert strip_accents("Ñoño") == "Ñoño"
 
 
 class TestNamesMatchAfterNormalization:

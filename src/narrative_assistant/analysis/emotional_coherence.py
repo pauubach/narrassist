@@ -234,7 +234,7 @@ class EmotionalCoherenceChecker:
     def __init__(
         self,
         sentiment_analyzer: SentimentAnalyzer | None = None,
-        min_confidence: float = 0.6,
+        min_confidence: float = 0.4,
         proximity_window: int | None = None,
     ):
         """
@@ -242,7 +242,8 @@ class EmotionalCoherenceChecker:
 
         Args:
             sentiment_analyzer: Analizador de sentimiento (usa singleton si None)
-            min_confidence: Confianza mínima para reportar incoherencia
+            min_confidence: Confianza mínima para reportar incoherencia (0.4 para
+                funcionar con analizadores fallback que dan confianza 0.5)
             proximity_window: Ventana de proximidad en caracteres para correlacionar
                 emoción declarada y diálogo (default: 500)
         """
@@ -607,6 +608,116 @@ class EmotionalCoherenceChecker:
                     incoherences.append(incoherence)
 
         return incoherences
+
+    def analyze_text(
+        self,
+        text: str,
+        entity_name: str | None = None,
+    ) -> list[EmotionalIncoherence]:
+        """
+        Analiza un texto simple buscando incoherencias emocionales.
+
+        Método de conveniencia que extrae diálogos automáticamente del texto.
+        Útil para tests y análisis rápidos de fragmentos cortos.
+
+        Args:
+            text: Texto a analizar
+            entity_name: Nombre de entidad específica (si None, detecta todas)
+
+        Returns:
+            Lista de incoherencias encontradas
+        """
+        # Extraer diálogos usando patrones de diálogo en español
+        # Patrones: —texto—, —texto (fin de línea), "texto", --texto--
+        dialogue_patterns = [
+            # Raya española con texto
+            r'—([^—\n]+)(?:—|(?=\n|$))',
+            # Doble guión (alternativa común en textos digitales)
+            r'--([^\n]+?)(?:--|(?=\n|$))',
+            # Comillas dobles ASCII
+            r'"([^"]+)"',
+            # Comillas tipográficas
+            r'"([^"]+)"',
+            r'«([^»]+)»',
+        ]
+
+        dialogues: list[tuple[str, str, int, int]] = []
+
+        for pattern in dialogue_patterns:
+            for match in re.finditer(pattern, text):
+                dialogue_text = match.group(1).strip()
+                if not dialogue_text:
+                    continue
+
+                start = match.start()
+                end = match.end()
+
+                # Intentar determinar el hablante
+                speaker = self._infer_speaker_from_context(text, start, entity_name)
+                if speaker:
+                    dialogues.append((speaker, dialogue_text, start, end))
+
+        # Determinar entidades a analizar
+        if entity_name:
+            entity_names = [entity_name]
+        else:
+            # Extraer nombres únicos de los diálogos detectados
+            entity_names = list({d[0] for d in dialogues})
+            if not entity_names:
+                # Intentar extraer de estados emocionales declarados
+                declared = self.sentiment.extract_declared_emotions(text, [], 0)
+                entity_names = list({d.entity_name for d in declared})
+
+        return self.analyze_chapter(
+            chapter_text=text,
+            entity_names=entity_names,
+            dialogues=dialogues,
+            chapter_id=0,
+        )
+
+    def _infer_speaker_from_context(
+        self,
+        text: str,
+        dialogue_start: int,
+        hint_entity: str | None = None,
+    ) -> str | None:
+        """
+        Infiere el hablante de un diálogo basándose en el contexto cercano.
+
+        Args:
+            text: Texto completo
+            dialogue_start: Posición donde comienza el diálogo
+            hint_entity: Entidad sugerida (si viene del test)
+
+        Returns:
+            Nombre del hablante inferido o None
+        """
+        # Si tenemos una pista, verificar si aparece cerca
+        if hint_entity:
+            # Buscar en los 150 caracteres anteriores al diálogo
+            context_start = max(0, dialogue_start - 150)
+            context = text[context_start:dialogue_start].lower()
+            if hint_entity.lower() in context:
+                return hint_entity
+
+        # Buscar patrones comunes: "Nombre dijo/exclamó/preguntó"
+        context_start = max(0, dialogue_start - 100)
+        context = text[context_start:dialogue_start]
+
+        # Patrón: Nombre + verbo de habla
+        speech_pattern = r'([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+(?:dijo|exclamó|preguntó|murmuró|gritó|susurró|respondió|añadió|contestó|replicó)'
+        match = re.search(speech_pattern, context)
+        if match:
+            return match.group(1)
+
+        # Patrón: verbo de habla + Nombre
+        speech_pattern2 = r'(?:—[^—]+—\s*)?(?:dijo|exclamó|preguntó|murmuró|gritó|susurró)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)'
+        match = re.search(speech_pattern2, context)
+        if match:
+            return match.group(1)
+
+        # Si hay una pista de entidad, usarla como fallback
+        return hint_entity
 
 
 # Singleton

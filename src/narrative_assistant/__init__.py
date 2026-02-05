@@ -4,11 +4,18 @@ Asistente de Corrección Narrativa - TFM
 Herramienta offline de análisis narrativo para correctores profesionales.
 """
 
+# Version: try importlib.metadata first, then fallback to hardcoded version
+# IMPORTANT: This fallback is critical for embedded Python where the package
+# is not installed via pip, so importlib.metadata.version() fails.
+_FALLBACK_VERSION = "0.4.44"
+
 try:
     from importlib.metadata import version
     __version__ = version("narrative-assistant")
 except Exception:
-    __version__ = None  # UI mostrará nombre sin versión
+    # Fallback for embedded Python or development environments
+    # where the package is not installed via pip
+    __version__ = _FALLBACK_VERSION
 
 __author__ = "Pau Ubach"
 

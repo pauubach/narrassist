@@ -112,10 +112,41 @@ EMOTION_KEYWORDS = {
 }
 
 # Mapeo inverso para búsqueda rápida
+# Incluye variantes de género (masculino/femenino) para adjetivos españoles
 KEYWORD_TO_EMOTION = {}
 for emotion, keywords in EMOTION_KEYWORDS.items():
     for keyword in keywords:
         KEYWORD_TO_EMOTION[keyword] = emotion
+        # Generar forma femenina si termina en -o (adjetivos)
+        if keyword.endswith("o"):
+            feminine = keyword[:-1] + "a"
+            KEYWORD_TO_EMOTION[feminine] = emotion
+        # Algunos adjetivos terminan en -e o consonante (misma forma)
+        # ya están incluidos en la lista base
+
+
+def normalize_emotion_keyword(word: str) -> str:
+    """
+    Normaliza una palabra emocional para búsqueda en diccionario.
+
+    Convierte formas femeninas a masculinas y maneja variantes.
+
+    Args:
+        word: Palabra a normalizar
+
+    Returns:
+        Forma normalizada (masculina) del adjetivo
+    """
+    word = word.lower().strip()
+    # Si ya está en el diccionario, devolverla
+    if word in KEYWORD_TO_EMOTION:
+        return word
+    # Intentar forma masculina si termina en -a
+    if word.endswith("a"):
+        masculine = word[:-1] + "o"
+        if masculine in KEYWORD_TO_EMOTION:
+            return masculine
+    return word
 
 
 @dataclass

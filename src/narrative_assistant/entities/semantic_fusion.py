@@ -470,12 +470,21 @@ def strip_accents(text: str) -> str:
     if not text:
         return text
 
+    # Preservar ñ/Ñ antes de la normalización NFD
+    # Usamos placeholders que no contienen caracteres especiales
+    _PLACEHOLDER_LOWER = "\x00\x01"  # Placeholder para ñ
+    _PLACEHOLDER_UPPER = "\x00\x02"  # Placeholder para Ñ
+    text = text.replace("ñ", _PLACEHOLDER_LOWER).replace("Ñ", _PLACEHOLDER_UPPER)
+
     # NFD descompone los caracteres acentuados en base + acento
     normalized = unicodedata.normalize("NFD", text)
     # Filtrar solo los "Nonspacing Mark" (acentos), manteniendo todo lo demás
     result = "".join(c for c in normalized if unicodedata.category(c) != "Mn")
     # Recomponer cualquier carácter que pudiera haberse descompuesto
-    return unicodedata.normalize("NFC", result)
+    result = unicodedata.normalize("NFC", result)
+
+    # Restaurar ñ/Ñ
+    return result.replace(_PLACEHOLDER_LOWER, "ñ").replace(_PLACEHOLDER_UPPER, "Ñ")
 
 
 def normalize_for_comparison(name: str) -> str:
