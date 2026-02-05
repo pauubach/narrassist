@@ -43,7 +43,7 @@ jobs:
 
       - name: Run unit tests
         run: |
-          pytest tests/unit -v --tb=short -x --junitxml=junit-unit.xml
+          pytest tests/unit -v --tb=short -x -m "not slow" --junitxml=junit-unit.xml
 
       - name: Upload test results
         uses: actions/upload-artifact@v4

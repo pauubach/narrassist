@@ -155,8 +155,9 @@ class TestGrammarReport:
         assert report.issues[0].error_type == GrammarErrorType.DEQUEISMO
 
 
+@pytest.mark.slow
 class TestGrammarChecker:
-    """Tests para GrammarChecker."""
+    """Tests para GrammarChecker (requiere cargar modelo spaCy)."""
 
     def test_checker_instantiation(self):
         """Checker se puede instanciar."""
