@@ -62,6 +62,15 @@
   /* Texto muted: #64748b (gray-500) tiene 4.6:1 sobre blanco - límite WCAG AA */
   --ds-color-text-muted: var(--p-text-muted-color, #64748b);
 
+  /* -------------------------------------------------------------------------
+     Colores de texto accesibles para estados - WCAG AA 4.5:1 sobre fondos claros
+     Usar en lugar de --{color}-500 para texto sobre fondos claros
+     ------------------------------------------------------------------------- */
+  --ds-text-success: #15803d;   /* green-700: 4.5:1 sobre blanco */
+  --ds-text-warning: #a16207;   /* yellow-700: 4.6:1 sobre blanco */
+  --ds-text-danger: #b91c1c;    /* red-700: 5.0:1 sobre blanco */
+  --ds-text-info: #1d4ed8;      /* blue-700: 4.6:1 sobre blanco */
+
   /* Color primario desde PrimeVue */
   --ds-color-primary: var(--p-primary-color, var(--ds-primary-500));
   --ds-color-success: var(--p-green-500, #22c55e);
@@ -381,6 +390,13 @@
   --ds-surface-800: #E5E7EB;
   --ds-surface-900: #F3F4F6;
   --ds-surface-ground: #0A0A0A;
+
+  /* Colores de texto accesibles para estados - dark mode
+     En dark mode, colores más brillantes OK porque el fondo es oscuro */
+  --ds-text-success: #4ade80;   /* green-400: alto contraste vs fondo oscuro */
+  --ds-text-warning: #facc15;   /* yellow-400 */
+  --ds-text-danger: #f87171;    /* red-400 */
+  --ds-text-info: #60a5fa;      /* blue-400 */
 
   /* Semantic colors (more vibrant for dark) */
   --ds-success-50: #14532D;

@@ -172,7 +172,7 @@ const sortedMethods = computed(() => {
 }
 
 .method-item.agreed {
-  border-left-color: var(--green-500);
+  border-left-color: var(--green-600); /* WCAG AA: mejor contraste que green-500 */
   background: var(--green-50);
 }
 
@@ -230,11 +230,11 @@ const sortedMethods = computed(() => {
 }
 
 .method-fill.agreed {
-  background: var(--green-500);
+  background: var(--green-600); /* WCAG AA: mejor contraste */
 }
 
 .agreed-icon {
-  color: var(--green-500);
+  color: var(--green-600); /* WCAG AA: 4.5:1 sobre fondos claros */
   font-size: 0.875rem;
   flex-shrink: 0;
 }

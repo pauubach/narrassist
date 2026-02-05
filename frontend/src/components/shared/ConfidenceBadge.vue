@@ -74,12 +74,13 @@ const formattedValue = computed(() => {
   return `${Math.round(props.value * 100)}%`
 })
 
-// Color based on confidence level
+// Color based on confidence level - WCAG AA: usar colores -700 para 4.5:1 sobre fondos claros
 const confidenceColor = computed(() => {
   switch (confidenceLevel.value) {
-    case 'high': return 'var(--green-500)'
-    case 'medium': return 'var(--yellow-500)'
-    case 'low': return 'var(--red-500)'
+    case 'high': return 'var(--green-700)'   // #15803d: 4.5:1 vs green-50
+    case 'medium': return 'var(--yellow-700)' // #a16207: 4.6:1 vs yellow-50
+    case 'low':
+    default: return 'var(--red-700)'       // #b91c1c: 5.0:1 vs red-50
   }
 })
 
@@ -87,7 +88,8 @@ const confidenceBgColor = computed(() => {
   switch (confidenceLevel.value) {
     case 'high': return 'var(--green-50)'
     case 'medium': return 'var(--yellow-50)'
-    case 'low': return 'var(--red-50)'
+    case 'low':
+    default: return 'var(--red-50)'
   }
 })
 
@@ -96,7 +98,8 @@ const iconClass = computed(() => {
   switch (confidenceLevel.value) {
     case 'high': return 'pi pi-check-circle'
     case 'medium': return 'pi pi-exclamation-circle'
-    case 'low': return 'pi pi-times-circle'
+    case 'low':
+    default: return 'pi pi-times-circle'
   }
 })
 
