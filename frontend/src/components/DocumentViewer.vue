@@ -184,6 +184,13 @@ import { transformChapters } from '@/types/transformers/projects'
 import DialogueAttributionPanel from '@/components/DialogueAttributionPanel.vue'
 import { apiUrl } from '@/config/api'
 
+// Extend Window interface for entity click handler
+declare global {
+  interface Window {
+    handleEntityClick?: (entityId: number) => void
+  }
+}
+
 const toast = useToast()
 
 // Referencias a elementos de capítulos para intersection observer
@@ -1300,7 +1307,7 @@ const doExport = async () => {
 
 // Exponer función global para manejar clicks en entidades
 if (typeof window !== 'undefined') {
-  (window as any).handleEntityClick = (entityId: number) => {
+  window.handleEntityClick = (entityId: number) => {
     emit('entityClick', entityId)
   }
 }

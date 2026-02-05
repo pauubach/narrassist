@@ -23,6 +23,7 @@ import { useWorkspaceStore } from '@/stores/workspace'
 import { useSelectionStore } from '@/stores/selection'
 import { useRouter, useRoute } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
+import { useDebouncedRef } from '@/composables/usePerformance'
 
 /**
  * EntitiesTab - Pestaña completa de gestión de entidades
@@ -67,7 +68,8 @@ const { getEntityIcon, getEntityLabel, getEntityColor } = useEntityUtils()
 const { formatChapterLabel } = useAlertUtils()
 
 // Estado de filtros
-const searchQuery = ref('')
+// Debounce la búsqueda para evitar filtrados excesivos en cada keystroke
+const { value: searchQuery, debouncedValue: debouncedSearchQuery } = useDebouncedRef('', 300)
 const selectedType = ref<string | null>(null)
 const selectedImportance = ref<string | null>(null)
 const showOnlyRelevant = ref(false) // Filtrar entidades con baja relevancia
@@ -177,12 +179,13 @@ const importanceEditOptions = [
 // Umbral de relevancia mínima (entidades con score < 0.1 se consideran poco relevantes)
 const RELEVANCE_THRESHOLD = 0.1
 
-// Entidades filtradas
+// Entidades filtradas (usa búsqueda con debounce para optimizar)
 const filteredEntities = computed(() => {
   let result = props.entities
 
-  if (searchQuery.value) {
-    const query = searchQuery.value.toLowerCase()
+  // Filtrar por búsqueda (usa valor con debounce)
+  if (debouncedSearchQuery.value) {
+    const query = debouncedSearchQuery.value.toLowerCase()
     result = result.filter(e =>
       e.name.toLowerCase().includes(query) ||
       e.aliases?.some(a => a.toLowerCase().includes(query))

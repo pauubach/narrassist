@@ -28,6 +28,7 @@ import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
 import DsEmptyState from '@/components/ds/DsEmptyState.vue'
 import { apiUrl } from '@/config/api'
+import { useDebouncedRef } from '@/composables/usePerformance'
 
 interface GlossaryEntry {
   id: number
@@ -74,7 +75,8 @@ interface GlossarySuggestion {
 // Estado
 const entries = ref<GlossaryEntry[]>([])
 const loading = ref(false)
-const searchQuery = ref('')
+// Debounce la búsqueda para evitar filtrados excesivos en cada keystroke
+const { value: searchQuery, debouncedValue: debouncedSearchQuery } = useDebouncedRef('', 300)
 const selectedCategory = ref<string | null>(null)
 const showEditDialog = ref(false)
 const editingEntry = ref<Partial<GlossaryEntry> | null>(null)
@@ -106,13 +108,13 @@ const categoryLabels: Record<string, string> = {
   'técnico': 'Técnico',
 }
 
-// Entradas filtradas
+// Entradas filtradas (usa búsqueda con debounce para optimizar)
 const filteredEntries = computed(() => {
   let result = entries.value
 
-  // Filtrar por búsqueda
-  if (searchQuery.value) {
-    const query = searchQuery.value.toLowerCase()
+  // Filtrar por búsqueda (usa valor con debounce)
+  if (debouncedSearchQuery.value) {
+    const query = debouncedSearchQuery.value.toLowerCase()
     result = result.filter(e =>
       e.term.toLowerCase().includes(query) ||
       e.definition.toLowerCase().includes(query) ||

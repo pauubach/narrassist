@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
 import DsBadge from '@/components/ds/DsBadge.vue'
-import type { Project, Entity, Alert, Chapter } from '@/types'
+import type { Project, Entity, Alert, Chapter, EntityType } from '@/types'
 import { useEntityUtils } from '@/composables/useEntityUtils'
 
 /**
@@ -73,8 +73,8 @@ const entityDistribution = computed(() => {
     .map(([type, count]) => ({
       type,
       count,
-      icon: getEntityIcon(type as any),
-      label: getEntityLabel(type as any)
+      icon: getEntityIcon(type as EntityType),
+      label: getEntityLabel(type as EntityType)
     }))
 })
 

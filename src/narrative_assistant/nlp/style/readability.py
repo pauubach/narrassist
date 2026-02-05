@@ -18,41 +18,14 @@ Referencias:
 
 import logging
 import re
-import threading
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
 from ...core.errors import ErrorSeverity, NLPError
+from ...core.patterns import lazy_singleton
 from ...core.result import Result
 
 logger = logging.getLogger(__name__)
-
-# =============================================================================
-# Singleton
-# =============================================================================
-
-_lock = threading.Lock()
-_instance: Optional["ReadabilityAnalyzer"] = None
-
-
-def get_readability_analyzer() -> "ReadabilityAnalyzer":
-    """Obtener instancia singleton del analizador de legibilidad."""
-    global _instance
-
-    if _instance is None:
-        with _lock:
-            if _instance is None:
-                _instance = ReadabilityAnalyzer()
-
-    return _instance
-
-
-def reset_readability_analyzer() -> None:
-    """Resetear instancia (para testing)."""
-    global _instance
-    with _lock:
-        _instance = None
 
 
 # =============================================================================
@@ -1137,3 +1110,19 @@ class ReadabilityAnalyzer:
 
         # Retornar el grupo con mayor puntuación
         return max(scores.items(), key=lambda x: x[1])[0]
+
+
+# =============================================================================
+# Singleton factory
+# =============================================================================
+
+
+@lazy_singleton
+def get_readability_analyzer() -> ReadabilityAnalyzer:
+    """Obtener instancia singleton del analizador de legibilidad."""
+    return ReadabilityAnalyzer()
+
+
+def reset_readability_analyzer() -> None:
+    """Resetear instancia (para testing)."""
+    get_readability_analyzer.reset()

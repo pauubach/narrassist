@@ -14,42 +14,15 @@ son apropiadas (diálogos informales, caracterización de personajes).
 
 import logging
 import re
-import threading
 from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
 from ...core.errors import ErrorSeverity, NLPError
+from ...core.patterns import lazy_singleton
 from ...core.result import Result
 
 logger = logging.getLogger(__name__)
-
-# =============================================================================
-# Singleton
-# =============================================================================
-
-_lock = threading.Lock()
-_instance: Optional["FillerDetector"] = None
-
-
-def get_filler_detector() -> "FillerDetector":
-    """Obtener instancia singleton del detector de muletillas."""
-    global _instance
-
-    if _instance is None:
-        with _lock:
-            if _instance is None:
-                _instance = FillerDetector()
-
-    return _instance
-
-
-def reset_filler_detector() -> None:
-    """Resetear instancia (para testing)."""
-    global _instance
-    with _lock:
-        _instance = None
 
 
 # =============================================================================
@@ -527,3 +500,19 @@ class FillerDetector:
             "Atenuadores": list(HEDGES.keys()),
             "Coletillas": list(TAG_QUESTIONS.keys()),
         }
+
+
+# =============================================================================
+# Singleton factory
+# =============================================================================
+
+
+@lazy_singleton
+def get_filler_detector() -> FillerDetector:
+    """Obtener instancia singleton del detector de muletillas."""
+    return FillerDetector()
+
+
+def reset_filler_detector() -> None:
+    """Resetear instancia (para testing)."""
+    get_filler_detector.reset()

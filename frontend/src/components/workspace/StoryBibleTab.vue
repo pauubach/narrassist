@@ -215,6 +215,7 @@ import ProgressSpinner from 'primevue/progressspinner'
 import TabView from 'primevue/tabview'
 import TabPanel from 'primevue/tabpanel'
 import { apiUrl } from '@/config/api'
+import { useDebouncedRef } from '@/composables/usePerformance'
 
 interface BibleEntry {
   entity_id: number
@@ -251,7 +252,8 @@ const loading = ref(false)
 const bible = ref<StoryBible | null>(null)
 const selectedId = ref<number | null>(null)
 const filterType = ref<string | null>(null)
-const searchQuery = ref('')
+// Debounce la búsqueda para evitar filtrados en cada keystroke
+const { value: searchQuery, debouncedValue: debouncedSearchQuery } = useDebouncedRef('', 300)
 const entityTypes = [
   { value: 'character', label: 'Personajes', icon: 'pi pi-user' },
   { value: 'location', label: 'Lugares', icon: 'pi pi-map-marker' },
@@ -283,8 +285,9 @@ const filteredEntries = computed(() => {
     const allowed = typeMap[filterType.value] || []
     entries = entries.filter(e => allowed.includes(e.entity_type.toUpperCase()))
   }
-  if (searchQuery.value) {
-    const q = searchQuery.value.toLowerCase()
+  // Usa el valor con debounce para optimizar rendimiento
+  if (debouncedSearchQuery.value) {
+    const q = debouncedSearchQuery.value.toLowerCase()
     entries = entries.filter(e =>
       e.canonical_name.toLowerCase().includes(q) ||
       e.aliases?.some(a => a.toLowerCase().includes(q))

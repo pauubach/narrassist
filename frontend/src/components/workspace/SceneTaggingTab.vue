@@ -827,9 +827,10 @@ watch(() => props.projectId, () => {
   text-transform: uppercase;
 }
 
-.text-success { color: var(--p-green-500); }
-.text-warning { color: var(--p-yellow-500); }
-.text-danger { color: var(--p-red-500); }
+/* WCAG AA: usar colores -700 para 4.5:1 sobre fondos claros */
+.text-success { color: var(--ds-text-success, #15803d); }
+.text-warning { color: var(--ds-text-warning, #a16207); }
+.text-danger { color: var(--ds-text-danger, #b91c1c); }
 
 .scenes-accordion {
   margin-top: var(--ds-space-4);

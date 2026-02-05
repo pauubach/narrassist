@@ -463,8 +463,8 @@ const allEntityTypes = [
 
 // Computed: solo mostrar tipos de entidades que existen en el proyecto
 const entityTypes = computed(() => {
-  const existingTypes = new Set(props.entities.map(e => e.type))
-  const availableTypes = allEntityTypes.filter(t => existingTypes.has(t.value as any))
+  const existingTypes = new Set<string>(props.entities.map(e => e.type))
+  const availableTypes = allEntityTypes.filter(t => existingTypes.has(t.value))
 
   // Siempre incluir "Todas" al principio si hay más de un tipo
   if (availableTypes.length > 1) {

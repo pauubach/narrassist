@@ -380,7 +380,8 @@ import type {
   TimelineEvent,
   NarrativeOrder,
   TimelineResolution,
-  InconsistencySeverity
+  InconsistencySeverity,
+  AlertSeverity
 } from '@/types'
 
 const props = defineProps<{
@@ -669,7 +670,7 @@ const getSeverityColor = (severity: InconsistencySeverity): string => {
 
 // Usar composable centralizado
 const getSeverityLabel = (severity: InconsistencySeverity): string => {
-  return getSeverityConfig(severity as any).label
+  return getSeverityConfig(severity as AlertSeverity).label
 }
 
 const getConfidenceClass = (confidence: number): string => {

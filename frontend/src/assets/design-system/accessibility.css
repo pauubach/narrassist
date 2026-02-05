@@ -427,3 +427,35 @@ main a:not(.p-button):not([role="button"]):hover {
     display: none !important;
   }
 }
+
+/* =============================================================================
+   12. ACCESSIBLE TEXT COLORS - WCAG AA 4.5:1
+   ============================================================================= */
+
+/*
+ * Clases de utilidad para texto coloreado accesible.
+ * Usar en lugar de text-success/text-danger/etc que usan colores -500.
+ * Estos colores garantizan 4.5:1 contraste sobre fondos claros (light mode)
+ * y alto contraste sobre fondos oscuros (dark mode).
+ */
+
+.text-success-a11y {
+  color: var(--ds-text-success, #15803d) !important;
+}
+
+.text-warning-a11y {
+  color: var(--ds-text-warning, #a16207) !important;
+}
+
+.text-danger-a11y {
+  color: var(--ds-text-danger, #b91c1c) !important;
+}
+
+.text-info-a11y {
+  color: var(--ds-text-info, #1d4ed8) !important;
+}
+
+/* Aliases comunes */
+.text-error-a11y {
+  color: var(--ds-text-danger, #b91c1c) !important;
+}

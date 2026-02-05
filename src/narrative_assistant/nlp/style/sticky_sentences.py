@@ -19,41 +19,14 @@ Referencias:
 
 import logging
 import re
-import threading
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
 from ...core.errors import ErrorSeverity, NLPError
+from ...core.patterns import lazy_singleton
 from ...core.result import Result
 
 logger = logging.getLogger(__name__)
-
-# =============================================================================
-# Singleton
-# =============================================================================
-
-_lock = threading.Lock()
-_instance: Optional["StickySentenceDetector"] = None
-
-
-def get_sticky_sentence_detector() -> "StickySentenceDetector":
-    """Obtener instancia singleton del detector de oraciones pesadas."""
-    global _instance
-
-    if _instance is None:
-        with _lock:
-            if _instance is None:
-                _instance = StickySentenceDetector()
-
-    return _instance
-
-
-def reset_sticky_sentence_detector() -> None:
-    """Resetear instancia (para testing)."""
-    global _instance
-    with _lock:
-        _instance = None
 
 
 # =============================================================================
@@ -839,6 +812,22 @@ class StickySentenceDetector:
             )
 
         return recommendations
+
+
+# =============================================================================
+# Singleton factory
+# =============================================================================
+
+
+@lazy_singleton
+def get_sticky_sentence_detector() -> StickySentenceDetector:
+    """Obtener instancia singleton del detector de oraciones pesadas."""
+    return StickySentenceDetector()
+
+
+def reset_sticky_sentence_detector() -> None:
+    """Resetear instancia (para testing)."""
+    get_sticky_sentence_detector.reset()
 
 
 # =============================================================================

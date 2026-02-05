@@ -513,5 +513,42 @@ Componentes usando `fetch()` directo en vez de `api.ts`:
 
 ---
 
+## 8. Progreso de Implementación
+
+### Fase 1: Fundamentos - EN PROGRESO
+
+| Tarea | Estado | Fecha | Notas |
+|-------|--------|-------|-------|
+| Crear decorator `@singleton` | ✅ Completado | 2026-02-04 | `core/patterns.py` con `singleton`, `lazy_singleton`, `SingletonMeta` |
+| Refactorizar 6 singletons style/ | ✅ Completado | 2026-02-04 | sentence_energy, sticky_sentences, readability, filler_detector, repetition_detector, sensory_report |
+| Service Layer básico | ⏳ Pendiente | - | - |
+| Estandarizar Result pattern | ⏳ Pendiente | - | - |
+
+### Fase 4: Frontend Cleanup - COMPLETADA
+
+| Tarea | Estado | Fecha | Notas |
+|-------|--------|-------|-------|
+| Eliminar `as any` voiceAndStyle.ts | ✅ Completado | 2026-02-04 | 8 type assertions corregidas |
+| Eliminar `as any` otros archivos | ✅ Completado | 2026-02-05 | 14+ corregidos (solo quedan 5 en tests) |
+| Debounce en search components | ✅ Completado | 2026-02-04 | 5 componentes corregidos |
+| Auditoría WCAG completa | ✅ Completado | 2026-02-04 | Ver `docs/WCAG_COLOR_AUDIT.md` |
+
+### Métricas Actualizadas
+
+| Métrica | Antes | Ahora | Objetivo |
+|---------|-------|-------|----------|
+| Cobertura tests | 21% | 21%* | 60% |
+| God classes (>500 líneas) | 5 | 5 | 0 |
+| Singletons duplicados | 17 | 11 | 0 |
+| `as any` en TypeScript | 22 | 5 (solo tests) | 0 (prod) ✓ |
+| Componentes >1000 líneas | 6 | 6 | 0 |
+| Componentes sin debounce | 5 | 0 | 0 ✓ |
+| WCAG violations | ~15 | 0 | 0 ✓ |
+
+*Tests de patterns.py añadidos pero no contabilizados en cobertura global
+
+---
+
 *Auditoría realizada: 2026-02-04*
+*Última actualización: 2026-02-05*
 *Herramientas: Claude Opus 4.5, 5 agentes especializados*

@@ -429,8 +429,9 @@ watch(() => props.projectId, () => {
   margin-top: var(--ds-space-1);
 }
 
-.text-danger { color: var(--p-red-500); }
-.text-success { color: var(--p-green-500); }
+/* WCAG AA: usar colores -700 para 4.5:1 sobre fondos claros */
+.text-danger { color: var(--ds-text-danger, #b91c1c); }
+.text-success { color: var(--ds-text-success, #15803d); }
 
 /* Cards */
 .inconsistencies-card :deep(.p-card-title),

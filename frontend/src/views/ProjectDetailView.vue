@@ -397,7 +397,7 @@
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useProjectsStore } from '@/stores/projects'
-import { useWorkspaceStore } from '@/stores/workspace'
+import { useWorkspaceStore, type WorkspaceTab } from '@/stores/workspace'
 import { useSelectionStore } from '@/stores/selection'
 import { useAnalysisStore, TAB_REQUIRED_PHASES, TAB_PHASE_DESCRIPTIONS, type WorkspaceTab as AnalysisWorkspaceTab } from '@/stores/analysis'
 import { useMentionNavigation } from '@/composables/useMentionNavigation'
@@ -415,7 +415,7 @@ import { ProjectSummary, EntityInspector, AlertInspector, ChapterInspector, Text
 import DocumentTypeChip from '@/components/DocumentTypeChip.vue'
 import CorrectionConfigModal from '@/components/workspace/CorrectionConfigModal.vue'
 import type { SidebarTab } from '@/stores/workspace'
-import type { Entity, Alert, Chapter, AlertSource } from '@/types'
+import type { Entity, Alert, Chapter, AlertSource, AlertSeverity } from '@/types'
 import { transformEntities, transformAlerts, transformChapters } from '@/types/transformers'
 import { useAlertUtils } from '@/composables/useAlertUtils'
 import { apiUrl } from '@/config/api'
@@ -738,7 +738,7 @@ const { getSeverityConfig } = useAlertUtils()
 
 // Helper para label de severidad
 const getSeverityLabel = (severity: string) => {
-  return getSeverityConfig(severity as any).label
+  return getSeverityConfig(severity as AlertSeverity).label
 }
 
 // Helper para label de tipo de entidad
@@ -772,7 +772,7 @@ const getEntityIcon = (type: string) => {
 const handleMenuTabEvent = (event: Event) => {
   const customEvent = event as CustomEvent<{ tab: string }>
   if (customEvent.detail?.tab) {
-    workspaceStore.setActiveTab(customEvent.detail.tab as any)
+    workspaceStore.setActiveTab(customEvent.detail.tab as WorkspaceTab)
   }
 }
 
@@ -795,7 +795,7 @@ onMounted(async () => {
     // Check for tab query parameter
     const tabParam = route.query.tab as string
     if (tabParam && ['text', 'entities', 'relations', 'alerts', 'style', 'resumen'].includes(tabParam)) {
-      workspaceStore.setActiveTab(tabParam as any)
+      workspaceStore.setActiveTab(tabParam as WorkspaceTab)
     }
 
     // Check for entity query parameter (para navegación desde /characters/:id)

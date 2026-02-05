@@ -5,7 +5,8 @@ import InputText from 'primevue/inputtext'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { useSelectionStore } from '@/stores/selection'
 import { useAlertUtils } from '@/composables/useAlertUtils'
-import type { Entity, Alert, Chapter } from '@/types'
+import { useDebouncedRef } from '@/composables/usePerformance'
+import type { Entity, Alert, Chapter, AlertSeverity } from '@/types'
 
 /**
  * CommandPalette - Paleta de comandos global (Cmd+K / Ctrl+K)
@@ -34,7 +35,8 @@ const { getSeverityConfig } = useAlertUtils()
 
 // Estado
 const visible = ref(false)
-const query = ref('')
+// Debounce la búsqueda para evitar cálculos excesivos en cada keystroke
+const { value: query, debouncedValue: debouncedQuery } = useDebouncedRef('', 150)
 const selectedIndex = ref(0)
 const inputRef = ref<HTMLInputElement | null>(null)
 
@@ -148,9 +150,9 @@ function fuzzyMatch(text: string, pattern: string): boolean {
   return patternIdx === lowerPattern.length
 }
 
-// Resultados filtrados
+// Resultados filtrados (usa query con debounce para optimizar rendimiento)
 const results = computed<CommandResult[]>(() => {
-  const q = query.value.trim()
+  const q = debouncedQuery.value.trim()
   const items: CommandResult[] = []
 
   // Si hay proyecto, buscar en sus datos
@@ -250,12 +252,12 @@ function getEntityLabel(type: string): string {
 // Helpers de alertas - usar composable centralizado
 function getSeverityIcon(severity: string): string {
   // Extraer solo el nombre de clase sin 'pi ' prefix
-  const fullIcon = getSeverityConfig(severity as any).icon
+  const fullIcon = getSeverityConfig(severity as AlertSeverity).icon
   return fullIcon.replace('pi ', '')
 }
 
 function getSeverityLabel(severity: string): string {
-  return getSeverityConfig(severity as any).label
+  return getSeverityConfig(severity as AlertSeverity).label
 }
 
 // Abrir/cerrar

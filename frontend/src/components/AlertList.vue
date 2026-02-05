@@ -323,7 +323,7 @@ import Chip from 'primevue/chip'
 import ProgressSpinner from 'primevue/progressspinner'
 import Paginator from 'primevue/paginator'
 import VirtualScroller from 'primevue/virtualscroller'
-import type { Alert } from '@/types'
+import type { Alert, AlertSeverity, AlertCategory, AlertStatus } from '@/types'
 import { debounce } from '@/composables'
 import { useAlertUtils } from '@/composables/useAlertUtils'
 
@@ -532,11 +532,11 @@ const getSeverityColor = (severity: string): string => {
 }
 
 const getSeverityIcon = (severity: string): string => {
-  return getSeverityConfig(severity as any).icon
+  return getSeverityConfig(severity as AlertSeverity).icon
 }
 
 const getCategoryLabel = (category: string): string => {
-  return getCategoryConfig(category as any).label
+  return getCategoryConfig(category as AlertCategory).label
 }
 
 const getStatusSeverity = (status: string): string => {
@@ -550,7 +550,7 @@ const getStatusSeverity = (status: string): string => {
 }
 
 const getStatusLabel = (status: string): string => {
-  return getStatusConfig(status as any).label
+  return getStatusConfig(status as AlertStatus).label
 }
 
 const formatDate = (date: Date | string): string => {

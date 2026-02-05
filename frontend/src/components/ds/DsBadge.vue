@@ -245,6 +245,44 @@ const classes = computed(() => {
   background-color: var(--ds-entity-other);
 }
 
+/* ==========================================================================
+   DARK MODE: Texto oscuro en badges con fondos brillantes (WCAG AA)
+   Los colores de dark mode tienen mayor luminosidad, requieren texto oscuro
+   para alcanzar el ratio de contraste 4.5:1 requerido por WCAG AA.
+   ========================================================================== */
+
+/* Entity badges en dark mode - usar texto oscuro */
+:global(.dark) .ds-badge--filled.ds-badge--entity-character,
+:global(.dark) .ds-badge--filled.ds-badge--entity-location,
+:global(.dark) .ds-badge--filled.ds-badge--entity-organization,
+:global(.dark) .ds-badge--filled.ds-badge--entity-object,
+:global(.dark) .ds-badge--filled.ds-badge--entity-event,
+:global(.dark) .ds-badge--filled.ds-badge--entity-animal,
+:global(.dark) .ds-badge--filled.ds-badge--entity-creature,
+:global(.dark) .ds-badge--filled.ds-badge--entity-building,
+:global(.dark) .ds-badge--filled.ds-badge--entity-region,
+:global(.dark) .ds-badge--filled.ds-badge--entity-vehicle,
+:global(.dark) .ds-badge--filled.ds-badge--entity-faction,
+:global(.dark) .ds-badge--filled.ds-badge--entity-family,
+:global(.dark) .ds-badge--filled.ds-badge--entity-time_period,
+:global(.dark) .ds-badge--filled.ds-badge--entity-concept,
+:global(.dark) .ds-badge--filled.ds-badge--entity-religion,
+:global(.dark) .ds-badge--filled.ds-badge--entity-magic_system,
+:global(.dark) .ds-badge--filled.ds-badge--entity-work,
+:global(.dark) .ds-badge--filled.ds-badge--entity-title,
+:global(.dark) .ds-badge--filled.ds-badge--entity-language,
+:global(.dark) .ds-badge--filled.ds-badge--entity-other {
+  color: #1a1a1a; /* Texto oscuro para contraste 4.5:1+ */
+}
+
+/* Severity badges en dark mode - usar texto oscuro en colores brillantes */
+:global(.dark) .ds-badge--filled.ds-badge--severity-critical,
+:global(.dark) .ds-badge--filled.ds-badge--severity-high,
+:global(.dark) .ds-badge--filled.ds-badge--severity-low,
+:global(.dark) .ds-badge--filled.ds-badge--severity-info {
+  color: #1a1a1a; /* Texto oscuro para contraste 4.5:1+ */
+}
+
 /* Outline variant - WCAG AA: colores oscuros para garantizar 4.5:1 en fondos claros */
 .ds-badge--outline {
   background-color: transparent;

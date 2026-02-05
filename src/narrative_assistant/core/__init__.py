@@ -56,6 +56,7 @@ from .resource_manager import (
     SystemCapabilities,
     get_resource_manager,
 )
+from .patterns import SingletonMeta, lazy_singleton, singleton
 from .result import Result
 from .utils import (
     format_duration,
@@ -118,4 +119,8 @@ __all__ = [
     "ResourceRecommendation",
     "HeavyTaskSemaphore",
     "get_resource_manager",
+    # Design Patterns
+    "singleton",
+    "lazy_singleton",
+    "SingletonMeta",
 ]

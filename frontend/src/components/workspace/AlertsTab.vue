@@ -8,11 +8,12 @@ import Dialog from 'primevue/dialog'
 import DsBadge from '@/components/ds/DsBadge.vue'
 import DsEmptyState from '@/components/ds/DsEmptyState.vue'
 import SequentialCorrectionMode from './SequentialCorrectionMode.vue'
-import type { Alert, AlertSeverity, AlertStatus, AlertSource } from '@/types'
+import type { Alert, AlertSeverity, AlertStatus, AlertSource, AlertCategory } from '@/types'
 import { useAlertUtils } from '@/composables/useAlertUtils'
 import { useSequentialMode } from '@/composables/useSequentialMode'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { useToast } from 'primevue/usetoast'
+import { useDebouncedRef } from '@/composables/usePerformance'
 
 /**
  * AlertsTab - Pestaña de gestión de alertas
@@ -78,7 +79,8 @@ const sequentialMode = useSequentialMode(
 const showResolveAllDialog = ref(false)
 
 // Estado de filtros
-const searchQuery = ref('')
+// Debounce la búsqueda para evitar filtrados excesivos en cada keystroke
+const { value: searchQuery, debouncedValue: debouncedSearchQuery } = useDebouncedRef('', 300)
 const selectedSeverities = ref<AlertSeverity[]>([])
 
 // Sincronizar con el filtro de severidad del store
@@ -141,13 +143,13 @@ const confidenceOptions = [
   { label: '> 70%', value: 70 }
 ]
 
-// Alertas filtradas
+// Alertas filtradas (usa búsqueda con debounce para optimizar)
 const filteredAlerts = computed(() => {
   let result = props.alerts
 
-  // Filtrar por búsqueda
-  if (searchQuery.value) {
-    const query = searchQuery.value.toLowerCase()
+  // Filtrar por búsqueda (usa valor con debounce)
+  if (debouncedSearchQuery.value) {
+    const query = debouncedSearchQuery.value.toLowerCase()
     result = result.filter(a =>
       a.title.toLowerCase().includes(query) ||
       a.description?.toLowerCase().includes(query)
@@ -201,7 +203,7 @@ const stats = computed(() => ({
 
 // Helpers - usar composable centralizado
 function getCategoryLabel(category: string): string {
-  return getCategoryConfig(category as any).label
+  return getCategoryConfig(category as AlertCategory).label
 }
 
 function clearFilters() {

@@ -43,7 +43,7 @@ import { useAppStore } from '@/stores/app'
 import { useThemeStore } from '@/stores/theme'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
 import { useNativeMenu } from './composables/useNativeMenu'
-import { useWorkspaceStore } from '@/stores/workspace'
+import { useWorkspaceStore, type WorkspaceTab } from '@/stores/workspace'
 import KeyboardShortcutsDialog from '@/components/KeyboardShortcutsDialog.vue'
 import AboutDialog from '@/components/AboutDialog.vue'
 import TutorialDialog from '@/components/TutorialDialog.vue'
@@ -83,15 +83,15 @@ useNativeMenu({
   onSettings: () => { router.push('/settings') },
   onViewChange: (view: string) => {
     // Map menu view IDs to workspace tab IDs
-    const tabMap: Record<string, string> = {
+    const tabMap: Record<string, WorkspaceTab> = {
       chapters: 'text',
       entities: 'entities',
       alerts: 'alerts',
       relationships: 'relationships',
       timeline: 'timeline',
     }
-    const tab = tabMap[view] || view
-    workspaceStore.setActiveTab(tab as any)
+    const tab = tabMap[view] ?? (view as WorkspaceTab)
+    workspaceStore.setActiveTab(tab)
   },
   onTutorial: () => { showTutorial.value = true },
   onKeyboardShortcuts: () => { showShortcutsHelp.value = true },

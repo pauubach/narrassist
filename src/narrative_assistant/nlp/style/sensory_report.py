@@ -19,41 +19,14 @@ Inspirado en ProWritingAid's Sensory Report.
 
 import logging
 import re
-import threading
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
 from ...core.errors import ErrorSeverity, NLPError
+from ...core.patterns import lazy_singleton
 from ...core.result import Result
 
 logger = logging.getLogger(__name__)
-
-# =============================================================================
-# Singleton
-# =============================================================================
-
-_lock = threading.Lock()
-_instance: Optional["SensoryAnalyzer"] = None
-
-
-def get_sensory_analyzer() -> "SensoryAnalyzer":
-    """Obtener instancia singleton del analizador sensorial."""
-    global _instance
-
-    if _instance is None:
-        with _lock:
-            if _instance is None:
-                _instance = SensoryAnalyzer()
-
-    return _instance
-
-
-def reset_sensory_analyzer() -> None:
-    """Resetear instancia (para testing)."""
-    global _instance
-    with _lock:
-        _instance = None
 
 
 # =============================================================================
@@ -897,3 +870,19 @@ class SensoryAnalyzer:
             return SensoryDensity.SPARSE
         else:
             return SensoryDensity.ABSENT
+
+
+# =============================================================================
+# Singleton factory
+# =============================================================================
+
+
+@lazy_singleton
+def get_sensory_analyzer() -> SensoryAnalyzer:
+    """Obtener instancia singleton del analizador sensorial."""
+    return SensoryAnalyzer()
+
+
+def reset_sensory_analyzer() -> None:
+    """Resetear instancia (para testing)."""
+    get_sensory_analyzer.reset()
