@@ -67,7 +67,7 @@ KNOWN_MODELS: dict[ModelType, ModelInfo] = {
         model_type=ModelType.SPACY,
         name="es_core_news_lg",
         display_name="spaCy Español (es_core_news_lg)",
-        size_mb=500,
+        size_mb=560,  # Tamaño real aproximado del modelo
         # El hash se calcula sobre el archivo meta.json del modelo
         sha256=None,  # spaCy no provee hashes oficiales
         source_url="https://github.com/explosion/spacy-models",
@@ -77,7 +77,7 @@ KNOWN_MODELS: dict[ModelType, ModelInfo] = {
         model_type=ModelType.EMBEDDINGS,
         name="paraphrase-multilingual-MiniLM-L12-v2",
         display_name="Sentence Transformers Multilingüe",
-        size_mb=500,
+        size_mb=470,  # Tamaño real del modelo en HuggingFace
         # Hash del archivo config.json del modelo (identificador estable)
         sha256=None,  # Se verificará estructura en lugar de hash
         source_url="https://huggingface.co/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",

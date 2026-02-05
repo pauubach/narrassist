@@ -9,14 +9,14 @@ semántica profunda, como:
 - Generación de sugerencias de corrección
 
 IMPORTANTE: Este módulo funciona 100% OFFLINE una vez configurado.
-Usa modelos locales a través de:
-1. Ollama (recomendado) - Servidor local con modelos como Llama, Mistral
-2. Transformers - Modelos HuggingFace descargados localmente
+Usa modelos locales a través de (en orden de prioridad):
+1. llama.cpp - Servidor ligero (~50MB), más rápido (~150 tok/s)
+2. Ollama - Servidor local con modelos como Llama, Mistral
+3. Transformers - Modelos HuggingFace descargados localmente
 
 Instalación bajo demanda:
-- Ollama se instala solo cuando el usuario intenta usar funcionalidades LLM
-- Los modelos se descargan cuando el usuario los selecciona en Settings
-- Ver ollama_manager.py para la gestión de instalación
+- Los binarios y modelos se descargan cuando el usuario los selecciona
+- Ver llamacpp_manager.py y ollama_manager.py para la gestión de instalación
 """
 
 from .client import (
@@ -47,6 +47,17 @@ from .expectation_inference import (
     detect_expectation_violations,
     # Funciones de conveniencia
     infer_expectations,
+)
+from .llamacpp_manager import (
+    # Constantes
+    AVAILABLE_MODELS as LLAMACPP_MODELS,
+    # Gestor principal
+    LlamaCppManager,
+    LlamaCppModelInfo,
+    # Tipos
+    LlamaCppStatus,
+    # Funciones singleton
+    get_llamacpp_manager,
 )
 from .ollama_manager import (
     # Constantes
@@ -93,6 +104,12 @@ __all__ = [
     "install_ollama_if_needed",
     "download_ollama_model",
     "ensure_llm_ready",
+    # Gestor llama.cpp (ligero, rápido)
+    "LlamaCppManager",
+    "LlamaCppStatus",
+    "LlamaCppModelInfo",
+    "LLAMACPP_MODELS",
+    "get_llamacpp_manager",
     # Gestor Ollama
     "OllamaManager",
     "OllamaConfig",

@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 _client_lock = threading.Lock()
 _client: Optional["LocalLLMClient"] = None
 
-LLMBackend = Literal["ollama", "transformers", "none"]
+LLMBackend = Literal["llamacpp", "ollama", "transformers", "none"]
 
 # Callback para solicitar instalación de Ollama
 _installation_prompt_callback: Callable[[], bool] | None = None
@@ -39,14 +39,20 @@ _installation_prompt_callback: Callable[[], bool] | None = None
 class LocalLLMConfig:
     """Configuración del cliente LLM local."""
 
-    # Backend a usar: ollama, transformers, none
+    # Backend a usar: llamacpp, ollama, transformers, none
+    # "auto" intenta en orden: llamacpp -> ollama -> transformers
     backend: LLMBackend = "ollama"
 
-    # Ollama config
+    # llama.cpp config (servidor local ligero, ~50MB)
+    llamacpp_host: str = "http://localhost:8081"
+    llamacpp_model: str = "llama-3.2-3b"  # Modelo por defecto
+    auto_install_llamacpp: bool = True  # Instalar automáticamente si no está
+
+    # Ollama config (servidor local, ~500MB)
     ollama_host: str = "http://localhost:11434"
     ollama_model: str = "llama3.2"  # Modelo por defecto (3B params, funciona en CPU)
 
-    # Transformers config (modelos locales)
+    # Transformers config (modelos locales via HuggingFace)
     transformers_model_path: Path | None = None
     transformers_model_name: str = "meta-llama/Llama-3.2-3B-Instruct"
 
@@ -88,8 +94,20 @@ class LocalLLMClient:
         self._initialize_backend()
 
     def _initialize_backend(self) -> None:
-        """Inicializa el backend de LLM."""
-        # Intentar Ollama primero
+        """
+        Inicializa el backend de LLM.
+
+        Orden de prioridad (fallback chain):
+        1. llama.cpp - Más rápido y ligero
+        2. Ollama - Fácil de usar
+        3. Transformers - Más flexible
+        4. none - Sin LLM
+        """
+        # Intentar llama.cpp primero (más ligero y rápido)
+        if self._config.backend in ("llamacpp", "auto") and self._try_init_llamacpp():
+            return
+
+        # Intentar Ollama
         if self._config.backend in ("ollama", "auto") and self._try_init_ollama():
             return
 
@@ -100,9 +118,81 @@ class LocalLLMClient:
 
         logger.warning(
             "No se pudo inicializar ningún backend LLM. "
-            "Instala Ollama o configura un modelo de Transformers local."
+            "Los análisis basados en LLM se omitirán."
         )
         self._backend = "none"
+
+    def _try_init_llamacpp(self) -> bool:
+        """
+        Intenta inicializar llama.cpp.
+
+        Comportamiento:
+        1. Verifica si llama-server está instalado
+        2. Si no está y auto_install está habilitado, lo instala
+        3. Verifica que haya modelos descargados
+        4. Inicia el servidor si no está corriendo
+        """
+        try:
+            from .llamacpp_manager import LlamaCppStatus, get_llamacpp_manager
+
+            manager = get_llamacpp_manager()
+
+            # Caso 1: No instalado
+            if not manager.is_installed:
+                if self._config.auto_install_llamacpp:
+                    logger.info("Instalando llama.cpp automáticamente...")
+                    success, msg = manager.install_binary()
+                    if not success:
+                        logger.warning(f"No se pudo instalar llama.cpp: {msg}")
+                        return False
+                else:
+                    logger.debug("llama.cpp no instalado, instalación automática deshabilitada")
+                    return False
+
+            # Caso 2: Sin modelos
+            if not manager.downloaded_models:
+                logger.debug("llama.cpp instalado pero sin modelos descargados")
+                # No descargar automáticamente - modelos son grandes
+                return False
+
+            # Caso 3: Verificar/iniciar servidor
+            if not manager.is_running:
+                if self._config.auto_start_service:
+                    logger.info("Iniciando servidor llama.cpp...")
+                    success, msg = manager.start_server(self._config.llamacpp_model)
+                    if not success:
+                        logger.warning(f"No se pudo iniciar llama.cpp: {msg}")
+                        return False
+                else:
+                    logger.debug("llama.cpp no está corriendo, inicio automático deshabilitado")
+                    return False
+
+            # Verificar que responde
+            return self._verify_llamacpp_ready(manager)
+
+        except ImportError:
+            logger.debug("llamacpp_manager no disponible")
+            return False
+        except Exception as e:
+            logger.debug(f"Error inicializando llama.cpp: {e}")
+            return False
+
+    def _verify_llamacpp_ready(self, manager: Any) -> bool:
+        """Verifica que llama.cpp esté listo para responder."""
+        try:
+            import httpx
+
+            response = httpx.get(f"{self._config.llamacpp_host}/health", timeout=5.0)
+
+            if response.status_code == 200:
+                self._backend = "llamacpp"
+                logger.info(f"llama.cpp inicializado con modelo: {self._config.llamacpp_model}")
+                return True
+
+        except Exception as e:
+            logger.debug(f"llama.cpp no responde: {e}")
+
+        return False
 
     def _try_init_ollama(self) -> bool:
         """
@@ -316,7 +406,9 @@ class LocalLLMClient:
     @property
     def model_name(self) -> str:
         """Nombre del modelo en uso."""
-        if self._backend == "ollama":
+        if self._backend == "llamacpp":
+            return self._config.llamacpp_model
+        elif self._backend == "ollama":
             return self._config.ollama_model
         elif self._backend == "transformers":
             return self._config.transformers_model_name
@@ -348,12 +440,67 @@ class LocalLLMClient:
             return None
 
         with self._lock:
-            if self._backend == "ollama":
+            if self._backend == "llamacpp":
+                return self._complete_llamacpp(prompt, system, max_tokens, temperature)
+            elif self._backend == "ollama":
                 return self._complete_ollama(prompt, system, max_tokens, temperature)
             elif self._backend == "transformers":
                 return self._complete_transformers(prompt, system, max_tokens, temperature)
 
         return None
+
+    def _complete_llamacpp(
+        self,
+        prompt: str,
+        system: str | None = None,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
+    ) -> str | None:
+        """
+        Genera respuesta usando llama.cpp (llama-server).
+
+        El servidor usa la API compatible con OpenAI.
+        """
+        try:
+            import httpx
+
+            messages = []
+            if system:
+                messages.append({"role": "system", "content": system})
+            messages.append({"role": "user", "content": prompt})
+
+            # Timeout alto para CPU sin GPU
+            timeout_config = httpx.Timeout(
+                connect=10.0,
+                read=self._config.timeout,
+                write=30.0,
+                pool=10.0,
+            )
+
+            # llama-server usa API compatible con OpenAI
+            response = httpx.post(
+                f"{self._config.llamacpp_host}/v1/chat/completions",
+                json={
+                    "messages": messages,
+                    "max_tokens": max_tokens or self._config.max_tokens,
+                    "temperature": temperature or self._config.temperature,
+                    "stream": False,
+                },
+                timeout=timeout_config,
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+                choices = data.get("choices", [])
+                if choices:
+                    return choices[0].get("message", {}).get("content", "")
+
+            logger.error(f"Error de llama.cpp: HTTP {response.status_code}")
+            return None
+
+        except Exception as e:
+            logger.error(f"Error en llamada a llama.cpp: {e}")
+            return None
 
     def _complete_ollama(
         self,
@@ -499,18 +646,48 @@ def _load_config() -> LocalLLMConfig:
     Carga la configuración del LLM local.
 
     Lee de variables de entorno:
-    - NA_LLM_BACKEND: ollama, transformers, auto
-    - NA_OLLAMA_HOST: URL del servidor Ollama
+    - NA_LLM_BACKEND: llamacpp, ollama, transformers, auto, none
+    - NA_LLAMACPP_HOST: URL del servidor llama.cpp (DEBE ser localhost por seguridad)
+    - NA_LLAMACPP_MODEL: Modelo de llama.cpp a usar
+    - NA_OLLAMA_HOST: URL del servidor Ollama (DEBE ser localhost por seguridad)
     - NA_OLLAMA_MODEL: Modelo de Ollama a usar
     - NA_LLM_MODEL_PATH: Ruta al modelo local de Transformers
+
+    SEGURIDAD: Los hosts LLM DEBEN ser localhost para evitar filtración de datos.
     """
-    backend = os.getenv("NA_LLM_BACKEND", "ollama")
-    if backend not in ("ollama", "transformers", "auto", "none"):
-        backend = "ollama"
+    backend = os.getenv("NA_LLM_BACKEND", "auto")
+    if backend not in ("llamacpp", "ollama", "transformers", "auto", "none"):
+        backend = "auto"
+
+    # Validar hosts - DEBEN ser localhost por seguridad de manuscritos
+    llamacpp_host = os.getenv("NA_LLAMACPP_HOST", "http://localhost:8081")
+    ollama_host = os.getenv("NA_OLLAMA_HOST", "http://localhost:11434")
+
+    def _is_localhost(host: str) -> bool:
+        """Verifica que el host sea localhost."""
+        return "localhost" in host or "127.0.0.1" in host
+
+    if not _is_localhost(llamacpp_host):
+        logger.warning(
+            f"NA_LLAMACPP_HOST debe ser localhost por seguridad. "
+            f"Ignorando valor: {llamacpp_host}"
+        )
+        llamacpp_host = "http://localhost:8081"
+
+    if not _is_localhost(ollama_host):
+        logger.warning(
+            f"NA_OLLAMA_HOST debe ser localhost por seguridad. "
+            f"Ignorando valor: {ollama_host}"
+        )
+        ollama_host = "http://localhost:11434"
 
     config = LocalLLMConfig(
         backend=backend,  # type: ignore
-        ollama_host=os.getenv("NA_OLLAMA_HOST", "http://localhost:11434"),
+        # llama.cpp config
+        llamacpp_host=llamacpp_host,
+        llamacpp_model=os.getenv("NA_LLAMACPP_MODEL", "llama-3.2-3b"),
+        # Ollama config
+        ollama_host=ollama_host,
         ollama_model=os.getenv("NA_OLLAMA_MODEL", "llama3.2"),
     )
 

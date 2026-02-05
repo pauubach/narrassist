@@ -23,12 +23,18 @@ async def get_llm_status():
     """
     Verifica si las funcionalidades LLM están disponibles.
 
+    Soporta múltiples backends con fallback:
+    1. llama.cpp (más rápido, ligero)
+    2. Ollama (fácil de usar)
+    3. Transformers (flexible)
+
     Returns:
         ApiResponse con estado del LLM incluyendo:
-        - available: Si Ollama está corriendo y hay modelos
-        - backend: Backend en uso (ollama, transformers, none)
+        - available: Si hay algún backend LLM disponible
+        - backend: Backend en uso (llamacpp, ollama, transformers, none)
         - model: Modelo principal configurado
         - available_methods: Lista de métodos de inferencia disponibles
+        - backends: Estado de cada backend disponible
     """
     try:
         from narrative_assistant.llm import is_llm_available, get_llm_client
@@ -36,22 +42,62 @@ async def get_llm_status():
         available = is_llm_available()
         client = get_llm_client()
 
-        # Obtener modelos disponibles directamente de Ollama
-        available_methods = ["rule_based", "embeddings"]  # Siempre disponibles
+        # Métodos siempre disponibles
+        available_methods = ["rule_based", "embeddings"]
         ollama_models = []
+        llamacpp_models = []
+        backends_status = {}
 
+        # Verificar llama.cpp
+        try:
+            from narrative_assistant.llm.llamacpp_manager import get_llamacpp_manager
+            manager = get_llamacpp_manager()
+            backends_status["llamacpp"] = {
+                "installed": manager.is_installed,
+                "running": manager.is_running,
+                "models": manager.downloaded_models,
+            }
+            if manager.is_running:
+                llamacpp_models = manager.downloaded_models
+                for model in llamacpp_models:
+                    available_methods.append(f"llamacpp:{model}")
+        except Exception as e:
+            logger.debug(f"Error checking llama.cpp: {e}")
+            backends_status["llamacpp"] = {"installed": False, "running": False, "models": []}
+
+        # Verificar Ollama
         try:
             import httpx
             response = httpx.get("http://localhost:11434/api/tags", timeout=2.0)
             if response.status_code == 200:
                 models = response.json().get("models", [])
                 for model in models:
-                    name = model.get("name", "").split(":")[0]  # Quitar :latest
+                    name = model.get("name", "").split(":")[0]
                     if name:
                         ollama_models.append(name)
-                        available_methods.append(name)
+                        available_methods.append(f"ollama:{name}")
+                backends_status["ollama"] = {
+                    "installed": True,
+                    "running": True,
+                    "models": ollama_models,
+                }
+            else:
+                backends_status["ollama"] = {"installed": True, "running": False, "models": []}
         except Exception as e:
-            logger.debug(f"Error getting Ollama models: {e}")
+            logger.debug(f"Error checking Ollama: {e}")
+            backends_status["ollama"] = {"installed": False, "running": False, "models": []}
+
+        # Verificar Transformers
+        try:
+            import torch
+            backends_status["transformers"] = {
+                "installed": True,
+                "device": "cuda" if torch.cuda.is_available() else (
+                    "mps" if hasattr(torch.backends, "mps") and torch.backends.mps.is_available() else "cpu"
+                ),
+            }
+        except ImportError:
+            backends_status["transformers"] = {"installed": False}
 
         return ApiResponse(
             success=True,
@@ -61,6 +107,8 @@ async def get_llm_status():
                 "model": client.model_name if client else None,
                 "available_methods": available_methods,
                 "ollama_models": ollama_models,
+                "llamacpp_models": llamacpp_models,
+                "backends": backends_status,
                 "message": "Modelos LLM activos" if available else "Usando análisis básico"
             }
         )
@@ -74,6 +122,8 @@ async def get_llm_status():
                 "model": None,
                 "available_methods": ["rule_based", "embeddings"],
                 "ollama_models": [],
+                "llamacpp_models": [],
+                "backends": {},
                 "message": "Usando análisis básico"
             }
         )
@@ -274,6 +324,241 @@ async def install_ollama_endpoint():
             data={"status": "error", "install_url": "https://ollama.com/download"}
         )
 
+
+# ============================================================================
+# llama.cpp endpoints (servidor ligero, ~50MB, más rápido que Ollama)
+# ============================================================================
+
+@router.get("/api/llamacpp/status", response_model=ApiResponse)
+async def get_llamacpp_status():
+    """
+    Obtiene el estado detallado de llama.cpp.
+
+    Returns:
+        ApiResponse con estado de instalación, servicio y modelos
+    """
+    try:
+        from narrative_assistant.llm.llamacpp_manager import (
+            get_llamacpp_manager,
+            LlamaCppStatus,
+        )
+
+        manager = get_llamacpp_manager()
+        status = manager.status
+
+        return ApiResponse(
+            success=True,
+            data={
+                "status": status.value,
+                "is_installed": manager.is_installed,
+                "is_running": manager.is_running,
+                "host": manager.host,
+                "port": manager._port,
+                "downloaded_models": manager.downloaded_models,
+                "available_models": [
+                    {
+                        "name": m.name,
+                        "display_name": m.display_name,
+                        "filename": m.filename,
+                        "size_gb": m.size_gb,
+                        "description": m.description,
+                        "url": m.url,
+                        "is_downloaded": m.is_downloaded,
+                        "is_default": m.is_default,
+                    }
+                    for m in manager.available_models
+                ],
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"Error getting llama.cpp status: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@router.post("/api/llamacpp/install", response_model=ApiResponse)
+async def install_llamacpp_binary():
+    """
+    Descarga e instala el binario llama-server (~50MB).
+
+    Returns:
+        ApiResponse con resultado de la instalación
+    """
+    try:
+        from narrative_assistant.llm.llamacpp_manager import get_llamacpp_manager
+
+        manager = get_llamacpp_manager()
+
+        if manager.is_installed:
+            return ApiResponse(
+                success=True,
+                data={"message": "llama.cpp ya está instalado", "status": "already_installed"}
+            )
+
+        import asyncio
+        success, msg = await asyncio.to_thread(manager.install_binary, None)
+
+        if success:
+            return ApiResponse(
+                success=True,
+                data={"message": msg, "status": "installed"}
+            )
+        else:
+            return ApiResponse(
+                success=False,
+                error=msg,
+                data={"status": "error"}
+            )
+
+    except Exception as e:
+        logger.error(f"Error installing llama.cpp: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@router.post("/api/llamacpp/download/{model_name}", response_model=ApiResponse)
+async def download_llamacpp_model(model_name: str):
+    """
+    Descarga un modelo GGUF de HuggingFace.
+
+    Modelos disponibles:
+    - llama-3.2-3b: ~2GB, recomendado para CPU
+    - qwen2.5-7b: ~4.4GB, mejor para español
+    - mistral-7b: ~4.1GB, alta calidad
+
+    Args:
+        model_name: Nombre del modelo a descargar
+
+    Returns:
+        ApiResponse con resultado de la operación
+    """
+    try:
+        from narrative_assistant.llm.llamacpp_manager import get_llamacpp_manager
+
+        manager = get_llamacpp_manager()
+
+        # Verificar que el binario está instalado
+        if not manager.is_installed:
+            # Intentar instalar automáticamente
+            success, msg = manager.install_binary()
+            if not success:
+                return ApiResponse(
+                    success=False,
+                    error=f"llama.cpp no está instalado y no se pudo instalar: {msg}"
+                )
+
+        # Verificar que el modelo es válido
+        valid_models = [m.name for m in manager.available_models]
+        if model_name not in valid_models:
+            return ApiResponse(
+                success=False,
+                error=f"Modelo no válido: {model_name}. Opciones: {', '.join(valid_models)}"
+            )
+
+        # Descargar modelo
+        import asyncio
+        success, message = await asyncio.to_thread(manager.download_model, model_name, None)
+
+        return ApiResponse(
+            success=success,
+            data={"message": message} if success else None,
+            error=message if not success else None
+        )
+
+    except Exception as e:
+        logger.error(f"Error downloading llama.cpp model {model_name}: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@router.post("/api/llamacpp/start", response_model=ApiResponse)
+async def start_llamacpp_server():
+    """
+    Inicia el servidor llama.cpp.
+
+    Returns:
+        ApiResponse con resultado de la operación
+    """
+    try:
+        from narrative_assistant.llm.llamacpp_manager import (
+            get_llamacpp_manager,
+            LlamaCppStatus,
+        )
+
+        manager = get_llamacpp_manager()
+
+        if not manager.is_installed:
+            return ApiResponse(
+                success=False,
+                error="llama.cpp no está instalado",
+                data={"status": LlamaCppStatus.NOT_INSTALLED.value}
+            )
+
+        if manager.is_running:
+            return ApiResponse(
+                success=True,
+                data={
+                    "status": LlamaCppStatus.RUNNING.value,
+                    "message": "llama.cpp ya está corriendo"
+                }
+            )
+
+        if not manager.downloaded_models:
+            return ApiResponse(
+                success=False,
+                error="No hay modelos descargados. Descarga un modelo primero.",
+                data={"status": LlamaCppStatus.INSTALLED.value}
+            )
+
+        import asyncio
+        success, message = await asyncio.to_thread(manager.start_server, None)
+
+        if success:
+            return ApiResponse(
+                success=True,
+                data={
+                    "status": LlamaCppStatus.RUNNING.value,
+                    "message": message
+                }
+            )
+        else:
+            return ApiResponse(
+                success=False,
+                error=message,
+                data={"status": LlamaCppStatus.ERROR.value}
+            )
+
+    except Exception as e:
+        logger.error(f"Error starting llama.cpp: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@router.post("/api/llamacpp/stop", response_model=ApiResponse)
+async def stop_llamacpp_server():
+    """
+    Detiene el servidor llama.cpp.
+
+    Returns:
+        ApiResponse con resultado
+    """
+    try:
+        from narrative_assistant.llm.llamacpp_manager import get_llamacpp_manager
+
+        manager = get_llamacpp_manager()
+        success, message = manager.stop_server()
+
+        return ApiResponse(
+            success=success,
+            data={"message": message} if success else None,
+            error=message if not success else None,
+        )
+
+    except Exception as e:
+        logger.error(f"Error stopping llama.cpp: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+# ============================================================================
+# LanguageTool endpoints
+# ============================================================================
 
 @router.get("/api/languagetool/status", response_model=ApiResponse)
 async def get_languagetool_status():

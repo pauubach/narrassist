@@ -308,6 +308,8 @@ try:
                         t.start()
                     except Exception as e:
                         _early_logger.exception("Could not import/run post_install: %s", e)
+            except Exception as e:
+                _early_logger.exception("Error in _start_background_post_install: %s", e)
 
         # Start the background installer (non-blocking)
         try:
@@ -463,7 +465,7 @@ try:
     app = FastAPI(
         title="Narrative Assistant API",
         description="API REST para el asistente de corrección narrativa",
-        version=deps.NA_VERSION,
+        version=deps.NA_VERSION or "0.4.40",
     )
     _early_logger.info("FastAPI app created successfully")
 

@@ -73,7 +73,10 @@ narrative-assistant verify
 ### Stack Tecnológico
 - **Python** 3.11+
 - **NLP**: spaCy (es_core_news_lg), sentence-transformers
-- **LLM Local**: Ollama (llama3.2, mistral, qwen2.5)
+- **LLM Local**: Sistema multi-backend con fallback:
+  1. **llama.cpp** (~50MB, ~150 tok/s) - Más rápido y ligero
+  2. **Ollama** (~500MB, ~30 tok/s) - Fácil de usar
+  3. **Transformers** - Flexible, cualquier modelo HuggingFace
 - **GPU**: PyTorch (CUDA/MPS/CPU auto-detect)
 - **DB**: SQLite con WAL mode
 - **Formatos**: DOCX (prioritario), TXT, MD, PDF, EPUB
@@ -149,11 +152,48 @@ model = EmbeddingsModel(auto_download=False)
 
 ---
 
-## Ollama / LLM Local
+## LLM Local (Sistema Multi-Backend)
 
-Ollama proporciona análisis semántico avanzado mediante modelos LLM que corren 100% localmente.
+El sistema de LLM usa **fallback automático** entre múltiples backends:
 
-### Instalación
+```
+llama.cpp (más rápido) → Ollama (fácil) → Transformers (flexible) → Reglas (siempre funciona)
+```
+
+### llama.cpp (Recomendado)
+
+Servidor ligero (~50MB) con rendimiento superior (~150 tok/s en CPU).
+
+```bash
+# Se instala automáticamente al usar la app
+# O manualmente via API:
+# POST /api/llamacpp/install
+
+# Descargar modelo
+# POST /api/llamacpp/download/llama-3.2-3b
+```
+
+**Modelos GGUF disponibles:**
+
+| Modelo | Tamaño | Uso | Notas |
+|--------|--------|-----|-------|
+| `llama-3.2-3b` | 2 GB | CPU | **Default**, rápido |
+| `qwen2.5-7b` | 4.4 GB | GPU | Mejor español |
+| `mistral-7b` | 4.1 GB | GPU | Alta calidad |
+
+**Ubicación de archivos:**
+```
+~/.narrative_assistant/llama.cpp/
+├── bin/
+│   └── llama-server    # Binario (~50MB)
+└── models/
+    └── *.gguf          # Modelos GGUF
+```
+
+### Ollama (Alternativa)
+
+Más fácil de usar pero más pesado (~500MB).
+
 ```bash
 # Automática (recomendado)
 python scripts/setup_ollama.py
@@ -168,7 +208,7 @@ curl -fsSL https://ollama.com/install.sh | sh
 brew install ollama
 ```
 
-### Modelos disponibles
+**Modelos disponibles:**
 
 | Modelo | Tamaño | Velocidad | Calidad | Notas |
 |--------|--------|-----------|---------|-------|
@@ -177,25 +217,16 @@ brew install ollama
 | `qwen2.5` | 7B | Media | Alta | Excelente para español |
 | `gemma2` | 9B | Lento | Muy alta | Requiere más recursos |
 
-### Descargar modelos
 ```bash
 ollama pull llama3.2     # Recomendado (~2 GB)
-ollama pull qwen2.5      # Opcional, mejor español (~4 GB)
-ollama pull mistral      # Opcional, mayor calidad (~4 GB)
+ollama serve             # Corre en localhost:11434
 ```
 
-### Iniciar servicio
-```bash
-ollama serve  # Corre en localhost:11434
+### Sistema Multi-Método (Votación)
 
-# Windows con GPU vieja o poca VRAM - forzar CPU:
-scripts\start_ollama_cpu.bat  # Inicia minimizado en modo CPU
-```
-
-### Sistema Multi-Modelo (Votación)
 El análisis de comportamiento de personajes puede usar múltiples métodos:
 
-1. **Modelos LLM** (llama3.2, mistral, qwen2.5, gemma2)
+1. **Modelos LLM** (llama.cpp o Ollama)
 2. **Reglas y heurísticas** (rule_based) - Siempre disponible
 3. **Embeddings semánticos** (embeddings) - Similitud vectorial
 
@@ -205,11 +236,21 @@ Configuración en Settings:
 - **Consenso mínimo**: Porcentaje de métodos que deben coincidir
 
 ### Variables de entorno LLM
+
 ```bash
-NA_LLM_BACKEND=ollama              # Backend: ollama, transformers, none
-NA_OLLAMA_HOST=http://localhost:11434  # URL del servidor Ollama
-NA_OLLAMA_MODEL=llama3.2           # Modelo por defecto
+# Backend principal (auto intenta en orden: llamacpp, ollama, transformers)
+NA_LLM_BACKEND=auto
+
+# llama.cpp (DEBE ser localhost por seguridad)
+NA_LLAMACPP_HOST=http://localhost:8081
+NA_LLAMACPP_MODEL=llama-3.2-3b
+
+# Ollama (DEBE ser localhost por seguridad)
+NA_OLLAMA_HOST=http://localhost:11434
+NA_OLLAMA_MODEL=llama3.2
 ```
+
+**SEGURIDAD**: Los hosts LLM DEBEN ser localhost. Si se configura un host remoto, el sistema lo ignora y usa localhost para evitar filtración de manuscritos.
 
 ---
 
@@ -357,6 +398,11 @@ mypy src/
 | `NA_MODELS_DIR` | path | ~/.narrative_assistant/models | Directorio de modelos |
 | `NA_SPACY_MODEL_PATH` | path | (auto) | Ruta explicita modelo spaCy |
 | `NA_EMBEDDINGS_MODEL_PATH` | path | (auto) | Ruta explicita modelo embeddings |
+| `NA_LLM_BACKEND` | auto, llamacpp, ollama, transformers, none | auto | Backend LLM (fallback automático) |
+| `NA_LLAMACPP_HOST` | localhost URL | http://localhost:8081 | Host llama.cpp (solo localhost) |
+| `NA_LLAMACPP_MODEL` | nombre modelo | llama-3.2-3b | Modelo GGUF por defecto |
+| `NA_OLLAMA_HOST` | localhost URL | http://localhost:11434 | Host Ollama (solo localhost) |
+| `NA_OLLAMA_MODEL` | nombre modelo | llama3.2 | Modelo Ollama por defecto |
 
 ---
 
@@ -441,8 +487,9 @@ Ver: [docs/02-architecture/SECURITY.md](docs/02-architecture/SECURITY.md)
 1. **Idioma**: El código está en inglés, docstrings y comentarios en español
 2. **Tests**: Aún no implementados, priorizar implementación
 3. **UI**: Vue 3 + PrimeVue (frontend), FastAPI (api-server)
-4. **LLM Integration**: Ollama para análisis semántico local (100% offline)
+4. **LLM Integration**: Sistema multi-backend (llama.cpp → Ollama → Transformers), 100% offline
 5. **Offline**: Todos los modelos (NLP y LLM) son locales, no requieren internet
+6. **Plataformas**: macOS (arm64, x64) y Windows (x64)
 
 ### Al generar código:
 - Usar type hints siempre
@@ -452,6 +499,7 @@ Ver: [docs/02-architecture/SECURITY.md](docs/02-architecture/SECURITY.md)
 - Considerar thread-safety en singletons
 - **NO añadir código que requiera internet** (excepto licencias)
 - **Verificar que no hay filtraciones de datos**
+- **Hosts LLM siempre localhost** (seguridad de manuscritos)
 
 ---
 
