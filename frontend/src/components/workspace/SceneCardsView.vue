@@ -153,7 +153,7 @@ function isTagged(scene: SceneData): boolean {
             </div>
 
             <!-- Type and tone chips -->
-            <div class="card-chips" v-if="scene.tags">
+            <div v-if="scene.tags" class="card-chips">
               <span
                 v-if="scene.tags.scene_type"
                 class="chip chip--type"

@@ -399,7 +399,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useProjectsStore } from '@/stores/projects'
 import { useWorkspaceStore, type WorkspaceTab } from '@/stores/workspace'
 import { useSelectionStore } from '@/stores/selection'
-import { useAnalysisStore, TAB_REQUIRED_PHASES, TAB_PHASE_DESCRIPTIONS, type WorkspaceTab as AnalysisWorkspaceTab } from '@/stores/analysis'
+import { useAnalysisStore, TAB_PHASE_DESCRIPTIONS } from '@/stores/analysis'
 import { useMentionNavigation } from '@/composables/useMentionNavigation'
 import Button from 'primevue/button'
 import ProgressSpinner from 'primevue/progressspinner'
@@ -415,9 +415,8 @@ import { ProjectSummary, EntityInspector, AlertInspector, ChapterInspector, Text
 import DocumentTypeChip from '@/components/DocumentTypeChip.vue'
 import CorrectionConfigModal from '@/components/workspace/CorrectionConfigModal.vue'
 import type { SidebarTab } from '@/stores/workspace'
-import type { Entity, Alert, Chapter, AlertSource, AlertSeverity } from '@/types'
+import type { Entity, Alert, Chapter, AlertSource } from '@/types'
 import { transformEntities, transformAlerts, transformChapters } from '@/types/transformers'
-import { useAlertUtils } from '@/composables/useAlertUtils'
 import { apiUrl } from '@/config/api'
 
 const route = useRoute()
@@ -498,19 +497,6 @@ const isAnalyzing = computed(() => {
 const hasBeenAnalyzed = computed(() => {
   if (!project.value) return false
   return (project.value.chapterCount || 0) > 0 || (project.value.entityCount || 0) > 0
-})
-
-const analysisProgress = computed(() => {
-  // Usar datos de polling si están disponibles
-  if (analysisProgressData.value) {
-    return analysisProgressData.value.progress
-  }
-  if (!project.value) return 0
-  return Math.round((project.value.analysisProgress || 0) * 100)
-})
-
-const analysisPhase = computed(() => {
-  return analysisProgressData.value?.phase || 'Analizando...'
 })
 
 // Polling del progreso de análisis
@@ -602,8 +588,8 @@ async function pollAnalysisProgress() {
         await loadChapters(project.value.id)
       }
     }
-  } catch (err) {
-    console.error('Error polling analysis progress:', err)
+  } catch (e) {
+    console.error('Error polling analysis progress:', e)
     // Si hay error de red o el endpoint no responde, detener polling
     // para evitar spam de errores
     console.log('[Polling] Stopping polling due to error')
@@ -673,25 +659,6 @@ const originalDocumentName = computed(() => {
 const entitiesCount = computed(() => entities.value.length)
 const alertsCount = computed(() => alerts.value.length)
 
-// Alertas agrupadas por severidad para sidebar
-const alertsBySeverity = computed(() => {
-  const counts: Record<string, number> = {}
-  for (const alert of alerts.value) {
-    if (alert.status === 'active') {
-      counts[alert.severity] = (counts[alert.severity] || 0) + 1
-    }
-  }
-  return counts
-})
-
-// Top personajes para sidebar
-const topCharacters = computed(() => {
-  return entities.value
-    .filter(e => e.type === 'character')
-    .sort((a, b) => (b.mentionCount || 0) - (a.mentionCount || 0))
-    .slice(0, 10)
-})
-
 // Entidad seleccionada para inspector
 const selectedEntity = computed(() => {
   if (selectionStore.primary?.type !== 'entity') return null
@@ -733,40 +700,6 @@ const rightPanelWidth = computed(() => {
   return preferredWidth ?? workspaceStore.rightPanel.width
 })
 
-// Usar composable centralizado para alertas
-const { getSeverityConfig } = useAlertUtils()
-
-// Helper para label de severidad
-const getSeverityLabel = (severity: string) => {
-  return getSeverityConfig(severity as AlertSeverity).label
-}
-
-// Helper para label de tipo de entidad
-const getEntityTypeLabel = (type: string) => {
-  const labels: Record<string, string> = {
-    character: 'Personaje',
-    location: 'Lugar',
-    object: 'Objeto',
-    organization: 'Organización',
-    event: 'Evento',
-    concept: 'Concepto',
-    other: 'Otro'
-  }
-  return labels[type] || type
-}
-
-const getEntityIcon = (type: string) => {
-  const icons: Record<string, string> = {
-    character: 'pi pi-user',
-    location: 'pi pi-map-marker',
-    organization: 'pi pi-building',
-    object: 'pi pi-box',
-    event: 'pi pi-calendar',
-    concept: 'pi pi-lightbulb',
-    other: 'pi pi-tag'
-  }
-  return icons[type] || 'pi pi-tag'
-}
 
 // Handle menu events for tab switching
 const handleMenuTabEvent = (event: Event) => {
@@ -840,7 +773,7 @@ onMounted(async () => {
     }
 
     loading.value = false
-  } catch (err) {
+  } catch {
     error.value = projectsStore.error || 'Error cargando proyecto'
     loading.value = false
   }
@@ -858,8 +791,8 @@ const loadEntities = async (projectId: number) => {
     if (data.success) {
       entities.value = transformEntities(data.data || [])
     }
-  } catch (err) {
-    console.error('Error loading entities:', err)
+  } catch (e) {
+    console.error('Error loading entities:', e)
   }
 }
 
@@ -870,8 +803,8 @@ const loadAlerts = async (projectId: number) => {
     if (data.success) {
       alerts.value = transformAlerts(data.data || [])
     }
-  } catch (err) {
-    console.error('Error loading alerts:', err)
+  } catch (e) {
+    console.error('Error loading alerts:', e)
   }
 }
 
@@ -882,8 +815,8 @@ const loadChapters = async (projectId: number) => {
     if (data.success) {
       chapters.value = transformChapters(data.data || [])
     }
-  } catch (err) {
-    console.error('Error loading chapters:', err)
+  } catch (e) {
+    console.error('Error loading chapters:', e)
     // Fallback
     if (project.value) {
       chapters.value = Array.from({ length: project.value.chapterCount }, (_, i) => ({
@@ -907,8 +840,8 @@ const loadRelationships = async (projectId: number) => {
     if (data.success) {
       relationships.value = data.data
     }
-  } catch (err) {
-    console.error('Error loading relationships:', err)
+  } catch (e) {
+    console.error('Error loading relationships:', e)
   }
 }
 
@@ -1040,8 +973,8 @@ const onAlertResolve = async (alert: Alert) => {
       await loadAlerts(projectId)
       selectionStore.clearAll()
     }
-  } catch (err) {
-    console.error('Error resolving alert:', err)
+  } catch (e) {
+    console.error('Error resolving alert:', e)
   }
 }
 
@@ -1053,8 +986,8 @@ const onAlertDismiss = async (alert: Alert) => {
       await loadAlerts(projectId)
       selectionStore.clearAll()
     }
-  } catch (err) {
-    console.error('Error dismissing alert:', err)
+  } catch (e) {
+    console.error('Error dismissing alert:', e)
   }
 }
 
@@ -1163,9 +1096,9 @@ const handleExportCorrected = async () => {
     document.body.removeChild(a)
     URL.revokeObjectURL(downloadUrl)
 
-  } catch (err) {
-    console.error('Error exporting corrected document:', err)
-    alert(err instanceof Error ? err.message : 'Error al exportar documento corregido')
+  } catch (e) {
+    console.error('Error exporting corrected document:', e)
+    alert(e instanceof Error ? e.message : 'Error al exportar documento corregido')
   }
 }
 
@@ -1201,8 +1134,8 @@ const quickExportStyleGuide = async () => {
     } else {
       throw new Error(data.error || 'Error desconocido')
     }
-  } catch (err) {
-    console.error('Error exporting style guide:', err)
+  } catch (e) {
+    console.error('Error exporting style guide:', e)
     error.value = 'No se pudo exportar la guía de estilo'
   } finally {
     exportingStyleGuide.value = false
@@ -1232,7 +1165,7 @@ const onAnalysisCompleted = async () => {
   // Timeline y Style cargan sus propios datos
 }
 
-const onDocumentTypeChanged = async (type: string, subtype: string | null) => {
+const onDocumentTypeChanged = async (_type: string, _subtype: string | null) => {
   // Recargar el proyecto para obtener el nuevo perfil de features
   if (project.value) {
     await projectsStore.fetchProject(project.value.id)
@@ -1266,7 +1199,7 @@ const startReanalysis = async () => {
       await loadEntities(project.value.id)
       await loadAlerts(project.value.id)
     }
-  } catch (err) {
+  } catch {
     error.value = 'Error de conexión'
     // En caso de error, recargar los datos originales
     if (project.value) {

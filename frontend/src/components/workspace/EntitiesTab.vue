@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { apiUrl } from '@/config/api'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
@@ -20,7 +20,6 @@ import type { Entity, MergeHistoryEntry, EntityAttribute } from '@/types'
 import { useEntityUtils } from '@/composables/useEntityUtils'
 import { useAlertUtils } from '@/composables/useAlertUtils'
 import { useWorkspaceStore } from '@/stores/workspace'
-import { useSelectionStore } from '@/stores/selection'
 import { useRouter, useRoute } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import { useDebouncedRef } from '@/composables/usePerformance'
@@ -63,7 +62,6 @@ const toast = useToast()
 const router = useRouter()
 const route = useRoute()
 const workspaceStore = useWorkspaceStore()
-const selectionStore = useSelectionStore()
 const { getEntityIcon, getEntityLabel, getEntityColor } = useEntityUtils()
 const { formatChapterLabel } = useAlertUtils()
 
@@ -152,13 +150,6 @@ const typeOptions = computed(() => {
     }))
   ]
 })
-
-const importanceOptions = [
-  { label: 'Todas', value: null },
-  { label: 'Principal', value: 'main' },
-  { label: 'Secundario', value: 'secondary' },
-  { label: 'Menor', value: 'minor' }
-]
 
 const entityTypeOptions = [
   { label: 'Personaje', value: 'character' },
@@ -532,29 +523,6 @@ function exportEntities() {
   }
 }
 
-// Helpers para el sidebar
-function getTypeSeverity(type: string): string {
-  const severities: Record<string, string> = {
-    'character': 'success',
-    'location': 'danger',
-    'organization': 'info',
-    'object': 'warning',
-    'event': 'secondary',
-    'concept': 'contrast',
-    'other': 'secondary'
-  }
-  return severities[type] || 'secondary'
-}
-
-function getImportanceSeverity(importance: string): string {
-  const severities: Record<string, string> = {
-    'main': 'success',
-    'secondary': 'info',
-    'minor': 'secondary'
-  }
-  return severities[importance] || 'secondary'
-}
-
 // Mapeo para DsBadge severity (usa los valores del design system)
 function getImportanceSeverityForBadge(importance: string): 'critical' | 'high' | 'medium' | 'low' | 'info' {
   const severities: Record<string, 'critical' | 'high' | 'medium' | 'low' | 'info'> = {
@@ -589,13 +557,6 @@ function getRelevanceClass(score: number): string {
   if (score >= 0.2) return 'relevance-medium'
   if (score >= 0.1) return 'relevance-low'
   return 'relevance-very-low'
-}
-
-function getRelevanceTooltip(score: number): string {
-  if (score >= 0.5) return 'Alta relevancia: entidad muy mencionada'
-  if (score >= 0.2) return 'Relevancia media: entidad mencionada regularmente'
-  if (score >= 0.1) return 'Baja relevancia: pocas menciones en el documento'
-  return 'Muy baja relevancia: mencionada raramente (posible falso positivo)'
 }
 
 /** Obtiene el color de fondo para un tipo de entidad */
@@ -669,7 +630,7 @@ function navigateToAttributeSource(attr: EntityAttribute) {
         <p class="header-subtitle">
           Lista técnica de personajes, lugares y conceptos detectados. 
           Fusiona duplicados, edita atributos y navega a menciones.
-          <span class="info-tip" v-tooltip.right="'Esta pestaña es para gestionar las entidades: fusionar duplicados, corregir tipos, editar atributos. Para una vista wiki consolidada, usa la pestaña Story Bible.'">
+          <span v-tooltip.right="'Esta pestaña es para gestionar las entidades: fusionar duplicados, corregir tipos, editar atributos. Para una vista wiki consolidada, usa la pestaña Story Bible.'" class="info-tip">
             <i class="pi pi-info-circle"></i>
           </span>
         </p>

@@ -229,10 +229,6 @@ function confirmResolveAll() {
   emit('resolve-all')
 }
 
-function handleReopen(alert: Alert) {
-  emit('alert-reopen', alert)
-}
-
 function exportAlerts() {
   if (!props.alerts || props.alerts.length === 0) {
     toast.add({ severity: 'warn', summary: 'Sin datos', detail: 'No hay alertas para exportar', life: 4000 })
@@ -284,11 +280,6 @@ function exportAlerts() {
     console.error('Error exporting alerts:', err)
     toast.add({ severity: 'error', summary: 'Error', detail: 'Error al exportar alertas', life: 5000 })
   }
-}
-
-// Helper para verificar si alerta está activa
-function isAlertActive(status: string): boolean {
-  return status === 'active'
 }
 
 /**

@@ -9,7 +9,7 @@
         </h3>
         <p class="subtitle">
           Declara el punto de vista de cada capítulo y detecta violaciones.
-          <span class="info-tooltip" v-tooltip.right="'La focalización es declarativa: tú defines qué tipo de narrador usa cada capítulo (omnisciente, primera persona, etc.) y el sistema detecta violaciones a esa declaración, como cuando un narrador limitado conoce pensamientos de otros personajes.'">
+          <span v-tooltip.right="'La focalización es declarativa: tú defines qué tipo de narrador usa cada capítulo (omnisciente, primera persona, etc.) y el sistema detecta violaciones a esa declaración, como cuando un narrador limitado conoce pensamientos de otros personajes.'" class="info-tooltip">
             <i class="pi pi-info-circle"></i>
           </span>
         </p>

@@ -543,10 +543,11 @@ const filteredEntities = computed(() => {
         return b.name.localeCompare(a.name)
       case 'first_mention':
         return (a.firstMentionChapter || 999) - (b.firstMentionChapter || 999)
-      case 'importance':
+      case 'importance': {
         const importanceOrder = { 'main': 5, 'secondary': 3, 'minor': 1 }
         return (importanceOrder[b.importance as keyof typeof importanceOrder] || 0) -
                (importanceOrder[a.importance as keyof typeof importanceOrder] || 0)
+      }
       case 'mention_count':
       default:
         return (b.mentionCount || 0) - (a.mentionCount || 0)

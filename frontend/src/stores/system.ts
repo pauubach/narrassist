@@ -192,7 +192,7 @@ export const useSystemStore = defineStore('system', () => {
       } else {
         backendConnected.value = false
       }
-    } catch (error) {
+    } catch {
       backendConnected.value = false
     }
   }

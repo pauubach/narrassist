@@ -605,14 +605,6 @@ const formatDuration = (days: number): string => {
   }
 }
 
-// Calcular duracion entre fechas (legacy, usado en otros lugares)
-const calculateDuration = (start: Date | null, end: Date | null): string => {
-  if (!start || !end) return ''
-  const diffMs = end.getTime() - start.getTime()
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-  return formatDuration(diffDays)
-}
-
 // Obtener nombre de entidad
 const getEntityName = (entityId: number): string => {
   if (props.entities) {

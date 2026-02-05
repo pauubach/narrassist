@@ -2,7 +2,6 @@
 import { computed } from 'vue'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
-import DsBadge from '@/components/ds/DsBadge.vue'
 import type { Project, Entity, Alert, Chapter, EntityType } from '@/types'
 import { useEntityUtils } from '@/composables/useEntityUtils'
 

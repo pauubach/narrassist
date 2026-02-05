@@ -102,7 +102,7 @@ const props = defineProps<{
   projectId: number
 }>()
 
-const emit = defineEmits<{
+defineEmits<{
   'undo': [entry: MergeHistoryEntry]
 }>()
 

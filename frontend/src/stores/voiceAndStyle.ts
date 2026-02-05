@@ -10,21 +10,17 @@ import { defineStore } from 'pinia'
 import { api } from '@/services/apiClient'
 import type {
   VoiceProfile,
-  VoiceProfilesResponse,
   RegisterAnalysis,
   RegisterChange,
   RegisterSummary,
   RegisterType,
   ChangeSeverity,
-  RegisterAnalysisResponse,
   DialogueAttribution,
   DialogueAttributionStats,
-  DialogueAttributionResponse,
   AttributionConfidence,
   AttributionMethod,
   KnowledgeFact,
   KnowledgeType,
-  CharacterKnowledgeResponse,
 } from '@/types'
 
 // =============================================================================

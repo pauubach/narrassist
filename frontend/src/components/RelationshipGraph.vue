@@ -398,7 +398,6 @@ import InputText from 'primevue/inputtext'
 import { apiUrl } from '@/config/api'
 import {
   useRelationshipGraphStore,
-  type RelationshipStrength,
   type RelationshipValence,
   type RelationshipType
 } from '@/stores/relationshipGraph'
@@ -590,7 +589,7 @@ function expandHull(
  */
 function catmullRomSpline(
   points: Array<{ x: number; y: number }>,
-  tension: number = 0.5,
+  _tension: number = 0.5,
   segments: number = 20
 ): Array<{ x: number; y: number }> {
   if (points.length < 3) return points
@@ -1466,17 +1465,6 @@ const getEntityColor = (type: string): string => {
   return getComputedStyle(document.documentElement).getPropertyValue('--ds-entity-other').trim() || '#616161'
 }
 
-const getNodeSize = (importance: string): number => {
-  const sizes: Record<string, number> = {
-    'critical': 35,
-    'high': 28,
-    'medium': 22,
-    'low': 16,
-    'minimal': 12
-  }
-  return sizes[importance] || 18
-}
-
 const getNodeShape = (type: string): string => {
   const shapes: Record<string, string> = {
     'CHARACTER': 'dot',
@@ -1675,22 +1663,6 @@ const saveNodePositions = () => {
   for (const [nodeId, pos] of Object.entries(positions)) {
     nodePositions.value.set(Number(nodeId), pos as { x: number; y: number })
   }
-}
-
-// Restaurar posiciones guardadas a los nodos
-const applyNodePositions = (nodes: DataSet<Node>) => {
-  if (nodePositions.value.size === 0) return
-
-  nodes.forEach((node) => {
-    const savedPos = nodePositions.value.get(node.id as number)
-    if (savedPos) {
-      nodes.update({
-        id: node.id,
-        x: savedPos.x,
-        y: savedPos.y
-      })
-    }
-  })
 }
 
 // Watchers - Optimizados para evitar recálculos innecesarios

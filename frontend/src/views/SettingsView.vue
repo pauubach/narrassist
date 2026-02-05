@@ -730,7 +730,7 @@
                     <div v-if="ltState === 'installing' && ltInstallProgress" class="lt-progress-container">
                       <ProgressBar 
                         :value="ltInstallProgress.percentage" 
-                        :showValue="true"
+                        :show-value="true"
                         style="height: 8px; margin-top: 8px;"
                       />
                       <div class="lt-progress-detail">
@@ -1228,15 +1228,12 @@ import SelectButton from 'primevue/selectbutton'
 import Select from 'primevue/select'
 import Slider from 'primevue/slider'
 import ToggleSwitch from 'primevue/toggleswitch'
-import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import Dialog from 'primevue/dialog'
 import MultiSelect from 'primevue/multiselect'
 import Badge from 'primevue/badge'
 import Tag from 'primevue/tag'
-import Checkbox from 'primevue/checkbox'
-import ProgressSpinner from 'primevue/progressspinner'
 import ProgressBar from 'primevue/progressbar'
 import Divider from 'primevue/divider'
 import { useToast } from 'primevue/usetoast'
@@ -1251,14 +1248,10 @@ import {
   FONT_FAMILIES,
   PRESETS,
   type ThemePreset,
-  type FontSize,
   type LineHeight,
-  type UIRadius,
-  type UICompactness,
-  type FontFamily,
-  type PresetInfo
+  type FontFamily
 } from '@/stores/theme'
-import { useSystemStore, type LTInstallProgress, type LTState, type LlamaCppState, type LlamaCppModel, type SystemCapabilities, type NLPMethod } from '@/stores/system'
+import { useSystemStore, type LTState, type LlamaCppState, type SystemCapabilities, type NLPMethod } from '@/stores/system'
 import type { CorrectionConfig } from '@/types'
 
 const router = useRouter()
@@ -1419,6 +1412,10 @@ const ollamaMethodOptions = [
     backend: 'ollama'
   }
 ]
+
+// Combinación estática de todas las opciones de métodos de inferencia
+// (usado para migración de configuración antigua)
+const inferenceMethodOptions = [...llamacppMethodOptions, ...ollamaMethodOptions]
 
 // Computed que combina opciones de LLM con información de modelos instalados
 const availableLLMOptions = computed(() => {
@@ -1721,8 +1718,8 @@ const systemPatterns = ref<SystemPattern[]>([])
 const userRejections = ref<UserRejection[]>([])
 const filterStats = ref<FilterStats | null>(null)
 
-// Agrupar patrones por categoría
-const groupedSystemPatterns = computed(() => {
+// Agrupar patrones por categoría (para futuro panel de filtros)
+const _groupedSystemPatterns = computed(() => {
   const groups: Record<string, { name: string; patterns: SystemPattern[] }> = {}
 
   for (const pattern of systemPatterns.value) {
@@ -1736,8 +1733,8 @@ const groupedSystemPatterns = computed(() => {
   return Object.values(groups)
 })
 
-// Labels para categorías de patrones
-const getCategoryLabel = (category: string): string => {
+// Labels para categorías de patrones (para futuro panel de filtros)
+const _getCategoryLabel = (category: string): string => {
   const labels: Record<string, string> = {
     temporal: 'Marcadores temporales',
     article: 'Artículos y determinantes',
@@ -1751,8 +1748,8 @@ const getCategoryLabel = (category: string): string => {
   return labels[category] || category
 }
 
-// Cargar datos de filtros
-async function loadFilterData() {
+// Cargar datos de filtros (para futuro panel de filtros)
+async function _loadFilterData() {
   try {
     // Cargar en paralelo
     const [statsRes, patternsRes, rejectionsRes] = await Promise.all([
@@ -1783,8 +1780,8 @@ async function loadFilterData() {
   }
 }
 
-// Toggle patrón del sistema
-async function toggleSystemPattern(patternId: number, isActive: boolean) {
+// Toggle patrón del sistema (para futuro panel de filtros)
+async function _toggleSystemPattern(patternId: number, isActive: boolean) {
   try {
     const response = await fetch(apiUrl(`/api/entity-filters/system-patterns/${patternId}`), {
       method: 'PATCH',
@@ -1812,8 +1809,8 @@ async function toggleSystemPattern(patternId: number, isActive: boolean) {
   }
 }
 
-// Eliminar rechazo global del usuario
-async function removeUserRejection(rejection: UserRejection) {
+// Eliminar rechazo global del usuario (para futuro panel de filtros)
+async function _removeUserRejection(rejection: UserRejection) {
   try {
     const response = await fetch(apiUrl(`/api/entity-filters/user-rejections/${rejection.id}`), {
       method: 'DELETE'
@@ -2427,7 +2424,7 @@ const saveSettings = () => {
   })
 }
 
-const onThemeChange = () => {
+const _onThemeChange = () => {
   themeStore.setMode(settings.value.theme)
   saveSettings()
 }
@@ -2676,7 +2673,7 @@ const resetSettings = () => {
   })
 }
 
-const openDocumentation = () => {
+const _openDocumentation = () => {
   // Abrir guía de usuario
   window.dispatchEvent(new CustomEvent('menubar:user-guide'))
 }

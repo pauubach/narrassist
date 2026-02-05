@@ -65,7 +65,7 @@
             <TabPanels>
               <!-- Parameters Tab -->
               <TabPanel value="0">
-                <Tabs :value="paramTabIndex" @update:value="paramTabIndex = String($event)" class="nested-tabs">
+                <Tabs :value="paramTabIndex" class="nested-tabs" @update:value="paramTabIndex = String($event)">
                   <TabList>
                     <Tab value="0">Diálogos</Tab>
                     <Tab value="1">Repeticiones</Tab>
@@ -77,574 +77,574 @@
                   <TabPanels>
                     <!-- Dialog Tab -->
                     <TabPanel value="0">
-                  <div class="config-section">
-                    <div class="param-row">
-                      <div class="param-info">
-                        <label>Análisis de diálogos</label>
-                        <small>Detectar y analizar marcadores de diálogo</small>
-                      </div>
-                      <div class="param-control">
-                        <ToggleSwitch
-                          v-model="localConfig.dialog.enabled"
-                          @change="markModified('dialog', 'enabled')"
-                        />
-                        <InheritanceIndicator
-                          :is-custom="isCustom('dialog', 'enabled')"
-                          @reset="resetParam('dialog', 'enabled')"
-                        />
-                      </div>
-                    </div>
-
-                    <!-- Preset de marcadores -->
-                    <div v-if="localConfig.dialog.enabled" class="param-row">
-                      <div class="param-info">
-                        <label>Estilo de marcadores</label>
-                        <small>Configuración predefinida o personalizada</small>
-                      </div>
-                      <div class="param-control wide">
-                        <Select
-                          v-model="localConfig.dialog.preset"
-                          :options="markerPresetOptions"
-                          optionLabel="label"
-                          optionValue="value"
-                          placeholder="Seleccionar estilo"
-                          @change="onPresetChange"
-                        />
-                        <InheritanceIndicator
-                          :is-custom="isCustom('dialog', 'preset')"
-                          @reset="resetParam('dialog', 'preset')"
-                        />
-                      </div>
-                    </div>
-
-                    <!-- Detección automática info -->
-                    <div v-if="localConfig.dialog.enabled && localConfig.dialog.preset === 'detect'" class="param-row info-row">
-                      <div class="detection-info">
-                        <i class="pi pi-info-circle"></i>
-                        <span>La detección automática analizará el documento al importarlo y sugerirá la configuración más adecuada.</span>
-                      </div>
-                    </div>
-
-                    <!-- Vista previa del estilo -->
-                    <div v-if="localConfig.dialog.enabled && localConfig.dialog.preset !== 'detect'" class="style-preview-container">
-                      <div class="preview-header">
-                        <i class="pi pi-eye"></i>
-                        <span>Vista previa</span>
-                      </div>
-                      <div class="preview-content">
-                        <p class="preview-line">
-                          <template v-if="localConfig.dialog.spoken_dialogue_dash !== 'none'">
-                            {{ getDashChar(localConfig.dialog.spoken_dialogue_dash) }}¿Lo recuerdas? {{ getDashChar(localConfig.dialog.spoken_dialogue_dash) }}preguntó{{ getDashChar(localConfig.dialog.spoken_dialogue_dash) }}. Él dijo: {{ getQuoteChars(localConfig.dialog.nested_dialogue_quote)[0] }}Nunca volveré{{ getQuoteChars(localConfig.dialog.nested_dialogue_quote)[1] }}.
-                          </template>
-                          <template v-else>
-                            {{ getQuoteChars(localConfig.dialog.spoken_dialogue_quote)[0] }}¿Lo recuerdas?{{ getQuoteChars(localConfig.dialog.spoken_dialogue_quote)[1] }} preguntó. {{ getQuoteChars(localConfig.dialog.spoken_dialogue_quote)[0] }}Él dijo: {{ getQuoteChars(localConfig.dialog.nested_dialogue_quote)[0] }}Nunca volveré{{ getQuoteChars(localConfig.dialog.nested_dialogue_quote)[1] }}.{{ getQuoteChars(localConfig.dialog.spoken_dialogue_quote)[1] }}
-                          </template>
-                        </p>
-                        <p class="preview-line preview-thought">
-                          <em v-if="localConfig.dialog.thoughts_use_italics">{{ getQuoteChars(localConfig.dialog.thoughts_quote)[0] }}Ojalá fuera verdad{{ getQuoteChars(localConfig.dialog.thoughts_quote)[1] }}</em>
-                          <template v-else>{{ getQuoteChars(localConfig.dialog.thoughts_quote)[0] }}Ojalá fuera verdad{{ getQuoteChars(localConfig.dialog.thoughts_quote)[1] }}</template>, pensó.
-                        </p>
-                      </div>
-                    </div>
-
-                    <!-- Configuración avanzada (colapsable) -->
-                    <div v-if="localConfig.dialog.enabled && localConfig.dialog.preset !== 'detect'" class="advanced-section">
-                      <Button
-                        :label="showAdvancedMarkers ? 'Ocultar configuración avanzada' : 'Configuración avanzada'"
-                        :icon="showAdvancedMarkers ? 'pi pi-chevron-up' : 'pi pi-chevron-down'"
-                        text
-                        size="small"
-                        @click="showAdvancedMarkers = !showAdvancedMarkers"
-                      />
-
-                      <div v-if="showAdvancedMarkers" class="advanced-options">
-                        <!-- Diálogo hablado - Guión -->
+                      <div class="config-section">
                         <div class="param-row">
                           <div class="param-info">
-                            <label>Diálogo hablado (guión)</label>
-                            <small>Tipo de guión para parlamentos</small>
-                          </div>
-                          <div class="param-control wide">
-                            <Select
-                              v-model="localConfig.dialog.spoken_dialogue_dash"
-                              :options="dashTypeOptions"
-                              optionLabel="label"
-                              optionValue="value"
-                              @change="markModified('dialog', 'spoken_dialogue_dash')"
-                            />
-                          </div>
-                        </div>
-
-                        <!-- Diálogo hablado - Comillas (alternativa) -->
-                        <div v-if="localConfig.dialog.spoken_dialogue_dash === 'none'" class="param-row">
-                          <div class="param-info">
-                            <label>Diálogo hablado (comillas)</label>
-                            <small>Comillas para parlamentos sin guión</small>
-                          </div>
-                          <div class="param-control wide">
-                            <Select
-                              v-model="localConfig.dialog.spoken_dialogue_quote"
-                              :options="quoteTypeOptions"
-                              optionLabel="label"
-                              optionValue="value"
-                              @change="markModified('dialog', 'spoken_dialogue_quote')"
-                            />
-                          </div>
-                        </div>
-
-                        <!-- Pensamientos -->
-                        <div class="param-row">
-                          <div class="param-info">
-                            <label>Pensamientos</label>
-                            <small>Comillas para pensamientos internos</small>
-                          </div>
-                          <div class="param-control wide">
-                            <Select
-                              v-model="localConfig.dialog.thoughts_quote"
-                              :options="quoteTypeOptions"
-                              optionLabel="label"
-                              optionValue="value"
-                              @change="markModified('dialog', 'thoughts_quote')"
-                            />
-                          </div>
-                        </div>
-
-                        <!-- Pensamientos en cursiva -->
-                        <div class="param-row">
-                          <div class="param-info">
-                            <label>Cursiva en pensamientos</label>
-                            <small>Aplicar cursiva además de comillas</small>
+                            <label>Análisis de diálogos</label>
+                            <small>Detectar y analizar marcadores de diálogo</small>
                           </div>
                           <div class="param-control">
                             <ToggleSwitch
-                              v-model="localConfig.dialog.thoughts_use_italics"
-                              @change="markModified('dialog', 'thoughts_use_italics')"
+                              v-model="localConfig.dialog.enabled"
+                              @change="markModified('dialog', 'enabled')"
+                            />
+                            <InheritanceIndicator
+                              :is-custom="isCustom('dialog', 'enabled')"
+                              @reset="resetParam('dialog', 'enabled')"
                             />
                           </div>
                         </div>
 
-                        <!-- Diálogo anidado -->
-                        <div class="param-row">
+                        <!-- Preset de marcadores -->
+                        <div v-if="localConfig.dialog.enabled" class="param-row">
                           <div class="param-info">
-                            <label>Diálogo anidado</label>
-                            <small>Comillas para citas dentro de diálogo</small>
+                            <label>Estilo de marcadores</label>
+                            <small>Configuración predefinida o personalizada</small>
                           </div>
                           <div class="param-control wide">
                             <Select
-                              v-model="localConfig.dialog.nested_dialogue_quote"
-                              :options="quoteTypeOptions"
-                              optionLabel="label"
-                              optionValue="value"
-                              @change="markModified('dialog', 'nested_dialogue_quote')"
+                              v-model="localConfig.dialog.preset"
+                              :options="markerPresetOptions"
+                              option-label="label"
+                              option-value="value"
+                              placeholder="Seleccionar estilo"
+                              @change="onPresetChange"
+                            />
+                            <InheritanceIndicator
+                              :is-custom="isCustom('dialog', 'preset')"
+                              @reset="resetParam('dialog', 'preset')"
                             />
                           </div>
                         </div>
 
-                        <!-- Citas textuales -->
-                        <div class="param-row">
+                        <!-- Detección automática info -->
+                        <div v-if="localConfig.dialog.enabled && localConfig.dialog.preset === 'detect'" class="param-row info-row">
+                          <div class="detection-info">
+                            <i class="pi pi-info-circle"></i>
+                            <span>La detección automática analizará el documento al importarlo y sugerirá la configuración más adecuada.</span>
+                          </div>
+                        </div>
+
+                        <!-- Vista previa del estilo -->
+                        <div v-if="localConfig.dialog.enabled && localConfig.dialog.preset !== 'detect'" class="style-preview-container">
+                          <div class="preview-header">
+                            <i class="pi pi-eye"></i>
+                            <span>Vista previa</span>
+                          </div>
+                          <div class="preview-content">
+                            <p class="preview-line">
+                              <template v-if="localConfig.dialog.spoken_dialogue_dash !== 'none'">
+                                {{ getDashChar(localConfig.dialog.spoken_dialogue_dash) }}¿Lo recuerdas? {{ getDashChar(localConfig.dialog.spoken_dialogue_dash) }}preguntó{{ getDashChar(localConfig.dialog.spoken_dialogue_dash) }}. Él dijo: {{ getQuoteChars(localConfig.dialog.nested_dialogue_quote)[0] }}Nunca volveré{{ getQuoteChars(localConfig.dialog.nested_dialogue_quote)[1] }}.
+                              </template>
+                              <template v-else>
+                                {{ getQuoteChars(localConfig.dialog.spoken_dialogue_quote)[0] }}¿Lo recuerdas?{{ getQuoteChars(localConfig.dialog.spoken_dialogue_quote)[1] }} preguntó. {{ getQuoteChars(localConfig.dialog.spoken_dialogue_quote)[0] }}Él dijo: {{ getQuoteChars(localConfig.dialog.nested_dialogue_quote)[0] }}Nunca volveré{{ getQuoteChars(localConfig.dialog.nested_dialogue_quote)[1] }}.{{ getQuoteChars(localConfig.dialog.spoken_dialogue_quote)[1] }}
+                              </template>
+                            </p>
+                            <p class="preview-line preview-thought">
+                              <em v-if="localConfig.dialog.thoughts_use_italics">{{ getQuoteChars(localConfig.dialog.thoughts_quote)[0] }}Ojalá fuera verdad{{ getQuoteChars(localConfig.dialog.thoughts_quote)[1] }}</em>
+                              <template v-else>{{ getQuoteChars(localConfig.dialog.thoughts_quote)[0] }}Ojalá fuera verdad{{ getQuoteChars(localConfig.dialog.thoughts_quote)[1] }}</template>, pensó.
+                            </p>
+                          </div>
+                        </div>
+
+                        <!-- Configuración avanzada (colapsable) -->
+                        <div v-if="localConfig.dialog.enabled && localConfig.dialog.preset !== 'detect'" class="advanced-section">
+                          <Button
+                            :label="showAdvancedMarkers ? 'Ocultar configuración avanzada' : 'Configuración avanzada'"
+                            :icon="showAdvancedMarkers ? 'pi pi-chevron-up' : 'pi pi-chevron-down'"
+                            text
+                            size="small"
+                            @click="showAdvancedMarkers = !showAdvancedMarkers"
+                          />
+
+                          <div v-if="showAdvancedMarkers" class="advanced-options">
+                            <!-- Diálogo hablado - Guión -->
+                            <div class="param-row">
+                              <div class="param-info">
+                                <label>Diálogo hablado (guión)</label>
+                                <small>Tipo de guión para parlamentos</small>
+                              </div>
+                              <div class="param-control wide">
+                                <Select
+                                  v-model="localConfig.dialog.spoken_dialogue_dash"
+                                  :options="dashTypeOptions"
+                                  option-label="label"
+                                  option-value="value"
+                                  @change="markModified('dialog', 'spoken_dialogue_dash')"
+                                />
+                              </div>
+                            </div>
+
+                            <!-- Diálogo hablado - Comillas (alternativa) -->
+                            <div v-if="localConfig.dialog.spoken_dialogue_dash === 'none'" class="param-row">
+                              <div class="param-info">
+                                <label>Diálogo hablado (comillas)</label>
+                                <small>Comillas para parlamentos sin guión</small>
+                              </div>
+                              <div class="param-control wide">
+                                <Select
+                                  v-model="localConfig.dialog.spoken_dialogue_quote"
+                                  :options="quoteTypeOptions"
+                                  option-label="label"
+                                  option-value="value"
+                                  @change="markModified('dialog', 'spoken_dialogue_quote')"
+                                />
+                              </div>
+                            </div>
+
+                            <!-- Pensamientos -->
+                            <div class="param-row">
+                              <div class="param-info">
+                                <label>Pensamientos</label>
+                                <small>Comillas para pensamientos internos</small>
+                              </div>
+                              <div class="param-control wide">
+                                <Select
+                                  v-model="localConfig.dialog.thoughts_quote"
+                                  :options="quoteTypeOptions"
+                                  option-label="label"
+                                  option-value="value"
+                                  @change="markModified('dialog', 'thoughts_quote')"
+                                />
+                              </div>
+                            </div>
+
+                            <!-- Pensamientos en cursiva -->
+                            <div class="param-row">
+                              <div class="param-info">
+                                <label>Cursiva en pensamientos</label>
+                                <small>Aplicar cursiva además de comillas</small>
+                              </div>
+                              <div class="param-control">
+                                <ToggleSwitch
+                                  v-model="localConfig.dialog.thoughts_use_italics"
+                                  @change="markModified('dialog', 'thoughts_use_italics')"
+                                />
+                              </div>
+                            </div>
+
+                            <!-- Diálogo anidado -->
+                            <div class="param-row">
+                              <div class="param-info">
+                                <label>Diálogo anidado</label>
+                                <small>Comillas para citas dentro de diálogo</small>
+                              </div>
+                              <div class="param-control wide">
+                                <Select
+                                  v-model="localConfig.dialog.nested_dialogue_quote"
+                                  :options="quoteTypeOptions"
+                                  option-label="label"
+                                  option-value="value"
+                                  @change="markModified('dialog', 'nested_dialogue_quote')"
+                                />
+                              </div>
+                            </div>
+
+                            <!-- Citas textuales -->
+                            <div class="param-row">
+                              <div class="param-info">
+                                <label>Citas textuales</label>
+                                <small>Comillas para citas literales</small>
+                              </div>
+                              <div class="param-control wide">
+                                <Select
+                                  v-model="localConfig.dialog.textual_quote"
+                                  :options="quoteTypeOptions"
+                                  option-label="label"
+                                  option-value="value"
+                                  @change="markModified('dialog', 'textual_quote')"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <!-- Alertar inconsistencias -->
+                        <div v-if="localConfig.dialog.enabled" class="param-row">
                           <div class="param-info">
-                            <label>Citas textuales</label>
-                            <small>Comillas para citas literales</small>
+                            <label>Alertar marcadores inconsistentes</label>
+                            <small>Detectar cuando se use un marcador diferente al preferido</small>
                           </div>
-                          <div class="param-control wide">
-                            <Select
-                              v-model="localConfig.dialog.textual_quote"
-                              :options="quoteTypeOptions"
-                              optionLabel="label"
-                              optionValue="value"
-                              @change="markModified('dialog', 'textual_quote')"
+                          <div class="param-control">
+                            <ToggleSwitch
+                              v-model="localConfig.dialog.flag_inconsistent_markers"
+                              @change="markModified('dialog', 'flag_inconsistent_markers')"
+                            />
+                            <InheritanceIndicator
+                              :is-custom="isCustom('dialog', 'flag_inconsistent_markers')"
+                              @reset="resetParam('dialog', 'flag_inconsistent_markers')"
+                            />
+                          </div>
+                        </div>
+
+                        <div v-if="localConfig.dialog.enabled" class="param-row">
+                          <div class="param-info">
+                            <label>Analizar variación de verbos dicendi</label>
+                            <small>Detectar repetición de "dijo", "exclamó", etc.</small>
+                          </div>
+                          <div class="param-control">
+                            <ToggleSwitch
+                              v-model="localConfig.dialog.analyze_dialog_tags"
+                              @change="markModified('dialog', 'analyze_dialog_tags')"
+                            />
+                            <InheritanceIndicator
+                              :is-custom="isCustom('dialog', 'analyze_dialog_tags')"
+                              @reset="resetParam('dialog', 'analyze_dialog_tags')"
                             />
                           </div>
                         </div>
                       </div>
-                    </div>
-
-                    <!-- Alertar inconsistencias -->
-                    <div v-if="localConfig.dialog.enabled" class="param-row">
-                      <div class="param-info">
-                        <label>Alertar marcadores inconsistentes</label>
-                        <small>Detectar cuando se use un marcador diferente al preferido</small>
-                      </div>
-                      <div class="param-control">
-                        <ToggleSwitch
-                          v-model="localConfig.dialog.flag_inconsistent_markers"
-                          @change="markModified('dialog', 'flag_inconsistent_markers')"
-                        />
-                        <InheritanceIndicator
-                          :is-custom="isCustom('dialog', 'flag_inconsistent_markers')"
-                          @reset="resetParam('dialog', 'flag_inconsistent_markers')"
-                        />
-                      </div>
-                    </div>
-
-                    <div v-if="localConfig.dialog.enabled" class="param-row">
-                      <div class="param-info">
-                        <label>Analizar variación de verbos dicendi</label>
-                        <small>Detectar repetición de "dijo", "exclamó", etc.</small>
-                      </div>
-                      <div class="param-control">
-                        <ToggleSwitch
-                          v-model="localConfig.dialog.analyze_dialog_tags"
-                          @change="markModified('dialog', 'analyze_dialog_tags')"
-                        />
-                        <InheritanceIndicator
-                          :is-custom="isCustom('dialog', 'analyze_dialog_tags')"
-                          @reset="resetParam('dialog', 'analyze_dialog_tags')"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </TabPanel>
+                    </TabPanel>
 
                     <!-- Repetition Tab -->
                     <TabPanel value="1">
-                  <div class="config-section">
-                    <div class="param-row">
-                      <div class="param-info">
-                        <label>Detección de repeticiones</label>
-                        <small>Analizar palabras repetidas en el texto</small>
-                      </div>
-                      <div class="param-control">
-                        <ToggleSwitch
-                          v-model="localConfig.repetition.enabled"
-                          @change="markModified('repetition', 'enabled')"
-                        />
-                        <InheritanceIndicator
-                          :is-custom="isCustom('repetition', 'enabled')"
-                          @reset="resetParam('repetition', 'enabled')"
-                        />
-                      </div>
-                    </div>
+                      <div class="config-section">
+                        <div class="param-row">
+                          <div class="param-info">
+                            <label>Detección de repeticiones</label>
+                            <small>Analizar palabras repetidas en el texto</small>
+                          </div>
+                          <div class="param-control">
+                            <ToggleSwitch
+                              v-model="localConfig.repetition.enabled"
+                              @change="markModified('repetition', 'enabled')"
+                            />
+                            <InheritanceIndicator
+                              :is-custom="isCustom('repetition', 'enabled')"
+                              @reset="resetParam('repetition', 'enabled')"
+                            />
+                          </div>
+                        </div>
 
-                    <div v-if="localConfig.repetition.enabled" class="param-row">
-                      <div class="param-info">
-                        <label>Tolerancia a repeticiones</label>
-                        <small>Cuántas ocurrencias antes de alertar</small>
-                      </div>
-                      <div class="param-control">
-                        <Select
-                          v-model="localConfig.repetition.tolerance"
-                          :options="toleranceOptions"
-                          option-label="label"
-                          option-value="value"
-                          @change="markModified('repetition', 'tolerance')"
-                        />
-                        <InheritanceIndicator
-                          :is-custom="isCustom('repetition', 'tolerance')"
-                          @reset="resetParam('repetition', 'tolerance')"
-                        />
-                      </div>
-                    </div>
+                        <div v-if="localConfig.repetition.enabled" class="param-row">
+                          <div class="param-info">
+                            <label>Tolerancia a repeticiones</label>
+                            <small>Cuántas ocurrencias antes de alertar</small>
+                          </div>
+                          <div class="param-control">
+                            <Select
+                              v-model="localConfig.repetition.tolerance"
+                              :options="toleranceOptions"
+                              option-label="label"
+                              option-value="value"
+                              @change="markModified('repetition', 'tolerance')"
+                            />
+                            <InheritanceIndicator
+                              :is-custom="isCustom('repetition', 'tolerance')"
+                              @reset="resetParam('repetition', 'tolerance')"
+                            />
+                          </div>
+                        </div>
 
-                    <div v-if="localConfig.repetition.enabled" class="param-row">
-                      <div class="param-info">
-                        <label>Ventana de proximidad</label>
-                        <small>Distancia en caracteres para considerar repetición</small>
-                      </div>
-                      <div class="param-control">
-                        <InputNumber
-                          v-model="localConfig.repetition.proximity_window_chars"
-                          :min="50"
-                          :max="500"
-                          :step="10"
-                          suffix=" chars"
-                          @input="markModified('repetition', 'proximity_window_chars')"
-                        />
-                        <InheritanceIndicator
-                          :is-custom="isCustom('repetition', 'proximity_window_chars')"
-                          @reset="resetParam('repetition', 'proximity_window_chars')"
-                        />
-                      </div>
-                    </div>
+                        <div v-if="localConfig.repetition.enabled" class="param-row">
+                          <div class="param-info">
+                            <label>Ventana de proximidad</label>
+                            <small>Distancia en caracteres para considerar repetición</small>
+                          </div>
+                          <div class="param-control">
+                            <InputNumber
+                              v-model="localConfig.repetition.proximity_window_chars"
+                              :min="50"
+                              :max="500"
+                              :step="10"
+                              suffix=" chars"
+                              @input="markModified('repetition', 'proximity_window_chars')"
+                            />
+                            <InheritanceIndicator
+                              :is-custom="isCustom('repetition', 'proximity_window_chars')"
+                              @reset="resetParam('repetition', 'proximity_window_chars')"
+                            />
+                          </div>
+                        </div>
 
-                    <div v-if="localConfig.repetition.enabled" class="param-row">
-                      <div class="param-info">
-                        <label>Alertar si FALTAN repeticiones</label>
-                        <small>Para contenido infantil que requiere repetición deliberada</small>
+                        <div v-if="localConfig.repetition.enabled" class="param-row">
+                          <div class="param-info">
+                            <label>Alertar si FALTAN repeticiones</label>
+                            <small>Para contenido infantil que requiere repetición deliberada</small>
+                          </div>
+                          <div class="param-control">
+                            <ToggleSwitch
+                              v-model="localConfig.repetition.flag_lack_of_repetition"
+                              @change="markModified('repetition', 'flag_lack_of_repetition')"
+                            />
+                            <InheritanceIndicator
+                              :is-custom="isCustom('repetition', 'flag_lack_of_repetition')"
+                              @reset="resetParam('repetition', 'flag_lack_of_repetition')"
+                            />
+                          </div>
+                        </div>
                       </div>
-                      <div class="param-control">
-                        <ToggleSwitch
-                          v-model="localConfig.repetition.flag_lack_of_repetition"
-                          @change="markModified('repetition', 'flag_lack_of_repetition')"
-                        />
-                        <InheritanceIndicator
-                          :is-custom="isCustom('repetition', 'flag_lack_of_repetition')"
-                          @reset="resetParam('repetition', 'flag_lack_of_repetition')"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </TabPanel>
+                    </TabPanel>
 
-                <!-- Sentence Tab -->
-                <TabPanel value="2">
-                  <div class="config-section">
-                    <div class="param-row">
-                      <div class="param-info">
-                        <label>Análisis de oraciones</label>
-                        <small>Analizar longitud y complejidad de oraciones</small>
-                      </div>
-                      <div class="param-control">
-                        <ToggleSwitch
-                          v-model="localConfig.sentence.enabled"
-                          @change="markModified('sentence', 'enabled')"
-                        />
-                        <InheritanceIndicator
-                          :is-custom="isCustom('sentence', 'enabled')"
-                          @reset="resetParam('sentence', 'enabled')"
-                        />
-                      </div>
-                    </div>
+                    <!-- Sentence Tab -->
+                    <TabPanel value="2">
+                      <div class="config-section">
+                        <div class="param-row">
+                          <div class="param-info">
+                            <label>Análisis de oraciones</label>
+                            <small>Analizar longitud y complejidad de oraciones</small>
+                          </div>
+                          <div class="param-control">
+                            <ToggleSwitch
+                              v-model="localConfig.sentence.enabled"
+                              @change="markModified('sentence', 'enabled')"
+                            />
+                            <InheritanceIndicator
+                              :is-custom="isCustom('sentence', 'enabled')"
+                              @reset="resetParam('sentence', 'enabled')"
+                            />
+                          </div>
+                        </div>
 
-                    <div v-if="localConfig.sentence.enabled" class="param-row">
-                      <div class="param-info">
-                        <label>Longitud máxima (palabras)</label>
-                        <small>Alerta si una oración supera este límite</small>
-                      </div>
-                      <div class="param-control">
-                        <InputNumber
-                          v-model="localConfig.sentence.max_length_words"
-                          :min="5"
-                          :max="100"
-                          placeholder="Sin límite"
-                          show-buttons
-                          @input="markModified('sentence', 'max_length_words')"
-                        />
-                        <InheritanceIndicator
-                          :is-custom="isCustom('sentence', 'max_length_words')"
-                          @reset="resetParam('sentence', 'max_length_words')"
-                        />
-                      </div>
-                    </div>
+                        <div v-if="localConfig.sentence.enabled" class="param-row">
+                          <div class="param-info">
+                            <label>Longitud máxima (palabras)</label>
+                            <small>Alerta si una oración supera este límite</small>
+                          </div>
+                          <div class="param-control">
+                            <InputNumber
+                              v-model="localConfig.sentence.max_length_words"
+                              :min="5"
+                              :max="100"
+                              placeholder="Sin límite"
+                              show-buttons
+                              @input="markModified('sentence', 'max_length_words')"
+                            />
+                            <InheritanceIndicator
+                              :is-custom="isCustom('sentence', 'max_length_words')"
+                              @reset="resetParam('sentence', 'max_length_words')"
+                            />
+                          </div>
+                        </div>
 
-                    <div v-if="localConfig.sentence.enabled" class="param-row">
-                      <div class="param-info">
-                        <label>Tolerancia a voz pasiva (%)</label>
-                        <small>Porcentaje máximo de oraciones en voz pasiva</small>
+                        <div v-if="localConfig.sentence.enabled" class="param-row">
+                          <div class="param-info">
+                            <label>Tolerancia a voz pasiva (%)</label>
+                            <small>Porcentaje máximo de oraciones en voz pasiva</small>
+                          </div>
+                          <div class="param-control">
+                            <InputNumber
+                              v-model="localConfig.sentence.passive_voice_tolerance_pct"
+                              :min="0"
+                              :max="100"
+                              suffix="%"
+                              @input="markModified('sentence', 'passive_voice_tolerance_pct')"
+                            />
+                            <InheritanceIndicator
+                              :is-custom="isCustom('sentence', 'passive_voice_tolerance_pct')"
+                              @reset="resetParam('sentence', 'passive_voice_tolerance_pct')"
+                            />
+                          </div>
+                        </div>
                       </div>
-                      <div class="param-control">
-                        <InputNumber
-                          v-model="localConfig.sentence.passive_voice_tolerance_pct"
-                          :min="0"
-                          :max="100"
-                          suffix="%"
-                          @input="markModified('sentence', 'passive_voice_tolerance_pct')"
-                        />
-                        <InheritanceIndicator
-                          :is-custom="isCustom('sentence', 'passive_voice_tolerance_pct')"
-                          @reset="resetParam('sentence', 'passive_voice_tolerance_pct')"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </TabPanel>
+                    </TabPanel>
 
-                <!-- Style Tab -->
-                <TabPanel value="3">
-                  <div class="config-section">
-                    <div class="param-row">
-                      <div class="param-info">
-                        <label>Análisis de estilo</label>
-                        <small>Detectar patrones estilísticos problemáticos</small>
-                      </div>
-                      <div class="param-control">
-                        <ToggleSwitch
-                          v-model="localConfig.style.enabled"
-                          @change="markModified('style', 'enabled')"
-                        />
-                        <InheritanceIndicator
-                          :is-custom="isCustom('style', 'enabled')"
-                          @reset="resetParam('style', 'enabled')"
-                        />
-                      </div>
-                    </div>
+                    <!-- Style Tab -->
+                    <TabPanel value="3">
+                      <div class="config-section">
+                        <div class="param-row">
+                          <div class="param-info">
+                            <label>Análisis de estilo</label>
+                            <small>Detectar patrones estilísticos problemáticos</small>
+                          </div>
+                          <div class="param-control">
+                            <ToggleSwitch
+                              v-model="localConfig.style.enabled"
+                              @change="markModified('style', 'enabled')"
+                            />
+                            <InheritanceIndicator
+                              :is-custom="isCustom('style', 'enabled')"
+                              @reset="resetParam('style', 'enabled')"
+                            />
+                          </div>
+                        </div>
 
-                    <div v-if="localConfig.style.enabled" class="param-row">
-                      <div class="param-info">
-                        <label>Variación de inicios de oración</label>
-                        <small>Detectar oraciones que empiezan igual</small>
-                      </div>
-                      <div class="param-control">
-                        <ToggleSwitch
-                          v-model="localConfig.style.analyze_sentence_starts"
-                          @change="markModified('style', 'analyze_sentence_starts')"
-                        />
-                        <InheritanceIndicator
-                          :is-custom="isCustom('style', 'analyze_sentence_starts')"
-                          @reset="resetParam('style', 'analyze_sentence_starts')"
-                        />
-                      </div>
-                    </div>
+                        <div v-if="localConfig.style.enabled" class="param-row">
+                          <div class="param-info">
+                            <label>Variación de inicios de oración</label>
+                            <small>Detectar oraciones que empiezan igual</small>
+                          </div>
+                          <div class="param-control">
+                            <ToggleSwitch
+                              v-model="localConfig.style.analyze_sentence_starts"
+                              @change="markModified('style', 'analyze_sentence_starts')"
+                            />
+                            <InheritanceIndicator
+                              :is-custom="isCustom('style', 'analyze_sentence_starts')"
+                              @reset="resetParam('style', 'analyze_sentence_starts')"
+                            />
+                          </div>
+                        </div>
 
-                    <div v-if="localConfig.style.enabled" class="param-row">
-                      <div class="param-info">
-                        <label>Oraciones pegajosas</label>
-                        <small>Detectar oraciones con demasiadas palabras comunes</small>
+                        <div v-if="localConfig.style.enabled" class="param-row">
+                          <div class="param-info">
+                            <label>Oraciones pegajosas</label>
+                            <small>Detectar oraciones con demasiadas palabras comunes</small>
+                          </div>
+                          <div class="param-control">
+                            <ToggleSwitch
+                              v-model="localConfig.style.analyze_sticky_sentences"
+                              @change="markModified('style', 'analyze_sticky_sentences')"
+                            />
+                            <InheritanceIndicator
+                              :is-custom="isCustom('style', 'analyze_sticky_sentences')"
+                              @reset="resetParam('style', 'analyze_sticky_sentences')"
+                            />
+                          </div>
+                        </div>
                       </div>
-                      <div class="param-control">
-                        <ToggleSwitch
-                          v-model="localConfig.style.analyze_sticky_sentences"
-                          @change="markModified('style', 'analyze_sticky_sentences')"
-                        />
-                        <InheritanceIndicator
-                          :is-custom="isCustom('style', 'analyze_sticky_sentences')"
-                          @reset="resetParam('style', 'analyze_sticky_sentences')"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </TabPanel>
+                    </TabPanel>
 
-                <!-- Structure Tab -->
-                <TabPanel value="4">
-                  <div class="config-section">
-                    <div class="param-row">
-                      <div class="param-info">
-                        <label>Análisis de timeline</label>
-                        <small>Detectar inconsistencias temporales</small>
-                      </div>
-                      <div class="param-control">
-                        <ToggleSwitch
-                          v-model="localConfig.structure.timeline_enabled"
-                          @change="markModified('structure', 'timeline_enabled')"
-                        />
-                        <InheritanceIndicator
-                          :is-custom="isCustom('structure', 'timeline_enabled')"
-                          @reset="resetParam('structure', 'timeline_enabled')"
-                        />
-                      </div>
-                    </div>
+                    <!-- Structure Tab -->
+                    <TabPanel value="4">
+                      <div class="config-section">
+                        <div class="param-row">
+                          <div class="param-info">
+                            <label>Análisis de timeline</label>
+                            <small>Detectar inconsistencias temporales</small>
+                          </div>
+                          <div class="param-control">
+                            <ToggleSwitch
+                              v-model="localConfig.structure.timeline_enabled"
+                              @change="markModified('structure', 'timeline_enabled')"
+                            />
+                            <InheritanceIndicator
+                              :is-custom="isCustom('structure', 'timeline_enabled')"
+                              @reset="resetParam('structure', 'timeline_enabled')"
+                            />
+                          </div>
+                        </div>
 
-                    <div class="param-row">
-                      <div class="param-info">
-                        <label>Relaciones entre personajes</label>
-                        <small>Rastrear y validar relaciones</small>
-                      </div>
-                      <div class="param-control">
-                        <ToggleSwitch
-                          v-model="localConfig.structure.relationships_enabled"
-                          @change="markModified('structure', 'relationships_enabled')"
-                        />
-                        <InheritanceIndicator
-                          :is-custom="isCustom('structure', 'relationships_enabled')"
-                          @reset="resetParam('structure', 'relationships_enabled')"
-                        />
-                      </div>
-                    </div>
+                        <div class="param-row">
+                          <div class="param-info">
+                            <label>Relaciones entre personajes</label>
+                            <small>Rastrear y validar relaciones</small>
+                          </div>
+                          <div class="param-control">
+                            <ToggleSwitch
+                              v-model="localConfig.structure.relationships_enabled"
+                              @change="markModified('structure', 'relationships_enabled')"
+                            />
+                            <InheritanceIndicator
+                              :is-custom="isCustom('structure', 'relationships_enabled')"
+                              @reset="resetParam('structure', 'relationships_enabled')"
+                            />
+                          </div>
+                        </div>
 
-                    <div class="param-row">
-                      <div class="param-info">
-                        <label>Consistencia de comportamiento</label>
-                        <small>Detectar cambios bruscos en personajes</small>
-                      </div>
-                      <div class="param-control">
-                        <ToggleSwitch
-                          v-model="localConfig.structure.behavior_consistency_enabled"
-                          @change="markModified('structure', 'behavior_consistency_enabled')"
-                        />
-                        <InheritanceIndicator
-                          :is-custom="isCustom('structure', 'behavior_consistency_enabled')"
-                          @reset="resetParam('structure', 'behavior_consistency_enabled')"
-                        />
-                      </div>
-                    </div>
+                        <div class="param-row">
+                          <div class="param-info">
+                            <label>Consistencia de comportamiento</label>
+                            <small>Detectar cambios bruscos en personajes</small>
+                          </div>
+                          <div class="param-control">
+                            <ToggleSwitch
+                              v-model="localConfig.structure.behavior_consistency_enabled"
+                              @change="markModified('structure', 'behavior_consistency_enabled')"
+                            />
+                            <InheritanceIndicator
+                              :is-custom="isCustom('structure', 'behavior_consistency_enabled')"
+                              @reset="resetParam('structure', 'behavior_consistency_enabled')"
+                            />
+                          </div>
+                        </div>
 
-                    <div class="param-row">
-                      <div class="param-info">
-                        <label>Seguimiento de ubicaciones</label>
-                        <small>Rastrear dónde están los personajes</small>
+                        <div class="param-row">
+                          <div class="param-info">
+                            <label>Seguimiento de ubicaciones</label>
+                            <small>Rastrear dónde están los personajes</small>
+                          </div>
+                          <div class="param-control">
+                            <ToggleSwitch
+                              v-model="localConfig.structure.location_tracking_enabled"
+                              @change="markModified('structure', 'location_tracking_enabled')"
+                            />
+                            <InheritanceIndicator
+                              :is-custom="isCustom('structure', 'location_tracking_enabled')"
+                              @reset="resetParam('structure', 'location_tracking_enabled')"
+                            />
+                          </div>
+                        </div>
                       </div>
-                      <div class="param-control">
-                        <ToggleSwitch
-                          v-model="localConfig.structure.location_tracking_enabled"
-                          @change="markModified('structure', 'location_tracking_enabled')"
-                        />
-                        <InheritanceIndicator
-                          :is-custom="isCustom('structure', 'location_tracking_enabled')"
-                          @reset="resetParam('structure', 'location_tracking_enabled')"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </TabPanel>
+                    </TabPanel>
 
-                <!-- Readability Tab -->
-                <TabPanel value="5">
-                  <div class="config-section">
-                    <div class="param-row">
-                      <div class="param-info">
-                        <label>Análisis de legibilidad</label>
-                        <small>Evaluar adecuación para edad objetivo</small>
-                      </div>
-                      <div class="param-control">
-                        <ToggleSwitch
-                          v-model="localConfig.readability.enabled"
-                          @change="markModified('readability', 'enabled')"
-                        />
-                        <InheritanceIndicator
-                          :is-custom="isCustom('readability', 'enabled')"
-                          @reset="resetParam('readability', 'enabled')"
-                        />
-                      </div>
-                    </div>
+                    <!-- Readability Tab -->
+                    <TabPanel value="5">
+                      <div class="config-section">
+                        <div class="param-row">
+                          <div class="param-info">
+                            <label>Análisis de legibilidad</label>
+                            <small>Evaluar adecuación para edad objetivo</small>
+                          </div>
+                          <div class="param-control">
+                            <ToggleSwitch
+                              v-model="localConfig.readability.enabled"
+                              @change="markModified('readability', 'enabled')"
+                            />
+                            <InheritanceIndicator
+                              :is-custom="isCustom('readability', 'enabled')"
+                              @reset="resetParam('readability', 'enabled')"
+                            />
+                          </div>
+                        </div>
 
-                    <div v-if="localConfig.readability.enabled" class="param-row">
-                      <div class="param-info">
-                        <label>Edad objetivo (mínima)</label>
-                        <small>Edad mínima del lector objetivo</small>
-                      </div>
-                      <div class="param-control">
-                        <InputNumber
-                          v-model="localConfig.readability.target_age_min"
-                          :min="0"
-                          :max="18"
-                          suffix=" años"
-                          @input="markModified('readability', 'target_age_min')"
-                        />
-                        <InheritanceIndicator
-                          :is-custom="isCustom('readability', 'target_age_min')"
-                          @reset="resetParam('readability', 'target_age_min')"
-                        />
-                      </div>
-                    </div>
+                        <div v-if="localConfig.readability.enabled" class="param-row">
+                          <div class="param-info">
+                            <label>Edad objetivo (mínima)</label>
+                            <small>Edad mínima del lector objetivo</small>
+                          </div>
+                          <div class="param-control">
+                            <InputNumber
+                              v-model="localConfig.readability.target_age_min"
+                              :min="0"
+                              :max="18"
+                              suffix=" años"
+                              @input="markModified('readability', 'target_age_min')"
+                            />
+                            <InheritanceIndicator
+                              :is-custom="isCustom('readability', 'target_age_min')"
+                              @reset="resetParam('readability', 'target_age_min')"
+                            />
+                          </div>
+                        </div>
 
-                    <div v-if="localConfig.readability.enabled" class="param-row">
-                      <div class="param-info">
-                        <label>Edad objetivo (máxima)</label>
-                        <small>Edad máxima del lector objetivo</small>
-                      </div>
-                      <div class="param-control">
-                        <InputNumber
-                          v-model="localConfig.readability.target_age_max"
-                          :min="0"
-                          :max="99"
-                          suffix=" años"
-                          @input="markModified('readability', 'target_age_max')"
-                        />
-                        <InheritanceIndicator
-                          :is-custom="isCustom('readability', 'target_age_max')"
-                          @reset="resetParam('readability', 'target_age_max')"
-                        />
-                      </div>
-                    </div>
+                        <div v-if="localConfig.readability.enabled" class="param-row">
+                          <div class="param-info">
+                            <label>Edad objetivo (máxima)</label>
+                            <small>Edad máxima del lector objetivo</small>
+                          </div>
+                          <div class="param-control">
+                            <InputNumber
+                              v-model="localConfig.readability.target_age_max"
+                              :min="0"
+                              :max="99"
+                              suffix=" años"
+                              @input="markModified('readability', 'target_age_max')"
+                            />
+                            <InheritanceIndicator
+                              :is-custom="isCustom('readability', 'target_age_max')"
+                              @reset="resetParam('readability', 'target_age_max')"
+                            />
+                          </div>
+                        </div>
 
-                    <div v-if="localConfig.readability.enabled" class="param-row">
-                      <div class="param-info">
-                        <label>Analizar vocabulario por edad</label>
-                        <small>Verificar que las palabras sean apropiadas</small>
+                        <div v-if="localConfig.readability.enabled" class="param-row">
+                          <div class="param-info">
+                            <label>Analizar vocabulario por edad</label>
+                            <small>Verificar que las palabras sean apropiadas</small>
+                          </div>
+                          <div class="param-control">
+                            <ToggleSwitch
+                              v-model="localConfig.readability.analyze_vocabulary_age"
+                              @change="markModified('readability', 'analyze_vocabulary_age')"
+                            />
+                            <InheritanceIndicator
+                              :is-custom="isCustom('readability', 'analyze_vocabulary_age')"
+                              @reset="resetParam('readability', 'analyze_vocabulary_age')"
+                            />
+                          </div>
+                        </div>
                       </div>
-                      <div class="param-control">
-                        <ToggleSwitch
-                          v-model="localConfig.readability.analyze_vocabulary_age"
-                          @change="markModified('readability', 'analyze_vocabulary_age')"
-                        />
-                        <InheritanceIndicator
-                          :is-custom="isCustom('readability', 'analyze_vocabulary_age')"
-                          @reset="resetParam('readability', 'analyze_vocabulary_age')"
-                        />
-                      </div>
-                    </div>
-                  </div>
                     </TabPanel>
                   </TabPanels>
                 </Tabs>
@@ -652,101 +652,101 @@
 
               <!-- Editorial Rules Tab -->
               <TabPanel value="1">
-              <div class="rules-section">
-                <div class="rules-description">
-                  <i class="pi pi-info-circle"></i>
-                  <span>
-                    Las reglas se aplican durante el análisis para detectar inconsistencias.
-                    Pueden heredarse del tipo/subtipo y personalizarse a nivel de documento.
-                  </span>
-                </div>
+                <div class="rules-section">
+                  <div class="rules-description">
+                    <i class="pi pi-info-circle"></i>
+                    <span>
+                      Las reglas se aplican durante el análisis para detectar inconsistencias.
+                      Pueden heredarse del tipo/subtipo y personalizarse a nivel de documento.
+                    </span>
+                  </div>
 
-                <!-- Rules list -->
-                <div class="rules-list">
-                  <div
-                    v-for="(rule, index) in localRules"
-                    :key="rule.id"
-                    class="rule-item"
-                    :class="{ disabled: !rule.enabled, inherited: rule.source !== 'custom' }"
-                  >
-                    <div class="rule-toggle">
-                      <ToggleSwitch
-                        v-model="rule.enabled"
-                        @change="markRuleModified(rule)"
-                      />
+                  <!-- Rules list -->
+                  <div class="rules-list">
+                    <div
+                      v-for="(rule, index) in localRules"
+                      :key="rule.id"
+                      class="rule-item"
+                      :class="{ disabled: !rule.enabled, inherited: rule.source !== 'custom' }"
+                    >
+                      <div class="rule-toggle">
+                        <ToggleSwitch
+                          v-model="rule.enabled"
+                          @change="markRuleModified(rule)"
+                        />
+                      </div>
+                      <div class="rule-content">
+                        <Textarea
+                          v-model="rule.text"
+                          :disabled="!rule.enabled"
+                          auto-resize
+                          rows="2"
+                          placeholder="Escriba la regla editorial..."
+                          @input="markRuleModified(rule)"
+                        />
+                      </div>
+                      <div class="rule-meta">
+                        <Tag
+                          v-if="rule.source === 'type'"
+                          severity="info"
+                          size="small"
+                        >
+                          <i class="pi pi-folder"></i> Tipo
+                        </Tag>
+                        <Tag
+                          v-else-if="rule.source === 'subtype'"
+                          severity="success"
+                          size="small"
+                        >
+                          <i class="pi pi-file"></i> Subtipo
+                        </Tag>
+                        <Tag
+                          v-else
+                          severity="warn"
+                          size="small"
+                        >
+                          <i class="pi pi-pencil"></i> Propia
+                        </Tag>
+                        <Button
+                          v-if="rule.source === 'custom'"
+                          v-tooltip="'Eliminar regla'"
+                          icon="pi pi-trash"
+                          text
+                          rounded
+                          severity="danger"
+                          size="small"
+                          @click="removeRule(index)"
+                        />
+                        <Button
+                          v-else-if="rule.overridden"
+                          v-tooltip="'Restaurar original'"
+                          icon="pi pi-refresh"
+                          text
+                          rounded
+                          severity="secondary"
+                          size="small"
+                          @click="resetRule(rule)"
+                        />
+                      </div>
                     </div>
-                    <div class="rule-content">
-                      <Textarea
-                        v-model="rule.text"
-                        :disabled="!rule.enabled"
-                        auto-resize
-                        rows="2"
-                        placeholder="Escriba la regla editorial..."
-                        @input="markRuleModified(rule)"
-                      />
-                    </div>
-                    <div class="rule-meta">
-                      <Tag
-                        v-if="rule.source === 'type'"
-                        severity="info"
-                        size="small"
-                      >
-                        <i class="pi pi-folder"></i> Tipo
-                      </Tag>
-                      <Tag
-                        v-else-if="rule.source === 'subtype'"
-                        severity="success"
-                        size="small"
-                      >
-                        <i class="pi pi-file"></i> Subtipo
-                      </Tag>
-                      <Tag
-                        v-else
-                        severity="warn"
-                        size="small"
-                      >
-                        <i class="pi pi-pencil"></i> Propia
-                      </Tag>
-                      <Button
-                        v-if="rule.source === 'custom'"
-                        v-tooltip="'Eliminar regla'"
-                        icon="pi pi-trash"
-                        text
-                        rounded
-                        severity="danger"
-                        size="small"
-                        @click="removeRule(index)"
-                      />
-                      <Button
-                        v-else-if="rule.overridden"
-                        v-tooltip="'Restaurar original'"
-                        icon="pi pi-refresh"
-                        text
-                        rounded
-                        severity="secondary"
-                        size="small"
-                        @click="resetRule(rule)"
-                      />
+
+                    <!-- Empty state -->
+                    <div v-if="localRules.length === 0" class="rules-empty">
+                      <i class="pi pi-list"></i>
+                      <span>No hay reglas definidas</span>
                     </div>
                   </div>
 
-                  <!-- Empty state -->
-                  <div v-if="localRules.length === 0" class="rules-empty">
-                    <i class="pi pi-list"></i>
-                    <span>No hay reglas definidas</span>
+                  <!-- Add rule button -->
+                  <div class="rules-actions">
+                    <Button
+                      label="Añadir regla"
+                      icon="pi pi-plus"
+                      text
+                      @click="addRule"
+                    />
                   </div>
                 </div>
-
-                <!-- Add rule button -->
-                <div class="rules-actions">
-                  <Button
-                    label="Añadir regla"
-                    icon="pi pi-plus"
-                    text
-                    @click="addRule"
-                  />
-                </div>
-              </div>
               </TabPanel>
             </TabPanels>
           </Tabs>
@@ -820,7 +820,6 @@ import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 import Button from 'primevue/button'
 import ToggleSwitch from 'primevue/toggleswitch'
-import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Select from 'primevue/select'
 import Textarea from 'primevue/textarea'
@@ -1080,14 +1079,6 @@ const onPresetChange = () => {
     }
   }
 }
-
-// Dialog markers as editable text
-const dialogMarkersText = computed({
-  get: () => localConfig.value.dialog?.dialog_markers?.join(', ') || '',
-  set: (val: string) => {
-    localConfig.value.dialog.dialog_markers = val.split(',').map(s => s.trim()).filter(Boolean)
-  }
-})
 
 const hasCustomizations = computed(() => modifiedParams.value.size > 0 || modifiedRules.value.size > 0)
 const hasUnsavedChanges = computed(() => hasCustomizations.value)

@@ -73,7 +73,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+// Note: computed might be needed for derived props
 import Tag from 'primevue/tag'
 import Chip from 'primevue/chip'
 import type { TimelineEvent, NarrativeOrder, TimelineResolution } from '@/types'

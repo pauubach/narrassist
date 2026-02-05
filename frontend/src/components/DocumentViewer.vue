@@ -172,7 +172,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, nextTick, watchEffect } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import Drawer from 'primevue/drawer'
@@ -312,9 +312,6 @@ const showSpellingErrors = ref(true)  // Toggle para mostrar/ocultar errores de 
 const showGrammarErrors = ref(true)   // Toggle para mostrar/ocultar errores de gramatica
 const showDialoguePanel = ref(false)  // Toggle para panel de atribución de diálogos
 const showDialogueHighlights = ref(true)  // Mostrar highlights de diálogos cuando el panel está abierto
-
-// Computed para mantener compatibilidad con showAnnotations
-const showAnnotations = computed(() => showSpellingErrors.value || showGrammarErrors.value)
 
 // Configuración de apariencia desde settings
 const fontSize = ref<'small' | 'medium' | 'large'>('medium')
@@ -577,7 +574,7 @@ const getTitleOffset = (content: string, title: string): number => {
     /^chapter\s+\d+/i.test(firstLine) ||
     /^parte\s+\d+/i.test(firstLine) ||
     // Numeración romana al inicio
-    /^[IVXLCDM]+[\.\:\s]/i.test(firstLine) ||
+    /^[IVXLCDM]+[.:\s]/i.test(firstLine) ||
     // Número seguido de punto y texto corto (ej: "1. El Despertar")
     /^\d+\.\s+\S/.test(firstLine)
 
@@ -790,7 +787,7 @@ function detectSectionHeading(text: string): { level: 'h2' | 'h3' | 'h4' | 'h5' 
   // - Todo en mayúsculas
   if (
     /^(PARTE|SECCIÓN|SECCION|LIBRO|ACTO|CAPÍTULO|CAPITULO)\s+/i.test(trimmed) ||
-    /^[IVXLCDM]+[\.\:\s]/i.test(trimmed) ||
+    /^[IVXLCDM]+[.:\s]/i.test(trimmed) ||
     (trimmed === trimmed.toUpperCase() && trimmed.length > 3 && /[A-Z]/.test(trimmed))
   ) {
     return { level: 'h2' }

@@ -305,7 +305,7 @@ const loadDocumentTypes = async () => {
     if (data.success) {
       documentTypes.value = data.data
     }
-  } catch (err) {
+  } catch {
     // Fallback to old API
     try {
       const response = await fetch(apiUrl('/api/document-types'))

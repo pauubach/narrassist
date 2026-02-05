@@ -723,13 +723,6 @@ const getSimilarityColor = (similarity: number): string => {
   return 'var(--red-500)'
 }
 
-const getSimilarityLabel = (similarity: number): string => {
-  if (similarity >= 0.7) return 'Alta'
-  if (similarity >= 0.5) return 'Media'
-  if (similarity >= 0.3) return 'Baja'
-  return 'Muy baja'
-}
-
 const getRecommendationText = (recommendation: string): string => {
   const texts: Record<string, string> = {
     'merge': 'Recomendado fusionar',

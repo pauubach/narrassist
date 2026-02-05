@@ -248,13 +248,14 @@ const handleDropdownKeydown = (event: KeyboardEvent) => {
         })
       }
       break
-    case 'Escape':
+    case 'Escape': {
       event.preventDefault()
       closeMenu()
       // Devolver foco al trigger del menú
       const trigger = document.getElementById(`menu-trigger-${activeMenuIndex.value}`)
       trigger?.focus()
       break
+    }
     case 'Tab':
       closeMenu()
       break

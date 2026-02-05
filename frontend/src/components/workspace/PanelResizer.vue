@@ -7,7 +7,7 @@ import { ref } from 'vue'
  * Emite eventos de resize con el delta de movimiento.
  */
 
-const props = defineProps<{
+defineProps<{
   /** Posición del resizer */
   position: 'left' | 'right'
   /** Posición actual como porcentaje (0-100) para accesibilidad */

@@ -8,7 +8,7 @@
  * - Cancelar análisis en curso
  */
 
-import { ref, computed, onUnmounted, watch } from 'vue'
+import { ref, computed, onUnmounted } from 'vue'
 import { API_BASE } from '@/config/api'
 import { useNotifications } from './useNotifications'
 
@@ -191,7 +191,7 @@ export function useAnalysisStream(options: UseAnalysisStreamOptions = {}) {
           }
           // Notificar error al usuario
           notifyAnalysisError(data.error)
-        } catch (e) {
+        } catch {
           error.value = 'Error durante el análisis'
           notifyAnalysisError()
         }
@@ -313,7 +313,7 @@ export function useAnalysisStream(options: UseAnalysisStreamOptions = {}) {
         }
       }
       return null
-    } catch (e) {
+    } catch {
       return null
     }
   }

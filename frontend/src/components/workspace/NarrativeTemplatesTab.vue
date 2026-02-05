@@ -92,12 +92,6 @@ async function analyze() {
   }
 }
 
-function getFitClass(score: number): string {
-  if (score >= 60) return 'fit-high'
-  if (score >= 35) return 'fit-medium'
-  return 'fit-low'
-}
-
 function getFitSeverity(score: number): 'success' | 'warn' | 'danger' | 'info' {
   if (score >= 60) return 'success'
   if (score >= 35) return 'warn'

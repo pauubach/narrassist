@@ -267,8 +267,8 @@ const loadData = async () => {
     if (statusData.success && statusData.data?.status) {
       overridesStatus.value = statusData.data.status
     }
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Error cargando configuración'
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : 'Error cargando configuración'
   } finally {
     loading.value = false
   }
@@ -301,7 +301,7 @@ const resetType = async (typeCode: string) => {
       })
       await loadData()
     }
-  } catch (err) {
+  } catch {
     toast.add({
       severity: 'error',
       summary: 'Error',
@@ -326,7 +326,7 @@ const resetSubtype = async (typeCode: string, subtypeCode: string) => {
       })
       await loadData()
     }
-  } catch (err) {
+  } catch {
     toast.add({
       severity: 'error',
       summary: 'Error',
@@ -357,7 +357,7 @@ const resetAll = async () => {
       showResetAllDialog.value = false
       await loadData()
     }
-  } catch (err) {
+  } catch {
     toast.add({
       severity: 'error',
       summary: 'Error',

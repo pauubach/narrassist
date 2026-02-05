@@ -58,7 +58,7 @@ const mockAlert1: Alert = {
   createdAt: new Date()
 }
 
-const mockAlert2: Alert = {
+const _mockAlert2: Alert = {
   id: 2,
   projectId: 1,
   category: 'location',

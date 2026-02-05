@@ -212,7 +212,7 @@ function getConfidenceSeverity(c: number): 'success' | 'warn' | 'secondary' {
               <i v-else class="pi pi-user char-archetype-icon" />
               <div class="char-names">
                 <span class="char-name">{{ char.character_name }}</span>
-                <span class="char-archetype" v-if="char.primary_archetype">
+                <span v-if="char.primary_archetype" class="char-archetype">
                   {{ char.primary_archetype.name }}
                   <span v-if="char.secondary_archetype" class="char-secondary">
                     / {{ char.secondary_archetype.name }}

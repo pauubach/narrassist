@@ -516,7 +516,7 @@ const props = defineProps<{
   projectId: number
 }>()
 
-const toast = useToast()
+const _toast = useToast()
 
 const loading = ref(false)
 const loadingMessage = ref('Cargando análisis...')

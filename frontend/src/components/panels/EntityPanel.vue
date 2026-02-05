@@ -163,14 +163,14 @@ watch(activeFilter, () => {
 
       <!-- Con agrupación por tipo -->
       <template v-else>
-        <div v-for="[type, entities] in groupedEntities" :key="type" class="entity-panel__group">
+        <div v-for="[type, groupEntities] in groupedEntities" :key="type" class="entity-panel__group">
           <div class="entity-panel__group-header">
             <i :class="getTypeConfig(type).icon" />
             <span>{{ getTypeConfig(type).labelPlural }}</span>
-            <span class="entity-panel__group-count">{{ entities.length }}</span>
+            <span class="entity-panel__group-count">{{ groupEntities.length }}</span>
           </div>
           <DsListItem
-            v-for="entity in entities"
+            v-for="entity in groupEntities"
             :key="entity.id"
             :title="entity.name"
             clickable

@@ -22,7 +22,6 @@ import Dialog from 'primevue/dialog'
 import Chips from 'primevue/chips'
 import Checkbox from 'primevue/checkbox'
 import Tag from 'primevue/tag'
-import Message from 'primevue/message'
 import ConfirmDialog from 'primevue/confirmdialog'
 import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
@@ -338,7 +337,7 @@ async function exportForPublication() {
         life: 3000
       })
     }
-  } catch (error) {
+  } catch {
     toast.add({
       severity: 'error',
       summary: 'Error',
@@ -477,8 +476,8 @@ function getConfidenceColor(confidence: number): string {
           severity="help"
           size="small"
           :loading="loadingSuggestions"
-          @click="loadSuggestions"
           title="Extraer automáticamente términos candidatos del manuscrito"
+          @click="loadSuggestions"
         />
         <Button
           v-if="stats.forPublication > 0"
@@ -531,8 +530,8 @@ function getConfidenceColor(confidence: number): string {
           text
           rounded
           size="small"
-          @click="showSuggestions = false; suggestions = []"
           title="Cerrar sugerencias"
+          @click="showSuggestions = false; suggestions = []"
         />
       </div>
       <div class="glossary-tab__suggestions-list">
