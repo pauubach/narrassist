@@ -61,6 +61,11 @@ from .utils import (
     format_duration,
     format_duration_verbose,
 )
+from .patterns import (
+    SingletonMeta,
+    singleton,
+    lazy_singleton,
+)
 
 __all__ = [
     # Errors
@@ -118,4 +123,8 @@ __all__ = [
     "ResourceRecommendation",
     "HeavyTaskSemaphore",
     "get_resource_manager",
+    # Patterns
+    "SingletonMeta",
+    "singleton",
+    "lazy_singleton",
 ]

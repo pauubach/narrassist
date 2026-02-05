@@ -74,22 +74,22 @@ const formattedValue = computed(() => {
   return `${Math.round(props.value * 100)}%`
 })
 
-// Color based on confidence level - WCAG AA: usar colores -700 para 4.5:1 sobre fondos claros
+// Color based on confidence level - WCAG AA: usar tokens semánticos con fallbacks
 const confidenceColor = computed(() => {
   switch (confidenceLevel.value) {
-    case 'high': return 'var(--green-700)'   // #15803d: 4.5:1 vs green-50
-    case 'medium': return 'var(--yellow-700)' // #a16207: 4.6:1 vs yellow-50
+    case 'high': return 'var(--app-success-text, var(--p-green-700, #15803d))'
+    case 'medium': return 'var(--app-warning-text, var(--p-yellow-700, #a16207))'
     case 'low':
-    default: return 'var(--red-700)'       // #b91c1c: 5.0:1 vs red-50
+    default: return 'var(--app-danger-text, var(--p-red-700, #b91c1c))'
   }
 })
 
 const confidenceBgColor = computed(() => {
   switch (confidenceLevel.value) {
-    case 'high': return 'var(--green-50)'
-    case 'medium': return 'var(--yellow-50)'
+    case 'high': return 'var(--app-success-bg, var(--p-green-50, #f0fdf4))'
+    case 'medium': return 'var(--app-warning-bg, var(--p-yellow-50, #fefce8))'
     case 'low':
-    default: return 'var(--red-50)'
+    default: return 'var(--app-danger-bg, var(--p-red-50, #fef2f2))'
   }
 })
 

@@ -1,6 +1,6 @@
 [project]
 name = "narrative-assistant"
-version = "0.4.43"
+version = "0.4.44"
 description = "Asistente de Corrección Narrativa - Herramienta offline de análisis narrativo para correctores profesionales"
 readme = "README.md"
 license = { text = "MIT" }
@@ -36,6 +36,9 @@ dependencies = [
     # CLI
     "rich>=13.0.0",
     "typer>=0.9.0",
+
+    # HTTP client (for model downloads)
+    "httpx>=0.27.0",
 
     # Utilities
     "numpy>=1.24.0",

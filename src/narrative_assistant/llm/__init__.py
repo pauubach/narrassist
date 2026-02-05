@@ -68,6 +68,17 @@ from .ollama_manager import (
     is_ollama_available,
     reset_ollama_manager,
 )
+from .llamacpp_manager import (
+    # Constantes
+    AVAILABLE_MODELS as LLAMACPP_MODELS,
+    # Tipos
+    LlamaCppStatus,
+    LlamaCppModelInfo,
+    # Gestor principal
+    LlamaCppManager,
+    # Funciones singleton
+    get_llamacpp_manager,
+)
 
 __all__ = [
     # Tipos - Expectation
@@ -109,4 +120,10 @@ __all__ = [
     "download_llm_model",
     # Deprecated
     "get_claude_client",
+    # LlamaCpp
+    "LlamaCppStatus",
+    "LlamaCppModelInfo",
+    "LlamaCppManager",
+    "get_llamacpp_manager",
+    "LLAMACPP_MODELS",
 ]

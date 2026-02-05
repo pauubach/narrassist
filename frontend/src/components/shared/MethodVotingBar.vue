@@ -172,8 +172,8 @@ const sortedMethods = computed(() => {
 }
 
 .method-item.agreed {
-  border-left-color: var(--green-600); /* WCAG AA: mejor contraste que green-500 */
-  background: var(--green-50);
+  border-left-color: var(--app-success-hover, var(--p-green-600, #16a34a)); /* WCAG AA */
+  background: var(--app-success-bg, var(--p-green-50, #f0fdf4));
 }
 
 .method-item.compact {
@@ -230,11 +230,11 @@ const sortedMethods = computed(() => {
 }
 
 .method-fill.agreed {
-  background: var(--green-600); /* WCAG AA: mejor contraste */
+  background: var(--app-success-hover, var(--p-green-600, #16a34a)); /* WCAG AA */
 }
 
 .agreed-icon {
-  color: var(--green-600); /* WCAG AA: 4.5:1 sobre fondos claros */
+  color: var(--app-success-hover, var(--p-green-600, #16a34a)); /* WCAG AA: 4.5:1 */
   font-size: 0.875rem;
   flex-shrink: 0;
 }
