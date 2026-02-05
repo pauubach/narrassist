@@ -8,6 +8,7 @@ correctamente pronombres posesivos como "sus" al sujeto apropiado.
 import pytest
 
 
+@pytest.mark.slow
 class TestPossessiveResolution:
     """
     Tests para la resolución de pronombres posesivos.
@@ -168,8 +169,9 @@ María apareció en la cafetería. Sus ojos verdes brillaban."""
         )
 
 
+@pytest.mark.slow
 class TestMentionExtraction:
-    """Tests para la extracción de menciones."""
+    """Tests para la extracción de menciones (carga modelos NLP)."""
 
     def test_possessive_extracted_as_possessive_type(self):
         """Verifica que los posesivos se extraen con tipo POSSESSIVE."""
