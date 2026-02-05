@@ -21,7 +21,7 @@ import signal
 import subprocess
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 from pathlib import Path
 from typing import Any, Callable
@@ -140,12 +140,12 @@ class LlamaCppManager:
 
     @property
     def is_running(self) -> bool:
-        """Verifica si el servidor está corriendo."""
-        if self._process is None:
-            return False
-
-        # Verificar si el proceso sigue vivo
-        return self._process.poll() is None
+        """Verifica si el servidor está corriendo (thread-safe)."""
+        with self._lock:
+            if self._process is None:
+                return False
+            # Verificar si el proceso sigue vivo
+            return self._process.poll() is None
 
     @property
     def status(self) -> LlamaCppStatus:
@@ -163,12 +163,12 @@ class LlamaCppManager:
 
     @property
     def available_models(self) -> list[LlamaCppModelInfo]:
-        """Lista de modelos disponibles con estado de descarga."""
+        """Lista de modelos disponibles con estado de descarga (sin mutar global)."""
         models = []
         for model in AVAILABLE_MODELS:
             model_path = self._models_dir / model.filename
-            model.is_downloaded = model_path.exists()
-            models.append(model)
+            # Crear copia con is_downloaded actualizado (no muta AVAILABLE_MODELS)
+            models.append(replace(model, is_downloaded=model_path.exists()))
         return models
 
     @property

@@ -22,6 +22,7 @@ import shutil
 import subprocess
 import sys
 import tarfile
+import urllib.error
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -97,8 +98,14 @@ def download_file(url: str, target_path: Path, description: str = "") -> bool:
         print(f"  [OK] Descargado: {target_path.name} ({size / (1024*1024):.1f} MB)")
         return True
 
-    except Exception as e:
-        print(f"  [ERROR] Fallo descarga: {e}")
+    except urllib.error.HTTPError as e:
+        print(f"  [ERROR] HTTP {e.code}: {e.reason}")
+        return False
+    except urllib.error.URLError as e:
+        print(f"  [ERROR] Error de red: {e.reason}")
+        return False
+    except OSError as e:
+        print(f"  [ERROR] Error de sistema: {e}")
         return False
 
 
@@ -169,8 +176,20 @@ def download_java_jre(target_dir: Path) -> bool:
             print(f"  [ERROR] No se encontró binario java en {java_bin}")
             return False
 
-    except Exception as e:
-        print(f"  [ERROR] Fallo extracción: {e}")
+    except zipfile.BadZipFile as e:
+        print(f"  [ERROR] Archivo ZIP corrupto: {e}")
+        if archive_path.exists():
+            archive_path.unlink()
+        return False
+    except tarfile.ReadError as e:
+        print(f"  [ERROR] Archivo TAR corrupto: {e}")
+        if archive_path.exists():
+            archive_path.unlink()
+        return False
+    except OSError as e:
+        print(f"  [ERROR] Error de sistema durante extracción: {e}")
+        if archive_path.exists():
+            archive_path.unlink()
         return False
 
 
@@ -225,8 +244,15 @@ def download_languagetool(target_dir: Path) -> bool:
             print(f"  [ERROR] No se encontró languagetool-server.jar")
             return False
 
-    except Exception as e:
-        print(f"  [ERROR] Fallo extracción: {e}")
+    except zipfile.BadZipFile as e:
+        print(f"  [ERROR] Archivo ZIP corrupto: {e}")
+        if zip_path.exists():
+            zip_path.unlink()
+        return False
+    except OSError as e:
+        print(f"  [ERROR] Error de sistema durante extracción: {e}")
+        if zip_path.exists():
+            zip_path.unlink()
         return False
 
 
