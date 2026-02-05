@@ -49,18 +49,19 @@ def _make_failure_result():
 def api_client():
     """TestClient con project_manager mockeado para devolver failure."""
     import main as api_main
+    import deps
 
     mock_pm = MagicMock()
     mock_pm.get.return_value = _make_failure_result()
 
-    original_pm = api_main.project_manager
-    api_main.project_manager = mock_pm
+    original_pm = deps.project_manager
+    deps.project_manager = mock_pm
 
     client = TestClient(api_main.app, raise_server_exceptions=False)
 
     yield client
 
-    api_main.project_manager = original_pm
+    deps.project_manager = original_pm
 
 
 NONEXISTENT_ID = 999999

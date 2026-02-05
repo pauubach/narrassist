@@ -1445,6 +1445,16 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
 
             for attr_data in data["attributes"]:
                 try:
+                    # Validar que la entidad existe en el texto o en la lista de menciones
+                    entity_name = attr_data.get("entity", "")
+                    if entity_name:
+                        # Verificar que la entidad está en el texto (evitar alucinaciones)
+                        if entity_name not in text and entity_name.lower() not in text.lower():
+                            # Si hay entity_mentions, verificar si está en la lista
+                            if known_entities and entity_name not in known_entities:
+                                logger.debug(f"LLM alucinó entidad '{entity_name}' no presente en texto/menciones")
+                                continue
+
                     # Mapear categoría
                     cat_str = attr_data.get("category", "physical").lower()
                     category = {
