@@ -746,9 +746,9 @@ pip install transformers
 | BK-02 | Integrar BookNLP multilingüe | Cuando esté disponible |
 | BK-03 | FlawedFictions benchmark | Cuando dataset se publique |
 | BK-04 | Fine-tune PlanTL RoBERTa en ficción | Si acumulamos datos etiquetados |
-| BK-05 | Comparativa antes/después | Para ediciones sucesivas |
+| ~~BK-05~~ | ~~Comparativa antes/después~~ | ✅ DONE - Snapshot pre-reanálisis + ComparisonService (two-pass matching) |
 | BK-06 | Exportar a Scrivener | Integración con herramienta escritores |
-| BK-07 | Análisis multi-documento | Sagas, series |
+| ~~BK-07~~ | ~~Análisis multi-documento~~ | ✅ DONE - Collections, entity links, cross-book analysis, workspace auxiliar |
 
 ---
 

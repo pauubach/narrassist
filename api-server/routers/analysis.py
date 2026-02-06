@@ -300,6 +300,17 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
             db_session = deps.get_database()
 
             try:
+                # ========== SNAPSHOT PRE-REANÁLISIS (BK-05) ==========
+                # Capturar estado actual antes de borrar (comparación antes/después)
+                try:
+                    from narrative_assistant.persistence.snapshot import SnapshotRepository
+                    snapshot_repo = SnapshotRepository()
+                    snapshot_repo.create_snapshot(project_id)
+                    snapshot_repo.cleanup_old_snapshots(project_id)
+                    logger.info(f"Pre-reanalysis snapshot created for project {project_id}")
+                except Exception as snap_err:
+                    logger.warning(f"Snapshot creation failed (continuing): {snap_err}")
+
                 # ========== LIMPIEZA DE DATOS EXISTENTES ==========
                 # Antes de re-analizar, eliminar entidades, alertas y capítulos anteriores
                 logger.info(f"Clearing existing data for project {project_id}")

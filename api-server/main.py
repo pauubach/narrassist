@@ -500,6 +500,7 @@ try:
 
     _early_logger.info("Importing services router...")
     from routers import services
+    from routers import collections
     _early_logger.info("services router imported")
 
     _early_logger.info("All routers imported successfully")
@@ -555,6 +556,9 @@ try:
 
     _early_logger.info("Registering services router...")
     app.include_router(services.router)
+
+    _early_logger.info("Registering collections router...")
+    app.include_router(collections.router)
 
     _early_logger.info("All routers registered successfully")
 

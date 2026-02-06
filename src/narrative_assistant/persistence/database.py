@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 _database_lock = threading.Lock()
 
 # Versión del schema actual
-SCHEMA_VERSION = 13
+SCHEMA_VERSION = 14
 
 # Tablas esenciales que deben existir para una BD válida
 # Solo incluir las tablas básicas definidas en SCHEMA_SQL
@@ -60,7 +60,12 @@ CREATE TABLE IF NOT EXISTS projects (
     document_type TEXT DEFAULT 'FIC',       -- FIC, MEM, BIO, CEL, DIV, ENS, AUT, TEC, PRA, GRA, INF, DRA
     document_subtype TEXT,                  -- Subtipo específico según la categoría
     document_type_confirmed INTEGER DEFAULT 0,  -- 1 si el usuario ha confirmado el tipo
-    detected_document_type TEXT             -- Tipo detectado por el sistema (puede diferir del actual)
+    detected_document_type TEXT,            -- Tipo detectado por el sistema (puede diferir del actual)
+
+    -- Colección / saga (versión 14)
+    collection_id INTEGER,
+    collection_order INTEGER DEFAULT 0,
+    FOREIGN KEY (collection_id) REFERENCES collections(id) ON DELETE SET NULL
 );
 
 -- Índice para búsqueda por fingerprint
@@ -817,8 +822,107 @@ CREATE INDEX IF NOT EXISTS idx_suppression_project ON suppression_rules(project_
 CREATE INDEX IF NOT EXISTS idx_suppression_active ON suppression_rules(is_active);
 CREATE INDEX IF NOT EXISTS idx_suppression_type ON suppression_rules(rule_type);
 
+-- ===================================================================
+-- NUEVAS TABLAS: Snapshots de análisis (versión 14, BK-05)
+-- ===================================================================
+
+-- Snapshots de análisis (una foto del estado antes de re-analizar)
+CREATE TABLE IF NOT EXISTS analysis_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    document_fingerprint TEXT,
+    alert_count INTEGER DEFAULT 0,
+    entity_count INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'complete',      -- complete, partial
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_snapshots_project ON analysis_snapshots(project_id);
+
+-- Alertas capturadas en el snapshot
+CREATE TABLE IF NOT EXISTS snapshot_alerts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    snapshot_id INTEGER NOT NULL,
+    project_id INTEGER NOT NULL,
+    alert_type TEXT NOT NULL,
+    category TEXT NOT NULL,
+    severity TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    chapter INTEGER,
+    start_char INTEGER,
+    end_char INTEGER,
+    excerpt TEXT DEFAULT '',
+    content_hash TEXT DEFAULT '',
+    confidence REAL DEFAULT 0.8,
+    entity_ids TEXT DEFAULT '[]',
+    related_entity_names TEXT DEFAULT '[]',
+    extra_data TEXT DEFAULT '{}',
+    FOREIGN KEY (snapshot_id) REFERENCES analysis_snapshots(id) ON DELETE CASCADE,
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_snap_alerts_snapshot ON snapshot_alerts(snapshot_id);
+CREATE INDEX IF NOT EXISTS idx_snap_alerts_project ON snapshot_alerts(project_id, snapshot_id);
+CREATE INDEX IF NOT EXISTS idx_snap_alerts_hash ON snapshot_alerts(content_hash);
+
+-- Entidades capturadas en el snapshot
+CREATE TABLE IF NOT EXISTS snapshot_entities (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    snapshot_id INTEGER NOT NULL,
+    project_id INTEGER NOT NULL,
+    original_entity_id INTEGER NOT NULL,
+    entity_type TEXT NOT NULL,
+    canonical_name TEXT NOT NULL,
+    aliases TEXT DEFAULT '[]',
+    importance TEXT DEFAULT 'secondary',
+    mention_count INTEGER DEFAULT 0,
+    FOREIGN KEY (snapshot_id) REFERENCES analysis_snapshots(id) ON DELETE CASCADE,
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_snap_entities_snapshot ON snapshot_entities(snapshot_id);
+CREATE INDEX IF NOT EXISTS idx_snap_entities_project ON snapshot_entities(project_id, snapshot_id);
+
+-- ===================================================================
+-- NUEVAS TABLAS: Colecciones / Sagas (versión 14, BK-07)
+-- ===================================================================
+
+-- Colecciones (agrupación de proyectos en saga/serie)
+CREATE TABLE IF NOT EXISTS collections (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    description TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Enlaces de entidades entre libros de una colección
+CREATE TABLE IF NOT EXISTS collection_entity_links (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    collection_id INTEGER NOT NULL,
+    source_entity_id INTEGER NOT NULL,
+    target_entity_id INTEGER NOT NULL,
+    source_project_id INTEGER NOT NULL,
+    target_project_id INTEGER NOT NULL,
+    similarity REAL DEFAULT 1.0,
+    match_type TEXT DEFAULT 'manual',    -- manual, suggested_accepted
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (collection_id) REFERENCES collections(id) ON DELETE CASCADE,
+    FOREIGN KEY (source_entity_id) REFERENCES entities(id) ON DELETE CASCADE,
+    FOREIGN KEY (target_entity_id) REFERENCES entities(id) ON DELETE CASCADE,
+    FOREIGN KEY (source_project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    FOREIGN KEY (target_project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    UNIQUE (collection_id, source_entity_id, target_entity_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_entity_links_collection ON collection_entity_links(collection_id);
+CREATE INDEX IF NOT EXISTS idx_entity_links_source ON collection_entity_links(source_entity_id);
+CREATE INDEX IF NOT EXISTS idx_entity_links_target ON collection_entity_links(target_entity_id);
+
 -- Insertar versión del schema
-INSERT OR REPLACE INTO schema_info (key, value) VALUES ('version', '12');
+INSERT OR REPLACE INTO schema_info (key, value) VALUES ('version', '14');
 """
 
 
@@ -988,6 +1092,9 @@ class Database:
             # Timeline: soporte para day_offset (Día 0, Día +1, etc.)
             ("timeline_events", "day_offset", "INTEGER"),
             ("timeline_events", "weekday", "TEXT"),
+            # v14: Colecciones / Sagas (BK-07)
+            ("projects", "collection_id", "INTEGER"),
+            ("projects", "collection_order", "INTEGER DEFAULT 0"),
         ]
         for table, column, col_def in migrations:
             try:
