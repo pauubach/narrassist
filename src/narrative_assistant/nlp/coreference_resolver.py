@@ -1047,6 +1047,18 @@ class HeuristicsCorefMethod:
     "Sus" refiere a María porque María es el sujeto de la oración anterior.
     """
 
+    def __init__(self):
+        # Frecuencia de menciones (se actualiza antes de resolver)
+        self._mention_freq: dict[str, int] = {}
+
+    def set_mention_frequencies(self, mentions: list["Mention"]) -> None:
+        """Calcula frecuencia de nombres propios para saliencia."""
+        self._mention_freq = {}
+        for m in mentions:
+            if m.mention_type == MentionType.PROPER_NOUN:
+                key = m.text.lower()
+                self._mention_freq[key] = self._mention_freq.get(key, 0) + 1
+
     def resolve(
         self,
         anaphor: Mention,
@@ -1085,8 +1097,17 @@ class HeuristicsCorefMethod:
                     score -= 0.1
                     reasons.append("lejano")
 
-            # Saliencia: personajes mencionados frecuentemente
-            # (esto requeriría información adicional sobre frecuencia)
+            # Saliencia: preferir candidatos mencionados frecuentemente
+            # (basado en frecuencia de nombre canónico en candidatos)
+            if hasattr(self, '_mention_freq') and self._mention_freq:
+                canonical = candidate.text.lower()
+                freq = self._mention_freq.get(canonical, 0)
+                if freq >= 5:
+                    score += 0.15
+                    reasons.append(f"alta saliencia ({freq}x)")
+                elif freq >= 3:
+                    score += 0.08
+                    reasons.append(f"saliencia media ({freq}x)")
 
             # Patrones narrativos comunes
             anaphor_lower = anaphor.text.lower()
@@ -1295,6 +1316,11 @@ class CoreferenceVotingResolver:
         logger.info(
             f"Anáforas: {len(anaphors)}, Antecedentes potenciales: {len(potential_antecedents)}"
         )
+
+        # Pasar frecuencias de mención al método heurístico para saliencia
+        heur_method = self._methods.get(CorefMethod.HEURISTICS)
+        if heur_method and hasattr(heur_method, 'set_mention_frequencies'):
+            heur_method.set_mention_frequencies(mentions)
 
         # Si hay narrador, resolver primero los pronombres de primera persona
         # y excluirlos de la resolución normal
@@ -1766,8 +1792,10 @@ class CoreferenceVotingResolver:
             else:
                 continue  # No se puede determinar
 
-            # Inferir género del contexto verbal (limitado — UNKNOWN por defecto)
-            gender = Gender.UNKNOWN
+            # Inferir género del contexto verbal:
+            # Buscar participios/adjetivos que concuerden con el sujeto omitido
+            # "Salió cansada" → femenino, "Llegó enfadado" → masculino
+            gender = self._infer_gender_from_context(token, doc)
 
             # Representación textual: verbo entre corchetes (ASCII-safe)
             zero_text = f"[PRO {token.text}]"
@@ -1790,6 +1818,41 @@ class CoreferenceVotingResolver:
 
         logger.debug(f"Extraídas {len(mentions)} menciones pro-drop (ZERO)")
         return mentions
+
+    @staticmethod
+    def _infer_gender_from_context(verb_token, doc) -> "Gender":
+        """
+        Infiere el género del sujeto omitido (pro-drop) desde el contexto.
+
+        En español, los participios y adjetivos predicativos concuerdan
+        con el sujeto: "Salió cansada" → femenino, "Llegó enfadado" → masculino.
+
+        Busca en los hijos del verbo y tokens adyacentes.
+        """
+        # Buscar participios/adjetivos dependientes del verbo
+        for child in verb_token.children:
+            morph = str(child.morph)
+            if child.pos_ in ("ADJ", "VERB") and "VerbForm=Part" in morph or child.pos_ == "ADJ":
+                if "Gender=Fem" in morph:
+                    return Gender.FEMININE
+                if "Gender=Masc" in morph:
+                    return Gender.MASCULINE
+
+        # Buscar en tokens inmediatamente después del verbo (hasta 3 tokens)
+        start_idx = verb_token.i + 1
+        end_idx = min(start_idx + 3, len(doc))
+        for i in range(start_idx, end_idx):
+            token = doc[i]
+            if token.pos_ in ("PUNCT", "CCONJ", "SCONJ"):
+                break  # Fin de cláusula
+            morph = str(token.morph)
+            if token.pos_ in ("ADJ", "VERB") and ("VerbForm=Part" in morph or token.pos_ == "ADJ"):
+                if "Gender=Fem" in morph:
+                    return Gender.FEMININE
+                if "Gender=Masc" in morph:
+                    return Gender.MASCULINE
+
+        return Gender.UNKNOWN
 
     # Nombres españoles comunes por género (para inferencia cuando spaCy no detecta)
     FEMININE_NAMES = {

@@ -679,15 +679,15 @@ pip install transformers
 # Model: mrm8488/bert-spanish-cased-finetuned-ner
 ```
 
-### Sprint 2: Correferencias y Pro-drop (1-2 semanas)
+### Sprint 2: Correferencias y Pro-drop -- COMPLETADO 2026-02-06
 
-| ID | Acción | Detalle |
-|----|--------|---------|
-| S2-01 | Implementar pro-drop resolution | Análisis morfológico verbal + saliencia |
-| S2-02 | Mejorar resolución posesivos | Proximidad + género/número + LLM |
-| S2-03 | Cadenas anafóricas transitivas | "él" → "el doctor" → "Juan" completo |
-| S2-04 | Pesos adaptativos | Aprender pesos óptimos con feedback |
-| S2-05 | Evaluar Qwen 2.5 para coref | Comparar con llama3.2 actual |
+| ID | Acción | Estado | Notas |
+|----|--------|--------|-------|
+| S2-01 | Pro-drop gender inference | DONE | `_infer_gender_from_context()` desde participios/adj |
+| S2-02 | Saliencia para correferencias | DONE | `set_mention_frequencies()` + scoring frecuencia |
+| S2-03 | Cadenas anafóricas transitivas | YA EXISTE | Union-find en `_build_chains()` |
+| S2-04 | Pesos adaptativos | PENDIENTE | Requiere feedback del usuario |
+| S2-05 | Evaluar Qwen 2.5 para coref | PENDIENTE | Comparar con llama3.2 actual |
 
 **Técnica pro-drop propuesta**:
 ```python
