@@ -60,7 +60,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; connect-src 'self' http://localhost:8008; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' data:"
+      "csp": "default-src 'self'; connect-src 'self' http://localhost:8008; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
     }
   }
 }

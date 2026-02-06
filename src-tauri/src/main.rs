@@ -492,7 +492,9 @@ fn spawn_embedded_backend(app: &AppHandle) -> Result<Child, String> {
                 .join("Versions")
                 .join("3.12")
                 .join("Python");
-            let _ = symlink(&relative_target, &python_symlink);
+            if let Err(e) = symlink(&relative_target, &python_symlink) {
+                eprintln!("[TAURI] Failed to create Python symlink: {}", e);
+            }
         }
     }
 

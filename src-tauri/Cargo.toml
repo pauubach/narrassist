@@ -4,7 +4,7 @@ version = "0.4.44"
 description = "Asistente de corrección narrativa para editores profesionales"
 authors = ["TFM Team"]
 license = "MIT"
-repository = ""
+repository = "https://github.com/pauubach/narrassist"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -16,7 +16,7 @@ tauri-build = { version = "2.0.1", features = [] }
 tauri = { version = "2.0.1", features = [] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1", features = ["rt-multi-thread", "time", "macros"] }
 reqwest = { version = "0.11", features = ["json"] }
 
 [features]
