@@ -7,7 +7,6 @@ import deps
 from deps import logger
 from deps import ApiResponse
 from fastapi import HTTPException
-from fastapi import Request
 from fastapi import Query
 from typing import Optional, Any
 from datetime import datetime
@@ -820,7 +819,7 @@ async def list_speaker_corrections(
 
 
 @router.post("/api/projects/{project_id}/speaker-corrections", response_model=ApiResponse)
-async def create_speaker_correction(project_id: int, request: Request):
+async def create_speaker_correction(project_id: int, payload: deps.DialogueCorrectionRequest):
     """
     Crea una corrección manual de atribución de hablante.
 
@@ -834,21 +833,13 @@ async def create_speaker_correction(project_id: int, request: Request):
     - notes: Notas del corrector (opcional)
     """
     try:
-        body = await request.json()
-
-        chapter_num = body.get("chapter_number")
-        dialogue_start = body.get("dialogue_start_char")
-        dialogue_end = body.get("dialogue_end_char")
-        dialogue_text = body.get("dialogue_text", "")
-        original_speaker_id = body.get("original_speaker_id")
-        corrected_speaker_id = body.get("corrected_speaker_id")
-        notes = body.get("notes")
-
-        if chapter_num is None or dialogue_start is None or dialogue_end is None:
-            return ApiResponse(
-                success=False,
-                error="chapter_number, dialogue_start_char y dialogue_end_char son obligatorios"
-            )
+        chapter_num = payload.chapter_number
+        dialogue_start = payload.dialogue_start_char
+        dialogue_end = payload.dialogue_end_char
+        dialogue_text = payload.dialogue_text
+        original_speaker_id = payload.original_speaker_id
+        corrected_speaker_id = payload.corrected_speaker_id
+        notes = payload.notes
 
         db = deps.get_database()
         with db.connect() as conn:

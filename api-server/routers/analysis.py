@@ -103,9 +103,16 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
         use_temp_file = False
 
         if file and file.filename:
-            # Usar archivo subido
+            # Validar tamaño (50 MB máximo)
+            MAX_UPLOAD_BYTES = 50 * 1024 * 1024
             with tempfile.NamedTemporaryFile(delete=False, suffix=Path(file.filename).suffix) as tmp_file:
-                shutil.copyfileobj(file.file, tmp_file)
+                size = 0
+                while chunk := file.file.read(8192):
+                    size += len(chunk)
+                    if size > MAX_UPLOAD_BYTES:
+                        Path(tmp_file.name).unlink(missing_ok=True)
+                        return ApiResponse(success=False, error="El archivo supera el límite de 50 MB")
+                    tmp_file.write(chunk)
                 tmp_path = Path(tmp_file.name)
             use_temp_file = True
             logger.info(f"Analysis started for project {project_id}")
@@ -292,7 +299,9 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
 
             def check_cancelled():
                 """Verifica si el análisis fue cancelado por el usuario."""
-                if deps.analysis_progress_storage.get(project_id, {}).get("status") == "cancelled":
+                with deps._progress_lock:
+                    cancelled = deps.analysis_progress_storage.get(project_id, {}).get("status") == "cancelled"
+                if cancelled:
                     raise Exception("Análisis cancelado por el usuario")
 
             # Obtener sesión de BD para este thread

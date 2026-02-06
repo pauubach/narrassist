@@ -430,9 +430,16 @@ async def create_project(
             unique_filename = f"{uuid.uuid4().hex}_{file.filename}"
             permanent_path = documents_dir / unique_filename
 
-            # Guardar archivo
+            # Guardar archivo con validación de tamaño (50 MB máximo)
+            MAX_UPLOAD_BYTES = 50 * 1024 * 1024
+            size = 0
             with open(permanent_path, "wb") as f:
-                shutil.copyfileobj(file.file, f)
+                while chunk := file.file.read(8192):
+                    size += len(chunk)
+                    if size > MAX_UPLOAD_BYTES:
+                        permanent_path.unlink(missing_ok=True)
+                        raise HTTPException(status_code=400, detail="El archivo supera el límite de 50 MB")
+                    f.write(chunk)
 
             document_path = permanent_path
             stored_path = str(permanent_path)

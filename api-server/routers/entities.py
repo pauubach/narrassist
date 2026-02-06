@@ -6,7 +6,6 @@ from fastapi import APIRouter
 import deps
 from deps import logger
 from deps import ApiResponse
-from fastapi import Request
 from fastapi import Query
 from typing import Optional, Any
 from datetime import datetime
@@ -73,16 +72,9 @@ async def list_entities(
                 (ch for ch in chapters if ch.chapter_number == chapter_number), None
             )
             if target_chapter:
-                for e in entities:
-                    mentions = entity_repo.get_mentions_by_entity(e.id)
-                    for m in mentions:
-                        if m.chapter_id == target_chapter.id:
-                            chapter_entity_ids.add(e.id)
-                            break
-                        # Fallback: comprobar por rango de posición
-                        if (target_chapter.start_char <= m.start_char < target_chapter.end_char):
-                            chapter_entity_ids.add(e.id)
-                            break
+                chapter_entity_ids = entity_repo.get_entity_ids_for_chapter(
+                    target_chapter.id, target_chapter.start_char, target_chapter.end_char
+                )
 
         # Calcular relevance_score para cada entidad
         # Fórmula: menciones / (palabras / 1000) normalizado
@@ -143,7 +135,7 @@ async def list_entities(
 
 
 @router.post("/api/projects/{project_id}/entities/preview-merge", response_model=ApiResponse)
-async def preview_merge_entities(project_id: int, request: Request):
+async def preview_merge_entities(project_id: int, body: deps.EntityIdsRequest):
     """
     Preview de fusión de entidades con análisis de similitud detallado y detección de conflictos.
 
@@ -154,20 +146,13 @@ async def preview_merge_entities(project_id: int, request: Request):
 
     Args:
         project_id: ID del proyecto
-        request: Body con entity_ids (lista de IDs a fusionar)
+        body: EntityIdsRequest con entity_ids (lista de IDs a fusionar, min 2)
 
     Returns:
         ApiResponse con preview detallado de la fusión
     """
     try:
-        data = await request.json()
-        entity_ids = data.get('entity_ids', [])
-
-        if len(entity_ids) < 2:
-            return ApiResponse(
-                success=False,
-                error="Se requieren al menos 2 entidades para previsualizar fusión"
-            )
+        entity_ids = body.entity_ids
 
         entity_repo = deps.entity_repository
 
@@ -399,27 +384,20 @@ async def preview_merge_entities(project_id: int, request: Request):
 
 
 @router.post("/api/projects/{project_id}/entities/merge", response_model=ApiResponse)
-async def merge_entities(project_id: int, request: Request):
+async def merge_entities(project_id: int, body: deps.MergeEntitiesRequest):
     """
     Fusiona múltiples entidades en una sola entidad principal.
 
     Args:
         project_id: ID del proyecto
-        request: Body con primary_entity_id y entity_ids
+        body: MergeEntitiesRequest con primary_entity_id y entity_ids
 
     Returns:
         ApiResponse con resultado de la fusión
     """
     try:
-        data = await request.json()
-        primary_entity_id = data.get('primary_entity_id')
-        entity_ids = data.get('entity_ids', [])
-
-        if not primary_entity_id or not entity_ids:
-            return ApiResponse(
-                success=False,
-                error="Se requiere primary_entity_id y entity_ids"
-            )
+        primary_entity_id = body.primary_entity_id
+        entity_ids = body.entity_ids
 
         entity_repo = deps.entity_repository
 
@@ -637,31 +615,29 @@ async def get_entity(project_id: int, entity_id: int):
 
 
 @router.put("/api/projects/{project_id}/entities/{entity_id}", response_model=ApiResponse)
-async def update_entity(project_id: int, entity_id: int, request: Request):
+async def update_entity(project_id: int, entity_id: int, body: deps.UpdateEntityRequest):
     """
     Actualiza una entidad existente.
 
     Args:
         project_id: ID del proyecto
         entity_id: ID de la entidad a actualizar
-        request: Body con campos a actualizar (name, type, importance, aliases)
+        body: UpdateEntityRequest con campos a actualizar (name, canonical_name, importance, aliases, description)
 
     Returns:
         ApiResponse con la entidad actualizada
     """
     try:
-        data = await request.json()
-
         # Verificar que la entidad existe y pertenece al proyecto
         entity, error = _verify_entity_ownership(entity_id, project_id)
         if error:
             return error
 
         # Mapear campos del request a parámetros del repositorio
-        canonical_name = data.get('name') or data.get('canonical_name')
-        aliases = data.get('aliases')
-        importance_str = data.get('importance')
-        description = data.get('description')
+        canonical_name = body.name or body.canonical_name
+        aliases = body.aliases
+        importance_str = body.importance
+        description = body.description
 
         # Convertir importance string a enum si se proporciona
         importance = None
@@ -1330,7 +1306,7 @@ async def list_coreference_corrections(project_id: int):
 
 
 @router.post("/api/projects/{project_id}/coreference-corrections", response_model=ApiResponse)
-async def create_coreference_correction(project_id: int, request: Request):
+async def create_coreference_correction(project_id: int, payload: deps.CoreferenceCorrectionRequest):
     """
     Crea una corrección manual de correferencia.
 
@@ -1345,22 +1321,14 @@ async def create_coreference_correction(project_id: int, request: Request):
     - notes: Notas del corrector (opcional)
     """
     try:
-        body = await request.json()
-
-        mention_start = body.get("mention_start_char")
-        mention_end = body.get("mention_end_char")
-        mention_text = body.get("mention_text", "")
-        chapter_number = body.get("chapter_number")
-        original_entity_id = body.get("original_entity_id")
-        corrected_entity_id = body.get("corrected_entity_id")
-        correction_type = body.get("correction_type", "reassign")
-        notes = body.get("notes")
-
-        if mention_start is None or mention_end is None:
-            return ApiResponse(success=False, error="mention_start_char y mention_end_char son obligatorios")
-
-        if correction_type not in ("reassign", "unlink", "confirm"):
-            return ApiResponse(success=False, error="correction_type debe ser 'reassign', 'unlink' o 'confirm'")
+        mention_start = payload.mention_start_char
+        mention_end = payload.mention_end_char
+        mention_text = payload.mention_text
+        chapter_number = payload.chapter_number
+        original_entity_id = payload.original_entity_id
+        corrected_entity_id = payload.corrected_entity_id
+        correction_type = payload.correction_type
+        notes = payload.notes
 
         db = deps.get_database()
         with db.connect() as conn:
@@ -1508,7 +1476,7 @@ async def list_rejected_entities(project_id: int):
 
 
 @router.post("/api/projects/{project_id}/entities/reject", response_model=ApiResponse)
-async def reject_entity_text(project_id: int, request: Request):
+async def reject_entity_text(project_id: int, body: deps.RejectEntityRequest):
     """
     Rechaza un texto de entidad para que no se vuelva a detectar.
 
@@ -1517,7 +1485,7 @@ async def reject_entity_text(project_id: int, request: Request):
 
     Args:
         project_id: ID del proyecto
-        request: Body con entity_text (texto a rechazar) y reason (opcional)
+        body: RejectEntityRequest con entity_text (texto a rechazar) y reason (opcional)
 
     Returns:
         ApiResponse con confirmación
@@ -1526,12 +1494,8 @@ async def reject_entity_text(project_id: int, request: Request):
         from narrative_assistant.nlp.entity_validator import get_entity_validator
         from narrative_assistant.persistence.database import get_database
 
-        data = await request.json()
-        entity_text = data.get('entity_text', '').strip()
-        reason = data.get('reason', '')
-
-        if not entity_text:
-            return ApiResponse(success=False, error="entity_text es requerido")
+        entity_text = body.entity_text.strip()
+        reason = body.reason
 
         # Usar el validador para rechazar la entidad
         validator = get_entity_validator(db=deps.get_database())
@@ -1684,13 +1648,13 @@ async def list_system_patterns(language: str = "es", only_active: bool = False):
 
 
 @router.patch("/api/entity-filters/system-patterns/{pattern_id}", response_model=ApiResponse)
-async def toggle_system_pattern(pattern_id: int, request: Request):
+async def toggle_system_pattern(pattern_id: int, body: deps.TogglePatternRequest):
     """
     Activa o desactiva un patrón del sistema.
 
     Args:
         pattern_id: ID del patrón
-        request: Body con is_active (bool)
+        body: TogglePatternRequest con is_active (bool)
 
     Returns:
         ApiResponse con confirmación
@@ -1698,8 +1662,7 @@ async def toggle_system_pattern(pattern_id: int, request: Request):
     try:
         from narrative_assistant.entities.filters import get_filter_repository
 
-        data = await request.json()
-        is_active = data.get('is_active', True)
+        is_active = body.is_active
 
         repo = get_filter_repository()
         success = repo.toggle_system_pattern(pattern_id, is_active)
@@ -1751,14 +1714,14 @@ async def list_user_rejections():
 
 
 @router.post("/api/entity-filters/user-rejections", response_model=ApiResponse)
-async def add_user_rejection(request: Request):
+async def add_user_rejection(body: deps.UserRejectionRequest):
     """
     Añade un rechazo global del usuario.
 
     La entidad se filtrará en todos los proyectos del usuario.
 
     Args:
-        request: Body con entity_name, entity_type (opcional), reason (opcional)
+        body: UserRejectionRequest con entity_name, entity_type (opcional), reason (opcional)
 
     Returns:
         ApiResponse con confirmación
@@ -1766,13 +1729,9 @@ async def add_user_rejection(request: Request):
     try:
         from narrative_assistant.entities.filters import get_filter_repository
 
-        data = await request.json()
-        entity_name = data.get('entity_name', '').strip()
-        entity_type = data.get('entity_type')
-        reason = data.get('reason')
-
-        if not entity_name:
-            return ApiResponse(success=False, error="entity_name es requerido")
+        entity_name = body.entity_name.strip()
+        entity_type = body.entity_type
+        reason = body.reason
 
         repo = get_filter_repository()
         rejection_id = repo.add_user_rejection(entity_name, entity_type, reason)
@@ -1872,14 +1831,14 @@ async def list_project_overrides(project_id: int):
 
 
 @router.post("/api/projects/{project_id}/entity-filters/overrides", response_model=ApiResponse)
-async def add_project_override(project_id: int, request: Request):
+async def add_project_override(project_id: int, body: deps.ProjectOverrideRequest):
     """
     Añade un override de entidad para un proyecto.
 
     Args:
         project_id: ID del proyecto
-        request: Body con entity_name, action ('reject' o 'force_include'),
-                 entity_type (opcional), reason (opcional)
+        body: ProjectOverrideRequest con entity_name, action ('reject' o 'force_include'),
+              entity_type (opcional), reason (opcional)
 
     Returns:
         ApiResponse con confirmación
@@ -1887,17 +1846,10 @@ async def add_project_override(project_id: int, request: Request):
     try:
         from narrative_assistant.entities.filters import get_filter_repository, FilterAction
 
-        data = await request.json()
-        entity_name = data.get('entity_name', '').strip()
-        action = data.get('action', 'reject')
-        entity_type = data.get('entity_type')
-        reason = data.get('reason')
-
-        if not entity_name:
-            return ApiResponse(success=False, error="entity_name es requerido")
-
-        if action not in ('reject', 'force_include'):
-            return ApiResponse(success=False, error="action debe ser 'reject' o 'force_include'")
+        entity_name = body.entity_name.strip()
+        action = body.action
+        entity_type = body.entity_type
+        reason = body.reason
 
         repo = get_filter_repository()
         override_id = repo.add_project_override(
@@ -1966,7 +1918,7 @@ async def remove_project_override(project_id: int, override_id: int):
 
 
 @router.post("/api/entity-filters/check", response_model=ApiResponse)
-async def check_entity_filter(request: Request):
+async def check_entity_filter(body: deps.CheckFilterRequest):
     """
     Verifica si una entidad sería filtrada por el sistema.
 
@@ -1974,7 +1926,7 @@ async def check_entity_filter(request: Request):
     no aparece en los resultados.
 
     Args:
-        request: Body con entity_name, entity_type (opcional), project_id (opcional)
+        body: CheckFilterRequest con entity_name, entity_type (opcional), project_id (opcional)
 
     Returns:
         ApiResponse con resultado de la evaluación
@@ -1982,13 +1934,9 @@ async def check_entity_filter(request: Request):
     try:
         from narrative_assistant.entities.filters import get_filter_repository
 
-        data = await request.json()
-        entity_name = data.get('entity_name', '').strip()
-        entity_type = data.get('entity_type')
-        project_id = data.get('project_id')
-
-        if not entity_name:
-            return ApiResponse(success=False, error="entity_name es requerido")
+        entity_name = body.entity_name.strip()
+        entity_type = body.entity_type
+        project_id = body.project_id
 
         repo = get_filter_repository()
         decision = repo.should_filter_entity(entity_name, entity_type, project_id)
@@ -2036,20 +1984,19 @@ async def list_entity_attributes(project_id: int, entity_id: int):
 
 
 @router.post("/api/projects/{project_id}/entities/{entity_id}/attributes", response_model=ApiResponse)
-async def create_entity_attribute(project_id: int, entity_id: int, request: Request):
+async def create_entity_attribute(project_id: int, entity_id: int, body: deps.CreateAttributeRequest):
     """
     Crea un nuevo atributo para una entidad.
 
     Args:
         project_id: ID del proyecto
         entity_id: ID de la entidad
-        request: Body con category, name, value
+        body: CreateAttributeRequest con category, name, value
 
     Returns:
         ApiResponse con el atributo creado
     """
     try:
-        data = await request.json()
         entity_repo = deps.entity_repository
 
         # Verificar que la entidad existe y pertenece al proyecto
@@ -2058,13 +2005,10 @@ async def create_entity_attribute(project_id: int, entity_id: int, request: Requ
             return ApiResponse(success=False, error="Entidad no encontrada")
 
         # Extraer datos del request
-        category = data.get('category', 'physical')
-        name = data.get('name')
-        value = data.get('value')
-        confidence = data.get('confidence', 1.0)
-
-        if not name or not value:
-            return ApiResponse(success=False, error="Se requieren 'name' y 'value'")
+        category = body.category
+        name = body.name
+        value = body.value
+        confidence = body.confidence
 
         # Crear atributo
         attribute_id = entity_repo.create_attribute(
@@ -2096,7 +2040,7 @@ async def create_entity_attribute(project_id: int, entity_id: int, request: Requ
 
 
 @router.put("/api/projects/{project_id}/entities/{entity_id}/attributes/{attribute_id}", response_model=ApiResponse)
-async def update_entity_attribute(project_id: int, entity_id: int, attribute_id: int, request: Request):
+async def update_entity_attribute(project_id: int, entity_id: int, attribute_id: int, body: deps.UpdateAttributeRequest):
     """
     Actualiza un atributo existente.
 
@@ -2104,13 +2048,12 @@ async def update_entity_attribute(project_id: int, entity_id: int, attribute_id:
         project_id: ID del proyecto
         entity_id: ID de la entidad
         attribute_id: ID del atributo
-        request: Body con name, value, is_verified
+        body: UpdateAttributeRequest con name, value, is_verified
 
     Returns:
         ApiResponse con el atributo actualizado
     """
     try:
-        data = await request.json()
         entity_repo = deps.entity_repository
 
         # Verificar que la entidad existe y pertenece al proyecto
@@ -2121,9 +2064,9 @@ async def update_entity_attribute(project_id: int, entity_id: int, attribute_id:
         # Actualizar atributo
         updated = entity_repo.update_attribute(
             attribute_id=attribute_id,
-            attribute_key=data.get('name'),
-            attribute_value=data.get('value'),
-            is_verified=data.get('is_verified'),
+            attribute_key=body.name,
+            attribute_value=body.value,
+            is_verified=body.is_verified,
         )
 
         if not updated:

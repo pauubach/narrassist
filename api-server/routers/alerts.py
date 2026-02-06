@@ -13,7 +13,6 @@ import deps
 import json
 from deps import logger
 from deps import ApiResponse
-from fastapi import Request
 from typing import Optional, Any
 from deps import AlertResponse, _verify_alert_ownership
 
@@ -175,21 +174,20 @@ async def list_alerts(
 
 
 @router.patch("/api/projects/{project_id}/alerts/{alert_id}/status", response_model=ApiResponse)
-async def update_alert_status(project_id: int, alert_id: int, request: Request):
+async def update_alert_status(project_id: int, alert_id: int, body: deps.AlertStatusRequest):
     """
     Actualiza el status de una alerta.
 
     Args:
         project_id: ID del proyecto
         alert_id: ID de la alerta
-        request: Body con {"status": "resolved"|"dismissed"|"open"}
+        body: AlertStatusRequest con status (resolved|dismissed|open|active|reopen)
 
     Returns:
         ApiResponse confirmando el cambio
     """
     try:
-        data = await request.json()
-        new_status_str = data.get('status', '').lower()
+        new_status_str = body.status.lower()
 
         # Mapear status string a enum
         status_map = {
@@ -329,7 +327,7 @@ async def resolve_all_alerts(project_id: int):
 
 
 @router.post("/api/projects/{project_id}/alerts/dismiss-batch", response_model=ApiResponse)
-async def dismiss_batch(project_id: int, request: Request):
+async def dismiss_batch(project_id: int, body: deps.BatchDismissRequest):
     """
     Descarta múltiples alertas de una vez, persistiendo para re-análisis.
 
@@ -344,13 +342,9 @@ async def dismiss_batch(project_id: int, request: Request):
         if not deps.dismissal_repository:
             return ApiResponse(success=False, error="Dismissal repository not initialized")
 
-        data = await request.json()
-        alert_ids = data.get("alert_ids", [])
-        reason = data.get("reason", "")
-        scope = data.get("scope", "instance")
-
-        if not alert_ids:
-            return ApiResponse(success=False, error="No se proporcionaron IDs de alertas")
+        alert_ids = body.alert_ids
+        reason = body.reason
+        scope = body.scope
 
         alert_repo = deps.alert_repository
         dismissal_items = []
@@ -500,7 +494,7 @@ async def get_suppression_rules(project_id: int):
 
 
 @router.post("/api/projects/{project_id}/suppression-rules", response_model=ApiResponse)
-async def create_suppression_rule(project_id: int, request: Request):
+async def create_suppression_rule(project_id: int, body: deps.SuppressionRuleRequest):
     """
     Crea una regla de supresión.
 
@@ -516,26 +510,12 @@ async def create_suppression_rule(project_id: int, request: Request):
         if not deps.dismissal_repository:
             return ApiResponse(success=False, error="Dismissal repository not initialized")
 
-        data = await request.json()
-        rule_type = data.get("rule_type", "")
-        pattern = data.get("pattern", "")
-
-        if not rule_type or not pattern:
-            return ApiResponse(success=False, error="rule_type y pattern son requeridos")
-
-        valid_types = {"alert_type", "category", "entity", "source_module"}
-        if rule_type not in valid_types:
-            return ApiResponse(
-                success=False,
-                error=f"rule_type inválido: {rule_type}. Válidos: {', '.join(valid_types)}"
-            )
-
         result = deps.dismissal_repository.create_suppression_rule(
-            rule_type=rule_type,
-            pattern=pattern,
+            rule_type=body.rule_type,
+            pattern=body.pattern,
             project_id=project_id,
-            entity_name=data.get("entity_name"),
-            reason=data.get("reason", ""),
+            entity_name=body.entity_name,
+            reason=body.reason or "",
         )
 
         if result.is_failure:

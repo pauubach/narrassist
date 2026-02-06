@@ -404,6 +404,16 @@ class EntityRepository:
         )
         return [EntityMention.from_row(row) for row in rows]
 
+    def get_entity_ids_for_chapter(self, chapter_id: int, chapter_start: int, chapter_end: int) -> set[int]:
+        """Obtiene IDs de entidades con menciones en un capítulo (query única)."""
+        rows = self.db.fetchall(
+            """SELECT DISTINCT entity_id FROM entity_mentions
+               WHERE chapter_id = ?
+                  OR (start_char >= ? AND start_char < ?)""",
+            (chapter_id, chapter_start, chapter_end),
+        )
+        return {row["entity_id"] for row in rows}
+
     def get_mentions_by_chapter(self, chapter_id: int) -> list[EntityMention]:
         """Obtiene todas las menciones de un capítulo."""
         rows = self.db.fetchall(

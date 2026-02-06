@@ -342,6 +342,128 @@ class DefaultOverrideRequest(BaseModel):
     config: dict
 
 
+# --- Request models for endpoints that used raw request.json() ---
+
+class AlertStatusRequest(BaseModel):
+    """PUT /api/projects/{id}/alerts/{id}/status"""
+    status: str = Field(..., pattern=r"^(resolved|dismissed|open|active|reopen)$")
+
+
+class BatchDismissRequest(BaseModel):
+    """POST /api/projects/{id}/alerts/batch-dismiss"""
+    alert_ids: list[int] = Field(..., min_length=1)
+    reason: str = ""
+    scope: str = "instance"
+
+
+class SuppressionRuleRequest(BaseModel):
+    """POST /api/projects/{id}/alerts/suppression-rules"""
+    rule_type: str = Field(..., pattern=r"^(alert_type|category|entity|source_module)$")
+    pattern: str = Field(..., min_length=1)
+    entity_name: Optional[str] = None
+    reason: Optional[str] = None
+
+
+class EntityIdsRequest(BaseModel):
+    """POST merge-preview / merge"""
+    entity_ids: list[int] = Field(..., min_length=2)
+
+
+class MergeEntitiesRequest(BaseModel):
+    """POST /api/projects/{id}/entities/merge"""
+    primary_entity_id: int
+    entity_ids: list[int] = Field(..., min_length=1)
+
+
+class UpdateEntityRequest(BaseModel):
+    """PUT /api/projects/{id}/entities/{id}"""
+    name: Optional[str] = None
+    canonical_name: Optional[str] = None
+    aliases: Optional[list[str]] = None
+    importance: Optional[str] = None
+    description: Optional[str] = None
+
+
+class CoreferenceCorrectionRequest(BaseModel):
+    """POST /api/projects/{id}/entities/coreference-corrections"""
+    mention_start_char: int
+    mention_end_char: int
+    mention_text: str = ""
+    chapter_number: Optional[int] = None
+    original_entity_id: Optional[int] = None
+    corrected_entity_id: Optional[int] = None
+    correction_type: str = Field("reassign", pattern=r"^(reassign|unlink|confirm)$")
+    notes: Optional[str] = None
+
+
+class RejectEntityRequest(BaseModel):
+    """POST /api/projects/{id}/entities/reject"""
+    entity_text: str = Field(..., min_length=1)
+    reason: str = ""
+
+
+class TogglePatternRequest(BaseModel):
+    """PATCH /api/entity-filters/system-patterns/{id}"""
+    is_active: bool = True
+
+
+class UserRejectionRequest(BaseModel):
+    """POST /api/entity-filters/user-rejections"""
+    entity_name: str = Field(..., min_length=1)
+    entity_type: Optional[str] = None
+    reason: Optional[str] = None
+
+
+class ProjectOverrideRequest(BaseModel):
+    """POST /api/projects/{id}/entity-overrides"""
+    entity_name: str = Field(..., min_length=1)
+    action: str = Field("reject", pattern=r"^(reject|force_include)$")
+    entity_type: Optional[str] = None
+    reason: Optional[str] = None
+
+
+class CheckFilterRequest(BaseModel):
+    """POST /api/entity-filters/check"""
+    entity_name: str = Field(..., min_length=1)
+    entity_type: Optional[str] = None
+    project_id: Optional[int] = None
+
+
+class CreateAttributeRequest(BaseModel):
+    """POST /api/projects/{id}/entities/{id}/attributes"""
+    category: str = "physical"
+    name: str = Field(..., min_length=1)
+    value: str = Field(..., min_length=1)
+    confidence: float = 1.0
+
+
+class UpdateAttributeRequest(BaseModel):
+    """PUT /api/projects/{id}/entities/{id}/attributes/{id}"""
+    name: Optional[str] = None
+    value: Optional[str] = None
+    is_verified: Optional[bool] = None
+
+
+class CreateRelationshipRequest(BaseModel):
+    """POST /api/projects/{id}/relationships"""
+    source_entity_id: int
+    target_entity_id: int
+    relation_type: str = "other"
+    description: str = ""
+    bidirectional: bool = True
+
+
+class DialogueCorrectionRequest(BaseModel):
+    """POST /api/projects/{id}/voice-style/dialogue-corrections"""
+    chapter_number: int
+    dialogue_start_char: int
+    dialogue_end_char: int
+    dialogue_text: str = ""
+    original_speaker_id: Optional[int] = None
+    corrected_speaker_id: Optional[int] = None
+    notes: Optional[str] = None
+
+
 class CorrectionConfigUpdate(BaseModel):
     """Modelo para actualizar configuración de corrección."""
     customizations: Optional[dict] = None  # Solo los parámetros personalizados

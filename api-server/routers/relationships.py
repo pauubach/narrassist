@@ -8,7 +8,6 @@ import json
 from deps import logger
 from deps import ApiResponse
 from fastapi import HTTPException
-from fastapi import Request
 from fastapi import Query
 from typing import Optional, Any
 from datetime import datetime
@@ -563,7 +562,7 @@ async def get_knowledge_anachronisms(
 
 
 @router.post("/api/projects/{project_id}/relationships", response_model=ApiResponse)
-async def create_relationship(project_id: int, request: Request):
+async def create_relationship(project_id: int, payload: deps.CreateRelationshipRequest):
     """
     Crea una nueva relación entre dos entidades.
 
@@ -584,16 +583,11 @@ async def create_relationship(project_id: int, request: Request):
         import uuid
         from datetime import datetime
 
-        body = await request.json()
-
-        source_entity_id = body.get("source_entity_id")
-        target_entity_id = body.get("target_entity_id")
-        relation_type_str = body.get("relation_type", "other")
-        description = body.get("description", "")
-        bidirectional = body.get("bidirectional", True)
-
-        if not source_entity_id or not target_entity_id:
-            return ApiResponse(success=False, error="source_entity_id y target_entity_id son requeridos")
+        source_entity_id = payload.source_entity_id
+        target_entity_id = payload.target_entity_id
+        relation_type_str = payload.relation_type
+        description = payload.description
+        bidirectional = payload.bidirectional
 
         # Obtener nombres de entidades
         entity_repo = get_entity_repository()
