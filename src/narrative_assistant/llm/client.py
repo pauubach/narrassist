@@ -60,6 +60,12 @@ class LocalLLMConfig:
     auto_start_service: bool = True  # Si True, inicia el servicio automáticamente
     force_cpu: bool = False  # Si True, fuerza modo CPU para Ollama
 
+    # S5-01: Preferencia de modelo para español
+    prefer_spanish_model: bool = True  # Prefiere Qwen 2.5 para textos en español
+
+    # S5-05: Cuantización
+    quantization: str = "Q4_K_M"  # Q4_K_M (default), Q6_K (calidad), Q8_0 (máxima)
+
 
 class LocalLLMClient:
     """
@@ -201,16 +207,18 @@ class LocalLLMClient:
 
     def _select_best_available_model(self, available_models: list[str]) -> str:
         """
-        Selecciona el mejor modelo disponible según el hardware.
+        Selecciona el mejor modelo disponible según hardware y preferencias.
 
-        Prioridad según calidad/velocidad:
-        - GPU con alta VRAM (>8GB): qwen2.5 > mistral > llama3.2 > gemma2
-        - GPU con VRAM media (4-8GB): llama3.2 > qwen2.5 > mistral
+        Estrategia de selección (S5-01 + S5-02):
+        - Si prefer_spanish_model=True: Qwen 2.5 como primera opción
+        - GPU con alta VRAM (>8GB): qwen2.5 > mistral > gemma2 > llama3.2
+        - GPU con VRAM media (4-8GB): qwen2.5 > llama3.2 > mistral
         - CPU o poca VRAM: llama3.2 (3B es rápido en CPU)
         """
         # Detectar capacidades de hardware
         has_gpu = False
         has_high_vram = False
+        vram_gb = 0.0
 
         try:
             from ..core.device import get_gpu_device
@@ -218,8 +226,8 @@ class LocalLLMClient:
             gpu = get_gpu_device()
             if gpu:
                 has_gpu = True
-                # Considerar "alta VRAM" si tiene más de 8GB
-                if gpu.total_memory_gb and gpu.total_memory_gb > 8:
+                vram_gb = gpu.total_memory_gb or 0.0
+                if vram_gb > 8:
                     has_high_vram = True
         except Exception:
             pass
@@ -227,27 +235,34 @@ class LocalLLMClient:
         # Normalizar nombres de modelos (quitar tags como :latest)
         normalized = [m.split(":")[0] for m in available_models]
 
-        # Definir orden de preferencia según hardware
+        # S5-01: Preferir Qwen 2.5 para español si hay hardware suficiente
+        prefer_qwen = self._config.prefer_spanish_model and (has_gpu or vram_gb >= 4)
+
+        # S5-02: Definir orden de preferencia según hardware
         if has_high_vram:
-            # GPU potente: preferir modelos más grandes/capaces
-            preference_order = ["qwen2.5", "mistral", "gemma2", "llama3.2", "llama3.1", "llama3"]
+            if prefer_qwen:
+                preference_order = ["qwen2.5", "mistral", "gemma2", "llama3.2"]
+            else:
+                preference_order = ["mistral", "qwen2.5", "gemma2", "llama3.2"]
         elif has_gpu:
-            # GPU con VRAM limitada: preferir modelos medianos
-            preference_order = ["llama3.2", "qwen2.5", "mistral", "llama3.1", "llama3"]
+            if prefer_qwen:
+                preference_order = ["qwen2.5", "llama3.2", "mistral"]
+            else:
+                preference_order = ["llama3.2", "qwen2.5", "mistral"]
         else:
-            # CPU: preferir modelos pequeños y rápidos
-            preference_order = ["llama3.2", "phi3", "gemma2:2b", "llama3.1", "qwen2.5"]
+            # CPU: llama3.2 (3B) es la mejor opción para velocidad
+            preference_order = ["llama3.2", "phi3", "gemma2:2b", "qwen2.5"]
 
         # Buscar el primer modelo disponible según preferencia
         for preferred in preference_order:
             for model in normalized:
                 if preferred in model:
-                    # Devolver el nombre original con tag
                     idx = normalized.index(model)
                     selected = available_models[idx].split(":")[0]
                     logger.info(
-                        f"Modelo seleccionado automáticamente: {selected} "
-                        f"(GPU: {has_gpu}, Alta VRAM: {has_high_vram})"
+                        f"Modelo seleccionado: {selected} "
+                        f"(GPU: {has_gpu}, VRAM: {vram_gb:.1f}GB, "
+                        f"prefer_spanish: {prefer_qwen})"
                     )
                     return selected
 

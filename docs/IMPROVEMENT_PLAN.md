@@ -718,15 +718,15 @@ pip install transformers
 | S4-04 | Ubicación de personajes | DONE | `check_impossible_travel()` añadido a CharacterLocationAnalyzer |
 | S4-05 | Modo español clásico | DONE | `classical_spanish.py`: 60+ variantes ortográficas, glosario arcaico |
 
-### Sprint 5: LLM y Modelos (1 semana)
+### Sprint 5: LLM y Modelos (1 semana) — COMPLETADO
 
-| ID | Acción | Detalle |
-|----|--------|---------|
-| S5-01 | Añadir Qwen 2.5 como modelo preferido | Best for Spanish |
-| S5-02 | Auto-selección por hardware | Detectar VRAM → seleccionar modelo |
-| S5-03 | Prompt engineering mejorado | CoT + few-shot para cada tarea |
-| S5-04 | Sanitización anti-injection | Limpiar texto antes de prompts |
-| S5-05 | Cuantización óptima | Q4_K_M por defecto, Q6_K para calidad |
+| ID | Acción | Estado | Notas |
+|----|--------|--------|-------|
+| S5-01 | Qwen 2.5 como modelo preferido | DONE | `prefer_spanish_model=True` en LocalLLMConfig |
+| S5-02 | Auto-selección por hardware | DONE | VRAM-based selection con prefer_qwen para GPU |
+| S5-03 | Prompt engineering mejorado | DONE | `prompts.py`: CoT + few-shot + templates centralizados |
+| S5-04 | Sanitización anti-injection | DONE | `sanitization.py`: 15 patrones injection, JSON validation |
+| S5-05 | Cuantización óptima | DONE | `quantization` field: Q4_K_M default, Q6_K/Q8_0 opciones |
 
 ### Sprint 6: Frontend y UX (1-2 semanas)
 
@@ -821,4 +821,4 @@ S6-01 ─→ S6-02 ─→ S6-03
 
 **Última actualización**: 2026-02-06
 **Autor**: Claude (Panel de 8 expertos simulados)
-**Próximo paso**: Sprint 5 - LLM y Modelos
+**Próximo paso**: Sprint 6 - Frontend y UX
