@@ -174,8 +174,8 @@ class SnapshotRepository:
                                 [m[0] for m in mentions[:10]],
                                 ensure_ascii=False,
                             )
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"Could not fetch aliases for entity {entity[0]}: {e}")
 
                     conn.execute(
                         """INSERT INTO snapshot_entities

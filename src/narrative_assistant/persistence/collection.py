@@ -16,6 +16,9 @@ logger = logging.getLogger(__name__)
 WARN_PROJECTS_THRESHOLD = 10
 WARN_ENTITY_LINKS_THRESHOLD = 100
 
+# Tipos válidos de cache en workspace (previene path traversal)
+VALID_CACHE_TYPES = frozenset({"cross_book_analysis", "entity_suggestions", "collection_summary"})
+
 
 @dataclass
 class Collection:
@@ -475,6 +478,9 @@ class CollectionRepository:
 
     def save_workspace_cache(self, collection_id: int, cache_type: str, data: dict) -> None:
         """Guarda datos en el workspace auxiliar (JSON)."""
+        if cache_type not in VALID_CACHE_TYPES:
+            logger.warning(f"Invalid cache_type rejected: {cache_type!r}")
+            return
         workspace = self._get_workspace_dir(collection_id)
         cache_file = workspace / f"{cache_type}.json"
         cache_file.write_text(
@@ -484,6 +490,9 @@ class CollectionRepository:
 
     def load_workspace_cache(self, collection_id: int, cache_type: str) -> dict | None:
         """Carga datos del workspace auxiliar."""
+        if cache_type not in VALID_CACHE_TYPES:
+            logger.warning(f"Invalid cache_type rejected: {cache_type!r}")
+            return None
         import os
         data_dir = os.environ.get("NA_DATA_DIR", str(Path.home() / ".narrative_assistant"))
         cache_file = Path(data_dir) / "collections" / str(collection_id) / f"{cache_type}.json"

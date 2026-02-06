@@ -12,8 +12,8 @@ Endpoints:
 
 import logging
 
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +37,7 @@ class CreateEntityLinkRequest(BaseModel):
     target_entity_id: int
     source_project_id: int
     target_project_id: int
-    similarity: float = 1.0
+    similarity: float = Field(default=1.0, ge=0.0, le=1.0)
     match_type: str = "manual"
 
 
@@ -202,7 +202,7 @@ async def delete_entity_link(collection_id: int, link_id: int):
 
 
 @router.get("/collections/{collection_id}/entity-link-suggestions")
-async def get_link_suggestions(collection_id: int, threshold: float = 0.7):
+async def get_link_suggestions(collection_id: int, threshold: float = Query(default=0.7, ge=0.0, le=1.0)):
     """Sugiere posibles enlaces entre entidades de distintos libros."""
     repo = _get_collection_repo()
     suggestions = repo.get_link_suggestions(collection_id, threshold)

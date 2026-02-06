@@ -636,8 +636,8 @@ class TestCollectionRepository:
         os.environ["NA_DATA_DIR"] = str(tmp_path)
         try:
             repo = CollectionRepository(isolated_database)
-            repo.save_workspace_cache(1, "test_cache", {"key": "value"})
-            loaded = repo.load_workspace_cache(1, "test_cache")
+            repo.save_workspace_cache(1, "cross_book_analysis", {"key": "value"})
+            loaded = repo.load_workspace_cache(1, "cross_book_analysis")
             assert loaded == {"key": "value"}
         finally:
             if "NA_DATA_DIR" in os.environ:
@@ -801,3 +801,196 @@ class TestSchemaV14:
         db = isolated_database
         with db.connection() as conn:
             conn.execute("SELECT collection_id, collection_order FROM projects LIMIT 0")
+
+
+# ============================================================================
+# Security / Adversarial Tests
+# ============================================================================
+
+
+class TestSecurityPathTraversal:
+    """Tests de seguridad: path traversal en workspace cache."""
+
+    def test_cache_type_path_traversal_rejected(self, isolated_database, tmp_path):
+        """cache_type con path traversal es rechazado."""
+        import os
+        from narrative_assistant.persistence.collection import CollectionRepository
+
+        os.environ["NA_DATA_DIR"] = str(tmp_path)
+        try:
+            repo = CollectionRepository(isolated_database)
+            # Intento de path traversal
+            repo.save_workspace_cache(1, "../../../etc/passwd", {"malicious": True})
+            # Verificar que NO se creó el archivo
+            malicious_path = tmp_path / ".." / ".." / ".." / "etc" / "passwd.json"
+            assert not malicious_path.exists()
+            # Verificar que load también rechaza
+            result = repo.load_workspace_cache(1, "../../../etc/passwd")
+            assert result is None
+        finally:
+            if "NA_DATA_DIR" in os.environ:
+                del os.environ["NA_DATA_DIR"]
+
+    def test_cache_type_invalid_name_rejected(self, isolated_database, tmp_path):
+        """cache_type con nombre no autorizado es rechazado."""
+        import os
+        from narrative_assistant.persistence.collection import CollectionRepository
+
+        os.environ["NA_DATA_DIR"] = str(tmp_path)
+        try:
+            repo = CollectionRepository(isolated_database)
+            repo.save_workspace_cache(1, "arbitrary_type", {"data": 1})
+            result = repo.load_workspace_cache(1, "arbitrary_type")
+            assert result is None
+        finally:
+            if "NA_DATA_DIR" in os.environ:
+                del os.environ["NA_DATA_DIR"]
+
+    def test_cache_type_valid_name_accepted(self, isolated_database, tmp_path):
+        """cache_type válido funciona correctamente."""
+        import os
+        from narrative_assistant.persistence.collection import CollectionRepository
+
+        os.environ["NA_DATA_DIR"] = str(tmp_path)
+        try:
+            repo = CollectionRepository(isolated_database)
+            for valid_type in ["cross_book_analysis", "entity_suggestions", "collection_summary"]:
+                repo.save_workspace_cache(1, valid_type, {"type": valid_type})
+                loaded = repo.load_workspace_cache(1, valid_type)
+                assert loaded is not None
+                assert loaded["type"] == valid_type
+        finally:
+            if "NA_DATA_DIR" in os.environ:
+                del os.environ["NA_DATA_DIR"]
+
+
+class TestSecurityInputValidation:
+    """Tests de validación de entrada."""
+
+    def test_entity_matcher_empty_name(self):
+        """EntityMatcher maneja nombres vacíos sin crash."""
+        from narrative_assistant.analysis.entity_matcher import exact_match, fuzzy_match
+        assert exact_match("", "") is True
+        assert exact_match("", "María") is False
+        sim = fuzzy_match("", "María")
+        assert sim >= 0.0  # No crash, retorna valor válido
+
+    def test_entity_matcher_special_characters(self):
+        """EntityMatcher maneja caracteres especiales."""
+        from narrative_assistant.analysis.entity_matcher import exact_match, fuzzy_match
+        # SQL injection attempt in name
+        assert exact_match("'; DROP TABLE--", "'; DROP TABLE--") is True
+        assert exact_match("'; DROP TABLE--", "María") is False
+        # Unicode edge cases
+        sim = fuzzy_match("María\u200b", "María")  # zero-width space
+        assert sim >= 0.0
+
+    def test_entity_matcher_very_long_name(self):
+        """EntityMatcher no crash con nombres muy largos."""
+        from narrative_assistant.analysis.entity_matcher import fuzzy_match
+        long_name = "A" * 10000
+        sim = fuzzy_match(long_name, "María")
+        assert 0.0 <= sim <= 1.0
+
+    def test_snapshot_nonexistent_project(self, isolated_database):
+        """Snapshot de proyecto inexistente retorna None."""
+        from narrative_assistant.persistence.snapshot import SnapshotRepository
+        repo = SnapshotRepository(isolated_database)
+        result = repo.create_snapshot(999999)
+        assert result is None
+
+    def test_comparison_nonexistent_project(self, isolated_database):
+        """Comparison de proyecto inexistente retorna None."""
+        from narrative_assistant.analysis.comparison import ComparisonService
+        service = ComparisonService(isolated_database)
+        result = service.compare(999999)
+        assert result is None
+
+    def test_collection_double_delete(self, isolated_database):
+        """Eliminar colección dos veces no crashea."""
+        from narrative_assistant.persistence.collection import CollectionRepository
+        repo = CollectionRepository(isolated_database)
+        cid = repo.create("Test")
+        repo.delete(cid)
+        repo.delete(cid)  # No crash
+
+    def test_entity_link_duplicate(self, isolated_database):
+        """Crear enlace duplicado retorna error, no crash."""
+        from narrative_assistant.persistence.collection import CollectionRepository
+        db = isolated_database
+        with db.connection() as conn:
+            conn.execute(
+                """INSERT INTO projects (id, name, document_fingerprint, document_format)
+                   VALUES (1, 'Book 1', 'fp1', 'txt')"""
+            )
+            conn.execute(
+                """INSERT INTO projects (id, name, document_fingerprint, document_format)
+                   VALUES (2, 'Book 2', 'fp2', 'txt')"""
+            )
+            conn.execute(
+                """INSERT INTO entities (id, project_id, entity_type, canonical_name)
+                   VALUES (1, 1, 'character', 'María')"""
+            )
+            conn.execute(
+                """INSERT INTO entities (id, project_id, entity_type, canonical_name)
+                   VALUES (2, 2, 'character', 'María')"""
+            )
+            conn.commit()
+
+        repo = CollectionRepository(db)
+        cid = repo.create("Saga")
+        repo.add_project(cid, 1)
+        repo.add_project(cid, 2)
+
+        result1 = repo.create_entity_link(cid, 1, 2, 1, 2)
+        assert result1["success"] is True
+
+        result2 = repo.create_entity_link(cid, 1, 2, 1, 2)
+        assert result2["success"] is False
+        assert "already exists" in result2["error"]
+
+    def test_cross_book_empty_collection(self, isolated_database):
+        """Cross-book analysis de colección vacía no crashea."""
+        from narrative_assistant.persistence.collection import CollectionRepository
+        from narrative_assistant.analysis.cross_book import CrossBookAnalyzer
+
+        repo = CollectionRepository(isolated_database)
+        cid = repo.create("Empty Saga")
+
+        analyzer = CrossBookAnalyzer(isolated_database)
+        report = analyzer.analyze(cid)
+        assert report.entity_links_analyzed == 0
+        assert len(report.inconsistencies) == 0
+
+    def test_cross_book_nonexistent_collection(self, isolated_database):
+        """Cross-book de colección inexistente no crashea."""
+        from narrative_assistant.analysis.cross_book import CrossBookAnalyzer
+        analyzer = CrossBookAnalyzer(isolated_database)
+        report = analyzer.analyze(999999)
+        assert report.collection_name == "(no encontrada)"
+
+    def test_snapshot_with_malformed_entity_ids(self, isolated_database):
+        """Snapshot maneja entity_ids malformados sin crash."""
+        from narrative_assistant.persistence.snapshot import SnapshotRepository
+
+        db = isolated_database
+        with db.connection() as conn:
+            conn.execute(
+                """INSERT INTO projects (id, name, document_fingerprint, document_format)
+                   VALUES (1, 'Test', 'fp1', 'txt')"""
+            )
+            # Alerta con entity_ids JSON inválido
+            conn.execute(
+                """INSERT INTO alerts (project_id, alert_type, category, severity,
+                          title, description, explanation, entity_ids)
+                   VALUES (1, 'test', 'consistency', 'medium', 'Test alert',
+                           'Test desc', 'Test expl', '}{invalid json}')"""
+            )
+            conn.commit()
+
+        repo = SnapshotRepository(db)
+        sid = repo.create_snapshot(1)
+        # No crash, snapshot creado (entity_names será [])
+        assert sid is not None
+        alerts = repo.get_snapshot_alerts(sid)
+        assert len(alerts) == 1
