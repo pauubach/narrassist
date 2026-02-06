@@ -32,6 +32,10 @@ _spacy_gpu_lock = threading.Lock()
 _gpu_configured: bool = False
 _gpu_active: bool = False
 
+# Cache global de modelos spaCy cargados (evita recargar ~500MB cada vez)
+_spacy_model_cache: dict[str, object] = {}
+_spacy_cache_lock = threading.Lock()
+
 
 def setup_spacy_gpu() -> bool:
     """
@@ -190,24 +194,49 @@ def load_spacy_model(
             )
 
     model_to_load = str(model_path)
-    logger.info(f"Cargando modelo spaCy: {model_to_load}")
 
-    try:
-        if disable_components:
-            nlp = spacy.load(model_to_load, disable=disable_components)
-            logger.debug(f"Componentes deshabilitados: {disable_components}")
-        else:
-            nlp = spacy.load(model_to_load)
-    except OSError as e:
-        raise ModelNotLoadedError(
-            model_name=model_name,
-            hint=f"Error cargando modelo: {e}",
-        ) from e
+    # Cache key: modelo + componentes deshabilitados
+    disable_key = ",".join(sorted(disable_components)) if disable_components else ""
+    cache_key = f"{model_to_load}|{disable_key}"
 
-    # Log información del modelo
-    logger.debug(f"Pipeline activo: {nlp.pipe_names}")
+    # Buscar en cache (thread-safe, evita recargar ~500MB)
+    if cache_key in _spacy_model_cache:
+        logger.debug(f"Modelo spaCy desde cache: {model_to_load}")
+        return _spacy_model_cache[cache_key]
+
+    with _spacy_cache_lock:
+        # Double-checked locking
+        if cache_key in _spacy_model_cache:
+            return _spacy_model_cache[cache_key]
+
+        logger.info(f"Cargando modelo spaCy: {model_to_load}")
+
+        try:
+            if disable_components:
+                nlp = spacy.load(model_to_load, disable=disable_components)
+                logger.debug(f"Componentes deshabilitados: {disable_components}")
+            else:
+                nlp = spacy.load(model_to_load)
+        except OSError as e:
+            raise ModelNotLoadedError(
+                model_name=model_name,
+                hint=f"Error cargando modelo: {e}",
+            ) from e
+
+        # Log información del modelo
+        logger.debug(f"Pipeline activo: {nlp.pipe_names}")
+
+        # Guardar en cache
+        _spacy_model_cache[cache_key] = nlp
 
     return nlp
+
+
+def clear_spacy_cache():
+    """Limpia el cache de modelos spaCy. Útil para tests o reload forzado."""
+    global _spacy_model_cache
+    with _spacy_cache_lock:
+        _spacy_model_cache.clear()
 
 
 def get_spacy_gpu_status() -> dict:

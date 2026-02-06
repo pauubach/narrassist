@@ -2,6 +2,12 @@
 Configuración compartida para pytest.
 
 Define fixtures comunes y configuración de tests.
+
+Gestión de memoria para modelos NLP:
+- spaCy se carga UNA VEZ por sesión (session-scoped) y se comparte entre tests
+- Los tests que necesitan spaCy/NLP deben marcarse con @pytest.mark.heavy
+- Por defecto pytest excluye @heavy (ver pytest.ini: -m "not heavy")
+- Para correr todos: pytest -m ""
 """
 
 import os
@@ -11,6 +17,98 @@ from pathlib import Path
 
 import pytest
 
+
+# ============================================================================
+# Markers automáticos para tests pesados
+# ============================================================================
+
+# Archivos/directorios que sabemos que cargan modelos NLP pesados
+_HEAVY_PATTERNS = {
+    "test_attributes.py",
+    "test_ner.py",
+    "test_cesp_linguistic.py",
+    "test_spanish_rules.py",
+    "test_ojos_verdes_bug.py",
+    "test_llamacpp_manager.py",  # start_server tests cuelgan sin timeout
+}
+
+_HEAVY_DIRS = {
+    "adversarial",
+    "evaluation",
+    "integration",
+    "regression",
+    "performance",
+}
+
+
+def pytest_collection_modifyitems(config, items):
+    """
+    Auto-marca tests como @heavy basándose en su ubicación.
+
+    Tests en adversarial/, evaluation/, integration/, regression/ y ciertos
+    archivos unit que cargan spaCy se marcan automáticamente como heavy.
+    Esto permite excluirlos por defecto en equipos con poca RAM.
+    """
+    heavy_marker = pytest.mark.heavy
+
+    for item in items:
+        # Ya marcado manualmente → respetar
+        if "heavy" in item.keywords:
+            continue
+
+        fspath = str(item.fspath)
+
+        # Por nombre de archivo
+        filename = os.path.basename(fspath)
+        if filename in _HEAVY_PATTERNS:
+            item.add_marker(heavy_marker)
+            continue
+
+        # Por directorio
+        parts = Path(fspath).parts
+        for part in parts:
+            if part in _HEAVY_DIRS:
+                item.add_marker(heavy_marker)
+                break
+
+
+# ============================================================================
+# Fixture session-scoped para spaCy (carga UNA vez, ~500MB)
+# ============================================================================
+
+@pytest.fixture(scope="session")
+def shared_spacy_nlp():
+    """
+    Modelo spaCy compartido entre TODOS los tests de la sesión.
+
+    Carga el modelo una sola vez (~500MB) y lo reutiliza.
+    Usar esta fixture en tests que necesiten spaCy directamente.
+    """
+    try:
+        from narrative_assistant.nlp.spacy_gpu import load_spacy_model
+        nlp = load_spacy_model()
+        return nlp
+    except Exception:
+        pytest.skip("Modelo spaCy no disponible")
+
+
+@pytest.fixture(scope="session")
+def shared_attribute_extractor():
+    """
+    AttributeExtractor compartido entre tests de la sesión.
+
+    Evita crear múltiples instancias que re-cargan spaCy.
+    """
+    try:
+        from narrative_assistant.nlp.attributes import AttributeExtractor
+        return AttributeExtractor(filter_metaphors=False)
+    except Exception:
+        pytest.skip("AttributeExtractor no disponible")
+
+
+# ============================================================================
+# Fixtures básicas (ligeras, sin modelos NLP)
+# ============================================================================
 
 @pytest.fixture
 def test_data_dir():
