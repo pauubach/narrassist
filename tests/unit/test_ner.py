@@ -2,6 +2,8 @@
 Tests unitarios para extracción de entidades (NER).
 """
 
+from unittest.mock import MagicMock, patch
+
 import pytest
 
 from narrative_assistant.nlp.ner import EntityLabel, NERExtractor
@@ -154,3 +156,81 @@ class TestEntityLabel:
         """Crea label desde string."""
         label = EntityLabel("PER")
         assert label == EntityLabel.PER
+
+
+class TestTransformerNER:
+    """Tests para integración de transformer NER (PlanTL RoBERTa)."""
+
+    def test_transformer_ner_module_import(self):
+        """El módulo transformer_ner se puede importar."""
+        from narrative_assistant.nlp.transformer_ner import (
+            TRANSFORMER_NER_MODELS,
+            TransformerNERModel,
+        )
+
+        assert "roberta-base-bne" in TRANSFORMER_NER_MODELS
+        assert "roberta-large-bne" in TRANSFORMER_NER_MODELS
+        assert "beto-ner" in TRANSFORMER_NER_MODELS
+
+    def test_transformer_ner_entity_dataclass(self):
+        """TransformerNEREntity tiene los campos correctos."""
+        from narrative_assistant.nlp.transformer_ner import TransformerNEREntity
+
+        ent = TransformerNEREntity(
+            text="Madrid", label="LOC", start=10, end=16, score=0.95
+        )
+        assert ent.text == "Madrid"
+        assert ent.label == "LOC"
+        assert ent.score == 0.95
+
+    def test_transformer_ner_label_mapping(self):
+        """Las etiquetas se mapean correctamente."""
+        from narrative_assistant.nlp.transformer_ner import LABEL_MAP
+
+        assert LABEL_MAP["PER"] == "PER"
+        assert LABEL_MAP["LOC"] == "LOC"
+        assert LABEL_MAP["ORG"] == "ORG"
+        assert LABEL_MAP["OTH"] == "MISC"  # CAPITEL
+
+    def test_extractor_accepts_transformer_flag(self):
+        """NERExtractor acepta el flag use_transformer_ner."""
+        extractor = NERExtractor(use_transformer_ner=False)
+        assert extractor.use_transformer_ner is False
+
+    def test_extract_entities_without_transformer(self):
+        """La extracción funciona sin transformer NER."""
+        extractor = NERExtractor(use_transformer_ner=False)
+        text = "María García vive en Barcelona."
+        result = extractor.extract_entities(text)
+        assert result.is_success
+        assert len(result.value.entities) > 0
+
+    def test_voting_boost_confidence(self):
+        """La votación multi-método aumenta la confianza."""
+        from narrative_assistant.nlp.ner import ExtractedEntity
+
+        extractor = NERExtractor(use_transformer_ner=False)
+        # Simular entidades de diferentes fuentes con la misma forma canónica
+        entities = [
+            ExtractedEntity(
+                text="Madrid", label=EntityLabel.LOC,
+                start_char=0, end_char=6, confidence=0.8, source="spacy",
+            )
+        ]
+        transformer_ents = [
+            ExtractedEntity(
+                text="Madrid", label=EntityLabel.LOC,
+                start_char=0, end_char=6, confidence=0.9, source="roberta",
+            )
+        ]
+        llm_ents = [
+            ExtractedEntity(
+                text="Madrid", label=EntityLabel.LOC,
+                start_char=0, end_char=6, confidence=0.85, source="llm",
+            )
+        ]
+        result = extractor._apply_multi_method_voting(
+            entities, transformer_ents, llm_ents
+        )
+        # 3 métodos coinciden → boost +0.15, pero capped at 0.98
+        assert result[0].confidence > 0.8

@@ -92,6 +92,10 @@ class NLPConfig:
     embeddings_model: str = "paraphrase-multilingual-MiniLM-L12-v2"
     embeddings_model_path: Path | None = None  # Ruta local, None = usar default
 
+    # Transformer NER (PlanTL RoBERTa)
+    transformer_ner_enabled: bool = True
+    transformer_ner_model: str = "roberta-base-bne"
+
     # Correferencia
     coreference_enabled: bool = True
 

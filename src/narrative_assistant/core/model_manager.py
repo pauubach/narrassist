@@ -44,6 +44,7 @@ class ModelType(Enum):
 
     SPACY = "spacy"
     EMBEDDINGS = "embeddings"
+    TRANSFORMER_NER = "transformer_ner"
 
 
 @dataclass(frozen=True)
@@ -83,6 +84,15 @@ KNOWN_MODELS: dict[ModelType, ModelInfo] = {
         sha256=None,  # Se verificará estructura en lugar de hash
         source_url="https://huggingface.co/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
         subdirectory="embeddings",
+    ),
+    ModelType.TRANSFORMER_NER: ModelInfo(
+        model_type=ModelType.TRANSFORMER_NER,
+        name="PlanTL-GOB-ES/roberta-base-bne-capitel-ner",
+        display_name="PlanTL RoBERTa NER (español)",
+        size_mb=500,
+        sha256=None,
+        source_url="https://huggingface.co/PlanTL-GOB-ES/roberta-base-bne-capitel-ner",
+        subdirectory="transformer_ner",
     ),
 }
 

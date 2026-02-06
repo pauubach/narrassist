@@ -647,24 +647,27 @@ Todo lo demás es nice-to-have.
 
 ## 8. Plan de Acción Priorizado
 
-### Sprint 0: Quick Wins (1-2 días)
+### Sprint 0: Quick Wins (1-2 días) -- COMPLETADO 2026-02-06
 
-| ID | Acción | Archivos | Esfuerzo |
-|----|--------|----------|----------|
-| QW-01 | Actualizar 15 xfails obsoletos a tests normales | `tests/adversarial/test_attribute_adversarial.py` | 30 min |
-| QW-02 | Fix bug frontend atributos (transformer) | `EntitiesTab.vue`, `entities.ts`, `transformers/entities.ts` | 2h |
-| QW-03 | Fix test_extract_organization | `tests/unit/test_ner.py` o ajustar expectativa | 30 min |
-| QW-04 | Fix entity fusion con "de" | `normalize_for_comparison()` | 1h |
+| ID | Acción | Estado | Notas |
+|----|--------|--------|-------|
+| QW-01 | Actualizar 15 xfails obsoletos | DONE | Per-case parametrize con XFAIL_CASES dict |
+| QW-02 | Fix bug frontend atributos | DONE | Añadidos span_start, span_end, chapter_id, source_mention_id |
+| QW-03 | Fix test_extract_organization | DONE | ONU/UNESCO/Unicef (ORG no ambiguo) |
+| QW-04 | Fix entity fusion con "de" | DONE | Variantes particle-stripped en generate_name_variants() |
+| extra | Fix test_emotional_coherence | DONE | min_confidence 0.4 (no 0.6) |
+| extra | Fix test_no_hair_in_unrelated_text | DONE | use_llm=False para evitar hallucination |
+| extra | Update pre-commit ruff v0.3→v0.15 | DONE | Reglas UP042/UP045 reconocidas |
 
-### Sprint 1: NER Mejorado (1 semana)
+### Sprint 1: NER Mejorado (1 semana) -- EN PROGRESO 2026-02-06
 
-| ID | Acción | Detalle |
-|----|--------|---------|
-| S1-01 | Integrar PlanTL RoBERTa NER | Añadir como método de votación NER |
-| S1-02 | Multi-model NER voting | spaCy + PlanTL + LLM preprocesador |
-| S1-03 | Mejorar gazetteer | Auto-alimentar con entidades confirmadas |
-| S1-04 | Añadir BETO como fallback | Para equipos sin GPU |
-| S1-05 | Benchmark NER | Evaluar con corpus test_books/ |
+| ID | Acción | Estado | Notas |
+|----|--------|--------|-------|
+| S1-01 | Integrar PlanTL RoBERTa NER | DONE | `transformer_ner.py`, descarga bajo demanda |
+| S1-02 | Multi-model NER voting | DONE | Votación con boost confianza (2+ métodos) |
+| S1-03 | Mejorar gazetteer | DONE | Auto-feed desde transformer (conf>=0.7) |
+| S1-04 | Añadir BETO como fallback | DONE | `beto-ner` en TRANSFORMER_NER_MODELS |
+| S1-05 | Benchmark NER | PENDIENTE | Evaluar con corpus test_books/ |
 
 **Modelos a descargar**:
 ```bash
@@ -816,6 +819,6 @@ S6-01 ─→ S6-02 ─→ S6-03
 
 ---
 
-**Última actualización**: 2026-02-06 ~05:00
+**Última actualización**: 2026-02-06
 **Autor**: Claude (Panel de 8 expertos simulados)
-**Próximo paso**: Implementar Sprint 0 (Quick Wins)
+**Próximo paso**: Sprint 1 - NER Mejorado (PlanTL RoBERTa)

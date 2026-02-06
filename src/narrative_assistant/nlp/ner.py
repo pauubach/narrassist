@@ -450,6 +450,8 @@ class NERExtractor:
         min_entity_confidence: float = 0.5,
         enable_gpu: bool | None = None,
         use_llm_preprocessing: bool = True,
+        use_transformer_ner: bool = True,
+        transformer_ner_model: str | None = None,
     ):
         """
         Inicializa el extractor NER.
@@ -459,9 +461,14 @@ class NERExtractor:
             min_entity_confidence: Confianza mínima para incluir entidades
             enable_gpu: Usar GPU para spaCy (None = auto)
             use_llm_preprocessing: Usar LLM como preprocesador para mejorar detección
+            use_transformer_ner: Usar modelo transformer (PlanTL RoBERTa) como
+                método adicional de detección NER
+            transformer_ner_model: Modelo transformer a usar (None = auto/default)
         """
         self.enable_gazetteer = enable_gazetteer
         self.use_llm_preprocessing = use_llm_preprocessing
+        self.use_transformer_ner = use_transformer_ner
+        self._transformer_ner_model_key = transformer_ner_model
 
         config = get_config()
         # Usar 'is None' para permitir 0.0 como valor válido
@@ -498,8 +505,12 @@ class NERExtractor:
                 "La extracción de entidades puede ser limitada."
             )
 
+        # Transformer NER (lazy loading)
+        self._transformer_ner = None
+
         logger.info(
-            f"NERExtractor inicializado (gazetteer={enable_gazetteer}, llm={use_llm_preprocessing})"
+            f"NERExtractor inicializado (gazetteer={enable_gazetteer}, "
+            f"llm={use_llm_preprocessing}, transformer={use_transformer_ner})"
         )
 
     # Frases comunes que nunca son entidades (saludos, expresiones, etc.)
@@ -896,6 +907,103 @@ class NERExtractor:
                 logger.warning(f"No se pudo cargar LLM client para NER: {e}")
                 self._llm_client = False
         return self._llm_client if self._llm_client else None
+
+    # Pesos para votación multi-método NER
+    NER_METHOD_WEIGHTS = {
+        "roberta": 0.50,  # Transformer (PlanTL) - mejor F1
+        "llm": 0.30,  # LLM (Ollama) - comprensión semántica
+        "spacy": 0.20,  # spaCy - baseline estadístico
+        "gazetteer": 0.10,  # Gazetteer - lookup
+        "heuristic": 0.10,  # Heurísticas
+    }
+
+    def _apply_multi_method_voting(
+        self,
+        entities: list[ExtractedEntity],
+        transformer_entities: list[ExtractedEntity],
+        llm_entities: list[ExtractedEntity],
+    ) -> list[ExtractedEntity]:
+        """
+        Aplica votación multi-método: boost de confianza para entidades
+        confirmadas por múltiples fuentes.
+
+        Si el mismo texto+label aparece en >1 método, aumentamos confianza.
+        """
+        # Construir índice de textos canónicos detectados por cada método
+        method_detections: dict[str, set[str]] = {}
+        for ent in transformer_entities:
+            key = f"{ent.label.value}:{(ent.canonical_form or ent.text).lower()}"
+            method_detections.setdefault(key, set()).add("roberta")
+        for ent in llm_entities:
+            key = f"{ent.label.value}:{(ent.canonical_form or ent.text).lower()}"
+            method_detections.setdefault(key, set()).add("llm")
+        for ent in entities:
+            if ent.source in ("spacy", "gazetteer", "heuristic"):
+                key = f"{ent.label.value}:{(ent.canonical_form or ent.text).lower()}"
+                method_detections.setdefault(key, set()).add(ent.source)
+
+        # Aplicar boost de confianza
+        for ent in entities:
+            key = f"{ent.label.value}:{(ent.canonical_form or ent.text).lower()}"
+            methods = method_detections.get(key, set())
+            if len(methods) >= 3:
+                # 3+ métodos coinciden: alta confianza
+                ent.confidence = min(ent.confidence + 0.15, 0.98)
+            elif len(methods) >= 2:
+                # 2 métodos coinciden: boost moderado
+                ent.confidence = min(ent.confidence + 0.08, 0.95)
+
+        return entities
+
+    def _extract_with_transformer(self, text: str) -> list[ExtractedEntity]:
+        """
+        Extrae entidades usando modelo transformer (PlanTL RoBERTa).
+
+        El modelo transformer está fine-tuned en NER español y tiene mejor
+        precisión que spaCy para entidades estándar (F1 ~82-85% vs ~65%).
+        """
+        try:
+            from .transformer_ner import get_transformer_ner
+        except ImportError:
+            logger.debug("Módulo transformer_ner no disponible")
+            return []
+
+        try:
+            if self._transformer_ner is None:
+                self._transformer_ner = get_transformer_ner(
+                    model_key=self._transformer_ner_model_key
+                )
+
+            raw_entities = self._transformer_ner.extract(text)
+            result: list[ExtractedEntity] = []
+            for ent in raw_entities:
+                label = self.SPACY_LABEL_MAP.get(ent.label)
+                if label is None:
+                    # Intentar mapeo directo desde EntityLabel
+                    try:
+                        label = EntityLabel(ent.label)
+                    except ValueError:
+                        continue
+
+                # Verificar que el texto coincide con la posición original
+                original_text = text[ent.start : ent.end]
+                entity_text = original_text if original_text.strip() else ent.text
+
+                entity = ExtractedEntity(
+                    text=entity_text,
+                    label=label,
+                    start_char=ent.start,
+                    end_char=ent.end,
+                    confidence=min(ent.score, 0.95),  # Cap: transformer tiende a dar >0.99
+                    source="roberta",
+                )
+                result.append(entity)
+
+            return result
+
+        except Exception as e:
+            logger.warning(f"Error en transformer NER: {e}")
+            return []
 
     def _preprocess_with_llm(self, text: str) -> list[ExtractedEntity]:
         """
@@ -2697,6 +2805,42 @@ JSON:"""
                         result.entities.append(entity)
                         entities_found.add(pos)
 
+            # 0.5 Transformer NER (PlanTL RoBERTa)
+            transformer_entities: list[ExtractedEntity] = []
+            if self.use_transformer_ner:
+                report_progress("ner", 0.35, "Analizando con modelo transformer...")
+                transformer_entities = self._extract_with_transformer(text)
+                for entity in transformer_entities:
+                    pos = (entity.start_char, entity.end_char)
+                    if pos not in entities_found:
+                        # No solapar con LLM
+                        overlaps = False
+                        for llm_ent in llm_entities:
+                            if self._entities_overlap(
+                                entity.start_char, entity.end_char,
+                                llm_ent.start_char, llm_ent.end_char,
+                            ):
+                                overlaps = True
+                                break
+                        if not overlaps:
+                            result.entities.append(entity)
+                            entities_found.add(pos)
+                if transformer_entities:
+                    logger.info(
+                        f"Transformer NER: {len(transformer_entities)} entidades detectadas"
+                    )
+                    # S1-03: Auto-alimentar gazetteer con entidades transformer
+                    # (mayor confianza que spaCy, no requieren _is_high_quality)
+                    if self.enable_gazetteer:
+                        with self._gazetteer_lock:
+                            for ent in transformer_entities:
+                                if (
+                                    ent.confidence >= 0.7
+                                    and ent.canonical_form
+                                    and len(self.dynamic_gazetteer) < MAX_GAZETTEER_SIZE
+                                ):
+                                    self.dynamic_gazetteer[ent.canonical_form] = ent.label
+
             report_progress("ner", 0.4, "Buscando personajes y lugares...")
             doc = self.nlp(text)
             report_progress("ner", 0.7, "Identificando menciones en el texto...")
@@ -2728,17 +2872,18 @@ JSON:"""
                 if pos in entities_found:
                     continue
 
-                # Verificar solapamiento con entidades LLM
-                overlaps_llm = False
-                for llm_ent in llm_entities:
+                # Verificar solapamiento con entidades LLM o transformer
+                overlaps_prior = False
+                for prior_ent in llm_entities + transformer_entities:
                     if self._entities_overlap(
-                        ent.start_char, ent.end_char, llm_ent.start_char, llm_ent.end_char
+                        ent.start_char, ent.end_char,
+                        prior_ent.start_char, prior_ent.end_char,
                     ):
-                        overlaps_llm = True
+                        overlaps_prior = True
                         break
 
-                if overlaps_llm:
-                    continue  # LLM tiene prioridad
+                if overlaps_prior:
+                    continue  # LLM/transformer tienen prioridad
 
                 # ===== NUEVO: Filtro morfológico genérico =====
                 # Obtener contexto alrededor de la entidad para análisis
@@ -2816,6 +2961,13 @@ JSON:"""
             # 2.5 Separar entidades coordinadas ("Pedro y Carmen" -> ["Pedro", "Carmen"])
             report_progress("ner", 0.85, "Analizando nombres compuestos...")
             result.entities = self._split_coordinated_entities(doc, result.entities)
+
+            # 2.6 Votación multi-método: boost de confianza para entidades
+            # detectadas por múltiples fuentes (spaCy, transformer, LLM)
+            if transformer_entities or llm_entities:
+                result.entities = self._apply_multi_method_voting(
+                    result.entities, transformer_entities, llm_entities
+                )
 
             # 3. Validación multi-capa (filtra falsos positivos)
             if enable_validation and result.entities:
