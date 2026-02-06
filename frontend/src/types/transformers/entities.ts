@@ -127,6 +127,10 @@ export function transformEntityAttribute(api: ApiEntityAttribute): EntityAttribu
     value: api.value,
     chapter: api.chapter ? parseInt(api.chapter, 10) : undefined,
     confidence: api.confidence,
+    spanStart: api.span_start ?? undefined,
+    spanEnd: api.span_end ?? undefined,
+    chapterId: api.chapter_id ?? undefined,
+    sourceMentionId: api.source_mention_id ?? undefined,
   }
 }
 

@@ -11,6 +11,7 @@ Los LLMs se ejecutan via Ollama (llama3.2, mistral, qwen2.5).
 """
 
 import logging
+import re
 import unicodedata
 from dataclasses import dataclass
 
@@ -173,6 +174,16 @@ PREFIXES_TO_STRIP = [
 
 # Ordenar de mayor a menor longitud para matching correcto
 PREFIXES_TO_STRIP_SORTED = sorted(PREFIXES_TO_STRIP, key=len, reverse=True)
+
+# Partículas interiores en nombres españoles (nobiliary particles)
+# Se usan para generar variantes de comparación: "García de la Cruz" → "García Cruz"
+INTERIOR_PARTICLES = [
+    "de la",
+    "de los",
+    "de las",
+    "del",
+    "de",
+]
 
 
 # =============================================================================
@@ -487,6 +498,37 @@ def strip_accents(text: str) -> str:
     return result.replace(_PLACEHOLDER_LOWER, "ñ").replace(_PLACEHOLDER_UPPER, "Ñ")
 
 
+def strip_interior_particles(name: str) -> str:
+    """
+    Elimina partículas interiores de nombres españoles.
+
+    Permite fusionar "García de la Cruz" con "García Cruz".
+
+    Args:
+        name: Nombre (puede tener cualquier case)
+
+    Returns:
+        Nombre sin partículas interiores
+
+    Examples:
+        >>> strip_interior_particles("García de la Cruz")
+        'García Cruz'
+        >>> strip_interior_particles("López del Valle")
+        'López Valle'
+    """
+    if not name:
+        return name
+
+    result = name
+    # Iterar partículas de mayor a menor longitud para evitar matches parciales
+    for particle in INTERIOR_PARTICLES:
+        # Buscar la partícula rodeada de espacios (no al inicio ni al final)
+        pattern = r"(?<=\S)\s+" + re.escape(particle) + r"\s+(?=\S)"
+        result = re.sub(pattern, " ", result, flags=re.IGNORECASE)
+
+    return " ".join(result.split())
+
+
 def normalize_for_comparison(name: str) -> str:
     """
     Normaliza un nombre para comparación flexible.
@@ -497,8 +539,9 @@ def normalize_for_comparison(name: str) -> str:
     3. Normaliza espacios
     4. Quita prefijos (artículos, títulos)
 
-    Esta función se usa para comparar si dos nombres son "iguales"
-    aunque tengan diferencias ortográficas menores.
+    NOTA: No quita partículas interiores (de, del, de la) aquí porque
+    son significativas para organizaciones y lugares ("Casa de la Moneda").
+    La variante sin partículas se genera en generate_name_variants().
 
     Args:
         name: Nombre original
@@ -599,10 +642,20 @@ def generate_name_variants(name: str) -> set[str]:
     """
     variants = {name}
 
-    # Añadir versión normalizada
+    # Añadir versión normalizada (sin prefijos)
     normalized = normalize_entity_name(name)
     if normalized and normalized != name:
         variants.add(normalized)
+
+    # Añadir versión sin partículas interiores (de, del, de la, etc.)
+    stripped = strip_interior_particles(name)
+    if stripped and stripped != name:
+        variants.add(stripped)
+    # También sin prefijos + sin partículas
+    if normalized:
+        stripped_normalized = strip_interior_particles(normalized)
+        if stripped_normalized and stripped_normalized != normalized:
+            variants.add(stripped_normalized)
 
     # Añadir versiones sin tildes (para matching más flexible)
     import unicodedata

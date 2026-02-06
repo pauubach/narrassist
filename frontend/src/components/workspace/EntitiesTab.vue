@@ -17,6 +17,8 @@ import UndoMergeDialog from '@/components/UndoMergeDialog.vue'
 import MergeHistoryPanel from '@/components/MergeHistoryPanel.vue'
 import RejectEntityDialog from '@/components/RejectEntityDialog.vue'
 import type { Entity, MergeHistoryEntry, EntityAttribute } from '@/types'
+import { transformEntityAttribute } from '@/types/transformers'
+import type { ApiEntityAttribute } from '@/types/api'
 import { useEntityUtils } from '@/composables/useEntityUtils'
 import { useAlertUtils } from '@/composables/useAlertUtils'
 import { useWorkspaceStore } from '@/stores/workspace'
@@ -237,7 +239,8 @@ async function loadEntityAttributes(entityId: number) {
     const response = await fetch(apiUrl(`/api/projects/${props.projectId}/entities/${entityId}/attributes`))
     const data = await response.json()
     if (data.success) {
-      selectedEntityAttributes.value = data.data || []
+      const rawAttributes: ApiEntityAttribute[] = data.data || []
+      selectedEntityAttributes.value = rawAttributes.map(transformEntityAttribute)
     } else {
       selectedEntityAttributes.value = []
     }

@@ -30,6 +30,47 @@ from narrative_assistant.nlp.attributes import (
 # ADVERSARIAL TEST CASES
 # =============================================================================
 
+# =============================================================================
+# XFAIL TRACKING - Cases that still genuinely fail with current implementation
+# Updated: 2026-02-06 based on actual test run results
+# =============================================================================
+XFAIL_CASES = {
+    # Multiple entities - resolución parcial
+    "multiple_01": "Distribución de atributos con pronombres (ella/él) en listas no implementada",
+    "multiple_03": "Atributos en aposición con múltiples entidades cercanas",
+    # Word order - orden no estándar
+    "word_order_01": "Orden OSV (Verdes eran los ojos de Laura) no implementado",
+    "word_order_03": "Negación con corrección (Alto no era... sino) no implementado",
+    # Negation
+    "negation_01": "Estructura 'No es que...sino' no implementada",
+    # Temporal
+    "temporal_01": "Resolución de conflicto temporal pasado vs presente no implementada",
+    # Compound
+    "compound_02": "Nombres compuestos con espacio (María José) no reconocidos",
+    # Implicit
+    "implicit_02": "Inferencia de múltiples atributos desde condición global (albina) no implementada",
+    # Long distance
+    "long_dist_03": "Resolución de posesivo (su madre) a larga distancia no implementada",
+    # Coordination
+    "coord_01": "Distribución de atributos paralelos en coordinación no implementada",
+    "coord_02": "Distinción atributos compartidos vs individuales con 'solo' no implementada",
+    # Context
+    "context_03": "Negación de identidad con corrección (no era X, sino Y) no implementada",
+}
+
+
+def _parametrize_adversarial(prefix: str) -> list:
+    """Retorna casos parametrizados con xfail selectivo para los que aún fallan."""
+    cases = [c for c in ADVERSARIAL_CASES if c["id"].startswith(prefix)]
+    result = []
+    for c in cases:
+        if c["id"] in XFAIL_CASES:
+            result.append(pytest.param(c, marks=pytest.mark.xfail(reason=XFAIL_CASES[c["id"]])))
+        else:
+            result.append(c)
+    return result
+
+
 ADVERSARIAL_CASES = [
     # -------------------------------------------------------------------------
     # 1. RELATIVE CLAUSES - El sujeto esta desplazado por una clausula relativa
@@ -881,12 +922,7 @@ class TestAdversarialArticles:
 class TestAdversarialMultipleEntities:
     """Tests para multiples entidades cercanas."""
 
-    @pytest.mark.xfail(
-        reason="Resolución de múltiples entidades cercanas parcialmente implementada"
-    )
-    @pytest.mark.parametrize(
-        "case", [c for c in ADVERSARIAL_CASES if c["id"].startswith("multiple")]
-    )
+    @pytest.mark.parametrize("case", _parametrize_adversarial("multiple"))
     def test_multiple_entities(self, extractor, case):
         """Verifica que multiples entidades cercanas se manejen correctamente."""
         result = extract_attributes_for_test(extractor, case["text"])
@@ -902,10 +938,7 @@ class TestAdversarialMultipleEntities:
 class TestAdversarialWordOrder:
     """Tests para orden de palabras no estandar."""
 
-    @pytest.mark.xfail(reason="Manejo de orden no estándar de palabras aún no implementado")
-    @pytest.mark.parametrize(
-        "case", [c for c in ADVERSARIAL_CASES if c["id"].startswith("word_order")]
-    )
+    @pytest.mark.parametrize("case", _parametrize_adversarial("word_order"))
     def test_unusual_word_order(self, extractor, case):
         """Verifica que ordenes de palabras no estandar se manejen."""
         result = extract_attributes_for_test(extractor, case["text"])
@@ -921,10 +954,7 @@ class TestAdversarialWordOrder:
 class TestAdversarialNegation:
     """Tests para negaciones complejas."""
 
-    @pytest.mark.xfail(reason="Manejo de negaciones complejas parcialmente implementado")
-    @pytest.mark.parametrize(
-        "case", [c for c in ADVERSARIAL_CASES if c["id"].startswith("negation")]
-    )
+    @pytest.mark.parametrize("case", _parametrize_adversarial("negation"))
     def test_negation_handling(self, extractor, case):
         """Verifica que las negaciones se manejen correctamente."""
         result = extract_attributes_for_test(extractor, case["text"])
@@ -978,10 +1008,7 @@ class TestAdversarialDialogue:
 class TestAdversarialTemporal:
     """Tests para atributos temporales/condicionales."""
 
-    @pytest.mark.xfail(reason="Atributos temporales/condicionales parcialmente implementados")
-    @pytest.mark.parametrize(
-        "case", [c for c in ADVERSARIAL_CASES if c["id"].startswith("temporal")]
-    )
+    @pytest.mark.parametrize("case", _parametrize_adversarial("temporal"))
     def test_temporal_attributes(self, extractor, case):
         """Verifica que los atributos temporales se manejen correctamente."""
         result = extract_attributes_for_test(extractor, case["text"])
@@ -998,10 +1025,7 @@ class TestAdversarialTemporal:
 class TestAdversarialCompound:
     """Tests para entidades compuestas."""
 
-    @pytest.mark.xfail(reason="Manejo de entidades compuestas parcialmente implementado")
-    @pytest.mark.parametrize(
-        "case", [c for c in ADVERSARIAL_CASES if c["id"].startswith("compound")]
-    )
+    @pytest.mark.parametrize("case", _parametrize_adversarial("compound"))
     def test_compound_entities(self, extractor, case):
         """Verifica que las entidades compuestas se manejen correctamente."""
         result = extract_attributes_for_test(extractor, case["text"])
@@ -1021,10 +1045,7 @@ class TestAdversarialCompound:
 class TestAdversarialImplicit:
     """Tests para atributos implicitos."""
 
-    @pytest.mark.xfail(reason="Inferencia de atributos implícitos aún no implementada")
-    @pytest.mark.parametrize(
-        "case", [c for c in ADVERSARIAL_CASES if c["id"].startswith("implicit")]
-    )
+    @pytest.mark.parametrize("case", _parametrize_adversarial("implicit"))
     def test_implicit_attributes(self, extractor, case):
         """Verifica que los atributos implicitos se infieran correctamente."""
         result = extract_attributes_for_test(extractor, case["text"])
@@ -1072,10 +1093,7 @@ class TestAdversarialOrthographic:
 class TestAdversarialLongDistance:
     """Tests para dependencias a larga distancia."""
 
-    @pytest.mark.xfail(reason="Dependencias a larga distancia parcialmente implementadas")
-    @pytest.mark.parametrize(
-        "case", [c for c in ADVERSARIAL_CASES if c["id"].startswith("long_dist")]
-    )
+    @pytest.mark.parametrize("case", _parametrize_adversarial("long_dist"))
     def test_long_distance_dependencies(self, extractor, case):
         """Verifica manejo de dependencias a larga distancia."""
         result = extract_attributes_for_test(extractor, case["text"])
@@ -1091,8 +1109,7 @@ class TestAdversarialLongDistance:
 class TestAdversarialCoordination:
     """Tests para coordinacion y listas."""
 
-    @pytest.mark.xfail(reason="Manejo de coordinación y listas parcialmente implementado")
-    @pytest.mark.parametrize("case", [c for c in ADVERSARIAL_CASES if c["id"].startswith("coord")])
+    @pytest.mark.parametrize("case", _parametrize_adversarial("coord"))
     def test_coordination(self, extractor, case):
         """Verifica manejo de coordinacion y listas."""
         result = extract_attributes_for_test(extractor, case["text"])
@@ -1150,10 +1167,7 @@ class TestAdversarialGeneric:
 class TestAdversarialContext:
     """Tests para interpretacion dependiente del contexto."""
 
-    @pytest.mark.xfail(reason="Interpretación dependiente del contexto parcialmente implementada")
-    @pytest.mark.parametrize(
-        "case", [c for c in ADVERSARIAL_CASES if c["id"].startswith("context")]
-    )
+    @pytest.mark.parametrize("case", _parametrize_adversarial("context"))
     def test_context_dependent(self, extractor, case):
         """Verifica interpretacion correcta segun contexto."""
         result = extract_attributes_for_test(extractor, case["text"])

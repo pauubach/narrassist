@@ -52,7 +52,8 @@ class TestNERExtractor:
 
     def test_extract_organization(self, extractor):
         """Extrae nombres de organizaciones."""
-        text = "El Real Madrid y el Barcelona son equipos rivales."
+        # Usar organizaciones inequívocas (no ciudades que también son equipos)
+        text = "La ONU y la UNESCO colaboran con Unicef en proyectos humanitarios."
         result = extractor.extract_entities(text)
 
         assert result.is_success

@@ -300,12 +300,16 @@ class TestHairExtractionPatterns:
         # Puede extraer: negro (color), corto (tipo), canas (color secundario)
         assert extraction.processed_chars > 0
 
-    def test_no_hair_in_unrelated_text(self, extractor):
+    def test_no_hair_in_unrelated_text(self):
         """No extrae pelo de texto sin mención de cabello."""
+        # Usar extractor sin LLM para evitar alucinaciones del modelo
+        deterministic_extractor = AttributeExtractor(
+            filter_metaphors=False, use_llm=False, use_embeddings=False
+        )
         text = "Juan caminaba por la calle pensando en su trabajo."
         entities = [("Juan", 0, 4)]
 
-        result = extractor.extract_attributes(text, entities)
+        result = deterministic_extractor.extract_attributes(text, entities)
 
         assert result.is_success
         extraction = result.value

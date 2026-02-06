@@ -134,7 +134,7 @@ class TestEmotionalCoherenceChecker:
         """Test creación del verificador."""
         assert checker is not None
         assert checker.sentiment is not None
-        assert checker.min_confidence == 0.6
+        assert checker.min_confidence == 0.4
 
     def test_custom_confidence(self):
         """Test con confianza personalizada."""

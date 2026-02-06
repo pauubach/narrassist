@@ -80,6 +80,10 @@ export interface ApiEntityAttribute {
   value: string
   chapter: string | null
   confidence: number
+  span_start: number | null
+  span_end: number | null
+  chapter_id: number | null
+  source_mention_id: number | null
 }
 
 /** Mención de entidad de la API */
