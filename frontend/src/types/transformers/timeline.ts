@@ -15,6 +15,7 @@ import type {
   TemporalInconsistency,
   TimeSpan
 } from '../domain/timeline'
+import { safeDate } from './projects'
 
 /**
  * Transforma un evento de timeline de la API al formato del dominio.
@@ -25,7 +26,7 @@ export function transformTimelineEvent(apiEvent: ApiTimelineEvent): TimelineEven
     description: apiEvent.description,
     chapter: apiEvent.chapter,
     paragraph: apiEvent.paragraph,
-    storyDate: apiEvent.story_date ? new Date(apiEvent.story_date) : null,
+    storyDate: safeDate(apiEvent.story_date) ?? null,
     storyDateResolution: apiEvent.story_date_resolution,
     dayOffset: apiEvent.day_offset ?? null,
     weekday: apiEvent.weekday ?? null,
@@ -60,8 +61,8 @@ export function transformTimeline(apiResponse: ApiTimelineResponse): Timeline {
   if (apiResponse.time_span) {
     const ts = apiResponse.time_span
     timeSpan = {
-      start: ts.start ? new Date(ts.start) : null,
-      end: ts.end ? new Date(ts.end) : null,
+      start: safeDate(ts.start) ?? null,
+      end: safeDate(ts.end) ?? null,
       durationDays: ts.duration_days ?? 0,
       isSynthetic: ts.is_synthetic ?? false,
       hasRealDates: ts.has_real_dates ?? true

@@ -196,7 +196,7 @@ import SelectButton from 'primevue/selectbutton'
 import ProgressSpinner from 'primevue/progressspinner'
 import Message from 'primevue/message'
 import { useToast } from 'primevue/usetoast'
-import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 
 const props = defineProps<{
   projectId: number
@@ -253,15 +253,9 @@ async function analyze() {
       paragraph_threshold: paragraphThreshold.value.toString(),
       min_sentence_length: '30',
     })
-    const response = await fetch(
-      apiUrl(`/api/projects/${props.projectId}/duplicate-content?${params}`)
+    const data = await api.getRaw<{ success: boolean; data: any; error?: string }>(
+      `/api/projects/${props.projectId}/duplicate-content?${params}`
     )
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-    }
-
-    const data = await response.json()
 
     if (data.success) {
       report.value = data.data

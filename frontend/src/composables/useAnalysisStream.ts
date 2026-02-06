@@ -9,7 +9,8 @@
  */
 
 import { ref, computed, onUnmounted } from 'vue'
-import { API_BASE } from '@/config/api'
+import { API_BASE, apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 import { useNotifications } from './useNotifications'
 
 export interface AnalysisPhase {
@@ -93,17 +94,19 @@ export function useAnalysisStream(options: UseAnalysisStreamOptions = {}) {
 
     try {
       // Iniciar análisis en el servidor
-      const formData = new FormData()
+      let result: { success: boolean; error?: string }
       if (file) {
+        // FormData upload: keep raw fetch (api.postForm has different error semantics)
+        const formData = new FormData()
         formData.append('file', file)
+        const response = await fetch(apiUrl(`/api/projects/${id}/analyze`), {
+          method: 'POST',
+          body: formData,
+        })
+        result = await response.json()
+      } else {
+        result = await api.postRaw<{ success: boolean; error?: string }>(`/api/projects/${id}/analyze`)
       }
-
-      const response = await fetch(`${config.baseUrl}/api/projects/${id}/analyze`, {
-        method: 'POST',
-        body: file ? formData : undefined,
-      })
-
-      const result = await response.json()
 
       if (!result.success) {
         error.value = result.error || 'Error al iniciar análisis'
@@ -252,11 +255,7 @@ export function useAnalysisStream(options: UseAnalysisStreamOptions = {}) {
 
     try {
       // Llamar al endpoint de cancelación
-      const response = await fetch(
-        `${config.baseUrl}/api/projects/${projectId}/analysis/cancel`,
-        { method: 'POST' }
-      )
-      const data = await response.json()
+      const data = await api.postRaw<{ success: boolean; error?: string }>(`/api/projects/${projectId}/analysis/cancel`)
 
       if (data.success) {
         disconnect()
@@ -297,8 +296,7 @@ export function useAnalysisStream(options: UseAnalysisStreamOptions = {}) {
    */
   async function checkProgress(id: number): Promise<AnalysisProgress | null> {
     try {
-      const response = await fetch(`${config.baseUrl}/api/projects/${id}/analysis/progress`)
-      const result = await response.json()
+      const result = await api.getRaw<{ success: boolean; data?: any }>(`/api/projects/${id}/analysis/progress`)
 
       if (result.success && result.data) {
         const data = result.data

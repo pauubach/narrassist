@@ -22,6 +22,8 @@ import type {
   AlertSource,
 } from '../domain/alerts'
 
+import { safeDate } from './projects'
+
 // =============================================================================
 // Mapeos de tipos
 // =============================================================================
@@ -177,8 +179,8 @@ export function transformAlert(api: ApiAlert): Alert {
     excerpt: api.excerpt ?? undefined,
     entityIds: api.entity_ids,
     confidence: api.confidence,
-    createdAt: new Date(api.created_at),
-    resolvedAt: api.resolved_at ? new Date(api.resolved_at) : undefined,
+    createdAt: safeDate(api.created_at, new Date())!,
+    resolvedAt: safeDate(api.resolved_at),
     extraData: transformAlertExtraData(api.extra_data),
   }
 }

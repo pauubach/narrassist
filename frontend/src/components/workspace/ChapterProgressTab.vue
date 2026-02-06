@@ -420,7 +420,7 @@ import AccordionContent from 'primevue/accordioncontent'
 import ProgressSpinner from 'primevue/progressspinner'
 import ProgressBar from 'primevue/progressbar'
 import { useToast } from 'primevue/usetoast'
-import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 
 interface NarrativeEvent {
   event_type: string
@@ -560,10 +560,9 @@ async function loadReport() {
     : 'Analizando con LLM (puede tardar)...'
 
   try {
-    const response = await fetch(
-      apiUrl(`/api/projects/${props.projectId}/chapter-progress?mode=${selectedMode.value}`)
+    const data = await api.getRaw<{ success: boolean; data: ChapterProgressReport; error?: string }>(
+      `/api/projects/${props.projectId}/chapter-progress?mode=${selectedMode.value}`
     )
-    const data = await response.json()
 
     if (data.success) {
       report.value = data.data

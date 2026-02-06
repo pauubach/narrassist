@@ -183,6 +183,7 @@ import type { ApiChapter } from '@/types/api/projects'
 import { transformChapters } from '@/types/transformers/projects'
 import DialogueAttributionPanel from '@/components/DialogueAttributionPanel.vue'
 import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 
 const toast = useToast()
 
@@ -401,8 +402,7 @@ const loadChapterDialogues = async (chapterNumber: number) => {
   if (chapterDialogues.value.has(chapterNumber)) return
 
   try {
-    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/chapters/${chapterNumber}/dialogue-attributions`))
-    const data = await response.json()
+    const data = await api.getRaw<{ success: boolean; data?: any }>(`/api/projects/${props.projectId}/chapters/${chapterNumber}/dialogue-attributions`)
 
     if (data.success && data.data?.attributions) {
       chapterDialogues.value.set(chapterNumber, data.data.attributions)
@@ -482,8 +482,7 @@ const loadDocument = async () => {
       chapters.value = props.externalChapters
     } else {
       // Cargar capítulos del API
-      const chaptersResponse = await fetch(apiUrl(`/api/projects/${props.projectId}/chapters`))
-      const chaptersData = await chaptersResponse.json()
+      const chaptersData = await api.getRaw<{ success: boolean; data?: any[] }>(`/api/projects/${props.projectId}/chapters`)
 
       if (!chaptersData.success) {
         throw new Error('Error cargando capítulos')
@@ -500,8 +499,7 @@ const loadDocument = async () => {
     }
 
     // Cargar entidades
-    const entitiesResponse = await fetch(apiUrl(`/api/projects/${props.projectId}/entities`))
-    const entitiesData = await entitiesResponse.json()
+    const entitiesData = await api.getRaw<{ success: boolean; data?: any[] }>(`/api/projects/${props.projectId}/entities`)
 
     if (entitiesData.success) {
       entities.value = entitiesData.data || []
@@ -525,8 +523,7 @@ const loadChapterAnnotations = async (chapterNumber: number) => {
   if (chapterAnnotations.value.has(chapterNumber)) return
 
   try {
-    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/chapters/${chapterNumber}/annotations`))
-    const data = await response.json()
+    const data = await api.getRaw<{ success: boolean; data?: any }>(`/api/projects/${props.projectId}/chapters/${chapterNumber}/annotations`)
 
     if (data.success && data.data?.annotations) {
       chapterAnnotations.value.set(chapterNumber, data.data.annotations)

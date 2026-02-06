@@ -281,7 +281,7 @@ import AccordionContent from 'primevue/accordioncontent'
 import ProgressSpinner from 'primevue/progressspinner'
 import Message from 'primevue/message'
 import { useToast } from 'primevue/usetoast'
-import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 
 interface Declaration {
   id: number
@@ -414,8 +414,7 @@ async function loadData() {
 
 async function loadDeclarations() {
   try {
-    const res = await fetch(apiUrl(`/api/projects/${props.projectId}/focalization`))
-    const data = await res.json()
+    const data = await api.getRaw<any>(`/api/projects/${props.projectId}/focalization`)
     if (data.success) {
       declarations.value = data.data.declarations || []
     }
@@ -426,8 +425,7 @@ async function loadDeclarations() {
 
 async function loadChapters() {
   try {
-    const res = await fetch(apiUrl(`/api/projects/${props.projectId}/chapters`))
-    const data = await res.json()
+    const data = await api.getRaw<any>(`/api/projects/${props.projectId}/chapters`)
     if (data.success) {
       chapters.value = (data.data || []).map((c: any) => ({
         number: c.chapter_number,
@@ -441,8 +439,7 @@ async function loadChapters() {
 
 async function loadCharacters() {
   try {
-    const res = await fetch(apiUrl(`/api/projects/${props.projectId}/entities`))
-    const data = await res.json()
+    const data = await api.getRaw<any>(`/api/projects/${props.projectId}/entities`)
     if (data.success) {
       characters.value = (data.data || [])
         .filter((e: any) => e.entity_type === 'PER')
@@ -456,8 +453,7 @@ async function loadCharacters() {
 async function detectViolations() {
   detectingViolations.value = true
   try {
-    const res = await fetch(apiUrl(`/api/projects/${props.projectId}/focalization/violations`))
-    const data = await res.json()
+    const data = await api.getRaw<any>(`/api/projects/${props.projectId}/focalization/violations`)
     if (data.success) {
       violations.value = data.data.violations || []
       hasDetectedViolations.value = true
@@ -479,10 +475,7 @@ async function detectViolations() {
 async function suggestFocalization(chapterNum: number) {
   suggestingChapter.value = chapterNum
   try {
-    const res = await fetch(
-      apiUrl(`/api/projects/${props.projectId}/chapters/${chapterNum}/focalization/suggest`)
-    )
-    const data = await res.json()
+    const data = await api.getRaw<any>(`/api/projects/${props.projectId}/chapters/${chapterNum}/focalization/suggest`)
     if (data.success) {
       currentSuggestion.value = data.data
       const chapter = chapters.value.find(c => c.number === chapterNum)
@@ -536,15 +529,12 @@ async function saveDeclaration() {
   saving.value = true
   try {
     const url = editingDeclaration.value
-      ? apiUrl(`/api/projects/${props.projectId}/focalization/${editingDeclaration.value.id}`)
-      : apiUrl(`/api/projects/${props.projectId}/focalization`)
+      ? `/api/projects/${props.projectId}/focalization/${editingDeclaration.value.id}`
+      : `/api/projects/${props.projectId}/focalization`
 
-    const res = await fetch(url, {
-      method: editingDeclaration.value ? 'PUT' : 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(dialogData.value),
-    })
-    const data = await res.json()
+    const data = editingDeclaration.value
+      ? await api.putRaw<any>(url, dialogData.value as any)
+      : await api.postRaw<any>(url, dialogData.value as any)
 
     if (data.success) {
       toast.add({ severity: 'success', summary: 'Guardado', detail: 'Focalización guardada', life: 3000 })
@@ -563,10 +553,7 @@ async function saveDeclaration() {
 
 async function deleteDeclaration(id: number) {
   try {
-    const res = await fetch(apiUrl(`/api/projects/${props.projectId}/focalization/${id}`), {
-      method: 'DELETE',
-    })
-    const data = await res.json()
+    const data = await api.del<any>(`/api/projects/${props.projectId}/focalization/${id}`)
     if (data.success) {
       toast.add({ severity: 'success', summary: 'Eliminado', detail: 'Declaración eliminada', life: 3000 })
       await loadDeclarations()

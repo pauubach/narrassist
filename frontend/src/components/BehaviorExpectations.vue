@@ -557,7 +557,7 @@ import ConfidenceBadge from '@/components/shared/ConfidenceBadge.vue'
 import MethodVotingBar from '@/components/shared/MethodVotingBar.vue'
 import { useVoiceAndStyleStore } from '@/stores/voiceAndStyle'
 import type { VoiceProfile } from '@/types'
-import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 
 interface BehaviorProfile {
   character_id: number
@@ -716,8 +716,7 @@ onMounted(async () => {
 const checkLLMStatus = async () => {
   checking.value = true
   try {
-    const response = await fetch(apiUrl('/api/llm/status'))
-    const data = await response.json()
+    const data = await api.getRaw<any>('/api/llm/status')
     if (data.success) {
       llmAvailable.value = data.data?.available || false
       llmBackend.value = data.data?.backend || 'none'
@@ -735,11 +734,9 @@ const checkLLMStatus = async () => {
 const analyzeCharacter = async () => {
   analyzing.value = true
   try {
-    const response = await fetch(
-      `/api/projects/${props.projectId}/characters/${props.characterId}/analyze-behavior`,
-      { method: 'POST' }
+    const data = await api.postRaw<any>(
+      `/api/projects/${props.projectId}/characters/${props.characterId}/analyze-behavior`
     )
-    const data = await response.json()
 
     if (data.success) {
       profile.value = data.data
@@ -757,11 +754,9 @@ const analyzeCharacter = async () => {
 const detectViolations = async () => {
   detectingViolations.value = true
   try {
-    const response = await fetch(
-      `/api/projects/${props.projectId}/characters/${props.characterId}/detect-violations`,
-      { method: 'POST' }
+    const data = await api.postRaw<any>(
+      `/api/projects/${props.projectId}/characters/${props.characterId}/detect-violations`
     )
-    const data = await response.json()
 
     if (data.success) {
       violations.value = data.data?.violations || []

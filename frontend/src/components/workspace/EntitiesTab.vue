@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import DsInput from '@/components/ds/DsInput.vue'
@@ -236,8 +236,7 @@ async function handleEntityClick(entity: Entity) {
 async function loadEntityAttributes(entityId: number) {
   loadingAttributes.value = true
   try {
-    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/entities/${entityId}/attributes`))
-    const data = await response.json()
+    const data = await api.getRaw<any>(`/api/projects/${props.projectId}/entities/${entityId}/attributes`)
     if (data.success) {
       const rawAttributes: ApiEntityAttribute[] = data.data || []
       selectedEntityAttributes.value = rawAttributes.map(transformEntityAttribute)
@@ -279,11 +278,7 @@ async function onEntityDelete(entity: Entity) {
   }
 
   try {
-    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/entities/${entity.id}`), {
-      method: 'DELETE',
-    })
-
-    const data = await response.json()
+    const data = await api.del<any>(`/api/projects/${props.projectId}/entities/${entity.id}`)
 
     if (data.success) {
       if (selectedEntity.value?.id === entity.id) {
@@ -318,13 +313,8 @@ async function handleRejectEntity(scope: 'project' | 'global', reason: string) {
 
   try {
     // 1. Primero eliminar la entidad actual del proyecto
-    const deleteResponse = await fetch(apiUrl(`/api/projects/${props.projectId}/entities/${entity.id}/reject`), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reason })
-    })
+    const deleteData = await api.postRaw<any>(`/api/projects/${props.projectId}/entities/${entity.id}/reject`, { reason })
 
-    const deleteData = await deleteResponse.json()
     if (!deleteData.success) {
       toast.add({ severity: 'error', summary: 'Error', detail: `Error al rechazar: ${deleteData.error}`, life: 5000 })
       return
@@ -333,34 +323,24 @@ async function handleRejectEntity(scope: 'project' | 'global', reason: string) {
     // 2. Según el alcance, añadir al filtro correspondiente
     if (scope === 'global') {
       // Añadir a rechazos globales del usuario
-      const globalResponse = await fetch(apiUrl('/api/entity-filters/user-rejections'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          entity_name: entity.name,
-          entity_type: entity.type,
-          reason
-        })
+      const globalData = await api.postRaw<any>('/api/entity-filters/user-rejections', {
+        entity_name: entity.name,
+        entity_type: entity.type,
+        reason
       })
 
-      const globalData = await globalResponse.json()
       if (!globalData.success) {
         console.warn('No se pudo añadir a filtros globales:', globalData.error)
       }
     } else {
       // Añadir a overrides del proyecto
-      const projectResponse = await fetch(apiUrl(`/api/projects/${props.projectId}/entity-filters/overrides`), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          entity_name: entity.name,
-          entity_type: entity.type,
-          action: 'reject',
-          reason
-        })
+      const projectData = await api.postRaw<any>(`/api/projects/${props.projectId}/entity-filters/overrides`, {
+        entity_name: entity.name,
+        entity_type: entity.type,
+        action: 'reject',
+        reason
       })
 
-      const projectData = await projectResponse.json()
       if (!projectData.success) {
         console.warn('No se pudo añadir a filtros del proyecto:', projectData.error)
       }
@@ -394,18 +374,12 @@ async function saveEntity() {
   }
 
   try {
-    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/entities/${editingEntity.value.id}`), {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: editingEntity.value.name,
-        type: editingEntity.value.type,
-        importance: editingEntity.value.importance,
-        aliases: editingEntity.value.aliases,
-      }),
+    const data = await api.putRaw<any>(`/api/projects/${props.projectId}/entities/${editingEntity.value.id}`, {
+      name: editingEntity.value.name,
+      type: editingEntity.value.type,
+      importance: editingEntity.value.importance,
+      aliases: editingEntity.value.aliases,
     })
-
-    const data = await response.json()
 
     if (data.success) {
       showEditDialog.value = false
@@ -425,16 +399,10 @@ async function saveEntity() {
 
 async function onMergeEntities(primaryEntityId: number, entityIdsToMerge: number[]) {
   try {
-    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/entities/merge`), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        primary_entity_id: primaryEntityId,
-        entity_ids: entityIdsToMerge
-      })
+    const data = await api.postRaw<any>(`/api/projects/${props.projectId}/entities/merge`, {
+      primary_entity_id: primaryEntityId,
+      entity_ids: entityIdsToMerge
     })
-
-    const data = await response.json()
 
     if (data.success) {
       showMergeDialog.value = false
@@ -467,11 +435,7 @@ async function onUndoMergeFromHistory(entry: MergeHistoryEntry) {
     showUndoMergeDialog.value = true
   } else {
     try {
-      const response = await fetch(
-        `/api/projects/${props.projectId}/entities/undo-merge/${entry.id}`,
-        { method: 'POST' }
-      )
-      const data = await response.json()
+      const data = await api.postRaw<any>(`/api/projects/${props.projectId}/entities/undo-merge/${entry.id}`)
 
       if (data.success) {
         emit('refresh')

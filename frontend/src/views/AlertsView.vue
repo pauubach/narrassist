@@ -290,10 +290,11 @@ import Panel from 'primevue/panel'
 import Divider from 'primevue/divider'
 import AlertList from '@/components/AlertList.vue'
 import type { Alert } from '@/types'
+import type { ApiAlert } from '@/types/api'
 import { transformAlerts } from '@/types/transformers'
 import { useToast } from 'primevue/usetoast'
 import { useAlertUtils } from '@/composables/useAlertUtils'
-import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 
 const { getSeverityConfig, getCategoryConfig, getStatusConfig } = useAlertUtils()
 
@@ -347,8 +348,7 @@ const loadAlerts = async () => {
   error.value = ''
 
   try {
-    const response = await fetch(apiUrl(`/api/projects/${projectId.value}/alerts`))
-    const data = await response.json()
+    const data = await api.getRaw<{ success: boolean; data?: ApiAlert[]; error?: string }>(`/api/projects/${projectId.value}/alerts`)
 
     if (data.success) {
       // Transform API response to domain types
@@ -387,11 +387,7 @@ const onViewContext = (alert: Alert) => {
 
 const onResolveAlert = async (alert: Alert) => {
   try {
-    const response = await fetch(apiUrl(`/api/projects/${projectId.value}/alerts/${alert.id}/resolve`), {
-      method: 'POST'
-    })
-
-    const data = await response.json()
+    const data = await api.postRaw<{ success: boolean }>(`/api/projects/${projectId.value}/alerts/${alert.id}/resolve`)
 
     if (data.success) {
       await loadAlerts()
@@ -404,11 +400,7 @@ const onResolveAlert = async (alert: Alert) => {
 
 const onDismissAlert = async (alert: Alert) => {
   try {
-    const response = await fetch(apiUrl(`/api/projects/${projectId.value}/alerts/${alert.id}/dismiss`), {
-      method: 'POST'
-    })
-
-    const data = await response.json()
+    const data = await api.postRaw<{ success: boolean }>(`/api/projects/${projectId.value}/alerts/${alert.id}/dismiss`)
 
     if (data.success) {
       await loadAlerts()
@@ -421,11 +413,7 @@ const onDismissAlert = async (alert: Alert) => {
 
 const onReopenAlert = async (alert: Alert) => {
   try {
-    const response = await fetch(apiUrl(`/api/projects/${projectId.value}/alerts/${alert.id}/reopen`), {
-      method: 'POST'
-    })
-
-    const data = await response.json()
+    const data = await api.postRaw<{ success: boolean }>(`/api/projects/${projectId.value}/alerts/${alert.id}/reopen`)
 
     if (data.success) {
       await loadAlerts()
@@ -441,11 +429,7 @@ const resolveAll = () => {
 
 const confirmResolveAll = async () => {
   try {
-    const response = await fetch(apiUrl(`/api/projects/${projectId.value}/alerts/resolve-all`), {
-      method: 'POST'
-    })
-
-    const data = await response.json()
+    const data = await api.postRaw<{ success: boolean }>(`/api/projects/${projectId.value}/alerts/resolve-all`)
 
     if (data.success) {
       showResolveAllDialog.value = false

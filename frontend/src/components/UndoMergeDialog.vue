@@ -96,7 +96,7 @@ import Message from 'primevue/message'
 import { useToast } from 'primevue/usetoast'
 import type { Entity, MergeHistoryEntry } from '@/types'
 import { transformMergeHistoryEntry } from '@/types/transformers'
-import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 
 const toast = useToast()
 
@@ -132,8 +132,7 @@ const loadMergeHistory = async () => {
   loading.value = true
   try {
     // Obtener el historial de fusiones del proyecto
-    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/entities/merge-history`))
-    const data = await response.json()
+    const data = await api.getRaw<any>(`/api/projects/${props.projectId}/entities/merge-history`)
 
     if (data.success && data.data.merges) {
       // Buscar la fusion mas reciente que creo esta entidad
@@ -157,11 +156,9 @@ const confirmUndo = async () => {
 
   undoing.value = true
   try {
-    const response = await fetch(
-      `/api/projects/${props.projectId}/entities/undo-merge/${mergeHistory.value.id}`,
-      { method: 'POST' }
+    const data = await api.postRaw<any>(
+      `/api/projects/${props.projectId}/entities/undo-merge/${mergeHistory.value.id}`
     )
-    const data = await response.json()
 
     if (data.success) {
       emit('undo-complete', data.data.restored_entity_ids || [])

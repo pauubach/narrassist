@@ -208,7 +208,7 @@ import AccordionHeader from 'primevue/accordionheader'
 import AccordionContent from 'primevue/accordioncontent'
 import ProgressSpinner from 'primevue/progressspinner'
 import { useToast } from 'primevue/usetoast'
-import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 
 interface DeathEvent {
   entity_id: number
@@ -272,10 +272,9 @@ const validAppearances = computed(() => {
 async function analyze() {
   loading.value = true
   try {
-    const response = await fetch(
-      apiUrl(`/api/projects/${props.projectId}/vital-status`)
+    const data = await api.getRaw<{ success: boolean; data: VitalStatusReport; error?: string }>(
+      `/api/projects/${props.projectId}/vital-status`
     )
-    const data = await response.json()
 
     if (data.success) {
       report.value = data.data
@@ -299,11 +298,9 @@ async function analyze() {
 async function generateAlerts() {
   generatingAlerts.value = true
   try {
-    const response = await fetch(
-      apiUrl(`/api/projects/${props.projectId}/vital-status/generate-alerts`),
-      { method: 'POST' }
+    const data = await api.postRaw<{ success: boolean; data: { alerts_created: number }; error?: string }>(
+      `/api/projects/${props.projectId}/vital-status/generate-alerts`
     )
-    const data = await response.json()
 
     if (data.success) {
       toast.add({

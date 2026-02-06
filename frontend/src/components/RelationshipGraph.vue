@@ -395,7 +395,7 @@ import Divider from 'primevue/divider'
 import MultiSelect from 'primevue/multiselect'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
-import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 import {
   useRelationshipGraphStore,
   type RelationshipValence,
@@ -1023,8 +1023,7 @@ const loadRelationships = async () => {
 
   loading.value = true
   try {
-    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/relationships`))
-    const result = await response.json()
+    const result = await api.getRaw<any>(`/api/projects/${props.projectId}/relationships`)
     if (result.success) {
       relationshipData.value = result.data
     }

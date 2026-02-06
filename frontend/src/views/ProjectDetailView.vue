@@ -418,7 +418,7 @@ import type { SidebarTab } from '@/stores/workspace'
 import type { Entity, Alert, Chapter, AlertSource } from '@/types'
 import { transformEntities, transformAlerts, transformChapters } from '@/types/transformers'
 import { useAlertUtils } from '@/composables/useAlertUtils'
-import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 
 const route = useRoute()
 const router = useRouter()
@@ -853,8 +853,7 @@ onUnmounted(() => {
 
 const loadEntities = async (projectId: number) => {
   try {
-    const response = await fetch(apiUrl(`/api/projects/${projectId}/entities`))
-    const data = await response.json()
+    const data = await api.getRaw<{ success: boolean; data?: any[] }>(`/api/projects/${projectId}/entities`)
     if (data.success) {
       entities.value = transformEntities(data.data || [])
     }
@@ -865,8 +864,7 @@ const loadEntities = async (projectId: number) => {
 
 const loadAlerts = async (projectId: number) => {
   try {
-    const response = await fetch(apiUrl(`/api/projects/${projectId}/alerts?status=open`))
-    const data = await response.json()
+    const data = await api.getRaw<{ success: boolean; data?: any[] }>(`/api/projects/${projectId}/alerts?status=open`)
     if (data.success) {
       alerts.value = transformAlerts(data.data || [])
     }
@@ -877,8 +875,7 @@ const loadAlerts = async (projectId: number) => {
 
 const loadChapters = async (projectId: number) => {
   try {
-    const response = await fetch(apiUrl(`/api/projects/${projectId}/chapters`))
-    const data = await response.json()
+    const data = await api.getRaw<{ success: boolean; data?: any[] }>(`/api/projects/${projectId}/chapters`)
     if (data.success) {
       chapters.value = transformChapters(data.data || [])
     }
@@ -902,8 +899,7 @@ const loadChapters = async (projectId: number) => {
 
 const loadRelationships = async (projectId: number) => {
   try {
-    const response = await fetch(apiUrl(`/api/projects/${projectId}/relationships`))
-    const data = await response.json()
+    const data = await api.getRaw<{ success: boolean; data?: any[] }>(`/api/projects/${projectId}/relationships`)
     if (data.success) {
       relationships.value = data.data
     }
@@ -1035,11 +1031,9 @@ const onAlertNavigate = (alert: Alert, source?: AlertSource) => {
 const onAlertResolve = async (alert: Alert) => {
   try {
     const projectId = project.value!.id
-    const response = await fetch(apiUrl(`/api/projects/${projectId}/alerts/${alert.id}/resolve`), { method: 'POST' })
-    if (response.ok) {
-      await loadAlerts(projectId)
-      selectionStore.clearAll()
-    }
+    await api.postRaw(`/api/projects/${projectId}/alerts/${alert.id}/resolve`)
+    await loadAlerts(projectId)
+    selectionStore.clearAll()
   } catch (err) {
     console.error('Error resolving alert:', err)
   }
@@ -1048,11 +1042,9 @@ const onAlertResolve = async (alert: Alert) => {
 const onAlertDismiss = async (alert: Alert) => {
   try {
     const projectId = project.value!.id
-    const response = await fetch(apiUrl(`/api/projects/${projectId}/alerts/${alert.id}/dismiss`), { method: 'POST' })
-    if (response.ok) {
-      await loadAlerts(projectId)
-      selectionStore.clearAll()
-    }
+    await api.postRaw(`/api/projects/${projectId}/alerts/${alert.id}/dismiss`)
+    await loadAlerts(projectId)
+    selectionStore.clearAll()
   } catch (err) {
     console.error('Error dismissing alert:', err)
   }
@@ -1176,13 +1168,7 @@ const quickExportStyleGuide = async () => {
 
   try {
     // Exportar directamente en formato Markdown (el más común para correctores)
-    const response = await fetch(apiUrl(`/api/projects/${project.value.id}/style-guide?format=markdown`))
-
-    if (!response.ok) {
-      throw new Error('Error al exportar guía de estilo')
-    }
-
-    const data = await response.json()
+    const data = await api.getRaw<{ success: boolean; data?: any; error?: string }>(`/api/projects/${project.value.id}/style-guide?format=markdown`)
 
     if (data.success) {
       const content = data.data.content
@@ -1252,8 +1238,7 @@ const startReanalysis = async () => {
   analysisStore.setAnalyzing(project.value.id, true)
 
   try {
-    const response = await fetch(apiUrl(`/api/projects/${project.value.id}/reanalyze`), { method: 'POST' })
-    const data = await response.json()
+    const data = await api.postRaw<{ success: boolean; error?: string }>(`/api/projects/${project.value.id}/reanalyze`)
 
     if (data.success) {
       // El proyecto ahora está en estado "analyzing", iniciar polling

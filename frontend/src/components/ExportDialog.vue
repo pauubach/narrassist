@@ -513,6 +513,7 @@ import Slider from 'primevue/slider'
 import Tag from 'primevue/tag'
 import { useToast } from 'primevue/usetoast'
 import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 
 const props = defineProps<{
   visible: boolean
@@ -676,13 +677,7 @@ const loadDocumentPreview = async () => {
       only_open_alerts: documentOptions.value.onlyOpenAlerts.toString()
     })
 
-    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/export/document/preview?${params}`))
-
-    if (!response.ok) {
-      throw new Error('Error al cargar preview')
-    }
-
-    const data = await response.json()
+    const data = await api.getRaw<{ success: boolean; data?: any; error?: string }>(`/api/projects/${props.projectId}/export/document/preview?${params}`)
 
     if (data.success) {
       documentPreview.value = data.data
@@ -761,13 +756,7 @@ const exportDocument = async () => {
 const exportReport = async () => {
   loadingReport.value = true
   try {
-    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/export/report?format=${reportFormat.value}`))
-
-    if (!response.ok) {
-      throw new Error('Error al exportar informe')
-    }
-
-    const data = await response.json()
+    const data = await api.getRaw<{ success: boolean; data?: any; error?: string }>(`/api/projects/${props.projectId}/export/report?format=${reportFormat.value}`)
 
     if (data.success) {
       const content = reportFormat.value === 'json'
@@ -812,13 +801,7 @@ const exportCharacterSheets = async () => {
       include_mentions: characterOptions.value.includeMentions.toString()
     })
 
-    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/export/characters?${params}`))
-
-    if (!response.ok) {
-      throw new Error('Error al exportar fichas')
-    }
-
-    const data = await response.json()
+    const data = await api.getRaw<{ success: boolean; data?: any; error?: string }>(`/api/projects/${props.projectId}/export/characters?${params}`)
 
     if (data.success) {
       const content = characterFormat.value === 'json'
@@ -856,13 +839,7 @@ const exportCharacterSheets = async () => {
 const loadStylePreview = async () => {
   loadingPreview.value = true
   try {
-    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/style-guide?preview=true`))
-
-    if (!response.ok) {
-      throw new Error('Error al cargar preview')
-    }
-
-    const data = await response.json()
+    const data = await api.getRaw<{ success: boolean; data?: any; error?: string }>(`/api/projects/${props.projectId}/style-guide?preview=true`)
 
     if (data.success && data.data.preview) {
       stylePreview.value = data.data.preview
@@ -886,13 +863,7 @@ const loadStylePreview = async () => {
 const exportStyleGuide = async () => {
   loadingStyle.value = true
   try {
-    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/style-guide?format=${styleFormat.value}`))
-
-    if (!response.ok) {
-      throw new Error('Error al exportar guía de estilo')
-    }
-
-    const data = await response.json()
+    const data = await api.getRaw<{ success: boolean; data?: any; error?: string }>(`/api/projects/${props.projectId}/style-guide?format=${styleFormat.value}`)
 
     if (data.success) {
       const format = data.data.format
@@ -979,13 +950,7 @@ const exportAlerts = async () => {
       include_resolved: alertOptions.value.includeResolved.toString()
     })
 
-    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/export/alerts?${params}`))
-
-    if (!response.ok) {
-      throw new Error('Error al exportar alertas')
-    }
-
-    const data = await response.json()
+    const data = await api.getRaw<{ success: boolean; data?: any; error?: string }>(`/api/projects/${props.projectId}/export/alerts?${params}`)
 
     if (data.success) {
       const content = alertFormat.value === 'json'

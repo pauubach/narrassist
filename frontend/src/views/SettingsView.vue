@@ -1199,7 +1199,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
 import SelectButton from 'primevue/selectbutton'
@@ -1491,8 +1491,7 @@ const regionOptions = computed(() => correctionOptions.value?.regions || [
 // Cargar presets de correcciones
 async function loadCorrectionPresets() {
   try {
-    const response = await fetch(apiUrl('/api/correction-presets'))
-    const data = await response.json()
+    const data = await api.getRaw<{ success: boolean; data?: any; error?: string }>('/api/correction-presets')
 
     if (data.success && data.data) {
       correctionPresetOptions.value = data.data.presets || []
@@ -1692,16 +1691,10 @@ const _getCategoryLabel = (category: string): string => {
 async function _loadFilterData() {
   try {
     // Cargar en paralelo
-    const [statsRes, patternsRes, rejectionsRes] = await Promise.all([
-      fetch(apiUrl('/api/entity-filters/stats')),
-      fetch(apiUrl('/api/entity-filters/system-patterns?language=es')),
-      fetch(apiUrl('/api/entity-filters/user-rejections'))
-    ])
-
     const [statsData, patternsData, rejectionsData] = await Promise.all([
-      statsRes.json(),
-      patternsRes.json(),
-      rejectionsRes.json()
+      api.getRaw<{ success: boolean; data?: any }>('/api/entity-filters/stats'),
+      api.getRaw<{ success: boolean; data?: any }>('/api/entity-filters/system-patterns?language=es'),
+      api.getRaw<{ success: boolean; data?: any }>('/api/entity-filters/user-rejections'),
     ])
 
     if (statsData.success) {
@@ -1723,13 +1716,7 @@ async function _loadFilterData() {
 // Toggle patrón del sistema (reservado para uso futuro)
 async function _toggleSystemPattern(patternId: number, isActive: boolean) {
   try {
-    const response = await fetch(apiUrl(`/api/entity-filters/system-patterns/${patternId}`), {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ is_active: isActive })
-    })
-
-    const data = await response.json()
+    const data = await api.patch<{ success: boolean; error?: string }>(`/api/entity-filters/system-patterns/${patternId}`, { is_active: isActive })
     if (data.success) {
       // Actualizar local
       const pattern = systemPatterns.value.find(p => p.id === patternId)
@@ -1752,11 +1739,7 @@ async function _toggleSystemPattern(patternId: number, isActive: boolean) {
 // Eliminar rechazo global del usuario (reservado para uso futuro)
 async function _removeUserRejection(rejection: UserRejection) {
   try {
-    const response = await fetch(apiUrl(`/api/entity-filters/user-rejections/${rejection.id}`), {
-      method: 'DELETE'
-    })
-
-    const data = await response.json()
+    const data = await api.del<{ success: boolean; error?: string }>(`/api/entity-filters/user-rejections/${rejection.id}`)
     if (data.success) {
       userRejections.value = userRejections.value.filter(r => r.id !== rejection.id)
       if (filterStats.value) {
@@ -2041,8 +2024,7 @@ const startLanguageTool = async () => {
 const installOllamaFromSettings = async () => {
   ollamaStarting.value = true
   try {
-    const response = await fetch(apiUrl('/api/ollama/install'), { method: 'POST' })
-    const result = await response.json()
+    const result = await api.postRaw<{ success: boolean }>('/api/ollama/install')
     if (result.success) {
       toast.add({ severity: 'info', summary: 'Instalando Ollama', detail: 'Descargando e instalando...', life: 5000 })
       await new Promise(resolve => setTimeout(resolve, 5000))
@@ -2363,13 +2345,10 @@ const changeDataLocation = () => {
 
 const loadCurrentDataLocation = async () => {
   try {
-    const response = await fetch(apiUrl('/api/maintenance/data-location'))
-    if (response.ok) {
-      const result = await response.json()
-      if (result.success && result.data) {
-        dataLocation.value = result.data.path
-        newDataLocation.value = result.data.path
-      }
+    const result = await api.getRaw<{ success: boolean; data?: any }>('/api/maintenance/data-location')
+    if (result.success && result.data) {
+      dataLocation.value = result.data.path
+      newDataLocation.value = result.data.path
     }
   } catch (error) {
     console.error('Error loading data location:', error)
@@ -2390,18 +2369,10 @@ const confirmChangeDataLocation = async () => {
   changingLocation.value = true
 
   try {
-    const response = await fetch(apiUrl('/api/maintenance/data-location'), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        new_path: newDataLocation.value,
-        migrate_data: migrateData.value
-      })
+    const result = await api.postRaw<{ success: boolean; data?: any; error?: string }>('/api/maintenance/data-location', {
+      new_path: newDataLocation.value,
+      migrate_data: migrateData.value
     })
-
-    const result = await response.json()
 
     if (result.success) {
       dataLocation.value = newDataLocation.value
@@ -2447,13 +2418,7 @@ const confirmChangeDataLocation = async () => {
 
 const clearCache = async () => {
   try {
-    const response = await fetch(apiUrl('/api/maintenance/clear-cache'), {
-      method: 'POST'
-    })
-
-    if (!response.ok) {
-      throw new Error('Error al limpiar caché')
-    }
+    await api.postRaw('/api/maintenance/clear-cache')
 
     toast.add({
       severity: 'success',
@@ -2532,10 +2497,7 @@ const _openDocumentation = () => {
 const startOllama = async () => {
   ollamaStarting.value = true
   try {
-    const response = await fetch(apiUrl('/api/ollama/start'), {
-      method: 'POST'
-    })
-    const result = await response.json()
+    const result = await api.postRaw<{ success: boolean; data?: any; error?: string }>('/api/ollama/start')
 
     if (result.success) {
       // Esperar un momento antes de recargar capacidades
@@ -2613,10 +2575,7 @@ const downloadDefaultModel = async () => {
   })
 
   try {
-    const response = await fetch(apiUrl('/api/ollama/pull/llama3.2'), {
-      method: 'POST'
-    })
-    const result = await response.json()
+    const result = await api.postRaw<{ success: boolean; error?: string }>('/api/ollama/pull/llama3.2')
 
     if (result.success) {
       toast.add({

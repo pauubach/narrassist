@@ -9,7 +9,7 @@ import type { Entity, Alert } from '@/types'
 import { useEntityUtils } from '@/composables/useEntityUtils'
 import { useMentionNavigation } from '@/composables/useMentionNavigation'
 import { useAlertUtils } from '@/composables/useAlertUtils'
-import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 
 const { formatChapterLabel, getSeverityConfig } = useAlertUtils()
 
@@ -129,10 +129,9 @@ async function loadCoreferenceInfo(entityId: number) {
   corefError.value = null
 
   try {
-    const response = await fetch(
-      apiUrl(`/api/projects/${props.projectId}/entities/${entityId}/coreference`)
+    const result = await api.getRaw<any>(
+      `/api/projects/${props.projectId}/entities/${entityId}/coreference`
     )
-    const result = await response.json()
 
     if (result.success && result.data) {
       corefInfo.value = result.data

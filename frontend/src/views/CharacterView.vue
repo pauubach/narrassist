@@ -259,7 +259,7 @@ import CharacterSheet from '@/components/CharacterSheet.vue'
 import UndoMergeDialog from '@/components/UndoMergeDialog.vue'
 import type { Entity, CharacterAttribute, CharacterRelationship } from '@/types'
 import { transformEntity, transformEntities } from '@/types/transformers'
-import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 
 const route = useRoute()
 const router = useRouter()
@@ -337,30 +337,26 @@ const loadCharacter = async () => {
 
   try {
     // Cargar personaje
-    const charResponse = await fetch(apiUrl(`/api/projects/${projectId.value}/entities/${characterId.value}`))
-    const charData = await charResponse.json()
+    const charData = await api.getRaw<{ success: boolean; data?: any; error?: string }>(`/api/projects/${projectId.value}/entities/${characterId.value}`)
 
     if (charData.success) {
       // Transform API response to domain type
       character.value = transformEntity(charData.data)
 
       // Cargar atributos
-      const attrsResponse = await fetch(apiUrl(`/api/projects/${projectId.value}/entities/${characterId.value}/attributes`))
-      const attrsData = await attrsResponse.json()
+      const attrsData = await api.getRaw<{ success: boolean; data?: any[] }>(`/api/projects/${projectId.value}/entities/${characterId.value}/attributes`)
       if (attrsData.success) {
         attributes.value = attrsData.data || []
       }
 
       // Cargar relaciones
-      const relsResponse = await fetch(apiUrl(`/api/projects/${projectId.value}/entities/${characterId.value}/relationships`))
-      const relsData = await relsResponse.json()
+      const relsData = await api.getRaw<{ success: boolean; data?: any[] }>(`/api/projects/${projectId.value}/entities/${characterId.value}/relationships`)
       if (relsData.success) {
         relationships.value = relsData.data || []
       }
 
       // Cargar personajes disponibles (para relaciones)
-      const entitiesResponse = await fetch(apiUrl(`/api/projects/${projectId.value}/entities`))
-      const entitiesData = await entitiesResponse.json()
+      const entitiesData = await api.getRaw<{ success: boolean; data?: any[] }>(`/api/projects/${projectId.value}/entities`)
       if (entitiesData.success) {
         // Transform and filter for characters
         const allEntities = transformEntities(entitiesData.data || [])
@@ -370,8 +366,7 @@ const loadCharacter = async () => {
       }
 
       // Cargar timeline del personaje
-      const timelineResponse = await fetch(apiUrl(`/api/projects/${projectId.value}/entities/${characterId.value}/timeline`))
-      const timelineData = await timelineResponse.json()
+      const timelineData = await api.getRaw<{ success: boolean; data?: any[] }>(`/api/projects/${projectId.value}/entities/${characterId.value}/timeline`)
       if (timelineData.success) {
         timeline.value = timelineData.data || []
       }
@@ -407,19 +402,11 @@ const saveCharacter = async () => {
   }
 
   try {
-    const response = await fetch(apiUrl(`/api/projects/${projectId.value}/entities/${characterId.value}`), {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        name: editingCharacter.value.name,
-        importance: editingCharacter.value.importance,
-        aliases: editingCharacter.value.aliases,
-      }),
+    const data = await api.putRaw<{ success: boolean; data?: any; message?: string; error?: string }>(`/api/projects/${projectId.value}/entities/${characterId.value}`, {
+      name: editingCharacter.value.name,
+      importance: editingCharacter.value.importance,
+      aliases: editingCharacter.value.aliases,
     })
-
-    const data = await response.json()
 
     if (data.success) {
       showEditDialog.value = false
@@ -455,19 +442,11 @@ const saveAttribute = async () => {
   }
 
   try {
-    const response = await fetch(apiUrl(`/api/projects/${projectId.value}/entities/${characterId.value}/attributes`), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        category: newAttribute.value.category,
-        name: newAttribute.value.name,
-        value: newAttribute.value.value,
-      }),
+    const data = await api.postRaw<{ success: boolean; data?: any; message?: string; error?: string }>(`/api/projects/${projectId.value}/entities/${characterId.value}/attributes`, {
+      category: newAttribute.value.category,
+      name: newAttribute.value.name,
+      value: newAttribute.value.value,
     })
-
-    const data = await response.json()
 
     if (data.success) {
       showAddAttributeDialog.value = false
@@ -499,11 +478,7 @@ const onDeleteAttribute = async (attributeId: number | undefined) => {
   }
 
   try {
-    const response = await fetch(apiUrl(`/api/projects/${projectId.value}/entities/${characterId.value}/attributes/${attributeId}`), {
-      method: 'DELETE',
-    })
-
-    const data = await response.json()
+    const data = await api.del<{ success: boolean; error?: string }>(`/api/projects/${projectId.value}/entities/${characterId.value}/attributes/${attributeId}`)
 
     if (data.success) {
       // Eliminar de la lista local
@@ -535,21 +510,13 @@ const saveRelationship = async () => {
   }
 
   try {
-    const response = await fetch(apiUrl(`/api/projects/${projectId.value}/relationships`), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        source_entity_id: characterId.value,
-        target_entity_id: newRelationship.value.entityId,
-        relation_type: newRelationship.value.relationshipType,
-        description: newRelationship.value.description || '',
-        bidirectional: true,
-      }),
+    const data = await api.postRaw<{ success: boolean; error?: string }>(`/api/projects/${projectId.value}/relationships`, {
+      source_entity_id: characterId.value,
+      target_entity_id: newRelationship.value.entityId,
+      relation_type: newRelationship.value.relationshipType,
+      description: newRelationship.value.description || '',
+      bidirectional: true,
     })
-
-    const data = await response.json()
 
     if (data.success) {
       showAddRelationshipDialog.value = false
@@ -572,11 +539,7 @@ const onDeleteRelationship = async (relationshipId: number | string | undefined)
   if (!confirm('¿Eliminar esta relación?')) return
 
   try {
-    const response = await fetch(apiUrl(`/api/projects/${projectId.value}/relationships/${relationshipId}`), {
-      method: 'DELETE',
-    })
-
-    const data = await response.json()
+    const data = await api.del<{ success: boolean; error?: string }>(`/api/projects/${projectId.value}/relationships/${relationshipId}`)
 
     if (data.success) {
       // Recargar relaciones

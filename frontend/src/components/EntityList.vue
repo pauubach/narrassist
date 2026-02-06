@@ -369,7 +369,7 @@ import Dialog from 'primevue/dialog'
 import type { Entity } from '@/types'
 import { debounce } from '@/composables'
 import { useToast } from 'primevue/usetoast'
-import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 
 // Umbral para activar virtualización (más de 50 items)
 const VIRTUALIZATION_THRESHOLD = 50
@@ -651,8 +651,7 @@ const loadMergeHistory = async () => {
 
   loadingMergeHistory.value = true
   try {
-    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/entities/merge-history`))
-    const data = await response.json()
+    const data = await api.getRaw<any>(`/api/projects/${props.projectId}/entities/merge-history`)
 
     if (data.success) {
       mergeHistory.value = data.data.merges || []
@@ -669,10 +668,7 @@ const undoMerge = async (mergeId: number) => {
 
   undoingMerge.value = mergeId
   try {
-    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/entities/undo-merge/${mergeId}`), {
-      method: 'POST'
-    })
-    const data = await response.json()
+    const data = await api.postRaw<any>(`/api/projects/${props.projectId}/entities/undo-merge/${mergeId}`)
 
     if (data.success) {
       toast.add({

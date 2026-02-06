@@ -15,7 +15,7 @@ import Accordion from 'primevue/accordion'
 import AccordionPanel from 'primevue/accordionpanel'
 import AccordionHeader from 'primevue/accordionheader'
 import AccordionContent from 'primevue/accordioncontent'
-import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 import AnalysisErrorState from '@/components/shared/AnalysisErrorState.vue'
 
 const props = defineProps<{
@@ -74,11 +74,9 @@ async function analyze() {
   loading.value = true
   errorMsg.value = null
   try {
-    const response = await fetch(
-      apiUrl(`/api/projects/${props.projectId}/narrative-templates`)
+    const data = await api.getRaw<{ success: boolean; data: TemplateReport; error?: string }>(
+      `/api/projects/${props.projectId}/narrative-templates`
     )
-    if (!response.ok) throw new Error(`Error del servidor (${response.status})`)
-    const data = await response.json()
     if (data.success) {
       report.value = data.data
     } else {

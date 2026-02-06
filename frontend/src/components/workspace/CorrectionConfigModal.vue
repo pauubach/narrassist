@@ -828,7 +828,7 @@ import Tag from 'primevue/tag'
 import Message from 'primevue/message'
 import { useToast } from 'primevue/usetoast'
 import InheritanceIndicator from './InheritanceIndicator.vue'
-import { apiUrl } from '../../config/api'
+import { api } from '@/services/apiClient'
 
 interface EditorialRule {
   id: string
@@ -1193,8 +1193,7 @@ const loadConfig = async () => {
       url = `/api/projects/${props.projectId}/correction-config`
     }
 
-    const response = await fetch(apiUrl(url))
-    const data = await response.json()
+    const data = await api.getRaw<any>(url)
 
     if (data.success) {
       // En modo defaults, usar effective_config
@@ -1293,13 +1292,7 @@ const saveConfig = async () => {
       body = { customizations }
     }
 
-    const response = await fetch(apiUrl(url), {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    })
-
-    const data = await response.json()
+    const data = await api.putRaw<any>(url, body as any)
     if (data.success) {
       const detail = props.editingDefaults
         ? 'Defaults actualizados correctamente'

@@ -27,7 +27,7 @@ import ConfirmDialog from 'primevue/confirmdialog'
 import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
 import DsEmptyState from '@/components/ds/DsEmptyState.vue'
-import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 
 interface GlossaryEntry {
   id: number
@@ -165,10 +165,7 @@ watch(() => props.projectId, () => {
 async function loadEntries() {
   loading.value = true
   try {
-    const response = await fetch(
-      apiUrl(`/api/projects/${props.projectId}/glossary`)
-    )
-    const data = await response.json()
+    const data = await api.getRaw<any>(`/api/projects/${props.projectId}/glossary`)
 
     if (data.success) {
       entries.value = data.data.entries
@@ -224,15 +221,12 @@ async function saveEntry() {
   try {
     const isNew = !editingEntry.value.id
     const url = isNew
-      ? apiUrl(`/api/projects/${props.projectId}/glossary`)
-      : apiUrl(`/api/projects/${props.projectId}/glossary/${editingEntry.value.id}`)
+      ? `/api/projects/${props.projectId}/glossary`
+      : `/api/projects/${props.projectId}/glossary/${editingEntry.value.id}`
 
-    const response = await fetch(url, {
-      method: isNew ? 'POST' : 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(editingEntry.value)
-    })
-    const data = await response.json()
+    const data = isNew
+      ? await api.postRaw<any>(url, editingEntry.value as any)
+      : await api.putRaw<any>(url, editingEntry.value as any)
 
     if (data.success) {
       toast.add({
@@ -273,11 +267,7 @@ function confirmDelete(entry: GlossaryEntry) {
 
 async function deleteEntry(entry: GlossaryEntry) {
   try {
-    const response = await fetch(
-      apiUrl(`/api/projects/${props.projectId}/glossary/${entry.id}`),
-      { method: 'DELETE' }
-    )
-    const data = await response.json()
+    const data = await api.del<any>(`/api/projects/${props.projectId}/glossary/${entry.id}`)
 
     if (data.success) {
       toast.add({
@@ -314,10 +304,7 @@ function getCategoryTagSeverity(category: string): 'success' | 'info' | 'warn' |
 
 async function exportForPublication() {
   try {
-    const response = await fetch(
-      apiUrl(`/api/projects/${props.projectId}/glossary/export/publication`)
-    )
-    const data = await response.json()
+    const data = await api.getRaw<any>(`/api/projects/${props.projectId}/glossary/export/publication`)
 
     if (data.success && data.data.content) {
       // Copiar al portapapeles
@@ -350,10 +337,7 @@ async function loadSuggestions() {
   loadingSuggestions.value = true
   showSuggestions.value = true
   try {
-    const response = await fetch(
-      apiUrl(`/api/projects/${props.projectId}/glossary/suggestions?max_suggestions=30`)
-    )
-    const data = await response.json()
+    const data = await api.getRaw<any>(`/api/projects/${props.projectId}/glossary/suggestions?max_suggestions=30`)
 
     if (data.success) {
       suggestions.value = data.data.suggestions
@@ -384,22 +368,14 @@ async function loadSuggestions() {
 async function acceptSuggestion(suggestion: GlossarySuggestion) {
   acceptingSuggestion.value = suggestion.term
   try {
-    const response = await fetch(
-      apiUrl(`/api/projects/${props.projectId}/glossary/suggestions/accept`),
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          term: suggestion.term,
-          definition: '',
-          category: suggestion.category_hint,
-          is_technical: suggestion.is_likely_technical,
-          is_invented: suggestion.is_likely_invented,
-          is_proper_noun: suggestion.is_likely_proper_noun,
-        })
-      }
-    )
-    const data = await response.json()
+    const data = await api.postRaw<any>(`/api/projects/${props.projectId}/glossary/suggestions/accept`, {
+      term: suggestion.term,
+      definition: '',
+      category: suggestion.category_hint,
+      is_technical: suggestion.is_likely_technical,
+      is_invented: suggestion.is_likely_invented,
+      is_proper_noun: suggestion.is_likely_proper_noun,
+    })
 
     if (data.success) {
       toast.add({

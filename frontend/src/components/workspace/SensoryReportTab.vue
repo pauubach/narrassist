@@ -261,7 +261,7 @@ import Accordion from 'primevue/accordion'
 import AccordionPanel from 'primevue/accordionpanel'
 import AccordionHeader from 'primevue/accordionheader'
 import AccordionContent from 'primevue/accordioncontent'
-import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 import AnalysisErrorState from '@/components/shared/AnalysisErrorState.vue'
 
 const props = defineProps<{
@@ -346,9 +346,9 @@ async function analyze() {
   loading.value = true
   errorMsg.value = null
   try {
-    const res = await fetch(apiUrl(`/api/projects/${props.projectId}/sensory-report`))
-    if (!res.ok) throw new Error(`Error del servidor (${res.status})`)
-    const json = await res.json()
+    const json = await api.getRaw<{ success: boolean; data: any; error?: string }>(
+      `/api/projects/${props.projectId}/sensory-report`
+    )
     if (json.success) {
       report.value = json.data
       // Use backend sense names if provided

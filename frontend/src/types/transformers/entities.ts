@@ -26,6 +26,8 @@ import type {
   MergeHistoryEntry,
 } from '../domain/entities'
 
+import { safeDate } from './projects'
+
 // =============================================================================
 // Mapeos de tipos
 // =============================================================================
@@ -107,8 +109,8 @@ export function transformEntity(api: ApiEntity): Entity {
     isActive: api.is_active,
     mergedFromIds: api.merged_from_ids ?? [],
     relevanceScore: api.relevance_score ?? undefined,
-    createdAt: api.created_at ? new Date(api.created_at) : undefined,
-    updatedAt: api.updated_at ? new Date(api.updated_at) : undefined,
+    createdAt: safeDate(api.created_at),
+    updatedAt: safeDate(api.updated_at),
   }
 }
 
@@ -235,8 +237,8 @@ export function transformMergeHistoryEntry(api: ApiMergeHistoryEntry): MergeHist
     resultEntityName: api.result_entity_name ?? api.canonical_name_before?.[0] ?? 'Entidad fusionada',
     sourceEntityIds: api.source_entity_ids,
     sourceEntityNames: api.source_entity_names ?? api.canonical_name_before ?? [],
-    mergedAt: new Date(api.merged_at),
-    undoneAt: api.undone_at ? new Date(api.undone_at) : undefined,
+    mergedAt: safeDate(api.merged_at, new Date())!,
+    undoneAt: safeDate(api.undone_at),
     note: api.note ?? undefined,
   }
 }

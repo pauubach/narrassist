@@ -214,7 +214,7 @@ import InputText from 'primevue/inputtext'
 import ProgressSpinner from 'primevue/progressspinner'
 import TabView from 'primevue/tabview'
 import TabPanel from 'primevue/tabpanel'
-import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 
 interface BibleEntry {
   entity_id: number
@@ -343,8 +343,9 @@ function navigateToEntity(entityId: number) {
 async function loadBible() {
   loading.value = true
   try {
-    const res = await fetch(apiUrl(`/api/projects/${props.projectId}/story-bible`))
-    const json = await res.json()
+    const json = await api.getRaw<{ success: boolean; data: StoryBible }>(
+      `/api/projects/${props.projectId}/story-bible`
+    )
     if (json.success) {
       bible.value = json.data
       // Auto-select first entry

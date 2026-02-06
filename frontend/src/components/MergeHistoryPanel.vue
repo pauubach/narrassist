@@ -96,7 +96,7 @@ import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import type { MergeHistoryEntry } from '@/types'
 import { transformMergeHistory } from '@/types/transformers'
-import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 
 const props = defineProps<{
   projectId: number
@@ -112,8 +112,7 @@ const history = ref<MergeHistoryEntry[]>([])
 const loadHistory = async () => {
   loading.value = true
   try {
-    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/entities/merge-history`))
-    const data = await response.json()
+    const data = await api.getRaw<any>(`/api/projects/${props.projectId}/entities/merge-history`)
 
     if (data.success && data.data.merges) {
       history.value = transformMergeHistory(data.data.merges)

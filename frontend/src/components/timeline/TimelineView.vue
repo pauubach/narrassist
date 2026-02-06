@@ -374,7 +374,7 @@ import VisTimeline from './VisTimeline.vue'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { transformTimeline } from '@/types/transformers'
 import { useAlertUtils } from '@/composables/useAlertUtils'
-import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 import type {
   Timeline,
   TimelineEvent,
@@ -513,8 +513,7 @@ const loadTimeline = async () => {
   loading.value = true
   error.value = null
   try {
-    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/timeline`))
-    const data = await response.json()
+    const data = await api.getRaw<any>(`/api/projects/${props.projectId}/timeline`)
 
     if (data.success && data.data) {
       timeline.value = transformTimeline(data.data)

@@ -382,7 +382,7 @@ import Checkbox from 'primevue/checkbox'
 import ProgressSpinner from 'primevue/progressspinner'
 import ProgressBar from 'primevue/progressbar'
 import { useToast } from 'primevue/usetoast'
-import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 import { useSystemStore } from '@/stores/system'
 import { storeToRefs } from 'pinia'
 
@@ -479,8 +479,7 @@ const downloadDefaultModel = async () => {
   modelDownloading.value = true
   toast.add({ severity: 'info', summary: 'Descargando modelo', detail: 'Esto puede tardar unos minutos...', life: 5000 })
   try {
-    const resp = await fetch(apiUrl('/api/ollama/pull/llama3.2'), { method: 'POST' })
-    const result = await resp.json()
+    const result = await api.postRaw<any>('/api/ollama/pull/llama3.2')
     if (result.success) {
       toast.add({ severity: 'success', summary: 'Modelo descargado', detail: 'Análisis semántico disponible', life: 3000 })
       await systemStore.refreshCapabilities()
@@ -499,13 +498,11 @@ let ollamaPollTimer: ReturnType<typeof setInterval> | null = null
 const installOllama = async () => {
   ollamaInstalling.value = true
   try {
-    const resp = await fetch(apiUrl('/api/ollama/install'), { method: 'POST' })
-    const result = await resp.json()
+    const result = await api.postRaw<any>('/api/ollama/install')
     if (result.success) {
       ollamaPollTimer = setInterval(async () => {
         try {
-          const statusResp = await fetch(apiUrl('/api/ollama/status'))
-          const statusResult = await statusResp.json()
+          const statusResult = await api.getRaw<any>('/api/ollama/status')
           if (statusResult.data?.is_installed) {
             clearInterval(ollamaPollTimer!)
             ollamaPollTimer = null
@@ -529,7 +526,7 @@ const installOllama = async () => {
 const startOllama = async () => {
   ollamaStarting.value = true
   try {
-    await fetch(apiUrl('/api/ollama/start'), { method: 'POST' })
+    await api.postRaw<any>('/api/ollama/start')
     await new Promise(r => setTimeout(r, 2000))
     await systemStore.refreshCapabilities()
   } finally {

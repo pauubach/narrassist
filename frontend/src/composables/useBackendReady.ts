@@ -16,22 +16,22 @@ export async function ensureBackendReady(): Promise<void> {
   if (systemStore.backendReady) return
 
   return new Promise((resolve, reject) => {
-    if (systemStore.backendReady) { resolve(); return }
+    let settled = false
+
+    const timer = setTimeout(() => {
+      if (settled) return
+      settled = true
+      unwatch()
+      reject(new Error('Backend no disponible después de 65s de espera'))
+    }, BACKEND_TIMEOUT_MS)
 
     const unwatch = watch(() => systemStore.backendReady, (ready) => {
-      if (ready) {
+      if (ready && !settled) {
+        settled = true
+        clearTimeout(timer)
         unwatch()
         resolve()
       }
-    })
-
-    setTimeout(() => {
-      unwatch()
-      if (!systemStore.backendReady) {
-        reject(new Error('Backend no disponible después de 65s de espera'))
-      } else {
-        resolve()
-      }
-    }, BACKEND_TIMEOUT_MS)
+    }, { immediate: true })
   })
 }

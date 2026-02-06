@@ -9,6 +9,18 @@ import type { Project, Chapter, Section, RecommendedAnalysis } from '../domain/p
 import { transformAlertSeverity } from './alerts'
 
 // =============================================================================
+// Helpers
+// =============================================================================
+
+/** Parsea una fecha de string, retorna fallback si es inválida */
+export function safeDate(value: string | null | undefined, fallback?: Date): Date | undefined {
+  if (!value) return fallback
+  const d = new Date(value)
+  if (isNaN(d.getTime())) return fallback
+  return d
+}
+
+// =============================================================================
 // Transformadores API -> Domain
 // =============================================================================
 
@@ -40,9 +52,9 @@ export function transformProject(api: ApiProject): Project {
     description: api.description ?? undefined,
     documentPath: api.document_path ?? undefined,
     documentFormat: api.document_format,
-    createdAt: api.created_at ? new Date(api.created_at) : new Date(),
-    lastModified: api.last_modified ? new Date(api.last_modified) : new Date(),
-    lastOpened: api.last_opened ? new Date(api.last_opened) : undefined,
+    createdAt: safeDate(api.created_at, new Date())!,
+    lastModified: safeDate(api.last_modified, new Date())!,
+    lastOpened: safeDate(api.last_opened),
     analysisStatus: api.analysis_status || 'completed',
     analysisProgress: api.analysis_progress,
     wordCount: api.word_count,
@@ -94,8 +106,8 @@ export function transformChapter(api: ApiChapter): Chapter {
     positionStart: api.position_start,
     positionEnd: api.position_end,
     structureType: api.structure_type ?? undefined,
-    createdAt: api.created_at ? new Date(api.created_at) : undefined,
-    updatedAt: api.updated_at ? new Date(api.updated_at) : undefined,
+    createdAt: safeDate(api.created_at),
+    updatedAt: safeDate(api.updated_at),
     sections: api.sections?.map(transformSection) || [],
   }
 }

@@ -135,7 +135,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import Popover from 'primevue/popover'
 import Button from 'primevue/button'
-import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 
 interface DocumentType {
   type: string
@@ -226,16 +226,11 @@ const selectType = async (typeCode: string) => {
 
   loading.value = true
   try {
-    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/document-type`), {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        document_type: typeCode,
-        document_subtype: null,
-      }),
+    const data = await api.putRaw<any>(`/api/projects/${props.projectId}/document-type`, {
+      document_type: typeCode,
+      document_subtype: null,
     })
 
-    const data = await response.json()
     if (data.success) {
       documentType.value = data.data.document_type
       selectedSubtype.value = null
@@ -256,16 +251,11 @@ const selectSubtype = async (subtypeCode: string | null) => {
   selectedSubtype.value = subtypeCode
   loading.value = true
   try {
-    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/document-type`), {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        document_type: documentType.value.type,
-        document_subtype: subtypeCode,
-      }),
+    const data = await api.putRaw<any>(`/api/projects/${props.projectId}/document-type`, {
+      document_type: documentType.value.type,
+      document_subtype: subtypeCode,
     })
 
-    const data = await response.json()
     if (data.success && data.data.document_type) {
       documentType.value = data.data.document_type
       emit('type-changed', data.data.document_type.type, subtypeCode)
@@ -286,8 +276,7 @@ const openCorrectionSettings = () => {
 
 const loadDocumentType = async () => {
   try {
-    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/document-type`))
-    const data = await response.json()
+    const data = await api.getRaw<any>(`/api/projects/${props.projectId}/document-type`)
     if (data.success) {
       documentType.value = data.data
       selectedSubtype.value = data.data.subtype
@@ -300,16 +289,14 @@ const loadDocumentType = async () => {
 const loadDocumentTypes = async () => {
   try {
     // Use new correction config API
-    const response = await fetch(apiUrl('/api/correction-config/types'))
-    const data = await response.json()
+    const data = await api.getRaw<any>('/api/correction-config/types')
     if (data.success) {
       documentTypes.value = data.data
     }
   } catch (_err) {
     // Fallback to old API
     try {
-      const response = await fetch(apiUrl('/api/document-types'))
-      const data = await response.json()
+      const data = await api.getRaw<any>('/api/document-types')
       if (data.success) {
         documentTypes.value = data.data
       }
@@ -329,8 +316,7 @@ const loadCorrectionConfig = async () => {
       ? `/api/correction-config/${typeCode}?subtype_code=${subtypeCode}`
       : `/api/correction-config/${typeCode}`
 
-    const response = await fetch(url)
-    const data = await response.json()
+    const data = await api.getRaw<any>(url)
     if (data.success) {
       correctionConfig.value = data.data
     }

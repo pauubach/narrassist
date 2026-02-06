@@ -177,7 +177,7 @@ import AccordionContent from 'primevue/accordioncontent'
 import ProgressSpinner from 'primevue/progressspinner'
 import { useToast } from 'primevue/usetoast'
 import CorrectionConfigModal from '../workspace/CorrectionConfigModal.vue'
-import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 
 interface SubtypeInfo {
   code: string
@@ -241,8 +241,7 @@ const loadData = async () => {
 
   try {
     // Load types with subtypes
-    const typesRes = await fetch(apiUrl('/api/correction-config/types'))
-    const typesData = await typesRes.json()
+    const typesData = await api.getRaw<any>('/api/correction-config/types')
     if (typesData.success && Array.isArray(typesData.data)) {
       types.value = typesData.data.map((t: any) => {
         // Normalize icon: backend returns "pi-book", we need "pi pi-book"
@@ -262,8 +261,7 @@ const loadData = async () => {
     }
 
     // Load overrides status
-    const statusRes = await fetch(apiUrl('/api/correction-config/defaults/status'))
-    const statusData = await statusRes.json()
+    const statusData = await api.getRaw<any>('/api/correction-config/defaults/status')
     if (statusData.success && statusData.data?.status) {
       overridesStatus.value = statusData.data.status
     }
@@ -288,10 +286,7 @@ const editSubtype = (typeCode: string, subtypeCode: string) => {
 
 const resetType = async (typeCode: string) => {
   try {
-    const response = await fetch(apiUrl(`/api/correction-config/defaults/${typeCode}`), {
-      method: 'DELETE'
-    })
-    const data = await response.json()
+    const data = await api.del<any>(`/api/correction-config/defaults/${typeCode}`)
     if (data.success) {
       toast.add({
         severity: 'success',
@@ -313,10 +308,7 @@ const resetType = async (typeCode: string) => {
 
 const resetSubtype = async (typeCode: string, subtypeCode: string) => {
   try {
-    const response = await fetch(apiUrl(`/api/correction-config/defaults/${typeCode}?subtype_code=${subtypeCode}`), {
-      method: 'DELETE'
-    })
-    const data = await response.json()
+    const data = await api.del<any>(`/api/correction-config/defaults/${typeCode}?subtype_code=${subtypeCode}`)
     if (data.success) {
       toast.add({
         severity: 'success',
@@ -343,10 +335,7 @@ const confirmResetAll = () => {
 const resetAll = async () => {
   resetting.value = true
   try {
-    const response = await fetch(apiUrl('/api/correction-config/defaults'), {
-      method: 'DELETE'
-    })
-    const data = await response.json()
+    const data = await api.del<any>('/api/correction-config/defaults')
     if (data.success) {
       toast.add({
         severity: 'success',

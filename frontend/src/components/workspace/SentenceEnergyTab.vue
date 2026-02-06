@@ -16,7 +16,7 @@ import AccordionPanel from 'primevue/accordionpanel'
 import AccordionHeader from 'primevue/accordionheader'
 import AccordionContent from 'primevue/accordioncontent'
 import Message from 'primevue/message'
-import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 import AnalysisErrorState from '@/components/shared/AnalysisErrorState.vue'
 
 const props = defineProps<{
@@ -97,11 +97,9 @@ async function analyze() {
   loading.value = true
   errorMsg.value = null
   try {
-    const response = await fetch(
-      apiUrl(`/api/projects/${props.projectId}/sentence-energy`)
+    const data = await api.getRaw<{ success: boolean; data: EnergyReport; error?: string }>(
+      `/api/projects/${props.projectId}/sentence-energy`
     )
-    if (!response.ok) throw new Error(`Error del servidor (${response.status})`)
-    const data = await response.json()
     if (data.success) {
       report.value = data.data
     } else {

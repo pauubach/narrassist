@@ -111,15 +111,19 @@ export const useRelationshipGraphStore = defineStore('relationshipGraph', () => 
   // Layout seleccionado
   const layoutType = ref<string>('forceAtlas2Based')
 
-  // Guardar filtros en localStorage cuando cambien
+  // Guardar filtros en localStorage cuando cambien (debounced)
+  let filterSaveTimer: ReturnType<typeof setTimeout> | null = null
   watch(
     filters,
     (newFilters) => {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(newFilters))
-      } catch (err) {
-        console.warn('Error saving relationship graph filters to storage:', err)
-      }
+      if (filterSaveTimer) clearTimeout(filterSaveTimer)
+      filterSaveTimer = setTimeout(() => {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(newFilters))
+        } catch (err) {
+          console.warn('Error saving relationship graph filters to storage:', err)
+        }
+      }, 300)
     },
     { deep: true }
   )

@@ -201,7 +201,7 @@ import AccordionContent from 'primevue/accordioncontent'
 import ProgressSpinner from 'primevue/progressspinner'
 import Message from 'primevue/message'
 import { useToast } from 'primevue/usetoast'
-import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 
 const props = defineProps<{
   projectId: number
@@ -256,15 +256,9 @@ async function analyze() {
       min_distance: minDistance.value.toString(),
       include_semantic: includeSemantic.value.toString(),
     })
-    const response = await fetch(
-      apiUrl(`/api/projects/${props.projectId}/echo-report?${params}`)
+    const data = await api.getRaw<{ success: boolean; data: any; error?: string }>(
+      `/api/projects/${props.projectId}/echo-report?${params}`
     )
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-    }
-
-    const data = await response.json()
 
     if (data.success) {
       report.value = data.data

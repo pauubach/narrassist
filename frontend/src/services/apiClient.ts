@@ -221,6 +221,103 @@ async function postRaw<T>(
   return parseRawResponse<T>(response)
 }
 
+/**
+ * PUT request con body JSON.
+ *
+ * @example
+ * await api.put('/api/projects/1/entities/5', { name: 'Nuevo nombre' })
+ */
+async function put<T>(
+  path: string,
+  body?: Record<string, unknown> | unknown[],
+  options: RequestOptions = {},
+): Promise<T> {
+  const { timeout = 30000, headers = {}, signal } = options
+  const abortSignal = createTimeoutSignal(timeout, signal)
+
+  const response = await fetch(apiUrl(path), {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...headers,
+    },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+    signal: abortSignal,
+  })
+
+  return parseResponse<T>(response)
+}
+
+/**
+ * PUT sin wrapper ApiResponse.
+ */
+async function putRaw<T>(
+  path: string,
+  body?: Record<string, unknown> | unknown[],
+  options: RequestOptions = {},
+): Promise<T> {
+  const { timeout = 30000, headers = {}, signal } = options
+  const abortSignal = createTimeoutSignal(timeout, signal)
+
+  const response = await fetch(apiUrl(path), {
+    method: 'PUT',
+    headers: body !== undefined ? { 'Content-Type': 'application/json', ...headers } : headers,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+    signal: abortSignal,
+  })
+
+  return parseRawResponse<T>(response)
+}
+
+/**
+ * PATCH request con body JSON.
+ *
+ * @example
+ * await api.patch('/api/entity-filters/system-patterns/1', { is_active: false })
+ */
+async function patch<T>(
+  path: string,
+  body?: Record<string, unknown>,
+  options: RequestOptions = {},
+): Promise<T> {
+  const { timeout = 30000, headers = {}, signal } = options
+  const abortSignal = createTimeoutSignal(timeout, signal)
+
+  const response = await fetch(apiUrl(path), {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      ...headers,
+    },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+    signal: abortSignal,
+  })
+
+  return parseRawResponse<T>(response)
+}
+
+/**
+ * DELETE request.
+ *
+ * @example
+ * await api.del('/api/projects/1')
+ */
+async function del<T>(
+  path: string,
+  options: RequestOptions = {},
+): Promise<T> {
+  const { timeout = 30000, headers = {}, signal } = options
+  const abortSignal = createTimeoutSignal(timeout, signal)
+
+  const response = await fetch(apiUrl(path), {
+    method: 'DELETE',
+    headers,
+    signal: abortSignal,
+  })
+
+  return parseRawResponse<T>(response)
+}
+
 export const api = {
   get,
   getRaw,
@@ -228,4 +325,8 @@ export const api = {
   postForm,
   postRaw,
   tryGet,
+  put,
+  putRaw,
+  patch,
+  del,
 } as const

@@ -11,7 +11,7 @@ import Card from 'primevue/card'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import ProgressSpinner from 'primevue/progressspinner'
-import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 import AnalysisErrorState from '@/components/shared/AnalysisErrorState.vue'
 
 const props = defineProps<{
@@ -64,11 +64,9 @@ async function analyze() {
   loading.value = true
   errorMsg.value = null
   try {
-    const response = await fetch(
-      apiUrl(`/api/projects/${props.projectId}/character-archetypes`)
+    const data = await api.getRaw<{ success: boolean; data: ArchetypeReport; error?: string }>(
+      `/api/projects/${props.projectId}/character-archetypes`
     )
-    if (!response.ok) throw new Error(`Error del servidor (${response.status})`)
-    const data = await response.json()
     if (data.success) {
       report.value = data.data
     } else {

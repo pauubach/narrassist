@@ -213,7 +213,7 @@ import AccordionHeader from 'primevue/accordionheader'
 import AccordionContent from 'primevue/accordioncontent'
 import ProgressSpinner from 'primevue/progressspinner'
 import { useToast } from 'primevue/usetoast'
-import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 
 interface LocationEvent {
   entity_id: number
@@ -280,10 +280,9 @@ const eventsByChapter = computed(() => {
 async function analyze() {
   loading.value = true
   try {
-    const response = await fetch(
-      apiUrl(`/api/projects/${props.projectId}/character-locations`)
+    const data = await api.getRaw<{ success: boolean; data: CharacterLocationReport; error?: string }>(
+      `/api/projects/${props.projectId}/character-locations`
     )
-    const data = await response.json()
 
     if (data.success) {
       report.value = data.data

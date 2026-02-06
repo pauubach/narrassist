@@ -257,7 +257,7 @@ import Badge from 'primevue/badge'
 import { useToast } from 'primevue/usetoast'
 import type { Project } from '@/types'
 // import { transformProjects, transformProject } from '@/types/transformers'  // Reserved
-import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 
 const router = useRouter()
 const toast = useToast()
@@ -443,13 +443,7 @@ const deleteProject = async (projectId: number) => {
 
   try {
     // Llamar al endpoint DELETE
-    const response = await fetch(apiUrl(`/api/projects/${projectId}`), {
-      method: 'DELETE'
-    })
-
-    if (!response.ok) {
-      throw new Error('Error al eliminar el proyecto')
-    }
+    await api.del(`/api/projects/${projectId}`)
 
     // Recargar la lista de proyectos
     await projectsStore.fetchProjects()

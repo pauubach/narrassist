@@ -176,7 +176,7 @@ import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import Message from 'primevue/message'
 import ProgressSpinner from 'primevue/progressspinner'
-import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 
 interface EmotionalState {
   emotion: string
@@ -242,15 +242,9 @@ const analyzeEmotions = async () => {
   error.value = null
 
   try {
-    const response = await fetch(
-      apiUrl(`/api/projects/${props.projectId}/characters/${encodeURIComponent(props.characterName)}/emotional-profile`)
+    const data = await api.getRaw<any>(
+      `/api/projects/${props.projectId}/characters/${encodeURIComponent(props.characterName)}/emotional-profile`
     )
-
-    if (!response.ok) {
-      throw new Error('Error al obtener perfil emocional')
-    }
-
-    const data = await response.json()
 
     if (data.success) {
       profile.value = data.data

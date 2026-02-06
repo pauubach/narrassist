@@ -22,7 +22,7 @@ import Tag from 'primevue/tag'
 // import Divider from 'primevue/divider'  // Reserved
 import SelectButton from 'primevue/selectbutton'
 import { useToast } from 'primevue/usetoast'
-import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 
 const props = defineProps<{
   projectId: number
@@ -217,8 +217,7 @@ watch(() => props.projectId, async () => {
 
 async function loadPresets() {
   try {
-    const response = await fetch(apiUrl('/api/correction-presets'))
-    const data = await response.json()
+    const data = await api.getRaw<any>('/api/correction-presets')
     if (data.success) {
       presets.value = data.data.presets
     }
@@ -230,8 +229,7 @@ async function loadPresets() {
 async function loadConfig() {
   loading.value = true
   try {
-    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/correction-config`))
-    const data = await response.json()
+    const data = await api.getRaw<any>(`/api/projects/${props.projectId}/correction-config`)
     if (data.success && data.data.config) {
       // Merge with defaults to ensure all fields exist
       config.value = {
@@ -261,10 +259,7 @@ async function loadConfig() {
 async function detectProfile() {
   detecting.value = true
   try {
-    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/correction-config/detect`), {
-      method: 'POST'
-    })
-    const data = await response.json()
+    const data = await api.postRaw<any>(`/api/projects/${props.projectId}/correction-config/detect`)
     if (data.success && data.data.detected) {
       detectionResult.value = data.data
       showDetectionBanner.value = true
@@ -312,15 +307,10 @@ async function saveConfig() {
 
   saving.value = true
   try {
-    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/correction-config`), {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        config: config.value,
-        selectedPreset: selectedPreset.value
-      })
+    const data = await api.putRaw<any>(`/api/projects/${props.projectId}/correction-config`, {
+      config: config.value,
+      selectedPreset: selectedPreset.value
     })
-    const data = await response.json()
     if (data.success) {
       hasCustomConfig.value = true
       emit('config-changed', config.value)
@@ -346,10 +336,7 @@ async function saveConfig() {
 
 async function resetConfig() {
   try {
-    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/correction-config`), {
-      method: 'DELETE'
-    })
-    const data = await response.json()
+    const data = await api.del<any>(`/api/projects/${props.projectId}/correction-config`)
     if (data.success) {
       config.value = data.data.config
       hasCustomConfig.value = false

@@ -13,9 +13,14 @@ import type {
   RegisterAnalysis,
   RegisterChange,
   RegisterSummary,
+  RegisterType,
+  ChangeSeverity,
   DialogueAttribution,
   DialogueAttributionStats,
+  AttributionConfidence,
+  AttributionMethod,
   KnowledgeFact,
+  KnowledgeType,
 } from '@/types'
 
 // =============================================================================
@@ -58,17 +63,17 @@ interface ApiRegisterAnalysis {
   segment_index: number
   chapter: number
   is_dialogue: boolean
-  primary_register: string
-  register_scores: Record<string, number>
+  primary_register: RegisterType
+  register_scores: Record<RegisterType, number>
   confidence: number
   formal_indicators: string[]
   colloquial_indicators: string[]
 }
 
 interface ApiRegisterChange {
-  from_register: string
-  to_register: string
-  severity: string
+  from_register: RegisterType
+  to_register: RegisterType
+  severity: ChangeSeverity
   explanation: string
   chapter: number | null
   position: number
@@ -83,8 +88,8 @@ interface ApiDialogueAttribution {
   end_char: number
   speaker_id: number | null
   speaker_name: string | null
-  confidence: string
-  method: string
+  confidence: AttributionConfidence
+  method: AttributionMethod
   speech_verb: string | null
   alternatives: Array<{ id: number; name: string; score: number }>
 }
@@ -95,7 +100,7 @@ interface ApiKnowledgeFact {
   known_entity_id: number
   knower_name: string
   known_name: string
-  knowledge_type: string
+  knowledge_type: KnowledgeType
   fact_description: string
   fact_value: string
   source_chapter: number
@@ -146,8 +151,8 @@ function transformRegisterAnalysis(api: ApiRegisterAnalysis): RegisterAnalysis {
     segmentIndex: api.segment_index,
     chapter: api.chapter,
     isDialogue: api.is_dialogue,
-    primaryRegister: api.primary_register as any,
-    registerScores: api.register_scores as any,
+    primaryRegister: api.primary_register,
+    registerScores: api.register_scores,
     confidence: api.confidence,
     formalIndicators: api.formal_indicators,
     colloquialIndicators: api.colloquial_indicators,
@@ -156,9 +161,9 @@ function transformRegisterAnalysis(api: ApiRegisterAnalysis): RegisterAnalysis {
 
 function transformRegisterChange(api: ApiRegisterChange): RegisterChange {
   return {
-    fromRegister: api.from_register as any,
-    toRegister: api.to_register as any,
-    severity: api.severity as any,
+    fromRegister: api.from_register,
+    toRegister: api.to_register,
+    severity: api.severity,
     explanation: api.explanation,
     chapter: api.chapter,
     position: api.position,
@@ -175,8 +180,8 @@ function transformDialogueAttribution(api: ApiDialogueAttribution): DialogueAttr
     endChar: api.end_char,
     speakerId: api.speaker_id,
     speakerName: api.speaker_name,
-    confidence: api.confidence as any,
-    method: api.method as any,
+    confidence: api.confidence,
+    method: api.method,
     speechVerb: api.speech_verb,
     alternatives: api.alternatives,
   }
@@ -189,7 +194,7 @@ function transformKnowledgeFact(api: ApiKnowledgeFact): KnowledgeFact {
     knownEntityId: api.known_entity_id,
     knowerName: api.knower_name,
     knownName: api.known_name,
-    knowledgeType: api.knowledge_type as any,
+    knowledgeType: api.knowledge_type,
     factDescription: api.fact_description,
     factValue: api.fact_value,
     sourceChapter: api.source_chapter,

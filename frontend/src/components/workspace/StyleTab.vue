@@ -32,7 +32,7 @@ import NarrativeHealthTab from './NarrativeHealthTab.vue'
 import CharacterArchetypesTab from './CharacterArchetypesTab.vue'
 import DuplicateContentTab from './DuplicateContentTab.vue'
 import ProlepisTab from './ProlepisTab.vue'
-import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 
 type CategoryId = 'narrative' | 'style' | 'consistency'
 
@@ -159,10 +159,9 @@ watch(() => props.projectId, () => {
 
 async function loadFeatureAvailability() {
   try {
-    const response = await fetch(
-      apiUrl(`/api/projects/${props.projectId}/scenes/stats`)
+    const data = await api.getRaw<{ success: boolean; data: any }>(
+      `/api/projects/${props.projectId}/scenes/stats`
     )
-    const data = await response.json()
     if (data.success) {
       hasScenes.value = data.data.has_scenes || false
     }

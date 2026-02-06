@@ -378,7 +378,7 @@ import ColorPicker from 'primevue/colorpicker'
 import ProgressSpinner from 'primevue/progressspinner'
 import { useToast } from 'primevue/usetoast'
 import SceneCardsView from './SceneCardsView.vue'
-import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 
 const props = defineProps<{
   projectId: number
@@ -496,10 +496,7 @@ const tagDialogTitle = computed(() => {
 async function loadScenes() {
   loading.value = true
   try {
-    const response = await fetch(
-      apiUrl(`/api/projects/${props.projectId}/scenes`)
-    )
-    const data = await response.json()
+    const data = await api.getRaw<any>(`/api/projects/${props.projectId}/scenes`)
 
     if (data.success) {
       hasScenes.value = data.data.has_scenes
@@ -521,10 +518,7 @@ async function loadScenes() {
 
 async function loadEntities() {
   try {
-    const response = await fetch(
-      apiUrl(`/api/projects/${props.projectId}/entities`)
-    )
-    const data = await response.json()
+    const data = await api.getRaw<any>(`/api/projects/${props.projectId}/entities`)
 
     if (data.success) {
       const entities = data.data.entities || []
@@ -554,15 +548,10 @@ async function saveSceneTags() {
 
   saving.value = true
   try {
-    const response = await fetch(
-      apiUrl(`/api/projects/${props.projectId}/scenes/${selectedScene.value.id}/tags`),
-      {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(tagForm.value),
-      }
+    const data = await api.putRaw<any>(
+      `/api/projects/${props.projectId}/scenes/${selectedScene.value.id}/tags`,
+      tagForm.value as any
     )
-    const data = await response.json()
 
     if (data.success) {
       toast.add({
@@ -600,18 +589,13 @@ async function saveCustomTag() {
 
   saving.value = true
   try {
-    const response = await fetch(
-      apiUrl(`/api/projects/${props.projectId}/scenes/${selectedScene.value.id}/custom-tags`),
+    const data = await api.postRaw<any>(
+      `/api/projects/${props.projectId}/scenes/${selectedScene.value.id}/custom-tags`,
       {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tag_name: customTagForm.value.name.trim(),
-          tag_color: customTagForm.value.color ? `#${customTagForm.value.color}` : null,
-        }),
+        tag_name: customTagForm.value.name.trim(),
+        tag_color: customTagForm.value.color ? `#${customTagForm.value.color}` : null,
       }
     )
-    const data = await response.json()
 
     if (data.success) {
       toast.add({
@@ -640,11 +624,9 @@ async function saveCustomTag() {
 
 async function removeCustomTag(sceneId: number, tagName: string) {
   try {
-    const response = await fetch(
-      apiUrl(`/api/projects/${props.projectId}/scenes/${sceneId}/custom-tags/${encodeURIComponent(tagName)}`),
-      { method: 'DELETE' }
+    const data = await api.del<any>(
+      `/api/projects/${props.projectId}/scenes/${sceneId}/custom-tags/${encodeURIComponent(tagName)}`
     )
-    const data = await response.json()
 
     if (data.success) {
       toast.add({

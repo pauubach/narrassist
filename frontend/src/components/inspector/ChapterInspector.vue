@@ -8,6 +8,7 @@ import AccordionHeader from 'primevue/accordionheader'
 import AccordionContent from 'primevue/accordioncontent'
 import ProgressSpinner from 'primevue/progressspinner'
 import type { Chapter, Entity, Alert } from '@/types'
+import { api } from '@/services/apiClient'
 
 /**
  * ChapterInspector - Panel de detalles de capítulo para el inspector.
@@ -100,10 +101,9 @@ async function loadChapterSummary() {
   summaryError.value = null
 
   try {
-    const response = await fetch(
+    const data = await api.getRaw<any>(
       `/api/projects/${props.projectId}/chapter-progress?mode=basic`
     )
-    const data = await response.json()
 
     if (data.success && data.data.chapters) {
       // Cache all chapters

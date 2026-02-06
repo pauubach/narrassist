@@ -422,7 +422,7 @@ import Message from 'primevue/message'
 import Divider from 'primevue/divider'
 import ProgressBar from 'primevue/progressbar'
 import type { Entity } from '@/types'
-import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 
 // Interfaces para similitud por nombre
 interface NameSimilarity {
@@ -659,12 +659,9 @@ const loadSimilarity = async () => {
 
   loadingSimilarity.value = true
   try {
-    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/entities/similarity`), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ entity_ids: Array.from(selectedEntityIds.value) })
+    const result = await api.postRaw<any>(`/api/projects/${props.projectId}/entities/similarity`, {
+      entity_ids: Array.from(selectedEntityIds.value)
     })
-    const result = await response.json()
     if (result.success) {
       similarityData.value = result.data
     }
@@ -681,12 +678,9 @@ const loadPreviewMerge = async () => {
 
   loadingPreview.value = true
   try {
-    const response = await fetch(apiUrl(`/api/projects/${props.projectId}/entities/preview-merge`), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ entity_ids: Array.from(selectedEntityIds.value) })
+    const result = await api.postRaw<any>(`/api/projects/${props.projectId}/entities/preview-merge`, {
+      entity_ids: Array.from(selectedEntityIds.value)
     })
-    const result = await response.json()
     if (result.success) {
       previewData.value = result.data
 

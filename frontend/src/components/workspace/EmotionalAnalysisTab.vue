@@ -201,7 +201,7 @@ import AccordionContent from 'primevue/accordioncontent'
 import ProgressSpinner from 'primevue/progressspinner'
 import Message from 'primevue/message'
 import { useToast } from 'primevue/usetoast'
-import { apiUrl } from '@/config/api'
+import { api } from '@/services/apiClient'
 
 interface Incoherence {
   entity_name: string
@@ -287,10 +287,9 @@ async function analyze() {
   loading.value = true
   analysisError.value = null
   try {
-    const response = await fetch(
-      apiUrl(`/api/projects/${props.projectId}/emotional-analysis`)
+    const data = await api.getRaw<{ success: boolean; data: any; error?: string }>(
+      `/api/projects/${props.projectId}/emotional-analysis`
     )
-    const data = await response.json()
 
     if (data.success) {
       const incoherences = data.data.incoherences || []

@@ -5,8 +5,8 @@
  */
 
 import { ref, watch, onMounted } from 'vue'
-import { API_BASE } from '@/config/api'
-import type { ChatMessage, ChatRequest, ChatResponse } from '@/types'
+import { api } from '@/services/apiClient'
+import type { ChatMessage, ChatResponse } from '@/types'
 
 
 
@@ -20,11 +20,13 @@ export function useChat(projectId: number) {
     loadHistory()
   })
 
-  // Persist history changes
+  // Persist history changes (debounced to avoid serializing on every keystroke)
+  let saveTimer: ReturnType<typeof setTimeout> | null = null
   watch(
     messages,
     () => {
-      saveHistory()
+      if (saveTimer) clearTimeout(saveTimer)
+      saveTimer = setTimeout(saveHistory, 500)
     },
     { deep: true }
   )
@@ -82,23 +84,15 @@ export function useChat(projectId: number) {
     isLoading.value = true
 
     try {
-      // Add timeout controller (120s for LLM response - CPU inference can be slow)
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 120000)
-
-      const response = await fetch(`${API_BASE}/api/projects/${projectId}/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      // 120s timeout for LLM response - CPU inference can be slow
+      const data = await api.postRaw<any>(
+        `/api/projects/${projectId}/chat`,
+        {
           message: content,
           history: history.slice(0, -1) // Exclude current message
-        } as ChatRequest),
-        signal: controller.signal
-      })
-
-      clearTimeout(timeoutId)
-
-      const data = await response.json()
+        },
+        { timeout: 120000 }
+      )
 
       if (data.success && data.data) {
         const chatResponse = data.data as ChatResponse
