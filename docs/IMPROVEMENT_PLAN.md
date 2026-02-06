@@ -708,15 +708,15 @@ pip install transformers
 | S3-04 | Expresiones temporales español | DONE | +6 patrones (pasados, transcurridos, etc.) |
 | S3-05 | HeidelTime para español | PENDIENTE | Evaluar integración futura |
 
-### Sprint 4: Atributos Avanzados (1-2 semanas)
+### Sprint 4: Atributos Avanzados (1-2 semanas) — COMPLETADO
 
-| ID | Acción | Detalle |
-|----|--------|---------|
-| S4-01 | 6-indicator character profiling | Presencia, acciones, habla, definición, sentimiento, entornos |
-| S4-02 | Character network analysis | Grafo de interacciones |
-| S4-03 | Detección out-of-character | Perfil → desviaciones |
-| S4-04 | Ubicación de personajes | Track dónde está cada personaje |
-| S4-05 | Modo español clásico | Vocabulario Siglo de Oro |
+| ID | Acción | Estado | Notas |
+|----|--------|--------|-------|
+| S4-01 | 6-indicator character profiling | DONE | `character_profiling.py`: 6 indicadores + rol + relevancia |
+| S4-02 | Character network analysis | DONE | `character_network.py`: centralidad, puentes, evolución temporal |
+| S4-03 | Detección out-of-character | DONE | `out_of_character.py`: registro habla, emoción, agentividad |
+| S4-04 | Ubicación de personajes | DONE | `check_impossible_travel()` añadido a CharacterLocationAnalyzer |
+| S4-05 | Modo español clásico | DONE | `classical_spanish.py`: 60+ variantes ortográficas, glosario arcaico |
 
 ### Sprint 5: LLM y Modelos (1 semana)
 
@@ -821,4 +821,4 @@ S6-01 ─→ S6-02 ─→ S6-03
 
 **Última actualización**: 2026-02-06
 **Autor**: Claude (Panel de 8 expertos simulados)
-**Próximo paso**: Sprint 1 - NER Mejorado (PlanTL RoBERTa)
+**Próximo paso**: Sprint 5 - LLM y Modelos

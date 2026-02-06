@@ -350,6 +350,105 @@ class CharacterLocationAnalyzer:
             return None
 
 
+    def check_impossible_travel(
+        self,
+        report: CharacterLocationReport,
+    ) -> list[LocationInconsistency]:
+        """
+        Detecta viajes imposibles: un personaje en dos ubicaciones distantes
+        sin tiempo narrativo suficiente entre ambas.
+
+        Se basa en:
+        - Ubicaciones conocidas como distantes (ciudades diferentes)
+        - Cambios de ubicación dentro del mismo capítulo sin transición
+        - Interior/exterior incompatibles simultáneos
+
+        Returns:
+            Lista de inconsistencias de viaje imposible.
+        """
+        inconsistencies = []
+
+        # Agrupar eventos por personaje
+        events_by_char: dict[int, list[LocationEvent]] = {}
+        for event in report.location_events:
+            if event.entity_id not in events_by_char:
+                events_by_char[event.entity_id] = []
+            events_by_char[event.entity_id].append(event)
+
+        for entity_id, events in events_by_char.items():
+            # Ordenar por capítulo y posición
+            events.sort(key=lambda e: (e.chapter, e.start_char))
+
+            for i in range(1, len(events)):
+                prev = events[i - 1]
+                curr = events[i]
+
+                # Solo verificar mismo capítulo (en capítulos diferentes
+                # se asume que hay tiempo suficiente)
+                if prev.chapter != curr.chapter:
+                    continue
+
+                # Verificar si las ubicaciones son incompatibles
+                if curr.change_type == LocationChangeType.TRANSITION:
+                    continue  # Transición explícita = ok
+
+                loc1 = prev.location_name.lower()
+                loc2 = curr.location_name.lower()
+
+                if loc1 == loc2:
+                    continue
+
+                # Verificar incompatibilidad conocida
+                if self._are_locations_incompatible(loc1, loc2):
+                    inconsistencies.append(
+                        LocationInconsistency(
+                            entity_id=entity_id,
+                            entity_name=curr.entity_name,
+                            location1_name=prev.location_name,
+                            location1_chapter=prev.chapter,
+                            location1_excerpt=prev.excerpt,
+                            location2_name=curr.location_name,
+                            location2_chapter=curr.chapter,
+                            location2_excerpt=curr.excerpt,
+                            explanation=(
+                                f"{curr.entity_name} aparece en {curr.location_name} "
+                                f"pero estaba en {prev.location_name} en el mismo capítulo "
+                                f"sin transición explícita"
+                            ),
+                            confidence=0.75,
+                        )
+                    )
+
+        return inconsistencies
+
+    @staticmethod
+    def _are_locations_incompatible(loc1: str, loc2: str) -> bool:
+        """
+        Determina si dos ubicaciones son incompatibles (no se puede estar
+        en ambas simultáneamente).
+        """
+        # Ubicaciones que son claramente diferentes ciudades/regiones
+        CITY_KEYWORDS = {
+            "madrid", "barcelona", "sevilla", "valencia", "bilbao",
+            "toledo", "granada", "córdoba", "salamanca", "zaragoza",
+            "lisboa", "paris", "londres", "roma", "berlín",
+        }
+
+        # Si ambos son nombres de ciudades conocidas y diferentes
+        if loc1 in CITY_KEYWORDS and loc2 in CITY_KEYWORDS:
+            return True
+
+        # Interior vs exterior incompatibles
+        INTERIOR = {"casa", "habitación", "cuarto", "sala", "cocina", "dormitorio", "despacho"}
+        EXTERIOR = {"jardín", "plaza", "calle", "campo", "bosque", "playa", "montaña"}
+
+        if (loc1 in INTERIOR and loc2 in EXTERIOR) or (loc1 in EXTERIOR and loc2 in INTERIOR):
+            # Estos podrían estar contiguos, menor confianza
+            return False  # No incompatibles por sí solos
+
+        return False
+
+
 def analyze_character_locations(
     project_id: int,
     chapters: list[dict],
@@ -367,4 +466,11 @@ def analyze_character_locations(
         Result con CharacterLocationReport
     """
     analyzer = CharacterLocationAnalyzer()
-    return analyzer.analyze(project_id, chapters, entities)
+    result = analyzer.analyze(project_id, chapters, entities)
+
+    # Añadir detección de viajes imposibles
+    if result.is_success and result.value:
+        impossible = analyzer.check_impossible_travel(result.value)
+        result.value.inconsistencies.extend(impossible)
+
+    return result

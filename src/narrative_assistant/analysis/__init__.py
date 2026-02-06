@@ -84,6 +84,30 @@ with contextlib.suppress(ImportError):
         get_semantic_redundancy_detector,
     )
 
+with contextlib.suppress(ImportError):
+    from .character_profiling import (
+        CharacterProfile,
+        CharacterProfiler,
+        CharacterRole,
+    )
+
+with contextlib.suppress(ImportError):
+    from .character_network import (
+        CharacterNetworkAnalyzer,
+        CharacterNetworkReport,
+        NetworkMetrics,
+        NetworkNode,
+    )
+
+with contextlib.suppress(ImportError):
+    from .out_of_character import (
+        DeviationSeverity,
+        DeviationType,
+        OutOfCharacterDetector,
+        OutOfCharacterEvent,
+        OutOfCharacterReport,
+    )
+
 __all__ = [
     # Tipos - Consistency
     "AttributeInconsistency",
@@ -148,4 +172,19 @@ __all__ = [
     "SemanticRedundancyDetector",
     # Funciones - Semantic Redundancy
     "get_semantic_redundancy_detector",
+    # Character Profiling
+    "CharacterProfile",
+    "CharacterProfiler",
+    "CharacterRole",
+    # Character Network
+    "CharacterNetworkAnalyzer",
+    "CharacterNetworkReport",
+    "NetworkMetrics",
+    "NetworkNode",
+    # Out-of-Character
+    "DeviationType",
+    "DeviationSeverity",
+    "OutOfCharacterDetector",
+    "OutOfCharacterEvent",
+    "OutOfCharacterReport",
 ]
