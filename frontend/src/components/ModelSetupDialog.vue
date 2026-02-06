@@ -349,7 +349,7 @@ async function recheckPython() {
       <template v-else-if="downloadPhase === 'downloading'">
         <div class="download-progress" role="status" aria-live="polite">
           <div class="download-header">
-            <i class="pi pi-download download-icon" :class="{ 'pi-spin': !realProgress?.hasRealProgress }"></i>
+            <i class="pi pi-download download-icon"></i>
             <div>
               <h3>Completando instalación</h3>
               <p class="subtitle">Descargando modelos de análisis de texto</p>
