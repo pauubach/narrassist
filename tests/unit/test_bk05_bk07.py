@@ -14,7 +14,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-
 # ============================================================================
 # EntityMatcher Tests
 # ============================================================================
@@ -354,8 +353,8 @@ class TestComparisonService:
 
     def test_comparison_fingerprint_change(self, isolated_database):
         """Detecta cambio de fingerprint."""
-        from narrative_assistant.persistence.snapshot import SnapshotRepository
         from narrative_assistant.analysis.comparison import ComparisonService
+        from narrative_assistant.persistence.snapshot import SnapshotRepository
 
         db = isolated_database
         with db.connection() as conn:
@@ -450,7 +449,10 @@ class TestCollectionRepository:
 
     def test_add_project_warning_threshold(self, isolated_database):
         """Warning cuando hay muchos proyectos."""
-        from narrative_assistant.persistence.collection import CollectionRepository, WARN_PROJECTS_THRESHOLD
+        from narrative_assistant.persistence.collection import (
+            WARN_PROJECTS_THRESHOLD,
+            CollectionRepository,
+        )
 
         db = isolated_database
         repo = CollectionRepository(db)
@@ -631,6 +633,7 @@ class TestCollectionRepository:
     def test_workspace_cache(self, isolated_database, tmp_path):
         """Workspace auxiliar guarda y carga datos."""
         import os
+
         from narrative_assistant.persistence.collection import CollectionRepository
 
         os.environ["NA_DATA_DIR"] = str(tmp_path)
@@ -654,8 +657,8 @@ class TestCrossBookAnalyzer:
 
     def test_cross_book_attribute_inconsistency(self, isolated_database):
         """Detecta inconsistencia de atributos entre libros."""
-        from narrative_assistant.persistence.collection import CollectionRepository
         from narrative_assistant.analysis.cross_book import CrossBookAnalyzer
+        from narrative_assistant.persistence.collection import CollectionRepository
 
         db = isolated_database
         with db.connection() as conn:
@@ -706,8 +709,8 @@ class TestCrossBookAnalyzer:
 
     def test_cross_book_no_inconsistency(self, isolated_database):
         """No hay inconsistencia cuando atributos coinciden."""
-        from narrative_assistant.persistence.collection import CollectionRepository
         from narrative_assistant.analysis.cross_book import CrossBookAnalyzer
+        from narrative_assistant.persistence.collection import CollectionRepository
 
         db = isolated_database
         with db.connection() as conn:
@@ -814,6 +817,7 @@ class TestSecurityPathTraversal:
     def test_cache_type_path_traversal_rejected(self, isolated_database, tmp_path):
         """cache_type con path traversal es rechazado."""
         import os
+
         from narrative_assistant.persistence.collection import CollectionRepository
 
         os.environ["NA_DATA_DIR"] = str(tmp_path)
@@ -834,6 +838,7 @@ class TestSecurityPathTraversal:
     def test_cache_type_invalid_name_rejected(self, isolated_database, tmp_path):
         """cache_type con nombre no autorizado es rechazado."""
         import os
+
         from narrative_assistant.persistence.collection import CollectionRepository
 
         os.environ["NA_DATA_DIR"] = str(tmp_path)
@@ -849,6 +854,7 @@ class TestSecurityPathTraversal:
     def test_cache_type_valid_name_accepted(self, isolated_database, tmp_path):
         """cache_type válido funciona correctamente."""
         import os
+
         from narrative_assistant.persistence.collection import CollectionRepository
 
         os.environ["NA_DATA_DIR"] = str(tmp_path)
@@ -951,8 +957,8 @@ class TestSecurityInputValidation:
 
     def test_cross_book_empty_collection(self, isolated_database):
         """Cross-book analysis de colección vacía no crashea."""
-        from narrative_assistant.persistence.collection import CollectionRepository
         from narrative_assistant.analysis.cross_book import CrossBookAnalyzer
+        from narrative_assistant.persistence.collection import CollectionRepository
 
         repo = CollectionRepository(isolated_database)
         cid = repo.create("Empty Saga")

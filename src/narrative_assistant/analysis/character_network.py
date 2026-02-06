@@ -237,7 +237,6 @@ class CharacterNetworkAnalyzer:
             return report
 
         # Métricas de centralidad
-        degree_centrality = nx.degree_centrality(G)
         try:
             betweenness = nx.betweenness_centrality(G, weight="weight")
         except Exception:

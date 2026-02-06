@@ -8,7 +8,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-
 # ============================================================================
 # S1-05: Benchmark NER Script (estructura y lógica)
 # ============================================================================
@@ -137,8 +136,8 @@ class TestAdaptiveWeights:
     def test_update_weights_correct_method(self):
         """Actualizar pesos incrementa el método correcto."""
         from narrative_assistant.nlp.coreference_resolver import (
-            CorefMethod,
             DEFAULT_COREF_WEIGHTS,
+            CorefMethod,
             update_adaptive_weights,
         )
 
@@ -157,8 +156,8 @@ class TestAdaptiveWeights:
     def test_update_weights_incorrect_methods(self):
         """Actualizar pesos decrementa los métodos incorrectos."""
         from narrative_assistant.nlp.coreference_resolver import (
-            CorefMethod,
             DEFAULT_COREF_WEIGHTS,
+            CorefMethod,
             update_adaptive_weights,
         )
 
@@ -255,9 +254,9 @@ class TestNarrativeOfThought:
     def test_not_prompt_templates_exist(self):
         """Los templates NoT existen y tienen contenido."""
         from narrative_assistant.llm.prompts import (
+            NARRATIVE_OF_THOUGHT_EXAMPLES,
             NARRATIVE_OF_THOUGHT_SYSTEM,
             NARRATIVE_OF_THOUGHT_TEMPLATE,
-            NARRATIVE_OF_THOUGHT_EXAMPLES,
         )
 
         assert len(NARRATIVE_OF_THOUGHT_SYSTEM) > 50
@@ -269,8 +268,8 @@ class TestNarrativeOfThought:
     def test_not_prompt_build(self):
         """build_prompt funciona con NoT templates."""
         from narrative_assistant.llm.prompts import (
-            NARRATIVE_OF_THOUGHT_TEMPLATE,
             NARRATIVE_OF_THOUGHT_EXAMPLES,
+            NARRATIVE_OF_THOUGHT_TEMPLATE,
             build_prompt,
         )
 
@@ -428,6 +427,7 @@ class TestHeidelTimePatterns:
     def test_hace_pattern(self):
         """Detecta 'hace X días/meses/años'."""
         import re
+
         from narrative_assistant.temporal.markers import TEMPORAL_PATTERNS, MarkerType
 
         text = "Hace tres meses que no lo veía"
@@ -441,6 +441,7 @@ class TestHeidelTimePatterns:
     def test_desde_hace_pattern(self):
         """Detecta 'desde hace X'."""
         import re
+
         from narrative_assistant.temporal.markers import TEMPORAL_PATTERNS, MarkerType
 
         text = "Desde hace dos años vivía allí"
@@ -454,6 +455,7 @@ class TestHeidelTimePatterns:
     def test_festividades_pattern(self):
         """Detecta festividades españolas."""
         import re
+
         from narrative_assistant.temporal.markers import TEMPORAL_PATTERNS, MarkerType
 
         for text in ["La Navidad de aquel año", "Durante la Semana Santa"]:
@@ -467,6 +469,7 @@ class TestHeidelTimePatterns:
     def test_siglo_pattern(self):
         """Detecta 'siglo XX', 'siglo XIX'."""
         import re
+
         from narrative_assistant.temporal.markers import TEMPORAL_PATTERNS, MarkerType
 
         text = "En el siglo XIX las cosas eran diferentes"
@@ -480,6 +483,7 @@ class TestHeidelTimePatterns:
     def test_age_expressions(self):
         """Detecta expresiones de edad HeidelTime."""
         import re
+
         from narrative_assistant.temporal.markers import TEMPORAL_PATTERNS, MarkerType
 
         age_texts = [
@@ -499,6 +503,7 @@ class TestHeidelTimePatterns:
     def test_vispera_anteanoche(self):
         """Detecta 'la víspera', 'anteanoche', etc."""
         import re
+
         from narrative_assistant.temporal.markers import TEMPORAL_PATTERNS, MarkerType
 
         for text in ["La víspera todo cambió", "Anteanoche lo vio por última vez"]:
@@ -512,6 +517,7 @@ class TestHeidelTimePatterns:
     def test_entre_anos_duration(self):
         """Detecta 'entre 1990 y 1995'."""
         import re
+
         from narrative_assistant.temporal.markers import TEMPORAL_PATTERNS, MarkerType
 
         text = "Entre 1990 y 1995 vivió en París"
@@ -525,6 +531,7 @@ class TestHeidelTimePatterns:
     def test_en_plena_guerra(self):
         """Detecta 'en plena guerra'."""
         import re
+
         from narrative_assistant.temporal.markers import TEMPORAL_PATTERNS, MarkerType
 
         text = "En plena guerra todo era diferente"

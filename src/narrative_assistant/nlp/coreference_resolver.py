@@ -38,6 +38,7 @@ import re
 import threading
 from dataclasses import dataclass, field
 from enum import Enum
+from pathlib import Path
 from typing import Protocol
 
 logger = logging.getLogger(__name__)
@@ -102,10 +103,9 @@ DEFAULT_COREF_WEIGHTS = {
 _ADAPTIVE_WEIGHTS_FILE = "adaptive_coref_weights.json"
 
 
-def _get_adaptive_weights_path() -> "Path":
+def _get_adaptive_weights_path() -> Path:
     """Retorna la ruta del archivo de pesos adaptativos."""
     import os
-    from pathlib import Path
 
     data_dir = os.environ.get("NA_DATA_DIR", "")
     if data_dir:

@@ -832,9 +832,9 @@ CONFIANZA_AJUSTADA: [0.0-1.0]"""
 
         try:
             from ..llm.prompts import (
+                NARRATIVE_OF_THOUGHT_EXAMPLES,
                 NARRATIVE_OF_THOUGHT_SYSTEM,
                 NARRATIVE_OF_THOUGHT_TEMPLATE,
-                NARRATIVE_OF_THOUGHT_EXAMPLES,
                 build_prompt,
             )
 

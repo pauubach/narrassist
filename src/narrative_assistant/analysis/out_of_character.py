@@ -19,10 +19,10 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 from .character_profiling import (
-    CharacterProfile,
-    CharacterRole,
     NEGATIVE_WORDS,
     POSITIVE_WORDS,
+    CharacterProfile,
+    CharacterRole,
 )
 
 logger = logging.getLogger(__name__)
@@ -271,7 +271,6 @@ class OutOfCharacterDetector:
     ) -> list[OutOfCharacterEvent]:
         """Verifica cambios emocionales bruscos entre capítulos."""
         events = []
-        baseline = profile.sentiment.avg_sentiment
 
         # Calcular sentimiento por capítulo
         name_lower = profile.entity_name.lower()

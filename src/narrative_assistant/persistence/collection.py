@@ -7,7 +7,7 @@ Sin límites artificiales - usa soft warnings para colecciones grandes.
 
 import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -469,8 +469,8 @@ class CollectionRepository:
     @staticmethod
     def _cleanup_workspace(collection_id: int) -> None:
         """Elimina el workspace auxiliar de una colección."""
-        import shutil
         import os
+        import shutil
         data_dir = os.environ.get("NA_DATA_DIR", str(Path.home() / ".narrative_assistant"))
         workspace = Path(data_dir) / "collections" / str(collection_id)
         if workspace.exists():

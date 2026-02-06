@@ -396,9 +396,7 @@ class CharacterProfiler:
                 profile.actions.action_count += 1
                 profile.actions.action_verbs[verb_form] += 1
 
-                # Categorizar acción por raíz verbal
-                verb_stem = verb_form[:4]  # Aproximación
-                categorized = False
+                # Categorizar acción por tipo de verbo
                 for verb_set, attr in [
                     (PHYSICAL_VERBS, "physical_actions"),
                     (VERBAL_VERBS, "verbal_actions"),
@@ -407,7 +405,6 @@ class CharacterProfiler:
                 ]:
                     if any(verb_form.startswith(v[:4]) for v in verb_set):
                         setattr(profile.actions, attr, getattr(profile.actions, attr) + 1)
-                        categorized = True
                         break
 
         # Calcular agentividad
@@ -443,6 +440,8 @@ class CharacterProfiler:
             # Formalidad simplificada
             from ..voice.profiles import (
                 FORMAL_MARKERS as _FORMAL,
+            )
+            from ..voice.profiles import (
                 INFORMAL_MARKERS as _INFORMAL,
             )
 

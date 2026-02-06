@@ -1,10 +1,10 @@
 """Tests para Sprint 6: API endpoints y funcionalidad frontend/UX."""
 
-import pytest
-from unittest.mock import MagicMock, patch
 from dataclasses import dataclass, field
 from datetime import datetime
+from unittest.mock import MagicMock, patch
 
+import pytest
 
 # ============================================================================
 # S6-01: Character Network Tests
@@ -41,7 +41,8 @@ class TestCharacterNetworkEndpoint:
 
     def test_network_report_serialization(self):
         from narrative_assistant.analysis.character_network import (
-            CharacterNetworkReport, NetworkMetrics
+            CharacterNetworkReport,
+            NetworkMetrics,
         )
 
         report = CharacterNetworkReport(
@@ -143,7 +144,8 @@ class TestCharacterProfiles:
 
     def test_profiler_role_assignment(self):
         from narrative_assistant.analysis.character_profiling import (
-            CharacterProfiler, CharacterRole
+            CharacterProfiler,
+            CharacterRole,
         )
 
         mentions = [
@@ -168,9 +170,7 @@ class TestCharacterProfiles:
         assert profiles == []
 
     def test_profile_to_dict(self):
-        from narrative_assistant.analysis.character_profiling import (
-            CharacterProfile, CharacterRole
-        )
+        from narrative_assistant.analysis.character_profiling import CharacterProfile, CharacterRole
 
         profile = CharacterProfile(
             entity_id=1,
@@ -346,7 +346,9 @@ class TestSprint4Regression:
 
     def test_ooc_event_serialization(self):
         from narrative_assistant.analysis.out_of_character import (
-            DeviationType, DeviationSeverity, OutOfCharacterEvent
+            DeviationSeverity,
+            DeviationType,
+            OutOfCharacterEvent,
         )
 
         event = OutOfCharacterEvent(

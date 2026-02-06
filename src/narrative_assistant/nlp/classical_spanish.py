@@ -128,12 +128,10 @@ ARCHAIC_VOCABULARY: dict[str, str] = {
     "mancebo": "joven",
     "mesonero": "posadero",
     "paje": "sirviente joven",
-    "yantar": "comida",
     "zagal": "muchacho pastor",
     "zurrón": "bolsa de cuero",
     # Verbos
     "acaecer": "suceder",
-    "asaz": "bastante",
     "atañer": "concernir",
     "departir": "conversar",
     "holgar": "descansar",
