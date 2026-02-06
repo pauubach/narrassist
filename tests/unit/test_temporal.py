@@ -330,3 +330,54 @@ class TestIntegration:
 
         assert "gantt" in mermaid or "No hay eventos" in mermaid
         assert "total_events" in json_data
+
+
+class TestAnachronismDetector:
+    """Tests para detección de anacronismos."""
+
+    @pytest.fixture
+    def detector(self):
+        from narrative_assistant.temporal.anachronisms import AnachronismDetector
+        return AnachronismDetector()
+
+    def test_detect_narrative_period_siglo(self, detector):
+        """Detecta periodo de siglo XVI."""
+        text = "En el siglo XVI, los conquistadores llegaron a América."
+        period = detector.detect_narrative_period(text)
+        assert period is not None
+        assert period[0] == 1501
+        assert period[1] == 1600
+
+    def test_detect_narrative_period_year(self, detector):
+        """Detecta periodo por año explícito."""
+        text = "En 1492, Colón descubrió América."
+        period = detector.detect_narrative_period(text)
+        assert period is not None
+        assert 1480 <= period[0] <= 1492
+        assert 1492 <= period[1] <= 1510
+
+    def test_detect_anachronism_phone_in_medieval(self, detector):
+        """Detecta teléfono como anacronismo en Edad Media."""
+        text = "En el siglo XII, el caballero sacó su teléfono móvil."
+        report = detector.detect(text)
+        assert len(report.anachronisms) >= 1
+        terms = [a.term.lower() for a in report.anachronisms]
+        assert any("teléfono" in t or "móvil" in t for t in terms)
+
+    def test_no_anachronism_modern(self, detector):
+        """No detecta anacronismos en texto moderno."""
+        text = "En el siglo XXI, Juan consultó su smartphone."
+        report = detector.detect(text)
+        assert len(report.anachronisms) == 0
+
+    def test_detect_anachronism_internet_1800(self, detector):
+        """Detecta internet como anacronismo en el siglo XIX."""
+        text = "En el siglo XIX, la condesa navegó por internet."
+        report = detector.detect(text)
+        assert len(report.anachronisms) >= 1
+
+    def test_no_period_no_anachronisms(self, detector):
+        """Sin periodo detectado, no reporta anacronismos."""
+        text = "El personaje caminaba por la calle."
+        report = detector.detect(text)
+        assert len(report.anachronisms) == 0

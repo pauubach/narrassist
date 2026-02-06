@@ -192,6 +192,28 @@ TEMPORAL_PATTERNS: dict[MarkerType, list[tuple[str, float]]] = {
             r"\b(la\s+)?(mañana|noche|tarde)\s+del?\s+(lunes|martes|miércoles|jueves|viernes|sábado|domingo)\b",
             0.75,
         ),
+        # "al rato", "al instante", "al momento"
+        (r"\bal\s+(rato|instante|momento|poco\s+rato)\b", 0.8),
+        # "pasados unos/algunos días"
+        (
+            r"\bpasad[oa]s?\s+(unos?|algunos?|varios?|pocos?)\s+(días?|semanas?|meses?|años?|horas?)\b",
+            0.9,
+        ),
+        # "transcurrido un tiempo", "transcurridas unas horas"
+        (
+            r"\btranscurrid[oa]s?\s+(un|una|unos|unas|algunos?|varios?|pocos?)\s+(tiempo|días?|semanas?|meses?|años?|horas?)\b",
+            0.9,
+        ),
+        # "con el paso de los días/años"
+        (
+            r"\bcon\s+el\s+paso\s+de\s+(los\s+)?(días|años|meses|semanas|tiempo)\b",
+            0.85,
+        ),
+        # "a las pocas horas/semanas"
+        (
+            r"\ba\s+las?\s+(pocas?|dos|tres|cuatro|cinco)\s+(horas?|días?|semanas?|meses?)\b",
+            0.85,
+        ),
     ],
     MarkerType.SEASON_EPOCH: [
         # "aquel verano", "ese invierno"

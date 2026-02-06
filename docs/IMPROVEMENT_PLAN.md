@@ -698,15 +698,15 @@ pip install transformers
 # 4. Validar con contexto LLM si confianza < 0.7
 ```
 
-### Sprint 3: Temporal y Anacronismos (1-2 semanas)
+### Sprint 3: Temporal y Anacronismos -- COMPLETADO 2026-02-06
 
-| ID | Acción | Detalle |
-|----|--------|---------|
-| S3-01 | Narrative-of-Thought prompting | Implementar NoT para timeline |
-| S3-02 | Timeline Self-Reflection | Multi-etapa con auto-corrección |
-| S3-03 | Detección de anacronismos | BD de tecnologías/objetos por época |
-| S3-04 | Expresiones temporales español | "al día siguiente", "un mes después" |
-| S3-05 | HeidelTime para español | Evaluar integración |
+| ID | Acción | Estado | Notas |
+|----|--------|--------|-------|
+| S3-01 | Narrative-of-Thought prompting | PENDIENTE | Requiere investigación adicional |
+| S3-02 | Timeline Self-Reflection | PENDIENTE | Requiere investigación adicional |
+| S3-03 | Detección de anacronismos | DONE | `anachronisms.py` con BD 80+ tecnologías por época |
+| S3-04 | Expresiones temporales español | DONE | +6 patrones (pasados, transcurridos, etc.) |
+| S3-05 | HeidelTime para español | PENDIENTE | Evaluar integración futura |
 
 ### Sprint 4: Atributos Avanzados (1-2 semanas)
 
