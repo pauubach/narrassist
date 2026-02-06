@@ -21,11 +21,51 @@ from narrative_assistant.alerts.models import AlertStatus
 
 router = APIRouter()
 
+
+def _resolve_alert_positions(alert, chapters_cache: dict | None = None) -> tuple[int | None, int | None]:
+    """
+    Intenta resolver start_char/end_char para alertas que no los tienen.
+
+    Si la alerta tiene excerpt y chapter pero no start_char, busca el excerpt
+    en el texto del capítulo para derivar la posición.
+
+    Returns:
+        (start_char, end_char) o (None, None) si no se puede resolver.
+    """
+    start = getattr(alert, 'start_char', None)
+    end = getattr(alert, 'end_char', None)
+
+    if start is not None and end is not None:
+        return start, end
+
+    excerpt = getattr(alert, 'excerpt', None)
+    chapter_num = getattr(alert, 'chapter', None)
+
+    if not excerpt or not chapter_num or not chapters_cache:
+        return start, end
+
+    chapter_data = chapters_cache.get(chapter_num)
+    if not chapter_data:
+        return start, end
+
+    content = chapter_data.get('content', '')
+    chapter_start_offset = chapter_data.get('start_char', 0)
+
+    # Buscar excerpt en el contenido del capítulo
+    idx = content.find(excerpt[:80])  # Usar primeros 80 chars para búsqueda
+    if idx >= 0:
+        start = chapter_start_offset + idx
+        end = start + len(excerpt)
+
+    return start, end
+
 @router.get("/api/projects/{project_id}/alerts", response_model=ApiResponse)
 async def list_alerts(
     project_id: int,
     status: Optional[str] = None,
     current_chapter: Optional[int] = None,
+    severity: Optional[str] = None,
+    focus: bool = False,
 ):
     """
     Lista todas las alertas de un proyecto, opcionalmente priorizadas.
@@ -34,6 +74,8 @@ async def list_alerts(
         project_id: ID del proyecto
         status: Filtrar por estado (open, resolved, dismissed)
         current_chapter: Capítulo actual para priorizar alertas cercanas
+        severity: Filtrar por severidad (critical, warning, info)
+        focus: Si True, modo focus: solo alertas critical y warning con confianza >= 0.7
 
     Returns:
         ApiResponse con lista de alertas (priorizadas si current_chapter se especifica)
@@ -63,8 +105,46 @@ async def list_alerts(
         else:
             alerts = all_alerts
 
-        alerts_data = [
-            AlertResponse(
+        # Filtrar por severidad si se especifica
+        if severity:
+            sev_lower = severity.lower()
+            alerts = [
+                a for a in alerts
+                if (a.severity.value if hasattr(a.severity, 'value') else str(a.severity)).lower() == sev_lower
+            ]
+
+        # Focus mode: solo alertas critical/warning con confianza >= 0.7
+        if focus:
+            focus_severities = {'critical', 'warning'}
+            alerts = [
+                a for a in alerts
+                if (a.severity.value if hasattr(a.severity, 'value') else str(a.severity)).lower() in focus_severities
+                and (getattr(a, 'confidence', 0.0) or 0.0) >= 0.7
+            ]
+
+        # Construir cache de capítulos para resolver posiciones faltantes (S6-04)
+        chapters_cache = None
+        has_missing_positions = any(
+            getattr(a, 'start_char', None) is None and getattr(a, 'excerpt', None)
+            for a in alerts
+        )
+        if has_missing_positions and hasattr(deps, 'chapter_repository') and deps.chapter_repository:
+            try:
+                chapters = deps.chapter_repository.get_by_project(project_id)
+                chapters_cache = {
+                    c.chapter_number: {
+                        'content': c.content,
+                        'start_char': c.start_char,
+                    }
+                    for c in chapters
+                }
+            except Exception:
+                pass  # Si falla, las posiciones quedarán como None
+
+        alerts_data = []
+        for a in alerts:
+            resolved_start, resolved_end = _resolve_alert_positions(a, chapters_cache)
+            alerts_data.append(AlertResponse(
                 id=a.id,
                 project_id=a.project_id,
                 category=a.category.value if hasattr(a.category, 'value') else str(a.category),
@@ -75,8 +155,8 @@ async def list_alerts(
                 explanation=a.explanation,
                 suggestion=a.suggestion,
                 chapter=a.chapter,
-                start_char=getattr(a, 'start_char', None),
-                end_char=getattr(a, 'end_char', None),
+                start_char=resolved_start,
+                end_char=resolved_end,
                 excerpt=getattr(a, 'excerpt', None) or '',
                 status=a.status.value if hasattr(a.status, 'value') else str(a.status),
                 entity_ids=getattr(a, 'entity_ids', []) or [],
@@ -86,9 +166,7 @@ async def list_alerts(
                 updated_at=a.updated_at.isoformat() if hasattr(a, 'updated_at') and a.updated_at else None,
                 resolved_at=a.resolved_at.isoformat() if hasattr(a, 'resolved_at') and a.resolved_at else None,
                 extra_data=getattr(a, 'extra_data', None) or {},
-            )
-            for a in alerts
-        ]
+            ))
 
         return ApiResponse(success=True, data=alerts_data)
     except Exception as e:

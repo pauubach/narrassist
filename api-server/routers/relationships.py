@@ -1520,3 +1520,278 @@ def get_character_archetypes(
         return ApiResponse(success=False, error=user_msg)
 
 
+# ============================================================================
+# S6-01: Network Metrics Endpoint
+# ============================================================================
+
+@router.get("/api/projects/{project_id}/character-network", response_model=ApiResponse)
+async def get_character_network(project_id: int):
+    """
+    Obtiene métricas de red de personajes (centralidad, puentes, evolución).
+
+    Complementa /relationships con métricas de análisis de grafos:
+    - Centralidad por personaje (degree, betweenness, closeness)
+    - Personajes puente (conectan subgrupos)
+    - Evolución temporal de la red
+    - Densidad y clustering coefficient
+
+    Returns:
+        ApiResponse con CharacterNetworkReport
+    """
+    logger.info(f"[NETWORK-API] Solicitando red de personajes para proyecto {project_id}")
+    try:
+        from narrative_assistant.analysis.character_network import CharacterNetworkAnalyzer
+        from narrative_assistant.entities.repository import get_entity_repository
+        from narrative_assistant.persistence.chapter import get_chapter_repository
+
+        if not deps.project_manager:
+            return ApiResponse(success=False, error="Project manager not initialized")
+
+        result = deps.project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail=f"Proyecto {project_id} no encontrado")
+
+        entity_repo = get_entity_repository()
+        entities = entity_repo.get_entities_by_project(project_id, active_only=True)
+        chapter_repo = get_chapter_repository()
+        chapters = chapter_repo.get_by_project(project_id)
+
+        if not entities:
+            return ApiResponse(success=True, data={"nodes": [], "edges": [], "metrics": {}})
+
+        # Recopilar co-ocurrencias
+        entity_names = {e.id: e.canonical_name for e in entities}
+        cooccurrences = []
+
+        all_mentions = []
+        for entity in entities:
+            mentions = entity_repo.get_mentions_by_entity(entity.id)
+            for m in mentions:
+                all_mentions.append({
+                    "entity_id": entity.id,
+                    "start_char": m.start_char,
+                    "end_char": m.end_char,
+                    "chapter_id": m.chapter_id,
+                })
+
+        chapter_id_to_number = {c.id: c.chapter_number for c in chapters}
+
+        # Detectar co-ocurrencias
+        mentions_by_chapter: dict = {}
+        for m in all_mentions:
+            ch_num = chapter_id_to_number.get(m.get("chapter_id"))
+            if ch_num is not None:
+                mentions_by_chapter.setdefault(ch_num, []).append(m)
+
+        WINDOW = 500
+        for ch_num, ch_mentions in mentions_by_chapter.items():
+            ch_mentions.sort(key=lambda x: x["start_char"])
+            for i, m1 in enumerate(ch_mentions):
+                for m2 in ch_mentions[i+1:]:
+                    if m1["entity_id"] == m2["entity_id"]:
+                        continue
+                    distance = m2["start_char"] - m1["end_char"]
+                    if distance > WINDOW:
+                        break
+                    cooccurrences.append({
+                        "entity1_id": min(m1["entity_id"], m2["entity_id"]),
+                        "entity2_id": max(m1["entity_id"], m2["entity_id"]),
+                        "chapter": ch_num,
+                        "distance_chars": distance,
+                    })
+
+        analyzer = CharacterNetworkAnalyzer()
+        report = analyzer.analyze(
+            cooccurrences=cooccurrences,
+            entity_names=entity_names,
+            total_chapters=len(chapters),
+        )
+
+        return ApiResponse(
+            success=True,
+            data=convert_numpy_types(report.to_dict()),
+        )
+
+    except HTTPException:
+        raise
+    except ImportError as e:
+        logger.error(f"[NETWORK-API] Import error: {e}")
+        return ApiResponse(success=False, error="Módulo de red de personajes no disponible")
+    except Exception as e:
+        logger.error(f"[NETWORK-API] Error: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+# ============================================================================
+# S6-03: Character Profiles Endpoint
+# ============================================================================
+
+# ============================================================================
+# S6-02: Timeline of Character Appearances
+# ============================================================================
+
+@router.get("/api/projects/{project_id}/character-timeline", response_model=ApiResponse)
+async def get_character_timeline(project_id: int):
+    """
+    Obtiene timeline de apariciones de personajes por capítulo.
+
+    Para cada personaje, devuelve en qué capítulos aparece y con cuántas
+    menciones. Útil para visualizar la presencia narrativa.
+
+    Returns:
+        ApiResponse con datos de timeline por personaje
+    """
+    logger.info(f"[TIMELINE-API] Solicitando timeline para proyecto {project_id}")
+    try:
+        from narrative_assistant.entities.repository import get_entity_repository
+        from narrative_assistant.persistence.chapter import get_chapter_repository
+
+        if not deps.project_manager:
+            return ApiResponse(success=False, error="Project manager not initialized")
+
+        result = deps.project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail=f"Proyecto {project_id} no encontrado")
+
+        entity_repo = get_entity_repository()
+        entities = entity_repo.get_entities_by_project(project_id, active_only=True)
+        chapter_repo = get_chapter_repository()
+        chapters = chapter_repo.get_by_project(project_id)
+
+        if not entities or not chapters:
+            return ApiResponse(success=True, data={
+                "characters": [],
+                "chapters": [],
+                "total_chapters": 0,
+            })
+
+        chapter_id_to_number = {c.id: c.chapter_number for c in chapters}
+        chapter_titles = {c.chapter_number: c.title or f"Cap. {c.chapter_number}" for c in chapters}
+
+        # Construir timeline por personaje
+        characters_timeline = []
+
+        for entity in entities:
+            mentions = entity_repo.get_mentions_by_entity(entity.id)
+            if not mentions:
+                continue
+
+            # Agrupar menciones por capítulo
+            by_chapter: dict[int, int] = {}
+            for m in mentions:
+                ch_num = chapter_id_to_number.get(m.chapter_id)
+                if ch_num is not None:
+                    by_chapter[ch_num] = by_chapter.get(ch_num, 0) + 1
+
+            if not by_chapter:
+                continue
+
+            chapters_present = sorted(by_chapter.keys())
+
+            characters_timeline.append({
+                "entity_id": entity.id,
+                "name": entity.canonical_name,
+                "entity_type": entity.entity_type.value if hasattr(entity.entity_type, 'value') else str(entity.entity_type),
+                "importance": entity.importance.value if hasattr(entity.importance, 'value') else str(entity.importance),
+                "total_mentions": sum(by_chapter.values()),
+                "chapters_present": len(chapters_present),
+                "first_chapter": chapters_present[0],
+                "last_chapter": chapters_present[-1],
+                "appearances": [
+                    {"chapter": ch, "mentions": by_chapter[ch]}
+                    for ch in range(1, len(chapters) + 1)
+                ],
+            })
+
+        # Ordenar por total de menciones (más relevantes primero)
+        characters_timeline.sort(key=lambda x: x["total_mentions"], reverse=True)
+
+        return ApiResponse(
+            success=True,
+            data={
+                "characters": characters_timeline,
+                "chapters": [
+                    {"number": c.chapter_number, "title": chapter_titles.get(c.chapter_number, "")}
+                    for c in sorted(chapters, key=lambda x: x.chapter_number)
+                ],
+                "total_chapters": len(chapters),
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[TIMELINE-API] Error: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))
+
+
+@router.get("/api/projects/{project_id}/character-profiles", response_model=ApiResponse)
+async def get_character_profiles(project_id: int):
+    """
+    Obtiene perfiles de 6 indicadores para todos los personajes.
+
+    Indicadores: presencia, acciones, habla, definición, sentimiento, entornos.
+    Incluye rol narrativo estimado y relevancia.
+
+    Returns:
+        ApiResponse con lista de CharacterProfile
+    """
+    logger.info(f"[PROFILES-API] Solicitando perfiles para proyecto {project_id}")
+    try:
+        from narrative_assistant.analysis.character_profiling import CharacterProfiler
+        from narrative_assistant.entities.repository import get_entity_repository
+        from narrative_assistant.persistence.chapter import get_chapter_repository
+
+        if not deps.project_manager:
+            return ApiResponse(success=False, error="Project manager not initialized")
+
+        result = deps.project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(status_code=404, detail=f"Proyecto {project_id} no encontrado")
+
+        entity_repo = get_entity_repository()
+        entities = entity_repo.get_entities_by_project(project_id, active_only=True)
+        chapter_repo = get_chapter_repository()
+        chapters = chapter_repo.get_by_project(project_id)
+
+        if not entities:
+            return ApiResponse(success=True, data={"profiles": [], "count": 0})
+
+        # Construir datos de entrada
+        mentions = []
+        for entity in entities:
+            entity_mentions = entity_repo.get_mentions_by_entity(entity.id)
+            chapter_id_map = {c.id: c.chapter_number for c in chapters}
+            for m in entity_mentions:
+                ch_num = chapter_id_map.get(m.chapter_id, 0)
+                mentions.append({
+                    "entity_id": entity.id,
+                    "entity_name": entity.canonical_name,
+                    "chapter": ch_num,
+                })
+
+        # Textos de capítulos para acciones/sentimiento
+        chapter_texts = {c.chapter_number: c.content for c in chapters}
+
+        profiler = CharacterProfiler(total_chapters=len(chapters))
+        profiles = profiler.build_profiles(
+            mentions=mentions,
+            chapter_texts=chapter_texts,
+        )
+
+        return ApiResponse(
+            success=True,
+            data={
+                "profiles": [p.to_dict() for p in profiles],
+                "count": len(profiles),
+            },
+        )
+
+    except HTTPException:
+        raise
+    except ImportError as e:
+        logger.error(f"[PROFILES-API] Import error: {e}")
+        return ApiResponse(success=False, error="Módulo de perfilado no disponible")
+    except Exception as e:
+        logger.error(f"[PROFILES-API] Error: {e}", exc_info=True)
+        return ApiResponse(success=False, error=str(e))

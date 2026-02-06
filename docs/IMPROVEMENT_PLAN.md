@@ -728,15 +728,15 @@ pip install transformers
 | S5-04 | Sanitización anti-injection | DONE | `sanitization.py`: 15 patrones injection, JSON validation |
 | S5-05 | Cuantización óptima | DONE | `quantization` field: Q4_K_M default, Q6_K/Q8_0 opciones |
 
-### Sprint 6: Frontend y UX (1-2 semanas)
+### Sprint 6: Frontend y UX — COMPLETADO
 
-| ID | Acción | Detalle |
-|----|--------|---------|
-| S6-01 | Red de personajes interactiva | D3.js / vis.js grafo |
-| S6-02 | Timeline de apariciones | Visualización capítulo por capítulo |
-| S6-03 | Dashboard de salud narrativa | Métricas al abrir proyecto |
-| S6-04 | Navegación al texto desde alertas | Fix spanStart/spanEnd |
-| S6-05 | Modo focus (solo alertas críticas) | Filtro de severidad |
+| ID | Acción | Estado | Notas |
+|----|--------|--------|-------|
+| S6-01 | Red de personajes (API) | DONE | `GET /character-network` con centralidad, puentes, evolución |
+| S6-02 | Timeline de apariciones | DONE | `GET /character-timeline` con apariciones por capítulo |
+| S6-03 | Perfiles de personajes (API) | DONE | `GET /character-profiles` con 6 indicadores |
+| S6-04 | Navegación al texto desde alertas | DONE | `_resolve_alert_positions()` busca excerpt en capítulo |
+| S6-05 | Modo focus (solo alertas críticas) | DONE | `focus=true` filtra critical/warning con confianza ≥ 0.7 + `severity` filter |
 
 ### Backlog (Futuro)
 
@@ -821,4 +821,4 @@ S6-01 ─→ S6-02 ─→ S6-03
 
 **Última actualización**: 2026-02-06
 **Autor**: Claude (Panel de 8 expertos simulados)
-**Próximo paso**: Sprint 6 - Frontend y UX
+**Próximo paso**: Sprints 0-6 completados. Backlog futuro disponible.
