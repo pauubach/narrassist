@@ -803,6 +803,213 @@ CONFIANZA_AJUSTADA: [0.0-1.0]"""
 
         return new_confidence, f"{verdict}: {reasoning}"
 
+    # =========================================================================
+    # S3-01: Narrative-of-Thought Analysis
+    # =========================================================================
+
+    def analyze_with_not(
+        self,
+        text: str,
+        entities: list[str],
+        markers: list[str],
+    ) -> list[TemporalInconsistency]:
+        """
+        Analiza texto usando Narrative-of-Thought (NoT) prompting.
+
+        El método NoT convierte eventos narrativos a una estructura temporal
+        ordenada, genera una narrativa cronológica y detecta contradicciones.
+
+        Args:
+            text: Texto narrativo a analizar (max ~2000 chars)
+            entities: Lista de nombres de entidades
+            markers: Lista de marcadores temporales
+
+        Returns:
+            Lista de inconsistencias detectadas por NoT
+        """
+        if not self.is_available:
+            return []
+
+        try:
+            from ..llm.prompts import (
+                NARRATIVE_OF_THOUGHT_SYSTEM,
+                NARRATIVE_OF_THOUGHT_TEMPLATE,
+                NARRATIVE_OF_THOUGHT_EXAMPLES,
+                build_prompt,
+            )
+
+            prompt = build_prompt(
+                NARRATIVE_OF_THOUGHT_TEMPLATE,
+                examples=NARRATIVE_OF_THOUGHT_EXAMPLES,
+                text=text[:2000],
+                entities=", ".join(entities[:10]),
+                markers=", ".join(markers[:15]),
+            )
+
+            response = self.client.complete(
+                prompt=prompt,
+                system=NARRATIVE_OF_THOUGHT_SYSTEM,
+                max_tokens=1000,
+                temperature=0.2,
+            )
+
+            if not response:
+                return []
+
+            return self._parse_not_response(response)
+
+        except Exception as e:
+            logger.debug(f"Error en análisis NoT: {e}")
+            return []
+
+    def _parse_not_response(self, response: str) -> list[TemporalInconsistency]:
+        """Parsea la respuesta del análisis NoT."""
+        import json
+        import re
+
+        inconsistencies = []
+
+        # Intentar parsear JSON de la respuesta
+        try:
+            # Buscar JSON en la respuesta
+            json_match = re.search(r"\{[\s\S]*\}", response)
+            if not json_match:
+                return []
+
+            data = json.loads(json_match.group())
+            raw_issues = data.get("inconsistencies", [])
+
+            type_mapping = {
+                "impossible_sequence": InconsistencyType.IMPOSSIBLE_SEQUENCE,
+                "age_contradiction": InconsistencyType.AGE_CONTRADICTION,
+                "anachronism": InconsistencyType.ANACHRONISM,
+                "marker_conflict": InconsistencyType.MARKER_CONFLICT,
+                "time_jump_suspicious": InconsistencyType.TIME_JUMP_SUSPICIOUS,
+            }
+
+            for issue in raw_issues:
+                inc_type_str = issue.get("type", "marker_conflict")
+                inc_type = type_mapping.get(inc_type_str, InconsistencyType.MARKER_CONFLICT)
+                confidence = min(1.0, max(0.0, float(issue.get("confidence", 0.7))))
+
+                inconsistencies.append(TemporalInconsistency(
+                    inconsistency_type=inc_type,
+                    severity=InconsistencySeverity.MEDIUM if confidence < 0.8 else InconsistencySeverity.HIGH,
+                    description=issue.get("description", "Inconsistencia detectada por NoT"),
+                    chapter=0,
+                    position=0,
+                    confidence=confidence,
+                    methods_agreed=["not_llm"],
+                    reasoning={"not": data.get("reasoning", "")},
+                ))
+
+        except (json.JSONDecodeError, ValueError) as e:
+            logger.debug(f"No se pudo parsear respuesta NoT: {e}")
+
+        return inconsistencies
+
+    # =========================================================================
+    # S3-02: Timeline Self-Reflection
+    # =========================================================================
+
+    def self_reflect_timeline(
+        self,
+        timeline_summary: str,
+        markers_summary: str,
+        character_ages: str,
+    ) -> list[TemporalInconsistency]:
+        """
+        Auto-reflexión sobre un timeline construido.
+
+        Revisa un timeline ya construido para detectar problemas que
+        los métodos automáticos pudieron haber pasado por alto.
+
+        Args:
+            timeline_summary: Resumen del timeline construido
+            markers_summary: Resumen de marcadores temporales
+            character_ages: Información de edades de personajes
+
+        Returns:
+            Lista de inconsistencias adicionales detectadas
+        """
+        if not self.is_available:
+            return []
+
+        try:
+            from ..llm.prompts import (
+                TIMELINE_SELF_REFLECTION_SYSTEM,
+                TIMELINE_SELF_REFLECTION_TEMPLATE,
+                build_prompt,
+            )
+
+            prompt = build_prompt(
+                TIMELINE_SELF_REFLECTION_TEMPLATE,
+                timeline_summary=timeline_summary[:1500],
+                markers_summary=markers_summary[:500],
+                character_ages=character_ages[:500],
+            )
+
+            response = self.client.complete(
+                prompt=prompt,
+                system=TIMELINE_SELF_REFLECTION_SYSTEM,
+                max_tokens=800,
+                temperature=0.1,
+            )
+
+            if not response:
+                return []
+
+            return self._parse_self_reflection_response(response)
+
+        except Exception as e:
+            logger.debug(f"Error en self-reflection: {e}")
+            return []
+
+    def _parse_self_reflection_response(self, response: str) -> list[TemporalInconsistency]:
+        """Parsea la respuesta de self-reflection."""
+        import json
+        import re
+
+        inconsistencies = []
+
+        try:
+            json_match = re.search(r"\{[\s\S]*\}", response)
+            if not json_match:
+                return []
+
+            data = json.loads(json_match.group())
+            issues = data.get("issues", [])
+
+            type_mapping = {
+                "age_inconsistency": InconsistencyType.CHARACTER_AGE_MISMATCH,
+                "impossible_travel": InconsistencyType.IMPOSSIBLE_SEQUENCE,
+                "anachronism": InconsistencyType.ANACHRONISM,
+                "wrong_order": InconsistencyType.IMPOSSIBLE_SEQUENCE,
+                "missing_flashback": InconsistencyType.TIME_JUMP_SUSPICIOUS,
+            }
+
+            for issue in issues:
+                issue_type = issue.get("type", "wrong_order")
+                inc_type = type_mapping.get(issue_type, InconsistencyType.MARKER_CONFLICT)
+                confidence = min(1.0, max(0.0, float(issue.get("confidence", 0.6))))
+
+                inconsistencies.append(TemporalInconsistency(
+                    inconsistency_type=inc_type,
+                    severity=InconsistencySeverity.MEDIUM,
+                    description=issue.get("description", "Problema detectado en self-reflection"),
+                    chapter=0,
+                    position=0,
+                    suggestion=issue.get("suggestion"),
+                    confidence=confidence,
+                    methods_agreed=["self_reflection"],
+                    reasoning={"self_reflection": data.get("reasoning", "")},
+                ))
+
+        except (json.JSONDecodeError, ValueError) as e:
+            logger.debug(f"No se pudo parsear self-reflection: {e}")
+
+        return inconsistencies
+
 
 # =============================================================================
 # Sistema de Votación y Funciones de Conveniencia
@@ -970,6 +1177,55 @@ class VotingTemporalChecker:
                     inc.confidence = llm_score
 
             result.method_contributions["llm"] = len(high_priority)
+
+            # S3-01: Narrative-of-Thought - análisis complementario
+            if text and len(text) >= 200:
+                entity_names = []
+                for event in timeline.events[:20]:
+                    entity_names.extend(
+                        str(eid) for eid in getattr(event, "entity_ids", [])
+                    )
+                marker_texts = [m.text for m in markers[:15]]
+
+                not_issues = self._base_checker._llm_validator.analyze_with_not(
+                    text[:2000],
+                    entities=list(set(entity_names))[:10],
+                    markers=marker_texts,
+                )
+
+                # Añadir inconsistencias NoT que no dupliquen las existentes
+                existing_descs = {inc.description.lower()[:50] for inc in direct_inconsistencies}
+                for not_inc in not_issues:
+                    if not_inc.description.lower()[:50] not in existing_descs:
+                        direct_inconsistencies.append(not_inc)
+                        existing_descs.add(not_inc.description.lower()[:50])
+
+                result.method_contributions["not"] = len(not_issues)
+
+            # S3-02: Timeline Self-Reflection
+            if timeline.events:
+                timeline_summary = self._get_timeline_summary(timeline)
+                markers_summary = ", ".join(m.text for m in markers[:10])
+                ages_summary = ""
+                if character_ages:
+                    ages_parts = []
+                    for eid, age_list in list(character_ages.items())[:5]:
+                        for ch, age in age_list[:3]:
+                            ages_parts.append(f"entity_{eid}: {age} años (cap. {ch})")
+                    ages_summary = "; ".join(ages_parts)
+
+                reflection_issues = self._base_checker._llm_validator.self_reflect_timeline(
+                    timeline_summary=timeline_summary,
+                    markers_summary=markers_summary,
+                    character_ages=ages_summary or "No disponible",
+                )
+
+                for ref_inc in reflection_issues:
+                    if ref_inc.description.lower()[:50] not in existing_descs:
+                        direct_inconsistencies.append(ref_inc)
+                        existing_descs.add(ref_inc.description.lower()[:50])
+
+                result.method_contributions["self_reflection"] = len(reflection_issues)
 
         # Fase 5: Aplicar bonus por consenso
         for inc in direct_inconsistencies:

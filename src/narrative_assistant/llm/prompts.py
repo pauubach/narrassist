@@ -240,10 +240,145 @@ def build_prompt(
     return "\n".join(parts)
 
 
+# ============================================================================
+# S3-01: NARRATIVE-OF-THOUGHT (NoT) - Razonamiento Temporal
+# ============================================================================
+
+NARRATIVE_OF_THOUGHT_SYSTEM = """Eres un experto en análisis temporal de narrativas.
+Usas el método Narrative-of-Thought (NoT) para razonar sobre la cronología de eventos.
+
+Tu proceso es:
+1. EXTRAER: Convierte los eventos narrativos a una estructura temporal ordenada
+2. ANCLAR: Asocia cada evento con su referencia temporal más concreta
+3. NARRAR: Genera una narrativa lineal cronológica con los eventos anclados
+4. VERIFICAR: Detecta contradicciones entre la narrativa original y la cronología
+
+Responde SIEMPRE en formato JSON válido."""
+
+NARRATIVE_OF_THOUGHT_TEMPLATE = """Analiza la cronología del siguiente texto narrativo.
+
+Texto:
+---
+{text}
+---
+
+Entidades conocidas: {entities}
+Marcadores temporales detectados: {markers}
+
+Sigue el método Narrative-of-Thought paso a paso:
+
+PASO 1 - EXTRAER EVENTOS:
+Identifica cada evento narrativo y conviértelo a la estructura:
+  evento(quién, qué, cuándo_relativo, cuándo_absoluto)
+
+PASO 2 - ANCLAR EN TIMELINE:
+Ordena los eventos cronológicamente (no en orden narrativo).
+Asigna un "día_relativo" empezando desde día 0.
+
+PASO 3 - GENERAR NARRATIVA TEMPORAL:
+Describe la secuencia cronológica real de los eventos.
+
+PASO 4 - VERIFICAR COHERENCIA:
+¿Hay contradicciones entre el orden narrativo y la cronología real?
+¿Hay eventos imposibles dada la timeline?
+
+Responde en JSON:
+{{
+  "events": [
+    {{"id": 1, "who": "personaje", "what": "acción", "when_relative": "día X", "when_absolute": "fecha si hay", "chapter": N}}
+  ],
+  "timeline_order": [1, 3, 2],
+  "narrative_order": [1, 2, 3],
+  "chronological_narrative": "Primero ocurrió X, luego Y...",
+  "inconsistencies": [
+    {{"event_ids": [1, 3], "type": "impossible_sequence|age_contradiction|anachronism", "description": "descripción", "confidence": 0.8}}
+  ],
+  "reasoning": "explicación del análisis"
+}}"""
+
+NARRATIVE_OF_THOUGHT_EXAMPLES = [
+    {
+        "input": (
+            'Texto: "En 1990, María tenía 20 años. Tres años después se graduó de la universidad. '
+            'En el capítulo 5, se menciona que María cumplió 30 en 1995."'
+        ),
+        "output": (
+            '{"events": ['
+            '{"id": 1, "who": "María", "what": "tenía 20 años", "when_relative": "día 0", "when_absolute": "1990", "chapter": 1},'
+            '{"id": 2, "who": "María", "what": "se graduó", "when_relative": "día 1095", "when_absolute": "1993", "chapter": 2},'
+            '{"id": 3, "who": "María", "what": "cumplió 30", "when_relative": "día 1825", "when_absolute": "1995", "chapter": 5}'
+            '], "timeline_order": [1, 2, 3], "narrative_order": [1, 2, 3], '
+            '"chronological_narrative": "En 1990 María tenía 20 años. En 1993 se graduó. En 1995 cumplió 30.", '
+            '"inconsistencies": [{"event_ids": [1, 3], "type": "age_contradiction", '
+            '"description": "Si tenía 20 en 1990, en 1995 tendría 25, no 30", "confidence": 0.95}], '
+            '"reasoning": "Hay una contradicción de edad: 1995-1990=5 años, pero 30-20=10 años de diferencia."}'
+        ),
+    },
+]
+
+
+# ============================================================================
+# S3-02: TIMELINE SELF-REFLECTION
+# ============================================================================
+
+TIMELINE_SELF_REFLECTION_SYSTEM = """Eres un revisor experto de timelines narrativas.
+Tu tarea es verificar la coherencia de un timeline construido automáticamente.
+
+Proceso de auto-reflexión:
+1. Revisa cada evento del timeline
+2. Verifica que las fechas y edades son consistentes entre sí
+3. Busca saltos temporales imposibles
+4. Identifica anacronismos (tecnología/cultura fuera de época)
+5. Evalúa si los flashbacks/prolepsis están correctamente identificados
+
+Sé conservador: solo señala problemas claros con alta confianza."""
+
+TIMELINE_SELF_REFLECTION_TEMPLATE = """Revisa este timeline construido automáticamente para una narrativa.
+
+TIMELINE CONSTRUIDO:
+{timeline_summary}
+
+MARCADORES TEMPORALES DETECTADOS:
+{markers_summary}
+
+EDADES DE PERSONAJES:
+{character_ages}
+
+Reflexiona sobre la coherencia del timeline:
+
+1. ¿Las fechas asignadas a los eventos son internamente consistentes?
+2. ¿Las edades de los personajes progresan correctamente?
+3. ¿Hay eventos marcados como cronológicos que deberían ser flashbacks?
+4. ¿Hay anacronismos (objetos/tecnología fuera de época)?
+5. ¿Hay personajes que aparecen en dos lugares simultáneamente?
+
+Responde en JSON:
+{{
+  "is_coherent": true/false,
+  "issues": [
+    {{
+      "type": "age_inconsistency|impossible_travel|anachronism|wrong_order|missing_flashback",
+      "description": "descripción del problema",
+      "affected_events": [1, 3],
+      "suggestion": "cómo corregirlo",
+      "confidence": 0.8
+    }}
+  ],
+  "refined_timeline": "descripción del timeline corregido si hay cambios",
+  "reasoning": "explicación del análisis de auto-reflexión"
+}}"""
+
+
+# ============================================================================
+# UTILIDADES (actualización)
+# ============================================================================
+
 # Registro de temperaturas recomendadas por tarea
 RECOMMENDED_TEMPERATURES = {
     "character_analysis": 0.3,
     "violation_detection": 0.2,
     "alert_review": 0.1,
     "coreference": 0.2,
+    "narrative_of_thought": 0.2,
+    "timeline_self_reflection": 0.1,
 }

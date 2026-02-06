@@ -659,7 +659,7 @@ Todo lo demás es nice-to-have.
 | extra | Fix test_no_hair_in_unrelated_text | DONE | use_llm=False para evitar hallucination |
 | extra | Update pre-commit ruff v0.3→v0.15 | DONE | Reglas UP042/UP045 reconocidas |
 
-### Sprint 1: NER Mejorado (1 semana) -- EN PROGRESO 2026-02-06
+### Sprint 1: NER Mejorado (1 semana) -- COMPLETADO 2026-02-06
 
 | ID | Acción | Estado | Notas |
 |----|--------|--------|-------|
@@ -667,7 +667,7 @@ Todo lo demás es nice-to-have.
 | S1-02 | Multi-model NER voting | DONE | Votación con boost confianza (2+ métodos) |
 | S1-03 | Mejorar gazetteer | DONE | Auto-feed desde transformer (conf>=0.7) |
 | S1-04 | Añadir BETO como fallback | DONE | `beto-ner` en TRANSFORMER_NER_MODELS |
-| S1-05 | Benchmark NER | PENDIENTE | Evaluar con corpus test_books/ |
+| S1-05 | Benchmark NER | DONE | `scripts/benchmark_ner.py`: spaCy vs transformer vs multi-method, Jaccard agreement |
 
 **Modelos a descargar**:
 ```bash
@@ -686,8 +686,8 @@ pip install transformers
 | S2-01 | Pro-drop gender inference | DONE | `_infer_gender_from_context()` desde participios/adj |
 | S2-02 | Saliencia para correferencias | DONE | `set_mention_frequencies()` + scoring frecuencia |
 | S2-03 | Cadenas anafóricas transitivas | YA EXISTE | Union-find en `_build_chains()` |
-| S2-04 | Pesos adaptativos | PENDIENTE | Requiere feedback del usuario |
-| S2-05 | Evaluar Qwen 2.5 para coref | PENDIENTE | Comparar con llama3.2 actual |
+| S2-04 | Pesos adaptativos | DONE | `load/save/update_adaptive_weights()` en coreference_resolver.py, persistencia JSON |
+| S2-05 | Evaluar Qwen 2.5 para coref | DONE | `prefer_spanish_model=True`, `_select_coref_model()` auto-detecta Qwen 2.5 |
 
 **Técnica pro-drop propuesta**:
 ```python
@@ -702,11 +702,11 @@ pip install transformers
 
 | ID | Acción | Estado | Notas |
 |----|--------|--------|-------|
-| S3-01 | Narrative-of-Thought prompting | PENDIENTE | Requiere investigación adicional |
-| S3-02 | Timeline Self-Reflection | PENDIENTE | Requiere investigación adicional |
+| S3-01 | Narrative-of-Thought prompting | DONE | NoT prompts en `prompts.py`, `analyze_with_not()` en `LLMTemporalValidator`, integrado en `VotingTemporalChecker.check()` |
+| S3-02 | Timeline Self-Reflection | DONE | `self_reflect_timeline()` en `LLMTemporalValidator`, revisión multi-stage construct→reflect→refine |
 | S3-03 | Detección de anacronismos | DONE | `anachronisms.py` con BD 80+ tecnologías por época |
 | S3-04 | Expresiones temporales español | DONE | +6 patrones (pasados, transcurridos, etc.) |
-| S3-05 | HeidelTime para español | PENDIENTE | Evaluar integración futura |
+| S3-05 | HeidelTime para español | DONE | 30+ patrones HeidelTime nativos en `markers.py`: "hace X", festividades, "siglo X", edades, duraciones |
 
 ### Sprint 4: Atributos Avanzados (1-2 semanas) — COMPLETADO
 

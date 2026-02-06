@@ -280,6 +280,130 @@ TEMPORAL_PATTERNS: dict[MarkerType, list[tuple[str, float]]] = {
     ],
 }
 
+# ============================================================================
+# S3-05: Patrones HeidelTime para español
+# ============================================================================
+# Patrones adicionales inspirados en HeidelTime (Strötgen & Gertz, 2010).
+# HeidelTime es Java-based; aquí implementamos sus patrones clave en Python.
+
+HEIDELTIME_PATTERNS: dict[MarkerType, list[tuple[str, float]]] = {
+    MarkerType.ABSOLUTE_DATE: [
+        # "lunes, 5 de enero" (día de la semana + fecha)
+        (
+            r"\b(lunes|martes|miércoles|jueves|viernes|sábado|domingo),?\s+(\d{1,2})\s+de\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\b",
+            0.95,
+        ),
+        # "5/1/1990", "05-01-1990" (formato numérico)
+        (r"\b(\d{1,2})[/-](\d{1,2})[/-](\d{4})\b", 0.85),
+        # "siglo XX", "siglo XIX", "siglo XV"
+        (r"\bsiglo\s+([IVXLCDM]+)\b", 0.9),
+        # "los años cincuenta", "los años sesenta"
+        (
+            r"\blos\s+años\s+(veinte|treinta|cuarenta|cincuenta|sesenta|setenta|ochenta|noventa)\b",
+            0.9,
+        ),
+    ],
+    MarkerType.RELATIVE_TIME: [
+        # "hace X días/meses/años"
+        (
+            r"\bhace\s+(\d+|un|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|pocos|varios|algunos|muchos)\s+(días?|semanas?|meses?|años?|horas?|minutos?)\b",
+            0.9,
+        ),
+        # "desde hace X"
+        (
+            r"\bdesde\s+hace\s+(\d+|un|una|dos|tres|cuatro|cinco|varios|algunos)\s+(días?|semanas?|meses?|años?|horas?)\b",
+            0.9,
+        ),
+        # "dentro de X días"
+        (
+            r"\bdentro\s+de\s+(\d+|un|una|dos|tres|pocos|algunos)\s+(días?|semanas?|meses?|años?|horas?)\b",
+            0.9,
+        ),
+        # "la víspera", "anteanoche", "anteayer", "pasado mañana"
+        (
+            r"\b(la\s+víspera|anteanoche|anteayer|pasado\s+mañana|antes\s+de\s+ayer)\b",
+            0.95,
+        ),
+        # "al anochecer", "al amanecer", "al mediodía", "a medianoche"
+        (
+            r"\b(al\s+anochecer|al\s+amanecer|al\s+mediodía|a\s+medianoche|al\s+atardecer|al\s+alba)\b",
+            0.85,
+        ),
+        # "en aquel entonces", "por aquel entonces", "en ese momento"
+        (
+            r"\b(en\s+aquel\s+entonces|por\s+aquel\s+entonces|en\s+ese\s+momento|en\s+aquel\s+momento|por\s+entonces)\b",
+            0.8,
+        ),
+        # "acto seguido", "a continuación", "a renglón seguido"
+        (
+            r"\b(acto\s+seguido|a\s+continuación|a\s+renglón\s+seguido|inmediatamente\s+después)\b",
+            0.85,
+        ),
+        # "la semana pasada", "el mes que viene", "el año anterior"
+        (
+            r"\b(la\s+semana|el\s+mes|el\s+año|el\s+día|la\s+noche)\s+(pasad[oa]|anterior|siguiente|que\s+viene|próxim[oa])\b",
+            0.9,
+        ),
+    ],
+    MarkerType.SEASON_EPOCH: [
+        # Festividades y eventos culturales
+        (
+            r"\b(Navidad|Nochebuena|Nochevieja|Año\s+Nuevo|Reyes|Semana\s+Santa|Todos\s+los\s+Santos|San\s+Valentín|San\s+Juan|Carnaval|Corpus\s+Christi)\b",
+            0.9,
+        ),
+        # "en tiempos de", "en la época de"
+        (
+            r"\ben\s+(tiempos|época|la\s+era|la\s+época)\s+de\s+[A-Z]",
+            0.8,
+        ),
+        # "antes de la guerra", "después de la revolución"
+        (
+            r"\b(antes|después|durante|tras|al\s+final)\s+de\s+la\s+(guerra|revolución|reconquista|cruzada|reforma|independencia|restauración|república)\b",
+            0.85,
+        ),
+        # "en plena", "en pleno" (intensificador temporal)
+        (
+            r"\ben\s+plen[oa]\s+(guerra|verano|invierno|noche|día|madrugada|tormenta|batalla)\b",
+            0.8,
+        ),
+    ],
+    MarkerType.CHARACTER_AGE: [
+        # "de joven", "de niño", "de mayor", "de viejo"
+        (r"\bde\s+(joven|niño|niña|mayor|viejo|vieja|pequeño|pequeña|adolescente|adulto|adulta)\b", 0.8),
+        # "siendo joven/niño/mayor"
+        (r"\bsiendo\s+(joven|niño|niña|mayor|viejo|vieja|adolescente|adulto|adulta)\b", 0.8),
+        # "en su juventud/niñez/vejez"
+        (r"\ben\s+su\s+(juventud|niñez|infancia|adolescencia|vejez|madurez)\b", 0.85),
+        # "a la edad de X años"
+        (r"\ba\s+la\s+edad\s+de\s+(\d{1,3})\s+años\b", 0.95),
+        # "recién cumplidos los X"
+        (r"\brecién\s+cumplid[oa]s?\s+(los\s+)?(\d{1,3})\b", 0.9),
+    ],
+    MarkerType.DURATION: [
+        # "desde X hasta Y"
+        (
+            r"\bdesde\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre|\d{4})\s+hasta\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre|\d{4})\b",
+            0.9,
+        ),
+        # "entre X y Y" (años)
+        (r"\bentre\s+(\d{4})\s+y\s+(\d{4})\b", 0.9),
+        # "a lo largo de su vida", "toda su vida", "de por vida"
+        (r"\b(a\s+lo\s+largo\s+de\s+su\s+vida|toda\s+su\s+vida|de\s+por\s+vida)\b", 0.85),
+        # "en cuestión de minutos/horas"
+        (
+            r"\ben\s+cuestión\s+de\s+(minutos|horas|días|semanas|meses|segundos)\b",
+            0.85,
+        ),
+    ],
+}
+
+# Merge HeidelTime patterns into main TEMPORAL_PATTERNS
+for marker_type, patterns in HEIDELTIME_PATTERNS.items():
+    if marker_type in TEMPORAL_PATTERNS:
+        TEMPORAL_PATTERNS[marker_type].extend(patterns)
+    else:
+        TEMPORAL_PATTERNS[marker_type] = patterns
+
 
 class TemporalMarkerExtractor:
     """

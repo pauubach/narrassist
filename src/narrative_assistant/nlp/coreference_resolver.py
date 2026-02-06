@@ -94,6 +94,128 @@ DEFAULT_COREF_WEIGHTS = {
     CorefMethod.HEURISTICS: 0.15,
 }
 
+
+# =============================================================================
+# S2-04: Pesos Adaptativos
+# =============================================================================
+
+_ADAPTIVE_WEIGHTS_FILE = "adaptive_coref_weights.json"
+
+
+def _get_adaptive_weights_path() -> "Path":
+    """Retorna la ruta del archivo de pesos adaptativos."""
+    import os
+    from pathlib import Path
+
+    data_dir = os.environ.get("NA_DATA_DIR", "")
+    if data_dir:
+        base = Path(data_dir)
+    else:
+        base = Path.home() / ".narrative_assistant"
+    base.mkdir(parents=True, exist_ok=True)
+    return base / _ADAPTIVE_WEIGHTS_FILE
+
+
+def load_adaptive_weights() -> dict[CorefMethod, float] | None:
+    """
+    Carga pesos adaptativos desde disco.
+
+    Returns:
+        Dict de pesos si existen, None si no hay pesos guardados.
+    """
+    import json
+
+    path = _get_adaptive_weights_path()
+    if not path.exists():
+        return None
+
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+
+        weights = {}
+        for key, value in data.get("weights", {}).items():
+            try:
+                method = CorefMethod(key)
+                weights[method] = float(value)
+            except (ValueError, KeyError):
+                continue
+
+        if weights:
+            logger.info(f"Pesos adaptativos cargados: {weights}")
+            return weights
+    except Exception as e:
+        logger.debug(f"No se pudieron cargar pesos adaptativos: {e}")
+
+    return None
+
+
+def save_adaptive_weights(
+    weights: dict[CorefMethod, float],
+    feedback_count: int = 0,
+) -> None:
+    """
+    Guarda pesos adaptativos a disco.
+
+    Args:
+        weights: Pesos actuales por método
+        feedback_count: Número total de feedbacks recibidos
+    """
+    import json
+    from datetime import datetime
+
+    path = _get_adaptive_weights_path()
+    data = {
+        "weights": {m.value: round(w, 4) for m, w in weights.items()},
+        "feedback_count": feedback_count,
+        "updated_at": datetime.now().isoformat(),
+    }
+
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        logger.info(f"Pesos adaptativos guardados en {path}")
+    except Exception as e:
+        logger.warning(f"No se pudieron guardar pesos adaptativos: {e}")
+
+
+def update_adaptive_weights(
+    current_weights: dict[CorefMethod, float],
+    correct_method: CorefMethod | None,
+    incorrect_methods: list[CorefMethod] | None = None,
+    learning_rate: float = 0.05,
+) -> dict[CorefMethod, float]:
+    """
+    Actualiza pesos basándose en feedback del usuario.
+
+    Cuando el usuario confirma o corrige una resolución de correferencia,
+    se ajustan los pesos de los métodos que acertaron/fallaron.
+
+    Args:
+        current_weights: Pesos actuales
+        correct_method: Método que acertó (se incrementa su peso)
+        incorrect_methods: Métodos que fallaron (se decrementan)
+        learning_rate: Tasa de aprendizaje (default 0.05)
+
+    Returns:
+        Nuevos pesos normalizados
+    """
+    new_weights = current_weights.copy()
+
+    if correct_method and correct_method in new_weights:
+        new_weights[correct_method] += learning_rate
+
+    for method in (incorrect_methods or []):
+        if method in new_weights:
+            new_weights[method] = max(0.05, new_weights[method] - learning_rate * 0.5)
+
+    # Normalizar para que sumen 1.0
+    total = sum(new_weights.values())
+    if total > 0:
+        new_weights = {m: w / total for m, w in new_weights.items()}
+
+    return new_weights
+
 # Mapeo de pronombres españoles a género/número
 # IMPORTANTE: Los posesivos están en SPANISH_POSSESSIVES, no aquí
 SPANISH_PRONOUNS = {
@@ -693,6 +815,40 @@ def _get_default_coref_methods() -> list[CorefMethod]:
         ]
 
 
+def _select_coref_model() -> str:
+    """
+    S2-05: Selecciona el mejor modelo LLM para correferencias en español.
+
+    Estrategia: Qwen 2.5 es superior para tareas lingüísticas en español.
+    Si está disponible en Ollama, se prefiere sobre llama3.2.
+    """
+    try:
+        from ..llm.client import get_llm_client
+
+        client = get_llm_client()
+        if client and client.is_available:
+            available = getattr(client, "_available_models", None)
+            if available is None:
+                # Intentar obtener modelos disponibles
+                try:
+                    import requests
+
+                    resp = requests.get("http://localhost:11434/api/tags", timeout=2)
+                    if resp.status_code == 200:
+                        models = [m["name"].split(":")[0] for m in resp.json().get("models", [])]
+                        if "qwen2.5" in models:
+                            logger.info("S2-05: Usando Qwen 2.5 para correferencias (mejor español)")
+                            return "qwen2.5"
+                        if "mistral" in models:
+                            return "mistral"
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+    return "llama3.2"  # Fallback
+
+
 @dataclass
 class CorefConfig:
     """Configuración del sistema de correferencias."""
@@ -709,8 +865,26 @@ class CorefConfig:
     ollama_timeout: int = 600  # 10 min - CPU sin GPU es muy lento
     use_llm_for_coref: bool = field(default=None)  # None = auto (GPU sí, CPU no)
 
+    # S2-04: Pesos adaptativos
+    use_adaptive_weights: bool = True  # Cargar pesos aprendidos si existen
+
+    # S2-05: Preferencia de modelo para español
+    prefer_spanish_model: bool = True  # Prefiere Qwen 2.5 para correferencias
+
     def __post_init__(self):
-        """Ajusta configuración según hardware si use_llm_for_coref es None."""
+        """Ajusta configuración según hardware y preferencias."""
+        # S2-04: Cargar pesos adaptativos si existen
+        if self.use_adaptive_weights:
+            adaptive = load_adaptive_weights()
+            if adaptive:
+                self.method_weights = adaptive
+                logger.info("Usando pesos adaptativos para correferencias")
+
+        # S2-05: Auto-seleccionar modelo preferido para español
+        if self.prefer_spanish_model and self.ollama_model == "llama3.2":
+            self.ollama_model = _select_coref_model()
+
+        # Ajustar uso de LLM según hardware
         if self.use_llm_for_coref is None:
             # Auto-detectar
             has_llm = CorefMethod.LLM in self.enabled_methods
