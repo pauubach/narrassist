@@ -27,7 +27,7 @@ export const useAppStore = defineStore('app', () => {
   const theme = ref<ThemeMode>('auto')
   const isDark = ref(false)
   let retryInterval: number | null = null
-  let unlisten: (() => void) | null = null
+  let _unlisten: (() => void) | null = null
 
   // Inicializar tema desde localStorage
   const savedTheme = localStorage.getItem('narrative_assistant_theme') as ThemeMode | null
@@ -115,7 +115,7 @@ export const useAppStore = defineStore('app', () => {
     if (!tauriListen) return
 
     try {
-      unlisten = await tauriListen('backend-status', (event) => {
+      _unlisten = await tauriListen('backend-status', (event) => {
         const payload = event.payload as { status: string; message: string }
         console.log('[Tauri] Backend status event:', payload)
 

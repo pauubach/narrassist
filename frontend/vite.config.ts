@@ -26,16 +26,23 @@ export default defineConfig({
     }
   },
 
-  // Build optimizations
+  // Build optimizations for local Tauri app
   build: {
     target: 'esnext',
     minify: 'esbuild',
-    sourcemap: true,
+    // No sourcemaps in production bundle (local app, not debuggable by users)
+    sourcemap: false,
+    // No gzip reporting — irrelevant for local filesystem (no HTTP content-encoding)
+    reportCompressedSize: false,
+    // Chunks >500KB are normal for a local app — suppress warning
+    chunkSizeWarningLimit: 1500,
     rollupOptions: {
       output: {
         manualChunks: {
           'vue-vendor': ['vue', 'vue-router', 'pinia'],
-          'ui-vendor': ['primevue']
+          'ui-vendor': ['primevue'],
+          'vis-network': ['vis-network', 'vis-data'],
+          'chart': ['chart.js'],
         }
       }
     }

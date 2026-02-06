@@ -45,12 +45,19 @@ frontend/node_modules/
 *.tmp
 .cache/
 nul
+temp_*/
+clean_registry.ps1
 
 # Test results and reports
 frontend/test-results/
 frontend/playwright-report/
 test-results/
 *.spec.ts-snapshots/
+*test_output*.txt
+*test_results*.txt
+
+# TypeScript build cache
+*.tsbuildinfo
 
 # Tauri build artifacts
 src-tauri/target/
