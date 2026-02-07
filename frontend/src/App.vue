@@ -51,13 +51,10 @@ import UserGuideDialog from '@/components/UserGuideDialog.vue'
 import MenuBar from '@/components/MenuBar.vue'
 import ModelSetupDialog from '@/components/ModelSetupDialog.vue'
 import { useSystemStore } from '@/stores/system'
-import { useNotifications } from '@/composables/useNotifications'
-
 const router = useRouter()
 const route = useRoute()
 const appStore = useAppStore()
 const systemStore = useSystemStore()
-const { requestPermission: requestNotificationPermission } = useNotifications()
 const themeStore = useThemeStore()
 const workspaceStore = useWorkspaceStore()
 const showShortcutsHelp = ref(false)
@@ -224,9 +221,6 @@ onMounted(() => {
   }
 
   tryShowTutorial()
-
-  // Solicitar permiso de notificaciones del OS (silencioso si ya concedido/denegado)
-  requestNotificationPermission()
 
   // Registrar event listeners (web MenuBar y atajos globales)
   window.addEventListener('keyboard:show-help', onShowHelp)

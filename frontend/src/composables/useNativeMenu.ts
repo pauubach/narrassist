@@ -11,13 +11,20 @@ let tauriListen: ((event: string, handler: (event: { payload: string }) => void)
 let tauriReadyPromise: Promise<void> | null = null
 
 // Dynamic import for Tauri event API (to avoid errors when running in browser)
+// Con timeout de 5s para evitar cuelgues indefinidos
 const tauriReady = ref(false)
 if (typeof window !== 'undefined' && '__TAURI__' in window) {
-  tauriReadyPromise = import('@tauri-apps/api/event').then(module => {
-    tauriListen = module.listen as typeof tauriListen
-    tauriReady.value = true
-    console.log('[Menu] Tauri event API loaded successfully')
-  }).catch(error => {
+  const importWithTimeout = Promise.race([
+    import('@tauri-apps/api/event').then(module => {
+      tauriListen = module.listen as typeof tauriListen
+      tauriReady.value = true
+      console.log('[Menu] Tauri event API loaded successfully')
+    }),
+    new Promise<void>((_, reject) =>
+      setTimeout(() => reject(new Error('Tauri event API import timeout (5s)')), 5000)
+    ),
+  ])
+  tauriReadyPromise = importWithTimeout.catch(error => {
     console.warn('[Menu] Failed to load Tauri event API:', error)
   })
 }

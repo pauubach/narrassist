@@ -58,7 +58,7 @@ export const useProjectsStore = defineStore('projects', () => {
     }
   }
 
-  async function createProject(name: string, description?: string, file?: File, rules?: string) {
+  async function createProject(name: string, description?: string, file?: File) {
     error.value = null
 
     try {
@@ -66,7 +66,6 @@ export const useProjectsStore = defineStore('projects', () => {
       formData.append('name', name)
       if (description) formData.append('description', description)
       if (file) formData.append('file', file)
-      if (rules) formData.append('rules', rules)
 
       const data = await api.postForm<ApiProject>('/api/projects', formData)
       const transformed = transformProject(data)

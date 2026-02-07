@@ -11,6 +11,7 @@ from fastapi import UploadFile, File
 from typing import Optional, Any
 from deps import generate_person_aliases
 from narrative_assistant.core.result import Result
+from narrative_assistant.core.errors import ModelNotLoadedError
 
 router = APIRouter()
 
@@ -2037,7 +2038,6 @@ JSON:"""
 
                 # Mensaje de error amigable según el tipo de excepción
                 err_str = str(e)
-                from narrative_assistant.core.errors import ModelNotLoadedError
                 if isinstance(e, ModelNotLoadedError) or "not loaded" in err_str.lower() or "not found" in err_str.lower():
                     user_msg = (
                         "Modelo de análisis no disponible. "

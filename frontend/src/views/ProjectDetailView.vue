@@ -427,7 +427,7 @@ const projectsStore = useProjectsStore()
 const workspaceStore = useWorkspaceStore()
 const selectionStore = useSelectionStore()
 const analysisStore = useAnalysisStore()
-const { notifyAnalysisComplete, notifyAnalysisError } = useNotifications()
+const { notifyAnalysisComplete, notifyAnalysisError, requestPermission: requestNotificationPermission } = useNotifications()
 
 // Navegación de menciones - usar projectId reactivo
 const mentionNav = useMentionNavigation(() => project.value?.id ?? 0)
@@ -785,6 +785,16 @@ const handleMenuTabEvent = (event: Event) => {
   }
 }
 
+// Handle menu events dispatched from App.vue / useNativeMenu
+const handleMenuExport = () => { showExportDialog.value = true }
+const handleMenuRunAnalysis = () => { showReanalyzeDialog.value = true }
+const handleMenuPauseAnalysis = () => {
+  // Currently no pause support — log for debugging
+  console.log('[Menu] Pause analysis not yet implemented')
+}
+const handleMenuToggleInspector = () => { workspaceStore.toggleRightPanel() }
+const handleMenuToggleSidebar = () => { workspaceStore.toggleLeftPanel() }
+
 onMounted(async () => {
   const projectId = parseInt(route.params.id as string)
 
@@ -794,8 +804,13 @@ onMounted(async () => {
     return
   }
 
-  // Listen for menu tab change events
+  // Listen for menu events (native Tauri menu + web MenuBar)
   window.addEventListener('menubar:view-tab', handleMenuTabEvent)
+  window.addEventListener('menubar:export', handleMenuExport)
+  window.addEventListener('menubar:run-analysis', handleMenuRunAnalysis)
+  window.addEventListener('menubar:pause-analysis', handleMenuPauseAnalysis)
+  window.addEventListener('menubar:toggle-inspector', handleMenuToggleInspector)
+  window.addEventListener('menubar:toggle-sidebar', handleMenuToggleSidebar)
 
   try {
     // Resetear workspace al entrar
@@ -857,6 +872,11 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener('menubar:view-tab', handleMenuTabEvent)
+  window.removeEventListener('menubar:export', handleMenuExport)
+  window.removeEventListener('menubar:run-analysis', handleMenuRunAnalysis)
+  window.removeEventListener('menubar:pause-analysis', handleMenuPauseAnalysis)
+  window.removeEventListener('menubar:toggle-inspector', handleMenuToggleInspector)
+  window.removeEventListener('menubar:toggle-sidebar', handleMenuToggleSidebar)
   stopAnalysisPolling()
 })
 
@@ -1238,6 +1258,9 @@ const startReanalysis = async () => {
   if (!project.value) return
   reanalyzing.value = true
   showReanalyzeDialog.value = false
+
+  // Request notification permission on first analysis (non-blocking)
+  requestNotificationPermission()
 
   // Resetear contadores inmediatamente para mostrar 0 durante el análisis
   entities.value = []
