@@ -296,10 +296,10 @@ async def record_manuscript_usage(project_id: int = Body(..., embed=True)):
 @router.get("/api/license/check-module/{module_name}", response_model=ApiResponse)
 async def check_module_access(module_name: str):
     """
-    Verifica si el usuario tiene acceso a un modulo especifico.
+    Verifica si el usuario tiene acceso a un módulo específico.
 
     Args:
-        module_name: Nombre del modulo (CORE, NARRATIVA, VOZ_ESTILO, AVANZADO)
+        module_name: Nombre del módulo (CORE, NARRATIVA, VOZ_ESTILO, AVANZADO)
 
     Returns:
         ApiResponse indicando si tiene acceso

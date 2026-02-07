@@ -14,7 +14,7 @@
           </Tag>
           <Tag
             v-if="isMerged"
-            v-tooltip.bottom="'Esta entidad es resultado de una fusion'"
+            v-tooltip.bottom="'Esta entidad es resultado de una fusión'"
             severity="info"
             class="merged-tag"
           >

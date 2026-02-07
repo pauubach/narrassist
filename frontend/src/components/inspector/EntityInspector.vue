@@ -253,7 +253,7 @@ const hasChapterData = computed(() => chapterAppearances.value.length > 1)
           <DsBadge :entity-type="entity.type" size="sm">{{ entityTypeLabel }}</DsBadge>
           <DsBadge
             v-if="isMerged"
-            v-tooltip.bottom="'Esta entidad es resultado de una fusion'"
+            v-tooltip.bottom="'Esta entidad es resultado de una fusión'"
             color="info"
             size="sm"
             icon="pi pi-link"

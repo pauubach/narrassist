@@ -98,17 +98,17 @@ class LicenseOfflineError(LicenseError):
         if self.grace_remaining:
             days = self.grace_remaining.days
             self.user_message = (
-                f"Sin conexion. Modo offline activo ({days} dias restantes). "
-                "Conectate a internet para verificar tu licencia."
+                f"Sin conexión. Modo offline activo ({days} días restantes). "
+                "Conéctate a internet para verificar tu licencia."
             )
         else:
-            self.user_message = "No se puede verificar la licencia sin conexion a internet."
+            self.user_message = "No se puede verificar la licencia sin conexión a internet."
         super().__post_init__()
 
 
 @dataclass
 class DeviceLimitError(LicenseError):
-    """Limite de dispositivos alcanzado."""
+    """Límite de dispositivos alcanzado."""
 
     current_devices: int = 0
     max_devices: int = 0
@@ -119,7 +119,7 @@ class DeviceLimitError(LicenseError):
     def __post_init__(self):
         if self.user_message is None:
             self.user_message = (
-                f"Has alcanzado el limite de {self.max_devices} dispositivo(s). "
+                f"Has alcanzado el límite de {self.max_devices} dispositivo(s). "
                 "Desactiva un dispositivo existente o actualiza tu plan."
             )
         super().__post_init__()
@@ -139,10 +139,10 @@ class DeviceCooldownError(LicenseError):
             hours_remaining = int((self.cooldown_ends - datetime.utcnow()).total_seconds() / 3600)
             self.user_message = (
                 f"Este dispositivo fue desactivado recientemente. "
-                f"Podras reactivarlo en {hours_remaining} horas."
+                f"Podrás reactivarlo en {hours_remaining} horas."
             )
         else:
-            self.user_message = "Este dispositivo esta en periodo de espera tras desactivacion."
+            self.user_message = "Este dispositivo está en periodo de espera tras desactivación."
         super().__post_init__()
 
 
@@ -160,16 +160,16 @@ class QuotaExceededError(LicenseError):
     def __post_init__(self):
         if self.user_message is None:
             self.user_message = (
-                f"Has alcanzado el limite de {self.max_usage} manuscritos este mes "
+                f"Has alcanzado el límite de {self.max_usage} manuscritos este mes "
                 f"({self.current_usage}/{self.max_usage}). "
-                "Espera al proximo periodo o actualiza tu plan."
+                "Espera al próximo periodo o actualiza tu plan."
             )
         super().__post_init__()
 
 
 @dataclass
 class ModuleNotLicensedError(LicenseError):
-    """Modulo no incluido en la licencia."""
+    """Módulo no incluido en la licencia."""
 
     module: LicenseModule | None = None
     message: str = "Module not licensed"

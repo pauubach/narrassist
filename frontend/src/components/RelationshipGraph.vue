@@ -58,7 +58,7 @@
           @click="showFilters = !showFilters"
         />
         <Button
-          v-tooltip.bottom="'Configuracion'"
+          v-tooltip.bottom="'Configuración'"
           icon="pi pi-cog"
           text
           rounded

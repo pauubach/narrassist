@@ -135,10 +135,10 @@ export const useLicenseStore = defineStore('license', () => {
         await fetchLicenseStatus()
         return true
       }
-      error.value = data.message || 'Verificacion fallida'
+      error.value = data.message || 'Verificación fallida'
       return false
     } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Verificacion fallida'
+      error.value = e instanceof Error ? e.message : 'Verificación fallida'
       console.error('Error verifying license:', e)
       return false
     } finally {

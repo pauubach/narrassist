@@ -149,7 +149,7 @@
 
           <!-- Entidades a absorber -->
           <div class="merge-entities">
-            <h4>Se fusionaran estas entidades:</h4>
+            <h4>Se fusionarán estas entidades:</h4>
             <div class="entities-to-merge">
               <div
                 v-for="entity in entitiesToMerge"
@@ -350,8 +350,8 @@
 
           <!-- Advertencia -->
           <Message severity="info" :closable="false">
-            <strong>Nota:</strong> Las entidades fusionadas se desactivaran pero podras deshacer
-            esta fusion desde el historial de fusiones o desde la ficha de la entidad resultante.
+            <strong>Nota:</strong> Las entidades fusionadas se desactivarán pero podrás deshacer
+            esta fusión desde el historial de fusiones o desde la ficha de la entidad resultante.
           </Message>
         </div>
       </div>

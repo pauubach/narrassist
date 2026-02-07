@@ -454,16 +454,39 @@ async def download_models(request: DownloadModelsRequest):
 
         manager = get_model_manager()
 
+        MODEL_TYPE_MAP = {
+            "spacy": ModelType.SPACY,
+            "embeddings": ModelType.EMBEDDINGS,
+            "transformer_ner": ModelType.TRANSFORMER_NER,
+        }
+
         def download_task():
+            from concurrent.futures import ThreadPoolExecutor, as_completed
+
+            models_to_download = []
             for model_name in request.models:
+                mt = MODEL_TYPE_MAP.get(model_name)
+                if mt:
+                    models_to_download.append((model_name, mt))
+
+            # Descargas paralelas: spaCy (GitHub CDN) + HF model en paralelo
+            # Máximo 2 workers para no saturar red ni RAM
+            def _download_one(name_and_type):
+                name, mt = name_and_type
                 try:
-                    if model_name == "spacy":
-                        manager.ensure_model(ModelType.SPACY, force_download=request.force)
-                    elif model_name == "embeddings":
-                        manager.ensure_model(ModelType.EMBEDDINGS, force_download=request.force)
-                    logger.info(f"Model {model_name} downloaded successfully")
+                    manager.ensure_model(mt, force_download=request.force)
+                    logger.info(f"Model {name} downloaded successfully")
                 except Exception as e:
-                    logger.error(f"Error downloading {model_name}: {e}")
+                    logger.error(f"Error downloading {name}: {e}")
+
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                futures = {pool.submit(_download_one, item): item[0] for item in models_to_download}
+                for future in as_completed(futures):
+                    model_name = futures[future]
+                    try:
+                        future.result()
+                    except Exception as e:
+                        logger.error(f"Download thread error for {model_name}: {e}")
 
         # Ejecutar en segundo plano
         thread = threading.Thread(target=download_task, daemon=True)
@@ -527,10 +550,10 @@ async def download_progress():
         try:
             real_sizes = get_real_model_sizes()
         except Exception:
-            real_sizes = {
-                "spacy": KNOWN_MODELS.get("spacy", {}).get("size_mb", 560) * 1024 * 1024,
-                "embeddings": KNOWN_MODELS.get("embeddings", {}).get("size_mb", 470) * 1024 * 1024,
-            }
+            from narrative_assistant.core.model_manager import ModelType as MT
+            real_sizes = {}
+            for mt, mi in KNOWN_MODELS.items():
+                real_sizes[mt.value] = mi.size_mb * 1024 * 1024
 
         return ApiResponse(
             success=True,
@@ -538,8 +561,7 @@ async def download_progress():
                 "active_downloads": progress or {},
                 "has_active": has_active,
                 "model_sizes": {
-                    "spacy": real_sizes.get("spacy", 0),
-                    "embeddings": real_sizes.get("embeddings", 0),
+                    **{k: v for k, v in real_sizes.items()},
                     "total": sum(real_sizes.values()),
                 },
             }

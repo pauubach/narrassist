@@ -165,16 +165,16 @@ class Device:
     Dispositivo vinculado a una licencia.
 
     Attributes:
-        id: Identificador unico en BD local
+        id: Identificador único en BD local
         license_id: ID de la licencia asociada
-        hardware_fingerprint: Hash unico del hardware
+        hardware_fingerprint: Hash único del hardware
         device_name: Nombre amigable del dispositivo
-        os_info: Informacion del sistema operativo
+        os_info: Información del sistema operativo
         status: Estado del dispositivo
-        activated_at: Fecha de activacion
-        deactivated_at: Fecha de desactivacion (si aplica)
+        activated_at: Fecha de activación
+        deactivated_at: Fecha de desactivación (si aplica)
         cooldown_ends_at: Fin del periodo de cooldown
-        last_seen_at: Ultima vez que el dispositivo verifico la licencia
+        last_seen_at: Última vez que el dispositivo verificó la licencia
         is_current_device: True si es el dispositivo actual
     """
 

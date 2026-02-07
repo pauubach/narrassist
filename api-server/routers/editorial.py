@@ -84,12 +84,12 @@ async def save_editorial_rules(project_id: int, request: EditorialRulesRequest):
     """
     Guarda las reglas editoriales de un proyecto.
 
-    Las reglas se interpretan durante el analisis de estilo para detectar
-    problemas especificos de la editorial o corrector.
+    Las reglas se interpretan durante el análisis de estilo para detectar
+    problemas específicos de la editorial o corrector.
 
     Args:
         project_id: ID del proyecto
-        request: Texto de reglas y estado de habilitacion
+        request: Texto de reglas y estado de habilitación
 
     Returns:
         ApiResponse confirmando el guardado

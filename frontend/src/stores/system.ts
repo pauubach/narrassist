@@ -4,6 +4,7 @@ import { apiUrl } from '@/config/api'
 import { api } from '@/services/apiClient'
 
 export interface ModelStatus {
+  type: string
   installed: boolean
   display_name: string
   size_mb: number
@@ -117,10 +118,11 @@ export const useSystemStore = defineStore('system', () => {
 
   // Download progress (real-time)
   const downloadProgress = ref<Record<string, DownloadProgressInfo>>({})
-  const modelSizes = ref<{ spacy: number; embeddings: number; total: number }>({
-    spacy: 560 * 1024 * 1024,
+  const modelSizes = ref<Record<string, number>>({
+    spacy: 540 * 1024 * 1024,
     embeddings: 470 * 1024 * 1024,
-    total: 1030 * 1024 * 1024,
+    transformer_ner: 500 * 1024 * 1024,
+    total: 1510 * 1024 * 1024,
   })
 
   // System capabilities (cached - loaded once at startup)
@@ -228,7 +230,7 @@ export const useSystemStore = defineStore('system', () => {
     return null
   }
 
-  async function downloadModels(models: string[] = ['spacy', 'embeddings'], force = false): Promise<boolean> {
+  async function downloadModels(models: string[] = ['spacy', 'embeddings', 'transformer_ner'], force = false): Promise<boolean> {
     modelsDownloading.value = true
     modelsError.value = null
 
@@ -253,7 +255,7 @@ export const useSystemStore = defineStore('system', () => {
       const response = await api.tryGet<{
         active_downloads: Record<string, DownloadProgressInfo>
         has_active: boolean
-        model_sizes: { spacy: number; embeddings: number; total: number }
+        model_sizes: Record<string, number>
       }>('/api/models/download/progress')
 
       if (response) {

@@ -1,26 +1,47 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useSystemStore } from '@/stores/system'
+import type { DownloadProgressInfo, ModelStatus } from '@/stores/system'
 import Dialog from 'primevue/dialog'
 import ProgressBar from 'primevue/progressbar'
 
 const systemStore = useSystemStore()
 
+type DownloadPhase =
+  | 'starting'
+  | 'checking'
+  | 'installing-deps'
+  | 'downloading'
+  | 'completed'
+  | 'error'
+  | 'python-missing'
+  | 'backend-error'
+
+interface RealProgress {
+  percent: number
+  bytesDownloaded: number
+  bytesTotal: number
+  speedMbps: number
+  phase: string
+  modelType: string | null
+  hasRealProgress: boolean
+}
+
 const visible = ref(true) // Siempre visible al inicio
-const downloadPhase = ref<'starting' | 'checking' | 'installing-deps' | 'downloading' | 'completed' | 'error' | 'python-missing' | 'backend-error'>('starting')
+const downloadPhase = ref<DownloadPhase>('starting')
 
 // Progreso real desde el backend
-const realProgress = computed(() => {
+const realProgress = computed<RealProgress | null>(() => {
   const progress = systemStore.downloadProgress
   if (!progress || Object.keys(progress).length === 0) return null
 
   // Combinar progreso de todos los modelos activos
-  const models = Object.values(progress)
+  const models = Object.values(progress) as DownloadProgressInfo[]
   if (models.length === 0) return null
 
-  const totalBytes = models.reduce((sum, m) => sum + (m.bytes_total || 0), 0)
-  const downloadedBytes = models.reduce((sum, m) => sum + (m.bytes_downloaded || 0), 0)
-  const avgSpeed = models.reduce((sum, m) => sum + (m.speed_bps || 0), 0) / models.length
+  const totalBytes = models.reduce((sum, m) => sum + m.bytes_total, 0)
+  const downloadedBytes = models.reduce((sum, m) => sum + m.bytes_downloaded, 0)
+  const avgSpeed = models.reduce((sum, m) => sum + m.speed_bps, 0) / models.length
 
   // Encontrar el modelo activo (no completado)
   const activeModel = models.find(m => m.phase !== 'completed' && m.phase !== 'error')
@@ -44,24 +65,24 @@ const displayProgress = computed(() => {
   return null // null = indeterminado
 })
 
+// Mapa de nombres funcionales por tipo de modelo
+const modelDisplayNames: Record<string, string> = {
+  spacy: 'Análisis gramatical y lingüístico',
+  embeddings: 'Análisis de similitud y contexto',
+  transformer_ner: 'Reconocimiento de personajes y lugares',
+}
+
 // Texto del modelo actual basado en progreso real
 const currentModel = computed(() => {
   if (!realProgress.value) return 'Iniciando descarga...'
 
   const phase = realProgress.value.phase
   const modelType = realProgress.value.modelType
+  const displayName = modelType ? (modelDisplayNames[modelType] || modelType) : ''
 
   if (phase === 'connecting') return 'Conectando con el servidor...'
-  if (phase === 'installing') {
-    return modelType === 'spacy'
-      ? 'Instalando spaCy...'
-      : 'Instalando modelo de embeddings...'
-  }
-  if (phase === 'downloading') {
-    return modelType === 'spacy'
-      ? 'Descargando spaCy (modelo de lenguaje)...'
-      : 'Descargando Embeddings (análisis semántico)...'
-  }
+  if (phase === 'installing') return `Instalando ${displayName}...`
+  if (phase === 'downloading') return `Descargando ${displayName}...`
   return 'Procesando...'
 })
 
@@ -151,17 +172,42 @@ onBeforeUnmount(() => {
   systemStore.stopPolling()
 })
 
-const missingModels = computed(() => {
-  if (!systemStore.modelsStatus?.nlp_models) return []
+// Mapa de model_name → model_type (para buscar progreso)
+const modelNameToType: Record<string, string> = {
+  es_core_news_lg: 'spacy',
+  'paraphrase-multilingual-MiniLM-L12-v2': 'embeddings',
+  'PlanTL-GOB-ES/roberta-base-bne-capitel-ner': 'transformer_ner',
+}
 
-  return Object.entries(systemStore.modelsStatus.nlp_models)
-    .filter(([_, info]) => !info.installed)
+// Orden fijo de instalación de modelos
+const MODEL_INSTALL_ORDER = [
+  'es_core_news_lg',
+  'paraphrase-multilingual-MiniLM-L12-v2',
+  'PlanTL-GOB-ES/roberta-base-bne-capitel-ner',
+]
+
+// Todos los modelos (instalados y pendientes) en orden de instalación
+const allModels = computed(() => {
+  const nlpModels = systemStore.modelsStatus?.nlp_models
+  if (!nlpModels) return []
+
+  const entries = Object.entries(nlpModels) as [string, ModelStatus][]
+  return entries
+    .sort(([a], [b]) => {
+      const ia = MODEL_INSTALL_ORDER.indexOf(a)
+      const ib = MODEL_INSTALL_ORDER.indexOf(b)
+      return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib)
+    })
     .map(([name, info]) => ({
       name,
-      displayName: info.display_name,
-      sizeMb: info.size_mb
+      type: info.type ?? modelNameToType[name] ?? name,
+      displayName: info.display_name || modelDisplayNames[modelNameToType[name]] || name,
+      sizeMb: info.size_mb || 0,
+      installed: info.installed,
     }))
 })
+
+const missingModels = computed(() => allModels.value.filter(m => !m.installed))
 
 // Usar tamaños reales del backend si están disponibles
 const totalDownloadSize = computed(() => {
@@ -237,16 +283,18 @@ async function retryStartup() {
 }
 
 // Helpers para estado de modelos individuales
+function getModelPhase(modelName: string): string | undefined {
+  const progress = systemStore.downloadProgress as Record<string, DownloadProgressInfo>
+  const modelType = modelNameToType[modelName] || modelName
+  return progress[modelType]?.phase
+}
+
 function isModelCompleted(modelName: string): boolean {
-  const progress = systemStore.downloadProgress
-  const modelType = modelName === 'es_core_news_lg' ? 'spacy' : 'embeddings'
-  return progress[modelType]?.phase === 'completed'
+  return getModelPhase(modelName) === 'completed'
 }
 
 function isModelDownloading(modelName: string): boolean {
-  const progress = systemStore.downloadProgress
-  const modelType = modelName === 'es_core_news_lg' ? 'spacy' : 'embeddings'
-  const phase = progress[modelType]?.phase
+  const phase = getModelPhase(modelName)
   return phase === 'downloading' || phase === 'connecting' || phase === 'installing'
 }
 
@@ -279,7 +327,7 @@ async function recheckPython() {
     :draggable="false"
     :header="downloadPhase === 'starting' ? 'Narrative Assistant' : 'Configuración inicial'"
     class="model-setup-dialog"
-    :style="{ width: '500px' }"
+    :style="{ width: 'min(500px, 90vw)' }"
   >
     <div class="dialog-content">
       <!-- Starting state - waiting for backend -->
@@ -384,10 +432,19 @@ async function recheckPython() {
           </div>
 
           <div class="models-list">
-            <div v-for="model in missingModels" :key="model.name" class="model-item">
-              <i class="pi" :class="isModelCompleted(model.name) ? 'pi-check-circle text-green' : (isModelDownloading(model.name) ? 'pi-spin pi-spinner text-blue' : 'pi-circle')"></i>
+            <div v-for="model in allModels" :key="model.name" class="model-item">
+              <i class="pi" :class="
+                model.installed || isModelCompleted(model.name)
+                  ? 'pi-check-circle text-green'
+                  : isModelDownloading(model.name)
+                    ? 'pi-spin pi-spinner text-blue'
+                    : 'pi-circle'
+              "></i>
               <span class="model-name">{{ model.displayName }}</span>
-              <span class="model-size">~{{ model.sizeMb }} MB</span>
+              <span class="model-size">
+                <template v-if="model.installed && !isModelDownloading(model.name)">Instalado</template>
+                <template v-else>~{{ model.sizeMb }} MB</template>
+              </span>
             </div>
           </div>
 
@@ -403,7 +460,7 @@ async function recheckPython() {
         <div class="download-complete">
           <i class="pi pi-check-circle complete-icon"></i>
           <h3>Listo para usar</h3>
-          <p>Narrative Assistant esta preparado.</p>
+          <p>Narrative Assistant está preparado.</p>
         </div>
       </template>
 
@@ -450,7 +507,7 @@ async function recheckPython() {
           <h3>Error en la descarga</h3>
           <p class="error-message">{{ systemStore.modelsError }}</p>
           <p class="error-hint">
-            Verifica tu conexion a internet e intenta de nuevo.
+            Verifica tu conexión a internet e intenta de nuevo.
           </p>
           <button class="retry-button" @click="retryDownload">
             <i class="pi pi-refresh"></i>
@@ -559,8 +616,8 @@ async function recheckPython() {
   font-weight: 500;
 }
 
-.text-blue {
-  color: var(--p-primary-color) !important;
+.model-item i.text-blue {
+  color: var(--p-primary-color);
 }
 
 .progress-bar {

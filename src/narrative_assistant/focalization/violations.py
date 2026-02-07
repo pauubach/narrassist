@@ -355,13 +355,13 @@ class FocalizationViolationDetector:
                             entity_involved=other_id,
                             entity_name=character_name.title(),
                             explanation=(
-                                f"Acceso a mente de '{character_name}' que no esta en la "
+                                f"Acceso a mente de '{character_name}' que no está en la "
                                 f"lista de focalizadores declarados"
                             ),
                             declared_focalizer=", ".join(declared_names),
                             suggestion=(
-                                f"Anada '{character_name}' a la lista de focalizadores "
-                                f"o reformule como observacion externa."
+                                f"Añada '{character_name}' a la lista de focalizadores "
+                                f"o reformule como observación externa."
                             ),
                             confidence=0.8,
                         )

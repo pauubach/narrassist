@@ -2,7 +2,7 @@
   <Dialog
     :visible="visible"
     modal
-    header="Deshacer Fusion"
+    header="Deshacer Fusión"
     :style="{ width: '500px' }"
     @update:visible="$emit('update:visible', $event)"
   >
@@ -10,8 +10,8 @@
       <!-- Advertencia -->
       <Message severity="warn" :closable="false">
         <p>
-          Esta accion restaurara las entidades que fueron fusionadas.
-          Las apariciones y atributos seran redistribuidos a sus entidades originales.
+          Esta acción restaurará las entidades que fueron fusionadas.
+          Las apariciones y atributos serán redistribuidos a sus entidades originales.
         </p>
       </Message>
 
@@ -31,7 +31,7 @@
 
       <!-- Entidades a restaurar -->
       <div v-if="mergeHistory" class="restore-section">
-        <h4>Se restauraran las siguientes entidades:</h4>
+        <h4>Se restaurarán las siguientes entidades:</h4>
         <div class="entities-to-restore">
           <div
             v-for="(name, index) in mergeHistory.sourceEntityNames"
@@ -58,13 +58,13 @@
       <!-- Loading state si no tenemos historial -->
       <div v-else-if="loading" class="loading-state">
         <i class="pi pi-spin pi-spinner"></i>
-        <span>Cargando informacion de fusion...</span>
+        <span>Cargando información de fusión...</span>
       </div>
 
       <!-- Sin historial -->
       <div v-else class="no-history">
         <Message severity="error" :closable="false">
-          No se encontro informacion de fusion para esta entidad.
+          No se encontró información de fusión para esta entidad.
         </Message>
       </div>
     </div>
@@ -77,7 +77,7 @@
         @click="$emit('update:visible', false)"
       />
       <Button
-        label="Deshacer Fusion"
+        label="Deshacer Fusión"
         icon="pi pi-replay"
         severity="warning"
         :loading="undoing"
@@ -135,7 +135,7 @@ const loadMergeHistory = async () => {
     const data = await api.getRaw<any>(`/api/projects/${props.projectId}/entities/merge-history`)
 
     if (data.success && data.data.merges) {
-      // Buscar la fusion mas reciente que creo esta entidad
+      // Buscar la fusión más reciente que creó esta entidad
       const relevantMerge = data.data.merges.find(
         (m: any) => m.target_id === props.entity?.id && !m.undone_at
       )

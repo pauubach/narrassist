@@ -68,27 +68,25 @@ KNOWN_MODELS: dict[ModelType, ModelInfo] = {
     ModelType.SPACY: ModelInfo(
         model_type=ModelType.SPACY,
         name="es_core_news_lg",
-        display_name="spaCy Español (es_core_news_lg)",
-        size_mb=560,  # Tamaño real aproximado del modelo
-        # El hash se calcula sobre el archivo meta.json del modelo
-        sha256=None,  # spaCy no provee hashes oficiales
+        display_name="Análisis gramatical y lingüístico",
+        size_mb=540,
+        sha256=None,
         source_url="https://github.com/explosion/spacy-models",
         subdirectory="spacy",
     ),
     ModelType.EMBEDDINGS: ModelInfo(
         model_type=ModelType.EMBEDDINGS,
         name="paraphrase-multilingual-MiniLM-L12-v2",
-        display_name="Sentence Transformers Multilingüe",
-        size_mb=470,  # Tamaño real del modelo en HuggingFace
-        # Hash del archivo config.json del modelo (identificador estable)
-        sha256=None,  # Se verificará estructura en lugar de hash
+        display_name="Análisis de similitud y contexto",
+        size_mb=470,
+        sha256=None,
         source_url="https://huggingface.co/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
         subdirectory="embeddings",
     ),
     ModelType.TRANSFORMER_NER: ModelInfo(
         model_type=ModelType.TRANSFORMER_NER,
         name="PlanTL-GOB-ES/roberta-base-bne-capitel-ner",
-        display_name="PlanTL RoBERTa NER (español)",
+        display_name="Reconocimiento de personajes y lugares",
         size_mb=500,
         sha256=None,
         source_url="https://huggingface.co/PlanTL-GOB-ES/roberta-base-bne-capitel-ner",
@@ -147,6 +145,60 @@ _progress_lock = threading.Lock()
 _model_sizes_cache: dict[str, int] = {}
 _model_sizes_cache_time: float = 0.0
 _MODEL_SIZES_CACHE_TTL = 7 * 24 * 3600.0  # 1 semana de cache (los tamaños cambian poco)
+
+
+def _create_hf_progress_tracker(model_type: ModelType):
+    """
+    Crea una clase tqdm personalizada que reporta progreso de descarga HuggingFace.
+
+    Se usa como tqdm_class en snapshot_download() para obtener progreso
+    byte-level real de las descargas de HuggingFace Hub.
+    """
+    import time
+
+    from tqdm.auto import tqdm as base_tqdm
+
+    class HFProgressTracker(base_tqdm):
+        _last_update: float = 0.0
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            # Solo rastrear la barra de bytes (no la de conteo de archivos)
+            if self.total and self.total > 1024:
+                _update_download_progress(
+                    model_type,
+                    phase="downloading",
+                    bytes_downloaded=0,
+                    bytes_total=self.total,
+                )
+
+        def update(self, n=1):
+            super().update(n)
+            now = time.time()
+            # Actualizar máximo cada 200ms para no saturar
+            if self.total and self.total > 1024 and now - self._last_update > 0.2:
+                self._last_update = now
+                elapsed = now - self.start_t if self.start_t else 1
+                speed = self.n / elapsed if elapsed > 0 else 0
+                _update_download_progress(
+                    model_type,
+                    phase="downloading",
+                    bytes_downloaded=self.n,
+                    bytes_total=self.total,
+                    speed_bps=speed,
+                )
+
+        def close(self):
+            if self.total and self.total > 1024:
+                _update_download_progress(
+                    model_type,
+                    phase="downloading",
+                    bytes_downloaded=self.total,
+                    bytes_total=self.total,
+                )
+            super().close()
+
+    return HFProgressTracker
 
 
 @dataclass
@@ -446,38 +498,235 @@ class ModelManager:
         progress_callback: Callable[[str, float], None] | None,
     ) -> Result[Path]:
         """
-        Descarga modelo spaCy usando la CLI de spaCy.
+        Descarga modelo spaCy via HTTP directo desde GitHub Releases.
 
-        spaCy descarga a su cache y luego copiamos al directorio de modelos.
+        Usa la API de compatibilidad de spaCy para determinar la versión
+        correcta del modelo, luego descarga el .whl con progreso byte-level real.
+        Si falla, cae a spacy.cli.download() como fallback.
+        """
+        import time
+
+        estimated_size = model_info.size_mb * 1024 * 1024
+
+        _update_download_progress(
+            model_info.model_type,
+            phase="connecting",
+            bytes_total=estimated_size,
+        )
+
+        if progress_callback:
+            progress_callback(f"Descargando {model_info.display_name}...", 0.05)
+
+        # Intentar descarga directa con progreso real
+        try:
+            result = self._download_spacy_direct(model_info, target_dir, estimated_size, progress_callback)
+            if result is not None:
+                return result
+        except Exception as e:
+            logger.warning(f"Descarga directa falló, usando fallback: {e}")
+
+        # Fallback: usar spacy.cli.download (sin progreso byte-level)
+        return self._download_spacy_fallback(model_info, target_dir, estimated_size, progress_callback)
+
+    def _download_spacy_direct(
+        self,
+        model_info: ModelInfo,
+        target_dir: Path,
+        estimated_size: int,
+        progress_callback: Callable[[str, float], None] | None,
+    ) -> Result[Path] | None:
+        """
+        Descarga directa del .whl de spaCy desde GitHub con progreso real.
+
+        Returns None si no se puede hacer descarga directa (fallback necesario).
+        """
+        import tempfile
+        import time
+        import zipfile
+
+        try:
+            import requests
+            import spacy
+        except ImportError:
+            return None
+
+        # Determinar versión compatible del modelo
+        model_version = self._resolve_spacy_model_version(model_info.name, spacy.about.__version__)
+        if not model_version:
+            return None
+
+        model_full = f"{model_info.name}-{model_version}"
+        url = (
+            f"https://github.com/explosion/spacy-models/releases/download/"
+            f"{model_full}/{model_full}-py3-none-any.whl"
+        )
+
+        logger.info(f"Descargando spaCy model directo: {url}")
+
+        try:
+            response = requests.get(url, stream=True, timeout=30)
+            response.raise_for_status()
+        except requests.RequestException as e:
+            logger.warning(f"HTTP directo falló ({e}), intentando fallback")
+            return None
+
+        total_size = int(response.headers.get("content-length", 0)) or estimated_size
+
+        _update_download_progress(
+            model_info.model_type,
+            phase="downloading",
+            bytes_total=total_size,
+        )
+
+        # Stream a archivo temporal
+        tmp_path = None
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".whl", delete=False) as tmp:
+                tmp_path = Path(tmp.name)
+                downloaded = 0
+                last_update = time.time()
+                start_time = last_update
+
+                for chunk in response.iter_content(chunk_size=65536):
+                    tmp.write(chunk)
+                    downloaded += len(chunk)
+
+                    now = time.time()
+                    if now - last_update > 0.2:
+                        elapsed = now - start_time
+                        speed = downloaded / elapsed if elapsed > 0 else 0
+                        _update_download_progress(
+                            model_info.model_type,
+                            phase="downloading",
+                            bytes_downloaded=downloaded,
+                            bytes_total=total_size,
+                            speed_bps=speed,
+                        )
+                        last_update = now
+
+            # Extraer modelo del .whl
+            _update_download_progress(
+                model_info.model_type,
+                phase="installing",
+                bytes_downloaded=total_size,
+                bytes_total=total_size,
+            )
+
+            if progress_callback:
+                progress_callback("Instalando modelo...", 0.85)
+
+            target_dir.mkdir(parents=True, exist_ok=True)
+
+            with zipfile.ZipFile(tmp_path) as zf:
+                # En el .whl, los archivos del modelo están en {model_name}/
+                prefix = f"{model_info.name}/"
+                extracted_count = 0
+
+                for member in zf.namelist():
+                    if not member.startswith(prefix):
+                        continue
+                    rel_path = member[len(prefix):]
+                    if not rel_path:
+                        continue
+
+                    target = target_dir / rel_path
+                    if member.endswith("/"):
+                        target.mkdir(parents=True, exist_ok=True)
+                    else:
+                        target.parent.mkdir(parents=True, exist_ok=True)
+                        with zf.open(member) as src, open(target, "wb") as dst:
+                            shutil.copyfileobj(src, dst)
+                        extracted_count += 1
+
+            if extracted_count == 0:
+                logger.warning("No se extrajeron archivos del .whl")
+                return None
+
+            _update_download_progress(
+                model_info.model_type,
+                phase="completed",
+                bytes_downloaded=total_size,
+                bytes_total=total_size,
+            )
+
+            if progress_callback:
+                progress_callback("Modelo instalado correctamente", 1.0)
+
+            logger.info(f"Modelo spaCy instalado en: {target_dir} ({extracted_count} archivos)")
+            return Result.success(target_dir)
+
+        finally:
+            if tmp_path:
+                tmp_path.unlink(missing_ok=True)
+
+    @staticmethod
+    def _resolve_spacy_model_version(model_name: str, spacy_version: str) -> str | None:
+        """
+        Determina la versión compatible del modelo spaCy para la versión instalada.
+
+        Intenta usar la API de compatibilidad de spaCy. Si falla, usa la
+        convención major.minor.0 que funciona para la mayoría de casos.
+        """
+        try:
+            from spacy.cli._util import get_compatibility
+
+            compat = get_compatibility()
+            spacy_compat = compat.get("spacy", {})
+
+            # Buscar la versión exacta de spaCy en la tabla de compatibilidad
+            if spacy_version in spacy_compat:
+                models = spacy_compat[spacy_version]
+                if model_name in models and models[model_name]:
+                    version = models[model_name][0]
+                    logger.debug(f"Versión compatible para {model_name}: {version}")
+                    return version
+
+            # Buscar por major.minor
+            major_minor = ".".join(spacy_version.split(".")[:2])
+            for sv, models in spacy_compat.items():
+                if sv.startswith(major_minor) and model_name in models and models[model_name]:
+                    version = models[model_name][0]
+                    logger.debug(f"Versión compatible (minor match) para {model_name}: {version}")
+                    return version
+
+        except Exception as e:
+            logger.debug(f"Error consultando compatibilidad spaCy: {e}")
+
+        # Fallback: usar major.minor.0
+        try:
+            parts = spacy_version.split(".")
+            fallback = f"{parts[0]}.{parts[1]}.0"
+            logger.debug(f"Usando versión fallback para {model_name}: {fallback}")
+            return fallback
+        except (IndexError, ValueError):
+            return None
+
+    def _download_spacy_fallback(
+        self,
+        model_info: ModelInfo,
+        target_dir: Path,
+        estimated_size: int,
+        progress_callback: Callable[[str, float], None] | None,
+    ) -> Result[Path]:
+        """
+        Fallback: descarga spaCy usando spacy.cli.download (sin progreso byte-level).
         """
         try:
             import spacy
             from spacy.cli import download
 
-            estimated_size = model_info.size_mb * 1024 * 1024
-
-            # Actualizar progreso global: conectando
-            _update_download_progress(
-                model_info.model_type,
-                phase="connecting",
-                bytes_total=estimated_size,
-            )
-
-            if progress_callback:
-                progress_callback(f"Descargando {model_info.display_name}...", 0.1)
-
-            # Actualizar progreso global: descargando
             _update_download_progress(
                 model_info.model_type,
                 phase="downloading",
                 bytes_total=estimated_size,
             )
 
-            # Descargar modelo usando spaCy CLI
-            logger.info(f"Ejecutando spacy download {model_info.name}")
+            if progress_callback:
+                progress_callback(f"Descargando {model_info.display_name}...", 0.1)
+
+            logger.info(f"Fallback: ejecutando spacy download {model_info.name}")
             download(model_info.name)
 
-            # Actualizar progreso global: instalando
             _update_download_progress(
                 model_info.model_type,
                 phase="installing",
@@ -488,15 +737,14 @@ class ModelManager:
             if progress_callback:
                 progress_callback("Copiando modelo a cache local...", 0.7)
 
-            # Cargar para obtener la ruta de instalación
             nlp = spacy.load(model_info.name)
             source_path = Path(nlp.path)
 
-            # Copiar al directorio de modelos
             logger.info(f"Copiando de {source_path} a {target_dir}")
+            if target_dir.exists():
+                shutil.rmtree(target_dir)
             shutil.copytree(source_path, target_dir)
 
-            # Actualizar progreso global: completado
             _update_download_progress(
                 model_info.model_type,
                 phase="completed",
@@ -530,79 +778,51 @@ class ModelManager:
         progress_callback: Callable[[str, float], None] | None,
     ) -> Result[Path]:
         """
-        Descarga modelo de embeddings usando sentence-transformers.
+        Descarga modelo de embeddings usando huggingface_hub.snapshot_download.
 
-        sentence-transformers descarga de HuggingFace Hub.
+        Usa tqdm_class personalizado para reportar progreso byte-level real.
         """
         try:
-            # Temporalmente deshabilitar modo offline para descarga
+            from huggingface_hub import snapshot_download
+        except ImportError:
+            return Result.failure(
+                ModelDownloadError(
+                    model_name=model_info.name,
+                    reason="huggingface_hub no instalado",
+                )
+            )
+
+        try:
             old_hf_offline = os.environ.get("HF_HUB_OFFLINE")
             old_transformers_offline = os.environ.get("TRANSFORMERS_OFFLINE")
-
             os.environ["HF_HUB_OFFLINE"] = "0"
             os.environ["TRANSFORMERS_OFFLINE"] = "0"
 
-            # Intentar obtener tamaño real desde HuggingFace
             estimated_size = model_info.size_mb * 1024 * 1024
-            real_size = get_model_size_from_huggingface(
-                f"sentence-transformers/{model_info.name}"
+
+            _update_download_progress(
+                model_info.model_type,
+                phase="connecting",
+                bytes_total=estimated_size,
             )
-            if real_size:
-                estimated_size = real_size
+
+            if progress_callback:
+                progress_callback(f"Descargando {model_info.display_name}...", 0.1)
 
             try:
-                from sentence_transformers import SentenceTransformer
+                repo_id = f"sentence-transformers/{model_info.name}"
+                tracker_class = _create_hf_progress_tracker(model_info.model_type)
 
-                # Actualizar progreso global: conectando
-                _update_download_progress(
-                    model_info.model_type,
-                    phase="connecting",
-                    bytes_total=estimated_size,
+                logger.info(f"Descargando modelo embeddings: {repo_id}")
+                target_dir.mkdir(parents=True, exist_ok=True)
+
+                snapshot_download(
+                    repo_id,
+                    local_dir=str(target_dir),
+                    tqdm_class=tracker_class,
+                    ignore_patterns=["*.onnx", "*.h5", "tf_*", "openvino/*", "onnx/*", "rust_model.ot"],
                 )
 
-                if progress_callback:
-                    progress_callback(f"Descargando {model_info.display_name}...", 0.1)
-
-                # Actualizar progreso global: descargando
-                _update_download_progress(
-                    model_info.model_type,
-                    phase="downloading",
-                    bytes_total=estimated_size,
-                )
-
-                # Descargar modelo con monitoreo de directorio
-                logger.info(f"Descargando modelo: {model_info.name}")
-
-                # Iniciar monitoreo del cache de HuggingFace en background
-                monitor_stop = threading.Event()
-                monitor_thread = threading.Thread(
-                    target=self._monitor_hf_download,
-                    args=(model_info.name, estimated_size, monitor_stop),
-                    daemon=True,
-                )
-                monitor_thread.start()
-
-                try:
-                    model = SentenceTransformer(model_info.name)
-                finally:
-                    monitor_stop.set()
-                    monitor_thread.join(timeout=1.0)
-
-                # Actualizar progreso global: instalando
-                _update_download_progress(
-                    model_info.model_type,
-                    phase="installing",
-                    bytes_downloaded=int(estimated_size * 0.9),
-                    bytes_total=estimated_size,
-                )
-
-                if progress_callback:
-                    progress_callback("Guardando modelo en cache local...", 0.8)
-
-                # Guardar en directorio local
-                model.save(str(target_dir))
-
-                # Actualizar progreso global: completado
                 _update_download_progress(
                     model_info.model_type,
                     phase="completed",
@@ -617,12 +837,10 @@ class ModelManager:
                 return Result.success(target_dir)
 
             finally:
-                # Restaurar variables de entorno
                 if old_hf_offline is not None:
                     os.environ["HF_HUB_OFFLINE"] = old_hf_offline
                 else:
                     os.environ.pop("HF_HUB_OFFLINE", None)
-
                 if old_transformers_offline is not None:
                     os.environ["TRANSFORMERS_OFFLINE"] = old_transformers_offline
                 else:
@@ -648,22 +866,21 @@ class ModelManager:
         progress_callback: Callable[[str, float], None] | None,
     ) -> Result[Path]:
         """
-        Descarga modelo transformer NER desde HuggingFace.
+        Descarga modelo transformer NER usando huggingface_hub.snapshot_download.
 
-        Usa la librería transformers para descargar tokenizer + model weights.
+        Usa tqdm_class personalizado para reportar progreso byte-level real.
         """
         try:
-            from transformers import AutoModelForTokenClassification, AutoTokenizer
+            from huggingface_hub import snapshot_download
         except ImportError:
             return Result.failure(
                 ModelDownloadError(
                     model_name=model_info.name,
-                    reason="transformers no instalado. Instalar con: pip install transformers",
+                    reason="huggingface_hub no instalado",
                 )
             )
 
         try:
-            # Temporalmente deshabilitar modo offline para descarga
             old_hf_offline = os.environ.get("HF_HUB_OFFLINE")
             old_transformers_offline = os.environ.get("TRANSFORMERS_OFFLINE")
             os.environ["HF_HUB_OFFLINE"] = "0"
@@ -680,40 +897,19 @@ class ModelManager:
             if progress_callback:
                 progress_callback(f"Descargando {model_info.display_name}...", 0.1)
 
-            _update_download_progress(
-                model_info.model_type,
-                phase="downloading",
-                bytes_total=estimated_size,
-            )
-
             try:
-                # Descargar tokenizer y modelo al cache de HuggingFace
-                logger.info(f"Descargando tokenizer: {model_info.name}")
-                if progress_callback:
-                    progress_callback("Descargando tokenizer...", 0.2)
+                repo_id = model_info.name  # Ya es "PlanTL-GOB-ES/roberta-base-bne-capitel-ner"
+                tracker_class = _create_hf_progress_tracker(model_info.model_type)
 
-                tokenizer = AutoTokenizer.from_pretrained(model_info.name)
-
-                logger.info(f"Descargando modelo: {model_info.name}")
-                if progress_callback:
-                    progress_callback("Descargando pesos del modelo (~500 MB)...", 0.4)
-
-                model = AutoModelForTokenClassification.from_pretrained(model_info.name)
-
-                _update_download_progress(
-                    model_info.model_type,
-                    phase="installing",
-                    bytes_downloaded=int(estimated_size * 0.9),
-                    bytes_total=estimated_size,
-                )
-
-                if progress_callback:
-                    progress_callback("Guardando modelo en cache local...", 0.8)
-
-                # Guardar en directorio local
+                logger.info(f"Descargando modelo transformer NER: {repo_id}")
                 target_dir.mkdir(parents=True, exist_ok=True)
-                tokenizer.save_pretrained(str(target_dir))
-                model.save_pretrained(str(target_dir))
+
+                snapshot_download(
+                    repo_id,
+                    local_dir=str(target_dir),
+                    tqdm_class=tracker_class,
+                    ignore_patterns=["*.onnx", "*.h5", "tf_*", "flax_*", "openvino/*", "onnx/*"],
+                )
 
                 _update_download_progress(
                     model_info.model_type,
@@ -729,7 +925,6 @@ class ModelManager:
                 return Result.success(target_dir)
 
             finally:
-                # Restaurar variables de entorno
                 if old_hf_offline is not None:
                     os.environ["HF_HUB_OFFLINE"] = old_hf_offline
                 else:
@@ -751,63 +946,6 @@ class ModelManager:
                     reason=f"Error en descarga transformer NER: {e}",
                 )
             )
-
-    def _monitor_hf_download(
-        self,
-        model_name: str,
-        total_size: int,
-        stop_event: threading.Event,
-    ) -> None:
-        """
-        Monitorea el progreso de descarga de HuggingFace en el cache.
-
-        Este método se ejecuta en un thread separado y actualiza el progreso
-        basándose en el tamaño de los archivos descargados.
-        """
-        import time
-
-        # Encontrar directorio de cache de HuggingFace
-        hf_cache = Path.home() / ".cache" / "huggingface" / "hub"
-        if not hf_cache.exists():
-            hf_cache = Path.home() / ".cache" / "torch" / "sentence_transformers"
-
-        last_size = 0
-        last_time = time.time()
-
-        while not stop_event.is_set():
-            try:
-                # Calcular tamaño actual del cache
-                current_size = 0
-                for cache_dir in [hf_cache, Path.home() / ".cache" / "torch"]:
-                    if cache_dir.exists():
-                        for f in cache_dir.rglob("*"):
-                            if f.is_file() and model_name.replace("/", "--") in str(f):
-                                current_size += f.stat().st_size
-
-                # Calcular velocidad
-                current_time = time.time()
-                elapsed = current_time - last_time
-                if elapsed > 0:
-                    speed = (current_size - last_size) / elapsed
-                else:
-                    speed = 0
-
-                # Actualizar progreso
-                _update_download_progress(
-                    ModelType.EMBEDDINGS,
-                    phase="downloading",
-                    bytes_downloaded=min(current_size, total_size),
-                    bytes_total=total_size,
-                    speed_bps=max(0, speed),
-                )
-
-                last_size = current_size
-                last_time = current_time
-
-            except Exception:
-                pass  # Ignorar errores de monitoreo
-
-            stop_event.wait(0.5)  # Actualizar cada 500ms
 
     def _verify_model_structure(self, model_type: ModelType, model_path: Path) -> bool:
         """
@@ -1125,6 +1263,13 @@ def get_real_model_sizes(force_refresh: bool = False) -> dict[str, int]:
             if model_type == ModelType.EMBEDDINGS:
                 hf_size = get_model_size_from_huggingface(
                     f"sentence-transformers/{model_info.name}",
+                    use_cache=False,
+                )
+                if hf_size:
+                    size = hf_size
+            elif model_type == ModelType.TRANSFORMER_NER:
+                hf_size = get_model_size_from_huggingface(
+                    model_info.name,
                     use_cache=False,
                 )
                 if hf_size:
