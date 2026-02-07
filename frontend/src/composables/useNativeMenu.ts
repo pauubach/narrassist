@@ -45,6 +45,15 @@ export function useNativeMenu(handlers: MenuEventHandlers = {}) {
 
   let unlisten: (() => void) | null = null
 
+  /** Invoca handler o registra log cuando no está conectado */
+  const invoke = (name: string, handler: (() => void) | undefined) => {
+    if (handler) {
+      handler()
+    } else {
+      console.warn(`[Menu] No handler for '${name}' — event dropped`)
+    }
+  }
+
   const handleMenuEvent = async (eventId: string) => {
     console.log('[Menu] Handling event:', eventId)
 
@@ -54,8 +63,8 @@ export function useNativeMenu(handlers: MenuEventHandlers = {}) {
         if (handlers.onNewProject) {
           handlers.onNewProject()
         } else {
-          // Navigate to projects and emit event to open dialog
           router.push('/projects')
+          // Esperar a que la vista se monte antes de disparar el evento
           setTimeout(() => {
             window.dispatchEvent(new CustomEvent('menubar:new-project'))
           }, 100)
@@ -71,15 +80,15 @@ export function useNativeMenu(handlers: MenuEventHandlers = {}) {
         break
 
       case 'close_project':
-        handlers.onCloseProject?.()
+        invoke('close_project', handlers.onCloseProject)
         break
 
       case 'import':
-        handlers.onImport?.()
+        invoke('import', handlers.onImport)
         break
 
       case 'export':
-        handlers.onExport?.()
+        invoke('export', handlers.onExport)
         break
 
       case 'settings':
@@ -92,74 +101,72 @@ export function useNativeMenu(handlers: MenuEventHandlers = {}) {
 
       // Ver
       case 'view_chapters':
-        handlers.onViewChange?.('chapters')
+        invoke('view_chapters', handlers.onViewChange ? () => handlers.onViewChange!('chapters') : undefined)
         break
 
       case 'view_entities':
-        handlers.onViewChange?.('entities')
+        invoke('view_entities', handlers.onViewChange ? () => handlers.onViewChange!('entities') : undefined)
         break
 
       case 'view_alerts':
-        handlers.onViewChange?.('alerts')
+        invoke('view_alerts', handlers.onViewChange ? () => handlers.onViewChange!('alerts') : undefined)
         break
 
       case 'view_relationships':
-        handlers.onViewChange?.('relationships')
+        invoke('view_relationships', handlers.onViewChange ? () => handlers.onViewChange!('relationships') : undefined)
         break
 
       case 'view_timeline':
-        handlers.onViewChange?.('timeline')
+        invoke('view_timeline', handlers.onViewChange ? () => handlers.onViewChange!('timeline') : undefined)
         break
 
       case 'toggle_inspector':
-        handlers.onToggleInspector?.()
+        invoke('toggle_inspector', handlers.onToggleInspector)
         break
 
       case 'toggle_sidebar':
-        handlers.onToggleSidebar?.()
+        invoke('toggle_sidebar', handlers.onToggleSidebar)
         break
 
       // Analisis
       case 'run_analysis':
-        handlers.onRunAnalysis?.()
+        invoke('run_analysis', handlers.onRunAnalysis)
         break
 
       case 'pause_analysis':
-        handlers.onPauseAnalysis?.()
+        invoke('pause_analysis', handlers.onPauseAnalysis)
         break
 
       case 'analyze_structure':
       case 'analyze_entities':
       case 'analyze_consistency':
       case 'analyze_style':
-        // Estos se manejan igual que run_analysis pero con fase especifica
-        handlers.onRunAnalysis?.()
+        invoke(eventId, handlers.onRunAnalysis)
         break
 
       // Ayuda
       case 'tutorial':
-        handlers.onTutorial?.()
+        invoke('tutorial', handlers.onTutorial)
         break
 
       case 'keyboard_shortcuts':
-        handlers.onKeyboardShortcuts?.()
+        invoke('keyboard_shortcuts', handlers.onKeyboardShortcuts)
         break
 
       case 'about':
-        handlers.onAbout?.()
+        invoke('about', handlers.onAbout)
         break
 
       case 'user_guide':
-        handlers.onUserGuide?.()
+        invoke('user_guide', handlers.onUserGuide)
         break
 
       case 'check_updates':
-        // TODO: Implementar verificacion de actualizaciones
-        console.log('[Menu] Check updates - not implemented yet')
+        console.log('[Menu] Check updates — not implemented yet')
         break
 
       default:
-        console.log('[Menu] Unhandled event:', eventId)
+        console.warn('[Menu] Unknown event ID:', eventId)
         break
     }
   }

@@ -36,8 +36,8 @@
 </template>
 
 <script setup lang="ts">
-import { RouterView, useRouter } from 'vue-router'
-import { onMounted, ref, watch, computed } from 'vue'
+import { RouterView, useRouter, useRoute } from 'vue-router'
+import { onMounted, onBeforeUnmount, ref, watch, computed } from 'vue'
 import Toast from 'primevue/toast'
 import { useAppStore } from '@/stores/app'
 import { useThemeStore } from '@/stores/theme'
@@ -53,6 +53,7 @@ import ModelSetupDialog from '@/components/ModelSetupDialog.vue'
 import { useSystemStore } from '@/stores/system'
 
 const router = useRouter()
+const route = useRoute()
 const appStore = useAppStore()
 const systemStore = useSystemStore()
 const themeStore = useThemeStore()
@@ -81,8 +82,19 @@ useKeyboardShortcuts()
 // Activar manejo de menú nativo de Tauri
 useNativeMenu({
   onSettings: () => { router.push('/settings') },
+  onCloseProject: () => {
+    console.log('[Menu] Close project requested')
+    router.push('/projects')
+  },
+  onImport: () => {
+    console.log('[Menu] Import requested — navigating to projects')
+    router.push('/projects')
+  },
+  onExport: () => {
+    console.log('[Menu] Export requested')
+    window.dispatchEvent(new CustomEvent('menubar:export'))
+  },
   onViewChange: (view: string) => {
-    // Map menu view IDs to workspace tab IDs
     const tabMap: Record<string, string> = {
       chapters: 'text',
       entities: 'entities',
@@ -92,6 +104,22 @@ useNativeMenu({
     }
     const tab = tabMap[view] || view
     workspaceStore.setActiveTab(tab as any)
+  },
+  onRunAnalysis: () => {
+    console.log('[Menu] Run analysis requested')
+    window.dispatchEvent(new CustomEvent('menubar:run-analysis'))
+  },
+  onPauseAnalysis: () => {
+    console.log('[Menu] Pause analysis requested')
+    window.dispatchEvent(new CustomEvent('menubar:pause-analysis'))
+  },
+  onToggleInspector: () => {
+    console.log('[Menu] Toggle inspector')
+    window.dispatchEvent(new CustomEvent('menubar:toggle-inspector'))
+  },
+  onToggleSidebar: () => {
+    console.log('[Menu] Toggle sidebar')
+    window.dispatchEvent(new CustomEvent('menubar:toggle-sidebar'))
   },
   onTutorial: () => { showTutorial.value = true },
   onKeyboardShortcuts: () => { showShortcutsHelp.value = true },
@@ -142,16 +170,31 @@ const openTutorial = () => {
   showTutorial.value = true
 }
 
+// Event listener references para cleanup
+const onShowHelp = () => { showShortcutsHelp.value = true }
+const onToggleTheme = () => { themeStore.toggleMode() }
+const onMenuAbout = () => { showAbout.value = true }
+const onMenuTutorial = () => { openTutorial() }
+const onMenuUserGuide = () => { showUserGuide.value = true }
+const onF1 = (e: KeyboardEvent) => {
+  if (e.key === 'F1') {
+    e.preventDefault()
+    showUserGuide.value = true
+  }
+}
+
 onMounted(() => {
   // Re-check Tauri in case it wasn't ready at component creation
   if (typeof window !== 'undefined') {
     isTauri.value = '__TAURI__' in window || '__TAURI_INTERNALS__' in window
   }
 
-  console.log('Narrative Assistant UI - v0.4.0')
+  const version = systemStore.backendVersion || 'loading...'
+  console.log(`Narrative Assistant UI - v${version}`)
   console.log('Vue 3.5 + PrimeVue 4')
   console.log(`Tema: ${appStore.theme} | Modo oscuro: ${appStore.isDark}`)
   console.log(`Entorno Tauri: ${isTauri.value}`)
+  console.log(`Ruta actual: ${route.fullPath}`)
 
   // Esperar a que los modelos estén listos antes de mostrar el tutorial
   const tryShowTutorial = () => {
@@ -160,14 +203,11 @@ onMounted(() => {
     console.log('[Tutorial] modelsReady:', systemStore.modelsReady)
 
     if (shouldShowTutorial && systemStore.modelsReady) {
-      // Solo mostrar tutorial cuando los modelos estén completamente listos
       setTimeout(() => {
         console.log('[Tutorial] Activando showTutorial.value = true')
         showTutorial.value = true
-        console.log('[Tutorial] showTutorial.value =', showTutorial.value)
       }, 1000)
     } else if (shouldShowTutorial && !systemStore.modelsReady) {
-      // Si los modelos no están listos, esperar hasta que lo estén
       console.log('[Tutorial] Esperando a que los modelos estén listos...')
       const unwatch = watch(() => systemStore.modelsReady, (ready: boolean) => {
         if (ready) {
@@ -175,46 +215,30 @@ onMounted(() => {
           setTimeout(() => {
             showTutorial.value = true
           }, 1000)
-          unwatch() // Dejar de observar
+          unwatch()
         }
       })
     }
   }
 
-  // Intentar mostrar tutorial
   tryShowTutorial()
 
-  // Listeners para eventos de teclado
-  window.addEventListener('keyboard:show-help', () => {
-    showShortcutsHelp.value = true
-  })
+  // Registrar event listeners (web MenuBar y atajos globales)
+  window.addEventListener('keyboard:show-help', onShowHelp)
+  window.addEventListener('keyboard:toggle-theme', onToggleTheme)
+  window.addEventListener('menubar:about', onMenuAbout)
+  window.addEventListener('menubar:tutorial', onMenuTutorial)
+  window.addEventListener('menubar:user-guide', onMenuUserGuide)
+  window.addEventListener('keydown', onF1)
+})
 
-  window.addEventListener('keyboard:toggle-theme', () => {
-    themeStore.toggleMode()
-  })
-
-  // Listener para mostrar diálogo "Acerca de"
-  window.addEventListener('menubar:about', () => {
-    showAbout.value = true
-  })
-
-  // Listener para mostrar tutorial desde menú
-  window.addEventListener('menubar:tutorial', () => {
-    openTutorial()
-  })
-
-  // Listener para mostrar guía de usuario
-  window.addEventListener('menubar:user-guide', () => {
-    showUserGuide.value = true
-  })
-
-  // Listener para F1 - abrir ayuda
-  window.addEventListener('keydown', (e) => {
-    if (e.key === 'F1') {
-      e.preventDefault()
-      showUserGuide.value = true
-    }
-  })
+onBeforeUnmount(() => {
+  window.removeEventListener('keyboard:show-help', onShowHelp)
+  window.removeEventListener('keyboard:toggle-theme', onToggleTheme)
+  window.removeEventListener('menubar:about', onMenuAbout)
+  window.removeEventListener('menubar:tutorial', onMenuTutorial)
+  window.removeEventListener('menubar:user-guide', onMenuUserGuide)
+  window.removeEventListener('keydown', onF1)
 })
 </script>
 

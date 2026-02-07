@@ -433,13 +433,15 @@ async function recheckPython() {
 
           <div class="models-list">
             <div v-for="model in allModels" :key="model.name" class="model-item">
-              <i class="pi" :class="
-                model.installed || isModelCompleted(model.name)
-                  ? 'pi-check-circle text-green'
-                  : isModelDownloading(model.name)
-                    ? 'pi-spin pi-spinner text-blue'
-                    : 'pi-circle'
-              "></i>
+              <i
+                class="pi" :class="
+                  model.installed || isModelCompleted(model.name)
+                    ? 'pi-check-circle text-green'
+                    : isModelDownloading(model.name)
+                      ? 'pi-spin pi-spinner text-blue'
+                      : 'pi-circle'
+                "
+              ></i>
               <span class="model-name">{{ model.displayName }}</span>
               <span class="model-size">
                 <template v-if="model.installed && !isModelDownloading(model.name)">Instalado</template>
