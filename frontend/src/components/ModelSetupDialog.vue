@@ -172,19 +172,8 @@ onBeforeUnmount(() => {
   systemStore.stopPolling()
 })
 
-// Mapa de model_name → model_type (para buscar progreso)
-const modelNameToType: Record<string, string> = {
-  es_core_news_lg: 'spacy',
-  'paraphrase-multilingual-MiniLM-L12-v2': 'embeddings',
-  'mrm8488/bert-spanish-cased-finetuned-ner': 'transformer_ner',
-}
-
-// Orden fijo de instalación de modelos
-const MODEL_INSTALL_ORDER = [
-  'es_core_news_lg',
-  'paraphrase-multilingual-MiniLM-L12-v2',
-  'mrm8488/bert-spanish-cased-finetuned-ner',
-]
+// Orden fijo de tipos de modelo para la UI
+const MODEL_TYPE_ORDER = ['spacy', 'embeddings', 'transformer_ner']
 
 // Todos los modelos (instalados y pendientes) en orden de instalación
 const allModels = computed(() => {
@@ -193,15 +182,15 @@ const allModels = computed(() => {
 
   const entries = Object.entries(nlpModels) as [string, ModelStatus][]
   return entries
-    .sort(([a], [b]) => {
-      const ia = MODEL_INSTALL_ORDER.indexOf(a)
-      const ib = MODEL_INSTALL_ORDER.indexOf(b)
+    .sort(([, a], [, b]) => {
+      const ia = MODEL_TYPE_ORDER.indexOf(a.type ?? '')
+      const ib = MODEL_TYPE_ORDER.indexOf(b.type ?? '')
       return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib)
     })
     .map(([name, info]) => ({
       name,
-      type: info.type ?? modelNameToType[name] ?? name,
-      displayName: info.display_name || modelDisplayNames[modelNameToType[name]] || name,
+      type: info.type ?? name,
+      displayName: info.display_name || modelDisplayNames[info.type ?? ''] || name,
       sizeMb: info.size_mb || 0,
       installed: info.installed,
     }))
@@ -282,19 +271,18 @@ async function retryStartup() {
   }
 }
 
-// Helpers para estado de modelos individuales
-function getModelPhase(modelName: string): string | undefined {
+// Helpers para estado de modelos individuales (usan model type, no model name)
+function getModelPhase(modelType: string): string | undefined {
   const progress = systemStore.downloadProgress as Record<string, DownloadProgressInfo>
-  const modelType = modelNameToType[modelName] || modelName
   return progress[modelType]?.phase
 }
 
-function isModelCompleted(modelName: string): boolean {
-  return getModelPhase(modelName) === 'completed'
+function isModelCompleted(modelType: string): boolean {
+  return getModelPhase(modelType) === 'completed'
 }
 
-function isModelDownloading(modelName: string): boolean {
-  const phase = getModelPhase(modelName)
+function isModelDownloading(modelType: string): boolean {
+  const phase = getModelPhase(modelType)
   return phase === 'downloading' || phase === 'connecting' || phase === 'installing'
 }
 
@@ -432,19 +420,19 @@ async function recheckPython() {
           </div>
 
           <div class="models-list">
-            <div v-for="model in allModels" :key="model.name" class="model-item">
+            <div v-for="model in allModels" :key="model.type" class="model-item">
               <i
                 class="pi" :class="
-                  model.installed || isModelCompleted(model.name)
+                  model.installed || isModelCompleted(model.type)
                     ? 'pi-check-circle text-green'
-                    : isModelDownloading(model.name)
+                    : isModelDownloading(model.type)
                       ? 'pi-spin pi-spinner text-blue'
                       : 'pi-circle'
                 "
               ></i>
               <span class="model-name">{{ model.displayName }}</span>
               <span class="model-size">
-                <template v-if="model.installed && !isModelDownloading(model.name)">Instalado</template>
+                <template v-if="model.installed && !isModelDownloading(model.type)">Instalado</template>
                 <template v-else>~{{ model.sizeMb }} MB</template>
               </span>
             </div>
