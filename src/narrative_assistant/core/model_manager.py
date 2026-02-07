@@ -504,8 +504,6 @@ class ModelManager:
         correcta del modelo, luego descarga el .whl con progreso byte-level real.
         Si falla, cae a spacy.cli.download() como fallback.
         """
-        import time
-
         estimated_size = model_info.size_mb * 1024 * 1024
 
         _update_download_progress(
