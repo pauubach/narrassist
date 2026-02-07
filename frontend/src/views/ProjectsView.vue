@@ -200,19 +200,8 @@
           </div>
         </div>
 
-        <div class="field">
-          <label for="project-rules">Normas y preferencias (opcional)</label>
-          <Textarea
-            id="project-rules"
-            v-model="newProject.rules"
-            rows="4"
-            placeholder="Ej: Usar coma antes de 'pero'. Evitar gerundios al inicio de frase. Los diálogos usan raya (—). Verificar concordancia de tiempos verbales..."
-            class="w-full"
-          />
-          <small class="p-text-secondary">
-            Normas editoriales, preferencias de estilo o criterios específicos para este manuscrito
-          </small>
-        </div>
+        <!-- Las reglas editoriales se gestionan desde la configuración del proyecto,
+             con un editor dedicado por regla individual (CorrectionConfigModal) -->
       </div>
 
       <template #footer>
@@ -286,7 +275,6 @@ const newProject = ref({
   name: '',
   description: '',
   file: null as File | null,
-  rules: ''
 })
 
 // Items del menú contextual
@@ -374,7 +362,6 @@ const createProject = async () => {
       newProject.value.name,
       newProject.value.description,
       newProject.value.file,
-      newProject.value.rules
     )
 
     if (project) {
@@ -422,7 +409,6 @@ const closeCreateDialog = () => {
     name: '',
     description: '',
     file: null,
-    rules: ''
   }
 }
 

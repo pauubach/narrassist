@@ -123,7 +123,10 @@ async function requestPermission(): Promise<boolean> {
 }
 
 /**
- * Muestra una notificación del sistema
+ * Muestra una notificación del sistema.
+ *
+ * Si la ventana tiene el foco, solo reproduce el sonido.
+ * Si la ventana NO tiene el foco, muestra notificación nativa del OS + sonido.
  */
 async function showNotification(options: NotificationOptions): Promise<void> {
   const prefs = getUserPreferences()
@@ -135,6 +138,12 @@ async function showNotification(options: NotificationOptions): Promise<void> {
 
   // Si las notificaciones están deshabilitadas, solo reproducir sonido
   if (!prefs.notifyAnalysisComplete) {
+    return
+  }
+
+  // Solo mostrar notificación nativa si la ventana NO tiene el foco
+  // (si tiene el foco, el usuario ya ve los toasts in-app)
+  if (document.hasFocus()) {
     return
   }
 
@@ -152,7 +161,7 @@ async function showNotification(options: NotificationOptions): Promise<void> {
     return
   }
 
-  // Crear notificación
+  // Crear notificación nativa del OS
   try {
     const notification = new Notification(options.title, {
       body: options.body,

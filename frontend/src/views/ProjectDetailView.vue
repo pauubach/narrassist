@@ -419,6 +419,7 @@ import type { Entity, Alert, Chapter, AlertSource } from '@/types'
 import { transformEntities, transformAlerts, transformChapters } from '@/types/transformers'
 import { useAlertUtils } from '@/composables/useAlertUtils'
 import { api } from '@/services/apiClient'
+import { useNotifications } from '@/composables/useNotifications'
 
 const route = useRoute()
 const router = useRouter()
@@ -426,6 +427,7 @@ const projectsStore = useProjectsStore()
 const workspaceStore = useWorkspaceStore()
 const selectionStore = useSelectionStore()
 const analysisStore = useAnalysisStore()
+const { notifyAnalysisComplete, notifyAnalysisError } = useNotifications()
 
 // Navegación de menciones - usar projectId reactivo
 const mentionNav = useMentionNavigation(() => project.value?.id ?? 0)
@@ -579,6 +581,13 @@ async function pollAnalysisProgress() {
     if (progressData.status === 'completed' || progressData.status === 'error' || progressData.status === 'failed') {
       console.log('[Polling] Analysis finished with status:', progressData.status)
       stopAnalysisPolling()
+
+      // Notificar al usuario (OS notification si ventana no tiene foco, sonido siempre)
+      if (progressData.status === 'completed') {
+        notifyAnalysisComplete(project.value?.name)
+      } else {
+        notifyAnalysisError(progressData.error || 'Error durante el análisis')
+      }
 
       // Pequeño delay para asegurar que la BD se haya actualizado completamente
       // (el análisis corre en background thread y puede haber una condición de carrera)

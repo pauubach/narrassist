@@ -2,10 +2,12 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useSystemStore } from '@/stores/system'
 import type { DownloadProgressInfo, ModelStatus } from '@/stores/system'
+import { useNotifications } from '@/composables/useNotifications'
 import Dialog from 'primevue/dialog'
 import ProgressBar from 'primevue/progressbar'
 
 const systemStore = useSystemStore()
+const { showNotification } = useNotifications()
 
 type DownloadPhase =
   | 'starting'
@@ -180,6 +182,12 @@ onMounted(async () => {
 watch(() => systemStore.modelsReady, (ready) => {
   if (ready && visible.value) {
     downloadPhase.value = 'completed'
+    showNotification({
+      title: 'Modelos instalados',
+      body: 'Narrative Assistant está listo para usar.',
+      severity: 'success',
+      playSound: true,
+    })
     setTimeout(() => {
       visible.value = false
     }, 2000)
@@ -189,6 +197,12 @@ watch(() => systemStore.modelsReady, (ready) => {
 watch(() => systemStore.modelsError, (error) => {
   if (error) {
     downloadPhase.value = 'error'
+    showNotification({
+      title: 'Error en la instalación',
+      body: error,
+      severity: 'error',
+      playSound: true,
+    })
   }
 })
 

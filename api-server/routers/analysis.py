@@ -2034,8 +2034,19 @@ JSON:"""
             except Exception as e:
                 logger.exception(f"Error during analysis for project {project_id}: {e}")
                 deps.analysis_progress_storage[project_id]["status"] = "error"
-                deps.analysis_progress_storage[project_id]["current_phase"] = f"Error: {str(e)}"
-                deps.analysis_progress_storage[project_id]["error"] = str(e)
+
+                # Mensaje de error amigable según el tipo de excepción
+                err_str = str(e)
+                from narrative_assistant.core.errors import ModelNotLoadedError
+                if isinstance(e, ModelNotLoadedError) or "not loaded" in err_str.lower() or "not found" in err_str.lower():
+                    user_msg = (
+                        "Modelo de análisis no disponible. "
+                        "Reinicia la aplicación para que se descarguen los modelos necesarios."
+                    )
+                else:
+                    user_msg = f"Error en el análisis: {err_str}"
+                deps.analysis_progress_storage[project_id]["current_phase"] = user_msg
+                deps.analysis_progress_storage[project_id]["error"] = user_msg
 
                 # Marcar proyecto como error
                 try:
@@ -2137,6 +2148,38 @@ JSON:"""
                     count += _persist_sections_recursive(conn, subsections, proj_id, chapter_id, section_id)
 
             return count
+
+        # Pre-check: verificar que los modelos críticos están disponibles
+        # antes de lanzar el thread, para dar un error claro al usuario
+        try:
+            from narrative_assistant.core.model_manager import ModelType, get_model_manager
+            mm = get_model_manager()
+            missing_models = []
+            model_labels = {
+                ModelType.SPACY: "Análisis lingüístico (spaCy)",
+                ModelType.EMBEDDINGS: "Similitud semántica (embeddings)",
+                ModelType.TRANSFORMER_NER: "Reconocimiento de entidades (NER)",
+            }
+            for mt, label in model_labels.items():
+                if not mm.get_model_path(mt):
+                    missing_models.append(label)
+
+            if missing_models:
+                names = ", ".join(missing_models)
+                logger.error(f"Modelos no disponibles para análisis: {names}")
+                # Limpiar estado de progreso
+                with deps._progress_lock:
+                    deps.analysis_progress_storage.pop(project_id, None)
+                project.analysis_status = "error"
+                deps.project_manager.update(project)
+                return ApiResponse(
+                    success=False,
+                    error=f"Modelos no descargados: {names}. "
+                          "Reinicia la aplicación para que se descarguen automáticamente."
+                )
+        except Exception as e:
+            logger.warning(f"Error en pre-check de modelos: {e}")
+            # No bloquear - el thread dará un error más específico
 
         # Ejecutar análisis real en thread separado
         thread = threading.Thread(target=run_real_analysis, daemon=True)

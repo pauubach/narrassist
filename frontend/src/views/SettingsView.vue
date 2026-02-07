@@ -1557,9 +1557,13 @@ function getFieldLabel(field: string | undefined): string {
 function getRegisterLabel(register: string | undefined): string {
   const labels: Record<string, string> = {
     formal: 'Formal',
+    formal_literary: 'Formal / Literario',
     neutral: 'Neutro',
     colloquial: 'Coloquial',
     vulgar: 'Vulgar',
+    technical: 'Técnico',
+    literary: 'Literario',
+    poetic: 'Poético',
   }
   return labels[register || 'neutral'] || register || 'Neutro'
 }

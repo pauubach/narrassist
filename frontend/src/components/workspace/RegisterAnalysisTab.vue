@@ -449,12 +449,13 @@ const pieChartOptions = {
 // Get color for register type
 function getRegisterColor(register: string): string {
   const colors: Record<string, string> = {
-    formal: '#6366f1',      // Indigo
-    neutral: '#8b5cf6',     // Violet  
-    colloquial: '#f59e0b',  // Amber
-    literary: '#10b981',    // Emerald
-    technical: '#3b82f6',   // Blue
-    poetic: '#ec4899'       // Pink
+    formal: '#6366f1',         // Indigo
+    formal_literary: '#6366f1', // Indigo (same as formal)
+    neutral: '#8b5cf6',        // Violet
+    colloquial: '#f59e0b',     // Amber
+    literary: '#10b981',       // Emerald
+    technical: '#3b82f6',      // Blue
+    poetic: '#ec4899',         // Pink
   }
   return colors[register.toLowerCase()] || '#64748b'
 }
@@ -577,10 +578,12 @@ const formatPercent = (value: number): string => {
 const getRegisterLabel = (register: string): string => {
   const labels: Record<string, string> = {
     formal: 'Formal',
+    formal_literary: 'Formal / Literario',
     neutral: 'Neutro',
     colloquial: 'Coloquial',
     technical: 'Técnico',
-    literary: 'Literario'
+    literary: 'Literario',
+    poetic: 'Poético',
   }
   return labels[register] || register
 }
@@ -588,10 +591,12 @@ const getRegisterLabel = (register: string): string => {
 const getRegisterSeverity = (register: string): string => {
   const severities: Record<string, string> = {
     formal: 'info',
+    formal_literary: 'info',
     neutral: 'secondary',
     colloquial: 'warning',
     technical: 'contrast',
-    literary: 'success'
+    literary: 'success',
+    poetic: 'help',
   }
   return severities[register] || 'secondary'
 }
@@ -858,7 +863,9 @@ watch(() => props.projectId, (newId) => {
 /* Progress bar colors - PrimeVue 4 compatible */
 /* The p-progressbar component uses p-progressbar-value internally */
 .register-formal :deep(.p-progressbar-value),
-.register-formal:deep(.p-progressbar-value) {
+.register-formal:deep(.p-progressbar-value),
+.register-formal_literary :deep(.p-progressbar-value),
+.register-formal_literary:deep(.p-progressbar-value) {
   background: #6366f1 !important; /* Indigo - Formal */
 }
 
