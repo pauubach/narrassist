@@ -160,9 +160,57 @@ class TransformerNERModel:
         cache.mkdir(parents=True, exist_ok=True)
         return cache
 
+    def _ensure_model_downloaded(self) -> Path | None:
+        """
+        Usa ModelManager para asegurar que el modelo está descargado localmente.
+
+        Returns:
+            Path al modelo local si está disponible, None si no se pudo.
+        """
+        try:
+            from ..core.model_manager import ModelType, get_model_manager
+
+            manager = get_model_manager()
+
+            # Primero verificar si ya existe localmente
+            existing = manager.get_model_path(ModelType.TRANSFORMER_NER)
+            if existing:
+                return existing
+
+            # Descargar con progreso gestionado
+            logger.info(
+                "Modelo transformer NER no encontrado localmente. "
+                "Iniciando descarga (~500 MB)..."
+            )
+
+            def log_progress(message: str, percent: float):
+                logger.info(f"[Transformer NER] {message} ({int(percent * 100)}%)")
+
+            result = manager.ensure_model(
+                ModelType.TRANSFORMER_NER,
+                progress_callback=log_progress,
+            )
+
+            if result.is_success:
+                return result.value
+            else:
+                logger.warning(
+                    f"ModelManager no pudo descargar: "
+                    f"{result.error.message if result.error else 'desconocido'}"
+                )
+                return None
+
+        except Exception as e:
+            logger.warning(f"Error usando ModelManager para transformer NER: {e}")
+            return None
+
     def _load_pipeline(self) -> bool:
         """
         Carga el pipeline de HuggingFace (descarga si es necesario).
+
+        Primero intenta usar ModelManager para garantizar descarga gestionada
+        con progreso. Si no está disponible, descarga directamente desde
+        HuggingFace.
 
         Returns:
             True si se cargó correctamente, False en caso de error.
@@ -183,24 +231,29 @@ class TransformerNERModel:
             logger.warning(self._load_error)
             return False
 
+        local_model_path = None
         try:
-            cache_dir = self._get_cache_dir()
-            logger.info(
-                f"Cargando modelo transformer NER: {self._hf_model_name} "
-                f"(cache: {cache_dir})"
-            )
+            # Intentar usar ModelManager para descarga gestionada
+            local_model_path = self._ensure_model_downloaded()
+
+            if local_model_path:
+                model_source = str(local_model_path)
+                logger.info(f"Cargando transformer NER desde cache local: {model_source}")
+            else:
+                model_source = self._hf_model_name
+                logger.warning(
+                    f"Descarga directa desde HuggingFace: {model_source}. "
+                    f"Esto puede tardar varios minutos (~500 MB)..."
+                )
 
             # Determinar device_map para pipeline
             device_arg = 0 if self._device == "cuda" else -1
 
-            tokenizer = AutoTokenizer.from_pretrained(
-                self._hf_model_name,
-                cache_dir=str(cache_dir),
-            )
-            model = AutoModelForTokenClassification.from_pretrained(
-                self._hf_model_name,
-                cache_dir=str(cache_dir),
-            )
+            logger.info(f"Cargando tokenizer desde: {model_source}")
+            tokenizer = AutoTokenizer.from_pretrained(model_source)
+
+            logger.info(f"Cargando pesos del modelo desde: {model_source}")
+            model = AutoModelForTokenClassification.from_pretrained(model_source)
 
             self._pipeline = hf_pipeline(
                 "ner",
@@ -225,13 +278,13 @@ class TransformerNERModel:
                 )
                 self._device = "cpu"
                 try:
+                    source = str(local_model_path) if local_model_path else self._hf_model_name
                     self._pipeline = hf_pipeline(
                         "ner",
-                        model=self._hf_model_name,
-                        tokenizer=self._hf_model_name,
+                        model=source,
+                        tokenizer=source,
                         device=-1,
                         aggregation_strategy="simple",
-                        cache_dir=str(cache_dir),
                     )
                     logger.info("Modelo transformer NER cargado en CPU (fallback)")
                     return True

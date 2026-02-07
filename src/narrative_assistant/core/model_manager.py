@@ -423,6 +423,8 @@ class ModelManager:
                 return self._download_spacy_model(model_info, target_dir, progress_callback)
             elif model_info.model_type == ModelType.EMBEDDINGS:
                 return self._download_embeddings_model(model_info, target_dir, progress_callback)
+            elif model_info.model_type == ModelType.TRANSFORMER_NER:
+                return self._download_transformer_ner_model(model_info, target_dir, progress_callback)
             else:
                 return Result.failure(
                     ModelDownloadError(
@@ -639,6 +641,117 @@ class ModelManager:
                 )
             )
 
+    def _download_transformer_ner_model(
+        self,
+        model_info: ModelInfo,
+        target_dir: Path,
+        progress_callback: Callable[[str, float], None] | None,
+    ) -> Result[Path]:
+        """
+        Descarga modelo transformer NER desde HuggingFace.
+
+        Usa la librería transformers para descargar tokenizer + model weights.
+        """
+        try:
+            from transformers import AutoModelForTokenClassification, AutoTokenizer
+        except ImportError:
+            return Result.failure(
+                ModelDownloadError(
+                    model_name=model_info.name,
+                    reason="transformers no instalado. Instalar con: pip install transformers",
+                )
+            )
+
+        try:
+            # Temporalmente deshabilitar modo offline para descarga
+            old_hf_offline = os.environ.get("HF_HUB_OFFLINE")
+            old_transformers_offline = os.environ.get("TRANSFORMERS_OFFLINE")
+            os.environ["HF_HUB_OFFLINE"] = "0"
+            os.environ["TRANSFORMERS_OFFLINE"] = "0"
+
+            estimated_size = model_info.size_mb * 1024 * 1024
+
+            _update_download_progress(
+                model_info.model_type,
+                phase="connecting",
+                bytes_total=estimated_size,
+            )
+
+            if progress_callback:
+                progress_callback(f"Descargando {model_info.display_name}...", 0.1)
+
+            _update_download_progress(
+                model_info.model_type,
+                phase="downloading",
+                bytes_total=estimated_size,
+            )
+
+            try:
+                # Descargar tokenizer y modelo al cache de HuggingFace
+                logger.info(f"Descargando tokenizer: {model_info.name}")
+                if progress_callback:
+                    progress_callback("Descargando tokenizer...", 0.2)
+
+                tokenizer = AutoTokenizer.from_pretrained(model_info.name)
+
+                logger.info(f"Descargando modelo: {model_info.name}")
+                if progress_callback:
+                    progress_callback("Descargando pesos del modelo (~500 MB)...", 0.4)
+
+                model = AutoModelForTokenClassification.from_pretrained(model_info.name)
+
+                _update_download_progress(
+                    model_info.model_type,
+                    phase="installing",
+                    bytes_downloaded=int(estimated_size * 0.9),
+                    bytes_total=estimated_size,
+                )
+
+                if progress_callback:
+                    progress_callback("Guardando modelo en cache local...", 0.8)
+
+                # Guardar en directorio local
+                target_dir.mkdir(parents=True, exist_ok=True)
+                tokenizer.save_pretrained(str(target_dir))
+                model.save_pretrained(str(target_dir))
+
+                _update_download_progress(
+                    model_info.model_type,
+                    phase="completed",
+                    bytes_downloaded=estimated_size,
+                    bytes_total=estimated_size,
+                )
+
+                if progress_callback:
+                    progress_callback("Modelo instalado correctamente", 1.0)
+
+                logger.info(f"Modelo transformer NER instalado en: {target_dir}")
+                return Result.success(target_dir)
+
+            finally:
+                # Restaurar variables de entorno
+                if old_hf_offline is not None:
+                    os.environ["HF_HUB_OFFLINE"] = old_hf_offline
+                else:
+                    os.environ.pop("HF_HUB_OFFLINE", None)
+                if old_transformers_offline is not None:
+                    os.environ["TRANSFORMERS_OFFLINE"] = old_transformers_offline
+                else:
+                    os.environ.pop("TRANSFORMERS_OFFLINE", None)
+
+        except Exception as e:
+            _update_download_progress(
+                model_info.model_type,
+                phase="error",
+                error_message=str(e),
+            )
+            return Result.failure(
+                ModelDownloadError(
+                    model_name=model_info.name,
+                    reason=f"Error en descarga transformer NER: {e}",
+                )
+            )
+
     def _monitor_hf_download(
         self,
         model_name: str,
@@ -731,6 +844,28 @@ class ModelManager:
             ).exists()
             if not has_weights:
                 logger.warning("Archivo de pesos faltante en modelo embeddings")
+                return False
+
+            return True
+
+        elif model_type == ModelType.TRANSFORMER_NER:
+            # Transformer NER requiere config.json, tokenizer y pesos
+            if not (model_path / "config.json").exists():
+                logger.warning("Archivo config.json faltante en modelo transformer NER")
+                return False
+
+            has_weights = (model_path / "pytorch_model.bin").exists() or (
+                model_path / "model.safetensors"
+            ).exists()
+            if not has_weights:
+                logger.warning("Archivo de pesos faltante en modelo transformer NER")
+                return False
+
+            has_tokenizer = (model_path / "tokenizer_config.json").exists() or (
+                model_path / "tokenizer.json"
+            ).exists()
+            if not has_tokenizer:
+                logger.warning("Tokenizer faltante en modelo transformer NER")
                 return False
 
             return True
@@ -867,7 +1002,8 @@ def get_model_size_from_huggingface(model_name: str, use_cache: bool = True) -> 
     """
     Obtiene el tamaño real de un modelo desde HuggingFace Hub.
 
-    Los tamaños se cachean por 1 hora para evitar consultas excesivas.
+    Los tamaños se cachean por 1 semana (éxito) o 5 minutos (error).
+    Esto evita hacer polling continuo a HuggingFace si falla.
 
     Args:
         model_name: Nombre del modelo en HuggingFace
@@ -880,27 +1016,34 @@ def get_model_size_from_huggingface(model_name: str, use_cache: bool = True) -> 
 
     global _model_sizes_cache, _model_sizes_cache_time
 
-    # Verificar cache
+    # Verificar cache (incluye fallos cacheados como None)
     if use_cache and model_name in _model_sizes_cache:
         cache_age = time.time() - _model_sizes_cache_time
         if cache_age < _MODEL_SIZES_CACHE_TTL:
-            logger.debug(f"Usando tamaño cacheado para {model_name}")
-            return _model_sizes_cache[model_name]
+            cached = _model_sizes_cache[model_name]
+            if cached is not None:
+                return cached
+            # Fallo cacheado: respetar cooldown de 5 minutos
+            if cache_age < 300:
+                return None
+            # Cooldown expirado, reintentar
 
     try:
         from huggingface_hub import model_info
 
-        info = model_info(model_name)
+        info = model_info(model_name, timeout=5)
         if info.siblings:
             total_size = sum(f.size for f in info.siblings if f.size)
             if total_size > 0:
                 logger.debug(f"Tamaño de {model_name} desde HuggingFace: {total_size} bytes ({total_size / (1024*1024):.1f} MB)")
-                # Guardar en cache
                 _model_sizes_cache[model_name] = total_size
                 _model_sizes_cache_time = time.time()
                 return total_size
     except Exception as e:
         logger.debug(f"No se pudo obtener tamaño de {model_name}: {e}")
+        # Cachear el fallo para evitar bucle de reintentos
+        _model_sizes_cache[model_name] = None
+        _model_sizes_cache_time = time.time()
     return None
 
 
@@ -951,43 +1094,47 @@ def get_spacy_model_size(model_name: str) -> int | None:
 
     except Exception as e:
         logger.debug(f"No se pudo obtener tamaño de spaCy {model_name}: {e}")
+        # Cachear el fallo para evitar reintentos continuos
+        _model_sizes_cache[cache_key] = None
+        _model_sizes_cache_time = time.time()
 
     return None
 
 
 def get_real_model_sizes(force_refresh: bool = False) -> dict[str, int]:
     """
-    Obtiene tamaños reales de los modelos, consultando APIs externas.
+    Obtiene tamaños estimados de los modelos.
 
-    Los resultados se cachean por 1 hora. Usa force_refresh=True para
-    forzar una consulta fresca.
+    Usa tamaños estáticos de KNOWN_MODELS para evitar llamadas HTTP
+    durante polling del frontend. Solo consulta APIs externas si
+    force_refresh=True.
 
     Args:
-        force_refresh: Si True, ignora el cache y consulta de nuevo
+        force_refresh: Si True, consulta APIs externas para tamaños exactos
 
     Returns:
         Dict con tamaños en bytes por tipo de modelo
     """
     sizes = {}
 
-    # Embeddings: consultar HuggingFace
-    embeddings_info = KNOWN_MODELS[ModelType.EMBEDDINGS]
-    hf_size = get_model_size_from_huggingface(
-        f"sentence-transformers/{embeddings_info.name}",
-        use_cache=not force_refresh,
-    )
-    if hf_size:
-        sizes["embeddings"] = hf_size
-    else:
-        sizes["embeddings"] = embeddings_info.size_mb * 1024 * 1024
+    for model_type, model_info in KNOWN_MODELS.items():
+        key = model_type.value
+        size = model_info.size_mb * 1024 * 1024  # Default estático
 
-    # spaCy: consultar GitHub releases
-    spacy_info = KNOWN_MODELS[ModelType.SPACY]
-    spacy_size = get_spacy_model_size(spacy_info.name)
-    if spacy_size:
-        sizes["spacy"] = spacy_size
-    else:
-        sizes["spacy"] = spacy_info.size_mb * 1024 * 1024
+        if force_refresh:
+            if model_type == ModelType.EMBEDDINGS:
+                hf_size = get_model_size_from_huggingface(
+                    f"sentence-transformers/{model_info.name}",
+                    use_cache=False,
+                )
+                if hf_size:
+                    size = hf_size
+            elif model_type == ModelType.SPACY:
+                spacy_size = get_spacy_model_size(model_info.name)
+                if spacy_size:
+                    size = spacy_size
+
+        sizes[key] = size
 
     return sizes
 

@@ -563,6 +563,17 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                     deps.analysis_progress_storage[project_id]["current_action"] = msg
                     update_time_remaining()
 
+                # Verificar si el modelo transformer NER necesita descargarse
+                # y actualizar progreso para informar al usuario
+                try:
+                    from narrative_assistant.core.model_manager import ModelType, get_model_manager
+                    manager = get_model_manager()
+                    if not manager.get_model_path(ModelType.TRANSFORMER_NER):
+                        deps.analysis_progress_storage[project_id]["current_phase"] = "Descargando modelo NER (~500 MB, solo la primera vez)..."
+                        deps.analysis_progress_storage[project_id]["current_action"] = "Esto puede tardar unos minutos..."
+                except Exception:
+                    pass  # No bloquear análisis si falla la verificación
+
                 # Habilitar preprocesamiento con LLM para mejor detección de entidades
                 ner_extractor = NERExtractor(use_llm_preprocessing=True)
                 ner_result = ner_extractor.extract_entities(

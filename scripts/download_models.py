@@ -109,6 +109,7 @@ def download_models(
     force: bool = False,
     download_spacy: bool = True,
     download_embeddings: bool = True,
+    download_transformer_ner: bool = True,
 ):
     """Descarga los modelos especificados."""
     from narrative_assistant.core.model_manager import (
@@ -166,6 +167,24 @@ def download_models(
             print(f"\n  ERROR: {result.error.message if result.error else 'Desconocido'}")
             error_count += 1
 
+    # Descargar transformer NER
+    if download_transformer_ner:
+        print("\n" + "-" * 40)
+        print("Modelo Transformer NER (PlanTL RoBERTa)")
+        print("-" * 40)
+
+        callback = create_progress_callback("Transformer NER")
+        result = manager.ensure_model(
+            ModelType.TRANSFORMER_NER, force_download=force, progress_callback=callback
+        )
+
+        if result.is_success:
+            print(f"\n  Instalado en: {result.value}")
+            success_count += 1
+        else:
+            print(f"\n  ERROR: {result.error.message if result.error else 'Desconocido'}")
+            error_count += 1
+
     # Resumen
     print("\n" + "=" * 60)
     if error_count == 0:
@@ -184,8 +203,10 @@ def download_models(
     print("  └── models/")
     print("      ├── spacy/")
     print("      │   └── es_core_news_lg/")
-    print("      └── embeddings/")
-    print("          └── paraphrase-multilingual-MiniLM-L12-v2/")
+    print("      ├── embeddings/")
+    print("      │   └── paraphrase-multilingual-MiniLM-L12-v2/")
+    print("      └── transformer_ner/")
+    print("          └── PlanTL-GOB-ES/roberta-base-bne-capitel-ner/")
     print()
 
     if error_count == 0:
@@ -234,6 +255,12 @@ Variables de entorno:
     )
 
     parser.add_argument(
+        "--transformer-ner",
+        action="store_true",
+        help="Descargar solo modelo transformer NER (PlanTL RoBERTa)",
+    )
+
+    parser.add_argument(
         "--status",
         "-s",
         action="store_true",
@@ -257,16 +284,22 @@ Variables de entorno:
     # Determinar qué modelos descargar
     download_spacy = True
     download_embeddings = True
+    download_transformer_ner = True
 
-    if args.spacy or args.embeddings:
+    if args.spacy or args.embeddings or args.transformer_ner:
         # Si se especifica alguno, descargar solo los especificados
         download_spacy = args.spacy
         download_embeddings = args.embeddings
+        download_transformer_ner = args.transformer_ner
 
     # Verificar dependencias
     try:
-        import spacy
-        import sentence_transformers
+        if download_spacy:
+            import spacy  # noqa: F401
+        if download_embeddings:
+            import sentence_transformers  # noqa: F401
+        if download_transformer_ner:
+            import transformers  # noqa: F401
     except ImportError as e:
         print(f"Error: Dependencias no instaladas: {e}")
         print("Ejecutar primero: pip install -e .")
@@ -277,6 +310,7 @@ Variables de entorno:
         force=args.force,
         download_spacy=download_spacy,
         download_embeddings=download_embeddings,
+        download_transformer_ner=download_transformer_ner,
     )
 
     return 0 if success else 1
