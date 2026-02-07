@@ -474,8 +474,11 @@ async def download_models(request: DownloadModelsRequest):
             def _download_one(name_and_type):
                 name, mt = name_and_type
                 try:
-                    manager.ensure_model(mt, force_download=request.force)
-                    logger.info(f"Model {name} downloaded successfully")
+                    result = manager.ensure_model(mt, force_download=request.force)
+                    if result.is_success:
+                        logger.info(f"Model {name} downloaded successfully")
+                    else:
+                        logger.error(f"Model {name} download failed: {result.error}")
                 except Exception as e:
                     logger.error(f"Error downloading {name}: {e}")
 

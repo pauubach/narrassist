@@ -85,14 +85,28 @@ KNOWN_MODELS: dict[ModelType, ModelInfo] = {
     ),
     ModelType.TRANSFORMER_NER: ModelInfo(
         model_type=ModelType.TRANSFORMER_NER,
-        name="PlanTL-GOB-ES/roberta-base-bne-capitel-ner",
+        name="mrm8488/bert-spanish-cased-finetuned-ner",
         display_name="Reconocimiento de personajes y lugares",
-        size_mb=500,
+        size_mb=440,
         sha256=None,
-        source_url="https://huggingface.co/PlanTL-GOB-ES/roberta-base-bne-capitel-ner",
+        source_url="https://huggingface.co/mrm8488/bert-spanish-cased-finetuned-ner",
         subdirectory="transformer_ner",
     ),
 }
+
+# Modelos alternativos para transformer NER (fallback si el principal falla con 401/403)
+# PlanTL-GOB-ES fue gateado en HuggingFace ~2025, por eso usamos mrm8488 como default
+TRANSFORMER_NER_FALLBACKS: list[ModelInfo] = [
+    ModelInfo(
+        model_type=ModelType.TRANSFORMER_NER,
+        name="Davlan/xlm-roberta-base-ner-hrl",
+        display_name="Reconocimiento de personajes y lugares (multilingual)",
+        size_mb=1100,
+        sha256=None,
+        source_url="https://huggingface.co/Davlan/xlm-roberta-base-ner-hrl",
+        subdirectory="transformer_ner",
+    ),
+]
 
 
 @dataclass
@@ -867,6 +881,7 @@ class ModelManager:
         Descarga modelo transformer NER usando huggingface_hub.snapshot_download.
 
         Usa tqdm_class personalizado para reportar progreso byte-level real.
+        Si el modelo principal falla (ej: 401 gated), intenta fallbacks.
         """
         try:
             from huggingface_hub import snapshot_download
@@ -878,72 +893,117 @@ class ModelManager:
                 )
             )
 
-        try:
-            old_hf_offline = os.environ.get("HF_HUB_OFFLINE")
-            old_transformers_offline = os.environ.get("TRANSFORMERS_OFFLINE")
-            os.environ["HF_HUB_OFFLINE"] = "0"
-            os.environ["TRANSFORMERS_OFFLINE"] = "0"
+        # Lista de modelos a intentar: principal + fallbacks
+        models_to_try = [model_info] + TRANSFORMER_NER_FALLBACKS
+        last_error: Exception | None = None
 
-            estimated_size = model_info.size_mb * 1024 * 1024
-
-            _update_download_progress(
-                model_info.model_type,
-                phase="connecting",
-                bytes_total=estimated_size,
-            )
-
-            if progress_callback:
-                progress_callback(f"Descargando {model_info.display_name}...", 0.1)
-
+        for attempt_info in models_to_try:
+            attempt_dir = self.models_dir / attempt_info.subdirectory / attempt_info.name
             try:
-                repo_id = model_info.name  # Ya es "PlanTL-GOB-ES/roberta-base-bne-capitel-ner"
-                tracker_class = _create_hf_progress_tracker(model_info.model_type)
+                old_hf_offline = os.environ.get("HF_HUB_OFFLINE")
+                old_transformers_offline = os.environ.get("TRANSFORMERS_OFFLINE")
+                os.environ["HF_HUB_OFFLINE"] = "0"
+                os.environ["TRANSFORMERS_OFFLINE"] = "0"
 
-                logger.info(f"Descargando modelo transformer NER: {repo_id}")
-                target_dir.mkdir(parents=True, exist_ok=True)
-
-                snapshot_download(
-                    repo_id,
-                    local_dir=str(target_dir),
-                    tqdm_class=tracker_class,
-                    ignore_patterns=["*.onnx", "*.h5", "tf_*", "flax_*", "openvino/*", "onnx/*"],
-                )
+                estimated_size = attempt_info.size_mb * 1024 * 1024
 
                 _update_download_progress(
-                    model_info.model_type,
-                    phase="completed",
-                    bytes_downloaded=estimated_size,
+                    attempt_info.model_type,
+                    phase="connecting",
                     bytes_total=estimated_size,
                 )
 
                 if progress_callback:
-                    progress_callback("Modelo instalado correctamente", 1.0)
+                    progress_callback(f"Descargando {attempt_info.display_name}...", 0.1)
 
-                logger.info(f"Modelo transformer NER instalado en: {target_dir}")
-                return Result.success(target_dir)
+                try:
+                    repo_id = attempt_info.name
+                    tracker_class = _create_hf_progress_tracker(attempt_info.model_type)
 
-            finally:
-                if old_hf_offline is not None:
-                    os.environ["HF_HUB_OFFLINE"] = old_hf_offline
+                    logger.info(f"Descargando modelo transformer NER: {repo_id}")
+                    attempt_dir.mkdir(parents=True, exist_ok=True)
+
+                    snapshot_download(
+                        repo_id,
+                        local_dir=str(attempt_dir),
+                        tqdm_class=tracker_class,
+                        ignore_patterns=["*.onnx", "*.h5", "tf_*", "flax_*", "openvino/*", "onnx/*"],
+                    )
+
+                    _update_download_progress(
+                        attempt_info.model_type,
+                        phase="completed",
+                        bytes_downloaded=estimated_size,
+                        bytes_total=estimated_size,
+                    )
+
+                    if progress_callback:
+                        progress_callback("Modelo instalado correctamente", 1.0)
+
+                    # Si descargamos un fallback, actualizar KNOWN_MODELS para que
+                    # get_model_path() lo encuentre con el nombre correcto
+                    if attempt_info.name != model_info.name:
+                        logger.info(
+                            f"Modelo principal '{model_info.name}' no disponible, "
+                            f"usando fallback: '{attempt_info.name}'"
+                        )
+                        KNOWN_MODELS[ModelType.TRANSFORMER_NER] = attempt_info
+
+                    logger.info(f"Modelo transformer NER instalado en: {attempt_dir}")
+                    return Result.success(attempt_dir)
+
+                finally:
+                    if old_hf_offline is not None:
+                        os.environ["HF_HUB_OFFLINE"] = old_hf_offline
+                    else:
+                        os.environ.pop("HF_HUB_OFFLINE", None)
+                    if old_transformers_offline is not None:
+                        os.environ["TRANSFORMERS_OFFLINE"] = old_transformers_offline
+                    else:
+                        os.environ.pop("TRANSFORMERS_OFFLINE", None)
+
+            except Exception as e:
+                last_error = e
+                error_str = str(e)
+                is_auth_error = "401" in error_str or "403" in error_str or "gated" in error_str.lower()
+
+                if is_auth_error and attempt_info.name != models_to_try[-1].name:
+                    logger.warning(
+                        f"Modelo '{attempt_info.name}' requiere autenticación (HTTP 401/403). "
+                        f"Intentando siguiente alternativa..."
+                    )
+                    # Limpiar directorio parcial del intento fallido
+                    if attempt_dir.exists():
+                        shutil.rmtree(attempt_dir, ignore_errors=True)
+                    continue
                 else:
-                    os.environ.pop("HF_HUB_OFFLINE", None)
-                if old_transformers_offline is not None:
-                    os.environ["TRANSFORMERS_OFFLINE"] = old_transformers_offline
-                else:
-                    os.environ.pop("TRANSFORMERS_OFFLINE", None)
+                    _update_download_progress(
+                        attempt_info.model_type,
+                        phase="error",
+                        error_message=str(e),
+                    )
+                    # Limpiar directorio parcial
+                    if attempt_dir.exists():
+                        shutil.rmtree(attempt_dir, ignore_errors=True)
+                    return Result.failure(
+                        ModelDownloadError(
+                            model_name=attempt_info.name,
+                            reason=f"Error en descarga transformer NER: {e}",
+                        )
+                    )
 
-        except Exception as e:
-            _update_download_progress(
-                model_info.model_type,
-                phase="error",
-                error_message=str(e),
+        # Todos los modelos fallaron
+        _update_download_progress(
+            model_info.model_type,
+            phase="error",
+            error_message=f"Todos los modelos NER fallaron: {last_error}",
+        )
+        return Result.failure(
+            ModelDownloadError(
+                model_name=model_info.name,
+                reason=f"No se pudo descargar ningún modelo NER. Último error: {last_error}",
             )
-            return Result.failure(
-                ModelDownloadError(
-                    model_name=model_info.name,
-                    reason=f"Error en descarga transformer NER: {e}",
-                )
-            )
+        )
 
     def _verify_model_structure(self, model_type: ModelType, model_path: Path) -> bool:
         """

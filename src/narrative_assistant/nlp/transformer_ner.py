@@ -1,13 +1,17 @@
 """
-NER basado en modelos Transformer (PlanTL RoBERTa / BETO).
+NER basado en modelos Transformer (BETO / XLM-RoBERTa).
 
 Proporciona extracción de entidades nombradas usando modelos transformer
 fine-tuned para NER en español, como alternativa/complemento a spaCy.
 
 Modelos soportados (en orden de preferencia):
-- PlanTL-GOB-ES/roberta-base-bne-capitel-ner (~500MB, default)
-- PlanTL-GOB-ES/roberta-large-bne-capitel-ner (~1.4GB, más preciso)
-- mrm8488/bert-spanish-cased-finetuned-ner (~440MB, fallback)
+- mrm8488/bert-spanish-cased-finetuned-ner (~440MB, default, público)
+- PlanTL-GOB-ES/roberta-base-bne-capitel-ner (~500MB, requiere auth HF)
+- PlanTL-GOB-ES/roberta-large-bne-capitel-ner (~1.4GB, requiere auth HF)
+
+NOTA: Los modelos PlanTL-GOB-ES fueron gateados en HuggingFace (~2025)
+y requieren autenticación. mrm8488/bert-spanish-cased-finetuned-ner es
+el default por ser público y tener buen rendimiento para español.
 
 El modelo se descarga automáticamente la primera vez que se usa
 y se guarda en ~/.narrative_assistant/models/transformer_ner/.
@@ -29,28 +33,31 @@ _lock = threading.Lock()
 _instance: "TransformerNERModel | None" = None
 
 # Modelos soportados con sus configuraciones
+# NOTA: PlanTL-GOB-ES gateado en HuggingFace (~2025), requiere token de autenticación
 TRANSFORMER_NER_MODELS = {
-    "roberta-base-bne": {
-        "hf_name": "PlanTL-GOB-ES/roberta-base-bne-capitel-ner",
-        "size_mb": 500,
-        "params": "125M",
-        "min_vram_mb": 800,
-    },
-    "roberta-large-bne": {
-        "hf_name": "PlanTL-GOB-ES/roberta-large-bne-capitel-ner",
-        "size_mb": 1400,
-        "params": "355M",
-        "min_vram_mb": 2500,
-    },
     "beto-ner": {
         "hf_name": "mrm8488/bert-spanish-cased-finetuned-ner",
         "size_mb": 440,
         "params": "110M",
         "min_vram_mb": 700,
     },
+    "roberta-base-bne": {
+        "hf_name": "PlanTL-GOB-ES/roberta-base-bne-capitel-ner",
+        "size_mb": 500,
+        "params": "125M",
+        "min_vram_mb": 800,
+        "requires_auth": True,
+    },
+    "roberta-large-bne": {
+        "hf_name": "PlanTL-GOB-ES/roberta-large-bne-capitel-ner",
+        "size_mb": 1400,
+        "params": "355M",
+        "min_vram_mb": 2500,
+        "requires_auth": True,
+    },
 }
 
-DEFAULT_MODEL = "roberta-base-bne"
+DEFAULT_MODEL = "beto-ner"
 
 # Mapeo de etiquetas del modelo a nuestras etiquetas
 # PlanTL CAPITEL usa: B-PER, I-PER, B-LOC, I-LOC, B-ORG, I-ORG, B-OTH, I-OTH

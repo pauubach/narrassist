@@ -176,14 +176,14 @@ onBeforeUnmount(() => {
 const modelNameToType: Record<string, string> = {
   es_core_news_lg: 'spacy',
   'paraphrase-multilingual-MiniLM-L12-v2': 'embeddings',
-  'PlanTL-GOB-ES/roberta-base-bne-capitel-ner': 'transformer_ner',
+  'mrm8488/bert-spanish-cased-finetuned-ner': 'transformer_ner',
 }
 
 // Orden fijo de instalación de modelos
 const MODEL_INSTALL_ORDER = [
   'es_core_news_lg',
   'paraphrase-multilingual-MiniLM-L12-v2',
-  'PlanTL-GOB-ES/roberta-base-bne-capitel-ner',
+  'mrm8488/bert-spanish-cased-finetuned-ner',
 ]
 
 // Todos los modelos (instalados y pendientes) en orden de instalación

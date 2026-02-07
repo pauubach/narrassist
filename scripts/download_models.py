@@ -206,7 +206,7 @@ def download_models(
     print("      ├── embeddings/")
     print("      │   └── paraphrase-multilingual-MiniLM-L12-v2/")
     print("      └── transformer_ner/")
-    print("          └── PlanTL-GOB-ES/roberta-base-bne-capitel-ner/")
+    print("          └── mrm8488/bert-spanish-cased-finetuned-ner/")
     print()
 
     if error_count == 0:

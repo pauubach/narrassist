@@ -263,6 +263,18 @@ export const useSystemStore = defineStore('system', () => {
         if (response.model_sizes) {
           modelSizes.value = response.model_sizes
         }
+
+        // Detect failed downloads: no active downloads but some have error phase
+        if (!response.has_active && Object.keys(response.active_downloads || {}).length > 0) {
+          const errorDownloads = Object.entries(response.active_downloads || {})
+            .filter(([, info]) => info.phase === 'error')
+          if (errorDownloads.length > 0) {
+            const failedNames = errorDownloads.map(([name]) => name).join(', ')
+            modelsError.value = `Error descargando modelo(s): ${failedNames}. Verifica tu conexión e intenta de nuevo.`
+            stopPolling()
+            modelsDownloading.value = false
+          }
+        }
       }
     } catch {
       // Ignore errors in progress polling
