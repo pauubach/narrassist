@@ -33,27 +33,52 @@ const downloadPhase = ref<DownloadPhase>('starting')
 // Progreso real desde el backend
 const realProgress = computed<RealProgress | null>(() => {
   const progress = systemStore.downloadProgress
-  if (!progress || Object.keys(progress).length === 0) return null
+  const nlpModels = systemStore.modelsStatus?.nlp_models
+  if ((!progress || Object.keys(progress).length === 0) && !nlpModels) return null
 
-  // Combinar progreso de todos los modelos activos
-  const models = Object.values(progress) as DownloadProgressInfo[]
-  if (models.length === 0) return null
+  const progressEntries = Object.entries(progress || {}) as [string, DownloadProgressInfo][]
+  const progressTypes = new Set(progressEntries.map(([key]) => key))
 
-  const totalBytes = models.reduce((sum, m) => sum + m.bytes_total, 0)
-  const downloadedBytes = models.reduce((sum, m) => sum + m.bytes_downloaded, 0)
-  const avgSpeed = models.reduce((sum, m) => sum + m.speed_bps, 0) / models.length
+  let totalBytes = 0
+  let downloadedBytes = 0
+  let totalSpeed = 0
+  let speedCount = 0
+  let activeModel: DownloadProgressInfo | null = null
 
-  // Encontrar el modelo activo (no completado)
-  const activeModel = models.find(m => m.phase !== 'completed' && m.phase !== 'error')
+  // Sumar progreso de descargas activas
+  for (const [, m] of progressEntries) {
+    totalBytes += m.bytes_total
+    downloadedBytes += m.bytes_downloaded
+    totalSpeed += m.speed_bps
+    speedCount++
+    if (!activeModel && m.phase !== 'completed' && m.phase !== 'error') {
+      activeModel = m
+    }
+  }
+
+  // Incluir modelos ya instalados que no están en progreso activo
+  // (ej: embeddings resuelto del cache HF instantáneamente)
+  if (nlpModels) {
+    for (const [, info] of Object.entries(nlpModels) as [string, ModelStatus][]) {
+      const modelType = info.type ?? ''
+      if (info.installed && !progressTypes.has(modelType)) {
+        const sizeBytes = (info.size_mb || 0) * 1024 * 1024
+        totalBytes += sizeBytes
+        downloadedBytes += sizeBytes
+      }
+    }
+  }
+
+  if (totalBytes === 0) return null
 
   return {
-    percent: totalBytes > 0 ? (downloadedBytes / totalBytes) * 100 : 0,
+    percent: (downloadedBytes / totalBytes) * 100,
     bytesDownloaded: downloadedBytes,
     bytesTotal: totalBytes,
-    speedMbps: avgSpeed / (1024 * 1024),
+    speedMbps: speedCount > 0 ? (totalSpeed / speedCount) / (1024 * 1024) : 0,
     phase: activeModel?.phase || 'downloading',
     modelType: activeModel?.model_type || null,
-    hasRealProgress: downloadedBytes > 0 && totalBytes > 0,
+    hasRealProgress: downloadedBytes > 0,
   }
 })
 
@@ -286,6 +311,11 @@ function isModelDownloading(modelType: string): boolean {
   return phase === 'downloading' || phase === 'connecting' || phase === 'installing'
 }
 
+function isModelPending(modelType: string): boolean {
+  // Modelo no instalado, no descargando, no completado: está en cola
+  return !getModelPhase(modelType) && downloadPhase.value === 'downloading'
+}
+
 async function recheckPython() {
   downloadPhase.value = 'checking'
   await systemStore.checkModelsStatus()
@@ -427,12 +457,15 @@ async function recheckPython() {
                     ? 'pi-check-circle text-green'
                     : isModelDownloading(model.type)
                       ? 'pi-spin pi-spinner text-blue'
-                      : 'pi-circle'
+                      : isModelPending(model.type)
+                        ? 'pi-clock text-muted'
+                        : 'pi-circle'
                 "
               ></i>
               <span class="model-name">{{ model.displayName }}</span>
               <span class="model-size">
                 <template v-if="model.installed && !isModelDownloading(model.type)">Instalado</template>
+                <template v-else-if="isModelPending(model.type)">En cola</template>
                 <template v-else>~{{ model.sizeMb }} MB</template>
               </span>
             </div>
@@ -640,6 +673,10 @@ async function recheckPython() {
 
 .model-item i.text-green {
   color: var(--p-green-500);
+}
+
+.model-item i.text-muted {
+  color: var(--p-text-muted-color);
 }
 
 .model-name {
