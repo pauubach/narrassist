@@ -385,11 +385,25 @@ class ModelManager:
 
         # Verificar estructura básica del modelo
         if self._verify_model_structure(model_type, model_path):
-            self._verified_paths[model_type] = model_path
-            return model_path
+            # Para spaCy, resolver subdir versionado si config.cfg no está en raíz
+            resolved = self._resolve_spacy_path(model_type, model_path)
+            self._verified_paths[model_type] = resolved
+            return resolved
 
         logger.warning(f"Modelo en {model_path} tiene estructura inválida")
         return None
+
+    def _resolve_spacy_path(self, model_type: ModelType, model_path: Path) -> Path:
+        """Para spaCy: si config.cfg está en un subdir versionado, devuelve ese subdir."""
+        if model_type != ModelType.SPACY:
+            return model_path
+        if (model_path / "config.cfg").exists():
+            return model_path
+        for child in model_path.iterdir():
+            if child.is_dir() and (child / "config.cfg").exists():
+                logger.debug(f"Resolviendo spaCy path a subdir versionado: {child}")
+                return child
+        return model_path
 
     def ensure_model(
         self,
@@ -631,10 +645,27 @@ class ModelManager:
 
             with zipfile.ZipFile(tmp_path) as zf:
                 # En el .whl, los archivos del modelo están en {model_name}/
-                prefix = f"{model_info.name}/"
+                # Pero spaCy empaqueta los datos en un subdir versionado:
+                #   es_core_news_lg/es_core_news_lg-3.7.0/config.cfg
+                # Necesitamos extraer desde el subdir versionado para que
+                # spacy.load(target_dir) encuentre config.cfg directamente.
+                base_prefix = f"{model_info.name}/"
+                all_names = zf.namelist()
+
+                # Detectar subdir versionado (e.g. es_core_news_lg-3.7.0/)
+                versioned_prefix = None
+                for name in all_names:
+                    if name.startswith(base_prefix) and "/config.cfg" in name:
+                        # Encontrado: es_core_news_lg/es_core_news_lg-3.7.0/config.cfg
+                        parts = name[len(base_prefix):].split("/")
+                        if len(parts) >= 2:
+                            versioned_prefix = f"{base_prefix}{parts[0]}/"
+                        break
+
+                prefix = versioned_prefix or base_prefix
                 extracted_count = 0
 
-                for member in zf.namelist():
+                for member in all_names:
                     if not member.startswith(prefix):
                         continue
                     rel_path = member[len(prefix):]
@@ -1020,13 +1051,15 @@ class ModelManager:
             return False
 
         if model_type == ModelType.SPACY:
-            # spaCy requiere meta.json y config.cfg
-            required_files = ["meta.json", "config.cfg"]
-            for f in required_files:
-                if not (model_path / f).exists():
-                    logger.warning(f"Archivo faltante en modelo spaCy: {f}")
-                    return False
-            return True
+            # spaCy requiere config.cfg (puede estar en raíz o en subdir versionado)
+            if (model_path / "config.cfg").exists():
+                return True
+            # Buscar en subdir versionado (e.g. es_core_news_lg-3.7.0/config.cfg)
+            for child in model_path.iterdir():
+                if child.is_dir() and (child / "config.cfg").exists():
+                    return True
+            logger.warning(f"Archivo faltante en modelo spaCy: config.cfg")
+            return False
 
         elif model_type == ModelType.EMBEDDINGS:
             # sentence-transformers requiere config.json y pytorch_model.bin o model.safetensors
