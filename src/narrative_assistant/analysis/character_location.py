@@ -135,27 +135,27 @@ class CharacterLocationAnalyzer:
 
     # Patrones de llegada
     ARRIVAL_PATTERNS = [
-        r"(?P<name>\w+)\s+(?:llegó|arribó|entró)\s+(?:a|en)\s+(?:la\s+|el\s+)?(?P<loc>\w+(?:\s+\w+)?)",
-        r"(?P<name>\w+)\s+(?:apareció|se\s+presentó)\s+en\s+(?:la\s+|el\s+)?(?P<loc>\w+(?:\s+\w+)?)",
-        r"cuando\s+(?P<name>\w+)\s+(?:llegó|entró)\s+(?:a|en)\s+(?:la\s+|el\s+)?(?P<loc>\w+(?:\s+\w+)?)",
+        r"(?P<name>\w+)\s+(?:llegó|arribó|entró)\s+(?:a|en)\s+(?:la\s+|el\s+)?(?P<loc>\w+(?:\s+\w+){0,3})",
+        r"(?P<name>\w+)\s+(?:apareció|se\s+presentó)\s+en\s+(?:la\s+|el\s+)?(?P<loc>\w+(?:\s+\w+){0,3})",
+        r"cuando\s+(?P<name>\w+)\s+(?:llegó|entró)\s+(?:a|en)\s+(?:la\s+|el\s+)?(?P<loc>\w+(?:\s+\w+){0,3})",
     ]
 
     # Patrones de salida
     DEPARTURE_PATTERNS = [
-        r"(?P<name>\w+)\s+(?:salió|partió|se\s+fue|abandonó)\s+(?:de\s+)?(?:la\s+|el\s+)?(?P<loc>\w+(?:\s+\w+)?)",
-        r"(?P<name>\w+)\s+(?:dejó)\s+(?:la\s+|el\s+)?(?P<loc>\w+(?:\s+\w+)?)",
+        r"(?P<name>\w+)\s+(?:salió|partió|se\s+fue|abandonó)\s+(?:de\s+)?(?:la\s+|el\s+)?(?P<loc>\w+(?:\s+\w+){0,3})",
+        r"(?P<name>\w+)\s+(?:dejó)\s+(?:la\s+|el\s+)?(?P<loc>\w+(?:\s+\w+){0,3})",
     ]
 
     # Patrones de presencia
     PRESENCE_PATTERNS = [
-        r"(?P<name>\w+)\s+(?:estaba|se\s+encontraba|permanecía)\s+en\s+(?:la\s+|el\s+)?(?P<loc>\w+(?:\s+\w+)?)",
-        r"en\s+(?:la\s+|el\s+)?(?P<loc>\w+(?:\s+\w+)?)[,\s]+(?P<name>\w+)\s+(?:esperaba|miraba|observaba)",
+        r"(?P<name>\w+)\s+(?:estaba|se\s+encontraba|permanecía)\s+en\s+(?:la\s+|el\s+)?(?P<loc>\w+(?:\s+\w+){0,3})",
+        r"en\s+(?:la\s+|el\s+)?(?P<loc>\w+(?:\s+\w+){0,3})[,\s]+(?P<name>\w+)\s+(?:esperaba|miraba|observaba)",
     ]
 
     # Patrones de transición
     TRANSITION_PATTERNS = [
-        r"(?P<name>\w+)\s+(?:viajó|caminó|fue|se\s+dirigió)\s+(?:de\s+(?:la\s+|el\s+)?(?P<from>\w+)\s+)?(?:a|hacia)\s+(?:la\s+|el\s+)?(?P<loc>\w+(?:\s+\w+)?)",
-        r"(?P<name>\w+)\s+(?:cruzó|atravesó)\s+(?:la\s+|el\s+)?(?P<loc>\w+(?:\s+\w+)?)",
+        r"(?P<name>\w+)\s+(?:viajó|caminó|fue|se\s+dirigió)\s+(?:de\s+(?:la\s+|el\s+)?(?P<from>\w+(?:\s+\w+){0,3})\s+)?(?:a|hacia)\s+(?:la\s+|el\s+)?(?P<loc>\w+(?:\s+\w+){0,3})",
+        r"(?P<name>\w+)\s+(?:cruzó|atravesó)\s+(?:la\s+|el\s+)?(?P<loc>\w+(?:\s+\w+){0,3})",
     ]
 
     def __init__(self):

@@ -71,7 +71,7 @@
         <Card class="stat-card">
           <template #content>
             <div class="stat-content">
-              <div class="stat-value severity-critical">
+              <div class="stat-value" :class="{ 'severity-critical': (report.global_stats.by_severity?.critical || 0) > 0 }">
                 {{ report.global_stats.by_severity?.critical || 0 }}
               </div>
               <div class="stat-label">Exactos</div>
@@ -82,7 +82,7 @@
         <Card class="stat-card">
           <template #content>
             <div class="stat-content">
-              <div class="stat-value severity-high">
+              <div class="stat-value" :class="{ 'severity-high': (report.global_stats.by_severity?.high || 0) > 0 }">
                 {{ report.global_stats.by_severity?.high || 0 }}
               </div>
               <div class="stat-label">Muy similares</div>
@@ -341,23 +341,25 @@ function getTypeLabel(type: string): string {
 .header-controls {
   display: flex;
   align-items: center;
-  gap: var(--ds-space-4);
+  gap: var(--ds-space-3);
   flex-wrap: wrap;
+  flex-shrink: 0;
 }
 
 .threshold-control {
   display: flex;
   align-items: center;
-  gap: var(--ds-space-2);
+  gap: var(--ds-space-1);
+  white-space: nowrap;
 }
 
 .threshold-control label {
-  font-size: var(--ds-font-size-sm);
+  font-size: var(--ds-font-size-xs);
   color: var(--ds-color-text-secondary);
 }
 
 .threshold-control :deep(.p-inputnumber) {
-  width: 80px;
+  width: 70px;
 }
 
 /* Loading & Empty states */

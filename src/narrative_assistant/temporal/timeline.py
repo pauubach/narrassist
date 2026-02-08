@@ -254,8 +254,8 @@ class TimelineBuilder:
         # Extraer día de la semana si se menciona en los marcadores
         weekday = None
         for marker in relative_markers:
-            if marker.weekday:
-                weekday = marker.weekday
+            if getattr(marker, "weekday", None):
+                weekday = getattr(marker, "weekday")
                 break
 
         # Buscar el evento del primer capítulo

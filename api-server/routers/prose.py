@@ -529,7 +529,7 @@ async def get_echo_report(
                     "type": "lexical",
                     "severity": severity,
                     "occurrences": [
-                        {"text": occ.context, "position": occ.position}
+                        {"text": occ.sentence, "position": occ.start_char}
                         for occ in rep.occurrences[:5]
                     ],
                 })
@@ -546,7 +546,7 @@ async def get_echo_report(
                             "type": "semantic",
                             "severity": "low",
                             "occurrences": [
-                                {"text": occ.context, "position": occ.position}
+                                {"text": occ.sentence, "position": occ.start_char}
                                 for occ in rep.occurrences[:5]
                             ],
                         })
@@ -963,26 +963,37 @@ async def get_sentence_variation(
     """
     Analiza la variación en la longitud de las oraciones.
 
-    Proporciona métricas de legibilidad y distribución de oraciones.
+    Proporciona métricas detalladas de distribución y variación por capítulo.
     """
     try:
-        from narrative_assistant.nlp.style.readability import get_readability_analyzer
+        import re as _re
+        import math
 
         result = deps.project_manager.get(project_id)
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Proyecto no encontrado")
-        project = result.value
 
-        analyzer = get_readability_analyzer()
         chapters = deps.chapter_repository.get_by_project(project_id)
 
+        def _split_sentences(text: str) -> list[str]:
+            raw = _re.split(r'(?<=[.!?])\s+', text)
+            return [s.strip() for s in raw if s.strip() and len(s.split()) > 0]
+
+        def _classify(length: int) -> str:
+            if length < 5:
+                return "very_short"
+            if length < 10:
+                return "short"
+            if length < 20:
+                return "medium"
+            if length < 35:
+                return "long"
+            return "very_long"
+
+        all_lengths: list[int] = []
         chapters_data = []
-        global_stats = {
-            "total_sentences": 0,
-            "total_words": 0,
-            "flesch_scores": [],
-        }
-        global_distribution = {"short": 0, "medium": 0, "long": 0, "very_long": 0}
+        global_distribution = {"very_short": 0, "short": 0, "medium": 0, "long": 0, "very_long": 0}
+        all_issues = []
 
         for chapter in chapters:
             if chapter_number is not None and chapter.chapter_number != chapter_number:
@@ -991,64 +1002,94 @@ async def get_sentence_variation(
             if not chapter_text.strip():
                 continue
 
-            result = analyzer.analyze(chapter_text)
-            if result.is_failure:
+            sentences = _split_sentences(chapter_text)
+            if not sentences:
                 continue
 
-            report = result.value
+            sent_data = []
+            ch_lengths = []
+
+            for s in sentences:
+                wc = len(s.split())
+                ch_lengths.append(wc)
+                cat = _classify(wc)
+                global_distribution[cat] += 1
+                sent_data.append({"length": wc, "text": s[:120]})
+
+            all_lengths.extend(ch_lengths)
+
+            n = len(ch_lengths)
+            avg_len = round(sum(ch_lengths) / n, 1)
+            sorted_lens = sorted(ch_lengths)
+            median_len = sorted_lens[n // 2] if n % 2 == 1 else round((sorted_lens[n // 2 - 1] + sorted_lens[n // 2]) / 2, 1)
+            variance = sum((x - avg_len) ** 2 for x in ch_lengths) / n
+            std_dev = round(math.sqrt(variance), 1)
+            var_coeff = round((std_dev / avg_len) * 100, 1) if avg_len > 0 else 0
+
+            ch_dist = {}
+            for wc in ch_lengths:
+                cat = _classify(wc)
+                ch_dist[cat] = ch_dist.get(cat, 0) + 1
 
             chapters_data.append({
                 "chapter_number": chapter.chapter_number,
                 "chapter_title": chapter.title or f"Capítulo {chapter.chapter_number}",
-                "flesch_szigriszt": round(report.flesch_szigriszt, 1),
-                "level": report.level.value,
-                "level_description": report.level_description,
+                "sentences": sent_data,
                 "statistics": {
-                    "total_sentences": report.total_sentences,
-                    "total_words": report.total_words,
-                    "avg_words_per_sentence": round(report.avg_words_per_sentence, 1),
-                    "avg_syllables_per_word": round(report.avg_syllables_per_word, 2),
+                    "total_sentences": n,
+                    "avg_length": avg_len,
+                    "median_length": median_len,
+                    "std_deviation": std_dev,
+                    "variation_coefficient": var_coeff,
+                    "min_length": min(ch_lengths),
+                    "max_length": max(ch_lengths),
                 },
-                "distribution": {
-                    "short": report.short_sentences,
-                    "medium": report.medium_sentences,
-                    "long": report.long_sentences,
-                    "very_long": report.very_long_sentences,
-                },
-                "target_audience": report.target_audience,
             })
 
-            global_stats["total_sentences"] += report.total_sentences
-            global_stats["total_words"] += report.total_words
-            global_stats["flesch_scores"].append(report.flesch_szigriszt)
-            global_distribution["short"] += report.short_sentences
-            global_distribution["medium"] += report.medium_sentences
-            global_distribution["long"] += report.long_sentences
-            global_distribution["very_long"] += report.very_long_sentences
+            ch_title = chapter.title or f"Cap. {chapter.chapter_number}"
+            if var_coeff < 20:
+                all_issues.append({"type": "monotonous", "message": f"Oraciones muy uniformes en {ch_title} (variación {var_coeff}%)", "chapter": chapter.chapter_number})
+            if ch_dist.get("very_long", 0) > n * 0.2:
+                all_issues.append({"type": "too_many_long", "message": f"Muchas oraciones muy largas en {ch_title}", "chapter": chapter.chapter_number})
+            if (ch_dist.get("very_short", 0) + ch_dist.get("short", 0)) > n * 0.7:
+                all_issues.append({"type": "choppy", "message": f"Predominio de oraciones cortas en {ch_title}", "chapter": chapter.chapter_number})
 
-        # Calcular promedios globales
-        avg_flesch = sum(global_stats["flesch_scores"]) / len(global_stats["flesch_scores"]) if global_stats["flesch_scores"] else 0
-        avg_wps = global_stats["total_words"] / global_stats["total_sentences"] if global_stats["total_sentences"] else 0
+        # Global statistics
+        if all_lengths:
+            n_total = len(all_lengths)
+            g_avg = round(sum(all_lengths) / n_total, 1)
+            g_var = sum((x - g_avg) ** 2 for x in all_lengths) / n_total
+            g_std = round(math.sqrt(g_var), 1)
+            g_var_coeff = round((g_std / g_avg) * 100, 1) if g_avg > 0 else 0
+            g_min = min(all_lengths)
+            g_max = max(all_lengths)
+        else:
+            n_total = g_avg = g_var_coeff = g_min = g_max = 0
 
         recommendations = []
-        if global_distribution["very_long"] > global_stats["total_sentences"] * 0.15:
-            recommendations.append("Muchas oraciones muy largas (>35 palabras). Considera dividirlas.")
-        if global_distribution["short"] > global_stats["total_sentences"] * 0.6:
-            recommendations.append("Texto con predominio de oraciones cortas. Varía la longitud para mejor ritmo.")
-        if avg_flesch < 40:
-            recommendations.append("El texto es difícil de leer. Simplifica el vocabulario y la estructura.")
+        if n_total > 0:
+            if global_distribution.get("very_long", 0) > n_total * 0.15:
+                recommendations.append("Muchas oraciones muy largas (>35 palabras). Considera dividirlas para mejorar la legibilidad.")
+            if (global_distribution.get("short", 0) + global_distribution.get("very_short", 0)) > n_total * 0.6:
+                recommendations.append("Predominio de oraciones cortas. Varía la longitud para mejorar el ritmo.")
+            if g_var_coeff < 20 and n_total > 5:
+                recommendations.append("Poca variación en longitud de oraciones. Alterna entre cortas y largas para mayor dinamismo.")
+            if not recommendations:
+                recommendations.append("La variación de oraciones es adecuada. ¡Buen ritmo!")
 
         return ApiResponse(
             success=True,
             data={
                 "global_stats": {
-                    "total_sentences": global_stats["total_sentences"],
-                    "total_words": global_stats["total_words"],
-                    "avg_words_per_sentence": round(avg_wps, 1),
-                    "avg_flesch_szigriszt": round(avg_flesch, 1),
+                    "total_sentences": n_total,
+                    "avg_length": g_avg,
+                    "variation_coefficient": g_var_coeff,
+                    "min_length": g_min,
+                    "max_length": g_max,
                 },
-                "distribution": global_distribution,
+                "global_distribution": global_distribution,
                 "chapters": chapters_data,
+                "all_issues": all_issues,
                 "recommendations": recommendations,
             }
         )
@@ -1094,16 +1135,16 @@ async def get_pacing_analysis(
             if not chapter_text.strip():
                 continue
 
-            result = analyzer.analyze([{
+            pacing_result = analyzer.analyze([{
                 "number": chapter.chapter_number,
                 "title": chapter.title or "",
                 "content": chapter_text
             }])
-            if result.is_failure:
-                logger.warning(f"Failed to analyze chapter {chapter.chapter_number}: {result.error}")
+            if not pacing_result.chapter_metrics:
+                logger.warning(f"No metrics for chapter {chapter.chapter_number}")
                 continue
 
-            report = result.value
+            report = pacing_result.chapter_metrics[0]
 
             # Contar palabras, oraciones, párrafos
             words = chapter_text.split()
@@ -1133,9 +1174,9 @@ async def get_pacing_analysis(
                 "dialogue_ratio": round(dialogue_ratio, 3),
                 "dialogue_lines": dialogue_lines,
                 "avg_sentence_length": round(word_count / sentence_count, 1) if sentence_count > 0 else 0,
-                "lexical_density": round(report.action_ratio + report.description_ratio, 3),
-                "pacing_score": round(report.overall_pacing, 2),
-                "pacing_label": _get_pacing_label(report.overall_pacing),
+                "lexical_density": round(report.lexical_density, 3),
+                "pacing_score": round(report.dialogue_ratio * 0.6 + report.action_verb_ratio * 0.4, 2),
+                "pacing_label": _get_pacing_label(report.dialogue_ratio * 0.6 + report.action_verb_ratio * 0.4),
             })
 
         if not chapter_metrics:
