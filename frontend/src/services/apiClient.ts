@@ -318,12 +318,49 @@ async function del<T>(
   return parseRawResponse<T>(response)
 }
 
+/**
+ * GET con check de envelope { success, data, error }.
+ * Reemplaza el patrón repetido:
+ *   const data = await api.getRaw<{ success: boolean; data: T; error?: string }>(url)
+ *   if (data.success) { result = data.data } else { throw new Error(data.error) }
+ *
+ * @example
+ *   const report = await api.getChecked<HealthReport>('/api/projects/1/narrative-health')
+ */
+async function getChecked<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const raw = await getRaw<{ success: boolean; data: T; error?: string }>(path, options)
+  if (!raw.success) {
+    throw new ApiError(raw.error || 'Error desconocido del servidor', 200, raw.error)
+  }
+  return raw.data
+}
+
+/**
+ * POST con check de envelope { success, data, error }.
+ *
+ * @example
+ *   const result = await api.postChecked<Result>('/api/projects/1/analyze', { phases })
+ */
+async function postChecked<T>(
+  path: string,
+  body?: Record<string, unknown>,
+  options: RequestOptions = {},
+): Promise<T> {
+  const raw = await postRaw<{ success: boolean; data: T; error?: string }>(path, options)
+  if (!raw.success) {
+    throw new ApiError(raw.error || 'Error desconocido del servidor', 200, raw.error)
+  }
+  return raw.data
+}
+
 export const api = {
   get,
   getRaw,
+  getChecked,
   post,
   postForm,
   postRaw,
+  postChecked,
   tryGet,
   put,
   putRaw,

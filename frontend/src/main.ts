@@ -1,3 +1,7 @@
+// Interceptor de console → archivo (DEBE ser lo primero)
+import { installConsoleInterceptor } from '@/services/logger'
+installConsoleInterceptor()
+
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import PrimeVue from 'primevue/config'

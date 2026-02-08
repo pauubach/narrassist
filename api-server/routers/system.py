@@ -187,6 +187,101 @@ async def debug_log():
     })
 
 
+# Frontend log file (same directory as backend-debug.log)
+_frontend_log_file: Path | None = None
+_frontend_logger = None
+
+def _get_frontend_logger():
+    """Lazy-init frontend file logger."""
+    global _frontend_log_file, _frontend_logger
+    if _frontend_logger is not None:
+        return _frontend_logger
+
+    import logging as _logging
+
+    _frontend_logger = _logging.getLogger("narrative_assistant.frontend")
+    _frontend_logger.setLevel(_logging.DEBUG)
+    _frontend_logger.propagate = False
+
+    try:
+        if sys.platform == 'win32':
+            log_dir = Path.home() / "AppData" / "Local" / "Narrative Assistant"
+        elif sys.platform == 'darwin':
+            log_dir = Path.home() / "Library" / "Logs" / "Narrative Assistant"
+        else:
+            log_dir = Path.home() / ".local" / "share" / "narrative-assistant"
+
+        log_dir.mkdir(parents=True, exist_ok=True)
+        _frontend_log_file = log_dir / "frontend.log"
+
+        handler = _logging.FileHandler(str(_frontend_log_file), encoding='utf-8', mode='a')
+        handler.setFormatter(_logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+        _frontend_logger.addHandler(handler)
+    except Exception:
+        pass
+
+    return _frontend_logger
+
+
+@router.post("/api/logs/frontend")
+async def receive_frontend_logs(request: Request):
+    """
+    Recibe logs del frontend y los escribe en frontend.log.
+    El frontend envía batches de mensajes para minimizar requests.
+    """
+    try:
+        body = await request.json()
+        entries = body.get("entries", [])
+        if not entries or not isinstance(entries, list):
+            return ApiResponse(success=True, data={"written": 0})
+
+        fl = _get_frontend_logger()
+        written = 0
+        for entry in entries[:200]:  # Max 200 entries per batch
+            level = entry.get("level", "info").upper()
+            msg = entry.get("message", "")
+            tag = entry.get("tag", "")
+            if not msg:
+                continue
+            prefix = f"[{tag}] " if tag else ""
+            log_msg = f"{prefix}{msg}"
+
+            if level == "ERROR":
+                fl.error(log_msg)
+            elif level == "WARN":
+                fl.warning(log_msg)
+            elif level == "DEBUG":
+                fl.debug(log_msg)
+            else:
+                fl.info(log_msg)
+            written += 1
+
+        return ApiResponse(success=True, data={"written": written})
+    except Exception as e:
+        logger.debug(f"Error receiving frontend logs: {e}")
+        return ApiResponse(success=True, data={"written": 0})
+
+
+@router.get("/api/debug/frontend-log")
+async def debug_frontend_log():
+    """Devuelve el contenido del log del frontend."""
+    _get_frontend_logger()  # Ensure file path is set
+    content = ""
+    if _frontend_log_file and _frontend_log_file.exists():
+        try:
+            content = _frontend_log_file.read_text(encoding='utf-8', errors='replace')
+            lines = content.split('\n')
+            if len(lines) > 500:
+                content = '\n'.join(lines[-500:])
+        except Exception as e:
+            content = f"Error reading frontend log: {e}"
+
+    return ApiResponse(success=True, data={
+        "log_file": str(_frontend_log_file) if _frontend_log_file else None,
+        "log_content": content,
+    })
+
+
 @router.get("/api/system/python-status")
 async def python_status():
     """
