@@ -149,6 +149,31 @@ function selectSubTab(tabId: string) {
   activeTabId.value = tabId
 }
 
+// Map tab IDs to components for KeepAlive + dynamic :is
+const componentMap: Record<string, any> = {
+  register: RegisterAnalysisTab,
+  focalization: FocalizationTab,
+  scenes: SceneTaggingTab,
+  sticky: StickySentencesTab,
+  echo: EchoReportTab,
+  variation: SentenceVariationTab,
+  pacing: PacingAnalysisTab,
+  emotions: EmotionalAnalysisTab,
+  readability: AgeReadabilityTab,
+  vital: VitalStatusTab,
+  locations: CharacterLocationTab,
+  progress: ChapterProgressTab,
+  sensory: SensoryReportTab,
+  energy: SentenceEnergyTab,
+  templates: NarrativeTemplatesTab,
+  health: NarrativeHealthTab,
+  archetypes: CharacterArchetypesTab,
+  prolepsis: ProlepisTab,
+  duplicates: DuplicateContentTab,
+}
+
+const activeComponent = computed(() => componentMap[activeTabId.value])
+
 onMounted(() => {
   loadFeatureAvailability()
 })
@@ -210,27 +235,11 @@ async function loadFeatureAvailability() {
       </div>
     </div>
 
-    <!-- Tab content -->
+    <!-- Tab content (KeepAlive preserves state across tab switches) -->
     <div class="subtab-content">
-      <RegisterAnalysisTab v-if="activeTabId === 'register'" :project-id="projectId" />
-      <FocalizationTab v-if="activeTabId === 'focalization'" :project-id="projectId" />
-      <SceneTaggingTab v-if="activeTabId === 'scenes'" :project-id="projectId" />
-      <StickySentencesTab v-if="activeTabId === 'sticky'" :project-id="projectId" />
-      <EchoReportTab v-if="activeTabId === 'echo'" :project-id="projectId" />
-      <SentenceVariationTab v-if="activeTabId === 'variation'" :project-id="projectId" />
-      <PacingAnalysisTab v-if="activeTabId === 'pacing'" :project-id="projectId" />
-      <EmotionalAnalysisTab v-if="activeTabId === 'emotions'" :project-id="projectId" />
-      <AgeReadabilityTab v-if="activeTabId === 'readability'" :project-id="projectId" />
-      <VitalStatusTab v-if="activeTabId === 'vital'" :project-id="projectId" />
-      <CharacterLocationTab v-if="activeTabId === 'locations'" :project-id="projectId" />
-      <ChapterProgressTab v-if="activeTabId === 'progress'" :project-id="projectId" />
-      <SensoryReportTab v-if="activeTabId === 'sensory'" :project-id="projectId" />
-      <SentenceEnergyTab v-if="activeTabId === 'energy'" :project-id="projectId" />
-      <NarrativeTemplatesTab v-if="activeTabId === 'templates'" :project-id="projectId" />
-      <NarrativeHealthTab v-if="activeTabId === 'health'" :project-id="projectId" />
-      <CharacterArchetypesTab v-if="activeTabId === 'archetypes'" :project-id="projectId" />
-      <ProlepisTab v-if="activeTabId === 'prolepsis'" :project-id="projectId" />
-      <DuplicateContentTab v-if="activeTabId === 'duplicates'" :project-id="projectId" />
+      <KeepAlive>
+        <component :is="activeComponent" :project-id="projectId" :key="activeTabId" />
+      </KeepAlive>
     </div>
   </div>
 </template>
