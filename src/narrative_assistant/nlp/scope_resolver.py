@@ -512,12 +512,32 @@ class ScopeResolver:
         ]
 
         if candidates_in_sentence:
-            # Tomar la más cercana por posición dentro de la oración
-            best = min(
-                candidates_in_sentence,
-                key=lambda x: abs(x[1] - position),
-            )
-            return (best[0], 0.85)  # Buena confianza: misma oración
+            # Separar candidatos antes y después de la posición
+            before_pos = [c for c in candidates_in_sentence if c[1] < position]
+            after_pos = [c for c in candidates_in_sentence if c[1] >= position]
+
+            # Preferir entidades ANTES de la posición del atributo
+            if before_pos:
+                best = min(before_pos, key=lambda x: abs(x[1] - position))
+                return (best[0], 0.85)
+
+            # Si solo hay entidades DESPUÉS, verificar que no son complementos objeto
+            # "Sus ojos azules miraban con curiosidad a María"
+            #   → "a María" = objeto, NO poseedora de "Sus ojos"
+            if after_pos:
+                non_object_candidates = []
+                for name, start, end, etype in after_pos:
+                    # Verificar si está precedida por "a " (marca de objeto directo/indirecto)
+                    prefix_start = max(0, start - 3)
+                    prefix = self.doc.text[prefix_start:start].strip()
+                    if prefix.endswith("a"):
+                        continue  # Es objeto, no poseedora
+                    non_object_candidates.append((name, start, end, etype))
+
+                if non_object_candidates:
+                    best = min(non_object_candidates, key=lambda x: abs(x[1] - position))
+                    return (best[0], 0.75)
+            # Si todas las entidades en la oración son objetos, continuar a Step 4
 
         # Paso 4: Buscar en scope de oraciones vecinas
         wider_scope = self.sentence_scope(position, window=SENTENCE_WINDOW)
