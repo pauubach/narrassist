@@ -29,6 +29,10 @@ const _backendDown = ref(false)
 /** true cuando el backend no responde (múltiples fallos consecutivos) */
 export const backendDown = readonly(_backendDown)
 
+const _recoveryAttempts = ref(0)
+/** Número de intentos de recuperación fallidos (para escalar el mensaje en UI) */
+export const recoveryAttempts = readonly(_recoveryAttempts)
+
 const CONNECTION_FAIL_THRESHOLD = 3
 let consecutiveFailures = 0
 let recoveryTimer: ReturnType<typeof setInterval> | null = null
@@ -37,6 +41,7 @@ function onRequestSuccess() {
   if (consecutiveFailures > 0 || _backendDown.value) {
     consecutiveFailures = 0
     _backendDown.value = false
+    _recoveryAttempts.value = 0
     stopRecoveryPolling()
   }
 }
@@ -59,7 +64,9 @@ function startRecoveryPolling() {
         onRequestSuccess()
         console.info('[API] Backend recuperado')
       }
-    } catch { /* sigue caído */ }
+    } catch {
+      _recoveryAttempts.value++
+    }
   }, 5000)
 }
 

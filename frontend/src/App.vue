@@ -16,13 +16,13 @@
         <i class="pi pi-exclamation-triangle"></i>
         <div class="backend-down-banner__text">
           <span class="backend-down-banner__title">Sin conexión con el servidor</span>
-          <span class="backend-down-banner__hint">
-            Reintentando automáticamente. Si persiste, cierra y vuelve a abrir la aplicación.
+          <span v-if="numRecoveryAttempts < 6" class="backend-down-banner__hint">
+            Reintentando automáticamente...
+          </span>
+          <span v-else class="backend-down-banner__hint">
+            No se pudo restablecer la conexión. Cierra la aplicación y vuelve a abrirla.
           </span>
         </div>
-        <button class="backend-down-banner__btn" @click="restartApp">
-          <i class="pi pi-refresh"></i> Reiniciar
-        </button>
       </div>
       <RouterView />
     </main>
@@ -51,7 +51,7 @@
 import { RouterView, useRouter, useRoute } from 'vue-router'
 import { onMounted, onBeforeUnmount, ref, watch, computed } from 'vue'
 import Toast from 'primevue/toast'
-import { backendDown } from '@/services/apiClient'
+import { backendDown, recoveryAttempts } from '@/services/apiClient'
 import { useAppStore } from '@/stores/app'
 import { useThemeStore } from '@/stores/theme'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
@@ -71,10 +71,7 @@ const systemStore = useSystemStore()
 const themeStore = useThemeStore()
 const workspaceStore = useWorkspaceStore()
 const isBackendDown = backendDown
-
-const restartApp = () => {
-  window.location.reload()
-}
+const numRecoveryAttempts = recoveryAttempts
 
 const showShortcutsHelp = ref(false)
 const showAbout = ref(false)
@@ -327,40 +324,10 @@ onBeforeUnmount(() => {
   opacity: 0.85;
 }
 
-.backend-down-banner__btn {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.3rem 0.75rem;
-  border: 1px solid var(--p-red-300);
-  border-radius: 6px;
-  background: var(--p-red-100);
-  color: var(--p-red-700);
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-  flex-shrink: 0;
-  transition: background 0.15s;
-}
-
-.backend-down-banner__btn:hover {
-  background: var(--p-red-200);
-}
-
 :global(.dark) .backend-down-banner {
   background-color: var(--p-red-900);
   color: var(--p-red-100);
   border-color: var(--p-red-700);
 }
 
-:global(.dark) .backend-down-banner__btn {
-  background: var(--p-red-800);
-  border-color: var(--p-red-600);
-  color: var(--p-red-100);
-}
-
-:global(.dark) .backend-down-banner__btn:hover {
-  background: var(--p-red-700);
-}
 </style>
