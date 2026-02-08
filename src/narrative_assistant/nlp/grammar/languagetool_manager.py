@@ -459,6 +459,7 @@ class LanguageToolInstaller:
     ):
         self._callback = progress_callback
         self._progress = InstallProgress()
+        self._last_logged_pct = -1.0  # throttle: solo loguear al cambiar >=1%
 
         # Rutas - reutilizar la lógica del manager
         mgr = get_languagetool_manager()
@@ -482,7 +483,11 @@ class LanguageToolInstaller:
         )
         if self._callback:
             self._callback(self._progress)
-        logger.info(f"LT Install [{percentage:.0f}%] {label}: {detail}")
+        # Throttle log: solo cada 1% para evitar 28K líneas en un download de 235MB
+        rounded = int(percentage)
+        if rounded != int(self._last_logged_pct):
+            self._last_logged_pct = percentage
+            logger.info(f"LT Install [{percentage:.0f}%] {label}: {detail}")
 
     def _report_error(self, error: str) -> None:
         """Reportar error."""

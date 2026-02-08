@@ -490,12 +490,14 @@ const ollamaStarting = ref(false)
 const modelDownloading = ref(false)
 const ollamaDownloadProgress = ref<{ percentage: number; status: string; error?: string } | null>(null)
 let ollamaDownloadPollTimer: ReturnType<typeof setInterval> | null = null
+let ollamaPolling = false
 
 function stopOllamaDownloadPolling() {
   if (ollamaDownloadPollTimer) {
     clearInterval(ollamaDownloadPollTimer)
     ollamaDownloadPollTimer = null
   }
+  ollamaPolling = false
 }
 
 // Descarga automática del modelo por defecto (async con polling de progreso)
@@ -516,6 +518,8 @@ const downloadDefaultModel = async () => {
     // Polling de progreso cada 1s
     let pollCount = 0
     ollamaDownloadPollTimer = setInterval(async () => {
+      if (ollamaPolling) return // guard: evitar callbacks solapados
+      ollamaPolling = true
       pollCount++
       // Timeout: 15 min
       if (pollCount > 900) {
@@ -558,7 +562,10 @@ const downloadDefaultModel = async () => {
           stopOllamaDownloadPolling()
           modelDownloading.value = false
           toast.add({ severity: 'error', summary: 'Error', detail: 'Se perdió la conexión con el servidor', life: 5000 })
+          return
         }
+      } finally {
+        ollamaPolling = false
       }
     }, 1000)
   } catch (_e) {

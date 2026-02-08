@@ -98,8 +98,11 @@
           <p>Arrastra tu archivo o haz clic para seleccionarlo. Formatos soportados:</p>
           <ul>
             <li><strong>.docx</strong> - Microsoft Word (recomendado)</li>
+            <li><strong>.doc</strong> - Word clásico</li>
             <li><strong>.txt</strong> - Texto plano</li>
             <li><strong>.md</strong> - Markdown</li>
+            <li><strong>.pdf</strong> - PDF</li>
+            <li><strong>.epub</strong> - Libro electrónico</li>
           </ul>
 
           <h3>3. Analizar</h3>
@@ -119,20 +122,33 @@
         <section id="interfaz" class="guide-section">
           <h2><i class="pi pi-desktop"></i> La Interfaz</h2>
 
-          <h3>Panel izquierdo: Navegación</h3>
-          <p>Aquí encontrarás:</p>
+          <h3>Barra lateral izquierda</h3>
+          <p>Navegación rápida con cuatro pestañas:</p>
           <ul>
-            <li><strong>Secciones</strong> - Lista de capítulos o secciones del documento</li>
-            <li><strong>Entidades</strong> - Personas, conceptos y términos detectados</li>
-            <li><strong>Lugares</strong> - Ubicaciones mencionadas</li>
-            <li><strong>Línea temporal</strong> - Eventos ordenados cronológicamente</li>
+            <li><strong>Capítulos</strong> - Secciones del documento, clic para navegar</li>
+            <li><strong>Alertas</strong> - Lista de inconsistencias detectadas</li>
+            <li><strong>Personajes</strong> - Entidades detectadas con sus apariciones</li>
+            <li><strong>Asistente</strong> - Ayuda contextual</li>
           </ul>
 
-          <h3>Panel central: Documento</h3>
+          <h3>Área central: Workspace</h3>
           <p>
-            Muestra el texto de tu manuscrito. Las referencias a entidades, lugares
-            y posibles problemas aparecen resaltadas con colores.
+            Pestañas superiores para acceder a las distintas vistas de análisis.
+            Según el tipo de documento se muestran las pestañas relevantes:
           </p>
+          <ul>
+            <li><strong>Texto</strong> - Vista del manuscrito con resaltado de entidades e inconsistencias</li>
+            <li><strong>Entidades</strong> - Gestión completa de personajes, lugares y conceptos</li>
+            <li><strong>Relaciones</strong> - Red de relaciones entre entidades</li>
+            <li><strong>Revisión</strong> - Panel de alertas con modo foco</li>
+            <li><strong>Cronología</strong> - Línea temporal de eventos</li>
+            <li><strong>Escritura</strong> - Análisis de voz, estilo y prosa</li>
+            <li><strong>Glosario</strong> - Términos y definiciones del manuscrito</li>
+            <li><strong>Resumen</strong> - Vista general del proyecto y métricas</li>
+            <li><strong>Story Bible</strong> - Referencia completa del universo narrativo</li>
+          </ul>
+
+          <h3>Resaltado del texto</h3>
           <div class="color-legend">
             <div class="legend-item">
               <span class="color-dot person"></span>
@@ -147,12 +163,6 @@
               <span>Posibles inconsistencias</span>
             </div>
           </div>
-
-          <h3>Panel derecho: Detalles</h3>
-          <p>
-            Al seleccionar un elemento (personaje, lugar, alerta), aquí verás
-            información detallada y todas sus apariciones en el texto.
-          </p>
         </section>
 
         <!-- Alertas -->
@@ -222,6 +232,88 @@
           </ul>
         </section>
 
+        <!-- Áreas de trabajo -->
+        <section id="workspace" class="guide-section">
+          <h2><i class="pi pi-th-large"></i> Áreas de Trabajo</h2>
+
+          <h3>Relaciones</h3>
+          <p>
+            Visualiza las conexiones entre personajes y entidades en un grafo interactivo.
+            Puedes ver quién interactúa con quién, la frecuencia de interacciones
+            y los tipos de relación (familiar, profesional, etc.).
+          </p>
+
+          <h3>Revisión (Alertas)</h3>
+          <p>
+            Panel avanzado para revisar inconsistencias. Incluye un <strong>modo foco</strong>
+            que te guía secuencialmente por cada alerta, mostrando el contexto del texto
+            y permitiéndote resolver, descartar o añadir notas a cada una.
+          </p>
+
+          <h3>Cronología</h3>
+          <p>
+            Muestra los eventos detectados en el manuscrito ordenados en el tiempo.
+            Útil para detectar inconsistencias temporales (ej: un evento que ocurre
+            antes de otro que debería ser previo).
+          </p>
+
+          <h3>Escritura</h3>
+          <p>
+            Analiza el estilo y la voz del manuscrito. Incluye:
+          </p>
+          <ul>
+            <li><strong>Perfiles de voz</strong> - Registro, formalidad y tono por personaje</li>
+            <li><strong>Métricas de prosa</strong> - Legibilidad, longitud de oraciones, ritmo</li>
+            <li><strong>Consistencia de registro</strong> - Detecta cambios bruscos de estilo</li>
+          </ul>
+
+          <h3>Glosario</h3>
+          <p>
+            Recopilación automática de términos relevantes del manuscrito con sus
+            definiciones contextuales y frecuencia de uso.
+          </p>
+
+          <h3>Story Bible</h3>
+          <p>
+            Referencia completa del universo narrativo: personajes con sus perfiles,
+            localizaciones, objetos importantes y reglas del mundo.
+          </p>
+        </section>
+
+        <!-- Exportar -->
+        <section id="exportar" class="guide-section">
+          <h2><i class="pi pi-download"></i> Exportar</h2>
+
+          <p>
+            Desde el menú <strong>Archivo → Exportar</strong> o el botón de exportar
+            en la vista de proyecto, puedes generar:
+          </p>
+
+          <h3>Documento completo</h3>
+          <p>
+            Informe profesional en <strong>Word (.docx)</strong> o <strong>PDF</strong> con portada,
+            índice y todas las secciones del análisis.
+          </p>
+
+          <h3>Informe de análisis</h3>
+          <p>
+            Resumen de alertas, entidades y métricas en <strong>Markdown</strong> o <strong>JSON</strong>.
+            Ideal para integrar con otras herramientas.
+          </p>
+
+          <h3>Guía de estilo</h3>
+          <p>
+            Documento con las convenciones de escritura, voces narrativas y
+            perfiles de personajes en <strong>Markdown</strong>, <strong>JSON</strong> o <strong>PDF</strong>.
+          </p>
+
+          <h3>Exportar a Scrivener</h3>
+          <p>
+            Genera un paquete <strong>.scriv</strong> compatible con Scrivener 3, conservando
+            capítulos, escenas y metadatos del análisis.
+          </p>
+        </section>
+
         <!-- Configuración -->
         <section id="configuracion" class="guide-section">
           <h2><i class="pi pi-cog"></i> Configuración</h2>
@@ -235,13 +327,14 @@
 
           <h3>Análisis</h3>
           <ul>
-            <li><strong>Analizador semántico</strong> - Motor de análisis avanzado (configúralo en Ajustes)</li>
+            <li><strong>Analizador semántico (Ollama)</strong> - Motor de IA local para análisis avanzado de personajes y relaciones</li>
+            <li><strong>LanguageTool</strong> - Corrector gramatical avanzado con +2000 reglas para español</li>
             <li><strong>Sensibilidad</strong> - Ajusta qué tan estricta es la detección de problemas</li>
           </ul>
 
           <p class="analysis-note">
-            El sistema detecta automáticamente errores ortográficos, gramaticales
-            y de concordancia, además de las inconsistencias narrativas.
+            Ambos componentes son opcionales y se ejecutan 100% en local.
+            Se instalan automáticamente la primera vez desde la pantalla de bienvenida.
           </p>
 
           <h3>Notificaciones</h3>
@@ -378,29 +471,37 @@
           <div class="faq-item">
             <h4>¿Cómo exporto el informe de inconsistencias?</h4>
             <p>
-              En el menú Archivo → Exportar, puedes generar un informe en
-              PDF o Word con todas las alertas y sus estados.
+              En el menú Archivo → Exportar o con el botón Exportar en la vista de proyecto.
+              Puedes elegir entre Word, PDF, Markdown, JSON o Scrivener según el tipo de informe.
+            </p>
+          </div>
+
+          <div class="faq-item">
+            <h4>¿Puedo re-analizar un documento ya analizado?</h4>
+            <p>
+              Sí, haz clic en "Re-analizar" en la vista de proyecto. Puedes seleccionar
+              qué fases del análisis ejecutar de nuevo.
+            </p>
+          </div>
+
+          <div class="faq-item">
+            <h4>¿Qué es LanguageTool?</h4>
+            <p>
+              Es un corrector gramatical avanzado con más de 2000 reglas para español.
+              Se instala automáticamente (~300 MB) y funciona 100% en local.
+              Detecta errores ortográficos, gramaticales y de concordancia.
             </p>
           </div>
         </section>
       </div>
     </div>
 
-    <template #footer>
-      <Button
-        label="Cerrar"
-        icon="pi pi-times"
-        text
-        @click="$emit('update:visible', false)"
-      />
-    </template>
   </Dialog>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
 import Dialog from 'primevue/dialog'
-import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 
 const props = defineProps<{
@@ -420,6 +521,8 @@ const sections = [
   { id: 'interfaz', title: 'La Interfaz', icon: 'pi pi-desktop' },
   { id: 'alertas', title: 'Alertas', icon: 'pi pi-bell' },
   { id: 'personajes', title: 'Entidades', icon: 'pi pi-tags' },
+  { id: 'workspace', title: 'Áreas de Trabajo', icon: 'pi pi-th-large' },
+  { id: 'exportar', title: 'Exportar', icon: 'pi pi-download' },
   { id: 'configuracion', title: 'Configuración', icon: 'pi pi-cog' },
   { id: 'privacidad', title: 'Privacidad', icon: 'pi pi-shield' },
   { id: 'atajos', title: 'Atajos', icon: 'pi pi-bolt' },

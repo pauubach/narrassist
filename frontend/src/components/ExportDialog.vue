@@ -497,9 +497,6 @@
       </Card>
     </div>
 
-    <template #footer>
-      <Button label="Cerrar" severity="secondary" @click="() => emit('update:visible', false)" />
-    </template>
   </Dialog>
 </template>
 
