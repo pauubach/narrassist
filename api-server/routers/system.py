@@ -283,6 +283,8 @@ async def models_status():
                     ["ollama", "list"],
                     stderr=subprocess.DEVNULL,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     timeout=5
                 )
                 # Parse output to get model names
@@ -382,6 +384,8 @@ async def install_dependencies():
                     [python_exe, "-m", "pip", "install"] + pip_install_args + [dep],
                     capture_output=True,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     creationflags=creation_flags
                 )
                 if result.returncode != 0:

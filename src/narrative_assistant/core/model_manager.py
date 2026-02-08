@@ -1058,7 +1058,7 @@ class ModelManager:
             for child in model_path.iterdir():
                 if child.is_dir() and (child / "config.cfg").exists():
                     return True
-            logger.warning(f"Archivo faltante en modelo spaCy: config.cfg")
+            logger.warning("Archivo faltante en modelo spaCy: config.cfg")
             return False
 
         elif model_type == ModelType.EMBEDDINGS:

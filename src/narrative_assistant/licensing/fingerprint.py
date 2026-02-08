@@ -158,6 +158,8 @@ class HardwareDetector:
                     ["sysctl", "-n", "machdep.cpu.brand_string"],
                     capture_output=True,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     timeout=5,
                 )
                 return result.stdout.strip()
@@ -222,6 +224,8 @@ class HardwareDetector:
                     ["sysctl", "-n", "hw.memsize"],
                     capture_output=True,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     timeout=5,
                 )
                 return round(int(result.stdout.strip()) / (1024**3), 1)
@@ -247,6 +251,8 @@ class HardwareDetector:
                     ["wmic", "diskdrive", "get", "serialnumber"],
                     capture_output=True,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     timeout=10,
                 )
                 lines = result.stdout.strip().split("\n")
@@ -258,6 +264,8 @@ class HardwareDetector:
                     ["system_profiler", "SPStorageDataType"],
                     capture_output=True,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     timeout=10,
                 )
                 for line in result.stdout.split("\n"):
@@ -272,6 +280,8 @@ class HardwareDetector:
                     ["lsblk", "-d", "-o", "SERIAL", "-n"],
                     capture_output=True,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     timeout=10,
                 )
                 serial = result.stdout.strip().split("\n")[0]
@@ -318,6 +328,8 @@ class HardwareDetector:
                     ["ioreg", "-rd1", "-c", "IOPlatformExpertDevice"],
                     capture_output=True,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     timeout=10,
                 )
                 for line in result.stdout.split("\n"):

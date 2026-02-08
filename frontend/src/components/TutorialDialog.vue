@@ -200,8 +200,23 @@
                 {{ systemCapabilities.ollama.models.length }} modelo(s) instalado(s)
               </p>
               <div v-else-if="modelDownloading" class="model-downloading">
-                <i class="pi pi-spin pi-spinner"></i>
-                <span class="ml-2">Descargando modelo de IA...</span>
+                <div class="ollama-progress-wrapper">
+                  <div class="ollama-progress-info">
+                    <span class="ollama-progress-label">Descargando modelo de IA...</span>
+                    <span v-if="ollamaDownloadProgress?.percentage" class="ollama-progress-percent">{{ Math.round(ollamaDownloadProgress.percentage) }}%</span>
+                  </div>
+                  <ProgressBar
+                    v-if="ollamaDownloadProgress?.percentage"
+                    :value="ollamaDownloadProgress.percentage"
+                    :show-value="false"
+                    class="ollama-progress-bar"
+                  />
+                  <ProgressBar
+                    v-else
+                    mode="indeterminate"
+                    class="ollama-progress-bar"
+                  />
+                </div>
               </div>
               <div v-else class="no-models-hint">
                 <Button
@@ -473,22 +488,76 @@ watch(() => props.visible, (newValue) => {
 const ollamaInstalling = ref(false)
 const ollamaStarting = ref(false)
 const modelDownloading = ref(false)
+const ollamaDownloadProgress = ref<{ percentage: number; status: string; error?: string } | null>(null)
+let ollamaDownloadPollTimer: ReturnType<typeof setInterval> | null = null
 
-// Descarga automática del modelo por defecto
+function stopOllamaDownloadPolling() {
+  if (ollamaDownloadPollTimer) {
+    clearInterval(ollamaDownloadPollTimer)
+    ollamaDownloadPollTimer = null
+  }
+}
+
+// Descarga automática del modelo por defecto (async con polling de progreso)
 const downloadDefaultModel = async () => {
   modelDownloading.value = true
+  ollamaDownloadProgress.value = null
   toast.add({ severity: 'info', summary: 'Descargando modelo', detail: 'Esto puede tardar unos minutos...', life: 5000 })
+
   try {
+    // Iniciar descarga en segundo plano
     const result = await api.postRaw<any>('/api/ollama/pull/llama3.2')
-    if (result.success) {
-      toast.add({ severity: 'success', summary: 'Modelo descargado', detail: 'Análisis semántico disponible', life: 3000 })
-      await systemStore.refreshCapabilities()
-    } else {
-      toast.add({ severity: 'error', summary: 'Error', detail: result.error || 'No se pudo descargar el modelo', life: 5000 })
+    if (!result.success) {
+      toast.add({ severity: 'error', summary: 'Error', detail: result.error || 'No se pudo iniciar la descarga', life: 5000 })
+      modelDownloading.value = false
+      return
     }
+
+    // Polling de progreso cada 1s
+    let pollCount = 0
+    ollamaDownloadPollTimer = setInterval(async () => {
+      pollCount++
+      // Timeout: 15 min
+      if (pollCount > 900) {
+        stopOllamaDownloadPolling()
+        modelDownloading.value = false
+        ollamaDownloadProgress.value = null
+        toast.add({ severity: 'error', summary: 'Timeout', detail: 'La descarga tardó demasiado', life: 5000 })
+        return
+      }
+
+      try {
+        const statusResult = await api.getRaw<any>('/api/ollama/status')
+        const dp = statusResult.data?.download_progress
+
+        if (dp) {
+          ollamaDownloadProgress.value = dp
+        }
+
+        // Completed
+        if (dp?.status === 'complete' || (!statusResult.data?.is_downloading && statusResult.data?.downloaded_models?.includes('llama3.2'))) {
+          stopOllamaDownloadPolling()
+          ollamaDownloadProgress.value = null
+          modelDownloading.value = false
+          await systemStore.refreshCapabilities()
+          toast.add({ severity: 'success', summary: 'Modelo descargado', detail: 'Análisis semántico disponible', life: 3000 })
+          return
+        }
+
+        // Error
+        if (dp?.status === 'error') {
+          stopOllamaDownloadPolling()
+          ollamaDownloadProgress.value = null
+          modelDownloading.value = false
+          toast.add({ severity: 'error', summary: 'Error', detail: dp.error || 'Error descargando modelo', life: 5000 })
+          return
+        }
+      } catch {
+        // Ignore poll errors
+      }
+    }, 1000)
   } catch (_e) {
     toast.add({ severity: 'error', summary: 'Error', detail: 'Error de conexión descargando modelo', life: 5000 })
-  } finally {
     modelDownloading.value = false
   }
 }
@@ -570,6 +639,7 @@ const startLanguageTool = async () => {
 watch(() => props.visible, (newValue) => {
   if (!newValue) {
     if (ollamaPollTimer) { clearInterval(ollamaPollTimer); ollamaPollTimer = null }
+    stopOllamaDownloadPolling()
     systemStore.stopLTPolling()
   }
 })
@@ -1070,6 +1140,39 @@ const finish = () => {
   margin: 0.25rem 0 0 0 !important;
   font-size: 0.8rem !important;
   color: var(--p-text-muted-color) !important;
+}
+
+.ollama-progress-wrapper {
+  width: 100%;
+}
+
+.ollama-progress-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.25rem;
+}
+
+.ollama-progress-label {
+  font-size: 0.85rem;
+  color: var(--p-text-color);
+  font-weight: 500;
+}
+
+.ollama-progress-percent {
+  font-size: 0.85rem;
+  color: var(--p-primary-color);
+  font-weight: 600;
+}
+
+.ollama-progress-bar {
+  height: 8px;
+  border-radius: 4px;
+}
+
+.ollama-progress-bar :deep(.p-progressbar-value) {
+  background: var(--p-primary-color);
+  border-radius: 4px;
 }
 
 .ollama-status p {

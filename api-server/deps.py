@@ -665,6 +665,8 @@ def find_python_executable() -> tuple[str | None, str | None, str | None]:
                 [python_cmd, "--version"],
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=5
             )
             if result.returncode == 0:
@@ -746,6 +748,8 @@ def find_python_executable() -> tuple[str | None, str | None, str | None]:
                     parts + ["--version"],
                     capture_output=True,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     timeout=5
                 )
                 if result.returncode == 0:

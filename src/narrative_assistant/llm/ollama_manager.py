@@ -175,6 +175,8 @@ class OllamaManager:
         self._downloaded_models: set[str] = set()
         self._platform = self._detect_platform()
         self._state_file: Path | None = None
+        self._download_progress: DownloadProgress | None = None
+        self._downloading_model: str | None = None
 
         # Configurar directorio de estado
         self._setup_state_dir()
@@ -378,6 +380,58 @@ class OllamaManager:
             return {"creationflags": subprocess.CREATE_NO_WINDOW}
         return {}
 
+    @property
+    def download_progress(self) -> DownloadProgress | None:
+        """Progreso de descarga actual (None si no hay descarga en curso)."""
+        return self._download_progress
+
+    @property
+    def downloading_model(self) -> str | None:
+        """Nombre del modelo que se está descargando (None si no hay descarga)."""
+        return self._downloading_model
+
+    @property
+    def is_downloading(self) -> bool:
+        """True si hay una descarga en curso."""
+        return self._download_progress is not None and self._download_progress.status == "downloading"
+
+    def start_download_async(self, model_name: str) -> bool:
+        """Inicia descarga de modelo en un hilo de fondo.
+
+        Returns:
+            True si la descarga se inició, False si ya hay una en curso.
+        """
+        if self.is_downloading:
+            return False
+
+        self._download_progress = DownloadProgress(status="downloading")
+        self._downloading_model = model_name
+
+        def _progress_cb(progress: DownloadProgress) -> None:
+            self._download_progress = progress
+
+        def _run() -> None:
+            try:
+                success, msg = self.download_model(model_name, progress_callback=_progress_cb)
+                if success:
+                    self._download_progress = DownloadProgress(
+                        status="complete", percentage=100.0
+                    )
+                elif not self._download_progress or self._download_progress.status != "error":
+                    self._download_progress = DownloadProgress(
+                        status="error", error=msg
+                    )
+            except Exception as e:
+                self._download_progress = DownloadProgress(
+                    status="error", error=str(e)
+                )
+            finally:
+                self._downloading_model = None
+
+        thread = threading.Thread(target=_run, daemon=True, name="ollama-pull")
+        thread.start()
+        return True
+
     def get_version(self) -> str | None:
         """Obtiene la version de Ollama instalada."""
         if not self.is_installed:
@@ -389,6 +443,8 @@ class OllamaManager:
                 [ollama_exe, "--version"],
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=10.0,
                 **self._subprocess_kwargs(),
             )
@@ -528,6 +584,8 @@ class OllamaManager:
                     ["brew", "install", "ollama"],
                     capture_output=True,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     timeout=600.0,  # 10 minutos
                 )
                 if result.returncode == 0:
@@ -580,6 +638,8 @@ class OllamaManager:
                 ["curl", "-fsSL", "https://ollama.com/install.sh"],
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=60.0,
             )
 
@@ -598,6 +658,8 @@ class OllamaManager:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
             )
 
             stdout, _ = process.communicate(input=install_script, timeout=600.0)
@@ -819,6 +881,8 @@ class OllamaManager:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 bufsize=1,
                 **self._subprocess_kwargs(),
             )
@@ -891,6 +955,8 @@ class OllamaManager:
                 [ollama_exe, "rm", model_name],
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=60.0,
                 **self._subprocess_kwargs(),
             )

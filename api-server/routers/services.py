@@ -159,14 +159,27 @@ async def get_ollama_status():
         manager = get_ollama_manager()
         status = manager.status
 
+        # Include download progress if a download is in progress
+        download_progress = None
+        if manager.download_progress is not None:
+            dp = manager.download_progress
+            download_progress = {
+                "percentage": dp.percentage,
+                "status": dp.status,
+                "model_name": manager.downloading_model,
+                "error": dp.error,
+            }
+
         return ApiResponse(
             success=True,
             data={
                 "status": status.value,
                 "is_installed": manager.is_installed,
                 "is_running": manager.is_running,
+                "is_downloading": manager.is_downloading,
                 "version": manager.get_version() if manager.is_installed else None,
                 "downloaded_models": manager.downloaded_models,
+                "download_progress": download_progress,
                 "available_models": [
                     {
                         "name": m.name,
@@ -190,13 +203,16 @@ async def get_ollama_status():
 @router.post("/api/ollama/pull/{model_name}", response_model=ApiResponse)
 async def pull_ollama_model(model_name: str):
     """
-    Descarga un modelo de Ollama.
+    Inicia descarga de un modelo de Ollama en segundo plano.
+
+    La descarga se ejecuta en un hilo de fondo. El progreso se puede
+    consultar via GET /api/ollama/status (campo download_progress).
 
     Args:
         model_name: Nombre del modelo a descargar (ej: llama3.2)
 
     Returns:
-        ApiResponse con resultado de la operación
+        ApiResponse con resultado del inicio de la operación
     """
     try:
         from narrative_assistant.llm.ollama_manager import get_ollama_manager
@@ -218,13 +234,18 @@ async def pull_ollama_model(model_name: str):
                     error=f"No se pudo iniciar Ollama: {msg}"
                 )
 
-        # Descargar modelo
-        success, message = manager.download_model(model_name)
+        # Iniciar descarga en segundo plano
+        started = manager.start_download_async(model_name)
+
+        if not started:
+            return ApiResponse(
+                success=False,
+                error="Ya hay una descarga en curso"
+            )
 
         return ApiResponse(
-            success=success,
-            data={"message": message} if success else None,
-            error=message if not success else None
+            success=True,
+            data={"message": f"Descarga de {model_name} iniciada"}
         )
 
     except Exception as e:
