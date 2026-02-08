@@ -5,6 +5,7 @@
  * Reemplaza las llamadas raw fetch() en los stores.
  */
 
+import { ref, readonly } from 'vue'
 import { apiUrl } from '@/config/api'
 import type { ApiResponse } from '@/types/api'
 
@@ -20,6 +21,63 @@ export class ApiError extends Error {
   }
 }
 
+// ── Monitor de conexión ──────────────────────────────────────
+// Detecta cuando el backend no responde y expone un estado reactivo
+// para que la UI muestre un banner único en vez de N toasts.
+
+const _backendDown = ref(false)
+/** true cuando el backend no responde (múltiples fallos consecutivos) */
+export const backendDown = readonly(_backendDown)
+
+const CONNECTION_FAIL_THRESHOLD = 3
+let consecutiveFailures = 0
+let recoveryTimer: ReturnType<typeof setInterval> | null = null
+
+function onRequestSuccess() {
+  if (consecutiveFailures > 0 || _backendDown.value) {
+    consecutiveFailures = 0
+    _backendDown.value = false
+    stopRecoveryPolling()
+  }
+}
+
+function onConnectionFailure() {
+  consecutiveFailures++
+  if (consecutiveFailures >= CONNECTION_FAIL_THRESHOLD && !_backendDown.value) {
+    _backendDown.value = true
+    console.warn(`[API] Backend no disponible (${consecutiveFailures} fallos consecutivos)`)
+    startRecoveryPolling()
+  }
+}
+
+function startRecoveryPolling() {
+  if (recoveryTimer) return
+  recoveryTimer = setInterval(async () => {
+    try {
+      const res = await fetch(apiUrl('/api/health'), { signal: AbortSignal.timeout(5000) })
+      if (res.ok) {
+        onRequestSuccess()
+        console.info('[API] Backend recuperado')
+      }
+    } catch { /* sigue caído */ }
+  }, 5000)
+}
+
+function stopRecoveryPolling() {
+  if (recoveryTimer) {
+    clearInterval(recoveryTimer)
+    recoveryTimer = null
+  }
+}
+
+/** Returns true if this error is a connection/timeout failure (not a server error) */
+export function isConnectionError(err: unknown): boolean {
+  if (err instanceof TypeError && (err.message.includes('fetch') || err.message.includes('network'))) return true
+  if (err instanceof DOMException && err.name === 'AbortError') return true
+  if (typeof err === 'string' && err.includes('no respondió')) return true
+  return false
+}
+
 /** Opciones para peticiones */
 interface RequestOptions {
   /** Timeout en ms (default: 30000) */
@@ -28,6 +86,24 @@ interface RequestOptions {
   headers?: Record<string, string>
   /** Signal para cancelación */
   signal?: AbortSignal
+}
+
+/**
+ * Wrapper de fetch que alimenta el monitor de conexión.
+ * Si backendDown=true, los componentes pueden mostrar un banner
+ * en vez de múltiples toasts de error individuales.
+ */
+async function monitoredFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  try {
+    const response = await fetch(input, init)
+    onRequestSuccess()
+    return response
+  } catch (err) {
+    if (isConnectionError(err)) {
+      onConnectionFailure()
+    }
+    throw err
+  }
 }
 
 /**
@@ -82,14 +158,15 @@ async function parseRawResponse<T>(response: Response): Promise<T> {
  */
 function createTimeoutSignal(timeoutMs: number, existingSignal?: AbortSignal): AbortSignal {
   const controller = new AbortController()
+  const reason = `El servidor no respondió en ${Math.round(timeoutMs / 1000)}s`
 
-  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  const timer = setTimeout(() => controller.abort(reason), timeoutMs)
 
   // Si hay un signal existente, abortar cuando este se aborte
   if (existingSignal) {
     existingSignal.addEventListener('abort', () => {
       clearTimeout(timer)
-      controller.abort()
+      controller.abort(existingSignal.reason)
     })
   }
 
@@ -109,7 +186,7 @@ async function get<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { timeout = 30000, headers = {}, signal } = options
   const abortSignal = createTimeoutSignal(timeout, signal)
 
-  const response = await fetch(apiUrl(path), {
+  const response = await monitoredFetch(apiUrl(path), {
     method: 'GET',
     headers,
     signal: abortSignal,
@@ -125,7 +202,7 @@ async function getRaw<T>(path: string, options: RequestOptions = {}): Promise<T>
   const { timeout = 30000, headers = {}, signal } = options
   const abortSignal = createTimeoutSignal(timeout, signal)
 
-  const response = await fetch(apiUrl(path), {
+  const response = await monitoredFetch(apiUrl(path), {
     method: 'GET',
     headers,
     signal: abortSignal,
@@ -148,7 +225,7 @@ async function post<T>(
   const { timeout = 30000, headers = {}, signal } = options
   const abortSignal = createTimeoutSignal(timeout, signal)
 
-  const response = await fetch(apiUrl(path), {
+  const response = await monitoredFetch(apiUrl(path), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -177,7 +254,7 @@ async function postForm<T>(
   const { timeout = 60000, headers = {}, signal } = options
   const abortSignal = createTimeoutSignal(timeout, signal)
 
-  const response = await fetch(apiUrl(path), {
+  const response = await monitoredFetch(apiUrl(path), {
     method: 'POST',
     headers, // No Content-Type - el browser lo pone con boundary
     body: formData,
@@ -217,7 +294,7 @@ async function postRaw<T>(
     signal: abortSignal,
   }
 
-  const response = await fetch(apiUrl(path), fetchOptions)
+  const response = await monitoredFetch(apiUrl(path), fetchOptions)
   return parseRawResponse<T>(response)
 }
 
@@ -235,7 +312,7 @@ async function put<T>(
   const { timeout = 30000, headers = {}, signal } = options
   const abortSignal = createTimeoutSignal(timeout, signal)
 
-  const response = await fetch(apiUrl(path), {
+  const response = await monitoredFetch(apiUrl(path), {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
@@ -259,7 +336,7 @@ async function putRaw<T>(
   const { timeout = 30000, headers = {}, signal } = options
   const abortSignal = createTimeoutSignal(timeout, signal)
 
-  const response = await fetch(apiUrl(path), {
+  const response = await monitoredFetch(apiUrl(path), {
     method: 'PUT',
     headers: body !== undefined ? { 'Content-Type': 'application/json', ...headers } : headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -283,7 +360,7 @@ async function patch<T>(
   const { timeout = 30000, headers = {}, signal } = options
   const abortSignal = createTimeoutSignal(timeout, signal)
 
-  const response = await fetch(apiUrl(path), {
+  const response = await monitoredFetch(apiUrl(path), {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
@@ -309,7 +386,7 @@ async function del<T>(
   const { timeout = 30000, headers = {}, signal } = options
   const abortSignal = createTimeoutSignal(timeout, signal)
 
-  const response = await fetch(apiUrl(path), {
+  const response = await monitoredFetch(apiUrl(path), {
     method: 'DELETE',
     headers,
     signal: abortSignal,

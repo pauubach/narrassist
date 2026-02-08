@@ -12,6 +12,10 @@
       aria-label="Contenido principal"
     >
       <Toast position="top-right" aria-live="polite" />
+      <div v-if="isBackendDown" class="backend-down-banner" role="alert">
+        <i class="pi pi-exclamation-triangle"></i>
+        <span>Sin conexión con el servidor. Reintentando...</span>
+      </div>
       <RouterView />
     </main>
     <KeyboardShortcutsDialog
@@ -39,6 +43,7 @@
 import { RouterView, useRouter, useRoute } from 'vue-router'
 import { onMounted, onBeforeUnmount, ref, watch, computed } from 'vue'
 import Toast from 'primevue/toast'
+import { backendDown } from '@/services/apiClient'
 import { useAppStore } from '@/stores/app'
 import { useThemeStore } from '@/stores/theme'
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts'
@@ -57,6 +62,7 @@ const appStore = useAppStore()
 const systemStore = useSystemStore()
 const themeStore = useThemeStore()
 const workspaceStore = useWorkspaceStore()
+const isBackendDown = backendDown
 const showShortcutsHelp = ref(false)
 const showAbout = ref(false)
 const showTutorial = ref(false)
@@ -273,5 +279,24 @@ onBeforeUnmount(() => {
 
 .app-content--with-menubar {
   margin-top: 32px;
+}
+
+.backend-down-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background-color: var(--p-red-50);
+  color: var(--p-red-700);
+  border-bottom: 2px solid var(--p-red-200);
+  font-size: 0.875rem;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+:global(.dark) .backend-down-banner {
+  background-color: var(--p-red-900);
+  color: var(--p-red-100);
+  border-color: var(--p-red-700);
 }
 </style>
