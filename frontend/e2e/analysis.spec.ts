@@ -314,7 +314,7 @@ test.describe('Re-analysis', () => {
       const hasProgress = await progressIndicator.isVisible().catch(() => false)
 
       // Una de las dos debería aparecer
-      expect(hasConfirm || hasProgress || true).toBe(true)
+      expect(hasConfirm || hasProgress).toBe(true)
     }
   })
 })
@@ -351,7 +351,7 @@ test.describe('Export Results', () => {
       // Verificar opciones de formato
       const formatOptions = page.getByText(/JSON|PDF|DOCX|Markdown/i)
       const hasFormats = await formatOptions.first().isVisible().catch(() => false)
-      expect(hasFormats || true).toBe(true)
+      expect(hasFormats).toBe(true)
     }
   })
 
@@ -439,7 +439,7 @@ test.describe('Analysis Error Handling', () => {
     const hasRetry = await retryButton.isVisible().catch(() => false)
 
     // El test pasa independientemente (no forzamos errores)
-    expect(hasRetry || true).toBe(true)
+    expect(hasRetry).toBe(true)
   })
 })
 

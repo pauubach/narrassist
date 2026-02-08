@@ -254,8 +254,8 @@ class CharacterNetworkAnalyzer:
             for u, v in bridge_edges:
                 bridges.add(u)
                 bridges.add(v)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Error calculando puentes en el grafo: {e}")
 
         # Nodos
         for eid in G.nodes():
@@ -297,16 +297,16 @@ class CharacterNetworkAnalyzer:
 
         try:
             report.metrics.avg_clustering_coefficient = nx.average_clustering(G)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Error calculando coeficiente de clustering promedio: {e}")
 
         report.metrics.connected_components = nx.number_connected_components(G)
 
         try:
             if nx.is_connected(G):
                 report.metrics.diameter = nx.diameter(G)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Error calculando diámetro del grafo: {e}")
 
         # Puentes y aislados
         report.bridge_characters = [

@@ -140,7 +140,7 @@ async def list_projects():
         return ApiResponse(success=True, data=projects_data)
     except Exception as e:
         logger.error(f"Error listing projects: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}", response_model=ApiResponse)
@@ -245,7 +245,7 @@ async def get_project(project_id: int):
         raise
     except Exception as e:
         logger.error(f"Error getting project {project_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/analysis-status", response_model=ApiResponse)
@@ -360,7 +360,7 @@ async def get_analysis_status(project_id: int):
         raise
     except Exception as e:
         logger.error(f"Error getting analysis status for project {project_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.post("/api/projects", response_model=ApiResponse)
@@ -551,7 +551,7 @@ async def create_project(
         raise
     except Exception as e:
         logger.error(f"Error creating project: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.delete("/api/projects/{project_id}", response_model=ApiResponse)
@@ -577,6 +577,6 @@ async def delete_project(project_id: int):
         return ApiResponse(success=True, message="Proyecto eliminado exitosamente")
     except Exception as e:
         logger.error(f"Error deleting project {project_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 

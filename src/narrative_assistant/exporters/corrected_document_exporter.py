@@ -378,7 +378,7 @@ class CorrectedDocumentExporter:
                     if search_text in run.text:
                         if options.as_track_changes:
                             # Reemplazar con track change
-                            run.text.replace(
+                            run.text = run.text.replace(
                                 search_text,
                                 correction.suggestion or "",
                                 1,  # Solo primera ocurrencia

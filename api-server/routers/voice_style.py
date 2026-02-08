@@ -198,7 +198,7 @@ async def get_voice_profiles(
         raise
     except Exception as e:
         logger.error(f"Error getting voice profiles: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/voice-profiles/compare", response_model=ApiResponse)
@@ -393,7 +393,7 @@ async def compare_voice_profiles(
         raise
     except Exception as e:
         logger.error(f"Error comparing voice profiles: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/voice-deviations", response_model=ApiResponse)
@@ -552,7 +552,7 @@ async def get_voice_deviations(
         raise
     except Exception as e:
         logger.error(f"Error detecting voice deviations: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/register-analysis", response_model=ApiResponse)
@@ -749,7 +749,7 @@ async def get_register_analysis(
         raise
     except Exception as e:
         logger.error(f"Error analyzing register: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/speaker-corrections", response_model=ApiResponse)
@@ -815,7 +815,7 @@ async def list_speaker_corrections(
         })
     except Exception as e:
         logger.error(f"Error listing speaker corrections: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.post("/api/projects/{project_id}/speaker-corrections", response_model=ApiResponse)
@@ -878,7 +878,7 @@ async def create_speaker_correction(project_id: int, payload: deps.DialogueCorre
         })
     except Exception as e:
         logger.error(f"Error creating speaker correction: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.delete("/api/projects/{project_id}/speaker-corrections/{correction_id}", response_model=ApiResponse)
@@ -899,7 +899,7 @@ async def delete_speaker_correction(project_id: int, correction_id: int):
         return ApiResponse(success=True, data={"deleted": True})
     except Exception as e:
         logger.error(f"Error deleting speaker correction: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/focalization", response_model=ApiResponse)
@@ -934,7 +934,7 @@ async def get_project_focalizations(project_id: int):
         raise
     except Exception as e:
         logger.error(f"Error getting focalizations: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.post("/api/projects/{project_id}/focalization", response_model=ApiResponse)
@@ -977,12 +977,12 @@ async def create_focalization(project_id: int, data: dict):
 
         return ApiResponse(success=True, data=declaration.to_dict())
     except ValueError as e:
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error creating focalization: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.put("/api/projects/{project_id}/focalization/{declaration_id}", response_model=ApiResponse)
@@ -1020,12 +1020,12 @@ async def update_focalization(project_id: int, declaration_id: int, data: dict):
 
         return ApiResponse(success=True, data=declaration.to_dict())
     except ValueError as e:
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error updating focalization: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.delete("/api/projects/{project_id}/focalization/{declaration_id}", response_model=ApiResponse)
@@ -1055,7 +1055,7 @@ async def delete_focalization(project_id: int, declaration_id: int):
         raise
     except Exception as e:
         logger.error(f"Error deleting focalization: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/focalization/violations", response_model=ApiResponse)
@@ -1123,7 +1123,7 @@ async def detect_focalization_violations(project_id: int):
         raise
     except Exception as e:
         logger.error(f"Error detecting focalization violations: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/register-analysis/genre-comparison", response_model=ApiResponse)
@@ -1223,6 +1223,6 @@ async def get_register_genre_comparison(
         raise
     except Exception as e:
         logger.error(f"Error comparing register with genre: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 

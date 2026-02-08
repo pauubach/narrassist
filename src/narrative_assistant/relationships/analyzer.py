@@ -196,8 +196,8 @@ class InteractionCoherenceChecker:
                         return InteractionTone.WARM
                     else:
                         return InteractionTone.AFFECTIONATE
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Error usando analizador de sentimiento para clasificar tono: {e}")
 
         return InteractionTone.NEUTRAL
 

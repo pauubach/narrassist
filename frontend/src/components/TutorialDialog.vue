@@ -553,7 +553,12 @@ const downloadDefaultModel = async () => {
           return
         }
       } catch {
-        // Ignore poll errors
+        // After sustained failures, notify user via toast
+        if (pollCount > 10 && !ollamaDownloadProgress.value) {
+          stopOllamaDownloadPolling()
+          modelDownloading.value = false
+          toast.add({ severity: 'error', summary: 'Error', detail: 'Se perdió la conexión con el servidor', life: 5000 })
+        }
       }
     }, 1000)
   } catch (_e) {
@@ -1094,6 +1099,10 @@ const finish = () => {
   align-items: center;
   gap: 0.75rem;
   flex-wrap: wrap;
+}
+
+.model-downloading {
+  width: 100%;
 }
 
 /* LanguageTool installation progress */

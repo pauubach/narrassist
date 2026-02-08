@@ -309,8 +309,8 @@ Responde SIEMPRE en formato JSON válido."""
             from narrative_assistant.nlp.embeddings import get_embeddings_model
 
             self._embeddings_model = get_embeddings_model()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Error cargando modelo de embeddings para inferencia: {e}")
 
     def _check_ollama_model(self, model_name: str) -> bool:
         """Verifica si un modelo específico está disponible en Ollama."""
@@ -321,8 +321,8 @@ Responde SIEMPRE en formato JSON válido."""
             if response.status_code == 200:
                 models = [m.get("name", "") for m in response.json().get("models", [])]
                 return any(model_name in m for m in models)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Error verificando disponibilidad del modelo Ollama '{model_name}': {e}")
         return False
 
     @property
@@ -505,15 +505,21 @@ Responde SIEMPRE en formato JSON válido."""
                 ]
             )
 
+            from narrative_assistant.llm.sanitization import sanitize_for_prompt
+
+            safe_name = sanitize_for_prompt(character_name, max_length=200)
+            safe_attrs = sanitize_for_prompt(existing_attributes, max_length=2000) if existing_attributes else "Ninguno especificado"
+            safe_text = sanitize_for_prompt(samples_text[:8000], max_length=8000)
+
             prompt = f"""Analiza el siguiente personaje basándote en los fragmentos de texto proporcionados.
 
-PERSONAJE: {character_name}
+PERSONAJE: {safe_name}
 
 ATRIBUTOS CONOCIDOS:
-{existing_attributes if existing_attributes else "Ninguno especificado"}
+{safe_attrs}
 
 FRAGMENTOS DE TEXTO:
-{samples_text[:8000]}
+{safe_text}
 
 Extrae la siguiente información sobre el personaje:
 

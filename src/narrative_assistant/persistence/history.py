@@ -314,6 +314,7 @@ class HistoryManager:
             return None
 
         return {
+            "action_type": entry.action_type.value if entry.action_type else None,
             "target_type": entry.target_type,
             "target_id": entry.target_id,
             "restore_value": entry.old_value,

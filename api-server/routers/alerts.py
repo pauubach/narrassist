@@ -170,7 +170,7 @@ async def list_alerts(
         return ApiResponse(success=True, data=alerts_data)
     except Exception as e:
         logger.error(f"Error listing alerts for project {project_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.patch("/api/projects/{project_id}/alerts/{alert_id}/status", response_model=ApiResponse)
@@ -215,8 +215,8 @@ async def update_alert_status(project_id: int, alert_id: int, body: deps.AlertSt
 
         # Persistir dismissal para que sobreviva re-análisis
         if new_status_str == 'dismissed' and deps.dismissal_repository:
-            reason = data.get('reason', '')
-            scope = data.get('scope', 'instance')
+            reason = body.reason
+            scope = body.scope
             if alert.content_hash:
                 deps.dismissal_repository.dismiss(
                     project_id=project_id,
@@ -248,7 +248,7 @@ async def update_alert_status(project_id: int, alert_id: int, body: deps.AlertSt
         )
     except Exception as e:
         logger.error(f"Error updating alert {alert_id} status: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 # Endpoints legacy para compatibilidad (redirigen al nuevo endpoint unificado)
@@ -318,7 +318,7 @@ async def resolve_all_alerts(project_id: int):
         )
     except Exception as e:
         logger.error(f"Error resolving all alerts for project {project_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 # =========================================================================
@@ -385,7 +385,7 @@ async def dismiss_batch(project_id: int, body: deps.BatchDismissRequest):
         )
     except Exception as e:
         logger.error(f"Error in batch dismiss for project {project_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/dismissals/stats", response_model=ApiResponse)
@@ -427,7 +427,7 @@ async def get_dismissal_stats(project_id: int):
         return ApiResponse(success=True, data=stats)
     except Exception as e:
         logger.error(f"Error getting dismissal stats for project {project_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.post("/api/projects/{project_id}/alerts/apply-dismissals", response_model=ApiResponse)
@@ -454,7 +454,7 @@ async def apply_dismissals(project_id: int):
         )
     except Exception as e:
         logger.error(f"Error applying dismissals for project {project_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 # =========================================================================
@@ -490,7 +490,7 @@ async def get_suppression_rules(project_id: int):
         return ApiResponse(success=True, data=rules_data)
     except Exception as e:
         logger.error(f"Error getting suppression rules: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.post("/api/projects/{project_id}/suppression-rules", response_model=ApiResponse)
@@ -528,7 +528,7 @@ async def create_suppression_rule(project_id: int, body: deps.SuppressionRuleReq
         )
     except Exception as e:
         logger.error(f"Error creating suppression rule: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.delete("/api/projects/{project_id}/suppression-rules/{rule_id}", response_model=ApiResponse)
@@ -545,6 +545,6 @@ async def delete_suppression_rule(project_id: int, rule_id: int):
         return ApiResponse(success=True, message="Regla eliminada")
     except Exception as e:
         logger.error(f"Error deleting suppression rule {rule_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 

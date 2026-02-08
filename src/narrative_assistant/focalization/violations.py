@@ -24,26 +24,26 @@ logger = logging.getLogger(__name__)
 
 # Verbos que implican acceso mental
 MENTAL_ACCESS_VERBS = {
-    # Pensamiento
-    "pensar": ["penso", "pensaba", "piensa", "pensando"],
-    "creer": ["creyo", "creia", "cree", "creyendo"],
-    "imaginar": ["imagino", "imaginaba", "imagina"],
-    "recordar": ["recordo", "recordaba", "recuerda"],
-    "olvidar": ["olvido", "olvidaba", "olvida"],
-    "saber": ["sabia", "supo", "sabe"],
-    "conocer": ["conocia", "conocio", "conoce"],
+    # Pensamiento (indicativo + subjuntivo)
+    "pensar": ["penso", "pensaba", "piensa", "pensando", "pensara", "pensase"],
+    "creer": ["creyo", "creia", "cree", "creyendo", "creyera", "creyese"],
+    "imaginar": ["imagino", "imaginaba", "imagina", "imaginara", "imaginase"],
+    "recordar": ["recordo", "recordaba", "recuerda", "recordara", "recordase"],
+    "olvidar": ["olvido", "olvidaba", "olvida", "olvidara", "olvidase"],
+    "saber": ["sabia", "supo", "sabe", "supiera", "supiese"],
+    "conocer": ["conocia", "conocio", "conoce", "conociera", "conociese"],
     # Emociones internas
-    "sentir": ["sintio", "sentia", "siente"],
-    "temer": ["temio", "temia", "teme"],
-    "desear": ["deseo", "deseaba", "desea"],
-    "esperar": ["espero", "esperaba", "espera"],
-    "querer": ["quiso", "queria", "quiere"],
-    "odiar": ["odio", "odiaba", "odia"],
-    "amar": ["amo", "amaba", "ama"],
+    "sentir": ["sintio", "sentia", "siente", "sintiera", "sintiese"],
+    "temer": ["temio", "temia", "teme", "temiera", "temiese"],
+    "desear": ["deseo", "deseaba", "desea", "deseara", "desease"],
+    "esperar": ["espero", "esperaba", "espera", "esperara", "esperase"],
+    "querer": ["quiso", "queria", "quiere", "quisiera", "quisiese"],
+    "odiar": ["odio", "odiaba", "odia", "odiara", "odiase"],
+    "amar": ["amo", "amaba", "ama", "amara", "amase"],
     # Percepcion interna
-    "comprender": ["comprendio", "comprendia", "comprende"],
-    "entender": ["entendio", "entendia", "entiende"],
-    "notar": ["noto", "notaba", "nota"],
+    "comprender": ["comprendio", "comprendia", "comprende", "comprendiera", "comprendiese"],
+    "entender": ["entendio", "entendia", "entiende", "entendiera", "entendiese"],
+    "notar": ["noto", "notaba", "nota", "notara", "notase"],
 }
 
 # Patrones que indican acceso mental

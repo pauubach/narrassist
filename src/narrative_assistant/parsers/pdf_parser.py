@@ -190,8 +190,8 @@ class PdfParser(DocumentParser):
                 first_page = pdf.pages[0]
                 if first_page.images:
                     metadata["has_images"] = True
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Error verificando imágenes en PDF: {e}")
 
         return metadata
 

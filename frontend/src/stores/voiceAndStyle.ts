@@ -243,8 +243,12 @@ export const useVoiceAndStyleStore = defineStore('voiceAndStyle', () => {
     stats: any
   }>>({})
 
-  // Loading and error states
-  const loading = ref(false)
+  // Loading and error states (per-action to avoid cross-cancellation)
+  const loadingVoice = ref(false)
+  const loadingRegister = ref(false)
+  const loadingDialogue = ref(false)
+  const loadingKnowledge = ref(false)
+  const loading = computed(() => loadingVoice.value || loadingRegister.value || loadingDialogue.value || loadingKnowledge.value)
   const error = ref<string | null>(null)
 
   // -------------------------------------------------------------------------
@@ -274,7 +278,7 @@ export const useVoiceAndStyleStore = defineStore('voiceAndStyle', () => {
   // -------------------------------------------------------------------------
 
   async function fetchVoiceProfiles(projectId: number): Promise<boolean> {
-    loading.value = true
+    loadingVoice.value = true
     error.value = null
 
     try {
@@ -291,7 +295,7 @@ export const useVoiceAndStyleStore = defineStore('voiceAndStyle', () => {
       console.error('Failed to fetch voice profiles:', err)
       return false
     } finally {
-      loading.value = false
+      loadingVoice.value = false
     }
   }
 
@@ -299,7 +303,7 @@ export const useVoiceAndStyleStore = defineStore('voiceAndStyle', () => {
     projectId: number,
     minSeverity: string = 'medium'
   ): Promise<boolean> {
-    loading.value = true
+    loadingRegister.value = true
     error.value = null
 
     try {
@@ -324,7 +328,7 @@ export const useVoiceAndStyleStore = defineStore('voiceAndStyle', () => {
       console.error('Failed to fetch register analysis:', err)
       return false
     } finally {
-      loading.value = false
+      loadingRegister.value = false
     }
   }
 
@@ -333,7 +337,7 @@ export const useVoiceAndStyleStore = defineStore('voiceAndStyle', () => {
     chapterNum: number
   ): Promise<boolean> {
     const key = `${projectId}-${chapterNum}`
-    loading.value = true
+    loadingDialogue.value = true
     error.value = null
 
     try {
@@ -354,7 +358,7 @@ export const useVoiceAndStyleStore = defineStore('voiceAndStyle', () => {
       console.error('Failed to fetch dialogue attributions:', err)
       return false
     } finally {
-      loading.value = false
+      loadingDialogue.value = false
     }
   }
 
@@ -364,7 +368,7 @@ export const useVoiceAndStyleStore = defineStore('voiceAndStyle', () => {
     mode: string = 'auto'
   ): Promise<boolean> {
     const key = `${projectId}-${entityId}`
-    loading.value = true
+    loadingKnowledge.value = true
     error.value = null
 
     try {
@@ -388,7 +392,7 @@ export const useVoiceAndStyleStore = defineStore('voiceAndStyle', () => {
       console.error('Failed to fetch character knowledge:', err)
       return false
     } finally {
-      loading.value = false
+      loadingKnowledge.value = false
     }
   }
 

@@ -59,6 +59,7 @@ export const useProjectsStore = defineStore('projects', () => {
   }
 
   async function createProject(name: string, description?: string, file?: File) {
+    loading.value = true
     error.value = null
 
     try {
@@ -76,6 +77,8 @@ export const useProjectsStore = defineStore('projects', () => {
       error.value = err instanceof Error ? err.message : 'Error desconocido'
       console.error('Failed to create project:', err)
       throw err
+    } finally {
+      loading.value = false
     }
   }
 

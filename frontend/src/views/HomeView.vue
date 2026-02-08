@@ -66,7 +66,7 @@
 
       <div class="actions">
         <Button label="Ver Proyectos" icon="pi pi-folder" size="large" @click="goToProjects" />
-        <Button label="Nuevo Proyecto" icon="pi pi-plus" severity="secondary" size="large" outlined />
+        <Button label="Nuevo Proyecto" icon="pi pi-plus" severity="secondary" size="large" outlined @click="goToProjects" />
       </div>
     </div>
   </div>
@@ -215,7 +215,7 @@ const goToSettings = () => {
 
 .status-label {
   font-weight: 500;
-  color: #475569;
+  color: var(--text-color-secondary);
 }
 
 .status-value {
@@ -223,25 +223,25 @@ const goToSettings = () => {
   border-radius: 4px;
   font-size: 0.875rem;
   font-weight: 600;
-  background: #fee2e2;
-  color: #dc2626;
+  background: var(--red-50);
+  color: var(--red-600);
 }
 
 .status-value.status-ok {
-  background: #d1fae5;
-  color: #059669;
+  background: var(--green-50);
+  color: var(--green-600);
 }
 
 .status-value.status-error {
-  background: #fee2e2;
-  color: #dc2626;
+  background: var(--red-50);
+  color: var(--red-600);
 }
 
 .backend-error-container {
   margin-top: 1.5rem;
   padding: 1rem;
-  background: #fef3c7;
-  border: 1px solid #f59e0b;
+  background: var(--yellow-50);
+  border: 1px solid var(--yellow-500);
   border-radius: 8px;
   display: flex;
   flex-direction: column;
@@ -253,18 +253,18 @@ const goToSettings = () => {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: #92400e;
+  color: var(--yellow-900);
   font-size: 0.9rem;
   margin: 0;
 }
 
 :global(.dark) .backend-error-container {
-  background: #451a03;
-  border-color: #b45309;
+  background: var(--yellow-900);
+  border-color: var(--yellow-700);
 }
 
 :global(.dark) .backend-error-message {
-  color: #fcd34d;
+  color: var(--yellow-300);
 }
 
 .actions {

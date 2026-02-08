@@ -16,6 +16,8 @@ Cada prompt tiene:
 
 import logging
 
+from narrative_assistant.llm.sanitization import sanitize_for_prompt
+
 logger = logging.getLogger(__name__)
 
 
@@ -228,9 +230,15 @@ def build_prompt(
             parts.append(f"Salida: {ex['output']}")
         parts.append("\nAhora analiza el siguiente caso:\n")
 
+    # Sanitizar variables de usuario antes de insertar en el prompt
+    sanitized_kwargs = {
+        k: sanitize_for_prompt(v) if isinstance(v, str) else v
+        for k, v in kwargs.items()
+    }
+
     # Rellenar template
     try:
-        filled = template.format(**kwargs)
+        filled = template.format(**sanitized_kwargs)
     except KeyError as e:
         logger.warning(f"Variable faltante en template: {e}")
         filled = template

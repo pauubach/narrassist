@@ -107,12 +107,15 @@
           >
             <div class="sidebar-container">
               <!-- Tabs icónicos del sidebar -->
-              <div class="sidebar-tabs">
+              <div class="sidebar-tabs" role="tablist" aria-label="Panel lateral">
                 <button
                   v-for="tab in workspaceStore.availableSidebarTabs"
                   :key="tab"
+                  role="tab"
                   class="sidebar-tab-btn"
                   :class="{ active: sidebarTab === tab }"
+                  :aria-selected="sidebarTab === tab"
+                  :aria-label="getSidebarTabTitle(tab)"
                   :title="getSidebarTabTitle(tab)"
                   @click="sidebarTab = tab"
                 >
@@ -418,6 +421,7 @@ import type { SidebarTab } from '@/stores/workspace'
 import type { Entity, Alert, Chapter, AlertSource } from '@/types'
 import { transformEntities, transformAlerts, transformChapters } from '@/types/transformers'
 import { useAlertUtils } from '@/composables/useAlertUtils'
+import { resetGlobalHighlight } from '@/composables/useHighlight'
 import { api } from '@/services/apiClient'
 import { useNotifications } from '@/composables/useNotifications'
 
@@ -878,6 +882,7 @@ onUnmounted(() => {
   window.removeEventListener('menubar:toggle-inspector', handleMenuToggleInspector)
   window.removeEventListener('menubar:toggle-sidebar', handleMenuToggleSidebar)
   stopAnalysisPolling()
+  resetGlobalHighlight()
 })
 
 const loadEntities = async (projectId: number) => {

@@ -131,22 +131,6 @@ You can now test the installer on a machine WITHOUT Python installed!
 """)
     
     return True
-        description="Step 4/4: Building Tauri installer"
-    ):
-        return False
-    
-    print(f"""
-================================================================================
-✓ Build completed successfully!
-================================================================================
-
-Installer location:
-  {repo_root / "src-tauri" / "target" / "release" / "bundle"}
-
-You can now test the installer on a machine WITHOUT Python installed!
-""")
-    
-    return True
 
 if __name__ == "__main__":
     success = main()

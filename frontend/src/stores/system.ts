@@ -438,7 +438,20 @@ export const useSystemStore = defineStore('system', () => {
               return
             }
           } catch {
-            // Ignore polling errors
+            // Show connection issue to user via progress UI
+            if (pollCount > 5 && !ltInstallProgress.value) {
+              ltInstallProgress.value = {
+                phase: 'error',
+                phase_label: 'Error de conexión',
+                percentage: 0,
+                detail: 'No se pudo conectar con el servidor. Reinicia la aplicación.',
+                error: 'connection_lost',
+              }
+              stopLTPolling()
+              ltInstalling.value = false
+              resolve(false)
+              return
+            }
           }
         }, 1000)
       })

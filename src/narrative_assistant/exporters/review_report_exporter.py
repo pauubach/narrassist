@@ -1038,17 +1038,17 @@ class ReviewReportExporter:
 
         # Por tipos específicos
         for category, issue_type, count in data.top_issues_by_type[:3]:
-            CATEGORY_DISPLAY_NAMES.get(category, category)
+            cat_display = CATEGORY_DISPLAY_NAMES.get(category, category)
             type_name = issue_type.replace("_", " ")
 
             if issue_type in ("lexical_close", "sentence_start"):
                 recommendations.append(
-                    f"Se detectaron {count} repeticiones de tipo '{type_name}'. "
+                    f"Se detectaron {count} repeticiones de tipo '{type_name}' ({cat_display}). "
                     "Considerar variar el vocabulario para mayor fluidez."
                 )
             elif issue_type in ("wrong_dash_dialogue", "wrong_quote_style"):
                 recommendations.append(
-                    f"Revisar {count} problemas de '{type_name}' en la tipografía."
+                    f"Revisar {count} problemas de '{type_name}' en {cat_display.lower()}."
                 )
             elif issue_type == "sentence_too_long":
                 recommendations.append(

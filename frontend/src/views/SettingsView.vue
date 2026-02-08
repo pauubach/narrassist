@@ -727,14 +727,17 @@
                     <span>{{ ltStatusMessage }}</span>
                     <!-- Barra de progreso para instalación -->
                     <div v-if="ltState === 'installing' && ltInstallProgress" class="lt-progress-container">
+                      <div class="ollama-progress-info">
+                        <span class="ollama-progress-label">{{ ltInstallProgress.phase_label }}</span>
+                        <span v-if="ltInstallProgress.percentage > 0" class="ollama-progress-percent">{{ Math.round(ltInstallProgress.percentage) }}%</span>
+                      </div>
                       <ProgressBar
                         :value="ltInstallProgress.percentage"
-                        :show-value="true"
-                        style="height: 8px; margin-top: 8px;"
+                        :show-value="false"
+                        class="ollama-progress-bar"
                       />
-                      <div class="lt-progress-detail">
-                        {{ ltInstallProgress.phase_label }}
-                        <span v-if="ltInstallProgress.percentage > 0"> · {{ Math.round(ltInstallProgress.percentage) }}%</span>
+                      <div v-if="ltInstallProgress.detail" class="lt-progress-detail">
+                        {{ ltInstallProgress.detail }}
                       </div>
                     </div>
                   </div>

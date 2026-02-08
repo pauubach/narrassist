@@ -140,7 +140,7 @@ async def export_document(
 
     except Exception as e:
         logger.error(f"Error exporting document for project {project_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/export/document/preview", response_model=ApiResponse)
@@ -258,7 +258,7 @@ async def preview_document_export(
 
     except Exception as e:
         logger.error(f"Error previewing document export: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/export/corrected")
@@ -401,7 +401,7 @@ async def export_corrected_document(
 
     except Exception as e:
         logger.error(f"Error exporting corrected document for project {project_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/export/review-report")
@@ -548,7 +548,7 @@ async def export_review_report(
 
     except Exception as e:
         logger.error(f"Error exporting review report for project {project_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/export/review-report/preview", response_model=ApiResponse)
@@ -663,7 +663,7 @@ async def preview_review_report(project_id: int):
 
     except Exception as e:
         logger.error(f"Error previewing review report for project {project_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/export/scrivener")
@@ -725,6 +725,6 @@ async def export_scrivener(
         raise
     except Exception as e:
         logger.error(f"Error exporting to Scrivener: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 

@@ -240,6 +240,7 @@ SPANISH_PRONOUNS = {
     "ti": (Gender.NEUTRAL, Number.SINGULAR),
     "contigo": (Gender.NEUTRAL, Number.SINGULAR),
     "usted": (Gender.NEUTRAL, Number.SINGULAR),
+    "vos": (Gender.NEUTRAL, Number.SINGULAR),  # Voseo rioplatense
     "ustedes": (Gender.NEUTRAL, Number.PLURAL),
     "vosotros": (Gender.MASCULINE, Number.PLURAL),
     "vosotras": (Gender.FEMININE, Number.PLURAL),
@@ -841,10 +842,10 @@ def _select_coref_model() -> str:
                             return "qwen2.5"
                         if "mistral" in models:
                             return "mistral"
-                except Exception:
-                    pass
-    except Exception:
-        pass
+                except Exception as e:
+                    logger.debug(f"Error obteniendo lista de modelos Ollama disponibles: {e}")
+    except Exception as e:
+        logger.debug(f"Error conectando con servidor Ollama para detectar modelo preferido: {e}")
 
     return "llama3.2"  # Fallback
 

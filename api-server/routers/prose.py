@@ -72,7 +72,7 @@ async def get_chapter_progress(
         )
     except Exception as e:
         logger.error(f"Error in chapter progress analysis: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/narrative-templates", response_model=ApiResponse)
@@ -332,7 +332,7 @@ async def get_sticky_sentences(
         raise
     except Exception as e:
         logger.error(f"Error analyzing sticky sentences: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/sentence-energy", response_model=ApiResponse)
@@ -591,7 +591,7 @@ async def get_echo_report(
         raise
     except Exception as e:
         logger.error(f"Error analyzing echo report: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/duplicate-content", response_model=ApiResponse)
@@ -719,7 +719,7 @@ async def get_duplicate_content(
         raise
     except Exception as e:
         logger.error(f"Error analyzing duplicate content: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/narrative-structure", response_model=ApiResponse)
@@ -812,7 +812,7 @@ async def get_narrative_structure(
         raise
     except Exception as e:
         logger.error(f"Error analyzing narrative structure: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/dialogue-validation", response_model=ApiResponse)
@@ -952,7 +952,7 @@ async def get_dialogue_validation(
         raise
     except Exception as e:
         logger.error(f"Error validating dialogues: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/sentence-variation", response_model=ApiResponse)
@@ -1056,7 +1056,7 @@ async def get_sentence_variation(
         raise
     except Exception as e:
         logger.error(f"Error analyzing sentence variation: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/pacing-analysis", response_model=ApiResponse)
@@ -1236,7 +1236,7 @@ async def get_pacing_analysis(
         raise
     except Exception as e:
         logger.error(f"Error analyzing pacing: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/tension-curve", response_model=ApiResponse)
@@ -1327,7 +1327,7 @@ async def get_tension_curve(
         raise
     except Exception as e:
         logger.error(f"Error computing tension curve: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/pacing/genre-benchmarks", response_model=ApiResponse)
@@ -1367,7 +1367,7 @@ async def get_genre_benchmarks(
         )
     except Exception as e:
         logger.error(f"Error getting genre benchmarks: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/pacing-analysis/genre-comparison", response_model=ApiResponse)
@@ -1466,7 +1466,7 @@ async def get_pacing_genre_comparison(
         raise
     except Exception as e:
         logger.error(f"Error comparing pacing with genre: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/register/genre-benchmarks", response_model=ApiResponse)
@@ -1508,7 +1508,7 @@ async def get_register_genre_benchmarks_endpoint(
         )
     except Exception as e:
         logger.error(f"Error getting register genre benchmarks: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/story-bible", response_model=ApiResponse)
@@ -1571,7 +1571,7 @@ async def get_story_bible(
         raise
     except Exception as e:
         logger.error(f"Error building story bible: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/story-bible/{entity_id}", response_model=ApiResponse)
@@ -1613,7 +1613,7 @@ async def get_story_bible_entry(
         raise
     except Exception as e:
         logger.error(f"Error building story bible entry: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/sensory-report", response_model=ApiResponse)
@@ -1790,7 +1790,7 @@ async def get_age_readability(
         raise
     except Exception as e:
         logger.error(f"Error analyzing age readability: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/semantic-redundancy", response_model=ApiResponse)

@@ -316,7 +316,7 @@ class ScrivenerExporter:
 
         # Serializar
         tree = ET.ElementTree(root)
-        output = io.BytesIO()
+        output = io.StringIO()
         tree.write(output, encoding="unicode", xml_declaration=True)
         return output.getvalue()
 

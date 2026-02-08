@@ -131,7 +131,7 @@ async def list_entities(
         return ApiResponse(success=True, data=entities_data)
     except Exception as e:
         logger.error(f"Error listing entities for project {project_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.post("/api/projects/{project_id}/entities/preview-merge", response_model=ApiResponse)
@@ -380,7 +380,7 @@ async def preview_merge_entities(project_id: int, body: deps.EntityIdsRequest):
 
     except Exception as e:
         logger.error(f"Error previewing entity merge: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.post("/api/projects/{project_id}/entities/merge", response_model=ApiResponse)
@@ -500,7 +500,7 @@ async def merge_entities(project_id: int, body: deps.MergeEntitiesRequest):
 
     except Exception as e:
         logger.error(f"Error merging entities for project {project_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/entities/merge-history", response_model=ApiResponse)
@@ -524,7 +524,7 @@ async def get_merge_history(project_id: int):
 
     except Exception as e:
         logger.error(f"Error getting merge history: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.post("/api/projects/{project_id}/entities/undo-merge/{merge_id}", response_model=ApiResponse)
@@ -556,7 +556,7 @@ async def undo_entity_merge(project_id: int, merge_id: int):
 
     except Exception as e:
         logger.error(f"Error undoing merge {merge_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/entities/{entity_id}", response_model=ApiResponse)
@@ -611,7 +611,7 @@ async def get_entity(project_id: int, entity_id: int):
 
     except Exception as e:
         logger.error(f"Error getting entity {entity_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.put("/api/projects/{project_id}/entities/{entity_id}", response_model=ApiResponse)
@@ -651,6 +651,7 @@ async def update_entity(project_id: int, entity_id: int, body: deps.UpdateEntity
             importance = importance_map.get(importance_str.lower())
 
         # Actualizar la entidad
+        entity_repo = deps.entity_repository
         updated = entity_repo.update_entity(
             entity_id=entity_id,
             canonical_name=canonical_name,
@@ -683,7 +684,7 @@ async def update_entity(project_id: int, entity_id: int, body: deps.UpdateEntity
 
     except Exception as e:
         logger.error(f"Error updating entity {entity_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.delete("/api/projects/{project_id}/entities/{entity_id}", response_model=ApiResponse)
@@ -725,7 +726,7 @@ async def delete_entity(project_id: int, entity_id: int, hard_delete: bool = Fal
 
     except Exception as e:
         logger.error(f"Error deleting entity {entity_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/entities/{entity_id}/timeline", response_model=ApiResponse)
@@ -839,7 +840,7 @@ async def get_entity_timeline(project_id: int, entity_id: int):
 
     except Exception as e:
         logger.error(f"Error getting timeline for entity {entity_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/entities/{entity_id}/mentions", response_model=ApiResponse)
@@ -1105,7 +1106,7 @@ async def get_entity_mentions(
 
     except Exception as e:
         logger.error(f"Error getting mentions for entity {entity_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/entities/{entity_id}/coreference", response_model=ApiResponse)
@@ -1254,7 +1255,7 @@ async def get_entity_coreference_info(project_id: int, entity_id: int):
 
     except Exception as e:
         logger.error(f"Error getting coreference info for entity {entity_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/coreference-corrections", response_model=ApiResponse)
@@ -1302,7 +1303,7 @@ async def list_coreference_corrections(project_id: int):
         })
     except Exception as e:
         logger.error(f"Error listing coreference corrections: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.post("/api/projects/{project_id}/coreference-corrections", response_model=ApiResponse)
@@ -1387,7 +1388,7 @@ async def create_coreference_correction(project_id: int, payload: deps.Coreferen
         })
     except Exception as e:
         logger.error(f"Error creating coreference correction: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.delete("/api/projects/{project_id}/coreference-corrections/{correction_id}", response_model=ApiResponse)
@@ -1428,7 +1429,7 @@ async def delete_coreference_correction(project_id: int, correction_id: int):
         return ApiResponse(success=True, data={"deleted": True, "reverted": True})
     except Exception as e:
         logger.error(f"Error deleting coreference correction: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/entities/rejected", response_model=ApiResponse)
@@ -1472,7 +1473,7 @@ async def list_rejected_entities(project_id: int):
 
     except Exception as e:
         logger.error(f"Error listing rejected entities for project {project_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.post("/api/projects/{project_id}/entities/reject", response_model=ApiResponse)
@@ -1523,7 +1524,7 @@ async def reject_entity_text(project_id: int, body: deps.RejectEntityRequest):
 
     except Exception as e:
         logger.error(f"Error rejecting entity for project {project_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.delete("/api/projects/{project_id}/entities/reject/{entity_text}", response_model=ApiResponse)
@@ -1561,7 +1562,7 @@ async def unreject_entity_text(project_id: int, entity_text: str):
 
     except Exception as e:
         logger.error(f"Error unrejecting entity for project {project_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/entity-filters/stats", response_model=ApiResponse)
@@ -1585,7 +1586,7 @@ async def get_filter_stats(project_id: Optional[int] = None):
 
     except Exception as e:
         logger.error(f"Error getting filter stats: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/entity-filters/system-patterns", response_model=ApiResponse)
@@ -1644,7 +1645,7 @@ async def list_system_patterns(language: str = "es", only_active: bool = False):
 
     except Exception as e:
         logger.error(f"Error listing system patterns: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.patch("/api/entity-filters/system-patterns/{pattern_id}", response_model=ApiResponse)
@@ -1677,7 +1678,7 @@ async def toggle_system_pattern(pattern_id: int, body: deps.TogglePatternRequest
 
     except Exception as e:
         logger.error(f"Error toggling system pattern {pattern_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/entity-filters/user-rejections", response_model=ApiResponse)
@@ -1710,7 +1711,7 @@ async def list_user_rejections():
 
     except Exception as e:
         logger.error(f"Error listing user rejections: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.post("/api/entity-filters/user-rejections", response_model=ApiResponse)
@@ -1746,7 +1747,7 @@ async def add_user_rejection(body: deps.UserRejectionRequest):
 
     except Exception as e:
         logger.error(f"Error adding user rejection: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.delete("/api/entity-filters/user-rejections/{rejection_id}", response_model=ApiResponse)
@@ -1789,7 +1790,7 @@ async def remove_user_rejection(rejection_id: int):
 
     except Exception as e:
         logger.error(f"Error removing user rejection {rejection_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/entity-filters/overrides", response_model=ApiResponse)
@@ -1827,7 +1828,7 @@ async def list_project_overrides(project_id: int):
 
     except Exception as e:
         logger.error(f"Error listing project overrides for {project_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.post("/api/projects/{project_id}/entity-filters/overrides", response_model=ApiResponse)
@@ -1871,7 +1872,7 @@ async def add_project_override(project_id: int, body: deps.ProjectOverrideReques
 
     except Exception as e:
         logger.error(f"Error adding project override for {project_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.delete("/api/projects/{project_id}/entity-filters/overrides/{override_id}", response_model=ApiResponse)
@@ -1914,7 +1915,7 @@ async def remove_project_override(project_id: int, override_id: int):
 
     except Exception as e:
         logger.error(f"Error removing project override {override_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.post("/api/entity-filters/check", response_model=ApiResponse)
@@ -1950,7 +1951,7 @@ async def check_entity_filter(body: deps.CheckFilterRequest):
 
     except Exception as e:
         logger.error(f"Error checking entity filter: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/entities/{entity_id}/attributes", response_model=ApiResponse)
@@ -1980,7 +1981,7 @@ async def list_entity_attributes(project_id: int, entity_id: int):
 
     except Exception as e:
         logger.error(f"Error listing attributes for entity {entity_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.post("/api/projects/{project_id}/entities/{entity_id}/attributes", response_model=ApiResponse)
@@ -2036,7 +2037,7 @@ async def create_entity_attribute(project_id: int, entity_id: int, body: deps.Cr
 
     except Exception as e:
         logger.error(f"Error creating attribute for entity {entity_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.put("/api/projects/{project_id}/entities/{entity_id}/attributes/{attribute_id}", response_model=ApiResponse)
@@ -2082,7 +2083,7 @@ async def update_entity_attribute(project_id: int, entity_id: int, attribute_id:
 
     except Exception as e:
         logger.error(f"Error updating attribute {attribute_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.delete("/api/projects/{project_id}/entities/{entity_id}/attributes/{attribute_id}", response_model=ApiResponse)
@@ -2122,6 +2123,6 @@ async def delete_entity_attribute(project_id: int, entity_id: int, attribute_id:
 
     except Exception as e:
         logger.error(f"Error deleting attribute {attribute_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 

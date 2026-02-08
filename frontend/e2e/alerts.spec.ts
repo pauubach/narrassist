@@ -100,7 +100,7 @@ test.describe('Alerts View - Structure', () => {
     const hasEmptyState = await page.getByText(/no hay alertas|sin alertas|empty/i).isVisible().catch(() => false)
 
     // Una de las dos condiciones debería cumplirse
-    expect(hasError || hasEmptyState || true).toBe(true) // Pasamos si la página carga
+    expect(hasError || hasEmptyState).toBe(true) // Pasamos si la página carga
   })
 })
 

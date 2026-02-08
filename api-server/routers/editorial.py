@@ -76,7 +76,7 @@ async def get_editorial_rules(project_id: int):
         raise
     except Exception as e:
         logger.error(f"Error getting editorial rules: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.post("/api/projects/{project_id}/editorial-rules", response_model=ApiResponse)
@@ -135,7 +135,7 @@ async def save_editorial_rules(project_id: int, request: EditorialRulesRequest):
         raise
     except Exception as e:
         logger.error(f"Error saving editorial rules: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.post("/api/projects/{project_id}/editorial-rules/check", response_model=ApiResponse)
@@ -200,7 +200,7 @@ async def check_editorial_rules(project_id: int, text: str = Body(..., embed=Tru
         raise
     except Exception as e:
         logger.error(f"Error checking editorial rules: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.put("/api/projects/{project_id}/correction-config", response_model=ApiResponse)
@@ -261,7 +261,7 @@ async def update_project_correction_config(
         raise
     except Exception as e:
         logger.error(f"Error updating correction config: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.post("/api/projects/{project_id}/correction-config/apply-preset", response_model=ApiResponse)
@@ -321,7 +321,7 @@ async def apply_correction_preset(
         raise
     except Exception as e:
         logger.error(f"Error applying preset: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.delete("/api/projects/{project_id}/correction-config", response_model=ApiResponse)
@@ -364,7 +364,7 @@ async def reset_project_correction_config(project_id: str) -> ApiResponse:
         raise
     except Exception as e:
         logger.error(f"Error resetting correction config: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.post("/api/projects/{project_id}/correction-config/detect", response_model=ApiResponse)
@@ -567,7 +567,7 @@ async def detect_document_profile(project_id: str) -> ApiResponse:
         raise
     except Exception as e:
         logger.error(f"Error detecting document profile: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/scenes", response_model=ApiResponse)
@@ -640,7 +640,7 @@ async def get_project_scenes(project_id: int):
         raise
     except Exception as e:
         logger.error(f"Error getting scenes: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/scenes/stats", response_model=ApiResponse)
@@ -681,7 +681,7 @@ async def get_scenes_stats(project_id: int):
         raise
     except Exception as e:
         logger.error(f"Error getting scene stats: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.put("/api/projects/{project_id}/scenes/{scene_id}/tags", response_model=ApiResponse)
@@ -742,7 +742,7 @@ async def tag_scene(project_id: int, scene_id: int, data: dict):
         raise
     except Exception as e:
         logger.error(f"Error tagging scene: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.post("/api/projects/{project_id}/scenes/{scene_id}/custom-tags", response_model=ApiResponse)
@@ -782,7 +782,7 @@ async def add_custom_tag(project_id: int, scene_id: int, data: dict):
         raise
     except Exception as e:
         logger.error(f"Error adding custom tag: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.delete("/api/projects/{project_id}/scenes/{scene_id}/custom-tags/{tag_name}", response_model=ApiResponse)
@@ -808,7 +808,7 @@ async def remove_custom_tag(project_id: int, scene_id: int, tag_name: str):
         raise
     except Exception as e:
         logger.error(f"Error removing custom tag: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/scenes/tag-catalog", response_model=ApiResponse)
@@ -838,7 +838,7 @@ async def get_tag_catalog(project_id: int):
         raise
     except Exception as e:
         logger.error(f"Error getting tag catalog: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/scenes/filter", response_model=ApiResponse)
@@ -926,7 +926,7 @@ async def filter_scenes(
         raise
     except Exception as e:
         logger.error(f"Error filtering scenes: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/document-types", response_model=ApiResponse)
@@ -946,7 +946,7 @@ async def get_document_types():
         return ApiResponse(success=True, data=types)
     except Exception as e:
         logger.error(f"Error getting document types: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/document-type", response_model=ApiResponse)
@@ -971,7 +971,7 @@ async def get_project_document_type(project_id: int):
         raise
     except Exception as e:
         logger.error(f"Error getting document type for project {project_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.put("/api/projects/{project_id}/document-type", response_model=ApiResponse)
@@ -1023,7 +1023,7 @@ async def set_project_document_type(
         raise
     except Exception as e:
         logger.error(f"Error setting document type for project {project_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/feature-profile", response_model=ApiResponse)
@@ -1051,7 +1051,7 @@ async def get_project_feature_profile(project_id: int):
         raise
     except Exception as e:
         logger.error(f"Error getting feature profile for project {project_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/feature-availability/{feature}", response_model=ApiResponse)
@@ -1083,7 +1083,7 @@ async def get_feature_availability(project_id: int, feature: str):
         )
     except Exception as e:
         logger.error(f"Error checking feature availability: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.post("/api/projects/{project_id}/detect-document-type", response_model=ApiResponse)
@@ -1125,7 +1125,7 @@ async def detect_document_type(project_id: int):
         raise
     except Exception as e:
         logger.error(f"Error detecting document type: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/correction-config/types", response_model=ApiResponse)
@@ -1145,7 +1145,7 @@ async def get_correction_types():
         return ApiResponse(success=True, data=types)
     except Exception as e:
         logger.error(f"Error getting correction types: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/correction-config/{type_code}", response_model=ApiResponse)
@@ -1172,7 +1172,7 @@ async def get_correction_config_for_type(
         return ApiResponse(success=True, data=config)
     except Exception as e:
         logger.error(f"Error getting correction config: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/correction-config", response_model=ApiResponse)
@@ -1210,7 +1210,7 @@ async def get_project_correction_config(project_id: int):
         raise
     except Exception as e:
         logger.error(f"Error getting project correction config: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/correction-config/{type_code}/diff", response_model=ApiResponse)
@@ -1233,7 +1233,7 @@ async def get_correction_config_diff(
         return ApiResponse(success=True, data=diff)
     except Exception as e:
         logger.error(f"Error getting config diff: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/correction-config/defaults", response_model=ApiResponse)
@@ -1255,7 +1255,7 @@ async def get_all_default_overrides():
         })
     except Exception as e:
         logger.error(f"Error getting default overrides: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/correction-config/defaults/{type_code}", response_model=ApiResponse)
@@ -1301,7 +1301,7 @@ async def get_type_default_override(
         })
     except Exception as e:
         logger.error(f"Error getting default override: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.put("/api/correction-config/defaults/{type_code}", response_model=ApiResponse)
@@ -1341,7 +1341,7 @@ async def set_type_default_override(
             return ApiResponse(success=False, error="Error al guardar override")
     except Exception as e:
         logger.error(f"Error setting default override: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.delete("/api/correction-config/defaults/{type_code}", response_model=ApiResponse)
@@ -1374,7 +1374,7 @@ async def delete_type_default_override(
         })
     except Exception as e:
         logger.error(f"Error deleting default override: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.delete("/api/correction-config/defaults", response_model=ApiResponse)
@@ -1396,7 +1396,7 @@ async def delete_all_default_overrides():
         })
     except Exception as e:
         logger.error(f"Error deleting all default overrides: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/correction-config/defaults/status", response_model=ApiResponse)
@@ -1432,6 +1432,6 @@ async def get_defaults_status():
         })
     except Exception as e:
         logger.error(f"Error getting defaults status: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 

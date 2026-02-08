@@ -8,7 +8,8 @@ let tauriListen: ((event: string, handler: (event: { payload: unknown }) => void
 let tauriInvoke: ((cmd: string) => Promise<string>) | null = null
 
 // Dynamic import for Tauri (to avoid errors when running in browser)
-if (typeof window !== 'undefined' && '__TAURI__' in window) {
+// Tauri 2.0 uses __TAURI_INTERNALS__ (not __TAURI__ unless withGlobalTauri=true)
+if (typeof window !== 'undefined' && ('__TAURI__' in window || '__TAURI_INTERNALS__' in window)) {
   import('@tauri-apps/api/event').then(module => {
     tauriListen = module.listen
   })

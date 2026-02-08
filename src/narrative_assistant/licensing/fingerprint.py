@@ -201,24 +201,24 @@ class HardwareDetector:
                 import ctypes
 
                 kernel32 = ctypes.windll.kernel32
-                c_ulong = ctypes.c_ulong
 
-                class MEMORYSTATUS(ctypes.Structure):
+                class MEMORYSTATUSEX(ctypes.Structure):
                     _fields_ = [
-                        ("dwLength", c_ulong),
-                        ("dwMemoryLoad", c_ulong),
-                        ("dwTotalPhys", c_ulong),
-                        ("dwAvailPhys", c_ulong),
-                        ("dwTotalPageFile", c_ulong),
-                        ("dwAvailPageFile", c_ulong),
-                        ("dwTotalVirtual", c_ulong),
-                        ("dwAvailVirtual", c_ulong),
+                        ("dwLength", ctypes.c_ulong),
+                        ("dwMemoryLoad", ctypes.c_ulong),
+                        ("ullTotalPhys", ctypes.c_ulonglong),
+                        ("ullAvailPhys", ctypes.c_ulonglong),
+                        ("ullTotalPageFile", ctypes.c_ulonglong),
+                        ("ullAvailPageFile", ctypes.c_ulonglong),
+                        ("ullTotalVirtual", ctypes.c_ulonglong),
+                        ("ullAvailVirtual", ctypes.c_ulonglong),
+                        ("ullAvailExtendedVirtual", ctypes.c_ulonglong),
                     ]
 
-                mem_status = MEMORYSTATUS()
-                mem_status.dwLength = ctypes.sizeof(MEMORYSTATUS)
-                kernel32.GlobalMemoryStatus(ctypes.byref(mem_status))
-                return round(mem_status.dwTotalPhys / (1024**3), 1)
+                mem_status = MEMORYSTATUSEX()
+                mem_status.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
+                kernel32.GlobalMemoryStatusEx(ctypes.byref(mem_status))
+                return round(mem_status.ullTotalPhys / (1024**3), 1)
             elif sys.platform == "darwin":
                 result = subprocess.run(
                     ["sysctl", "-n", "hw.memsize"],

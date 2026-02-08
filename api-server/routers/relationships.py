@@ -278,7 +278,7 @@ async def get_project_relationships(project_id: int):
         raise
     except Exception as e:
         logger.error(f"[RELATIONSHIPS-API] Error proyecto {project_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/relationships/asymmetry/{entity_a_id}/{entity_b_id}", response_model=ApiResponse)
@@ -336,7 +336,7 @@ async def get_knowledge_asymmetry(project_id: int, entity_a_id: int, entity_b_id
         raise
     except Exception as e:
         logger.error(f"Error getting asymmetry report: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/characters/{entity_id}/knowledge", response_model=ApiResponse)
@@ -459,7 +459,7 @@ async def get_character_knowledge(
         raise
     except Exception as e:
         logger.error(f"Error getting character knowledge: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/knowledge/anachronisms", response_model=ApiResponse)
@@ -558,7 +558,7 @@ async def get_knowledge_anachronisms(
         raise
     except Exception as e:
         logger.error(f"Error detecting knowledge anachronisms: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.post("/api/projects/{project_id}/relationships", response_model=ApiResponse)
@@ -644,7 +644,7 @@ async def create_relationship(project_id: int, payload: deps.CreateRelationshipR
 
     except Exception as e:
         logger.error(f"Error creating relationship: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.delete("/api/projects/{project_id}/relationships/{relationship_id}", response_model=ApiResponse)
@@ -672,7 +672,7 @@ async def delete_relationship(project_id: int, relationship_id: str):
 
     except Exception as e:
         logger.error(f"Error deleting relationship {relationship_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.post("/api/projects/{project_id}/characters/{character_id}/analyze-behavior", response_model=ApiResponse)
@@ -779,7 +779,7 @@ async def analyze_character_behavior(project_id: int, character_id: int):
         )
     except Exception as e:
         logger.error(f"Error analyzing character behavior: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.post("/api/projects/{project_id}/characters/{character_id}/detect-violations", response_model=ApiResponse)
@@ -880,7 +880,7 @@ async def detect_character_violations(
         )
     except Exception as e:
         logger.error(f"Error detecting violations: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/characters/{character_id}/expectations", response_model=ApiResponse)
@@ -930,7 +930,7 @@ async def get_character_expectations(project_id: int, character_id: int):
         )
     except Exception as e:
         logger.error(f"Error getting expectations: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/emotional-analysis", response_model=ApiResponse)
@@ -1041,7 +1041,7 @@ async def get_emotional_analysis(project_id: int):
         )
     except Exception as e:
         logger.error(f"Error in emotional analysis: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/characters/{character_name}/emotional-profile", response_model=ApiResponse)
@@ -1154,7 +1154,7 @@ async def get_character_emotional_profile(project_id: int, character_name: str):
         )
     except Exception as e:
         logger.error(f"Error getting emotional profile: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/vital-status", response_model=ApiResponse)
@@ -1233,7 +1233,7 @@ async def get_vital_status_analysis(project_id: int):
         )
     except Exception as e:
         logger.error(f"Error in vital status analysis: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.post("/api/projects/{project_id}/vital-status/generate-alerts", response_model=ApiResponse)
@@ -1331,7 +1331,7 @@ async def generate_vital_status_alerts(project_id: int):
         )
     except Exception as e:
         logger.error(f"Error generating vital status alerts: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/character-locations", response_model=ApiResponse)
@@ -1412,7 +1412,7 @@ async def get_character_locations(project_id: int):
         )
     except Exception as e:
         logger.error(f"Error in character location analysis: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/character-archetypes", response_model=ApiResponse)
@@ -1613,7 +1613,7 @@ async def get_character_network(project_id: int):
         return ApiResponse(success=False, error="Módulo de red de personajes no disponible")
     except Exception as e:
         logger.error(f"[NETWORK-API] Error: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 # ============================================================================
@@ -1716,7 +1716,7 @@ async def get_character_timeline(project_id: int):
         raise
     except Exception as e:
         logger.error(f"[TIMELINE-API] Error: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/character-profiles", response_model=ApiResponse)
@@ -1788,4 +1788,4 @@ async def get_character_profiles(project_id: int):
         return ApiResponse(success=False, error="Módulo de perfilado no disponible")
     except Exception as e:
         logger.error(f"[PROFILES-API] Error: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")

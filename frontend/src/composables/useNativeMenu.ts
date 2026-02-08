@@ -13,7 +13,9 @@ let tauriReadyPromise: Promise<void> | null = null
 // Dynamic import for Tauri event API (to avoid errors when running in browser)
 // Con timeout de 5s para evitar cuelgues indefinidos
 const tauriReady = ref(false)
-if (typeof window !== 'undefined' && '__TAURI__' in window) {
+// Tauri 2.0 uses __TAURI_INTERNALS__ (not __TAURI__ unless withGlobalTauri=true)
+const isTauriEnv = typeof window !== 'undefined' && ('__TAURI__' in window || '__TAURI_INTERNALS__' in window)
+if (isTauriEnv) {
   const importWithTimeout = Promise.race([
     import('@tauri-apps/api/event').then(module => {
       tauriListen = module.listen as typeof tauriListen
@@ -180,7 +182,7 @@ export function useNativeMenu(handlers: MenuEventHandlers = {}) {
 
   onMounted(async () => {
     // Solo configurar listener si estamos en Tauri
-    if (typeof window !== 'undefined' && '__TAURI__' in window && tauriReadyPromise) {
+    if (isTauriEnv && tauriReadyPromise) {
       try {
         // Esperar a que el import asíncrono termine (sin timeout artificial)
         await tauriReadyPromise

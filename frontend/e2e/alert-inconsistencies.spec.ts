@@ -230,7 +230,7 @@ test.describe('Alert Navigation - Go to Text', () => {
         const hasHighlight = await highlight.isVisible().catch(() => false)
 
         // Either URL param or highlight should be present
-        expect(hasPositionParam || hasHighlight || true).toBe(true)
+        expect(hasPositionParam || hasHighlight).toBe(true)
       }
     }
   })

@@ -160,7 +160,7 @@ test.describe('Graph Interaction', () => {
           const hasDetails = await detailsPanel.isVisible().catch(() => false)
 
           // El test pasa independientemente (puede no haber nodo en el centro)
-          expect(hasDetails || true).toBe(true)
+          expect(hasDetails).toBe(true)
         }
       }
     }
@@ -284,7 +284,7 @@ test.describe('Behavior Expectations', () => {
         const editInput = page.locator('textarea, input[type="text"]').filter({ hasText: '' })
         const hasEdit = await editInput.isVisible().catch(() => false)
 
-        expect(hasEdit || true).toBe(true)
+        expect(hasEdit).toBe(true)
       }
     }
   })
@@ -307,7 +307,7 @@ test.describe('Behavior Expectations', () => {
       const hasScores = await confidenceScores.first().isVisible().catch(() => false)
 
       // El test pasa si hay scores o no
-      expect(hasScores || true).toBe(true)
+      expect(hasScores).toBe(true)
     }
   })
 })
@@ -339,7 +339,7 @@ test.describe('Graph Controls', () => {
       const hasFit = await fitView.isVisible().catch(() => false)
 
       // Al menos uno de los controles debería estar presente
-      expect(hasZoomIn || hasZoomOut || hasFit || true).toBe(true)
+      expect(hasZoomIn || hasZoomOut || hasFit).toBe(true)
     }
   })
 
@@ -408,7 +408,7 @@ test.describe('Relationship Details', () => {
           const evidenceSection = page.getByText(/Evidencia|Evidence|Contexto/i)
           const hasEvidence = await evidenceSection.isVisible().catch(() => false)
 
-          expect(hasEvidence || true).toBe(true)
+          expect(hasEvidence).toBe(true)
         }
       }
     }
@@ -441,7 +441,7 @@ test.describe('Relationship Details', () => {
         const textTab = page.locator('[aria-selected="true"]')
         const isActive = await textTab.isVisible().catch(() => false)
 
-        expect(isActive || true).toBe(true)
+        expect(isActive).toBe(true)
       }
     }
   })

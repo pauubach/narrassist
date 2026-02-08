@@ -17,7 +17,7 @@ router = APIRouter()
 
 @router.get("/api/projects/{project_id}/glossary", response_model=ApiResponse)
 async def list_glossary_entries(
-    project_id: str,
+    project_id: int,
     category: Optional[str] = None,
     only_technical: bool = False,
     only_invented: bool = False,
@@ -43,7 +43,7 @@ async def list_glossary_entries(
 
         repo = GlossaryRepository()
         entries = repo.list_by_project(
-            project_id=int(project_id),
+            project_id=project_id,
             category=category,
             only_technical=only_technical,
             only_invented=only_invented,
@@ -62,12 +62,12 @@ async def list_glossary_entries(
         raise
     except Exception as e:
         logger.error(f"Error listing glossary entries: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.post("/api/projects/{project_id}/glossary", response_model=ApiResponse)
 async def create_glossary_entry(
-    project_id: str,
+    project_id: int,
     request: GlossaryEntryRequest,
 ) -> ApiResponse:
     """
@@ -84,7 +84,7 @@ async def create_glossary_entry(
         repo = GlossaryRepository()
 
         entry = GlossaryEntry(
-            project_id=int(project_id),
+            project_id=project_id,
             term=request.term,
             definition=request.definition,
             variants=request.variants,
@@ -109,17 +109,17 @@ async def create_glossary_entry(
 
     except ValueError as e:
         # Término duplicado
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error creating glossary entry: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/glossary/{entry_id}", response_model=ApiResponse)
 async def get_glossary_entry(
-    project_id: str,
+    project_id: int,
     entry_id: int,
 ) -> ApiResponse:
     """
@@ -136,7 +136,7 @@ async def get_glossary_entry(
         repo = GlossaryRepository()
         entry = repo.get(entry_id)
 
-        if not entry or entry.project_id != int(project_id):
+        if not entry or entry.project_id != project_id:
             raise HTTPException(status_code=404, detail="Glossary entry not found")
 
         return ApiResponse(success=True, data=entry.to_dict())
@@ -145,12 +145,12 @@ async def get_glossary_entry(
         raise
     except Exception as e:
         logger.error(f"Error getting glossary entry: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.put("/api/projects/{project_id}/glossary/{entry_id}", response_model=ApiResponse)
 async def update_glossary_entry(
-    project_id: str,
+    project_id: int,
     entry_id: int,
     request: GlossaryEntryRequest,
 ) -> ApiResponse:
@@ -168,7 +168,7 @@ async def update_glossary_entry(
         repo = GlossaryRepository()
         existing = repo.get(entry_id)
 
-        if not existing or existing.project_id != int(project_id):
+        if not existing or existing.project_id != project_id:
             raise HTTPException(status_code=404, detail="Glossary entry not found")
 
         # Actualizar campos
@@ -197,12 +197,12 @@ async def update_glossary_entry(
         raise
     except Exception as e:
         logger.error(f"Error updating glossary entry: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.delete("/api/projects/{project_id}/glossary/{entry_id}", response_model=ApiResponse)
 async def delete_glossary_entry(
-    project_id: str,
+    project_id: int,
     entry_id: int,
 ) -> ApiResponse:
     """
@@ -219,7 +219,7 @@ async def delete_glossary_entry(
         repo = GlossaryRepository()
         existing = repo.get(entry_id)
 
-        if not existing or existing.project_id != int(project_id):
+        if not existing or existing.project_id != project_id:
             raise HTTPException(status_code=404, detail="Glossary entry not found")
 
         term = existing.term
@@ -234,12 +234,12 @@ async def delete_glossary_entry(
         raise
     except Exception as e:
         logger.error(f"Error deleting glossary entry: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/glossary/context/llm", response_model=ApiResponse)
 async def get_glossary_llm_context(
-    project_id: str,
+    project_id: int,
     max_entries: int = 50,
     categories: Optional[str] = None,
 ) -> ApiResponse:
@@ -266,7 +266,7 @@ async def get_glossary_llm_context(
             category_list = [c.strip() for c in categories.split(",")]
 
         context = repo.generate_llm_context(
-            project_id=int(project_id),
+            project_id=project_id,
             max_entries=max_entries,
             categories=category_list,
         )
@@ -283,11 +283,11 @@ async def get_glossary_llm_context(
         raise
     except Exception as e:
         logger.error(f"Error generating glossary LLM context: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/glossary/export/publication", response_model=ApiResponse)
-async def export_glossary_for_publication(project_id: str) -> ApiResponse:
+async def export_glossary_for_publication(project_id: int) -> ApiResponse:
     """
     Exporta el glosario formateado para incluir en la publicación.
 
@@ -302,7 +302,7 @@ async def export_glossary_for_publication(project_id: str) -> ApiResponse:
         from narrative_assistant.persistence.glossary import GlossaryRepository
 
         repo = GlossaryRepository()
-        content = repo.export_for_publication(int(project_id))
+        content = repo.export_for_publication(project_id)
 
         return ApiResponse(
             success=True,
@@ -316,12 +316,12 @@ async def export_glossary_for_publication(project_id: str) -> ApiResponse:
         raise
     except Exception as e:
         logger.error(f"Error exporting glossary: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.post("/api/projects/{project_id}/glossary/import", response_model=ApiResponse)
 async def import_glossary(
-    project_id: str,
+    project_id: int,
     entries: list[dict] = Body(...),
     merge: bool = True,
 ) -> ApiResponse:
@@ -342,7 +342,7 @@ async def import_glossary(
         from narrative_assistant.persistence.glossary import GlossaryRepository
 
         repo = GlossaryRepository()
-        created, updated = repo.import_from_dict(int(project_id), entries, merge=merge)
+        created, updated = repo.import_from_dict(project_id, entries, merge=merge)
 
         return ApiResponse(
             success=True,
@@ -358,12 +358,12 @@ async def import_glossary(
         raise
     except Exception as e:
         logger.error(f"Error importing glossary: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/glossary/search", response_model=ApiResponse)
 async def search_glossary(
-    project_id: str,
+    project_id: int,
     q: str = Query(..., min_length=1, description="Término a buscar"),
 ) -> ApiResponse:
     """
@@ -378,7 +378,7 @@ async def search_glossary(
         from narrative_assistant.persistence.glossary import GlossaryRepository
 
         repo = GlossaryRepository()
-        entry = repo.find_by_term_or_variant(int(project_id), q)
+        entry = repo.find_by_term_or_variant(project_id, q)
 
         if entry:
             return ApiResponse(
@@ -401,11 +401,11 @@ async def search_glossary(
         raise
     except Exception as e:
         logger.error(f"Error searching glossary: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/glossary/summary", response_model=ApiResponse)
-async def get_glossary_summary(project_id: str) -> ApiResponse:
+async def get_glossary_summary(project_id: int) -> ApiResponse:
     """
     Obtiene un resumen del glosario del proyecto.
     """
@@ -418,7 +418,7 @@ async def get_glossary_summary(project_id: str) -> ApiResponse:
         from narrative_assistant.persistence.glossary import GlossaryRepository
 
         repo = GlossaryRepository()
-        entries = repo.list_by_project(int(project_id))
+        entries = repo.list_by_project(project_id)
 
         # Calcular estadísticas
         by_category = {}
@@ -451,12 +451,12 @@ async def get_glossary_summary(project_id: str) -> ApiResponse:
         raise
     except Exception as e:
         logger.error(f"Error getting glossary summary: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/glossary/suggestions", response_model=ApiResponse)
 async def get_glossary_suggestions(
-    project_id: str,
+    project_id: int,
     min_frequency: int = Query(2, ge=1, le=10, description="Frecuencia mínima"),
     max_frequency: int = Query(50, ge=5, le=200, description="Frecuencia máxima"),
     min_confidence: float = Query(0.5, ge=0.0, le=1.0, description="Confianza mínima"),
@@ -491,7 +491,7 @@ async def get_glossary_suggestions(
         from narrative_assistant.analysis.glossary_extractor import GlossaryExtractor
 
         repo = GlossaryRepository()
-        existing_terms = repo.get_all_terms(int(project_id))
+        existing_terms = repo.get_all_terms(project_id)
 
         # Obtener capítulos del proyecto
         chapters_result = project.get_chapters()
@@ -579,12 +579,12 @@ async def get_glossary_suggestions(
         raise
     except Exception as e:
         logger.error(f"Error extracting glossary suggestions: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.post("/api/projects/{project_id}/glossary/suggestions/accept", response_model=ApiResponse)
 async def accept_glossary_suggestion(
-    project_id: str,
+    project_id: int,
     term: str = Body(..., embed=True),
     definition: str = Body("", embed=True),
     category: str = Body("general", embed=True),
@@ -614,7 +614,7 @@ async def accept_glossary_suggestion(
         repo = GlossaryRepository()
 
         # Verificar que no existe
-        existing = repo.get_by_term(int(project_id), term)
+        existing = repo.get_by_term(project_id, term)
         if existing:
             return ApiResponse(
                 success=False,
@@ -622,7 +622,7 @@ async def accept_glossary_suggestion(
             )
 
         entry = GlossaryEntry(
-            project_id=int(project_id),
+            project_id=project_id,
             term=term,
             definition=definition or f"(Definición pendiente para '{term}')",
             category=category,
@@ -643,7 +643,7 @@ async def accept_glossary_suggestion(
         raise
     except Exception as e:
         logger.error(f"Error accepting glossary suggestion: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/dictionary/lookup/{word}", response_model=ApiResponse)
@@ -689,7 +689,7 @@ async def dictionary_lookup(word: str):
 
     except Exception as e:
         logger.error(f"Error looking up word '{word}': {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/dictionary/synonyms/{word}", response_model=ApiResponse)
@@ -721,7 +721,7 @@ async def get_synonyms(word: str):
 
     except Exception as e:
         logger.error(f"Error getting synonyms for '{word}': {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/dictionary/search", response_model=ApiResponse)
@@ -755,7 +755,7 @@ async def dictionary_search(prefix: str, limit: int = 20):
 
     except Exception as e:
         logger.error(f"Error searching prefix '{prefix}': {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/dictionary/status", response_model=ApiResponse)
@@ -782,7 +782,7 @@ async def dictionary_status():
 
     except Exception as e:
         logger.error(f"Error getting dictionary status: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.post("/api/dictionary/initialize", response_model=ApiResponse)
@@ -815,7 +815,7 @@ async def initialize_dictionaries():
 
     except Exception as e:
         logger.error(f"Error initializing dictionaries: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.post("/api/dictionary/custom", response_model=ApiResponse)
@@ -854,7 +854,7 @@ async def add_custom_word(request: CustomWordRequest):
 
     except Exception as e:
         logger.error(f"Error adding custom word: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.delete("/api/dictionary/custom/{word}", response_model=ApiResponse)
@@ -891,7 +891,7 @@ async def remove_custom_word(word: str):
 
     except Exception as e:
         logger.error(f"Error removing custom word: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/dictionary/custom", response_model=ApiResponse)
@@ -918,7 +918,7 @@ async def list_custom_words():
 
     except Exception as e:
         logger.error(f"Error listing custom words: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/dictionary/external-links/{word}", response_model=ApiResponse)
@@ -962,6 +962,6 @@ async def get_external_dictionary_links(word: str):
 
     except Exception as e:
         logger.error(f"Error getting external links for '{word}': {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 

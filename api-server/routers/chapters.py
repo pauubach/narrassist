@@ -80,7 +80,7 @@ async def list_chapters(project_id: int):
         raise
     except Exception as e:
         logger.error(f"Error listing chapters for project {project_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/chapters/{chapter_number}/annotations", response_model=ApiResponse)
@@ -149,7 +149,7 @@ async def get_chapter_annotations(project_id: int, chapter_number: int):
 
     except Exception as e:
         logger.error(f"Error getting chapter annotations: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/style-guide", response_model=ApiResponse)
@@ -384,7 +384,7 @@ async def get_style_guide(project_id: int, format: str = "json", preview: bool =
         raise
     except Exception as e:
         logger.error(f"Error generating style guide for project {project_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/timeline", response_model=ApiResponse)
@@ -603,7 +603,7 @@ async def get_project_timeline(project_id: int, force_refresh: bool = False):
         )
     except Exception as e:
         logger.error(f"Error getting timeline for project {project_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/temporal-markers", response_model=ApiResponse)
@@ -664,7 +664,7 @@ async def get_temporal_markers(project_id: int, chapter_number: Optional[int] = 
 
     except Exception as e:
         logger.error(f"Error getting temporal markers: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/chapters/{chapter_number}/emotional-analysis", response_model=ApiResponse)
@@ -735,7 +735,7 @@ async def get_chapter_emotional_analysis(project_id: int, chapter_number: int):
         )
     except Exception as e:
         logger.error(f"Error in chapter emotional analysis: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/chapters/{chapter_number}/register-analysis", response_model=ApiResponse)
@@ -891,7 +891,7 @@ async def get_chapter_register_analysis(
         raise
     except Exception as e:
         logger.error(f"Error analyzing chapter register: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/chapters/{chapter_number}/dialogue-attributions", response_model=ApiResponse)
@@ -1049,7 +1049,7 @@ async def get_dialogue_attributions(project_id: int, chapter_number: int):
         raise
     except Exception as e:
         logger.error(f"Error attributing speakers: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/chapters/{chapter_number}/focalization/suggest", response_model=ApiResponse)
@@ -1103,7 +1103,7 @@ async def suggest_chapter_focalization(project_id: int, chapter_number: int):
         raise
     except Exception as e:
         logger.error(f"Error suggesting focalization: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/chapters/{chapter_number}/scenes", response_model=ApiResponse)
@@ -1152,6 +1152,6 @@ async def get_chapter_scenes(project_id: int, chapter_number: int):
         raise
     except Exception as e:
         logger.error(f"Error getting chapter scenes: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 

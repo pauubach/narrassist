@@ -624,8 +624,8 @@ class EmbeddingsRelationMethod:
                     try:
                         emb = self.embeddings.encode(phrase)
                         embeddings_list.append(emb)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"Error codificando frase prototipo para embeddings: {e}")
                 if embeddings_list:
                     import numpy as np
 

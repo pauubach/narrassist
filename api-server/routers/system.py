@@ -1064,7 +1064,7 @@ async def clear_cache():
 
     except Exception as e:
         logger.error(f"Error clearing cache: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/maintenance/data-location", response_model=ApiResponse)
@@ -1093,7 +1093,7 @@ async def get_data_location():
         )
     except Exception as e:
         logger.error(f"Error getting data location: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/system/resources", response_model=ApiResponse)
@@ -1279,4 +1279,4 @@ async def change_data_location(request: ChangeDataLocationRequest):
 
     except Exception as e:
         logger.error(f"Error changing data location: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")

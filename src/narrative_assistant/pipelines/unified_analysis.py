@@ -3441,9 +3441,9 @@ class UnifiedAnalysisPipeline:
 
             # Nombres de entidades conocidas para conteo de presencia
             entity_names = [
-                e.get("canonical_name") or e.get("name", "")
+                getattr(e, "canonical_name", "") or getattr(e, "name", "")
                 for e in (context.entities or [])
-                if e.get("canonical_name") or e.get("name")
+                if getattr(e, "canonical_name", "") or getattr(e, "name", "")
             ]
 
             enriched_count = 0

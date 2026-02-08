@@ -12,6 +12,16 @@ from deps import DeviceDeactivationRequest, LicenseActivationRequest
 
 router = APIRouter()
 
+
+def get_license_verifier():
+    """Obtiene el LicenseVerifier, retorna None si el módulo de licencias no está disponible."""
+    try:
+        from narrative_assistant.licensing.verification import LicenseVerifier
+        return LicenseVerifier()
+    except Exception:
+        return None
+
+
 @router.get("/api/license/status", response_model=ApiResponse)
 async def get_license_status():
     """
@@ -71,7 +81,7 @@ async def get_license_status():
 
     except Exception as e:
         logger.error(f"Error getting license status: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.post("/api/license/activate", response_model=ApiResponse)
@@ -107,7 +117,7 @@ async def activate_license(request: LicenseActivationRequest):
 
     except Exception as e:
         logger.error(f"Error activating license: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.post("/api/license/verify", response_model=ApiResponse)
@@ -139,7 +149,7 @@ async def verify_license():
 
     except Exception as e:
         logger.error(f"Error verifying license: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/license/devices", response_model=ApiResponse)
@@ -180,7 +190,7 @@ async def get_license_devices():
 
     except Exception as e:
         logger.error(f"Error getting devices: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.post("/api/license/devices/deactivate", response_model=ApiResponse)
@@ -214,7 +224,7 @@ async def deactivate_device(request: DeviceDeactivationRequest):
 
     except Exception as e:
         logger.error(f"Error deactivating device: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/license/usage", response_model=ApiResponse)
@@ -250,7 +260,7 @@ async def get_license_usage():
 
     except Exception as e:
         logger.error(f"Error getting usage: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.post("/api/license/record-manuscript", response_model=ApiResponse)
@@ -290,7 +300,7 @@ async def record_manuscript_usage(project_id: int = Body(..., embed=True)):
 
     except Exception as e:
         logger.error(f"Error recording manuscript usage: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/license/check-module/{module_name}", response_model=ApiResponse)
@@ -331,6 +341,6 @@ async def check_module_access(module_name: str):
 
     except Exception as e:
         logger.error(f"Error checking module access: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 

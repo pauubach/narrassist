@@ -79,7 +79,7 @@ async def get_llm_status():
         )
     except Exception as e:
         logger.error(f"Error checking LLM status: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.post("/api/ollama/start", response_model=ApiResponse)
@@ -142,7 +142,7 @@ async def start_ollama_service():
 
     except Exception as e:
         logger.error(f"Error starting Ollama: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/ollama/status", response_model=ApiResponse)
@@ -197,7 +197,7 @@ async def get_ollama_status():
 
     except Exception as e:
         logger.error(f"Error getting Ollama status: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.post("/api/ollama/pull/{model_name}", response_model=ApiResponse)
@@ -250,7 +250,7 @@ async def pull_ollama_model(model_name: str):
 
     except Exception as e:
         logger.error(f"Error pulling model {model_name}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.post("/api/ollama/install", response_model=ApiResponse)
@@ -291,7 +291,7 @@ async def install_ollama_endpoint():
         logger.error(f"Error installing Ollama: {e}", exc_info=True)
         return ApiResponse(
             success=False,
-            error=str(e),
+            error="Error interno del servidor",
             data={"status": "error", "install_url": "https://ollama.com/download"}
         )
 
@@ -387,7 +387,7 @@ async def install_languagetool_endpoint():
 
     except Exception as e:
         logger.error(f"Error starting LanguageTool install: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.post("/api/languagetool/start", response_model=ApiResponse)
@@ -433,7 +433,7 @@ async def start_languagetool_endpoint():
 
     except Exception as e:
         logger.error(f"Error starting LanguageTool: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.post("/api/languagetool/stop", response_model=ApiResponse)
@@ -460,7 +460,7 @@ async def stop_languagetool_endpoint():
 
     except Exception as e:
         logger.error(f"Error stopping LanguageTool: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.post("/api/projects/{project_id}/chat", response_model=ApiResponse)
@@ -627,7 +627,7 @@ en el contexto proporcionado, indícalo claramente.
         raise
     except Exception as e:
         logger.error(f"Error in chat endpoint: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/correction-presets", response_model=ApiResponse)
@@ -736,6 +736,6 @@ async def get_correction_presets() -> ApiResponse:
 
     except Exception as e:
         logger.error(f"Error getting correction presets: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 

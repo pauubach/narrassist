@@ -68,7 +68,7 @@ async def reanalyze_project(project_id: int):
         raise
     except Exception as e:
         logger.error(f"Error re-analyzing project {project_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.post("/api/projects/{project_id}/analyze", response_model=ApiResponse)
@@ -98,6 +98,13 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
             raise HTTPException(status_code=404, detail=f"Proyecto {project_id} no encontrado")
 
         project = result.value
+
+        # Guard de concurrencia: no permitir doble análisis
+        if project.analysis_status == "analyzing":
+            return ApiResponse(
+                success=False,
+                error="Ya hay un análisis en curso para este proyecto. Espera a que termine."
+            )
 
         # Determinar el archivo a usar
         tmp_path: Path
@@ -438,7 +445,7 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
 
                 # Actualizar settings del proyecto con el tipo de documento
                 try:
-                    deps.project_manager = ProjectManager(db_session)
+                    local_pm = ProjectManager(db_session)
                     project_settings = project.settings or {}
                     project_settings["document_type"] = document_type
                     project_settings["document_classification"] = {
@@ -448,7 +455,7 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                     }
                     project_settings["recommended_analysis"] = analysis_settings
 
-                    deps.project_manager.update_project(project_id, {
+                    local_pm.update_project(project_id, {
                         "settings": json.dumps(project_settings)
                     })
                     logger.info(f"Saved document type to project settings: {document_type}")
@@ -2195,7 +2202,7 @@ JSON:"""
         raise
     except Exception as e:
         logger.error(f"Error starting analysis for project {project_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/analysis/progress", response_model=ApiResponse)
@@ -2250,7 +2257,7 @@ async def get_analysis_progress(project_id: int):
 
     except Exception as e:
         logger.error(f"Error getting analysis progress for project {project_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.post("/api/projects/{project_id}/analysis/cancel", response_model=ApiResponse)
@@ -2299,7 +2306,7 @@ async def cancel_analysis(project_id: int):
 
     except Exception as e:
         logger.error(f"Error cancelling analysis for project {project_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error=str(e))
+        return ApiResponse(success=False, error="Error interno del servidor")
 
 
 @router.get("/api/projects/{project_id}/analysis/stream")

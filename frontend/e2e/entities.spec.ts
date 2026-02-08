@@ -214,7 +214,7 @@ test.describe('Entity Merge', () => {
       // Verificar que muestra scores de similitud
       const similarityScore = page.getByText(/\d+%|similitud/i)
       const hasScore = await similarityScore.isVisible().catch(() => false)
-      expect(hasScore || true).toBe(true) // Pasa si existe o no
+      expect(hasScore).toBe(true) // Pasa si existe o no
     }
   })
 })
@@ -427,7 +427,7 @@ test.describe('Accessibility', () => {
     const focusedElement = page.locator(':focus')
     const hasFocus = await focusedElement.isVisible().catch(() => false)
 
-    expect(hasFocus || true).toBe(true)
+    expect(hasFocus).toBe(true)
   })
 
   test('entity cards should have proper roles', async ({ page, request }) => {

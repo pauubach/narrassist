@@ -80,6 +80,17 @@ useKeyboardShortcuts()
 
 // Activar manejo de menú nativo de Tauri
 useNativeMenu({
+  onNewProject: () => {
+    console.log('[Menu] New project requested')
+    router.push('/projects')
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('menubar:new-project'))
+    }, 200)
+  },
+  onOpenProject: () => {
+    console.log('[Menu] Open project requested')
+    router.push('/projects')
+  },
   onSettings: () => { router.push('/settings') },
   onCloseProject: () => {
     console.log('[Menu] Close project requested')

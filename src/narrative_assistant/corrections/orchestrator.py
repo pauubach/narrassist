@@ -98,6 +98,7 @@ class CorrectionOrchestrator:
             Lista de CorrectionIssue encontrados
         """
         all_issues: list[CorrectionIssue] = []
+        failed_detectors: list[str] = []
 
         # Separar detectores que requieren spaCy
         parallel_detectors = []
@@ -140,6 +141,7 @@ class CorrectionOrchestrator:
                         all_issues.extend(self._limit_issues(issues, category))
                     except Exception as e:
                         logger.error(f"Error en detector {category.value}: {e}")
+                        failed_detectors.append(category.value)
 
         # Ejecutar detectores secuenciales (requieren spaCy)
         for category, detector in sequential_detectors:
@@ -151,6 +153,7 @@ class CorrectionOrchestrator:
                 all_issues.extend(self._limit_issues(issues, category))
             except Exception as e:
                 logger.error(f"Error en detector {category.value}: {e}")
+                failed_detectors.append(category.value)
 
         # Ejecutar detector de terminología (usa embeddings opcionalmente)
         if self.config.terminology.enabled:
@@ -164,6 +167,7 @@ class CorrectionOrchestrator:
                 )
             except Exception as e:
                 logger.error(f"Error en detector de terminología: {e}")
+                failed_detectors.append("terminology")
 
         # Ejecutar detector de campo especializado
         if self.config.field_dictionary.enabled:
@@ -175,6 +179,7 @@ class CorrectionOrchestrator:
                 all_issues.extend(self._limit_issues(field_issues, CorrectionCategory.TERMINOLOGY))
             except Exception as e:
                 logger.error(f"Error en detector de campo: {e}")
+                failed_detectors.append("field_dictionary")
 
         # Ejecutar detector de glosario (requiere project_id)
         if self.config.glossary.enabled and project_id is not None:
@@ -186,9 +191,13 @@ class CorrectionOrchestrator:
                 all_issues.extend(self._limit_issues(glossary_issues, CorrectionCategory.GLOSSARY))
             except Exception as e:
                 logger.error(f"Error en detector de glosario: {e}")
+                failed_detectors.append("glossary")
 
         # Ordenar por posición en el texto
         all_issues.sort(key=lambda x: x.start_char)
+
+        if failed_detectors:
+            logger.warning(f"Detectores con error: {', '.join(failed_detectors)}")
 
         logger.info(f"Análisis de correcciones completado: {len(all_issues)} sugerencias")
 
