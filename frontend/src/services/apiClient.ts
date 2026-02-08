@@ -346,7 +346,7 @@ async function postChecked<T>(
   body?: Record<string, unknown>,
   options: RequestOptions = {},
 ): Promise<T> {
-  const raw = await postRaw<{ success: boolean; data: T; error?: string }>(path, options)
+  const raw = await postRaw<{ success: boolean; data: T; error?: string }>(path, body, options)
   if (!raw.success) {
     throw new ApiError(raw.error || 'Error desconocido del servidor', 200, raw.error)
   }
