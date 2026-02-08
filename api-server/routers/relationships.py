@@ -1692,7 +1692,7 @@ async def get_character_timeline(project_id: int):
                 "first_chapter": chapters_present[0],
                 "last_chapter": chapters_present[-1],
                 "appearances": [
-                    {"chapter": ch, "mentions": by_chapter[ch]}
+                    {"chapter": ch, "mentions": by_chapter.get(ch, 0)}
                     for ch in range(1, len(chapters) + 1)
                 ],
             })

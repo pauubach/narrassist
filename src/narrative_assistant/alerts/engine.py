@@ -638,7 +638,7 @@ class AlertEngine:
             chapter=chapter,
             start_char=start_char,
             end_char=end_char,
-            excerpt=context or text,
+            excerpt=text,
             confidence=confidence,
             source_module="corrections_detector",
             extra_data=extra_data

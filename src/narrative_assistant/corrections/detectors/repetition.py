@@ -268,21 +268,21 @@ class RepetitionDetector(BaseDetector):
                         continue
                     reported_pairs.add(pair_key)
 
-                    # Reportar
+                    # Reportar — posición solo del primer token (no del span entre ambos)
                     issues.append(
                         CorrectionIssue(
                             category=self.category.value,
                             issue_type=RepetitionIssueType.LEXICAL_CLOSE.value,
                             start_char=token["start"],
-                            end_char=other["end"],
-                            text=f"{token['text']}...{other['text']}",
+                            end_char=token["end"],
+                            text=token["text"],
                             explanation=(
                                 f"'{token['text']}' aparece repetida a {word_distance} "
                                 f"palabras de distancia"
                             ),
                             suggestion=None,  # El corrector decide la variación
                             confidence=self._calculate_confidence(word_distance, distance),
-                            context=self._extract_context(text, token["start"], other["end"]),
+                            context=self._extract_context(text, token["start"], token["end"]),
                             chapter_index=chapter_index,
                             rule_id="REP_LEXICAL",
                             extra_data={
