@@ -1252,6 +1252,15 @@ const onAnalysisCompleted = async () => {
   // Timeline y Style cargan sus propios datos
 }
 
+// Reload stale data when switching to tabs that depend on analysis
+watch(() => workspaceStore.activeTab, async (newTab) => {
+  if (!project.value) return
+  if (newTab === 'relationships' && (!relationships.value || relationships.value.length === 0)) {
+    await loadEntities(project.value.id)
+    await loadRelationships(project.value.id)
+  }
+})
+
 const onDocumentTypeChanged = async (_type: string, _subtype: string | null) => {
   // Recargar el proyecto para obtener el nuevo perfil de features
   if (project.value) {
