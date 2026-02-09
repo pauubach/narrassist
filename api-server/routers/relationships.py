@@ -1458,12 +1458,19 @@ def get_character_archetypes(
                 if entity_type_str.upper() == "PERSON":
                     entity_type_str = "character"
 
+                # Convertir EntityImportance enum a string para archetype analyzer
+                raw_importance = ent.importance if hasattr(ent, 'importance') else "medium"
+                if hasattr(raw_importance, 'value'):
+                    importance_str = raw_importance.value
+                else:
+                    importance_str = str(raw_importance)
+
                 ent_dict = {
                     "id": ent.id if hasattr(ent, 'id') else 0,
                     "entity_type": entity_type_str,
                     "name": ent.name if hasattr(ent, 'name') else ent.canonical_name if hasattr(ent, 'canonical_name') else "",
                     "canonical_name": ent.canonical_name if hasattr(ent, 'canonical_name') else "",
-                    "importance": ent.importance if hasattr(ent, 'importance') else "secondary",
+                    "importance": importance_str,
                     "mention_count": ent.mention_count if hasattr(ent, 'mention_count') else 0,
                     "chapters_present": len(ent.chapter_appearances) if hasattr(ent, 'chapter_appearances') else 0,
                     "description": ent.description if hasattr(ent, 'description') else "",
@@ -1491,6 +1498,52 @@ def get_character_archetypes(
         # Arcos de personaje del chapter progress
         character_arcs = [a.to_dict() for a in progress.character_arcs]
 
+        # Obtener perfiles de centralidad narrativa (6 indicadores)
+        profiles_data = []
+        try:
+            from narrative_assistant.analysis.character_profiling import CharacterProfiler
+            from narrative_assistant.entities.repository import get_entity_repository
+            from narrative_assistant.persistence.chapter import get_chapter_repository
+
+            entity_repo = get_entity_repository()
+            all_entities = entity_repo.get_entities_by_project(project_id, active_only=True)
+            chapter_repo = get_chapter_repository()
+            chapters = chapter_repo.get_by_project(project_id)
+
+            if all_entities and chapters:
+                mentions = []
+                chapter_id_map = {c.id: c.chapter_number for c in chapters}
+                for entity in all_entities:
+                    entity_mentions = entity_repo.get_mentions_by_entity(entity.id)
+                    for m in entity_mentions:
+                        ch_num = chapter_id_map.get(m.chapter_id, 0)
+                        mentions.append({
+                            "entity_id": entity.id,
+                            "entity_name": entity.canonical_name,
+                            "chapter": ch_num,
+                        })
+
+                chapter_texts = {c.chapter_number: c.content for c in chapters}
+                profiler = CharacterProfiler(total_chapters=len(chapters))
+                raw_profiles = profiler.build_profiles(
+                    mentions=mentions,
+                    chapter_texts=chapter_texts,
+                )
+                for p in raw_profiles:
+                    pd = p.to_dict()
+                    profiles_data.append({
+                        "character_name": pd["entity_name"],
+                        "narrative_relevance": pd["narrative_relevance"],
+                        "role": pd["role"],
+                        "agency_score": pd.get("actions", {}).get("agency", 0),
+                    })
+                logger.info(
+                    f"[ARCHETYPES] Profiling: {len(profiles_data)} personajes, "
+                    f"roles: {[p['role'] for p in profiles_data]}"
+                )
+        except Exception as e:
+            logger.warning(f"Could not build profiles for archetype analysis: {e}")
+
         # Analizar arquetipos
         analyzer = CharacterArchetypeAnalyzer()
         report = analyzer.analyze(
@@ -1499,6 +1552,7 @@ def get_character_archetypes(
             relationships=relationships_data,
             interactions=[],  # No hay endpoint de interacciones aún
             total_chapters=progress.total_chapters,
+            profiles=profiles_data or None,
         )
 
         return ApiResponse(success=True, data=report.to_dict())

@@ -43,6 +43,7 @@ interface ArchetypeReport {
   characters: CharacterProfile[]
   archetype_distribution: Record<string, number>
   ensemble_notes: string[]
+  protagonist_suggestion: string | null
 }
 
 const loading = ref(false)
@@ -87,8 +88,14 @@ function toggleCharacter(id: number) {
 function getImportanceLabel(imp: string): string {
   const labels: Record<string, string> = {
     protagonist: 'Protagonista',
+    principal: 'Protagonista',
+    high: 'Principal',
+    primary: 'Principal',
     secondary: 'Secundario',
+    medium: 'Secundario',
     minor: 'Menor',
+    low: 'Menor',
+    minimal: 'Mencionado',
     mentioned: 'Mencionado',
   }
   return labels[imp] || imp
@@ -97,8 +104,14 @@ function getImportanceLabel(imp: string): string {
 function getImportanceSeverity(imp: string): 'info' | 'warn' | 'secondary' | 'success' {
   const map: Record<string, 'info' | 'warn' | 'secondary' | 'success'> = {
     protagonist: 'success',
+    principal: 'success',
+    high: 'info',
+    primary: 'info',
     secondary: 'info',
+    medium: 'info',
     minor: 'secondary',
+    low: 'secondary',
+    minimal: 'secondary',
     mentioned: 'secondary',
   }
   return map[imp] || 'secondary'
@@ -157,6 +170,14 @@ function getConfidenceSeverity(c: number): 'success' | 'warn' | 'secondary' {
 
     <!-- Results -->
     <div v-else class="results-container">
+      <!-- Protagonist suggestion -->
+      <div v-if="report.protagonist_suggestion" class="protagonist-banner">
+        <i class="pi pi-star-fill"></i>
+        <span>
+          Protagonista sugerido: <strong>{{ report.protagonist_suggestion }}</strong>
+        </span>
+      </div>
+
       <!-- Ensemble notes -->
       <Card v-if="report.ensemble_notes.length" class="ensemble-card">
         <template #title>
@@ -195,7 +216,10 @@ function getConfidenceSeverity(c: number): 'success' | 'warn' | 'secondary' {
           v-for="char in report.characters"
           :key="char.character_id"
           class="character-card"
-          :class="{ 'character-card--expanded': expandedCharacter === char.character_id }"
+          :class="{
+            'character-card--expanded': expandedCharacter === char.character_id,
+            'character-card--protagonist': report.protagonist_suggestion === char.character_name,
+          }"
           @click="toggleCharacter(char.character_id)"
         >
           <!-- Character header -->
@@ -209,7 +233,14 @@ function getConfidenceSeverity(c: number): 'success' | 'warn' | 'secondary' {
               />
               <i v-else class="pi pi-user char-archetype-icon" />
               <div class="char-names">
-                <span class="char-name">{{ char.character_name }}</span>
+                <span class="char-name">
+                  {{ char.character_name }}
+                  <i
+                    v-if="report.protagonist_suggestion === char.character_name"
+                    class="pi pi-star-fill protagonist-star"
+                    title="Protagonista sugerido"
+                  />
+                </span>
                 <span v-if="char.primary_archetype" class="char-archetype">
                   {{ char.primary_archetype.name }}
                   <span v-if="char.secondary_archetype" class="char-secondary">
@@ -316,6 +347,30 @@ function getConfidenceSeverity(c: number): 'success' | 'warn' | 'secondary' {
 
 .empty-state i { font-size: 2rem; opacity: 0.5; }
 
+/* Protagonist banner */
+.protagonist-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2, 0.5rem);
+  padding: var(--ds-space-2, 0.5rem) var(--ds-space-3, 0.75rem);
+  background: var(--p-blue-50, #eff6ff);
+  border: 1px solid var(--p-blue-200, #bfdbfe);
+  border-radius: var(--ds-radius-md, 8px);
+  color: var(--p-blue-700, #1d4ed8);
+  font-size: var(--ds-font-size-sm, 0.8125rem);
+}
+
+.protagonist-banner i {
+  color: var(--p-yellow-500, #eab308);
+  font-size: 1rem;
+}
+
+:global(.dark) .protagonist-banner {
+  background: var(--p-blue-900, #1e3a5f);
+  border-color: var(--p-blue-700, #1d4ed8);
+  color: var(--p-blue-100, #dbeafe);
+}
+
 /* Ensemble */
 .ensemble-card :deep(.p-card-title) {
   display: flex;
@@ -386,6 +441,16 @@ function getConfidenceSeverity(c: number): 'success' | 'warn' | 'secondary' {
 
 .character-card--expanded {
   border-color: var(--ds-color-primary, var(--primary-color));
+}
+
+.character-card--protagonist {
+  border-left: 3px solid var(--p-blue-500, #3b82f6);
+}
+
+.protagonist-star {
+  color: var(--p-yellow-500, #eab308);
+  font-size: 0.75rem;
+  margin-left: 4px;
 }
 
 .char-header {

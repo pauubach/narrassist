@@ -224,12 +224,14 @@ class ArchetypeReport:
     characters: list[CharacterArchetypeProfile] = field(default_factory=list)
     archetype_distribution: dict[str, int] = field(default_factory=dict)
     ensemble_notes: list[str] = field(default_factory=list)
+    protagonist_suggestion: str | None = None  # Nombre del protagonista sugerido
 
     def to_dict(self) -> dict:
         return {
             "characters": [c.to_dict() for c in self.characters],
             "archetype_distribution": self.archetype_distribution,
             "ensemble_notes": self.ensemble_notes,
+            "protagonist_suggestion": self.protagonist_suggestion,
         }
 
 
@@ -309,6 +311,7 @@ class CharacterArchetypeAnalyzer:
         relationships: list[dict],
         interactions: list[dict],
         total_chapters: int,
+        profiles: list[dict] | None = None,
     ) -> ArchetypeReport:
         """
         Analizar arquetipos de todos los personajes.
@@ -319,6 +322,7 @@ class CharacterArchetypeAnalyzer:
             relationships: Relaciones (dicts con entity1_id, entity2_id, relation_type, subtype, etc.)
             interactions: Interacciones (dicts con entity1_id, entity2_id, tone, intensity, etc.)
             total_chapters: Número total de capítulos
+            profiles: Perfiles de CharacterProfiler (dicts con narrative_relevance, role, etc.)
 
         Returns:
             ArchetypeReport
@@ -350,15 +354,25 @@ class CharacterArchetypeAnalyzer:
                 if eid is not None:
                     ints_by_id.setdefault(eid, []).append(inter)
 
+        # Indexar perfiles por character name (el profiler usa names)
+        profiles_by_name: dict[str, dict] = {}
+        if profiles:
+            for prof in profiles:
+                pname = prof.get("character_name", "")
+                if pname:
+                    profiles_by_name[pname] = prof
+
         # Analizar cada personaje
         for char in characters:
             cid = char.get("id") or char.get("entity_id")
+            char_name = char.get("name") or char.get("canonical_name", "")
             profile = self._analyze_character(
                 char=char,
                 arc=arcs_by_id.get(cid),
                 relations=rels_by_id.get(cid, []),
                 interactions=ints_by_id.get(cid, []),
                 total_chapters=total_chapters,
+                char_profile=profiles_by_name.get(char_name),
             )
             report.characters.append(profile)
 
@@ -371,6 +385,23 @@ class CharacterArchetypeAnalyzer:
         # Notas del elenco
         report.ensemble_notes = self._analyze_ensemble(report.characters)
 
+        # Identificar protagonista sugerido
+        hero_chars = [
+            c for c in report.characters
+            if c.primary_archetype and c.primary_archetype.archetype == ArchetypeId.HERO
+        ]
+        if hero_chars:
+            # Si hay un solo héroe, es el protagonista
+            best = max(hero_chars, key=lambda c: c.primary_archetype.score)
+            report.protagonist_suggestion = best.character_name
+        elif report.characters:
+            # Sin héroe claro: sugerir el de mayor importancia
+            protagonist_chars = [
+                c for c in report.characters if c.importance in ("principal", "protagonist")
+            ]
+            if protagonist_chars:
+                report.protagonist_suggestion = protagonist_chars[0].character_name
+
         return report
 
     def _analyze_character(
@@ -380,11 +411,20 @@ class CharacterArchetypeAnalyzer:
         relations: list[dict],
         interactions: list[dict],
         total_chapters: int,
+        char_profile: dict | None = None,
     ) -> CharacterArchetypeProfile:
         """Analizar arquetipos de un personaje individual."""
         cid = char.get("id") or char.get("entity_id", 0)
         name = char.get("name") or char.get("canonical_name", "Desconocido")
         importance = char.get("importance", "secondary")
+
+        # Si tenemos profiling, usar el role asignado para overridear importance
+        if char_profile:
+            role = char_profile.get("role", "")
+            if role == "protagonist":
+                importance = "principal"
+            elif role == "deuteragonist":
+                importance = "high"
 
         # Inicializar scores
         scores: dict[ArchetypeId, float] = dict.fromkeys(ArchetypeId, 0.0)
@@ -405,6 +445,10 @@ class CharacterArchetypeAnalyzer:
 
         # --- Señal 5: Presencia ---
         self._score_presence(char, total_chapters, scores, signals)
+
+        # --- Señal 6: Centralidad narrativa (profiling) ---
+        if char_profile:
+            self._score_narrative_centrality(char_profile, scores, signals)
 
         # Preservar raw_scores para calcular confianza basada en evidencia real
         raw_scores = dict(scores)
@@ -469,24 +513,40 @@ class CharacterArchetypeAnalyzer:
         scores: dict[ArchetypeId, float],
         signals: dict[ArchetypeId, list[str]],
     ) -> None:
-        """Puntuar según importancia del personaje."""
-        if importance == "protagonist":
-            # Distribuido: no asumir que protagonista = Héroe
+        """Puntuar según importancia del personaje.
+
+        Maneja tanto valores legacy (protagonist/secondary/minor) como
+        los actuales de EntityImportance (principal/high/medium/low/minimal).
+        """
+        # Normalizar: mapear EntityImportance values al tier arquetípico
+        importance_lower = importance.lower() if importance else ""
+        if importance_lower in ("protagonist", "principal"):
+            # Protagonista / importancia principal
             scores[ArchetypeId.HERO] += 10
             scores[ArchetypeId.EXPLORER] += 5
             scores[ArchetypeId.REBEL] += 5
             scores[ArchetypeId.LOVER] += 5
             scores[ArchetypeId.RULER] += 5
             signals[ArchetypeId.HERO].append("Protagonista del manuscrito")
-        elif importance == "secondary":
+        elif importance_lower in ("secondary", "high", "primary"):
+            # Co-protagonista / importancia alta
             scores[ArchetypeId.MENTOR] += 8
             scores[ArchetypeId.SHADOW] += 8
             scores[ArchetypeId.CAREGIVER] += 5
             scores[ArchetypeId.THRESHOLD_GUARDIAN] += 5
-        elif importance == "minor":
+        elif importance_lower in ("medium",):
+            # Importancia media — aún puede tener funciones narrativas
+            scores[ArchetypeId.MENTOR] += 5
+            scores[ArchetypeId.SHADOW] += 5
+            scores[ArchetypeId.CAREGIVER] += 3
+            scores[ArchetypeId.THRESHOLD_GUARDIAN] += 3
+        elif importance_lower in ("minor", "low"):
             scores[ArchetypeId.HERALD] += 8
             scores[ArchetypeId.TRICKSTER] += 5
             scores[ArchetypeId.JESTER] += 5
+        elif importance_lower in ("minimal", "mentioned"):
+            scores[ArchetypeId.HERALD] += 5
+            scores[ArchetypeId.THRESHOLD_GUARDIAN] += 3
 
     def _score_arc(
         self,
@@ -685,6 +745,56 @@ class CharacterArchetypeAnalyzer:
         if mentions >= 50:
             scores[ArchetypeId.HERO] += 8
 
+    def _score_narrative_centrality(
+        self,
+        char_profile: dict,
+        scores: dict[ArchetypeId, float],
+        signals: dict[ArchetypeId, list[str]],
+    ) -> None:
+        """Señal 6: Centralidad narrativa basada en CharacterProfiler.
+
+        Usa narrative_relevance (0-1), role y agency_score del sistema de
+        profiling de 6 indicadores para diferenciar arquetipos.
+        """
+        relevance = char_profile.get("narrative_relevance", 0)
+        role = char_profile.get("role", "")
+        agency = char_profile.get("agency_score", 0)
+
+        # Protagonista (>= 0.7 relevance) → fuerte señal heroica
+        if role == "protagonist" or relevance >= 0.7:
+            scores[ArchetypeId.HERO] += 20
+            scores[ArchetypeId.EXPLORER] += 8
+            signals[ArchetypeId.HERO].append(
+                f"Centralidad narrativa alta ({relevance:.0%})"
+            )
+        # Deuteragonista (>= 0.45) → funciones de soporte importantes
+        elif role == "deuteragonist" or relevance >= 0.45:
+            scores[ArchetypeId.MENTOR] += 10
+            scores[ArchetypeId.SHADOW] += 10
+            scores[ArchetypeId.CAREGIVER] += 5
+            signals[ArchetypeId.MENTOR].append(
+                f"Centralidad narrativa media ({relevance:.0%})"
+            )
+        # Supporting (>= 0.2) → funciones puntuales
+        elif role == "supporting" or relevance >= 0.2:
+            scores[ArchetypeId.HERALD] += 8
+            scores[ArchetypeId.THRESHOLD_GUARDIAN] += 8
+        # Minor/mentioned → presencia testimonial
+        elif relevance < 0.2:
+            scores[ArchetypeId.HERALD] += 5
+
+        # Agency score: personajes activos vs pasivos
+        if agency >= 0.7:
+            scores[ArchetypeId.HERO] += 8
+            scores[ArchetypeId.REBEL] += 5
+            scores[ArchetypeId.RULER] += 5
+            signals[ArchetypeId.HERO].append(
+                f"Alta agentividad ({agency:.0%})"
+            )
+        elif agency <= 0.3 and relevance >= 0.3:
+            scores[ArchetypeId.INNOCENT] += 8
+            scores[ArchetypeId.CAREGIVER] += 5
+
     # =========================================================================
     # Generación de resumen y notas de elenco
     # =========================================================================
@@ -743,6 +853,22 @@ class CharacterArchetypeAnalyzer:
                 "No se detectó un Mentor entre los personajes analizados. "
                 "No todas las estructuras narrativas requieren esta función."
             )
+
+        # Detectar arquetipos duplicados (el caso que motivó esta mejora)
+        archetype_chars: dict[ArchetypeId, list[str]] = {}
+        for ch in characters:
+            if ch.primary_archetype:
+                aid = ch.primary_archetype.archetype
+                archetype_chars.setdefault(aid, []).append(ch.character_name)
+        for aid, names in archetype_chars.items():
+            if len(names) >= 2:
+                info = ARCHETYPE_INFO[aid]
+                names_str = " y ".join(f"«{n}»" for n in names[:3])
+                notes.append(
+                    f"{names_str} comparten el arquetipo de **{info['name']}**. "
+                    "Los personajes pueden cumplir la misma función narrativa "
+                    "o tener rasgos diferenciadores no captados por el texto analizado."
+                )
 
         # Diversidad de arquetipos
         if len(characters) >= 5 and len(primary_types) <= 2:
