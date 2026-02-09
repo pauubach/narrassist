@@ -3347,6 +3347,49 @@ class UnifiedAnalysisPipeline:
                         if result.is_success:
                             context.alerts.append(result.value)
 
+            # Alertas de variantes de nombres de entidades
+            try:
+                from ..analysis.name_variant_detector import detect_name_variants
+                from ..entities.repository import get_entity_repository
+
+                entity_repo = get_entity_repository()
+                mentions_by_entity: dict[int, list] = {}
+                for entity in context.entities:
+                    eid = getattr(entity, "id", None)
+                    if eid is not None:
+                        mentions_by_entity[eid] = entity_repo.get_mentions_by_entity(eid)
+
+                dialogue_spans = [
+                    (d.get("start_char", 0), d.get("end_char", 0))
+                    for d in context.dialogues
+                    if d.get("start_char") is not None and d.get("end_char") is not None
+                ]
+
+                name_variants = detect_name_variants(
+                    entities=context.entities,
+                    mentions_by_entity=mentions_by_entity,
+                    dialogue_spans=dialogue_spans if dialogue_spans else None,
+                )
+
+                for nv in name_variants:
+                    result = engine.create_from_name_variant(
+                        project_id=context.project_id,
+                        entity_id=nv.entity_id,
+                        entity_name=nv.entity_name,
+                        canonical_form=nv.canonical_form,
+                        variant_form=nv.variant_form,
+                        canonical_count=nv.canonical_count,
+                        variant_count=nv.variant_count,
+                        variant_mentions=nv.variant_mentions,
+                        all_in_dialogue=nv.all_in_dialogue,
+                        confidence=nv.confidence,
+                    )
+                    if result.is_success:
+                        context.alerts.append(result.value)
+
+            except Exception as e:
+                logger.warning(f"Name variant detection failed: {e}")
+
             context.stats["alerts_created"] = len(context.alerts)
 
         except Exception as e:

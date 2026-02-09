@@ -160,6 +160,14 @@ class Alert:
             ed = self.extra_data
             parts.append(ed.get("text", ""))
             parts.append(ed.get("error_type", ""))
+        elif self.alert_type == "entity_name_variant":
+            ed = self.extra_data
+            parts.extend(
+                [
+                    ed.get("canonical_form", ""),
+                    ed.get("variant_form", ""),
+                ]
+            )
         elif self.alert_type == "deceased_reappearance":
             ed = self.extra_data
             parts.extend(

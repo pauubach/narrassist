@@ -1558,6 +1558,94 @@ class AlertEngine:
             },
         )
 
+    def create_from_name_variant(
+        self,
+        project_id: int,
+        entity_id: int,
+        entity_name: str,
+        canonical_form: str,
+        variant_form: str,
+        canonical_count: int,
+        variant_count: int,
+        variant_mentions: list[dict],
+        all_in_dialogue: bool = False,
+        confidence: float = 0.85,
+    ) -> Result[Alert]:
+        """
+        Crea alerta por variante ortográfica en nombre de entidad.
+
+        Detecta cuando un personaje aparece con diferentes acentuaciones
+        (ej: "María" 150 veces vs "Maria" 2 veces).
+        """
+        if all_in_dialogue:
+            severity = AlertSeverity.HINT
+        elif confidence >= 0.9:
+            severity = AlertSeverity.WARNING
+        else:
+            severity = AlertSeverity.INFO
+
+        title = f"Variante de nombre: '{variant_form}'"
+        vez = "vez" if variant_count == 1 else "veces"
+        description = (
+            f"'{entity_name}' aparece como '{variant_form}' "
+            f"{variant_count} {vez} "
+            f"(forma habitual: '{canonical_form}', {canonical_count} menciones)"
+        )
+
+        chapters_affected = sorted(set(
+            m["chapter_id"] for m in variant_mentions
+            if m.get("chapter_id") is not None
+        ))
+        ch_list = ", ".join(str(c) for c in chapters_affected[:5])
+        if len(chapters_affected) > 5:
+            ch_list += f" (+{len(chapters_affected) - 5} más)"
+
+        ch_word = "capítulo" if len(chapters_affected) == 1 else "capítulos"
+        explanation = (
+            f"La entidad '{entity_name}' se menciona habitualmente como "
+            f"'{canonical_form}' ({canonical_count} veces). "
+            f"Sin embargo, aparece como '{variant_form}' en {ch_word} {ch_list}. "
+        )
+        if all_in_dialogue:
+            explanation += (
+                "Todas las apariciones de la variante están dentro de diálogos, "
+                "lo cual podría ser intencional (registro informal)."
+            )
+        else:
+            explanation += "Esto podría ser un error tipográfico (tilde omitida)."
+
+        first = variant_mentions[0] if variant_mentions else {}
+
+        return self.create_alert(
+            project_id=project_id,
+            category=AlertCategory.ENTITY,
+            severity=severity,
+            alert_type="entity_name_variant",
+            title=title,
+            description=description,
+            explanation=explanation,
+            suggestion=f"Revisar si '{variant_form}' debería ser '{canonical_form}'",
+            chapter=first.get("chapter_id"),
+            start_char=first.get("start_char"),
+            end_char=first.get("end_char"),
+            excerpt=(
+                first.get("context_before", "") +
+                variant_form +
+                first.get("context_after", "")
+            ),
+            entity_ids=[entity_id],
+            confidence=confidence,
+            source_module="name_variant_detector",
+            extra_data={
+                "canonical_form": canonical_form,
+                "variant_form": variant_form,
+                "canonical_count": canonical_count,
+                "variant_count": variant_count,
+                "chapters_affected": chapters_affected,
+                "all_in_dialogue": all_in_dialogue,
+            },
+        )
+
     def create_alerts_from_dialogue_report(
         self,
         project_id: int,
