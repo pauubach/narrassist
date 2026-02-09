@@ -1,6 +1,6 @@
 {
   "name": "narrative-assistant-ui",
-  "version": "0.7.13",
+  "version": "0.7.14",
   "type": "module",
   "description": "Interfaz de usuario para Narrative Assistant - Herramienta de corrección narrativa",
   "author": "Pau Ubach",
