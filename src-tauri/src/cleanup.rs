@@ -8,7 +8,7 @@
 
 use serde::Serialize;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Categoría de datos almacenada en disco
 #[derive(Serialize, Clone)]
@@ -32,7 +32,7 @@ pub struct DataCategory {
 }
 
 /// Calcula el tamaño total de un directorio recursivamente
-fn dir_size(path: &PathBuf) -> u64 {
+fn dir_size(path: &Path) -> u64 {
     if !path.exists() {
         return 0;
     }
