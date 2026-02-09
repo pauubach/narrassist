@@ -82,6 +82,18 @@ export const useProjectsStore = defineStore('projects', () => {
     }
   }
 
+  /** Actualiza solo progreso y estado de análisis sin recargar toda la lista */
+  function updateProjectProgress(projectId: number, progress: number, status: string) {
+    const idx = projects.value.findIndex(p => p.id === projectId)
+    if (idx !== -1) {
+      projects.value[idx] = {
+        ...projects.value[idx],
+        analysisProgress: progress,
+        analysisStatus: status as Project['analysisStatus'],
+      }
+    }
+  }
+
   function clearError() {
     error.value = null
   }
@@ -101,6 +113,7 @@ export const useProjectsStore = defineStore('projects', () => {
     fetchProjects,
     fetchProject,
     createProject,
+    updateProjectProgress,
     clearError,
     clearCurrentProject
   }

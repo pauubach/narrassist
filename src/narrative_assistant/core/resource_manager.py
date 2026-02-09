@@ -9,6 +9,7 @@ Detecta capacidades de la máquina y optimiza el uso de recursos:
 - Control de tareas pesadas concurrentes
 """
 
+import gc
 import logging
 import os
 import platform
@@ -295,33 +296,29 @@ class ResourceManager:
             return 4096  # 4GB conservador
 
     def _detect_gpu(self, caps: SystemCapabilities) -> None:
-        """Detecta GPU y VRAM."""
+        """Detecta GPU y VRAM usando el DeviceDetector centralizado."""
         try:
-            import torch
+            from .device import DeviceType, get_device_detector
 
-            if torch.cuda.is_available():
+            detector = get_device_detector()
+            device_info = detector.detect_best_device()
+
+            if device_info.device_type == DeviceType.CUDA:
                 caps.gpu_available = True
-                device = torch.cuda.current_device()
-                caps.gpu_name = torch.cuda.get_device_name(device)
-                props = torch.cuda.get_device_properties(device)
-                caps.gpu_vram_total_mb = props.total_memory // (1024 * 1024)
+                caps.gpu_name = device_info.device_name
+                if device_info.memory_gb:
+                    caps.gpu_vram_total_mb = int(device_info.memory_gb * 1024)
+                    # Estimar VRAM disponible (80% de total como aproximación)
+                    caps.gpu_vram_available_mb = int(caps.gpu_vram_total_mb * 0.8)
+                caps.gpu_is_low_vram = device_info.is_low_vram
 
-                # VRAM disponible
-                free_mem = torch.cuda.mem_get_info()[0]
-                caps.gpu_vram_available_mb = free_mem // (1024 * 1024)
-
-                caps.gpu_is_low_vram = caps.gpu_vram_total_mb < 6144  # <6GB
-
-            elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-                # Apple Silicon
+            elif device_info.device_type == DeviceType.MPS:
                 caps.gpu_available = True
                 caps.gpu_name = "Apple Silicon (MPS)"
                 caps.gpu_vram_total_mb = 8192  # Asumido, MPS usa RAM unificada
                 caps.gpu_vram_available_mb = caps.ram_available_mb // 2
                 caps.gpu_is_low_vram = False  # MPS maneja memoria dinámicamente
 
-        except ImportError:
-            pass
         except Exception as e:
             logger.warning(f"Error detectando GPU: {e}")
 
@@ -430,6 +427,161 @@ class ResourceManager:
             return cpu > 80 or mem.percent > 85
         except Exception:
             return False
+
+    def check_memory_pressure(self) -> str:
+        """
+        Verifica presión de memoria con umbrales según tier.
+
+        Returns:
+            "ok" — sin presión
+            "warning" — presión moderada (reducir batch sizes)
+            "critical" — presión alta (ejecutar GC, pausar tareas)
+            "danger" — riesgo de crash (abortar operación)
+        """
+        if not PSUTIL_AVAILABLE:
+            return "ok"
+
+        try:
+            mem = psutil.virtual_memory()
+            ram_percent = mem.percent
+            ram_avail_mb = mem.available // (1024 * 1024)
+        except Exception:
+            return "ok"
+
+        tier = self.capabilities.tier
+
+        # Umbrales más restrictivos en hardware limitado
+        if tier == ResourceTier.LOW:
+            # LOW: equipo con poca RAM — ser más agresivo
+            if ram_percent > 92 or ram_avail_mb < 512:
+                return "danger"
+            if ram_percent > 85 or ram_avail_mb < 1024:
+                return "critical"
+            if ram_percent > 75 or ram_avail_mb < 2048:
+                return "warning"
+        elif tier == ResourceTier.MEDIUM:
+            if ram_percent > 95 or ram_avail_mb < 512:
+                return "danger"
+            if ram_percent > 90 or ram_avail_mb < 1024:
+                return "critical"
+            if ram_percent > 82 or ram_avail_mb < 2048:
+                return "warning"
+        else:  # HIGH
+            if ram_percent > 95 or ram_avail_mb < 1024:
+                return "danger"
+            if ram_percent > 92 or ram_avail_mb < 2048:
+                return "critical"
+            if ram_percent > 85 or ram_avail_mb < 4096:
+                return "warning"
+
+        return "ok"
+
+    def relieve_memory_pressure(self, aggressive: bool = False) -> float:
+        """
+        Intenta liberar memoria del proceso actual.
+
+        Args:
+            aggressive: Si True, fuerza recolección completa + limpieza GPU.
+
+        Returns:
+            MB liberados (estimado).
+        """
+        from .memory_monitor import get_process_memory_mb
+
+        mem_before = get_process_memory_mb()
+
+        # 1. Garbage collection — siempre
+        gc.collect()
+
+        if aggressive:
+            # 2. Forzar generación completa
+            gc.collect(2)
+
+            # 3. Limpiar cache GPU si disponible
+            try:
+                from .device import clear_gpu_memory
+
+                clear_gpu_memory()
+            except Exception:
+                pass
+
+            # 4. Limpiar caches de Python
+            try:
+                import linecache
+
+                linecache.clearcache()
+            except Exception:
+                pass
+
+        mem_after = get_process_memory_mb()
+        freed = max(0, mem_before - mem_after)
+
+        if freed > 0:
+            logger.info(f"Memoria liberada: {freed:.1f} MB (aggressive={aggressive})")
+
+        return freed
+
+    def guard_heavy_task(
+        self,
+        task_name: str,
+        func: Callable[..., Any],
+        *args,
+        timeout: float | None = None,
+        **kwargs,
+    ) -> Any:
+        """
+        Ejecuta una tarea pesada CON protección activa de memoria.
+
+        A diferencia de run_heavy_task, este método:
+        - Verifica presión de memoria ANTES de ejecutar
+        - Ejecuta GC si hay presión moderada
+        - Rechaza la tarea si hay presión crítica
+        - Ejecuta GC DESPUÉS de completar
+
+        Args:
+            task_name: Nombre de la tarea
+            func: Función a ejecutar
+            *args: Argumentos posicionales
+            timeout: Tiempo máximo de espera
+            **kwargs: Argumentos nombrados
+
+        Returns:
+            Resultado de la función
+
+        Raises:
+            MemoryError: Si el sistema no tiene memoria suficiente
+            TimeoutError: Si no se pueden adquirir recursos
+        """
+        # Pre-check: verificar presión de memoria
+        pressure = self.check_memory_pressure()
+
+        if pressure == "danger":
+            # Intento de emergencia: GC agresivo
+            self.relieve_memory_pressure(aggressive=True)
+            pressure = self.check_memory_pressure()
+            if pressure == "danger":
+                raise MemoryError(
+                    f"Memoria insuficiente para '{task_name}'. "
+                    f"RAM disponible: {self.capabilities.ram_available_mb}MB. "
+                    f"Cierre otras aplicaciones o reduzca el tamaño del documento."
+                )
+
+        if pressure == "critical":
+            logger.warning(
+                f"Presión de memoria alta antes de '{task_name}' — ejecutando GC"
+            )
+            self.relieve_memory_pressure(aggressive=True)
+
+        elif pressure == "warning":
+            logger.info(f"Presión de memoria moderada antes de '{task_name}' — GC ligero")
+            self.relieve_memory_pressure(aggressive=False)
+
+        # Ejecutar con semáforo
+        try:
+            return self.run_heavy_task(task_name, func, *args, timeout=timeout, **kwargs)
+        finally:
+            # Post-task: limpiar memoria
+            self.relieve_memory_pressure(aggressive=(pressure != "ok"))
 
     def get_available_workers(self) -> int:
         """

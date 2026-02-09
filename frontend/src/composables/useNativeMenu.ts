@@ -47,6 +47,7 @@ interface MenuEventHandlers {
   onKeyboardShortcuts?: () => void
   onAbout?: () => void
   onUserGuide?: () => void
+  onManageData?: () => void
 }
 
 export function useNativeMenu(handlers: MenuEventHandlers = {}) {
@@ -168,6 +169,10 @@ export function useNativeMenu(handlers: MenuEventHandlers = {}) {
 
       case 'user_guide':
         invoke('user_guide', handlers.onUserGuide)
+        break
+
+      case 'manage_data':
+        invoke('manage_data', handlers.onManageData)
         break
 
       case 'check_updates':

@@ -693,13 +693,13 @@ async def get_correction_presets() -> ApiResponse:
         # También incluir opciones de configuración
         options = {
             "document_fields": [
-                {"value": f.value, "label": _field_label(f)} for f in DocumentField
+                {"value": f.value, "label": _field_label(f.value)} for f in DocumentField
             ],
             "register_levels": [
-                {"value": r.value, "label": _register_label(r)} for r in RegisterLevel
+                {"value": r.value, "label": _register_label(r.value)} for r in RegisterLevel
             ],
             "audience_types": [
-                {"value": a.value, "label": _audience_label(a)} for a in AudienceType
+                {"value": a.value, "label": _audience_label(a.value)} for a in AudienceType
             ],
             "regions": [
                 {"value": "es_ES", "label": "España"},

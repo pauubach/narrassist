@@ -61,6 +61,7 @@ export interface SystemCapabilities {
     has_gpu: boolean
     has_high_vram: boolean
     has_cupy: boolean
+    gpu_blocked: { name: string; compute_capability: number; min_required: number } | null
     cpu: { name: string }
   }
   ollama: {

@@ -267,9 +267,9 @@ async function loadEntityAttributes(entityId: number) {
 async function loadEntityRichData(entityId: number) {
   loadingRichData.value = true
   try {
-    const data = await api.getRaw<any>(`/api/projects/${props.projectId}/story-bible?entity_id=${entityId}`)
-    if (data.success && data.data?.entries?.length > 0) {
-      const entry = data.data.entries[0]
+    const data = await api.getRaw<any>(`/api/projects/${props.projectId}/story-bible/${entityId}`)
+    if (data.success && data.data) {
+      const entry = data.data
       entityRelationships.value = entry.relationships || []
       entityVitalStatus.value = entry.vital_status || null
     } else {

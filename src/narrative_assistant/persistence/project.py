@@ -47,7 +47,7 @@ class Project:
     created_at: datetime | None = None
     updated_at: datetime | None = None
     last_opened_at: datetime | None = None
-    analysis_status: str = "pending"  # pending, analyzing, completed, error
+    analysis_status: str = "pending"  # pending, queued, analyzing, completed, error
     analysis_progress: float = 0.0
     settings: dict[str, Any] = field(default_factory=dict)
     document_type: str = "FIC"  # Tipo de documento (FIC, MEM, etc.)

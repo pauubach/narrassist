@@ -291,13 +291,10 @@ class LocalLLMClient:
             if model_path and model_path.exists():
                 logger.info(f"Cargando modelo local desde: {model_path}")
 
-                # Detectar dispositivo
-                if torch.cuda.is_available():
-                    device = "cuda"
-                elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-                    device = "mps"
-                else:
-                    device = "cpu"
+                # Detectar dispositivo via DeviceDetector centralizado
+                from narrative_assistant.core.device import get_torch_device_string
+
+                device = get_torch_device_string()
 
                 self._transformers_pipeline = pipeline(
                     "text-generation",

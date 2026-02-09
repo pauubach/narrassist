@@ -242,6 +242,7 @@ class LLMExtractor(BaseExtractor):
             AttributeType.AGE,
             AttributeType.SKIN,
             AttributeType.DISTINCTIVE_FEATURE,
+            AttributeType.FACIAL_HAIR,
         }
 
     def _get_client(self):

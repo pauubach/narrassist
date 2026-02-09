@@ -8,11 +8,17 @@ Soporta:
 
 Incluye gestión defensiva de memoria GPU para evitar crashes en sistemas
 con VRAM limitada (< 6GB).
+
+IMPORTANTE: Este módulo bloquea GPUs inseguras (CC < 6.0) a nivel de
+entorno (CUDA_VISIBLE_DEVICES) ANTES de que PyTorch pueda inicializar
+CUDA. Esto previene BSOD en GPUs pre-Pascal (Maxwell, Kepler).
 """
 
 import gc
 import logging
+import os
 import platform
+import subprocess
 import threading
 from dataclasses import dataclass
 from enum import Enum, auto
@@ -21,6 +27,89 @@ logger = logging.getLogger(__name__)
 
 # Umbral de VRAM para considerar GPU "segura" para uso intensivo
 MIN_SAFE_VRAM_GB = 6.0
+
+# Compute Capability mínima para usar CUDA sin riesgo de BSOD/crash
+# GPUs con CC < 6.0 (pre-Pascal) tienen drivers inestables con PyTorch moderno
+MIN_SAFE_COMPUTE_CAPABILITY = 6.0
+
+
+# Info sobre GPU bloqueada (si aplica) — se llena en _block_unsafe_gpu()
+_blocked_gpu_info: dict | None = None
+
+
+def get_blocked_gpu_info() -> dict | None:
+    """Retorna info de la GPU bloqueada, o None si no se bloqueó ninguna."""
+    return _blocked_gpu_info
+
+
+def _block_unsafe_gpu() -> None:
+    """
+    Bloquea GPUs inseguras ANTES de que PyTorch/CuPy las vean.
+
+    Usa nvidia-smi (no requiere PyTorch) para detectar la Compute Capability.
+    Si la GPU tiene CC < 6.0 (pre-Pascal: Maxwell, Kepler, Fermi), establece
+    CUDA_VISIBLE_DEVICES="" para que torch.cuda.is_available() retorne False
+    en TODOS los módulos, cerrando cualquier bypass.
+
+    Esto previene BSODs causados por drivers inestables en GPUs antiguas
+    con versiones modernas de PyTorch/CUDA.
+    """
+    global _blocked_gpu_info
+
+    # Si el usuario ya forzó CPU, no hacer nada
+    if os.environ.get("NA_DEVICE", "").lower() == "cpu":
+        return
+
+    # Si ya se deshabilitó CUDA externamente, no hacer nada
+    cuda_visible = os.environ.get("CUDA_VISIBLE_DEVICES")
+    if cuda_visible is not None and cuda_visible.strip() in ("", "-1"):
+        return
+
+    try:
+        # Obtener CC y nombre de la GPU
+        result = subprocess.run(
+            ["nvidia-smi", "--query-gpu=compute_cap,name", "--format=csv,noheader,nounits"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode != 0:
+            return  # nvidia-smi no disponible o falló
+
+        for line in result.stdout.strip().splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            parts = [p.strip() for p in line.split(",")]
+            try:
+                cc = float(parts[0])
+            except (ValueError, IndexError):
+                continue
+
+            gpu_name = parts[1] if len(parts) > 1 else "GPU NVIDIA"
+
+            if cc < MIN_SAFE_COMPUTE_CAPABILITY:
+                os.environ["CUDA_VISIBLE_DEVICES"] = ""
+                _blocked_gpu_info = {
+                    "name": gpu_name,
+                    "compute_capability": cc,
+                    "min_required": MIN_SAFE_COMPUTE_CAPABILITY,
+                }
+                # Usar print porque logger puede no estar configurado aún
+                print(
+                    f"[device] {gpu_name} (Compute Capability {cc}) detectada. "
+                    f"Mínimo requerido: {MIN_SAFE_COMPUTE_CAPABILITY}. "
+                    f"CUDA deshabilitado para prevenir BSOD. Usando CPU."
+                )
+                return
+    except FileNotFoundError:
+        pass  # nvidia-smi no instalado → no hay GPU NVIDIA
+    except Exception:
+        pass  # Cualquier error → no bloquear, dejar que el detector decida
+
+
+# CRÍTICO: Ejecutar ANTES de cualquier import de torch/cupy
+_block_unsafe_gpu()
 
 # Lock para thread-safety en singleton
 _detector_lock = threading.Lock()
@@ -79,7 +168,12 @@ class DeviceDetector:
         self._cupy_available: bool = False
 
     def detect_cuda(self) -> DeviceInfo | None:
-        """Detecta GPU NVIDIA con CUDA."""
+        """
+        Detecta GPU NVIDIA con CUDA.
+
+        Rechaza GPUs con Compute Capability < MIN_SAFE_COMPUTE_CAPABILITY
+        para evitar BSOD/crashes con drivers antiguos (pre-Pascal: Kepler, Maxwell).
+        """
         try:
             import torch
 
@@ -87,10 +181,26 @@ class DeviceDetector:
 
             if torch.cuda.is_available():
                 device_id = 0  # Usar primera GPU por defecto
-                device_name = torch.cuda.get_device_name(device_id)
-                memory_gb = torch.cuda.get_device_properties(device_id).total_memory / (1024**3)
+                props = torch.cuda.get_device_properties(device_id)
+                device_name = props.name
+                memory_gb = props.total_memory / (1024**3)
+                cc = float(f"{props.major}.{props.minor}")
 
-                logger.info(f"CUDA disponible: {device_name} ({memory_gb:.1f} GB)")
+                logger.info(
+                    f"CUDA detectada: {device_name} "
+                    f"(CC {cc}, {memory_gb:.1f} GB VRAM)"
+                )
+
+                # Rechazar GPUs con Compute Capability antigua
+                if cc < MIN_SAFE_COMPUTE_CAPABILITY:
+                    logger.warning(
+                        f"GPU {device_name} tiene Compute Capability {cc} "
+                        f"(mínimo requerido: {MIN_SAFE_COMPUTE_CAPABILITY}). "
+                        f"Usando CPU para evitar inestabilidad de driver. "
+                        f"Para forzar GPU: NA_DEVICE=cuda"
+                    )
+                    return None
+
                 return DeviceInfo(
                     device_type=DeviceType.CUDA,
                     device_name=device_name,

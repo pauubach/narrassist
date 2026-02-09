@@ -16,6 +16,7 @@ import json
 import logging
 import os
 import platform
+import re
 import shutil
 import subprocess
 import tempfile
@@ -746,6 +747,22 @@ class OllamaManager:
             progress_callback(progress)
         return False
 
+    def _should_force_cpu(self) -> bool:
+        """Detecta si la GPU fue bloqueada por seguridad (CC < 6.0 → BSOD risk)."""
+        try:
+            from narrative_assistant.core.device import get_blocked_gpu_info
+            blocked = get_blocked_gpu_info()
+            if blocked:
+                logger.info(
+                    f"GPU bloqueada detectada ({blocked.get('name', '?')}, "
+                    f"CC {blocked.get('compute_capability', '?')}). "
+                    f"Forzando Ollama en modo CPU."
+                )
+                return True
+        except Exception:
+            pass
+        return False
+
     def start_service(self, force_cpu: bool = False) -> tuple[bool, str]:
         """
         Inicia el servicio de Ollama.
@@ -756,11 +773,19 @@ class OllamaManager:
         Returns:
             Tupla (exito, mensaje)
         """
+        # Auto-detectar GPU bloqueada (prevención BSOD en Maxwell/Kepler)
+        if not force_cpu:
+            force_cpu = self._should_force_cpu()
+
         with self._lock:
             if not self.is_installed:
                 return False, "Ollama no esta instalado"
 
             if self.is_running:
+                # Si Ollama ya está corriendo pero necesitamos CPU mode,
+                # verificar si debemos reiniciar
+                if force_cpu:
+                    return self._restart_in_cpu_mode()
                 return True, "Ollama ya esta corriendo"
 
             self._status = OllamaStatus.STARTING
@@ -768,7 +793,7 @@ class OllamaManager:
             try:
                 env = os.environ.copy()
 
-                # Configurar modo CPU si se solicita
+                # Configurar modo CPU si se solicita o GPU bloqueada
                 if force_cpu or self._config.force_cpu:
                     env["CUDA_VISIBLE_DEVICES"] = "-1"
                     env["OLLAMA_GPU_OVERHEAD"] = "0"
@@ -821,12 +846,46 @@ class OllamaManager:
                 self._status = OllamaStatus.ERROR
                 return False, f"Error iniciando servicio: {e}"
 
+    def _restart_in_cpu_mode(self) -> tuple[bool, str]:
+        """Reinicia Ollama en modo CPU si está corriendo con GPU bloqueada."""
+        logger.warning("Ollama corriendo con GPU potencialmente insegura. Intentando reiniciar en modo CPU...")
+        try:
+            # Intentar detener Ollama via taskkill (Windows) o kill (Unix)
+            import subprocess as sp
+            if self._platform == InstallationPlatform.WINDOWS:
+                sp.run(["taskkill", "/IM", "ollama.exe", "/F"],
+                       capture_output=True, timeout=10)
+                # También matar ollama_llama_server si existe
+                sp.run(["taskkill", "/IM", "ollama_llama_server.exe", "/F"],
+                       capture_output=True, timeout=10)
+            else:
+                sp.run(["pkill", "-f", "ollama serve"],
+                       capture_output=True, timeout=10)
+
+            # Esperar a que se detenga
+            for _ in range(10):
+                if not self.is_running:
+                    break
+                time.sleep(1)
+        except Exception as e:
+            logger.warning(f"Error deteniendo Ollama: {e}")
+
+        if self.is_running:
+            logger.warning("No se pudo detener Ollama. Continuando con la instancia existente (riesgo BSOD).")
+            return True, "Ollama corriendo (no se pudo reiniciar en CPU)"
+
+        # Reiniciar con force_cpu
+        self._config.force_cpu = True
+        self._status = OllamaStatus.STOPPED
+        return self.start_service(force_cpu=True)
+
     def ensure_running(self, force_cpu: bool = False) -> tuple[bool, str]:
         """
         Asegura que Ollama este corriendo.
 
         Si no esta instalado, retorna False.
         Si esta instalado pero no corriendo, intenta iniciarlo.
+        Si GPU bloqueada, reinicia en modo CPU si es necesario.
 
         Args:
             force_cpu: Si True, fuerza modo CPU
@@ -837,7 +896,13 @@ class OllamaManager:
         if not self.is_installed:
             return False, "Ollama no esta instalado"
 
+        # Auto-detectar GPU bloqueada
+        if not force_cpu:
+            force_cpu = self._should_force_cpu()
+
         if self.is_running:
+            if force_cpu:
+                return self._restart_in_cpu_mode()
             return True, "Ollama esta corriendo"
 
         return self.start_service(force_cpu)
@@ -887,23 +952,34 @@ class OllamaManager:
                 **self._subprocess_kwargs(),
             )
 
-            for line in process.stdout:
-                line = line.strip()
-                logger.debug(f"ollama pull: {line}")
+            # Regex para extraer porcentaje de líneas con ANSI escapes
+            _ansi_re = re.compile(r"\x1b\[[^a-zA-Z]*[a-zA-Z]|\[[\d;?]*[a-zA-Z]")
+            last_error_line = ""
 
-                # Parsear progreso si es posible
-                if "%" in line:
+            for line in process.stdout:
+                # Limpiar ANSI escapes y caracteres de control
+                clean = _ansi_re.sub("", line).strip()
+                clean = "".join(c for c in clean if c.isprintable() or c in " \t")
+                clean = clean.strip()
+
+                if not clean:
+                    continue
+
+                logger.debug(f"ollama pull: {clean}")
+
+                # Capturar líneas de error para mensajes útiles
+                if clean.lower().startswith("error"):
+                    last_error_line = clean
+
+                # Parsear progreso: Ollama emite "pulling xxx:  45% ▕...▏ 1.2 GB/2.0 GB"
+                pct_match = re.search(r"(\d+)%", clean)
+                if pct_match:
                     try:
-                        # Formato tipico: "pulling... 45%"
-                        parts = line.split()
-                        for part in parts:
-                            if "%" in part:
-                                pct = float(part.replace("%", ""))
-                                progress.percentage = pct
-                                if progress_callback:
-                                    progress_callback(progress)
-                                break
-                    except Exception:
+                        pct = float(pct_match.group(1))
+                        progress.percentage = pct
+                        if progress_callback:
+                            progress_callback(progress)
+                    except ValueError:
                         pass
 
             process.wait()
@@ -918,11 +994,46 @@ class OllamaManager:
                 logger.info(f"Modelo {model_name} descargado correctamente")
                 return True, f"Modelo {model_name} descargado"
             else:
+                # Construir mensaje de error descriptivo
+                if last_error_line:
+                    error_msg = last_error_line
+                else:
+                    error_msg = f"ollama pull {model_name} falló (código {process.returncode})"
+
+                # Detectar causas comunes y dar mensajes accionables
+                error_lower = error_msg.lower()
+                if "id_ed25519" in error_lower or "no puede encontrar" in error_lower:
+                    error_msg = (
+                        "Ollama necesita reiniciarse. "
+                        "Cierra Ollama desde la bandeja del sistema y vuelve a abrirlo."
+                    )
+                elif "connection" in error_lower or "timeout" in error_lower:
+                    error_msg = (
+                        f"Error de conexión descargando {model_name}. "
+                        "Verifica tu conexión a internet."
+                    )
+                elif "no space" in error_lower or "disk" in error_lower:
+                    model_info = self.get_model_info(model_name)
+                    size = f" (~{model_info.size_gb} GB)" if model_info else ""
+                    error_msg = f"Espacio en disco insuficiente para {model_name}{size}."
+
+                logger.error(f"ollama pull falló: {error_msg}")
                 progress.status = "error"
-                progress.error = "Error en ollama pull"
+                progress.error = error_msg
                 if progress_callback:
                     progress_callback(progress)
-                return False, "Error descargando modelo"
+                return False, error_msg
+
+        except FileNotFoundError:
+            error_msg = (
+                "Comando 'ollama' no encontrado. "
+                "Instala Ollama desde ollama.com/download"
+            )
+            progress.status = "error"
+            progress.error = error_msg
+            if progress_callback:
+                progress_callback(progress)
+            return False, error_msg
 
         except Exception as e:
             progress.status = "error"

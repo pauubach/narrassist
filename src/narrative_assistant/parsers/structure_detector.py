@@ -261,6 +261,11 @@ class Chapter:
         if include_title:
             return chapter_text
 
+        # Capítulos fallback (sin encabezados detectados) no tienen línea de título
+        # que excluir — la primera línea es contenido real del documento
+        if self.detected_by == "fallback":
+            return chapter_text
+
         # Excluir la primera línea (título del capítulo) del contenido
         first_newline = chapter_text.find("\n")
         if first_newline == -1:

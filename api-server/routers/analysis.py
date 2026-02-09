@@ -15,6 +15,39 @@ from narrative_assistant.core.errors import ModelNotLoadedError
 
 router = APIRouter()
 
+
+def _start_queued_analysis(queued_entry: dict):
+    """
+    Inicia el análisis de un proyecto que estaba en cola.
+    Se ejecuta en un thread separado para no bloquear el thread que acaba de terminar.
+    """
+    import threading
+    import asyncio
+
+    project_id = queued_entry["project_id"]
+    logger.info(f"Auto-starting queued analysis for project {project_id}")
+
+    def _trigger():
+        try:
+            # Crear un event loop para llamar a la función async
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                loop.run_until_complete(start_analysis(project_id, file=None))
+            finally:
+                loop.close()
+        except Exception as e:
+            logger.error(f"Error auto-starting queued project {project_id}: {e}", exc_info=True)
+            # Limpiar estado de cola si falla
+            with deps._progress_lock:
+                if project_id in deps.analysis_progress_storage:
+                    deps.analysis_progress_storage[project_id]["status"] = "error"
+                    deps.analysis_progress_storage[project_id]["error"] = f"Error al iniciar: {e}"
+
+    thread = threading.Thread(target=_trigger, daemon=True)
+    thread.start()
+
+
 @router.post("/api/projects/{project_id}/reanalyze", response_model=ApiResponse)
 async def reanalyze_project(project_id: int):
     """
@@ -99,7 +132,7 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
 
         project = result.value
 
-        # Guard de concurrencia: no permitir doble análisis
+        # Guard de concurrencia: no permitir doble análisis del mismo proyecto
         if project.analysis_status == "analyzing":
             return ApiResponse(
                 success=False,
@@ -142,6 +175,9 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                 error="Se requiere un archivo o que el proyecto tenga document_path"
             )
 
+        # Two-tier concurrency: Phase 1 (parsing/classification/structure) runs immediately
+        # for all projects. Only heavy phases (NER+) are exclusive with queue.
+
         # Actualizar estado del proyecto a "analyzing" en la BD
         project.analysis_status = "analyzing"
         project.analysis_progress = 0.0
@@ -162,7 +198,7 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                     {"id": "classification", "name": "Clasificando tipo de documento", "completed": False, "current": False},
                     {"id": "structure", "name": "Identificando capítulos", "completed": False, "current": False},
                     {"id": "ner", "name": "Buscando personajes y lugares", "completed": False, "current": False},
-                    {"id": "fusion", "name": "Unificando personajes", "completed": False, "current": False},
+                    {"id": "fusion", "name": "Unificando entidades", "completed": False, "current": False},
                     {"id": "attributes", "name": "Analizando características", "completed": False, "current": False},
                     {"id": "consistency", "name": "Verificando coherencia", "completed": False, "current": False},
                     {"id": "grammar", "name": "Revisando gramática y ortografía", "completed": False, "current": False},
@@ -305,6 +341,9 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                 # Guardar timestamp de última actualización para cálculo dinámico
                 deps.analysis_progress_storage[project_id]["_last_progress_update"] = time.time()
 
+                # Persistir progreso en BD para que la pantalla principal lo muestre
+                persist_progress()
+
             def check_cancelled():
                 """Verifica si el análisis fue cancelado por el usuario."""
                 with deps._progress_lock:
@@ -312,10 +351,24 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                 if cancelled:
                     raise Exception("Análisis cancelado por el usuario")
 
+            def persist_progress():
+                """Persiste el progreso actual en la BD para que la pantalla principal lo muestre."""
+                try:
+                    pct = deps.analysis_progress_storage.get(project_id, {}).get("progress", 0)
+                    normalized = round(pct / 100.0, 2)  # 0.0 - 1.0
+                    with db_session.connection() as conn:
+                        conn.execute(
+                            "UPDATE projects SET analysis_progress = ? WHERE id = ?",
+                            (normalized, project_id),
+                        )
+                except Exception as e:
+                    logger.debug(f"Could not persist progress: {e}")
+
             # Obtener sesión de BD para este thread
             from narrative_assistant.persistence.database import get_database
             db_session = deps.get_database()
 
+            queued_for_heavy = False  # Flag: si True, proyecto encolado para fase pesada
             try:
                 # ========== SNAPSHOT PRE-REANÁLISIS (BK-05) ==========
                 # Capturar estado actual antes de borrar (comparación antes/después)
@@ -404,6 +457,7 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                 phases[0]["current"] = False
                 phases[0]["duration"] = round(phase_durations["parsing"], 1)
                 update_time_remaining()
+                persist_progress()
 
                 # Actualizar word_count del proyecto inmediatamente para que el frontend lo muestre
                 try:
@@ -552,6 +606,35 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
 
                 logger.info(f"Structure detection complete: {chapters_count} chapters")
                 check_cancelled()  # Verificar cancelación
+
+                # ========== TIER 2 GATE: Claim heavy analysis slot ==========
+                # Phases 1-3 (lightweight) ran in parallel. Now we need the
+                # exclusive heavy slot for NER, coreference, attributes, etc.
+                with deps._progress_lock:
+                    if deps._heavy_analysis_project_id is not None:
+                        # Heavy slot busy — queue this project for later
+                        deps._heavy_analysis_queue.append({
+                            "project_id": project_id,
+                            "file_path": str(tmp_path),
+                            "use_temp_file": use_temp_file,
+                        })
+                        deps.analysis_progress_storage[project_id]["status"] = "queued_for_heavy"
+                        deps.analysis_progress_storage[project_id]["current_phase"] = "Estructura lista — en cola para análisis profundo"
+                        deps.analysis_progress_storage[project_id]["current_action"] = ""
+                        queued_for_heavy = True
+                    else:
+                        deps._heavy_analysis_project_id = project_id
+
+                if queued_for_heavy:
+                    logger.info(
+                        f"Project {project_id}: lightweight phases done, "
+                        f"queued for heavy (slot busy: #{deps._heavy_analysis_project_id})"
+                    )
+                    # Update project status to queued (but structure is ready)
+                    project.analysis_status = "queued"
+                    proj_manager = ProjectManager(db_session)
+                    proj_manager.update(project)
+                    return  # Exit — will be resumed when heavy slot frees
 
                 # ========== FASE 4: NER ==========
                 current_phase_key = "ner"
@@ -890,7 +973,7 @@ JSON:"""
                 fusion_pct_start, fusion_pct_end = get_phase_progress_range("fusion")
                 phases[4]["current"] = True  # Marcar fase fusion como activa en UI
                 deps.analysis_progress_storage[project_id]["progress"] = fusion_pct_start
-                deps.analysis_progress_storage[project_id]["current_phase"] = "Unificando personajes mencionados de diferentes formas..."
+                deps.analysis_progress_storage[project_id]["current_phase"] = "Unificando entidades mencionadas de diferentes formas..."
                 deps.analysis_progress_storage[project_id]["current_action"] = "Preparando unificación..."
 
                 try:
@@ -1823,8 +1906,24 @@ JSON:"""
                     from narrative_assistant.corrections import CorrectionConfig
                     from narrative_assistant.corrections.orchestrator import CorrectionOrchestrator
 
-                    # Usar configuración por defecto (configurable en futuro)
+                    # Cargar configuración de corrección del proyecto
                     correction_config = CorrectionConfig.default()
+                    try:
+                        project_settings = project.settings or {}
+                        cc = project_settings.get("correction_config", {})
+                        dialog_cfg = cc.get("dialog", {})
+                        dash_val = dialog_cfg.get("spoken_dialogue_dash", "")
+                        # Mapear modelo nuevo (em_dash/en_dash/hyphen) → antiguo (em/en/hyphen)
+                        dash_map = {"em_dash": "em", "en_dash": "en", "hyphen": "hyphen"}
+                        if dash_val in dash_map:
+                            correction_config.typography.dialogue_dash = dash_map[dash_val]
+                        quote_val = dialog_cfg.get("nested_dialogue_quote", "")
+                        quote_map = {"angular": "angular", "double": "curly", "single": "straight"}
+                        if quote_val in quote_map:
+                            correction_config.typography.quote_style = quote_map[quote_val]
+                    except Exception as cfg_err:
+                        logger.debug(f"Could not load project correction config: {cfg_err}")
+
                     orchestrator = CorrectionOrchestrator(config=correction_config)
 
                     # Analizar el texto completo
@@ -2064,20 +2163,44 @@ JSON:"""
                     logger.error(f"Failed to update project status to error: {db_error}")
 
             finally:
-                # Limpiar archivo temporal solo si fue creado temporalmente
-                if use_temp_file and tmp_path.exists():
-                    try:
-                        tmp_path.unlink()
-                    except Exception:
-                        pass
+                if queued_for_heavy:
+                    # Project was queued for heavy phases — DON'T clean up:
+                    # - Temp file will be re-used when dequeued
+                    # - We don't hold the heavy slot
+                    # - Progress is preserved as "queued_for_heavy"
+                    pass
+                else:
+                    # Limpiar archivo temporal solo si fue creado temporalmente
+                    if use_temp_file and tmp_path.exists():
+                        try:
+                            tmp_path.unlink()
+                        except Exception:
+                            pass
 
-                # Limpiar progreso después de un delay para que el frontend lea el estado final
-                def _cleanup_progress(pid: int):
-                    deps.analysis_progress_storage.pop(pid, None)
+                    # Liberar el slot de análisis pesado y comprobar cola
+                    next_heavy = None
+                    with deps._progress_lock:
+                        if deps._heavy_analysis_project_id == project_id:
+                            deps._heavy_analysis_project_id = None
+                        # Extraer siguiente proyecto de la cola pesada
+                        if deps._heavy_analysis_queue:
+                            next_heavy = deps._heavy_analysis_queue.pop(0)
 
-                cleanup_timer = threading.Timer(300, _cleanup_progress, args=[project_id])
-                cleanup_timer.daemon = True
-                cleanup_timer.start()
+                    # Limpiar progreso después de un delay para que el frontend lea el estado final
+                    def _cleanup_progress(pid: int):
+                        with deps._progress_lock:
+                            # No limpiar si el proyecto se re-encoló o está corriendo
+                            stored = deps.analysis_progress_storage.get(pid)
+                            if stored and stored.get("status") in ("completed", "error", "failed", "cancelled"):
+                                deps.analysis_progress_storage.pop(pid, None)
+
+                    cleanup_timer = threading.Timer(300, _cleanup_progress, args=[project_id])
+                    cleanup_timer.daemon = True
+                    cleanup_timer.start()
+
+                    # Auto-iniciar siguiente proyecto de la cola pesada
+                    if next_heavy:
+                        _start_queued_analysis(next_heavy)
 
         def _persist_chapters_to_db(chapters_data: list, proj_id: int, db):
             """Persiste los capítulos y secciones en la base de datos."""
@@ -2276,6 +2399,58 @@ async def cancel_analysis(project_id: int):
     """
     try:
         with deps._progress_lock:
+            # Check if project is in the heavy analysis queue
+            heavy_idx = next(
+                (i for i, q in enumerate(deps._heavy_analysis_queue) if q["project_id"] == project_id),
+                None
+            )
+            if heavy_idx is not None:
+                deps._heavy_analysis_queue.pop(heavy_idx)
+                deps.analysis_progress_storage.pop(project_id, None)
+                logger.info(f"Heavy-queued analysis removed for project {project_id}")
+                try:
+                    result = deps.project_manager.get(project_id)
+                    if result.is_success:
+                        project = result.value
+                        project.analysis_status = "pending"
+                        deps.project_manager.update(project)
+                except Exception:
+                    pass
+                return ApiResponse(
+                    success=True,
+                    data={
+                        "project_id": project_id,
+                        "status": "cancelled",
+                        "message": "Análisis en cola cancelado"
+                    }
+                )
+
+            # Also check legacy queue (backward compatibility)
+            queue_idx = next(
+                (i for i, q in enumerate(deps._analysis_queue) if q["project_id"] == project_id),
+                None
+            )
+            if queue_idx is not None:
+                deps._analysis_queue.pop(queue_idx)
+                deps.analysis_progress_storage.pop(project_id, None)
+                logger.info(f"Queued analysis removed for project {project_id}")
+                try:
+                    result = deps.project_manager.get(project_id)
+                    if result.is_success:
+                        project = result.value
+                        project.analysis_status = "pending"
+                        deps.project_manager.update(project)
+                except Exception:
+                    pass
+                return ApiResponse(
+                    success=True,
+                    data={
+                        "project_id": project_id,
+                        "status": "cancelled",
+                        "message": "Análisis en cola cancelado"
+                    }
+                )
+
             if project_id not in deps.analysis_progress_storage:
                 return ApiResponse(
                     success=False,

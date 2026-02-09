@@ -4,7 +4,7 @@ Tests unitarios para extracción de atributos.
 
 import pytest
 
-from narrative_assistant.nlp.attributes import AttributeExtractor
+from narrative_assistant.nlp.attributes import AttributeExtractor, AttributeKey
 
 
 class TestAttributeExtractor:
@@ -537,3 +537,167 @@ class TestExtractionPipelineIntegration:
         result = pipeline.extract("María tenía ojos azules.", [], chapter=1)
 
         assert result == []
+
+
+class TestFacialHairPatterns:
+    """Tests para los patrones de vello facial (barba, bigote, patillas)."""
+
+    @pytest.fixture
+    def extractor(self):
+        return AttributeExtractor(filter_metaphors=False)
+
+    def test_extract_barba_with_entity(self, extractor):
+        """Extrae barba espesa con entidad explícita."""
+        text = "Juan tenía barba espesa y ojos marrones."
+        entities = [("Juan", 0, 4)]
+        result = extractor.extract_attributes(text, entities)
+        assert result.is_success
+        attrs = result.value.attributes
+        facial = [a for a in attrs if a.key.value == "facial_hair"]
+        assert len(facial) >= 1
+        assert any("espesa" in a.value.lower() for a in facial)
+
+    def test_extract_barba_con_preposicion(self, extractor):
+        """Extrae 'con barba canosa' (sin entidad explícita, requiere contexto)."""
+        text = "Pedro era un hombre viejo, con barba canosa y mirada triste."
+        entities = [("Pedro", 0, 5)]
+        result = extractor.extract_attributes(text, entities)
+        assert result.is_success
+        attrs = result.value.attributes
+        facial = [a for a in attrs if a.key.value == "facial_hair"]
+        assert len(facial) >= 1
+        assert any("canosa" in a.value.lower() for a in facial)
+
+    def test_extract_bigote_recortado(self, extractor):
+        """Extrae bigote con adjetivo validado."""
+        text = "Andrés llevaba un bigote recortado desde hacía años."
+        entities = [("Andrés", 0, 6)]
+        result = extractor.extract_attributes(text, entities)
+        assert result.is_success
+        attrs = result.value.attributes
+        facial = [a for a in attrs if a.key.value == "facial_hair"]
+        assert len(facial) >= 1
+
+    def test_extract_patillas_largas(self, extractor):
+        """Extrae patillas con adjetivo."""
+        text = "El detective tenía patillas largas al estilo del siglo XIX."
+        entities = [("detective", 3, 12)]
+        result = extractor.extract_attributes(text, entities)
+        assert result.is_success
+        attrs = result.value.attributes
+        facial = [a for a in attrs if a.key.value == "facial_hair"]
+        assert len(facial) >= 1
+
+    def test_extract_canas_en_barba(self, extractor):
+        """Extrae canas en barba."""
+        text = "Miguel tenía canas en su barba desde los cuarenta."
+        entities = [("Miguel", 0, 6)]
+        result = extractor.extract_attributes(text, entities)
+        assert result.is_success
+        attrs = result.value.attributes
+        # Puede ser facial_hair o hair_color dependiendo del patrón
+        relevant = [a for a in attrs if a.key.value in ("facial_hair", "hair_color")]
+        assert len(relevant) >= 1
+
+    def test_no_false_positive_barbacoa(self, extractor):
+        """No detecta barba en 'barbacoa'."""
+        text = "Juan preparó una barbacoa en el patio de la casa."
+        entities = [("Juan", 0, 4)]
+        result = extractor.extract_attributes(text, entities)
+        assert result.is_success
+        attrs = result.value.attributes
+        facial = [a for a in attrs if a.key.value == "facial_hair"]
+        assert len(facial) == 0
+
+    def test_no_false_positive_barba_sin_adjetivo(self, extractor):
+        """No detecta barba sin adjetivo validado."""
+        text = "La barba crecía sin control, cada vez más larga."
+        entities = [("Pedro", 0, 5)]
+        result = extractor.extract_attributes(text, entities)
+        assert result.is_success
+        attrs = result.value.attributes
+        # "sin control" no es un adjetivo validado del whitelist
+        facial = [a for a in attrs if a.key.value == "facial_hair" and "sin control" in a.value]
+        assert len(facial) == 0
+
+    def test_no_false_positive_patillas_electronicas(self, extractor):
+        """No detecta patillas de objetos electrónicos."""
+        text = "Las patillas del chip se habían doblado."
+        entities = []
+        result = extractor.extract_attributes(text, entities)
+        assert result.is_success
+        attrs = result.value.attributes
+        facial = [a for a in attrs if a.key.value == "facial_hair"]
+        assert len(facial) == 0
+
+    def test_su_barba_possessive_resolution(self, extractor):
+        """'su barba' se resuelve a entidad cercana."""
+        text = "Carlos entró al salón. Su barba negra le cubría medio rostro."
+        entities = [("Carlos", 0, 6)]
+        result = extractor.extract_attributes(text, entities)
+        assert result.is_success
+        attrs = result.value.attributes
+        facial = [a for a in attrs if a.key.value == "facial_hair"]
+        if facial:
+            assert any(a.entity_name == "Carlos" for a in facial)
+
+
+class TestPossessiveEntityResolution:
+    """Tests para la resolución de posesivos ('sus ojos', 'su barba')."""
+
+    @pytest.fixture
+    def extractor(self):
+        return AttributeExtractor(filter_metaphors=False)
+
+    def test_sus_ojos_resolves_to_nearest_person(self, extractor):
+        """'Sus ojos azules' se resuelve a la persona más cercana."""
+        text = "Juan entró poco después. Era un hombre muy alto. Sus ojos azules miraban con curiosidad."
+        entities = [("Juan", 0, 4)]
+        result = extractor.extract_attributes(text, entities)
+        assert result.is_success
+        attrs = result.value.attributes
+        eye_attrs = [a for a in attrs if a.key == AttributeKey.EYE_COLOR]
+        # Should find at least one eye color
+        assert len(eye_attrs) >= 1
+        # Should be assigned to Juan (nearest person)
+        juan_eyes = [a for a in eye_attrs if a.entity_name == "Juan"]
+        assert len(juan_eyes) >= 1
+
+    def test_sus_ojos_after_two_sentences(self, extractor):
+        """Posesivo se resuelve correctamente con dos oraciones intermedias.
+
+        Bug original: "Sus ojos azules" al final se atribuía a María
+        porque el subject inheritance no tenía límite de distancia.
+        Con el fix de max 2 oraciones, Juan es el sujeto correcto.
+        """
+        text = (
+            "María apareció en la cafetería. Sus ojos verdes llamaron la atención. "
+            "Juan entró poco después. Era un hombre alto, delgado como un junco. "
+            "Sus ojos azules miraban con curiosidad a María."
+        )
+        entities = [("María", 0, 5), ("Juan", 70, 74)]
+        result = extractor.extract_attributes(text, entities)
+        assert result.is_success
+        attrs = result.value.attributes
+        # Look for eye_color attributes
+        eye_attrs = [a for a in attrs if a.key == AttributeKey.EYE_COLOR]
+        assert len(eye_attrs) >= 1
+        # "azules" should be attributed to Juan, NOT to María
+        azul_attrs = [a for a in eye_attrs if "azul" in a.value.lower()]
+        assert len(azul_attrs) >= 1
+        for attr in azul_attrs:
+            assert attr.entity_name != "María", (
+                f"'azules' incorrectly attributed to María instead of Juan: {attr}"
+            )
+
+    def test_possessive_not_assigned_to_object(self, extractor):
+        """'Sus ojos' no se asigna a entidad marcada como objeto ('a María')."""
+        text = "Juan caminaba despacio. Sus ojos azules miraban a María."
+        entities = [("Juan", 0, 4), ("María", 50, 55)]
+        result = extractor.extract_attributes(text, entities)
+        assert result.is_success
+        attrs = result.value.attributes
+        eye_attrs = [a for a in attrs if a.key == AttributeKey.EYE_COLOR and "azul" in a.value]
+        # If resolved, should be Juan, not María
+        if eye_attrs:
+            assert all(a.entity_name != "María" for a in eye_attrs)

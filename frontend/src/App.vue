@@ -43,6 +43,10 @@
       :visible="showUserGuide"
       @update:visible="showUserGuide = $event"
     />
+    <DataManagementDialog
+      :visible="showManageData"
+      @update:visible="showManageData = $event"
+    />
     <ModelSetupDialog />
   </div>
 </template>
@@ -62,6 +66,7 @@ import AboutDialog from '@/components/AboutDialog.vue'
 import TutorialDialog from '@/components/TutorialDialog.vue'
 import UserGuideDialog from '@/components/UserGuideDialog.vue'
 import MenuBar from '@/components/MenuBar.vue'
+import DataManagementDialog from '@/components/DataManagementDialog.vue'
 import ModelSetupDialog from '@/components/ModelSetupDialog.vue'
 import { useSystemStore } from '@/stores/system'
 const router = useRouter()
@@ -77,6 +82,7 @@ const showShortcutsHelp = ref(false)
 const showAbout = ref(false)
 const showTutorial = ref(false)
 const showUserGuide = ref(false)
+const showManageData = ref(false)
 
 // Detect Tauri environment - check immediately and also on mount
 // __TAURI__ is injected by Tauri's webview, check multiple ways
@@ -151,6 +157,7 @@ useNativeMenu({
   onKeyboardShortcuts: () => { showShortcutsHelp.value = true },
   onAbout: () => { showAbout.value = true },
   onUserGuide: () => { showUserGuide.value = true },
+  onManageData: () => { showManageData.value = true },
 })
 
 // Verificar si se debe mostrar el tutorial al inicio
@@ -202,6 +209,7 @@ const onToggleTheme = () => { themeStore.toggleMode() }
 const onMenuAbout = () => { showAbout.value = true }
 const onMenuTutorial = () => { openTutorial() }
 const onMenuUserGuide = () => { showUserGuide.value = true }
+const onMenuManageData = () => { showManageData.value = true }
 const onF1 = (e: KeyboardEvent) => {
   if (e.key === 'F1') {
     e.preventDefault()
@@ -255,6 +263,7 @@ onMounted(() => {
   window.addEventListener('menubar:about', onMenuAbout)
   window.addEventListener('menubar:tutorial', onMenuTutorial)
   window.addEventListener('menubar:user-guide', onMenuUserGuide)
+  window.addEventListener('menubar:manage-data', onMenuManageData)
   window.addEventListener('keydown', onF1)
 })
 
@@ -264,6 +273,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('menubar:about', onMenuAbout)
   window.removeEventListener('menubar:tutorial', onMenuTutorial)
   window.removeEventListener('menubar:user-guide', onMenuUserGuide)
+  window.removeEventListener('menubar:manage-data', onMenuManageData)
   window.removeEventListener('keydown', onF1)
 })
 </script>

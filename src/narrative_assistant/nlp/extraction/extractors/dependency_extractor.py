@@ -151,8 +151,10 @@ BODY_PARTS_TO_ATTR = {
     "melena": AttributeType.HAIR_COLOR,
     "piel": AttributeType.SKIN,
     "rostro": AttributeType.SKIN,
-    "barba": AttributeType.HAIR_COLOR,
-    "bigote": AttributeType.HAIR_COLOR,
+    "barba": AttributeType.FACIAL_HAIR,
+    "bigote": AttributeType.FACIAL_HAIR,
+    "perilla": AttributeType.FACIAL_HAIR,
+    "patillas": AttributeType.FACIAL_HAIR,
 }
 
 # Partes del cuerpo que pueden tener tipo (largo/corto)
@@ -160,7 +162,8 @@ BODY_PARTS_WITH_TYPE = {
     "cabello": AttributeType.HAIR_TYPE,
     "pelo": AttributeType.HAIR_TYPE,
     "melena": AttributeType.HAIR_TYPE,
-    "barba": AttributeType.HAIR_TYPE,
+    "barba": AttributeType.FACIAL_HAIR,
+    "bigote": AttributeType.FACIAL_HAIR,
 }
 
 # Verbos que introducen descripciones
@@ -216,6 +219,7 @@ class DependencyExtractor(BaseExtractor):
             AttributeType.AGE,
             AttributeType.SKIN,
             AttributeType.DISTINCTIVE_FEATURE,
+            AttributeType.FACIAL_HAIR,
         }
 
     def can_handle(self, context: ExtractionContext) -> float:
@@ -658,16 +662,23 @@ class DependencyExtractor(BaseExtractor):
         # Mapear cada oración a su sujeto
         sentence_subjects: dict[int, str | None] = {}
         last_subject = None
+        sentences_since_last_subject = 0
 
         for sent in doc.sents:
             subject = self._find_sentence_subject(sent, entity_names)
             if subject:
                 last_subject = subject
+                sentences_since_last_subject = 0
                 sentence_subjects[sent.start] = subject
             else:
-                # Heredar sujeto de oración anterior si no hay reset
-                # Un "reset" ocurre con verbos de movimiento + sujeto nuevo
-                sentence_subjects[sent.start] = last_subject
+                sentences_since_last_subject += 1
+                # Solo heredar sujeto de oración anterior si está cerca (max 2 oraciones)
+                # Esto evita asignar atributos al personaje equivocado cuando el sujeto
+                # cambió implícitamente (pro-drop en español)
+                if sentences_since_last_subject <= 2:
+                    sentence_subjects[sent.start] = last_subject
+                else:
+                    sentence_subjects[sent.start] = None
 
         # Ahora buscar posesivos en cada oración
         for sent in doc.sents:

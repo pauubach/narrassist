@@ -162,10 +162,10 @@
 
         <div v-else-if="systemCapabilities" class="hardware-result">
           <div class="hardware-icon-container" :class="{ 'has-gpu': systemCapabilities.hardware.has_gpu }">
-            <i :class="systemCapabilities.hardware.has_gpu ? 'pi pi-bolt' : 'pi pi-desktop'"></i>
+            <i :class="systemCapabilities.hardware.has_gpu ? 'pi pi-bolt' : systemCapabilities.hardware.gpu_blocked ? 'pi pi-exclamation-triangle' : 'pi pi-desktop'"></i>
           </div>
 
-          <h2>{{ systemCapabilities.hardware.has_gpu ? 'GPU Detectada' : 'Modo CPU' }}</h2>
+          <h2>{{ systemCapabilities.hardware.has_gpu ? 'GPU Detectada' : systemCapabilities.hardware.gpu_blocked ? 'GPU no compatible' : 'Modo CPU' }}</h2>
 
           <div v-if="systemCapabilities.hardware.gpu" class="gpu-info">
             <Tag :value="systemCapabilities.hardware.gpu.name" severity="success" />
@@ -174,17 +174,26 @@
             </p>
           </div>
 
+          <div v-else-if="systemCapabilities.hardware.gpu_blocked" class="cpu-info">
+            <Tag :value="systemCapabilities.hardware.gpu_blocked.name" severity="warn" />
+            <p class="gpu-memory">No compatible con procesamiento neuronal</p>
+          </div>
+
           <div v-else class="cpu-info">
             <Tag :value="systemCapabilities.hardware.cpu.name" severity="info" />
           </div>
 
           <Message
-            :severity="systemCapabilities.hardware.has_gpu ? 'success' : 'info'"
+            :severity="systemCapabilities.hardware.has_gpu ? 'success' : systemCapabilities.hardware.gpu_blocked ? 'warn' : 'info'"
             :closable="false"
             class="hardware-message"
           >
             <span v-if="systemCapabilities.hardware.has_gpu">
               Tu sistema tiene aceleración por GPU. Los análisis serán más rápidos.
+            </span>
+            <span v-else-if="systemCapabilities.hardware.gpu_blocked">
+              Tu {{ systemCapabilities.hardware.gpu_blocked.name }} no es compatible con el procesamiento neuronal moderno.
+              El análisis funcionará correctamente en CPU.
             </span>
             <span v-else>
               El análisis funcionará correctamente en CPU.

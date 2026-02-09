@@ -722,7 +722,38 @@ class UnifiedAnalysisPipeline:
         Captura excepciones y las convierte en PhaseError con contexto.
         Registra la fase como completada o fallida.
         Mide delta de memoria RSS antes/después de cada fase.
+        Verifica presión de memoria antes de cada fase y actúa según tier.
         """
+        # Pre-fase: verificar presión de memoria
+        try:
+            from ..core.resource_manager import get_resource_manager
+
+            rm = get_resource_manager()
+            pressure = rm.check_memory_pressure()
+            if pressure == "danger":
+                logger.warning(
+                    f"Presión de memoria PELIGROSA antes de '{phase_name}' — "
+                    f"intentando liberar memoria"
+                )
+                rm.relieve_memory_pressure(aggressive=True)
+                pressure = rm.check_memory_pressure()
+                if pressure == "danger" and not is_fatal:
+                    logger.error(
+                        f"Memoria insuficiente para '{phase_name}' — saltando fase"
+                    )
+                    context.skipped_phases.add(phase_name)
+                    return Result.failure(
+                        f"Memoria insuficiente para fase '{phase_name}'"
+                    )
+            elif pressure in ("critical", "warning"):
+                logger.info(
+                    f"Presión de memoria ({pressure}) antes de '{phase_name}' — "
+                    f"liberando memoria"
+                )
+                rm.relieve_memory_pressure(aggressive=(pressure == "critical"))
+        except Exception as e:
+            logger.debug(f"Error en check de memoria pre-fase: {e}")
+
         phase_start = datetime.now()
         mem_start = self._memory_monitor.snapshot(phase_name, label="start")
 

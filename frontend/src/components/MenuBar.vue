@@ -161,6 +161,8 @@ const menus = computed<Menu[]>(() => {
         { label: 'Atajos de Teclado', action: 'shortcuts', icon: 'hashtag', shortcut: 'F1' },
         { label: 'Documentación', action: 'docs', icon: 'book' },
         { divider: true, label: '' },
+        { label: 'Gestionar datos...', action: 'manageData', icon: 'database' },
+        { divider: true, label: '' },
         { label: 'Acerca de', action: 'about', icon: 'info-circle' },
       ]
     }
@@ -344,6 +346,9 @@ const handleMenuAction = (item: MenuItem) => {
     case 'docs':
       // Abrir guía de usuario integrada
       window.dispatchEvent(new CustomEvent('menubar:user-guide'))
+      break
+    case 'manageData':
+      window.dispatchEvent(new CustomEvent('menubar:manage-data'))
       break
     case 'runAnalysis':
       window.dispatchEvent(new CustomEvent('menubar:run-analysis'))

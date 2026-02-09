@@ -2,6 +2,7 @@
  * Tests para el store de análisis
  *
  * Verifican el comportamiento del polling y actualización de estado.
+ * El store usa estado per-project para evitar contaminación entre proyectos.
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
@@ -36,9 +37,61 @@ describe('analysisStore', () => {
     })
   })
 
-  describe('getProgress', () => {
-    it('should fetch and update progress', async () => {
+  describe('per-project isolation', () => {
+    it('should isolate analysis state between projects', () => {
       const store = useAnalysisStore()
+
+      // Set analysis for project 1
+      store.setAnalyzing(1, true)
+      // Set analysis for project 2
+      store.setAnalyzing(2, true)
+
+      // View project 1
+      store.setActiveProjectId(1)
+      expect(store.currentAnalysis?.project_id).toBe(1)
+
+      // View project 2
+      store.setActiveProjectId(2)
+      expect(store.currentAnalysis?.project_id).toBe(2)
+    })
+
+    it('should show null when no active project', () => {
+      const store = useAnalysisStore()
+      store.setAnalyzing(1, true)
+
+      store.setActiveProjectId(null)
+      expect(store.currentAnalysis).toBeNull()
+      expect(store.isAnalyzing).toBe(false)
+    })
+
+    it('should track analyzing state per project', () => {
+      const store = useAnalysisStore()
+
+      store.setAnalyzing(1, true)
+      store.setAnalyzing(2, false)
+
+      expect(store.isProjectAnalyzing(1)).toBe(true)
+      expect(store.isProjectAnalyzing(2)).toBe(false)
+    })
+
+    it('should detect any active analysis via hasAnyActiveAnalysis', () => {
+      const store = useAnalysisStore()
+
+      expect(store.hasAnyActiveAnalysis).toBe(false)
+
+      store.setAnalyzing(1, true)
+      expect(store.hasAnyActiveAnalysis).toBe(true)
+
+      // Even if active project is different
+      store.setActiveProjectId(2)
+      expect(store.hasAnyActiveAnalysis).toBe(true)
+    })
+  })
+
+  describe('getProgress', () => {
+    it('should fetch and update progress for active project', async () => {
+      const store = useAnalysisStore()
+      store.setActiveProjectId(1)
 
       const mockProgressData = {
         project_id: 1,
@@ -62,7 +115,8 @@ describe('analysisStore', () => {
 
     it('should set isAnalyzing to false when completed', async () => {
       const store = useAnalysisStore()
-      store.isAnalyzing = true
+      store.setActiveProjectId(1)
+      store.setAnalyzing(1, true)
 
       const mockProgressData = {
         project_id: 1,
@@ -84,7 +138,8 @@ describe('analysisStore', () => {
 
     it('should set error when analysis fails', async () => {
       const store = useAnalysisStore()
-      store.isAnalyzing = true
+      store.setActiveProjectId(1)
+      store.setAnalyzing(1, true)
 
       const mockProgressData = {
         project_id: 1,
@@ -134,6 +189,7 @@ describe('analysisStore', () => {
   describe('startAnalysis', () => {
     it('should initiate analysis and set isAnalyzing', async () => {
       const store = useAnalysisStore()
+      store.setActiveProjectId(1)
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -149,6 +205,7 @@ describe('analysisStore', () => {
 
     it('should set error on failure', async () => {
       const store = useAnalysisStore()
+      store.setActiveProjectId(1)
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -164,39 +221,46 @@ describe('analysisStore', () => {
   })
 
   describe('clearAnalysis', () => {
-    it('should reset all state', () => {
+    it('should reset state for the active project', () => {
       const store = useAnalysisStore()
+      store.setActiveProjectId(1)
 
-      // Set some state
-      store.isAnalyzing = true
-      store.error = 'Some error'
-      store.currentAnalysis = {
-        project_id: 1,
-        status: 'running',
-        progress: 50,
-        current_phase: 'Test',
-        phases: [],
-      }
+      // Set some state via setAnalyzing
+      store.setAnalyzing(1, true)
 
-      store.clearAnalysis()
+      store.clearAnalysis(1)
 
       expect(store.isAnalyzing).toBe(false)
       expect(store.error).toBeNull()
       expect(store.currentAnalysis).toBeNull()
     })
+
+    it('should not affect other projects', () => {
+      const store = useAnalysisStore()
+
+      store.setAnalyzing(1, true)
+      store.setAnalyzing(2, true)
+
+      store.clearAnalysis(1)
+
+      // Project 2 should still be analyzing
+      expect(store.isProjectAnalyzing(2)).toBe(true)
+    })
   })
 
   describe('clearError', () => {
-    it('should clear only the error', () => {
+    it('should clear only the error for active project', () => {
       const store = useAnalysisStore()
+      store.setActiveProjectId(1)
 
-      store.error = 'Some error'
-      store.isAnalyzing = true
+      // Set error via internal map
+      store._errors[1] = 'Some error'
+      store.setAnalyzing(1, true)
 
-      store.clearError()
+      store.clearError(1)
 
       expect(store.error).toBeNull()
-      expect(store.isAnalyzing).toBe(true) // No afecta otros estados
+      expect(store.isAnalyzing).toBe(true)
     })
   })
 })
@@ -207,26 +271,19 @@ describe('analysisStore', () => {
  */
 describe('Analysis Polling Behavior', () => {
   it('should poll when status is analyzing', () => {
-    // Este test documenta el comportamiento esperado:
-    // Cuando project.analysisStatus es 'analyzing', 'pending', o 'in_progress',
-    // el componente debe iniciar polling
-
     const analyzingStatuses = ['pending', 'in_progress', 'analyzing']
     const completedStatuses = ['completed', 'error', 'failed']
 
-    // Verificar que sabemos cuáles activan polling
     for (const status of analyzingStatuses) {
       expect(['pending', 'in_progress', 'analyzing']).toContain(status)
     }
 
-    // Verificar que sabemos cuáles NO activan polling
     for (const status of completedStatuses) {
       expect(['completed', 'error', 'failed']).toContain(status)
     }
   })
 
   it('should stop polling when analysis completes', () => {
-    // Documentar que polling debe detenerse en estos estados
     const stopPollingStatuses = ['completed', 'error', 'failed']
 
     for (const status of stopPollingStatuses) {
@@ -241,7 +298,6 @@ describe('Analysis Polling Behavior', () => {
  */
 describe('Analysis Progress Data Structure', () => {
   it('should have correct AnalysisProgress interface', () => {
-    // Documentar la estructura esperada
     const validProgressData = {
       project_id: 1,
       status: 'running' as const,
@@ -260,7 +316,6 @@ describe('Analysis Progress Data Structure', () => {
       error: undefined,
     }
 
-    // Verificar campos requeridos
     expect(validProgressData).toHaveProperty('project_id')
     expect(validProgressData).toHaveProperty('status')
     expect(validProgressData).toHaveProperty('progress')
@@ -271,7 +326,6 @@ describe('Analysis Progress Data Structure', () => {
   it('should handle all status values', () => {
     const validStatuses = ['pending', 'running', 'completed', 'failed']
 
-    // El store debe manejar todos estos estados
     for (const status of validStatuses) {
       expect(validStatuses).toContain(status)
     }

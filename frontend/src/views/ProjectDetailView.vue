@@ -41,9 +41,18 @@
           />
           <Button label="Exportar" icon="pi pi-download" outlined @click="showExportDialog = true" />
           <Button
-            :label="isAnalyzing ? 'Analizando...' : (hasBeenAnalyzed ? 'Re-analizar' : 'Analizar')"
-            :icon="isAnalyzing ? 'pi pi-spin pi-spinner' : (hasBeenAnalyzed ? 'pi pi-refresh' : 'pi pi-play')"
-            :disabled="isAnalyzing"
+            v-if="isAnalyzing"
+            label="Cancelar análisis"
+            icon="pi pi-times"
+            severity="danger"
+            outlined
+            :loading="cancellingAnalysis"
+            @click="handleCancelAnalysis"
+          />
+          <Button
+            v-else
+            :label="hasBeenAnalyzed ? 'Re-analizar' : 'Analizar'"
+            :icon="hasBeenAnalyzed ? 'pi pi-refresh' : 'pi pi-play'"
             @click="showReanalyzeDialog = true"
           />
         </div>
@@ -476,6 +485,24 @@ const getSidebarTabTitle = (tab: SidebarTab): string => {
 
 const project = computed(() => projectsStore.currentProject)
 
+// Cancelación de análisis
+const cancellingAnalysis = ref(false)
+async function handleCancelAnalysis() {
+  if (!project.value) return
+  cancellingAnalysis.value = true
+  try {
+    const success = await analysisStore.cancelAnalysis(project.value.id)
+    if (success) {
+      stopAnalysisPolling()
+      analysisProgressData.value = null
+      // Refresh project status
+      await projectsStore.fetchProject(project.value.id)
+    }
+  } finally {
+    cancellingAnalysis.value = false
+  }
+}
+
 // Estado del análisis con polling
 const analysisProgressData = ref<{ progress: number; phase: string; error?: string; metrics?: { chapters_found?: number; entities_found?: number } } | null>(null)
 let analysisPollingInterval: ReturnType<typeof setInterval> | null = null
@@ -506,7 +533,8 @@ const _analysisProgress = computed(() => {
     return analysisProgressData.value.progress
   }
   if (!project.value) return 0
-  return Math.round((project.value.analysisProgress || 0) * 100)
+  // analysisProgress ya viene como 0-100 desde la API
+  return project.value.analysisProgress || 0
 })
 
 const _analysisPhase = computed(() => {
@@ -576,7 +604,7 @@ async function pollAnalysisProgress() {
     }
 
     // Si completado o error, detener polling y recargar datos
-    if (progressData.status === 'completed' || progressData.status === 'error' || progressData.status === 'failed') {
+    if (progressData.status === 'completed' || progressData.status === 'error' || progressData.status === 'failed' || progressData.status === 'cancelled') {
       console.log('[Polling] Analysis finished with status:', progressData.status)
       stopAnalysisPolling()
 
@@ -650,7 +678,7 @@ watch(isAnalyzing, (analyzing, oldAnalyzing) => {
 watch(() => project.value?.analysisStatus, (newStatus, oldStatus) => {
   console.log('[Analysis] project.analysisStatus changed:', oldStatus, '->', newStatus)
   // 'pending' es el estado inicial (no analizado), NO un análisis en curso
-  if (newStatus === 'in_progress' || newStatus === 'analyzing') {
+  if (newStatus === 'in_progress' || newStatus === 'analyzing' || newStatus === 'queued') {
     if (!analysisPollingInterval) {
       console.log('[Analysis] Starting polling from status change')
       startAnalysisPolling()
@@ -811,6 +839,9 @@ onMounted(async () => {
   window.addEventListener('menubar:toggle-sidebar', handleMenuToggleSidebar)
 
   try {
+    // Establecer proyecto activo en el analysis store (aísla estado por proyecto)
+    analysisStore.setActiveProjectId(projectId)
+
     // Resetear workspace al entrar
     workspaceStore.reset()
 
@@ -877,6 +908,8 @@ onUnmounted(() => {
   window.removeEventListener('menubar:toggle-sidebar', handleMenuToggleSidebar)
   stopAnalysisPolling()
   resetGlobalHighlight()
+  // No limpiar activeProjectId aquí: el análisis puede seguir en background
+  // y los computed deben seguir reflejando su estado para StatusBar
 })
 
 const loadEntities = async (projectId: number) => {

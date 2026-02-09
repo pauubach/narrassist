@@ -4,7 +4,7 @@ import { api } from '@/services/apiClient'
 
 export interface AnalysisProgress {
   project_id: number
-  status: 'pending' | 'running' | 'completed' | 'failed' | 'error' | 'idle'
+  status: 'pending' | 'running' | 'queued' | 'queued_for_heavy' | 'completed' | 'failed' | 'error' | 'idle' | 'cancelled'
   progress: number
   current_phase: string
   current_action?: string
@@ -146,10 +146,13 @@ const BACKEND_PHASE_TO_FRONTEND: Record<string, keyof ExecutedPhases | null> = {
 }
 
 export const useAnalysisStore = defineStore('analysis', () => {
-  // Estado
-  const currentAnalysis = ref<AnalysisProgress | null>(null)
-  const isAnalyzing = ref(false)
-  const error = ref<string | null>(null)
+  // ============================================================================
+  // Estado interno por proyecto (evita contaminar datos entre proyectos)
+  // ============================================================================
+  const _analyses = ref<Record<number, AnalysisProgress>>({})
+  const _analyzing = ref<Record<number, boolean>>({})
+  const _errors = ref<Record<number, string | null>>({})
+  const _activeProjectId = ref<number | null>(null)
 
   /**
    * Estado de fases ejecutadas por proyecto.
@@ -162,14 +165,56 @@ export const useAnalysisStore = defineStore('analysis', () => {
    */
   const runningPhases = ref<Set<keyof ExecutedPhases>>(new Set())
 
+  // ============================================================================
+  // Computed: vista del proyecto activo (backward-compatible)
+  // StatusBar y otros componentes leen estos sin necesitar projectId
+  // ============================================================================
+  const currentAnalysis = computed<AnalysisProgress | null>(() =>
+    _activeProjectId.value != null ? (_analyses.value[_activeProjectId.value] ?? null) : null
+  )
+  const isAnalyzing = computed<boolean>(() =>
+    _activeProjectId.value != null ? (_analyzing.value[_activeProjectId.value] ?? false) : false
+  )
+  const error = computed<string | null>(() =>
+    _activeProjectId.value != null ? (_errors.value[_activeProjectId.value] ?? null) : null
+  )
+
   // Getters
   const hasActiveAnalysis = computed(() => isAnalyzing.value && currentAnalysis.value !== null)
+  const hasAnyActiveAnalysis = computed(() => Object.values(_analyzing.value).some(v => v))
   const progressPercentage = computed(() => currentAnalysis.value?.progress || 0)
 
+  // ============================================================================
+  // Gestión del proyecto activo
+  // ============================================================================
+
+  /**
+   * Establece qué proyecto es el "activo" para los computed globales.
+   * Llamar al entrar a ProjectDetailView.
+   */
+  function setActiveProjectId(projectId: number | null) {
+    _activeProjectId.value = projectId
+  }
+
+  // ============================================================================
+  // Consultas por proyecto (para uso externo)
+  // ============================================================================
+
+  function isProjectAnalyzing(projectId: number): boolean {
+    return _analyzing.value[projectId] ?? false
+  }
+
+  function getProjectProgress(projectId: number): number {
+    return _analyses.value[projectId]?.progress ?? 0
+  }
+
+  // ============================================================================
   // Actions
+  // ============================================================================
+
   async function startAnalysis(projectId: number, file?: File) {
-    isAnalyzing.value = true
-    error.value = null
+    _analyzing.value[projectId] = true
+    delete _errors.value[projectId]
 
     try {
       const formData = new FormData()
@@ -177,19 +222,37 @@ export const useAnalysisStore = defineStore('analysis', () => {
         formData.append('file', file)
       }
 
-      await api.postForm(`/api/projects/${projectId}/analyze`, formData)
-      currentAnalysis.value = {
+      const response = await api.postForm<{ project_id: number; status: string }>(`/api/projects/${projectId}/analyze`, formData)
+      const isQueued = response?.status === 'queued'
+      // Re-assert _analyzing after await (checkAnalysisStatus may have cleared it during the await)
+      _analyzing.value[projectId] = true
+      _analyses.value[projectId] = {
         project_id: projectId,
-        status: 'running',
+        status: isQueued ? 'queued' : 'running',
         progress: 0,
-        current_phase: 'Iniciando...',
+        current_phase: isQueued ? 'En cola — esperando análisis anterior' : 'Iniciando...',
         phases: []
       }
       return true
     } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Error desconocido'
-      isAnalyzing.value = false
+      _errors.value[projectId] = err instanceof Error ? err.message : 'Error desconocido'
+      _analyzing.value[projectId] = false
       console.error('Failed to start analysis:', err)
+      return false
+    }
+  }
+
+  async function cancelAnalysis(projectId: number): Promise<boolean> {
+    try {
+      await api.postRaw<{ success: boolean }>(`/api/projects/${projectId}/analysis/cancel`, {})
+      _analyzing.value[projectId] = false
+      if (_analyses.value[projectId]) {
+        _analyses.value[projectId].status = 'idle'
+        _analyses.value[projectId].current_phase = 'Análisis cancelado'
+      }
+      return true
+    } catch (err) {
+      console.error('Failed to cancel analysis:', err)
       return false
     }
   }
@@ -197,7 +260,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
   async function getProgress(projectId: number) {
     try {
       const progressData = await api.get<AnalysisProgress>(`/api/projects/${projectId}/analysis/progress`)
-      currentAnalysis.value = progressData
+      _analyses.value[projectId] = progressData
 
       // Actualizar executedPhases progresivamente según fases completadas
       if (progressData.phases && Array.isArray(progressData.phases)) {
@@ -216,10 +279,13 @@ export const useAnalysisStore = defineStore('analysis', () => {
 
       // Actualizar estado
       if (progressData.status === 'completed' || progressData.progress >= 100) {
-        isAnalyzing.value = false
+        _analyzing.value[projectId] = false
       } else if (progressData.status === 'error' || progressData.status === 'failed') {
-        isAnalyzing.value = false
-        error.value = progressData.error || 'Análisis fallido'
+        _analyzing.value[projectId] = false
+        _errors.value[projectId] = progressData.error || 'Análisis fallido'
+      } else if (progressData.status === 'queued' || progressData.status === 'queued_for_heavy') {
+        // Queued: keep as "analyzing" so polling continues
+        _analyzing.value[projectId] = true
       }
 
       return progressData
@@ -229,33 +295,38 @@ export const useAnalysisStore = defineStore('analysis', () => {
     }
   }
 
-  function clearAnalysis() {
-    currentAnalysis.value = null
-    isAnalyzing.value = false
-    error.value = null
+  function clearAnalysis(projectId?: number) {
+    const id = projectId ?? _activeProjectId.value
+    if (id != null) {
+      delete _analyses.value[id]
+      delete _analyzing.value[id]
+      delete _errors.value[id]
+    }
   }
 
-  function clearError() {
-    error.value = null
+  function clearError(projectId?: number) {
+    const id = projectId ?? _activeProjectId.value
+    if (id != null) {
+      delete _errors.value[id]
+    }
   }
 
   /**
    * Marca el inicio de un análisis (para cuando se llama desde fuera del store)
    */
   function setAnalyzing(projectId: number, analyzing: boolean) {
-    isAnalyzing.value = analyzing
+    _analyzing.value[projectId] = analyzing
     if (analyzing) {
-      currentAnalysis.value = {
+      _analyses.value[projectId] = {
         project_id: projectId,
         status: 'running',
         progress: 0,
         current_phase: 'Iniciando análisis...',
         phases: []
       }
-      error.value = null
-    } else if (!analyzing && currentAnalysis.value?.project_id === projectId) {
-      // Solo limpiar si es el mismo proyecto
-      currentAnalysis.value = null
+      delete _errors.value[projectId]
+    } else {
+      delete _analyses.value[projectId]
     }
   }
 
@@ -266,17 +337,30 @@ export const useAnalysisStore = defineStore('analysis', () => {
    */
   async function checkAnalysisStatus(projectId: number): Promise<boolean> {
     try {
+      // If already marked as analyzing (e.g., startAnalysis was called concurrently),
+      // don't clear — just query backend to update progress data
+      const alreadyActive = _analyzing.value[projectId] === true
+
       const progressData = await api.get<AnalysisProgress>(`/api/projects/${projectId}/analysis/progress`)
       const status = progressData.status
-      if (status === 'running' || status === 'pending') {
-        currentAnalysis.value = progressData
-        isAnalyzing.value = true
+      if (status === 'running' || status === 'pending' || status === 'queued' || status === 'queued_for_heavy') {
+        _analyses.value[projectId] = progressData
+        _analyzing.value[projectId] = true
         return true
       }
-      clearAnalysis()
+
+      // Backend says idle — but if startAnalysis is in-flight, don't clear
+      if (alreadyActive) {
+        return true
+      }
+
+      clearAnalysis(projectId)
       return false
     } catch {
-      clearAnalysis()
+      if (_analyzing.value[projectId] === true) {
+        return true
+      }
+      clearAnalysis(projectId)
       return false
     }
   }
@@ -334,9 +418,8 @@ export const useAnalysisStore = defineStore('analysis', () => {
     // Añadir a fases en ejecución
     phases.forEach(p => runningPhases.value.add(p))
 
-    // Actualizar estado global de análisis (source of truth)
-    isAnalyzing.value = true
-    currentAnalysis.value = {
+    _analyzing.value[projectId] = true
+    _analyses.value[projectId] = {
       project_id: projectId,
       status: 'running',
       progress: 0,
@@ -348,23 +431,23 @@ export const useAnalysisStore = defineStore('analysis', () => {
         current: p === phases[0]
       }))
     }
-    error.value = null
+    delete _errors.value[projectId]
 
     try {
       await api.post(`/api/projects/${projectId}/analyze`, { phases, force })
       await loadExecutedPhases(projectId)
       return true
     } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Error desconocido'
+      _errors.value[projectId] = err instanceof Error ? err.message : 'Error desconocido'
       console.error('Error in partial analysis:', err)
       return false
     } finally {
       // Quitar de fases en ejecución
       phases.forEach(p => runningPhases.value.delete(p))
-      // Limpiar estado global si no quedan fases corriendo
+      // Limpiar estado si no quedan fases corriendo
       if (runningPhases.value.size === 0) {
-        isAnalyzing.value = false
-        currentAnalysis.value = null
+        _analyzing.value[projectId] = false
+        delete _analyses.value[projectId]
       }
     }
   }
@@ -384,22 +467,33 @@ export const useAnalysisStore = defineStore('analysis', () => {
   }
 
   return {
-    // State
+    // State (computed: sigue el proyecto activo)
     currentAnalysis,
     isAnalyzing,
     error,
     executedPhases,
     runningPhases,
+    // Internal maps (para uso avanzado/testing)
+    _analyses,
+    _analyzing,
+    _errors,
+    _activeProjectId,
     // Getters
     hasActiveAnalysis,
+    hasAnyActiveAnalysis,
     progressPercentage,
     // Actions
+    setActiveProjectId,
     startAnalysis,
+    cancelAnalysis,
     getProgress,
     clearAnalysis,
     clearError,
     setAnalyzing,
     checkAnalysisStatus,
+    // Per-project queries
+    isProjectAnalyzing,
+    getProjectProgress,
     // Phase tracking
     loadExecutedPhases,
     isPhaseExecuted,

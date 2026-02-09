@@ -496,20 +496,38 @@
           </template>
           <template #content>
             <!-- 1. Hardware Info Banner (CPU/GPU) -->
-            <Message v-if="systemCapabilities" :severity="systemCapabilities.hardware.has_gpu ? 'success' : 'info'" :closable="false" class="hardware-banner">
+            <Message
+              v-if="systemCapabilities"
+              :severity="systemCapabilities.hardware.has_gpu ? 'success' : systemCapabilities.hardware.gpu_blocked ? 'warn' : 'info'"
+              :closable="false"
+              class="hardware-banner"
+            >
               <div class="hardware-info">
-                <i :class="systemCapabilities.hardware.has_gpu ? 'pi pi-bolt' : 'pi pi-desktop'"></i>
+                <i :class="systemCapabilities.hardware.has_gpu ? 'pi pi-bolt' : systemCapabilities.hardware.gpu_blocked ? 'pi pi-exclamation-triangle' : 'pi pi-desktop'"></i>
                 <div>
-                  <strong>{{ systemCapabilities.hardware.has_gpu ? 'GPU detectada' : 'Modo CPU' }}</strong>
-                  <span v-if="systemCapabilities.hardware.gpu">
-                    - {{ systemCapabilities.hardware.gpu.name }}
-                    <template v-if="systemCapabilities.hardware.gpu.memory_gb">
-                      ({{ systemCapabilities.hardware.gpu.memory_gb.toFixed(1) }} GB)
-                    </template>
-                  </span>
-                  <span v-else>
-                    - {{ systemCapabilities.hardware.cpu.name }}
-                  </span>
+                  <template v-if="systemCapabilities.hardware.has_gpu">
+                    <strong>GPU detectada</strong>
+                    <span>
+                      - {{ systemCapabilities.hardware.gpu?.name }}
+                      <template v-if="systemCapabilities.hardware.gpu?.memory_gb">
+                        ({{ systemCapabilities.hardware.gpu?.memory_gb.toFixed(1) }} GB)
+                      </template>
+                    </span>
+                  </template>
+                  <template v-else-if="systemCapabilities.hardware.gpu_blocked">
+                    <strong>GPU no compatible</strong>
+                    <span>
+                      - {{ systemCapabilities.hardware.gpu_blocked.name }}
+                      no es compatible con el procesamiento neuronal
+                      (Compute Capability {{ systemCapabilities.hardware.gpu_blocked.compute_capability }},
+                      se requiere {{ systemCapabilities.hardware.gpu_blocked.min_required }}+).
+                      Usando CPU.
+                    </span>
+                  </template>
+                  <template v-else>
+                    <strong>Modo CPU</strong>
+                    <span>- {{ systemCapabilities.hardware.cpu.name }}</span>
+                  </template>
                 </div>
               </div>
             </Message>
@@ -659,8 +677,15 @@
                       @update:model-value="toggleMethod('coreference', String(key), $event)"
                     />
                     <span class="method-name">{{ method.name }}</span>
-                    <Tag v-if="method.recommended_gpu && !method.requires_gpu" value="GPU recomendada" severity="info" class="method-tag" />
-                    <Tag v-if="method.requires_gpu" value="Requiere GPU" severity="warning" class="method-tag" />
+                    <Tag v-if="method.recommended_gpu && !method.requires_gpu && !systemCapabilities?.hardware.has_gpu" value="Mejor con GPU" severity="secondary" class="method-tag" />
+                    <Tag v-if="method.recommended_gpu && !method.requires_gpu && systemCapabilities?.hardware.has_gpu" value="GPU recomendada" severity="info" class="method-tag" />
+                    <Tag
+                      v-if="method.requires_gpu"
+                      :value="systemCapabilities?.hardware.gpu_blocked ? 'GPU no compatible' : 'Requiere GPU'"
+                      severity="warning"
+                      class="method-tag"
+                      v-tooltip.top="gpuRequirementTooltip"
+                    />
                     <Tag v-if="!method.available" value="No disponible" severity="danger" class="method-tag" />
                   </div>
                   <p class="method-description">{{ method.description }}</p>
@@ -691,8 +716,15 @@
                       @update:model-value="toggleMethod('ner', String(key), $event)"
                     />
                     <span class="method-name">{{ method.name }}</span>
-                    <Tag v-if="method.recommended_gpu && !method.requires_gpu" value="GPU recomendada" severity="info" class="method-tag" />
-                    <Tag v-if="method.requires_gpu" value="Requiere GPU" severity="warning" class="method-tag" />
+                    <Tag v-if="method.recommended_gpu && !method.requires_gpu && !systemCapabilities?.hardware.has_gpu" value="Mejor con GPU" severity="secondary" class="method-tag" />
+                    <Tag v-if="method.recommended_gpu && !method.requires_gpu && systemCapabilities?.hardware.has_gpu" value="GPU recomendada" severity="info" class="method-tag" />
+                    <Tag
+                      v-if="method.requires_gpu"
+                      :value="systemCapabilities?.hardware.gpu_blocked ? 'GPU no compatible' : 'Requiere GPU'"
+                      severity="warning"
+                      class="method-tag"
+                      v-tooltip.top="gpuRequirementTooltip"
+                    />
                     <Tag v-if="!method.available" value="No disponible" severity="danger" class="method-tag" />
                   </div>
                   <p class="method-description">{{ method.description }}</p>
@@ -767,8 +799,15 @@
                       @update:model-value="toggleMethod('grammar', String(key), $event)"
                     />
                     <span class="method-name">{{ method.name }}</span>
-                    <Tag v-if="method.recommended_gpu && !method.requires_gpu" value="GPU recomendada" severity="info" class="method-tag" />
-                    <Tag v-if="method.requires_gpu" value="Requiere GPU" severity="warning" class="method-tag" />
+                    <Tag v-if="method.recommended_gpu && !method.requires_gpu && !systemCapabilities?.hardware.has_gpu" value="Mejor con GPU" severity="secondary" class="method-tag" />
+                    <Tag v-if="method.recommended_gpu && !method.requires_gpu && systemCapabilities?.hardware.has_gpu" value="GPU recomendada" severity="info" class="method-tag" />
+                    <Tag
+                      v-if="method.requires_gpu"
+                      :value="systemCapabilities?.hardware.gpu_blocked ? 'GPU no compatible' : 'Requiere GPU'"
+                      severity="warning"
+                      class="method-tag"
+                      v-tooltip.top="gpuRequirementTooltip"
+                    />
                     <Tag v-if="!method.available" value="No disponible" severity="danger" class="method-tag" />
                   </div>
                   <p class="method-description">{{ method.description }}</p>
@@ -796,8 +835,15 @@
                       @update:model-value="toggleMethod('spelling', String(key), $event)"
                     />
                     <span class="method-name">{{ method.name }}</span>
-                    <Tag v-if="method.recommended_gpu && !method.requires_gpu" value="GPU recomendada" severity="info" class="method-tag" />
-                    <Tag v-if="method.requires_gpu" value="Requiere GPU" severity="warning" class="method-tag" />
+                    <Tag v-if="method.recommended_gpu && !method.requires_gpu && !systemCapabilities?.hardware.has_gpu" value="Mejor con GPU" severity="secondary" class="method-tag" />
+                    <Tag v-if="method.recommended_gpu && !method.requires_gpu && systemCapabilities?.hardware.has_gpu" value="GPU recomendada" severity="info" class="method-tag" />
+                    <Tag
+                      v-if="method.requires_gpu"
+                      :value="systemCapabilities?.hardware.gpu_blocked ? 'GPU no compatible' : 'Requiere GPU'"
+                      severity="warning"
+                      class="method-tag"
+                      v-tooltip.top="gpuRequirementTooltip"
+                    />
                     <Tag v-if="!method.available" value="No disponible" severity="danger" class="method-tag" />
                   </div>
                   <p class="method-description">{{ method.description }}</p>
@@ -827,7 +873,8 @@
                 >
                   <span class="mode-name">{{ method.name }}</span>
                   <p class="mode-description">{{ method.description }}</p>
-                  <Tag v-if="method.recommended_gpu" value="GPU recomendada" severity="info" class="method-tag" />
+                  <Tag v-if="method.recommended_gpu && !systemCapabilities?.hardware.has_gpu" value="Mejor con GPU" severity="secondary" class="method-tag" />
+                  <Tag v-if="method.recommended_gpu && systemCapabilities?.hardware.has_gpu" value="GPU recomendada" severity="info" class="method-tag" />
                   <Tag v-if="!method.available" value="No disponible" severity="danger" class="method-tag" />
                 </div>
               </div>
@@ -1064,9 +1111,9 @@
             <!-- Variante regional por defecto -->
             <div class="setting-item">
               <div class="setting-info">
-                <label class="setting-label">Variante regional preferida</label>
+                <label class="setting-label">Variante regional</label>
                 <p class="setting-description">
-                  Variante del español para nuevos proyectos
+                  Variante del español para nuevos proyectos. Cada proyecto puede personalizarse desde su configuración.
                 </p>
               </div>
               <div class="setting-control">
@@ -1469,6 +1516,14 @@ const settings = ref<Settings>({
 // Capacidades del sistema - usar store centralizado
 const systemCapabilities = computed(() => systemStore.systemCapabilities)
 const loadingCapabilities = computed(() => systemStore.capabilitiesLoading)
+
+const gpuRequirementTooltip = computed(() => {
+  const blocked = systemCapabilities.value?.hardware.gpu_blocked
+  if (blocked) {
+    return `${blocked.name} (CC ${blocked.compute_capability}) no es compatible. Se requiere NVIDIA Pascal o superior (CC ${blocked.min_required}+).`
+  }
+  return 'Necesita una GPU NVIDIA compatible (GTX 1000 series o superior)'
+})
 
 const dataLocation = ref('~/.narrative_assistant')
 const showResetDialog = ref(false)

@@ -35,10 +35,12 @@ ATTRIBUTE_KEY_INFO: dict[str, tuple[str, str]] = {
     "hair_type": ("tipo de cabello", "m"),
     "hair_modification": ("modificación de cabello", "f"),  # teñido, natural, decolorado
     "age": ("edad", "f"),
+    "apparent_age": ("edad aparente", "f"),
     "height": ("altura", "f"),
     "build": ("complexión", "f"),
     "skin": ("piel", "f"),
     "distinctive_feature": ("rasgo distintivo", "m"),
+    "facial_hair": ("vello facial", "m"),
     "personality": ("personalidad", "f"),
     "temperament": ("temperamento", "m"),
     "fear": ("miedo", "m"),
@@ -215,6 +217,134 @@ def _get_spacy_for_lemmas():
     return _spacy_nlp
 
 
+# Regiones corporales para sub-matching de DISTINCTIVE_FEATURE.
+# Solo se comparan rasgos de la misma región (nariz vs nariz, no nariz vs cicatriz).
+_BODY_REGION_PREFIXES: dict[str, str] = {}
+for _region, _keywords in {
+    "nariz": ("nariz", "narigudo", "nariguda"),
+    "labios": ("labio", "labios"),
+    "frente": ("frente",),
+    "menton": ("mentón", "menton", "barbilla"),
+    "mejillas": ("mejilla", "mejillas"),
+    "orejas": ("oreja", "orejas", "orejudo", "orejuda"),
+    "manos": ("mano", "manos"),
+    "cicatriz": ("cicatriz", "cicatrices"),
+    "lunar": ("lunar", "lunares"),
+    "tatuaje": ("tatuaje", "tatuajes"),
+    "pecas": ("peca", "pecas", "pecoso", "pecosa"),
+    "marca": ("marca", "mancha"),
+    "rostro": ("rostro", "cara"),
+    "cojera": ("cojera", "cojo", "coja", "patizambo", "patizamba"),
+    "ojos": ("bizco", "bizca"),
+    "dientes": ("desdentado", "desdentada"),
+}.items():
+    for _kw in _keywords:
+        _BODY_REGION_PREFIXES[_kw] = _region
+
+
+# Dimensiones de vello facial — solo valores de la misma dimensión son comparables
+_FACIAL_HAIR_DIMENSIONS: dict[str, str] = {
+    # Densidad / grosor
+    "espeso": "density", "espesa": "density",
+    "poblado": "density", "poblada": "density",
+    "tupido": "density", "tupida": "density",
+    "cerrado": "density", "cerrada": "density",
+    "fino": "density", "fina": "density",
+    "ralo": "density", "rala": "density",
+    "escaso": "density", "escasa": "density",
+    "incipiente": "density",
+    # Color
+    "canoso": "color", "canosa": "color",
+    "cana": "color", "canas": "color",
+    "gris": "color",
+    "entrecano": "color", "entrecana": "color",
+    "negro": "color", "negra": "color",
+    "oscuro": "color", "oscura": "color",
+    "rojizo": "color", "rojiza": "color",
+    "rubio": "color", "rubia": "color",
+    "blanco": "color", "blanca": "color",
+    # Longitud
+    "largo": "length", "larga": "length",
+    "corto": "length", "corta": "length",
+    "recortado": "length", "recortada": "length",
+    # Estilo / cuidado
+    "cuidado": "style", "cuidada": "style",
+    "descuidado": "style", "descuidada": "style",
+}
+
+
+def _same_facial_hair_dimension(value1: str, value2: str) -> bool:
+    """
+    Determina si dos valores de vello facial pertenecen a la misma dimensión.
+
+    Solo valores de la misma dimensión son comparables:
+    - "espesa" vs "rala" → True (ambas densidad)
+    - "espesa" vs "canas" → False (densidad vs color)
+    """
+    v1 = _normalize_value(value1)
+    v2 = _normalize_value(value2)
+
+    dim1 = _FACIAL_HAIR_DIMENSIONS.get(v1)
+    dim2 = _FACIAL_HAIR_DIMENSIONS.get(v2)
+
+    # Si alguno no tiene dimensión conocida, asumir comparable (fallback conservador)
+    if dim1 is None or dim2 is None:
+        return True
+
+    return dim1 == dim2
+
+
+def _same_body_region(value1: str, value2: str) -> bool:
+    """
+    Determina si dos rasgos distintivos pertenecen a la misma región corporal.
+
+    Solo rasgos del mismo tipo deben compararse como posibles inconsistencias.
+    Ej: "nariz aguileña" vs "nariz chata" → True (misma región)
+        "nariz aguileña" vs "cicatriz en mejilla" → False (regiones diferentes)
+    """
+    v1 = value1.lower().strip()
+    v2 = value2.lower().strip()
+
+    region1 = None
+    region2 = None
+
+    for keyword, region in _BODY_REGION_PREFIXES.items():
+        if keyword in v1:
+            region1 = region
+            break
+    for keyword, region in _BODY_REGION_PREFIXES.items():
+        if keyword in v2:
+            region2 = region
+            break
+
+    # Si alguno no tiene región reconocida, no comparar (no sabemos si es el mismo tipo)
+    if region1 is None or region2 is None:
+        return False
+
+    return region1 == region2
+
+
+def _extract_descriptor(value: str) -> str | None:
+    """
+    Extrae el descriptor (adjetivo) de un rasgo distintivo.
+
+    "nariz aguileña" → "aguileña"
+    "labios gruesos" → "gruesos"
+    "cicatriz" → None (sin descriptor)
+    """
+    v = value.lower().strip()
+    for keyword in _BODY_REGION_PREFIXES:
+        if v.startswith(keyword):
+            rest = v[len(keyword) :].strip()
+            return rest if rest else None
+        # Handle "labios gruesos" where keyword is "labio" (singular)
+        # and value starts with "labios" (plural)
+        if keyword.endswith("o") and v.startswith(keyword + "s"):
+            rest = v[len(keyword) + 1 :].strip()
+            return rest if rest else None
+    return None
+
+
 def _normalize_value(value: str) -> str:
     """
     Normaliza un valor a su lema (forma canónica).
@@ -240,7 +370,11 @@ def _normalize_value(value: str) -> str:
         try:
             doc = nlp(v)
             if doc and len(doc) > 0:
-                lemma = doc[0].lemma_.lower()
+                if len(doc) == 1:
+                    lemma = doc[0].lemma_.lower()
+                else:
+                    # Multi-word: lematizar todos los tokens
+                    lemma = " ".join(token.lemma_.lower() for token in doc)
                 _lemma_cache[v] = lemma
                 return lemma
         except Exception as e:
@@ -312,8 +446,10 @@ def is_temporal_attribute(attr_key: AttributeKey, value: str) -> bool:
         AttributeKey.HEIGHT,  # La altura no cambia
         AttributeKey.BUILD,  # La constitución puede cambiar pero lentamente
         AttributeKey.AGE,  # La edad es permanente en un momento dado
+        AttributeKey.APPARENT_AGE,  # La apariencia de edad no cambia en una narración
         AttributeKey.SKIN,  # Color de piel
         AttributeKey.DISTINCTIVE_FEATURE,  # Cicatrices, tatuajes, lunares
+        AttributeKey.FACIAL_HAIR,  # Tipo/estilo de barba es bastante estable
     }
 
     if attr_key in permanent_keys:
@@ -332,8 +468,10 @@ COLOR_SYNONYMS: dict[str, set[str]] = {
     "castaño": {"marrón", "pardo", "chocolate"},
     "marrón": {"castaño", "pardo", "chocolate"},
     "negro": {"azabache", "oscuro", "moreno"},
-    "blanco": {"cano", "canoso", "plateado", "gris"},
-    "canoso": {"cano", "blanco", "plateado", "gris"},
+    "blanco": {"cano", "cana", "canas", "canoso", "plateado", "gris"},
+    "canoso": {"cano", "cana", "canas", "blanco", "plateado", "gris"},
+    "cana": {"canoso", "cano", "canas", "blanco", "plateado", "gris", "entrecano"},
+    "canas": {"canoso", "cano", "cana", "blanco", "plateado", "gris", "entrecano"},
     "rubio": {"dorado", "pajizo", "claro"},
     "rojo": {"pelirrojo", "cobrizo", "bermejo"},
     "pelirrojo": {"rojo", "cobrizo", "bermejo"},
@@ -379,6 +517,40 @@ PERSONALITY_SYNONYMS: dict[str, set[str]] = {
     "humilde": {"modesto", "sencillo", "llano"},
 }
 
+# Sinónimos de vello facial
+# Incluye lemas masculinos (normalización spaCy: espesa→espeso) y femeninos
+FACIAL_HAIR_SYNONYMS: dict[str, set[str]] = {
+    "espeso": {"poblado", "tupido", "cerrado", "espesa", "poblada", "tupida"},
+    "espesa": {"poblada", "tupida", "cerrada", "espeso", "poblado", "tupido"},
+    "poblado": {"espeso", "tupido", "cerrado", "poblada", "espesa"},
+    "poblada": {"espesa", "tupida", "cerrada", "poblado", "espeso"},
+    "tupido": {"espeso", "poblado", "cerrado", "tupida", "espesa"},
+    "tupida": {"espesa", "poblada", "cerrada", "tupido", "espeso"},
+    "cerrado": {"espeso", "poblado", "tupido", "cerrada"},
+    "cerrada": {"espesa", "poblada", "tupida", "cerrado"},
+    "fino": {"ralo", "escaso", "fina", "rala"},
+    "fina": {"rala", "escasa", "fino", "ralo"},
+    "ralo": {"fino", "escaso", "rala", "fina"},
+    "rala": {"fina", "escasa", "ralo", "fino"},
+    "canoso": {"gris", "blanco", "entrecano", "canosa", "cana", "canas"},
+    "canosa": {"gris", "blanca", "entrecana", "canoso", "cana", "canas"},
+    "cana": {"canoso", "canosa", "gris", "entrecano", "entrecana", "canas"},
+    "canas": {"canoso", "canosa", "gris", "entrecano", "entrecana", "cana"},
+    "gris": {"canoso", "canosa", "entrecano", "entrecana", "cana", "canas"},
+    "entrecano": {"canoso", "gris", "entrecana", "cana", "canas"},
+    "entrecana": {"canosa", "gris", "entrecano", "cana", "canas"},
+    "recortado": {"cuidado", "corto", "recortada"},
+    "recortada": {"cuidada", "corta", "recortado"},
+    "cuidado": {"recortado", "cuidada"},
+    "cuidada": {"recortada", "cuidado"},
+    "negro": {"oscuro", "negra"},
+    "negra": {"oscura", "negro"},
+    "oscuro": {"negro", "oscura"},
+    "oscura": {"negra", "oscuro"},
+    "rojizo": {"rojiza"},
+    "rojiza": {"rojizo"},
+}
+
 # Combinación de sinónimos por tipo de atributo
 SYNONYMS_BY_KEY: dict[AttributeKey, dict[str, set[str]]] = {
     AttributeKey.EYE_COLOR: COLOR_SYNONYMS,
@@ -387,6 +559,7 @@ SYNONYMS_BY_KEY: dict[AttributeKey, dict[str, set[str]]] = {
     AttributeKey.HEIGHT: BUILD_SYNONYMS,
     AttributeKey.PERSONALITY: PERSONALITY_SYNONYMS,
     AttributeKey.TEMPERAMENT: PERSONALITY_SYNONYMS,
+    AttributeKey.FACIAL_HAIR: FACIAL_HAIR_SYNONYMS,
 }
 
 
@@ -411,10 +584,12 @@ COLOR_ANTONYMS: dict[str, set[str]] = {
     "azul": {"verde", "marrón", "negro", "castaño", "miel", "ámbar"},
     "marrón": {"verde", "azul", "gris", "negro"},
     "castaño": {"verde", "azul", "rubio", "negro", "pelirrojo"},
-    "negro": {"verde", "azul", "rubio", "castaño", "pelirrojo", "canoso", "blanco"},
+    "negro": {"verde", "azul", "rubio", "castaño", "pelirrojo", "canoso", "cana", "canas", "blanco"},
     "rubio": {"negro", "castaño", "moreno", "pelirrojo"},
-    "pelirrojo": {"negro", "rubio", "castaño", "moreno", "canoso"},
+    "pelirrojo": {"negro", "rubio", "castaño", "moreno", "canoso", "cana", "canas"},
     "canoso": {"negro", "rubio", "castaño", "pelirrojo"},
+    "cana": {"negro", "rubio", "castaño", "pelirrojo"},
+    "canas": {"negro", "rubio", "castaño", "pelirrojo"},
     "blanco": {"negro", "castaño", "rubio"},
     "gris": {"verde", "azul", "marrón"},
     "miel": {"verde", "azul", "negro"},
@@ -501,6 +676,41 @@ LOCATION_ANTONYMS: dict[str, set[str]] = {
     "roma": {"madrid", "barcelona", "londres", "parís", "nueva york", "berlín"},
 }
 
+# Antónimos de vello facial
+# Incluye lemas masculinos (normalización spaCy) y femeninos
+FACIAL_HAIR_ANTONYMS: dict[str, set[str]] = {
+    "espeso": {"fino", "ralo", "escaso", "incipiente", "fina", "rala"},
+    "espesa": {"fina", "rala", "escasa", "incipiente", "fino", "ralo"},
+    "poblado": {"fino", "ralo", "escaso", "fina", "rala"},
+    "poblada": {"fina", "rala", "escasa", "fino", "ralo"},
+    "tupido": {"fino", "ralo", "escaso", "fina", "rala"},
+    "tupida": {"fina", "rala", "escasa", "fino", "ralo"},
+    "fino": {"espeso", "poblado", "tupido", "cerrado", "espesa", "poblada"},
+    "fina": {"espesa", "poblada", "tupida", "cerrada", "espeso", "poblado"},
+    "ralo": {"espeso", "poblado", "tupido", "cerrado", "espesa", "poblada"},
+    "rala": {"espesa", "poblada", "tupida", "cerrada", "espeso", "poblado"},
+    "largo": {"corto", "recortado", "corta", "recortada"},
+    "larga": {"corta", "recortada", "corto", "recortado"},
+    "corto": {"largo", "larga"},
+    "corta": {"larga", "largo"},
+    "recortado": {"largo", "descuidado", "larga", "descuidada"},
+    "recortada": {"larga", "descuidada", "largo", "descuidado"},
+    "cuidado": {"descuidado", "descuidada"},
+    "cuidada": {"descuidada", "descuidado"},
+    "descuidado": {"cuidado", "recortado", "cuidada", "recortada"},
+    "descuidada": {"cuidada", "recortada", "cuidado", "recortado"},
+    "canoso": {"negro", "oscuro", "rojizo", "rubio", "negra", "oscura"},
+    "canosa": {"negra", "oscura", "rojiza", "rubia", "negro", "oscuro"},
+    "cana": {"negro", "oscuro", "rojizo", "rubio", "negra", "oscura"},
+    "canas": {"negro", "oscuro", "rojizo", "rubio", "negra", "oscura"},
+    "negro": {"canoso", "rubio", "rojizo", "blanco", "canosa", "rubia", "cana", "canas"},
+    "negra": {"canosa", "rubia", "rojiza", "blanca", "canoso", "rubio", "cana", "canas"},
+    "rubio": {"negro", "oscuro", "canoso", "negra", "cana", "canas"},
+    "rubia": {"negra", "oscura", "canosa", "negro", "cana", "canas"},
+    "rojizo": {"negro", "canoso", "rubio", "negra", "cana", "canas"},
+    "rojiza": {"negra", "canosa", "rubia", "negro", "cana", "canas"},
+}
+
 # Combinación de todos los antónimos por tipo de atributo
 ANTONYMS_BY_KEY: dict[AttributeKey, dict[str, set[str]]] = {
     AttributeKey.EYE_COLOR: COLOR_ANTONYMS,
@@ -511,6 +721,7 @@ ANTONYMS_BY_KEY: dict[AttributeKey, dict[str, set[str]]] = {
     AttributeKey.PERSONALITY: PERSONALITY_ANTONYMS,
     AttributeKey.TEMPERAMENT: PERSONALITY_ANTONYMS,
     AttributeKey.LOCATION: LOCATION_ANTONYMS,
+    AttributeKey.FACIAL_HAIR: FACIAL_HAIR_ANTONYMS,
 }
 
 
@@ -711,6 +922,15 @@ class AttributeConsistencyChecker:
                             )
                             continue
 
+                        # Para DISTINCTIVE_FEATURE multi-value: solo comparar rasgos
+                        # del mismo tipo corporal (nariz vs nariz, no nariz vs cicatriz)
+                        if attr_key == AttributeKey.DISTINCTIVE_FEATURE:
+                            if not _same_body_region(attr1.value, attr2.value):
+                                logger.debug(
+                                    f"  Skipping {attr1.value} vs {attr2.value} (different body regions)"
+                                )
+                                continue
+
                         # Saltar atributos temporales que pueden cambiar
                         if is_temporal_attribute(attr_key, attr1.value) or is_temporal_attribute(
                             attr_key, attr2.value
@@ -804,8 +1024,27 @@ class AttributeConsistencyChecker:
             if v2 in antonyms and v1 in antonyms.get(v2, set()):
                 return 0.95, InconsistencyType.ANTONYM
 
-        # 2. Caso especial: edad (valores numéricos)
-        if attr_key == AttributeKey.AGE:
+        # 1b. Caso especial: DISTINCTIVE_FEATURE de la misma región corporal
+        # "nariz aguileña" vs "nariz chata" → comparar solo descriptores
+        if attr_key == AttributeKey.DISTINCTIVE_FEATURE and _same_body_region(v1, v2):
+            # Extraer descriptores (parte después de la región corporal)
+            desc1 = _extract_descriptor(v1)
+            desc2 = _extract_descriptor(v2)
+            if desc1 and desc2 and desc1 != desc2:
+                # Descriptores diferentes para la misma parte del cuerpo = inconsistencia
+                return 0.75, InconsistencyType.SEMANTIC_DIFF
+
+        # 1c. Caso especial: FACIAL_HAIR — solo comparar misma dimensión
+        # "espesa" (densidad) vs "canas" (color) NO son inconsistentes
+        if attr_key == AttributeKey.FACIAL_HAIR:
+            if not _same_facial_hair_dimension(v1, v2):
+                logger.debug(
+                    f"Dimensiones distintas de vello facial: {v1} vs {v2} — no comparar"
+                )
+                return 0.0, InconsistencyType.VALUE_CHANGE
+
+        # 2. Caso especial: edad (real o aparente, valores numéricos o descriptivos)
+        if attr_key in (AttributeKey.AGE, AttributeKey.APPARENT_AGE):
             return self._check_age_consistency(v1, v2)
 
         # 3. Similitud semántica con embeddings
@@ -834,31 +1073,66 @@ class AttributeConsistencyChecker:
 
         return 0.4, InconsistencyType.VALUE_CHANGE
 
+    # Rangos aproximados para descriptores de edad
+    _AGE_RANGES: dict[str, tuple[int, int]] = {
+        "niño": (0, 12), "niña": (0, 12),
+        "adolescente": (13, 17),
+        "joven": (15, 30),
+        "veinteañero": (20, 29), "veinteañera": (20, 29),
+        "treintañero": (30, 39), "treintañera": (30, 39),
+        "cuarentón": (40, 49), "cuarentona": (40, 49),
+        "cincuentón": (50, 59), "cincuentona": (50, 59),
+        "de mediana edad": (40, 55),
+        "maduro": (40, 60), "madura": (40, 60),
+        "mayor": (55, 80),
+        "sexagenario": (60, 69), "sexagenaria": (60, 69),
+        "septuagenario": (70, 79), "septuagenaria": (70, 79),
+        "octogenario": (80, 89), "octogenaria": (80, 89),
+        "nonagenario": (90, 99), "nonagenaria": (90, 99),
+        "viejo": (60, 99), "vieja": (60, 99),
+        "anciano": (65, 99), "anciana": (65, 99),
+    }
+
+    def _age_to_range(self, value: str) -> tuple[int, int] | None:
+        """Convierte un valor de edad a rango numérico."""
+        try:
+            n = int(value)
+            return (n, n)
+        except ValueError:
+            return self._AGE_RANGES.get(value.lower())
+
     def _check_age_consistency(
         self,
         v1: str,
         v2: str,
     ) -> tuple[float, InconsistencyType]:
-        """Verifica consistencia de edades numéricas."""
-        try:
-            age1 = int(v1)
-            age2 = int(v2)
-            diff = abs(age1 - age2)
+        """Verifica consistencia de edades numéricas o descriptivas."""
+        r1 = self._age_to_range(v1)
+        r2 = self._age_to_range(v2)
 
-            # Diferencia pequeña (1-2 años) puede ser redondeo
-            if diff <= 2:
-                return 0.3, InconsistencyType.VALUE_CHANGE
-
-            # Diferencia media (3-5 años) es sospechosa
-            if diff <= 5:
-                return 0.6, InconsistencyType.VALUE_CHANGE
-
-            # Diferencia grande = muy probable inconsistencia
-            return 0.9, InconsistencyType.CONTRADICTORY
-
-        except ValueError:
-            # No son números, usar comparación por defecto
+        if r1 is None or r2 is None:
+            # At least one value isn't recognized — soft comparison
             return 0.5, InconsistencyType.VALUE_CHANGE
+
+        # Check if ranges overlap
+        overlap_start = max(r1[0], r2[0])
+        overlap_end = min(r1[1], r2[1])
+
+        if overlap_start <= overlap_end:
+            # Ranges overlap — compatible
+            # Calculate how much they overlap vs total span
+            overlap_size = overlap_end - overlap_start
+            total_span = max(r1[1], r2[1]) - min(r1[0], r2[0])
+            overlap_ratio = overlap_size / max(total_span, 1)
+            if overlap_ratio > 0.5:
+                return 0.1, InconsistencyType.VALUE_CHANGE  # Very compatible
+            return 0.3, InconsistencyType.VALUE_CHANGE  # Some overlap
+
+        # No overlap — gap between ranges
+        gap = overlap_start - overlap_end
+        if gap <= 5:
+            return 0.6, InconsistencyType.VALUE_CHANGE  # Close but non-overlapping
+        return 0.9, InconsistencyType.CONTRADICTORY  # Clearly contradictory
 
     def _calculate_semantic_similarity(
         self,

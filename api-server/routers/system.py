@@ -61,15 +61,27 @@ async def system_info():
     try:
         config = deps.get_config()
 
+        # Usar detección real de GPU (no solo config)
+        gpu_available = False
+        gpu_device_str = "cpu"
+        try:
+            from narrative_assistant.core.device import get_device_detector, DeviceType
+            detector = get_device_detector()
+            device = detector.detect_best_device()
+            gpu_available = device.device_type in (DeviceType.CUDA, DeviceType.MPS)
+            gpu_device_str = device.device_type.name.lower()
+        except Exception:
+            pass
+
         return ApiResponse(
             success=True,
             data={
                 "version": deps.NA_VERSION,
                 "gpu": {
-                    "device": config.gpu.device_preference,
-                    "available": config.gpu.device_preference != "cpu",
-                    "spacy_gpu": config.gpu.spacy_gpu_enabled,
-                    "embeddings_gpu": config.gpu.embeddings_gpu_enabled,
+                    "device": gpu_device_str,
+                    "available": gpu_available,
+                    "spacy_gpu": config.gpu.spacy_gpu_enabled and gpu_available,
+                    "embeddings_gpu": config.gpu.embeddings_gpu_enabled and gpu_available,
                 },
                 "models": {
                     "spacy_model": config.nlp.spacy_model,
@@ -696,7 +708,7 @@ async def system_capabilities():
         ApiResponse con capacidades detalladas del sistema
     """
     try:
-        from narrative_assistant.core.device import get_device_detector, DeviceType
+        from narrative_assistant.core.device import get_device_detector, DeviceType, get_blocked_gpu_info
 
         detector = get_device_detector()
 
@@ -705,6 +717,9 @@ async def system_capabilities():
         mps_device = detector.detect_mps()
         cpu_device = detector.get_cpu_info()
         has_cupy = detector.detect_cupy() if cuda_device else False
+
+        # Info de GPU bloqueada por CC < 6.0 (prevención de BSOD)
+        blocked_gpu = get_blocked_gpu_info()
 
         # Determinar GPU principal
         gpu_info = None
@@ -994,6 +1009,7 @@ async def system_capabilities():
                     "has_gpu": has_gpu,
                     "has_high_vram": has_high_vram,
                     "has_cupy": has_cupy,
+                    "gpu_blocked": blocked_gpu,  # None o {name, compute_capability, min_required}
                     "cpu": {
                         "name": cpu_device.device_name,
                     },

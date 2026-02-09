@@ -1,6 +1,7 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod cleanup;
 mod menu;
 
 #[cfg(not(debug_assertions))]
@@ -269,7 +270,9 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             start_backend_server,
             stop_backend_server,
-            check_backend_health
+            check_backend_health,
+            cleanup::get_data_categories,
+            cleanup::delete_data_category
         ])
         .setup(|app| {
             // Configurar menu nativo

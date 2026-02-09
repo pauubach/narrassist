@@ -89,6 +89,7 @@ const allPhases: PhaseDefinition[] = [
 
 // Computed - usando propiedades reales del store
 const isAnalyzing = computed(() => analysisStore.isAnalyzing)
+const isQueued = computed(() => analysisStore.currentAnalysis?.status === 'queued')
 const progress = computed(() => analysisStore.currentAnalysis?.progress ?? 0)
 const currentStep = computed(() => analysisStore.currentAnalysis?.current_phase ?? '')
 const currentAction = computed(() => analysisStore.currentAnalysis?.current_action ?? '')
@@ -182,6 +183,12 @@ const currentStepLabel = computed(() => {
 const analysisStatus = computed(() => {
   if (isAnalyzing.value) return null
 
+  // Si hay un análisis en cola (puede que isAnalyzing sea false por timing)
+  const currentStatus = analysisStore.currentAnalysis?.status
+  if (currentStatus === 'queued') {
+    return { icon: 'pi-clock', text: 'En cola — esperando análisis anterior', class: 'status-queued' }
+  }
+
   // Si hay error (del store o del prop)
   if (analysisStore.error || props.analysisError) {
     const detail = analysisStore.error
@@ -255,8 +262,14 @@ function toggleDetails() {
       />
     </div>
 
+    <!-- Estado: en cola -->
+    <div v-if="isQueued" class="status-section status-analysis-state status-queued">
+      <i class="pi pi-clock"></i>
+      <span>En cola — esperando análisis anterior</span>
+    </div>
+
     <!-- Progreso cuando SÍ está analizando -->
-    <div v-if="isAnalyzing" class="status-section status-progress" @click="toggleDetails">
+    <div v-if="isAnalyzing && !isQueued" class="status-section status-progress" @click="toggleDetails">
       <span class="progress-step">{{ currentStepLabel }}</span>
       <ProgressBar
         :value="progress"
@@ -415,6 +428,15 @@ function toggleDetails() {
 
 .status-error i {
   color: var(--red-500);
+}
+
+.status-queued {
+  color: var(--orange-600);
+  background: var(--orange-50);
+}
+
+.status-queued i {
+  color: var(--orange-500);
 }
 
 .status-pending {
@@ -783,6 +805,10 @@ function toggleDetails() {
 
 .dark .status-completed {
   background: rgba(34, 197, 94, 0.15);
+}
+
+.dark .status-queued {
+  background: rgba(249, 115, 22, 0.15);
 }
 
 .dark .status-error {

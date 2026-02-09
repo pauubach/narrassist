@@ -115,13 +115,21 @@
                   <span class="stat-label">capítulos</span>
                 </div>
                 <div class="stat">
-                  <span class="stat-value">{{ project.analysisProgress ?? 0 }}%</span>
+                  <span v-if="project.analysisStatus === 'queued'" class="stat-value stat-queued">En cola</span>
+                  <span v-else class="stat-value">{{ project.analysisProgress ?? 0 }}%</span>
                   <span class="stat-label">analizado</span>
                 </div>
               </div>
 
               <ProgressBar
-                v-if="(project.analysisProgress ?? 0) < 100"
+                v-if="project.analysisStatus === 'queued'"
+                :value="0"
+                :show-value="false"
+                class="mt-3 progress-queued"
+                mode="indeterminate"
+              />
+              <ProgressBar
+                v-else-if="(project.analysisProgress ?? 0) < 100"
                 :value="project.analysisProgress ?? 0"
                 :show-value="false"
                 class="mt-3"
@@ -222,6 +230,7 @@
 
     <!-- Menu contextual de proyecto -->
     <Menu ref="projectMenu" :model="projectMenuItems" :popup="true" />
+    <ConfirmDialog />
   </div>
 </template>
 
@@ -243,12 +252,15 @@ import ProgressSpinner from 'primevue/progressspinner'
 import Message from 'primevue/message'
 import Menu from 'primevue/menu'
 import Badge from 'primevue/badge'
+import ConfirmDialog from 'primevue/confirmdialog'
+import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
 import type { Project } from '@/types'
 // import { transformProjects, transformProject } from '@/types/transformers'  // Reserved
 import { api } from '@/services/apiClient'
 
 const router = useRouter()
+const confirmDialog = useConfirm()
 const toast = useToast()
 const projectsStore = useProjectsStore()
 const analysisStore = useAnalysisStore()
@@ -333,9 +345,67 @@ const filteredProjects = computed(() => {
   })
 })
 
+// Polling ligero: solo actualiza progreso de proyectos en análisis (sin recargar la lista)
+let progressPollingInterval: ReturnType<typeof setInterval> | null = null
+
+function getAnalyzingProjectIds(): number[] {
+  return projectsStore.projects
+    .filter(p =>
+      p.analysisStatus === 'analyzing' ||
+      p.analysisStatus === 'queued' ||
+      p.analysisStatus === 'in_progress' ||
+      (p.analysisProgress > 0 && p.analysisProgress < 100)
+    )
+    .map(p => p.id)
+}
+
+function startProgressPolling() {
+  if (progressPollingInterval) return
+  progressPollingInterval = setInterval(async () => {
+    const analyzingIds = getAnalyzingProjectIds()
+    if (analyzingIds.length === 0 && !analysisStore.hasAnyActiveAnalysis) {
+      stopProgressPolling()
+      return
+    }
+    // Polling ligero: solo pedir progreso de cada proyecto en análisis
+    let anyCompleted = false
+    for (const pid of analyzingIds) {
+      try {
+        const data = await api.get<{ status: string; progress: number }>(`/api/projects/${pid}/analysis/progress`)
+        const progress = data.progress ?? 0
+        if (data.status === 'completed' || data.status === 'idle') {
+          projectsStore.updateProjectProgress(pid, 100, 'completed')
+          anyCompleted = true
+        } else if (data.status === 'queued') {
+          projectsStore.updateProjectProgress(pid, 0, 'queued')
+        } else {
+          projectsStore.updateProjectProgress(pid, progress, 'analyzing')
+        }
+      } catch {
+        // Silenciar errores de polling
+      }
+    }
+    // Si algún proyecto completó, refrescar lista completa (puede haber encolados que arrancaron)
+    if (anyCompleted) {
+      await projectsStore.fetchProjects()
+    }
+  }, 3000)
+}
+
+function stopProgressPolling() {
+  if (progressPollingInterval) {
+    clearInterval(progressPollingInterval)
+    progressPollingInterval = null
+  }
+}
+
 // Funciones
 const loadProjects = async () => {
   await projectsStore.fetchProjects()
+  // Iniciar polling si hay algún proyecto analizándose
+  if (getAnalyzingProjectIds().length > 0 || analysisStore.hasAnyActiveAnalysis) {
+    startProgressPolling()
+  }
 }
 
 const openProject = (projectId: number) => {
@@ -417,26 +487,29 @@ const showProjectMenu = (event: Event, project: Project) => {
   projectMenu.value.toggle(event)
 }
 
-const deleteProject = async (projectId: number) => {
+const deleteProject = (projectId: number) => {
   if (!selectedProject.value) return
 
-  // Mostrar confirmación
-  const confirmed = confirm(
-    `¿Estás seguro de que deseas eliminar el proyecto "${selectedProject.value.name}"?\n\nEsta acción no se puede deshacer.`
-  )
+  const projectName = selectedProject.value.name
 
-  if (!confirmed) return
-
-  try {
-    // Llamar al endpoint DELETE
-    await api.del(`/api/projects/${projectId}`)
-
-    // Recargar la lista de proyectos
-    await projectsStore.fetchProjects()
-  } catch (error) {
-    console.error('Error deleting project:', error)
-    toast.add({ severity: 'error', summary: 'Error', detail: 'Error al eliminar el proyecto. Por favor, inténtalo de nuevo.', life: 5000 })
-  }
+  confirmDialog.require({
+    message: `¿Estás seguro de que deseas eliminar el proyecto "${projectName}"?\n\nEsta acción no se puede deshacer.`,
+    header: 'Eliminar proyecto',
+    icon: 'pi pi-trash',
+    rejectLabel: 'Cancelar',
+    acceptLabel: 'Eliminar',
+    acceptClass: 'p-button-danger',
+    accept: async () => {
+      try {
+        await api.del(`/api/projects/${projectId}`)
+        await projectsStore.fetchProjects()
+        toast.add({ severity: 'success', summary: 'Eliminado', detail: `Proyecto "${projectName}" eliminado.`, life: 3000 })
+      } catch (error) {
+        console.error('Error deleting project:', error)
+        toast.add({ severity: 'error', summary: 'Error', detail: 'Error al eliminar el proyecto. Por favor, inténtalo de nuevo.', life: 5000 })
+      }
+    }
+  })
 }
 
 const getFormatIcon = (format: string) => {
@@ -492,6 +565,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener('menubar:new-project', handleNewProjectEvent)
+  stopProgressPolling()
 })
 </script>
 
@@ -704,6 +778,15 @@ onUnmounted(() => {
   font-size: 1.25rem;
   font-weight: 700;
   color: var(--primary-color);
+}
+
+.stat-queued {
+  font-size: 0.9rem;
+  color: var(--text-color-secondary);
+}
+
+.progress-queued :deep(.p-progressbar-value) {
+  background: var(--surface-400);
 }
 
 .stat-label {

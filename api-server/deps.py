@@ -26,7 +26,7 @@ logger = logging.getLogger("narrative_assistant.api")
 # Constants
 # ============================================================================
 
-BACKEND_VERSION = "0.7.12"
+BACKEND_VERSION = "0.7.13"
 IS_EMBEDDED_RUNTIME = os.environ.get("NA_EMBEDDED") == "1" or "python-embed" in (sys.executable or "").lower()
 
 # Minimum required Python version (major, minor)
@@ -58,6 +58,21 @@ INSTALLING_DEPENDENCIES = False
 # Analysis progress storage (protected by _progress_lock)
 analysis_progress_storage: dict[int, dict] = {}
 _progress_lock = threading.Lock()
+
+# Analysis queue: only one analysis at a time (protected by _progress_lock)
+# Stores the project_id of the currently running analysis, or None
+_active_analysis_project_id: int | None = None
+
+# Queue of projects waiting to be analyzed (protected by _progress_lock)
+# Each entry is a dict with keys: project_id, file_path, use_temp_file
+_analysis_queue: list[dict] = []
+
+# Two-tier concurrency: lightweight phases run in parallel, heavy phases are exclusive
+# Heavy analysis (Tier 2: NER, coreference, attributes, grammar, alerts) exclusive lock
+_heavy_analysis_project_id: int | None = None
+# Queue of projects that finished Tier 1 (parsing/structure), waiting for heavy slot
+# Each entry is a dict with keys: project_id, context (data from Tier 1)
+_heavy_analysis_queue: list[dict] = []
 
 # Cache for Python status
 _python_status_cache: dict | None = None
@@ -339,7 +354,7 @@ class CustomWordRequest(BaseModel):
 
 
 class DefaultOverrideRequest(BaseModel):
-    config: dict
+    overrides: dict
 
 
 # --- Request models for endpoints that used raw request.json() ---
@@ -812,41 +827,46 @@ def _classify_mention_type(surface_form: str) -> str:
 
 
 def _field_label(field: str) -> str:
-    """Etiqueta legible para campos de corrección."""
+    """Etiqueta legible para campos de documento."""
     labels = {
-        "punctuation": "Puntuación",
-        "spelling": "Ortografía",
-        "grammar": "Gramática",
-        "style": "Estilo",
-        "register": "Registro",
-        "consistency": "Consistencia",
+        "general": "General",
+        "literary": "Literario",
+        "journalistic": "Periodístico",
+        "academic": "Académico",
+        "technical": "Técnico",
+        "legal": "Jurídico",
+        "medical": "Médico",
+        "business": "Empresarial",
+        "selfhelp": "Autoayuda",
+        "culinary": "Culinario",
     }
-    return labels.get(field, field.replace("_", " ").title())
+    field_str = field.value if hasattr(field, "value") else str(field)
+    return labels.get(field_str, field_str.replace("_", " ").title())
 
 
 def _register_label(register: str) -> str:
     """Etiqueta legible para tipo de registro."""
     labels = {
         "formal": "Formal",
-        "informal": "Informal",
         "neutral": "Neutro",
-        "literary": "Literario",
-        "academic": "Académico",
         "colloquial": "Coloquial",
+        "vulgar": "Vulgar",
     }
-    return labels.get(register, register.title())
+    reg_str = register.value if hasattr(register, "value") else str(register)
+    return labels.get(reg_str, reg_str.title())
 
 
 def _audience_label(audience: str) -> str:
     """Etiqueta legible para tipo de audiencia."""
     labels = {
-        "adult": "Adulto",
-        "young_adult": "Joven adulto",
-        "children": "Infantil",
-        "academic": "Académico",
         "general": "General",
+        "children": "Infantil",
+        "adult": "Adulto",
+        "specialist": "Especialista",
+        "mixed": "Mixta",
     }
-    return labels.get(audience, audience.title())
+    aud_str = audience.value if hasattr(audience, "value") else str(audience)
+    return labels.get(aud_str, aud_str.replace("_", " ").title())
 
 
 def _get_sticky_recommendation(glue_percentage: float) -> str:

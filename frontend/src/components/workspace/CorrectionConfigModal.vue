@@ -71,6 +71,7 @@
                     <Tab value="1">Repeticiones</Tab>
                     <Tab value="2">Oraciones</Tab>
                     <Tab value="3">Estilo</Tab>
+                    <Tab value="6">Regional</Tab>
                     <Tab value="4">Estructura</Tab>
                     <Tab value="5">Legibilidad</Tab>
                   </TabList>
@@ -646,6 +647,82 @@
                         </div>
                       </div>
                     </TabPanel>
+
+                    <!-- Regional Tab -->
+                    <TabPanel value="6">
+                      <div class="config-section">
+                        <div class="param-row">
+                          <div class="param-info">
+                            <label>Vocabulario regional</label>
+                            <small>Detectar mezcla de variantes del español</small>
+                          </div>
+                          <div class="param-control">
+                            <ToggleSwitch
+                              v-model="localConfig.regional.enabled"
+                              @change="markModified('regional', 'enabled')"
+                            />
+                            <InheritanceIndicator
+                              :is-custom="isCustom('regional', 'enabled')"
+                              @reset="resetParam('regional', 'enabled')"
+                            />
+                          </div>
+                        </div>
+
+                        <div v-if="localConfig.regional.enabled" class="param-row">
+                          <div class="param-info">
+                            <label>Variante regional</label>
+                            <small>Variante del español de referencia para este proyecto</small>
+                          </div>
+                          <div class="param-control">
+                            <Select
+                              v-model="localConfig.regional.target_region"
+                              :options="regionOptions"
+                              option-label="label"
+                              option-value="value"
+                              @change="markModified('regional', 'target_region')"
+                            />
+                            <InheritanceIndicator
+                              :is-custom="isCustom('regional', 'target_region')"
+                              @reset="resetParam('regional', 'target_region')"
+                            />
+                          </div>
+                        </div>
+
+                        <div v-if="localConfig.regional.enabled" class="param-row">
+                          <div class="param-info">
+                            <label>Detectar mezcla de variantes</label>
+                            <small>Alertar si se mezclan regionalismos de distintas zonas</small>
+                          </div>
+                          <div class="param-control">
+                            <ToggleSwitch
+                              v-model="localConfig.regional.detect_mixed_variants"
+                              @change="markModified('regional', 'detect_mixed_variants')"
+                            />
+                            <InheritanceIndicator
+                              :is-custom="isCustom('regional', 'detect_mixed_variants')"
+                              @reset="resetParam('regional', 'detect_mixed_variants')"
+                            />
+                          </div>
+                        </div>
+
+                        <div v-if="localConfig.regional.enabled" class="param-row">
+                          <div class="param-info">
+                            <label>Sugerir alternativas regionales</label>
+                            <small>Proponer equivalentes en la variante seleccionada</small>
+                          </div>
+                          <div class="param-control">
+                            <ToggleSwitch
+                              v-model="localConfig.regional.suggest_regional_alternatives"
+                              @change="markModified('regional', 'suggest_regional_alternatives')"
+                            />
+                            <InheritanceIndicator
+                              :is-custom="isCustom('regional', 'suggest_regional_alternatives')"
+                              @reset="resetParam('regional', 'suggest_regional_alternatives')"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </TabPanel>
                   </TabPanels>
                 </Tabs>
               </TabPanel>
@@ -902,6 +979,13 @@ interface CorrectionConfig {
     analyze_vocabulary_age: boolean
     max_vocabulary_size: number | null
   }
+  regional: {
+    enabled: boolean
+    target_region: string
+    detect_mixed_variants: boolean
+    suggest_regional_alternatives: boolean
+    min_confidence: number
+  }
   editorial_rules: {
     rules: EditorialRule[]
   }
@@ -952,6 +1036,7 @@ const defaultLocalConfig: CorrectionConfig = {
   style: { enabled: false, analyze_sentence_starts: false, analyze_sticky_sentences: false, sticky_threshold_pct: 40, analyze_register: false, analyze_emotions: false },
   structure: { timeline_enabled: false, relationships_enabled: false, behavior_consistency_enabled: false, scenes_enabled: false, location_tracking_enabled: false, vital_status_enabled: false },
   readability: { enabled: false, target_age_min: null, target_age_max: null, analyze_vocabulary_age: false, max_vocabulary_size: null },
+  regional: { enabled: true, target_region: 'es_ES', detect_mixed_variants: true, suggest_regional_alternatives: true, min_confidence: 0.7 },
   editorial_rules: { rules: [] },
   inheritance: {},
 }
@@ -998,6 +1083,16 @@ const quoteTypeOptions = [
   { value: 'single', label: "Comillas simples ('')" },
   { value: 'none', label: 'Sin comillas' },
   { value: 'auto', label: 'Detectar automáticamente' },
+]
+
+// Opciones de variantes regionales
+const regionOptions = [
+  { value: 'es_ES', label: 'España' },
+  { value: 'es_MX', label: 'México' },
+  { value: 'es_AR', label: 'Argentina' },
+  { value: 'es_CO', label: 'Colombia' },
+  { value: 'es_CL', label: 'Chile' },
+  { value: 'es_PE', label: 'Perú' },
 ]
 
 // Helper para obtener el carácter de guión
@@ -1586,6 +1681,7 @@ watch(
 .footer-actions {
   display: flex;
   gap: 0.5rem;
+  margin-left: auto;
 }
 
 /* Unsaved dialog */

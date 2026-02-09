@@ -32,6 +32,7 @@ class AttributeType(Enum):
     AGE = "age"
     SKIN = "skin"
     DISTINCTIVE_FEATURE = "distinctive_feature"  # Para fantasy/sci-fi
+    FACIAL_HAIR = "facial_hair"  # Barba, bigote, patillas
 
     # Ubicación
     LOCATION = "location"

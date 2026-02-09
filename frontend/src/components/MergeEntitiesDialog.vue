@@ -356,16 +356,18 @@
         </div>
       </div>
 
-      <!-- Indicador de progreso -->
+      <!-- Indicador de pasos -->
       <div class="steps-indicator">
-        <div
-          v-for="i in 3"
-          :key="i"
-          class="step-dot"
-          :class="{ 'active': step === i, 'completed': step > i }"
-        >
-          {{ i }}
-        </div>
+        <template v-for="i in 3" :key="i">
+          <div class="step-item" :class="{ 'active': step === i, 'completed': step > i }">
+            <div class="step-dot">
+              <i v-if="step > i" class="pi pi-check" style="font-size: 0.75rem" />
+              <span v-else>{{ i }}</span>
+            </div>
+            <span class="step-label">{{ ['Seleccionar', 'Nombre', 'Confirmar'][i - 1] }}</span>
+          </div>
+          <div v-if="i < 3" class="step-connector" :class="{ 'completed': step > i }" />
+        </template>
       </div>
     </div>
 
@@ -1159,8 +1161,16 @@ watch(() => props.visible, (isVisible) => {
 .steps-indicator {
   display: flex;
   justify-content: center;
-  gap: 1rem;
-  padding-top: 0.5rem;
+  align-items: flex-start;
+  gap: 0;
+  padding-top: 0.75rem;
+}
+
+.step-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
 }
 
 .step-dot {
@@ -1175,17 +1185,47 @@ watch(() => props.visible, (isVisible) => {
   font-weight: 600;
   font-size: 0.875rem;
   transition: all 0.3s;
+  border: 2px solid var(--surface-300);
 }
 
-.step-dot.active {
+.step-item.active .step-dot {
   background: var(--primary-color);
   color: white;
+  border-color: var(--primary-color);
   transform: scale(1.1);
 }
 
-.step-dot.completed {
+.step-item.completed .step-dot {
   background: var(--green-500);
   color: white;
+  border-color: var(--green-500);
+}
+
+.step-label {
+  font-size: 0.7rem;
+  color: var(--text-color-secondary);
+  white-space: nowrap;
+}
+
+.step-item.active .step-label {
+  color: var(--primary-color);
+  font-weight: 600;
+}
+
+.step-item.completed .step-label {
+  color: var(--green-500);
+}
+
+.step-connector {
+  width: 40px;
+  height: 2px;
+  background: var(--surface-300);
+  margin-top: 16px; /* center with dot */
+  flex-shrink: 0;
+}
+
+.step-connector.completed {
+  background: var(--green-500);
 }
 
 /* Footer */

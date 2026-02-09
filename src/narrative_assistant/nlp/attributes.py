@@ -114,10 +114,12 @@ class AttributeKey(Enum):
     HAIR_TYPE = "hair_type"
     HAIR_MODIFICATION = "hair_modification"  # teñido, natural, decolorado, mechas
     AGE = "age"
+    APPARENT_AGE = "apparent_age"  # "aparentaba 30", "parecía joven"
     HEIGHT = "height"
     BUILD = "build"
     SKIN = "skin"
     DISTINCTIVE_FEATURE = "distinctive_feature"
+    FACIAL_HAIR = "facial_hair"
 
     # Psicológicos
     PERSONALITY = "personality"
@@ -303,6 +305,7 @@ COLORS = {
     "pelirrojos",
     "canoso",
     "canosos",
+    "canas",
     "blanco",
     "blancos",
     "oscuro",
@@ -441,6 +444,54 @@ PERSONALITY_TRAITS = {
     "astuto",
     "astuta",
     "torpe",
+}
+
+# Vello facial (barba, bigote, patillas) - adjetivos validados
+FACIAL_HAIR_DESCRIPTORS = {
+    "espesa",
+    "espeso",
+    "poblada",
+    "poblado",
+    "cerrada",
+    "cerrado",
+    "fina",
+    "fino",
+    "rala",
+    "ralo",
+    "canosa",
+    "canoso",
+    "gris",
+    "blanca",
+    "blanco",
+    "recortada",
+    "recortado",
+    "tupida",
+    "tupido",
+    "larga",
+    "largo",
+    "corta",
+    "corto",
+    "rojiza",
+    "rojizo",
+    "negra",
+    "negro",
+    "oscura",
+    "oscuro",
+    "rubia",
+    "rubio",
+    "incipiente",
+    "descuidada",
+    "descuidado",
+    "cuidada",
+    "cuidado",
+    "entrecana",
+    "entrecano",
+    "caída",
+    "caído",
+    "puntiaguda",
+    "puntiagudo",
+    "perilla",
+    "canas",
 }
 
 
@@ -738,6 +789,109 @@ ATTRIBUTE_PATTERNS: list[tuple[str, AttributeKey, AttributeCategory, float, bool
         0.7,
         False,
     ),
+    # "Juan aparentaba 30 años" / "Juan aparentaba unos 30" → APPARENT_AGE (con nombre)
+    (
+        r"(\b[A-ZÁÉÍÓÚÜÑ][a-záéíóúüñ]+)\s+aparentaba\s+(?:unos\s+)?(\d+)\s*(?:años)?",
+        AttributeKey.APPARENT_AGE,
+        AttributeCategory.PHYSICAL,
+        0.75,
+        False,
+    ),
+    # "aparentaba unos 30 años" → APPARENT_AGE (sin nombre, resolver por proximidad)
+    (
+        r"[Aa]parentaba\s+(?:unos\s+)?(\d+)\s*(?:años)?",
+        AttributeKey.APPARENT_AGE,
+        AttributeCategory.PHYSICAL,
+        0.6,
+        False,
+    ),
+    # "que aparentaba unos 30 años" → APPARENT_AGE (cláusula relativa)
+    (
+        r"que\s+aparentaba\s+(?:unos\s+)?(\d+)\s*(?:años)?",
+        AttributeKey.APPARENT_AGE,
+        AttributeCategory.PHYSICAL,
+        0.65,
+        False,
+    ),
+    # "aparentaba ser joven/mayor" → APPARENT_AGE descriptivo
+    (
+        r"[Aa]parentaba\s+(?:ser\s+)?(joven|viejo|vieja|anciano|anciana|maduro|madura|mayor"
+        r"|de\s+mediana\s+edad)",
+        AttributeKey.APPARENT_AGE,
+        AttributeCategory.PHYSICAL,
+        0.6,
+        False,
+    ),
+    # "Juan parecía tener 30 años" / "Juan parecía de unos 30" → APPARENT_AGE (con nombre)
+    (
+        r"(\b[A-ZÁÉÍÓÚÜÑ][a-záéíóúüñ]+)\s+parec[íi]a\s+(?:tener\s+(?:unos\s+)?|de\s+(?:unos\s+)?)(\d+)\s*(?:años)?",
+        AttributeKey.APPARENT_AGE,
+        AttributeCategory.PHYSICAL,
+        0.75,
+        False,
+    ),
+    # "parecía tener/de unos 30 años" → APPARENT_AGE (sin nombre)
+    (
+        r"[Pp]arec[íi]a\s+(?:tener\s+(?:unos\s+)?|de\s+(?:unos\s+)?)(\d+)\s*(?:años)?",
+        AttributeKey.APPARENT_AGE,
+        AttributeCategory.PHYSICAL,
+        0.6,
+        False,
+    ),
+    # "parecía joven/mayor" → APPARENT_AGE descriptivo sin nombre
+    (
+        r"[Pp]arec[íi]a\s+(joven|viejo|vieja|anciano|anciana|maduro|madura|mayor"
+        r"|de\s+mediana\s+edad)",
+        AttributeKey.APPARENT_AGE,
+        AttributeCategory.PHYSICAL,
+        0.6,
+        False,
+    ),
+    # "Juan era joven/viejo/anciano/adolescente" → APPARENT_AGE (subjetivo, con nombre)
+    (
+        r"(\b[A-ZÁÉÍÓÚÜÑ][a-záéíóúüñ]+)\s+era\s+(joven|viejo|vieja|anciano|anciana|"
+        r"adolescente|ni[ñn]o|ni[ñn]a|maduro|madura|mayor|sexagenario|sexagenaria|"
+        r"septuagenario|septuagenaria|octogenario|octogenaria|nonagenario|nonagenaria|"
+        r"cincuent[oó]n|cincuentona|cuarent[oó]n|cuarentona|treinta[ñn]ero|treinta[ñn]era|"
+        r"veintea[ñn]ero|veintea[ñn]era)",
+        AttributeKey.APPARENT_AGE,
+        AttributeCategory.PHYSICAL,
+        0.75,
+        False,
+    ),
+    # "un hombre/mujer joven/viejo/anciano" → APPARENT_AGE (sujeto implícito)
+    (
+        r"(?:un|una)\s+(?:hombre|mujer|chico|chica|señor|señora|persona)\s+"
+        r"(joven|viejo|vieja|anciano|anciana|maduro|madura|mayor|de\s+mediana\s+edad)",
+        AttributeKey.APPARENT_AGE,
+        AttributeCategory.PHYSICAL,
+        0.5,
+        False,
+    ),
+    # "rondaba los 40" / "rondaba los cuarenta" → APPARENT_AGE
+    (
+        r"(\b[A-ZÁÉÍÓÚÜÑ][a-záéíóúüñ]+)\s+rondaba\s+los\s+(\d+)",
+        AttributeKey.APPARENT_AGE,
+        AttributeCategory.PHYSICAL,
+        0.7,
+        False,
+    ),
+    # "rondaba los 40" sin nombre → APPARENT_AGE
+    (
+        r"[Rr]ondaba\s+los\s+(\d+)",
+        AttributeKey.APPARENT_AGE,
+        AttributeCategory.PHYSICAL,
+        0.55,
+        False,
+    ),
+    # "cumplía 30 años" / "acababa de cumplir 50" → AGE (real)
+    (
+        r"(\b[A-ZÁÉÍÓÚÜÑ][a-záéíóúüñ]+)\s+(?:acab[aó]\s+de\s+)?cumpl[íi][aó]\s+(\d+)\s*(?:años)?",
+        AttributeKey.AGE,
+        AttributeCategory.PHYSICAL,
+        0.9,
+        False,
+    ),
     # === ALTURA/CONSTITUCIÓN ===
     # "Juan era alto" / "María era delgada"
     (
@@ -953,13 +1107,147 @@ ATTRIBUTE_PATTERNS: list[tuple[str, AttributeKey, AttributeCategory, float, bool
         False,
     ),
     # === RASGOS DISTINTIVOS ===
-    # "Juan tenía una cicatriz en..."
+    # "Juan tenía una cicatriz en..." / "tenía pecas" / "tenía un lunar"
     (
         r"(\b[A-ZÁÉÍÓÚÜÑ][a-záéíóúüñ]+)\s+ten[íi]a\s+(?:una?\s+)?"
-        r"(cicatriz|tatuaje|lunar|marca|mancha|cojera|parche)",
+        r"(cicatriz|tatuaje|lunar|marca|mancha|cojera|parche|pecas|hoyuelos)",
         AttributeKey.DISTINCTIVE_FEATURE,
         AttributeCategory.PHYSICAL,
         0.85,
+        False,
+    ),
+    # "nariz aguileña" / "labios gruesos" / "mentón pronunciado" (rasgo facial)
+    (
+        r"(?:su|sus)\s+(nariz\s+(?:aguile[ñn]a|respingona|chata|grande|peque[ñn]a|recta|"
+        r"torcida|prominente|afilada|ancha|ganchuda|roma)|"
+        r"labios?\s+(?:gruesos?|finos?|carnosos?|delgados?|finos?|apretados?)|"
+        r"frente\s+(?:ancha|estrecha|amplia|despejada|prominente|arrugada)|"
+        r"ment[oó]n\s+(?:pronunciado|prominente|d[eé]bil|cuadrado|hundido|partido)|"
+        r"mejillas?\s+(?:hundidas?|rubicundas?|sonrosadas?|p[aá]lidas?|huesudas?)|"
+        r"orejas?\s+(?:grandes?|peque[ñn]as?|puntiagudas?|de\s+soplillo)|"
+        r"manos?\s+(?:grandes?|peque[ñn]as?|delicadas?|[aá]speras?|huesudas?|nudosas?))",
+        AttributeKey.DISTINCTIVE_FEATURE,
+        AttributeCategory.PHYSICAL,
+        0.7,
+        False,
+    ),
+    # "con nariz aguileña" / "de labios gruesos" (contexto preposicional)
+    (
+        r"(?:con|de)\s+(nariz\s+(?:aguile[ñn]a|respingona|chata|grande|peque[ñn]a|recta|"
+        r"torcida|prominente|afilada|ancha|ganchuda|roma)|"
+        r"labios?\s+(?:gruesos?|finos?|carnosos?|delgados?|apretados?)|"
+        r"frente\s+(?:ancha|estrecha|amplia|despejada|prominente|arrugada)|"
+        r"ment[oó]n\s+(?:pronunciado|prominente|d[eé]bil|cuadrado|hundido|partido)|"
+        r"mejillas?\s+(?:hundidas?|rubicundas?|sonrosadas?|p[aá]lidas?|huesudas?)|"
+        r"orejas?\s+(?:grandes?|peque[ñn]as?|de\s+soplillo|puntiagudas?)|"
+        r"manos?\s+(?:grandes?|peque[ñn]as?|delicadas?|[aá]speras?|huesudas?|nudosas?)|"
+        r"pecas\s+(?:en\s+(?:la|las|el)\s+\w+)?|"
+        r"rostro\s+(?:pecoso|anguloso|redondo|alargado|ovalado|cuadrado))",
+        AttributeKey.DISTINCTIVE_FEATURE,
+        AttributeCategory.PHYSICAL,
+        0.65,
+        False,
+    ),
+    # "era pecoso/pecosa" / "era narigudo/narigona" (adjetivo como rasgo)
+    (
+        r"(\b[A-ZÁÉÍÓÚÜÑ][a-záéíóúüñ]+)\s+era\s+"
+        r"(pecoso|pecosa|narigudo|nariguda|orejudo|orejuda|"
+        r"desdentado|desdentada|patizambo|patizamba|bizco|bizca)",
+        AttributeKey.DISTINCTIVE_FEATURE,
+        AttributeCategory.PHYSICAL,
+        0.8,
+        False,
+    ),
+    # "cicatriz en la mejilla" / "lunar en el cuello" (rasgo con ubicación)
+    (
+        r"(?:una?\s+)?((?:cicatriz|lunar|tatuaje|peca|marca)\s+en\s+(?:la|el|las|los|su|sus)\s+"
+        r"\w+(?:\s+\w+)?)",
+        AttributeKey.DISTINCTIVE_FEATURE,
+        AttributeCategory.PHYSICAL,
+        0.75,
+        False,
+    ),
+    # === VELLO FACIAL (barba, bigote, patillas) ===
+    # "Juan tenía barba espesa" / "María llevaba un bigote fino"
+    (
+        r"(\b[A-ZÁÉÍÓÚÜÑ][a-záéíóúüñ]+)\s+(?:ten[íi]a|llevaba|luc[íi]a)\s+(?:una?\s+)?"
+        r"(?:barba|bigote|perilla|patillas)\s+"
+        r"(espesa|espeso|poblada|poblado|cerrada|fina|fino|rala|ralo|canosa|canoso|"
+        r"gris|blanca|blanco|recortada|recortado|tupida|tupido|larga|largo|corta|corto|"
+        r"rojiza|rojizo|negra|negro|oscura|oscuro|rubia|rubio|incipiente|descuidada|"
+        r"descuidado|cuidada|cuidado|entrecana|entrecano|puntiaguda|puntiagudo)",
+        AttributeKey.FACIAL_HAIR,
+        AttributeCategory.PHYSICAL,
+        0.85,
+        False,
+    ),
+    # "con barba espesa" / "con bigote canoso" (requiere contexto de entidad)
+    (
+        r"con\s+(?:barba|bigote|perilla|patillas)\s+"
+        r"(espesa|espeso|poblada|poblado|cerrada|fina|fino|rala|ralo|canosa|canoso|"
+        r"gris|blanca|blanco|recortada|recortado|tupida|tupido|larga|largo|corta|corto|"
+        r"rojiza|rojizo|negra|negro|oscura|oscuro|rubia|rubio|incipiente|descuidada|"
+        r"descuidado|cuidada|cuidado|entrecana|entrecano|puntiaguda|puntiagudo)",
+        AttributeKey.FACIAL_HAIR,
+        AttributeCategory.PHYSICAL,
+        0.75,
+        False,
+    ),
+    # "barba espesa" (genérico, menor confianza)
+    (
+        r"(?<!\w)(?:barba|bigote|perilla)\s+"
+        r"(espesa|espeso|poblada|poblado|cerrada|fina|fino|rala|ralo|canosa|canoso|"
+        r"gris|blanca|blanco|recortada|recortado|tupida|tupido|larga|largo|corta|corto|"
+        r"rojiza|rojizo|negra|negro|oscura|oscuro|rubia|rubio|incipiente|descuidada|"
+        r"descuidado|cuidada|cuidado|entrecana|entrecano|puntiaguda|puntiagudo)",
+        AttributeKey.FACIAL_HAIR,
+        AttributeCategory.PHYSICAL,
+        0.6,
+        False,
+    ),
+    # "su barba" / "sus patillas" (posesivo, requiere contexto)
+    (
+        r"su(?:s)?\s+(?:barba|bigote|perilla|patillas)\s+"
+        r"(espesa|espeso|poblada|poblado|cerrada|fina|fino|rala|ralo|canosa|canoso|"
+        r"gris|blanca|blanco|recortada|recortado|tupida|tupido|larga|largo|corta|corto|"
+        r"rojiza|rojizo|negra|negro|oscura|oscuro|rubia|rubio|incipiente|descuidada|"
+        r"descuidado|cuidada|cuidado|entrecana|entrecano|puntiaguda|puntiagudo)",
+        AttributeKey.FACIAL_HAIR,
+        AttributeCategory.PHYSICAL,
+        0.7,
+        False,
+    ),
+    # "patillas largas" / "patillas canosas"
+    (
+        r"patillas\s+(largas|cortas|espesas|pobladas|canosas|tupidas)",
+        AttributeKey.FACIAL_HAIR,
+        AttributeCategory.PHYSICAL,
+        0.65,
+        False,
+    ),
+    # === CANAS / ENVEJECIMIENTO CAPILAR ===
+    # "canas en su barba/bigote" → FACIAL_HAIR (vello facial canoso)
+    (
+        r"(canas)\s+en\s+(?:su|la|el)\s+(?:barba|bigote)",
+        AttributeKey.FACIAL_HAIR,
+        AttributeCategory.PHYSICAL,
+        0.7,
+        False,
+    ),
+    # "canas en su pelo/cabello/sienes" → HAIR_COLOR (cabello canoso)
+    (
+        r"(canas)\s+en\s+(?:su|la|el|las)\s+(?:cabello|pelo|cabeza|sien|sienes|melena)",
+        AttributeKey.HAIR_COLOR,
+        AttributeCategory.PHYSICAL,
+        0.7,
+        False,
+    ),
+    # "Juan tenía/mostraba canas" (genérico → hair_color)
+    (
+        r"(\b[A-ZÁÉÍÓÚÜÑ][a-záéíóúüñ]+)\s+(?:ten[íi]a|mostraba|lucía)\s+(?:ya\s+)?canas",
+        AttributeKey.HAIR_COLOR,
+        AttributeCategory.PHYSICAL,
+        0.7,
         False,
     ),
     # ==========================================================================
@@ -1539,10 +1827,17 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
             ("physical", "age"): [
                 "tiene años",
                 "de edad",
+                "cumplía",
+            ],
+            ("physical", "apparent_age"): [
+                "aparentaba",
+                "parecía tener",
                 "joven",
                 "viejo",
                 "anciano",
                 "niño",
+                "treintañero",
+                "cuarentón",
             ],
             ("physical", "build"): [
                 "alto",
@@ -2192,10 +2487,12 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
             "hair_type": AttributeKey.HAIR_TYPE,
             "hair_modification": AttributeKey.HAIR_MODIFICATION,
             "age": AttributeKey.AGE,
+            "apparent_age": AttributeKey.APPARENT_AGE,
             "height": AttributeKey.HEIGHT,
             "build": AttributeKey.BUILD,
             "skin": AttributeKey.SKIN,
             "distinctive_feature": AttributeKey.DISTINCTIVE_FEATURE,
+            "facial_hair": AttributeKey.FACIAL_HAIR,
             "personality": AttributeKey.PERSONALITY,
             "temperament": AttributeKey.TEMPERAMENT,
             "fear": AttributeKey.FEAR,
@@ -2915,15 +3212,37 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
         if key == AttributeKey.BUILD:
             return value_lower in BUILD_TYPES
 
+        if key == AttributeKey.FACIAL_HAIR:
+            return value_lower in FACIAL_HAIR_DESCRIPTORS
+
         if key == AttributeKey.PERSONALITY:
             return value_lower in PERSONALITY_TRAITS
 
         if key == AttributeKey.AGE:
             try:
                 age = int(value)
-                return 0 < age < 200  # Rango razonable
+                return 0 < age < 200
             except ValueError:
                 return False
+
+        if key == AttributeKey.APPARENT_AGE:
+            # Numeric apparent age
+            try:
+                age = int(value)
+                return 0 < age < 200
+            except ValueError:
+                pass
+            # Descriptive age (joven, anciano, treintañero, etc.)
+            age_descriptors = {
+                "joven", "viejo", "vieja", "anciano", "anciana",
+                "adolescente", "niño", "niña", "maduro", "madura", "mayor",
+                "sexagenario", "sexagenaria", "septuagenario", "septuagenaria",
+                "octogenario", "octogenaria", "nonagenario", "nonagenaria",
+                "cincuentón", "cincuentona", "cuarentón", "cuarentona",
+                "treintañero", "treintañera", "veinteañero", "veinteañera",
+                "de mediana edad",
+            }
+            return value_lower in age_descriptors
 
         if key == AttributeKey.PROFESSION:
             # Excluir palabras genéricas que no son profesiones
@@ -3088,7 +3407,9 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
         combined_context = immediate_context + " " + context_forward
         has_3rd_person_verb = bool(
             regex_module.search(
-                r"\b(tenía|era|estaba|llevaba|parecía|mostraba)\b",
+                r"\b(tenía|era|estaba|llevaba|parecía|mostraba|lucía|vestía|"
+                r"miraba|miraban|caminaba|sonreía|hablaba|portaba|exhibía|"
+                r"presentaba|aparentaba|revelaba|transmitía|observaba)\b",
                 combined_context,
                 regex_module.IGNORECASE,
             )
@@ -3322,7 +3643,11 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
 
         # Caso 1: Sujeto elíptico (verbo en 3ª persona sin sujeto)
         # En español, el sujeto elíptico típicamente refiere al sujeto de la oración anterior
-        if has_3rd_person_verb and not has_pronoun and last_sentence_break > 0:
+        # TAMBIÉN: posesivo "su/sus" sin pronombre objeto indica referencia a 3ª persona
+        # Ejemplo: "Sus ojos azules miraban" → posesivo indica que los ojos pertenecen
+        # al referente más relevante en la oración anterior
+        has_possessive_reference = has_possessive and not has_object_pronoun
+        if (has_3rd_person_verb or has_possessive_reference) and not has_pronoun and last_sentence_break > 0:
             # Buscar persona ANTES del último punto (oración anterior)
             before_sentence_break = context[:last_sentence_break]
 

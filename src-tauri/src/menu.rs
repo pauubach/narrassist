@@ -46,6 +46,7 @@ pub mod help_menu {
     pub const TUTORIAL: &str = "tutorial";
     pub const KEYBOARD_SHORTCUTS: &str = "keyboard_shortcuts";
     pub const USER_GUIDE: &str = "user_guide";
+    pub const MANAGE_DATA: &str = "manage_data";
     pub const CHECK_UPDATES: &str = "check_updates";
     pub const ABOUT: &str = "about";
 }
@@ -75,6 +76,7 @@ const ALL_MENU_IDS: &[&str] = &[
     help_menu::TUTORIAL,
     help_menu::KEYBOARD_SHORTCUTS,
     help_menu::USER_GUIDE,
+    help_menu::MANAGE_DATA,
     help_menu::CHECK_UPDATES,
     help_menu::ABOUT,
 ];
@@ -313,6 +315,14 @@ pub fn create_menu(app: &AppHandle) -> Result<Menu<Wry>, tauri::Error> {
         Some("F1"),
     )?;
     let separator8 = PredefinedMenuItem::separator(app)?;
+    let manage_data = MenuItem::with_id(
+        app,
+        help_menu::MANAGE_DATA,
+        "Gestionar datos...",
+        true,
+        None::<&str>,
+    )?;
+    let separator8b = PredefinedMenuItem::separator(app)?;
     let check_updates = MenuItem::with_id(
         app,
         help_menu::CHECK_UPDATES,
@@ -337,6 +347,8 @@ pub fn create_menu(app: &AppHandle) -> Result<Menu<Wry>, tauri::Error> {
             &keyboard_shortcuts,
             &user_guide,
             &separator8,
+            &manage_data,
+            &separator8b,
             &check_updates,
             &about,
         ],
@@ -420,10 +432,10 @@ mod tests {
     /// (para detectar si se anade un item sin actualizar ALL_MENU_IDS)
     #[test]
     fn menu_ids_count_matches_expected() {
-        // 6 archivo + 7 ver + 6 analisis + 5 ayuda = 24
+        // 6 archivo + 7 ver + 6 analisis + 6 ayuda = 25
         assert_eq!(
             ALL_MENU_IDS.len(),
-            24,
+            25,
             "Se cambio el numero de items de menu. Actualizar ALL_MENU_IDS y este test."
         );
     }
@@ -457,6 +469,7 @@ mod tests {
             "tutorial",
             "keyboard_shortcuts",
             "user_guide",
+            "manage_data",
             "check_updates",
             "about",
         ];
@@ -507,6 +520,7 @@ mod tests {
         assert_eq!(help_menu::TUTORIAL, "tutorial");
         assert_eq!(help_menu::KEYBOARD_SHORTCUTS, "keyboard_shortcuts");
         assert_eq!(help_menu::USER_GUIDE, "user_guide");
+        assert_eq!(help_menu::MANAGE_DATA, "manage_data");
         assert_eq!(help_menu::CHECK_UPDATES, "check_updates");
         assert_eq!(help_menu::ABOUT, "about");
     }

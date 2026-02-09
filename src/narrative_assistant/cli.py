@@ -9,6 +9,7 @@ import logging
 import sys
 from pathlib import Path
 
+from .core.device import _block_unsafe_gpu  # noqa: F401 — Force GPU safety check before any torch import
 from .core.config import get_config
 from .core.utils import format_duration
 

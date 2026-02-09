@@ -573,3 +573,375 @@ class TestGenericInconsistencyDetection:
         inconsistencies = result.value
         # No debería haber inconsistencia porque son entidades diferentes
         assert len(inconsistencies) == 0
+
+    def test_detect_facial_hair_inconsistency(self, checker):
+        """Detecta inconsistencia en vello facial (barba espesa vs barba rala)."""
+        attributes = [
+            ExtractedAttribute(
+                entity_name="Juan",
+                category=AttributeCategory.PHYSICAL,
+                key=AttributeKey.FACIAL_HAIR,
+                value="espesa",
+                source_text="con barba espesa",
+                start_char=0,
+                end_char=16,
+                confidence=0.8,
+                chapter_id=1,
+            ),
+            ExtractedAttribute(
+                entity_name="Juan",
+                category=AttributeCategory.PHYSICAL,
+                key=AttributeKey.FACIAL_HAIR,
+                value="rala",
+                source_text="barba rala",
+                start_char=500,
+                end_char=510,
+                confidence=0.8,
+                chapter_id=3,
+            ),
+        ]
+
+        result = checker.check_consistency(attributes)
+
+        assert result.is_success
+        inconsistencies = result.value
+        facial_incon = [i for i in inconsistencies if i.attribute_key == AttributeKey.FACIAL_HAIR]
+        assert len(facial_incon) > 0
+        assert facial_incon[0].entity_name == "Juan"
+
+    def test_no_facial_hair_inconsistency_for_synonyms(self, checker):
+        """No detecta inconsistencia cuando son sinónimos (espesa/poblada)."""
+        attributes = [
+            ExtractedAttribute(
+                entity_name="Juan",
+                category=AttributeCategory.PHYSICAL,
+                key=AttributeKey.FACIAL_HAIR,
+                value="espesa",
+                source_text="barba espesa",
+                start_char=0,
+                end_char=12,
+                confidence=0.8,
+                chapter_id=1,
+            ),
+            ExtractedAttribute(
+                entity_name="Juan",
+                category=AttributeCategory.PHYSICAL,
+                key=AttributeKey.FACIAL_HAIR,
+                value="poblada",
+                source_text="barba poblada",
+                start_char=500,
+                end_char=513,
+                confidence=0.8,
+                chapter_id=2,
+            ),
+        ]
+
+        result = checker.check_consistency(attributes)
+
+        assert result.is_success
+        inconsistencies = result.value
+        facial_incon = [i for i in inconsistencies if i.attribute_key == AttributeKey.FACIAL_HAIR]
+        assert len(facial_incon) == 0
+
+    def test_facial_hair_color_inconsistency(self, checker):
+        """Detecta inconsistencia en color de barba (negra vs canosa)."""
+        attributes = [
+            ExtractedAttribute(
+                entity_name="Pedro",
+                category=AttributeCategory.PHYSICAL,
+                key=AttributeKey.FACIAL_HAIR,
+                value="negra",
+                source_text="barba negra",
+                start_char=0,
+                end_char=11,
+                confidence=0.8,
+                chapter_id=1,
+            ),
+            ExtractedAttribute(
+                entity_name="Pedro",
+                category=AttributeCategory.PHYSICAL,
+                key=AttributeKey.FACIAL_HAIR,
+                value="canosa",
+                source_text="barba canosa",
+                start_char=500,
+                end_char=512,
+                confidence=0.8,
+                chapter_id=2,
+            ),
+        ]
+
+        result = checker.check_consistency(attributes)
+
+        assert result.is_success
+        inconsistencies = result.value
+        facial_incon = [i for i in inconsistencies if i.attribute_key == AttributeKey.FACIAL_HAIR]
+        assert len(facial_incon) > 0
+
+    def test_different_dimensions_no_inconsistency(self, checker):
+        """'espesa' (densidad) vs 'canas' (color) → dimensiones distintas, sin inconsistencia."""
+        attributes = [
+            ExtractedAttribute(
+                entity_name="Juan",
+                category=AttributeCategory.PHYSICAL,
+                key=AttributeKey.FACIAL_HAIR,
+                value="espesa",
+                source_text="barba espesa",
+                start_char=0,
+                end_char=12,
+                confidence=0.8,
+                chapter_id=1,
+            ),
+            ExtractedAttribute(
+                entity_name="Juan",
+                category=AttributeCategory.PHYSICAL,
+                key=AttributeKey.FACIAL_HAIR,
+                value="canas",
+                source_text="barba con canas",
+                start_char=500,
+                end_char=515,
+                confidence=0.8,
+                chapter_id=3,
+            ),
+        ]
+        result = checker.check_consistency(attributes)
+        assert result.is_success
+        inconsistencies = result.value
+        facial_incon = [i for i in inconsistencies if i.attribute_key == AttributeKey.FACIAL_HAIR]
+        assert len(facial_incon) == 0
+
+
+class TestDistinctiveFeatureConsistency:
+    """Tests para consistencia de rasgos distintivos con sub-matching por región corporal."""
+
+    @pytest.fixture
+    def checker(self):
+        return AttributeConsistencyChecker(use_embeddings=False)
+
+    def test_nariz_inconsistency_detected(self, checker):
+        """'nariz aguileña' vs 'nariz chata' → inconsistencia (misma región)."""
+        attributes = [
+            ExtractedAttribute(
+                entity_name="Pedro",
+                category=AttributeCategory.PHYSICAL,
+                key=AttributeKey.DISTINCTIVE_FEATURE,
+                value="nariz aguileña",
+                source_text="su nariz aguileña",
+                start_char=0,
+                end_char=17,
+                confidence=0.8,
+                chapter_id=1,
+            ),
+            ExtractedAttribute(
+                entity_name="Pedro",
+                category=AttributeCategory.PHYSICAL,
+                key=AttributeKey.DISTINCTIVE_FEATURE,
+                value="nariz chata",
+                source_text="con nariz chata",
+                start_char=500,
+                end_char=515,
+                confidence=0.8,
+                chapter_id=5,
+            ),
+        ]
+        result = checker.check_consistency(attributes)
+        assert result.is_success
+        inconsistencies = result.value
+        assert len(inconsistencies) > 0
+        assert inconsistencies[0].entity_name.lower() == "pedro"
+
+    def test_different_regions_no_inconsistency(self, checker):
+        """'nariz aguileña' vs 'cicatriz en mejilla' → NO inconsistencia (regiones distintas)."""
+        attributes = [
+            ExtractedAttribute(
+                entity_name="Pedro",
+                category=AttributeCategory.PHYSICAL,
+                key=AttributeKey.DISTINCTIVE_FEATURE,
+                value="nariz aguileña",
+                source_text="su nariz aguileña",
+                start_char=0,
+                end_char=17,
+                confidence=0.8,
+                chapter_id=1,
+            ),
+            ExtractedAttribute(
+                entity_name="Pedro",
+                category=AttributeCategory.PHYSICAL,
+                key=AttributeKey.DISTINCTIVE_FEATURE,
+                value="cicatriz en la mejilla",
+                source_text="una cicatriz en la mejilla",
+                start_char=500,
+                end_char=526,
+                confidence=0.8,
+                chapter_id=2,
+            ),
+        ]
+        result = checker.check_consistency(attributes)
+        assert result.is_success
+        inconsistencies = result.value
+        assert len(inconsistencies) == 0
+
+    def test_labios_inconsistency_detected(self, checker):
+        """'labios gruesos' vs 'labios finos' → inconsistencia."""
+        attributes = [
+            ExtractedAttribute(
+                entity_name="Ana",
+                category=AttributeCategory.PHYSICAL,
+                key=AttributeKey.DISTINCTIVE_FEATURE,
+                value="labios gruesos",
+                source_text="sus labios gruesos",
+                start_char=0,
+                end_char=18,
+                confidence=0.8,
+                chapter_id=1,
+            ),
+            ExtractedAttribute(
+                entity_name="Ana",
+                category=AttributeCategory.PHYSICAL,
+                key=AttributeKey.DISTINCTIVE_FEATURE,
+                value="labios finos",
+                source_text="con labios finos",
+                start_char=800,
+                end_char=816,
+                confidence=0.8,
+                chapter_id=8,
+            ),
+        ]
+        result = checker.check_consistency(attributes)
+        assert result.is_success
+        inconsistencies = result.value
+        assert len(inconsistencies) > 0
+
+
+class TestAgeConsistency:
+    """Tests para consistencia de edad real y edad aparente."""
+
+    @pytest.fixture
+    def checker(self):
+        return AttributeConsistencyChecker()
+
+    def test_real_age_inconsistency(self, checker):
+        """Edad real 25 vs 50 → inconsistencia."""
+        attributes = [
+            ExtractedAttribute(
+                entity_name="Juan",
+                category=AttributeCategory.PHYSICAL,
+                key=AttributeKey.AGE,
+                value="25",
+                source_text="tenía 25 años",
+                start_char=0,
+                end_char=14,
+                confidence=0.9,
+                chapter_id=1,
+            ),
+            ExtractedAttribute(
+                entity_name="Juan",
+                category=AttributeCategory.PHYSICAL,
+                key=AttributeKey.AGE,
+                value="50",
+                source_text="tenía 50 años",
+                start_char=500,
+                end_char=514,
+                confidence=0.9,
+                chapter_id=5,
+            ),
+        ]
+        result = checker.check_consistency(attributes)
+        assert result.is_success
+        inconsistencies = result.value
+        assert len(inconsistencies) > 0
+        assert any(i.confidence >= 0.7 for i in inconsistencies)
+
+    def test_real_vs_apparent_no_cross_comparison(self, checker):
+        """AGE=25 y APPARENT_AGE=30 → NO deben compararse entre sí."""
+        attributes = [
+            ExtractedAttribute(
+                entity_name="Juan",
+                category=AttributeCategory.PHYSICAL,
+                key=AttributeKey.AGE,
+                value="25",
+                source_text="tenía 25 años",
+                start_char=0,
+                end_char=14,
+                confidence=0.9,
+                chapter_id=1,
+            ),
+            ExtractedAttribute(
+                entity_name="Juan",
+                category=AttributeCategory.PHYSICAL,
+                key=AttributeKey.APPARENT_AGE,
+                value="30",
+                source_text="aparentaba unos 30 años",
+                start_char=500,
+                end_char=523,
+                confidence=0.8,
+                chapter_id=3,
+            ),
+        ]
+        result = checker.check_consistency(attributes)
+        assert result.is_success
+        inconsistencies = result.value
+        # No debería haber inconsistencia al cruzar age vs apparent_age
+        assert len(inconsistencies) == 0
+
+    def test_apparent_age_inconsistency_descriptive(self, checker):
+        """'joven' vs 'anciano' en APPARENT_AGE → inconsistencia."""
+        attributes = [
+            ExtractedAttribute(
+                entity_name="María",
+                category=AttributeCategory.PHYSICAL,
+                key=AttributeKey.APPARENT_AGE,
+                value="joven",
+                source_text="era joven",
+                start_char=0,
+                end_char=9,
+                confidence=0.7,
+                chapter_id=1,
+            ),
+            ExtractedAttribute(
+                entity_name="María",
+                category=AttributeCategory.PHYSICAL,
+                key=AttributeKey.APPARENT_AGE,
+                value="anciano",
+                source_text="parecía anciana",
+                start_char=800,
+                end_char=815,
+                confidence=0.7,
+                chapter_id=8,
+            ),
+        ]
+        result = checker.check_consistency(attributes)
+        assert result.is_success
+        inconsistencies = result.value
+        assert len(inconsistencies) > 0
+        assert any(i.confidence >= 0.7 for i in inconsistencies)
+
+    def test_compatible_descriptors_no_inconsistency(self, checker):
+        """'joven' y 'veinteañero' son compatibles → sin inconsistencia."""
+        attributes = [
+            ExtractedAttribute(
+                entity_name="Pedro",
+                category=AttributeCategory.PHYSICAL,
+                key=AttributeKey.APPARENT_AGE,
+                value="joven",
+                source_text="era joven",
+                start_char=0,
+                end_char=9,
+                confidence=0.7,
+                chapter_id=1,
+            ),
+            ExtractedAttribute(
+                entity_name="Pedro",
+                category=AttributeCategory.PHYSICAL,
+                key=AttributeKey.APPARENT_AGE,
+                value="veinteañero",
+                source_text="un veinteañero",
+                start_char=300,
+                end_char=314,
+                confidence=0.7,
+                chapter_id=3,
+            ),
+        ]
+        result = checker.check_consistency(attributes)
+        assert result.is_success
+        inconsistencies = result.value
+        assert len(inconsistencies) == 0
