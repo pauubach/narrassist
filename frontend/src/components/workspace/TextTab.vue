@@ -155,10 +155,16 @@ const scrollTarget = computed((): ScrollTarget | null => {
 
   // Si tenemos un chapterId directo (navegación desde menciones), usarlo
   if (directChapterId !== null) {
+    // La posición del backend es GLOBAL (relativa a full_text), hay que convertirla
+    // a posición relativa al capítulo para que highlightTextInChapter la use correctamente
+    const chapter = props.chapters.find(ch => ch.id === directChapterId)
+    const localPosition = chapter
+      ? props.scrollToPosition - chapter.positionStart
+      : props.scrollToPosition
+
     return {
       chapterId: directChapterId,
-      // La posición ya es relativa al capítulo cuando viene de menciones
-      position: props.scrollToPosition,
+      position: localPosition,
       text: textToHighlight || undefined,
     }
   }
