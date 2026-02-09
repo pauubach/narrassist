@@ -111,13 +111,6 @@ def detect_name_variants(
             if len(forms) < 2:
                 continue
 
-            # Filtrar: solo formas que difieren en acentos
-            # (misma normalización pero texto diferente)
-            accent_forms = [f for f in forms if f != _strip_accents(f) or any(
-                _strip_accents(f) == _strip_accents(other) and f != other
-                for other in forms
-            )]
-
             # Si no hay al menos 2 formas distintas, nada que hacer
             unique_forms = list(set(forms))
             if len(unique_forms) < 2:

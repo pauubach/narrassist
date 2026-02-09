@@ -255,7 +255,7 @@ class TimelineBuilder:
         weekday = None
         for marker in relative_markers:
             if getattr(marker, "weekday", None):
-                weekday = getattr(marker, "weekday")
+                weekday = marker.weekday
                 break
 
         # Buscar el evento del primer capítulo
