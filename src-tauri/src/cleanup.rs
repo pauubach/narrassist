@@ -8,7 +8,7 @@
 
 use serde::Serialize;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 /// Categoría de datos almacenada en disco
 #[derive(Serialize, Clone)]
