@@ -137,7 +137,11 @@ pub fn get_data_categories() -> Vec<DataCategory> {
             id: "huggingface".into(),
             label: "HuggingFace (compartido)".into(),
             description: "Cache de modelos - compartido con otras aplicaciones".into(),
-            path: home.join(".cache").join("huggingface").to_string_lossy().into(),
+            path: home
+                .join(".cache")
+                .join("huggingface")
+                .to_string_lossy()
+                .into(),
             size_bytes: dir_size(&home.join(".cache").join("huggingface")),
             is_shared: true,
             is_destructive: false,
@@ -200,11 +204,11 @@ pub fn delete_data_category(id: String) -> Result<String, String> {
             let _ = fs::remove_dir(&na);
             Ok("Modelos NLP eliminados".into())
         }
-        "ollama" | "huggingface" => {
-            Err("Los directorios compartidos no se pueden eliminar automaticamente. \
+        "ollama" | "huggingface" => Err(
+            "Los directorios compartidos no se pueden eliminar automaticamente. \
                  Eliminelos manualmente si no los utiliza con otras aplicaciones."
-                .into())
-        }
+                .into(),
+        ),
         _ => Err(format!("Categoria desconocida: {}", id)),
     }
 }
