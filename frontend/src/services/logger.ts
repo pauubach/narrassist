@@ -29,7 +29,7 @@ interface LogEntry {
 const FLUSH_INTERVAL_MS = 3000
 const MAX_BUFFER_SIZE = 100
 
-let buffer: LogEntry[] = []
+const buffer: LogEntry[] = []
 let flushTimer: ReturnType<typeof setInterval> | null = null
 let flushing = false
 let installed = false

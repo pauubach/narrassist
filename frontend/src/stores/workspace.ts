@@ -10,7 +10,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
-export type WorkspaceTab = 'text' | 'entities' | 'relationships' | 'alerts' | 'timeline' | 'style' | 'glossary' | 'summary' | 'story-bible'
+export type WorkspaceTab = 'text' | 'entities' | 'relationships' | 'alerts' | 'timeline' | 'style' | 'glossary' | 'summary'
 
 export type SidebarTab = 'chapters' | 'alerts' | 'characters' | 'assistant'
 
@@ -75,11 +75,6 @@ export const TAB_LAYOUT_CONFIG: Record<WorkspaceTab, TabLayoutConfig> = {
     showRightPanel: false,  // Dashboard full-width
     sidebarTabs: []
   },
-  'story-bible': {
-    showLeftPanel: false,
-    showRightPanel: false,  // Story Bible has its own sidebar layout
-    sidebarTabs: []
-  }
 }
 
 export const useWorkspaceStore = defineStore('workspace', () => {

@@ -80,6 +80,9 @@ const showOnlyRelevant = ref(false) // Filtrar entidades con baja relevancia
 const selectedEntity = ref<Entity | null>(null)
 const selectedEntityAttributes = ref<EntityAttribute[]>([])
 const loadingAttributes = ref(false)
+const entityRelationships = ref<any[]>([])
+const entityVitalStatus = ref<any>(null)
+const loadingRichData = ref(false)
 const showEditDialog = ref(false)
 const showMergeDialog = ref(false)
 const showUndoMergeDialog = ref(false)
@@ -120,10 +123,14 @@ watch(() => props.entities, async (newEntities, oldEntities) => {
       selectedEntity.value = updatedEntity
       // Recargar atributos desde el backend
       await loadEntityAttributes(updatedEntity.id)
+      // Recargar datos enriquecidos
+      await loadEntityRichData(updatedEntity.id)
     } else {
       // La entidad ya no existe, limpiar selección
       selectedEntity.value = null
       selectedEntityAttributes.value = []
+      entityRelationships.value = []
+      entityVitalStatus.value = null
     }
   }
 
@@ -226,6 +233,8 @@ async function handleEntityClick(entity: Entity) {
   selectedEntity.value = entity
   // Cargar atributos de la entidad
   await loadEntityAttributes(entity.id)
+  // Cargar datos enriquecidos (relaciones y estado vital) desde story-bible
+  await loadEntityRichData(entity.id)
   // NO emitir entity-select - los detalles se muestran en el panel central
   // El panel derecho (EntityInspector) no debe abrirse aquí
 }
@@ -248,6 +257,31 @@ async function loadEntityAttributes(entityId: number) {
     selectedEntityAttributes.value = []
   } finally {
     loadingAttributes.value = false
+  }
+}
+
+/**
+ * Carga datos enriquecidos de la entidad desde el story-bible API
+ * (relaciones y estado vital)
+ */
+async function loadEntityRichData(entityId: number) {
+  loadingRichData.value = true
+  try {
+    const data = await api.getRaw<any>(`/api/projects/${props.projectId}/story-bible?entity_id=${entityId}`)
+    if (data.success && data.data?.entries?.length > 0) {
+      const entry = data.data.entries[0]
+      entityRelationships.value = entry.relationships || []
+      entityVitalStatus.value = entry.vital_status || null
+    } else {
+      entityRelationships.value = []
+      entityVitalStatus.value = null
+    }
+  } catch (err) {
+    console.error('Error loading rich entity data:', err)
+    entityRelationships.value = []
+    entityVitalStatus.value = null
+  } finally {
+    loadingRichData.value = false
   }
 }
 
@@ -611,6 +645,16 @@ function getTypeTextColor(type: string): string {
 const { translateAttributeName } = useAlertUtils()
 
 /**
+ * Navega a una entidad relacionada al hacer clic en una relación
+ */
+function navigateToRelatedEntity(relatedEntityId: number) {
+  const entity = props.entities.find(e => e.id === relatedEntityId)
+  if (entity) {
+    handleEntityClick(entity)
+  }
+}
+
+/**
  * Navega al texto donde se encontró el atributo
  */
 function navigateToAttributeSource(attr: EntityAttribute) {
@@ -631,11 +675,8 @@ function navigateToAttributeSource(attr: EntityAttribute) {
           Gestión de Entidades
         </h3>
         <p class="header-subtitle">
-          Lista técnica de personajes, lugares y conceptos detectados.
+          Personajes, lugares y conceptos detectados.
           Fusiona duplicados, edita atributos y navega a menciones.
-          <span v-tooltip.right="'Esta pestaña es para gestionar las entidades: fusionar duplicados, corregir tipos, editar atributos. Para una vista wiki consolidada, usa la pestaña Story Bible.'" class="info-tip">
-            <i class="pi pi-info-circle"></i>
-          </span>
         </p>
       </div>
     </div>
@@ -863,6 +904,50 @@ function navigateToAttributeSource(attr: EntityAttribute) {
             <div v-else-if="loadingAttributes" class="detail-section">
               <h4 class="section-title">Atributos</h4>
               <p class="loading-text">Cargando atributos...</p>
+            </div>
+
+            <!-- Estado vital -->
+            <div v-if="entityVitalStatus && entityVitalStatus.status === 'dead'" class="detail-section">
+              <h4 class="section-title">Estado vital</h4>
+              <div class="vital-status vital-dead">
+                <i class="pi pi-exclamation-triangle"></i>
+                <span>Fallece en el capítulo {{ entityVitalStatus.death_chapter }}</span>
+                <span v-if="entityVitalStatus.confidence" class="vital-confidence">
+                  ({{ Math.round(entityVitalStatus.confidence * 100) }}% confianza)
+                </span>
+              </div>
+            </div>
+
+            <!-- Relaciones -->
+            <div v-if="entityRelationships.length > 0" class="detail-section">
+              <h4 class="section-title">Relaciones</h4>
+              <div class="relationships-list">
+                <div
+                  v-for="(rel, idx) in entityRelationships"
+                  :key="idx"
+                  class="relationship-item"
+                  @click="navigateToRelatedEntity(rel.related_entity_id)"
+                >
+                  <div class="rel-info">
+                    <span class="rel-name">{{ rel.related_entity_name }}</span>
+                    <span class="rel-type">{{ rel.relation_type }}</span>
+                  </div>
+                  <div class="rel-meta">
+                    <Tag v-if="rel.strength" :value="rel.strength" size="small" severity="secondary" />
+                    <Tag
+                      v-if="rel.valence"
+                      :value="rel.valence === 'positive' ? 'Positiva' : rel.valence === 'negative' ? 'Negativa' : 'Neutral'"
+                      :severity="rel.valence === 'positive' ? 'success' : rel.valence === 'negative' ? 'danger' : 'secondary'"
+                      size="small"
+                    />
+                  </div>
+                  <i class="pi pi-chevron-right rel-arrow"></i>
+                </div>
+              </div>
+            </div>
+            <div v-else-if="loadingRichData" class="detail-section">
+              <h4 class="section-title">Relaciones</h4>
+              <p class="loading-text">Cargando relaciones...</p>
             </div>
 
             <!-- Acción ver en texto -->
@@ -1626,5 +1711,71 @@ function navigateToAttributeSource(attr: EntityAttribute) {
 .dark .entity-item.selected {
   background: var(--primary-900);
   border-color: var(--primary-700);
+}
+
+/* Vital Status */
+.vital-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+.vital-dead {
+  background: var(--red-50);
+  color: var(--red-700);
+  border: 1px solid var(--red-200);
+}
+:global(.dark) .vital-dead {
+  background: var(--red-900);
+  color: var(--red-100);
+  border-color: var(--red-700);
+}
+.vital-confidence {
+  opacity: 0.7;
+  font-size: 0.8rem;
+}
+
+/* Relationships */
+.relationships-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.relationship-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.relationship-item:hover {
+  background: var(--surface-hover);
+}
+.rel-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.rel-name {
+  font-weight: 500;
+  font-size: 0.875rem;
+  color: var(--primary-color);
+}
+.rel-type {
+  font-size: 0.75rem;
+  color: var(--text-color-secondary);
+}
+.rel-meta {
+  display: flex;
+  gap: 0.25rem;
+}
+.rel-arrow {
+  color: var(--text-color-secondary);
+  font-size: 0.75rem;
 }
 </style>

@@ -3,8 +3,6 @@ import { ref, computed, watch } from 'vue'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import DsBadge from '@/components/ds/DsBadge.vue'
-import MethodVotingBar from '@/components/shared/MethodVotingBar.vue'
-import ConfidenceBadge from '@/components/shared/ConfidenceBadge.vue'
 import type { Entity, Alert } from '@/types'
 import { useEntityUtils } from '@/composables/useEntityUtils'
 import { useMentionNavigation } from '@/composables/useMentionNavigation'
@@ -13,48 +11,13 @@ import { api } from '@/services/apiClient'
 
 const { formatChapterLabel, getSeverityConfig } = useAlertUtils()
 
-// Coreference info state
-interface MethodContribution {
-  name: string
-  method: string
-  count: number
-  score: number
-  agreed: boolean
-}
-
-interface MethodVoteDetail {
-  method: string
-  methodLabel: string
-  score: number
-  weight: number
-  weightedScore: number
-  reasoning: string
-}
-
-interface VotingReasoning {
-  mentionText: string
-  startChar: number
-  endChar: number
-  resolvedTo: string
-  finalScore: number
-  contextBefore: string
-  contextAfter: string
-  methodVotes: MethodVoteDetail[]
-}
-
+// Coreference info state (solo confianza para indicador compacto)
 interface CoreferenceInfo {
-  entityId: number
-  entityName: string
-  methodContributions: MethodContribution[]
-  mentionsByType: Record<string, Array<{ text: string; confidence: number; source: string }>>
-  votingReasoning: VotingReasoning[]
   overallConfidence: number
-  totalMentions: number
 }
 
 const corefInfo = ref<CoreferenceInfo | null>(null)
 const corefLoading = ref(false)
-const corefError = ref<string | null>(null)
 
 /**
  * EntityInspector - Panel de detalles de entidad para el inspector.
@@ -123,10 +86,9 @@ watch(
   { immediate: true }
 )
 
-/** Cargar información de correferencia */
+/** Cargar información de correferencia (solo confianza) */
 async function loadCoreferenceInfo(entityId: number) {
   corefLoading.value = true
-  corefError.value = null
 
   try {
     const result = await api.getRaw<any>(
@@ -134,47 +96,21 @@ async function loadCoreferenceInfo(entityId: number) {
     )
 
     if (result.success && result.data) {
-      corefInfo.value = result.data
+      corefInfo.value = { overallConfidence: result.data.overallConfidence ?? 1 }
     } else {
-      corefError.value = result.error || 'Error al cargar correferencias'
+      corefInfo.value = null
     }
-  } catch (err) {
-    corefError.value = err instanceof Error ? err.message : 'Error desconocido'
+  } catch {
+    corefInfo.value = null
   } finally {
     corefLoading.value = false
   }
 }
 
-/** Tiene información de correferencia válida para mostrar */
-const hasCoreferenceInfo = computed(() => {
-  return corefInfo.value && corefInfo.value.methodContributions.length > 0
+/** Tiene confianza baja que merece aviso al usuario */
+const hasLowConfidence = computed(() => {
+  return corefInfo.value != null && corefInfo.value.overallConfidence < 0.7
 })
-
-/** Tiene razonamiento de votación disponible */
-const hasVotingReasoning = computed(() => {
-  return corefInfo.value?.votingReasoning && corefInfo.value.votingReasoning.length > 0
-})
-
-/** Toggle para mostrar/ocultar detalles de razonamiento */
-const showVotingDetails = ref(false)
-
-/** Etiquetas para tipos de mención */
-const MENTION_TYPE_LABELS: Record<string, string> = {
-  proper_noun: 'Nombre',
-  pronoun: 'Pronombre',
-  definite_np: 'SN definido',
-  demonstrative: 'Demostrativo',
-  possessive: 'Posesivo',
-}
-
-function getMentionTypeLabel(type: string): string {
-  return MENTION_TYPE_LABELS[type] || type
-}
-
-/** Formatea score como porcentaje */
-function formatScore(score: number): string {
-  return `${Math.round(score * 100)}%`
-}
 
 // ============================================================================
 // Related Alerts
@@ -311,99 +247,12 @@ const hasChapterData = computed(() => chapterAppearances.value.length > 1)
         <p class="description">{{ entity.description }}</p>
       </div>
 
-      <!-- Información de Correferencia -->
-      <div v-if="hasCoreferenceInfo" class="info-section coref-section">
-        <div class="section-label">
-          <i class="pi pi-sitemap"></i>
-          Detección de menciones
+      <!-- Aviso de confianza baja (sin detalles técnicos) -->
+      <div v-if="hasLowConfidence" class="info-section">
+        <div class="confidence-warning">
+          <i class="pi pi-info-circle"></i>
+          <span>Confianza de detección: {{ Math.round((corefInfo?.overallConfidence ?? 0) * 100) }}%</span>
         </div>
-        <div class="coref-confidence">
-          <span class="confidence-label">Confianza promedio:</span>
-          <ConfidenceBadge
-            :value="corefInfo!.overallConfidence"
-            variant="badge"
-            size="sm"
-          />
-        </div>
-        <MethodVotingBar
-          :methods="corefInfo!.methodContributions"
-          :compact="false"
-        />
-        <div class="mention-types">
-          <span
-            v-for="(mentions, type) in corefInfo!.mentionsByType"
-            :key="type"
-            v-tooltip.top="`${mentions.length} menciones de tipo ${type}`"
-            class="mention-type-tag"
-          >
-            {{ getMentionTypeLabel(type) }}: {{ mentions.length }}
-          </span>
-        </div>
-
-        <!-- Toggle para detalles de votación -->
-        <div v-if="hasVotingReasoning" class="voting-toggle">
-          <Button
-            :label="showVotingDetails ? 'Ocultar razonamiento' : `Ver razonamiento (${corefInfo!.votingReasoning.length})`"
-            :icon="showVotingDetails ? 'pi pi-chevron-up' : 'pi pi-chevron-down'"
-            severity="secondary"
-            text
-            size="small"
-            @click="showVotingDetails = !showVotingDetails"
-          />
-        </div>
-
-        <!-- Detalle de votación por mención -->
-        <div v-if="showVotingDetails && hasVotingReasoning" class="voting-reasoning-list">
-          <div
-            v-for="(vr, idx) in corefInfo!.votingReasoning"
-            :key="idx"
-            class="voting-reasoning-item"
-          >
-            <div class="vr-header">
-              <span class="vr-anaphor">&laquo;{{ vr.mentionText }}&raquo;</span>
-              <span class="vr-arrow">→</span>
-              <span class="vr-resolved">{{ vr.resolvedTo }}</span>
-              <Tag
-                :value="formatScore(vr.finalScore)"
-                :severity="vr.finalScore >= 0.8 ? 'success' : vr.finalScore >= 0.6 ? 'warn' : 'danger'"
-                class="vr-score-tag"
-              />
-            </div>
-            <div class="vr-context">
-              <span class="vr-ctx-text">...{{ vr.contextBefore }}<strong>{{ vr.mentionText }}</strong>{{ vr.contextAfter }}...</span>
-            </div>
-            <div class="vr-methods">
-              <div
-                v-for="vote in vr.methodVotes"
-                :key="vote.method"
-                class="vr-method-row"
-              >
-                <span class="vr-method-name">{{ vote.methodLabel }}</span>
-                <div class="vr-method-bar-container">
-                  <div
-                    class="vr-method-bar"
-                    :style="{ width: `${Math.round(vote.score * 100)}%` }"
-                    :class="{
-                      'bar-high': vote.score >= 0.7,
-                      'bar-medium': vote.score >= 0.4 && vote.score < 0.7,
-                      'bar-low': vote.score < 0.4,
-                    }"
-                  ></div>
-                </div>
-                <span class="vr-method-score">{{ formatScore(vote.score) }}</span>
-                <span class="vr-method-reasoning" :title="vote.reasoning">
-                  {{ vote.reasoning }}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Loading coreference -->
-      <div v-else-if="corefLoading" class="info-section coref-loading">
-        <i class="pi pi-spin pi-spinner"></i>
-        <span>Cargando información...</span>
       </div>
 
       <!-- Mini Timeline de apariciones -->
@@ -538,6 +387,9 @@ const hasChapterData = computed(() => chapterAppearances.value.length > 1)
   display: flex;
   flex-direction: column;
   height: 100%;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .inspector-header {
@@ -603,7 +455,9 @@ const hasChapterData = computed(() => chapterAppearances.value.length > 1)
 
 .inspector-body {
   flex: 1;
+  min-width: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: var(--ds-space-4);
   display: flex;
   flex-direction: column;
@@ -795,192 +649,28 @@ const hasChapterData = computed(() => chapterAppearances.value.length > 1)
   background: var(--ds-surface-section);
 }
 
-/* Coreference section */
-.coref-section {
-  background: var(--ds-surface-ground);
-  padding: var(--ds-space-3);
+/* Confidence warning */
+.confidence-warning {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  padding: var(--ds-space-2) var(--ds-space-3);
+  background: var(--p-yellow-50, #fefce8);
+  border: 1px solid var(--p-yellow-200, #fde68a);
   border-radius: var(--ds-radius-md);
-  margin: 0 calc(-1 * var(--ds-space-4));
-  padding-left: var(--ds-space-4);
-  padding-right: var(--ds-space-4);
-}
-
-.coref-section .section-label {
-  display: flex;
-  align-items: center;
-  gap: var(--ds-space-2);
-  margin-bottom: var(--ds-space-3);
-}
-
-.coref-section .section-label i {
-  color: var(--ds-color-primary);
-}
-
-.coref-confidence {
-  display: flex;
-  align-items: center;
-  gap: var(--ds-space-2);
-  margin-bottom: var(--ds-space-3);
-}
-
-.confidence-label {
   font-size: var(--ds-font-size-sm);
-  color: var(--ds-color-text-secondary);
+  color: var(--p-yellow-700, #a16207);
 }
 
-.mention-types {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--ds-space-2);
-  margin-top: var(--ds-space-3);
-  padding-top: var(--ds-space-3);
-  border-top: 1px solid var(--ds-surface-border);
+.confidence-warning i {
+  font-size: 1rem;
+  flex-shrink: 0;
 }
 
-.mention-type-tag {
-  font-size: var(--ds-font-size-xs);
-  padding: var(--ds-space-1) var(--ds-space-2);
-  background: var(--ds-surface-card);
-  border-radius: var(--ds-radius-sm);
-  color: var(--ds-color-text-secondary);
-}
-
-.coref-loading {
-  display: flex;
-  align-items: center;
-  gap: var(--ds-space-2);
-  color: var(--ds-color-text-secondary);
-  font-size: var(--ds-font-size-sm);
-}
-
-/* Voting Reasoning */
-.voting-toggle {
-  margin-top: var(--ds-space-3);
-  padding-top: var(--ds-space-2);
-  border-top: 1px solid var(--ds-surface-border);
-  text-align: center;
-}
-
-.voting-reasoning-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ds-space-3);
-  margin-top: var(--ds-space-3);
-  max-height: 400px;
-  overflow-y: auto;
-}
-
-.voting-reasoning-item {
-  background: var(--ds-surface-card);
-  border-radius: var(--ds-radius-md);
-  padding: var(--ds-space-3);
-  border: 1px solid var(--ds-surface-border);
-}
-
-.vr-header {
-  display: flex;
-  align-items: center;
-  gap: var(--ds-space-2);
-  flex-wrap: wrap;
-  margin-bottom: var(--ds-space-2);
-}
-
-.vr-anaphor {
-  font-weight: var(--ds-font-weight-semibold);
-  color: var(--ds-color-primary);
-  font-size: var(--ds-font-size-sm);
-}
-
-.vr-arrow {
-  color: var(--ds-color-text-secondary);
-  font-size: var(--ds-font-size-xs);
-}
-
-.vr-resolved {
-  font-weight: var(--ds-font-weight-semibold);
-  color: var(--ds-color-text);
-  font-size: var(--ds-font-size-sm);
-}
-
-.vr-score-tag {
-  margin-left: auto;
-}
-
-.vr-context {
-  margin-bottom: var(--ds-space-2);
-  padding: var(--ds-space-2);
-  background: var(--ds-surface-ground);
-  border-radius: var(--ds-radius-sm);
-  font-size: var(--ds-font-size-xs);
-  color: var(--ds-color-text-secondary);
-  line-height: 1.4;
-  max-height: 3em;
-  overflow: hidden;
-}
-
-.vr-ctx-text strong {
-  color: var(--ds-color-primary);
-  font-weight: var(--ds-font-weight-bold);
-}
-
-.vr-methods {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ds-space-1);
-}
-
-.vr-method-row {
-  display: grid;
-  grid-template-columns: 80px 60px 36px 1fr;
-  align-items: center;
-  gap: var(--ds-space-2);
-  font-size: var(--ds-font-size-xs);
-}
-
-.vr-method-name {
-  color: var(--ds-color-text-secondary);
-  font-weight: var(--ds-font-weight-medium);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.vr-method-bar-container {
-  height: 6px;
-  background: var(--ds-surface-ground);
-  border-radius: 3px;
-  overflow: hidden;
-}
-
-.vr-method-bar {
-  height: 100%;
-  border-radius: 3px;
-  transition: width 0.3s ease;
-}
-
-.vr-method-bar.bar-high {
-  background: var(--p-green-500, #22c55e);
-}
-
-.vr-method-bar.bar-medium {
-  background: var(--p-yellow-500, #eab308);
-}
-
-.vr-method-bar.bar-low {
-  background: var(--p-red-400, #f87171);
-}
-
-.vr-method-score {
-  color: var(--ds-color-text);
-  font-weight: var(--ds-font-weight-semibold);
-  text-align: right;
-}
-
-.vr-method-reasoning {
-  color: var(--ds-color-text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.dark .confidence-warning {
+  background: rgba(234, 179, 8, 0.1);
+  border-color: rgba(234, 179, 8, 0.3);
+  color: var(--p-yellow-400, #facc15);
 }
 
 /* Mini Timeline */

@@ -145,7 +145,6 @@
             <li><strong>Escritura</strong> - Análisis de voz, estilo y prosa</li>
             <li><strong>Glosario</strong> - Términos y definiciones del manuscrito</li>
             <li><strong>Resumen</strong> - Vista general del proyecto y métricas</li>
-            <li><strong>Story Bible</strong> - Referencia completa del universo narrativo</li>
           </ul>
 
           <h3>Resaltado del texto</h3>
@@ -273,10 +272,10 @@
             definiciones contextuales y frecuencia de uso.
           </p>
 
-          <h3>Story Bible</h3>
+          <h3>Entidades enriquecidas</h3>
           <p>
-            Referencia completa del universo narrativo: personajes con sus perfiles,
-            localizaciones, objetos importantes y reglas del mundo.
+            La pestaña de Entidades incluye relaciones entre personajes,
+            estado vital y datos enriquecidos del universo narrativo.
           </p>
         </section>
 

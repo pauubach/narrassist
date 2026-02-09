@@ -62,6 +62,9 @@ class SpellingIssue:
     detection_method: DetectionMethod = DetectionMethod.DICTIONARY
     explanation: str = ""  # Explicación para el usuario
 
+    # Capítulo (asignado tras mapeo de posición global → capítulo)
+    chapter: int | None = None
+
     # Para deduplicación
     context_hash: str = ""  # Hash del contexto para agrupar
 
@@ -92,6 +95,7 @@ class SpellingIssue:
             "confidence": self.confidence,
             "detection_method": self.detection_method.value,
             "explanation": self.explanation,
+            "chapter": self.chapter,
         }
 
 

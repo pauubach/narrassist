@@ -2373,6 +2373,43 @@ class UnifiedAnalysisPipeline:
         context.phase_times["quality"] = (datetime.now() - phase_start).total_seconds()
         return Result.success(None)
 
+    @staticmethod
+    def _find_chapter_for_position(
+        position: int, chapters: list
+    ) -> int | None:
+        """
+        Mapea una posición global de carácter al número de capítulo correspondiente.
+
+        Args:
+            position: Posición (start_char) en el texto completo
+            chapters: Lista de objetos Chapter con start_char, end_char, number
+
+        Returns:
+            Número de capítulo o None si no se encuentra
+        """
+        for ch in chapters:
+            if ch.start_char <= position < ch.end_char:
+                return ch.number
+        return None
+
+    def _assign_chapters_to_issues(
+        self, issues: list, chapters: list
+    ) -> None:
+        """
+        Asigna el número de capítulo a cada issue según su posición global.
+
+        Args:
+            issues: Lista de SpellingIssue o GrammarIssue con start_char
+            chapters: Lista de Chapter con start_char, end_char, number
+        """
+        if not chapters:
+            return
+        for issue in issues:
+            if hasattr(issue, "chapter") and hasattr(issue, "start_char"):
+                issue.chapter = self._find_chapter_for_position(
+                    issue.start_char, chapters
+                )
+
     def _run_spelling_check(self, context: AnalysisContext) -> None:
         """Verificar ortografía."""
         try:
@@ -2397,6 +2434,10 @@ class UnifiedAnalysisPipeline:
                     for issue in result.value.issues
                     if issue.confidence >= self.config.spelling_min_confidence
                 ]
+                # Mapear posición global → capítulo
+                self._assign_chapters_to_issues(
+                    context.spelling_issues, context.chapters
+                )
                 context.stats["spelling_issues"] = len(context.spelling_issues)
 
         except Exception as e:
@@ -2419,6 +2460,10 @@ class UnifiedAnalysisPipeline:
                     for issue in result.value.issues
                     if issue.confidence >= self.config.grammar_min_confidence
                 ]
+                # Mapear posición global → capítulo
+                self._assign_chapters_to_issues(
+                    context.grammar_issues, context.chapters
+                )
                 context.stats["grammar_issues"] = len(context.grammar_issues)
 
         except Exception as e:
@@ -3099,6 +3144,7 @@ class UnifiedAnalysisPipeline:
                     suggestions=issue.suggestions,
                     confidence=issue.confidence,
                     explanation=issue.explanation,
+                    chapter=issue.chapter,
                 )
                 if result.is_success:
                     context.alerts.append(result.value)
@@ -3116,6 +3162,7 @@ class UnifiedAnalysisPipeline:
                     confidence=issue.confidence,
                     explanation=issue.explanation,
                     rule_id=issue.rule_id,
+                    chapter=issue.chapter,
                 )
                 if result.is_success:
                     context.alerts.append(result.value)

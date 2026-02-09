@@ -105,7 +105,7 @@ export const PHASE_LABELS: Record<keyof ExecutedPhases, string> = {
  * Mapeo de tabs del workspace a las fases de análisis que requieren.
  * Si una tab no está en el mapa, no requiere análisis específico.
  */
-export type WorkspaceTab = 'text' | 'entities' | 'relationships' | 'alerts' | 'timeline' | 'style' | 'glossary' | 'summary' | 'story-bible'
+export type WorkspaceTab = 'text' | 'entities' | 'relationships' | 'alerts' | 'timeline' | 'style' | 'glossary' | 'summary'
 
 export const TAB_REQUIRED_PHASES: Partial<Record<WorkspaceTab, keyof ExecutedPhases>> = {
   // text: 'parsing', // Siempre disponible tras análisis inicial

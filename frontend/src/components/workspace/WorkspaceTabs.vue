@@ -52,7 +52,6 @@ const _tabConfigMapping: Record<WorkspaceTab, string> = {
   style: 'style',
   glossary: 'text', // Siempre visible
   summary: 'text', // Siempre visible
-  'story-bible': 'entities',
 }
 
 // Configuración base de todas las tabs
@@ -65,7 +64,6 @@ const allTabs: TabConfig[] = [
   { id: 'style', label: 'Escritura', icon: 'pi pi-pencil', configKey: 'style' },
   { id: 'glossary', label: 'Glosario', icon: 'pi pi-book', configKey: 'text' },
   { id: 'summary', label: 'Resumen', icon: 'pi pi-chart-bar', configKey: 'text' },
-  { id: 'story-bible', label: 'Story Bible', icon: 'pi pi-book', configKey: 'entities' },
 ]
 
 // Tabs filtradas según el tipo de documento
@@ -81,8 +79,8 @@ const tabs = computed<TabConfig[]>(() => {
     .map(tab => ({
       ...tab,
       // Aplicar label dinámico según tipo de documento
-      // (summary, glossary y story-bible mantienen su label fijo)
-      label: (tab.id === 'summary' || tab.id === 'glossary' || tab.id === 'story-bible')
+      // (summary y glossary mantienen su label fijo)
+      label: (tab.id === 'summary' || tab.id === 'glossary')
         ? tab.label
         : (tab.configKey ? getTabLabel(tab.configKey) : tab.label),
       // Añadir badges

@@ -97,6 +97,9 @@ class GrammarIssue:
     explanation: str = ""  # Explicación para el usuario
     rule_id: str = ""  # ID de la regla aplicada
 
+    # Capítulo (asignado tras mapeo de posición global → capítulo)
+    chapter: int | None = None
+
     # Contexto gramatical
     affected_words: list[str] = field(default_factory=list)
     grammatical_context: dict = field(default_factory=dict)
@@ -151,6 +154,7 @@ class GrammarIssue:
             "detection_method": self.detection_method.value,
             "explanation": self.explanation,
             "rule_id": self.rule_id,
+            "chapter": self.chapter,
         }
 
 

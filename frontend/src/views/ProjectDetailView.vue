@@ -272,12 +272,6 @@
             :project-id="project.id"
           />
 
-          <!-- Tab Story Bible -->
-          <StoryBibleTab
-            v-else-if="workspaceStore.activeTab === 'story-bible'"
-            :project-id="project.id"
-          />
-
           <!-- Tab Resumen -->
           <ResumenTab
             v-else-if="workspaceStore.activeTab === 'summary'"
@@ -410,7 +404,7 @@ import Message from 'primevue/message'
 import Dialog from 'primevue/dialog'
 import ExportDialog from '@/components/ExportDialog.vue'
 import StatusBar from '@/components/layout/StatusBar.vue'
-import { WorkspaceTabs, TextTab, AlertsTab, EntitiesTab, RelationsTab, StyleTab, GlossaryTab, ResumenTab, StoryBibleTab, PanelResizer } from '@/components/workspace'
+import { WorkspaceTabs, TextTab, AlertsTab, EntitiesTab, RelationsTab, StyleTab, GlossaryTab, ResumenTab, PanelResizer } from '@/components/workspace'
 import { AnalysisRequired } from '@/components/analysis'
 import { TimelineView } from '@/components/timeline'
 import { ChaptersPanel, AlertsPanel, CharactersPanel, AssistantPanel } from '@/components/sidebar'
@@ -1578,6 +1572,8 @@ const startReanalysis = async () => {
   border-right: 1px solid var(--surface-border);
   position: relative;
   box-sizing: border-box;
+  overflow: hidden;
+  min-width: 0;
 }
 
 .center-panel {
@@ -1594,6 +1590,8 @@ const startReanalysis = async () => {
   background: var(--surface-card);
   border-left: 1px solid var(--surface-border);
   position: relative;
+  overflow: hidden;
+  min-width: 0;
 }
 
 /* Animación de paneles */
@@ -1618,6 +1616,9 @@ const startReanalysis = async () => {
   display: flex;
   flex-direction: column;
   height: 100%;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .inspector-header {
@@ -1631,6 +1632,7 @@ const startReanalysis = async () => {
   flex: 1;
   min-width: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 1rem;
 }
 

@@ -91,6 +91,9 @@ const emit = defineEmits<{
   flex-direction: column;
   gap: var(--ds-space-4);
   padding: var(--ds-space-4);
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .summary-stats {
