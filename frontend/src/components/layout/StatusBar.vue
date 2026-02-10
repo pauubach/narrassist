@@ -70,26 +70,33 @@ interface PhaseDefinition {
   range: [number, number]
 }
 
-// Rangos ajustados según tiempos reales de procesamiento:
-// - Loading/chapters: muy rápido (~5%)
-// - NER: proceso pesado con spaCy (~25% del tiempo)
-// - Correferencias: más lento, usa LLM/embeddings (~35% del tiempo)
-// - Atributos: moderado (~15%)
-// - Inconsistencias: moderado (~15%)
-// - Clustering: rápido (~5%)
+// Rangos alineados con los pesos del backend (13 fases):
+// Tier 1 (paralelo): parsing+classification+structure ~3%
+// Tier 2 (exclusivo): ner..alerts ~67%
+// Tier 3 (enriquecimiento): relationships..health ~30%
 const allPhases: PhaseDefinition[] = [
-  { id: 'loading', name: 'Cargando documento', range: [0, 3] },
-  { id: 'chapters', name: 'Detectando capítulos', range: [3, 5] },
-  { id: 'ner', name: 'Extrayendo entidades (NLP)', range: [5, 30] },
-  { id: 'coreference', name: 'Resolviendo correferencias', range: [30, 65] },
-  { id: 'attributes', name: 'Analizando atributos', range: [65, 80] },
-  { id: 'inconsistencies', name: 'Detectando inconsistencias', range: [80, 95] },
-  { id: 'clustering', name: 'Agrupando relaciones', range: [95, 100] },
+  { id: 'parsing', name: 'Lectura del documento', range: [0, 1] },
+  { id: 'classification', name: 'Clasificando documento', range: [1, 2] },
+  { id: 'structure', name: 'Identificando capítulos', range: [2, 3] },
+  { id: 'ner', name: 'Buscando personajes y lugares', range: [3, 34] },
+  { id: 'fusion', name: 'Unificando entidades', range: [34, 49] },
+  { id: 'attributes', name: 'Analizando características', range: [49, 57] },
+  { id: 'consistency', name: 'Verificando coherencia', range: [57, 60] },
+  { id: 'grammar', name: 'Revisando gramática y ortografía', range: [60, 66] },
+  { id: 'alerts', name: 'Preparando observaciones', range: [66, 70] },
+  { id: 'relationships', name: 'Analizando relaciones', range: [70, 78] },
+  { id: 'voice', name: 'Perfilando voces', range: [78, 86] },
+  { id: 'prose', name: 'Evaluando escritura', range: [86, 94] },
+  { id: 'health', name: 'Salud narrativa', range: [94, 100] },
 ]
 
 // Computed - usando propiedades reales del store
 const isAnalyzing = computed(() => analysisStore.isAnalyzing)
-const isQueued = computed(() => analysisStore.currentAnalysis?.status === 'queued')
+const isQueued = computed(() => {
+  const s = analysisStore.currentAnalysis?.status
+  return s === 'queued' || s === 'queued_for_heavy'
+})
+const isQueuedForHeavy = computed(() => analysisStore.currentAnalysis?.status === 'queued_for_heavy')
 const progress = computed(() => analysisStore.currentAnalysis?.progress ?? 0)
 const currentStep = computed(() => analysisStore.currentAnalysis?.current_phase ?? '')
 const currentAction = computed(() => analysisStore.currentAnalysis?.current_action ?? '')
@@ -165,13 +172,19 @@ function calculatePhaseProgress(phaseId: string, totalProgress: number): number 
 
 // Mapeo de pasos a textos legibles (para compatibilidad)
 const stepLabels: Record<string, string> = {
-  'loading': 'Cargando documento',
-  'chapters': 'Detectando capítulos',
-  'ner': 'Extrayendo entidades',
-  'coreference': 'Resolviendo correferencias',
-  'attributes': 'Analizando atributos',
-  'inconsistencies': 'Detectando inconsistencias',
-  'clustering': 'Agrupando relaciones',
+  'parsing': 'Lectura del documento',
+  'classification': 'Clasificando documento',
+  'structure': 'Identificando capítulos',
+  'ner': 'Buscando personajes y lugares',
+  'fusion': 'Unificando entidades',
+  'attributes': 'Analizando características',
+  'consistency': 'Verificando coherencia',
+  'grammar': 'Revisando gramática',
+  'alerts': 'Preparando observaciones',
+  'relationships': 'Analizando relaciones',
+  'voice': 'Perfilando voces',
+  'prose': 'Evaluando escritura',
+  'health': 'Salud narrativa',
   'complete': 'Análisis completado'
 }
 
@@ -185,6 +198,9 @@ const analysisStatus = computed(() => {
 
   // Si hay un análisis en cola (puede que isAnalyzing sea false por timing)
   const currentStatus = analysisStore.currentAnalysis?.status
+  if (currentStatus === 'queued_for_heavy') {
+    return { icon: 'pi-clock', text: 'Estructura lista — en cola para análisis profundo', class: 'status-queued-heavy' }
+  }
   if (currentStatus === 'queued') {
     return { icon: 'pi-clock', text: 'En cola — esperando análisis anterior', class: 'status-queued' }
   }
@@ -262,8 +278,19 @@ function toggleDetails() {
       />
     </div>
 
-    <!-- Estado: en cola -->
-    <div v-if="isQueued" class="status-section status-analysis-state status-queued">
+    <!-- Estado: en cola (estructura lista, esperando análisis pesado) -->
+    <div v-if="isQueuedForHeavy" class="status-section status-analysis-state status-queued-heavy" @click="toggleDetails">
+      <i class="pi pi-check-circle queued-heavy-check"></i>
+      <span>Estructura lista — en cola para análisis profundo</span>
+      <Button
+        :icon="showDetails ? 'pi pi-chevron-down' : 'pi pi-chevron-up'"
+        text rounded size="small" class="expand-btn"
+        @click.stop="toggleDetails"
+      />
+    </div>
+
+    <!-- Estado: en cola (no iniciado) -->
+    <div v-else-if="isQueued" class="status-section status-analysis-state status-queued">
       <i class="pi pi-clock"></i>
       <span>En cola — esperando análisis anterior</span>
     </div>
@@ -437,6 +464,19 @@ function toggleDetails() {
 
 .status-queued i {
   color: var(--orange-500);
+}
+
+.status-queued-heavy {
+  color: var(--blue-600);
+  background: var(--blue-50);
+}
+
+.status-queued-heavy i {
+  color: var(--blue-500);
+}
+
+.status-queued-heavy .queued-heavy-check {
+  color: var(--green-500);
 }
 
 .status-pending {
@@ -809,6 +849,19 @@ function toggleDetails() {
 
 .dark .status-queued {
   background: rgba(249, 115, 22, 0.15);
+}
+
+.dark .status-queued-heavy {
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--blue-300);
+}
+
+.dark .status-queued-heavy i {
+  color: var(--blue-400);
+}
+
+.dark .status-queued-heavy .queued-heavy-check {
+  color: var(--green-400);
 }
 
 .dark .status-error {

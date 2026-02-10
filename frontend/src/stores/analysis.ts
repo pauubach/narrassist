@@ -136,6 +136,7 @@ export const TAB_PHASE_DESCRIPTIONS: Partial<Record<WorkspaceTab, string>> = {
  */
 const BACKEND_PHASE_TO_FRONTEND: Record<string, keyof ExecutedPhases | null> = {
   parsing: 'parsing',
+  classification: null, // Clasificación no tiene fase frontend propia
   structure: 'structure',
   ner: 'entities',
   fusion: 'coreference',
@@ -143,6 +144,10 @@ const BACKEND_PHASE_TO_FRONTEND: Record<string, keyof ExecutedPhases | null> = {
   consistency: 'coherence',
   grammar: 'grammar',
   alerts: null, // Las alertas no son una "fase" en el sentido del frontend
+  relationships: 'relationships',
+  voice: 'voice_profiles',
+  prose: 'register',
+  health: null, // Salud narrativa es un resumen, no una fase específica
 }
 
 export const useAnalysisStore = defineStore('analysis', () => {

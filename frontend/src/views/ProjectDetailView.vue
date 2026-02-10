@@ -679,7 +679,7 @@ watch(isAnalyzing, (analyzing, oldAnalyzing) => {
 watch(() => project.value?.analysisStatus, (newStatus, oldStatus) => {
   console.log('[Analysis] project.analysisStatus changed:', oldStatus, '->', newStatus)
   // 'pending' es el estado inicial (no analizado), NO un análisis en curso
-  if (newStatus === 'in_progress' || newStatus === 'analyzing' || newStatus === 'queued') {
+  if (newStatus === 'in_progress' || newStatus === 'analyzing' || newStatus === 'queued' || newStatus === 'queued_for_heavy') {
     if (!analysisPollingInterval) {
       console.log('[Analysis] Starting polling from status change')
       startAnalysisPolling()
