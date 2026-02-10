@@ -1047,6 +1047,7 @@ import {
   getSensitivityLabel, getSensitivitySeverity,
   getRegionLabel, getSpeedLabel, getSpeedSeverity,
 } from '@/utils/settingsLabels'
+import { safeSetItem, safeGetItem } from '@/utils/safeStorage'
 
 const router = useRouter()
 const toast = useToast()
@@ -1135,7 +1136,7 @@ async function loadCorrectionPresets() {
       correctionOptions.value = data.data.options || null
 
       // Cargar configuracion guardada
-      const savedPreset = localStorage.getItem('defaultCorrectionPreset')
+      const savedPreset = safeGetItem('defaultCorrectionPreset')
       if (savedPreset) {
         defaultCorrectionPreset.value = savedPreset
         const preset = correctionPresetOptions.value.find(p => p.id === savedPreset)
@@ -1146,12 +1147,12 @@ async function loadCorrectionPresets() {
         defaultCorrectionConfig.value = correctionPresetOptions.value[0].config
       }
 
-      const savedRegion = localStorage.getItem('defaultCorrectionRegion')
+      const savedRegion = safeGetItem('defaultCorrectionRegion')
       if (savedRegion) {
         defaultRegion.value = savedRegion
       }
 
-      useLLMReview.value = localStorage.getItem('useLLMReview') === 'true'
+      useLLMReview.value = safeGetItem('useLLMReview') === 'true'
     }
   } catch (error) {
     console.error('Error loading correction presets:', error)
@@ -1162,16 +1163,16 @@ function onDefaultPresetChange() {
   const preset = correctionPresetOptions.value.find(p => p.id === defaultCorrectionPreset.value)
   if (preset) {
     defaultCorrectionConfig.value = preset.config
-    localStorage.setItem('defaultCorrectionPreset', preset.id)
+    safeSetItem('defaultCorrectionPreset', preset.id)
   }
 }
 
 function onDefaultRegionChange() {
-  localStorage.setItem('defaultCorrectionRegion', defaultRegion.value)
+  safeSetItem('defaultCorrectionRegion', defaultRegion.value)
 }
 
 function onLLMReviewChange() {
-  localStorage.setItem('useLLMReview', useLLMReview.value.toString())
+  safeSetItem('useLLMReview', useLLMReview.value.toString())
 }
 
 // LanguageTool state - usar store centralizado
@@ -1276,7 +1277,7 @@ const loadSystemCapabilities = async (): Promise<boolean> => {
   const capabilities = await systemStore.loadCapabilities(true) // force refresh
   if (capabilities) {
     // Si es la primera vez (no hay settings guardados), aplicar defaults según hardware
-    const savedSettings = localStorage.getItem('narrative_assistant_settings')
+    const savedSettings = safeGetItem('narrative_assistant_settings')
     if (!savedSettings) {
       applyDefaultsFromCapabilities(capabilities)
     }

@@ -7,6 +7,7 @@ import Material from '@primeuix/themes/material'
 import Nora from '@primeuix/themes/nora'
 
 import { customPresets, type ThemePresetConfig, type CustomPresetKey } from '@/themes/presets'
+import { safeSetItem, safeGetItem } from '@/utils/safeStorage'
 
 // ============================================================================
 // Types
@@ -520,11 +521,11 @@ export const useThemeStore = defineStore('theme', () => {
   // ============================================================================
 
   function saveConfig() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(config.value))
+    safeSetItem(STORAGE_KEY, JSON.stringify(config.value))
   }
 
   function loadConfig() {
-    const saved = localStorage.getItem(STORAGE_KEY)
+    const saved = safeGetItem(STORAGE_KEY)
     if (saved) {
       try {
         const parsed = JSON.parse(saved) as Partial<ThemeConfig>

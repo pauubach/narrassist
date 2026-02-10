@@ -9,6 +9,7 @@ import { ref } from 'vue'
 import { useToast } from 'primevue/usetoast'
 import { useThemeStore } from '@/stores/theme'
 import type { SystemCapabilities } from '@/stores/system'
+import { safeSetItem, safeGetItem } from '@/utils/safeStorage'
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -84,7 +85,7 @@ export function useSettingsPersistence() {
   // ── Load ────────────────────────────────────────────────
 
   function loadSettings() {
-    const savedSettings = localStorage.getItem(STORAGE_KEY)
+    const savedSettings = safeGetItem(STORAGE_KEY)
     if (savedSettings) {
       try {
         const parsed = JSON.parse(savedSettings)
@@ -123,12 +124,12 @@ export function useSettingsPersistence() {
   // ── Save ────────────────────────────────────────────────
 
   function saveSettings() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings.value))
+    const ok = safeSetItem(STORAGE_KEY, JSON.stringify(settings.value))
     window.dispatchEvent(new CustomEvent('settings-changed', { detail: settings.value }))
     toast.add({
-      severity: 'success',
-      summary: 'Configuraci\u00F3n guardada',
-      detail: 'Los cambios se han guardado correctamente',
+      severity: ok ? 'success' : 'warn',
+      summary: ok ? 'Configuraci\u00F3n guardada' : 'Error al guardar',
+      detail: ok ? 'Los cambios se han guardado correctamente' : 'No se pudieron guardar los cambios (almacenamiento lleno)',
       life: 3000,
     })
   }
@@ -139,7 +140,7 @@ export function useSettingsPersistence() {
 
   /** Debounced save for sliders — shows toast only after user stops sliding. */
   function onSliderChange() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings.value))
+    safeSetItem(STORAGE_KEY, JSON.stringify(settings.value))
     window.dispatchEvent(new CustomEvent('settings-changed', { detail: settings.value }))
 
     if (saveDebounceTimer) {

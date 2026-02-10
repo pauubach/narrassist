@@ -93,6 +93,8 @@ interface RequestOptions {
   headers?: Record<string, string>
   /** Signal para cancelación */
   signal?: AbortSignal
+  /** Number of retries on connection error (default: 0, max: 3). Only for GET requests. */
+  retries?: number
 }
 
 /**
@@ -111,6 +113,32 @@ async function monitoredFetch(input: RequestInfo | URL, init?: RequestInit): Pro
     }
     throw err
   }
+}
+
+/**
+ * monitoredFetch with retry + exponential backoff for transient connection errors.
+ * Only used for idempotent (GET) requests.
+ */
+async function monitoredFetchWithRetry(
+  input: RequestInfo | URL,
+  init: RequestInit | undefined,
+  retries: number,
+): Promise<Response> {
+  const maxRetries = Math.min(retries, 3)
+  let lastError: unknown
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await monitoredFetch(input, init)
+    } catch (err) {
+      lastError = err
+      if (isConnectionError(err) && attempt < maxRetries) {
+        await new Promise(r => setTimeout(r, 500 * Math.pow(2, attempt)))
+        continue
+      }
+      throw err
+    }
+  }
+  throw lastError // unreachable, but satisfies TS
 }
 
 /**
@@ -190,14 +218,13 @@ function createTimeoutSignal(timeoutMs: number, existingSignal?: AbortSignal): A
  * const projects = await api.get<ApiProject[]>('/api/projects')
  */
 async function get<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { timeout = 30000, headers = {}, signal } = options
+  const { timeout = 30000, headers = {}, signal, retries = 0 } = options
   const abortSignal = createTimeoutSignal(timeout, signal)
+  const fetchInit = { method: 'GET', headers, signal: abortSignal }
 
-  const response = await monitoredFetch(apiUrl(path), {
-    method: 'GET',
-    headers,
-    signal: abortSignal,
-  })
+  const response = retries > 0
+    ? await monitoredFetchWithRetry(apiUrl(path), fetchInit, retries)
+    : await monitoredFetch(apiUrl(path), fetchInit)
 
   return parseResponse<T>(response)
 }
@@ -206,14 +233,13 @@ async function get<T>(path: string, options: RequestOptions = {}): Promise<T> {
  * GET request sin wrapper ApiResponse (para health checks, etc).
  */
 async function getRaw<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { timeout = 30000, headers = {}, signal } = options
+  const { timeout = 30000, headers = {}, signal, retries = 0 } = options
   const abortSignal = createTimeoutSignal(timeout, signal)
+  const fetchInit = { method: 'GET', headers, signal: abortSignal }
 
-  const response = await monitoredFetch(apiUrl(path), {
-    method: 'GET',
-    headers,
-    signal: abortSignal,
-  })
+  const response = retries > 0
+    ? await monitoredFetchWithRetry(apiUrl(path), fetchInit, retries)
+    : await monitoredFetch(apiUrl(path), fetchInit)
 
   return parseRawResponse<T>(response)
 }

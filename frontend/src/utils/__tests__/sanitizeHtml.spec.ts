@@ -2,6 +2,7 @@
  * Tests for the sanitizeHtml defense-in-depth utility.
  */
 
+import { describe, it, expect } from 'vitest'
 import { sanitizeHtml } from '../sanitizeHtml'
 
 describe('sanitizeHtml', () => {

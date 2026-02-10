@@ -123,7 +123,7 @@ describe('analysisStore', () => {
 
       const result = await store.getProgress(1)
 
-      expect(mockApiClient.get).toHaveBeenCalledWith('/api/projects/1/analysis/progress')
+      expect(mockApiClient.get).toHaveBeenCalledWith('/api/projects/1/analysis/progress', { retries: 2 })
       expect(result).toEqual(mockProgressData)
       expect(store.currentAnalysis).toEqual(mockProgressData)
     })

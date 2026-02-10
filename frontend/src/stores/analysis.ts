@@ -218,6 +218,9 @@ export const useAnalysisStore = defineStore('analysis', () => {
   // ============================================================================
 
   async function startAnalysis(projectId: number, file?: File) {
+    // Guard: prevent duplicate concurrent requests for the same project
+    if (_analyzing.value[projectId]) return false
+
     _analyzing.value[projectId] = true
     delete _errors.value[projectId]
 
@@ -264,7 +267,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
 
   async function getProgress(projectId: number) {
     try {
-      const progressData = await api.get<AnalysisProgress>(`/api/projects/${projectId}/analysis/progress`)
+      const progressData = await api.get<AnalysisProgress>(`/api/projects/${projectId}/analysis/progress`, { retries: 2 })
       _analyses.value[projectId] = progressData
 
       // Actualizar executedPhases progresivamente según fases completadas
@@ -346,7 +349,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
       // don't clear — just query backend to update progress data
       const alreadyActive = _analyzing.value[projectId] === true
 
-      const progressData = await api.get<AnalysisProgress>(`/api/projects/${projectId}/analysis/progress`)
+      const progressData = await api.get<AnalysisProgress>(`/api/projects/${projectId}/analysis/progress`, { retries: 2 })
       const status = progressData.status
       if (status === 'running' || status === 'pending' || status === 'queued' || status === 'queued_for_heavy') {
         _analyses.value[projectId] = progressData
@@ -420,6 +423,9 @@ export const useAnalysisStore = defineStore('analysis', () => {
     phases: (keyof ExecutedPhases)[],
     force: boolean = false
   ): Promise<boolean> {
+    // Guard: prevent duplicate concurrent requests
+    if (_analyzing.value[projectId]) return false
+
     // Añadir a fases en ejecución
     phases.forEach(p => runningPhases.value.add(p))
 
