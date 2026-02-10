@@ -78,8 +78,8 @@
           <!-- Preview -->
           <div v-if="documentPreview" class="document-preview">
             <div class="preview-row">
-              <span class="preview-label">Paginas estimadas:</span>
-              <Tag :value="documentPreview.estimated_pages + ' pags.'" severity="info" />
+              <span class="preview-label">Páginas estimadas:</span>
+              <Tag :value="documentPreview.estimated_pages + ' págs.'" severity="info" />
             </div>
             <div class="preview-row">
               <span class="preview-label">Contenido:</span>

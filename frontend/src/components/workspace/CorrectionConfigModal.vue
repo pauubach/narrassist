@@ -18,12 +18,12 @@
               <i class="pi pi-pencil"></i> Personalizado
             </Tag>
             <Tag v-else-if="!loading && !editingDefaults" severity="secondary" size="small" class="header-tag">
-              <i class="pi pi-link"></i> Heredado
+              <i class="pi pi-link"></i> Por defecto
             </Tag>
             <i
               v-if="!loading && !editingDefaults"
               v-tooltip.bottom="{
-                value: 'Los parámetros se heredan del tipo/subtipo. El icono 🔗 indica valor heredado, el botón ↩ permite restaurar valores personalizados.',
+                value: 'Los parámetros vienen del tipo/subtipo. El icono 🔗 indica valor por defecto, el botón ↩ permite restaurar valores personalizados.',
                 showDelay: 200
               }"
               class="pi pi-info-circle inheritance-help-icon"

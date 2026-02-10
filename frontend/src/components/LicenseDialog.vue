@@ -87,7 +87,7 @@
       <!-- Cuotas -->
       <div class="license-quotas">
         <div class="quota-item">
-          <span class="quota-label">Paginas este mes</span>
+          <span class="quota-label">Páginas este mes</span>
           <span class="quota-value">
             <template v-if="licenseStore.licenseInfo?.unlimited">
               Ilimitadas
@@ -111,8 +111,8 @@
         <div class="offline-content">
           <strong>Modo offline</strong>
           <p>
-            Quedan {{ licenseStore.offlineDaysRemaining }} dias para verificar tu licencia.
-            Conectate a internet para renovar.
+            Quedan {{ licenseStore.offlineDaysRemaining }} días para verificar tu licencia.
+            Conéctate a internet para renovar.
           </p>
         </div>
       </Message>
@@ -121,7 +121,7 @@
       <Message v-if="licenseStore.isTrial" severity="info" :closable="false">
         <div class="trial-content">
           <strong>Periodo de prueba</strong>
-          <p>Tienes acceso completo durante 14 dias.</p>
+          <p>Tienes acceso completo durante 14 días.</p>
           <Button
             label="Comprar licencia"
             size="small"
@@ -194,10 +194,10 @@
       </div>
 
       <p v-if="licenseStore.devicesRemaining > 0" class="devices-hint">
-        Puedes registrar {{ licenseStore.devicesRemaining }} dispositivo(s) mas.
+        Puedes registrar {{ licenseStore.devicesRemaining }} dispositivo(s) más.
       </p>
       <p v-else class="devices-hint devices-full">
-        Has alcanzado el limite de dispositivos. Desactiva uno para usar otro.
+        Has alcanzado el límite de dispositivos. Desactiva uno para usar otro.
       </p>
     </div>
 
@@ -224,10 +224,10 @@
             ></div>
           </div>
           <div class="usage-labels">
-            <span class="usage-used">{{ licenseStore.usage.pages_used }} paginas usadas</span>
+            <span class="usage-used">{{ licenseStore.usage.pages_used }} páginas usadas</span>
             <span class="usage-limit">
               <template v-if="licenseStore.usage.unlimited">Ilimitado</template>
-              <template v-else>{{ licenseStore.usage.pages_max }} limite</template>
+              <template v-else>{{ licenseStore.usage.pages_max }} límite</template>
             </span>
           </div>
         </div>
@@ -235,21 +235,21 @@
         <div v-if="!licenseStore.usage.unlimited" class="usage-remaining">
           <template v-if="licenseStore.usage.pages_remaining > 0">
             <i class="pi pi-check-circle success-icon"></i>
-            <span>Te quedan <strong>{{ licenseStore.usage.pages_remaining }}</strong> paginas este periodo</span>
+            <span>Te quedan <strong>{{ licenseStore.usage.pages_remaining }}</strong> páginas este periodo</span>
           </template>
           <template v-else>
             <i class="pi pi-exclamation-circle warning-icon"></i>
-            <span>Has agotado tu cuota de paginas para este periodo</span>
+            <span>Has agotado tu cuota de páginas para este periodo</span>
           </template>
         </div>
 
         <div v-else class="usage-remaining">
           <i class="pi pi-infinity success-icon"></i>
-          <span>Paginas ilimitadas con tu plan</span>
+          <span>Páginas ilimitadas con tu plan</span>
         </div>
 
         <div class="usage-note">
-          <small>Nota: El re-analisis de un documento ya procesado no consume cuota adicional.</small>
+          <small>Nota: El reanálisis de un documento ya procesado no consume cuota adicional.</small>
         </div>
       </div>
 
@@ -325,15 +325,15 @@ const dialogTitle = computed(() => {
 // Nombres de features para mostrar
 const featureNames: Record<LicenseFeature, string> = {
   attribute_consistency: 'Consistencia de atributos',
-  grammar_spelling: 'Gramatica y ortografia',
+  grammar_spelling: 'Gramática y ortografía',
   ner_coreference: 'Entidades y correferencias',
   name_variants: 'Variantes de nombres',
   character_profiling: 'Perfiles de personajes',
-  network_analysis: 'Analisis de relaciones',
-  anachronism_detection: 'Deteccion de anacronismos',
-  ooc_detection: 'Deteccion fuera de caracter',
-  classical_spanish: 'Espanol clasico',
-  multi_model: 'Multi-modelo (votacion)',
+  network_analysis: 'Análisis de relaciones',
+  anachronism_detection: 'Detección de anacronismos',
+  ooc_detection: 'Detección fuera de carácter',
+  classical_spanish: 'Español clásico',
+  multi_model: 'Multi-modelo (votación)',
   full_reports: 'Informes completos',
 }
 

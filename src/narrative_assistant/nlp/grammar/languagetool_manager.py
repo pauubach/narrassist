@@ -7,7 +7,7 @@ Este módulo gestiona el ciclo de vida del servidor LanguageTool:
 - Detención al cerrar la aplicación o desactivar
 - Verificación de estado y reconexión
 
-El servidor se inicia como subproceso y consume ~500MB RAM.
+El servidor se inicia como subproceso y consume ~256MB RAM (heap limitado).
 """
 
 import contextlib
@@ -234,7 +234,7 @@ class LanguageToolManager:
             # Comando para iniciar
             cmd = [
                 java_cmd,
-                "-Xmx512m",
+                "-Xmx256m",
                 "-cp",
                 str(jar_file),
                 "org.languagetool.server.HTTPServer",
@@ -567,21 +567,20 @@ class LanguageToolInstaller:
                 self._report_error(msg)
                 return False, msg
 
-            # Fase 7: Iniciar servidor (95-100%)
-            self._report("starting", "Iniciando servidor", 95, "Arrancando LanguageTool...")
+            # Fase 7: Completar (95-100%)
+            # NO arrancar el servidor automáticamente: consume ~512MB RAM
+            # y combinado con Python backend + Ollama puede causar OOM.
+            # El usuario puede iniciarlo manualmente desde Settings.
             mgr = get_languagetool_manager()
             # Refrescar rutas del manager por si acaba de instalarse
             mgr._lt_dir = self._lt_dir
             mgr._java_dir = self._java_dir
-            started = mgr.start(wait=True)
 
             self._report(
                 "completed",
                 "Instalación completada",
                 100,
-                "LanguageTool instalado y activo"
-                if started
-                else "Instalado (servidor no iniciado)",
+                "LanguageTool instalado. Puedes iniciarlo desde Ajustes.",
             )
 
             return True, "LanguageTool instalado correctamente"
@@ -873,7 +872,7 @@ class LanguageToolInstaller:
         if system == "Windows":
             bat = self._lt_dir / "start_lt.bat"
             bat.write_text(
-                f'@echo off\ncd /d "%~dp0"\n"{java_cmd}" -Xmx512m -cp languagetool-server.jar '
+                f'@echo off\ncd /d "%~dp0"\n"{java_cmd}" -Xmx256m -cp languagetool-server.jar '
                 f'org.languagetool.server.HTTPServer --port {DEFAULT_PORT} --allow-origin "*"\n',
                 encoding="utf-8",
             )
@@ -881,7 +880,7 @@ class LanguageToolInstaller:
         sh = self._lt_dir / "start_lt.sh"
         sh_java = "java" if has_system_java else '"$(dirname "$0")/../java/bin/java"'
         sh.write_text(
-            f'#!/bin/bash\ncd "$(dirname "$0")"\n{sh_java} -Xmx512m -cp languagetool-server.jar '
+            f'#!/bin/bash\ncd "$(dirname "$0")"\n{sh_java} -Xmx256m -cp languagetool-server.jar '
             f'org.languagetool.server.HTTPServer --port {DEFAULT_PORT} --allow-origin "*"\n',
             encoding="utf-8",
         )

@@ -638,9 +638,13 @@ const installLanguageTool = async () => {
   const success = await systemStore.installLanguageTool()
   if (success) {
     await systemStore.refreshCapabilities()
-    toast.add({ severity: 'success', summary: 'LanguageTool instalado', detail: 'Corrector avanzado disponible', life: 3000 })
+    toast.add({ severity: 'success', summary: 'LanguageTool instalado', detail: 'Corrector avanzado disponible. Inícialo desde Ajustes.', life: 5000 })
   } else {
-    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo instalar LanguageTool. Verifica tu conexión a internet.', life: 8000 })
+    // Distinguir entre error de conexión (backend caído) y error de descarga
+    const errorDetail = systemStore.backendConnected
+      ? 'No se pudo instalar LanguageTool. Verifica tu conexión a internet.'
+      : 'Se perdió la conexión con el servidor durante la instalación. Reinicia la aplicación.'
+    toast.add({ severity: 'error', summary: 'Error', detail: errorDetail, life: 8000 })
   }
 }
 const startLanguageTool = async () => {

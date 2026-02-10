@@ -239,7 +239,7 @@ function onShow() {
     <template #footer>
       <div class="dialog-footer">
         <span class="footer-hint">
-          En macOS, despues de limpiar, arrastre la aplicacion a la Papelera.
+          En macOS, después de limpiar, arrastre la aplicación a la Papelera.
         </span>
         <Button label="Cerrar" icon="pi pi-times" text @click="dialogVisible = false" />
       </div>

@@ -2,12 +2,12 @@
   <div class="inheritance-indicator" :class="{ custom: isCustom }">
     <i
       v-if="!isCustom"
-      v-tooltip.top="'Heredado del tipo/subtipo'"
+      v-tooltip.top="'Valor por defecto del tipo/subtipo'"
       class="pi pi-link"
     />
     <Button
       v-else
-      v-tooltip.top="'Restaurar valor heredado'"
+      v-tooltip.top="'Restaurar valor por defecto'"
       icon="pi pi-undo"
       text
       rounded

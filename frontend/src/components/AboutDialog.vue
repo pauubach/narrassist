@@ -22,19 +22,19 @@
       </div>
 
       <div class="system-status">
-        <h3>Estado del Sistema</h3>
+        <h3>Estado</h3>
 
         <div class="status-item">
-          <span class="status-label">Backend Python:</span>
+          <span class="status-label">Motor de análisis:</span>
           <Tag
             :severity="backendStatus.connected ? 'success' : 'danger'"
           >
-            {{ backendStatus.connected ? 'Conectado' : 'Desconectado' }}
+            {{ backendStatus.connected ? 'Listo' : 'No disponible' }}
           </Tag>
         </div>
 
         <div class="status-item">
-          <span class="status-label">Base de datos:</span>
+          <span class="status-label">Almacenamiento:</span>
           <Tag
             :severity="backendStatus.connected ? 'success' : 'warn'"
           >
@@ -43,7 +43,7 @@
         </div>
 
         <div class="status-item">
-          <span class="status-label">Modelos IA:</span>
+          <span class="status-label">Modelos de lenguaje:</span>
           <Tag
             :severity="backendStatus.connected ? 'success' : 'warn'"
           >

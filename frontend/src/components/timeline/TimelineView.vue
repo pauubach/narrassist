@@ -130,8 +130,8 @@
       </div>
       <p class="empty-tip">
         <i class="pi pi-info-circle"></i>
-        Para generar una linea temporal, el texto debe contener referencias temporales explicitas
-        como fechas, estaciones, o expresiones como "tres dias despues".
+        Para generar una línea temporal, el texto debe contener referencias temporales explícitas
+        como fechas, estaciones, o expresiones como "tres días después".
       </p>
       <Button
         label="Recargar"
@@ -276,7 +276,7 @@
     >
       <div v-if="selectedEvent" class="event-detail">
         <div class="detail-section">
-          <h5>Informacion Temporal</h5>
+          <h5>Información Temporal</h5>
           <div class="detail-grid">
             <div class="detail-item">
               <span class="label">Fecha en la historia:</span>
