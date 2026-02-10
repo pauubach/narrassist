@@ -202,6 +202,7 @@ import ProgressSpinner from 'primevue/progressspinner'
 import Message from 'primevue/message'
 import { useToast } from 'primevue/usetoast'
 import { api } from '@/services/apiClient'
+import { sanitizeHtml } from '@/utils/sanitizeHtml'
 
 const props = defineProps<{
   projectId: number
@@ -314,7 +315,7 @@ function highlightWord(text: string, word: string): string {
   if (!text || !word) return text
   const escaped = escapeHtml(text)
   const regex = new RegExp(`(${escapeRegex(escapeHtml(word))})`, 'gi')
-  return escaped.replace(regex, '<mark>$1</mark>')
+  return sanitizeHtml(escaped.replace(regex, '<mark>$1</mark>'))
 }
 </script>
 

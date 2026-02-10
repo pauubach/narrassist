@@ -184,6 +184,7 @@ import { transformChapters } from '@/types/transformers/projects'
 import DialogueAttributionPanel from '@/components/DialogueAttributionPanel.vue'
 import { apiUrl } from '@/config/api'
 import { api } from '@/services/apiClient'
+import { sanitizeHtml } from '@/utils/sanitizeHtml'
 
 const toast = useToast()
 
@@ -740,7 +741,7 @@ const getHighlightedContent = (chapter: Chapter): string => {
   }
 
   // Convertir saltos de línea en párrafos y detectar encabezados de sección
-  return content
+  const html = content
     .split('\n\n')
     .map(block => {
       const trimmedBlock = block.trim()
@@ -757,6 +758,9 @@ const getHighlightedContent = (chapter: Chapter): string => {
       return `<p>${block.replace(/\n/g, '<br>')}</p>`
     })
     .join('')
+
+  // Defense-in-depth: sanitize final HTML to strip anything unexpected
+  return sanitizeHtml(html)
 }
 
 /**

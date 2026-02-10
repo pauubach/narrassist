@@ -192,16 +192,20 @@ const allSpans = computed<AnySpan[]>(() => {
 const segments = computed<TextSegment[]>(() => {
   if (!props.text) return []
 
+  const spans = allSpans.value
+  if (spans.length === 0) {
+    return [{ text: props.text, start: props.offsetBase || 0, end: props.text.length + (props.offsetBase || 0), spans: [] }]
+  }
+
   const result: TextSegment[] = []
   const baseOffset = props.offsetBase || 0
-  let _currentPos = 0
 
   // Crear puntos de corte únicos
   const breakpoints = new Set<number>()
   breakpoints.add(0)
   breakpoints.add(props.text.length)
 
-  for (const span of allSpans.value) {
+  for (const span of spans) {
     const relStart = span.start - baseOffset
     const relEnd = span.end - baseOffset
     if (relStart >= 0 && relStart <= props.text.length) breakpoints.add(relStart)
@@ -210,27 +214,39 @@ const segments = computed<TextSegment[]>(() => {
 
   const sortedBreakpoints = Array.from(breakpoints).sort((a, b) => a - b)
 
-  // Crear segmentos entre breakpoints
+  // Build event list for sweep-line: +1 at span start, -1 at span end
+  type SweepEvent = { pos: number; type: 'start' | 'end'; span: AnySpan }
+  const events: SweepEvent[] = []
+  for (const span of spans) {
+    events.push({ pos: span.start, type: 'start', span })
+    events.push({ pos: span.end, type: 'end', span })
+  }
+  events.sort((a, b) => a.pos - b.pos || (a.type === 'end' ? -1 : 1))
+
+  // Sweep: maintain active spans set as we walk through breakpoints
+  const active = new Set<AnySpan>()
+  let eventIdx = 0
+
   for (let i = 0; i < sortedBreakpoints.length - 1; i++) {
     const start = sortedBreakpoints[i]
     const end = sortedBreakpoints[i + 1]
-
     if (start >= end) continue
 
-    const segmentText = props.text.slice(start, end)
     const absoluteStart = start + baseOffset
-    const absoluteEnd = end + baseOffset
 
-    // Encontrar spans que cubren este segmento
-    const coveringSpans = allSpans.value.filter(
-      span => span.start <= absoluteStart && span.end >= absoluteEnd
-    )
+    // Process events up to this segment's absolute start
+    while (eventIdx < events.length && events[eventIdx].pos <= absoluteStart) {
+      const ev = events[eventIdx]
+      if (ev.type === 'start') active.add(ev.span)
+      else active.delete(ev.span)
+      eventIdx++
+    }
 
     result.push({
-      text: segmentText,
+      text: props.text.slice(start, end),
       start: absoluteStart,
-      end: absoluteEnd,
-      spans: coveringSpans,
+      end: end + baseOffset,
+      spans: active.size > 0 ? Array.from(active) : [],
     })
   }
 
