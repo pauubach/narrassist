@@ -738,6 +738,70 @@ pip install transformers
 | S6-04 | Navegación al texto desde alertas | DONE | `_resolve_alert_positions()` busca excerpt en capítulo |
 | S6-05 | Modo focus (solo alertas críticas) | DONE | `focus=true` filtra critical/warning con confianza ≥ 0.7 + `severity` filter |
 
+### Sprint 7a: Licensing Migration — COMPLETADO 2026-02-10
+
+| ID | Accion | Estado | Detalle |
+|----|--------|--------|---------|
+| S7a-01 | Eliminar LicenseModule, LicenseBundle | DONE | Enums legacy eliminados de models.py |
+| S7a-02 | Renombrar tiers FREELANCE→CORRECTOR, AGENCIA→PROFESIONAL | DONE | 3 tiers: CORRECTOR, PROFESIONAL, EDITORIAL |
+| S7a-03 | Cuota de manuscritos → paginas (250 words=1 page) | DONE | `words_to_pages()`, rollover 1 mes |
+| S7a-04 | Implementar rollover (1 mes) | DONE | `_get_usage_with_rollover()` en verification.py |
+| S7a-05 | Renombrar ModuleNotLicensedError → TierFeatureError | DONE | core/errors.py, 7 clases de error |
+| S7a-06 | Crear check_tier_feature() | DONE | `check_feature()` en LicenseVerifier |
+| S7a-07 | Actualizar schema SQL (5 tablas) | DONE | licenses, devices, subscriptions, usage, promo_codes |
+| S7a-08 | Actualizar API endpoints | DONE | 7 endpoints en license.py |
+| S7a-09 | Actualizar frontend store | DONE | license.ts con tipos, computed, acciones |
+| S7a-10 | Actualizar LicenseDialog | DONE | Nuevo LicenseDialog.vue sin modulos |
+| S7a-11 | Actualizar exports licensing/__init__.py | DONE | API publica completa |
+| S7a-12 | Tests unitarios nuevo modelo | DONE | 147 tests (81 models + 66 verification) |
+
+> Documentacion produccion: [LICENSING_PRODUCTION_PLAN.md](LICENSING_PRODUCTION_PLAN.md)
+
+### Sprint 7b: Feature Gating + Integration (5 dias) — PENDIENTE
+
+| ID | Accion | Estado | Detalle |
+|----|--------|--------|---------|
+| S7b-01 | Feature gating en character_profiling | PENDIENTE | character_profiling.py |
+| S7b-02 | Feature gating en character_network | PENDIENTE | character_network.py |
+| S7b-03 | Feature gating en anachronism detection | PENDIENTE | temporal/ |
+| S7b-04 | Feature gating en classical_spanish | PENDIENTE | classical_spanish.py |
+| S7b-05 | Feature gating en multi-model voting | PENDIENTE | coreference_resolver.py |
+| S7b-06 | Integrar OOC detection en pipeline | PENDIENTE | analysis.py, out_of_character.py |
+| S7b-07 | Integrar Classical Spanish en pipeline | PENDIENTE | analysis.py, classical_spanish.py |
+| S7b-08 | Pasar settings frontend → backend en analisis | PENDIENTE | analysis.ts, analysis.py |
+| S7b-09 | Conectar endpoint anachronisms con frontend | PENDIENTE | relationships.py, TimelineView.vue |
+| S7b-10 | Crear CharacterProfileModal unificado | PENDIENTE | Nuevo componente |
+
+### Sprint 7c: Pipeline Fixes (3 dias) — PENDIENTE
+
+| ID | Accion | Estado | Detalle |
+|----|--------|--------|---------|
+| S7c-01 | Persistir cola pesada en BD | PENDIENTE | deps.py, analysis.py |
+| S7c-02 | Fix: chapters_with_ids en coreference | PENDIENTE | analysis.py:1200 |
+| S7c-03 | Validar documento vacio en fase 1 | PENDIENTE | analysis.py |
+| S7c-04 | Health check Ollama antes de fase 5 | PENDIENTE | analysis.py |
+| S7c-05 | Fix: fallo silencioso persistencia capitulos | PENDIENTE | analysis.py:382-420 |
+| S7c-06 | Limpiar columnas BD no usadas | PENDIENTE | database.py |
+| S7c-07 | Limpiar componentes huerfanos | PENDIENTE | StoryBibleTab, etc. |
+
+### Sprint 7d: UX + Copy (5 dias) — PENDIENTE
+
+| ID | Accion | Estado | Detalle |
+|----|--------|--------|---------|
+| S7d-01 | Unificar nombres de tabs | PENDIENTE | Alertas/Timeline/Estilo |
+| S7d-02 | Banner "Analisis en progreso" para usuario nuevo | PENDIENTE | ProjectDetailView.vue |
+| S7d-03 | Indicadores severidad: color + texto + icono | PENDIENTE | Multiples |
+| S7d-04 | aria-labels en botones de solo icono | PENDIENTE | Multiples |
+| S7d-05 | Separar setup Ollama del tutorial | PENDIENTE | TutorialDialog.vue |
+| S7d-06 | Mejorar empty states con contexto y acciones | PENDIENTE | Multiples |
+| S7d-07 | Guia terminologia: Entidad/Personaje/Manuscrito/Doc | PENDIENTE | Interno |
+| S7d-08 | Breadcrumb en ProjectDetailView | PENDIENTE | ProjectDetailView.vue |
+| S7d-09 | "Saltar tutorial" en todos los pasos | PENDIENTE | TutorialDialog.vue |
+| S7d-10 | Simplificar AboutDialog (sin jargon tecnico) | PENDIENTE | AboutDialog.vue |
+| S7d-11 | Renombrar settings tecnicos a lenguaje corrector | PENDIENTE | SettingsView.vue |
+| S7d-12 | "Restaurar valores por defecto" en Settings | PENDIENTE | SettingsView.vue |
+| S7d-13 | Fix copy: "Heredado"→"Por defecto", tildes | PENDIENTE | CorrectionConfigModal, DataMgmt |
+
 ### Backlog (Futuro)
 
 | ID | Acción | Detalle |
@@ -819,6 +883,6 @@ S6-01 ─→ S6-02 ─→ S6-03
 
 ---
 
-**Última actualización**: 2026-02-06
+**Ultima actualizacion**: 2026-02-10
 **Autor**: Claude (Panel de 8 expertos simulados)
-**Próximo paso**: Sprints 0-6 completados. Backlog futuro disponible.
+**Estado**: S0-S6 completados. S7a (Licensing) completado. S7b-d pendientes.

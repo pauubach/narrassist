@@ -1,10 +1,10 @@
 # Estado del Proyecto - Narrative Assistant
 
-> **Última actualización**: 2026-02-08
-> **Versión**: 0.7.9
+> **Ultima actualizacion**: 2026-02-10
+> **Version**: 0.7.17
 > **Changelog**: Ver [CHANGELOG.md](CHANGELOG.md)
 > **Roadmap**: Ver [ROADMAP.md](ROADMAP.md)
-> **Revisión experta**: Ver [EXPERT_REVIEW_FINDINGS.md](../EXPERT_REVIEW_FINDINGS.md)
+> **Plan de mejora**: Ver [IMPROVEMENT_PLAN.md](IMPROVEMENT_PLAN.md)
 
 ---
 

@@ -460,4 +460,4 @@ Las versiones 0.0.x fueron desarrollo interno sin changelog formal.
 
 *Documento actualizado: 2026-02-04*
 
-> **Nota**: Para el estado actual completo del proyecto (v0.3.37+), ver [PROJECT_STATUS.md](PROJECT_STATUS.md) y [research/ROADMAP_STATUS.md](research/ROADMAP_STATUS.md).
+> **Nota**: Para el estado actual completo del proyecto, ver [PROJECT_STATUS.md](PROJECT_STATUS.md) y [IMPROVEMENT_PLAN.md](IMPROVEMENT_PLAN.md).

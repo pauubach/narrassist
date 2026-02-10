@@ -1,20 +1,16 @@
 # Roadmap - Narrative Assistant
 
-> **Última actualización**: 2026-02-04
-> **Versión actual**: 0.3.37
+> **Ultima actualizacion**: 2026-02-10
+> **Version actual**: 0.7.17
 > **Estado actual**: Ver [PROJECT_STATUS.md](PROJECT_STATUS.md)
 > **Historial de cambios**: Ver [CHANGELOG.md](CHANGELOG.md)
+> **Plan de mejora**: Ver [IMPROVEMENT_PLAN.md](IMPROVEMENT_PLAN.md)
 
 ---
 
 ## Resumen
 
-Este documento define las funcionalidades **pendientes de implementar**. El proyecto está funcionalmente completo para la funcionalidad core de correctores — solo queda infraestructura y mejoras de calidad.
-
-**Documentación detallada de estado**:
-- [research/ROADMAP_STATUS.md](research/ROADMAP_STATUS.md) - Estado detallado con auditorías
-- [research/AUDIT_DECISIONS_AND_ROADMAP.md](research/AUDIT_DECISIONS_AND_ROADMAP.md) - Decisiones de auditoría y sprints de calidad
-- [../EXPERT_REVIEW_FINDINGS.md](../EXPERT_REVIEW_FINDINGS.md) - Hallazgos de revisión multi-experto
+Este documento define las funcionalidades **pendientes de implementar**. El proyecto esta funcionalmente completo para la funcionalidad core de correctores — queda infraestructura, mejoras de calidad y licencias.
 
 ---
 
@@ -36,7 +32,7 @@ Todas las features core están implementadas:
 
 ### Sprints de Calidad (Post-Auditoría)
 
-> Detalle: [AUDIT_DECISIONS_AND_ROADMAP.md](research/AUDIT_DECISIONS_AND_ROADMAP.md)
+> Detalle: [AUDIT_DECISIONS_AND_ROADMAP.md](_archive/planning/AUDIT_DECISIONS_AND_ROADMAP.md) (archivado, 100% completado)
 
 | Sprint | Objetivo | Items | Días |
 |--------|----------|-------|------|
