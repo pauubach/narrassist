@@ -7,9 +7,27 @@
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
-import { useAnalysisStore } from '../analysis'
+import { useAnalysisStore, ANALYSIS_DEPENDENCIES, type ExecutedPhases } from '../analysis'
 
-// Mock de fetch global
+// Mock del api client (para las nuevas funcionalidades que usan api)
+vi.mock('@/services/apiClient', () => ({
+  api: {
+    get: vi.fn(),
+    post: vi.fn(),
+    postForm: vi.fn(),
+    postRaw: vi.fn(),
+  },
+}))
+
+import { api } from '@/services/apiClient'
+const mockApiClient = api as unknown as {
+  get: ReturnType<typeof vi.fn>
+  post: ReturnType<typeof vi.fn>
+  postForm: ReturnType<typeof vi.fn>
+  postRaw: ReturnType<typeof vi.fn>
+}
+
+// Mock de fetch global (para tests legacy que usan fetch directamente)
 const mockFetch = vi.fn()
 global.fetch = mockFetch
 
@@ -101,14 +119,11 @@ describe('analysisStore', () => {
         phases: [],
       }
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ success: true, data: mockProgressData }),
-      })
+      mockApiClient.get.mockResolvedValueOnce(mockProgressData)
 
       const result = await store.getProgress(1)
 
-      expect(mockFetch).toHaveBeenCalledWith('/api/projects/1/analysis/progress', expect.objectContaining({ method: 'GET' }))
+      expect(mockApiClient.get).toHaveBeenCalledWith('/api/projects/1/analysis/progress')
       expect(result).toEqual(mockProgressData)
       expect(store.currentAnalysis).toEqual(mockProgressData)
     })
@@ -126,10 +141,7 @@ describe('analysisStore', () => {
         phases: [],
       }
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ success: true, data: mockProgressData }),
-      })
+      mockApiClient.get.mockResolvedValueOnce(mockProgressData)
 
       await store.getProgress(1)
 
@@ -150,10 +162,7 @@ describe('analysisStore', () => {
         phases: [],
       }
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ success: true, data: mockProgressData }),
-      })
+      mockApiClient.get.mockResolvedValueOnce(mockProgressData)
 
       await store.getProgress(1)
 
@@ -164,21 +173,17 @@ describe('analysisStore', () => {
     it('should handle network errors gracefully', async () => {
       const store = useAnalysisStore()
 
-      mockFetch.mockRejectedValueOnce(new Error('Network error'))
+      mockApiClient.get.mockRejectedValueOnce(new Error('Network error'))
 
       const result = await store.getProgress(1)
 
       expect(result).toBeNull()
-      // No debe crash, solo loguear el error
     })
 
     it('should handle non-ok responses', async () => {
       const store = useAnalysisStore()
 
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 500,
-      })
+      mockApiClient.get.mockRejectedValueOnce(new Error('HTTP 500'))
 
       const result = await store.getProgress(1)
 
@@ -191,9 +196,9 @@ describe('analysisStore', () => {
       const store = useAnalysisStore()
       store.setActiveProjectId(1)
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ success: true }),
+      mockApiClient.postForm.mockResolvedValueOnce({
+        project_id: 1,
+        status: 'running',
       })
 
       const result = await store.startAnalysis(1)
@@ -207,10 +212,7 @@ describe('analysisStore', () => {
       const store = useAnalysisStore()
       store.setActiveProjectId(1)
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ success: false, error: 'Failed to start' }),
-      })
+      mockApiClient.postForm.mockRejectedValueOnce(new Error('Failed to start'))
 
       const result = await store.startAnalysis(1)
 
@@ -329,5 +331,408 @@ describe('Analysis Progress Data Structure', () => {
     for (const status of validStatuses) {
       expect(validStatuses).toContain(status)
     }
+  })
+})
+
+
+// ============================================================================
+// Phase Tracking & Partial Analysis (nuevas funcionalidades S8)
+// ============================================================================
+
+describe('Phase Tracking', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  describe('executedPhases', () => {
+    it('should start with no executed phases', () => {
+      const store = useAnalysisStore()
+      expect(store.getProjectPhases(1)).toEqual({})
+    })
+
+    it('should load executed phases from backend', async () => {
+      const store = useAnalysisStore()
+      mockApiClient.get.mockResolvedValueOnce({
+        executed: { parsing: true, structure: true, entities: true },
+      })
+
+      const result = await store.loadExecutedPhases(1)
+
+      expect(mockApiClient.get).toHaveBeenCalledWith('/api/projects/1/analysis-status')
+      expect(result).toEqual({ parsing: true, structure: true, entities: true })
+      expect(store.getProjectPhases(1)).toEqual({ parsing: true, structure: true, entities: true })
+    })
+
+    it('should return null on backend error', async () => {
+      const store = useAnalysisStore()
+      mockApiClient.get.mockRejectedValueOnce(new Error('500'))
+
+      const result = await store.loadExecutedPhases(1)
+
+      expect(result).toBeNull()
+    })
+
+    it('should isolate phases between projects', async () => {
+      const store = useAnalysisStore()
+
+      mockApiClient.get.mockResolvedValueOnce({
+        executed: { parsing: true, entities: true },
+      })
+      await store.loadExecutedPhases(1)
+
+      mockApiClient.get.mockResolvedValueOnce({
+        executed: { parsing: true, grammar: true },
+      })
+      await store.loadExecutedPhases(2)
+
+      expect(store.isPhaseExecuted(1, 'entities')).toBe(true)
+      expect(store.isPhaseExecuted(1, 'grammar')).toBe(false)
+      expect(store.isPhaseExecuted(2, 'grammar')).toBe(true)
+      expect(store.isPhaseExecuted(2, 'entities')).toBe(false)
+    })
+  })
+
+  describe('isPhaseExecuted', () => {
+    it('should return false for non-executed phase', () => {
+      const store = useAnalysisStore()
+      expect(store.isPhaseExecuted(1, 'entities')).toBe(false)
+    })
+
+    it('should return true after phase is marked executed', async () => {
+      const store = useAnalysisStore()
+      mockApiClient.get.mockResolvedValueOnce({
+        executed: { entities: true },
+      })
+      await store.loadExecutedPhases(1)
+
+      expect(store.isPhaseExecuted(1, 'entities')).toBe(true)
+    })
+  })
+
+  describe('getMissingDependencies', () => {
+    it('should return empty for phase with no dependencies', () => {
+      const store = useAnalysisStore()
+      expect(store.getMissingDependencies(1, 'parsing')).toEqual([])
+    })
+
+    it('should return all deps when nothing is executed', () => {
+      const store = useAnalysisStore()
+      const missing = store.getMissingDependencies(1, 'attributes')
+      // attributes requires: entities + coreference
+      expect(missing).toContain('entities')
+      expect(missing).toContain('coreference')
+    })
+
+    it('should return only missing deps', async () => {
+      const store = useAnalysisStore()
+      mockApiClient.get.mockResolvedValueOnce({
+        executed: { parsing: true, entities: true },
+      })
+      await store.loadExecutedPhases(1)
+
+      // attributes requires entities + coreference; entities is done
+      const missing = store.getMissingDependencies(1, 'attributes')
+      expect(missing).toEqual(['coreference'])
+    })
+
+    it('should return empty when all deps satisfied', async () => {
+      const store = useAnalysisStore()
+      mockApiClient.get.mockResolvedValueOnce({
+        executed: { parsing: true, entities: true, coreference: true },
+      })
+      await store.loadExecutedPhases(1)
+
+      expect(store.getMissingDependencies(1, 'attributes')).toEqual([])
+    })
+  })
+
+  describe('canRunPhase', () => {
+    it('should allow running parsing (no deps)', () => {
+      const store = useAnalysisStore()
+      expect(store.canRunPhase(1, 'parsing')).toBe(true)
+    })
+
+    it('should block phase with missing deps', () => {
+      const store = useAnalysisStore()
+      expect(store.canRunPhase(1, 'coreference')).toBe(false) // needs entities
+    })
+
+    it('should allow phase when deps satisfied', async () => {
+      const store = useAnalysisStore()
+      mockApiClient.get.mockResolvedValueOnce({
+        executed: { parsing: true, entities: true },
+      })
+      await store.loadExecutedPhases(1)
+
+      expect(store.canRunPhase(1, 'coreference')).toBe(true)
+    })
+  })
+
+  describe('isPhaseRunning', () => {
+    it('should be false initially', () => {
+      const store = useAnalysisStore()
+      expect(store.isPhaseRunning('entities')).toBe(false)
+    })
+  })
+})
+
+describe('ANALYSIS_DEPENDENCIES', () => {
+  it('should have parsing as root (no deps)', () => {
+    expect(ANALYSIS_DEPENDENCIES.parsing).toEqual([])
+  })
+
+  it('should have structure depend on parsing', () => {
+    expect(ANALYSIS_DEPENDENCIES.structure).toContain('parsing')
+  })
+
+  it('should have coreference depend on entities', () => {
+    expect(ANALYSIS_DEPENDENCIES.coreference).toContain('entities')
+  })
+
+  it('should have attributes depend on entities and coreference', () => {
+    expect(ANALYSIS_DEPENDENCIES.attributes).toContain('entities')
+    expect(ANALYSIS_DEPENDENCIES.attributes).toContain('coreference')
+  })
+
+  it('should have voice_profiles depend on entities and attributes', () => {
+    expect(ANALYSIS_DEPENDENCIES.voice_profiles).toContain('entities')
+    expect(ANALYSIS_DEPENDENCIES.voice_profiles).toContain('attributes')
+  })
+
+  it('should have no circular dependencies', () => {
+    const visited = new Set<string>()
+    const visiting = new Set<string>()
+
+    function hasCycle(phase: string): boolean {
+      if (visiting.has(phase)) return true // cycle!
+      if (visited.has(phase)) return false
+
+      visiting.add(phase)
+      const deps = ANALYSIS_DEPENDENCIES[phase as keyof ExecutedPhases] || []
+      for (const dep of deps) {
+        if (hasCycle(dep)) return true
+      }
+      visiting.delete(phase)
+      visited.add(phase)
+      return false
+    }
+
+    for (const phase of Object.keys(ANALYSIS_DEPENDENCIES)) {
+      expect(hasCycle(phase)).toBe(false)
+    }
+  })
+
+  it('should have all dependency targets defined in ExecutedPhases', () => {
+    const allPhases = new Set(Object.keys(ANALYSIS_DEPENDENCIES))
+    for (const [phase, deps] of Object.entries(ANALYSIS_DEPENDENCIES)) {
+      for (const dep of deps) {
+        expect(allPhases.has(dep)).toBe(true)
+      }
+    }
+  })
+})
+
+
+// ============================================================================
+// Queued states (3-tier concurrency)
+// ============================================================================
+
+describe('Queued States', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+  })
+
+  it('should recognize queued status from startAnalysis', async () => {
+    const store = useAnalysisStore()
+    store.setActiveProjectId(1)
+
+    mockApiClient.postForm.mockResolvedValueOnce({
+      project_id: 1,
+      status: 'queued',
+    })
+
+    await store.startAnalysis(1)
+
+    expect(store.currentAnalysis?.status).toBe('queued')
+    expect(store.isAnalyzing).toBe(true)
+  })
+
+  it('should keep polling when status is queued_for_heavy', async () => {
+    const store = useAnalysisStore()
+    store.setActiveProjectId(1)
+    store.setAnalyzing(1, true)
+
+    mockApiClient.get.mockResolvedValueOnce({
+      project_id: 1,
+      status: 'queued_for_heavy',
+      progress: 3,
+      current_phase: 'Estructura lista',
+      phases: [
+        { id: 'parsing', name: 'Parsing', completed: true, current: false },
+        { id: 'classification', name: 'Classification', completed: true, current: false },
+        { id: 'structure', name: 'Structure', completed: true, current: false },
+      ],
+    })
+
+    await store.getProgress(1)
+
+    expect(store.currentAnalysis?.status).toBe('queued_for_heavy')
+    expect(store.isAnalyzing).toBe(true) // Still polling
+  })
+
+  it('should update executedPhases progressively during analysis', async () => {
+    const store = useAnalysisStore()
+    store.setActiveProjectId(1)
+    store.setAnalyzing(1, true)
+
+    mockApiClient.get.mockResolvedValueOnce({
+      project_id: 1,
+      status: 'running',
+      progress: 40,
+      current_phase: 'fusion',
+      phases: [
+        { id: 'parsing', name: 'Parsing', completed: true, current: false },
+        { id: 'structure', name: 'Structure', completed: true, current: false },
+        { id: 'ner', name: 'NER', completed: true, current: false },
+        { id: 'fusion', name: 'Fusion', completed: false, current: true },
+      ],
+    })
+
+    await store.getProgress(1)
+
+    // parsing->parsing, structure->structure, ner->entities
+    expect(store.isPhaseExecuted(1, 'parsing')).toBe(true)
+    expect(store.isPhaseExecuted(1, 'structure')).toBe(true)
+    expect(store.isPhaseExecuted(1, 'entities')).toBe(true) // ner maps to entities
+    expect(store.isPhaseExecuted(1, 'coreference')).toBe(false) // fusion not completed yet
+  })
+
+  it('should handle cancelled status', async () => {
+    const store = useAnalysisStore()
+    store.setActiveProjectId(1)
+    store.setAnalyzing(1, true)
+
+    mockApiClient.postRaw.mockResolvedValueOnce({ success: true })
+
+    const result = await store.cancelAnalysis(1)
+
+    expect(store.isAnalyzing).toBe(false)
+    expect(store.currentAnalysis?.status).toBe('idle')
+  })
+})
+
+
+// ============================================================================
+// checkAnalysisStatus (recovery on page load)
+// ============================================================================
+
+describe('checkAnalysisStatus', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+  })
+
+  it('should detect running analysis on page load', async () => {
+    const store = useAnalysisStore()
+
+    mockApiClient.get.mockResolvedValueOnce({
+      project_id: 1,
+      status: 'running',
+      progress: 60,
+      current_phase: 'attributes',
+      phases: [],
+    })
+
+    const isActive = await store.checkAnalysisStatus(1)
+
+    expect(isActive).toBe(true)
+    expect(store.isProjectAnalyzing(1)).toBe(true)
+  })
+
+  it('should detect queued analysis on page load', async () => {
+    const store = useAnalysisStore()
+
+    mockApiClient.get.mockResolvedValueOnce({
+      project_id: 1,
+      status: 'queued',
+      progress: 0,
+      current_phase: 'En cola',
+      phases: [],
+    })
+
+    const isActive = await store.checkAnalysisStatus(1)
+
+    expect(isActive).toBe(true)
+    expect(store.isProjectAnalyzing(1)).toBe(true)
+  })
+
+  it('should detect queued_for_heavy on page load', async () => {
+    const store = useAnalysisStore()
+
+    mockApiClient.get.mockResolvedValueOnce({
+      project_id: 1,
+      status: 'queued_for_heavy',
+      progress: 3,
+      current_phase: 'Estructura lista',
+      phases: [],
+    })
+
+    const isActive = await store.checkAnalysisStatus(1)
+
+    expect(isActive).toBe(true)
+    expect(store.isProjectAnalyzing(1)).toBe(true)
+  })
+
+  it('should clear state when no active analysis', async () => {
+    const store = useAnalysisStore()
+
+    mockApiClient.get.mockResolvedValueOnce({
+      project_id: 1,
+      status: 'idle',
+      progress: 0,
+      current_phase: '',
+      phases: [],
+    })
+
+    const isActive = await store.checkAnalysisStatus(1)
+
+    expect(isActive).toBe(false)
+    expect(store.isProjectAnalyzing(1)).toBe(false)
+  })
+
+  it('should not clear if startAnalysis is in-flight', async () => {
+    const store = useAnalysisStore()
+    // Simulate startAnalysis setting _analyzing before checkAnalysisStatus returns
+    store.setAnalyzing(1, true)
+
+    mockApiClient.get.mockResolvedValueOnce({
+      project_id: 1,
+      status: 'idle', // Backend says idle, but startAnalysis is in-flight
+      progress: 0,
+      current_phase: '',
+      phases: [],
+    })
+
+    const isActive = await store.checkAnalysisStatus(1)
+
+    // Should NOT clear because _analyzing was already true
+    expect(isActive).toBe(true)
+    expect(store.isProjectAnalyzing(1)).toBe(true)
+  })
+
+  it('should handle network error gracefully', async () => {
+    const store = useAnalysisStore()
+
+    mockApiClient.get.mockRejectedValueOnce(new Error('Network error'))
+
+    const isActive = await store.checkAnalysisStatus(1)
+
+    expect(isActive).toBe(false)
   })
 })
