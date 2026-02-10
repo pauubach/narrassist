@@ -31,6 +31,13 @@ async def get_voice_profiles(
     Returns:
         ApiResponse con perfiles de voz por personaje
     """
+    # Check enrichment cache first (S8a-13) — only when not forcing refresh
+    if not force_refresh:
+        from routers._enrichment_cache import get_cached_enrichment
+        cached = get_cached_enrichment(deps.get_database(), project_id, "voice_profiles", allow_stale=True)
+        if cached:
+            return ApiResponse(success=True, data=cached)
+
     try:
         import json as json_mod
 
@@ -412,6 +419,13 @@ async def get_voice_deviations(
     Returns:
         ApiResponse con desviaciones detectadas por personaje
     """
+    # Check enrichment cache first (S8a-13) — only when no chapter filter
+    if chapter_number is None:
+        from routers._enrichment_cache import get_cached_enrichment
+        cached = get_cached_enrichment(deps.get_database(), project_id, "voice_deviations", allow_stale=True)
+        if cached:
+            return ApiResponse(success=True, data=cached)
+
     try:
         from narrative_assistant.voice.profiles import VoiceProfileBuilder
         from narrative_assistant.voice.deviations import VoiceDeviationDetector
@@ -570,6 +584,13 @@ async def get_register_analysis(
     Returns:
         ApiResponse con análisis de registro y cambios detectados
     """
+    # Check enrichment cache first (S8a-13) — only when no chapter filter
+    if chapter_number is None:
+        from routers._enrichment_cache import get_cached_enrichment
+        cached = get_cached_enrichment(deps.get_database(), project_id, "register_analysis", allow_stale=True)
+        if cached:
+            return ApiResponse(success=True, data=cached)
+
     try:
         from narrative_assistant.voice.register import (
             RegisterChangeDetector,
@@ -1061,6 +1082,12 @@ async def delete_focalization(project_id: int, declaration_id: int):
 @router.get("/api/projects/{project_id}/focalization/violations", response_model=ApiResponse)
 async def detect_focalization_violations(project_id: int):
     """Detecta violaciones de focalización en todo el proyecto."""
+    # Check enrichment cache first (S8a-13)
+    from routers._enrichment_cache import get_cached_enrichment
+    cached = get_cached_enrichment(deps.get_database(), project_id, "focalization_violations", allow_stale=True)
+    if cached:
+        return ApiResponse(success=True, data=cached)
+
     try:
         from narrative_assistant.focalization import (
             FocalizationDeclarationService,

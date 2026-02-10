@@ -42,6 +42,13 @@ async def get_chapter_progress(
     Returns:
         ChapterProgressReport con resúmenes de todos los capítulos
     """
+    # Check enrichment cache first (S8a-13) — only for basic mode (what pipeline caches)
+    if mode == "basic":
+        from routers._enrichment_cache import get_cached_enrichment
+        cached = get_cached_enrichment(deps.get_database(), project_id, "chapter_progress", allow_stale=True)
+        if cached:
+            return ApiResponse(success=True, data=cached)
+
     try:
         from narrative_assistant.analysis.chapter_summary import (
             analyze_chapter_progress,
@@ -87,6 +94,12 @@ def get_narrative_templates(
     Evalúa Tres Actos, Viaje del Héroe, Save the Cat, Kishotenketsu
     y Cinco Actos (Freytag). Herramienta diagnóstica para el corrector.
     """
+    # Check enrichment cache first (S8a-13)
+    from routers._enrichment_cache import get_cached_enrichment
+    cached = get_cached_enrichment(deps.get_database(), project_id, "narrative_templates", allow_stale=True)
+    if cached:
+        return ApiResponse(success=True, data=cached)
+
     try:
         from narrative_assistant.analysis.chapter_summary import analyze_chapter_progress
         from narrative_assistant.analysis.narrative_templates import NarrativeTemplateAnalyzer
@@ -140,6 +153,12 @@ def get_narrative_health(
     clímax, resolución, arco emocional, ritmo, coherencia, estructura,
     equilibrio de personajes y tramas cerradas.
     """
+    # Check enrichment cache first (S8a-13)
+    from routers._enrichment_cache import get_cached_enrichment
+    cached = get_cached_enrichment(deps.get_database(), project_id, "narrative_health", allow_stale=True)
+    if cached:
+        return ApiResponse(success=True, data=cached)
+
     try:
         from narrative_assistant.analysis.chapter_summary import analyze_chapter_progress
         from narrative_assistant.analysis.narrative_health import NarrativeHealthChecker
@@ -220,6 +239,13 @@ async def get_sticky_sentences(
     Las oraciones pesadas son aquellas con alto porcentaje de palabras funcionales
     (artículos, preposiciones, conjunciones) que dificultan la lectura.
     """
+    # Check enrichment cache first (S8a-13)
+    if chapter_number is None:  # Cache only covers all-chapters analysis
+        from routers._enrichment_cache import get_cached_enrichment
+        cached = get_cached_enrichment(deps.get_database(), project_id, "sticky_sentences", allow_stale=True)
+        if cached:
+            return ApiResponse(success=True, data=cached)
+
     try:
         from narrative_assistant.nlp.style.sticky_sentences import get_sticky_sentence_detector
 
@@ -347,6 +373,13 @@ def get_sentence_energy(
     Evalúa voz activa/pasiva, fuerza de verbos, estructura y nominalizaciones
     para determinar el dinamismo de cada oración.
     """
+    # Check enrichment cache first (S8a-13)
+    if chapter_number is None:
+        from routers._enrichment_cache import get_cached_enrichment
+        cached = get_cached_enrichment(deps.get_database(), project_id, "sentence_energy", allow_stale=True)
+        if cached:
+            return ApiResponse(success=True, data=cached)
+
     try:
         from narrative_assistant.nlp.style.sentence_energy import get_sentence_energy_detector
 
@@ -475,6 +508,13 @@ async def get_echo_report(
 
     Detecta palabras repetidas en proximidad que afectan la fluidez del texto.
     """
+    # Check enrichment cache first (S8a-13) — only lexical, no per-chapter filter
+    if chapter_number is None and not include_semantic:
+        from routers._enrichment_cache import get_cached_enrichment
+        cached = get_cached_enrichment(deps.get_database(), project_id, "echo_report", allow_stale=True)
+        if cached:
+            return ApiResponse(success=True, data=cached)
+
     try:
         from narrative_assistant.nlp.style.repetition_detector import get_repetition_detector
 
@@ -734,6 +774,13 @@ async def get_narrative_structure(
     Prolepsis: menciones de eventos futuros antes de que ocurran
     (detectadas por condicional + marcadores temporales).
     """
+    # Check enrichment cache first (S8a-13)
+    if chapter_number is None:
+        from routers._enrichment_cache import get_cached_enrichment
+        cached = get_cached_enrichment(deps.get_database(), project_id, "narrative_structure", allow_stale=True)
+        if cached:
+            return ApiResponse(success=True, data=cached)
+
     try:
         from narrative_assistant.analysis.narrative_structure import get_narrative_structure_detector
 
@@ -834,6 +881,13 @@ async def get_dialogue_validation(
 
     Si create_alerts=True, genera alertas en AlertsTab con categoría DIALOGUE.
     """
+    # Check enrichment cache first (S8a-13)
+    if chapter_number is None and not create_alerts:
+        from routers._enrichment_cache import get_cached_enrichment
+        cached = get_cached_enrichment(deps.get_database(), project_id, "dialogue_validation", allow_stale=True)
+        if cached:
+            return ApiResponse(success=True, data=cached)
+
     try:
         from narrative_assistant.nlp.dialogue_validator import (
             DialogueContextValidator,
@@ -965,6 +1019,13 @@ async def get_sentence_variation(
 
     Proporciona métricas detalladas de distribución y variación por capítulo.
     """
+    # Check enrichment cache first (S8a-13)
+    if chapter_number is None:
+        from routers._enrichment_cache import get_cached_enrichment
+        cached = get_cached_enrichment(deps.get_database(), project_id, "sentence_variation", allow_stale=True)
+        if cached:
+            return ApiResponse(success=True, data=cached)
+
     try:
         import re as _re
         import math
@@ -1111,6 +1172,13 @@ async def get_pacing_analysis(
     Detecta variaciones en el pacing a través de capítulos/escenas.
     Devuelve métricas por capítulo, observaciones y recomendaciones.
     """
+    # Check enrichment cache first (S8a-13)
+    if chapter_number is None:
+        from routers._enrichment_cache import get_cached_enrichment
+        cached = get_cached_enrichment(deps.get_database(), project_id, "pacing_analysis", allow_stale=True)
+        if cached:
+            return ApiResponse(success=True, data=cached)
+
     try:
         import re
         from narrative_assistant.analysis.pacing import get_pacing_analyzer
@@ -1299,6 +1367,13 @@ async def get_tension_curve(
         Curva de tensión con puntos por capítulo, tipo de arco narrativo
         y datos para visualización en gráfico.
     """
+    # Check enrichment cache first (S8a-13)
+    if chapter_number is None:
+        from routers._enrichment_cache import get_cached_enrichment
+        cached = get_cached_enrichment(deps.get_database(), project_id, "tension_curve", allow_stale=True)
+        if cached:
+            return ApiResponse(success=True, data=cached)
+
     try:
         from narrative_assistant.analysis.pacing import compute_tension_curve
         from narrative_assistant.persistence.chapter import get_chapter_repository
@@ -1671,6 +1746,13 @@ def get_sensory_report(
     - Capítulos pobres/ricos en detalles sensoriales
     - Balance entre sentidos
     """
+    # Check enrichment cache first (S8a-13)
+    if chapter_number is None:
+        from routers._enrichment_cache import get_cached_enrichment
+        cached = get_cached_enrichment(deps.get_database(), project_id, "sensory_report", allow_stale=True)
+        if cached:
+            return ApiResponse(success=True, data=cached)
+
     try:
         from narrative_assistant.nlp.style.sensory_report import (
             get_sensory_analyzer,
@@ -1755,6 +1837,13 @@ async def get_age_readability(
     - Complejidad del vocabulario
     - Estimación de edad lectora
     """
+    # Check enrichment cache first (S8a-13) — only when no specific target_age_group
+    if not target_age_group:
+        from routers._enrichment_cache import get_cached_enrichment
+        cached = get_cached_enrichment(deps.get_database(), project_id, "age_readability", allow_stale=True)
+        if cached:
+            return ApiResponse(success=True, data=cached)
+
     try:
         from narrative_assistant.nlp.style.readability import get_readability_analyzer, AgeGroup
 

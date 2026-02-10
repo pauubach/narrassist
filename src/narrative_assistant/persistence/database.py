@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 _database_lock = threading.Lock()
 
 # Versión del schema actual
-SCHEMA_VERSION = 15
+SCHEMA_VERSION = 16
 
 # Tablas esenciales que deben existir para una BD válida
 # Solo incluir las tablas básicas definidas en SCHEMA_SQL
@@ -992,8 +992,33 @@ CREATE INDEX IF NOT EXISTS idx_entity_links_collection ON collection_entity_link
 CREATE INDEX IF NOT EXISTS idx_entity_links_source ON collection_entity_links(source_entity_id);
 CREATE INDEX IF NOT EXISTS idx_entity_links_target ON collection_entity_links(target_entity_id);
 
+-- Cache de enrichment (S8a-11): resultados pre-computados de análisis derivados
+-- Evita recomputar on-the-fly cuando el usuario abre un tab
+CREATE TABLE IF NOT EXISTS enrichment_cache (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    enrichment_type TEXT NOT NULL,       -- e.g. 'character_network', 'voice_profiles', 'echo_report'
+    entity_scope TEXT,                   -- NULL=global, 'entity:42'=per-entity scope
+    status TEXT NOT NULL DEFAULT 'pending',  -- pending/computing/completed/failed/stale
+    input_hash TEXT,                     -- hash of inputs (for invalidation)
+    output_hash TEXT,                    -- hash of output (for early cutoff)
+    result_json TEXT,                    -- JSON blob with cached result
+    error_message TEXT,                  -- error details if status='failed'
+    phase INTEGER,                      -- pipeline phase that produced this (10-13)
+    revision INTEGER NOT NULL DEFAULT 0,
+    computed_at TEXT,                    -- timestamp of last successful computation
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    UNIQUE (project_id, enrichment_type, entity_scope)
+);
+
+CREATE INDEX IF NOT EXISTS idx_enrichment_project ON enrichment_cache(project_id);
+CREATE INDEX IF NOT EXISTS idx_enrichment_type ON enrichment_cache(project_id, enrichment_type);
+CREATE INDEX IF NOT EXISTS idx_enrichment_status ON enrichment_cache(project_id, status);
+
 -- Insertar versión del schema
-INSERT OR REPLACE INTO schema_info (key, value) VALUES ('version', '14');
+INSERT OR REPLACE INTO schema_info (key, value) VALUES ('version', '16');
 """
 
 
@@ -1166,6 +1191,8 @@ class Database:
             # v14: Colecciones / Sagas (BK-07)
             ("projects", "collection_id", "INTEGER"),
             ("projects", "collection_order", "INTEGER DEFAULT 0"),
+            # v15: chapter_id en entity_attributes (S8a-06)
+            ("entity_attributes", "chapter_id", "INTEGER"),
         ]
         for table, column, col_def in migrations:
             try:

@@ -77,6 +77,19 @@ class ProgressTracker:
         self.update_time_remaining()
         self.persist_progress()
 
+    def update_progress(self, phase_key: str, fraction: float, message: str):
+        """Update progress within a phase (fraction 0.0 to 1.0)."""
+        pct_start, pct_end = self.get_phase_progress_range(phase_key)
+        pct = int(pct_start + (pct_end - pct_start) * fraction)
+        storage = deps.analysis_progress_storage.get(self.project_id)
+        if storage:
+            storage["progress"] = pct
+            storage["current_action"] = message
+
+    def complete_phase(self, phase_key: str, phase_index: int):
+        """Alias for end_phase."""
+        self.end_phase(phase_key, phase_index)
+
     def set_progress(self, pct: int):
         """Establece el porcentaje de progreso."""
         deps.analysis_progress_storage[self.project_id]["progress"] = pct
@@ -127,6 +140,7 @@ class ProgressTracker:
                     "parsing": 2, "structure": 2, "ner": 30,
                     "fusion": 10, "attributes": 15, "consistency": 3,
                     "grammar": 5, "alerts": 3,
+                    "relationships": 8, "voice": 10, "prose": 10, "health": 8,
                 }
                 min_time_remaining += base_times.get(phase_id, 5)
 
@@ -339,6 +353,8 @@ def run_cleanup(ctx: dict, tracker: ProgressTracker):
             # Borrar analysis phases
             conn.execute("DELETE FROM analysis_phases WHERE run_id IN (SELECT id FROM analysis_runs WHERE project_id = ?)", (project_id,))
             conn.execute("DELETE FROM analysis_runs WHERE project_id = ?", (project_id,))
+            # Borrar enrichment cache (S8a-16)
+            conn.execute("DELETE FROM enrichment_cache WHERE project_id = ?", (project_id,))
 
         logger.info(f"Cleared existing data for project {project_id}")
     except Exception as clear_err:
@@ -595,6 +611,23 @@ def claim_heavy_slot_or_queue(ctx: dict, tracker: ProgressTracker) -> bool:
     project = ctx["project"]
 
     with deps._progress_lock:
+        # S8a-18: Check watchdog timeout — if heavy slot has been held too long, force-release
+        if deps._heavy_analysis_project_id is not None and deps._heavy_analysis_claimed_at is not None:
+            elapsed = time.time() - deps._heavy_analysis_claimed_at
+            if elapsed > deps.HEAVY_SLOT_TIMEOUT_SECONDS:
+                stale_pid = deps._heavy_analysis_project_id
+                logger.warning(
+                    f"Watchdog: heavy slot held by project {stale_pid} for "
+                    f"{elapsed:.0f}s (>{deps.HEAVY_SLOT_TIMEOUT_SECONDS}s). Force-releasing."
+                )
+                deps._heavy_analysis_project_id = None
+                deps._heavy_analysis_claimed_at = None
+                # Mark stale project as error
+                stale_storage = deps.analysis_progress_storage.get(stale_pid)
+                if stale_storage:
+                    stale_storage["status"] = "error"
+                    stale_storage["error"] = "Análisis excedió el tiempo máximo"
+
         if deps._heavy_analysis_project_id is not None:
             # Heavy slot busy — queue this project
             deps._heavy_analysis_queue.append({
@@ -610,6 +643,7 @@ def claim_heavy_slot_or_queue(ctx: dict, tracker: ProgressTracker) -> bool:
             return False
         else:
             deps._heavy_analysis_project_id = project_id
+            deps._heavy_analysis_claimed_at = time.time()
             return True
 
 
@@ -2611,6 +2645,33 @@ def handle_analysis_error(ctx: dict, error: Exception):
 # Finally block: cleanup + queue management
 # ============================================================================
 
+def release_heavy_slot(ctx: dict):
+    """S8a-15: Release heavy slot early so next project can start heavy phases.
+
+    Called between Tier 2 (heavy NLP) and Tier 3 (enrichment).
+    Enrichment is CPU-only and doesn't compete for GPU/LLM resources.
+    """
+    project_id = ctx["project_id"]
+
+    if ctx.get("heavy_slot_released"):
+        return  # Already released
+
+    next_heavy = None
+    with deps._progress_lock:
+        if deps._heavy_analysis_project_id == project_id:
+            deps._heavy_analysis_project_id = None
+            deps._heavy_analysis_claimed_at = None
+            ctx["heavy_slot_released"] = True
+            logger.info(f"Project {project_id}: released heavy slot before enrichment")
+        if deps._heavy_analysis_queue:
+            next_heavy = deps._heavy_analysis_queue.pop(0)
+
+    # Auto-start next queued project
+    if next_heavy:
+        from routers.analysis import _start_queued_analysis
+        _start_queued_analysis(next_heavy)
+
+
 def run_finally_cleanup(ctx: dict):
     """Limpieza final: archivo temporal, slot pesado, cola."""
     project_id = ctx["project_id"]
@@ -2628,12 +2689,13 @@ def run_finally_cleanup(ctx: dict):
         except Exception:
             pass
 
-    # Liberar slot pesado y comprobar cola
+    # Liberar slot pesado y comprobar cola (if not already released by release_heavy_slot)
     next_heavy = None
     with deps._progress_lock:
         if deps._heavy_analysis_project_id == project_id:
             deps._heavy_analysis_project_id = None
-        if deps._heavy_analysis_queue:
+            deps._heavy_analysis_claimed_at = None
+        if not ctx.get("heavy_slot_released") and deps._heavy_analysis_queue:
             next_heavy = deps._heavy_analysis_queue.pop(0)
 
     # Limpiar progreso después de delay

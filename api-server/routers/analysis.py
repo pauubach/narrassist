@@ -199,7 +199,11 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                     {"id": "attributes", "name": "Analizando características", "completed": False, "current": False},
                     {"id": "consistency", "name": "Verificando coherencia", "completed": False, "current": False},
                     {"id": "grammar", "name": "Revisando gramática y ortografía", "completed": False, "current": False},
-                    {"id": "alerts", "name": "Preparando observaciones", "completed": False, "current": False}
+                    {"id": "alerts", "name": "Preparando observaciones", "completed": False, "current": False},
+                    {"id": "relationships", "name": "Analizando relaciones", "completed": False, "current": False},
+                    {"id": "voice", "name": "Perfilando voces", "completed": False, "current": False},
+                    {"id": "prose", "name": "Evaluando escritura", "completed": False, "current": False},
+                    {"id": "health", "name": "Salud narrativa", "completed": False, "current": False},
                 ],
                 "metrics": {},
                 "estimated_seconds_remaining": 60,
@@ -223,8 +227,17 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                 claim_heavy_slot_or_queue, run_ollama_healthcheck,
                 run_ner, run_llm_entity_validation, run_fusion,
                 run_attributes, run_consistency, run_grammar, run_alerts,
+                release_heavy_slot,
                 run_reconciliation, run_completion,
                 handle_analysis_error, run_finally_cleanup,
+            )
+            from routers._enrichment_phases import (
+                run_relationships_enrichment,
+                run_voice_enrichment,
+                run_prose_enrichment,
+                run_health_enrichment,
+                capture_entity_fingerprint,
+                invalidate_enrichment_if_mutated,
             )
 
             start_time = time.time()
@@ -232,16 +245,25 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
 
             phase_weights = {
                 "parsing": 0.01,
-                "classification": 0.02,
-                "structure": 0.02,
-                "ner": 0.44,
-                "fusion": 0.21,
-                "attributes": 0.12,
-                "consistency": 0.04,
-                "grammar": 0.08,
-                "alerts": 0.06,
+                "classification": 0.01,
+                "structure": 0.01,
+                "ner": 0.31,
+                "fusion": 0.15,
+                "attributes": 0.08,
+                "consistency": 0.03,
+                "grammar": 0.06,
+                "alerts": 0.04,
+                "relationships": 0.08,
+                "voice": 0.08,
+                "prose": 0.08,
+                "health": 0.06,
             }
-            phase_order = ["parsing", "classification", "structure", "ner", "fusion", "attributes", "consistency", "grammar", "alerts"]
+            phase_order = [
+                "parsing", "classification", "structure",
+                "ner", "fusion", "attributes",
+                "consistency", "grammar", "alerts",
+                "relationships", "voice", "prose", "health",
+            ]
 
             # --- S8a-14: Thin orchestrator using extracted phase functions ---
             from narrative_assistant.persistence.database import get_database
@@ -302,6 +324,22 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                 run_consistency(ctx, tracker)
                 run_grammar(ctx, tracker)
                 run_alerts(ctx, tracker)
+
+                # S8a-15: Release heavy slot — enrichment is CPU-only,
+                # next queued project can start heavy NLP immediately
+                release_heavy_slot(ctx)
+
+                # S8a-17: Capture entity fingerprint before enrichment
+                entity_fp = capture_entity_fingerprint(ctx["db_session"], project_id)
+
+                # Tier 3: Enrichment phases (CPU-only, no GPU/LLM needed)
+                run_relationships_enrichment(ctx, tracker)
+                run_voice_enrichment(ctx, tracker)
+                run_prose_enrichment(ctx, tracker)
+                run_health_enrichment(ctx, tracker)
+
+                # S8a-17: Check for entity mutations during enrichment
+                invalidate_enrichment_if_mutated(ctx["db_session"], project_id, entity_fp)
 
                 # Final reconciliation + completion
                 run_reconciliation(ctx, tracker)

@@ -943,6 +943,12 @@ async def get_emotional_analysis(project_id: int):
     - Acciones incoherentes con el estado emocional
     - Cambios emocionales abruptos sin justificación narrativa
     """
+    # Check enrichment cache first (S8a-13)
+    from routers._enrichment_cache import get_cached_enrichment
+    cached = get_cached_enrichment(deps.get_database(), project_id, "emotional_analysis", allow_stale=True)
+    if cached:
+        return ApiResponse(success=True, data=cached)
+
     try:
         from narrative_assistant.analysis.emotional_coherence import (
             get_emotional_coherence_checker,
@@ -1347,6 +1353,12 @@ async def get_character_locations(project_id: int):
     Returns:
         Reporte con eventos de ubicación e inconsistencias
     """
+    # Check enrichment cache first (S8a-13)
+    from routers._enrichment_cache import get_cached_enrichment
+    cached = get_cached_enrichment(deps.get_database(), project_id, "character_locations", allow_stale=True)
+    if cached:
+        return ApiResponse(success=True, data=cached)
+
     try:
         from narrative_assistant.analysis.character_location import (
             analyze_character_locations,
@@ -1587,6 +1599,13 @@ async def get_character_network(project_id: int):
         ApiResponse con CharacterNetworkReport
     """
     logger.info(f"[NETWORK-API] Solicitando red de personajes para proyecto {project_id}")
+
+    # Check enrichment cache first (S8a-13)
+    from routers._enrichment_cache import get_cached_enrichment
+    cached = get_cached_enrichment(deps.get_database(), project_id, "character_network", allow_stale=True)
+    if cached:
+        return ApiResponse(success=True, data=cached)
+
     try:
         from narrative_assistant.analysis.character_network import CharacterNetworkAnalyzer
         from narrative_assistant.entities.repository import get_entity_repository
@@ -1690,6 +1709,13 @@ async def get_character_timeline(project_id: int):
         ApiResponse con datos de timeline por personaje
     """
     logger.info(f"[TIMELINE-API] Solicitando timeline para proyecto {project_id}")
+
+    # Check enrichment cache first (S8a-13)
+    from routers._enrichment_cache import get_cached_enrichment
+    cached = get_cached_enrichment(deps.get_database(), project_id, "character_timeline", allow_stale=True)
+    if cached:
+        return ApiResponse(success=True, data=cached)
+
     try:
         from narrative_assistant.entities.repository import get_entity_repository
         from narrative_assistant.persistence.chapter import get_chapter_repository
@@ -1785,6 +1811,13 @@ async def get_character_profiles(project_id: int):
         ApiResponse con lista de CharacterProfile
     """
     logger.info(f"[PROFILES-API] Solicitando perfiles para proyecto {project_id}")
+
+    # Check enrichment cache first (S8a-13)
+    from routers._enrichment_cache import get_cached_enrichment
+    cached = get_cached_enrichment(deps.get_database(), project_id, "character_profiles", allow_stale=True)
+    if cached:
+        return ApiResponse(success=True, data=cached)
+
     try:
         from narrative_assistant.analysis.character_profiling import CharacterProfiler
         from narrative_assistant.entities.repository import get_entity_repository

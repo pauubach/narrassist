@@ -26,7 +26,7 @@ logger = logging.getLogger("narrative_assistant.api")
 # Constants
 # ============================================================================
 
-BACKEND_VERSION = "0.7.20"
+BACKEND_VERSION = "0.7.21"
 IS_EMBEDDED_RUNTIME = os.environ.get("NA_EMBEDDED") == "1" or "python-embed" in (sys.executable or "").lower()
 
 # Minimum required Python version (major, minor)
@@ -70,9 +70,13 @@ _analysis_queue: list[dict] = []
 # Two-tier concurrency: lightweight phases run in parallel, heavy phases are exclusive
 # Heavy analysis (Tier 2: NER, coreference, attributes, grammar, alerts) exclusive lock
 _heavy_analysis_project_id: int | None = None
+# Timestamp when the heavy slot was claimed (for watchdog timeout — S8a-18)
+_heavy_analysis_claimed_at: float | None = None
 # Queue of projects that finished Tier 1 (parsing/structure), waiting for heavy slot
 # Each entry is a dict with keys: project_id, context (data from Tier 1)
 _heavy_analysis_queue: list[dict] = []
+# Watchdog timeout in seconds (30 minutes)
+HEAVY_SLOT_TIMEOUT_SECONDS: int = 30 * 60
 
 # Cache for Python status
 _python_status_cache: dict | None = None
