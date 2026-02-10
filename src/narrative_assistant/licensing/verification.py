@@ -21,7 +21,6 @@ from ..core.result import Result
 from .fingerprint import get_hardware_fingerprint, get_hardware_info
 from .models import (
     DEVICE_DEACTIVATION_COOLDOWN_HOURS,
-    TIER_FEATURES,
     Device,
     DeviceStatus,
     License,

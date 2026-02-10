@@ -515,7 +515,7 @@ class UsageRecord:
             document_fingerprint=row["document_fingerprint"],
             document_name=row["document_name"],
             word_count=row["word_count"],
-            page_count=row["page_count"] if "page_count" in row.keys() else 0,
+            page_count=row.get("page_count", 0),
             analysis_started_at=datetime.fromisoformat(row["analysis_started_at"])
             if row["analysis_started_at"]
             else None,

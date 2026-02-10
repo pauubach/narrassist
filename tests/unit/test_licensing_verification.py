@@ -47,7 +47,6 @@ from narrative_assistant.licensing.verification import (
     get_cached_license,
 )
 
-
 # =============================================================================
 # Fixtures: in-memory SQLite DB
 # =============================================================================
