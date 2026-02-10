@@ -14,17 +14,10 @@
 
     <!-- Main content -->
     <div v-else-if="project" class="project-layout">
-      <!-- Breadcrumb (S7d-08) -->
-      <nav class="project-breadcrumb" aria-label="Navegación">
-        <a href="#" @click.prevent="goBack" class="breadcrumb-link">Proyectos</a>
-        <i class="pi pi-angle-right breadcrumb-separator"></i>
-        <span class="breadcrumb-current">{{ project.name }}</span>
-      </nav>
-
       <!-- Header -->
       <div class="project-header">
         <div class="header-left">
-          <Button icon="pi pi-arrow-left" text rounded aria-label="Volver a proyectos" @click="goBack" />
+          <Button icon="pi pi-arrow-left" label="Proyectos" text rounded aria-label="Volver a proyectos" @click="goBack" class="back-btn" />
           <div class="header-info">
             <h1>{{ project.name }}</h1>
             <div class="header-meta">
@@ -112,18 +105,6 @@
         :document-type="project.documentType"
         :recommended-analysis="project.recommendedAnalysis"
       />
-
-      <!-- S7d-02: Banner for new users who haven't analyzed yet -->
-      <div v-if="!hasBeenAnalyzed && !isAnalyzing" class="analysis-prompt-banner">
-        <i class="pi pi-info-circle"></i>
-        <span>Sube un documento y haz clic en <strong>Analizar</strong> para detectar inconsistencias, entidades y problemas de redacción.</span>
-        <Button
-          label="Analizar ahora"
-          icon="pi pi-play"
-          size="small"
-          @click="showReanalyzeDialog = true"
-        />
-      </div>
 
       <!-- WORKSPACE CONTENT - Layout contextual según tab activo -->
       <div class="workspace-content">
@@ -834,10 +815,6 @@ const handleMenuTabEvent = (event: Event) => {
 // Handle menu events dispatched from App.vue / useNativeMenu
 const handleMenuExport = () => { showExportDialog.value = true }
 const handleMenuRunAnalysis = () => { showReanalyzeDialog.value = true }
-const handleMenuPauseAnalysis = () => {
-  // Currently no pause support — log for debugging
-  console.log('[Menu] Pause analysis not yet implemented')
-}
 const handleMenuToggleInspector = () => { workspaceStore.toggleRightPanel() }
 const handleMenuToggleSidebar = () => { workspaceStore.toggleLeftPanel() }
 
@@ -854,7 +831,6 @@ onMounted(async () => {
   window.addEventListener('menubar:view-tab', handleMenuTabEvent)
   window.addEventListener('menubar:export', handleMenuExport)
   window.addEventListener('menubar:run-analysis', handleMenuRunAnalysis)
-  window.addEventListener('menubar:pause-analysis', handleMenuPauseAnalysis)
   window.addEventListener('menubar:toggle-inspector', handleMenuToggleInspector)
   window.addEventListener('menubar:toggle-sidebar', handleMenuToggleSidebar)
 
@@ -923,7 +899,6 @@ onUnmounted(() => {
   window.removeEventListener('menubar:view-tab', handleMenuTabEvent)
   window.removeEventListener('menubar:export', handleMenuExport)
   window.removeEventListener('menubar:run-analysis', handleMenuRunAnalysis)
-  window.removeEventListener('menubar:pause-analysis', handleMenuPauseAnalysis)
   window.removeEventListener('menubar:toggle-inspector', handleMenuToggleInspector)
   window.removeEventListener('menubar:toggle-sidebar', handleMenuToggleSidebar)
   stopAnalysisPolling()
@@ -1387,63 +1362,9 @@ const startReanalysis = async () => {
   min-height: 0;
 }
 
-/* Breadcrumb */
-.project-breadcrumb {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0.375rem 1rem 0;
-  font-size: 0.8rem;
-}
-
-.breadcrumb-link {
-  color: var(--primary-color);
-  text-decoration: none;
-  cursor: pointer;
-}
-
-.breadcrumb-link:hover {
-  text-decoration: underline;
-}
-
-.breadcrumb-separator {
-  font-size: 0.7rem;
-  color: var(--text-color-secondary);
-}
-
-.breadcrumb-current {
-  color: var(--text-color-secondary);
-  max-width: 300px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Analysis prompt banner */
-.analysis-prompt-banner {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  background: var(--blue-50);
-  border-bottom: 1px solid var(--blue-200);
-  color: var(--blue-700);
-  font-size: 0.875rem;
-}
-
-.dark .analysis-prompt-banner {
-  background: var(--blue-900);
-  border-color: var(--blue-800);
-  color: var(--blue-100);
-}
-
-.analysis-prompt-banner i {
-  font-size: 1.1rem;
-  flex-shrink: 0;
-}
-
-.analysis-prompt-banner span {
-  flex: 1;
+/* Back button */
+.back-btn :deep(.p-button-label) {
+  font-weight: 500;
 }
 
 /* Header */

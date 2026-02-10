@@ -252,7 +252,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import Card from 'primevue/card'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
@@ -337,9 +337,19 @@ const paginatedDetails = computed(() => {
   return filteredDetails.value.slice(start, start + pageSize)
 })
 
+// Auto-load on mount
+onMounted(() => {
+  if (props.projectId) {
+    analyze()
+  }
+})
+
 watch(() => props.projectId, () => {
   report.value = null
   errorMsg.value = null
+  if (props.projectId) {
+    analyze()
+  }
 })
 
 async function analyze() {

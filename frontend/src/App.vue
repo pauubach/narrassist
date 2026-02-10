@@ -141,10 +141,6 @@ useNativeMenu({
     console.log('[Menu] Run analysis requested')
     window.dispatchEvent(new CustomEvent('menubar:run-analysis'))
   },
-  onPauseAnalysis: () => {
-    console.log('[Menu] Pause analysis requested')
-    window.dispatchEvent(new CustomEvent('menubar:pause-analysis'))
-  },
   onToggleInspector: () => {
     console.log('[Menu] Toggle inspector')
     window.dispatchEvent(new CustomEvent('menubar:toggle-inspector'))

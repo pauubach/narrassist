@@ -146,12 +146,6 @@ const menus = computed<Menu[]>(() => {
       label: 'Análisis',
       items: [
         { label: 'Ejecutar análisis', action: 'runAnalysis', icon: 'play', shortcut: 'Ctrl+R', disabled: !isInProject.value },
-        { label: 'Pausar análisis', action: 'pauseAnalysis', icon: 'pause', disabled: !isInProject.value },
-        { divider: true, label: '' },
-        { label: 'Analizar estructura', action: 'analyzeStructure', icon: 'sitemap', disabled: !isInProject.value },
-        { label: 'Analizar entidades', action: 'analyzeEntities', icon: 'users', disabled: !isInProject.value },
-        { label: 'Analizar consistencia', action: 'analyzeConsistency', icon: 'check-circle', disabled: !isInProject.value },
-        { label: 'Analizar estilo', action: 'analyzeStyle', icon: 'palette', disabled: !isInProject.value },
       ]
     },
     {
@@ -352,21 +346,6 @@ const handleMenuAction = (item: MenuItem) => {
       break
     case 'runAnalysis':
       window.dispatchEvent(new CustomEvent('menubar:run-analysis'))
-      break
-    case 'pauseAnalysis':
-      window.dispatchEvent(new CustomEvent('menubar:pause-analysis'))
-      break
-    case 'analyzeStructure':
-      window.dispatchEvent(new CustomEvent('menubar:analyze-structure'))
-      break
-    case 'analyzeEntities':
-      window.dispatchEvent(new CustomEvent('menubar:analyze-entities'))
-      break
-    case 'analyzeConsistency':
-      window.dispatchEvent(new CustomEvent('menubar:analyze-consistency'))
-      break
-    case 'analyzeStyle':
-      window.dispatchEvent(new CustomEvent('menubar:analyze-style'))
       break
   }
 }

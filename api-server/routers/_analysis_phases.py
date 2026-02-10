@@ -1,0 +1,2655 @@
+"""
+Funciones de fase extraídas de run_real_analysis().
+
+Cada función recibe un contexto compartido (dict) y un ProgressTracker.
+Las fases mutan el contexto añadiendo resultados que fases posteriores necesitan.
+
+S8a-14: Refactor monolito → funciones standalone.
+"""
+
+import json
+import logging
+import time
+import threading
+from collections import Counter
+from pathlib import Path
+from typing import Any
+
+import deps
+from deps import logger, ApiResponse, generate_person_aliases
+
+
+# ============================================================================
+# ProgressTracker: encapsula toda la lógica de progreso
+# ============================================================================
+
+class ProgressTracker:
+    """Encapsula la lógica de progreso, time-estimation y cancelación."""
+
+    def __init__(
+        self,
+        project_id: int,
+        phases: list[dict],
+        phase_weights: dict[str, float],
+        phase_order: list[str],
+        db_session: Any,
+    ):
+        self.project_id = project_id
+        self.phases = phases
+        self.phase_weights = phase_weights
+        self.phase_order = phase_order
+        self.db_session = db_session
+        self.current_phase_key = "parsing"
+        self.phase_start_times: dict[str, float] = {}
+        self.phase_durations: dict[str, float] = {}
+
+    def get_phase_progress_range(self, phase_id: str) -> tuple[int, int]:
+        """Calcula el rango de progreso (inicio, fin) para una fase basado en pesos."""
+        cumulative = 0.0
+        for pid in self.phase_order:
+            weight = self.phase_weights.get(pid, 0.05)
+            if pid == phase_id:
+                start_pct = int(cumulative * 100)
+                end_pct = int((cumulative + weight) * 100)
+                return (start_pct, end_pct)
+            cumulative += weight
+        return (0, 100)
+
+    def start_phase(self, phase_key: str, phase_index: int, message: str):
+        """Marca el inicio de una fase."""
+        self.current_phase_key = phase_key
+        self.phase_start_times[phase_key] = time.time()
+        pct_start, _ = self.get_phase_progress_range(phase_key)
+        self.phases[phase_index]["current"] = True
+        storage = deps.analysis_progress_storage[self.project_id]
+        storage["progress"] = pct_start
+        storage["current_phase"] = message
+
+    def end_phase(self, phase_key: str, phase_index: int):
+        """Marca el fin de una fase."""
+        _, pct_end = self.get_phase_progress_range(phase_key)
+        self.phase_durations[phase_key] = time.time() - self.phase_start_times[phase_key]
+        deps.analysis_progress_storage[self.project_id]["progress"] = pct_end
+        self.phases[phase_index]["completed"] = True
+        self.phases[phase_index]["current"] = False
+        self.phases[phase_index]["duration"] = round(self.phase_durations[phase_key], 1)
+        self.check_cancelled()
+        self.update_time_remaining()
+        self.persist_progress()
+
+    def set_progress(self, pct: int):
+        """Establece el porcentaje de progreso."""
+        deps.analysis_progress_storage[self.project_id]["progress"] = pct
+
+    def set_message(self, message: str):
+        """Establece el mensaje de fase actual."""
+        deps.analysis_progress_storage[self.project_id]["current_phase"] = message
+
+    def set_action(self, action: str):
+        """Establece la acción actual (sub-tarea)."""
+        deps.analysis_progress_storage[self.project_id]["current_action"] = action
+
+    def set_metric(self, key: str, value: Any):
+        """Establece una métrica en el storage."""
+        deps.analysis_progress_storage[self.project_id]["metrics"][key] = value
+
+    def update_time_remaining(self):
+        """Calcula tiempo restante usando tiempos reales de fases completadas."""
+        now = time.time()
+
+        # Calcular tiempo transcurrido en la fase actual
+        phase_elapsed = 0
+        if self.current_phase_key in self.phase_start_times:
+            phase_elapsed = now - self.phase_start_times[self.current_phase_key]
+
+        # Calcular peso completado y tiempo total de fases completadas
+        completed_weight = 0.0
+        completed_time = 0.0
+        pending_weight = 0.0
+        current_weight = self.phase_weights.get(self.current_phase_key, 0.05)
+        found_current = False
+        min_time_remaining = 0
+
+        for phase_id in self.phase_order:
+            w = self.phase_weights.get(phase_id, 0.05)
+            if phase_id == self.current_phase_key:
+                found_current = True
+                continue
+            if not found_current:
+                # Ya completada
+                if phase_id in self.phase_durations:
+                    completed_weight += w
+                    completed_time += self.phase_durations[phase_id]
+            else:
+                # Pendiente
+                pending_weight += w
+                base_times = {
+                    "parsing": 2, "structure": 2, "ner": 30,
+                    "fusion": 10, "attributes": 15, "consistency": 3,
+                    "grammar": 5, "alerts": 3,
+                }
+                min_time_remaining += base_times.get(phase_id, 5)
+
+        remaining_weight = current_weight + pending_weight
+
+        # Estimar tiempo restante
+        use_measured_speed = completed_weight > 0.10 and completed_time > 5.0
+
+        if use_measured_speed:
+            speed = completed_time / completed_weight
+            if phase_elapsed > 0:
+                estimated_phase_total = speed * current_weight
+                phase_remaining = max(0, estimated_phase_total - phase_elapsed)
+            else:
+                phase_remaining = speed * current_weight
+            future_time = speed * pending_weight
+            total_remaining = int(phase_remaining + future_time)
+        else:
+            word_count = deps.analysis_progress_storage[self.project_id].get(
+                "metrics", {}
+            ).get("word_count", 500)
+            base_estimate = 60 + int(word_count * 0.2)
+            total_remaining = int(base_estimate * remaining_weight)
+
+        storage = deps.analysis_progress_storage[self.project_id]
+        storage["estimated_seconds_remaining"] = max(min_time_remaining, total_remaining)
+        storage["_last_progress_update"] = time.time()
+        self.persist_progress()
+
+    def check_cancelled(self):
+        """Verifica si el análisis fue cancelado por el usuario."""
+        with deps._progress_lock:
+            cancelled = deps.analysis_progress_storage.get(
+                self.project_id, {}
+            ).get("status") == "cancelled"
+        if cancelled:
+            raise Exception("Análisis cancelado por el usuario")
+
+    def persist_progress(self):
+        """Persiste el progreso actual en la BD."""
+        try:
+            pct = deps.analysis_progress_storage.get(self.project_id, {}).get("progress", 0)
+            normalized = round(pct / 100.0, 2)
+            with self.db_session.connection() as conn:
+                conn.execute(
+                    "UPDATE projects SET analysis_progress = ? WHERE id = ?",
+                    (normalized, self.project_id),
+                )
+        except Exception as e:
+            logger.debug(f"Could not persist progress: {e}")
+
+
+# ============================================================================
+# Database helpers (moved from analysis.py to avoid circular import)
+# ============================================================================
+
+def persist_chapters_to_db(chapters_data: list, project_id: int, db):
+    """Persiste los capítulos y secciones en la base de datos."""
+    try:
+        with db.transaction() as conn:
+            conn.execute("DELETE FROM sections WHERE project_id = ?", (project_id,))
+            conn.execute("DELETE FROM chapters WHERE project_id = ?", (project_id,))
+
+            total_sections = 0
+            for ch in chapters_data:
+                cursor = conn.execute(
+                    """
+                    INSERT INTO chapters (
+                        project_id, chapter_number, title, content,
+                        start_char, end_char, word_count, structure_type
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        project_id,
+                        ch["chapter_number"],
+                        ch["title"],
+                        ch["content"],
+                        ch["start_char"],
+                        ch["end_char"],
+                        ch["word_count"],
+                        ch["structure_type"],
+                    ),
+                )
+                chapter_id = cursor.lastrowid
+
+                sections = ch.get("sections", [])
+                if sections:
+                    sections_created = _persist_sections_recursive(
+                        conn, sections, project_id, chapter_id, None
+                    )
+                    total_sections += sections_created
+
+        logger.info(f"Persisted {len(chapters_data)} chapters and {total_sections} sections to database")
+    except Exception as e:
+        logger.error(f"Error persisting chapters: {e}", exc_info=True)
+        raise  # S7c-05: Don't silently swallow — chapters are needed for NER
+
+
+def _persist_sections_recursive(
+    conn, sections: list, project_id: int, chapter_id: int, parent_id: int | None
+) -> int:
+    """Persiste secciones recursivamente con sus subsecciones."""
+    count = 0
+    for idx, s in enumerate(sections):
+        cursor = conn.execute(
+            """
+            INSERT INTO sections (
+                project_id, chapter_id, parent_section_id, section_number,
+                title, heading_level, start_char, end_char
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                project_id,
+                chapter_id,
+                parent_id,
+                s.get("number", idx + 1),
+                s.get("title"),
+                s.get("heading_level", 2),
+                s.get("start_char", 0),
+                s.get("end_char", 0),
+            ),
+        )
+        section_id = cursor.lastrowid
+        count += 1
+
+        subsections = s.get("subsections", [])
+        if subsections:
+            count += _persist_sections_recursive(
+                conn, subsections, project_id, chapter_id, section_id
+            )
+
+    return count
+
+
+# ============================================================================
+# Pre-analysis steps
+# ============================================================================
+
+def run_snapshot(ctx: dict, tracker: ProgressTracker):
+    """Captura snapshot pre-reanálisis (BK-05)."""
+    try:
+        from narrative_assistant.persistence.snapshot import SnapshotRepository
+        snapshot_repo = SnapshotRepository()
+        snapshot_repo.create_snapshot(ctx["project_id"])
+        snapshot_repo.cleanup_old_snapshots(ctx["project_id"])
+        logger.info(f"Pre-reanalysis snapshot created for project {ctx['project_id']}")
+    except Exception as snap_err:
+        logger.warning(f"Snapshot creation failed (continuing): {snap_err}")
+
+
+def run_cleanup(ctx: dict, tracker: ProgressTracker):
+    """Limpia datos existentes antes de re-analizar."""
+    project_id = ctx["project_id"]
+    db_session = ctx["db_session"]
+    logger.info(f"Clearing existing data for project {project_id}")
+    try:
+        with db_session.connection() as conn:
+            # Borrar alertas existentes
+            conn.execute("DELETE FROM alerts WHERE project_id = ?", (project_id,))
+            # Borrar historial de revisión
+            conn.execute("DELETE FROM review_history WHERE project_id = ?", (project_id,))
+            # Borrar atributos y evidencias
+            conn.execute(
+                "DELETE FROM attribute_evidences WHERE attribute_id IN "
+                "(SELECT id FROM entity_attributes WHERE entity_id IN "
+                "(SELECT id FROM entities WHERE project_id = ?))",
+                (project_id,),
+            )
+            conn.execute(
+                "DELETE FROM entity_attributes WHERE entity_id IN "
+                "(SELECT id FROM entities WHERE project_id = ?)",
+                (project_id,),
+            )
+            # Borrar menciones
+            conn.execute(
+                "DELETE FROM entity_mentions WHERE entity_id IN "
+                "(SELECT id FROM entities WHERE project_id = ?)",
+                (project_id,),
+            )
+            # Borrar entidades
+            conn.execute("DELETE FROM entities WHERE project_id = ?", (project_id,))
+            # Borrar relaciones y interacciones
+            conn.execute("DELETE FROM interactions WHERE project_id = ?", (project_id,))
+            conn.execute("DELETE FROM relationships WHERE project_id = ?", (project_id,))
+            # Borrar timeline
+            conn.execute("DELETE FROM timeline_events WHERE project_id = ?", (project_id,))
+            conn.execute("DELETE FROM temporal_markers WHERE project_id = ?", (project_id,))
+            # Borrar escenas
+            conn.execute("DELETE FROM scene_tags WHERE scene_id IN (SELECT id FROM scenes WHERE project_id = ?)", (project_id,))
+            conn.execute("DELETE FROM scenes WHERE project_id = ?", (project_id,))
+            # Borrar datos de voz y pacing
+            conn.execute("DELETE FROM register_changes WHERE project_id = ?", (project_id,))
+            conn.execute("DELETE FROM pacing_metrics WHERE project_id = ?", (project_id,))
+            conn.execute("DELETE FROM emotional_arcs WHERE project_id = ?", (project_id,))
+            conn.execute("DELETE FROM voice_profiles WHERE project_id = ?", (project_id,))
+            # Borrar vital status events (S8a-03)
+            conn.execute("DELETE FROM vital_status_events WHERE project_id = ?", (project_id,))
+            # Borrar character location events (S8a-04)
+            conn.execute("DELETE FROM character_location_events WHERE project_id = ?", (project_id,))
+            # Borrar OOC events (S8a-05)
+            conn.execute("DELETE FROM ooc_events WHERE project_id = ?", (project_id,))
+            # Borrar focalization
+            conn.execute("DELETE FROM focalization_declarations WHERE project_id = ?", (project_id,))
+            # Borrar correcciones de correferencia y speaker
+            conn.execute("DELETE FROM coreference_corrections WHERE project_id = ?", (project_id,))
+            conn.execute("DELETE FROM speaker_corrections WHERE project_id = ?", (project_id,))
+            # Borrar alert dismissals y suppression rules
+            conn.execute("DELETE FROM alert_dismissals WHERE project_id = ?", (project_id,))
+            conn.execute("DELETE FROM suppression_rules WHERE project_id = ?", (project_id,))
+            # Borrar analysis phases
+            conn.execute("DELETE FROM analysis_phases WHERE run_id IN (SELECT id FROM analysis_runs WHERE project_id = ?)", (project_id,))
+            conn.execute("DELETE FROM analysis_runs WHERE project_id = ?", (project_id,))
+
+        logger.info(f"Cleared existing data for project {project_id}")
+    except Exception as clear_err:
+        logger.warning(f"Error clearing existing data (continuing): {clear_err}")
+
+
+def apply_license_and_settings(ctx: dict, tracker: ProgressTracker):
+    """Aplica license gating y project settings al análisis."""
+    from narrative_assistant.licensing.gating import is_licensing_enabled, apply_license_gating
+    from narrative_assistant.pipelines.unified_analysis import UnifiedConfig
+
+    analysis_config = UnifiedConfig.standard()
+    if is_licensing_enabled():
+        try:
+            from narrative_assistant.licensing.verification import get_cached_license
+            cached = get_cached_license()
+            tier = cached.tier if cached else None
+            analysis_config = apply_license_gating(analysis_config, tier)
+            logger.info(f"License gating applied (tier={tier})")
+        except Exception as lic_err:
+            logger.warning(f"License gating check failed, using defaults: {lic_err}")
+    else:
+        logger.debug("Licensing disabled (NA_LICENSING_ENABLED=false), all features enabled")
+
+    # Apply project settings
+    try:
+        import json
+        project = ctx["project"]
+        project_settings = project.settings if isinstance(project.settings, dict) else (
+            json.loads(project.settings) if project.settings else {}
+        )
+        analysis_features = project_settings.get("analysis_features", {})
+        if analysis_features:
+            _SETTINGS_MAP = {
+                "character_profiling": "run_character_profiling",
+                "network_analysis": "run_network_analysis",
+                "anachronism_detection": "run_anachronism_detection",
+                "ooc_detection": "run_ooc_detection",
+                "classical_spanish": "run_classical_spanish",
+                "name_variants": "run_name_variants",
+                "multi_model_voting": "run_multi_model_voting",
+                "spelling": "run_spelling",
+                "grammar": "run_grammar",
+                "consistency": "run_consistency",
+            }
+            for feat_key, config_field in _SETTINGS_MAP.items():
+                if feat_key in analysis_features and hasattr(analysis_config, config_field):
+                    user_val = bool(analysis_features[feat_key])
+                    if not user_val:
+                        setattr(analysis_config, config_field, False)
+            logger.info(f"Applied project analysis settings: {analysis_features}")
+    except Exception as settings_err:
+        logger.debug(f"Could not apply project analysis settings: {settings_err}")
+
+    ctx["analysis_config"] = analysis_config
+
+
+# ============================================================================
+# Phase 1: Parsing
+# ============================================================================
+
+def run_parsing(ctx: dict, tracker: ProgressTracker):
+    """Fase 1: Lee y parsea el documento."""
+    from narrative_assistant.parsers.base import detect_format, get_parser
+    from narrative_assistant.persistence.project import ProjectManager
+
+    project_id = ctx["project_id"]
+    tmp_path = ctx["tmp_path"]
+
+    tracker.start_phase("parsing", 0, "Leyendo el documento...")
+
+    doc_format = detect_format(tmp_path)
+    parser = get_parser(doc_format)
+    parse_result = parser.parse(tmp_path)
+
+    if parse_result.is_failure:
+        raise Exception(f"Error parsing document: {parse_result.error}")
+
+    raw_document = parse_result.value
+    full_text = raw_document.full_text
+    word_count = len(full_text.split())
+
+    # S7c-03: Validar documento vacío
+    if not full_text or not full_text.strip():
+        raise Exception(
+            "El documento está vacío o no contiene texto legible. "
+            "Verifica que el archivo no esté corrupto."
+        )
+
+    tracker.set_metric("word_count", word_count)
+    tracker.end_phase("parsing", 0)
+
+    # Actualizar word_count del proyecto inmediatamente
+    try:
+        project = ctx["project"]
+        project.word_count = word_count
+        proj_manager = ProjectManager(ctx["db_session"])
+        proj_manager.update(project)
+        logger.debug(f"Updated project word_count to {word_count}")
+    except Exception as e:
+        logger.warning(f"Could not update project word_count: {e}")
+
+    logger.info(f"Parsing complete: {word_count} words")
+
+    # Store results in context
+    ctx["raw_document"] = raw_document
+    ctx["full_text"] = full_text
+    ctx["word_count"] = word_count
+
+
+# ============================================================================
+# Phase 2: Classification
+# ============================================================================
+
+def run_classification(ctx: dict, tracker: ProgressTracker):
+    """Fase 2: Clasifica el tipo de documento."""
+    project_id = ctx["project_id"]
+    full_text = ctx["full_text"]
+
+    tracker.start_phase("classification", 1, "Clasificando tipo de documento...")
+
+    try:
+        from narrative_assistant.parsers.document_classifier import DocumentClassifier
+        classifier = DocumentClassifier()
+        classification = classifier.classify(full_text)
+
+        document_type = classification.document_type if classification else "unknown"
+        ctx["classification"] = classification
+        ctx["document_type"] = document_type
+
+        logger.info(f"Document classified as: {document_type}")
+        if classification:
+            logger.info(f"  Confidence: {classification.confidence:.2f}")
+            logger.info(f"  Genre: {classification.genre}")
+
+        # Guardar en proyecto
+        try:
+            project = ctx["project"]
+            if hasattr(project, "document_type"):
+                project.document_type = document_type
+            from narrative_assistant.persistence.project import ProjectManager
+            proj_manager = ProjectManager(ctx["db_session"])
+            proj_manager.update(project)
+        except Exception as e:
+            logger.debug(f"Could not persist document_type: {e}")
+
+    except Exception as e:
+        logger.warning(f"Document classification failed (continuing): {e}")
+        ctx["classification"] = None
+        ctx["document_type"] = "unknown"
+
+    tracker.end_phase("classification", 1)
+
+
+# ============================================================================
+# Phase 3: Structure
+# ============================================================================
+
+def run_structure(ctx: dict, tracker: ProgressTracker):
+    """Fase 3: Detecta la estructura del documento (capítulos, secciones)."""
+    project_id = ctx["project_id"]
+    full_text = ctx["full_text"]
+    raw_document = ctx["raw_document"]
+    db_session = ctx["db_session"]
+
+    tracker.start_phase("structure", 2, "Identificando la estructura del documento...")
+
+    from narrative_assistant.parsers.structure_detector import StructureDetector
+    detector = StructureDetector()
+
+    # Detectar estructura, pasar raw_document para acceso a metadata
+    chapters_data = detector.detect(full_text, raw_document=raw_document)
+    chapters_count = len(chapters_data)
+
+    if chapters_count == 0:
+        # Crear un capítulo único con todo el texto
+        chapters_data = [{
+            "number": 1,
+            "title": "Documento completo",
+            "start_char": 0,
+            "end_char": len(full_text),
+            "content": full_text,
+            "word_count": ctx["word_count"],
+            "structure_type": "flat",
+            "sections": [],
+        }]
+        chapters_count = 1
+
+    # Persistir capítulos en BD
+    persist_chapters_to_db(chapters_data, project_id, db_session)
+
+    # Cargar capítulos con IDs de BD
+    from narrative_assistant.persistence.chapter_repository import ChapterRepository
+    chapter_repo = ChapterRepository(db_session)
+    chapters_with_ids = chapter_repo.get_by_project(project_id)
+
+    def find_chapter_id_for_position(start_char: int) -> int | None:
+        """Busca el chapter_id para una posición de carácter dada."""
+        for ch in chapters_with_ids:
+            if ch.start_char <= start_char < ch.end_char:
+                return ch.id
+        # Fallback: capítulo más cercano
+        if chapters_with_ids:
+            closest = min(chapters_with_ids, key=lambda c: abs(c.start_char - start_char))
+            return closest.id
+        return None
+
+    # S8a-02: Compute and persist chapter metrics (lightweight, regex-based)
+    try:
+        from narrative_assistant.persistence.chapter import compute_chapter_metrics
+
+        metrics_computed = 0
+        for ch_db in chapters_with_ids:
+            ch_data = next(
+                (c for c in chapters_data if c["chapter_number"] == ch_db.chapter_number),
+                None,
+            )
+            if ch_data and ch_data.get("content"):
+                metrics = compute_chapter_metrics(ch_data["content"])
+                if metrics:
+                    chapter_repo.update_metrics(ch_db.id, metrics)
+                    metrics_computed += 1
+        logger.info(f"Chapter metrics computed for {metrics_computed}/{chapters_count} chapters")
+    except Exception as e:
+        logger.warning(f"Error computing chapter metrics (continuing): {e}")
+
+    tracker.set_metric("chapters_found", chapters_count)
+    tracker.end_phase("structure", 2)
+
+    logger.info(f"Structure detection complete: {chapters_count} chapters")
+
+    # Store results
+    ctx["chapters_data"] = chapters_data
+    ctx["chapters_count"] = chapters_count
+    ctx["chapters_with_ids"] = chapters_with_ids
+    ctx["find_chapter_id_for_position"] = find_chapter_id_for_position
+
+
+# ============================================================================
+# Tier 2 gate: Claim heavy analysis slot
+# ============================================================================
+
+def claim_heavy_slot_or_queue(ctx: dict, tracker: ProgressTracker) -> bool:
+    """
+    Intenta reclamar el slot de análisis pesado.
+
+    Returns:
+        True si se reclamó el slot (continuar con fases pesadas).
+        False si el proyecto fue encolado (detener aquí).
+    """
+    from narrative_assistant.persistence.project import ProjectManager
+
+    project_id = ctx["project_id"]
+    project = ctx["project"]
+
+    with deps._progress_lock:
+        if deps._heavy_analysis_project_id is not None:
+            # Heavy slot busy — queue this project
+            deps._heavy_analysis_queue.append({
+                "project_id": project_id,
+                "file_path": str(ctx["tmp_path"]),
+                "use_temp_file": ctx["use_temp_file"],
+            })
+            deps.analysis_progress_storage[project_id]["status"] = "queued_for_heavy"
+            deps.analysis_progress_storage[project_id]["current_phase"] = (
+                "Estructura lista — en cola para análisis profundo"
+            )
+            deps.analysis_progress_storage[project_id]["current_action"] = ""
+            return False
+        else:
+            deps._heavy_analysis_project_id = project_id
+            return True
+
+
+def run_ollama_healthcheck(ctx: dict, tracker: ProgressTracker):
+    """S7c-04: Health check de Ollama antes de fases pesadas."""
+    analysis_config = ctx["analysis_config"]
+    if not analysis_config.use_llm:
+        return
+
+    try:
+        from narrative_assistant.llm.ollama_manager import is_ollama_available
+        ollama_available = is_ollama_available()
+        if not ollama_available:
+            logger.warning("Ollama no disponible, continuando sin LLM")
+            analysis_config.use_llm = False
+    except ImportError:
+        logger.debug("Ollama manager not available")
+    except Exception as e:
+        logger.warning(f"Ollama health check failed: {e}")
+        analysis_config.use_llm = False
+
+
+# ============================================================================
+# Phase 4: NER
+# ============================================================================
+
+def _filter_overlapping_entities(raw_entities: list) -> list:
+    """Elimina entidades solapadas, prefiriendo la más larga."""
+    if not raw_entities:
+        return []
+    sorted_ents = sorted(
+        raw_entities, key=lambda e: (e.start_char, -(e.end_char - e.start_char))
+    )
+    result = []
+    for ent in sorted_ents:
+        overlaps = False
+        for accepted in result:
+            if not (ent.end_char <= accepted.start_char or ent.start_char >= accepted.end_char):
+                overlaps = True
+                break
+        if not overlaps:
+            result.append(ent)
+    return result
+
+
+def run_ner(ctx: dict, tracker: ProgressTracker):
+    """Fase 4: Extracción de entidades con NER."""
+    from narrative_assistant.nlp.ner import NERExtractor, EntityLabel
+    from narrative_assistant.entities.models import Entity, EntityType, EntityImportance, EntityMention
+    from narrative_assistant.entities.repository import get_entity_repository
+
+    project_id = ctx["project_id"]
+    full_text = ctx["full_text"]
+    find_chapter_id_for_position = ctx["find_chapter_id_for_position"]
+
+    tracker.start_phase("ner", 3, "Buscando personajes, lugares y otros elementos...")
+
+    ner_pct_start, ner_pct_end = tracker.get_phase_progress_range("ner")
+
+    # Callback para actualizar progreso durante NER
+    def ner_progress_callback(fase: str, pct: float, msg: str):
+        ner_range = ner_pct_end - ner_pct_start
+        ner_progress = ner_pct_start + int(pct * ner_range)
+        deps.analysis_progress_storage[project_id]["progress"] = ner_progress
+        deps.analysis_progress_storage[project_id]["current_action"] = msg
+        tracker.update_time_remaining()
+
+    # Verificar si el modelo transformer NER necesita descargarse
+    try:
+        from narrative_assistant.core.model_manager import ModelType, get_model_manager
+        manager = get_model_manager()
+        if not manager.get_model_path(ModelType.TRANSFORMER_NER):
+            deps.analysis_progress_storage[project_id]["current_phase"] = (
+                "Descargando modelo NER (~500 MB, solo la primera vez)..."
+            )
+            deps.analysis_progress_storage[project_id]["current_action"] = (
+                "Esto puede tardar unos minutos..."
+            )
+    except Exception:
+        pass
+
+    # Habilitar preprocesamiento con LLM para mejor detección de entidades
+    ner_extractor = NERExtractor(use_llm_preprocessing=True)
+    ner_result = ner_extractor.extract_entities(
+        full_text,
+        progress_callback=ner_progress_callback,
+    )
+
+    entities = []
+    entity_repo = get_entity_repository()
+
+    if ner_result.is_success and ner_result.value:
+        raw_entities = ner_result.value.entities or []
+
+        label_to_type = {
+            EntityLabel.PER: EntityType.CHARACTER,
+            EntityLabel.LOC: EntityType.LOCATION,
+            EntityLabel.ORG: EntityType.ORGANIZATION,
+            EntityLabel.MISC: EntityType.CONCEPT,
+        }
+
+        raw_entities = _filter_overlapping_entities(raw_entities)
+        logger.info(f"After overlap filtering: {len(raw_entities)} entities")
+
+        # Agrupar entidades por nombre canónico
+        entity_mentions: dict[str, list] = {}
+        for ent in raw_entities:
+            normalized = " ".join(ent.text.strip().lower().split())
+            key = normalized
+            if key not in entity_mentions:
+                entity_mentions[key] = []
+            entity_mentions[key].append(ent)
+
+        logger.info(
+            f"DEBUG NER grouping: {len(raw_entities)} raw mentions -> "
+            f"{len(entity_mentions)} unique entities"
+        )
+        sorted_entities = sorted(
+            entity_mentions.items(), key=lambda x: len(x[1]), reverse=True
+        )[:10]
+        for key, mentions in sorted_entities:
+            logger.info(f"  Entity '{key}': {len(mentions)} mentions")
+
+        logger.info(
+            f"NER: {len(raw_entities)} menciones totales, "
+            f"{len(entity_mentions)} entidades únicas"
+        )
+
+        # Recolectar nombres canónicos para evitar conflictos de aliases
+        all_canonical_names = set()
+        for key, mentions_list in entity_mentions.items():
+            first_mention = mentions_list[0]
+            best_mentions = [m for m in mentions_list if m.label == EntityLabel.PER]
+            canonical_text = best_mentions[0].text if best_mentions else first_mention.text
+            all_canonical_names.add(canonical_text)
+
+        # Crear entidades únicas
+        total_entities_to_create = len(entity_mentions)
+        entities_created = 0
+        for key, mentions_list in entity_mentions.items():
+            first_mention = mentions_list[0]
+            mention_count = len(mentions_list)
+
+            # Calcular importancia
+            if mention_count >= 20:
+                importance = EntityImportance.PRINCIPAL
+            elif mention_count >= 10:
+                importance = EntityImportance.HIGH
+            elif mention_count >= 5:
+                importance = EntityImportance.MEDIUM
+            elif mention_count >= 2:
+                importance = EntityImportance.LOW
+            else:
+                importance = EntityImportance.MINIMAL
+
+            first_appearance = min(m.start_char for m in mentions_list)
+
+            # Determinar tipo por votación
+            label_counts = Counter(m.label for m in mentions_list)
+            if EntityLabel.PER in label_counts and EntityLabel.MISC in label_counts:
+                best_label = EntityLabel.PER
+            else:
+                best_label = label_counts.most_common(1)[0][0]
+
+            best_mentions = [m for m in mentions_list if m.label == best_label]
+            canonical_text = best_mentions[0].text if best_mentions else first_mention.text
+
+            entity_type = label_to_type.get(best_label, EntityType.CONCEPT)
+            auto_aliases = []
+            if entity_type == EntityType.CHARACTER:
+                auto_aliases = generate_person_aliases(canonical_text, all_canonical_names)
+                if auto_aliases:
+                    logger.debug(f"Generated aliases for '{canonical_text}': {auto_aliases}")
+
+            entity = Entity(
+                project_id=project_id,
+                entity_type=entity_type,
+                canonical_name=canonical_text,
+                aliases=auto_aliases,
+                importance=importance,
+                description=None,
+                first_appearance_char=first_appearance,
+                mention_count=mention_count,
+                merged_from_ids=[],
+                is_active=True,
+            )
+
+            try:
+                entity_id = entity_repo.create_entity(entity)
+                entity.id = entity_id
+                entities.append(entity)
+
+                # Crear menciones en BD
+                mentions_to_create = []
+                for ent in mentions_list:
+                    mention_chapter_id = find_chapter_id_for_position(ent.start_char)
+                    mention = EntityMention(
+                        entity_id=entity_id,
+                        surface_form=ent.text,
+                        start_char=ent.start_char,
+                        end_char=ent.end_char,
+                        chapter_id=mention_chapter_id,
+                        confidence=ent.confidence,
+                        source=ent.source,
+                    )
+                    mentions_to_create.append(mention)
+
+                if len(mentions_to_create) >= 5:
+                    sample_forms = [m.surface_form for m in mentions_to_create[:5]]
+                    logger.info(
+                        f"Entity '{entity.canonical_name}': Creating "
+                        f"{len(mentions_to_create)} mentions. "
+                        f"Sample surface forms: {sample_forms}"
+                    )
+
+                try:
+                    mentions_created = entity_repo.create_mentions_batch(mentions_to_create)
+                    logger.debug(
+                        f"Entity '{entity.canonical_name}': "
+                        f"Batch created {mentions_created} mentions"
+                    )
+                except Exception as batch_err:
+                    logger.warning(
+                        f"Batch insert failed for {entity.canonical_name}, "
+                        f"falling back to individual: {batch_err}"
+                    )
+                    mentions_created = 0
+                    for mention in mentions_to_create:
+                        try:
+                            entity_repo.create_mention(mention)
+                            mentions_created += 1
+                        except Exception as me:
+                            logger.warning(
+                                f"Error creating mention for "
+                                f"{entity.canonical_name} at {mention.start_char}: {me}"
+                            )
+
+                if mentions_created != len(mentions_list):
+                    logger.warning(
+                        f"Entity '{entity.canonical_name}': Created "
+                        f"{mentions_created}/{len(mentions_list)} mentions - MISMATCH!"
+                    )
+                else:
+                    logger.info(
+                        f"Entity '{entity.canonical_name}': Successfully created "
+                        f"{mentions_created} mentions"
+                    )
+
+                # Actualizar progreso cada 5 entidades
+                entities_created += 1
+                if entities_created % 5 == 0 and total_entities_to_create > 0:
+                    sub_pct = entities_created / total_entities_to_create
+                    sub_progress = ner_pct_start + int(sub_pct * (ner_pct_end - ner_pct_start))
+                    deps.analysis_progress_storage[project_id]["progress"] = min(
+                        ner_pct_end, sub_progress
+                    )
+                    tracker.update_time_remaining()
+
+            except Exception as e:
+                logger.warning(f"Error creating entity {first_mention.text}: {e}")
+
+    tracker.end_phase("ner", 3)
+    logger.info(f"NER complete: {len(entities)} entities")
+
+    ctx["entities"] = entities
+    ctx["entity_repo"] = entity_repo
+
+
+# ============================================================================
+# Phase 3.25: LLM validation of entities
+# ============================================================================
+
+def run_llm_entity_validation(ctx: dict, tracker: ProgressTracker):
+    """Fase 3.25: Filtra entidades inválidas usando LLM."""
+    project_id = ctx["project_id"]
+    entities = ctx["entities"]
+    entity_repo = ctx["entity_repo"]
+
+    deps.analysis_progress_storage[project_id]["current_action"] = (
+        "Verificando personajes detectados..."
+    )
+    try:
+        from narrative_assistant.llm.client import get_llm_client
+
+        llm_client = get_llm_client()
+        if not (llm_client and llm_client.is_available and len(entities) > 0):
+            return
+
+        entities_to_validate = [
+            {"name": e.canonical_name, "type": e.entity_type.value}
+            for e in entities
+        ]
+
+        validation_prompt = f"""Revisa esta lista de entidades extraídas de un texto narrativo.
+Marca como INVÁLIDAS las que NO sean entidades reales:
+- Descripciones físicas ("Sus ojos verdes", "cabello negro")
+- Frases incompletas o fragmentos
+- Pronombres solos ("él", "ella") - a menos que sean nombres propios
+- Adjetivos o expresiones genéricas
+
+ENTIDADES A VALIDAR:
+{json.dumps(entities_to_validate, ensure_ascii=False, indent=2)}
+
+Responde SOLO con JSON:
+{{"invalid": ["nombre1", "nombre2", ...]}}
+
+Si todas son válidas, responde: {{"invalid": []}}
+
+JSON:"""
+
+        response = llm_client.complete(
+            validation_prompt,
+            system=(
+                "Eres un experto en NER. Identifica entidades inválidas "
+                "(no son personajes, lugares u organizaciones reales)."
+            ),
+            temperature=0.1,
+        )
+
+        if response:
+            try:
+                cleaned = response.strip()
+                if cleaned.startswith("```"):
+                    lines = cleaned.split("\n")
+                    lines = [line for line in lines if not line.startswith("```")]
+                    cleaned = "\n".join(lines)
+                start_idx = cleaned.find("{")
+                end_idx = cleaned.rfind("}") + 1
+                if start_idx != -1 and end_idx > start_idx:
+                    cleaned = cleaned[start_idx:end_idx]
+                data = json.loads(cleaned)
+                invalid_names = set(n.lower() for n in data.get("invalid", []))
+
+                if invalid_names:
+                    before_count = len(entities)
+                    entities_to_remove = []
+                    for ent in entities:
+                        if ent.canonical_name.lower() in invalid_names:
+                            entities_to_remove.append(ent)
+                            try:
+                                entity_repo.delete_entity(ent.id, hard_delete=False)
+                            except Exception:
+                                pass
+
+                    entities = [e for e in entities if e not in entities_to_remove]
+                    removed_count = before_count - len(entities)
+
+                    if removed_count > 0:
+                        logger.info(
+                            f"Validación LLM: {removed_count} entidades inválidas removidas: "
+                            f"{[e.canonical_name for e in entities_to_remove]}"
+                        )
+            except Exception as e:
+                logger.debug(f"Error parseando validación LLM: {e}")
+
+    except Exception as e:
+        logger.warning(f"Error en validación de entidades con LLM (continuando): {e}")
+
+    tracker.check_cancelled()
+    ctx["entities"] = entities
+
+
+# ============================================================================
+# Phase 3.5: Entity Fusion + Coreference
+# ============================================================================
+
+def _name_score(ent) -> int:
+    """Calcula un score para decidir cuál nombre es más descriptivo."""
+    name = ent.canonical_name
+    score = 0
+    score += len(name) * 2
+    if name and name[0].isupper():
+        score += 20
+    if " " in name:
+        score += 30
+    lower_name = name.lower()
+    pronouns = {"él", "ella", "ellos", "ellas", "este", "esta", "ese", "esa"}
+    if lower_name in pronouns:
+        score -= 100
+    return score
+
+
+def _is_name_subset(short_name: str, long_name: str) -> bool:
+    """Check if short_name's words are a subset of long_name's words."""
+    short_words = set(short_name.lower().split())
+    long_words = set(long_name.lower().split())
+    return bool(short_words) and bool(long_words) and short_words < long_words
+
+
+def run_fusion(ctx: dict, tracker: ProgressTracker):
+    """Fase 3.5: Fusión de entidades + correferencias."""
+    from narrative_assistant.entities.models import EntityType, EntityImportance
+    from narrative_assistant.entities.repository import get_entity_repository
+
+    project_id = ctx["project_id"]
+    full_text = ctx["full_text"]
+    chapters_data = ctx["chapters_data"]
+    entities = ctx["entities"]
+    find_chapter_id_for_position = ctx["find_chapter_id_for_position"]
+
+    tracker.start_phase("fusion", 4, "Unificando entidades mencionadas de diferentes formas...")
+    deps.analysis_progress_storage[project_id]["current_action"] = "Preparando unificación..."
+
+    fusion_pct_start, fusion_pct_end = tracker.get_phase_progress_range("fusion")
+    coref_result = None
+    merged_entity_ids = set()
+
+    try:
+        from narrative_assistant.entities.semantic_fusion import get_semantic_fusion_service
+
+        fusion_service = get_semantic_fusion_service()
+        entity_repo = get_entity_repository()
+        ctx["entity_repo"] = entity_repo
+
+        deps.analysis_progress_storage[project_id]["current_action"] = (
+            f"Comparando {len(entities)} entidades..."
+        )
+
+        # 1. Fusión semántica por tipo
+        entities_by_type: dict[EntityType, list] = {}
+        for ent in entities:
+            if ent.entity_type not in entities_by_type:
+                entities_by_type[ent.entity_type] = []
+            entities_by_type[ent.entity_type].append(ent)
+
+        fusion_pairs: list[tuple] = []
+
+        for entity_type, type_entities in entities_by_type.items():
+            if len(type_entities) < 2:
+                continue
+
+            entity_names = [e.canonical_name for e in type_entities]
+            logger.info(f"Fusion check: {entity_type.value} entities = {entity_names}")
+
+            for i, ent1 in enumerate(type_entities):
+                for j, ent2 in enumerate(type_entities):
+                    if i >= j:
+                        continue
+
+                    name1 = ent1.canonical_name
+                    name2 = ent2.canonical_name
+                    force_merge = _is_name_subset(name1, name2) or _is_name_subset(name2, name1)
+
+                    if force_merge:
+                        logger.info(f"Fusión forzada por nombre contenido: '{name1}' ↔ '{name2}'")
+
+                    result = fusion_service.should_merge(ent1, ent2)
+
+                    if result.should_merge or force_merge:
+                        merge_reason = (
+                            f"nombre contenido ({name1} ⊂ {name2} o viceversa)"
+                            if force_merge and not result.should_merge
+                            else result.reason
+                        )
+                        logger.info(
+                            f"Fusión sugerida: '{ent1.canonical_name}' + '{ent2.canonical_name}' "
+                            f"(similaridad: {result.similarity:.2f}, razón: {merge_reason})"
+                        )
+
+                        score1 = _name_score(ent1)
+                        score2 = _name_score(ent2)
+                        if score1 >= score2:
+                            fusion_pairs.append((ent1, ent2))
+                        else:
+                            fusion_pairs.append((ent2, ent1))
+
+        # Ejecutar fusiones
+        if fusion_pairs:
+            deps.analysis_progress_storage[project_id]["current_action"] = (
+                f"Unificando {len(fusion_pairs)} pares de nombres similares..."
+            )
+
+        for idx, (keep_entity, merge_entity) in enumerate(fusion_pairs):
+            if merge_entity.id in merged_entity_ids:
+                continue
+
+            try:
+                if keep_entity.aliases is None:
+                    keep_entity.aliases = []
+                if merge_entity.canonical_name not in keep_entity.aliases:
+                    keep_entity.aliases.append(merge_entity.canonical_name)
+
+                keep_entity.mention_count = (keep_entity.mention_count or 0) + (
+                    merge_entity.mention_count or 0
+                )
+
+                if keep_entity.merged_from_ids is None:
+                    keep_entity.merged_from_ids = []
+                if merge_entity.id:
+                    keep_entity.merged_from_ids.append(merge_entity.id)
+
+                entity_repo.update_entity(
+                    entity_id=keep_entity.id,
+                    aliases=keep_entity.aliases,
+                    merged_from_ids=keep_entity.merged_from_ids,
+                )
+                entity_repo.increment_mention_count(
+                    keep_entity.id, merge_entity.mention_count or 0
+                )
+
+                # Recalcular importancia
+                new_mention_count = keep_entity.mention_count
+                if new_mention_count >= 20:
+                    new_importance = EntityImportance.PRINCIPAL
+                elif new_mention_count >= 10:
+                    new_importance = EntityImportance.HIGH
+                elif new_mention_count >= 5:
+                    new_importance = EntityImportance.MEDIUM
+                elif new_mention_count >= 2:
+                    new_importance = EntityImportance.LOW
+                else:
+                    new_importance = EntityImportance.MINIMAL
+
+                if new_importance != keep_entity.importance:
+                    entity_repo.update_entity(
+                        entity_id=keep_entity.id,
+                        importance=new_importance,
+                    )
+                    keep_entity.importance = new_importance
+                    logger.debug(
+                        f"Importancia actualizada: '{keep_entity.canonical_name}' "
+                        f"-> {new_importance.value}"
+                    )
+
+                if merge_entity.id and keep_entity.id:
+                    entity_repo.move_mentions(merge_entity.id, keep_entity.id)
+
+                entity_repo.delete_entity(merge_entity.id, hard_delete=False)
+                merged_entity_ids.add(merge_entity.id)
+
+                logger.info(
+                    f"Fusión ejecutada: '{merge_entity.canonical_name}' → "
+                    f"'{keep_entity.canonical_name}'"
+                )
+
+                if (idx + 1) % 5 == 0:
+                    deps.analysis_progress_storage[project_id]["current_action"] = (
+                        f"Unificando nombres: {keep_entity.canonical_name}... "
+                        f"({idx + 1}/{len(fusion_pairs)})"
+                    )
+
+            except Exception as e:
+                logger.warning(
+                    f"Error fusionando {merge_entity.canonical_name} → "
+                    f"{keep_entity.canonical_name}: {e}"
+                )
+
+        entities = [e for e in entities if e.id not in merged_entity_ids]
+
+        if fusion_pairs:
+            deps.analysis_progress_storage[project_id]["current_action"] = (
+                f"Unificados {len(merged_entity_ids)} personajes duplicados"
+            )
+
+        # Reconciliar contadores
+        try:
+            reconciled = entity_repo.reconcile_all_mention_counts(project_id)
+            logger.info(f"Reconciliados contadores de menciones para {reconciled} entidades")
+            entities = entity_repo.get_entities_by_project(project_id, active_only=True)
+        except Exception as recon_err:
+            logger.warning(f"Error reconciliando contadores de menciones: {recon_err}")
+
+        deps.analysis_progress_storage[project_id]["progress"] = 57
+        tracker.update_time_remaining()
+
+        # 2. Resolución de correferencias
+        deps.analysis_progress_storage[project_id]["current_phase"] = (
+            "Identificando referencias cruzadas entre personajes..."
+        )
+
+        try:
+            from narrative_assistant.nlp.coreference_resolver import (
+                resolve_coreferences_voting,
+                CorefConfig,
+                CorefMethod,
+                MentionType as CorefMentionType,
+            )
+
+            coref_config = CorefConfig(
+                enabled_methods=[
+                    CorefMethod.EMBEDDINGS,
+                    CorefMethod.LLM,
+                    CorefMethod.MORPHO,
+                    CorefMethod.HEURISTICS,
+                ],
+                min_confidence=0.5,
+                consensus_threshold=0.6,
+                use_chapter_boundaries=True,
+                ollama_model="llama3.2",
+            )
+
+            coref_result = resolve_coreferences_voting(
+                text=full_text,
+                chapters=chapters_data,
+                config=coref_config,
+            )
+
+            logger.info(
+                f"Correferencias (votación): {coref_result.total_chains} cadenas, "
+                f"{coref_result.total_mentions} menciones, "
+                f"{len(coref_result.unresolved)} sin resolver"
+            )
+
+            for method, count in coref_result.method_contributions.items():
+                logger.debug(f"  Método {method.value}: {count} resoluciones")
+
+            # Vincular cadenas con entidades
+            character_entities = [
+                e for e in entities if e.entity_type == EntityType.CHARACTER
+            ]
+
+            for chain in coref_result.chains:
+                if not chain.main_mention:
+                    logger.debug(
+                        f"Cadena de correferencia ignorada (solo pronombres): "
+                        f"{[m.text for m in chain.mentions[:3]]}..."
+                    )
+                    continue
+
+                matching_entity = None
+                for ent in character_entities:
+                    if (
+                        ent.canonical_name
+                        and chain.main_mention
+                        and ent.canonical_name.lower() == chain.main_mention.lower()
+                    ):
+                        matching_entity = ent
+                        break
+                    if ent.aliases:
+                        for alias in ent.aliases:
+                            if (
+                                chain.main_mention
+                                and alias.lower() == chain.main_mention.lower()
+                            ):
+                                matching_entity = ent
+                                break
+                    if not matching_entity:
+                        for mention in chain.mentions:
+                            if (
+                                ent.canonical_name
+                                and mention.text.lower() == ent.canonical_name.lower()
+                            ):
+                                matching_entity = ent
+                                break
+
+                if matching_entity:
+                    pronoun_count = sum(
+                        1
+                        for m in chain.mentions
+                        if m.mention_type == CorefMentionType.PRONOUN
+                    )
+
+                    if pronoun_count > 0:
+                        try:
+                            entity_repo.increment_mention_count(
+                                matching_entity.id, pronoun_count
+                            )
+                            matching_entity.mention_count = (
+                                matching_entity.mention_count or 0
+                            ) + pronoun_count
+
+                            new_mc = matching_entity.mention_count
+                            if new_mc >= 20:
+                                new_imp = EntityImportance.PRINCIPAL
+                            elif new_mc >= 10:
+                                new_imp = EntityImportance.HIGH
+                            elif new_mc >= 5:
+                                new_imp = EntityImportance.MEDIUM
+                            elif new_mc >= 2:
+                                new_imp = EntityImportance.LOW
+                            else:
+                                new_imp = EntityImportance.MINIMAL
+
+                            if new_imp != matching_entity.importance:
+                                entity_repo.update_entity(
+                                    entity_id=matching_entity.id,
+                                    importance=new_imp,
+                                )
+                                matching_entity.importance = new_imp
+
+                            logger.debug(
+                                f"Correferencia: +{pronoun_count} pronombres → "
+                                f"'{matching_entity.canonical_name}'"
+                            )
+                        except Exception as e:
+                            logger.warning(f"Error actualizando correferencias: {e}")
+
+                    # Añadir aliases nuevos
+                    new_aliases = []
+                    for mention in chain.mentions:
+                        if (
+                            mention.mention_type == CorefMentionType.PROPER_NOUN
+                            and mention.text.lower()
+                            != matching_entity.canonical_name.lower()
+                        ):
+                            if matching_entity.aliases is None:
+                                matching_entity.aliases = []
+                            if mention.text not in matching_entity.aliases:
+                                matching_entity.aliases.append(mention.text)
+                                new_aliases.append(mention.text)
+
+                    if new_aliases:
+                        try:
+                            entity_repo.update_entity(
+                                entity_id=matching_entity.id,
+                                aliases=matching_entity.aliases,
+                            )
+                            logger.debug(
+                                f"Nuevos aliases para '{matching_entity.canonical_name}': "
+                                f"{new_aliases}"
+                            )
+                        except Exception as e:
+                            logger.warning(f"Error actualizando aliases: {e}")
+
+        except ImportError as e:
+            logger.warning(f"Módulo de correferencias no disponible: {e}")
+        except Exception as e:
+            logger.warning(f"Error en resolución de correferencias: {e}")
+
+        deps.analysis_progress_storage[project_id]["progress"] = fusion_pct_end
+        deps.analysis_progress_storage[project_id]["metrics"]["entities_found"] = len(entities)
+        deps.analysis_progress_storage[project_id]["current_action"] = (
+            f"Encontrados {len(entities)} personajes y elementos únicos"
+        )
+        tracker.end_phase("fusion", 4)
+
+        logger.info(
+            f"Fusión de entidades completada en "
+            f"{tracker.phase_durations.get('fusion', 0):.1f}s: "
+            f"{len(merged_entity_ids)} entidades fusionadas, "
+            f"{len(entities)} entidades activas"
+        )
+
+        # Buscar menciones adicionales
+        try:
+            from narrative_assistant.nlp.mention_finder import get_mention_finder
+
+            mention_finder = get_mention_finder()
+            deps.analysis_progress_storage[project_id]["current_action"] = (
+                "Buscando menciones adicionales..."
+            )
+
+            entity_names = [e.canonical_name for e in entities if e.canonical_name]
+            aliases_dict = {}
+            for e in entities:
+                if e.canonical_name and e.aliases:
+                    aliases_dict[e.canonical_name] = e.aliases
+
+            existing_positions = set()
+            for entity in entities:
+                mentions_db = entity_repo.get_mentions_by_entity(entity.id)
+                for m in mentions_db:
+                    existing_positions.add((m.start_char, m.end_char))
+
+            additional_mentions = mention_finder.find_all_mentions(
+                text=full_text,
+                entity_names=entity_names,
+                aliases=aliases_dict,
+                existing_positions=existing_positions,
+            )
+
+            from narrative_assistant.entities.models import EntityMention as EM
+
+            mentions_by_entity: dict[str, list] = {}
+            for am in additional_mentions:
+                if am.entity_name not in mentions_by_entity:
+                    mentions_by_entity[am.entity_name] = []
+                mentions_by_entity[am.entity_name].append(am)
+
+            additional_count = 0
+            for entity in entities:
+                name = entity.canonical_name
+                if name in mentions_by_entity:
+                    new_mentions = mentions_by_entity[name]
+                    for am in new_mentions:
+                        ch_id = find_chapter_id_for_position(am.start_char)
+                        mention = EM(
+                            entity_id=entity.id,
+                            surface_form=am.surface_form,
+                            start_char=am.start_char,
+                            end_char=am.end_char,
+                            chapter_id=ch_id,
+                            confidence=am.confidence,
+                            source="mention_finder",
+                        )
+                        try:
+                            entity_repo.create_mention(mention)
+                            additional_count += 1
+                        except Exception:
+                            pass
+
+            if additional_count > 0:
+                logger.info(f"MentionFinder: Added {additional_count} additional mentions")
+                deps.analysis_progress_storage[project_id]["current_action"] = (
+                    f"Encontradas {additional_count} menciones adicionales"
+                )
+
+        except Exception as mf_err:
+            logger.warning(f"MentionFinder failed (non-critical): {mf_err}")
+
+        # Recalcular importancia final
+        logger.info("Recalculando importancia de entidades...")
+        db = deps.get_database()
+        for entity in entities:
+            try:
+                with db.connection() as conn:
+                    cursor = conn.execute(
+                        "SELECT COUNT(*) FROM entity_mentions WHERE entity_id = ?",
+                        (entity.id,),
+                    )
+                    row = cursor.fetchone()
+                    real_mention_count = row[0] if row else 0
+
+                if real_mention_count >= 20:
+                    new_importance = EntityImportance.PRINCIPAL
+                elif real_mention_count >= 10:
+                    new_importance = EntityImportance.HIGH
+                elif real_mention_count >= 5:
+                    new_importance = EntityImportance.MEDIUM
+                elif real_mention_count >= 2:
+                    new_importance = EntityImportance.LOW
+                else:
+                    new_importance = EntityImportance.MINIMAL
+
+                if (
+                    new_importance != entity.importance
+                    or entity.mention_count != real_mention_count
+                ):
+                    entity_repo.update_entity(
+                        entity_id=entity.id,
+                        importance=new_importance,
+                    )
+                    with db.connection() as conn:
+                        conn.execute(
+                            "UPDATE entities SET mention_count = ? WHERE id = ?",
+                            (real_mention_count, entity.id),
+                        )
+                    entity.importance = new_importance
+                    entity.mention_count = real_mention_count
+                    logger.debug(
+                        f"'{entity.canonical_name}': {real_mention_count} menciones "
+                        f"-> {new_importance.value}"
+                    )
+            except Exception as e:
+                logger.warning(
+                    f"Error recalculando importancia de '{entity.canonical_name}': {e}"
+                )
+
+    except Exception as e:
+        logger.warning(f"Error en fusión de entidades (continuando sin fusión): {e}")
+        tracker.phase_durations["fusion"] = time.time() - tracker.phase_start_times.get(
+            "fusion", time.time()
+        )
+        tracker.phases[4]["completed"] = True
+        tracker.phases[4]["current"] = False
+        tracker.phases[4]["duration"] = round(tracker.phase_durations["fusion"], 1)
+
+    tracker.check_cancelled()
+
+    ctx["entities"] = entities
+    ctx["coref_result"] = coref_result
+
+
+# ============================================================================
+# Phase 5: Attributes
+# ============================================================================
+
+def run_attributes(ctx: dict, tracker: ProgressTracker):
+    """Fase 5: Extracción de atributos de personajes."""
+    from narrative_assistant.core.result import Result
+    from narrative_assistant.entities.repository import get_entity_repository
+    from narrative_assistant.nlp.attributes import AttributeExtractor
+
+    project_id = ctx["project_id"]
+    full_text = ctx["full_text"]
+    chapters_data = ctx["chapters_data"]
+    entities = ctx["entities"]
+    coref_result = ctx.get("coref_result")
+
+    tracker.start_phase("attributes", 5, "Analizando características de los personajes...")
+
+    attr_pct_start, attr_pct_end = tracker.get_phase_progress_range("attributes")
+    attributes = []
+
+    if entities:
+        # Detectar GPU
+        try:
+            from narrative_assistant.core.device import get_device_detector
+            detector = get_device_detector()
+            has_gpu = detector.device_type.value in ("cuda", "mps")
+        except Exception:
+            has_gpu = False
+
+        use_embeddings = has_gpu
+        if use_embeddings:
+            logger.info("GPU detectada - habilitando análisis de embeddings para atributos")
+            deps.analysis_progress_storage[project_id]["current_action"] = (
+                "Análisis avanzado con GPU activado"
+            )
+        else:
+            logger.info("Sin GPU - usando métodos rápidos para atributos (LLM, patrones)")
+
+        attr_extractor = AttributeExtractor(use_embeddings=use_embeddings)
+        entity_repo = get_entity_repository()
+
+        # Preparar menciones
+        from narrative_assistant.entities.models import EntityType
+        character_entities = [
+            e for e in entities if e.entity_type.value == "character"
+        ]
+
+        if character_entities:
+            entity_mentions = []
+            for e in character_entities:
+                if e.id:
+                    db_mentions = entity_repo.get_mentions_by_entity(e.id)
+                    for m in db_mentions:
+                        entity_mentions.append(
+                            (e.canonical_name, m.start_char, m.end_char)
+                        )
+                if not any(name == e.canonical_name for name, _, _ in entity_mentions):
+                    entity_mentions.append(
+                        (
+                            e.canonical_name,
+                            e.first_appearance_char or 0,
+                            (e.first_appearance_char or 0) + len(e.canonical_name or ""),
+                        )
+                    )
+
+            logger.debug(
+                f"Menciones de BD cargadas: {len(entity_mentions)} "
+                f"para {len(character_entities)} entidades"
+            )
+
+            # Añadir menciones de correferencia
+            if coref_result and coref_result.chains:
+                for chain in coref_result.chains:
+                    matching_entity = next(
+                        (
+                            e
+                            for e in character_entities
+                            if e.canonical_name
+                            and chain.main_mention
+                            and e.canonical_name.lower() == chain.main_mention.lower()
+                        ),
+                        None,
+                    )
+                    if matching_entity:
+                        for mention in chain.mentions:
+                            entity_mentions.append(
+                                (
+                                    matching_entity.canonical_name,
+                                    mention.start_char,
+                                    mention.end_char,
+                                )
+                            )
+
+            logger.info(
+                f"Extrayendo atributos: {len(entity_mentions)} menciones de entidades"
+            )
+
+            # Procesar en lotes
+            total_chars = len(character_entities)
+            all_extracted_attrs = []
+            batch_size = 10
+
+            for batch_start in range(0, total_chars, batch_size):
+                batch_end = min(batch_start + batch_size, total_chars)
+                batch_chars = character_entities[batch_start:batch_end]
+
+                batch_names = [
+                    e.canonical_name for e in batch_chars if e.canonical_name
+                ][:3]
+                if len(batch_chars) > 3:
+                    names_str = ", ".join(batch_names) + "..."
+                else:
+                    names_str = ", ".join(batch_names)
+
+                deps.analysis_progress_storage[project_id]["current_action"] = (
+                    f"Analizando: {names_str} ({batch_end}/{total_chars})"
+                )
+
+                batch_progress = 0.1 + (0.35 * batch_end / max(total_chars, 1))
+                deps.analysis_progress_storage[project_id]["progress"] = (
+                    attr_pct_start + int((attr_pct_end - attr_pct_start) * batch_progress)
+                )
+
+                batch_entity_names = {
+                    e.canonical_name.lower()
+                    for e in batch_chars
+                    if e.canonical_name
+                }
+                batch_mentions = [
+                    (name, start, end)
+                    for name, start, end in entity_mentions
+                    if name and name.lower() in batch_entity_names
+                ]
+
+                if batch_mentions:
+                    try:
+                        import concurrent.futures
+
+                        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                            future = executor.submit(
+                                attr_extractor.extract_attributes,
+                                full_text,
+                                batch_mentions,
+                                None,
+                            )
+                            try:
+                                batch_result = future.result(timeout=30)
+                                if batch_result.is_success and batch_result.value:
+                                    all_extracted_attrs.extend(batch_result.value.attributes)
+                            except concurrent.futures.TimeoutError:
+                                logger.warning(
+                                    f"Timeout extrayendo atributos para: {names_str}"
+                                )
+                    except Exception as e:
+                        logger.warning(
+                            f"Error extrayendo atributos para {names_str}: {e}"
+                        )
+
+                tracker.check_cancelled()
+
+            # Resultado combinado
+            from narrative_assistant.nlp.attributes import AttributeExtractionResult
+
+            attr_result = Result.success(
+                AttributeExtractionResult(attributes=all_extracted_attrs)
+            )
+            logger.info(f"Atributos extraídos: {len(all_extracted_attrs)}")
+
+            deps.analysis_progress_storage[project_id]["progress"] = (
+                attr_pct_start + int((attr_pct_end - attr_pct_start) * 0.5)
+            )
+            deps.analysis_progress_storage[project_id]["current_action"] = (
+                "Registrando características encontradas..."
+            )
+
+            if attr_result.is_success and attr_result.value:
+                extracted_attrs = attr_result.value.attributes
+
+                # Asignar capítulo a cada atributo
+                if chapters_data:
+
+                    def find_chapter_number_for_position(char_pos: int) -> int | None:
+                        for ch in chapters_data:
+                            if ch["start_char"] <= char_pos <= ch["end_char"]:
+                                return ch["chapter_number"]
+                        return None
+
+                    attrs_with_chapter = 0
+                    for attr in extracted_attrs:
+                        if attr.start_char is not None and attr.start_char > 0:
+                            chapter_num = find_chapter_number_for_position(attr.start_char)
+                            if chapter_num is not None:
+                                attr.chapter_id = chapter_num
+                                attrs_with_chapter += 1
+
+                    logger.info(
+                        f"Asignados capítulos a {attrs_with_chapter}/"
+                        f"{len(extracted_attrs)} atributos"
+                    )
+
+                # Resolver con correferencias
+                if coref_result and coref_result.chains:
+                    try:
+                        from narrative_assistant.nlp.attributes import (
+                            resolve_attributes_with_coreferences,
+                        )
+
+                        pronouns = {
+                            "él", "ella", "ellos", "ellas",
+                            "su", "sus", "este", "esta", "ese", "esa",
+                        }
+                        pronoun_attrs_before = sum(
+                            1
+                            for a in extracted_attrs
+                            if a.entity_name and a.entity_name.lower() in pronouns
+                        )
+
+                        resolved_attrs = resolve_attributes_with_coreferences(
+                            attributes=extracted_attrs,
+                            coref_chains=coref_result.chains,
+                            text=full_text,
+                        )
+
+                        pronoun_attrs_after = sum(
+                            1
+                            for a in resolved_attrs
+                            if a.entity_name and a.entity_name.lower() in pronouns
+                        )
+
+                        resolved_count = pronoun_attrs_before - pronoun_attrs_after
+                        if resolved_count > 0:
+                            logger.info(
+                                f"Correferencia de atributos: {resolved_count} atributos "
+                                f"de pronombres resueltos a entidades "
+                                f"({pronoun_attrs_before} → {pronoun_attrs_after} sin resolver)"
+                            )
+                        elif pronoun_attrs_before > 0:
+                            logger.warning(
+                                f"Correferencia de atributos: {pronoun_attrs_before} "
+                                f"atributos con pronombres no pudieron resolverse"
+                            )
+
+                        extracted_attrs = resolved_attrs
+                    except Exception as e:
+                        logger.warning(
+                            f"Error resolviendo atributos con correferencias: {e}",
+                            exc_info=True,
+                        )
+                else:
+                    logger.info(
+                        "Sin cadenas de correferencia - atributos de pronombres "
+                        "no se resolverán"
+                    )
+
+                # Persistir atributos
+                total_attrs = len(extracted_attrs)
+                attrs_processed = 0
+                for attr in extracted_attrs:
+                    if not attr.entity_name:
+                        continue
+
+                    matching_entity = next(
+                        (
+                            e
+                            for e in character_entities
+                            if e.canonical_name
+                            and e.canonical_name.lower() == attr.entity_name.lower()
+                        ),
+                        None,
+                    )
+                    if matching_entity:
+                        try:
+                            attr_key = (
+                                attr.key.value
+                                if hasattr(attr.key, "value")
+                                else str(attr.key)
+                            )
+                            attr_type = (
+                                attr.category.value
+                                if hasattr(attr.category, "value")
+                                else "physical"
+                            )
+
+                            entity_repo.create_attribute(
+                                entity_id=matching_entity.id,
+                                attribute_type=attr_type,
+                                attribute_key=attr_key,
+                                attribute_value=attr.value,
+                                confidence=attr.confidence,
+                                chapter_id=getattr(attr, "chapter_id", None),
+                            )
+                            attributes.append(attr)
+                        except Exception as e:
+                            logger.warning(
+                                f"Error creating attribute for "
+                                f"{matching_entity.canonical_name}: {e}"
+                            )
+
+                    attrs_processed += 1
+                    if attrs_processed % 10 == 0 or attrs_processed == total_attrs:
+                        save_progress = 0.6 + (
+                            0.35 * attrs_processed / max(total_attrs, 1)
+                        )
+                        deps.analysis_progress_storage[project_id]["progress"] = (
+                            attr_pct_start
+                            + int((attr_pct_end - attr_pct_start) * save_progress)
+                        )
+                        deps.analysis_progress_storage[project_id]["current_action"] = (
+                            f"Guardando características... ({attrs_processed}/{total_attrs})"
+                        )
+
+    tracker.end_phase("attributes", 5)
+    deps.analysis_progress_storage[project_id]["metrics"]["attributes_extracted"] = len(
+        attributes
+    )
+    logger.info(f"Attribute extraction complete: {len(attributes)} attributes")
+
+    ctx["attributes"] = attributes
+
+
+# ============================================================================
+# Phase 6: Consistency (+ vital status, locations, OOC, anachronisms, classical)
+# ============================================================================
+
+def run_consistency(ctx: dict, tracker: ProgressTracker):
+    """Fase 6: Verificación de consistencia y sub-análisis."""
+    from narrative_assistant.analysis.attribute_consistency import AttributeConsistencyChecker
+
+    project_id = ctx["project_id"]
+    full_text = ctx["full_text"]
+    chapters_data = ctx["chapters_data"]
+    entities = ctx["entities"]
+    attributes = ctx["attributes"]
+    analysis_config = ctx["analysis_config"]
+
+    tracker.start_phase("consistency", 6, "Verificando la coherencia del relato...")
+
+    cons_pct_start, cons_pct_end = tracker.get_phase_progress_range("consistency")
+
+    # Consistencia de atributos
+    inconsistencies = []
+    if attributes:
+        checker = AttributeConsistencyChecker()
+        check_result = checker.check_consistency(attributes)
+        if check_result.is_success:
+            inconsistencies = check_result.value or []
+
+    # Sub-fase 5.1: Estado vital
+    vital_status_report = None
+    location_report = None
+    chapter_progress_report = None
+
+    deps.analysis_progress_storage[project_id]["current_action"] = (
+        "Verificando estado vital de personajes..."
+    )
+
+    # Preparar datos para sub-fases
+    chapters_for_analysis = [
+        {
+            "number": ch["chapter_number"],
+            "content": ch["content"],
+            "text": ch["content"],
+            "start_char": ch["start_char"],
+        }
+        for ch in chapters_data
+    ]
+
+    entities_for_analysis = [
+        {
+            "id": e.id,
+            "canonical_name": e.canonical_name,
+            "entity_type": (
+                e.entity_type.value
+                if hasattr(e.entity_type, "value")
+                else str(e.entity_type)
+            ),
+            "aliases": e.aliases if hasattr(e, "aliases") else [],
+        }
+        for e in entities
+    ]
+
+    try:
+        from narrative_assistant.analysis.vital_status import analyze_vital_status
+
+        vital_result = analyze_vital_status(
+            project_id=project_id,
+            chapters=chapters_for_analysis,
+            entities=entities_for_analysis,
+        )
+
+        if vital_result.is_success:
+            vital_status_report = vital_result.value
+            logger.info(
+                f"Vital status analysis: {len(vital_status_report.death_events)} deaths, "
+                f"{len(vital_status_report.post_mortem_appearances)} post-mortem appearances"
+            )
+
+            # S8a-03: Persist vital status events to DB
+            try:
+                db = ctx["db_session"]
+                with db.connection() as conn:
+                    # Limpiar eventos anteriores
+                    conn.execute(
+                        "DELETE FROM vital_status_events WHERE project_id = ?",
+                        (project_id,),
+                    )
+                    # Insertar death events
+                    for de in vital_status_report.death_events:
+                        conn.execute(
+                            """INSERT INTO vital_status_events
+                            (project_id, entity_id, entity_name, event_type,
+                             chapter, start_char, end_char, excerpt,
+                             confidence, death_type)
+                            VALUES (?, ?, ?, 'death', ?, ?, ?, ?, ?, ?)""",
+                            (
+                                project_id, de.entity_id, de.entity_name,
+                                de.chapter, de.start_char, de.end_char,
+                                de.excerpt, de.confidence, de.death_type,
+                            ),
+                        )
+                    # Insertar post-mortem appearances
+                    for pm in vital_status_report.post_mortem_appearances:
+                        conn.execute(
+                            """INSERT INTO vital_status_events
+                            (project_id, entity_id, entity_name, event_type,
+                             chapter, start_char, end_char, excerpt,
+                             confidence, death_chapter, appearance_type, is_valid)
+                            VALUES (?, ?, ?, 'post_mortem_appearance', ?, ?, ?, ?, ?, ?, ?, ?)""",
+                            (
+                                project_id, pm.entity_id, pm.entity_name,
+                                pm.appearance_chapter,
+                                pm.appearance_start_char, pm.appearance_end_char,
+                                pm.appearance_excerpt, pm.confidence,
+                                pm.death_chapter, pm.appearance_type,
+                                1 if pm.is_valid else 0,
+                            ),
+                        )
+                persisted = (
+                    len(vital_status_report.death_events)
+                    + len(vital_status_report.post_mortem_appearances)
+                )
+                logger.info(f"Persisted {persisted} vital status events to DB")
+            except Exception as persist_err:
+                logger.warning(f"Error persisting vital status (continuing): {persist_err}")
+
+        else:
+            logger.warning(f"Vital status analysis failed: {vital_result.error}")
+
+    except ImportError as e:
+        logger.warning(f"Vital status module not available: {e}")
+    except Exception as e:
+        logger.warning(f"Error in vital status analysis: {e}", exc_info=True)
+
+    tracker.check_cancelled()
+
+    # Sub-fase 5.2: Ubicaciones
+    deps.analysis_progress_storage[project_id]["current_action"] = (
+        "Verificando ubicaciones de personajes..."
+    )
+
+    try:
+        from narrative_assistant.analysis.character_location import (
+            analyze_character_locations,
+        )
+
+        location_result = analyze_character_locations(
+            project_id=project_id,
+            chapters=chapters_for_analysis,
+            entities=entities_for_analysis,
+        )
+
+        if location_result.is_success:
+            location_report = location_result.value
+            inconsistency_count = (
+                len(location_report.inconsistencies)
+                if hasattr(location_report, "inconsistencies")
+                else 0
+            )
+            logger.info(
+                f"Character location analysis: {len(location_report.location_events)} events, "
+                f"{inconsistency_count} inconsistencies"
+            )
+
+            # S8a-04: Persist character location events to DB
+            try:
+                db = ctx["db_session"]
+                with db.connection() as conn:
+                    conn.execute(
+                        "DELETE FROM character_location_events WHERE project_id = ?",
+                        (project_id,),
+                    )
+                    for le in location_report.location_events:
+                        conn.execute(
+                            """INSERT INTO character_location_events
+                            (project_id, entity_id, entity_name, location_name,
+                             chapter, start_char, end_char, excerpt,
+                             change_type, confidence)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                            (
+                                project_id, le.entity_id, le.entity_name,
+                                le.location_name, le.chapter,
+                                le.start_char, le.end_char, le.excerpt,
+                                le.change_type.value if hasattr(le.change_type, "value") else str(le.change_type),
+                                le.confidence,
+                            ),
+                        )
+                logger.info(
+                    f"Persisted {len(location_report.location_events)} "
+                    f"character location events to DB"
+                )
+            except Exception as persist_err:
+                logger.warning(
+                    f"Error persisting character locations (continuing): {persist_err}"
+                )
+
+        else:
+            logger.warning(f"Character location analysis failed: {location_result.error}")
+
+    except ImportError as e:
+        logger.warning(f"Character location module not available: {e}")
+    except Exception as e:
+        logger.warning(f"Error in character location analysis: {e}", exc_info=True)
+
+    tracker.check_cancelled()
+
+    # Sub-fase 5.3: Resumen por capítulo
+    deps.analysis_progress_storage[project_id]["current_action"] = (
+        "Generando resumen de avance narrativo..."
+    )
+
+    try:
+        from narrative_assistant.analysis.chapter_summary import analyze_chapter_progress
+
+        chapter_progress_report = analyze_chapter_progress(
+            project_id=project_id,
+            db_path=None,
+            mode="basic",
+        )
+
+        if chapter_progress_report:
+            logger.info(
+                f"Chapter progress analysis: "
+                f"{len(chapter_progress_report.chapters)} chapters analyzed"
+            )
+
+    except ImportError as e:
+        logger.warning(f"Chapter summary module not available: {e}")
+    except Exception as e:
+        logger.warning(f"Error in chapter progress analysis: {e}", exc_info=True)
+
+    tracker.check_cancelled()
+
+    # Sub-fase 5.4: Out-of-character
+    ooc_report = None
+    if analysis_config.run_ooc_detection:
+        deps.analysis_progress_storage[project_id]["current_action"] = (
+            "Detectando comportamiento fuera de personaje..."
+        )
+        try:
+            from narrative_assistant.analysis.out_of_character import OutOfCharacterDetector
+            from narrative_assistant.analysis.character_profiling import CharacterProfiler
+
+            profiler = CharacterProfiler()
+            character_entities = [
+                e
+                for e in entities
+                if (
+                    hasattr(e.entity_type, "value")
+                    and e.entity_type.value in ("character", "PER", "PERSON")
+                )
+                or (
+                    isinstance(e.entity_type, str)
+                    and e.entity_type in ("character", "PER", "PERSON")
+                )
+            ]
+            if character_entities:
+                chapter_texts = {
+                    ch["chapter_number"]: ch["content"] for ch in chapters_data
+                }
+                profiles = profiler.build_profiles(
+                    character_entities, chapters_data, chapter_texts
+                )
+                if profiles:
+                    ooc_detector = OutOfCharacterDetector()
+                    ooc_report = ooc_detector.detect(
+                        profiles=profiles,
+                        chapter_texts=chapter_texts,
+                    )
+                    logger.info(f"OOC detection: {len(ooc_report.events)} events found")
+
+                    # S8a-05: Persist OOC events to DB
+                    try:
+                        db = ctx["db_session"]
+                        with db.connection() as conn:
+                            conn.execute(
+                                "DELETE FROM ooc_events WHERE project_id = ?",
+                                (project_id,),
+                            )
+                            for ev in ooc_report.events:
+                                conn.execute(
+                                    """INSERT INTO ooc_events
+                                    (project_id, entity_id, entity_name,
+                                     deviation_type, severity, description,
+                                     expected, actual, chapter, excerpt,
+                                     confidence, is_intentional)
+                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                                    (
+                                        project_id,
+                                        ev.entity_id, ev.entity_name,
+                                        ev.deviation_type.value if hasattr(ev.deviation_type, "value") else str(ev.deviation_type),
+                                        ev.severity.value if hasattr(ev.severity, "value") else str(ev.severity),
+                                        ev.description, ev.expected, ev.actual,
+                                        ev.chapter, ev.excerpt,
+                                        ev.confidence,
+                                        1 if ev.is_intentional else 0,
+                                    ),
+                                )
+                        logger.info(f"Persisted {len(ooc_report.events)} OOC events to DB")
+                    except Exception as persist_err:
+                        logger.warning(f"Error persisting OOC events (continuing): {persist_err}")
+
+        except ImportError as e:
+            logger.warning(f"OOC detection module not available: {e}")
+        except Exception as e:
+            logger.warning(f"Error in OOC detection: {e}", exc_info=True)
+
+        tracker.check_cancelled()
+
+    # Sub-fase 5.5: Anacronismos
+    anachronism_report = None
+    if analysis_config.run_anachronism_detection:
+        deps.analysis_progress_storage[project_id]["current_action"] = (
+            "Detectando anacronismos..."
+        )
+        try:
+            from narrative_assistant.temporal.anachronisms import AnachronismDetector
+
+            anach_detector = AnachronismDetector()
+            anachronism_report = anach_detector.detect(full_text)
+            if anachronism_report and anachronism_report.anachronisms:
+                logger.info(
+                    f"Anachronism detection: "
+                    f"{len(anachronism_report.anachronisms)} anachronisms found"
+                )
+            else:
+                logger.info(
+                    "Anachronism detection: no anachronisms found "
+                    "(period may not be detected)"
+                )
+        except ImportError as e:
+            logger.warning(f"Anachronism detection module not available: {e}")
+        except Exception as e:
+            logger.warning(f"Error in anachronism detection: {e}", exc_info=True)
+
+        tracker.check_cancelled()
+
+    # Sub-fase 5.6: Español clásico
+    classical_normalization = None
+    if analysis_config.run_classical_spanish:
+        deps.analysis_progress_storage[project_id]["current_action"] = (
+            "Detectando español clásico..."
+        )
+        try:
+            from narrative_assistant.nlp.classical_spanish import ClassicalSpanishNormalizer
+
+            normalizer = ClassicalSpanishNormalizer()
+            period = normalizer.detect_period(full_text)
+            if period != "modern":
+                classical_normalization = normalizer.normalize(full_text)
+                logger.info(
+                    f"Classical Spanish: period={period}, "
+                    f"{len(classical_normalization.replacements)} normalizations"
+                )
+            else:
+                logger.debug("Classical Spanish: modern text, skipping normalization")
+        except ImportError as e:
+            logger.warning(f"Classical Spanish module not available: {e}")
+        except Exception as e:
+            logger.warning(f"Error in classical Spanish detection: {e}", exc_info=True)
+
+        tracker.check_cancelled()
+
+    # Guardar métricas
+    deps.analysis_progress_storage[project_id]["metrics"]["vital_status_deaths"] = (
+        len(vital_status_report.death_events) if vital_status_report else 0
+    )
+    deps.analysis_progress_storage[project_id]["metrics"]["location_events"] = (
+        len(location_report.location_events) if location_report else 0
+    )
+    deps.analysis_progress_storage[project_id]["metrics"]["ooc_events"] = (
+        len(ooc_report.events) if ooc_report else 0
+    )
+    deps.analysis_progress_storage[project_id]["metrics"]["anachronisms_found"] = (
+        len(anachronism_report.anachronisms)
+        if anachronism_report and anachronism_report.anachronisms
+        else 0
+    )
+
+    tracker.end_phase("consistency", 6)
+    deps.analysis_progress_storage[project_id]["metrics"]["inconsistencies_found"] = len(
+        inconsistencies
+    )
+    logger.info(f"Consistency analysis complete: {len(inconsistencies)} inconsistencies")
+
+    ctx["inconsistencies"] = inconsistencies
+    ctx["vital_status_report"] = vital_status_report
+    ctx["location_report"] = location_report
+    ctx["chapter_progress_report"] = chapter_progress_report
+    ctx["ooc_report"] = ooc_report
+    ctx["anachronism_report"] = anachronism_report
+    ctx["classical_normalization"] = classical_normalization
+
+
+# ============================================================================
+# Phase 7: Grammar
+# ============================================================================
+
+def run_grammar(ctx: dict, tracker: ProgressTracker):
+    """Fase 7: Análisis gramatical y correcciones editoriales."""
+    project_id = ctx["project_id"]
+    full_text = ctx["full_text"]
+    project = ctx["project"]
+
+    tracker.start_phase("grammar", 7, "Revisando la redacción...")
+
+    grammar_issues = []
+    spelling_issues = []
+    try:
+        from narrative_assistant.nlp.grammar import (
+            get_grammar_checker,
+            ensure_languagetool_running,
+            is_languagetool_installed,
+        )
+
+        if is_languagetool_installed():
+            lt_started = ensure_languagetool_running()
+            if lt_started:
+                logger.info("LanguageTool server started successfully")
+
+        grammar_checker = get_grammar_checker()
+
+        if not grammar_checker.languagetool_available:
+            grammar_checker.reload_languagetool()
+            if grammar_checker.languagetool_available:
+                logger.info("LanguageTool now available after reload")
+
+        grammar_result = grammar_checker.check(full_text)
+
+        if grammar_result.is_success:
+            grammar_report = grammar_result.value
+            grammar_issues = grammar_report.issues
+            logger.info(f"Grammar check found {len(grammar_issues)} issues")
+        else:
+            logger.warning(f"Grammar check failed: {grammar_result.error}")
+
+    except ImportError as e:
+        logger.warning(f"Grammar module not available: {e}")
+    except Exception as e:
+        logger.warning(f"Error in grammar analysis: {e}")
+
+    # Correcciones editoriales
+    correction_issues = []
+    try:
+        deps.analysis_progress_storage[project_id]["current_phase"] = (
+            "Buscando repeticiones y errores tipográficos..."
+        )
+
+        from narrative_assistant.corrections import CorrectionConfig
+        from narrative_assistant.corrections.orchestrator import CorrectionOrchestrator
+
+        correction_config = CorrectionConfig.default()
+        try:
+            project_settings = project.settings or {}
+            cc = project_settings.get("correction_config", {})
+            dialog_cfg = cc.get("dialog", {})
+            dash_val = dialog_cfg.get("spoken_dialogue_dash", "")
+            dash_map = {"em_dash": "em", "en_dash": "en", "hyphen": "hyphen"}
+            if dash_val in dash_map:
+                correction_config.typography.dialogue_dash = dash_map[dash_val]
+            quote_val = dialog_cfg.get("nested_dialogue_quote", "")
+            quote_map = {"angular": "angular", "double": "curly", "single": "straight"}
+            if quote_val in quote_map:
+                correction_config.typography.quote_style = quote_map[quote_val]
+        except Exception as cfg_err:
+            logger.debug(f"Could not load project correction config: {cfg_err}")
+
+        orchestrator = CorrectionOrchestrator(config=correction_config)
+
+        correction_issues = orchestrator.analyze(
+            text=full_text,
+            chapter_index=None,
+            spacy_doc=None,
+        )
+
+        logger.info(f"Corrections analysis found {len(correction_issues)} suggestions")
+
+    except ImportError as e:
+        logger.warning(f"Corrections module not available: {e}")
+    except Exception as e:
+        logger.warning(f"Error in corrections analysis: {e}")
+
+    tracker.end_phase("grammar", 7)
+    deps.analysis_progress_storage[project_id]["metrics"]["grammar_issues_found"] = len(
+        grammar_issues
+    )
+    deps.analysis_progress_storage[project_id]["metrics"]["correction_suggestions"] = len(
+        correction_issues
+    )
+    logger.info(
+        f"Grammar analysis complete: {len(grammar_issues)} grammar issues, "
+        f"{len(correction_issues)} correction suggestions"
+    )
+
+    ctx["grammar_issues"] = grammar_issues
+    ctx["spelling_issues"] = spelling_issues
+    ctx["correction_issues"] = correction_issues
+
+
+# ============================================================================
+# Phase 8: Alerts
+# ============================================================================
+
+def run_alerts(ctx: dict, tracker: ProgressTracker):
+    """Fase 8: Creación de alertas a partir de todos los hallazgos."""
+    from narrative_assistant.alerts.engine import get_alert_engine, AlertCategory, AlertSeverity
+
+    project_id = ctx["project_id"]
+    inconsistencies = ctx.get("inconsistencies", [])
+    grammar_issues = ctx.get("grammar_issues", [])
+    correction_issues = ctx.get("correction_issues", [])
+    vital_status_report = ctx.get("vital_status_report")
+    location_report = ctx.get("location_report")
+    ooc_report = ctx.get("ooc_report")
+    anachronism_report = ctx.get("anachronism_report")
+
+    tracker.start_phase("alerts", 8, "Preparando observaciones y sugerencias...")
+
+    alerts_created = 0
+    alert_engine = get_alert_engine()
+
+    # Alertas de inconsistencias de atributos
+    if inconsistencies:
+        for inc in inconsistencies:
+            try:
+                alert_result = alert_engine.create_from_attribute_inconsistency(
+                    project_id=project_id,
+                    entity_name=inc.entity_name,
+                    entity_id=inc.entity_id,
+                    attribute_key=(
+                        inc.attribute_key.value
+                        if hasattr(inc.attribute_key, "value")
+                        else str(inc.attribute_key)
+                    ),
+                    value1=inc.value1,
+                    value2=inc.value2,
+                    value1_source={
+                        "chapter": inc.value1_chapter,
+                        "excerpt": inc.value1_excerpt,
+                        "start_char": inc.value1_position,
+                    },
+                    value2_source={
+                        "chapter": inc.value2_chapter,
+                        "excerpt": inc.value2_excerpt,
+                        "start_char": inc.value2_position,
+                    },
+                    explanation=inc.explanation,
+                    confidence=inc.confidence,
+                )
+                if alert_result.is_success:
+                    alerts_created += 1
+            except Exception as e:
+                logger.warning(f"Error creating attribute inconsistency alert: {e}")
+
+    # Alertas de errores gramaticales
+    if grammar_issues:
+        for issue in grammar_issues:
+            try:
+                alert_result = alert_engine.create_from_grammar_issue(
+                    project_id=project_id,
+                    text=issue.text,
+                    start_char=issue.start_char,
+                    end_char=issue.end_char,
+                    sentence=issue.sentence,
+                    error_type=(
+                        issue.error_type.value
+                        if hasattr(issue.error_type, "value")
+                        else str(issue.error_type)
+                    ),
+                    suggestion=issue.suggestion,
+                    confidence=issue.confidence,
+                    explanation=issue.explanation,
+                    rule_id=issue.rule_id if hasattr(issue, "rule_id") else "",
+                )
+                if alert_result.is_success:
+                    alerts_created += 1
+            except Exception as e:
+                logger.warning(f"Error creating grammar alert: {e}")
+
+    # Alertas de correcciones editoriales
+    if correction_issues:
+        for issue in correction_issues:
+            try:
+                alert_result = alert_engine.create_from_correction_issue(
+                    project_id=project_id,
+                    category=issue.category,
+                    issue_type=issue.issue_type,
+                    text=issue.text,
+                    start_char=issue.start_char,
+                    end_char=issue.end_char,
+                    explanation=issue.explanation,
+                    suggestion=issue.suggestion,
+                    confidence=issue.confidence,
+                    context=issue.context,
+                    chapter=issue.chapter_index,
+                    rule_id=issue.rule_id or "",
+                    extra_data=issue.extra_data,
+                )
+                if alert_result.is_success:
+                    alerts_created += 1
+            except Exception as e:
+                logger.warning(f"Error creating correction alert: {e}")
+
+    # Alertas de estado vital
+    if vital_status_report and hasattr(vital_status_report, "post_mortem_appearances"):
+        for appearance in vital_status_report.post_mortem_appearances:
+            if appearance.is_valid:
+                continue
+            try:
+                alert_result = alert_engine.create_from_deceased_reappearance(
+                    project_id=project_id,
+                    entity_id=appearance.entity_id,
+                    entity_name=appearance.entity_name,
+                    death_chapter=appearance.death_chapter,
+                    appearance_chapter=appearance.appearance_chapter,
+                    appearance_start_char=appearance.appearance_start_char,
+                    appearance_end_char=appearance.appearance_end_char,
+                    appearance_excerpt=appearance.appearance_excerpt,
+                    appearance_type=appearance.appearance_type,
+                    confidence=appearance.confidence,
+                )
+                if alert_result.is_success:
+                    alerts_created += 1
+            except Exception as e:
+                logger.warning(f"Error creating deceased reappearance alert: {e}")
+
+    # Alertas de inconsistencias de ubicación
+    if location_report and hasattr(location_report, "inconsistencies"):
+        for loc_inc in location_report.inconsistencies:
+            try:
+                alert_result = alert_engine.create_alert(
+                    project_id=project_id,
+                    category=AlertCategory.CONSISTENCY,
+                    severity=AlertSeverity.WARNING,
+                    alert_type="location_inconsistency",
+                    title=f"Inconsistencia de ubicación: {loc_inc.entity_name}",
+                    description=(
+                        f"{loc_inc.entity_name} aparece en {loc_inc.location1_name} "
+                        f"(cap {loc_inc.location1_chapter}) "
+                        f"y en {loc_inc.location2_name} "
+                        f"(cap {loc_inc.location2_chapter})"
+                    ),
+                    explanation=loc_inc.explanation,
+                    confidence=loc_inc.confidence,
+                )
+                if alert_result.is_success:
+                    alerts_created += 1
+            except Exception as e:
+                logger.warning(f"Error creating location inconsistency alert: {e}")
+
+    # Alertas OOC
+    if ooc_report and hasattr(ooc_report, "events"):
+        for event in ooc_report.events:
+            try:
+                severity = (
+                    AlertSeverity.WARNING
+                    if event.severity.value == "high"
+                    else AlertSeverity.INFO
+                )
+                alert_result = alert_engine.create_alert(
+                    project_id=project_id,
+                    category=AlertCategory.CONSISTENCY,
+                    severity=severity,
+                    alert_type="out_of_character",
+                    title=f"Comportamiento atípico: {event.character_name}",
+                    description=event.description,
+                    explanation=event.explanation,
+                    confidence=event.confidence,
+                    chapter=(
+                        event.chapter_number
+                        if hasattr(event, "chapter_number")
+                        else None
+                    ),
+                )
+                if alert_result.is_success:
+                    alerts_created += 1
+            except Exception as e:
+                logger.warning(f"Error creating OOC alert: {e}")
+
+    # Alertas de anacronismos
+    if anachronism_report and anachronism_report.anachronisms:
+        for anach in anachronism_report.anachronisms:
+            try:
+                alert_result = alert_engine.create_alert(
+                    project_id=project_id,
+                    category=AlertCategory.TIMELINE_ISSUE,
+                    severity=AlertSeverity.WARNING,
+                    alert_type="anachronism",
+                    title=f"Posible anacronismo: {anach.term}",
+                    description=(
+                        f"'{anach.term}' aparece en un contexto temporal donde no existía "
+                        f"({anach.expected_period})"
+                    ),
+                    explanation=anach.explanation,
+                    confidence=anach.confidence,
+                )
+                if alert_result.is_success:
+                    alerts_created += 1
+            except Exception as e:
+                logger.warning(f"Error creating anachronism alert: {e}")
+
+    tracker.end_phase("alerts", 8)
+    deps.analysis_progress_storage[project_id]["metrics"]["alerts_generated"] = alerts_created
+    logger.info(f"Alerts phase complete: {alerts_created} alerts created")
+
+    ctx["alerts_created"] = alerts_created
+
+
+# ============================================================================
+# Reconciliation + Completion
+# ============================================================================
+
+def run_reconciliation(ctx: dict, tracker: ProgressTracker):
+    """Reconciliación final de contadores de menciones."""
+    from narrative_assistant.entities.repository import get_entity_repository
+
+    project_id = ctx["project_id"]
+
+    try:
+        entity_repo = get_entity_repository()
+        reconciled_count = entity_repo.reconcile_all_mention_counts(project_id)
+        logger.info(f"Reconciliación final: {reconciled_count} entidades sincronizadas")
+    except Exception as recon_err:
+        logger.warning(f"Error en reconciliación final de mention_count: {recon_err}")
+
+
+def run_completion(ctx: dict, tracker: ProgressTracker):
+    """Marca el análisis como completado y actualiza el proyecto."""
+    from narrative_assistant.persistence.project import ProjectManager
+
+    project_id = ctx["project_id"]
+    project = ctx["project"]
+    entities = ctx.get("entities", [])
+    attributes = ctx.get("attributes", [])
+    alerts_created = ctx.get("alerts_created", 0)
+    word_count = ctx["word_count"]
+    chapters_count = ctx["chapters_count"]
+    start_time = ctx["start_time"]
+
+    deps.analysis_progress_storage[project_id]["status"] = "completed"
+    deps.analysis_progress_storage[project_id]["current_phase"] = "Análisis completado"
+    deps.analysis_progress_storage[project_id]["estimated_seconds_remaining"] = 0
+
+    total_duration = round(time.time() - start_time, 1)
+    deps.analysis_progress_storage[project_id]["metrics"]["total_duration_seconds"] = (
+        total_duration
+    )
+
+    metrics = deps.analysis_progress_storage[project_id]["metrics"]
+    deps.analysis_progress_storage[project_id]["stats"] = {
+        "entities": metrics.get("entities_found", len(entities)),
+        "alerts": metrics.get("alerts_generated", alerts_created),
+        "chapters": metrics.get("chapters_found", chapters_count),
+        "corrections": metrics.get("correction_suggestions", 0),
+        "grammar": metrics.get("grammar_issues_found", 0),
+        "attributes": metrics.get("attributes_extracted", len(attributes)),
+        "words": metrics.get("word_count", word_count),
+        "duration": total_duration,
+    }
+
+    project.analysis_status = "completed"
+    project.analysis_progress = 1.0
+    project.word_count = word_count
+    project.chapter_count = chapters_count
+
+    proj_manager = ProjectManager(ctx["db_session"])
+    proj_manager.update(project)
+
+    logger.info(f"Analysis completed for project {project_id} in {total_duration}s")
+    logger.info(
+        f"Results: {word_count} words, {chapters_count} chapters, "
+        f"{len(entities)} entities, {alerts_created} alerts"
+    )
+
+
+# ============================================================================
+# Error handling
+# ============================================================================
+
+def handle_analysis_error(ctx: dict, error: Exception):
+    """Maneja errores durante el análisis."""
+    from narrative_assistant.core.errors import ModelNotLoadedError
+    from narrative_assistant.persistence.project import ProjectManager
+
+    project_id = ctx["project_id"]
+    project = ctx["project"]
+
+    logger.exception(f"Error during analysis for project {project_id}: {error}")
+    deps.analysis_progress_storage[project_id]["status"] = "error"
+
+    err_str = str(error)
+    if (
+        isinstance(error, ModelNotLoadedError)
+        or "not loaded" in err_str.lower()
+        or "not found" in err_str.lower()
+    ):
+        user_msg = (
+            "Modelo de análisis no disponible. "
+            "Reinicia la aplicación para que se descarguen los modelos necesarios."
+        )
+    else:
+        user_msg = f"Error en el análisis: {err_str}"
+
+    deps.analysis_progress_storage[project_id]["current_phase"] = user_msg
+    deps.analysis_progress_storage[project_id]["error"] = user_msg
+
+    try:
+        project.analysis_status = "error"
+        proj_manager = ProjectManager(ctx["db_session"])
+        proj_manager.update(project)
+    except Exception as db_error:
+        logger.error(f"Failed to update project status to error: {db_error}")
+
+
+# ============================================================================
+# Finally block: cleanup + queue management
+# ============================================================================
+
+def run_finally_cleanup(ctx: dict):
+    """Limpieza final: archivo temporal, slot pesado, cola."""
+    project_id = ctx["project_id"]
+    queued_for_heavy = ctx.get("queued_for_heavy", False)
+
+    if queued_for_heavy:
+        return
+
+    # Limpiar archivo temporal
+    tmp_path = ctx.get("tmp_path")
+    use_temp_file = ctx.get("use_temp_file", False)
+    if use_temp_file and tmp_path and tmp_path.exists():
+        try:
+            tmp_path.unlink()
+        except Exception:
+            pass
+
+    # Liberar slot pesado y comprobar cola
+    next_heavy = None
+    with deps._progress_lock:
+        if deps._heavy_analysis_project_id == project_id:
+            deps._heavy_analysis_project_id = None
+        if deps._heavy_analysis_queue:
+            next_heavy = deps._heavy_analysis_queue.pop(0)
+
+    # Limpiar progreso después de delay
+    def _cleanup_progress(pid: int):
+        with deps._progress_lock:
+            stored = deps.analysis_progress_storage.get(pid)
+            if stored and stored.get("status") in (
+                "completed", "error", "failed", "cancelled"
+            ):
+                deps.analysis_progress_storage.pop(pid, None)
+
+    cleanup_timer = threading.Timer(300, _cleanup_progress, args=[project_id])
+    cleanup_timer.daemon = True
+    cleanup_timer.start()
+
+    # Auto-iniciar siguiente proyecto de la cola pesada
+    if next_heavy:
+        from routers.analysis import _start_queued_analysis
+        _start_queued_analysis(next_heavy)

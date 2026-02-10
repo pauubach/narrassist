@@ -34,11 +34,6 @@ pub mod view_menu {
 /// IDs del menu Analisis
 pub mod analysis_menu {
     pub const RUN: &str = "run_analysis";
-    pub const PAUSE: &str = "pause_analysis";
-    pub const STRUCTURE: &str = "analyze_structure";
-    pub const ENTITIES: &str = "analyze_entities";
-    pub const CONSISTENCY: &str = "analyze_consistency";
-    pub const STYLE: &str = "analyze_style";
 }
 
 /// IDs del menu Ayuda
@@ -68,11 +63,6 @@ const ALL_MENU_IDS: &[&str] = &[
     view_menu::TOGGLE_INSPECTOR,
     view_menu::TOGGLE_SIDEBAR,
     analysis_menu::RUN,
-    analysis_menu::PAUSE,
-    analysis_menu::STRUCTURE,
-    analysis_menu::ENTITIES,
-    analysis_menu::CONSISTENCY,
-    analysis_menu::STYLE,
     help_menu::TUTORIAL,
     help_menu::KEYBOARD_SHORTCUTS,
     help_menu::USER_GUIDE,
@@ -240,55 +230,12 @@ pub fn create_menu(app: &AppHandle) -> Result<Menu<Wry>, tauri::Error> {
         true,
         Some("CmdOrCtrl+R"),
     )?;
-    let pause_analysis = MenuItem::with_id(
-        app,
-        analysis_menu::PAUSE,
-        "Pausar analisis",
-        true,
-        None::<&str>,
-    )?;
-    let separator7 = PredefinedMenuItem::separator(app)?;
-    let analyze_structure = MenuItem::with_id(
-        app,
-        analysis_menu::STRUCTURE,
-        "Analizar estructura",
-        true,
-        None::<&str>,
-    )?;
-    let analyze_entities = MenuItem::with_id(
-        app,
-        analysis_menu::ENTITIES,
-        "Analizar entidades",
-        true,
-        None::<&str>,
-    )?;
-    let analyze_consistency = MenuItem::with_id(
-        app,
-        analysis_menu::CONSISTENCY,
-        "Analizar consistencia",
-        true,
-        None::<&str>,
-    )?;
-    let analyze_style = MenuItem::with_id(
-        app,
-        analysis_menu::STYLE,
-        "Analizar estilo",
-        true,
-        None::<&str>,
-    )?;
-
     let analysis_submenu = Submenu::with_items(
         app,
         "Analisis",
         true,
         &[
             &run_analysis,
-            &pause_analysis,
-            &separator7,
-            &analyze_structure,
-            &analyze_entities,
-            &analyze_consistency,
-            &analyze_style,
         ],
     )?;
 
@@ -432,10 +379,10 @@ mod tests {
     /// (para detectar si se anade un item sin actualizar ALL_MENU_IDS)
     #[test]
     fn menu_ids_count_matches_expected() {
-        // 6 archivo + 7 ver + 6 analisis + 6 ayuda = 25
+        // 6 archivo + 7 ver + 1 analisis + 6 ayuda = 20
         assert_eq!(
             ALL_MENU_IDS.len(),
-            25,
+            20,
             "Se cambio el numero de items de menu. Actualizar ALL_MENU_IDS y este test."
         );
     }
@@ -461,11 +408,6 @@ mod tests {
             "toggle_inspector",
             "toggle_sidebar",
             "run_analysis",
-            "pause_analysis",
-            "analyze_structure",
-            "analyze_entities",
-            "analyze_consistency",
-            "analyze_style",
             "tutorial",
             "keyboard_shortcuts",
             "user_guide",
@@ -508,11 +450,6 @@ mod tests {
     #[test]
     fn analysis_menu_ids_correct() {
         assert_eq!(analysis_menu::RUN, "run_analysis");
-        assert_eq!(analysis_menu::PAUSE, "pause_analysis");
-        assert_eq!(analysis_menu::STRUCTURE, "analyze_structure");
-        assert_eq!(analysis_menu::ENTITIES, "analyze_entities");
-        assert_eq!(analysis_menu::CONSISTENCY, "analyze_consistency");
-        assert_eq!(analysis_menu::STYLE, "analyze_style");
     }
 
     #[test]

@@ -42,7 +42,6 @@ interface MenuEventHandlers {
   onToggleInspector?: () => void
   onToggleSidebar?: () => void
   onRunAnalysis?: () => void
-  onPauseAnalysis?: () => void
   onTutorial?: () => void
   onKeyboardShortcuts?: () => void
   onAbout?: () => void
@@ -141,17 +140,6 @@ export function useNativeMenu(handlers: MenuEventHandlers = {}) {
       // Analisis
       case 'run_analysis':
         invoke('run_analysis', handlers.onRunAnalysis)
-        break
-
-      case 'pause_analysis':
-        invoke('pause_analysis', handlers.onPauseAnalysis)
-        break
-
-      case 'analyze_structure':
-      case 'analyze_entities':
-      case 'analyze_consistency':
-      case 'analyze_style':
-        invoke(eventId, handlers.onRunAnalysis)
         break
 
       // Ayuda

@@ -509,6 +509,7 @@ class EntityRepository:
         attribute_value: str,
         confidence: float = 1.0,
         source_mention_id: int | None = None,
+        chapter_id: int | None = None,
     ) -> int:
         """
         Crea un nuevo atributo para una entidad.
@@ -520,6 +521,7 @@ class EntityRepository:
             attribute_value: Valor del atributo
             confidence: Confianza de la extracción (0.0-1.0)
             source_mention_id: ID de la mención de origen (opcional)
+            chapter_id: Capítulo donde se detectó el atributo (opcional, S8a-06)
 
         Returns:
             ID del atributo creado
@@ -527,8 +529,8 @@ class EntityRepository:
         sql = """
             INSERT INTO entity_attributes (
                 entity_id, attribute_type, attribute_key, attribute_value,
-                confidence, source_mention_id, is_verified
-            ) VALUES (?, ?, ?, ?, ?, ?, 0)
+                confidence, source_mention_id, chapter_id, is_verified
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, 0)
         """
 
         with self.db.connection() as conn:
@@ -541,6 +543,7 @@ class EntityRepository:
                     attribute_value,
                     confidence,
                     source_mention_id,
+                    chapter_id,
                 ),
             )
             attribute_id = cursor.lastrowid

@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 _database_lock = threading.Lock()
 
 # Versión del schema actual
-SCHEMA_VERSION = 14
+SCHEMA_VERSION = 15
 
 # Tablas esenciales que deben existir para una BD válida
 # Solo incluir las tablas básicas definidas en SCHEMA_SQL
@@ -168,6 +168,7 @@ CREATE TABLE IF NOT EXISTS entity_attributes (
     attribute_key TEXT NOT NULL,
     attribute_value TEXT NOT NULL,
     source_mention_id INTEGER,
+    chapter_id INTEGER,                  -- S8a-06: capítulo donde se detectó el atributo
     confidence REAL DEFAULT 1.0,
     is_verified INTEGER DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -591,6 +592,76 @@ CREATE TABLE IF NOT EXISTS voice_profiles (
 
 CREATE INDEX IF NOT EXISTS idx_voice_profiles_project ON voice_profiles(project_id);
 CREATE INDEX IF NOT EXISTS idx_voice_profiles_entity ON voice_profiles(entity_id);
+
+-- Eventos de estado vital: muertes y apariciones post-mortem (S8a-03)
+CREATE TABLE IF NOT EXISTS vital_status_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    entity_id INTEGER NOT NULL,
+    entity_name TEXT NOT NULL,
+    event_type TEXT NOT NULL,             -- 'death' | 'post_mortem_appearance'
+    chapter INTEGER NOT NULL,
+    start_char INTEGER,
+    end_char INTEGER,
+    excerpt TEXT,
+    confidence REAL DEFAULT 0.5,
+    -- Campos específicos de muerte
+    death_type TEXT,                      -- 'direct', 'narrated', 'reported', 'implied'
+    -- Campos específicos de aparición post-mortem
+    death_chapter INTEGER,               -- En qué capítulo murió (para post_mortem)
+    appearance_type TEXT,                 -- 'dialogue', 'action', 'narration'
+    is_valid INTEGER DEFAULT 0,          -- 1 si es flashback/recuerdo válido
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    FOREIGN KEY (entity_id) REFERENCES entities(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_vital_status_project ON vital_status_events(project_id);
+CREATE INDEX IF NOT EXISTS idx_vital_status_entity ON vital_status_events(entity_id);
+
+-- Eventos de ubicación de personajes (S8a-04)
+CREATE TABLE IF NOT EXISTS character_location_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    entity_id INTEGER NOT NULL,
+    entity_name TEXT NOT NULL,
+    location_name TEXT NOT NULL,
+    chapter INTEGER NOT NULL,
+    start_char INTEGER,
+    end_char INTEGER,
+    excerpt TEXT,
+    change_type TEXT NOT NULL,            -- 'arrival', 'departure', 'presence', 'implied'
+    confidence REAL DEFAULT 0.5,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    FOREIGN KEY (entity_id) REFERENCES entities(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_char_location_project ON character_location_events(project_id);
+CREATE INDEX IF NOT EXISTS idx_char_location_entity ON character_location_events(entity_id);
+
+-- Eventos out-of-character (S8a-05)
+CREATE TABLE IF NOT EXISTS ooc_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    entity_id INTEGER NOT NULL,
+    entity_name TEXT NOT NULL,
+    deviation_type TEXT NOT NULL,         -- 'register', 'formality', 'vocabulary', etc.
+    severity TEXT NOT NULL,               -- 'low', 'medium', 'high'
+    description TEXT,
+    expected TEXT,
+    actual TEXT,
+    chapter INTEGER,
+    excerpt TEXT,
+    confidence REAL DEFAULT 0.5,
+    is_intentional INTEGER DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    FOREIGN KEY (entity_id) REFERENCES entities(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_ooc_events_project ON ooc_events(project_id);
+CREATE INDEX IF NOT EXISTS idx_ooc_events_entity ON ooc_events(entity_id);
 
 -- ===================================================================
 -- NUEVAS TABLAS: Sistema híbrido de filtros de entidades (versión 7)

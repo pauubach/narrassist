@@ -802,6 +802,243 @@ pip install transformers
 | S7d-12 | "Restaurar valores por defecto" en Settings | DONE | Boton "Restaurar todo" en CorrectionConfigModal |
 | S7d-13 | Fix copy: "Heredado"→"Por defecto", tildes | PENDIENTE | "Heredado" en CorrectionConfigModal + InheritanceIndicator |
 
+### Sprint 8a: Pipeline Enrichment + Persistencia (8-12 dias)
+
+> **Objetivo**: Que TODOS los tabs tengan datos al completar el analisis. Sin esperas on-the-fly.
+>
+> **Contexto**: Actualmente la pipeline (fases 1-9) persiste entidades, alertas, capitulos y atributos.
+> Pero ~25 analisis (relaciones, voz, prosa, salud narrativa...) se computan on-the-fly cuando el
+> usuario abre un tab (1-30s de espera cada uno). Ademas, la pipeline computa datos que luego
+> descarta (vital status, locations, OOC, chapter metrics).
+>
+> **Solucion**: Extender la pipeline con 4 fases de enrichment (10-13) que pre-computan y persisten
+> todos los analisis derivados. El usuario puede navegar desde la fase 3 (estructura lista).
+> Los tabs se "iluminan" progresivamente con badges conforme cada fase los habilita.
+>
+> **Prerrequisito arquitectonico**: Antes de anadir fases 10-13, extraer cada fase del monolito
+> `run_real_analysis()` (actualmente ~2300 lineas) a funciones standalone. Sin esto, el monolito
+> creceria a ~3000+ lineas y seria inmantenible.
+>
+> **Concurrencia**: Las fases de enrichment (10-13) NO necesitan GPU ni modelos pesados (solo leen
+> de BD + computan en CPU). Por tanto pueden ejecutarse fuera del heavy analysis slot, liberandolo
+> para el siguiente proyecto en cola. Implementar un tercer tier "enrichment" que no bloquea.
+
+#### Nuevas fases de pipeline
+
+| Fase | ID | Nombre UI | Peso | Tiempo est. | Persiste |
+|------|-----|-----------|------|-------------|---------|
+| 10 | `relationships` | Analizando relaciones | 0.08 | ~8s | network, timeline, profiles, locations |
+| 11 | `voice` | Perfilando voces | 0.08 | ~10s | voice_profiles, deviations |
+| 12 | `prose` | Evaluando escritura | 0.08 | ~10s | echoes, pacing, readability, sensory, sticky, energy |
+| 13 | `health` | Salud narrativa | 0.06 | ~8s | health scores, emotional arcs, templates |
+
+> Fases 10-13 comparten resultados intermedios (dialogos extraidos 1 vez → voice + emotional +
+> dialogue_validation). Reduccion estimada: -30-40% vs computar por separado.
+
+#### Pesos recalculados (13 fases)
+
+```
+parsing: 0.01, classification: 0.01, structure: 0.01,      # 3% - lightweight
+ner: 0.31, fusion: 0.15, attributes: 0.08,                  # 54% - heavy NLP
+consistency: 0.03, grammar: 0.06, alerts: 0.04,             # 13% - medium
+relationships: 0.08, voice: 0.08, prose: 0.08, health: 0.06 # 30% - enrichment
+```
+
+#### Disponibilidad progresiva de tabs
+
+| Fase completada | % | Tabs que se activan |
+|-----------------|---|---------------------|
+| 3. Estructura | 3% | Texto, Glosario, Focalizacion (declaraciones) |
+| 5. Fusion | 50% | Entidades |
+| 6. Atributos | 58% | Entidades (enriquecido con atributos) |
+| 9. Alertas | 71% | Alertas |
+| 10. Relaciones | 79% | Red de personajes, Cronologia, Perfiles, Ubicaciones |
+| 11. Voz | 87% | Perfiles de voz, Desviaciones |
+| 12. Escritura | 95% | Ecos, Ritmo, Legibilidad, Sensorial, Duplicados |
+| 13. Salud | 100% | Salud narrativa, Emocional, Plantillas |
+
+#### Tareas
+
+| ID | Accion | Estado | Detalle |
+|----|--------|--------|---------|
+| S8a-01 | Auto-load tabs que no auto-cargan | DONE | SensoryReportTab: onMounted + watch con auto-analyze. PacingAnalysisTab y RegisterAnalysisTab ya tenian onMounted |
+| S8a-02 | Persistir chapter metrics en pipeline | DONE | Añadido en run_structure() de _analysis_phases.py: compute_chapter_metrics() → update_metrics() para cada capitulo |
+| S8a-03 | Persistir vital status en pipeline | DONE | Tabla vital_status_events (schema v15), persist en run_consistency(), cleanup en run_cleanup(). Nota: detección basada en orden de capítulos, no consulta timeline temporal |
+| S8a-04 | Persistir character locations en pipeline | DONE | Tabla character_location_events, persist en run_consistency(), cleanup en run_cleanup() |
+| S8a-05 | Persistir OOC events en pipeline | DONE | Tabla ooc_events, persist en run_consistency(), cleanup en run_cleanup() |
+| S8a-06 | Anadir chapter_id a entity_attributes | DONE | Columna chapter_id en schema, create_attribute() actualizado, pipeline pasa chapter_id |
+| S8a-07 | Fase 10: Relationships enrichment | PENDIENTE | Mover logica de /relationships, /character-network, /character-timeline a pipeline |
+| S8a-08 | Fase 11: Voice enrichment | PENDIENTE | Mover logica de /voice-profiles, /voice-deviations a pipeline |
+| S8a-09 | Fase 12: Prose enrichment | PENDIENTE | Mover logica de sticky, echo, pacing, sensory, readability, energy a pipeline |
+| S8a-10 | Fase 13: Health enrichment | PENDIENTE | Mover logica de /narrative-health, /emotional-analysis, /narrative-templates a pipeline |
+| S8a-11 | Tabla enrichment_cache en BD | PENDIENTE | CREATE TABLE enrichment_cache (project_id, type, entity_scope, input_hash, output_hash, status, result, revision, updated_at); status: pending/computing/completed/failed/stale. Canonicalizar floats (sorted keys, round 6 decimals) para estabilidad de hashes |
+| S8a-12 | Actualizar progress phases (9 → 13) | PENDIENTE | analysis.py: phase_weights, phase_order, phases[], base_times_per_phase |
+| S8a-13 | Endpoints GET leen de cache/BD en vez de computar | PENDIENTE | Cada endpoint: si enrichment_cache tiene datos frescos, retornar; si no, computar |
+| S8a-14 | Extraer fases a funciones standalone | DONE | Refactor: 2180-line monolith → 23 funciones en _analysis_phases.py (2515 lineas). analysis.py reducido de 2813 a 644 lineas. ProgressTracker class. 1430 tests pass. |
+| S8a-15 | Tercer tier: enrichment fuera del heavy slot | PENDIENTE | Fases 10-13 no necesitan GPU → ejecutar fuera de _heavy_analysis_project_id, liberandolo para siguiente proyecto en cola |
+| S8a-16 | Limpiar enrichment_cache en re-analisis | PENDIENTE | En cleanup_before_reanalysis(): DELETE FROM enrichment_cache WHERE project_id=? junto con el resto de limpieza |
+| S8a-17 | Proteccion contra mutaciones durante enrichment | PENDIENTE | Si usuario hace merge/reject mientras fase 10-13 corre: capturar revision al inicio de fase, comparar al final, re-ejecutar si cambio |
+| S8a-18 | Watchdog/timeout en heavy analysis slot | PENDIENTE | Si _heavy_analysis_project_id lleva >30min sin progreso, liberar slot automaticamente con log de error |
+
+### Sprint 8b: Tab Badges + Empty States (3-5 dias)
+
+> **Objetivo**: Indicar visualmente el estado de cada tab con badges semanticos.
+>
+> **Patrones UX aplicados**: Material Design 3 (badges en tabs), Carbon (regla de 3 canales:
+> icono + color + texto), Apple HIG (mostrar contenido inmediatamente), NN/g (nunca ocultar tabs).
+>
+> **Anti-patrones evitados**: No deshabilitar tabs (Friedman/Smashing), no empty states sin
+> contexto (Eleken), no spinners >10s (NN/g), no ocultar tabs (Friedman).
+>
+> **Decision de diseno (revision post-auditoria)**: Los badges grises informativos (Entidades: 42)
+> aportan poco valor y generan "badge blindness". Solo usar badges accionables (naranja) para
+> alertas pendientes. El resto de tabs comunican su estado via contenido interior + empty states.
+
+#### Badges (solo accionables)
+
+| Tipo | Color PrimeVue | Semantica | Tabs |
+|------|---------------|-----------|------|
+| **Accionable** | `severity="warning"` (naranja) | "N observaciones pendientes" | Alertas |
+| **Todo resuelto** | `severity="success"` (verde) | "Todo resuelto" | Alertas (cuando count = 0) |
+| **Error** | `severity="danger"` (rojo dot) | "Fallo en analisis" | Cualquier tab cuya fase fallo |
+
+#### Estados por tab
+
+| Estado | Badge | Contenido interior |
+|--------|-------|-------------------|
+| Sin datos (analisis no ha llegado) | Sin badge | Empty state amigable: "Estamos leyendo tu manuscrito..." / "Analizando personajes..." |
+| Procesando | Dot animado (sutil) | Skeleton o spinner inline + mensaje orientado a actividad |
+| Listo | Sin badge (excepto Alertas) | Contenido completo |
+| Alertas pendientes | Badge numerico naranja | Contenido completo con alertas |
+| Todo resuelto (solo Alertas) | Check verde | "Todas las observaciones resueltas" |
+| Fallo en fase | Dot rojo / "!" | "No se pudo completar el analisis. Puedes re-analizar." |
+| Datos stale | Sin badge | Nota inline discreta: "Algunos datos pueden haber cambiado — Actualizar" |
+
+> **Empty states**: Usar lenguaje orientado a la actividad del escritor, no a fases tecnicas.
+> Ej: "Estamos analizando las voces de tus personajes..." en vez de "Esperando fase 11 (voice)".
+
+#### Tareas
+
+| ID | Accion | Estado | Detalle |
+|----|--------|--------|---------|
+| S8b-01 | Componente TabBadge reutilizable | PENDIENTE | Badge con severity prop (warning/success/danger) + dot animado |
+| S8b-02 | Backend: completed_phases en progress | PENDIENTE | /analysis/progress devuelve completed_phases: string[] (NO tabs_ready — evitar acoplamiento frontend) |
+| S8b-03 | Store: tab states reactivos | PENDIENTE | analysis.ts: tabStates computed mapeando completed_phases → tabs segun matriz de disponibilidad |
+| S8b-04 | Integrar badges en ProjectDetailView tabs | PENDIENTE | Solo Alertas muestra badge numerico; resto usa estado interno |
+| S8b-05 | Empty states amigables por tab | PENDIENTE | Mensajes orientados a actividad: "Analizando relaciones entre personajes...", "Evaluando el estilo..." |
+| S8b-06 | Badge Alertas: count sin resolver (naranja) | PENDIENTE | Alertas con status new/open → badge warning |
+| S8b-07 | Badge Alertas: todo resuelto (verde) | PENDIENTE | Cuando count = 0 → badge success con check |
+| S8b-08 | Estado "failed" para fases de enrichment | PENDIENTE | Si fase 10-13 falla: dot rojo + mensaje claro con opcion re-analizar |
+| S8b-09 | Datos stale: nota inline discreta | PENDIENTE | En vez de banner amarillo agresivo, nota neutral bajo el contenido: "Algunos datos pueden haber cambiado" |
+
+### Sprint 8c: Invalidacion Granular + Datos Stale (6-9 dias)
+
+> **Objetivo**: Cuando el usuario modifica datos (merge, reject, edit), solo recomputar lo afectado.
+>
+> **Algoritmo**: "Salsa-lite" — inspirado en Salsa (rust-analyzer), Build Systems a la Carte
+> (Mokhov 2018), y Event Sourcing. Combina: event-driven invalidation + verifying traces +
+> early cutoff + demand-driven evaluation.
+>
+> **Principio clave**: No recomputar TODO. Clasificar analisis en 3 categorias:
+> - **Cat A (Inmutables)**: Prose-level, no dependen de entidades → nunca stale
+> - **Cat B (Per-entity)**: Se recomputan solo para la entidad afectada (~2-5s)
+> - **Cat C (Globales)**: Dependen de relaciones entre entidades → mark stale, lazy recompute
+>
+> **Nota arquitectonica**: Cada fase de enrichment debe ser transaccional dentro de su scope.
+> Si falla a mitad de una fase, se hace rollback completo de esa fase (no quedan escrituras parciales).
+
+#### Clasificacion de analisis
+
+| Categoria | Analisis | Invalidado por merge/reject? | Estrategia |
+|-----------|----------|------------------------------|-----------|
+| **A: Inmutables** | sticky_sentences, echo_report, pacing, sensory, readability, temporal_markers, register, energy, variation, duplicate_content | NO (solo texto) | Computar 1 vez, persistir, no tocar |
+| **B: Per-entity** | voice_profiles, character_timeline, emotional_profile, vital_status, character_locations | SI (solo entidad afectada) | Recompute incremental: DELETE + INSERT para entity_id |
+| **C: Globales** | relationships, character_network, character_archetypes, narrative_health, chapter_progress | SI (todo el grafo) | Mark stale → lazy recompute cuando usuario abre tab |
+
+#### Event → Invalidation Map
+
+| Evento usuario | Cat A | Cat B (incrementales) | Cat C (stale) |
+|---------------|-------|----------------------|---------------|
+| **Merge entidades** | No tocar | voice(keeper), timeline(keeper), emotional(keeper), vital(keeper), locations(keeper) | relationships, network, archetypes, health, progress |
+| **Undo merge** | No tocar | voice(restored), timeline(restored), emotional(restored), vital(restored), locations(restored) | relationships, network, archetypes, health, progress |
+| **Reject entidad** | No tocar | DELETE voice(X), timeline(X), emotional(X) | relationships, network, archetypes, health |
+| **Edit atributo** | No tocar | — | health |
+| **Cambiar focalizacion** | No tocar | — | — |
+| **Resolver/descartar alerta** | No tocar | — | — (solo contadores) |
+| **Cambiar config correccion** | No tocar | — | RE-ANALISIS fases 7-9 (boton "Re-analizar") |
+| **Cambiar modelo LLM** | No tocar | — | RE-ANALISIS completo (confirmar con usuario) |
+
+> **Nota**: Undo-merge restaura la entidad original, por lo que debe invalidar los mismos
+> scopes que merge. Los enrichment per-entity de la entidad restaurada se recomputan.
+
+#### Stale data UX
+
+| Coste recompute | Estrategia | UX |
+|----------------|-----------|-----|
+| Trivial (<1s) | Auto-actualizar silenciosamente | Sin indicador |
+| Barato (<5s, sin LLM) | Auto-recompute background al detectar cambio | Spinner breve |
+| Caro (>5s o con LLM) | Marcar stale → nota inline discreta | "Algunos datos pueden haber cambiado — Actualizar" |
+| Re-analisis necesario | Banner rojo | "Configuracion cambiada — Re-analizar" |
+
+> **Decision de diseno (revision post-auditoria)**: No usar banner amarillo agresivo para stale.
+> El merge/reject es una accion natural del flujo de trabajo — castigar al usuario con un banner
+> prominente genera friccion. En su lugar, nota inline discreta bajo el contenido afectado.
+
+#### Early cutoff (optimizacion Salsa)
+
+Si recomputar un enrichment produce el MISMO resultado (ej: merge solo anadio menciones redundantes),
+NO propagar invalidacion downstream. Comparar `output_hash` antes vs despues.
+
+> **Estabilidad de hashes**: Para evitar falsos positivos por serializacion de floats, usar
+> representacion canonica: sorted keys, floats redondeados a 6 decimales, JSON determinista.
+> `input_hash` = hash de los inputs que entraron a la computacion.
+> `output_hash` = hash del resultado producido. Si `output_hash` no cambia → early cutoff.
+
+#### Tareas
+
+| ID | Accion | Estado | Detalle |
+|----|--------|--------|---------|
+| S8c-01 | Tabla invalidation_events en BD | PENDIENTE | CREATE TABLE invalidation_events (project_id, event_type, entity_ids, timestamp, revision) |
+| S8c-02 | Event emitter en endpoints de mutacion | PENDIENTE | merge, undo_merge, reject, edit_attribute → emit event con entity_ids |
+| S8c-03 | Handlers Cat B: recompute per-entity | PENDIENTE | voice_profiles, timeline, emotional por entity_id afectado |
+| S8c-04 | Handlers Cat C: mark stale | PENDIENTE | UPDATE enrichment_cache SET status='stale' WHERE type IN (...) |
+| S8c-05 | Frontend: detectar datos stale | PENDIENTE | Comparar revision en response vs stored → mostrar nota inline |
+| S8c-06 | Frontend: nota inline stale con boton "Actualizar" | PENDIENTE | Nota discreta bajo contenido + auto-trigger recompute al abrir tab si coste <5s |
+| S8c-07 | Early cutoff: output_hash comparison | PENDIENTE | Comparar output_hash antes/despues de recompute. Canonicalizar: sorted keys, round(6), JSON determinista |
+| S8c-08 | Funciones enrichment scoped por entity_id | PENDIENTE | compute_voice_profile(project_id, entity_id=X) en vez de global |
+| S8c-09 | Tests invalidation cascades | PENDIENTE | 30-35 test cases cubriendo: 7 eventos x 3 categorias, secuencial, concurrente, undo, failure paths, early cutoff |
+| S8c-10 | Transaccionalidad por fase de enrichment | PENDIENTE | Cada fase 10-13 wrappea sus escrituras en transaccion. Fallo → rollback completo de esa fase |
+| S8c-11 | Proteccion race condition: mutacion durante enrichment | PENDIENTE | Capturar entity revision al inicio de enrichment, comparar al commit; si cambio → re-ejecutar fase afectada |
+
+### Resumen Sprint 8
+
+| Sub-sprint | Tareas | Dias | Impacto |
+|-----------|--------|------|---------|
+| **S8a**: Pipeline Enrichment | 18 | 8-12 | Todos los tabs con datos post-analisis |
+| **S8b**: Tab Badges + Empty States | 9 | 3-5 | UX: disponibilidad progresiva visible |
+| **S8c**: Invalidacion Granular | 11 | 6-9 | Datos siempre coherentes tras acciones usuario |
+| **TOTAL** | **38** | **17-26** | Pipeline completa, UX profesional, datos coherentes |
+
+> **Orden critico**: S8a-14 (extraer fases a funciones) es prerequisito de S8a-07..10 (nuevas fases).
+>
+> **Entrega incremental**: S8a-01 (auto-load) se puede hacer en 30 min. S8a-02..06 (persistir gaps)
+> en 2-3 dias. S8a-14 (refactor monolito) en 1-2 dias. S8b en paralelo con S8a-07..13. S8c
+> despues de S8a+S8b.
+>
+> **Concurrencia**: Las fases de enrichment (10-13) liberan el heavy slot, permitiendo que otro
+> proyecto inicie su analisis pesado (NER, fusion...) mientras el primero termina sus enrichments.
+>
+> **Revision post-auditoria**: Plan revisado tras auditoria con subagentes Arquitecto y QA+UX.
+> Cambios principales: (1) Prerequisito refactor monolito, (2) Tercer tier concurrencia,
+> (3) enrichment_cache con input_hash + output_hash + status, (4) Undo-merge en event map,
+> (5) Solo badges accionables (sin informativos grises), (6) Empty states en lenguaje escritor,
+> (7) Nota inline discreta vs banner amarillo agresivo, (8) Estado "failed" para fases,
+> (9) Tests 30-35 vs 18, (10) Transaccionalidad por fase, (11) Watchdog timeout heavy slot.
+>
+> **Referencias tecnicas**: Salsa red-green algorithm (rust-analyzer), Build Systems a la Carte
+> (Mokhov et al., ICFP 2018), Material Design 3 badges, Carbon Design status indicators,
+> Apple HIG loading patterns, NN/g skeleton screens.
+
 ### Backlog (Futuro)
 
 | ID | Acción | Detalle |
@@ -812,7 +1049,22 @@ pip install transformers
 | BK-04 | Fine-tune PlanTL RoBERTa en ficción | Si acumulamos datos etiquetados |
 | ~~BK-05~~ | ~~Comparativa antes/después~~ | ✅ DONE - Snapshot pre-reanálisis + ComparisonService (two-pass matching) |
 | BK-06 | Exportar a Scrivener | Integración con herramienta escritores |
+| BK-08 | Integrar timeline en vital_status | Cruzar temporal_markers con death_events: si flashback_time < death_time → aparición válida. Requiere detección de línea temporal no lineal (prólogos, alternancia pasado/presente). LLM para desambiguación en casos difíciles. |
 | ~~BK-07~~ | ~~Análisis multi-documento~~ | ✅ DONE - Collections, entity links, cross-book analysis, workspace auxiliar |
+| BK-09 | Merge-induced attribute orphaning | **P1** — Al fusionar entidades, `entity_attributes.entity_id` apunta al entity_id absorbido. Atributos desaparecen del UI. Falta CASCADE o rewrite de FK en merge. |
+| BK-10 | Dialogue attribution cascading errors | **P1** — Si `cesp_resolver` misatribuye speaker en cap N, los siguientes heredan el error (no hay reset per-chapter). Error se amplifica en manuscritos largos. |
+| BK-11 | Detección de narrativa no lineal | **P1** — 40% de ficción literaria es no lineal (flashbacks, frame narratives). El sistema usa orden de capítulos como proxy cronológico → falsos positivos masivos en vital_status. Relacionado con BK-08 pero más amplio. |
+| BK-12 | Cache para fases de enriquecimiento | **P1** — Fases 10-13 (relaciones, voz, prosa) recalculan on-the-fly en cada visita a tab. Sin cache → OOM en hardware limitado (8GB RAM). Blocker para S8a-07..10. |
+| BK-13 | Pro-drop ambigüedad multi-personaje | **P2** — En escenas con 2+ candidatos del mismo género ("Salió corriendo" con María y Ana presentes), heurística "last mentioned" falla. Necesita saliency weighting + LLM fallback. |
+| BK-14 | Ubicaciones jerárquicas/anidadas | **P2** — Tracking trata ubicaciones como flat. "Juan en cocina, María en salón, ambos en casa García" genera falso positivo de viaje imposible. Falta ontología espacial (habitación ⊂ edificio ⊂ ciudad). |
+| BK-15 | Emotional masking no modelado | **P2** — OOC flags `declared=furioso + behavior=calma` como incoherente. No modela ocultación intencional de emociones (noir, thriller psicológico). Indicadores: "dijo con calma forzada", "fingió alegría". |
+| BK-16 | Hilos narrativos sin resolver (Chekhov's gun) | **P2** — No detecta personajes introducidos con alta saliencia (backstory, conflicto) que desaparecen sin resolución. FlawedFictions cat.5. Los editores lo piden como top-3. |
+| BK-17 | Glossary → entity disambiguation | **P3** — Glossary ("El Doctor → Juan Pérez") no se inyecta en NER/coreference pipeline. Usuario define alias manualmente y luego fusiona igualmente. Inyectar en gazetteer. |
+| BK-18 | Confidence decay para inferencias stale | **P3** — Alertas LLM (OOC, anacronismos) persisten con confidence original tras merge de entidades. Input cambió pero score no. S8c lo aborda parcialmente con stale marking. |
+
+> **Panel de expertos (10-Feb-2026)**: Sesión de 8 expertos simulados (QA, Lingüista, Corrector, Arquitecto,
+> AppSec, Frontend, Product Owner, UX). BK-09..18 son gaps nuevos identificados por análisis cross-módulo,
+> testing adversarial, y simulación de flujo editorial real. 4× P1, 4× P2, 2× P3.
 
 ---
 
@@ -885,4 +1137,4 @@ S6-01 ─→ S6-02 ─→ S6-03
 
 **Ultima actualizacion**: 2026-02-10
 **Autor**: Claude (Panel de 8 expertos simulados)
-**Estado**: S0-S7a completados. S7b 8/10 done. S7c 6/7 done. S7d 9/13 done. Quedan 7 tareas reales.
+**Estado**: S0-S7a completados. S7b 8/10 done. S7c 6/7 done. S7d 9/13 done. S8 planificado (38 tareas, revisado post-auditoria). Quedan 45 tareas reales.
