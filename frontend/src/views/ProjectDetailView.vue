@@ -408,6 +408,8 @@ import { useWorkspaceStore } from '@/stores/workspace'
 import { useSelectionStore } from '@/stores/selection'
 import { useAnalysisStore, TAB_PHASE_DESCRIPTIONS } from '@/stores/analysis'
 import { useMentionNavigation } from '@/composables/useMentionNavigation'
+import { useProjectData } from '@/composables/useProjectData'
+import { useAnalysisPolling } from '@/composables/useAnalysisPolling'
 import Button from 'primevue/button'
 import ProgressSpinner from 'primevue/progressspinner'
 import Message from 'primevue/message'
@@ -422,9 +424,7 @@ import { ProjectSummary, EntityInspector, AlertInspector, ChapterInspector, Text
 import DocumentTypeChip from '@/components/DocumentTypeChip.vue'
 import CorrectionConfigModal from '@/components/workspace/CorrectionConfigModal.vue'
 import type { SidebarTab } from '@/stores/workspace'
-import type { Entity, Alert, Chapter, AlertSource } from '@/types'
-import { transformEntities, transformAlerts, transformChapters } from '@/types/transformers'
-import { useAlertUtils } from '@/composables/useAlertUtils'
+import type { Entity, Alert, AlertSource } from '@/types'
 import { resetGlobalHighlight } from '@/composables/useHighlight'
 import { api } from '@/services/apiClient'
 import { useNotifications } from '@/composables/useNotifications'
@@ -435,11 +435,26 @@ const projectsStore = useProjectsStore()
 const workspaceStore = useWorkspaceStore()
 const selectionStore = useSelectionStore()
 const analysisStore = useAnalysisStore()
-const { notifyAnalysisComplete, notifyAnalysisError, requestPermission: requestNotificationPermission } = useNotifications()
+const { requestPermission: requestNotificationPermission } = useNotifications()
+
+// ── Composables ────────────────────────────────────────────
+const project = computed(() => projectsStore.currentProject)
+
+const { entities, alerts, chapters, relationships, entitiesCount, alertsCount,
+        loadEntities, loadAlerts, loadChapters, loadRelationships } = useProjectData()
+
+const { isAnalyzing, hasBeenAnalyzed, cancellingAnalysis,
+        startPolling: startAnalysisPolling, stopPolling: stopAnalysisPolling,
+        cancelAnalysis: handleCancelAnalysis } = useAnalysisPolling({
+  project,
+  entities, alerts, chapters,
+  loadEntities, loadAlerts, loadChapters,
+})
 
 // Navegación de menciones - usar projectId reactivo
 const mentionNav = useMentionNavigation(() => project.value?.id ?? 0)
 
+// ── Local UI state ─────────────────────────────────────────
 const loading = ref(true)
 const error = ref('')
 const showExportDialog = ref(false)
@@ -447,10 +462,6 @@ const showReanalyzeDialog = ref(false)
 const correctionConfigModalRef = ref<InstanceType<typeof CorrectionConfigModal> | null>(null)
 const reanalyzing = ref(false)
 const exportingStyleGuide = ref(false)
-const entities = ref<Entity[]>([])
-const alerts = ref<Alert[]>([])
-const chapters = ref<Chapter[]>([])
-const relationships = ref<any>(null)
 
 // Estado para sincronización
 const activeChapterId = ref<number | null>(null)
@@ -460,7 +471,7 @@ const scrollToChapterId = ref<number | null>(null)
 // ID de entidad inicial (para navegación desde /characters/:id)
 const initialEntityId = ref<number | null>(null)
 
-// Estado del sidebar - se resetea al cambiar de tab principal
+// Estado del sidebar
 const sidebarTab = ref<SidebarTab>('chapters')
 
 // Helpers para sidebar tabs
@@ -484,220 +495,16 @@ const getSidebarTabTitle = (tab: SidebarTab): string => {
   return titles[tab]
 }
 
-const project = computed(() => projectsStore.currentProject)
-
-// Cancelación de análisis
-const cancellingAnalysis = ref(false)
-async function handleCancelAnalysis() {
-  if (!project.value) return
-  cancellingAnalysis.value = true
-  try {
-    const success = await analysisStore.cancelAnalysis(project.value.id)
-    if (success) {
-      stopAnalysisPolling()
-      analysisProgressData.value = null
-      // Refresh project status
-      await projectsStore.fetchProject(project.value.id)
-    }
-  } finally {
-    cancellingAnalysis.value = false
-  }
-}
-
-// Estado del análisis con polling
-const analysisProgressData = ref<{ progress: number; phase: string; error?: string; metrics?: { chapters_found?: number; entities_found?: number } } | null>(null)
-let analysisPollingInterval: ReturnType<typeof setInterval> | null = null
-// Track what was already loaded during this analysis session
-let chaptersLoadedDuringAnalysis = false
-let entitiesLoadedDuringAnalysis = false
-let alertsLoadedDuringAnalysis = false
-
-const isAnalyzing = computed(() => {
-  if (!project.value) return false
-  const status = project.value.analysisStatus
-  // Solo estados activos de análisis deshabilitan el botón
-  // 'pending' NO es un análisis activo: es el estado inicial de un proyecto recién creado
-  // Si el status es null, undefined, 'completed', 'error', 'pending' - permitir analizar
-  const activeStatuses = ['in_progress', 'analyzing']
-  return status ? activeStatuses.includes(status) : false
-})
-
-/** Indica si el proyecto ya fue analizado alguna vez (tiene capítulos o entidades) */
-const hasBeenAnalyzed = computed(() => {
-  if (!project.value) return false
-  return (project.value.chapterCount || 0) > 0 || (project.value.entityCount || 0) > 0
-})
-
-const _analysisProgress = computed(() => {
-  // Usar datos de polling si están disponibles
-  if (analysisProgressData.value) {
-    return analysisProgressData.value.progress
-  }
-  if (!project.value) return 0
-  // analysisProgress ya viene como 0-100 desde la API
-  return project.value.analysisProgress || 0
-})
-
-const _analysisPhase = computed(() => {
-  return analysisProgressData.value?.phase || 'Analizando...'
-})
-
-// Polling del progreso de análisis
-async function pollAnalysisProgress() {
-  if (!project.value) {
-    console.log('[Polling] No project, stopping polling')
-    stopAnalysisPolling()
-    return
-  }
-
-  try {
-    console.log('[Polling] Fetching progress for project', project.value.id)
-    // Usar el store para obtener el progreso (actualiza estado global)
-    const progressData = await analysisStore.getProgress(project.value.id)
-    console.log('[Polling] Progress data:', progressData)
-
-    // Si no hay datos de progreso, significa que no hay análisis activo
-    // Detener el polling para evitar llamadas innecesarias
-    if (!progressData) {
-      console.log('[Polling] No progress data returned, stopping polling')
-      stopAnalysisPolling()
-      analysisProgressData.value = null
-      return
-    }
-
-    analysisProgressData.value = {
-      progress: progressData.progress || 0,
-      phase: progressData.current_phase || 'Analizando...',
-      error: progressData.error,
-      metrics: progressData.metrics
-    }
-
-    // Si hay capítulos disponibles y aún no los cargamos, cargarlos ahora
-    const chaptersFound = progressData.metrics?.chapters_found
-    if (chaptersFound && chaptersFound > 0 && !chaptersLoadedDuringAnalysis && chapters.value.length === 0) {
-      console.log('[Polling] Chapters found in analysis, loading chapters:', chaptersFound)
-      chaptersLoadedDuringAnalysis = true
-      loadChapters(project.value!.id)
-    }
-
-    // Si hay entidades disponibles y aún no las cargamos, cargarlas ahora
-    const entitiesFound = progressData.metrics?.entities_found
-    if (entitiesFound && entitiesFound > 0 && !entitiesLoadedDuringAnalysis && entities.value.length === 0) {
-      console.log('[Polling] Entities found in analysis, loading entities:', entitiesFound)
-      entitiesLoadedDuringAnalysis = true
-      loadEntities(project.value!.id)
-    }
-
-    // Cargar alertas cuando la fase grammar esté completada (las alertas se van generando)
-    const grammarPhase = progressData.phases?.find((p: { id: string }) => p.id === 'grammar')
-    if (grammarPhase?.completed && !alertsLoadedDuringAnalysis && alerts.value.length === 0) {
-      console.log('[Polling] Grammar phase completed, loading alerts')
-      alertsLoadedDuringAnalysis = true
-      loadAlerts(project.value!.id)
-    }
-
-    // Si idle (no hay análisis activo), detener polling silenciosamente
-    if (progressData.status === 'idle') {
-      console.log('[Polling] No active analysis (idle), stopping polling')
-      stopAnalysisPolling()
-      analysisProgressData.value = null
-      return
-    }
-
-    // Si completado o error, detener polling y recargar datos
-    if (progressData.status === 'completed' || progressData.status === 'error' || progressData.status === 'failed' || progressData.status === 'cancelled') {
-      console.log('[Polling] Analysis finished with status:', progressData.status)
-      stopAnalysisPolling()
-
-      // Notificar al usuario (OS notification si ventana no tiene foco, sonido siempre)
-      if (progressData.status === 'completed') {
-        notifyAnalysisComplete(project.value?.name)
-      } else {
-        notifyAnalysisError(progressData.error || 'Error durante el análisis')
-      }
-
-      // Pequeño delay para asegurar que la BD se haya actualizado completamente
-      // (el análisis corre en background thread y puede haber una condición de carrera)
-      await new Promise(resolve => setTimeout(resolve, 500))
-
-      // Recargar proyecto y datos
-      await projectsStore.fetchProject(project.value!.id)
-      // Recargar fases ejecutadas para actualizar tabs
-      await analysisStore.loadExecutedPhases(project.value!.id)
-      await loadEntities(project.value!.id)
-      await loadAlerts(project.value!.id)
-      await loadChapters(project.value!.id)
-      analysisProgressData.value = null
-
-      // Verificar que los datos se cargaron correctamente
-      // Si wordCount sigue siendo 0 pero hay capítulos, reintentar
-      if (project.value && project.value.wordCount === 0 && (progressData.metrics?.chapters_found || 0) > 0) {
-        console.log('[Polling] Data seems stale, retrying fetch after delay...')
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        await projectsStore.fetchProject(project.value.id)
-        await loadChapters(project.value.id)
-      }
-    }
-  } catch (err) {
-    console.error('Error polling analysis progress:', err)
-    // Si hay error de red o el endpoint no responde, detener polling
-    // para evitar spam de errores
-    console.log('[Polling] Stopping polling due to error')
-    stopAnalysisPolling()
-  }
-}
-
-function startAnalysisPolling() {
-  if (analysisPollingInterval) return
-  // Reset the flags when starting a new polling session
-  chaptersLoadedDuringAnalysis = false
-  entitiesLoadedDuringAnalysis = false
-  alertsLoadedDuringAnalysis = false
-  analysisPollingInterval = setInterval(pollAnalysisProgress, 1500)
-  // Hacer primera llamada inmediatamente
-  pollAnalysisProgress()
-}
-
-function stopAnalysisPolling() {
-  if (analysisPollingInterval) {
-    clearInterval(analysisPollingInterval)
-    analysisPollingInterval = null
-  }
-}
-
-// Iniciar/detener polling cuando cambia el estado de análisis
-watch(isAnalyzing, (analyzing, oldAnalyzing) => {
-  console.log('[Analysis] isAnalyzing changed:', oldAnalyzing, '->', analyzing)
-  if (analyzing) {
-    startAnalysisPolling()
-  } else {
-    stopAnalysisPolling()
-  }
-}, { immediate: true })
-
-// También observar cambios en el proyecto para detectar análisis
-watch(() => project.value?.analysisStatus, (newStatus, oldStatus) => {
-  console.log('[Analysis] project.analysisStatus changed:', oldStatus, '->', newStatus)
-  // 'pending' es el estado inicial (no analizado), NO un análisis en curso
-  if (newStatus === 'in_progress' || newStatus === 'analyzing' || newStatus === 'queued' || newStatus === 'queued_for_heavy') {
-    if (!analysisPollingInterval) {
-      console.log('[Analysis] Starting polling from status change')
-      startAnalysisPolling()
-    }
-  }
-})
-
 // Observar selectedEntityForMentions para cargar y navegar a menciones
 watch(() => workspaceStore.selectedEntityForMentions, async (entityId) => {
   if (entityId !== null && project.value) {
-    // Cargar menciones de la entidad y navegar a la primera
     await mentionNav.startNavigation(entityId)
-    // Limpiar el valor para permitir re-seleccionar la misma entidad
     workspaceStore.selectedEntityForMentions = null
   }
 })
 
-// Computed: nombre original del documento (sin prefijo hash)
+// ── Computed (inspector + layout) ──────────────────────────
+
 const originalDocumentName = computed(() => {
   if (!project.value?.documentPath) return null
   const filename = project.value.documentPath.split(/[/\\]/).pop() || project.value.documentPath
@@ -705,56 +512,27 @@ const originalDocumentName = computed(() => {
   return match ? match[1] : filename
 })
 
-// Stats
-const entitiesCount = computed(() => entities.value.length)
-const alertsCount = computed(() => alerts.value.length)
-
-// Alertas agrupadas por severidad para sidebar (reservado para uso futuro)
-const _alertsBySeverity = computed(() => {
-  const counts: Record<string, number> = {}
-  for (const alert of alerts.value) {
-    if (alert.status === 'active') {
-      counts[alert.severity] = (counts[alert.severity] || 0) + 1
-    }
-  }
-  return counts
-})
-
-// Top personajes para sidebar (reservado para uso futuro)
-const _topCharacters = computed(() => {
-  return entities.value
-    .filter(e => e.type === 'character')
-    .sort((a, b) => (b.mentionCount || 0) - (a.mentionCount || 0))
-    .slice(0, 10)
-})
-
-// Entidad seleccionada para inspector
 const selectedEntity = computed(() => {
   if (selectionStore.primary?.type !== 'entity') return null
   return entities.value.find(e => e.id === selectionStore.primary?.id) || null
 })
 
-// Alerta seleccionada para inspector
 const selectedAlert = computed(() => {
   if (selectionStore.primary?.type !== 'alert') return null
   return alerts.value.find(a => a.id === selectionStore.primary?.id) || null
 })
 
-// Capítulo actual para el inspector contextual
 const currentChapter = computed(() => {
   if (!activeChapterId.value) return null
   return chapters.value.find(c => c.id === activeChapterId.value) || null
 })
 
-// Determinar si mostrar ChapterInspector contextualmente
-// Se muestra cuando: estamos en tab texto, hay un capítulo visible, y no hay selección explícita
 const showChapterInspector = computed(() => {
   return workspaceStore.activeTab === 'text' &&
          currentChapter.value !== null &&
          !selectionStore.hasSelection
 })
 
-// Título del inspector
 const inspectorTitle = computed(() => {
   if (selectedEntity.value) return 'Entidad'
   if (selectedAlert.value) return 'Alerta'
@@ -763,46 +541,12 @@ const inspectorTitle = computed(() => {
   return 'Resumen'
 })
 
-// Ancho del panel derecho (usa el preferido del tab si existe)
 const rightPanelWidth = computed(() => {
   const preferredWidth = workspaceStore.currentLayoutConfig.rightPanelWidth
   return preferredWidth ?? workspaceStore.rightPanel.width
 })
 
-// Usar composable centralizado para alertas
-const { getSeverityConfig } = useAlertUtils()
-
-// Helper para label de severidad (reservado para uso futuro)
-const _getSeverityLabel = (severity: string) => {
-  return getSeverityConfig(severity as any).label
-}
-
-// Helper para label de tipo de entidad (reservado para uso futuro)
-const _getEntityTypeLabel = (type: string) => {
-  const labels: Record<string, string> = {
-    character: 'Personaje',
-    location: 'Lugar',
-    object: 'Objeto',
-    organization: 'Organización',
-    event: 'Evento',
-    concept: 'Concepto',
-    other: 'Otro'
-  }
-  return labels[type] || type
-}
-
-const _getEntityIcon = (type: string) => {
-  const icons: Record<string, string> = {
-    character: 'pi pi-user',
-    location: 'pi pi-map-marker',
-    organization: 'pi pi-building',
-    object: 'pi pi-box',
-    event: 'pi pi-calendar',
-    concept: 'pi pi-lightbulb',
-    other: 'pi pi-tag'
-  }
-  return icons[type] || 'pi pi-tag'
-}
+// ── Event handlers ─────────────────────────────────────────
 
 // Handle menu events for tab switching
 const handleMenuTabEvent = (event: Event) => {
@@ -812,11 +556,36 @@ const handleMenuTabEvent = (event: Event) => {
   }
 }
 
-// Handle menu events dispatched from App.vue / useNativeMenu
 const handleMenuExport = () => { showExportDialog.value = true }
 const handleMenuRunAnalysis = () => { showReanalyzeDialog.value = true }
 const handleMenuToggleInspector = () => { workspaceStore.toggleRightPanel() }
 const handleMenuToggleSidebar = () => { workspaceStore.toggleLeftPanel() }
+
+// Keyboard shortcut handlers
+const handleNextAlert = () => {
+  const currentIdx = selectedAlert.value
+    ? alerts.value.findIndex(a => a.id === selectedAlert.value!.id)
+    : -1
+  const next = alerts.value[currentIdx + 1] || alerts.value[0]
+  if (next) selectionStore.selectAlert(next)
+}
+const handlePrevAlert = () => {
+  const currentIdx = selectedAlert.value
+    ? alerts.value.findIndex(a => a.id === selectedAlert.value!.id)
+    : alerts.value.length
+  const prev = alerts.value[currentIdx - 1] || alerts.value[alerts.value.length - 1]
+  if (prev) selectionStore.selectAlert(prev)
+}
+const handleResolveAlert = () => {
+  if (selectedAlert.value) onAlertResolve(selectedAlert.value)
+}
+const handleDismissAlert = () => {
+  if (selectedAlert.value) onAlertDismiss(selectedAlert.value)
+}
+const handleEscape = () => { selectionStore.clearAll() }
+const handleKeyboardExport = () => { showExportDialog.value = true }
+
+// ── Lifecycle ──────────────────────────────────────────────
 
 onMounted(async () => {
   const projectId = parseInt(route.params.id as string)
@@ -834,31 +603,34 @@ onMounted(async () => {
   window.addEventListener('menubar:toggle-inspector', handleMenuToggleInspector)
   window.addEventListener('menubar:toggle-sidebar', handleMenuToggleSidebar)
 
-  try {
-    // Establecer proyecto activo en el analysis store (aísla estado por proyecto)
-    analysisStore.setActiveProjectId(projectId)
+  // Keyboard shortcut events
+  window.addEventListener('keyboard:next-alert', handleNextAlert)
+  window.addEventListener('keyboard:prev-alert', handlePrevAlert)
+  window.addEventListener('keyboard:resolve-alert', handleResolveAlert)
+  window.addEventListener('keyboard:dismiss-alert', handleDismissAlert)
+  window.addEventListener('keyboard:escape', handleEscape)
+  window.addEventListener('keyboard:export', handleKeyboardExport)
+  window.addEventListener('keyboard:toggle-sidebar', handleMenuToggleSidebar)
 
-    // Resetear workspace al entrar
+  try {
+    analysisStore.setActiveProjectId(projectId)
     workspaceStore.reset()
 
-    // Check for tab query parameter
     const tabParam = route.query.tab as string
     if (tabParam && ['text', 'entities', 'relations', 'alerts', 'style', 'resumen'].includes(tabParam)) {
       workspaceStore.setActiveTab(tabParam as any)
     }
 
-    // Check for entity query parameter (para navegación desde /characters/:id)
     const entityParam = route.query.entity as string
     if (entityParam) {
       initialEntityId.value = parseInt(entityParam)
     }
 
     await projectsStore.fetchProject(projectId)
-    // Cargar fases ejecutadas para mostrar tabs condicionalmente
     await analysisStore.loadExecutedPhases(projectId)
     await loadEntities(projectId)
     await loadAlerts(projectId)
-    await loadChapters(projectId)
+    await loadChapters(projectId, project.value ?? undefined)
     await loadRelationships(projectId)
 
     // Check for alert query parameter (para navegación desde AlertsView)
@@ -867,22 +639,17 @@ onMounted(async () => {
       const alertId = parseInt(alertParam)
       const targetAlert = alerts.value.find(a => a.id === alertId)
       if (targetAlert && targetAlert.spanStart !== undefined) {
-        // Convertir chapter number a chapter ID
         const targetChapter = chapters.value.find(c => c.chapterNumber === targetAlert.chapter)
         const chapterId = targetChapter?.id ?? null
-
-        // Navegar a la posición de la alerta en el texto
         workspaceStore.navigateToTextPosition(
           targetAlert.spanStart,
           targetAlert.excerpt || undefined,
           chapterId
         )
-        // Seleccionar la alerta en el inspector
         selectionStore.selectAlert(targetAlert)
       }
     }
 
-    // Verificar si hay un análisis en curso (por si se refrescó la página)
     const hasActiveAnalysis = await analysisStore.checkAnalysisStatus(projectId)
     if (hasActiveAnalysis) {
       startAnalysisPolling()
@@ -901,68 +668,18 @@ onUnmounted(() => {
   window.removeEventListener('menubar:run-analysis', handleMenuRunAnalysis)
   window.removeEventListener('menubar:toggle-inspector', handleMenuToggleInspector)
   window.removeEventListener('menubar:toggle-sidebar', handleMenuToggleSidebar)
+  window.removeEventListener('keyboard:next-alert', handleNextAlert)
+  window.removeEventListener('keyboard:prev-alert', handlePrevAlert)
+  window.removeEventListener('keyboard:resolve-alert', handleResolveAlert)
+  window.removeEventListener('keyboard:dismiss-alert', handleDismissAlert)
+  window.removeEventListener('keyboard:escape', handleEscape)
+  window.removeEventListener('keyboard:export', handleKeyboardExport)
+  window.removeEventListener('keyboard:toggle-sidebar', handleMenuToggleSidebar)
   stopAnalysisPolling()
   resetGlobalHighlight()
-  // No limpiar activeProjectId aquí: el análisis puede seguir en background
-  // y los computed deben seguir reflejando su estado para StatusBar
 })
 
-const loadEntities = async (projectId: number) => {
-  try {
-    const data = await api.getRaw<{ success: boolean; data?: any[] }>(`/api/projects/${projectId}/entities`)
-    if (data.success) {
-      entities.value = transformEntities(data.data || [])
-    }
-  } catch (err) {
-    console.error('Error loading entities:', err)
-  }
-}
-
-const loadAlerts = async (projectId: number) => {
-  try {
-    const data = await api.getRaw<{ success: boolean; data?: any[] }>(`/api/projects/${projectId}/alerts?status=open`)
-    if (data.success) {
-      alerts.value = transformAlerts(data.data || [])
-    }
-  } catch (err) {
-    console.error('Error loading alerts:', err)
-  }
-}
-
-const loadChapters = async (projectId: number) => {
-  try {
-    const data = await api.getRaw<{ success: boolean; data?: any[] }>(`/api/projects/${projectId}/chapters`)
-    if (data.success) {
-      chapters.value = transformChapters(data.data || [])
-    }
-  } catch (err) {
-    console.error('Error loading chapters:', err)
-    // Fallback
-    if (project.value) {
-      chapters.value = Array.from({ length: project.value.chapterCount }, (_, i) => ({
-        id: i + 1,
-        projectId: projectId,
-        title: `Capítulo ${i + 1}`,
-        content: '',
-        chapterNumber: i + 1,
-        wordCount: Math.floor(project.value!.wordCount / project.value!.chapterCount),
-        positionStart: 0,
-        positionEnd: 0
-      }))
-    }
-  }
-}
-
-const loadRelationships = async (projectId: number) => {
-  try {
-    const data = await api.getRaw<{ success: boolean; data?: any[] }>(`/api/projects/${projectId}/relationships`)
-    if (data.success) {
-      relationships.value = data.data
-    }
-  } catch (err) {
-    console.error('Error loading relationships:', err)
-  }
-}
+// ── Navigation & handlers ──────────────────────────────────
 
 const goBack = () => {
   router.push({ name: 'projects' })

@@ -53,7 +53,7 @@
 
 <script setup lang="ts">
 import { RouterView, useRouter, useRoute } from 'vue-router'
-import { onMounted, onBeforeUnmount, ref, watch, computed } from 'vue'
+import { onMounted, onBeforeUnmount, onErrorCaptured, ref, watch, computed } from 'vue'
 import Toast from 'primevue/toast'
 import { backendDown, recoveryAttempts } from '@/services/apiClient'
 import { useAppStore } from '@/stores/app'
@@ -77,6 +77,13 @@ const themeStore = useThemeStore()
 const workspaceStore = useWorkspaceStore()
 const isBackendDown = backendDown
 const numRecoveryAttempts = recoveryAttempts
+
+// ── Global error boundary ───────────────────────────────────
+onErrorCaptured((err, instance, info) => {
+  console.error(`[ErrorBoundary] ${info}:`, err, instance?.$options?.name || instance?.$options?.__name)
+  // Don't swallow the error — let Vue's default handler log it too
+  return true
+})
 
 const showShortcutsHelp = ref(false)
 const showAbout = ref(false)
