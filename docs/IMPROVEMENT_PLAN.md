@@ -1068,6 +1068,67 @@ NO propagar invalidacion downstream. Comparar `output_hash` antes vs despues.
 
 ---
 
+## 8b. Plan de Trabajo BK-09..18 (Panel de Expertos, 10-Feb-2026)
+
+### Sprint S9: Integridad de Datos y Diálogos (8-11 días)
+
+| Orden | ID | Esfuerzo | Descripción | Riesgo |
+|-------|----|----------|-------------|--------|
+| 1 | BK-09 | S (1-2d) | Entity merge fix — migrar TODAS las FK (15 tablas), no solo attributes/mentions | Medio: si se olvida alguna tabla, datos inconsistentes |
+| 2 | BK-15 | S (1-2d) | Masking emocional — "fingió calma" no es error de OOC. Patrones: fingió, disimulando, conteniendo | Bajo |
+| 3 | BK-17 | S (1-2d) | Glosario → gazetteer NER — inyectar términos del usuario con confidence 1.0 | Bajo |
+| 4 | BK-10 | M (3-5d) | Reset speaker attribution por capítulo/escena + confidence decay intra-capítulo | Alto: cascada afecta voice/OOC/emocional |
+
+**Criterios de éxito**: 0 filas huérfanas post-merge; no cascada speaker inter-capítulo; OOC con masking = `is_intentional`; glosario en gazetteer.
+
+### Sprint S10: Timeline No Lineal + Cache (11-18 días)
+
+| Orden | ID | Esfuerzo | Descripción | Riesgo |
+|-------|----|----------|-------------|--------|
+| 1 | BK-12 | M (3-5d) | Enrichment cache granular con `get_or_compute()`, `invalidate()`, `mark_stale()` | Medio: result_json grande |
+| 2 | BK-14 | M (3-5d) | Ubicaciones jerárquicas — `LocationOntology` con `is_reachable()` | Bajo-medio |
+| 3 | BK-11 | L (5-8d) | Timeline no lineal — mapa temporal por capítulo, integrar en vital_status y locations | Muy alto: 40% ficción no lineal |
+
+**Criterios de éxito**: 2º acceso a tab < 100ms; cocina⊂casa no genera FP; flashbacks no generan "muerto reaparece".
+
+**Dependencias**: BK-12 es prerequisito de BK-18. BK-11 se beneficia de BK-14.
+
+### Sprint S11: Pro-drop + Chekhov (8-13 días)
+
+| Orden | ID | Esfuerzo | Descripción | Riesgo |
+|-------|----|----------|-------------|--------|
+| 1 | BK-13 | M (3-5d) | Ambiguity scoring pro-drop — `ambiguity_score` con saliencia reciente | Medio |
+| 2 | BK-16 | L (5-8d) | Chekhov tracker extendido — personajes SUPPORTING que desaparecen + hilos sin resolver | Medio: frontera subjetiva |
+
+**Criterios de éxito**: Pro-drop multi-candidato mismo género → confianza < 0.7; personajes con backstory que desaparecen detectados.
+
+### Sprint S12: Confidence Decay (1-2 días)
+
+| Orden | ID | Esfuerzo | Descripción | Riesgo |
+|-------|----|----------|-------------|--------|
+| 1 | BK-18 | S (1-2d) | Decay gradual: `effective_confidence = original * 0.97^events_since` | Bajo |
+
+**Esfuerzo total estimado**: 28-44 días (7-11 semanas). S9 y S10 paralelizables.
+
+```
+Sprint S9 (Integridad)          Sprint S10 (Timeline + Cache)
+┌──────────────────────┐       ┌──────────────────────────────┐
+│ BK-09 (Merge Fix)    │       │ BK-12 (Enrichment Cache)     │
+│ BK-15 (Masking)      │       │   ↓                          │
+│ BK-17 (Glossary→NER) │       │ BK-14 (Location Hierarchy)   │
+│ BK-10 (Dialogue)     │       │   ↓                          │
+└──────────────────────┘       │ BK-11 (Non-linear Timeline)  │
+                               └──────────────┬───────────────┘
+                                              ↓
+Sprint S11 (NLP Avanzado)      Sprint S12 (Decay)
+┌──────────────────────────┐   ┌──────────────────────┐
+│ BK-13 (Pro-drop Ambig.)  │   │ BK-18 (Conf. Decay)  │←── BK-12
+│ BK-16 (Chekhov Tracker)  │   └──────────────────────┘
+└──────────────────────────┘
+```
+
+---
+
 ## 9. Cronograma de Implementación
 
 ### Fase Inmediata (Sprint 0): 1-2 días
