@@ -230,14 +230,7 @@ pub fn create_menu(app: &AppHandle) -> Result<Menu<Wry>, tauri::Error> {
         true,
         Some("CmdOrCtrl+R"),
     )?;
-    let analysis_submenu = Submenu::with_items(
-        app,
-        "Analisis",
-        true,
-        &[
-            &run_analysis,
-        ],
-    )?;
+    let analysis_submenu = Submenu::with_items(app, "Analisis", true, &[&run_analysis])?;
 
     // Menu Ayuda
     let tutorial = MenuItem::with_id(
