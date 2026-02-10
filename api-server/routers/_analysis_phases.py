@@ -629,11 +629,11 @@ def claim_heavy_slot_or_queue(ctx: dict, tracker: ProgressTracker) -> bool:
                     stale_storage["error"] = "Análisis excedió el tiempo máximo"
 
         if deps._heavy_analysis_project_id is not None:
-            # Heavy slot busy — queue this project
+            # Heavy slot busy — queue this project with full Tier 1 context
             deps._heavy_analysis_queue.append({
                 "project_id": project_id,
-                "file_path": str(ctx["tmp_path"]),
-                "use_temp_file": ctx["use_temp_file"],
+                "tier1_context": ctx,
+                "tracker": tracker,
             })
             deps.analysis_progress_storage[project_id]["status"] = "queued_for_heavy"
             deps.analysis_progress_storage[project_id]["current_phase"] = (
@@ -2645,31 +2645,38 @@ def handle_analysis_error(ctx: dict, error: Exception):
 # Finally block: cleanup + queue management
 # ============================================================================
 
+def _release_heavy_and_start_next(project_id: int, ctx: dict | None = None) -> None:
+    """Release heavy slot and auto-start next queued project.
+
+    Unified helper used by both release_heavy_slot and run_finally_cleanup
+    to avoid duplicated slot-release + queue-pop logic.
+    """
+    next_heavy = None
+    with deps._progress_lock:
+        if deps._heavy_analysis_project_id == project_id:
+            deps._heavy_analysis_project_id = None
+            deps._heavy_analysis_claimed_at = None
+            if ctx is not None:
+                ctx["heavy_slot_released"] = True
+            logger.info(f"Project {project_id}: released heavy slot")
+        if deps._heavy_analysis_queue:
+            next_heavy = deps._heavy_analysis_queue.pop(0)
+
+    # Auto-start next queued project with saved Tier 1 context
+    if next_heavy:
+        from routers.analysis import _resume_queued_heavy_analysis
+        _resume_queued_heavy_analysis(next_heavy)
+
+
 def release_heavy_slot(ctx: dict):
     """S8a-15: Release heavy slot early so next project can start heavy phases.
 
     Called between Tier 2 (heavy NLP) and Tier 3 (enrichment).
     Enrichment is CPU-only and doesn't compete for GPU/LLM resources.
     """
-    project_id = ctx["project_id"]
-
     if ctx.get("heavy_slot_released"):
         return  # Already released
-
-    next_heavy = None
-    with deps._progress_lock:
-        if deps._heavy_analysis_project_id == project_id:
-            deps._heavy_analysis_project_id = None
-            deps._heavy_analysis_claimed_at = None
-            ctx["heavy_slot_released"] = True
-            logger.info(f"Project {project_id}: released heavy slot before enrichment")
-        if deps._heavy_analysis_queue:
-            next_heavy = deps._heavy_analysis_queue.pop(0)
-
-    # Auto-start next queued project
-    if next_heavy:
-        from routers.analysis import _start_queued_analysis
-        _start_queued_analysis(next_heavy)
+    _release_heavy_and_start_next(ctx["project_id"], ctx)
 
 
 def run_finally_cleanup(ctx: dict):
@@ -2689,14 +2696,9 @@ def run_finally_cleanup(ctx: dict):
         except Exception:
             pass
 
-    # Liberar slot pesado y comprobar cola (if not already released by release_heavy_slot)
-    next_heavy = None
-    with deps._progress_lock:
-        if deps._heavy_analysis_project_id == project_id:
-            deps._heavy_analysis_project_id = None
-            deps._heavy_analysis_claimed_at = None
-        if not ctx.get("heavy_slot_released") and deps._heavy_analysis_queue:
-            next_heavy = deps._heavy_analysis_queue.pop(0)
+    # Liberar slot pesado y auto-start next (if not already released)
+    if not ctx.get("heavy_slot_released"):
+        _release_heavy_and_start_next(project_id, ctx)
 
     # Limpiar progreso después de delay
     def _cleanup_progress(pid: int):
@@ -2710,8 +2712,3 @@ def run_finally_cleanup(ctx: dict):
     cleanup_timer = threading.Timer(300, _cleanup_progress, args=[project_id])
     cleanup_timer.daemon = True
     cleanup_timer.start()
-
-    # Auto-iniciar siguiente proyecto de la cola pesada
-    if next_heavy:
-        from routers.analysis import _start_queued_analysis
-        _start_queued_analysis(next_heavy)

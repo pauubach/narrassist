@@ -13,20 +13,125 @@ from typing import Optional, Any
 router = APIRouter()
 
 
+def _resume_queued_heavy_analysis(queued_entry: dict):
+    """
+    Resume análisis de un proyecto que completó Tier 1 y estaba esperando el slot pesado.
+
+    Usa el tier1_context guardado para saltar directamente a las fases pesadas
+    sin re-parsear, re-clasificar ni re-detectar capítulos.
+    """
+    import threading
+    import time as time_module
+
+    ctx = queued_entry["tier1_context"]
+    tracker = queued_entry["tracker"]
+    project_id = ctx["project_id"]
+    logger.info(f"Resuming heavy phases for queued project {project_id}")
+
+    def _run_heavy():
+        from routers._analysis_phases import (
+            ProgressTracker,
+            run_ollama_healthcheck,
+            run_ner, run_llm_entity_validation, run_fusion,
+            run_attributes, run_consistency, run_grammar, run_alerts,
+            release_heavy_slot,
+            run_reconciliation, run_completion,
+            handle_analysis_error, run_finally_cleanup,
+        )
+        from routers._enrichment_phases import (
+            run_relationships_enrichment,
+            run_voice_enrichment,
+            run_prose_enrichment,
+            run_health_enrichment,
+            capture_entity_fingerprint,
+            invalidate_enrichment_if_mutated,
+        )
+
+        try:
+            # Fresh DB session for the new thread
+            ctx["db_session"] = deps.get_database()
+            tracker.db_session = ctx["db_session"]
+            ctx["queued_for_heavy"] = False
+            ctx["heavy_slot_released"] = False
+
+            # Claim heavy slot
+            with deps._progress_lock:
+                deps._heavy_analysis_project_id = project_id
+                deps._heavy_analysis_claimed_at = time_module.time()
+                storage = deps.analysis_progress_storage.get(project_id)
+                if storage:
+                    storage["status"] = "running"
+                    storage["current_phase"] = "Preparando análisis profundo..."
+                    storage["current_action"] = ""
+
+            # Update project status from queued back to analyzing
+            try:
+                from narrative_assistant.persistence.project import ProjectManager
+                project = ctx["project"]
+                project.analysis_status = "analyzing"
+                proj_manager = ProjectManager(ctx["db_session"])
+                proj_manager.update(project)
+            except Exception as e:
+                logger.warning(f"Could not update project status: {e}")
+
+            # Continue from where Tier 1 left off
+            run_ollama_healthcheck(ctx, tracker)
+
+            # Tier 2: Heavy phases (exclusive — one project at a time)
+            run_ner(ctx, tracker)
+            run_llm_entity_validation(ctx, tracker)
+            run_fusion(ctx, tracker)
+            run_attributes(ctx, tracker)
+            run_consistency(ctx, tracker)
+            run_grammar(ctx, tracker)
+            run_alerts(ctx, tracker)
+
+            # Release heavy slot — enrichment is CPU-only
+            release_heavy_slot(ctx)
+
+            # Capture entity fingerprint before enrichment
+            entity_fp = capture_entity_fingerprint(ctx["db_session"], project_id)
+
+            # Tier 3: Enrichment phases (CPU-only)
+            run_relationships_enrichment(ctx, tracker)
+            run_voice_enrichment(ctx, tracker)
+            run_prose_enrichment(ctx, tracker)
+            run_health_enrichment(ctx, tracker)
+
+            # Check for entity mutations during enrichment
+            invalidate_enrichment_if_mutated(ctx["db_session"], project_id, entity_fp)
+
+            # Final reconciliation + completion
+            run_reconciliation(ctx, tracker)
+            run_completion(ctx, tracker)
+
+        except Exception as e:
+            handle_analysis_error(ctx, e)
+
+        finally:
+            run_finally_cleanup(ctx)
+
+    thread = threading.Thread(target=_run_heavy, daemon=True)
+    thread.start()
+
+
 def _start_queued_analysis(queued_entry: dict):
     """
-    Inicia el análisis de un proyecto que estaba en cola.
-    Se ejecuta en un thread separado para no bloquear el thread que acaba de terminar.
+    Legacy fallback: re-starts full analysis for a queued project.
+
+    Prefer _resume_queued_heavy_analysis when tier1_context is available.
     """
+    if "tier1_context" in queued_entry:
+        return _resume_queued_heavy_analysis(queued_entry)
+
     import threading
     import asyncio
 
     project_id = queued_entry["project_id"]
-    logger.info(f"Auto-starting queued analysis for project {project_id}")
+    logger.info(f"Fallback: re-starting full analysis for project {project_id}")
 
     def _trigger():
         try:
-            # Crear un event loop para llamar a la función async
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             try:
@@ -35,7 +140,6 @@ def _start_queued_analysis(queued_entry: dict):
                 loop.close()
         except Exception as e:
             logger.error(f"Error auto-starting queued project {project_id}: {e}", exc_info=True)
-            # Limpiar estado de cola si falla
             with deps._progress_lock:
                 if project_id in deps.analysis_progress_storage:
                     deps.analysis_progress_storage[project_id]["status"] = "error"
