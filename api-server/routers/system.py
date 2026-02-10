@@ -415,6 +415,7 @@ async def models_status():
                 "all_required_installed": all(
                     info.get("installed", False)
                     for info in status.values()
+                    if info.get("required", True)
                 ),
             },
         )
@@ -573,12 +574,18 @@ async def download_models(request: DownloadModelsRequest):
 
         def download_task():
             from concurrent.futures import ThreadPoolExecutor, as_completed
+            from narrative_assistant.core.model_manager import (
+                _update_download_progress,
+                _clear_download_progress,
+            )
 
             models_to_download = []
             for model_name in request.models:
                 mt = MODEL_TYPE_MAP.get(model_name)
                 if mt:
                     models_to_download.append((model_name, mt))
+                    # Clear stale progress from previous attempts
+                    _clear_download_progress(mt)
 
             # Descargas paralelas: spaCy (GitHub CDN) + HF model en paralelo
             # Máximo 2 workers para no saturar red ni RAM
@@ -588,10 +595,20 @@ async def download_models(request: DownloadModelsRequest):
                     result = manager.ensure_model(mt, force_download=request.force)
                     if result.is_success:
                         logger.info(f"Model {name} downloaded successfully")
+                        # Mark completed in progress tracker (ensure_model
+                        # doesn't update progress when model is found locally)
+                        _update_download_progress(mt, phase="completed")
                     else:
                         logger.error(f"Model {name} download failed: {result.error}")
+                        _update_download_progress(
+                            mt, phase="error",
+                            error_message=str(result.error),
+                        )
                 except Exception as e:
                     logger.error(f"Error downloading {name}: {e}")
+                    _update_download_progress(
+                        mt, phase="error", error_message=str(e),
+                    )
 
             with ThreadPoolExecutor(max_workers=2) as pool:
                 futures = {pool.submit(_download_one, item): item[0] for item in models_to_download}

@@ -430,6 +430,59 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                 from narrative_assistant.persistence.project import ProjectManager
                 from narrative_assistant.persistence.document_fingerprint import generate_fingerprint
 
+                # ========== LICENSE GATING ==========
+                # Determinar features disponibles segun licencia
+                # NA_LICENSING_ENABLED=false (default) -> todo desbloqueado
+                from narrative_assistant.licensing.gating import is_licensing_enabled, apply_license_gating
+                from narrative_assistant.pipelines.unified_analysis import UnifiedConfig
+
+                analysis_config = UnifiedConfig.standard()
+                if is_licensing_enabled():
+                    try:
+                        from narrative_assistant.licensing.verification import get_cached_license
+                        cached = get_cached_license()
+                        tier = cached.tier if cached else None
+                        analysis_config = apply_license_gating(analysis_config, tier)
+                        logger.info(f"License gating applied (tier={tier})")
+                    except Exception as lic_err:
+                        logger.warning(f"License gating check failed, using defaults: {lic_err}")
+                else:
+                    logger.debug("Licensing disabled (NA_LICENSING_ENABLED=false), all features enabled")
+
+                # ========== APPLY PROJECT SETTINGS (S7b-08) ==========
+                # User preferences from project.settings.analysis_features
+                # override analysis_config (but can only DISABLE, never re-enable
+                # something the license gating disabled)
+                try:
+                    import json
+                    project_settings = project.settings if isinstance(project.settings, dict) else (
+                        json.loads(project.settings) if project.settings else {}
+                    )
+                    analysis_features = project_settings.get("analysis_features", {})
+                    if analysis_features:
+                        # Map frontend feature keys to UnifiedConfig fields
+                        _SETTINGS_MAP = {
+                            "character_profiling": "run_character_profiling",
+                            "network_analysis": "run_network_analysis",
+                            "anachronism_detection": "run_anachronism_detection",
+                            "ooc_detection": "run_ooc_detection",
+                            "classical_spanish": "run_classical_spanish",
+                            "name_variants": "run_name_variants",
+                            "multi_model_voting": "run_multi_model_voting",
+                            "spelling": "run_spelling",
+                            "grammar": "run_grammar",
+                            "consistency": "run_consistency",
+                        }
+                        for feat_key, config_field in _SETTINGS_MAP.items():
+                            if feat_key in analysis_features and hasattr(analysis_config, config_field):
+                                user_val = bool(analysis_features[feat_key])
+                                # Only disable — never re-enable something license blocked
+                                if not user_val:
+                                    setattr(analysis_config, config_field, False)
+                        logger.info(f"Applied project analysis settings: {analysis_features}")
+                except Exception as settings_err:
+                    logger.debug(f"Could not apply project analysis settings: {settings_err}")
+
                 # ========== FASE 1: PARSING ==========
                 current_phase_key = "parsing"
                 phase_start_times["parsing"] = time.time()
@@ -448,6 +501,13 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                 raw_document = parse_result.value
                 full_text = raw_document.full_text
                 word_count = len(full_text.split())
+
+                # S7c-03: Validar documento vacío
+                if not full_text or not full_text.strip():
+                    raise Exception(
+                        "El documento está vacío o no contiene texto legible. "
+                        "Verifica que el archivo no esté corrupto."
+                    )
 
                 deps.analysis_progress_storage[project_id]["progress"] = pct_end
                 deps.analysis_progress_storage[project_id]["metrics"]["word_count"] = word_count
@@ -635,6 +695,21 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                     proj_manager = ProjectManager(db_session)
                     proj_manager.update(project)
                     return  # Exit — will be resumed when heavy slot frees
+
+                # S7c-04: Health check de Ollama antes de fases pesadas
+                ollama_available = False
+                if analysis_config.use_llm:
+                    try:
+                        from narrative_assistant.llm.ollama_manager import is_ollama_available
+                        ollama_available = is_ollama_available()
+                        if not ollama_available:
+                            logger.warning("Ollama no disponible, continuando sin LLM")
+                            analysis_config.use_llm = False
+                    except ImportError:
+                        logger.debug("Ollama manager not available")
+                    except Exception as e:
+                        logger.warning(f"Ollama health check failed: {e}")
+                        analysis_config.use_llm = False
 
                 # ========== FASE 4: NER ==========
                 current_phase_key = "ner"
@@ -1833,12 +1908,91 @@ JSON:"""
 
                 check_cancelled()
 
+                # ========== SUB-FASE 5.4: DETECCIÓN OUT-OF-CHARACTER ==========
+                ooc_report = None
+                if analysis_config.run_ooc_detection:
+                    deps.analysis_progress_storage[project_id]["current_action"] = "Detectando comportamiento fuera de personaje..."
+                    try:
+                        from narrative_assistant.analysis.out_of_character import OutOfCharacterDetector
+                        from narrative_assistant.analysis.character_profiling import CharacterProfiler
+
+                        # Build profiles from entities
+                        profiler = CharacterProfiler()
+                        character_entities = [
+                            e for e in entities
+                            if (hasattr(e.entity_type, 'value') and e.entity_type.value in ("character", "PER", "PERSON"))
+                            or (isinstance(e.entity_type, str) and e.entity_type in ("character", "PER", "PERSON"))
+                        ]
+                        if character_entities:
+                            chapter_texts = {ch["chapter_number"]: ch["content"] for ch in chapters_data}
+                            profiles = profiler.build_profiles(character_entities, chapters_data, chapter_texts)
+                            if profiles:
+                                ooc_detector = OutOfCharacterDetector()
+                                ooc_report = ooc_detector.detect(
+                                    profiles=profiles,
+                                    chapter_texts=chapter_texts,
+                                )
+                                logger.info(f"OOC detection: {len(ooc_report.events)} events found")
+                    except ImportError as e:
+                        logger.warning(f"OOC detection module not available: {e}")
+                    except Exception as e:
+                        logger.warning(f"Error in OOC detection: {e}", exc_info=True)
+
+                    check_cancelled()
+
+                # ========== SUB-FASE 5.5: DETECCIÓN DE ANACRONISMOS ==========
+                anachronism_report = None
+                if analysis_config.run_anachronism_detection:
+                    deps.analysis_progress_storage[project_id]["current_action"] = "Detectando anacronismos..."
+                    try:
+                        from narrative_assistant.temporal.anachronisms import AnachronismDetector
+
+                        detector = AnachronismDetector()
+                        anachronism_report = detector.detect(full_text)
+                        if anachronism_report and anachronism_report.anachronisms:
+                            logger.info(f"Anachronism detection: {len(anachronism_report.anachronisms)} anachronisms found")
+                        else:
+                            logger.info("Anachronism detection: no anachronisms found (period may not be detected)")
+                    except ImportError as e:
+                        logger.warning(f"Anachronism detection module not available: {e}")
+                    except Exception as e:
+                        logger.warning(f"Error in anachronism detection: {e}", exc_info=True)
+
+                    check_cancelled()
+
+                # ========== SUB-FASE 5.6: NORMALIZACIÓN ESPAÑOL CLÁSICO ==========
+                classical_normalization = None
+                if analysis_config.run_classical_spanish:
+                    deps.analysis_progress_storage[project_id]["current_action"] = "Detectando español clásico..."
+                    try:
+                        from narrative_assistant.nlp.classical_spanish import ClassicalSpanishNormalizer
+
+                        normalizer = ClassicalSpanishNormalizer()
+                        period = normalizer.detect_period(full_text)
+                        if period != "modern":
+                            classical_normalization = normalizer.normalize(full_text)
+                            logger.info(f"Classical Spanish: period={period}, {len(classical_normalization.replacements)} normalizations")
+                        else:
+                            logger.debug("Classical Spanish: modern text, skipping normalization")
+                    except ImportError as e:
+                        logger.warning(f"Classical Spanish module not available: {e}")
+                    except Exception as e:
+                        logger.warning(f"Error in classical Spanish detection: {e}", exc_info=True)
+
+                    check_cancelled()
+
                 # Guardar métricas de análisis adicionales
                 deps.analysis_progress_storage[project_id]["metrics"]["vital_status_deaths"] = (
                     len(vital_status_report.death_events) if vital_status_report else 0
                 )
                 deps.analysis_progress_storage[project_id]["metrics"]["location_events"] = (
                     len(location_report.location_events) if location_report else 0
+                )
+                deps.analysis_progress_storage[project_id]["metrics"]["ooc_events"] = (
+                    len(ooc_report.events) if ooc_report else 0
+                )
+                deps.analysis_progress_storage[project_id]["metrics"]["anachronisms_found"] = (
+                    len(anachronism_report.anachronisms) if anachronism_report and anachronism_report.anachronisms else 0
                 )
 
                 phase_durations["consistency"] = time.time() - phase_start_times["consistency"]
@@ -2085,6 +2239,51 @@ JSON:"""
                         except Exception as e:
                             logger.warning(f"Error creating location inconsistency alert: {e}")
 
+                # Alertas de comportamiento out-of-character
+                if ooc_report and hasattr(ooc_report, 'events'):
+                    from narrative_assistant.alerts.engine import AlertCategory, AlertSeverity
+                    for event in ooc_report.events:
+                        try:
+                            severity = AlertSeverity.WARNING if event.severity.value == "high" else AlertSeverity.INFO
+                            alert_result = alert_engine.create_alert(
+                                project_id=project_id,
+                                category=AlertCategory.CONSISTENCY,
+                                severity=severity,
+                                alert_type="out_of_character",
+                                title=f"Comportamiento atípico: {event.character_name}",
+                                description=event.description,
+                                explanation=event.explanation,
+                                confidence=event.confidence,
+                                chapter=event.chapter_number if hasattr(event, 'chapter_number') else None,
+                            )
+                            if alert_result.is_success:
+                                alerts_created += 1
+                        except Exception as e:
+                            logger.warning(f"Error creating OOC alert: {e}")
+
+                # Alertas de anacronismos
+                if anachronism_report and anachronism_report.anachronisms:
+                    from narrative_assistant.alerts.engine import AlertCategory, AlertSeverity
+                    for anach in anachronism_report.anachronisms:
+                        try:
+                            alert_result = alert_engine.create_alert(
+                                project_id=project_id,
+                                category=AlertCategory.TIMELINE_ISSUE,
+                                severity=AlertSeverity.WARNING,
+                                alert_type="anachronism",
+                                title=f"Posible anacronismo: {anach.term}",
+                                description=(
+                                    f"'{anach.term}' aparece en un contexto temporal donde no existía "
+                                    f"({anach.expected_period})"
+                                ),
+                                explanation=anach.explanation,
+                                confidence=anach.confidence,
+                            )
+                            if alert_result.is_success:
+                                alerts_created += 1
+                        except Exception as e:
+                            logger.warning(f"Error creating anachronism alert: {e}")
+
                 phase_durations["alerts"] = time.time() - phase_start_times["alerts"]
                 deps.analysis_progress_storage[project_id]["progress"] = 100
                 deps.analysis_progress_storage[project_id]["metrics"]["alerts_generated"] = alerts_created
@@ -2246,6 +2445,7 @@ JSON:"""
                 logger.info(f"Persisted {len(chapters_data)} chapters and {total_sections} sections to database")
             except Exception as e:
                 logger.error(f"Error persisting chapters: {e}", exc_info=True)
+                raise  # S7c-05: Don't silently swallow — chapters are needed for NER
 
         def _persist_sections_recursive(conn, sections: list, proj_id: int, chapter_id: int, parent_id: int | None) -> int:
             """Persiste secciones recursivamente con sus subsecciones."""

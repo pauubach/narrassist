@@ -265,7 +265,7 @@
               <i class="pi pi-file"></i>
               {{ selectedChapter.title || `Capítulo ${selectedChapter.segment_id}` }}
             </span>
-            <Button icon="pi pi-times" text rounded @click="selectedChapter = null" />
+            <Button icon="pi pi-times" text rounded aria-label="Cerrar detalle" @click="selectedChapter = null" />
           </div>
         </template>
         <template #content>

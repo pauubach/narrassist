@@ -265,15 +265,34 @@ export const useSystemStore = defineStore('system', () => {
           modelSizes.value = response.model_sizes
         }
 
-        // Detect failed downloads: no active downloads but some have error phase
+        // Detect finished downloads: no active downloads but entries exist
         if (!response.has_active && Object.keys(response.active_downloads || {}).length > 0) {
           const errorDownloads = Object.entries(response.active_downloads || {})
             .filter(([, info]) => info.phase === 'error')
-          if (errorDownloads.length > 0) {
-            const failedNames = errorDownloads.map(([name]) => name).join(', ')
-            modelsError.value = `Error descargando modelo(s): ${failedNames}. Verifica tu conexión e intenta de nuevo.`
+          const allCompleted = Object.values(response.active_downloads || {})
+            .every((info) => info.phase === 'completed')
+
+          if (allCompleted) {
+            // All downloads completed successfully
             stopPolling()
             modelsDownloading.value = false
+          } else if (errorDownloads.length > 0) {
+            // Some downloads failed — check if required models are OK
+            // (refresh models status to get all_required_installed)
+            const status = await checkModelsStatus()
+            if (status?.all_required_installed) {
+              // Required models OK, optional ones failed — warn but don't block
+              const failedNames = errorDownloads.map(([name]) => name).join(', ')
+              console.warn(`Optional model download failed: ${failedNames}`)
+              stopPolling()
+              modelsDownloading.value = false
+            } else {
+              // Required models missing — show error
+              const failedNames = errorDownloads.map(([name]) => name).join(', ')
+              modelsError.value = `Error descargando modelo(s): ${failedNames}. Verifica tu conexión e intenta de nuevo.`
+              stopPolling()
+              modelsDownloading.value = false
+            }
           }
         }
       }

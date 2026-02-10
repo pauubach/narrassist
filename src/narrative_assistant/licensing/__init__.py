@@ -40,6 +40,12 @@ from .models import (
     initialize_licensing_schema,
     words_to_pages,
 )
+from .gating import (
+    apply_license_gating,
+    get_allowed_features,
+    is_feature_allowed,
+    is_licensing_enabled,
+)
 from .verification import (
     DeviceCooldownError,
     DeviceLimitError,
@@ -115,4 +121,9 @@ __all__ = [
     "record_manuscript_usage",
     "deactivate_device",
     "get_license_info",
+    # Gating
+    "is_licensing_enabled",
+    "is_feature_allowed",
+    "get_allowed_features",
+    "apply_license_gating",
 ]

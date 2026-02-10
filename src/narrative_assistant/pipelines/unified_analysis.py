@@ -126,6 +126,16 @@ class UnifiedConfig:
     run_temporal_consistency: bool = True
     create_alerts: bool = True
 
+    # Features avanzadas (gated por licencia)
+    run_character_profiling: bool = True
+    run_network_analysis: bool = True
+    run_anachronism_detection: bool = True
+    run_ooc_detection: bool = True
+    run_classical_spanish: bool = True
+    run_name_variants: bool = True
+    run_multi_model_voting: bool = True
+    run_full_reports: bool = True
+
     # Parámetros
     min_confidence: float = 0.5
     use_llm: bool = False  # Usar LLM local (Ollama)

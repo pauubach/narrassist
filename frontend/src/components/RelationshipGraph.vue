@@ -346,7 +346,7 @@
           <i :class="getEntityIcon(selectedEntity.type)"></i>
           <h4>{{ selectedEntity.label }}</h4>
         </div>
-        <Button icon="pi pi-times" text rounded size="small" @click="selectedEntity = null" />
+        <Button icon="pi pi-times" text rounded size="small" aria-label="Cerrar panel" @click="selectedEntity = null" />
       </div>
       <div class="panel-content">
         <div v-if="selectedEntityRelations.length > 0" class="relations-list">

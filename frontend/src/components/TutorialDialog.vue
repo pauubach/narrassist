@@ -118,9 +118,9 @@
               <span class="tab active">Texto</span>
               <span class="tab">Entidades</span>
               <span class="tab">Relaciones</span>
-              <span class="tab">Alertas</span>
-              <span class="tab">Timeline</span>
-              <span class="tab">Estilo</span>
+              <span class="tab">Revisión</span>
+              <span class="tab">Cronología</span>
+              <span class="tab">Escritura</span>
               <span class="tab">Glosario</span>
               <span class="tab">Resumen</span>
             </div>
@@ -371,6 +371,14 @@
         </div>
 
         <div class="nav-buttons">
+          <Button
+            v-if="currentStep > 0 && currentStep < totalSteps - 1"
+            label="Saltar tutorial"
+            severity="secondary"
+            text
+            size="small"
+            @click="finish"
+          />
           <Button
             v-if="currentStep > 0"
             label="Anterior"

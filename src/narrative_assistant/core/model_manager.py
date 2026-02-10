@@ -58,6 +58,7 @@ class ModelInfo:
     sha256: str | None  # None si no se conoce el hash
     source_url: str  # URL informativo (no se usa directamente)
     subdirectory: str  # Subdirectorio dentro de models/
+    required: bool = True  # False = optional enhancement, won't block setup
 
 
 # Definición de modelos conocidos con sus hashes
@@ -91,6 +92,7 @@ KNOWN_MODELS: dict[ModelType, ModelInfo] = {
         sha256=None,
         source_url="https://huggingface.co/mrm8488/bert-spanish-cased-finetuned-ner",
         subdirectory="transformer_ner",
+        required=False,  # Optional: NER falls back to spaCy + gazetteer
     ),
 }
 
@@ -490,10 +492,14 @@ class ModelManager:
         """
         target_dir = self.models_dir / model_info.subdirectory / model_info.name
 
-        # Eliminar si existe y force=True
-        if force and target_dir.exists():
-            logger.info(f"Eliminando modelo existente: {target_dir}")
-            shutil.rmtree(target_dir)
+        if target_dir.exists():
+            if force:
+                logger.info(f"Eliminando modelo existente: {target_dir}")
+                shutil.rmtree(target_dir)
+            elif not self._verify_model_structure(model_info.model_type, target_dir):
+                # Clean up incomplete/corrupt dir from previous failed download
+                logger.info(f"Eliminando directorio de modelo incompleto: {target_dir}")
+                shutil.rmtree(target_dir, ignore_errors=True)
 
         # Crear directorio padre
         target_dir.parent.mkdir(parents=True, exist_ok=True)
@@ -1149,6 +1155,7 @@ class ModelManager:
                 "size_mb": model_info.size_mb,
                 "installed": model_path is not None,
                 "path": str(model_path) if model_path else None,
+                "required": model_info.required,
             }
 
         return status

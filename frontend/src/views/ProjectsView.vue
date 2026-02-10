@@ -204,7 +204,7 @@
           <div v-if="newProject.file" class="selected-file">
             <i class="pi pi-file"></i>
             <span>{{ newProject.file.name }}</span>
-            <Button icon="pi pi-times" text rounded @click="newProject.file = null" />
+            <Button icon="pi pi-times" text rounded aria-label="Quitar archivo" @click="newProject.file = null" />
           </div>
         </div>
 
