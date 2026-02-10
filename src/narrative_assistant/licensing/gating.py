@@ -5,10 +5,16 @@ Usa NA_LICENSING_ENABLED=true para activar las restricciones por tier.
 Por defecto (false), todas las features estan desbloqueadas (modo desarrollo).
 """
 
+from __future__ import annotations
+
 import logging
 import os
+from typing import TYPE_CHECKING
 
 from .models import TIER_FEATURES, LicenseFeature, LicenseTier
+
+if TYPE_CHECKING:
+    from narrative_assistant.pipelines.unified_analysis import UnifiedConfig
 
 logger = logging.getLogger(__name__)
 
@@ -92,7 +98,7 @@ _FEATURE_CONFIG_MAP: dict[LicenseFeature, list[str]] = {
 }
 
 
-def apply_license_gating(config: "UnifiedConfig", tier: LicenseTier | None = None) -> "UnifiedConfig":
+def apply_license_gating(config: UnifiedConfig, tier: LicenseTier | None = None) -> UnifiedConfig:
     """
     Aplica restricciones de licencia a un UnifiedConfig.
 
