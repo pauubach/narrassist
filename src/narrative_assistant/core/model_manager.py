@@ -862,6 +862,7 @@ class ModelManager:
                 snapshot_download(
                     repo_id,
                     local_dir=str(target_dir),
+                    local_dir_use_symlinks=False,
                     tqdm_class=tracker_class,
                     ignore_patterns=["*.onnx", "*.h5", "tf_*", "openvino/*", "onnx/*", "rust_model.ot"],
                 )
@@ -957,6 +958,7 @@ class ModelManager:
                     snapshot_download(
                         repo_id,
                         local_dir=str(attempt_dir),
+                        local_dir_use_symlinks=False,
                         tqdm_class=tracker_class,
                         ignore_patterns=["*.onnx", "*.h5", "tf_*", "flax_*", "openvino/*", "onnx/*"],
                     )

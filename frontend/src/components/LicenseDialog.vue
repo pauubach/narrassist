@@ -64,22 +64,22 @@
         </div>
       </div>
 
-      <!-- Modulos -->
-      <div class="license-modules">
-        <h4>Modulos incluidos</h4>
-        <div class="modules-grid">
+      <!-- Features -->
+      <div class="license-features">
+        <h4>Funcionalidades incluidas</h4>
+        <div class="features-grid">
           <Tag
-            v-for="module in licenseStore.modules"
-            :key="module"
-            :value="moduleNames[module]"
+            v-for="feature in licenseStore.features"
+            :key="feature"
+            :value="featureNames[feature] || feature"
             severity="success"
           />
           <Tag
-            v-for="module in missingModules"
-            :key="module"
-            :value="moduleNames[module]"
+            v-for="feature in missingFeatures"
+            :key="feature"
+            :value="featureNames[feature] || feature"
             severity="secondary"
-            class="module-missing"
+            class="feature-missing"
           />
         </div>
       </div>
@@ -87,13 +87,13 @@
       <!-- Cuotas -->
       <div class="license-quotas">
         <div class="quota-item">
-          <span class="quota-label">Manuscritos este mes</span>
+          <span class="quota-label">Paginas este mes</span>
           <span class="quota-value">
-            <template v-if="licenseStore.manuscriptsRemaining === -1">
-              Ilimitados
+            <template v-if="licenseStore.licenseInfo?.unlimited">
+              Ilimitadas
             </template>
             <template v-else>
-              {{ licenseStore.licenseInfo?.manuscripts_used }} / {{ licenseStore.licenseInfo?.manuscripts_max }}
+              {{ licenseStore.licenseInfo?.pages_used }} / {{ licenseStore.licenseInfo?.pages_max }}
             </template>
           </span>
         </div>
@@ -215,11 +215,6 @@
       <h4>Uso del Periodo Actual</h4>
 
       <div v-if="licenseStore.usage" class="usage-details">
-        <div class="usage-period">
-          <i class="pi pi-calendar"></i>
-          <span>Periodo: {{ formatDate(licenseStore.usage.period_start) }} - {{ formatDate(licenseStore.usage.period_end) }}</span>
-        </div>
-
         <div class="usage-chart">
           <div class="usage-bar-container">
             <div
@@ -229,32 +224,32 @@
             ></div>
           </div>
           <div class="usage-labels">
-            <span class="usage-used">{{ licenseStore.usage.manuscripts_used }} usados</span>
+            <span class="usage-used">{{ licenseStore.usage.pages_used }} paginas usadas</span>
             <span class="usage-limit">
               <template v-if="licenseStore.usage.unlimited">Ilimitado</template>
-              <template v-else>{{ licenseStore.usage.manuscripts_limit }} limite</template>
+              <template v-else>{{ licenseStore.usage.pages_max }} limite</template>
             </span>
           </div>
         </div>
 
         <div v-if="!licenseStore.usage.unlimited" class="usage-remaining">
-          <template v-if="licenseStore.usage.manuscripts_remaining > 0">
+          <template v-if="licenseStore.usage.pages_remaining > 0">
             <i class="pi pi-check-circle success-icon"></i>
-            <span>Te quedan <strong>{{ licenseStore.usage.manuscripts_remaining }}</strong> manuscritos este periodo</span>
+            <span>Te quedan <strong>{{ licenseStore.usage.pages_remaining }}</strong> paginas este periodo</span>
           </template>
           <template v-else>
             <i class="pi pi-exclamation-circle warning-icon"></i>
-            <span>Has agotado tu cuota de manuscritos para este periodo</span>
+            <span>Has agotado tu cuota de paginas para este periodo</span>
           </template>
         </div>
 
         <div v-else class="usage-remaining">
           <i class="pi pi-infinity success-icon"></i>
-          <span>Manuscritos ilimitados con tu plan</span>
+          <span>Paginas ilimitadas con tu plan</span>
         </div>
 
         <div class="usage-note">
-          <small>Nota: El re-análisis de un manuscrito ya procesado no consume cuota adicional.</small>
+          <small>Nota: El re-analisis de un documento ya procesado no consume cuota adicional.</small>
         </div>
       </div>
 
@@ -282,7 +277,7 @@ import Message from 'primevue/message'
 import Tag from 'primevue/tag'
 import Divider from 'primevue/divider'
 
-import { useLicenseStore, type LicenseModule } from '../stores/license'
+import { useLicenseStore, type LicenseFeature } from '../stores/license'
 
 interface Props {
   visible: boolean
@@ -327,18 +322,37 @@ const dialogTitle = computed(() => {
   }
 })
 
-// Nombres de modulos para mostrar
-const moduleNames: Record<LicenseModule, string> = {
-  CORE: 'Core',
-  NARRATIVA: 'Narrativa',
-  VOZ_ESTILO: 'Voz y Estilo',
-  AVANZADO: 'Avanzado',
+// Nombres de features para mostrar
+const featureNames: Record<LicenseFeature, string> = {
+  attribute_consistency: 'Consistencia de atributos',
+  grammar_spelling: 'Gramatica y ortografia',
+  ner_coreference: 'Entidades y correferencias',
+  name_variants: 'Variantes de nombres',
+  character_profiling: 'Perfiles de personajes',
+  network_analysis: 'Analisis de relaciones',
+  anachronism_detection: 'Deteccion de anacronismos',
+  ooc_detection: 'Deteccion fuera de caracter',
+  classical_spanish: 'Espanol clasico',
+  multi_model: 'Multi-modelo (votacion)',
+  full_reports: 'Informes completos',
 }
 
-const allModules: LicenseModule[] = ['CORE', 'NARRATIVA', 'VOZ_ESTILO', 'AVANZADO']
+const allFeatures: LicenseFeature[] = [
+  'attribute_consistency',
+  'grammar_spelling',
+  'ner_coreference',
+  'name_variants',
+  'character_profiling',
+  'network_analysis',
+  'anachronism_detection',
+  'ooc_detection',
+  'classical_spanish',
+  'multi_model',
+  'full_reports',
+]
 
-const missingModules = computed(() => {
-  return allModules.filter((m) => !licenseStore.modules.includes(m))
+const missingFeatures = computed(() => {
+  return allFeatures.filter((f) => !licenseStore.features.includes(f))
 })
 
 const statusClass = computed(() => {
@@ -365,15 +379,9 @@ const statusMessage = computed(() => {
 
 const usagePercentage = computed(() => {
   if (!licenseStore.usage || licenseStore.usage.unlimited) return 0
-  if (licenseStore.usage.manuscripts_limit === 0) return 0
-  return Math.min(100, (licenseStore.usage.manuscripts_used / licenseStore.usage.manuscripts_limit) * 100)
+  if (licenseStore.usage.pages_max === 0) return 0
+  return Math.min(100, (licenseStore.usage.pages_used / licenseStore.usage.pages_max) * 100)
 })
-
-const formatDate = (dateStr: string) => {
-  if (!dateStr) return ''
-  const date = new Date(dateStr)
-  return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })
-}
 
 // Determinar vista inicial
 watch(
@@ -552,24 +560,24 @@ onMounted(() => {
   font-size: 0.9rem;
 }
 
-/* Modulos */
-.license-modules {
+/* Features */
+.license-features {
   margin-bottom: 1.5rem;
 }
 
-.license-modules h4 {
+.license-features h4 {
   margin: 0 0 0.75rem 0;
   font-size: 0.9rem;
   font-weight: 600;
 }
 
-.modules-grid {
+.features-grid {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
 }
 
-.module-missing {
+.feature-missing {
   opacity: 0.5;
   text-decoration: line-through;
 }
@@ -721,14 +729,6 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 1rem;
-}
-
-.usage-period {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  color: var(--p-text-muted-color);
-  font-size: 0.9rem;
 }
 
 .usage-chart {

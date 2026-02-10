@@ -5,7 +5,8 @@ Proporciona:
 - Verificacion online contra el backend
 - Modo offline con periodo de gracia de 14 dias
 - Gestion de dispositivos vinculados
-- Control de cuota de manuscritos
+- Control de cuota de paginas (250 palabras = 1 pagina)
+- Verificacion de features por tier
 """
 
 import json
@@ -20,16 +21,17 @@ from ..core.result import Result
 from .fingerprint import get_hardware_fingerprint, get_hardware_info
 from .models import (
     DEVICE_DEACTIVATION_COOLDOWN_HOURS,
+    TIER_FEATURES,
     Device,
     DeviceStatus,
     License,
-    LicenseBundle,
-    LicenseModule,
+    LicenseFeature,
     LicenseStatus,
     LicenseTier,
     Subscription,
     UsageRecord,
     initialize_licensing_schema,
+    words_to_pages,
 )
 
 logger = logging.getLogger(__name__)
@@ -98,17 +100,17 @@ class LicenseOfflineError(LicenseError):
         if self.grace_remaining:
             days = self.grace_remaining.days
             self.user_message = (
-                f"Sin conexión. Modo offline activo ({days} días restantes). "
-                "Conéctate a internet para verificar tu licencia."
+                f"Sin conexion. Modo offline activo ({days} dias restantes). "
+                "Conectate a internet para verificar tu licencia."
             )
         else:
-            self.user_message = "No se puede verificar la licencia sin conexión a internet."
+            self.user_message = "No se puede verificar la licencia sin conexion a internet."
         super().__post_init__()
 
 
 @dataclass
 class DeviceLimitError(LicenseError):
-    """Límite de dispositivos alcanzado."""
+    """Limite de dispositivos alcanzado."""
 
     current_devices: int = 0
     max_devices: int = 0
@@ -119,7 +121,7 @@ class DeviceLimitError(LicenseError):
     def __post_init__(self):
         if self.user_message is None:
             self.user_message = (
-                f"Has alcanzado el límite de {self.max_devices} dispositivo(s). "
+                f"Has alcanzado el limite de {self.max_devices} dispositivo(s). "
                 "Desactiva un dispositivo existente o actualiza tu plan."
             )
         super().__post_init__()
@@ -139,49 +141,50 @@ class DeviceCooldownError(LicenseError):
             hours_remaining = int((self.cooldown_ends - datetime.utcnow()).total_seconds() / 3600)
             self.user_message = (
                 f"Este dispositivo fue desactivado recientemente. "
-                f"Podrás reactivarlo en {hours_remaining} horas."
+                f"Podras reactivarlo en {hours_remaining} horas."
             )
         else:
-            self.user_message = "Este dispositivo está en periodo de espera tras desactivación."
+            self.user_message = "Este dispositivo esta en periodo de espera tras desactivacion."
         super().__post_init__()
 
 
 @dataclass
 class QuotaExceededError(LicenseError):
-    """Cuota de manuscritos excedida."""
+    """Cuota de paginas excedida."""
 
     current_usage: int = 0
     max_usage: int = 0
     billing_period: str = ""
-    message: str = "Manuscript quota exceeded"
+    message: str = "Page quota exceeded"
     severity: ErrorSeverity = ErrorSeverity.FATAL
     user_message: str | None = None
 
     def __post_init__(self):
         if self.user_message is None:
             self.user_message = (
-                f"Has alcanzado el límite de {self.max_usage} manuscritos este mes "
+                f"Has alcanzado el limite de {self.max_usage} paginas este mes "
                 f"({self.current_usage}/{self.max_usage}). "
-                "Espera al próximo periodo o actualiza tu plan."
+                "Espera al proximo periodo o actualiza tu plan."
             )
         super().__post_init__()
 
 
 @dataclass
-class ModuleNotLicensedError(LicenseError):
-    """Módulo no incluido en la licencia."""
+class TierFeatureError(LicenseError):
+    """Funcionalidad no disponible en el tier actual."""
 
-    module: LicenseModule | None = None
-    message: str = "Module not licensed"
+    feature: LicenseFeature | None = None
+    required_tier: str = "Profesional"
+    message: str = "Feature not available in current tier"
     severity: ErrorSeverity = ErrorSeverity.FATAL
     user_message: str | None = None
 
     def __post_init__(self):
         if self.user_message is None:
-            module_name = self.module.display_name if self.module else "este modulo"
+            feature_name = self.feature.display_name if self.feature else "esta funcionalidad"
             self.user_message = (
-                f"Tu licencia no incluye {module_name}. "
-                "Actualiza tu plan para acceder a esta funcionalidad."
+                f"{feature_name} requiere el plan {self.required_tier}. "
+                "Actualiza tu plan para acceder."
             )
         super().__post_init__()
 
@@ -201,7 +204,7 @@ class VerificationResult:
     message: str
     is_offline: bool = False
     grace_remaining: timedelta | None = None
-    quota_remaining: int | None = None
+    quota_remaining: int | None = None  # Paginas restantes (None = ilimitado)
     devices_remaining: int = 0
 
     @property
@@ -225,7 +228,8 @@ class LicenseVerifier:
     - Verificacion online/offline
     - Cache de verificacion
     - Gestion de dispositivos
-    - Control de cuotas
+    - Control de cuotas (paginas)
+    - Verificacion de features por tier
     """
 
     # URL del backend de licencias
@@ -257,7 +261,7 @@ class LicenseVerifier:
 
     @staticmethod
     def _get_app_version() -> str:
-        """Obtiene la versión actual de la aplicación."""
+        """Obtiene la version actual de la aplicacion."""
         try:
             from .. import __version__
 
@@ -315,7 +319,7 @@ class LicenseVerifier:
             if license_obj.status == LicenseStatus.EXPIRED:
                 return Result.failure(LicenseExpiredError(expired_at=license_obj.expires_at))
 
-            # 5. Calcular cuota restante
+            # 5. Calcular cuota restante (paginas)
             quota_remaining = self._calculate_quota_remaining(license_obj)
 
             # 6. Construir resultado
@@ -402,11 +406,9 @@ class LicenseVerifier:
                 if sub_data := response_data.get("subscription"):
                     license_obj.subscription = Subscription.from_dict(sub_data)
 
-                # Actualizar tier/bundle si cambiaron
+                # Actualizar tier si cambio
                 if tier := response_data.get("tier"):
                     license_obj.tier = LicenseTier(tier)
-                if bundle := response_data.get("bundle"):
-                    license_obj.bundle = LicenseBundle(bundle)
 
                 logger.info("Licencia verificada online exitosamente")
                 return Result.success(license_obj)
@@ -679,40 +681,62 @@ class LicenseVerifier:
         return Result.success(device)
 
     # =========================================================================
-    # Gestion de Cuotas
+    # Gestion de Cuotas (Paginas con Rollover)
     # =========================================================================
 
     def _calculate_quota_remaining(self, license_obj: License) -> int | None:
-        """Calcula manuscritos restantes en el periodo actual."""
+        """Calcula paginas restantes en el periodo actual (con rollover).
+
+        Rollover: las paginas no usadas del mes anterior se suman al mes actual.
+        Solo se arrastra 1 mes (no acumulacion infinita).
+        """
         limits = license_obj.limits
-        if limits.max_manuscripts_per_month == 0:
+        if limits.is_unlimited:
             return None  # Ilimitado
 
         billing_period = UsageRecord.current_billing_period()
         db = self._get_db()
 
+        # Paginas usadas este mes
         row = db.fetchone(
             """
-            SELECT COUNT(*) as count FROM usage_records
+            SELECT COALESCE(SUM(page_count), 0) as total_pages
+            FROM usage_records
             WHERE license_id = ? AND billing_period = ? AND counted_for_quota = 1
             """,
             (license_obj.id, billing_period),
         )
+        current_pages_used = row["total_pages"] if row else 0
 
-        used = row["count"] if row else 0
-        remaining = limits.max_manuscripts_per_month - used
+        # Calcular rollover del mes anterior
+        rollover_pages = 0
+        if limits.pages_rollover_months > 0:
+            prev_period = UsageRecord.previous_billing_period()
+            prev_row = db.fetchone(
+                """
+                SELECT COALESCE(SUM(page_count), 0) as total_pages
+                FROM usage_records
+                WHERE license_id = ? AND billing_period = ? AND counted_for_quota = 1
+                """,
+                (license_obj.id, prev_period),
+            )
+            prev_pages_used = prev_row["total_pages"] if prev_row else 0
+            rollover_pages = max(0, limits.max_pages_per_month - prev_pages_used)
+
+        total_available = limits.max_pages_per_month + rollover_pages
+        remaining = total_available - current_pages_used
 
         return max(0, remaining)
 
     def check_quota(self, license_obj: License | None = None) -> Result[int]:
         """
-        Verifica si hay cuota disponible.
+        Verifica si hay cuota de paginas disponible.
 
         Args:
             license_obj: Licencia a verificar (usa cache si None)
 
         Returns:
-            Result con manuscritos restantes
+            Result con paginas restantes (-1 si ilimitado)
         """
         if license_obj is None:
             license_obj = get_cached_license()
@@ -724,10 +748,11 @@ class LicenseVerifier:
             return Result.success(-1)  # Ilimitado
 
         if remaining <= 0:
+            limits = license_obj.limits
             return Result.failure(
                 QuotaExceededError(
-                    current_usage=license_obj.limits.max_manuscripts_per_month,
-                    max_usage=license_obj.limits.max_manuscripts_per_month,
+                    current_usage=limits.max_pages_per_month,
+                    max_usage=limits.max_pages_per_month,
                     billing_period=UsageRecord.current_billing_period(),
                 )
             )
@@ -742,7 +767,7 @@ class LicenseVerifier:
         word_count: int,
     ) -> Result[UsageRecord]:
         """
-        Registra uso de un manuscrito.
+        Registra uso de un manuscrito (cuota en paginas).
 
         Args:
             project_id: ID del proyecto
@@ -757,6 +782,8 @@ class LicenseVerifier:
         if license_obj is None:
             return Result.failure(LicenseNotFoundError())
 
+        page_count = words_to_pages(word_count)
+
         # Verificar si ya existe registro para este documento en este periodo
         billing_period = UsageRecord.current_billing_period()
         db = self._get_db()
@@ -770,15 +797,16 @@ class LicenseVerifier:
         )
 
         if existing:
-            # Ya registrado, actualizar
+            # Ya registrado (re-analisis), actualizar sin contar contra cuota
             db.execute(
                 """
                 UPDATE usage_records SET
                     analysis_completed_at = ?,
-                    word_count = ?
+                    word_count = ?,
+                    page_count = ?
                 WHERE id = ?
                 """,
-                (datetime.utcnow().isoformat(), word_count, existing["id"]),
+                (datetime.utcnow().isoformat(), word_count, page_count, existing["id"]),
             )
             return Result.success(
                 UsageRecord(
@@ -788,7 +816,9 @@ class LicenseVerifier:
                     document_fingerprint=document_fingerprint,
                     document_name=document_name,
                     word_count=word_count,
+                    page_count=page_count,
                     billing_period=billing_period,
+                    counted_for_quota=False,
                 )
             )
 
@@ -799,6 +829,7 @@ class LicenseVerifier:
             document_fingerprint=document_fingerprint,
             document_name=document_name,
             word_count=word_count,
+            page_count=page_count,
             analysis_started_at=datetime.utcnow(),
             billing_period=billing_period,
             counted_for_quota=True,
@@ -809,8 +840,9 @@ class LicenseVerifier:
                 """
                 INSERT INTO usage_records (
                     license_id, project_id, document_fingerprint, document_name,
-                    word_count, analysis_started_at, billing_period, counted_for_quota
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    word_count, page_count, analysis_started_at, billing_period,
+                    counted_for_quota
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     record.license_id,
@@ -818,6 +850,7 @@ class LicenseVerifier:
                     record.document_fingerprint,
                     record.document_name,
                     record.word_count,
+                    record.page_count,
                     record.analysis_started_at.isoformat(),
                     record.billing_period,
                     1,
@@ -825,23 +858,25 @@ class LicenseVerifier:
             )
             record.id = cursor.lastrowid
 
-        logger.info(f"Uso registrado: {document_name} ({word_count} palabras)")
+        logger.info(
+            f"Uso registrado: {document_name} ({word_count} palabras, {page_count} paginas)"
+        )
         return Result.success(record)
 
     # =========================================================================
-    # Verificacion de Modulos
+    # Verificacion de Features por Tier
     # =========================================================================
 
-    def check_module(
+    def check_feature(
         self,
-        module: LicenseModule,
+        feature: LicenseFeature,
         license_obj: License | None = None,
     ) -> Result[bool]:
         """
-        Verifica si un modulo esta disponible.
+        Verifica si una feature esta disponible en el tier actual.
 
         Args:
-            module: Modulo a verificar
+            feature: Feature a verificar
             license_obj: Licencia (usa cache si None)
 
         Returns:
@@ -852,8 +887,13 @@ class LicenseVerifier:
             if license_obj is None:
                 return Result.failure(LicenseNotFoundError())
 
-        if not license_obj.has_module(module):
-            return Result.failure(ModuleNotLicensedError(module=module))
+        if not license_obj.has_feature(feature):
+            return Result.failure(
+                TierFeatureError(
+                    feature=feature,
+                    required_tier="Profesional",
+                )
+            )
 
         return Result.success(True)
 
@@ -906,7 +946,6 @@ class LicenseVerifier:
                     """
                     UPDATE licenses SET
                         tier = ?,
-                        bundle = ?,
                         status = ?,
                         last_verified_at = ?,
                         grace_period_ends_at = ?,
@@ -915,7 +954,6 @@ class LicenseVerifier:
                     """,
                     (
                         license_obj.tier.value,
-                        license_obj.bundle.value,
                         license_obj.status.value,
                         license_obj.last_verified_at.isoformat()
                         if license_obj.last_verified_at
@@ -931,17 +969,16 @@ class LicenseVerifier:
                 cursor = conn.execute(
                     """
                     INSERT INTO licenses (
-                        license_key, user_email, user_name, tier, bundle,
+                        license_key, user_email, user_name, tier,
                         status, created_at, activated_at, last_verified_at,
                         grace_period_ends_at, extra_data
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         license_obj.license_key,
                         license_obj.user_email,
                         license_obj.user_name,
                         license_obj.tier.value,
-                        license_obj.bundle.value,
                         license_obj.status.value,
                         license_obj.created_at.isoformat()
                         if license_obj.created_at
@@ -1017,8 +1054,7 @@ class LicenseVerifier:
                 license_key=license_key,
                 user_email=license_data.get("email", ""),
                 user_name=license_data.get("name", ""),
-                tier=LicenseTier(license_data.get("tier", "freelance")),
-                bundle=LicenseBundle(license_data.get("bundle", "solo_core")),
+                tier=LicenseTier(license_data.get("tier", "corrector")),
                 status=LicenseStatus.ACTIVE,
                 created_at=datetime.utcnow(),
                 activated_at=datetime.utcnow(),
@@ -1095,26 +1131,26 @@ def activate_license(license_key: str) -> Result[License]:
     return verifier.activate_license(license_key)
 
 
-def check_module_access(module: LicenseModule) -> Result[bool]:
+def check_feature_access(feature: LicenseFeature) -> Result[bool]:
     """
-    Verifica si un modulo esta disponible.
+    Verifica si una feature esta disponible en el tier actual.
 
     Args:
-        module: Modulo a verificar
+        feature: Feature a verificar
 
     Returns:
         Result con True si disponible
     """
     verifier = LicenseVerifier()
-    return verifier.check_module(module)
+    return verifier.check_feature(feature)
 
 
 def check_quota() -> Result[int]:
     """
-    Verifica la cuota de manuscritos restante.
+    Verifica la cuota de paginas restante.
 
     Returns:
-        Result con manuscritos restantes (-1 si ilimitado)
+        Result con paginas restantes (-1 si ilimitado)
     """
     verifier = LicenseVerifier()
     return verifier.check_quota()
@@ -1183,19 +1219,18 @@ def get_license_info() -> dict | None:
 
     return {
         "tier": license_obj.tier.display_name,
-        "bundle": license_obj.bundle.display_name,
         "status": license_obj.status.value,
         "user_email": license_obj.user_email,
         "user_name": license_obj.user_name,
-        "modules": [m.display_name for m in license_obj.modules],
+        "features": [f.display_name for f in sorted(license_obj.features, key=lambda x: x.value)],
         "devices": {
             "active": license_obj.active_device_count,
             "max": license_obj.limits.max_devices,
         },
         "quota": {
             "remaining": quota,
-            "max": license_obj.limits.max_manuscripts_per_month,
-            "unlimited": license_obj.limits.max_manuscripts_per_month == 0,
+            "max": license_obj.limits.max_pages_per_month,
+            "unlimited": license_obj.limits.is_unlimited,
         },
         "offline": {
             "is_offline": license_obj.is_in_grace_period,

@@ -462,7 +462,7 @@ class DeviceCooldownError(LicensingError):
 
 @dataclass
 class QuotaExceededError(LicensingError):
-    """Cuota de manuscritos excedida."""
+    """Cuota de paginas excedida."""
 
     current_usage: int = 0
     max_usage: int = 0
@@ -473,11 +473,11 @@ class QuotaExceededError(LicensingError):
     context: dict[str, Any] = field(default_factory=dict, init=False)
 
     def __post_init__(self):
-        self.message = f"Manuscript quota exceeded ({self.current_usage}/{self.max_usage})"
+        self.message = f"Page quota exceeded ({self.current_usage}/{self.max_usage})"
         self.user_message = (
-            f"Has alcanzado el límite de {self.max_usage} manuscritos este mes "
+            f"Has alcanzado el limite de {self.max_usage} paginas este mes "
             f"({self.current_usage}/{self.max_usage}). "
-            "Espera al próximo período o actualiza tu plan."
+            "Espera al proximo periodo o actualiza tu plan."
         )
         self.context = {
             "current_usage": self.current_usage,
@@ -488,20 +488,24 @@ class QuotaExceededError(LicensingError):
 
 
 @dataclass
-class ModuleNotLicensedError(LicensingError):
-    """Módulo no incluido en la licencia actual."""
+class TierFeatureError(LicensingError):
+    """Funcionalidad no disponible en el tier actual."""
 
-    module_name: str = ""
+    feature_name: str = ""
+    required_tier: str = ""
     message: str = field(init=False)
     severity: ErrorSeverity = field(default=ErrorSeverity.FATAL, init=False)
     user_message: str | None = field(default=None, init=False)
     context: dict[str, Any] = field(default_factory=dict, init=False)
 
     def __post_init__(self):
-        self.message = f"Module '{self.module_name}' not licensed"
+        self.message = f"Feature '{self.feature_name}' requires tier '{self.required_tier}'"
         self.user_message = (
-            f"Tu licencia no incluye el módulo '{self.module_name}'. "
-            "Actualiza tu plan para acceder a esta funcionalidad."
+            f"Esta funcionalidad requiere el plan {self.required_tier or 'Profesional'}. "
+            "Actualiza tu plan para acceder."
         )
-        self.context = {"module_name": self.module_name}
+        self.context = {
+            "feature_name": self.feature_name,
+            "required_tier": self.required_tier,
+        }
         super().__post_init__()

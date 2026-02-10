@@ -4,93 +4,125 @@ Modelos de datos para el sistema de licencias.
 Define las estructuras para:
 - Licencias y suscripciones
 - Dispositivos vinculados
-- Registro de uso
-- Tiers y bundles de funcionalidad
+- Registro de uso (cuota en paginas)
+- Tiers y features de funcionalidad
 """
 
 import json
+import math
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
 
 # =============================================================================
-# Enums y Constantes
+# Constantes
+# =============================================================================
+
+# Estandar editorial: 1 pagina = 250 palabras
+WORDS_PER_PAGE = 250
+
+# Periodo de gracia offline en dias
+OFFLINE_GRACE_PERIOD_DAYS = 14
+
+# Cooldown al desactivar dispositivo en horas
+DEVICE_DEACTIVATION_COOLDOWN_HOURS = 48
+
+
+# =============================================================================
+# Funciones auxiliares
+# =============================================================================
+
+
+def words_to_pages(word_count: int) -> int:
+    """Convierte conteo de palabras a paginas (redondeo arriba).
+
+    Args:
+        word_count: Numero de palabras del documento.
+
+    Returns:
+        Numero de paginas (250 palabras = 1 pagina), minimo 0.
+    """
+    if word_count <= 0:
+        return 0
+    return math.ceil(word_count / WORDS_PER_PAGE)
+
+
+# =============================================================================
+# Enums
 # =============================================================================
 
 
 class LicenseTier(Enum):
     """Niveles de suscripcion disponibles."""
 
-    FREELANCE = "freelance"
-    AGENCIA = "agencia"
+    CORRECTOR = "corrector"
+    PROFESIONAL = "profesional"
     EDITORIAL = "editorial"
 
     @property
     def display_name(self) -> str:
         """Nombre para mostrar al usuario."""
         names = {
-            LicenseTier.FREELANCE: "Freelance",
-            LicenseTier.AGENCIA: "Agencia",
+            LicenseTier.CORRECTOR: "Corrector",
+            LicenseTier.PROFESIONAL: "Profesional",
             LicenseTier.EDITORIAL: "Editorial",
         }
         return names[self]
 
 
-class LicenseModule(Enum):
-    """Modulos de funcionalidad disponibles."""
+class LicenseFeature(Enum):
+    """Funcionalidades disponibles por tier."""
 
-    CORE = "core"  # Base obligatoria
-    NARRATIVA = "narrativa"  # Analisis narrativo
-    VOZ_ESTILO = "voz_estilo"  # Voz y estilo
-    AVANZADO = "avanzado"  # Funciones avanzadas
-
-    @property
-    def display_name(self) -> str:
-        """Nombre para mostrar al usuario."""
-        names = {
-            LicenseModule.CORE: "Core",
-            LicenseModule.NARRATIVA: "Narrativa",
-            LicenseModule.VOZ_ESTILO: "Voz y Estilo",
-            LicenseModule.AVANZADO: "Avanzado",
-        }
-        return names[self]
-
-
-class LicenseBundle(Enum):
-    """Bundles de modulos predefinidos."""
-
-    SOLO_CORE = "solo_core"
-    PROFESIONAL = "profesional"  # Core + Narrativa + Voz
-    COMPLETO = "completo"  # Todo
-
-    @property
-    def modules(self) -> list[LicenseModule]:
-        """Modulos incluidos en el bundle."""
-        bundles = {
-            LicenseBundle.SOLO_CORE: [LicenseModule.CORE],
-            LicenseBundle.PROFESIONAL: [
-                LicenseModule.CORE,
-                LicenseModule.NARRATIVA,
-                LicenseModule.VOZ_ESTILO,
-            ],
-            LicenseBundle.COMPLETO: [
-                LicenseModule.CORE,
-                LicenseModule.NARRATIVA,
-                LicenseModule.VOZ_ESTILO,
-                LicenseModule.AVANZADO,
-            ],
-        }
-        return bundles[self]
+    ATTRIBUTE_CONSISTENCY = "attribute_consistency"
+    GRAMMAR_SPELLING = "grammar_spelling"
+    NER_COREFERENCE = "ner_coreference"
+    NAME_VARIANTS = "name_variants"
+    CHARACTER_PROFILING = "character_profiling"
+    NETWORK_ANALYSIS = "network_analysis"
+    ANACHRONISM_DETECTION = "anachronism_detection"
+    OOC_DETECTION = "ooc_detection"
+    CLASSICAL_SPANISH = "classical_spanish"
+    MULTI_MODEL = "multi_model"
+    FULL_REPORTS = "full_reports"
 
     @property
     def display_name(self) -> str:
         """Nombre para mostrar al usuario."""
         names = {
-            LicenseBundle.SOLO_CORE: "Solo Core",
-            LicenseBundle.PROFESIONAL: "Profesional",
-            LicenseBundle.COMPLETO: "Completo",
+            LicenseFeature.ATTRIBUTE_CONSISTENCY: "Consistencia de atributos",
+            LicenseFeature.GRAMMAR_SPELLING: "Gramatica y ortografia",
+            LicenseFeature.NER_COREFERENCE: "NER + correferencias",
+            LicenseFeature.NAME_VARIANTS: "Deteccion de variantes de nombre",
+            LicenseFeature.CHARACTER_PROFILING: "Character profiling",
+            LicenseFeature.NETWORK_ANALYSIS: "Analisis de red de personajes",
+            LicenseFeature.ANACHRONISM_DETECTION: "Deteccion de anacronismos",
+            LicenseFeature.OOC_DETECTION: "Deteccion out-of-character",
+            LicenseFeature.CLASSICAL_SPANISH: "Espanol clasico (Siglo de Oro)",
+            LicenseFeature.MULTI_MODEL: "Analisis multi-modelo",
+            LicenseFeature.FULL_REPORTS: "Informes completos",
         }
         return names[self]
+
+
+# Features basicas (Corrector)
+_BASIC_FEATURES: frozenset[LicenseFeature] = frozenset(
+    {
+        LicenseFeature.ATTRIBUTE_CONSISTENCY,
+        LicenseFeature.GRAMMAR_SPELLING,
+        LicenseFeature.NER_COREFERENCE,
+        LicenseFeature.NAME_VARIANTS,
+    }
+)
+
+# Todas las features (Profesional y Editorial)
+_ALL_FEATURES: frozenset[LicenseFeature] = frozenset(LicenseFeature)
+
+# Mapping tier -> features disponibles
+TIER_FEATURES: dict[LicenseTier, frozenset[LicenseFeature]] = {
+    LicenseTier.CORRECTOR: _BASIC_FEATURES,
+    LicenseTier.PROFESIONAL: _ALL_FEATURES,
+    LicenseTier.EDITORIAL: _ALL_FEATURES,
+}
 
 
 class LicenseStatus(Enum):
@@ -120,38 +152,36 @@ class DeviceStatus(Enum):
 class TierLimits:
     """Limites asociados a un tier de licencia."""
 
-    max_manuscripts_per_month: int  # 0 = ilimitado
+    max_pages_per_month: int  # -1 = ilimitado
     max_devices: int
-    min_devices: int = 1  # Minimo de dispositivos incluidos
+    pages_rollover_months: int = 1  # Meses de rollover (0 = sin rollover)
 
     @classmethod
     def for_tier(cls, tier: LicenseTier) -> "TierLimits":
         """Obtiene los limites para un tier especifico."""
         limits = {
-            LicenseTier.FREELANCE: cls(
-                max_manuscripts_per_month=5,
+            LicenseTier.CORRECTOR: cls(
+                max_pages_per_month=1500,
                 max_devices=1,
-                min_devices=1,
+                pages_rollover_months=1,
             ),
-            LicenseTier.AGENCIA: cls(
-                max_manuscripts_per_month=15,
+            LicenseTier.PROFESIONAL: cls(
+                max_pages_per_month=3000,
                 max_devices=2,
-                min_devices=1,
+                pages_rollover_months=1,
             ),
             LicenseTier.EDITORIAL: cls(
-                max_manuscripts_per_month=0,  # Ilimitado
-                max_devices=100,  # Maximo practico
-                min_devices=5,
+                max_pages_per_month=-1,  # Ilimitado
+                max_devices=10,
+                pages_rollover_months=0,  # No aplica
             ),
         }
         return limits[tier]
 
-
-# Periodo de gracia offline en dias
-OFFLINE_GRACE_PERIOD_DAYS = 14
-
-# Cooldown al desactivar dispositivo en horas
-DEVICE_DEACTIVATION_COOLDOWN_HOURS = 48
+    @property
+    def is_unlimited(self) -> bool:
+        """Verifica si la cuota es ilimitada."""
+        return self.max_pages_per_month == -1
 
 
 # =============================================================================
@@ -165,16 +195,16 @@ class Device:
     Dispositivo vinculado a una licencia.
 
     Attributes:
-        id: Identificador único en BD local
+        id: Identificador unico en BD local
         license_id: ID de la licencia asociada
-        hardware_fingerprint: Hash único del hardware
+        hardware_fingerprint: Hash unico del hardware
         device_name: Nombre amigable del dispositivo
-        os_info: Información del sistema operativo
+        os_info: Informacion del sistema operativo
         status: Estado del dispositivo
-        activated_at: Fecha de activación
-        deactivated_at: Fecha de desactivación (si aplica)
+        activated_at: Fecha de activacion
+        deactivated_at: Fecha de desactivacion (si aplica)
         cooldown_ends_at: Fin del periodo de cooldown
-        last_seen_at: Última vez que el dispositivo verificó la licencia
+        last_seen_at: Ultima vez que el dispositivo verifico la licencia
         is_current_device: True si es el dispositivo actual
     """
 
@@ -276,15 +306,14 @@ class Device:
 @dataclass
 class Subscription:
     """
-    Suscripcion asociada a una licencia (datos de Stripe).
+    Suscripcion asociada a una licencia (datos del proveedor de pagos).
 
     Attributes:
         id: Identificador unico en BD local
         license_id: ID de la licencia asociada
-        stripe_subscription_id: ID de la suscripcion en Stripe
-        stripe_customer_id: ID del cliente en Stripe
+        stripe_subscription_id: ID de la suscripcion en el proveedor
+        stripe_customer_id: ID del cliente en el proveedor
         tier: Nivel de suscripcion
-        bundle: Bundle de modulos
         status: Estado de la suscripcion
         current_period_start: Inicio del periodo actual
         current_period_end: Fin del periodo actual
@@ -297,9 +326,8 @@ class Subscription:
     license_id: int = 0
     stripe_subscription_id: str = ""
     stripe_customer_id: str = ""
-    tier: LicenseTier = LicenseTier.FREELANCE
-    bundle: LicenseBundle = LicenseBundle.SOLO_CORE
-    status: str = "active"  # Stripe status: active, past_due, canceled, etc.
+    tier: LicenseTier = LicenseTier.CORRECTOR
+    status: str = "active"  # Payment provider status: active, past_due, canceled, trialing
     current_period_start: datetime | None = None
     current_period_end: datetime | None = None
     cancel_at_period_end: bool = False
@@ -327,7 +355,6 @@ class Subscription:
             "stripe_subscription_id": self.stripe_subscription_id,
             "stripe_customer_id": self.stripe_customer_id,
             "tier": self.tier.value,
-            "bundle": self.bundle.value,
             "status": self.status,
             "current_period_start": self.current_period_start.isoformat()
             if self.current_period_start
@@ -348,8 +375,7 @@ class Subscription:
             license_id=data.get("license_id", 0),
             stripe_subscription_id=data.get("stripe_subscription_id", ""),
             stripe_customer_id=data.get("stripe_customer_id", ""),
-            tier=LicenseTier(data.get("tier", "freelance")),
-            bundle=LicenseBundle(data.get("bundle", "solo_core")),
+            tier=LicenseTier(data.get("tier", "corrector")),
             status=data.get("status", "active"),
             current_period_start=datetime.fromisoformat(data["current_period_start"])
             if data.get("current_period_start")
@@ -375,7 +401,6 @@ class Subscription:
             stripe_subscription_id=row["stripe_subscription_id"],
             stripe_customer_id=row["stripe_customer_id"],
             tier=LicenseTier(row["tier"]),
-            bundle=LicenseBundle(row["bundle"]),
             status=row["status"],
             current_period_start=datetime.fromisoformat(row["current_period_start"])
             if row["current_period_start"]
@@ -392,7 +417,7 @@ class Subscription:
 @dataclass
 class UsageRecord:
     """
-    Registro de uso de manuscritos.
+    Registro de uso de manuscritos (cuota en paginas).
 
     Attributes:
         id: Identificador unico en BD local
@@ -401,6 +426,7 @@ class UsageRecord:
         document_fingerprint: Fingerprint del documento
         document_name: Nombre del documento
         word_count: Conteo de palabras
+        page_count: Conteo de paginas (ceil(word_count / 250))
         analysis_started_at: Inicio del analisis
         analysis_completed_at: Fin del analisis (si aplica)
         billing_period: Periodo de facturacion (YYYY-MM)
@@ -413,16 +439,30 @@ class UsageRecord:
     document_fingerprint: str = ""
     document_name: str = ""
     word_count: int = 0
+    page_count: int = 0
     analysis_started_at: datetime | None = None
     analysis_completed_at: datetime | None = None
     billing_period: str = ""  # YYYY-MM
     counted_for_quota: bool = True
+
+    def __post_init__(self):
+        """Calcula page_count si no se proporciono."""
+        if self.page_count == 0 and self.word_count > 0:
+            self.page_count = words_to_pages(self.word_count)
 
     @classmethod
     def current_billing_period(cls) -> str:
         """Retorna el periodo de facturacion actual."""
         now = datetime.utcnow()
         return f"{now.year}-{now.month:02d}"
+
+    @classmethod
+    def previous_billing_period(cls) -> str:
+        """Retorna el periodo de facturacion anterior."""
+        now = datetime.utcnow()
+        if now.month == 1:
+            return f"{now.year - 1}-12"
+        return f"{now.year}-{now.month - 1:02d}"
 
     def to_dict(self) -> dict:
         """Serializa a diccionario."""
@@ -433,6 +473,7 @@ class UsageRecord:
             "document_fingerprint": self.document_fingerprint,
             "document_name": self.document_name,
             "word_count": self.word_count,
+            "page_count": self.page_count,
             "analysis_started_at": self.analysis_started_at.isoformat()
             if self.analysis_started_at
             else None,
@@ -453,6 +494,7 @@ class UsageRecord:
             document_fingerprint=data.get("document_fingerprint", ""),
             document_name=data.get("document_name", ""),
             word_count=data.get("word_count", 0),
+            page_count=data.get("page_count", 0),
             analysis_started_at=datetime.fromisoformat(data["analysis_started_at"])
             if data.get("analysis_started_at")
             else None,
@@ -473,6 +515,7 @@ class UsageRecord:
             document_fingerprint=row["document_fingerprint"],
             document_name=row["document_name"],
             word_count=row["word_count"],
+            page_count=row["page_count"] if "page_count" in row.keys() else 0,
             analysis_started_at=datetime.fromisoformat(row["analysis_started_at"])
             if row["analysis_started_at"]
             else None,
@@ -495,15 +538,13 @@ class License:
         user_email: Email del usuario
         user_name: Nombre del usuario
         tier: Nivel de suscripcion
-        bundle: Bundle de modulos
-        modules: Lista de modulos habilitados (calculado desde bundle)
         status: Estado actual de la licencia
         created_at: Fecha de creacion
         activated_at: Fecha de primera activacion
         expires_at: Fecha de expiracion
         last_verified_at: Ultima verificacion online
         grace_period_ends_at: Fin del periodo de gracia offline
-        subscription: Datos de suscripcion Stripe
+        subscription: Datos de suscripcion
         devices: Lista de dispositivos vinculados
         extra_data: Datos adicionales (JSON)
     """
@@ -512,8 +553,7 @@ class License:
     license_key: str = ""
     user_email: str = ""
     user_name: str = ""
-    tier: LicenseTier = LicenseTier.FREELANCE
-    bundle: LicenseBundle = LicenseBundle.SOLO_CORE
+    tier: LicenseTier = LicenseTier.CORRECTOR
     status: LicenseStatus = LicenseStatus.ACTIVE
     created_at: datetime | None = None
     activated_at: datetime | None = None
@@ -525,9 +565,9 @@ class License:
     extra_data: dict = field(default_factory=dict)
 
     @property
-    def modules(self) -> list[LicenseModule]:
-        """Modulos habilitados segun el bundle."""
-        return self.bundle.modules
+    def features(self) -> frozenset[LicenseFeature]:
+        """Features disponibles segun el tier."""
+        return TIER_FEATURES.get(self.tier, _BASIC_FEATURES)
 
     @property
     def limits(self) -> TierLimits:
@@ -562,9 +602,9 @@ class License:
         """Numero de dispositivos activos."""
         return len(self.active_devices)
 
-    def has_module(self, module: LicenseModule) -> bool:
-        """Verifica si un modulo esta habilitado."""
-        return module in self.modules
+    def has_feature(self, feature: LicenseFeature) -> bool:
+        """Verifica si una feature esta disponible en el tier actual."""
+        return feature in self.features
 
     def can_add_device(self) -> bool:
         """Verifica si se puede agregar otro dispositivo."""
@@ -598,7 +638,6 @@ class License:
             "user_email": self.user_email,
             "user_name": self.user_name,
             "tier": self.tier.value,
-            "bundle": self.bundle.value,
             "status": self.status.value,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "activated_at": self.activated_at.isoformat() if self.activated_at else None,
@@ -622,8 +661,7 @@ class License:
             license_key=data.get("license_key", ""),
             user_email=data.get("user_email", ""),
             user_name=data.get("user_name", ""),
-            tier=LicenseTier(data.get("tier", "freelance")),
-            bundle=LicenseBundle(data.get("bundle", "solo_core")),
+            tier=LicenseTier(data.get("tier", "corrector")),
             status=LicenseStatus(data.get("status", "active")),
             created_at=datetime.fromisoformat(data["created_at"])
             if data.get("created_at")
@@ -660,7 +698,6 @@ class License:
             user_email=row["user_email"],
             user_name=row["user_name"],
             tier=LicenseTier(row["tier"]),
-            bundle=LicenseBundle(row["bundle"]),
             status=LicenseStatus(row["status"]),
             created_at=datetime.fromisoformat(row["created_at"]) if row["created_at"] else None,
             activated_at=datetime.fromisoformat(row["activated_at"])
@@ -689,8 +726,7 @@ CREATE TABLE IF NOT EXISTS licenses (
     license_key TEXT NOT NULL UNIQUE,
     user_email TEXT NOT NULL,
     user_name TEXT,
-    tier TEXT NOT NULL DEFAULT 'freelance',
-    bundle TEXT NOT NULL DEFAULT 'solo_core',
+    tier TEXT NOT NULL DEFAULT 'corrector',
     status TEXT NOT NULL DEFAULT 'active',
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     activated_at TEXT,
@@ -704,14 +740,13 @@ CREATE INDEX IF NOT EXISTS idx_licenses_key ON licenses(license_key);
 CREATE INDEX IF NOT EXISTS idx_licenses_email ON licenses(user_email);
 CREATE INDEX IF NOT EXISTS idx_licenses_status ON licenses(status);
 
--- Suscripciones (datos de Stripe)
+-- Suscripciones (datos del proveedor de pagos)
 CREATE TABLE IF NOT EXISTS subscriptions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     license_id INTEGER NOT NULL UNIQUE,
     stripe_subscription_id TEXT NOT NULL,
     stripe_customer_id TEXT NOT NULL,
-    tier TEXT NOT NULL DEFAULT 'freelance',
-    bundle TEXT NOT NULL DEFAULT 'solo_core',
+    tier TEXT NOT NULL DEFAULT 'corrector',
     status TEXT NOT NULL DEFAULT 'active',
     current_period_start TEXT,
     current_period_end TEXT,
@@ -745,7 +780,7 @@ CREATE INDEX IF NOT EXISTS idx_devices_license ON devices(license_id);
 CREATE INDEX IF NOT EXISTS idx_devices_fingerprint ON devices(hardware_fingerprint);
 CREATE INDEX IF NOT EXISTS idx_devices_status ON devices(status);
 
--- Registros de uso de manuscritos
+-- Registros de uso (cuota en paginas)
 CREATE TABLE IF NOT EXISTS usage_records (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     license_id INTEGER NOT NULL,
@@ -753,6 +788,7 @@ CREATE TABLE IF NOT EXISTS usage_records (
     document_fingerprint TEXT NOT NULL,
     document_name TEXT,
     word_count INTEGER DEFAULT 0,
+    page_count INTEGER DEFAULT 0,
     analysis_started_at TEXT NOT NULL DEFAULT (datetime('now')),
     analysis_completed_at TEXT,
     billing_period TEXT NOT NULL,

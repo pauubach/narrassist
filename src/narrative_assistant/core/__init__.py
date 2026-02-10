@@ -37,7 +37,7 @@ from .errors import (
     # Licensing errors
     LicensingError,
     ModelNotLoadedError,
-    ModuleNotLicensedError,
+    TierFeatureError,
     NarrativeError,
     NLPError,
     OutOfMemoryError,

@@ -1,20 +1,20 @@
 """
 Router: license
+
+Endpoints para gestion de licencias, dispositivos, cuotas (paginas) y features por tier.
 """
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Body
+
 import deps
+from deps import ApiResponse, DeviceDeactivationRequest, LicenseActivationRequest
 from deps import logger
-from deps import ApiResponse
-from fastapi import Body
-from fastapi import Request
-from deps import DeviceDeactivationRequest, LicenseActivationRequest
 
 router = APIRouter()
 
 
 def get_license_verifier():
-    """Obtiene el LicenseVerifier, retorna None si el módulo de licencias no está disponible."""
+    """Obtiene el LicenseVerifier, retorna None si el modulo de licencias no esta disponible."""
     try:
         from narrative_assistant.licensing.verification import LicenseVerifier
         return LicenseVerifier()
@@ -38,18 +38,19 @@ async def get_license_status():
                 data={
                     "status": "no_license",
                     "tier": None,
-                    "modules": [],
+                    "features": [],
                     "devices_used": 0,
                     "devices_max": 0,
-                    "manuscripts_used": 0,
-                    "manuscripts_max": 0,
+                    "pages_used": 0,
+                    "pages_max": 0,
+                    "pages_remaining": 0,
                     "expires_at": None,
                     "is_trial": False,
                     "offline_days_remaining": None,
                 }
             )
 
-        result = verifier.get_current_license()
+        result = verifier.verify()
 
         if result.is_failure:
             return ApiResponse(
@@ -58,24 +59,50 @@ async def get_license_status():
                     "status": "no_license",
                     "error": str(result.error),
                     "tier": None,
-                    "modules": [],
+                    "features": [],
                 }
             )
 
-        license_info = result.value
+        verification = result.value
+        license_obj = verification.license
+
+        if license_obj is None:
+            return ApiResponse(
+                success=True,
+                data={
+                    "status": "no_license",
+                    "tier": None,
+                    "features": [],
+                }
+            )
+
         return ApiResponse(
             success=True,
             data={
-                "status": "active" if license_info.is_active else "expired",
-                "tier": license_info.tier.value if license_info.tier else None,
-                "modules": [m.value for m in license_info.modules] if license_info.modules else [],
-                "devices_used": license_info.devices_used,
-                "devices_max": license_info.max_devices,
-                "manuscripts_used": license_info.manuscripts_used_this_period,
-                "manuscripts_max": license_info.manuscripts_per_month,
-                "expires_at": license_info.expires_at.isoformat() if license_info.expires_at else None,
-                "is_trial": license_info.is_trial,
-                "offline_days_remaining": license_info.offline_grace_days_remaining,
+                "status": license_obj.status.value,
+                "tier": license_obj.tier.value,
+                "features": [f.value for f in sorted(license_obj.features, key=lambda x: x.value)],
+                "devices_used": license_obj.active_device_count,
+                "devices_max": license_obj.limits.max_devices,
+                "pages_used": (
+                    license_obj.limits.max_pages_per_month - verification.quota_remaining
+                    if verification.quota_remaining is not None
+                    else 0
+                ),
+                "pages_max": license_obj.limits.max_pages_per_month,
+                "pages_remaining": verification.quota_remaining,
+                "unlimited": license_obj.limits.is_unlimited,
+                "expires_at": license_obj.expires_at.isoformat() if license_obj.expires_at else None,
+                "is_trial": (
+                    license_obj.subscription.status == "trialing"
+                    if license_obj.subscription
+                    else False
+                ),
+                "offline_days_remaining": (
+                    license_obj.grace_period_remaining.days
+                    if license_obj.grace_period_remaining
+                    else None
+                ),
             }
         )
 
@@ -105,13 +132,13 @@ async def activate_license(request: LicenseActivationRequest):
         if result.is_failure:
             return ApiResponse(success=False, error=str(result.error))
 
-        license_info = result.value
+        license_obj = result.value
         return ApiResponse(
             success=True,
             data={
                 "message": "Licencia activada correctamente",
-                "tier": license_info.tier.value if license_info.tier else None,
-                "modules": [m.value for m in license_info.modules] if license_info.modules else [],
+                "tier": license_obj.tier.value,
+                "features": [f.value for f in sorted(license_obj.features, key=lambda x: x.value)],
             }
         )
 
@@ -133,7 +160,7 @@ async def verify_license():
         if not verifier:
             return ApiResponse(success=False, error="Modulo de licencias no disponible")
 
-        result = verifier.verify_license()
+        result = verifier.verify(force_online=True)
 
         if result.is_failure:
             return ApiResponse(success=False, error=str(result.error))
@@ -143,7 +170,6 @@ async def verify_license():
             data={
                 "valid": result.value.is_valid,
                 "message": result.value.message,
-                "verified_online": result.value.verified_online,
             }
         )
 
@@ -165,26 +191,30 @@ async def get_license_devices():
         if not verifier:
             return ApiResponse(success=False, error="Modulo de licencias no disponible")
 
-        result = verifier.get_devices()
+        result = verifier.verify()
 
         if result.is_failure:
             return ApiResponse(success=False, error=str(result.error))
 
-        devices = result.value
+        license_obj = result.value.license
+        if not license_obj:
+            return ApiResponse(success=False, error="No se encontro licencia")
+
         return ApiResponse(
             success=True,
             data={
                 "devices": [
                     {
-                        "fingerprint": d.fingerprint[:8] + "...",  # Parcial por privacidad
-                        "name": d.name,
+                        "id": d.id,
+                        "fingerprint": d.hardware_fingerprint[:8] + "...",
+                        "name": d.device_name,
                         "status": d.status.value,
-                        "last_seen": d.last_seen.isoformat() if d.last_seen else None,
-                        "is_current": d.is_current,
+                        "last_seen": d.last_seen_at.isoformat() if d.last_seen_at else None,
+                        "is_current": d.is_current_device,
                     }
-                    for d in devices
+                    for d in license_obj.devices
                 ],
-                "max_devices": verifier.max_devices,
+                "max_devices": license_obj.limits.max_devices,
             }
         )
 
@@ -230,31 +260,41 @@ async def deactivate_device(request: DeviceDeactivationRequest):
 @router.get("/api/license/usage", response_model=ApiResponse)
 async def get_license_usage():
     """
-    Obtiene el uso de la licencia en el periodo actual.
+    Obtiene el uso de la licencia en el periodo actual (paginas).
 
     Returns:
-        ApiResponse con estadisticas de uso
+        ApiResponse con estadisticas de uso en paginas
     """
     try:
         verifier = get_license_verifier()
         if not verifier:
             return ApiResponse(success=False, error="Modulo de licencias no disponible")
 
-        result = verifier.get_usage()
+        result = verifier.verify()
 
         if result.is_failure:
             return ApiResponse(success=False, error=str(result.error))
 
-        usage = result.value
+        verification = result.value
+        license_obj = verification.license
+
+        if not license_obj:
+            return ApiResponse(success=False, error="No se encontro licencia")
+
+        limits = license_obj.limits
+        quota_remaining = verification.quota_remaining
+
         return ApiResponse(
             success=True,
             data={
-                "period_start": usage.period_start.isoformat(),
-                "period_end": usage.period_end.isoformat(),
-                "manuscripts_used": usage.manuscripts_used,
-                "manuscripts_limit": usage.manuscripts_limit,
-                "manuscripts_remaining": max(0, usage.manuscripts_limit - usage.manuscripts_used),
-                "unlimited": usage.manuscripts_limit == -1,
+                "pages_used": (
+                    limits.max_pages_per_month - quota_remaining
+                    if quota_remaining is not None
+                    else 0
+                ),
+                "pages_max": limits.max_pages_per_month,
+                "pages_remaining": quota_remaining if quota_remaining is not None else -1,
+                "unlimited": limits.is_unlimited,
             }
         )
 
@@ -263,10 +303,10 @@ async def get_license_usage():
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
-@router.post("/api/license/record-manuscript", response_model=ApiResponse)
-async def record_manuscript_usage(project_id: int = Body(..., embed=True)):
+@router.post("/api/license/record-usage", response_model=ApiResponse)
+async def record_usage(project_id: int = Body(..., embed=True)):
     """
-    Registra el uso de un manuscrito contra la cuota.
+    Registra el uso de un manuscrito contra la cuota de paginas.
 
     Args:
         project_id: ID del proyecto/manuscrito
@@ -280,7 +320,7 @@ async def record_manuscript_usage(project_id: int = Body(..., embed=True)):
             # Sin verificador, permitir uso (desarrollo)
             return ApiResponse(success=True, data={"allowed": True})
 
-        result = verifier.record_manuscript_usage(project_id)
+        result = verifier.check_quota()
 
         if result.is_failure:
             error = result.error
@@ -294,22 +334,22 @@ async def record_manuscript_usage(project_id: int = Body(..., embed=True)):
             success=True,
             data={
                 "allowed": True,
-                "manuscripts_remaining": result.value.manuscripts_remaining,
+                "pages_remaining": result.value,
             }
         )
 
     except Exception as e:
-        logger.error(f"Error recording manuscript usage: {e}", exc_info=True)
+        logger.error(f"Error recording usage: {e}", exc_info=True)
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
-@router.get("/api/license/check-module/{module_name}", response_model=ApiResponse)
-async def check_module_access(module_name: str):
+@router.get("/api/license/check-feature/{feature_name}", response_model=ApiResponse)
+async def check_feature_access(feature_name: str):
     """
-    Verifica si el usuario tiene acceso a un módulo específico.
+    Verifica si el usuario tiene acceso a una feature segun su tier.
 
     Args:
-        module_name: Nombre del módulo (CORE, NARRATIVA, VOZ_ESTILO, AVANZADO)
+        feature_name: Nombre de la feature (attribute_consistency, character_profiling, etc.)
 
     Returns:
         ApiResponse indicando si tiene acceso
@@ -320,7 +360,17 @@ async def check_module_access(module_name: str):
             # Sin verificador, permitir todo (desarrollo)
             return ApiResponse(success=True, data={"has_access": True})
 
-        result = verifier.check_module_access(module_name)
+        from narrative_assistant.licensing.models import LicenseFeature
+
+        try:
+            feature = LicenseFeature(feature_name)
+        except ValueError:
+            return ApiResponse(
+                success=False,
+                error=f"Feature desconocida: {feature_name}",
+            )
+
+        result = verifier.check_feature(feature)
 
         if result.is_failure:
             return ApiResponse(
@@ -328,6 +378,7 @@ async def check_module_access(module_name: str):
                 data={
                     "has_access": False,
                     "reason": str(result.error),
+                    "required_tier": "profesional",
                 }
             )
 
@@ -335,12 +386,10 @@ async def check_module_access(module_name: str):
             success=True,
             data={
                 "has_access": True,
-                "module": module_name,
+                "feature": feature_name,
             }
         )
 
     except Exception as e:
-        logger.error(f"Error checking module access: {e}", exc_info=True)
+        logger.error(f"Error checking feature access: {e}", exc_info=True)
         return ApiResponse(success=False, error="Error interno del servidor")
-
-

@@ -6,24 +6,38 @@ import { api } from '@/services/apiClient'
 import { ref, computed } from 'vue'
 
 // Tipos de licencia
-export type LicenseTier = 'freelance' | 'agencia' | 'editorial'
-export type LicenseModule = 'CORE' | 'NARRATIVA' | 'VOZ_ESTILO' | 'AVANZADO'
+export type LicenseTier = 'corrector' | 'profesional' | 'editorial'
+export type LicenseFeature =
+  | 'attribute_consistency'
+  | 'grammar_spelling'
+  | 'ner_coreference'
+  | 'name_variants'
+  | 'character_profiling'
+  | 'network_analysis'
+  | 'anachronism_detection'
+  | 'ooc_detection'
+  | 'classical_spanish'
+  | 'multi_model'
+  | 'full_reports'
 export type LicenseStatus = 'no_license' | 'active' | 'expired' | 'grace_period' | 'suspended'
 
 export interface LicenseInfo {
   status: LicenseStatus
   tier: LicenseTier | null
-  modules: LicenseModule[]
+  features: LicenseFeature[]
   devices_used: number
   devices_max: number
-  manuscripts_used: number
-  manuscripts_max: number
+  pages_used: number
+  pages_max: number
+  pages_remaining: number | null
+  unlimited: boolean
   expires_at: string | null
   is_trial: boolean
   offline_days_remaining: number | null
 }
 
 export interface DeviceInfo {
+  id: string
   fingerprint: string
   name: string
   status: 'active' | 'inactive' | 'pending'
@@ -32,11 +46,9 @@ export interface DeviceInfo {
 }
 
 export interface UsageInfo {
-  period_start: string
-  period_end: string
-  manuscripts_used: number
-  manuscripts_limit: number
-  manuscripts_remaining: number
+  pages_used: number
+  pages_max: number
+  pages_remaining: number
   unlimited: boolean
 }
 
@@ -69,23 +81,23 @@ export const useLicenseStore = defineStore('license', () => {
 
   const tierDisplayName = computed(() => {
     const names: Record<LicenseTier, string> = {
-      freelance: 'Freelance',
-      agencia: 'Agencia',
+      corrector: 'Corrector',
+      profesional: 'Profesional',
       editorial: 'Editorial',
     }
     return tier.value ? names[tier.value] : 'Sin licencia'
   })
 
-  const modules = computed(() => licenseInfo.value?.modules ?? [])
+  const features = computed(() => licenseInfo.value?.features ?? [])
 
-  const hasModule = (module: LicenseModule) => {
-    return modules.value.includes(module)
+  const hasFeature = (feature: LicenseFeature) => {
+    return features.value.includes(feature)
   }
 
-  const manuscriptsRemaining = computed(() => {
+  const pagesRemaining = computed(() => {
     if (!licenseInfo.value) return 0
-    if (licenseInfo.value.manuscripts_max === -1) return -1 // Ilimitado
-    return Math.max(0, licenseInfo.value.manuscripts_max - licenseInfo.value.manuscripts_used)
+    if (licenseInfo.value.unlimited) return -1 // Ilimitado
+    return licenseInfo.value.pages_remaining ?? 0
   })
 
   const devicesRemaining = computed(() => {
@@ -180,27 +192,27 @@ export const useLicenseStore = defineStore('license', () => {
     }
   }
 
-  async function checkModuleAccess(moduleName: LicenseModule): Promise<boolean> {
+  async function checkFeatureAccess(featureName: LicenseFeature): Promise<boolean> {
     try {
-      const data = await api.get<{ has_access: boolean }>(`/api/license/check-module/${moduleName}`)
+      const data = await api.get<{ has_access: boolean }>(`/api/license/check-feature/${featureName}`)
       return data.has_access === true
     } catch (e) {
-      console.error('Error checking module access:', e)
+      console.error('Error checking feature access:', e)
       return false
     }
   }
 
-  async function recordManuscriptUsage(projectId: number): Promise<boolean> {
+  async function recordUsage(projectId: number): Promise<boolean> {
     try {
-      const data = await api.post<{ allowed: boolean }>('/api/license/record-manuscript', { project_id: projectId })
+      const data = await api.post<{ allowed: boolean }>('/api/license/record-usage', { project_id: projectId })
       if (data.allowed) {
         await fetchLicenseStatus()
         return true
       }
-      error.value = 'Cuota de manuscritos excedida'
+      error.value = 'Cuota de paginas excedida'
       return false
     } catch (e) {
-      console.error('Error recording manuscript usage:', e)
+      console.error('Error recording usage:', e)
       return true // Permitir en modo desarrollo si no hay conexion
     }
   }
@@ -223,8 +235,8 @@ export const useLicenseStore = defineStore('license', () => {
     offlineDaysRemaining,
     tier,
     tierDisplayName,
-    modules,
-    manuscriptsRemaining,
+    features,
+    pagesRemaining,
     devicesRemaining,
 
     // Acciones
@@ -234,8 +246,8 @@ export const useLicenseStore = defineStore('license', () => {
     fetchDevices,
     deactivateDevice,
     fetchUsage,
-    checkModuleAccess,
-    recordManuscriptUsage,
-    hasModule,
+    checkFeatureAccess,
+    recordUsage,
+    hasFeature,
   }
 })
