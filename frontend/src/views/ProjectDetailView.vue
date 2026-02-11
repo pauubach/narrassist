@@ -99,8 +99,9 @@
       <!-- WORKSPACE TABS - Encima de todo el layout -->
       <!-- Las pestañas se adaptan según el tipo de documento detectado -->
       <WorkspaceTabs
-        :entity-count="entitiesCount"
-        :alert-count="alertsCount"
+        :alert-count="unresolvedAlertCount"
+        :total-alert-count="alertsCount"
+        :tab-statuses="tabStatuses"
         :document-type="project.documentType"
         :recommended-analysis="project.recommendedAnalysis"
       />
@@ -208,6 +209,7 @@
             v-else-if="workspaceStore.activeTab === 'entities'"
             :project-id="project.id"
             required-phase="entities"
+            tab="entities"
             :description="TAB_PHASE_DESCRIPTIONS.entities"
             @analysis-completed="onAnalysisCompleted"
           >
@@ -227,6 +229,7 @@
             v-else-if="workspaceStore.activeTab === 'relationships'"
             :project-id="project.id"
             required-phase="coreference"
+            tab="relationships"
             :description="TAB_PHASE_DESCRIPTIONS.relationships"
             @analysis-completed="onAnalysisCompleted"
           >
@@ -259,6 +262,7 @@
             v-else-if="workspaceStore.activeTab === 'timeline'"
             :project-id="project.id"
             required-phase="structure"
+            tab="timeline"
             :description="TAB_PHASE_DESCRIPTIONS.timeline"
             @analysis-completed="onAnalysisCompleted"
           >
@@ -403,7 +407,7 @@
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useProjectsStore } from '@/stores/projects'
-import { useWorkspaceStore } from '@/stores/workspace'
+import { useWorkspaceStore, type WorkspaceTab } from '@/stores/workspace'
 import { useSelectionStore } from '@/stores/selection'
 import { useAnalysisStore, TAB_PHASE_DESCRIPTIONS } from '@/stores/analysis'
 import { useMentionNavigation } from '@/composables/useMentionNavigation'
@@ -452,6 +456,22 @@ const { isAnalyzing, hasBeenAnalyzed, cancellingAnalysis,
 
 // Navegación de menciones - usar projectId reactivo
 const mentionNav = useMentionNavigation(() => project.value?.id ?? 0)
+
+// ── Tab status + alert badges ─────────────────────────────
+const unresolvedAlertCount = computed(() =>
+  alerts.value.filter(a => a.status === 'active').length
+)
+
+const tabStatuses = computed(() => {
+  const pid = project.value?.id
+  if (!pid) return {}
+  const tabs: WorkspaceTab[] = ['text', 'entities', 'relationships', 'alerts', 'timeline', 'style', 'glossary', 'summary']
+  const result: Partial<Record<WorkspaceTab, ReturnType<typeof analysisStore.getTabStatus>>> = {}
+  for (const tab of tabs) {
+    result[tab] = analysisStore.getTabStatus(pid, tab)
+  }
+  return result
+})
 
 // ── Local UI state ─────────────────────────────────────────
 const loading = ref(true)

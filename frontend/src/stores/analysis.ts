@@ -124,10 +124,20 @@ export const TAB_REQUIRED_PHASES: Partial<Record<WorkspaceTab, keyof ExecutedPha
  * Descripción de qué contenido se verá cuando se ejecute la fase.
  */
 export const TAB_PHASE_DESCRIPTIONS: Partial<Record<WorkspaceTab, string>> = {
-  entities: 'Extrae personajes, lugares, objetos y otros elementos de tu documento.',
-  relationships: 'Detecta las relaciones entre personajes y entidades.',
-  timeline: 'Analiza marcadores temporales y construye la línea temporal del documento.',
-  style: 'Analiza el registro, gramática y estilo del texto.',
+  entities: 'Ejecuta el análisis para identificar personajes, lugares y otros elementos de tu documento.',
+  relationships: 'Ejecuta el análisis para descubrir cómo se relacionan los personajes entre sí.',
+  timeline: 'Ejecuta el análisis para construir la línea temporal de tu documento.',
+  style: 'Ejecuta el análisis para evaluar la gramática, registro y estilo de tu texto.',
+}
+
+/**
+ * Mensajes de actividad mostrados durante la ejecución del análisis.
+ */
+export const TAB_RUNNING_DESCRIPTIONS: Partial<Record<WorkspaceTab, string>> = {
+  entities: 'Identificando personajes, lugares y objetos...',
+  relationships: 'Analizando relaciones entre personajes...',
+  timeline: 'Construyendo la línea temporal...',
+  style: 'Evaluando el estilo y la gramática...',
 }
 
 /**
@@ -477,6 +487,42 @@ export const useAnalysisStore = defineStore('analysis', () => {
     return executedPhases.value[projectId] ?? {}
   }
 
+  /**
+   * Estado de un tab del workspace: idle, pending, running, completed, failed.
+   *
+   * - idle: No hay análisis ni datos
+   * - pending: El tab requiere una fase que aún no se ha ejecutado
+   * - running: La fase requerida está ejecutándose ahora mismo
+   * - completed: La fase se ejecutó correctamente
+   * - failed: El análisis falló (status error/failed)
+   */
+  type TabStatus = 'idle' | 'pending' | 'running' | 'completed' | 'failed'
+
+  function getTabStatus(projectId: number, tab: WorkspaceTab): TabStatus {
+    const requiredPhase = TAB_REQUIRED_PHASES[tab]
+
+    // Tabs sin requisito de fase (text, alerts, glossary, summary) → completed
+    if (!requiredPhase) return 'completed'
+
+    const executed = isPhaseExecuted(projectId, requiredPhase)
+
+    if (executed) return 'completed'
+
+    // Verificar si hay un análisis fallido para este proyecto
+    const analysis = _analyses.value[projectId]
+    if (analysis && (analysis.status === 'failed' || analysis.status === 'error')) {
+      return 'failed'
+    }
+
+    // Verificar si la fase está corriendo
+    if (isPhaseRunning(requiredPhase)) return 'running'
+
+    // Análisis global en curso → running
+    if (_analyzing.value[projectId]) return 'running'
+
+    return 'pending'
+  }
+
   return {
     // State (computed: sigue el proyecto activo)
     currentAnalysis,
@@ -513,5 +559,6 @@ export const useAnalysisStore = defineStore('analysis', () => {
     runPartialAnalysis,
     isPhaseRunning,
     getProjectPhases,
+    getTabStatus,
   }
 })

@@ -7,13 +7,15 @@
  */
 import { computed } from 'vue'
 import Button from 'primevue/button'
-import { useAnalysisStore, PHASE_LABELS, type ExecutedPhases } from '@/stores/analysis'
+import { useAnalysisStore, PHASE_LABELS, TAB_RUNNING_DESCRIPTIONS, type ExecutedPhases, type WorkspaceTab } from '@/stores/analysis'
 
 const props = defineProps<{
   /** ID del proyecto */
   projectId: number
   /** Fase requerida para mostrar el contenido */
   requiredPhase: keyof ExecutedPhases
+  /** Tab del workspace (para mensajes contextuales de running) */
+  tab?: WorkspaceTab
   /** Texto descriptivo de qué se verá cuando se ejecute */
   description?: string
 }>()
@@ -49,6 +51,21 @@ const isRunning = computed(() => {
   return false
 })
 
+// El análisis falló y la fase no se ejecutó
+const isFailed = computed(() => {
+  if (isExecuted.value) return false
+  const analysis = analysisStore.currentAnalysis
+  if (!analysis || analysis.project_id !== props.projectId) {
+    // Verificar via error en el store
+    return analysisStore.error !== null && !isRunning.value
+  }
+  return (analysis.status === 'failed' || analysis.status === 'error') && !isRunning.value
+})
+
+const failedMessage = computed(() =>
+  analysisStore.error || 'El análisis no pudo completarse.'
+)
+
 const missingDependencies = computed(() =>
   analysisStore.getMissingDependencies(props.projectId, props.requiredPhase)
 )
@@ -66,6 +83,13 @@ const phasesToRun = computed(() => {
   const phases: (keyof ExecutedPhases)[] = [...missingDependencies.value, props.requiredPhase]
   // Eliminar duplicados manteniendo orden
   return [...new Set(phases)]
+})
+
+const runningDescription = computed(() => {
+  if (props.tab && TAB_RUNNING_DESCRIPTIONS[props.tab]) {
+    return TAB_RUNNING_DESCRIPTIONS[props.tab]
+  }
+  return 'Ejecutando análisis...'
 })
 
 const runButtonLabel = computed(() => {
@@ -136,7 +160,26 @@ async function runAnalysis() {
     <Transition name="fade">
       <div v-if="isRunning" class="running-overlay">
         <i class="pi pi-spin pi-spinner" />
-        <span>Ejecutando análisis...</span>
+        <span>{{ runningDescription }}</span>
+      </div>
+    </Transition>
+
+    <!-- Error overlay cuando el análisis falló -->
+    <Transition name="fade">
+      <div v-if="isFailed && !isRunning" class="failed-overlay">
+        <div class="failed-content">
+          <div class="icon-container icon-container--failed">
+            <i class="pi pi-exclamation-triangle" />
+          </div>
+          <h3 class="title">El análisis no se completó</h3>
+          <p class="description">{{ failedMessage }}</p>
+          <Button
+            label="Reintentar análisis"
+            icon="pi pi-refresh"
+            class="run-button"
+            @click="runAnalysis"
+          />
+        </div>
       </div>
     </Transition>
   </div>
@@ -242,6 +285,33 @@ async function runAnalysis() {
 .content {
   width: 100%;
   height: 100%;
+}
+
+.failed-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ds-surface-ground);
+  z-index: 10;
+}
+
+.failed-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 400px;
+  padding: var(--ds-space-6);
+}
+
+.icon-container--failed {
+  background: color-mix(in srgb, var(--ds-color-danger) 10%, var(--ds-surface-card));
+}
+
+.icon-container--failed i {
+  color: var(--ds-color-danger);
 }
 
 .running-overlay {

@@ -4,12 +4,16 @@ import { useWorkspaceStore, type WorkspaceTab } from '@/stores/workspace'
 import { useDocumentTypeConfig } from '@/composables/useDocumentTypeConfig'
 import type { DocumentType, RecommendedAnalysis } from '@/types/domain/projects'
 import { storeToRefs } from 'pinia'
+import TabStatusIndicator from './TabStatusIndicator.vue'
+import type { TabStatus } from './TabStatusIndicator.vue'
 
 /**
  * WorkspaceTabs - Barra de pestanas del workspace.
  *
  * Las pestañas visibles se adaptan al tipo de documento detectado.
  * Por ejemplo, para autoayuda no se muestran Timeline ni Relaciones.
+ * Muestra indicadores de estado por tab (running, completed, failed)
+ * y badges numéricos para alertas (naranja = pendientes, verde = todo resuelto).
  */
 
 const workspaceStore = useWorkspaceStore()
@@ -20,7 +24,6 @@ interface TabConfig {
   id: WorkspaceTab
   label: string
   icon: string
-  badge?: number
   /** Key para lookup en documentTypeConfig */
   configKey?: string
 }
@@ -30,6 +33,10 @@ const props = defineProps<{
   entityCount?: number
   /** Contador de alertas para badge */
   alertCount?: number
+  /** Total de alertas (para determinar si hay alertas resueltas) */
+  totalAlertCount?: number
+  /** Estado de cada tab del workspace */
+  tabStatuses?: Partial<Record<WorkspaceTab, TabStatus>>
   /** Tipo de documento detectado */
   documentType?: DocumentType
   /** Configuración de análisis recomendada */
@@ -83,11 +90,32 @@ const tabs = computed<TabConfig[]>(() => {
       label: (tab.id === 'summary' || tab.id === 'glossary')
         ? tab.label
         : (tab.configKey ? getTabLabel(tab.configKey) : tab.label),
-      // Añadir badges
-      badge: tab.id === 'entities' ? props.entityCount :
-             tab.id === 'alerts' ? props.alertCount : undefined,
     }))
 })
+
+/**
+ * Estado del indicador para un tab específico.
+ */
+function getStatus(tabId: WorkspaceTab): TabStatus {
+  return props.tabStatuses?.[tabId] ?? 'completed'
+}
+
+/**
+ * Conteo para mostrar en un tab (solo alertas muestra badge numérico).
+ */
+function getBadgeCount(tabId: WorkspaceTab): number | undefined {
+  if (tabId === 'alerts') return props.alertCount
+  return undefined
+}
+
+/**
+ * Determina si el badge de alertas es warning (hay sin resolver) o no.
+ * Si hay alertas totales pero 0 sin resolver → todo resuelto (no warning).
+ */
+function isAlertWarning(tabId: WorkspaceTab): boolean {
+  if (tabId !== 'alerts') return false
+  return (props.alertCount ?? 0) > 0
+}
 
 function selectTab(tab: WorkspaceTab) {
   workspaceStore.setActiveTab(tab)
@@ -139,12 +167,11 @@ function handleKeydown(event: KeyboardEvent, index: number) {
     >
       <i :class="tab.icon" class="workspace-tabs__icon" />
       <span class="workspace-tabs__label">{{ tab.label }}</span>
-      <span
-        v-if="tab.badge !== undefined && tab.badge > 0"
-        class="workspace-tabs__badge"
-      >
-        {{ tab.badge > 99 ? '99+' : tab.badge }}
-      </span>
+      <TabStatusIndicator
+        :status="getStatus(tab.id)"
+        :count="getBadgeCount(tab.id)"
+        :is-warning="isAlertWarning(tab.id)"
+      />
     </button>
 
     <!-- Spacer -->
@@ -216,24 +243,6 @@ function handleKeydown(event: KeyboardEvent, index: number) {
 
 .workspace-tabs__label {
   white-space: nowrap;
-}
-
-.workspace-tabs__badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 var(--ds-space-1-5);
-  font-size: var(--ds-font-size-xs);
-  font-weight: var(--ds-font-weight-semibold);
-  color: white;
-  background-color: var(--ds-color-primary);
-  border-radius: var(--ds-radius-full);
-}
-
-.workspace-tabs__tab--active .workspace-tabs__badge {
-  background-color: var(--ds-color-primary-dark);
 }
 
 .workspace-tabs__spacer {
