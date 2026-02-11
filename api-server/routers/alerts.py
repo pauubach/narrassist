@@ -226,6 +226,15 @@ async def update_alert_status(project_id: int, alert_id: int, body: deps.AlertSt
                     scope=scope,
                     reason=reason,
                 )
+            # Recalibrar confianza del detector tras descarte (BK-22)
+            try:
+                from narrative_assistant.alerts.engine import get_alert_engine
+                engine = get_alert_engine()
+                engine.recalibrate_detector(
+                    project_id, alert.alert_type, getattr(alert, 'source_module', '')
+                )
+            except Exception:
+                pass  # best-effort
         elif new_status_str in ('open', 'active', 'reopen') and deps.dismissal_repository:
             # Reabrir: eliminar dismissal persistido
             if alert.content_hash:
@@ -375,6 +384,16 @@ async def dismiss_batch(project_id: int, body: deps.BatchDismissRequest):
                 reason=reason,
             )
 
+            # Recalibrar detectores afectados (BK-22)
+            try:
+                from narrative_assistant.alerts.engine import get_alert_engine
+                engine = get_alert_engine()
+                affected = {(item["alert_type"], item["source_module"]) for item in dismissal_items}
+                for alert_type, source_module in affected:
+                    engine.recalibrate_detector(project_id, alert_type, source_module)
+            except Exception:
+                pass  # best-effort
+
         count = len(alert_ids)
         logger.info(f"Batch dismissed {count} alerts for project {project_id}")
 
@@ -454,6 +473,66 @@ async def apply_dismissals(project_id: int):
         )
     except Exception as e:
         logger.error(f"Error applying dismissals for project {project_id}: {e}", exc_info=True)
+        return ApiResponse(success=False, error="Error interno del servidor")
+
+
+@router.post("/api/projects/{project_id}/alerts/recalibrate", response_model=ApiResponse)
+async def recalibrate_detectors(project_id: int):
+    """
+    Recalibra la confianza de todos los detectores según el historial de descartes.
+
+    Para cada par (alert_type, source_module) calcula:
+    - fp_rate = dismissed / total
+    - calibration_factor = 1 - fp_rate * 0.5
+
+    Las futuras alertas de ese detector se crearán con confianza ajustada.
+    """
+    try:
+        from narrative_assistant.alerts.engine import get_alert_engine
+        engine = get_alert_engine()
+        results = engine.recalibrate_project(project_id)
+
+        return ApiResponse(
+            success=True,
+            data={"calibrations": results, "detectors_calibrated": len(results)},
+            message=f"Se han recalibrado {len(results)} detectores",
+        )
+    except Exception as e:
+        logger.error(f"Error recalibrating for project {project_id}: {e}", exc_info=True)
+        return ApiResponse(success=False, error="Error interno del servidor")
+
+
+@router.get("/api/projects/{project_id}/alerts/calibration", response_model=ApiResponse)
+async def get_calibration_data(project_id: int):
+    """Obtiene los datos de calibración actuales por detector."""
+    try:
+        from narrative_assistant.persistence.database import get_database
+        db = get_database()
+        rows = db.fetchall(
+            """
+            SELECT alert_type, source_module, total_alerts, total_dismissed,
+                   fp_rate, calibration_factor, updated_at
+            FROM detector_calibration
+            WHERE project_id = ?
+            ORDER BY fp_rate DESC
+            """,
+            (project_id,),
+        )
+        calibrations = [
+            {
+                "alert_type": r["alert_type"],
+                "source_module": r["source_module"],
+                "total_alerts": r["total_alerts"],
+                "total_dismissed": r["total_dismissed"],
+                "fp_rate": r["fp_rate"],
+                "calibration_factor": r["calibration_factor"],
+                "updated_at": r["updated_at"],
+            }
+            for r in rows
+        ]
+        return ApiResponse(success=True, data={"calibrations": calibrations})
+    except Exception as e:
+        logger.error(f"Error getting calibration for project {project_id}: {e}", exc_info=True)
         return ApiResponse(success=False, error="Error interno del servidor")
 
 

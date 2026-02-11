@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 _database_lock = threading.Lock()
 
 # Versión del schema actual
-SCHEMA_VERSION = 17
+SCHEMA_VERSION = 18
 
 # Tablas esenciales que deben existir para una BD válida
 # Solo incluir las tablas básicas definidas en SCHEMA_SQL
@@ -880,6 +880,23 @@ CREATE INDEX IF NOT EXISTS idx_dismissals_project ON alert_dismissals(project_id
 CREATE INDEX IF NOT EXISTS idx_dismissals_hash ON alert_dismissals(content_hash);
 CREATE INDEX IF NOT EXISTS idx_dismissals_type ON alert_dismissals(alert_type);
 
+-- Calibración de confianza por detector (versión 18, BK-22)
+CREATE TABLE IF NOT EXISTS detector_calibration (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    alert_type TEXT NOT NULL,
+    source_module TEXT NOT NULL DEFAULT '',
+    total_alerts INTEGER DEFAULT 0,
+    total_dismissed INTEGER DEFAULT 0,
+    fp_rate REAL DEFAULT 0.0,            -- ratio false positives
+    calibration_factor REAL DEFAULT 1.0, -- multiplicador: effective = original * factor
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    UNIQUE (project_id, alert_type, source_module)
+);
+
+CREATE INDEX IF NOT EXISTS idx_calibration_project ON detector_calibration(project_id);
+
 -- Reglas de supresión definidas por el usuario
 CREATE TABLE IF NOT EXISTS suppression_rules (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1022,7 +1039,7 @@ CREATE INDEX IF NOT EXISTS idx_enrichment_type ON enrichment_cache(project_id, e
 CREATE INDEX IF NOT EXISTS idx_enrichment_status ON enrichment_cache(project_id, status);
 
 -- Insertar versión del schema
-INSERT OR REPLACE INTO schema_info (key, value) VALUES ('version', '17');
+INSERT OR REPLACE INTO schema_info (key, value) VALUES ('version', '18');
 """
 
 

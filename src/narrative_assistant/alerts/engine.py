@@ -35,6 +35,7 @@ class AlertEngine:
     - Gestiona estados y transiciones
     - Filtra y busca alertas
     - Genera resúmenes y estadísticas
+    - Recalibra confianza según historial de descartes (BK-22)
     """
 
     def __init__(self, repository: AlertRepository | None = None):
@@ -46,6 +47,8 @@ class AlertEngine:
         """
         self.repo = repository or get_alert_repository()
         self.alert_handlers: dict[str, Callable[[Any], Alert]] = {}
+        # Cache de calibración en memoria: {(project_id, alert_type, source_module): factor}
+        self._calibration_cache: dict[tuple[int, str, str], float] = {}
 
     def register_handler(self, alert_type: str, handler: Callable[[Any], Alert]) -> None:
         """
@@ -72,6 +75,9 @@ class AlertEngine:
         """
         Crea una nueva alerta.
 
+        Aplica calibración automática: si el detector tiene un historial
+        alto de descartes (falsos positivos), la confianza se reduce.
+
         Args:
             project_id: ID del proyecto
             category: Categoría de la alerta
@@ -85,6 +91,13 @@ class AlertEngine:
         Returns:
             Result con la alerta creada
         """
+        original_confidence = kwargs.get("confidence", 0.8)
+        source_module = kwargs.get("source_module", "")
+
+        # Aplicar calibración de confianza (BK-22)
+        factor = self._get_calibration_factor(project_id, alert_type, source_module)
+        effective_confidence = round(original_confidence * factor, 4)
+
         alert = Alert(
             id=0,  # Se asignará por la DB
             project_id=project_id,
@@ -101,8 +114,8 @@ class AlertEngine:
             end_char=kwargs.get("end_char"),
             excerpt=kwargs.get("excerpt", ""),
             entity_ids=kwargs.get("entity_ids", []),
-            confidence=kwargs.get("confidence", 0.8),
-            source_module=kwargs.get("source_module", ""),
+            confidence=effective_confidence,
+            source_module=source_module,
             extra_data=kwargs.get("extra_data", {}),
         )
 
@@ -1718,6 +1731,162 @@ class AlertEngine:
             "chapter_start_dialogue": "Capítulo inicia con diálogo sin contexto",
         }
         return title_map.get(issue_type, f"Problema de diálogo: {issue_type}")
+
+    # ==========================================================================
+    # Calibración de confianza por detector (BK-22)
+    # ==========================================================================
+
+    def _get_calibration_factor(
+        self, project_id: int, alert_type: str, source_module: str
+    ) -> float:
+        """
+        Obtiene el factor de calibración para un detector.
+
+        Busca en cache primero, luego en DB. Devuelve 1.0 si no hay datos.
+        """
+        cache = getattr(self, "_calibration_cache", None)
+        if cache is None:
+            self._calibration_cache = {}
+            cache = self._calibration_cache
+
+        cache_key = (project_id, alert_type, source_module)
+        if cache_key in cache:
+            return cache[cache_key]
+
+        try:
+            from ..persistence.database import get_database
+
+            db = get_database()
+            row = db.fetchone(
+                """
+                SELECT calibration_factor FROM detector_calibration
+                WHERE project_id = ? AND alert_type = ? AND source_module = ?
+                """,
+                (project_id, alert_type, source_module),
+            )
+            factor = row["calibration_factor"] if row else 1.0
+            self._calibration_cache[cache_key] = factor
+            return factor
+        except Exception:
+            return 1.0
+
+    def recalibrate_detector(
+        self, project_id: int, alert_type: str, source_module: str
+    ) -> float:
+        """
+        Recalcula la calibración para un (project, alert_type, source_module).
+
+        fp_rate = dismissed / total
+        calibration_factor = 1 - fp_rate * 0.5
+          → 0% dismissed  = factor 1.0 (sin cambio)
+          → 50% dismissed = factor 0.75
+          → 100% dismissed = factor 0.5 (mitad de confianza)
+
+        Returns:
+            Nuevo factor de calibración
+        """
+        try:
+            from ..persistence.database import get_database
+
+            db = get_database()
+
+            row = db.fetchone(
+                """
+                SELECT
+                    COUNT(*) as total,
+                    SUM(CASE WHEN status = 'dismissed' THEN 1 ELSE 0 END) as dismissed
+                FROM alerts
+                WHERE project_id = ? AND alert_type = ? AND source_module = ?
+                """,
+                (project_id, alert_type, source_module),
+            )
+
+            total = row["total"] if row else 0
+            dismissed = row["dismissed"] if row else 0
+
+            if total == 0:
+                fp_rate = 0.0
+                factor = 1.0
+            else:
+                fp_rate = dismissed / total
+                factor = round(1.0 - fp_rate * 0.5, 4)
+
+            db.execute(
+                """
+                INSERT INTO detector_calibration
+                    (project_id, alert_type, source_module, total_alerts,
+                     total_dismissed, fp_rate, calibration_factor, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                ON CONFLICT (project_id, alert_type, source_module)
+                DO UPDATE SET
+                    total_alerts = excluded.total_alerts,
+                    total_dismissed = excluded.total_dismissed,
+                    fp_rate = excluded.fp_rate,
+                    calibration_factor = excluded.calibration_factor,
+                    updated_at = datetime('now')
+                """,
+                (project_id, alert_type, source_module, total, dismissed, fp_rate, factor),
+            )
+
+            # Invalidar cache
+            cache_key = (project_id, alert_type, source_module)
+            self._calibration_cache.pop(cache_key, None)
+
+            logger.debug(
+                f"Recalibrated {alert_type}/{source_module}: "
+                f"{dismissed}/{total} dismissed, factor={factor}"
+            )
+            return factor
+
+        except Exception as e:
+            logger.warning(f"Recalibration failed for {alert_type}/{source_module}: {e}")
+            return 1.0
+
+    def recalibrate_project(self, project_id: int) -> dict[str, float]:
+        """
+        Recalibra todos los detectores de un proyecto.
+
+        Returns:
+            Dict de {alert_type/source_module: factor}
+        """
+        try:
+            from ..persistence.database import get_database
+
+            db = get_database()
+            rows = db.fetchall(
+                """
+                SELECT DISTINCT alert_type, source_module
+                FROM alerts
+                WHERE project_id = ?
+                """,
+                (project_id,),
+            )
+
+            results = {}
+            for row in rows:
+                at = row["alert_type"]
+                sm = row["source_module"] or ""
+                factor = self.recalibrate_detector(project_id, at, sm)
+                results[f"{at}/{sm}"] = factor
+
+            self._calibration_cache = {
+                k: v for k, v in self._calibration_cache.items() if k[0] != project_id
+            }
+
+            logger.info(f"Recalibrated {len(results)} detectors for project {project_id}")
+            return results
+        except Exception as e:
+            logger.warning(f"Project recalibration failed: {e}")
+            return {}
+
+    def clear_calibration_cache(self, project_id: int | None = None) -> None:
+        """Limpia la cache de calibración (opcionalmente solo para un proyecto)."""
+        if project_id is None:
+            self._calibration_cache.clear()
+        else:
+            self._calibration_cache = {
+                k: v for k, v in self._calibration_cache.items() if k[0] != project_id
+            }
 
 
 def get_alert_engine() -> AlertEngine:
