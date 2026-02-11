@@ -8,16 +8,17 @@ from __future__ import annotations
 
 import logging
 import re
+
 from .coreference_resolver import (
-    CorefCandidate,
-    CorefMethod,
-    CoreferenceChain,
     FIRST_PERSON_PRONOUNS,
+    NARRATOR_PATTERNS,
+    CorefCandidate,
+    CoreferenceChain,
+    CorefMethod,
     Gender,
     Mention,
     MentionType,
     MentionVotingDetail,
-    NARRATOR_PATTERNS,
     Number,
 )
 

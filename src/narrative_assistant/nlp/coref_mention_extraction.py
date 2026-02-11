@@ -8,18 +8,19 @@ from __future__ import annotations
 
 import logging
 import re
+
 from .coreference_resolver import (
     ALL_PERSON_NOUNS,
     DEFINITE_ARTICLES,
-    Gender,
-    Mention,
-    MentionType,
-    Number,
     PERSON_NOUNS_FEMININE,
     PERSON_NOUNS_MASCULINE,
     SPANISH_DEMONSTRATIVES,
     SPANISH_POSSESSIVES,
     SPANISH_PRONOUNS,
+    Gender,
+    Mention,
+    MentionType,
+    Number,
 )
 
 logger = logging.getLogger(__name__)

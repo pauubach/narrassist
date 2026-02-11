@@ -8,7 +8,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useProjectsStore } from '../projects'
-import type { Project } from '@/types'
+import type { Project as _Project } from '@/types'
 
 // ── Mocks ────────────────────────────────────────────────────
 

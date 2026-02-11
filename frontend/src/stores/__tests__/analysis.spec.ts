@@ -529,7 +529,7 @@ describe('ANALYSIS_DEPENDENCIES', () => {
 
   it('should have all dependency targets defined in ExecutedPhases', () => {
     const allPhases = new Set(Object.keys(ANALYSIS_DEPENDENCIES))
-    for (const [phase, deps] of Object.entries(ANALYSIS_DEPENDENCIES)) {
+    for (const [_phase, deps] of Object.entries(ANALYSIS_DEPENDENCIES)) {
       for (const dep of deps) {
         expect(allPhases.has(dep)).toBe(true)
       }
@@ -620,7 +620,7 @@ describe('Queued States', () => {
 
     mockApiClient.postRaw.mockResolvedValueOnce({ success: true })
 
-    const result = await store.cancelAnalysis(1)
+    const _result = await store.cancelAnalysis(1)
 
     expect(store.isAnalyzing).toBe(false)
     expect(store.currentAnalysis?.status).toBe('idle')

@@ -7,7 +7,7 @@
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
-import { useSystemStore, type LTState, type ModelsStatus, type SystemCapabilities } from '../system'
+import { useSystemStore, type LTState as _LTState, type ModelsStatus, type SystemCapabilities } from '../system'
 
 // ── Mocks ────────────────────────────────────────────────────
 

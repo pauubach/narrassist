@@ -10,9 +10,9 @@ Tests:
 """
 import json
 import sqlite3
-import pytest
 from unittest.mock import MagicMock
 
+import pytest
 
 # ── Helpers ────────────────────────────────────────────────
 
@@ -89,7 +89,8 @@ def _seed_cache(conn, project_id, enrichment_type, status="completed", entity_sc
 
 class TestEmitInvalidationEvent:
     def test_emits_event_with_correct_revision(self):
-        import sys, os
+        import os
+        import sys
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "api-server"))
         from routers._invalidation import emit_invalidation_event
 
@@ -103,7 +104,8 @@ class TestEmitInvalidationEvent:
         assert rev2 == 2
 
     def test_emits_event_records_entity_ids(self):
-        import sys, os
+        import os
+        import sys
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "api-server"))
         from routers._invalidation import emit_invalidation_event
 
@@ -118,7 +120,8 @@ class TestEmitInvalidationEvent:
         assert row["event_type"] == "merge"
 
     def test_emits_event_stores_detail(self):
-        import sys, os
+        import os
+        import sys
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "api-server"))
         from routers._invalidation import emit_invalidation_event
 
@@ -135,7 +138,8 @@ class TestEmitInvalidationEvent:
 
 class TestStaleMarking:
     def test_merge_marks_entity_dependent_types_stale(self):
-        import sys, os
+        import os
+        import sys
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "api-server"))
         from routers._invalidation import emit_invalidation_event
 
@@ -159,7 +163,8 @@ class TestStaleMarking:
         assert status_map["echo_report"] == "completed"  # unaffected
 
     def test_attribute_edit_marks_attribute_dependent_types(self):
-        import sys, os
+        import os
+        import sys
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "api-server"))
         from routers._invalidation import emit_invalidation_event
 
@@ -182,7 +187,8 @@ class TestStaleMarking:
         assert status_map["pacing_report"] == "completed"
 
     def test_marks_per_entity_scope_stale(self):
-        import sys, os
+        import os
+        import sys
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "api-server"))
         from routers._invalidation import emit_invalidation_event
 
@@ -203,7 +209,8 @@ class TestStaleMarking:
         assert scope_status["entity:99"] == "completed"  # Different entity, unaffected
 
     def test_does_not_mark_already_stale_entries(self):
-        import sys, os
+        import os
+        import sys
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "api-server"))
         from routers._invalidation import emit_invalidation_event
 
@@ -221,7 +228,8 @@ class TestStaleMarking:
         assert row["status"] == "stale"
 
     def test_does_not_affect_other_projects(self):
-        import sys, os
+        import os
+        import sys
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "api-server"))
         from routers._invalidation import emit_invalidation_event
 
@@ -247,7 +255,8 @@ class TestStaleMarking:
 
 class TestRevisionTracking:
     def test_get_project_revision_returns_max(self):
-        import sys, os
+        import os
+        import sys
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "api-server"))
         from routers._invalidation import emit_invalidation_event, get_project_revision
 
@@ -263,7 +272,8 @@ class TestRevisionTracking:
         assert get_project_revision(db, 1) == 2
 
     def test_get_stale_enrichment_types(self):
-        import sys, os
+        import os
+        import sys
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "api-server"))
         from routers._invalidation import get_stale_enrichment_types
 
@@ -288,7 +298,8 @@ class TestEventTypeCoverage:
         "attribute_create", "attribute_edit", "attribute_delete",
     ])
     def test_event_type_is_mapped(self, event_type):
-        import sys, os
+        import os
+        import sys
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "api-server"))
         from routers._invalidation import EVENT_INVALIDATION_MAP
 
@@ -300,7 +311,8 @@ class TestEventTypeCoverage:
         "attribute_create", "attribute_edit", "attribute_delete",
     ])
     def test_event_emission_succeeds(self, event_type):
-        import sys, os
+        import os
+        import sys
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "api-server"))
         from routers._invalidation import emit_invalidation_event
 

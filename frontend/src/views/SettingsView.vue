@@ -413,10 +413,10 @@
                     <Tag v-if="method.recommended_gpu && !method.requires_gpu && systemCapabilities?.hardware.has_gpu" value="Aceleración recomendada" severity="info" class="method-tag" />
                     <Tag
                       v-if="method.requires_gpu"
+                      v-tooltip.top="gpuRequirementTooltip"
                       :value="systemCapabilities?.hardware.gpu_blocked ? 'Hardware no compatible' : 'Requiere aceleración'"
                       severity="warning"
                       class="method-tag"
-                      v-tooltip.top="gpuRequirementTooltip"
                     />
                     <Tag v-if="!method.available" value="No disponible" severity="danger" class="method-tag" />
                   </div>
@@ -452,10 +452,10 @@
                     <Tag v-if="method.recommended_gpu && !method.requires_gpu && systemCapabilities?.hardware.has_gpu" value="Aceleración recomendada" severity="info" class="method-tag" />
                     <Tag
                       v-if="method.requires_gpu"
+                      v-tooltip.top="gpuRequirementTooltip"
                       :value="systemCapabilities?.hardware.gpu_blocked ? 'Hardware no compatible' : 'Requiere aceleración'"
                       severity="warning"
                       class="method-tag"
-                      v-tooltip.top="gpuRequirementTooltip"
                     />
                     <Tag v-if="!method.available" value="No disponible" severity="danger" class="method-tag" />
                   </div>
@@ -528,10 +528,10 @@
                     <Tag v-if="method.recommended_gpu && !method.requires_gpu && systemCapabilities?.hardware.has_gpu" value="Aceleración recomendada" severity="info" class="method-tag" />
                     <Tag
                       v-if="method.requires_gpu"
+                      v-tooltip.top="gpuRequirementTooltip"
                       :value="systemCapabilities?.hardware.gpu_blocked ? 'Hardware no compatible' : 'Requiere aceleración'"
                       severity="warning"
                       class="method-tag"
-                      v-tooltip.top="gpuRequirementTooltip"
                     />
                     <Tag v-if="!method.available" value="No disponible" severity="danger" class="method-tag" />
                   </div>
@@ -564,10 +564,10 @@
                     <Tag v-if="method.recommended_gpu && !method.requires_gpu && systemCapabilities?.hardware.has_gpu" value="Aceleración recomendada" severity="info" class="method-tag" />
                     <Tag
                       v-if="method.requires_gpu"
+                      v-tooltip.top="gpuRequirementTooltip"
                       :value="systemCapabilities?.hardware.gpu_blocked ? 'Hardware no compatible' : 'Requiere aceleración'"
                       severity="warning"
                       class="method-tag"
-                      v-tooltip.top="gpuRequirementTooltip"
                     />
                     <Tag v-if="!method.available" value="No disponible" severity="danger" class="method-tag" />
                   </div>

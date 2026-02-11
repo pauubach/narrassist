@@ -1426,8 +1426,8 @@ CONDITIONAL_INDICATORS = [
 
 
 from .attr_context import AttributeContextMixin
-from .attr_voting import AttributeVotingMixin
 from .attr_entity_resolution import AttributeEntityResolutionMixin
+from .attr_voting import AttributeVotingMixin
 
 
 class AttributeExtractor(AttributeContextMixin, AttributeVotingMixin, AttributeEntityResolutionMixin):

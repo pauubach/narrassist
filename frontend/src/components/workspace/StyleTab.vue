@@ -238,7 +238,7 @@ async function loadFeatureAvailability() {
     <!-- Tab content (KeepAlive preserves state across tab switches) -->
     <div class="subtab-content">
       <KeepAlive>
-        <component :is="activeComponent" :project-id="projectId" :key="activeTabId" />
+        <component :is="activeComponent" :key="activeTabId" :project-id="projectId" />
       </KeepAlive>
     </div>
   </div>

@@ -160,6 +160,12 @@ def db():
             UNIQUE (license_id, hardware_fingerprint)
         );
 
+        CREATE TABLE IF NOT EXISTS projects (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL DEFAULT '',
+            is_demo INTEGER DEFAULT 0
+        );
+
         CREATE TABLE IF NOT EXISTS usage_records (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             license_id INTEGER NOT NULL,

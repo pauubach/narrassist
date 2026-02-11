@@ -22,7 +22,8 @@
 
     <template v-else>
       <!-- variant === 'text' -->
-      <div v-for="i in rows" :key="i" class="ds-skeleton__line shimmer"
+      <div
+        v-for="i in rows" :key="i" class="ds-skeleton__line shimmer"
         :style="{ width: lineWidth(i) }"
       />
     </template>

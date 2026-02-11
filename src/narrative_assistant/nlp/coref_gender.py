@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import re
+
 from .coreference_resolver import (
     Gender,
     Mention,
@@ -28,7 +29,7 @@ class CorefGenderMixin:
     """
 
     @staticmethod
-    def _infer_gender_from_context(verb_token, doc) -> "Gender":
+    def _infer_gender_from_context(verb_token, doc) -> Gender:
         """
         Infiere el género del sujeto omitido (pro-drop) desde el contexto.
 

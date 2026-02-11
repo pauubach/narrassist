@@ -38,8 +38,11 @@ class AttributeEntityResolutionMixin:
     def _validate_value(self, key, value: str) -> bool:
         """Valida que el valor sea apropiado para el tipo de atributo."""
         from .attributes import (
-            COLORS, HAIR_MODIFICATIONS, BUILD_TYPES,
-            FACIAL_HAIR_DESCRIPTORS, PERSONALITY_TRAITS,
+            BUILD_TYPES,
+            COLORS,
+            FACIAL_HAIR_DESCRIPTORS,
+            HAIR_MODIFICATIONS,
+            PERSONALITY_TRAITS,
             AttributeKey,
         )
 
@@ -152,7 +155,7 @@ class AttributeEntityResolutionMixin:
         Returns:
             Nombre de la entidad más probable o None
         """
-        from .attributes import _normalize_entity_mentions, _is_person_entity, _is_location_entity
+        from .attributes import _is_location_entity, _is_person_entity, _normalize_entity_mentions
 
         if not entity_mentions:
             return None
@@ -594,7 +597,7 @@ class AttributeEntityResolutionMixin:
 
     def _infer_category(self, value: str, token):
         """Infiere la categoría del atributo basándose en el valor y POS."""
-        from .attributes import AttributeCategory, BUILD_TYPES, COLORS, PERSONALITY_TRAITS
+        from .attributes import BUILD_TYPES, COLORS, PERSONALITY_TRAITS, AttributeCategory
 
         value_lower = value.lower()
 
@@ -627,7 +630,7 @@ class AttributeEntityResolutionMixin:
         Returns:
             AttributeKey más probable
         """
-        from .attributes import AttributeKey, BUILD_TYPES, PERSONALITY_TRAITS
+        from .attributes import BUILD_TYPES, PERSONALITY_TRAITS, AttributeKey
 
         value_lower = value.lower()
 

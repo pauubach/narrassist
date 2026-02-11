@@ -13,10 +13,10 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .unified_analysis import AnalysisContext
 
+import unicodedata
+
 from ..core.errors import ErrorSeverity, NarrativeError
 from ..core.result import Result
-
-import unicodedata
 
 
 def _normalize_key(text: str) -> str:

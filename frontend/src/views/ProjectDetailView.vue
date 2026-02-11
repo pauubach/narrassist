@@ -16,7 +16,7 @@
       <!-- Header -->
       <div class="project-header">
         <div class="header-left">
-          <Button icon="pi pi-arrow-left" label="Proyectos" text rounded aria-label="Volver a proyectos" @click="goBack" class="back-btn" />
+          <Button icon="pi pi-arrow-left" label="Proyectos" text rounded aria-label="Volver a proyectos" class="back-btn" @click="goBack" />
           <div class="header-info">
             <h1>{{ project.name }}</h1>
             <div class="header-meta">

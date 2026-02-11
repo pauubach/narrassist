@@ -339,7 +339,7 @@
                     class="conflict-custom-input"
                     size="small"
                     @focus="conflictResolutions[conflict.attribute_name] = ''"
-                    @update:model-value="conflictResolutions[conflict.attribute_name] = $event"
+                    @update:model-value="conflictResolutions[conflict.attribute_name] = $event ?? ''"
                   />
                 </div>
               </div>

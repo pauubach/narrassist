@@ -8,11 +8,12 @@ from __future__ import annotations
 
 import logging
 import re
+
 from .coreference_resolver import (
+    NARRATOR_PATTERNS,
     CorefMethod,
     Gender,
     Mention,
-    NARRATOR_PATTERNS,
 )
 
 logger = logging.getLogger(__name__)
