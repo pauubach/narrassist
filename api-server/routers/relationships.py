@@ -31,6 +31,13 @@ async def get_project_relationships(project_id: int):
         ApiResponse con datos de relaciones
     """
     logger.info(f"[RELATIONSHIPS-API] Solicitando relaciones para proyecto {project_id}")
+
+    # Check enrichment cache first (S8a-13)
+    from routers._enrichment_cache import get_cached_enrichment
+    cached = get_cached_enrichment(deps.get_database(), project_id, "character_network", allow_stale=True)
+    if cached:
+        return ApiResponse(success=True, data=cached)
+
     try:
         from narrative_assistant.analysis import (
             RelationshipClusteringEngine,
@@ -1440,6 +1447,12 @@ def get_character_archetypes(
     Cambiante, Embaucador, Inocente, Explorador, Sabio, Amante, Gobernante,
     Cuidador, Creador, Bufón o Rebelde.
     """
+    # Check enrichment cache first (S8a-13)
+    from routers._enrichment_cache import get_cached_enrichment
+    cached = get_cached_enrichment(deps.get_database(), project_id, "character_archetypes", allow_stale=True)
+    if cached:
+        return ApiResponse(success=True, data=cached)
+
     try:
         from narrative_assistant.analysis.chapter_summary import analyze_chapter_progress
         from narrative_assistant.analysis.character_archetypes import CharacterArchetypeAnalyzer

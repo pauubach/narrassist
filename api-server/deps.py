@@ -527,6 +527,7 @@ def convert_numpy_types(obj: Any) -> Any:
         return obj
 
 
+
 def generate_person_aliases(canonical_name: str, all_canonical_names: set[str]) -> list[str]:
     """
     Genera aliases automáticos para nombres de personas.
