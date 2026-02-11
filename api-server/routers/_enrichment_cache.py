@@ -39,7 +39,7 @@ def get_cached_enrichment(
                 params.append(entity_scope)
 
             row = conn.execute(
-                f"""SELECT result_json, status, computed_at
+                f"""SELECT result_json, status, computed_at, revision
                     FROM enrichment_cache
                     WHERE project_id = ? AND enrichment_type = ?
                     AND {scope_filter} AND {status_filter}
@@ -60,6 +60,7 @@ def get_cached_enrichment(
                         "hit": True,
                         "stale": is_stale,
                         "computed_at": row[2],
+                        "revision": row[3] if len(row) > 3 else 0,
                     }
                 return result
 

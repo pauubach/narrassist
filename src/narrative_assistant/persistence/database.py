@@ -1038,8 +1038,23 @@ CREATE INDEX IF NOT EXISTS idx_enrichment_project ON enrichment_cache(project_id
 CREATE INDEX IF NOT EXISTS idx_enrichment_type ON enrichment_cache(project_id, enrichment_type);
 CREATE INDEX IF NOT EXISTS idx_enrichment_status ON enrichment_cache(project_id, status);
 
+-- Eventos de invalidación granular (S8c)
+CREATE TABLE IF NOT EXISTS invalidation_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    event_type TEXT NOT NULL,             -- merge, undo_merge, reject, attribute_create, attribute_edit, attribute_delete
+    entity_ids TEXT NOT NULL DEFAULT '[]', -- JSON array of affected entity IDs
+    detail TEXT,                          -- JSON with event-specific details
+    revision INTEGER NOT NULL DEFAULT 1,  -- monotonically increasing per project
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_invalidation_project ON invalidation_events(project_id);
+CREATE INDEX IF NOT EXISTS idx_invalidation_revision ON invalidation_events(project_id, revision);
+
 -- Insertar versión del schema
-INSERT OR REPLACE INTO schema_info (key, value) VALUES ('version', '18');
+INSERT OR REPLACE INTO schema_info (key, value) VALUES ('version', '19');
 """
 
 
@@ -1226,6 +1241,28 @@ class Database:
                     logger.info(f"Migración: añadida columna {table}.{column}")
             except Exception as e:
                 logger.warning(f"Error en migración {table}.{column}: {e}")
+
+        # Migraciones de tablas nuevas (CREATE TABLE IF NOT EXISTS)
+        table_migrations = [
+            # v19: Invalidación granular (S8c)
+            """CREATE TABLE IF NOT EXISTS invalidation_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                event_type TEXT NOT NULL,
+                entity_ids TEXT NOT NULL DEFAULT '[]',
+                detail TEXT,
+                revision INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+            )""",
+            "CREATE INDEX IF NOT EXISTS idx_invalidation_project ON invalidation_events(project_id)",
+            "CREATE INDEX IF NOT EXISTS idx_invalidation_revision ON invalidation_events(project_id, revision)",
+        ]
+        for sql in table_migrations:
+            try:
+                conn.execute(sql)
+            except Exception as e:
+                logger.warning(f"Error en migración de tabla: {e}")
 
     def _create_schema_from_scratch(self) -> None:
         """Crea el schema completo desde cero."""

@@ -533,6 +533,14 @@ async def merge_entities(project_id: int, body: deps.MergeEntitiesRequest):
     except Exception as e:
         logger.error(f"Error merging entities for project {project_id}: {e}", exc_info=True)
         return ApiResponse(success=False, error="Error interno del servidor")
+    else:
+        # Invalidación granular (S8c) — best-effort, no bloquea respuesta
+        try:
+            from routers._invalidation import emit_invalidation_event
+            all_ids = [body.primary_entity_id] + source_entity_ids
+            emit_invalidation_event(deps.get_database(), project_id, "merge", all_ids)
+        except Exception:
+            pass
 
 
 @router.get("/api/projects/{project_id}/entities/merge-history", response_model=ApiResponse)
@@ -580,9 +588,18 @@ async def undo_entity_merge(project_id: int, merge_id: int):
         if result.is_failure:
             return ApiResponse(success=False, error=str(result.error))
 
+        restored_ids = result.value
+
+        # Invalidación granular (S8c)
+        try:
+            from routers._invalidation import emit_invalidation_event
+            emit_invalidation_event(deps.get_database(), project_id, "undo_merge", restored_ids)
+        except Exception:
+            pass
+
         return ApiResponse(
             success=True,
-            data={"restored_entity_ids": result.value},
+            data={"restored_entity_ids": restored_ids},
             message="Fusión deshecha exitosamente"
         )
 
@@ -1547,6 +1564,14 @@ async def reject_entity_text(project_id: int, body: deps.RejectEntityRequest):
                     (reason, project_id, entity_text.lower().strip())
                 )
 
+            # Invalidación granular (S8c)
+            try:
+                from routers._invalidation import emit_invalidation_event
+                emit_invalidation_event(deps.get_database(), project_id, "reject", [],
+                                       detail={"entity_text": entity_text})
+            except Exception:
+                pass
+
             return ApiResponse(
                 success=True,
                 data={"message": f"Entidad '{entity_text}' rechazada correctamente"}
@@ -2054,6 +2079,14 @@ async def create_entity_attribute(project_id: int, entity_id: int, body: deps.Cr
 
         logger.info(f"Created attribute {attribute_id} for entity {entity_id}: {name}={value}")
 
+        # Invalidación granular (S8c)
+        try:
+            from routers._invalidation import emit_invalidation_event
+            emit_invalidation_event(deps.get_database(), project_id, "attribute_create", [entity_id],
+                                   detail={"attribute": name, "value": value})
+        except Exception:
+            pass
+
         return ApiResponse(
             success=True,
             data={
@@ -2107,6 +2140,14 @@ async def update_entity_attribute(project_id: int, entity_id: int, attribute_id:
 
         logger.info(f"Updated attribute {attribute_id} for entity {entity_id}")
 
+        # Invalidación granular (S8c)
+        try:
+            from routers._invalidation import emit_invalidation_event
+            emit_invalidation_event(deps.get_database(), project_id, "attribute_edit", [entity_id],
+                                   detail={"attribute_id": attribute_id})
+        except Exception:
+            pass
+
         return ApiResponse(
             success=True,
             data={"id": attribute_id},
@@ -2146,6 +2187,14 @@ async def delete_entity_attribute(project_id: int, entity_id: int, attribute_id:
             return ApiResponse(success=False, error="No se pudo eliminar el atributo")
 
         logger.info(f"Deleted attribute {attribute_id} from entity {entity_id}")
+
+        # Invalidación granular (S8c)
+        try:
+            from routers._invalidation import emit_invalidation_event
+            emit_invalidation_event(deps.get_database(), project_id, "attribute_delete", [entity_id],
+                                   detail={"attribute_id": attribute_id})
+        except Exception:
+            pass
 
         return ApiResponse(
             success=True,

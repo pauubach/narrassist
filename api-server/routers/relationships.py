@@ -1889,3 +1889,32 @@ async def get_character_profiles(project_id: int):
     except Exception as e:
         logger.error(f"[PROFILES-API] Error: {e}", exc_info=True)
         return ApiResponse(success=False, error="Error interno del servidor")
+
+
+@router.get("/api/projects/{project_id}/enrichment/stale", response_model=ApiResponse)
+async def get_stale_enrichments(project_id: int):
+    """
+    Obtiene el estado de invalidación del proyecto.
+
+    Returns:
+        revision: última revisión de invalidación
+        stale_types: lista de enrichment types marcados como stale
+    """
+    try:
+        from routers._invalidation import get_project_revision, get_stale_enrichment_types
+
+        db = deps.get_database()
+        revision = get_project_revision(db, project_id)
+        stale_types = get_stale_enrichment_types(db, project_id)
+
+        return ApiResponse(
+            success=True,
+            data={
+                "revision": revision,
+                "stale_types": stale_types,
+                "has_stale": len(stale_types) > 0,
+            },
+        )
+    except Exception as e:
+        logger.error(f"Error getting stale enrichments: {e}")
+        return ApiResponse(success=True, data={"revision": 0, "stale_types": [], "has_stale": False})

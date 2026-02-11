@@ -33,12 +33,44 @@ def _cache_result(
     result: Any,
     phase: int,
     entity_scope: str | None = None,
-) -> None:
-    """Store an enrichment result in the cache table."""
+) -> bool:
+    """Store an enrichment result in the cache table.
+
+    Returns True if result was written, False if early cutoff (output unchanged).
+    """
     try:
         result_json = json.dumps(result, ensure_ascii=False, default=str, sort_keys=True)
         output_hash = hashlib.sha256(result_json.encode()).hexdigest()[:16]
+
         with db_session.connection() as conn:
+            # Early cutoff: si el output_hash no cambió, solo marcar completed
+            scope_filter = "entity_scope IS NULL" if entity_scope is None else "entity_scope = ?"
+            params = [project_id, enrichment_type]
+            if entity_scope is not None:
+                params.append(entity_scope)
+
+            existing = conn.execute(
+                f"""SELECT output_hash, status FROM enrichment_cache
+                    WHERE project_id = ? AND enrichment_type = ? AND {scope_filter}
+                    LIMIT 1""",
+                params,
+            ).fetchone()
+
+            if existing and existing[0] == output_hash and existing[1] in ("completed", "stale"):
+                # Output no cambió — solo actualizar status y timestamp
+                update_params = [project_id, enrichment_type]
+                if entity_scope is not None:
+                    update_params.append(entity_scope)
+                conn.execute(
+                    f"""UPDATE enrichment_cache
+                        SET status = 'completed', updated_at = datetime('now')
+                        WHERE project_id = ? AND enrichment_type = ? AND {scope_filter}""",
+                    update_params,
+                )
+                conn.commit()
+                logger.debug(f"Early cutoff: {enrichment_type} unchanged for project {project_id}")
+                return False
+
             conn.execute(
                 """INSERT OR REPLACE INTO enrichment_cache
                    (project_id, enrichment_type, entity_scope, status,
@@ -50,8 +82,10 @@ def _cache_result(
                  output_hash, result_json, phase),
             )
             conn.commit()
+            return True
     except Exception as e:
         logger.warning(f"Failed to cache {enrichment_type} for project {project_id}: {e}")
+        return False
 
 
 def _mark_failed(
@@ -100,9 +134,10 @@ def capture_entity_fingerprint(db_session: Any, project_id: int) -> str:
 def invalidate_enrichment_if_mutated(
     db_session: Any, project_id: int, saved_fingerprint: str
 ) -> bool:
-    """S8a-17: Check if entities were mutated during enrichment.
+    """S8a-17 + S8c-11: Check if entities were mutated during enrichment.
 
-    If the fingerprint changed, delete all enrichment cache for the project.
+    If the fingerprint changed, mark entity-dependent enrichments as stale
+    (granular invalidation) instead of deleting everything.
     Returns True if cache was invalidated.
     """
     if not saved_fingerprint:
@@ -112,17 +147,36 @@ def invalidate_enrichment_if_mutated(
     if current != saved_fingerprint:
         logger.warning(
             f"[Enrichment] Entity mutation detected for project {project_id} "
-            f"(before={saved_fingerprint}, after={current}). Invalidating cache."
+            f"(before={saved_fingerprint}, after={current}). Marking stale."
         )
         try:
+            from routers._invalidation import ENTITY_DEPENDENT_TYPES, ATTRIBUTE_DEPENDENT_TYPES
+
+            affected_types = ENTITY_DEPENDENT_TYPES | ATTRIBUTE_DEPENDENT_TYPES
+            placeholders = ",".join("?" for _ in affected_types)
+
             with db_session.connection() as conn:
                 conn.execute(
-                    "DELETE FROM enrichment_cache WHERE project_id = ?",
-                    (project_id,),
+                    f"""UPDATE enrichment_cache
+                        SET status = 'stale', updated_at = datetime('now')
+                        WHERE project_id = ?
+                        AND enrichment_type IN ({placeholders})
+                        AND status = 'completed'""",
+                    [project_id] + list(affected_types),
                 )
                 conn.commit()
         except Exception as e:
-            logger.error(f"Failed to invalidate enrichment cache: {e}")
+            logger.error(f"Failed to mark enrichment stale: {e}")
+            # Fallback: delete all (legacy behavior)
+            try:
+                with db_session.connection() as conn:
+                    conn.execute(
+                        "DELETE FROM enrichment_cache WHERE project_id = ?",
+                        (project_id,),
+                    )
+                    conn.commit()
+            except Exception:
+                pass
         return True
     return False
 
@@ -137,14 +191,31 @@ def _run_enrichment(
 ) -> bool:
     """Run a single enrichment computation with error handling.
 
+    Marks cache as 'computing' before starting. On success, stores result
+    atomically. On failure, marks as 'failed' with error message.
+
     Returns True if successful, False otherwise.
     """
+    # Marcar como 'computing' antes de empezar (S8c-10)
+    try:
+        with db_session.connection() as conn:
+            conn.execute(
+                """INSERT OR REPLACE INTO enrichment_cache
+                   (project_id, enrichment_type, entity_scope, status, phase, updated_at)
+                   VALUES (?, ?, NULL, 'computing', ?, datetime('now'))""",
+                (project_id, enrichment_type, phase),
+            )
+            conn.commit()
+    except Exception:
+        pass  # Best effort
+
     try:
         t0 = time.time()
         result = compute_fn()
         elapsed = time.time() - t0
-        _cache_result(db_session, project_id, enrichment_type, result, phase)
-        logger.info(f"[Enrichment] {label} completed in {elapsed:.1f}s")
+        changed = _cache_result(db_session, project_id, enrichment_type, result, phase)
+        cutoff_note = "" if changed else " (early cutoff)"
+        logger.info(f"[Enrichment] {label} completed in {elapsed:.1f}s{cutoff_note}")
         return True
     except Exception as e:
         logger.warning(f"[Enrichment] {label} failed: {e}", exc_info=True)
