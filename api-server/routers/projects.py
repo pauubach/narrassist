@@ -368,7 +368,8 @@ async def create_project(
     name: str = Body(...),
     description: Optional[str] = Body(None),
     file_path: Optional[str] = Body(None),
-    file: Optional[UploadFile] = File(None)
+    file: Optional[UploadFile] = File(None),
+    is_demo: Optional[bool] = Body(False),
 ):
     """
     Crea un nuevo proyecto con documento y comienza el análisis.
@@ -496,6 +497,7 @@ async def create_project(
                 document_path=Path(stored_path),
                 description=description or f"Documento: {document_path.name}",
                 check_existing=True,
+                is_demo=bool(is_demo),
             )
 
             if create_result.is_failure:

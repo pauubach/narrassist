@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 _database_lock = threading.Lock()
 
 # Versión del schema actual
-SCHEMA_VERSION = 16
+SCHEMA_VERSION = 17
 
 # Tablas esenciales que deben existir para una BD válida
 # Solo incluir las tablas básicas definidas en SCHEMA_SQL
@@ -65,6 +65,10 @@ CREATE TABLE IF NOT EXISTS projects (
     -- Colección / saga (versión 14)
     collection_id INTEGER,
     collection_order INTEGER DEFAULT 0,
+
+    -- Demo project (versión 17) — no cuenta para cuota de licencia
+    is_demo INTEGER DEFAULT 0,
+
     FOREIGN KEY (collection_id) REFERENCES collections(id) ON DELETE SET NULL
 );
 
@@ -1018,7 +1022,7 @@ CREATE INDEX IF NOT EXISTS idx_enrichment_type ON enrichment_cache(project_id, e
 CREATE INDEX IF NOT EXISTS idx_enrichment_status ON enrichment_cache(project_id, status);
 
 -- Insertar versión del schema
-INSERT OR REPLACE INTO schema_info (key, value) VALUES ('version', '16');
+INSERT OR REPLACE INTO schema_info (key, value) VALUES ('version', '17');
 """
 
 
@@ -1193,6 +1197,8 @@ class Database:
             ("projects", "collection_order", "INTEGER DEFAULT 0"),
             # v15: chapter_id en entity_attributes (S8a-06)
             ("entity_attributes", "chapter_id", "INTEGER"),
+            # v17: Demo project flag (PP-3c)
+            ("projects", "is_demo", "INTEGER DEFAULT 0"),
         ]
         for table, column, col_def in migrations:
             try:

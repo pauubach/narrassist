@@ -783,9 +783,18 @@ class LicenseVerifier:
 
         page_count = words_to_pages(word_count)
 
-        # Verificar si ya existe registro para este documento en este periodo
+        # Verificar si el proyecto es demo (no cuenta para cuota)
         billing_period = UsageRecord.current_billing_period()
         db = self._get_db()
+
+        is_demo_project = False
+        project_row = db.fetchone(
+            "SELECT is_demo FROM projects WHERE id = ?", (project_id,)
+        )
+        if project_row and project_row["is_demo"]:
+            is_demo_project = True
+
+        # Verificar si ya existe registro para este documento en este periodo
 
         existing = db.fetchone(
             """
@@ -821,7 +830,7 @@ class LicenseVerifier:
                 )
             )
 
-        # Nuevo registro
+        # Nuevo registro — demo projects no cuentan para cuota
         record = UsageRecord(
             license_id=license_obj.id,
             project_id=project_id,
@@ -831,7 +840,7 @@ class LicenseVerifier:
             page_count=page_count,
             analysis_started_at=datetime.utcnow(),
             billing_period=billing_period,
-            counted_for_quota=True,
+            counted_for_quota=not is_demo_project,
         )
 
         with db.transaction() as conn:

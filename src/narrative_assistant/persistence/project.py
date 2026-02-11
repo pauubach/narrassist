@@ -54,6 +54,7 @@ class Project:
     document_subtype: str | None = None  # Subtipo específico
     document_type_confirmed: bool = False  # Si el usuario confirmó el tipo
     detected_document_type: str | None = None  # Tipo detectado automáticamente
+    is_demo: bool = False  # Proyecto demo — no cuenta para cuota de licencia
 
     def to_dict(self) -> dict:
         """Serializa a diccionario."""
@@ -73,6 +74,7 @@ class Project:
             "document_subtype": self.document_subtype,
             "document_type_confirmed": self.document_type_confirmed,
             "detected_document_type": self.detected_document_type,
+            "is_demo": self.is_demo,
         }
 
     @classmethod
@@ -106,6 +108,7 @@ class Project:
             if row["document_type_confirmed"]
             else False,
             detected_document_type=row["detected_document_type"],
+            is_demo=bool(row["is_demo"]) if row["is_demo"] else False,
         )
 
 
@@ -130,6 +133,7 @@ class ProjectManager:
         document_path: Path | None = None,
         description: str = "",
         check_existing: bool = True,
+        is_demo: bool = False,
     ) -> Result[Project]:
         """
         Crea un proyecto desde el contenido de un documento.
@@ -173,6 +177,7 @@ class ProjectManager:
             document_fingerprint=fingerprint.full_hash,
             document_format=document_format,
             word_count=fingerprint.word_count,
+            is_demo=is_demo,
         )
 
         # Insertar en BD
@@ -181,8 +186,8 @@ class ProjectManager:
                 """
                 INSERT INTO projects (
                     name, description, document_path, document_fingerprint,
-                    document_format, word_count, settings_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    document_format, word_count, settings_json, is_demo
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     project.name,
@@ -192,6 +197,7 @@ class ProjectManager:
                     project.document_format,
                     project.word_count,
                     json.dumps(project.settings) if project.settings else None,
+                    1 if project.is_demo else 0,
                 ),
             )
             project.id = cursor.lastrowid
