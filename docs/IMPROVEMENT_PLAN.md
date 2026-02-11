@@ -759,7 +759,7 @@ pip install transformers
 
 > Documentacion produccion: [LICENSING_PRODUCTION_PLAN.md](LICENSING_PRODUCTION_PLAN.md)
 
-### Sprint 7b: Feature Gating + Integration (5 dias) — COMPLETADO (S7b-09, S7b-10 pendientes)
+### Sprint 7b: Feature Gating + Integration (5 dias) — COMPLETADO ✅
 
 | ID | Accion | Estado | Detalle |
 |----|--------|--------|---------|
@@ -771,8 +771,8 @@ pip install transformers
 | S7b-06 | Integrar OOC detection en pipeline | DONE | analysis.py:1912-1935, alertas OOC generadas |
 | S7b-07 | Integrar Classical Spanish en pipeline | DONE | analysis.py:1965-1980, deteccion periodo + normalizacion |
 | S7b-08 | Pasar settings frontend → backend en analisis | DONE | analysis.py:452-484, mapeo settings → UnifiedConfig |
-| S7b-09 | Conectar endpoint anachronisms con frontend | PENDIENTE | Endpoint existe, falta integracion frontend |
-| S7b-10 | Crear CharacterProfileModal unificado | PENDIENTE | Componente no existe |
+| S7b-09 | Conectar endpoint anachronisms con frontend | DONE | AnachronismsPanel.vue integrado en AnalysisView (v0.8.0, commit 6ddebec) |
+| S7b-10 | Crear CharacterProfileModal unificado | DONE | CharacterProfileModal.vue con 6 indicadores + gráficos evolución (v0.8.1/v0.8.2) |
 
 ### Sprint 7c: Pipeline Fixes (3 dias) — COMPLETADO (1 backlog)
 
@@ -1111,70 +1111,307 @@ NO propagar invalidacion downstream. Comparar `output_hash` antes vs despues.
 
 ## 8b. Plan de Trabajo BK-09..18 (Panel de Expertos, 10-Feb-2026)
 
-### Sprint S9: Integridad de Datos y Diálogos (8-11 días)
+### Sprint S9: Integridad de Datos y Diálogos (~25-31h, 5-7 días)
 
-| Orden | ID | Esfuerzo | Descripción | Riesgo |
-|-------|----|----------|-------------|--------|
-| 1 | BK-09 | S (1-2d) | Entity merge fix — migrar TODAS las FK (15 tablas), no solo attributes/mentions | Medio: si se olvida alguna tabla, datos inconsistentes |
-| 2 | BK-15 | S (1-2d) | Masking emocional — "fingió calma" no es error de OOC. Patrones: fingió, disimulando, conteniendo | Bajo |
-| 3 | BK-17 | S (1-2d) | Glosario → gazetteer NER — inyectar términos del usuario con confidence 1.0 | Bajo |
-| ~~4~~ | ~~BK-10a~~ | ~~S (2-3h)~~ | ~~Aplicar correcciones usuario en SpeakerAttributor~~ | Movido a Sprint PP-4 |
-| 4 | BK-10b | S (3-4h) | Scene breaks intra-capítulo: usar patrones `chapter.py:621-626` en speaker attribution | Medio: edge cases |
-| 5 | BK-10c | S (2-3h) | Confidence decay: `base * 0.95^turns_since_explicit`, reset en verba dicendi/scene break/chapter | Bajo |
+> **Especificado**: 11-Feb-2026 por panel de expertos (QA Senior, Arquitecto Python,
+> Corrector Editorial 15+ años, AppSec Specialist).
 
-**Criterios de éxito**: 0 filas huérfanas post-merge; correcciones usuario aplicadas en reanálisis; scene breaks detectan `***`/`---`/triple newline; OOC con masking = `is_intentional`; glosario en gazetteer.
+#### BK-09: Entity Merge FK Migration [CRITICAL, 6-8h]
 
-### Sprint S10: Timeline No Lineal + Cache (11-18 días)
+**Problema**: `EntityFusionService.merge_entities()` solo migra `entity_mentions` y
+`entity_attributes`. Las otras **13 tablas FK** quedan huérfanas → data loss silenciosa.
 
-| Orden | ID | Esfuerzo | Descripción | Riesgo |
-|-------|----|----------|-------------|--------|
-| ~~1~~ | ~~BK-12~~ | ~~M (3-5d)~~ | ~~Enrichment cache granular~~ | DUPLICADO: absorbido por S8a-11 (tabla) + S8a-13 (read-from-cache) |
-| 1 | BK-14 | M (3-5d) | Ubicaciones jerárquicas — `LocationOntology` con `is_reachable()` | Bajo-medio |
-| 2 | BK-11 | L (5-8d) | Timeline no lineal — mapa temporal por capítulo, integrar en vital_status y locations | Muy alto: 40% ficción no lineal |
+**Tablas afectadas** (auditoria completa):
 
-**Criterios de éxito**: cocina⊂casa no genera FP; flashbacks no generan "muerto reaparece".
+| # | Tabla | FK Column(s) | ON DELETE | Estado |
+|---|-------|-------------|-----------|--------|
+| 1 | `entity_mentions` | `entity_id` | CASCADE | ✅ Migrada |
+| 2 | `entity_attributes` | `entity_id` | CASCADE | ✅ Migrada |
+| 3 | `relationships` | `entity1_id`, `entity2_id` | CASCADE | ❌ Huérfana |
+| 4 | `interactions` | `entity1_id`, `entity2_id` | CASCADE | ❌ Huérfana |
+| 5 | `voice_profiles` | `entity_id` | CASCADE | ❌ Huérfana |
+| 6 | `vital_status_events` | `entity_id` | CASCADE | ❌ Huérfana |
+| 7 | `character_location_events` | `entity_id` | CASCADE | ❌ Huérfana |
+| 8 | `ooc_events` | `entity_id` | CASCADE | ❌ Huérfana |
+| 9 | `scene_tags` | `location_entity_id` | SET NULL | ❌ Huérfana |
+| 10 | `temporal_markers` | `entity_id` | SET NULL | ❌ Huérfana |
+| 11 | `coreference_corrections` | `original_entity_id`, `corrected_entity_id` | SET NULL | ❌ Huérfana |
+| 12 | `speaker_corrections` | `original_speaker_id`, `corrected_speaker_id` | SET NULL | ❌ Huérfana |
+| 13 | `collection_entity_links` | `source_entity_id`, `target_entity_id` | CASCADE | ❌ Huérfana |
+| 14 | `enrichment_cache` | `entity_scope` (JSON) | N/A | ⚠️ Parcial |
+| 15 | `alerts` | `entity_ids` (JSON array) | N/A | ⚠️ Parcial |
 
-**Dependencias**: S8a-11+S8a-13 (cache, antes BK-12) es prerequisito de BK-18. BK-11 se beneficia de BK-14.
+**Archivos a modificar**:
+- `src/narrative_assistant/entities/fusion.py` — Añadir 13 llamadas `move_*()` en merge_entities()
+- `src/narrative_assistant/entities/repository.py` — Métodos: move_relationships(), move_interactions(), move_voice_profiles(), move_vital_status_events(), move_location_events(), move_ooc_events(), move_scene_tags(), move_temporal_markers(), move_coref_corrections(), move_speaker_corrections(), move_collection_links(), update_alerts_json(), update_enrichment_cache_json()
 
-### Sprint S11: Pro-drop + Chekhov (8-13 días)
+**Edge cases**: Relaciones duplicadas post-merge (A→C y B→C, merge A+B) → consolidar con max(confidence). Self-relationships (A→A) → transformar a (merged→merged).
 
-| Orden | ID | Esfuerzo | Descripción | Riesgo |
-|-------|----|----------|-------------|--------|
-| 1 | BK-13 | M (3-5d) | Ambiguity scoring pro-drop — `ambiguity_score` con saliencia reciente | Medio |
-| 2 | BK-16 | L (5-8d) | Chekhov tracker extendido — personajes SUPPORTING que desaparecen + hilos sin resolver | Medio: frontera subjetiva |
+**Tests**: 1 test por tabla FK + 1 test integración completo (15 FK) + 1 test verificación 0 huérfanas.
 
-**Criterios de éxito**: Pro-drop multi-candidato mismo género → confianza < 0.7; personajes con backstory que desaparecen detectados.
+#### BK-15: Detección de Masking Emocional [HIGH, 3-4h]
 
-### Sprint S12: Confidence Decay (1-2 días)
+**Problema**: "María fingió calma" genera alerta OOC falsa. El sistema confunde masking intencional con inconsistencia de personalidad.
 
-| Orden | ID | Esfuerzo | Descripción | Riesgo |
-|-------|----|----------|-------------|--------|
-| 1 | BK-18 | S (1-2d) | Decay gradual: `effective_confidence = original * 0.97^events_since` | Bajo |
+**Patrones a detectar** (7 familias verbales):
 
-> **PENDIENTE**: S9-S12 necesitan especificación detallada antes de implementar (archivos
-> afectados, esquemas BD, algoritmos, sub-tareas). Actualmente solo tienen descripciones
-> de alto nivel. Detallar cuando se vaya a empezar cada sprint. BK-11 (timeline no lineal)
-> es la más compleja: requiere desacoplar orden de capítulos del orden cronológico, añadir
-> temporal metadata a chapters, y corregir vital_status + age_consistency que asumen linealidad.
+| Familia | Ejemplos | Tipo |
+|---------|----------|------|
+| Fingir | fingió, finge, fingía, fingieron, fingida | FEIGN |
+| Simular | simuló, simula, simulaba, simulando | SIMULATE |
+| Aparentar | aparentó, aparenta, aparentaba, aparentando | APPEAR |
+| Disimular | disimulaba, disimula, disimulando, disimulada | CONCEAL |
+| Contener/Refrenar | contuvo, contiene, contenía, refrenó, refrenando | RESTRAIN |
+| Hacerse | se hizo, haciéndose, hizo como si | PRETEND |
+| Ocultar | ocultaba, oculta, ocultando, ocultada | HIDE |
 
-**Esfuerzo total estimado**: 24-37 días (6-9 semanas). S9 y S10 paralelizables.
+**Emociones enmascarables**: calma, tranquilidad, serenidad, alegría, confianza, indiferencia, frialdad.
+
+**Algoritmo**: `REGEX(MASK_VERB) + (?:su\s+)? + REGEX(MASKABLE_EMOTION)` → marcar `is_intentional=True`, no generar alerta OOC (o generar INFO con confidence ≤ 0.3).
+
+**Excepcción**: Masking + contradicción física ("aparentaba calma aunque sus manos temblaban") → INFO alert, plot-relevant.
+
+**Archivos**: `src/narrative_assistant/analysis/out_of_character.py` — Añadir `_check_emotional_masking()` antes de generar alertas. Añadir `EMOTIONAL_MASKING_MARKERS` y `MASKABLE_EMOTIONS` junto a `TRANSITION_MARKERS` existente.
+
+**Tests**: 5 tests (fingió calma, disimulando miedo, aparentaba+temblaba, no-mask normal OOC, mask con leakage físico).
+
+#### BK-17: Glosario → Gazetteer NER [HIGH, 4-5h]
+
+**Problema**: Términos de usuario (fantasía, sci-fi, dominios específicos) no se inyectan en NER. "Winterfell" no se detecta como location porque spaCy no lo conoce.
+
+**Algoritmo `_inject_glossary_entities()`**:
+1. Ordenar glosario por longitud DESC ("House Stark" antes que "Stark")
+2. Para cada término: búsqueda case-insensitive en texto
+3. Verificar word boundary (no "Fall" dentro de "Waterfall")
+4. Check overlap con entidades spaCy existentes → glossary gana (confidence=1.0)
+5. Crear `ExtractedEntity(source="glossary", confidence=1.0)`
+
+**Schema BD**: Tabla `user_glossary` (project_id, term, entity_type, confidence DEFAULT 1.0, UNIQUE(project_id, term, entity_type)).
+
+**Archivos**:
+- `src/narrative_assistant/nlp/ner.py` — Añadir `_inject_glossary_entities()` en pipeline NER
+- `src/narrative_assistant/persistence/database.py` — Schema v19: tabla user_glossary
+- `api-server/routers/entities.py` — CRUD endpoints: GET/POST/DELETE /projects/{id}/glossary
+
+**Tests**: 6 tests (case insensitive, word boundary, priority sobre spaCy, múltiples ocurrencias, overlap parcial, API CRUD).
+
+#### BK-10b: Scene Breaks en Speaker Attribution [MEDIUM, 5-6h]
+
+**Problema**: Capítulos con múltiples escenas (`***`, `---`, blank lines) tratados como conversación única. Contexto de participantes se contamina entre escenas.
+
+**Patrones scene break**: `^\s*\*\s*\*\s*\*\s*$`, `^\s*---+\s*$`, `^\s*###\s*$`, `^\s*═{3,}\s*$`, blank lines (3+).
+
+**Archivos**: `src/narrative_assistant/voice/speaker_attribution.py` — Añadir `_detect_scene_breaks_in_chapter()`, resetear `current_participants` y `last_speaker` en cada scene break.
+
+**Tests**: 4 tests (asterisk reset, dash reset, blank line reset, multi-scene alternation correcta).
+
+#### BK-10c: Speaker Confidence Decay [MEDIUM, 4-5h]
+
+**Fórmula**: `effective_confidence = base * 0.97^dialogue_distance`
+- 5 diálogos: 0.86 (alta). 10: 0.74 (media). 30: 0.40 (baja). Floor: 0.30.
+- Reset en: verba dicendi explícito, scene break, cambio de capítulo.
+
+**Archivos**: `src/narrative_assistant/voice/speaker_attribution.py` — Tracking `last_speaker_mention_idx`, apply decay factor.
+
+**Tests**: 3 tests (decay cercano, decay lejano, reset en scene break).
+
+**Criterios de éxito S9**: 0 filas huérfanas post-merge; masking emocional no genera FP; glosario inyectado con confidence=1.0; scene breaks resetean contexto speaker; decay reduce confianza con distancia.
+
+---
+
+### Sprint S10: Ubicaciones Jerárquicas + Timeline No Lineal (~27-30h, 6-8 días)
+
+> **Especificado**: 11-Feb-2026 por panel de expertos (Lingüista Computacional,
+> Corrector Editorial 15+ años, Arquitecto Python, Product Owner).
+
+#### BK-14: LocationOntology [ROI #1, 12h]
+
+**Problema**: cocina y salón en misma casa → alerta de "ubicación incompatible". 30% de FP en alertas de ubicación son por falta de jerarquía.
+
+**Arquitectura**:
+```
+LocationOntology
+├── locations: dict[str, LocationNode]  # nombre → nodo
+├── hierarchy: dict[str, set[str]]      # padre → hijos
+├── are_compatible(loc1, loc2) → bool
+│   ├── Same location → True
+│   ├── Ancestor relationship → True (cocina⊂casa)
+│   └── Different cities → False
+└── is_reachable(loc1, loc2, hours, period) → bool
+    ├── Medieval: 40km/day
+    └── Modern: 1000km/day (tren/avión)
+```
+
+**Schema BD (v19)**: `location_ontology` (location_name, parent_id, coordinates, period), `location_gazetteer` (100+ ciudades españolas pre-pobladas).
+
+**Desafíos español**: "Valencia" = ciudad o comunidad (contexto). Nombres arcaicos ("Hispalis" = Sevilla). Mix ficción+real ("Macondo" + "Madrid").
+
+**Archivos a crear**: `src/narrative_assistant/analysis/location_ontology.py` (400 líneas), `src/narrative_assistant/analysis/location_builder.py` (200 líneas, LLM-assisted).
+
+**Archivos a modificar**: `src/narrative_assistant/analysis/character_location.py` — Reemplazar `_are_locations_incompatible()` con ontología. `persistence/database.py` — Schema v19.
+
+**Tests**: 8 tests (room-in-building, multi-level, different-cities, reachability medieval/modern, unknown=fail-safe, ancestors, descendants, haversine).
+
+#### BK-11: Timeline No Lineal [ROI #2, 15-18h]
+
+**Problema**: Sistema asume `chapter_number = orden cronológico`. 40% de ficción moderna tiene flashbacks. "María 50 años en cap 1, 20 años en cap 2 (flashback)" → falsa alerta "edad retrocede".
+
+**Arquitectura**:
+```
+TemporalMap
+├── temporal_map: dict[chapter → TemporalSlice]
+│   └── TemporalSlice(chapter, discourse_position, story_time,
+│       narrative_type: CHRONOLOGICAL|ANALEPSIS|PROLEPSIS|PARALLEL)
+├── get_character_age_in_chapter(entity_id, chapter) → int
+│   └── reference_age + (story_time_diff / 365.25)
+├── is_character_alive_in_chapter(entity_id, chapter) → bool
+│   └── story_time vs death_time (no chapter_number)
+└── is_location_transition_possible(entity_id, loc1, ch1, loc2, ch2) → bool
+    └── story_time gap → LocationOntology.is_reachable(hours)
+```
+
+**Detección de flashbacks** (marcadores español):
+- Subjuntivo + imperfecto: "Si hubiera sabido..."
+- Presente histórico: "Llegó a la puerta y ve que está abierta"
+- Adverbios temporales: "tres meses antes", "aquel otoño", "de niño"
+- LLM-assisted para detección ambigua
+
+**Schema BD (v20)**: `chapter_timeline_context` (chapter, discourse_position, story_date, narrative_type, is_embedded, parent_timeline_chapter). `character_age_timeline` (entity_id, story_date, age, source_chapter, confidence).
+
+**Archivos a crear**: `src/narrative_assistant/temporal/temporal_map.py`, `src/narrative_assistant/temporal/non_linear_detector.py`
+
+**Archivos a modificar**: `vital_status.py` (usar TemporalMap en vez de chapter ≥), `character_location.py` (story_time gap en vez de chapter count).
+
+**Dependencias**: BK-14 (LocationOntology) para is_reachable() — opcional, funciona sin ella.
+
+**Tests**: 8 tests (age-in-present, age-in-flashback, consistency-no-error, inconsistency-detected, alive-before-death, alive-in-flashback, location-transition-with-time, nested-flashbacks).
+
+**Criterios de éxito S10**: cocina⊂casa → 0 FP; flashbacks detectados → edad calculada por story_time; gazetteer español con 100+ ubicaciones; reachability parametrizada por periodo histórico.
+
+---
+
+### Sprint S11: Pro-drop + Chekhov (~26-30h, 6-7 días)
+
+> **Especificado**: 11-Feb-2026 por panel de expertos.
+
+#### BK-13: Pro-drop Ambiguity Scoring [ROI #3, 12-14h]
+
+**Problema**: 40% de prosa española tiene sujetos elididos. `MentionType.ZERO` existe en el enum pero nunca se extrae. "Salió furioso" → ¿quién salió?
+
+**Algoritmo**:
+```
+ProDropAmbiguityScorer
+├── extract_zero_pronouns(text, spacy_doc) → list[Mention]
+│   └── Verbo conjugado sin nsubj/nsubjpass = zero pronoun
+│       └── Inferir género de ADJ predicativo: "Salió cansada" → fem
+├── calculate_ambiguity_score(zero, candidates, context) → float
+│   ├── Saliencia (25%): frecuencia mención normalizada
+│   ├── Recencia (30%): distancia a última mención
+│   ├── Concordancia género (20%): gramática
+│   ├── Estructura discurso (15%): sujeto oración anterior
+│   └── Concordancia número (10%): singular/plural
+│   └── ambiguity = 1 - overall_confidence
+└── Resultado: confianza < 0.7 si múltiples candidatos mismo género
+```
+
+**Desafíos español**: 3a persona ambigua (él/ella/usted). Reflexivos ("se levantó"). Voseo argentino. Impersonal "se" (NO es pro-drop: "Se vende casa").
+
+**Schema BD (v21)**: `character_saliency` (entity_id, mention_frequency, saliency_score). `pro_drop_mentions` (chapter_id, start_char, gender, number, resolved_entity_id, ambiguity_score).
+
+**Archivos a crear**: `src/narrative_assistant/nlp/pro_drop_extractor.py`, `src/narrative_assistant/analysis/saliency_tracker.py`.
+
+**Archivos a modificar**: `coref_mention_extraction.py` (poblar MentionType.ZERO), `coref_voting.py` (integrar ambiguity scores en weights).
+
+**Tests**: 8 tests (extract simple, gender fem/masc, ambiguity single candidate, ambiguity multiple same gender, saliency, gender mismatch, number agreement, impersonal se filter).
+
+#### BK-16: Chekhov Tracker [ROI #4, 14-16h]
+
+**Problema**: Personajes SUPPORTING que desaparecen + hilos narrativos sin resolver. `ChekhovElement` dataclass existe en `chapter_summary.py:153-184` pero nunca se llama. Dimensión "chekhov" declarada en `narrative_health.py` pero no implementada.
+
+**Algoritmo**:
+```
+ChekhovTracker
+├── identify_supporting_characters(profiles) → list[int]
+│   └── Filtros: role SUPPORTING/MINOR, 3-30 menciones, 2-6 capítulos, tiene acciones/diálogo
+├── track_supporting_character(entity_id) → ChekhovElement
+│   └── is_fired = aparece en último 10-20% del libro
+├── detect_abandoned_threads(relationships, events) → list[dict]
+│   └── Hilos: relaciones, conflictos, misterios, foreshadowing
+│   └── Abandonado si: last_mentioned < 70% del libro AND sin resolución
+└── Alertas: Unfired Chekhov con confidence ≥ 0.7
+```
+
+**Patrones narrativos español**: Subtramas románticas (esperan resolución). Sagas familiares (arcos largos aceptables). Picaresca (estructura episódica → hilos sueltos intencionales).
+
+**Schema BD (v22)**: `chekhov_elements`, `abandoned_threads`.
+
+**Archivos a crear**: `src/narrative_assistant/analysis/chekhov_tracker.py`
+
+**Archivos a modificar**: `narrative_health.py` (implementar dimensión chekhov), `alerts/engine.py` (alertas desde unfired elements), `api-server/routers/relationships.py` (GET /projects/{id}/chekhov/elements).
+
+**Tests**: 6 tests (identify supporting, not-fired, fired, abandoned thread, alert generation, confidence calculation).
+
+**Criterios de éxito S11**: Pro-drop multi-candidato mismo género → confianza < 0.7; personajes con backstory que desaparecen → alerta; sujetos elididos extraídos y resueltos por correferencias.
+
+---
+
+### Sprint S12: Confidence Decay Temporal (~2-3h, 0.5 días)
+
+> **Especificado**: 11-Feb-2026 por panel de expertos.
+
+#### BK-18: Decay Temporal de Alertas [LOW, 2-3h]
+
+**Problema**: Alerta de cap 1 misma prioridad que alerta de cap 95. No hay penalización temporal.
+
+**Fórmula**: `effective_confidence = original * calibration_factor * 0.97^chapter_distance`
+- Floor: 0.15 (evitar alertas vanishing)
+- Habilitado para: attribute_inconsistency, temporal_anachronism, relationship_contradiction, character_location_impossibility
+- Deshabilitado para: grammar_error, spelling_error, out_of_character
+
+**Archivos**: `src/narrative_assistant/alerts/engine.py` — Aplicar decay en `create_alert()` después del `calibration_factor` existente (BK-22).
+
+**Tests**: 3 tests (decay chapter cercano, decay chapter lejano, no-decay para grammar).
+
+**Dependencia**: BK-09 (FK integrity) debe estar completo antes.
+
+---
+
+### Priorización Global y Roadmap
+
+**Esfuerzo total**: ~80-94h (~10-12 días efectivos)
 
 ```
-Sprint S9 (Integridad)          Sprint S10 (Timeline + Cache)
-┌──────────────────────┐       ┌──────────────────────────────┐
-│ BK-09 (Merge Fix)    │       │ BK-12 (Enrichment Cache)     │
-│ BK-15 (Masking)      │       │   ↓                          │
-│ BK-17 (Glossary→NER) │       │ BK-14 (Location Hierarchy)   │
-│ BK-10 (Dialogue)     │       │   ↓                          │
-└──────────────────────┘       │ BK-11 (Non-linear Timeline)  │
-                               └──────────────┬───────────────┘
-                                              ↓
-Sprint S11 (NLP Avanzado)      Sprint S12 (Decay)
-┌──────────────────────────┐   ┌──────────────────────┐
-│ BK-13 (Pro-drop Ambig.)  │   │ BK-18 (Conf. Decay)  │←── BK-12
-│ BK-16 (Chekhov Tracker)  │   └──────────────────────┘
-└──────────────────────────┘
+Semana 1: S9 — Data Integrity (CRITICAL)
+┌────────────────────────────────────────────────┐
+│ BK-09 (Merge FK)  → BK-15 (Masking) → BK-17   │
+│ [6-8h]              [3-4h]            [4-5h]    │
+│            → BK-10b (Scene) → BK-10c (Decay)   │
+│              [5-6h]           [4-5h]            │
+└────────────────────────────────────────────────┘
+
+Semana 2: S10 — Ubicaciones + Timeline
+┌────────────────────────────────────────────────┐
+│ BK-14 (LocationOntology) → BK-11 (Timeline)    │
+│ [12h]                      [15-18h]             │
+└────────────────────────────────────────────────┘
+
+Semana 3: S11 — NLP Avanzado + S12
+┌────────────────────────────────────────────────┐
+│ BK-13 (Pro-drop) → BK-16 (Chekhov) → BK-18    │
+│ [12-14h]           [14-16h]          [2-3h]    │
+└────────────────────────────────────────────────┘
 ```
+
+**Ranking ROI** (valor/esfuerzo):
+1. **BK-14** — Quick win, 30% FP reduction, foundation para BK-11
+2. **BK-09** — CRITICAL data integrity, silent data loss actual
+3. **BK-11** — Highest business value, 40% ficción moderna
+4. **BK-13** — High Spanish-specific value, 40% prosa española
+5. **BK-15** — Easy win, elimina FP en OOC
+6. **BK-17** — Desbloquea fantasía/sci-fi
+7. **BK-10b/c** — Mejora speaker attribution
+8. **BK-16** — Nicho editorial, nice-to-have
+9. **BK-18** — Trivial, mejora priorización alertas
 
 #### BK-10 detalle (revisado 10-Feb-2026)
 
@@ -1481,7 +1718,7 @@ Sprint S11 (NLP Avanzado)      Sprint S12 (Decay)
 
 | ID | Acción | Estado | Detalle |
 |----|--------|--------|---------|
-| BK-23a | Unificar loading Ollama (Tutorial=Settings) | PENDIENTE | Patrón gold standard: label + % + barra determinada/indeterminada. |
+| BK-23a | Unificar loading Ollama (Tutorial=Settings) | DONE | DsDownloadProgress.vue unificado, usado en ModelSetupDialog + Settings (v0.8.0, commit 6ddebec) |
 | BK-23b | Crear componente Skeleton para listas | DONE | Skeleton loaders para entidades, alertas, relaciones (commit 3fbe310) |
 | BK-23c | Consolidar z-index y animaciones | DONE | Variables CSS centralizadas, una sola animación spin (commit 3fbe310) |
 
@@ -1493,8 +1730,8 @@ Sprint S11 (NLP Avanzado)      Sprint S12 (Decay)
 | **PP-2**: UI interactiva | 3 | ✅ DONE | Corrector puede corregir errores del sistema |
 | **PP-3**: Tutorial + jargon + onboarding | 6 | ✅ DONE | First-time experience profesional |
 | **PP-4**: Feedback loop | 2 | ✅ DONE | Sistema aprende de correcciones |
-| **PP-5**: Polish visual | 3 | ⚠️ 2/3 | BK-23a pendiente (1h) |
-| **TOTAL** | **17** | **16/17 DONE** | Producto vendible con workflow completo |
+| **PP-5**: Polish visual | 3 | ✅ DONE | Completado (v0.8.0) |
+| **TOTAL** | **17** | **17/17 DONE** | Producto vendible con workflow completo |
 
 > **Orden de ejecución**: PP-1 → PP-2 → PP-3 → PP-4 → PP-5.
 >
@@ -1514,21 +1751,13 @@ Sprint S11 (NLP Avanzado)      Sprint S12 (Decay)
 S0 (xfails), S1 (NER), S2 (correferencias), S3 (temporal), S4 (atributos avanzados),
 S5 (LLM), S6 (frontend UX), S7a (licensing). Total: ~10 semanas ejecutadas.
 
-### Casi completado (S7b/c/d): ⚠️ 2 tareas pendientes
+### Completado: Sprint S7 ✅
 
-| ID | Tarea | Esfuerzo | Estado |
-|----|-------|----------|--------|
-| S7b-09 | Conectar endpoint anachronisms con frontend | 2h | PENDIENTE |
-| S7b-10 | Crear CharacterProfileModal unificado | 3h | PENDIENTE |
-| ~~S7d-04~~ | ~~aria-labels faltantes~~ | ~~1h~~ | ✅ DONE (Sprint PP-3) |
-| ~~S7d-10~~ | ~~Simplificar AboutDialog~~ | ~~1h~~ | ✅ DONE (Sprint PP-3) |
-| ~~S7d-11~~ | ~~Renombrar jargon técnico~~ | ~~3h~~ | ✅ DONE (Sprint PP-3) |
-
-> S7b-09 y S7b-10 son las únicas tareas pendientes de S7.
+> S7b-09 (AnachronismsPanel) y S7b-10 (CharacterProfileModal) completados en v0.8.0-v0.8.2.
 
 ### Completado: Sprint PP — Product Polish ✅
 
-> 16/17 tareas completadas. Solo BK-23a (unificar loading Ollama, 1h) pendiente.
+> 17/17 tareas completadas. BK-23a completado en v0.8.0.
 
 ### Completado: Sprint S8 — Pipeline + Invalidación ✅
 
@@ -1573,13 +1802,13 @@ S5 (LLM), S6 (frontend UX), S7a (licensing). Total: ~10 semanas ejecutadas.
 COMPLETADO                                          FUTURO
 ───────────────────────────────────────────────── ──────────────────────
 S0-S6 (NLP + Frontend)                              S9 (Integridad)
-S7a (Licensing)                                     S10 (Timeline)
-S7b 8/10 (S7b-09, S7b-10 pendientes)              S11 (Pro-drop)
-S7c 6/7                                             S12 (Decay)
-S7d ✅ COMPLETADO                                   ───────────────
-Sprint PP ✅ (16/17, BK-23a pendiente)             APARCADO:
+S7a (Licensing) ✅                                  S10 (Timeline)
+S7b ✅ (10/10)                                      S11 (Pro-drop)
+S7c ✅ (6/7, 1 backlog)                             S12 (Decay)
+S7d ✅ (13/13)                                      ───────────────
+Sprint PP ✅ (17/17)                                APARCADO:
 Sprint S8 ✅ (S8a + S8b + S8c)                     Landing web
-  Tag: v0.8.0                                       UserGuide PDF
+  v0.8.0 → v0.8.6 (bugfixes)                       UserGuide PDF
                                                     EPUB export
                                                     XLSX export
                                                     Maverick/BookNLP
@@ -1589,11 +1818,11 @@ Sprint S8 ✅ (S8a + S8b + S8c)                     Landing web
 
 | Bloque | Horas/Días | Tipo |
 |--------|-----------|------|
-| ~~Sprint PP~~ | ~~39h~~ | ✅ COMPLETADO (excepto BK-23a, 1h) |
+| ~~Sprint PP~~ | ~~39h~~ | ✅ COMPLETADO (17/17) |
 | ~~Sprint S8~~ | ~~17-26 días~~ | ✅ COMPLETADO (v0.8.0) |
-| Tareas sueltas | ~6h | S7b-09 (2h), S7b-10 (3h), BK-23a (1h) |
+| ~~Tareas sueltas~~ | ~~6h~~ | ✅ S7b-09, S7b-10, BK-23a completados (v0.8.0-v0.8.2) |
 | Sprint S9-S12 | 24-37 días (6-9 semanas) | NLP avanzado |
-| **TOTAL restante** | **~7-10 semanas** | S9-S12 + 3 tareas sueltas |
+| **TOTAL restante** | **~6-9 semanas** | S9-S12 |
 
 ---
 
@@ -1627,4 +1856,4 @@ Sprint S8 ✅ (S8a + S8b + S8c)                     Landing web
 
 **Ultima actualizacion**: 2026-02-11
 **Autor**: Claude (Panel de 8 expertos simulados + sesión producto 10-Feb)
-**Estado**: S0-S8 completados (v0.8.0). Sprint PP completado (16/17). S7b 8/10, S7c 6/7, S7d 13/13 done. Pendiente: S7b-09, S7b-10, BK-23a (~6h) + S9-S12 (24-37 días). ~7-10 semanas restantes.
+**Estado**: S0-S8 completados (v0.8.0). Sprint PP completado (17/17). S7b-S7d completados. Tag: v0.8.6. Pendiente: S9-S12 (24-37 días, ~6-9 semanas).
