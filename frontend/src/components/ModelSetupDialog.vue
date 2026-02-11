@@ -156,6 +156,8 @@ onMounted(async () => {
   // Si los modelos estan listos, cerrar el dialogo rapidamente
   if (systemStore.modelsReady) {
     downloadPhase.value = 'completed'
+    // Auto-config hardware en background (Ollama, settings recomendados)
+    systemStore.autoConfigOnStartup()
     setTimeout(() => {
       visible.value = false
     }, 800) // breve flash de "Listo"
@@ -182,6 +184,8 @@ onMounted(async () => {
 watch(() => systemStore.modelsReady, (ready) => {
   if (ready && visible.value) {
     downloadPhase.value = 'completed'
+    // Auto-config hardware en background (Ollama, settings recomendados)
+    systemStore.autoConfigOnStartup()
     showNotification({
       title: 'Modelos instalados',
       body: 'Narrative Assistant está listo para usar.',

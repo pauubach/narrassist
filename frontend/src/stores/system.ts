@@ -510,6 +510,75 @@ export const useSystemStore = defineStore('system', () => {
     }
   }
 
+  // =========================================================================
+  // Auto-config on startup (PP-3b)
+  // =========================================================================
+
+  /**
+   * Auto-configura hardware y servicios al primer arranque.
+   * - Aplica config recomendada si no hay settings previos
+   * - Inicia Ollama si está instalado pero no corriendo
+   * - Descarga modelo por defecto si Ollama está listo pero sin modelos
+   * Ejecutar en background después de que modelos NLP estén listos.
+   */
+  async function autoConfigOnStartup(): Promise<void> {
+    try {
+      // Asegurar que capabilities están cargadas
+      const caps = await loadCapabilities()
+      if (!caps) return
+
+      // 1. Aplicar config recomendada si es primera vez
+      const savedSettings = localStorage.getItem('narrative_assistant_settings')
+      if (!savedSettings) {
+        const methods = caps.nlp_methods
+        const enabledMethods: Record<string, string[]> = {
+          coreference: [], ner: [], grammar: [], spelling: [], character_knowledge: [],
+        }
+
+        for (const category of ['coreference', 'ner', 'grammar', 'spelling', 'character_knowledge'] as const) {
+          const catMethods = methods[category]
+          if (catMethods) {
+            for (const [key, method] of Object.entries(catMethods)) {
+              if (method.available && method.default_enabled) {
+                enabledMethods[category].push(key)
+              }
+            }
+          }
+        }
+
+        const defaultSettings = { enabledNLPMethods: enabledMethods }
+        localStorage.setItem('narrative_assistant_settings', JSON.stringify(defaultSettings))
+        window.dispatchEvent(new CustomEvent('settings-changed', { detail: defaultSettings }))
+      }
+
+      // 2. Auto-iniciar Ollama si está instalado pero no corriendo
+      const ollama = caps.ollama
+      if (ollama?.installed && !ollama?.available) {
+        try {
+          await api.postRaw('/api/ollama/start')
+          // Esperar a que arranque
+          await new Promise(r => setTimeout(r, 3000))
+          await refreshCapabilities()
+        } catch {
+          // Silencioso — el usuario puede iniciarlo manualmente desde Configuración
+        }
+      }
+
+      // 3. Descargar modelo por defecto si Ollama está listo pero sin modelos
+      const updatedCaps = systemCapabilities.value
+      if (updatedCaps?.ollama?.available && updatedCaps.ollama.models.length === 0) {
+        try {
+          await api.postRaw('/api/ollama/pull/llama3.2')
+          // No polling aquí — la descarga corre en background en el servidor
+        } catch {
+          // Silencioso
+        }
+      }
+    } catch {
+      // Auto-config es best-effort, no debe bloquear la app
+    }
+  }
+
   return {
     // State
     backendConnected,
@@ -556,6 +625,9 @@ export const useSystemStore = defineStore('system', () => {
     // LanguageTool actions
     installLanguageTool,
     startLanguageTool,
-    stopLTPolling
+    stopLTPolling,
+
+    // Auto-config
+    autoConfigOnStartup,
   }
 })
