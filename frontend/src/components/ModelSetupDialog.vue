@@ -6,6 +6,13 @@ import { useNotifications } from '@/composables/useNotifications'
 import Dialog from 'primevue/dialog'
 import ProgressBar from 'primevue/progressbar'
 
+const props = withDefaults(defineProps<{
+  /** Cuando true, el diálogo no se muestra pero el backend sigue trabajando */
+  hidden?: boolean
+}>(), {
+  hidden: false,
+})
+
 const systemStore = useSystemStore()
 const { showNotification } = useNotifications()
 
@@ -29,7 +36,11 @@ interface RealProgress {
   hasRealProgress: boolean
 }
 
-const visible = ref(true) // Siempre visible al inicio
+const internalVisible = ref(true) // El diálogo quiere mostrarse
+const visible = computed({
+  get: () => internalVisible.value && !props.hidden,
+  set: (val: boolean) => { internalVisible.value = val },
+})
 const downloadPhase = ref<DownloadPhase>('starting')
 
 // Progreso real desde el backend

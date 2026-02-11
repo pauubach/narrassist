@@ -47,13 +47,13 @@
       :visible="showManageData"
       @update:visible="showManageData = $event"
     />
-    <ModelSetupDialog />
+    <ModelSetupDialog :hidden="showTutorial" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { RouterView, useRouter, useRoute } from 'vue-router'
-import { onMounted, onBeforeUnmount, onErrorCaptured, ref, watch, computed } from 'vue'
+import { onMounted, onBeforeUnmount, onErrorCaptured, ref, computed } from 'vue'
 import Toast from 'primevue/toast'
 import { backendDown, recoveryAttempts } from '@/services/apiClient'
 import { useAppStore } from '@/stores/app'
@@ -233,32 +233,16 @@ onMounted(() => {
   console.log(`Entorno Tauri: ${isTauri.value}`)
   console.log(`Ruta actual: ${route.fullPath}`)
 
-  // Esperar a que los modelos estén listos antes de mostrar el tutorial
-  const tryShowTutorial = () => {
-    const shouldShowTutorial = checkTutorialStatus()
-    console.log('[Tutorial] shouldShowTutorial:', shouldShowTutorial)
-    console.log('[Tutorial] modelsReady:', systemStore.modelsReady)
-
-    if (shouldShowTutorial && systemStore.modelsReady) {
-      setTimeout(() => {
-        console.log('[Tutorial] Activando showTutorial.value = true')
-        showTutorial.value = true
-      }, 1000)
-    } else if (shouldShowTutorial && !systemStore.modelsReady) {
-      console.log('[Tutorial] Esperando a que los modelos estén listos...')
-      const unwatch = watch(() => systemStore.modelsReady, (ready: boolean) => {
-        if (ready) {
-          console.log('[Tutorial] Modelos listos! Mostrando tutorial')
-          setTimeout(() => {
-            showTutorial.value = true
-          }, 1000)
-          unwatch()
-        }
-      })
-    }
+  // Mostrar tutorial inmediatamente si corresponde (modelos se instalan en background)
+  const shouldShowTutorial = checkTutorialStatus()
+  console.log('[Tutorial] shouldShowTutorial:', shouldShowTutorial)
+  if (shouldShowTutorial) {
+    // Pequeño delay para que el DOM se estabilice
+    setTimeout(() => {
+      console.log('[Tutorial] Activando showTutorial.value = true')
+      showTutorial.value = true
+    }, 500)
   }
-
-  tryShowTutorial()
 
   // Registrar event listeners (web MenuBar y atajos globales)
   window.addEventListener('keyboard:show-help', onShowHelp)
