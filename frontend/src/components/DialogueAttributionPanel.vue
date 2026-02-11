@@ -74,7 +74,11 @@
         <div class="dialogue-header">
           <div class="speaker-info">
             <i class="pi pi-user"></i>
-            <span class="speaker-name">{{ attr.speakerName || 'Desconocido' }}</span>
+            <span v-if="isDialogueCorrected(attr)" class="speaker-name speaker-corrected">
+              {{ getCorrectedSpeaker(attr) }}
+              <Tag severity="success" size="small" class="corrected-tag">Corregido</Tag>
+            </span>
+            <span v-else class="speaker-name">{{ attr.speakerName || 'Desconocido' }}</span>
           </div>
           <div class="attribution-meta">
             <Tag :severity="getConfidenceSeverity(attr.confidence)" size="small">
@@ -83,6 +87,44 @@
             <Tag severity="secondary" size="small">
               {{ getMethodLabel(attr.method) }}
             </Tag>
+            <Button
+              v-if="correctingIndex !== idx"
+              v-tooltip="'Corregir hablante'"
+              icon="pi pi-pencil"
+              text
+              rounded
+              size="small"
+              class="correct-btn"
+              @click.stop="startCorrection(idx, attr)"
+            />
+          </div>
+        </div>
+
+        <!-- Inline speaker correction -->
+        <div v-if="correctingIndex === idx" class="correction-form" @click.stop>
+          <label class="correction-label">Hablante correcto:</label>
+          <Select
+            v-model="correctedSpeakerId"
+            :options="speakerOptions"
+            option-label="label"
+            option-value="value"
+            placeholder="Seleccionar hablante"
+            class="correction-select"
+            size="small"
+          />
+          <div class="correction-actions">
+            <Button
+              icon="pi pi-check"
+              size="small"
+              :loading="savingCorrection"
+              @click.stop="saveCorrection(attr)"
+            />
+            <Button
+              icon="pi pi-times"
+              size="small"
+              text
+              @click.stop="cancelCorrection"
+            />
           </div>
         </div>
 
@@ -92,13 +134,15 @@
         </div>
 
         <!-- Alternatives if low confidence -->
-        <div v-if="attr.alternatives && attr.alternatives.length > 0 && attr.confidence !== 'high'" class="alternatives">
+        <div v-if="attr.alternatives && attr.alternatives.length > 0 && attr.confidence !== 'high' && correctingIndex !== idx" class="alternatives">
           <span class="alternatives-label">Alternativas:</span>
           <div class="alternatives-list">
             <Chip
               v-for="(alt, altIdx) in attr.alternatives.slice(0, 3)"
               :key="altIdx"
               :label="`${alt.name} (${(alt.score * 100).toFixed(0)}%)`"
+              class="alt-chip"
+              @click.stop="startCorrection(idx, attr); correctedSpeakerId = alt.id"
             />
           </div>
         </div>
@@ -132,11 +176,21 @@ import Chip from 'primevue/chip'
 import Select from 'primevue/select'
 import ProgressSpinner from 'primevue/progressspinner'
 import { useVoiceAndStyleStore } from '@/stores/voiceAndStyle'
+import { useToast } from 'primevue/usetoast'
+import { api } from '@/services/apiClient'
 import type { DialogueAttribution, DialogueAttributionStats } from '@/types'
+
+interface SpeakerEntity {
+  id: number
+  name: string
+  type?: string
+  entity_type?: string
+}
 
 const props = defineProps<{
   projectId: number
   chapters: Array<{ id: number; number: number; title: string }>
+  entities?: SpeakerEntity[]
   initialChapter?: number
 }>()
 
@@ -144,12 +198,34 @@ defineEmits<{
   'select-dialogue': [attribution: DialogueAttribution]
 }>()
 
+const toast = useToast()
+
 const store = useVoiceAndStyleStore()
 
 // State
 const loading = ref(false)
 const error = ref<string | null>(null)
 const selectedChapter = ref<number | null>(props.initialChapter ?? null)
+
+// Speaker correction state
+const correctingIndex = ref<number | null>(null)
+const correctedSpeakerId = ref<number | null>(null)
+const savingCorrection = ref(false)
+const correctedDialogues = ref<Map<string, { speakerName: string; speakerId: number | null }>>(new Map())
+
+// Entity options for speaker correction dropdown
+const speakerOptions = computed(() => {
+  const characters = (props.entities || []).filter(e => {
+    const t = e.type || e.entity_type || ''
+    return t === 'character'
+  })
+  const options: Array<{ label: string; value: number | null }> = characters.map(e => ({
+    label: e.name,
+    value: e.id
+  }))
+  options.push({ label: 'Desconocido', value: null })
+  return options
+})
 
 // Chapter options for dropdown
 const chapterOptions = computed(() => {
@@ -234,6 +310,65 @@ const getMethodLabel = (method: string): string => {
 const truncateText = (text: string, maxLength: number): string => {
   if (text.length <= maxLength) return text
   return text.substring(0, maxLength) + '...'
+}
+
+// Speaker correction methods
+function startCorrection(idx: number, attr: DialogueAttribution) {
+  correctingIndex.value = idx
+  correctedSpeakerId.value = attr.speakerId
+}
+
+function cancelCorrection() {
+  correctingIndex.value = null
+  correctedSpeakerId.value = null
+}
+
+function getDialogueKey(attr: DialogueAttribution): string {
+  return `${selectedChapter.value}-${attr.startChar}-${attr.endChar}`
+}
+
+function isDialogueCorrected(attr: DialogueAttribution): boolean {
+  return correctedDialogues.value.has(getDialogueKey(attr))
+}
+
+function getCorrectedSpeaker(attr: DialogueAttribution): string {
+  const correction = correctedDialogues.value.get(getDialogueKey(attr))
+  return correction?.speakerName || attr.speakerName || 'Desconocido'
+}
+
+async function saveCorrection(attr: DialogueAttribution) {
+  if (selectedChapter.value === null) return
+
+  savingCorrection.value = true
+  try {
+    const data = await api.postRaw<any>(`/api/projects/${props.projectId}/speaker-corrections`, {
+      chapter_number: selectedChapter.value,
+      dialogue_start_char: attr.startChar,
+      dialogue_end_char: attr.endChar,
+      dialogue_text: attr.text,
+      original_speaker_id: attr.speakerId,
+      corrected_speaker_id: correctedSpeakerId.value,
+    })
+
+    if (data.success) {
+      // Track locally which dialogues have been corrected
+      const selectedOption = speakerOptions.value.find(o => o.value === correctedSpeakerId.value)
+      correctedDialogues.value.set(getDialogueKey(attr), {
+        speakerName: selectedOption?.label || 'Desconocido',
+        speakerId: correctedSpeakerId.value,
+      })
+      toast.add({ severity: 'success', summary: 'Corregido', detail: 'Hablante corregido correctamente', life: 2000 })
+    } else {
+      toast.add({ severity: 'error', summary: 'Error', detail: data.error || 'No se pudo guardar', life: 4000 })
+    }
+  } catch (err) {
+    console.error('Error saving speaker correction:', err)
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Error al guardar la corrección', life: 4000 })
+  } finally {
+    savingCorrection.value = false
+    correctingIndex.value = null
+    correctedSpeakerId.value = null
+  }
 }
 
 // Auto-load if initial chapter provided
@@ -487,5 +622,65 @@ watch(selectedChapter, (newChapter) => {
 
 .speech-verb em {
   color: var(--primary-color);
+}
+
+/* Speaker correction */
+.correct-btn {
+  opacity: 0;
+  transition: opacity 0.15s;
+  width: 1.5rem !important;
+  height: 1.5rem !important;
+  padding: 0 !important;
+}
+
+.attribution-item:hover .correct-btn {
+  opacity: 1;
+}
+
+.speaker-corrected {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.corrected-tag {
+  font-size: 0.65rem;
+}
+
+.correction-form {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.5rem;
+  background: var(--primary-50);
+  border: 1px solid var(--primary-200);
+  border-radius: 6px;
+  flex-wrap: wrap;
+}
+
+.correction-label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-color-secondary);
+  white-space: nowrap;
+}
+
+.correction-select {
+  flex: 1;
+  min-width: 150px;
+}
+
+.correction-actions {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.alt-chip {
+  cursor: pointer;
+}
+
+.alt-chip:hover {
+  background: var(--primary-100);
 }
 </style>

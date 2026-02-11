@@ -165,6 +165,7 @@
         v-if="showDialoguePanel"
         :project-id="projectId"
         :chapters="chaptersForPanel"
+        :entities="entities"
         @select-dialogue="onDialogueSelected"
       />
     </Drawer>
