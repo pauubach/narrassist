@@ -16,6 +16,7 @@ import MergeEntitiesDialog from '@/components/MergeEntitiesDialog.vue'
 import UndoMergeDialog from '@/components/UndoMergeDialog.vue'
 import MergeHistoryPanel from '@/components/MergeHistoryPanel.vue'
 import RejectEntityDialog from '@/components/RejectEntityDialog.vue'
+import { CharacterProfileModal } from '@/components/modals'
 import type { Entity, MergeHistoryEntry, EntityAttribute } from '@/types'
 import { transformEntityAttribute } from '@/types/transformers'
 import type { ApiEntityAttribute } from '@/types/api'
@@ -102,6 +103,7 @@ const showMergeDialog = ref(false)
 const showUndoMergeDialog = ref(false)
 const showMergeHistory = ref(false)
 const showRejectDialog = ref(false)
+const showProfileModal = ref(false)
 const entityToReject = ref<Entity | null>(null)
 const editingEntity = ref<Entity | null>(null)
 const entityToUndoMerge = ref<Entity | null>(null)
@@ -917,6 +919,14 @@ function navigateToAttributeSource(attr: EntityAttribute) {
             </div>
             <div class="detail-actions">
               <Button
+                v-if="selectedEntity.type === 'character'"
+                icon="pi pi-id-card"
+                label="Ver perfil"
+                size="small"
+                outlined
+                @click="showProfileModal = true"
+              />
+              <Button
                 icon="pi pi-pencil"
                 label="Editar"
                 size="small"
@@ -1308,6 +1318,14 @@ function navigateToAttributeSource(attr: EntityAttribute) {
       :project-id="projectId"
       :mention-count="entityToReject?.mentionCount || 0"
       @reject="handleRejectEntity"
+    />
+
+    <!-- Modal de perfil de personaje -->
+    <CharacterProfileModal
+      :visible="showProfileModal"
+      :entity="selectedEntity"
+      :project-id="projectId"
+      @update:visible="showProfileModal = $event"
     />
 
     <!-- Panel de historial de fusiones -->

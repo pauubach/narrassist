@@ -319,25 +319,12 @@
                   />
                 </div>
                 <!-- Barra de progreso de descarga de modelo -->
-                <div v-if="modelDownloading" class="ollama-progress-wrapper">
-                  <div class="ollama-progress-info">
-                    <span class="ollama-progress-label">Descargando modelo de IA...</span>
-                    <span v-if="ollamaDownloadProgress?.percentage" class="ollama-progress-percent">
-                      {{ Math.round(ollamaDownloadProgress.percentage) }}%
-                    </span>
-                  </div>
-                  <ProgressBar
-                    v-if="ollamaDownloadProgress?.percentage"
-                    :value="ollamaDownloadProgress.percentage"
-                    :show-value="false"
-                    class="ollama-progress-bar"
-                  />
-                  <ProgressBar
-                    v-else
-                    mode="indeterminate"
-                    class="ollama-progress-bar"
-                  />
-                </div>
+                <DsDownloadProgress
+                  v-if="modelDownloading"
+                  label="Descargando modelo de IA..."
+                  :percentage="ollamaDownloadProgress?.percentage ?? null"
+                  class="ollama-progress-wrapper"
+                />
               </div>
 
               <!-- Selector de modelos -->
@@ -503,20 +490,13 @@
                     }}</strong>
                     <span>{{ ltStatusMessage }}</span>
                     <!-- Barra de progreso para instalación -->
-                    <div v-if="ltState === 'installing' && ltInstallProgress" class="lt-progress-container">
-                      <div class="ollama-progress-info">
-                        <span class="ollama-progress-label">{{ ltInstallProgress.phase_label }}</span>
-                        <span v-if="ltInstallProgress.percentage > 0" class="ollama-progress-percent">{{ Math.round(ltInstallProgress.percentage) }}%</span>
-                      </div>
-                      <ProgressBar
-                        :value="ltInstallProgress.percentage"
-                        :show-value="false"
-                        class="ollama-progress-bar"
-                      />
-                      <div v-if="ltInstallProgress.detail" class="lt-progress-detail">
-                        {{ ltInstallProgress.detail }}
-                      </div>
-                    </div>
+                    <DsDownloadProgress
+                      v-if="ltState === 'installing' && ltInstallProgress"
+                      :label="ltInstallProgress.phase_label"
+                      :percentage="ltInstallProgress.percentage > 0 ? ltInstallProgress.percentage : null"
+                      :detail="ltInstallProgress.detail"
+                      class="lt-progress-container"
+                    />
                   </div>
                   <Button
                     v-if="ltState !== 'installing'"
@@ -1027,7 +1007,7 @@ import Dialog from 'primevue/dialog'
 import MultiSelect from 'primevue/multiselect'
 import Badge from 'primevue/badge'
 import Tag from 'primevue/tag'
-import ProgressBar from 'primevue/progressbar'
+import DsDownloadProgress from '@/components/ds/DsDownloadProgress.vue'
 import Divider from 'primevue/divider'
 import { useToast } from 'primevue/usetoast'
 import CorrectionDefaultsManager from '@/components/settings/CorrectionDefaultsManager.vue'
@@ -2015,56 +1995,10 @@ const handleScroll = () => {
   margin-top: 0.5rem;
 }
 
-.ollama-progress-info {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.25rem;
-}
-
-.ollama-progress-label {
-  font-size: 0.85rem;
-  color: var(--p-text-color);
-  font-weight: 500;
-}
-
-.ollama-progress-percent {
-  font-size: 0.85rem;
-  color: var(--p-primary-color);
-  font-weight: 600;
-}
-
-.ollama-progress-bar {
-  height: 8px;
-  border-radius: 4px;
-}
-
-.ollama-progress-bar :deep(.p-progressbar-value) {
-  background: var(--p-primary-color);
-  border-radius: 4px;
-}
-
 /* LanguageTool progress bar */
 .lt-progress-container {
   margin-top: 0.5rem;
   width: 100%;
-}
-
-.lt-progress-detail {
-  font-size: 0.75rem;
-  color: var(--p-text-muted-color);
-  margin-top: 0.25rem;
-  display: flex;
-  justify-content: space-between;
-}
-
-.lt-progress-container :deep(.p-progressbar) {
-  height: 8px;
-  border-radius: 4px;
-}
-
-.lt-progress-container :deep(.p-progressbar-value) {
-  background: var(--p-primary-color);
 }
 
 /* Setting deshabilitado visualmente */

@@ -4,7 +4,7 @@ import { useSystemStore } from '@/stores/system'
 import type { DownloadProgressInfo, ModelStatus } from '@/stores/system'
 import { useNotifications } from '@/composables/useNotifications'
 import Dialog from 'primevue/dialog'
-import ProgressBar from 'primevue/progressbar'
+import DsDownloadProgress from '@/components/ds/DsDownloadProgress.vue'
 
 const props = withDefaults(defineProps<{
   /** Cuando true, el diálogo no se muestra pero el backend sigue trabajando */
@@ -421,17 +421,11 @@ async function recheckPython() {
             </div>
           </div>
 
-          <div class="progress-section">
-            <div class="progress-info">
-              <span class="current-model">Instalando numpy, spaCy, transformers...</span>
-              <span class="progress-phase">En progreso</span>
-            </div>
-            <!-- Barra indeterminada para dependencias (no tenemos progreso real) -->
-            <ProgressBar
-              mode="indeterminate"
-              class="progress-bar"
-            />
-          </div>
+          <DsDownloadProgress
+            label="Instalando numpy, spaCy, transformers..."
+            :percentage="null"
+            class="progress-section"
+          />
 
           <p class="download-note">
             <i class="pi pi-info-circle"></i>
@@ -451,32 +445,13 @@ async function recheckPython() {
             </div>
           </div>
 
-          <div class="progress-section">
-            <div class="progress-info">
-              <span class="current-model">{{ currentModel }}</span>
-              <span v-if="displayProgress !== null" class="progress-percent">{{ displayProgress }}%</span>
-              <span v-else class="progress-phase">Descargando...</span>
-            </div>
-
-            <!-- Barra de progreso: determinada si hay progreso real, indeterminada si no -->
-            <ProgressBar
-              v-if="displayProgress !== null"
-              :value="displayProgress"
-              :show-value="false"
-              class="progress-bar"
-            />
-            <ProgressBar
-              v-else
-              mode="indeterminate"
-              class="progress-bar"
-            />
-
-            <!-- Info de velocidad y bytes (solo si hay progreso real) -->
-            <div v-if="downloadInfo" class="download-stats">
-              <span class="download-bytes">{{ downloadInfo.downloaded }} / {{ downloadInfo.total }}</span>
-              <span v-if="downloadInfo.speed" class="download-speed">{{ downloadInfo.speed }}</span>
-            </div>
-          </div>
+          <DsDownloadProgress
+            :label="currentModel"
+            :percentage="displayProgress"
+            :bytes-info="downloadInfo ? `${downloadInfo.downloaded} / ${downloadInfo.total}` : undefined"
+            :speed="downloadInfo?.speed ?? undefined"
+            class="progress-section"
+          />
 
           <div class="models-list">
             <div v-for="model in allModels" :key="model.type" class="model-item">
@@ -630,50 +605,8 @@ async function recheckPython() {
   margin-bottom: 1.5rem;
 }
 
-.progress-info {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 0.5rem;
-  font-size: 0.875rem;
-}
-
-.current-model {
-  color: var(--p-text-color);
-}
-
-.progress-percent {
-  color: var(--p-primary-color);
-  font-weight: 600;
-}
-
-.progress-phase {
-  color: var(--p-text-muted-color);
-  font-style: italic;
-}
-
-.download-stats {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 0.5rem;
-  font-size: 0.8rem;
-  color: var(--p-text-muted-color);
-}
-
-.download-bytes {
-  font-family: monospace;
-}
-
-.download-speed {
-  color: var(--p-primary-color);
-  font-weight: 500;
-}
-
 .model-item i.text-blue {
   color: var(--p-primary-color);
-}
-
-.progress-bar {
-  height: 8px;
 }
 
 .models-list {

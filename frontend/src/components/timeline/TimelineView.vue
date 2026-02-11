@@ -265,6 +265,42 @@
           </div>
         </div>
       </div>
+
+      <!-- Panel de Anacronismos de Conocimiento -->
+      <div v-if="anachronisms.length > 0" class="inconsistencies-panel anachronisms-panel">
+        <div class="panel-header">
+          <i class="pi pi-history"></i>
+          <h4>Anacronismos de Conocimiento ({{ anachronisms.length }})</h4>
+        </div>
+        <div class="inconsistencies-list">
+          <div
+            v-for="(anach, index) in anachronisms"
+            :key="index"
+            class="inconsistency-item"
+            :class="`severity-${anach.severity}`"
+          >
+            <div class="inconsistency-header">
+              <Tag :severity="anach.severity === 'high' ? 'danger' : 'warn'">
+                {{ anach.severity === 'high' ? 'Alta' : 'Media' }}
+              </Tag>
+              <span class="inconsistency-chapter">
+                Cap. {{ anach.usedChapter }} → {{ anach.learnedChapter }}
+              </span>
+            </div>
+            <p class="inconsistency-description">{{ anach.description }}</p>
+            <div class="inconsistency-details">
+              <div class="detail-item">
+                <span class="detail-label">Personaje:</span>
+                <span>{{ anach.knowerName }}</span>
+              </div>
+              <div v-if="anach.factValue" class="detail-item">
+                <span class="detail-label">Conocimiento:</span>
+                <span>{{ anach.factValue }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Selected Event Detail Panel -->
@@ -404,6 +440,20 @@ const selectedEvent = ref<TimelineEvent | null>(null)
 const hoveredEvent = ref<TimelineEvent | null>(null)
 const showEventDetail = ref(false)
 
+// Anacronismos de conocimiento
+interface KnowledgeAnachronism {
+  knowerName: string
+  knownName: string
+  factValue: string
+  factDescription: string
+  usedChapter: number
+  learnedChapter: number
+  severity: 'high' | 'medium'
+  description: string
+}
+const anachronisms = ref<KnowledgeAnachronism[]>([])
+const anachronismsLoading = ref(false)
+
 // View mode: list (vertical) or horizontal (vis-timeline)
 type ViewMode = 'list' | 'horizontal'
 const viewMode = ref<ViewMode>('list')
@@ -528,6 +578,32 @@ const loadTimeline = async () => {
     timeline.value = null
   } finally {
     loading.value = false
+  }
+}
+
+// Cargar anacronismos de conocimiento
+const loadAnachronisms = async () => {
+  anachronismsLoading.value = true
+  try {
+    const data = await api.getRaw<any>(
+      `/api/projects/${props.projectId}/knowledge/anachronisms?mode=rules`
+    )
+    if (data.success && data.data?.anachronisms) {
+      anachronisms.value = data.data.anachronisms.map((a: any) => ({
+        knowerName: a.knower_name,
+        knownName: a.known_name,
+        factValue: a.fact_value,
+        factDescription: a.fact_description ?? '',
+        usedChapter: a.used_chapter,
+        learnedChapter: a.learned_chapter,
+        severity: a.severity ?? 'medium',
+        description: a.description,
+      }))
+    }
+  } catch {
+    // Non-critical — don't block timeline
+  } finally {
+    anachronismsLoading.value = false
   }
 }
 
@@ -740,11 +816,13 @@ const exportTimeline = () => {
 // Lifecycle
 onMounted(() => {
   loadTimeline()
+  loadAnachronisms()
 })
 
 // Watch para recargar cuando cambie el proyecto
 watch(() => props.projectId, () => {
   loadTimeline()
+  loadAnachronisms()
 })
 </script>
 

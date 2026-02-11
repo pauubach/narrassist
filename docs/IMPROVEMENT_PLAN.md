@@ -16,6 +16,8 @@
 6. [Estado del Arte - Investigación](#6-estado-del-arte---investigación)
 7. [Panel de Expertos - Hallazgos](#7-panel-de-expertos---hallazgos)
 8. [Plan de Acción Priorizado](#8-plan-de-acción-priorizado)
+   - [8b. Plan de Trabajo BK-09..18](#8b-plan-de-trabajo-bk-0918)
+   - [8c. Auditoría de Producto](#8c-auditoría-de-producto-panel-de-expertos-10-feb-2026)
 9. [Cronograma de Implementación](#9-cronograma-de-implementación)
 10. [Fuentes y Referencias](#10-fuentes-y-referencias)
 
@@ -757,7 +759,7 @@ pip install transformers
 
 > Documentacion produccion: [LICENSING_PRODUCTION_PLAN.md](LICENSING_PRODUCTION_PLAN.md)
 
-### Sprint 7b: Feature Gating + Integration (5 dias) — COMPLETADO (2 pendientes)
+### Sprint 7b: Feature Gating + Integration (5 dias) — COMPLETADO (S7b-09, S7b-10 pendientes)
 
 | ID | Accion | Estado | Detalle |
 |----|--------|--------|---------|
@@ -784,25 +786,25 @@ pip install transformers
 | S7c-06 | Limpiar columnas BD no usadas | N/A | Auditoria: no se encontraron columnas sin uso |
 | S7c-07 | Limpiar componentes huerfanos | DONE | StoryBibleTab ya eliminado, sin huerfanos |
 
-### Sprint 7d: UX + Copy (5 dias) — COMPLETADO (4 pendientes)
+### Sprint 7d: UX + Copy (5 dias) — COMPLETADO
 
 | ID | Accion | Estado | Detalle |
 |----|--------|--------|---------|
 | S7d-01 | Unificar nombres de tabs | DONE | Texto/Entidades/Relaciones/Alertas/Cronologia/Escritura/Glosario/Resumen |
 | S7d-02 | Banner "Analisis en progreso" para usuario nuevo | DONE | analysis-prompt-banner en ProjectDetailView.vue |
 | S7d-03 | Indicadores severidad: color + texto + icono | DONE | AlertInspector.vue: severityIcon + severityLabel + severityColor |
-| S7d-04 | aria-labels en botones de solo icono | PENDIENTE | Mayoria presente, faltan algunos en StatusBar |
+| S7d-04 | aria-labels en botones de solo icono | DONE | StatusBar + botones solo icono (commit 86832b5, Sprint PP-3) |
 | S7d-05 | Separar setup Ollama del tutorial | DONE | Integrado en tutorial paso 3 (decision de diseno) |
 | S7d-06 | Mejorar empty states con contexto y acciones | DONE | Banner + estados vacios con acciones en multiples vistas |
 | S7d-07 | Guia terminologia: Entidad/Personaje/Manuscrito/Doc | BACKLOG | Documentacion interna, baja prioridad |
 | S7d-08 | Breadcrumb en ProjectDetailView | DONE | nav.project-breadcrumb con aria-label |
 | S7d-09 | "Saltar tutorial" en todos los pasos | DONE | Boton "Saltar tutorial" en pasos 1-3 |
-| S7d-10 | Simplificar AboutDialog (sin jargon tecnico) | PENDIENTE | Verificar y simplificar contenido |
-| S7d-11 | Renombrar settings tecnicos a lenguaje corrector | PENDIENTE | Algunos terminos tecnicos persisten |
+| S7d-10 | Simplificar AboutDialog (sin jargon tecnico) | DONE | Eliminadas versiones de deps, links GitHub. Solo version app + licencia + contacto (commit 86832b5, Sprint PP-3) |
+| S7d-11 | Renombrar settings tecnicos a lenguaje corrector | DONE | ~30 terminos renombrados en SettingsView, TutorialDialog, AboutDialog (commit ef39568, Sprint PP-3) |
 | S7d-12 | "Restaurar valores por defecto" en Settings | DONE | Boton "Restaurar todo" en CorrectionConfigModal |
-| S7d-13 | Fix copy: "Heredado"→"Por defecto", tildes | PENDIENTE | "Heredado" en CorrectionConfigModal + InheritanceIndicator |
+| S7d-13 | Fix copy: "Heredado"→"Por defecto", tildes | DONE | 0 instancias de "Heredado" en codebase. Reemplazado por "Por defecto" en CorrectionConfigModal + InheritanceIndicator |
 
-### Sprint 8a: Pipeline Enrichment + Persistencia (8-12 dias)
+### Sprint 8a: Pipeline Enrichment + Persistencia (8-12 dias) — COMPLETADO
 
 > **Objetivo**: Que TODOS los tabs tengan datos al completar el analisis. Sin esperas on-the-fly.
 >
@@ -867,20 +869,20 @@ relationships: 0.08, voice: 0.08, prose: 0.08, health: 0.06 # 30% - enrichment
 | S8a-04 | Persistir character locations en pipeline | DONE | Tabla character_location_events, persist en run_consistency(), cleanup en run_cleanup() |
 | S8a-05 | Persistir OOC events en pipeline | DONE | Tabla ooc_events, persist en run_consistency(), cleanup en run_cleanup() |
 | S8a-06 | Anadir chapter_id a entity_attributes | DONE | Columna chapter_id en schema, create_attribute() actualizado, pipeline pasa chapter_id |
-| S8a-07 | Fase 10: Relationships enrichment | PENDIENTE | Mover logica de /relationships, /character-network, /character-timeline a pipeline |
-| S8a-08 | Fase 11: Voice enrichment | PENDIENTE | Mover logica de /voice-profiles, /voice-deviations a pipeline |
-| S8a-09 | Fase 12: Prose enrichment | PENDIENTE | Mover logica de sticky, echo, pacing, sensory, readability, energy a pipeline |
-| S8a-10 | Fase 13: Health enrichment | PENDIENTE | Mover logica de /narrative-health, /emotional-analysis, /narrative-templates a pipeline |
-| S8a-11 | Tabla enrichment_cache en BD | PENDIENTE | CREATE TABLE enrichment_cache (project_id, type, entity_scope, input_hash, output_hash, status, result, revision, updated_at); status: pending/computing/completed/failed/stale. Canonicalizar floats (sorted keys, round 6 decimals) para estabilidad de hashes |
-| S8a-12 | Actualizar progress phases (9 → 13) | PENDIENTE | analysis.py: phase_weights, phase_order, phases[], base_times_per_phase |
-| S8a-13 | Endpoints GET leen de cache/BD en vez de computar | PENDIENTE | Cada endpoint: si enrichment_cache tiene datos frescos, retornar; si no, computar |
+| S8a-07 | Fase 10: Relationships enrichment | DONE | Logica de /relationships, /character-network, /character-timeline movida a pipeline (commit 4a25d6f) |
+| S8a-08 | Fase 11: Voice enrichment | DONE | Logica de /voice-profiles, /voice-deviations movida a pipeline (commit 4a25d6f) |
+| S8a-09 | Fase 12: Prose enrichment | DONE | Logica de sticky, echo, pacing, sensory, readability, energy movida a pipeline (commit 4a25d6f) |
+| S8a-10 | Fase 13: Health enrichment | DONE | Logica de /narrative-health, /emotional-analysis, /narrative-templates movida a pipeline (commit 4a25d6f) |
+| S8a-11 | Tabla enrichment_cache en BD | DONE | Schema v15+: enrichment_cache con project_id, type, entity_scope, input_hash, output_hash, status, result_json, revision, timestamps (commit 4a25d6f) |
+| S8a-12 | Actualizar progress phases (9 → 13) | DONE | analysis.py: phase_weights, phase_order, phases[] actualizados a 13 fases (commit 4a25d6f) |
+| S8a-13 | Endpoints GET leen de cache/BD en vez de computar | DONE | get_cached_enrichment() en _enrichment_cache.py, endpoints relationships + archetypes cache-first (commit 8c8ca55) |
 | S8a-14 | Extraer fases a funciones standalone | DONE | Refactor: 2180-line monolith → 23 funciones en _analysis_phases.py (2515 lineas). analysis.py reducido de 2813 a 644 lineas. ProgressTracker class. 1430 tests pass. |
-| S8a-15 | Tercer tier: enrichment fuera del heavy slot | PENDIENTE | Fases 10-13 no necesitan GPU → ejecutar fuera de _heavy_analysis_project_id, liberandolo para siguiente proyecto en cola |
-| S8a-16 | Limpiar enrichment_cache en re-analisis | PENDIENTE | En cleanup_before_reanalysis(): DELETE FROM enrichment_cache WHERE project_id=? junto con el resto de limpieza |
-| S8a-17 | Proteccion contra mutaciones durante enrichment | PENDIENTE | Si usuario hace merge/reject mientras fase 10-13 corre: capturar revision al inicio de fase, comparar al final, re-ejecutar si cambio |
-| S8a-18 | Watchdog/timeout en heavy analysis slot | PENDIENTE | Si _heavy_analysis_project_id lleva >30min sin progreso, liberar slot automaticamente con log de error |
+| S8a-15 | Tercer tier: enrichment fuera del heavy slot | DONE | Fases 10-13 ejecutan fuera de _heavy_analysis_project_id, 3-tier concurrency (commit 4a25d6f) |
+| S8a-16 | Limpiar enrichment_cache en re-analisis | DONE | cleanup_before_reanalysis(): DELETE FROM enrichment_cache WHERE project_id=? (commit 4a25d6f) |
+| ~~S8a-17~~ | ~~Proteccion contra mutaciones durante enrichment~~ | DUPLICADO | Unificado en S8c-11 (race protection mutación durante enrichment) |
+| S8a-18 | Watchdog/timeout en heavy analysis slot | DONE | HEAVY_SLOT_TIMEOUT_SECONDS, force-release con log de error (commit 4a25d6f) |
 
-### Sprint 8b: Tab Badges + Empty States (3-5 dias)
+### Sprint 8b: Tab Badges + Empty States (3-5 dias) — COMPLETADO
 
 > **Objetivo**: Indicar visualmente el estado de cada tab con badges semanticos.
 >
@@ -921,17 +923,17 @@ relationships: 0.08, voice: 0.08, prose: 0.08, health: 0.06 # 30% - enrichment
 
 | ID | Accion | Estado | Detalle |
 |----|--------|--------|---------|
-| S8b-01 | Componente TabBadge reutilizable | PENDIENTE | Badge con severity prop (warning/success/danger) + dot animado |
-| S8b-02 | Backend: completed_phases en progress | PENDIENTE | /analysis/progress devuelve completed_phases: string[] (NO tabs_ready — evitar acoplamiento frontend) |
-| S8b-03 | Store: tab states reactivos | PENDIENTE | analysis.ts: tabStates computed mapeando completed_phases → tabs segun matriz de disponibilidad |
-| S8b-04 | Integrar badges en ProjectDetailView tabs | PENDIENTE | Solo Alertas muestra badge numerico; resto usa estado interno |
-| S8b-05 | Empty states amigables por tab | PENDIENTE | Mensajes orientados a actividad: "Analizando relaciones entre personajes...", "Evaluando el estilo..." |
-| S8b-06 | Badge Alertas: count sin resolver (naranja) | PENDIENTE | Alertas con status new/open → badge warning |
-| S8b-07 | Badge Alertas: todo resuelto (verde) | PENDIENTE | Cuando count = 0 → badge success con check |
-| S8b-08 | Estado "failed" para fases de enrichment | PENDIENTE | Si fase 10-13 falla: dot rojo + mensaje claro con opcion re-analizar |
-| S8b-09 | Datos stale: nota inline discreta | PENDIENTE | En vez de banner amarillo agresivo, nota neutral bajo el contenido: "Algunos datos pueden haber cambiado" |
+| S8b-01 | Componente TabStatusIndicator reutilizable | DONE | TabStatusIndicator.vue con animated dot (running), check (completed), error (failed), numeric badge. Type TabStatus exportado (commit 1b04638) |
+| S8b-02 | Backend: completed_phases en progress | DONE | /analysis/progress ya devuelve phases[].completed (ya existia) |
+| S8b-03 | Store: tab states reactivos | DONE | analysis.ts: getTabStatus() mapeando TAB_REQUIRED_PHASES → fase → idle/pending/running/completed/failed (commit 1b04638) |
+| S8b-04 | Integrar badges en ProjectDetailView tabs | DONE | WorkspaceTabs con TabStatusIndicator, alertas con badge numerico naranja (commit 1b04638) |
+| S8b-05 | Empty states amigables por tab | DONE | TAB_RUNNING_DESCRIPTIONS con mensajes orientados a actividad, AnalysisRequired con prop tab (commit 1b04638) |
+| S8b-06 | Badge Alertas: count sin resolver (naranja) | DONE | unresolvedAlertCount → isWarning prop en TabStatusIndicator (commit 1b04638) |
+| S8b-07 | Badge Alertas: todo resuelto (verde) | DONE | TabStatusIndicator completed state con check icon (commit 1b04638) |
+| S8b-08 | Estado "failed" para fases de enrichment | DONE | AnalysisRequired: isFailed computed + failed overlay con retry button (commit 1b04638) |
+| S8b-09 | Datos stale: nota inline discreta | DONE | DsStaleNote.vue: nota neutral inline "Algunos datos pueden haber cambiado" (commit 1b04638) |
 
-### Sprint 8c: Invalidacion Granular + Datos Stale (6-9 dias)
+### Sprint 8c: Invalidacion Granular + Datos Stale (6-9 dias) — COMPLETADO
 
 > **Objetivo**: Cuando el usuario modifica datos (merge, reject, edit), solo recomputar lo afectado.
 >
@@ -984,6 +986,34 @@ relationships: 0.08, voice: 0.08, prose: 0.08, health: 0.06 # 30% - enrichment
 > El merge/reject es una accion natural del flujo de trabajo — castigar al usuario con un banner
 > prominente genera friccion. En su lugar, nota inline discreta bajo el contenido afectado.
 
+#### Trigger de recompute: Híbrido (aprobado 10-Feb-2026)
+
+> **Contexto**: El corrector NO edita texto en la app. Corrige en Word. La app solo muestra
+> dónde y qué corregir. Las mutaciones del usuario son: merge entidades, accept/reject alertas,
+> asignar atributos, corregir speaker. El texto NUNCA cambia → Cat A nunca se invalida.
+>
+> **Debate panel (UX + Arquitecto + QA + Editora + Corrector)**:
+>
+> | Criterio | Debounce (3-5s) | Esperar cambio pantalla |
+> |----------|-----------------|------------------------|
+> | **UX** | Datos siempre frescos al mirar | Puede ver datos stale, sorpresa al volver |
+> | **Performance** | Recomputa mientras trabaja (background OK) | Más eficiente, agrupa cambios |
+> | **Corrector** | "Mergeo 3 entidades seguidas → 3 recomputes" | "Mergeo 3 → 1 recompute al cambiar tab" |
+> | **QA** | Race conditions si merge rápido | Limpio, 1 trigger claro |
+> | **Editora** | Prefiere ver resultado inmediato | "No me importa esperar si el resultado es bueno" |
+>
+> **Decisión**: Híbrido — combinar ambos según coste:
+> - **Cat B** (per-entity, 2-5s): Debounce 5s, recompute background. Si corrector mergea 3
+>   entidades en 10s, debounce agrupa en 1-2 recomputes rápidos.
+> - **Cat C-fast** (<20s, sin LLM): Debounce 5s, recompute background.
+> - **Cat C-slow** (LLM, 60-180s): Esperar cambio de pantalla. No tiene sentido lanzar
+>   recompute LLM mientras corrector sigue trabajando en el mismo tab.
+> - **Mensaje inline** cuando hay recompute en curso: "Recomputando relaciones..." (no bloquear).
+>
+> **Nota workflow**: El corrector trabaja en un tab (ej: Entidades), hace merges, y cuando
+> cambia a otro tab (ej: Relaciones), ese tab muestra datos frescos porque Cat C-slow se
+> disparó al detectar el cambio de pantalla.
+
 #### Early cutoff (optimizacion Salsa)
 
 Si recomputar un enrichment produce el MISMO resultado (ej: merge solo anadio menciones redundantes),
@@ -998,17 +1028,17 @@ NO propagar invalidacion downstream. Comparar `output_hash` antes vs despues.
 
 | ID | Accion | Estado | Detalle |
 |----|--------|--------|---------|
-| S8c-01 | Tabla invalidation_events en BD | PENDIENTE | CREATE TABLE invalidation_events (project_id, event_type, entity_ids, timestamp, revision) |
-| S8c-02 | Event emitter en endpoints de mutacion | PENDIENTE | merge, undo_merge, reject, edit_attribute → emit event con entity_ids |
-| S8c-03 | Handlers Cat B: recompute per-entity | PENDIENTE | voice_profiles, timeline, emotional por entity_id afectado |
-| S8c-04 | Handlers Cat C: mark stale | PENDIENTE | UPDATE enrichment_cache SET status='stale' WHERE type IN (...) |
-| S8c-05 | Frontend: detectar datos stale | PENDIENTE | Comparar revision en response vs stored → mostrar nota inline |
-| S8c-06 | Frontend: nota inline stale con boton "Actualizar" | PENDIENTE | Nota discreta bajo contenido + auto-trigger recompute al abrir tab si coste <5s |
-| S8c-07 | Early cutoff: output_hash comparison | PENDIENTE | Comparar output_hash antes/despues de recompute. Canonicalizar: sorted keys, round(6), JSON determinista |
-| S8c-08 | Funciones enrichment scoped por entity_id | PENDIENTE | compute_voice_profile(project_id, entity_id=X) en vez de global |
-| S8c-09 | Tests invalidation cascades | PENDIENTE | 30-35 test cases cubriendo: 7 eventos x 3 categorias, secuencial, concurrente, undo, failure paths, early cutoff |
-| S8c-10 | Transaccionalidad por fase de enrichment | PENDIENTE | Cada fase 10-13 wrappea sus escrituras en transaccion. Fallo → rollback completo de esa fase |
-| S8c-11 | Proteccion race condition: mutacion durante enrichment | PENDIENTE | Capturar entity revision al inicio de enrichment, comparar al commit; si cambio → re-ejecutar fase afectada |
+| S8c-01 | Tabla invalidation_events en BD | DONE | Schema v19: invalidation_events (project_id, event_type, entity_ids, detail, revision, created_at). Migration en _apply_column_migrations() (commit a4d08fb) |
+| S8c-02 | Event emitter en endpoints de mutacion | DONE | emit_invalidation_event() en _invalidation.py. Llamado desde 6 mutation endpoints en entities.py: merge, undo_merge, reject, attribute_create/edit/delete (commit a4d08fb) |
+| S8c-03 | Handlers Cat B: recompute per-entity | DONE | _mark_stale() marca per-entity entries (entity_scope IN entity:X) como stale (commit a4d08fb) |
+| S8c-04 | Handlers Cat C: mark stale | DONE | _mark_stale() marca entradas globales (entity_scope IS NULL) como stale. EVENT_INVALIDATION_MAP define tipos afectados por evento (commit a4d08fb) |
+| S8c-05 | Frontend: detectar datos stale | DONE | _cache metadata incluye revision + stale flag en response. GET /enrichment/stale endpoint (commit a4d08fb) |
+| S8c-06 | Frontend: nota inline stale con boton "Actualizar" | DONE | DsStaleNote.vue componente inline + allow_stale en get_cached_enrichment() (commit a4d08fb) |
+| S8c-07 | Early cutoff: output_hash comparison | DONE | _cache_result() compara output_hash antes/despues, skip write si unchanged (commit a4d08fb) |
+| S8c-08 | Funciones enrichment scoped por entity_id | DONE | entity_scope column en enrichment_cache, per-entity marking en _mark_stale() (commit a4d08fb) |
+| S8c-09 | Tests invalidation cascades | DONE | 22 tests en test_invalidation.py: emission (3), stale marking (5), revision tracking (2), event type coverage (12 parametrized) (commit a4d08fb) |
+| S8c-10 | Transaccionalidad por fase de enrichment | DONE | status='computing' antes de iniciar, completed/failed al terminar. _run_enrichment() en _enrichment_phases.py (commit a4d08fb) |
+| S8c-11 | Proteccion race condition: mutacion durante enrichment | DONE | invalidate_enrichment_if_mutated() usa granular stale marking con ENTITY_DEPENDENT_TYPES | ATTRIBUTE_DEPENDENT_TYPES (commit a4d08fb) |
 
 ### Resumen Sprint 8
 
@@ -1052,7 +1082,7 @@ NO propagar invalidacion downstream. Comparar `output_hash` antes vs despues.
 | BK-08 | Integrar timeline en vital_status | Cruzar temporal_markers con death_events: si flashback_time < death_time → aparición válida. Requiere detección de línea temporal no lineal (prólogos, alternancia pasado/presente). LLM para desambiguación en casos difíciles. |
 | ~~BK-07~~ | ~~Análisis multi-documento~~ | ✅ DONE - Collections, entity links, cross-book analysis, workspace auxiliar |
 | BK-09 | Merge-induced attribute orphaning | **P1** — Al fusionar entidades, `entity_attributes.entity_id` apunta al entity_id absorbido. Atributos desaparecen del UI. Falta CASCADE o rewrite de FK en merge. |
-| BK-10 | Dialogue attribution cascading errors | **P1** — Si `cesp_resolver` misatribuye speaker en cap N, los siguientes heredan el error (no hay reset per-chapter). Error se amplifica en manuscritos largos. |
+| BK-10 | Dialogue attribution: correcciones no aplicadas + scene breaks | **P1** — El hard reset por capítulo YA EXISTE (`speaker_attribution.py:376-380`). Los problemas reales son: (a) tabla `speaker_corrections` existe pero `SpeakerAttributor` NO la lee → correcciones del usuario ignoradas, (b) sin detección de cambio de escena intra-capítulo (`chapter.py:621-626` tiene patrones `***`, `---`, triple newline pero no se usan), (c) sin confidence decay intra-capítulo. Ver sub-tareas BK-10a/b/c. |
 | BK-11 | Detección de narrativa no lineal | **P1** — 40% de ficción literaria es no lineal (flashbacks, frame narratives). El sistema usa orden de capítulos como proxy cronológico → falsos positivos masivos en vital_status. Relacionado con BK-08 pero más amplio. |
 | BK-12 | Cache para fases de enriquecimiento | **P1** — Fases 10-13 (relaciones, voz, prosa) recalculan on-the-fly en cada visita a tab. Sin cache → OOM en hardware limitado (8GB RAM). Blocker para S8a-07..10. |
 | BK-13 | Pro-drop ambigüedad multi-personaje | **P2** — En escenas con 2+ candidatos del mismo género ("Salió corriendo" con María y Ana presentes), heurística "last mentioned" falla. Necesita saliency weighting + LLM fallback. |
@@ -1061,10 +1091,21 @@ NO propagar invalidacion downstream. Comparar `output_hash` antes vs despues.
 | BK-16 | Hilos narrativos sin resolver (Chekhov's gun) | **P2** — No detecta personajes introducidos con alta saliencia (backstory, conflicto) que desaparecen sin resolución. FlawedFictions cat.5. Los editores lo piden como top-3. |
 | BK-17 | Glossary → entity disambiguation | **P3** — Glossary ("El Doctor → Juan Pérez") no se inyecta en NER/coreference pipeline. Usuario define alias manualmente y luego fusiona igualmente. Inyectar en gazetteer. |
 | BK-18 | Confidence decay para inferencias stale | **P3** — Alertas LLM (OOC, anacronismos) persisten con confidence original tras merge de entidades. Input cambió pero score no. S8c lo aborda parcialmente con stale marking. |
+| ~~BK-19~~ | ~~UI "Añadir/editar atributo" en EntitiesTab~~ | ✅ DONE — Inline add/edit/delete en EntitiesTab. Formulario con categoria, nombre, valor, confianza auto 1.0 (commit b326317, Sprint PP-2) |
+| ~~BK-20~~ | ~~UI "Corregir hablante" en DialogueAttributionPanel~~ | ✅ DONE — Boton "Corregir" en cada dialogo, dropdown con entidades del capitulo, POST a speaker_corrections (commit 8b52e80, Sprint PP-2) |
+| ~~BK-21~~ | ~~Resolver conflictos atributos en merge~~ | ✅ DONE — MergeEntitiesDialog paso 3: radio buttons para conflictos critical/medium, resoluciones enviadas en POST merge (commit 7a44c73, Sprint PP-2) |
+| ~~BK-22~~ | ~~Feedback loop: sistema aprende de correcciones~~ | ✅ DONE — detector_calibration table, recalibracion de confianza por ratio FP, get_dismissal_stats() → effective_confidence (commit 3cd35d3, Sprint PP-4) |
+| BK-23 | Estandarizar loading patterns (spinners/barras) | **P3** — BK-23b (skeleton loaders) y BK-23c (z-index + animations) DONE. BK-23a (unificar loading Ollama Tutorial=Settings) PENDIENTE. |
+| ~~BK-24~~ | ~~Conectar 3 endpoints export faltantes~~ | ✅ DONE — /export/characters (routing a character_sheets.py), /export/report (ReviewReportExporter), /export/alerts + CSV (commit c653867, Sprint PP-1) |
 
 > **Panel de expertos (10-Feb-2026)**: Sesión de 8 expertos simulados (QA, Lingüista, Corrector, Arquitecto,
 > AppSec, Frontend, Product Owner, UX). BK-09..18 son gaps nuevos identificados por análisis cross-módulo,
 > testing adversarial, y simulación de flujo editorial real. 4× P1, 4× P2, 2× P3.
+>
+> **Panel de expertos (10-Feb-2026, sesión producto)**: Ampliación con foco en producto vendible.
+> BK-19..24 son gaps identificados en auditoría de UX interactiva, export, y consistencia visual.
+> Incluye: correcciones interactivas, export como puente a Word, loading patterns, y feedback loop.
+> 3× P1, 2× P2, 1× P3.
 
 ---
 
@@ -1077,21 +1118,23 @@ NO propagar invalidacion downstream. Comparar `output_hash` antes vs despues.
 | 1 | BK-09 | S (1-2d) | Entity merge fix — migrar TODAS las FK (15 tablas), no solo attributes/mentions | Medio: si se olvida alguna tabla, datos inconsistentes |
 | 2 | BK-15 | S (1-2d) | Masking emocional — "fingió calma" no es error de OOC. Patrones: fingió, disimulando, conteniendo | Bajo |
 | 3 | BK-17 | S (1-2d) | Glosario → gazetteer NER — inyectar términos del usuario con confidence 1.0 | Bajo |
-| 4 | BK-10 | M (3-5d) | Reset speaker attribution por capítulo/escena + confidence decay intra-capítulo | Alto: cascada afecta voice/OOC/emocional |
+| ~~4~~ | ~~BK-10a~~ | ~~S (2-3h)~~ | ~~Aplicar correcciones usuario en SpeakerAttributor~~ | Movido a Sprint PP-4 |
+| 4 | BK-10b | S (3-4h) | Scene breaks intra-capítulo: usar patrones `chapter.py:621-626` en speaker attribution | Medio: edge cases |
+| 5 | BK-10c | S (2-3h) | Confidence decay: `base * 0.95^turns_since_explicit`, reset en verba dicendi/scene break/chapter | Bajo |
 
-**Criterios de éxito**: 0 filas huérfanas post-merge; no cascada speaker inter-capítulo; OOC con masking = `is_intentional`; glosario en gazetteer.
+**Criterios de éxito**: 0 filas huérfanas post-merge; correcciones usuario aplicadas en reanálisis; scene breaks detectan `***`/`---`/triple newline; OOC con masking = `is_intentional`; glosario en gazetteer.
 
 ### Sprint S10: Timeline No Lineal + Cache (11-18 días)
 
 | Orden | ID | Esfuerzo | Descripción | Riesgo |
 |-------|----|----------|-------------|--------|
-| 1 | BK-12 | M (3-5d) | Enrichment cache granular con `get_or_compute()`, `invalidate()`, `mark_stale()` | Medio: result_json grande |
-| 2 | BK-14 | M (3-5d) | Ubicaciones jerárquicas — `LocationOntology` con `is_reachable()` | Bajo-medio |
-| 3 | BK-11 | L (5-8d) | Timeline no lineal — mapa temporal por capítulo, integrar en vital_status y locations | Muy alto: 40% ficción no lineal |
+| ~~1~~ | ~~BK-12~~ | ~~M (3-5d)~~ | ~~Enrichment cache granular~~ | DUPLICADO: absorbido por S8a-11 (tabla) + S8a-13 (read-from-cache) |
+| 1 | BK-14 | M (3-5d) | Ubicaciones jerárquicas — `LocationOntology` con `is_reachable()` | Bajo-medio |
+| 2 | BK-11 | L (5-8d) | Timeline no lineal — mapa temporal por capítulo, integrar en vital_status y locations | Muy alto: 40% ficción no lineal |
 
-**Criterios de éxito**: 2º acceso a tab < 100ms; cocina⊂casa no genera FP; flashbacks no generan "muerto reaparece".
+**Criterios de éxito**: cocina⊂casa no genera FP; flashbacks no generan "muerto reaparece".
 
-**Dependencias**: BK-12 es prerequisito de BK-18. BK-11 se beneficia de BK-14.
+**Dependencias**: S8a-11+S8a-13 (cache, antes BK-12) es prerequisito de BK-18. BK-11 se beneficia de BK-14.
 
 ### Sprint S11: Pro-drop + Chekhov (8-13 días)
 
@@ -1108,7 +1151,13 @@ NO propagar invalidacion downstream. Comparar `output_hash` antes vs despues.
 |-------|----|----------|-------------|--------|
 | 1 | BK-18 | S (1-2d) | Decay gradual: `effective_confidence = original * 0.97^events_since` | Bajo |
 
-**Esfuerzo total estimado**: 28-44 días (7-11 semanas). S9 y S10 paralelizables.
+> **PENDIENTE**: S9-S12 necesitan especificación detallada antes de implementar (archivos
+> afectados, esquemas BD, algoritmos, sub-tareas). Actualmente solo tienen descripciones
+> de alto nivel. Detallar cuando se vaya a empezar cada sprint. BK-11 (timeline no lineal)
+> es la más compleja: requiere desacoplar orden de capítulos del orden cronológico, añadir
+> temporal metadata a chapters, y corregir vital_status + age_consistency que asumen linealidad.
+
+**Esfuerzo total estimado**: 24-37 días (6-9 semanas). S9 y S10 paralelizables.
 
 ```
 Sprint S9 (Integridad)          Sprint S10 (Timeline + Cache)
@@ -1127,44 +1176,424 @@ Sprint S11 (NLP Avanzado)      Sprint S12 (Decay)
 └──────────────────────────┘
 ```
 
+#### BK-10 detalle (revisado 10-Feb-2026)
+
+> **Análisis previo erróneo**: Se asumía que no había reset por capítulo. Código real
+> (`speaker_attribution.py:376-380`) ya hace hard reset en cada cambio de capítulo:
+> ```python
+> if chapter != last_chapter:
+>     current_participants = []
+>     last_speaker = None
+>     last_chapter = chapter
+> ```
+>
+> **Panel de expertos (Lingüista + Corrector + Arquitecto)**:
+>
+> **Lingüista**: "El reset duro pierde contexto valioso. En una escena continua entre capítulos,
+> el lector sabe quién habla. Mejor usar confidence decay gradual: 0.95^(distancia_en_turnos)
+> hasta scene break, donde sí se resetea."
+>
+> **Corrector**: "Lo más importante es que si yo corrijo un speaker mal atribuido, la app lo
+> recuerde para la próxima vez. No quiero corregir lo mismo dos veces."
+>
+> **Arquitecto**: "La tabla `speaker_corrections` ya existe en la BD. Los endpoints GET/POST/DELETE
+> existen en `voice_style.py:776-902`. Pero `SpeakerAttributor` nunca lee de esa tabla.
+> Conectar el pipeline es 2-3h de trabajo."
+>
+> **Sub-tareas**:
+
+| ID | Acción | Esfuerzo | Detalle |
+|----|--------|----------|---------|
+| BK-10a | Aplicar correcciones usuario en attribution | S (2-3h) | `SpeakerAttributor.attribute()` lee `speaker_corrections` y aplica overrides con confidence=1.0 ANTES del algoritmo heurístico. Infrastructure exists: DB table + API endpoints. |
+| BK-10b | Detección scene breaks intra-capítulo | S (3-4h) | Usar patrones de `chapter.py:621-626` (`***`, `---`, triple newline) en `speaker_attribution.py`. En scene break: reset `current_participants` y `last_speaker`, no solo en cambio de capítulo. |
+| BK-10c | Confidence decay gradual | S (2-3h) | Reemplazar confidence fija por decay: `confidence = base * 0.95^(turns_since_explicit)`. Decay se resetea en: verba dicendi explícito, scene break, cambio de capítulo. Enum `AttributionConfidence` → float continuo. |
+
+---
+
+## 8c. Auditoría de Producto (Panel de Expertos, 10-Feb-2026)
+
+> **Contexto**: Pivote de enfoque académico (TFM) a producto vendible. El objetivo es que un
+> corrector profesional pueda usar la app sin tecnicismos, entendiendo qué hace y cómo usarla.
+>
+> **Workflow real del corrector**: El corrector NO edita texto en la app. Abre el manuscrito en
+> la app para auditarlo, revisa hallazgos (alertas, entidades, relaciones), acepta/rechaza,
+> y luego corrige en Word. **Export es el puente** entre la app y el trabajo real.
+>
+> **Panel**: UX Designer, Corrector Editorial (15+ años), Product Owner, Frontend Engineer,
+> Arquitecto Python, QA Senior, Lingüista Computacional, AppSec Specialist.
+
+### 8c.1 Correcciones Interactivas — "El sistema aprende"
+
+> **Premisa del corrector**: "Si rechazo una alerta, el sistema no debería volver a mostrarla.
+> Si corrijo un speaker, debería recordarlo. Si asigno un atributo, debería usarlo."
+
+#### Estado actual de cada workflow interactivo
+
+| Workflow | UI | API | BD | Feedback loop |
+|----------|-----|-----|-----|---------------|
+| **Aceptar/rechazar alertas** | **COMPLETO** — Lista + modo secuencial con atajos (A/D/S/F/←/→), undo (Ctrl+Z), hasta 50 acciones | PATCH status, POST resolve-all, POST dismiss-batch con scope (instance/project/global) | `dismissal_repository` | **PARCIAL** — Dismissals persisten entre reanálisis (`apply_dismissals()`), pero NO recalibran confianza ni pesos de detectores |
+| **Asignar atributos** | **FALTA** — EntitiesTab solo lectura (muestra atributos, navega al texto, pero no edita) | **EXISTE** — POST create, PUT update con `is_verified` | `entity_attributes` | **NO** — Atributos verificados no influyen en extracción futura |
+| **Corregir speaker** | **FALTA** — DialogueAttributionPanel muestra alternativas y confianza, pero es solo lectura | **EXISTE** — GET/POST/DELETE speaker corrections | `speaker_corrections` | **NO** — `SpeakerAttributor` no lee de esta tabla (BK-10a) |
+| **Merge entidades** | **COMPLETO** — Wizard 3 pasos, aliases auto-transfer, conflictos detectados, undo | POST merge, POST undo-merge, POST preview-merge con similitud | `merge_history` | **PARCIAL** — Merge persiste, pero conflictos de atributos no se resuelven |
+| **Resolver conflictos merge** | **FALTA** — Se muestran (critical/medium/low) pero corrector no puede elegir valor | N/A | N/A | N/A |
+
+> **Decisión panel**:
+>
+> **Product Owner**: "BK-19 (atributos) y BK-20 (speaker) son blocker para vender. Un corrector
+> que no puede corregir errores del sistema no volverá a usarlo."
+>
+> **UX**: "El formulario de atributos debe ser inline (no dialog). Click en atributo → editar.
+> Botón '+' para añadir. Para speaker: dropdown con entidades del capítulo."
+>
+> **QA**: "BK-22 (feedback loop) es P2, no P1. Primero que el corrector pueda corregir (BK-19/20),
+> luego que el sistema aprenda de esas correcciones."
+>
+> **Corrector**: "Lo prioritario es que mis correcciones se apliquen en el reanálisis (BK-10a).
+> Que el sistema mejore solo es el siguiente paso."
+
+#### Plan de sistema de aprendizaje (BK-22)
+
+> **Mecanismo propuesto por Arquitecto + Lingüista**:
+>
+> 1. **Nivel 1 — Memoria de sesión** (ya parcial): Dismissals persisten, correcciones speaker
+>    persisten, merges persisten. Cuando se reanaliza, se aplican. **Falta**: conectar
+>    `speaker_corrections` al pipeline (BK-10a).
+>
+> 2. **Nivel 2 — Recalibración de confianza**: Usar `get_dismissal_stats()` (ya calcula ratio
+>    FP por tipo de detector) para ajustar `effective_confidence = original * (1 - fp_rate)`.
+>    Si detector X tiene 60% de rechazo → sus alertas bajan de confianza automáticamente.
+>
+> 3. **Nivel 3 — Pesos adaptativos por manuscrito**: Si el corrector consistentemente rechaza
+>    alertas de un tipo (ej: "registro informal en diálogos"), el sistema baja la sensibilidad
+>    para ese detector en ese manuscrito. Ya existe infraestructura: `adaptive_weights` en
+>    `coreference_resolver.py` (`load/save/update_adaptive_weights()`).
+>
+> **Prioridad**: Nivel 1 → BK-10a (quick win). Nivel 2 → BK-22 (sprint futuro). Nivel 3 → backlog.
+
+### 8c.2 Export — El Puente con Word
+
+> **Premisa**: El corrector revisa en la app y corrige en Word. El export es el producto
+> final que entrega al autor/editorial. Sin export completo, la app es un visor bonito.
+
+#### Estado actual del export
+
+| Export | Estado | Formato | Endpoint | Notas |
+|--------|--------|---------|----------|-------|
+| Documento completo | **COMPLETO** | DOCX, PDF | `/export/document` | Portada, TOC, estadísticas, personajes, alertas |
+| Track Changes | **COMPLETO** | DOCX | `/export/corrected` | Correcciones como revisiones de Word (accept/reject nativo) |
+| Review Report | **COMPLETO** | DOCX, PDF | `/export/review-report` | Informe editorial profesional por categoría |
+| Style Guide | **COMPLETO** | MD, JSON, PDF | `/style-guide` | Decisiones ortográficas, entidades canónicas |
+| Scrivener | **COMPLETO** | ZIP (.scriv) | `/export/scrivener` | Capítulos + notas de personajes + keywords |
+| Fichas personajes | **CÓDIGO EXISTE, ENDPOINT FALTA** | MD, JSON | — | `character_sheets.py` (419 líneas) completo, sin routing |
+| Informe análisis | **ENDPOINT FALTA** | MD, JSON | — | Frontend llama `/export/report` → 404 |
+| Solo alertas | **ENDPOINT FALTA** | JSON, CSV | — | Frontend llama `/export/alerts` → 404. Sin CSV para equipos |
+
+> **Panel**:
+>
+> **Corrector**: "La ficha de personajes es lo primero que miro antes de corregir. La imprimo
+> y la tengo al lado. Sin esto el export está incompleto."
+>
+> **Product Owner**: "3 endpoints rotos en la UI = percepción de producto inacabado. Quick win
+> de 2-3h que sube la calidad percibida enormemente."
+>
+> **Frontend Engineer**: "ExportDialog.vue ya tiene los 8 tipos de export con opciones
+> (filtros, formatos, previews). El frontend está listo, solo falta el backend routing."
+>
+> **Decisión**: BK-24 es P1 y debe ir PRIMERO en el sprint de producto. Es el mayor ROI
+> posible: 2-3h de trabajo, 3 features que el usuario ya espera.
+
+### 8c.3 Tutorial y Onboarding
+
+> **Estado actual**: TutorialDialog.vue (1376 líneas), wizard de 5 pasos:
+> Welcome → How-to → Workspace → Hardware → Ready.
+>
+> **Problema**: Paso 3 (Hardware) ocupa 40% del tutorial con detección GPU, instalación Ollama,
+> instalación LanguageTool. Un corrector no necesita saber qué es un "modelo de IA" ni "GPU".
+
+#### Decisiones del panel
+
+| Punto | Decisión | Razón |
+|-------|----------|-------|
+| Hardware en tutorial | **ELIMINAR** | Corrector no necesita saber de GPU. Auto-configurar. |
+| Auto-config perfil | **IMPLEMENTAR** | Detectar hardware → descargar modelos → activar mejor perfil sin intervención del usuario |
+| Feature discovery | **AÑADIR al tutorial** | Explicar qué hace cada tab, qué tipo de errores detecta |
+| Alert workflow | **AÑADIR al tutorial** | Mostrar cómo revisar una alerta: leer → ir al texto → aceptar/rechazar |
+| Demo project | **NO CUENTA para licencias** | Proyecto demo para practicar, no penaliza cuota de páginas |
+| UserGuide con screenshots | **SÍ** | Capturas de cada tab + flujo de trabajo. Versión PDF exportable |
+| Landing page web | **ANOTAR, NO AHORA** | Después de testear con clientes reales. Documentar para futuro |
+
+> **UX**: "El tutorial debe responder 3 preguntas: ¿Qué hace la app? ¿Cómo la uso? ¿Qué
+> significan los resultados? Hardware es un detalle de instalación, no de uso."
+>
+> **Corrector**: "Quiero ver ejemplos reales. 'Mira, aquí detectó que María tenía ojos verdes
+> en el capítulo 3 y azules en el 7'. Eso me convence más que una lista de features."
+>
+> **Product Owner**: "El auto-config es crítico para first-time experience. Si el corrector
+> abre la app y tiene que instalar Ollama manualmente, lo perdemos."
+
+### 8c.4 Jargon Técnico vs Lenguaje del Corrector
+
+> **Regla**: Eliminar jerga de programador/ML. Mantener terminología lingüística que un
+> corrector profesional conoce.
+
+#### Términos a eliminar (jerga programador)
+
+| Término actual | Reemplazo | Archivos afectados |
+|---------------|-----------|-------------------|
+| NLP | "análisis lingüístico" | SettingsView, TutorialDialog, AboutDialog |
+| GPU / CUDA / MPS | "aceleración por hardware" | SettingsView, TutorialDialog |
+| LLM | "modelo de lenguaje" o "motor de análisis" | SettingsView, TutorialDialog |
+| Embeddings | "análisis semántico" | SettingsView |
+| spaCy | eliminar referencia | SettingsView, AboutDialog |
+| Ollama | "Motor de IA local" | SettingsView, TutorialDialog |
+| LanguageTool | "Corrector gramatical" (ya parcial) | SettingsView |
+| Backend / Frontend | eliminar | AboutDialog |
+| Token / Tokenización | "segmentación de texto" | si aparece en UI |
+| Pipeline | "proceso de análisis" | si aparece en UI |
+| VRAM / RAM | "memoria disponible" | SettingsView |
+| Batch size | "tamaño de lote" o eliminar | SettingsView |
+| Cuantización / Q4_K_M | eliminar de UI | SettingsView |
+
+#### Términos a MANTENER (el corrector los conoce)
+
+| Término | Razón |
+|---------|-------|
+| Morfosintáctico | Formación estándar en corrección editorial |
+| Léxico | Término básico de lingüística |
+| Semántico | El corrector entiende "análisis semántico" |
+| Correferencia | Término técnico pero usado en lingüística aplicada |
+| Anáfora | Término que un corrector con formación conoce |
+| Registro (formal/informal) | Concepto estándar en edición |
+| Concordancia | Fundamental en corrección |
+| Anacoluto | El corrector lo busca activamente |
+
+> **Lingüista**: "Un corrector con 15 años de experiencia sabe perfectamente qué es
+> 'morfosintáctico'. Lo que NO sabe es qué es un 'embedding' o 'CUDA'."
+>
+> **UX**: "La regla es simple: si lo explicarías en un manual de corrección editorial, se queda.
+> Si lo explicarías en un curso de machine learning, se va."
+
+### 8c.5 Consistencia Visual: Loading Patterns
+
+> **Auditoría**: 52 indicadores de carga en 49 archivos. 3 custom components (DsLoadingState,
+> AnalysisProgress, AnalysisRequired), 2 PrimeVue ProgressSpinner, 6 PrimeVue ProgressBar,
+> 16 icon spinners manuales (`pi-spin pi-spinner`), ~8 Button `:loading`.
+
+#### Decision tree estandarizado
+
+```
+¿Es carga de PÁGINA COMPLETA?
+├─ SÍ → ProgressSpinner + texto centrado ("Cargando proyecto...")
+│
+└─ NO
+   ├─ ¿Es operación LARGA con % conocido?
+   │  └─ SÍ → ProgressBar determinada + label + % separado
+   │     (patrón TutorialDialog: label arriba, barra abajo, % a la derecha)
+   │     Con fallback a indeterminada si % no disponible
+   │
+   ├─ ¿Es operación LARGA sin %?
+   │  └─ SÍ → ProgressBar indeterminada + label descriptivo
+   │
+   ├─ ¿Es carga de SECCIÓN/PANEL?
+   │  └─ SÍ → DsLoadingState (variant="inline", size="sm")
+   │
+   └─ ¿Es acción de BOTÓN?
+      └─ SÍ → Button `:loading` prop (swap icon automático)
+```
+
+#### Inconsistencias a corregir
+
+| Problema | Dónde | Fix |
+|----------|-------|-----|
+| Descarga Ollama: visual diferente en Tutorial vs Settings | TutorialDialog + SettingsView | Unificar al patrón Tutorial (label + % + barra) |
+| Skeleton loaders: CSS existe, componente nunca usado | `animations.css` → `.skeleton-loader` | Crear componente Skeleton para listas (entidades, alertas) |
+| Z-index overlay inconsistente | DsLoadingState vs AnalysisProgress vs AnalysisRequired | Crear variables CSS: `--ds-z-overlay`, `--ds-z-modal` |
+| Dos animaciones spin duplicadas | `spin` en animations.css + `ds-spin` en DsLoadingState | Consolidar en una sola |
+| ProgressBar `:show-value` inconsistente | Algunos true, otros false con label separado | Siempre false + label separado (más control visual) |
+
+> **Frontend Engineer**: "El patrón del TutorialDialog (mini-spinner al lado de la opción +
+> barra debajo) es el gold standard. Lo aplico a todas las descargas de modelos."
+>
+> **UX**: "Spinner para cosas rápidas (<3s). Barra para cosas largas. Skeleton para listas
+> que se están cargando. Nunca mezclar en el mismo contexto."
+
+### 8c.6 Entity Merge: Alias y Atributos
+
+> **Estado actual del merge** (MergeEntitiesDialog.vue, 1702 líneas):
+>
+> ✅ **Aliases**: Cuando se mergean A + B → C, TODOS los nombres (canónicos + aliases de ambos)
+> se convierten en aliases de C. El nombre de la entidad eliminada se añade automáticamente
+> como alias. El corrector elige el nombre principal en paso 2 del wizard.
+>
+> ✅ **Conflictos detectados**: El wizard muestra conflictos de atributos con severidad
+> (critical/medium/low). Ejemplo: "edad=25 vs edad=28" → critical.
+>
+> ❌ **Conflictos NO resolubles**: El corrector ve el conflicto pero no puede elegir qué valor
+> conservar. El merge procede y el backend decide (no documentado cómo).
+>
+> **Decisión panel (BK-21)**: Añadir resolución de conflictos en paso 3 del wizard.
+> Para cada conflicto critical/medium: radio button "Conservar valor de [Entidad A]" /
+> "Conservar valor de [Entidad B]" / "Nuevo valor: [input]". Low severity: auto-merge.
+
+### Sprint PP: Product Polish (BK-19..24) — COMPLETADO (1 pendiente: BK-23a)
+
+> **Objetivo**: Convertir la app de "funcional" a "vendible". Quick wins primero,
+> luego UI interactiva, luego aprendizaje del sistema.
+>
+> **Requisito**: Estas tareas van ANTES de S9-S12 (NLP avanzado). Un producto que no se
+> puede usar correctamente no se beneficia de mejor NLP.
+
+#### Fase PP-1: Quick Wins Export (2-3h) — ✅ COMPLETADO
+
+| ID | Acción | Estado | Detalle |
+|----|--------|--------|---------|
+| BK-24a | Endpoint `/export/characters` | DONE | Routing a `character_sheets.py` (commit c653867) |
+| BK-24b | Endpoint `/export/report` | DONE | ReviewReportExporter con formato resumido (commit c653867) |
+| BK-24c | Endpoint `/export/alerts` + CSV | DONE | JSON + CSV con tipo, severidad, texto, capítulo, estado, sugerencia (commit c653867) |
+
+#### Fase PP-2: UI Correcciones Interactivas (13h) — ✅ COMPLETADO
+
+| ID | Acción | Estado | Detalle |
+|----|--------|--------|---------|
+| BK-19 | UI añadir/editar atributos | DONE | EntitiesTab: inline add/edit/delete, formulario con categoría/nombre/valor/confianza (commit b326317) |
+| BK-20 | UI corregir speaker | DONE | DialogueAttributionPanel: botón "Corregir", dropdown entidades, POST speaker_corrections, tag verde "Corregido" (commit 8b52e80) |
+| BK-21 | Resolver conflictos en merge | DONE | MergeEntitiesDialog paso 3: radio buttons para conflictos, resoluciones en POST merge (commit 7a44c73) |
+
+#### Fase PP-3: Tutorial, Jargon y Onboarding (12h) — ✅ COMPLETADO
+
+| ID | Acción | Estado | Detalle |
+|----|--------|--------|---------|
+| S7d-11 | Renombrar jargon técnico | DONE | ~30 términos renombrados en SettingsView, TutorialDialog, AboutDialog (commit ef39568) |
+| PP-3a | Reestructurar tutorial (eliminar hardware) | DONE | Nuevo flujo: Welcome → Qué detecta → Workspace → Alert workflow → Ready. Auto-config en background (commit f08a88b) |
+| PP-3b | Auto-config hardware + descarga modelos | DONE | Detectar GPU/RAM → descargar modelos óptimos → activar mejor perfil automáticamente (commit f08a88b) |
+| PP-3c | Demo project no cuenta para licencias | DONE | Flag is_demo en BD + skip en _get_usage_with_rollover() (commit fcc417f) |
+| S7d-04 | aria-labels faltantes | DONE | StatusBar + botones solo icono (commit 86832b5) |
+| S7d-10 | Simplificar AboutDialog | DONE | Solo versión app, licencia, contacto (commit 86832b5) |
+
+#### Fase PP-4: Feedback Loop (8h) — ✅ COMPLETADO
+
+| ID | Acción | Estado | Detalle |
+|----|--------|--------|---------|
+| BK-10a | Aplicar correcciones speaker en pipeline | DONE | SpeakerAttributor lee speaker_corrections, override con confidence=1.0 (commit 8755c9c) |
+| BK-22 | Recalibrar confianza por detector | DONE | detector_calibration table, effective_confidence = original * (1 - fp_rate * 0.5) (commit 3cd35d3) |
+
+#### Fase PP-5: Polish Visual (4h) — 2/3 COMPLETADO
+
+| ID | Acción | Estado | Detalle |
+|----|--------|--------|---------|
+| BK-23a | Unificar loading Ollama (Tutorial=Settings) | PENDIENTE | Patrón gold standard: label + % + barra determinada/indeterminada. |
+| BK-23b | Crear componente Skeleton para listas | DONE | Skeleton loaders para entidades, alertas, relaciones (commit 3fbe310) |
+| BK-23c | Consolidar z-index y animaciones | DONE | Variables CSS centralizadas, una sola animación spin (commit 3fbe310) |
+
+#### Resumen Sprint PP
+
+| Fase | Tareas | Estado | Impacto |
+|------|--------|--------|---------|
+| **PP-1**: Export quick wins | 3 | ✅ DONE | 3 features rotas → funcionales |
+| **PP-2**: UI interactiva | 3 | ✅ DONE | Corrector puede corregir errores del sistema |
+| **PP-3**: Tutorial + jargon + onboarding | 6 | ✅ DONE | First-time experience profesional |
+| **PP-4**: Feedback loop | 2 | ✅ DONE | Sistema aprende de correcciones |
+| **PP-5**: Polish visual | 3 | ⚠️ 2/3 | BK-23a pendiente (1h) |
+| **TOTAL** | **17** | **16/17 DONE** | Producto vendible con workflow completo |
+
+> **Orden de ejecución**: PP-1 → PP-2 → PP-3 → PP-4 → PP-5.
+>
+> PP-1 primero porque es el mayor ROI (2-3h, 3 features). PP-2 antes de PP-4 porque el
+> corrector necesita poder corregir antes de que el sistema aprenda de sus correcciones.
+>
+> **Relación con S8/S9**: Sprint PP es independiente y puede ejecutarse EN PARALELO con S8a
+> (pipeline enrichment) ya que toca archivos diferentes (frontend vs backend pipeline).
+> PP-4 (BK-10a) toca `speaker_attribution.py` que no se modifica en S8a.
+
 ---
 
 ## 9. Cronograma de Implementación
 
-### Fase Inmediata (Sprint 0): 1-2 días
+### Completado (S0-S7a): ✅
+
+S0 (xfails), S1 (NER), S2 (correferencias), S3 (temporal), S4 (atributos avanzados),
+S5 (LLM), S6 (frontend UX), S7a (licensing). Total: ~10 semanas ejecutadas.
+
+### Casi completado (S7b/c/d): ⚠️ 2 tareas pendientes
+
+| ID | Tarea | Esfuerzo | Estado |
+|----|-------|----------|--------|
+| S7b-09 | Conectar endpoint anachronisms con frontend | 2h | PENDIENTE |
+| S7b-10 | Crear CharacterProfileModal unificado | 3h | PENDIENTE |
+| ~~S7d-04~~ | ~~aria-labels faltantes~~ | ~~1h~~ | ✅ DONE (Sprint PP-3) |
+| ~~S7d-10~~ | ~~Simplificar AboutDialog~~ | ~~1h~~ | ✅ DONE (Sprint PP-3) |
+| ~~S7d-11~~ | ~~Renombrar jargon técnico~~ | ~~3h~~ | ✅ DONE (Sprint PP-3) |
+
+> S7b-09 y S7b-10 son las únicas tareas pendientes de S7.
+
+### Completado: Sprint PP — Product Polish ✅
+
+> 16/17 tareas completadas. Solo BK-23a (unificar loading Ollama, 1h) pendiente.
+
+### Completado: Sprint S8 — Pipeline + Invalidación ✅
+
+> S8a (18 tareas), S8b (9 tareas), S8c (11 tareas) — todo completado.
+> Tag: v0.8.0
+
+### PRÓXIMO: S9-S12 — NLP Avanzado (~28-44 días, 7-11 semanas)
+
+> Mejoras de calidad NLP. Solo tiene sentido cuando el producto base está pulido (PP)
+> y la pipeline es robusta (S8).
+
+| Sprint | Foco | Tareas clave | Días |
+|--------|------|-------------|------|
+| **S9** | Integridad datos + diálogos | BK-09 (merge FK), BK-15 (masking), BK-17 (glossary→NER), BK-10b/c (scene breaks + decay) | 6-9d |
+| **S10** | Timeline no lineal | BK-14 (ubicaciones jerárquicas), BK-11 (narrativa no lineal — 40% ficción). ~~BK-12 absorbido por S8a~~ | 8-13d |
+| **S11** | Pro-drop + Chekhov | BK-13 (ambigüedad multi-candidato), BK-16 (hilos narrativos sin resolver) | 8-13d |
+| **S12** | Confidence decay | BK-18 (decay gradual post-merge) | 1-2d |
+
+### APARCADO: Ideas documentadas, no planificadas
+
+> Estas ideas aportan valor pero no son necesarias para la primera versión vendible.
+> Se documentan para tenerlas en cuenta en futuras iteraciones, tras testear con clientes.
+
+| Idea | Razón para aparcar | Cuándo retomar |
+|------|-------------------|----------------|
+| **Landing page web** | Necesita testeo con clientes reales primero. Documentar estructura y copy, pero no implementar. | Tras primeras 10 ventas |
+| **UserGuide PDF exportable** | Aporta valor, pero requiere capturas actualizadas de cada tab. Mejor cuando UI sea estable. | Tras Sprint PP (UI estable) |
+| **Formato EPUB en export** | Relevante para producción editorial. No urgente para corrector que trabaja en Word. | Tras feedback de clientes |
+| **Formato XLSX en export** | Útil para equipos grandes. CSV cubre el 80% del caso de uso. | Si lo piden clientes |
+| **Pesos adaptativos nivel 3** (por manuscrito) | Infraestructura existe (`adaptive_weights`), pero nivel 2 (recalibración global) es suficiente primero. | Tras BK-22 (nivel 2) |
+| **Integrar Maverick** (BK-01) | Solo inglés por ahora. Monitorizar releases. | Cuando soporte español |
+| **Integrar BookNLP** (BK-02) | Sin release público multilingüe. | Cuando esté disponible |
+| **FlawedFictions benchmark** (BK-03) | Dataset no publicado. | Cuando se publique |
+| **Fine-tune RoBERTa en ficción** (BK-04) | Necesita corpus etiquetado. Se puede acumular de correcciones de usuarios. | Tras 100+ manuscritos procesados |
+| **Análisis multi-documento mejorado** (BK-07) | Ya funcional (collections). Mejoras son nice-to-have. | Feedback de clientes |
+| ~~Auto-config hardware~~ | Promovido a Sprint PP-3b | — |
+| ~~Demo project sin coste licencia~~ | Promovido a Sprint PP-3c | — |
+
+### Roadmap visual completo
+
 ```
-QW-01 → QW-02 → QW-03 → QW-04
-[xfails]  [frontend]  [test ORG]  [fusion]
+COMPLETADO                                          FUTURO
+───────────────────────────────────────────────── ──────────────────────
+S0-S6 (NLP + Frontend)                              S9 (Integridad)
+S7a (Licensing)                                     S10 (Timeline)
+S7b 8/10 (S7b-09, S7b-10 pendientes)              S11 (Pro-drop)
+S7c 6/7                                             S12 (Decay)
+S7d ✅ COMPLETADO                                   ───────────────
+Sprint PP ✅ (16/17, BK-23a pendiente)             APARCADO:
+Sprint S8 ✅ (S8a + S8b + S8c)                     Landing web
+  Tag: v0.8.0                                       UserGuide PDF
+                                                    EPUB export
+                                                    XLSX export
+                                                    Maverick/BookNLP
 ```
 
-### Fase Corta (Sprint 1-2): 2-3 semanas
-```
-S1-01 ─→ S1-02 ─→ S1-05
-[PlanTL]  [voting]  [benchmark]
-                         │
-S2-01 ─→ S2-02 ─→ S2-03 ─→ S2-04
-[pro-drop] [posesiv] [cadenas] [pesos]
-```
+### Estimaciones restantes
 
-### Fase Media (Sprint 3-4): 2-4 semanas
-```
-S3-01 ─→ S3-02 ─→ S3-03
-[NoT]    [reflect] [anacro]
-                      │
-S4-01 ─→ S4-02 ─→ S4-04
-[6-indic] [network] [ubicación]
-```
-
-### Fase Larga (Sprint 5-6): 2-3 semanas
-```
-S5-01 ─→ S5-02 ─→ S5-03
-[Qwen]   [auto]   [prompts]
-                      │
-S6-01 ─→ S6-02 ─→ S6-03
-[grafo]  [timeline] [dashboard]
-```
-
-### Estimación Total: ~8-12 semanas
+| Bloque | Horas/Días | Tipo |
+|--------|-----------|------|
+| ~~Sprint PP~~ | ~~39h~~ | ✅ COMPLETADO (excepto BK-23a, 1h) |
+| ~~Sprint S8~~ | ~~17-26 días~~ | ✅ COMPLETADO (v0.8.0) |
+| Tareas sueltas | ~6h | S7b-09 (2h), S7b-10 (3h), BK-23a (1h) |
+| Sprint S9-S12 | 24-37 días (6-9 semanas) | NLP avanzado |
+| **TOTAL restante** | **~7-10 semanas** | S9-S12 + 3 tareas sueltas |
 
 ---
 
@@ -1196,6 +1625,6 @@ S6-01 ─→ S6-02 ─→ S6-03
 
 ---
 
-**Ultima actualizacion**: 2026-02-10
-**Autor**: Claude (Panel de 8 expertos simulados)
-**Estado**: S0-S7a completados. S7b 8/10 done. S7c 6/7 done. S7d 9/13 done. S8 planificado (38 tareas, revisado post-auditoria). Quedan 45 tareas reales.
+**Ultima actualizacion**: 2026-02-11
+**Autor**: Claude (Panel de 8 expertos simulados + sesión producto 10-Feb)
+**Estado**: S0-S8 completados (v0.8.0). Sprint PP completado (16/17). S7b 8/10, S7c 6/7, S7d 13/13 done. Pendiente: S7b-09, S7b-10, BK-23a (~6h) + S9-S12 (24-37 días). ~7-10 semanas restantes.
