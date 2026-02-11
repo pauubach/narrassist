@@ -832,7 +832,7 @@ class ModelManager:
         Usa tqdm_class personalizado para reportar progreso byte-level real.
         """
         try:
-            from huggingface_hub import snapshot_download
+            import huggingface_hub  # noqa: F401
         except ImportError:
             return Result.failure(
                 ModelDownloadError(
@@ -865,10 +865,9 @@ class ModelManager:
                 logger.info(f"Descargando modelo embeddings: {repo_id}")
                 target_dir.mkdir(parents=True, exist_ok=True)
 
-                snapshot_download(
+                self._snapshot_download_with_retry(
                     repo_id,
                     local_dir=str(target_dir),
-                    local_dir_use_symlinks=False,
                     tqdm_class=tracker_class,
                     ignore_patterns=["*.onnx", "*.h5", "tf_*", "openvino/*", "onnx/*", "rust_model.ot"],
                 )
@@ -922,7 +921,7 @@ class ModelManager:
         Si el modelo principal falla (ej: 401 gated), intenta fallbacks.
         """
         try:
-            from huggingface_hub import snapshot_download
+            import huggingface_hub  # noqa: F401
         except ImportError:
             return Result.failure(
                 ModelDownloadError(
@@ -961,10 +960,9 @@ class ModelManager:
                     logger.info(f"Descargando modelo transformer NER: {repo_id}")
                     attempt_dir.mkdir(parents=True, exist_ok=True)
 
-                    snapshot_download(
+                    self._snapshot_download_with_retry(
                         repo_id,
                         local_dir=str(attempt_dir),
-                        local_dir_use_symlinks=False,
                         tqdm_class=tracker_class,
                         ignore_patterns=["*.onnx", "*.h5", "tf_*", "flax_*", "openvino/*", "onnx/*"],
                     )
@@ -1041,6 +1039,45 @@ class ModelManager:
                 reason=f"No se pudo descargar ningún modelo NER. Último error: {last_error}",
             )
         )
+
+    @staticmethod
+    def _snapshot_download_with_retry(
+        repo_id: str,
+        local_dir: str,
+        tqdm_class: type | None = None,
+        ignore_patterns: list[str] | None = None,
+        max_retries: int = 5,
+    ) -> None:
+        """snapshot_download con reintentos para errores transitorios."""
+        import time
+
+        from huggingface_hub import snapshot_download
+
+        for retry in range(max_retries):
+            try:
+                snapshot_download(
+                    repo_id,
+                    local_dir=local_dir,
+                    local_dir_use_symlinks=False,
+                    tqdm_class=tqdm_class,
+                    ignore_patterns=ignore_patterns,
+                )
+                return
+            except Exception as dl_err:
+                dl_str = str(dl_err).lower()
+                is_transient = any(k in dl_str for k in [
+                    "timeout", "connection", "reset", "broken pipe",
+                    "temporary", "429", "500", "502", "503", "504",
+                ])
+                if is_transient and retry < max_retries - 1:
+                    wait = (retry + 1) * 5
+                    logger.warning(
+                        f"Descarga de {repo_id} falló (intento {retry + 1}/{max_retries}): "
+                        f"{dl_err}. Reintentando en {wait}s..."
+                    )
+                    time.sleep(wait)
+                    continue
+                raise
 
     def _cleanup_model_dir(self, attempt_dir: Path) -> None:
         """Elimina directorio parcial y padres vacíos hasta models_dir."""

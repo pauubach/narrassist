@@ -503,7 +503,7 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                 return ApiResponse(
                     success=False,
                     error=f"Modelos no descargados: {names}. "
-                          "Descárgalos desde Ajustes > Modelos."
+                          "Descárgalos desde Configuración > Verificar modelos."
                 )
         except Exception as e:
             logger.warning(f"Error en pre-check de modelos: {e}")

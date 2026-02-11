@@ -885,6 +885,23 @@
           <template #content>
             <div class="setting-item">
               <div class="setting-info">
+                <label class="setting-label">Modelos NLP</label>
+                <p class="setting-description">Verificar y descargar modelos de análisis (spaCy, embeddings, NER)</p>
+              </div>
+              <div class="setting-control">
+                <Button
+                  :label="nlpDownloading ? 'Descargando...' : 'Verificar modelos'"
+                  icon="pi pi-download"
+                  severity="secondary"
+                  outlined
+                  :loading="nlpDownloading"
+                  @click="redownloadNLPModels"
+                />
+              </div>
+            </div>
+
+            <div class="setting-item">
+              <div class="setting-info">
                 <label class="setting-label">Limpiar caché</label>
                 <p class="setting-description">Eliminar archivos temporales y caché de modelos</p>
               </div>
@@ -1061,6 +1078,24 @@ const {
 
 const systemCapabilities = computed(() => systemStore.systemCapabilities)
 const loadingCapabilities = computed(() => systemStore.capabilitiesLoading)
+
+// ── NLP model download ──────────────────────────────────────
+
+const nlpDownloading = ref(false)
+
+async function redownloadNLPModels() {
+  nlpDownloading.value = true
+  try {
+    const ok = await systemStore.downloadModels(['spacy', 'embeddings', 'transformer_ner'])
+    if (ok) {
+      toast.add({ severity: 'success', summary: 'Modelos verificados', detail: 'Todos los modelos NLP están disponibles.', life: 3000 })
+    } else {
+      toast.add({ severity: 'error', summary: 'Error', detail: systemStore.modelsError || 'Error descargando modelos.', life: 5000 })
+    }
+  } finally {
+    nlpDownloading.value = false
+  }
+}
 
 // ── Data location state ────────────────────────────────────
 
