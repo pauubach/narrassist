@@ -9,15 +9,14 @@ S8a-14: Refactor monolito → funciones standalone.
 
 import json
 import logging
-import time
 import threading
+import time
 from collections import Counter
 from pathlib import Path
 from typing import Any
 
 import deps
-from deps import logger, ApiResponse, generate_person_aliases
-
+from deps import ApiResponse, generate_person_aliases, logger
 
 # ============================================================================
 # ProgressTracker: encapsula toda la lógica de progreso
@@ -363,7 +362,7 @@ def run_cleanup(ctx: dict, tracker: ProgressTracker):
 
 def apply_license_and_settings(ctx: dict, tracker: ProgressTracker):
     """Aplica license gating y project settings al análisis."""
-    from narrative_assistant.licensing.gating import is_licensing_enabled, apply_license_gating
+    from narrative_assistant.licensing.gating import apply_license_gating, is_licensing_enabled
     from narrative_assistant.pipelines.unified_analysis import UnifiedConfig
 
     analysis_config = UnifiedConfig.standard()
@@ -525,14 +524,38 @@ def run_structure(ctx: dict, tracker: ProgressTracker):
     from narrative_assistant.parsers.structure_detector import StructureDetector
     detector = StructureDetector()
 
-    # Detectar estructura, pasar raw_document para acceso a metadata
-    chapters_data = detector.detect(full_text, raw_document=raw_document)
+    # Detectar estructura pasando el RawDocument completo
+    structure_result = detector.detect(raw_document)
+
+    chapters_data = []
+    if structure_result.is_success and structure_result.value.chapters:
+        for ch in structure_result.value.chapters:
+            content = ch.get_text(full_text)
+            sections_data = []
+            for sec in ch.sections:
+                sections_data.append({
+                    "title": sec.title,
+                    "level": sec.level,
+                    "start_char": sec.start_char,
+                    "end_char": sec.end_char,
+                })
+            chapters_data.append({
+                "chapter_number": ch.number,
+                "title": ch.title or f"Capítulo {ch.number}",
+                "content": content,
+                "start_char": ch.start_char,
+                "end_char": ch.end_char,
+                "word_count": len(content.split()),
+                "structure_type": ch.structure_type.value if hasattr(ch.structure_type, 'value') else str(ch.structure_type),
+                "sections": sections_data,
+            })
+
     chapters_count = len(chapters_data)
 
     if chapters_count == 0:
         # Crear un capítulo único con todo el texto
         chapters_data = [{
-            "number": 1,
+            "chapter_number": 1,
             "title": "Documento completo",
             "start_char": 0,
             "end_char": len(full_text),
@@ -691,9 +714,14 @@ def _filter_overlapping_entities(raw_entities: list) -> list:
 
 def run_ner(ctx: dict, tracker: ProgressTracker):
     """Fase 4: Extracción de entidades con NER."""
-    from narrative_assistant.nlp.ner import NERExtractor, EntityLabel
-    from narrative_assistant.entities.models import Entity, EntityType, EntityImportance, EntityMention
+    from narrative_assistant.entities.models import (
+        Entity,
+        EntityImportance,
+        EntityMention,
+        EntityType,
+    )
     from narrative_assistant.entities.repository import get_entity_repository
+    from narrative_assistant.nlp.ner import EntityLabel, NERExtractor
 
     project_id = ctx["project_id"]
     full_text = ctx["full_text"]
@@ -1035,7 +1063,7 @@ def _is_name_subset(short_name: str, long_name: str) -> bool:
 
 def run_fusion(ctx: dict, tracker: ProgressTracker):
     """Fase 3.5: Fusión de entidades + correferencias."""
-    from narrative_assistant.entities.models import EntityType, EntityImportance
+    from narrative_assistant.entities.models import EntityImportance, EntityType
     from narrative_assistant.entities.repository import get_entity_repository
 
     project_id = ctx["project_id"]
@@ -1216,9 +1244,11 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
 
         try:
             from narrative_assistant.nlp.coreference_resolver import (
-                resolve_coreferences_voting,
                 CorefConfig,
                 CorefMethod,
+                resolve_coreferences_voting,
+            )
+            from narrative_assistant.nlp.coreference_resolver import (
                 MentionType as CorefMentionType,
             )
 
@@ -2067,8 +2097,8 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
             "Detectando comportamiento fuera de personaje..."
         )
         try:
-            from narrative_assistant.analysis.out_of_character import OutOfCharacterDetector
             from narrative_assistant.analysis.character_profiling import CharacterProfiler
+            from narrative_assistant.analysis.out_of_character import OutOfCharacterDetector
 
             profiler = CharacterProfiler()
             character_entities = [
@@ -2237,8 +2267,8 @@ def run_grammar(ctx: dict, tracker: ProgressTracker):
     spelling_issues = []
     try:
         from narrative_assistant.nlp.grammar import (
-            get_grammar_checker,
             ensure_languagetool_running,
+            get_grammar_checker,
             is_languagetool_installed,
         )
 
@@ -2332,7 +2362,7 @@ def run_grammar(ctx: dict, tracker: ProgressTracker):
 
 def run_alerts(ctx: dict, tracker: ProgressTracker):
     """Fase 8: Creación de alertas a partir de todos los hallazgos."""
-    from narrative_assistant.alerts.engine import get_alert_engine, AlertCategory, AlertSeverity
+    from narrative_assistant.alerts.engine import AlertCategory, AlertSeverity, get_alert_engine
 
     project_id = ctx["project_id"]
     inconsistencies = ctx.get("inconsistencies", [])
