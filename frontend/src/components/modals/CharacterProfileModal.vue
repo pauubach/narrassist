@@ -11,6 +11,7 @@ import Dialog from 'primevue/dialog'
 import Button from 'primevue/button'
 import Badge from 'primevue/badge'
 import Tag from 'primevue/tag'
+import Chart from 'primevue/chart'
 import type { Entity } from '@/types'
 import { useEntityUtils } from '@/composables/useEntityUtils'
 import { api } from '@/services/apiClient'
@@ -21,6 +22,7 @@ interface PresenceData {
   firstChapter: number
   lastChapter: number
   continuity: number
+  mentionsPerChapter: Record<number, number>
 }
 
 interface ActionData {
@@ -52,12 +54,14 @@ interface SentimentData {
   positive: number
   negative: number
   dominantEmotions: [string, number][]
+  byChapter: Record<number, number>
 }
 
 interface EnvironmentData {
   primaryLocation: string
   locations: [string, number][]
   changes: number
+  locationsByChapter: Record<number, string[]>
 }
 
 interface CharacterProfile {
@@ -148,6 +152,7 @@ function transformProfile(raw: any): CharacterProfile {
       firstChapter: raw.presence?.first_chapter ?? 0,
       lastChapter: raw.presence?.last_chapter ?? 0,
       continuity: raw.presence?.continuity ?? 0,
+      mentionsPerChapter: raw.presence?.mentions_per_chapter ?? {},
     },
     actions: {
       count: raw.actions?.count ?? 0,
@@ -175,11 +180,13 @@ function transformProfile(raw: any): CharacterProfile {
       positive: raw.sentiment?.positive ?? 0,
       negative: raw.sentiment?.negative ?? 0,
       dominantEmotions: raw.sentiment?.dominant_emotions ?? [],
+      byChapter: raw.sentiment?.by_chapter ?? {},
     },
     environment: {
       primaryLocation: raw.environment?.primary_location ?? '',
       locations: raw.environment?.locations ?? [],
       changes: raw.environment?.changes ?? 0,
+      locationsByChapter: raw.environment?.locations_by_chapter ?? {},
     },
   }
 }
@@ -221,6 +228,130 @@ function close() {
 function formatPercent(value: number): string {
   return `${Math.round(value * 100)}%`
 }
+
+// --- Charts: evolución temporal ---
+
+const sortedChapters = computed(() => {
+  if (!profile.value) return []
+  return Object.keys(profile.value.presence.mentionsPerChapter)
+    .map(Number)
+    .sort((a, b) => a - b)
+})
+
+const hasTemporalData = computed(() => sortedChapters.value.length >= 2)
+
+const presenceChartData = computed(() => {
+  if (!profile.value || !hasTemporalData.value) return null
+  const mpc = profile.value.presence.mentionsPerChapter
+  return {
+    labels: sortedChapters.value.map(ch => `Cap ${ch}`),
+    datasets: [{
+      label: 'Menciones',
+      data: sortedChapters.value.map(ch => mpc[ch] ?? 0),
+      borderColor: 'rgb(59, 130, 246)',
+      backgroundColor: 'rgba(59, 130, 246, 0.1)',
+      fill: true,
+      tension: 0.3,
+      pointRadius: 3,
+    }],
+  }
+})
+
+const sentimentChartData = computed(() => {
+  if (!profile.value || !hasTemporalData.value) return null
+  const sbc = profile.value.sentiment.byChapter
+  const chapters = sortedChapters.value.filter(ch => sbc[ch] !== undefined)
+  if (chapters.length < 2) return null
+  return {
+    labels: chapters.map(ch => `Cap ${ch}`),
+    datasets: [{
+      label: 'Sentimiento',
+      data: chapters.map(ch => sbc[ch]),
+      borderColor: 'rgb(34, 197, 94)',
+      backgroundColor: (ctx: any) => {
+        if (!ctx.chart?.chartArea) return 'rgba(34,197,94,0.1)'
+        const { top, bottom } = ctx.chart.chartArea
+        const gradient = ctx.chart.ctx.createLinearGradient(0, top, 0, bottom)
+        gradient.addColorStop(0, 'rgba(34, 197, 94, 0.3)')
+        gradient.addColorStop(0.5, 'rgba(200, 200, 200, 0.05)')
+        gradient.addColorStop(1, 'rgba(239, 68, 68, 0.3)')
+        return gradient
+      },
+      fill: true,
+      tension: 0.3,
+      pointRadius: 3,
+    }],
+  }
+})
+
+const miniChartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      callbacks: {
+        title: (items: any[]) => items[0]?.label ?? '',
+      },
+    },
+  },
+  scales: {
+    x: {
+      grid: { display: false },
+      ticks: { font: { size: 10 }, maxRotation: 0 },
+    },
+    y: {
+      grid: { color: 'rgba(0,0,0,0.05)' },
+      ticks: { font: { size: 10 } },
+    },
+  },
+}
+
+const sentimentChartOptions = {
+  ...miniChartOptions,
+  scales: {
+    ...miniChartOptions.scales,
+    y: {
+      ...miniChartOptions.scales.y,
+      min: -1,
+      max: 1,
+      ticks: { font: { size: 10 }, stepSize: 0.5 },
+    },
+  },
+}
+
+// --- Transiciones de ubicación ---
+
+interface LocationTransition {
+  location: string
+  fromChapter: number
+  toChapter: number
+}
+
+const locationTransitions = computed<LocationTransition[]>(() => {
+  if (!profile.value) return []
+  const lbc = profile.value.environment.locationsByChapter
+  const chapters = Object.keys(lbc).map(Number).sort((a, b) => a - b)
+  if (chapters.length === 0) return []
+
+  const transitions: LocationTransition[] = []
+  let currentLoc = lbc[chapters[0]]?.[0] ?? ''
+  let fromCh = chapters[0]
+
+  for (const ch of chapters.slice(1)) {
+    const primary = lbc[ch]?.[0] ?? ''
+    if (primary && primary !== currentLoc) {
+      transitions.push({ location: currentLoc, fromChapter: fromCh, toChapter: ch - 1 })
+      currentLoc = primary
+      fromCh = ch
+    }
+  }
+  // Último tramo
+  if (currentLoc) {
+    transitions.push({ location: currentLoc, fromChapter: fromCh, toChapter: chapters[chapters.length - 1] })
+  }
+  return transitions
+})
 </script>
 
 <template>
@@ -276,6 +407,9 @@ function formatPercent(value: number): string {
             <span class="stat-value">{{ profile.presence.firstChapter }}–{{ profile.presence.lastChapter }}</span>
             <span class="stat-label">Rango caps.</span>
           </div>
+        </div>
+        <div v-if="presenceChartData" class="chart-container">
+          <Chart type="line" :data="presenceChartData" :options="miniChartOptions" />
         </div>
       </section>
 
@@ -383,6 +517,9 @@ function formatPercent(value: number): string {
             {{ emotion }} ({{ count }})
           </span>
         </div>
+        <div v-if="sentimentChartData" class="chart-container">
+          <Chart type="line" :data="sentimentChartData" :options="sentimentChartOptions" />
+        </div>
       </section>
 
       <!-- Entorno -->
@@ -403,6 +540,19 @@ function formatPercent(value: number): string {
           <span v-for="([loc, count]) in profile.environment.locations.slice(0, 5)" :key="loc" class="verb-tag">
             {{ loc }} ({{ count }})
           </span>
+        </div>
+        <div v-if="locationTransitions.length > 1" class="location-transitions">
+          <span class="detail-label">Recorrido:</span>
+          <div class="transition-flow">
+            <!-- eslint-disable-next-line vue/no-v-for-template-key -->
+            <template v-for="(t, idx) in locationTransitions" :key="idx">
+              <span class="transition-step">
+                <span class="transition-location">{{ t.location }}</span>
+                <span class="transition-range">Cap {{ t.fromChapter === t.toChapter ? t.fromChapter : `${t.fromChapter}–${t.toChapter}` }}</span>
+              </span>
+              <i v-if="idx < locationTransitions.length - 1" class="pi pi-arrow-right transition-arrow"></i>
+            </template>
+          </div>
         </div>
       </section>
     </div>
@@ -637,5 +787,51 @@ function formatPercent(value: number): string {
 .empty-hint {
   font-size: var(--ds-font-size-sm);
   opacity: 0.7;
+}
+
+/* Charts */
+.chart-container {
+  height: 180px;
+  margin-top: var(--ds-space-2);
+}
+
+/* Location transitions */
+.location-transitions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-2);
+  margin-top: var(--ds-space-2);
+}
+
+.transition-flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ds-space-2);
+}
+
+.transition-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--ds-space-2) var(--ds-space-3);
+  background: var(--ds-surface-hover, #f1f5f9);
+  border-radius: var(--ds-radius-md);
+}
+
+.transition-location {
+  font-size: var(--ds-font-size-sm);
+  font-weight: var(--ds-font-weight-semibold);
+  color: var(--ds-color-text);
+}
+
+.transition-range {
+  font-size: var(--ds-font-size-xs);
+  color: var(--ds-color-text-secondary);
+}
+
+.transition-arrow {
+  font-size: 0.75rem;
+  color: var(--ds-color-text-secondary);
 }
 </style>

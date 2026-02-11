@@ -149,6 +149,7 @@ class CharacterProfile:
                 "first_chapter": self.presence.first_appearance_chapter,
                 "last_chapter": self.presence.last_appearance_chapter,
                 "continuity": round(self.presence.continuity, 3),
+                "mentions_per_chapter": dict(self.presence.mentions_per_chapter),
             },
             "actions": {
                 "count": self.actions.action_count,
@@ -176,11 +177,15 @@ class CharacterProfile:
                 "positive": self.sentiment.positive_mentions,
                 "negative": self.sentiment.negative_mentions,
                 "dominant_emotions": self.sentiment.dominant_emotions[:5],
+                "by_chapter": dict(self.sentiment.sentiment_by_chapter),
             },
             "environment": {
                 "primary_location": self.environment.primary_location,
                 "locations": self.environment.locations.most_common(5),
                 "changes": self.environment.location_changes,
+                "locations_by_chapter": {
+                    ch: locs for ch, locs in self.environment.locations_by_chapter.items()
+                },
             },
         }
 
@@ -496,6 +501,11 @@ class CharacterProfiler:
             for p in self._profiles.values()
         }
 
+        # Acumuladores por capítulo: {entity_id: {chapter: {pos, neg, total}}}
+        chapter_counts: dict[int, dict[int, dict[str, int]]] = defaultdict(
+            lambda: defaultdict(lambda: {"pos": 0, "neg": 0, "total": 0})
+        )
+
         for chapter_num, text in chapter_texts.items():
             sentences = re.split(r"[.!?]+", text)
 
@@ -513,19 +523,31 @@ class CharacterProfiler:
                     pos = len(words & POSITIVE_WORDS)
                     neg = len(words & NEGATIVE_WORDS)
 
+                    counts = chapter_counts[entity_id][chapter_num]
+                    counts["total"] += 1
+
                     if pos > neg:
                         profile.sentiment.positive_mentions += 1
+                        counts["pos"] += 1
                     elif neg > pos:
                         profile.sentiment.negative_mentions += 1
+                        counts["neg"] += 1
                     else:
                         profile.sentiment.neutral_mentions += 1
 
-        # Calcular promedios
+        # Calcular promedios globales y por capítulo
         for profile in self._profiles.values():
             s = profile.sentiment
             total = s.positive_mentions + s.negative_mentions + s.neutral_mentions
             if total > 0:
                 s.avg_sentiment = (s.positive_mentions - s.negative_mentions) / total
+
+            # Sentimiento por capítulo
+            for ch, c in chapter_counts.get(profile.entity_id, {}).items():
+                if c["total"] > 0:
+                    s.sentiment_by_chapter[ch] = round(
+                        (c["pos"] - c["neg"]) / c["total"], 3
+                    )
 
     def _build_environment(self, location_events: list[dict]) -> None:
         """Construye indicador de entornos a partir de eventos de ubicación."""
