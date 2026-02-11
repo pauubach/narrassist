@@ -183,9 +183,7 @@ class CharacterProfile:
                 "primary_location": self.environment.primary_location,
                 "locations": self.environment.locations.most_common(5),
                 "changes": self.environment.location_changes,
-                "locations_by_chapter": {
-                    ch: locs for ch, locs in self.environment.locations_by_chapter.items()
-                },
+                "locations_by_chapter": dict(self.environment.locations_by_chapter),
             },
         }
 
