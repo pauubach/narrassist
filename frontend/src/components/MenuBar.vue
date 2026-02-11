@@ -364,7 +364,7 @@ const handleMenuAction = (item: MenuItem) => {
   display: flex;
   align-items: center;
   padding: 0 0.5rem;
-  z-index: 1000;
+  z-index: var(--ds-z-dropdown);
   user-select: none;
 }
 
@@ -403,7 +403,7 @@ const handleMenuAction = (item: MenuItem) => {
   border-radius: 6px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   padding: 0.25rem 0;
-  z-index: 1001;
+  z-index: var(--ds-z-sticky);
 }
 
 .menu-item {

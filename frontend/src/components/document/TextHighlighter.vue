@@ -551,7 +551,7 @@ function handleMouseUp() {
 /* ==================== */
 .error-suggestion-popup {
   position: fixed;
-  z-index: 9999;
+  z-index: var(--ds-z-tooltip);
   background: var(--surface-0, white);
   border: 1px solid var(--surface-border, #e5e7eb);
   border-radius: 8px;

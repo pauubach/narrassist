@@ -33,8 +33,7 @@
     <div class="content">
       <!-- Estado: Cargando -->
       <div v-if="projectsStore.loading" class="loading-state">
-        <ProgressSpinner />
-        <p>Cargando proyectos...</p>
+        <DsSkeleton variant="card" :rows="3" />
       </div>
 
       <!-- Estado: Error -->
@@ -248,7 +247,7 @@ import DsInput from '@/components/ds/DsInput.vue'
 import FileUpload from 'primevue/fileupload'
 import Select from 'primevue/select'
 import ProgressBar from 'primevue/progressbar'
-import ProgressSpinner from 'primevue/progressspinner'
+import DsSkeleton from '@/components/ds/DsSkeleton.vue'
 import Message from 'primevue/message'
 import Menu from 'primevue/menu'
 import Badge from 'primevue/badge'

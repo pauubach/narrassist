@@ -471,7 +471,7 @@ watch(groupBy, () => {
 /* Event tooltip */
 .event-tooltip {
   position: fixed;
-  z-index: 1000;
+  z-index: var(--ds-z-dropdown);
   max-width: 300px;
   padding: 0.75rem;
   background: var(--surface-card);

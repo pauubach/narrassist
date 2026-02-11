@@ -561,7 +561,7 @@ function toggleDetails() {
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.12);
   padding: 1rem;
   margin-bottom: 0.5rem;
-  z-index: 1000;
+  z-index: var(--ds-z-dropdown);
   color: var(--p-text-color, var(--text-color, #1e293b));
 }
 

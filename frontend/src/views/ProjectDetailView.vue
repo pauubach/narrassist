@@ -2,8 +2,7 @@
   <div class="project-detail-view">
     <!-- Loading state -->
     <div v-if="loading" class="loading-state">
-      <ProgressSpinner />
-      <p>Cargando proyecto...</p>
+      <DsSkeleton variant="list" :rows="5" />
     </div>
 
     <!-- Error state -->
@@ -411,7 +410,7 @@ import { useMentionNavigation } from '@/composables/useMentionNavigation'
 import { useProjectData } from '@/composables/useProjectData'
 import { useAnalysisPolling } from '@/composables/useAnalysisPolling'
 import Button from 'primevue/button'
-import ProgressSpinner from 'primevue/progressspinner'
+import DsSkeleton from '@/components/ds/DsSkeleton.vue'
 import Message from 'primevue/message'
 import Dialog from 'primevue/dialog'
 import ExportDialog from '@/components/ExportDialog.vue'
