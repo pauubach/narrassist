@@ -1035,6 +1035,36 @@ async def get_dialogue_attributions(project_id: int, chapter_number: int):
             for i, attr in enumerate(attributions)
         ]
 
+        # Aplicar correcciones del usuario (override con máxima confianza)
+        try:
+            from narrative_assistant.persistence.database import get_database
+            db = get_database()
+            corrections = db.fetchall(
+                """
+                SELECT sc.dialogue_start_char, sc.dialogue_end_char,
+                       sc.corrected_speaker_id, e.name as corrected_speaker_name
+                FROM speaker_corrections sc
+                JOIN entities e ON e.id = sc.corrected_speaker_id
+                WHERE sc.project_id = ? AND sc.chapter_number = ?
+                """,
+                (project_id, chapter_number),
+            )
+
+            corr_map = {
+                (c["dialogue_start_char"], c["dialogue_end_char"]): c
+                for c in corrections
+            }
+            for attr_data in attributions_data:
+                key = (attr_data["start_char"], attr_data["end_char"])
+                if key in corr_map:
+                    corr = corr_map[key]
+                    attr_data["speaker_id"] = corr["corrected_speaker_id"]
+                    attr_data["speaker_name"] = corr["corrected_speaker_name"]
+                    attr_data["confidence"] = "high"
+                    attr_data["method"] = "user_correction"
+        except Exception as e:
+            logger.debug(f"Could not apply speaker corrections: {e}")
+
         return ApiResponse(
             success=True,
             data={

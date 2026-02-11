@@ -315,6 +315,44 @@ class PipelineResolutionMixin:
                             dialogue["resolved_speaker"] = speaker
                             dialogue["attribution_method"] = "hint_only"
 
+            # Aplicar correcciones del usuario (override con máxima confianza)
+            try:
+                from ..persistence.database import get_database
+
+                db = get_database()
+                corrections = db.fetchall(
+                    """
+                    SELECT sc.chapter_number, sc.dialogue_start_char, sc.dialogue_end_char,
+                           sc.corrected_speaker_id, e.name as corrected_speaker_name
+                    FROM speaker_corrections sc
+                    JOIN entities e ON e.id = sc.corrected_speaker_id
+                    WHERE sc.project_id = ?
+                    """,
+                    (context.project_id,),
+                )
+
+                corrections_applied = 0
+                for corr in corrections:
+                    for dialogue in context.dialogues:
+                        if (
+                            dialogue.get("chapter") == corr["chapter_number"]
+                            and dialogue.get("start_char") == corr["dialogue_start_char"]
+                            and dialogue.get("end_char") == corr["dialogue_end_char"]
+                        ):
+                            dialogue["resolved_speaker"] = corr["corrected_speaker_name"]
+                            dialogue["speaker_id"] = corr["corrected_speaker_id"]
+                            dialogue["attribution_confidence"] = "high"
+                            dialogue["attribution_method"] = "user_correction"
+                            corrections_applied += 1
+                            break
+
+                if corrections_applied > 0:
+                    logger.info(
+                        f"Applied {corrections_applied} user speaker corrections"
+                    )
+            except Exception as e:
+                logger.debug(f"Could not apply speaker corrections: {e}")
+
             # Estadísticas
             attributed = sum(1 for d in context.dialogues if d.get("resolved_speaker"))
             context.stats["dialogues_attributed"] = attributed
