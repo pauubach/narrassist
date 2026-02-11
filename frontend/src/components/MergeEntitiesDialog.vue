@@ -307,8 +307,15 @@
                   <div
                     v-for="(cv, cvIndex) in conflict.conflicting_values"
                     :key="cvIndex"
-                    class="conflict-value-item"
+                    class="conflict-value-item conflict-value-selectable"
+                    :class="{ 'conflict-value-chosen': conflictResolutions[conflict.attribute_name] === cv.value }"
+                    @click="conflictResolutions[conflict.attribute_name] = cv.value"
                   >
+                    <RadioButton
+                      v-model="conflictResolutions[conflict.attribute_name]"
+                      :value="cv.value"
+                      :name="`conflict-${index}`"
+                    />
                     <span class="cv-value">"{{ cv.value }}"</span>
                     <span class="cv-source">
                       <i class="pi pi-user"></i>
@@ -318,6 +325,22 @@
                       ({{ (cv.confidence * 100).toFixed(0) }}% conf.)
                     </span>
                   </div>
+                </div>
+                <!-- Custom value input -->
+                <div class="conflict-custom">
+                  <RadioButton
+                    v-model="conflictResolutions[conflict.attribute_name]"
+                    :value="'__custom__' + index"
+                    :name="`conflict-${index}`"
+                  />
+                  <InputText
+                    :model-value="conflictResolutions[conflict.attribute_name]?.startsWith('__custom__') ? '' : (conflictResolutions[conflict.attribute_name] || '')"
+                    placeholder="Otro valor..."
+                    class="conflict-custom-input"
+                    size="small"
+                    @focus="conflictResolutions[conflict.attribute_name] = ''"
+                    @update:model-value="conflictResolutions[conflict.attribute_name] = $event"
+                  />
                 </div>
               </div>
             </div>
@@ -423,6 +446,7 @@ import Tag from 'primevue/tag'
 import Message from 'primevue/message'
 import Divider from 'primevue/divider'
 import ProgressBar from 'primevue/progressbar'
+import InputText from 'primevue/inputtext'
 import type { Entity } from '@/types'
 import { api } from '@/services/apiClient'
 
@@ -507,7 +531,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:visible': [value: boolean]
-  'merge': [primaryId: number, entityIds: number[]]
+  'merge': [primaryId: number, entityIds: number[], resolutions?: Array<{ attribute_name: string; chosen_value: string }>]
   'cancel': []
 }>()
 
@@ -530,6 +554,9 @@ const loadingSimilarity = ref(false)
 const similarityData = ref<SimilarityData | null>(null)
 const previewData = ref<PreviewMergeData | null>(null)
 const loadingPreview = ref(false)
+
+// Attribute conflict resolutions: { attribute_name -> chosen_value }
+const conflictResolutions = ref<Record<string, string>>({})
 
 // Inicializar con entidades preseleccionadas
 watch(() => props.preselectedEntities, (entities) => {
@@ -855,12 +882,15 @@ const confirmMerge = async () => {
       id => id !== primaryId
     )
 
-    // Emitir con información adicional del nombre y aliases
-    emit('merge', primaryId, idsToMerge)
+    // Build attribute resolutions from UI selections
+    const resolutions: Array<{ attribute_name: string; chosen_value: string }> = []
+    for (const [attrName, value] of Object.entries(conflictResolutions.value)) {
+      if (value && !value.startsWith('__custom__')) {
+        resolutions.push({ attribute_name: attrName, chosen_value: value })
+      }
+    }
 
-    // TODO: El backend debería recibir también:
-    // - selectedPrimaryName.value como nuevo canonical_name
-    // - resultAliases.value como nuevos aliases
+    emit('merge', primaryId, idsToMerge, resolutions.length > 0 ? resolutions : undefined)
   } finally {
     merging.value = false
   }
@@ -879,6 +909,7 @@ const resetDialog = () => {
   selectedPrimaryName.value = null
   similarityData.value = null
   previewData.value = null
+  conflictResolutions.value = {}
 }
 
 // Helpers
@@ -1641,6 +1672,40 @@ watch(() => props.visible, (isVisible) => {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  font-size: 0.8125rem;
+}
+
+.conflict-value-selectable {
+  cursor: pointer;
+  padding: 0.375rem 0.5rem;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+
+.conflict-value-selectable:hover {
+  background: var(--surface-100);
+}
+
+.conflict-value-chosen {
+  background: var(--green-50);
+  border: 1px solid var(--green-200);
+}
+
+.conflict-custom {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.375rem;
+  padding-left: 0.5rem;
+}
+
+.conflict-custom-input {
+  flex: 1;
+  max-width: 200px;
+}
+
+:deep(.conflict-custom-input.p-inputtext) {
+  padding: 0.25rem 0.5rem;
   font-size: 0.8125rem;
 }
 

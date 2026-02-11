@@ -445,12 +445,16 @@ async function saveEntity() {
   }
 }
 
-async function onMergeEntities(primaryEntityId: number, entityIdsToMerge: number[]) {
+async function onMergeEntities(primaryEntityId: number, entityIdsToMerge: number[], resolutions?: Array<{ attribute_name: string; chosen_value: string }>) {
   try {
-    const data = await api.postRaw<any>(`/api/projects/${props.projectId}/entities/merge`, {
+    const body: Record<string, unknown> = {
       primary_entity_id: primaryEntityId,
-      entity_ids: entityIdsToMerge
-    })
+      entity_ids: entityIdsToMerge,
+    }
+    if (resolutions && resolutions.length > 0) {
+      body.attribute_resolutions = resolutions
+    }
+    const data = await api.postRaw<any>(`/api/projects/${props.projectId}/entities/merge`, body)
 
     if (data.success) {
       showMergeDialog.value = false

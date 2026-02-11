@@ -476,6 +476,38 @@ async def merge_entities(project_id: int, body: deps.MergeEntitiesRequest):
                 note=f"Fusión de {merged_count} entidades en '{primary_entity.canonical_name}'",
             )
 
+        # Apply attribute conflict resolutions
+        resolutions_applied = 0
+        if body.attribute_resolutions and merged_count > 0:
+            attrs = entity_repo.get_attributes_by_entity(primary_entity_id)
+            for resolution in body.attribute_resolutions:
+                # Find all attributes with this key
+                matching = [a for a in attrs if a.get("attribute_key") == resolution.attribute_name]
+                if not matching:
+                    continue
+
+                # Keep one with the chosen value, delete the rest
+                kept = False
+                for attr in matching:
+                    if attr.get("attribute_value") == resolution.chosen_value and not kept:
+                        kept = True
+                        continue
+                    # Delete duplicate/conflicting attribute
+                    entity_repo.delete_attribute(attr["id"])
+                    resolutions_applied += 1
+
+                # If chosen value doesn't match any existing, update the first one
+                if not kept and matching:
+                    entity_repo.update_attribute(
+                        attribute_id=matching[0]["id"],
+                        attribute_value=resolution.chosen_value,
+                        is_verified=True,
+                    )
+                    resolutions_applied += 1
+
+            if resolutions_applied > 0:
+                logger.info(f"Applied {resolutions_applied} attribute resolutions for entity {primary_entity_id}")
+
         logger.info(f"Merged {merged_count} entities into entity {primary_entity_id} ({primary_entity.canonical_name})")
 
         # Obtener la entidad actualizada para retornarla

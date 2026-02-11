@@ -390,10 +390,16 @@ class EntityIdsRequest(BaseModel):
     entity_ids: list[int] = Field(..., min_length=2)
 
 
+class AttributeResolution(BaseModel):
+    """Resolución de un conflicto de atributo durante merge."""
+    attribute_name: str
+    chosen_value: str  # Valor elegido (puede ser custom)
+
 class MergeEntitiesRequest(BaseModel):
     """POST /api/projects/{id}/entities/merge"""
     primary_entity_id: int
     entity_ids: list[int] = Field(..., min_length=1)
+    attribute_resolutions: Optional[list[AttributeResolution]] = None
 
 
 class UpdateEntityRequest(BaseModel):
