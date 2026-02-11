@@ -25,7 +25,7 @@
         <h3>Estado</h3>
 
         <div class="status-item">
-          <span class="status-label">Motor de análisis:</span>
+          <span class="status-label">Herramienta de análisis:</span>
           <Tag
             :severity="backendStatus.connected ? 'success' : 'danger'"
           >
@@ -34,7 +34,7 @@
         </div>
 
         <div class="status-item">
-          <span class="status-label">Almacenamiento:</span>
+          <span class="status-label">Base de datos:</span>
           <Tag
             :severity="backendStatus.connected ? 'success' : 'warn'"
           >
@@ -43,7 +43,7 @@
         </div>
 
         <div class="status-item">
-          <span class="status-label">Modelos de lenguaje:</span>
+          <span class="status-label">Modelos de IA:</span>
           <Tag
             :severity="backendStatus.connected ? 'success' : 'warn'"
           >

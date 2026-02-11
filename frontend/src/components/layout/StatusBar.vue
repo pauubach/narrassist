@@ -270,6 +270,7 @@ function toggleDetails() {
       <Button
         v-if="hasCompletedAnalysis"
         :icon="showDetails ? 'pi pi-chevron-down' : 'pi pi-chevron-up'"
+        :aria-label="showDetails ? 'Ocultar detalles' : 'Mostrar detalles'"
         text
         rounded
         size="small"
@@ -284,6 +285,7 @@ function toggleDetails() {
       <span>Estructura lista — en cola para análisis profundo</span>
       <Button
         :icon="showDetails ? 'pi pi-chevron-down' : 'pi pi-chevron-up'"
+        :aria-label="showDetails ? 'Ocultar detalles' : 'Mostrar detalles'"
         text rounded size="small" class="expand-btn"
         @click.stop="toggleDetails"
       />
@@ -306,6 +308,7 @@ function toggleDetails() {
       <span class="progress-percent">{{ progress }}%</span>
       <Button
         :icon="showDetails ? 'pi pi-chevron-down' : 'pi pi-chevron-up'"
+        :aria-label="showDetails ? 'Ocultar detalles' : 'Mostrar detalles'"
         text
         rounded
         size="small"
@@ -326,6 +329,7 @@ function toggleDetails() {
           <h4>{{ isAnalyzing ? 'Progreso del Análisis' : 'Resumen del Análisis' }}</h4>
           <Button
             icon="pi pi-times"
+            aria-label="Cerrar detalles"
             text
             rounded
             size="small"
