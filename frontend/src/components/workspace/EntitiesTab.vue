@@ -80,6 +80,20 @@ const showOnlyRelevant = ref(false) // Filtrar entidades con baja relevancia
 const selectedEntity = ref<Entity | null>(null)
 const selectedEntityAttributes = ref<EntityAttribute[]>([])
 const loadingAttributes = ref(false)
+
+// Inline attribute editing
+const showAddAttribute = ref(false)
+const newAttribute = ref({ category: 'physical', name: '', value: '' })
+const editingAttributeId = ref<number | null>(null)
+const editingAttributeValue = ref('')
+const savingAttribute = ref(false)
+
+const attributeCategoryOptions = [
+  { label: 'Físico', value: 'physical' },
+  { label: 'Psicológico', value: 'psychological' },
+  { label: 'Social', value: 'social' },
+  { label: 'Otro', value: 'other' },
+]
 const entityRelationships = ref<any[]>([])
 const entityVitalStatus = ref<any>(null)
 const loadingRichData = ref(false)
@@ -655,6 +669,108 @@ function navigateToRelatedEntity(relatedEntityId: number) {
 }
 
 /**
+ * Inicia la edición inline de un atributo
+ */
+function startEditAttribute(attr: EntityAttribute) {
+  editingAttributeId.value = attr.id
+  editingAttributeValue.value = attr.value
+}
+
+/**
+ * Cancela la edición inline
+ */
+function cancelEditAttribute() {
+  editingAttributeId.value = null
+  editingAttributeValue.value = ''
+}
+
+/**
+ * Guarda el valor editado de un atributo existente
+ */
+async function saveEditedAttribute(attr: EntityAttribute) {
+  if (!selectedEntity.value || !editingAttributeValue.value.trim()) return
+
+  savingAttribute.value = true
+  try {
+    const data = await api.putRaw<any>(
+      `/api/projects/${props.projectId}/entities/${selectedEntity.value.id}/attributes/${attr.id}`,
+      { value: editingAttributeValue.value.trim() }
+    )
+
+    if (data.success) {
+      await loadEntityAttributes(selectedEntity.value.id)
+      toast.add({ severity: 'success', summary: 'Guardado', detail: 'Atributo actualizado', life: 2000 })
+    } else {
+      toast.add({ severity: 'error', summary: 'Error', detail: data.error || 'No se pudo actualizar', life: 4000 })
+    }
+  } catch (err) {
+    console.error('Error updating attribute:', err)
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Error al actualizar el atributo', life: 4000 })
+  } finally {
+    savingAttribute.value = false
+    editingAttributeId.value = null
+    editingAttributeValue.value = ''
+  }
+}
+
+/**
+ * Crea un nuevo atributo para la entidad seleccionada
+ */
+async function createAttribute() {
+  if (!selectedEntity.value || !newAttribute.value.name.trim() || !newAttribute.value.value.trim()) return
+
+  savingAttribute.value = true
+  try {
+    const data = await api.postRaw<any>(
+      `/api/projects/${props.projectId}/entities/${selectedEntity.value.id}/attributes`,
+      {
+        category: newAttribute.value.category,
+        name: newAttribute.value.name.trim(),
+        value: newAttribute.value.value.trim(),
+        confidence: 1.0,
+      }
+    )
+
+    if (data.success) {
+      await loadEntityAttributes(selectedEntity.value.id)
+      newAttribute.value = { category: 'physical', name: '', value: '' }
+      showAddAttribute.value = false
+      toast.add({ severity: 'success', summary: 'Creado', detail: 'Atributo añadido', life: 2000 })
+    } else {
+      toast.add({ severity: 'error', summary: 'Error', detail: data.error || 'No se pudo crear', life: 4000 })
+    }
+  } catch (err) {
+    console.error('Error creating attribute:', err)
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Error al crear el atributo', life: 4000 })
+  } finally {
+    savingAttribute.value = false
+  }
+}
+
+/**
+ * Elimina un atributo de la entidad seleccionada
+ */
+async function deleteAttribute(attr: EntityAttribute) {
+  if (!selectedEntity.value) return
+
+  try {
+    const data = await api.del<any>(
+      `/api/projects/${props.projectId}/entities/${selectedEntity.value.id}/attributes/${attr.id}`
+    )
+
+    if (data.success) {
+      await loadEntityAttributes(selectedEntity.value.id)
+      toast.add({ severity: 'success', summary: 'Eliminado', detail: 'Atributo eliminado', life: 2000 })
+    } else {
+      toast.add({ severity: 'error', summary: 'Error', detail: data.error || 'No se pudo eliminar', life: 4000 })
+    }
+  } catch (err) {
+    console.error('Error deleting attribute:', err)
+    toast.add({ severity: 'error', summary: 'Error', detail: 'Error al eliminar el atributo', life: 4000 })
+  }
+}
+
+/**
  * Navega al texto donde se encontró el atributo
  */
 function navigateToAttributeSource(attr: EntityAttribute) {
@@ -877,33 +993,124 @@ function navigateToAttributeSource(attr: EntityAttribute) {
             </div>
 
             <!-- Atributos -->
-            <div v-if="selectedEntityAttributes.length > 0" class="detail-section">
-              <h4 class="section-title">Atributos</h4>
-              <div class="attributes-list">
+            <div class="detail-section">
+              <div class="section-header-row">
+                <h4 class="section-title">Atributos</h4>
+                <Button
+                  v-tooltip="'Añadir atributo'"
+                  icon="pi pi-plus"
+                  text
+                  rounded
+                  size="small"
+                  class="section-add-btn"
+                  @click="showAddAttribute = !showAddAttribute"
+                />
+              </div>
+
+              <!-- Formulario inline para añadir atributo -->
+              <div v-if="showAddAttribute" class="add-attribute-form">
+                <Select
+                  v-model="newAttribute.category"
+                  :options="attributeCategoryOptions"
+                  option-label="label"
+                  option-value="value"
+                  placeholder="Categoría"
+                  class="attr-form-select"
+                />
+                <InputText
+                  v-model="newAttribute.name"
+                  placeholder="Nombre (ej: color_ojos)"
+                  class="attr-form-input"
+                  @keyup.enter="createAttribute"
+                />
+                <InputText
+                  v-model="newAttribute.value"
+                  placeholder="Valor (ej: azules)"
+                  class="attr-form-input"
+                  @keyup.enter="createAttribute"
+                />
+                <div class="attr-form-actions">
+                  <Button
+                    icon="pi pi-check"
+                    size="small"
+                    :loading="savingAttribute"
+                    :disabled="!newAttribute.name.trim() || !newAttribute.value.trim()"
+                    @click="createAttribute"
+                  />
+                  <Button
+                    icon="pi pi-times"
+                    size="small"
+                    text
+                    @click="showAddAttribute = false"
+                  />
+                </div>
+              </div>
+
+              <div v-if="loadingAttributes" class="loading-text">Cargando atributos...</div>
+
+              <div v-else-if="selectedEntityAttributes.length > 0" class="attributes-list">
                 <div
                   v-for="attr in selectedEntityAttributes"
                   :key="attr.id"
                   class="attribute-item"
                 >
                   <span class="attribute-name">{{ translateAttributeName(attr.name) }}</span>
-                  <span class="attribute-value">{{ attr.value }}</span>
-                  <span v-if="attr.chapter" class="attribute-chapter">Cap. {{ attr.chapter }}</span>
-                  <Button
-                    v-if="attr.spanStart !== undefined && attr.spanStart !== null"
-                    v-tooltip="'Ver en el texto'"
-                    icon="pi pi-search"
-                    text
-                    rounded
-                    size="small"
-                    class="attribute-nav-btn"
-                    @click.stop="navigateToAttributeSource(attr)"
-                  />
+
+                  <!-- Modo edición inline -->
+                  <template v-if="editingAttributeId === attr.id">
+                    <InputText
+                      v-model="editingAttributeValue"
+                      class="attr-edit-input"
+                      autofocus
+                      @keyup.enter="saveEditedAttribute(attr)"
+                      @keyup.escape="cancelEditAttribute"
+                    />
+                    <Button
+                      icon="pi pi-check"
+                      text rounded size="small"
+                      class="attribute-nav-btn"
+                      :loading="savingAttribute"
+                      @click.stop="saveEditedAttribute(attr)"
+                    />
+                    <Button
+                      icon="pi pi-times"
+                      text rounded size="small"
+                      class="attribute-nav-btn"
+                      @click.stop="cancelEditAttribute"
+                    />
+                  </template>
+
+                  <!-- Modo lectura -->
+                  <template v-else>
+                    <span
+                      class="attribute-value attribute-value-editable"
+                      @click.stop="startEditAttribute(attr)"
+                    >{{ attr.value }}</span>
+                    <span v-if="attr.chapter" class="attribute-chapter">Cap. {{ attr.chapter }}</span>
+                    <Button
+                      v-if="attr.spanStart !== undefined && attr.spanStart !== null"
+                      v-tooltip="'Ver en el texto'"
+                      icon="pi pi-search"
+                      text rounded size="small"
+                      class="attribute-nav-btn"
+                      @click.stop="navigateToAttributeSource(attr)"
+                    />
+                    <Button
+                      v-tooltip="'Eliminar atributo'"
+                      icon="pi pi-trash"
+                      text rounded size="small"
+                      severity="danger"
+                      class="attribute-nav-btn attribute-delete-btn"
+                      @click.stop="deleteAttribute(attr)"
+                    />
+                  </template>
                 </div>
               </div>
-            </div>
-            <div v-else-if="loadingAttributes" class="detail-section">
-              <h4 class="section-title">Atributos</h4>
-              <p class="loading-text">Cargando atributos...</p>
+
+              <div v-else-if="!loadingAttributes && !showAddAttribute" class="empty-attributes">
+                Sin atributos detectados.
+                <a class="add-attr-link" @click="showAddAttribute = true">Añadir manualmente</a>
+              </div>
             </div>
 
             <!-- Estado vital -->
@@ -1578,6 +1785,94 @@ function navigateToAttributeSource(attr: EntityAttribute) {
   background: var(--surface-100);
   padding: 0.125rem 0.5rem;
   border-radius: 4px;
+}
+
+.section-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.section-add-btn {
+  width: 1.5rem !important;
+  height: 1.5rem !important;
+  padding: 0 !important;
+}
+
+.section-add-btn :deep(.p-button-icon) {
+  font-size: 0.7rem;
+}
+
+.add-attribute-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: var(--surface-card);
+  border: 1px solid var(--primary-200);
+  border-radius: 6px;
+}
+
+.attr-form-select {
+  width: 130px;
+}
+
+.attr-form-input {
+  flex: 1;
+  min-width: 100px;
+}
+
+:deep(.attr-form-select .p-select-label),
+:deep(.attr-form-input.p-inputtext) {
+  padding: 0.375rem 0.5rem;
+  font-size: 0.8125rem;
+}
+
+.attr-form-actions {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.attr-edit-input {
+  flex: 1;
+  min-width: 80px;
+}
+
+:deep(.attr-edit-input.p-inputtext) {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8125rem;
+}
+
+.attribute-value-editable {
+  cursor: pointer;
+  border-bottom: 1px dashed var(--surface-border);
+  transition: border-color 0.2s;
+}
+
+.attribute-value-editable:hover {
+  border-bottom-color: var(--primary-color);
+}
+
+.attribute-delete-btn {
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.attribute-item:hover .attribute-delete-btn {
+  opacity: 1;
+}
+
+.empty-attributes {
+  font-size: 0.85rem;
+  color: var(--text-color-secondary);
+  font-style: italic;
+}
+
+.add-attr-link {
+  color: var(--primary-color);
+  cursor: pointer;
+  text-decoration: underline;
+  font-style: normal;
 }
 
 .attribute-nav-btn {
