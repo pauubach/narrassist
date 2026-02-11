@@ -99,11 +99,11 @@ export function useOllamaManagement() {
     try {
       const result = await api.postRaw<{ success: boolean }>('/api/ollama/install')
       if (result.success) {
-        toast.add({ severity: 'info', summary: 'Instalando Ollama', detail: 'Descargando e instalando...', life: 5000 })
+        toast.add({ severity: 'info', summary: 'Instalando analizador', detail: 'Descargando e instalando...', life: 5000 })
         await new Promise(resolve => setTimeout(resolve, 5000))
         await reloadCapabilities()
         if (systemCapabilities.value?.ollama?.installed) {
-          toast.add({ severity: 'success', summary: 'Ollama instalado', detail: 'Ahora puedes iniciar el analizador', life: 3000 })
+          toast.add({ severity: 'success', summary: 'Analizador instalado', detail: 'Ahora puedes iniciar el analizador', life: 3000 })
         }
       } else {
         openOllamaDownload()

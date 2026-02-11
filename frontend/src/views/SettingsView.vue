@@ -251,7 +251,7 @@
                 <i :class="systemCapabilities.hardware.has_gpu ? 'pi pi-bolt' : systemCapabilities.hardware.gpu_blocked ? 'pi pi-exclamation-triangle' : 'pi pi-desktop'"></i>
                 <div>
                   <template v-if="systemCapabilities.hardware.has_gpu">
-                    <strong>GPU detectada</strong>
+                    <strong>Aceleración por hardware detectada</strong>
                     <span>
                       - {{ systemCapabilities.hardware.gpu?.name }}
                       <template v-if="systemCapabilities.hardware.gpu?.memory_gb">
@@ -260,10 +260,10 @@
                     </span>
                   </template>
                   <template v-else-if="systemCapabilities.hardware.gpu_blocked">
-                    <strong>GPU no compatible</strong>
+                    <strong>Hardware no compatible</strong>
                     <span>
                       - {{ systemCapabilities.hardware.gpu_blocked.name }}
-                      no es compatible con el procesamiento neuronal
+                      no es compatible con el análisis avanzado
                       (Compute Capability {{ systemCapabilities.hardware.gpu_blocked.compute_capability }},
                       se requiere {{ systemCapabilities.hardware.gpu_blocked.min_required }}+).
                       Usando CPU.
@@ -277,7 +277,7 @@
               </div>
             </Message>
 
-            <!-- 2. Analizador Semántico (Ollama + modelos) -->
+            <!-- 2. Analizador Semántico -->
             <div class="nlp-category">
               <div class="category-header">
                 <h4><i class="pi pi-microchip-ai"></i> Analizador Semántico</h4>
@@ -422,11 +422,11 @@
                       @update:model-value="toggleMethod('coreference', String(key), $event)"
                     />
                     <span class="method-name">{{ method.name }}</span>
-                    <Tag v-if="method.recommended_gpu && !method.requires_gpu && !systemCapabilities?.hardware.has_gpu" value="Mejor con GPU" severity="secondary" class="method-tag" />
-                    <Tag v-if="method.recommended_gpu && !method.requires_gpu && systemCapabilities?.hardware.has_gpu" value="GPU recomendada" severity="info" class="method-tag" />
+                    <Tag v-if="method.recommended_gpu && !method.requires_gpu && !systemCapabilities?.hardware.has_gpu" value="Mejor con aceleración" severity="secondary" class="method-tag" />
+                    <Tag v-if="method.recommended_gpu && !method.requires_gpu && systemCapabilities?.hardware.has_gpu" value="Aceleración recomendada" severity="info" class="method-tag" />
                     <Tag
                       v-if="method.requires_gpu"
-                      :value="systemCapabilities?.hardware.gpu_blocked ? 'GPU no compatible' : 'Requiere GPU'"
+                      :value="systemCapabilities?.hardware.gpu_blocked ? 'Hardware no compatible' : 'Requiere aceleración'"
                       severity="warning"
                       class="method-tag"
                       v-tooltip.top="gpuRequirementTooltip"
@@ -461,11 +461,11 @@
                       @update:model-value="toggleMethod('ner', String(key), $event)"
                     />
                     <span class="method-name">{{ method.name }}</span>
-                    <Tag v-if="method.recommended_gpu && !method.requires_gpu && !systemCapabilities?.hardware.has_gpu" value="Mejor con GPU" severity="secondary" class="method-tag" />
-                    <Tag v-if="method.recommended_gpu && !method.requires_gpu && systemCapabilities?.hardware.has_gpu" value="GPU recomendada" severity="info" class="method-tag" />
+                    <Tag v-if="method.recommended_gpu && !method.requires_gpu && !systemCapabilities?.hardware.has_gpu" value="Mejor con aceleración" severity="secondary" class="method-tag" />
+                    <Tag v-if="method.recommended_gpu && !method.requires_gpu && systemCapabilities?.hardware.has_gpu" value="Aceleración recomendada" severity="info" class="method-tag" />
                     <Tag
                       v-if="method.requires_gpu"
-                      :value="systemCapabilities?.hardware.gpu_blocked ? 'GPU no compatible' : 'Requiere GPU'"
+                      :value="systemCapabilities?.hardware.gpu_blocked ? 'Hardware no compatible' : 'Requiere aceleración'"
                       severity="warning"
                       class="method-tag"
                       v-tooltip.top="gpuRequirementTooltip"
@@ -544,11 +544,11 @@
                       @update:model-value="toggleMethod('grammar', String(key), $event)"
                     />
                     <span class="method-name">{{ method.name }}</span>
-                    <Tag v-if="method.recommended_gpu && !method.requires_gpu && !systemCapabilities?.hardware.has_gpu" value="Mejor con GPU" severity="secondary" class="method-tag" />
-                    <Tag v-if="method.recommended_gpu && !method.requires_gpu && systemCapabilities?.hardware.has_gpu" value="GPU recomendada" severity="info" class="method-tag" />
+                    <Tag v-if="method.recommended_gpu && !method.requires_gpu && !systemCapabilities?.hardware.has_gpu" value="Mejor con aceleración" severity="secondary" class="method-tag" />
+                    <Tag v-if="method.recommended_gpu && !method.requires_gpu && systemCapabilities?.hardware.has_gpu" value="Aceleración recomendada" severity="info" class="method-tag" />
                     <Tag
                       v-if="method.requires_gpu"
-                      :value="systemCapabilities?.hardware.gpu_blocked ? 'GPU no compatible' : 'Requiere GPU'"
+                      :value="systemCapabilities?.hardware.gpu_blocked ? 'Hardware no compatible' : 'Requiere aceleración'"
                       severity="warning"
                       class="method-tag"
                       v-tooltip.top="gpuRequirementTooltip"
@@ -580,11 +580,11 @@
                       @update:model-value="toggleMethod('spelling', String(key), $event)"
                     />
                     <span class="method-name">{{ method.name }}</span>
-                    <Tag v-if="method.recommended_gpu && !method.requires_gpu && !systemCapabilities?.hardware.has_gpu" value="Mejor con GPU" severity="secondary" class="method-tag" />
-                    <Tag v-if="method.recommended_gpu && !method.requires_gpu && systemCapabilities?.hardware.has_gpu" value="GPU recomendada" severity="info" class="method-tag" />
+                    <Tag v-if="method.recommended_gpu && !method.requires_gpu && !systemCapabilities?.hardware.has_gpu" value="Mejor con aceleración" severity="secondary" class="method-tag" />
+                    <Tag v-if="method.recommended_gpu && !method.requires_gpu && systemCapabilities?.hardware.has_gpu" value="Aceleración recomendada" severity="info" class="method-tag" />
                     <Tag
                       v-if="method.requires_gpu"
-                      :value="systemCapabilities?.hardware.gpu_blocked ? 'GPU no compatible' : 'Requiere GPU'"
+                      :value="systemCapabilities?.hardware.gpu_blocked ? 'Hardware no compatible' : 'Requiere aceleración'"
                       severity="warning"
                       class="method-tag"
                       v-tooltip.top="gpuRequirementTooltip"
@@ -618,8 +618,8 @@
                 >
                   <span class="mode-name">{{ method.name }}</span>
                   <p class="mode-description">{{ method.description }}</p>
-                  <Tag v-if="method.recommended_gpu && !systemCapabilities?.hardware.has_gpu" value="Mejor con GPU" severity="secondary" class="method-tag" />
-                  <Tag v-if="method.recommended_gpu && systemCapabilities?.hardware.has_gpu" value="GPU recomendada" severity="info" class="method-tag" />
+                  <Tag v-if="method.recommended_gpu && !systemCapabilities?.hardware.has_gpu" value="Mejor con aceleración" severity="secondary" class="method-tag" />
+                  <Tag v-if="method.recommended_gpu && systemCapabilities?.hardware.has_gpu" value="Aceleración recomendada" severity="info" class="method-tag" />
                   <Tag v-if="!method.available" value="No disponible" severity="danger" class="method-tag" />
                 </div>
               </div>
@@ -876,10 +876,10 @@
             <!-- Revisión con LLM -->
             <div class="setting-item">
               <div class="setting-info">
-                <label class="setting-label">Revisión con LLM</label>
+                <label class="setting-label">Revisión inteligente</label>
                 <p class="setting-description">
-                  Usar inteligencia artificial local para filtrar falsos positivos en las alertas de corrección.
-                  Requiere Ollama instalado.
+                  Usar el motor de análisis local para filtrar falsos positivos en las alertas de corrección.
+                  Requiere el analizador semántico activo.
                 </p>
               </div>
               <div class="setting-control">
@@ -1219,9 +1219,9 @@ const ltStatusMessage = computed(() => {
   }
 
   const messages: Record<LTState, string> = {
-    not_installed: 'Instala LanguageTool para +2000 reglas de gramática y ortografía (~300MB)',
+    not_installed: 'Instala el corrector avanzado para +2000 reglas de gramática y ortografía (~300MB)',
     installing: 'Iniciando descarga...',
-    installed_not_running: 'LanguageTool instalado pero no activo',
+    installed_not_running: 'Corrector avanzado instalado pero no activo',
     running: 'Corrector avanzado activo'
   }
   return messages[ltState.value]
@@ -1229,18 +1229,18 @@ const ltStatusMessage = computed(() => {
 
 // LanguageTool install/start - usar acciones del store con toasts
 const installLanguageTool = async () => {
-  toast.add({ severity: 'info', summary: 'Instalando LanguageTool', detail: 'Descargando Java y LanguageTool...', life: 5000 })
+  toast.add({ severity: 'info', summary: 'Instalando corrector avanzado', detail: 'Descargando componentes necesarios...', life: 5000 })
   const success = await systemStore.installLanguageTool()
   if (success) {
     await loadSystemCapabilities()
     const lt = systemCapabilities.value?.languagetool
     if (lt?.running) {
-      toast.add({ severity: 'success', summary: 'LanguageTool instalado', detail: 'Corrector avanzado disponible', life: 3000 })
+      toast.add({ severity: 'success', summary: 'Corrector avanzado instalado', detail: 'Corrector avanzado disponible', life: 3000 })
     } else if (lt?.installed) {
-      toast.add({ severity: 'success', summary: 'LanguageTool instalado', detail: 'Puedes iniciarlo desde aquí', life: 3000 })
+      toast.add({ severity: 'success', summary: 'Corrector avanzado instalado', detail: 'Puedes iniciarlo desde aquí', life: 3000 })
     }
   } else {
-    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo instalar LanguageTool', life: 5000 })
+    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo instalar el corrector avanzado', life: 5000 })
   }
 }
 
@@ -1248,9 +1248,9 @@ const startLanguageTool = async () => {
   const success = await systemStore.startLanguageTool()
   if (success) {
     await loadSystemCapabilities()
-    toast.add({ severity: 'success', summary: 'LanguageTool iniciado', detail: 'Corrector avanzado disponible', life: 3000 })
+    toast.add({ severity: 'success', summary: 'Corrector avanzado iniciado', detail: 'Corrector avanzado disponible', life: 3000 })
   } else {
-    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo iniciar LanguageTool', life: 5000 })
+    toast.add({ severity: 'error', summary: 'Error', detail: 'No se pudo iniciar el corrector avanzado', life: 5000 })
   }
 }
 
@@ -1769,7 +1769,7 @@ const handleScroll = () => {
 }
 
 /* ============================================================================
-   Métodos NLP - Sección de configuración granular
+   Métodos de Análisis - Sección de configuración granular
    ============================================================================ */
 
 .hardware-banner {

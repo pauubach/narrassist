@@ -189,11 +189,11 @@
             class="hardware-message"
           >
             <span v-if="systemCapabilities.hardware.has_gpu">
-              Tu sistema tiene aceleración por GPU. Los análisis serán más rápidos.
+              Tu sistema tiene aceleración por hardware. Los análisis serán más rápidos.
             </span>
             <span v-else-if="systemCapabilities.hardware.gpu_blocked">
-              Tu {{ systemCapabilities.hardware.gpu_blocked.name }} no es compatible con el procesamiento neuronal moderno.
-              El análisis funcionará correctamente en CPU.
+              Tu {{ systemCapabilities.hardware.gpu_blocked.name }} no es compatible con el análisis avanzado.
+              El análisis funcionará correctamente en modo estándar.
             </span>
             <span v-else>
               El análisis funcionará correctamente en CPU.
@@ -202,7 +202,7 @@
 
           <!-- Ollama status -->
           <div v-if="systemCapabilities.ollama" class="ollama-status">
-            <h4>Analizador Semántico (Ollama)</h4>
+            <h4>Analizador Semántico</h4>
             <div v-if="systemCapabilities.ollama.available" class="ollama-available">
               <Tag value="Disponible" severity="success" />
               <p v-if="systemCapabilities.ollama.models.length > 0">
@@ -242,7 +242,7 @@
             <div v-else-if="systemCapabilities.ollama.installed" class="ollama-unavailable">
               <Tag value="No iniciado" severity="warning" />
               <Button
-                label="Iniciar Ollama"
+                label="Iniciar analizador"
                 icon="pi pi-play"
                 size="small"
                 severity="warning"
@@ -254,7 +254,7 @@
             <div v-else class="ollama-unavailable">
               <Tag value="No instalado" severity="warning" />
               <Button
-                label="Instalar Ollama"
+                label="Instalar analizador"
                 icon="pi pi-download"
                 size="small"
                 severity="warning"
@@ -262,13 +262,13 @@
                 class="ml-2"
                 @click="installOllama"
               />
-              <p>Análisis avanzado con IA local</p>
+              <p>Análisis avanzado del significado y contexto</p>
             </div>
           </div>
 
           <!-- LanguageTool status -->
           <div class="ollama-status">
-            <h4>Corrector Avanzado (LanguageTool)</h4>
+            <h4>Corrector Avanzado</h4>
             <div v-if="ltRunning" class="ollama-available">
               <Tag value="Activo" severity="success" />
               <p>+2000 reglas de gramática y ortografía</p>
@@ -297,7 +297,7 @@
                   :show-value="false"
                   class="lt-progress-bar"
                 />
-                <p class="lt-progress-detail">{{ ltInstallProgress?.detail || 'Descargando Java y LanguageTool...' }}</p>
+                <p class="lt-progress-detail">{{ ltInstallProgress?.detail || 'Descargando componentes del corrector...' }}</p>
               </div>
             </div>
             <div v-else class="ollama-unavailable">
@@ -348,7 +348,7 @@
           <div class="config-tips">
             <p>
               <i class="pi pi-cog"></i>
-              <span>Personaliza los métodos en <strong>Configuración > Métodos NLP</strong></span>
+              <span>Personaliza los métodos en <strong>Configuración > Métodos de Análisis</strong></span>
             </p>
             <p>
               <i class="pi pi-question-circle"></i>

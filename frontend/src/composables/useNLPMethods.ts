@@ -45,8 +45,8 @@ const DEFAULT_METHODS: Record<string, Record<string, NLPMethod>> = {
   },
   character_knowledge: {
     rules: { name: 'Reglas', description: 'Inferencia basada en reglas narrativas', available: true, default_enabled: true, requires_gpu: false, recommended_gpu: false },
-    llm: { name: 'LLM', description: 'An\u00E1lisis sem\u00E1ntico con modelo de lenguaje', available: false, default_enabled: false, requires_gpu: false, recommended_gpu: true },
-    hybrid: { name: 'H\u00EDbrido', description: 'Combina reglas con verificaci\u00F3n LLM', available: false, default_enabled: false, requires_gpu: false, recommended_gpu: true },
+    llm: { name: 'Análisis semántico', description: 'Análisis profundo con modelo de lenguaje', available: false, default_enabled: false, requires_gpu: false, recommended_gpu: true },
+    hybrid: { name: 'Híbrido', description: 'Combina reglas con verificación semántica', available: false, default_enabled: false, requires_gpu: false, recommended_gpu: true },
   },
 }
 
@@ -73,9 +73,9 @@ export function useNLPMethods(
   const gpuRequirementTooltip = computed(() => {
     const blocked = systemCapabilities.value?.hardware.gpu_blocked
     if (blocked) {
-      return `${blocked.name} (CC ${blocked.compute_capability}) no es compatible. Se requiere NVIDIA Pascal o superior (CC ${blocked.min_required}+).`
+      return `${blocked.name} no es compatible con el análisis avanzado. Se requiere hardware más reciente.`
     }
-    return 'Necesita una GPU NVIDIA compatible (GTX 1000 series o superior)'
+    return 'Necesita aceleración por hardware para este método'
   })
 
   function getNLPMethodsForCategory(category: NLPCategory): Record<string, NLPMethod> {
