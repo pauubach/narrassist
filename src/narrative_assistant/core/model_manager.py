@@ -1011,9 +1011,8 @@ class ModelManager:
                         f"Modelo '{attempt_info.name}' requiere autenticación (HTTP 401/403). "
                         f"Intentando siguiente alternativa..."
                     )
-                    # Limpiar directorio parcial del intento fallido
-                    if attempt_dir.exists():
-                        shutil.rmtree(attempt_dir, ignore_errors=True)
+                    # Limpiar directorio parcial del intento fallido + padres vacíos
+                    self._cleanup_model_dir(attempt_dir)
                     continue
                 else:
                     _update_download_progress(
@@ -1021,9 +1020,8 @@ class ModelManager:
                         phase="error",
                         error_message=str(e),
                     )
-                    # Limpiar directorio parcial
-                    if attempt_dir.exists():
-                        shutil.rmtree(attempt_dir, ignore_errors=True)
+                    # Limpiar directorio parcial + padres vacíos
+                    self._cleanup_model_dir(attempt_dir)
                     return Result.failure(
                         ModelDownloadError(
                             model_name=attempt_info.name,
@@ -1043,6 +1041,19 @@ class ModelManager:
                 reason=f"No se pudo descargar ningún modelo NER. Último error: {last_error}",
             )
         )
+
+    def _cleanup_model_dir(self, attempt_dir: Path) -> None:
+        """Elimina directorio parcial y padres vacíos hasta models_dir."""
+        if attempt_dir.exists():
+            shutil.rmtree(attempt_dir, ignore_errors=True)
+        # Limpiar padres vacíos (ej: transformer_ner/mrm8488/)
+        parent = attempt_dir.parent
+        while parent != self.models_dir and parent.exists():
+            try:
+                parent.rmdir()  # Solo borra si está vacío
+                parent = parent.parent
+            except OSError:
+                break
 
     def _verify_model_structure(self, model_type: ModelType, model_path: Path) -> bool:
         """

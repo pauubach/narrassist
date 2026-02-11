@@ -2,13 +2,11 @@
 Router: analysis
 """
 
-from fastapi import APIRouter
+from typing import Optional
+
 import deps
-from deps import logger
-from deps import ApiResponse
-from fastapi import HTTPException
-from fastapi import UploadFile, File
-from typing import Optional, Any
+from deps import ApiResponse, logger
+from fastapi import APIRouter, File, HTTPException, UploadFile
 
 router = APIRouter()
 
@@ -30,21 +28,27 @@ def _resume_queued_heavy_analysis(queued_entry: dict):
 
     def _run_heavy():
         from routers._analysis_phases import (
-            ProgressTracker,
-            run_ollama_healthcheck,
-            run_ner, run_llm_entity_validation, run_fusion,
-            run_attributes, run_consistency, run_grammar, run_alerts,
+            handle_analysis_error,
             release_heavy_slot,
-            run_reconciliation, run_completion,
-            handle_analysis_error, run_finally_cleanup,
+            run_alerts,
+            run_attributes,
+            run_completion,
+            run_consistency,
+            run_finally_cleanup,
+            run_fusion,
+            run_grammar,
+            run_llm_entity_validation,
+            run_ner,
+            run_ollama_healthcheck,
+            run_reconciliation,
         )
         from routers._enrichment_phases import (
-            run_relationships_enrichment,
-            run_voice_enrichment,
-            run_prose_enrichment,
-            run_health_enrichment,
             capture_entity_fingerprint,
             invalidate_enrichment_if_mutated,
+            run_health_enrichment,
+            run_prose_enrichment,
+            run_relationships_enrichment,
+            run_voice_enrichment,
         )
 
         try:
@@ -124,8 +128,8 @@ def _start_queued_analysis(queued_entry: dict):
     if "tier1_context" in queued_entry:
         return _resume_queued_heavy_analysis(queued_entry)
 
-    import threading
     import asyncio
+    import threading
 
     project_id = queued_entry["project_id"]
     logger.info(f"Fallback: re-starting full analysis for project {project_id}")
@@ -219,7 +223,6 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
     """
     try:
         import tempfile
-        import shutil
         from pathlib import Path
 
         # Validar que el proyecto existe
@@ -326,22 +329,34 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
             """Ejecuta el análisis real — orquestador que delega en funciones de fase."""
             from routers._analysis_phases import (
                 ProgressTracker,
-                run_snapshot, run_cleanup, apply_license_and_settings,
-                run_parsing, run_classification, run_structure,
-                claim_heavy_slot_or_queue, run_ollama_healthcheck,
-                run_ner, run_llm_entity_validation, run_fusion,
-                run_attributes, run_consistency, run_grammar, run_alerts,
+                apply_license_and_settings,
+                claim_heavy_slot_or_queue,
+                handle_analysis_error,
                 release_heavy_slot,
-                run_reconciliation, run_completion,
-                handle_analysis_error, run_finally_cleanup,
+                run_alerts,
+                run_attributes,
+                run_classification,
+                run_cleanup,
+                run_completion,
+                run_consistency,
+                run_finally_cleanup,
+                run_fusion,
+                run_grammar,
+                run_llm_entity_validation,
+                run_ner,
+                run_ollama_healthcheck,
+                run_parsing,
+                run_reconciliation,
+                run_snapshot,
+                run_structure,
             )
             from routers._enrichment_phases import (
-                run_relationships_enrichment,
-                run_voice_enrichment,
-                run_prose_enrichment,
-                run_health_enrichment,
                 capture_entity_fingerprint,
                 invalidate_enrichment_if_mutated,
+                run_health_enrichment,
+                run_prose_enrichment,
+                run_relationships_enrichment,
+                run_voice_enrichment,
             )
 
             start_time = time.time()
@@ -370,7 +385,6 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
             ]
 
             # --- S8a-14: Thin orchestrator using extracted phase functions ---
-            from narrative_assistant.persistence.database import get_database
             db_session = deps.get_database()
 
             tracker = ProgressTracker(
@@ -459,7 +473,11 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
         # Pre-check: verificar que los modelos críticos están disponibles
         # antes de lanzar el thread, para dar un error claro al usuario
         try:
-            from narrative_assistant.core.model_manager import ModelType, get_model_manager
+            from narrative_assistant.core.model_manager import (
+                KNOWN_MODELS,
+                ModelType,
+                get_model_manager,
+            )
             mm = get_model_manager()
             missing_models = []
             model_labels = {
@@ -468,6 +486,9 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                 ModelType.TRANSFORMER_NER: "Reconocimiento de entidades (NER)",
             }
             for mt, label in model_labels.items():
+                model_info = KNOWN_MODELS.get(mt)
+                if model_info and not model_info.required:
+                    continue  # No bloquear por modelos opcionales
                 if not mm.get_model_path(mt):
                     missing_models.append(label)
 
@@ -482,7 +503,7 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                 return ApiResponse(
                     success=False,
                     error=f"Modelos no descargados: {names}. "
-                          "Reinicia la aplicación para que se descarguen automáticamente."
+                          "Descárgalos desde Ajustes > Modelos."
                 )
         except Exception as e:
             logger.warning(f"Error en pre-check de modelos: {e}")
@@ -684,6 +705,7 @@ async def stream_analysis_progress(project_id: int):
     """
     import asyncio
     import json
+
     from fastapi.responses import StreamingResponse
 
     async def event_generator():
