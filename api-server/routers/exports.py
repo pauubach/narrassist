@@ -728,3 +728,351 @@ async def export_scrivener(
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
+@router.get("/api/projects/{project_id}/export/characters", response_model=ApiResponse)
+async def export_characters(
+    project_id: int,
+    format: str = "json",
+    only_main: bool = True,
+    include_attributes: bool = True,
+    include_mentions: bool = True,
+):
+    """
+    Exporta fichas de personajes en JSON o Markdown.
+
+    Args:
+        project_id: ID del proyecto
+        format: 'json' o 'md'
+        only_main: Solo personajes principales
+        include_attributes: Incluir atributos extraídos
+        include_mentions: Incluir información de menciones
+    """
+    try:
+        if not deps.entity_repository:
+            return ApiResponse(success=False, error="Entity repository not initialized")
+
+        entities = deps.entity_repository.get_by_project(project_id)
+        if not entities:
+            return ApiResponse(success=False, error="No se encontraron entidades en este proyecto")
+
+        # Filtrar personajes
+        characters = [e for e in entities if e.entity_type.value == "character"]
+        if only_main:
+            characters = [e for e in characters if e.importance.value in ("main", "secondary")]
+
+        if not characters:
+            return ApiResponse(success=False, error="No se encontraron personajes para exportar")
+
+        # Obtener atributos si se solicitan
+        attrs_by_entity: dict[int, list[dict]] = {}
+        if include_attributes:
+            all_attrs = deps.entity_repository.get_attributes_by_project(project_id)
+            for attr in all_attrs:
+                eid = attr["entity_id"]
+                attrs_by_entity.setdefault(eid, []).append(attr)
+
+        # Obtener menciones si se solicitan
+        mentions_by_entity: dict[int, dict] = {}
+        if include_mentions:
+            for entity in characters:
+                try:
+                    mention_list = deps.entity_repository.get_mentions_by_entity(entity.id)
+                    chapter_ids = sorted({m.chapter_id for m in mention_list if m.chapter_id})
+                    mention_data = {
+                        "total_mentions": len(mention_list),
+                        "chapters": chapter_ids,
+                    }
+                    mentions_by_entity[entity.id] = mention_data
+                except Exception:
+                    pass
+
+        # Construir fichas
+        sheets = []
+        for entity in characters:
+            sheet: dict[str, Any] = {
+                "entity_id": entity.id,
+                "canonical_name": entity.canonical_name,
+                "aliases": entity.aliases or [],
+                "entity_type": entity.entity_type.value,
+                "importance": entity.importance.value,
+            }
+
+            if include_attributes:
+                entity_attrs = attrs_by_entity.get(entity.id, [])
+                physical = []
+                psychological = []
+                other = []
+                for a in entity_attrs:
+                    info = {
+                        "key": a["attribute_key"],
+                        "value": a["attribute_value"],
+                        "confidence": a.get("confidence", 0.5),
+                    }
+                    cat = (a.get("attribute_type") or "").lower()
+                    if cat == "physical":
+                        physical.append(info)
+                    elif cat == "psychological":
+                        psychological.append(info)
+                    else:
+                        other.append(info)
+                sheet["physical_attributes"] = physical
+                sheet["psychological_attributes"] = psychological
+                sheet["other_attributes"] = other
+
+            if include_mentions:
+                m = mentions_by_entity.get(entity.id, {})
+                sheet["mentions"] = m if m else {"total": 0, "chapters": []}
+
+            sheets.append(sheet)
+
+        if format.lower() == "md":
+            # Generar markdown
+            lines = ["# Fichas de Personajes\n"]
+            for s in sheets:
+                lines.append(f"## {s['canonical_name']}")
+                lines.append("")
+                if s.get("aliases"):
+                    lines.append(f"**También conocido como:** {', '.join(s['aliases'])}")
+                lines.append(f"**Tipo:** {s['entity_type']}")
+                lines.append(f"**Importancia:** {s['importance']}")
+                lines.append("")
+
+                if include_attributes:
+                    if s.get("physical_attributes"):
+                        lines.append("### Atributos Físicos")
+                        for a in s["physical_attributes"]:
+                            lines.append(f"- **{a['key'].replace('_', ' ').title()}:** {a['value']} (confianza: {a['confidence']:.0%})")
+                        lines.append("")
+                    if s.get("psychological_attributes"):
+                        lines.append("### Atributos Psicológicos")
+                        for a in s["psychological_attributes"]:
+                            lines.append(f"- **{a['key'].replace('_', ' ').title()}:** {a['value']} (confianza: {a['confidence']:.0%})")
+                        lines.append("")
+                    if s.get("other_attributes"):
+                        lines.append("### Otros Atributos")
+                        for a in s["other_attributes"]:
+                            lines.append(f"- **{a['key'].replace('_', ' ').title()}:** {a['value']}")
+                        lines.append("")
+
+                if include_mentions and s.get("mentions"):
+                    m = s["mentions"]
+                    lines.append("### Apariciones")
+                    if isinstance(m, dict):
+                        lines.append(f"- **Total menciones:** {m.get('total', m.get('total_mentions', 0))}")
+                        chapters = m.get("chapters", [])
+                        if chapters:
+                            lines.append(f"- **Capítulos:** {', '.join(str(c) for c in chapters)}")
+                    lines.append("")
+
+                lines.append("---\n")
+
+            return ApiResponse(success=True, data={"content": "\n".join(lines)})
+        else:
+            return ApiResponse(success=True, data=sheets)
+
+    except Exception as e:
+        logger.error(f"Error exporting characters for project {project_id}: {e}", exc_info=True)
+        return ApiResponse(success=False, error="Error interno del servidor")
+
+
+@router.get("/api/projects/{project_id}/export/report", response_model=ApiResponse)
+async def export_report(
+    project_id: int,
+    format: str = "json",
+):
+    """
+    Exporta un informe resumido del análisis en JSON o Markdown.
+
+    Incluye estadísticas generales, resumen de entidades, alertas por categoría
+    y observaciones principales.
+
+    Args:
+        project_id: ID del proyecto
+        format: 'json' o 'md'
+    """
+    try:
+        if not deps.project_manager:
+            return ApiResponse(success=False, error="Project manager not initialized")
+
+        result = deps.project_manager.get(project_id)
+        if result.is_failure:
+            return ApiResponse(success=False, error=str(result.error))
+
+        project = result.value
+
+        # Recopilar estadísticas
+        entities = deps.entity_repository.get_by_project(project_id) if deps.entity_repository else []
+        alerts = deps.alert_repository.get_by_project(project_id) if deps.alert_repository else []
+        chapters = deps.chapter_repository.get_by_project(project_id) if deps.chapter_repository else []
+
+        # Clasificar entidades
+        characters = [e for e in entities if e.entity_type.value == "character"]
+        locations = [e for e in entities if e.entity_type.value == "location"]
+
+        # Clasificar alertas
+        alerts_by_category: dict[str, int] = {}
+        alerts_by_severity: dict[str, int] = {"critical": 0, "error": 0, "warning": 0, "info": 0}
+        open_alerts = [a for a in alerts if getattr(a, 'status', 'open') == 'open']
+        for a in open_alerts:
+            cat = a.category.value if hasattr(a.category, 'value') else str(a.category)
+            alerts_by_category[cat] = alerts_by_category.get(cat, 0) + 1
+            sev = getattr(a, 'severity', 'warning')
+            sev_str = sev.value if hasattr(sev, 'value') else str(sev)
+            if sev_str in alerts_by_severity:
+                alerts_by_severity[sev_str] += 1
+
+        report_data = {
+            "project_name": project.name,
+            "statistics": {
+                "word_count": getattr(project, 'word_count', 0) or 0,
+                "chapter_count": len(chapters),
+                "character_count": len(characters),
+                "location_count": len(locations),
+                "total_entities": len(entities),
+                "total_alerts": len(open_alerts),
+            },
+            "alerts_by_category": alerts_by_category,
+            "alerts_by_severity": alerts_by_severity,
+            "top_alerts": [
+                {
+                    "category": a.category.value if hasattr(a.category, 'value') else str(a.category),
+                    "description": getattr(a, 'description', '') or '',
+                    "severity": (a.severity.value if hasattr(a.severity, 'value') else str(getattr(a, 'severity', 'warning'))),
+                    "chapter": getattr(a, 'chapter', None),
+                }
+                for a in sorted(open_alerts, key=lambda x: -(getattr(x, 'confidence', 0) or 0))[:20]
+            ],
+            "main_characters": [
+                {"name": e.canonical_name, "importance": e.importance.value, "aliases": e.aliases or []}
+                for e in characters if e.importance.value in ("main", "secondary")
+            ],
+        }
+
+        if format.lower() == "md":
+            lines = [
+                f"# Informe de Análisis: {project.name}",
+                "",
+                "## Estadísticas Generales",
+                "",
+                f"- **Palabras:** {report_data['statistics']['word_count']:,}",
+                f"- **Capítulos:** {report_data['statistics']['chapter_count']}",
+                f"- **Personajes:** {report_data['statistics']['character_count']}",
+                f"- **Localizaciones:** {report_data['statistics']['location_count']}",
+                f"- **Total entidades:** {report_data['statistics']['total_entities']}",
+                f"- **Alertas abiertas:** {report_data['statistics']['total_alerts']}",
+                "",
+            ]
+
+            if alerts_by_severity["critical"] > 0 or alerts_by_severity["error"] > 0:
+                lines.append("## Alertas por Severidad")
+                lines.append("")
+                for sev, count in alerts_by_severity.items():
+                    if count > 0:
+                        lines.append(f"- **{sev.title()}:** {count}")
+                lines.append("")
+
+            if alerts_by_category:
+                lines.append("## Alertas por Categoría")
+                lines.append("")
+                for cat, count in sorted(alerts_by_category.items(), key=lambda x: -x[1]):
+                    lines.append(f"- **{cat}:** {count}")
+                lines.append("")
+
+            if report_data["main_characters"]:
+                lines.append("## Personajes Principales")
+                lines.append("")
+                for ch in report_data["main_characters"]:
+                    aliases = f" ({', '.join(ch['aliases'])})" if ch['aliases'] else ""
+                    lines.append(f"- **{ch['name']}**{aliases} — {ch['importance']}")
+                lines.append("")
+
+            if report_data["top_alerts"]:
+                lines.append("## Observaciones Principales")
+                lines.append("")
+                for alert in report_data["top_alerts"][:10]:
+                    ch_str = f" (cap. {alert['chapter']})" if alert['chapter'] else ""
+                    lines.append(f"- [{alert['severity']}] {alert['description']}{ch_str}")
+                lines.append("")
+
+            lines.append("---")
+            lines.append("_Informe generado por Narrative Assistant_")
+
+            return ApiResponse(success=True, data={"content": "\n".join(lines)})
+        else:
+            return ApiResponse(success=True, data=report_data)
+
+    except Exception as e:
+        logger.error(f"Error exporting report for project {project_id}: {e}", exc_info=True)
+        return ApiResponse(success=False, error="Error interno del servidor")
+
+
+@router.get("/api/projects/{project_id}/export/alerts", response_model=ApiResponse)
+async def export_alerts(
+    project_id: int,
+    format: str = "json",
+    include_pending: bool = True,
+    include_resolved: bool = False,
+):
+    """
+    Exporta alertas del proyecto en JSON o CSV.
+
+    Args:
+        project_id: ID del proyecto
+        format: 'json' o 'csv'
+        include_pending: Incluir alertas pendientes/abiertas
+        include_resolved: Incluir alertas resueltas
+    """
+    try:
+        if not deps.alert_repository:
+            return ApiResponse(success=False, error="Alert repository not initialized")
+
+        all_alerts = deps.alert_repository.get_by_project(project_id)
+
+        # Filtrar por estado
+        filtered = []
+        for a in all_alerts:
+            status = getattr(a, 'status', 'open')
+            if status == 'open' and include_pending:
+                filtered.append(a)
+            elif status in ('resolved', 'accepted', 'rejected') and include_resolved:
+                filtered.append(a)
+
+        if not filtered:
+            return ApiResponse(success=False, error="No se encontraron alertas con los filtros seleccionados")
+
+        # Serializar alertas
+        alert_rows = []
+        for a in filtered:
+            row = {
+                "id": getattr(a, 'id', None),
+                "category": a.category.value if hasattr(a.category, 'value') else str(a.category),
+                "type": getattr(a, 'alert_type', '') or '',
+                "severity": (a.severity.value if hasattr(a.severity, 'value') else str(getattr(a, 'severity', 'warning'))),
+                "description": getattr(a, 'description', '') or '',
+                "chapter": getattr(a, 'chapter', None),
+                "excerpt": getattr(a, 'excerpt', '') or '',
+                "suggestion": getattr(a, 'suggestion', '') or '',
+                "confidence": getattr(a, 'confidence', 0) or 0,
+                "status": getattr(a, 'status', 'open'),
+            }
+            alert_rows.append(row)
+
+        if format.lower() == "csv":
+            import csv
+            import io
+
+            output = io.StringIO()
+            fieldnames = ["id", "category", "type", "severity", "description", "chapter", "excerpt", "suggestion", "confidence", "status"]
+            writer = csv.DictWriter(output, fieldnames=fieldnames)
+            writer.writeheader()
+            for row in alert_rows:
+                writer.writerow(row)
+
+            return ApiResponse(success=True, data={"content": output.getvalue()})
+        else:
+            return ApiResponse(success=True, data=alert_rows)
+
+    except Exception as e:
+        logger.error(f"Error exporting alerts for project {project_id}: {e}", exc_info=True)
+        return ApiResponse(success=False, error="Error interno del servidor")
+
+
