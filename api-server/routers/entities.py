@@ -2,14 +2,17 @@
 Router: entities
 """
 
-from fastapi import APIRouter
+from typing import Optional
+
 import deps
-from deps import logger
-from deps import ApiResponse
-from fastapi import Query
-from typing import Optional, Any
-from datetime import datetime
-from deps import EntityResponse, _classify_mention_type, _verify_entity_ownership
+from deps import (
+    ApiResponse,
+    EntityResponse,
+    _classify_mention_type,
+    _verify_entity_ownership,
+    logger,
+)
+from fastapi import APIRouter, Query
 
 router = APIRouter()
 
@@ -170,8 +173,8 @@ async def preview_merge_entities(project_id: int, body: deps.EntityIdsRequest):
         # 1. Calcular similitud detallada entre pares
         # =====================================================================
         try:
-            from narrative_assistant.entities.semantic_fusion import get_semantic_fusion_service
             from narrative_assistant.entities.fusion import EntityFusionService
+            from narrative_assistant.entities.semantic_fusion import get_semantic_fusion_service
             semantic_service = get_semantic_fusion_service()
             fusion_service = EntityFusionService(repository=entity_repo)
         except ImportError:
@@ -181,8 +184,8 @@ async def preview_merge_entities(project_id: int, body: deps.EntityIdsRequest):
         # Calcular similitud por nombre (Levenshtein/SequenceMatcher)
         def compute_name_similarity(name1: str, name2: str) -> dict:
             """Calcula múltiples métricas de similitud por nombre."""
-            from difflib import SequenceMatcher
             import unicodedata
+            from difflib import SequenceMatcher
 
             def normalize(s):
                 return unicodedata.normalize('NFKD', s.lower()).encode('ascii', 'ignore').decode()
@@ -1013,7 +1016,6 @@ async def get_entity_mentions(
 
         def normalize_surface_form(text: str) -> str:
             """Normaliza texto para comparación (minúsculas, sin espacios extra)."""
-            import unicodedata
             text = text.lower().strip()
             text = ' '.join(text.split())  # Normalizar espacios
             return text
@@ -1495,7 +1497,6 @@ async def list_rejected_entities(project_id: int):
         ApiResponse con lista de entidades rechazadas
     """
     try:
-        from narrative_assistant.persistence.database import get_database
 
         db = deps.get_database()
         rows = db.fetchall(
@@ -1542,7 +1543,6 @@ async def reject_entity_text(project_id: int, body: deps.RejectEntityRequest):
     """
     try:
         from narrative_assistant.nlp.entity_validator import get_entity_validator
-        from narrative_assistant.persistence.database import get_database
 
         entity_text = body.entity_text.strip()
         reason = body.reason
@@ -1600,7 +1600,6 @@ async def unreject_entity_text(project_id: int, entity_text: str):
     """
     try:
         from narrative_assistant.nlp.entity_validator import get_entity_validator
-        from narrative_assistant.persistence.database import get_database
 
         if not entity_text:
             return ApiResponse(success=False, error="entity_text es requerido")
@@ -1822,7 +1821,6 @@ async def remove_user_rejection(rejection_id: int):
     """
     try:
         from narrative_assistant.entities.filters import get_filter_repository
-        from narrative_assistant.persistence.database import get_database
 
         # Primero obtener el nombre de la entidad
         db = deps.get_database()
@@ -1902,7 +1900,7 @@ async def add_project_override(project_id: int, body: deps.ProjectOverrideReques
         ApiResponse con confirmación
     """
     try:
-        from narrative_assistant.entities.filters import get_filter_repository, FilterAction
+        from narrative_assistant.entities.filters import FilterAction, get_filter_repository
 
         entity_name = body.entity_name.strip()
         action = body.action
@@ -1946,7 +1944,6 @@ async def remove_project_override(project_id: int, override_id: int):
     """
     try:
         from narrative_assistant.entities.filters import get_filter_repository
-        from narrative_assistant.persistence.database import get_database
 
         # Primero obtener el nombre de la entidad
         db = deps.get_database()

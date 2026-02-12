@@ -151,10 +151,9 @@ class Alert:
                 ]
             )
         elif self.alert_type.startswith("spelling_"):
-            # Para ortografía: palabra + posición aproximada
+            # Para ortografía: palabra + capítulo (sin posición — cambia al editar doc)
             ed = self.extra_data
             parts.append(ed.get("word", ""))
-            parts.append(str(self.start_char or 0))
         elif self.alert_type.startswith("grammar_"):
             # Para gramática: texto + tipo de error
             ed = self.extra_data

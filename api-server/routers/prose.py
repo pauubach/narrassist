@@ -2,14 +2,11 @@
 Router: prose
 """
 
-from fastapi import APIRouter
+from typing import Any, Optional
+
 import deps
-from deps import logger
-from deps import ApiResponse
-from fastapi import HTTPException
-from fastapi import Query
-from typing import Optional, Any
-from deps import _get_pacing_label, _get_sticky_recommendation
+from deps import ApiResponse, _get_pacing_label, _get_sticky_recommendation, logger
+from fastapi import APIRouter, HTTPException, Query
 
 router = APIRouter()
 
@@ -782,7 +779,9 @@ async def get_narrative_structure(
             return ApiResponse(success=True, data=cached)
 
     try:
-        from narrative_assistant.analysis.narrative_structure import get_narrative_structure_detector
+        from narrative_assistant.analysis.narrative_structure import (
+            get_narrative_structure_detector,
+        )
 
         result = deps.project_manager.get(project_id)
         if result.is_failure:
@@ -889,12 +888,12 @@ async def get_dialogue_validation(
             return ApiResponse(success=True, data=cached)
 
     try:
+        from narrative_assistant.alerts.engine import get_alert_engine
         from narrative_assistant.nlp.dialogue_validator import (
             DialogueContextValidator,
-            DialogueIssueType,
             DialogueIssueSeverity,
+            DialogueIssueType,
         )
-        from narrative_assistant.alerts.engine import get_alert_engine
 
         result = deps.project_manager.get(project_id)
         if result.is_failure:
@@ -1027,8 +1026,8 @@ async def get_sentence_variation(
             return ApiResponse(success=True, data=cached)
 
     try:
-        import re as _re
         import math
+        import re as _re
 
         result = deps.project_manager.get(project_id)
         if result.is_failure:
@@ -1181,6 +1180,7 @@ async def get_pacing_analysis(
 
     try:
         import re
+
         from narrative_assistant.analysis.pacing import get_pacing_analyzer
 
         result = deps.project_manager.get(project_id)
@@ -1500,7 +1500,9 @@ async def get_pacing_genre_comparison(
         import re
 
         from narrative_assistant.analysis.pacing import (
-            compare_with_benchmarks, compute_tension_curve, get_pacing_analyzer,
+            compare_with_benchmarks,
+            compute_tension_curve,
+            get_pacing_analyzer,
         )
 
         result = deps.project_manager.get(project_id)
@@ -1597,7 +1599,8 @@ async def get_register_genre_benchmarks_endpoint(
     """
     try:
         from narrative_assistant.voice.register import (
-            REGISTER_GENRE_BENCHMARKS, get_register_genre_benchmarks,
+            REGISTER_GENRE_BENCHMARKS,
+            get_register_genre_benchmarks,
         )
 
         if genre_code:
@@ -1755,9 +1758,9 @@ def get_sensory_report(
 
     try:
         from narrative_assistant.nlp.style.sensory_report import (
-            get_sensory_analyzer,
-            generate_sensory_suggestions,
             SENSE_NAMES,
+            generate_sensory_suggestions,
+            get_sensory_analyzer,
         )
         from narrative_assistant.persistence.chapter import get_chapter_repository
 
@@ -1845,7 +1848,7 @@ async def get_age_readability(
             return ApiResponse(success=True, data=cached)
 
     try:
-        from narrative_assistant.nlp.style.readability import get_readability_analyzer, AgeGroup
+        from narrative_assistant.nlp.style.readability import AgeGroup, get_readability_analyzer
 
         result = deps.project_manager.get(project_id)
         if result.is_failure:
@@ -1949,8 +1952,8 @@ async def get_semantic_redundancy(
     """
     try:
         from narrative_assistant.analysis.semantic_redundancy import (
-            get_semantic_redundancy_detector,
             RedundancyMode,
+            get_semantic_redundancy_detector,
         )
         from narrative_assistant.core import get_resource_manager
 

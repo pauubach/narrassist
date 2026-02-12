@@ -3,23 +3,21 @@ Router: system
 """
 
 import os
+import sys
+from datetime import datetime
 from pathlib import Path
 
-from fastapi import APIRouter
 import deps
-import sys
-from deps import logger
-from deps import ApiResponse
-from fastapi import HTTPException
-from fastapi import Request
-from datetime import datetime
 from deps import (
+    ApiResponse,
     ChangeDataLocationRequest,
     DownloadModelsRequest,
     HealthResponse,
-    get_python_status,
     _check_languagetool_available,
+    get_python_status,
+    logger,
 )
+from fastapi import APIRouter, HTTPException, Request
 
 router = APIRouter()
 
@@ -65,7 +63,7 @@ async def system_info():
         gpu_available = False
         gpu_device_str = "cpu"
         try:
-            from narrative_assistant.core.device import get_device_detector, DeviceType
+            from narrative_assistant.core.device import DeviceType, get_device_detector
             detector = get_device_detector()
             device = detector.detect_best_device()
             gpu_available = device.device_type in (DeviceType.CUDA, DeviceType.MPS)
@@ -104,7 +102,6 @@ async def debug_diagnostic():
     Diagnóstico detallado del backend - para debugging de problemas.
     Devuelve el estado completo del sistema, paths, DB, módulos.
     """
-    import traceback
 
     diag = {
         "version": deps.BACKEND_VERSION,
@@ -325,7 +322,7 @@ async def models_status():
         import importlib.util
 
         # Log sys.path para debugging
-        logger.info(f"=== Checking dependencies ===")
+        logger.info("=== Checking dependencies ===")
         logger.info(f"MODULES_LOADED: {deps.MODULES_LOADED}")
         logger.info(f"sys.path has {len(sys.path)} entries")
         logger.info(f"First 5 sys.path entries: {sys.path[:5]}")
@@ -441,8 +438,8 @@ async def install_dependencies():
     Returns:
         ApiResponse indicando que la instalación ha comenzado
     """
-    import subprocess
     import importlib
+    import subprocess
 
     # Verificar que Python está disponible antes de intentar instalar
     python_info = get_python_status()
@@ -561,8 +558,9 @@ async def download_models(request: DownloadModelsRequest):
         )
 
     try:
-        from narrative_assistant.core.model_manager import get_model_manager, ModelType
         import threading
+
+        from narrative_assistant.core.model_manager import ModelType, get_model_manager
 
         manager = get_model_manager()
 
@@ -574,9 +572,10 @@ async def download_models(request: DownloadModelsRequest):
 
         def download_task():
             from concurrent.futures import ThreadPoolExecutor, as_completed
+
             from narrative_assistant.core.model_manager import (
-                _update_download_progress,
                 _clear_download_progress,
+                _update_download_progress,
             )
 
             models_to_download = []
@@ -666,9 +665,9 @@ async def download_progress():
 
     try:
         from narrative_assistant.core.model_manager import (
+            KNOWN_MODELS,
             get_download_progress,
             get_real_model_sizes,
-            KNOWN_MODELS,
         )
 
         progress = get_download_progress()
@@ -725,7 +724,10 @@ async def system_capabilities():
         ApiResponse con capacidades detalladas del sistema
     """
     try:
-        from narrative_assistant.core.device import get_device_detector, DeviceType, get_blocked_gpu_info
+        from narrative_assistant.core.device import (
+            get_blocked_gpu_info,
+            get_device_detector,
+        )
 
         detector = get_device_detector()
 
@@ -776,9 +778,9 @@ async def system_capabilities():
             ollama_installed = shutil.which("ollama") is not None
 
         # Verificar si está corriendo y obtener modelos
-        import urllib.request
-        import urllib.error
         import json as json_module
+        import urllib.error
+        import urllib.request
         try:
             ollama_host = "http://localhost:11434"
             logger.info(f"Verificando Ollama en {ollama_host}/api/tags...")
@@ -811,6 +813,8 @@ async def system_capabilities():
         try:
             from narrative_assistant.nlp.grammar.languagetool_manager import (
                 get_languagetool_manager as _get_lt_mgr,
+            )
+            from narrative_assistant.nlp.grammar.languagetool_manager import (
                 is_lt_installing as _is_lt_installing,
             )
             _lt_mgr = _get_lt_mgr()
@@ -1239,7 +1243,7 @@ async def get_resource_status():
         ApiResponse con estado completo de recursos
     """
     try:
-        from narrative_assistant.core import get_resource_manager, get_config
+        from narrative_assistant.core import get_config, get_resource_manager
 
         rm = get_resource_manager()
         config = get_config()
@@ -1305,8 +1309,8 @@ async def change_data_location(request: ChangeDataLocationRequest):
     Returns:
         ApiResponse con el resultado de la operación
     """
-    import shutil
     import os
+    import shutil
 
     try:
         new_path = Path(request.new_path).expanduser().resolve()

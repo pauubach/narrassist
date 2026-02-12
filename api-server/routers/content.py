@@ -2,16 +2,11 @@
 Router: content
 """
 
-from fastapi import APIRouter
+from typing import Optional
+
 import deps
-from deps import logger
-from deps import ApiResponse
-from fastapi import HTTPException
-from fastapi import Body
-from fastapi import Request
-from fastapi import Query
-from typing import Optional, Any
-from deps import CustomWordRequest, GlossaryEntryRequest
+from deps import ApiResponse, CustomWordRequest, GlossaryEntryRequest, logger
+from fastapi import APIRouter, Body, HTTPException, Query
 
 router = APIRouter()
 
@@ -107,7 +102,7 @@ async def create_glossary_entry(
             message=f"Término '{request.term}' añadido al glosario",
         )
 
-    except ValueError as e:
+    except ValueError:
         # Término duplicado
         return ApiResponse(success=False, error="Error interno del servidor")
     except HTTPException:
@@ -487,8 +482,8 @@ async def get_glossary_suggestions(
         project = result.value
 
         # Obtener términos existentes en el glosario para excluirlos
-        from narrative_assistant.persistence.glossary import GlossaryRepository
         from narrative_assistant.analysis.glossary_extractor import GlossaryExtractor
+        from narrative_assistant.persistence.glossary import GlossaryRepository
 
         repo = GlossaryRepository()
         existing_terms = repo.get_all_terms(project_id)

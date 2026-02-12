@@ -8,13 +8,11 @@ Endpoints para gestión de alertas, incluyendo:
 - Batch operations
 """
 
-from fastapi import APIRouter
+from typing import Optional
+
 import deps
-import json
-from deps import logger
-from deps import ApiResponse
-from typing import Optional, Any
-from deps import AlertResponse, _verify_alert_ownership
+from deps import AlertResponse, ApiResponse, _verify_alert_ownership, logger
+from fastapi import APIRouter
 
 from narrative_assistant.alerts.models import AlertStatus
 

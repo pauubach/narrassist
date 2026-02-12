@@ -150,7 +150,7 @@ def invalidate_enrichment_if_mutated(
             f"(before={saved_fingerprint}, after={current}). Marking stale."
         )
         try:
-            from routers._invalidation import ENTITY_DEPENDENT_TYPES, ATTRIBUTE_DEPENDENT_TYPES
+            from routers._invalidation import ATTRIBUTE_DEPENDENT_TYPES, ENTITY_DEPENDENT_TYPES
 
             affected_types = ENTITY_DEPENDENT_TYPES | ATTRIBUTE_DEPENDENT_TYPES
             placeholders = ",".join("?" for _ in affected_types)

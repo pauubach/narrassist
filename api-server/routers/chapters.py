@@ -2,13 +2,12 @@
 Router: chapters
 """
 
-from fastapi import APIRouter
+from typing import Optional
+
 import deps
-from deps import logger
-from deps import ApiResponse
-from fastapi import HTTPException
-from fastapi import Query
-from typing import Optional, Any
+from deps import ApiResponse, logger
+from fastapi import APIRouter, HTTPException, Query
+
 from narrative_assistant.alerts.models import AlertStatus
 
 router = APIRouter()
@@ -266,11 +265,17 @@ async def get_style_guide(project_id: int, format: str = "json", preview: bool =
 
             try:
                 # Intentar usar reportlab si está disponible
-                from reportlab.lib.pagesizes import A4
-                from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-                from reportlab.lib.units import cm
-                from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
                 from reportlab.lib import colors
+                from reportlab.lib.pagesizes import A4
+                from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+                from reportlab.lib.units import cm
+                from reportlab.platypus import (
+                    Paragraph,
+                    SimpleDocTemplate,
+                    Spacer,
+                    Table,
+                    TableStyle,
+                )
 
                 buffer = io.BytesIO()
                 doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=2*cm, rightMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
@@ -472,9 +477,9 @@ async def get_project_timeline(project_id: int, force_refresh: bool = False):
 
         # Importar módulo temporal
         from narrative_assistant.temporal import (
+            TemporalConsistencyChecker,
             TemporalMarkerExtractor,
             TimelineBuilder,
-            TemporalConsistencyChecker,
         )
 
         # Extraer marcadores temporales
@@ -515,8 +520,8 @@ async def get_project_timeline(project_id: int, force_refresh: bool = False):
         # Persistir timeline si se calculó
         try:
             from narrative_assistant.persistence.timeline import (
-                TimelineEventData,
                 TemporalMarkerData,
+                TimelineEventData,
             )
 
             events_data = []
@@ -754,12 +759,11 @@ async def get_chapter_register_analysis(
         ApiResponse con análisis de registro del capítulo
     """
     try:
-        from narrative_assistant.voice.register import (
-            RegisterChangeDetector,
-            RegisterAnalyzer,
-        )
         from narrative_assistant.nlp.dialogue import detect_dialogues
         from narrative_assistant.persistence.chapter import get_chapter_repository
+        from narrative_assistant.voice.register import (
+            RegisterChangeDetector,
+        )
 
         if not deps.project_manager:
             return ApiResponse(success=False, error="Project manager not initialized")
@@ -909,11 +913,11 @@ async def get_dialogue_attributions(project_id: int, chapter_number: int):
         ApiResponse con atribuciones de diálogos y estadísticas
     """
     try:
-        from narrative_assistant.voice.speaker_attribution import SpeakerAttributor
-        from narrative_assistant.voice.profiles import VoiceProfileBuilder
-        from narrative_assistant.nlp.dialogue import detect_dialogues
         from narrative_assistant.entities.repository import get_entity_repository
+        from narrative_assistant.nlp.dialogue import detect_dialogues
         from narrative_assistant.persistence.chapter import get_chapter_repository
+        from narrative_assistant.voice.profiles import VoiceProfileBuilder
+        from narrative_assistant.voice.speaker_attribution import SpeakerAttributor
 
         # Verificar proyecto
         if not deps.project_manager:
@@ -1086,9 +1090,12 @@ async def get_dialogue_attributions(project_id: int, chapter_number: int):
 async def suggest_chapter_focalization(project_id: int, chapter_number: int):
     """Sugiere la focalización más probable para un capítulo."""
     try:
-        from narrative_assistant.focalization import FocalizationDeclarationService, SQLiteFocalizationRepository
-        from narrative_assistant.persistence.chapter import get_chapter_repository
         from narrative_assistant.entities.repository import get_entity_repository
+        from narrative_assistant.focalization import (
+            FocalizationDeclarationService,
+            SQLiteFocalizationRepository,
+        )
+        from narrative_assistant.persistence.chapter import get_chapter_repository
 
         if not deps.project_manager:
             return ApiResponse(success=False, error="Project manager not initialized")

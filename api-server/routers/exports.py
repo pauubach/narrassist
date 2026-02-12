@@ -2,14 +2,11 @@
 Router: exports
 """
 
-from fastapi import APIRouter
+from typing import Any, Optional
+
 import deps
-from deps import logger
-from deps import ApiResponse
-from fastapi import HTTPException
-from fastapi import Query
-from typing import Optional, Any
-from deps import _estimate_export_pages
+from deps import ApiResponse, _estimate_export_pages, logger
+from fastapi import APIRouter, HTTPException, Query
 
 router = APIRouter()
 
@@ -181,7 +178,7 @@ async def preview_document_export(
                 ExportOptions,
                 collect_export_data,
             )
-        except ImportError as e:
+        except ImportError:
             return ApiResponse(success=False, error="Modulo de exportacion no disponible")
 
         options = ExportOptions(
@@ -318,11 +315,11 @@ async def export_corrected_document(
 
         # Importar exportador
         try:
+            from narrative_assistant.corrections.base import CorrectionIssue
             from narrative_assistant.exporters.corrected_document_exporter import (
                 CorrectedDocumentExporter,
                 TrackChangeOptions,
             )
-            from narrative_assistant.corrections.base import CorrectionIssue
         except ImportError as e:
             logger.error(f"Corrected document exporter not available: {e}")
             return ApiResponse(
@@ -457,11 +454,11 @@ async def export_review_report(
 
         # Importar módulos necesarios
         try:
+            from narrative_assistant.corrections.base import CorrectionIssue
             from narrative_assistant.exporters.review_report_exporter import (
                 ReviewReportExporter,
                 ReviewReportOptions,
             )
-            from narrative_assistant.corrections.base import CorrectionIssue
         except ImportError as e:
             logger.error(f"Review report exporter not available: {e}")
             return ApiResponse(
@@ -577,12 +574,12 @@ async def preview_review_report(project_id: int):
 
         # Importar módulos
         try:
+            from narrative_assistant.corrections.base import CorrectionIssue
             from narrative_assistant.exporters.review_report_exporter import (
                 ReviewReportExporter,
                 ReviewReportOptions,
             )
-            from narrative_assistant.corrections.base import CorrectionIssue
-        except ImportError as e:
+        except ImportError:
             return ApiResponse(success=False, error="Módulo de informes no disponible")
 
         # Obtener alertas de corrección
@@ -688,8 +685,8 @@ async def export_scrivener(
 
     try:
         from narrative_assistant.exporters.scrivener_exporter import (
-            export_to_scrivener,
             ScrivenerExportOptions,
+            export_to_scrivener,
         )
 
         result = deps.project_manager.get(project_id)

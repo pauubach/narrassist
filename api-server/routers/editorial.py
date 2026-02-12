@@ -2,17 +2,18 @@
 Router: editorial
 """
 
-from fastapi import APIRouter
+from typing import Optional
+
 import deps
-from deps import logger
-from deps import ApiResponse
-from fastapi import HTTPException
-from fastapi import Body
-from fastapi import Request
-from fastapi import Query
-from typing import Optional, Any
-from datetime import datetime
-from deps import DefaultOverrideRequest, EditorialRulesRequest, CorrectionConfigUpdate, _field_label
+from deps import (
+    ApiResponse,
+    CorrectionConfigUpdate,
+    DefaultOverrideRequest,
+    EditorialRulesRequest,
+    _field_label,
+    logger,
+)
+from fastapi import APIRouter, Body, HTTPException, Query
 
 router = APIRouter()
 
@@ -387,11 +388,9 @@ async def detect_document_profile(project_id: str) -> ApiResponse:
         from narrative_assistant.corrections.config import (
             CorrectionConfig,
             DocumentField,
-            RegisterLevel,
-            AudienceType,
         )
-        from narrative_assistant.corrections.detectors.regional import RegionalDetector
         from narrative_assistant.corrections.detectors.field_terminology import BUILTIN_FIELD_TERMS
+        from narrative_assistant.corrections.detectors.regional import RegionalDetector
 
         # Obtener texto del documento (primeros capítulos)
         chapters = deps.chapter_repository.get_by_project(int(project_id)) if deps.chapter_repository else []
@@ -698,7 +697,7 @@ async def tag_scene(project_id: int, scene_id: int, data: dict):
         - notes: notas del usuario
     """
     try:
-        from narrative_assistant.scenes import SceneService, SceneType, SceneTone
+        from narrative_assistant.scenes import SceneService, SceneTone, SceneType
 
         if not deps.project_manager:
             return ApiResponse(success=False, error="Project manager not initialized")
@@ -861,7 +860,7 @@ async def filter_scenes(
         - participant_id: filtrar por participante
     """
     try:
-        from narrative_assistant.scenes import SceneService, SceneType, SceneTone
+        from narrative_assistant.scenes import SceneService, SceneTone, SceneType
 
         if not deps.project_manager:
             return ApiResponse(success=False, error="Project manager not initialized")
@@ -1244,7 +1243,9 @@ async def get_all_default_overrides():
     Estos son los cambios que el usuario ha hecho a los defaults de tipos/subtipos.
     """
     try:
-        from narrative_assistant.correction_config.defaults_repository import get_defaults_repository
+        from narrative_assistant.correction_config.defaults_repository import (
+            get_defaults_repository,
+        )
 
         repo = get_defaults_repository()
         overrides = repo.get_all_overrides()
@@ -1274,8 +1275,14 @@ async def get_type_default_override(
         ApiResponse con el override y la configuración efectiva
     """
     try:
-        from narrative_assistant.correction_config.defaults_repository import get_defaults_repository
-        from narrative_assistant.correction_config import get_correction_config, TYPES_REGISTRY, SUBTYPES_REGISTRY
+        from narrative_assistant.correction_config import (
+            SUBTYPES_REGISTRY,
+            TYPES_REGISTRY,
+            get_correction_config,
+        )
+        from narrative_assistant.correction_config.defaults_repository import (
+            get_defaults_repository,
+        )
 
         repo = get_defaults_repository()
         override = repo.get_override(type_code, subtype_code)
@@ -1322,8 +1329,10 @@ async def set_type_default_override(
         ApiResponse con el resultado y la configuración efectiva actualizada
     """
     try:
-        from narrative_assistant.correction_config.defaults_repository import get_defaults_repository
         from narrative_assistant.correction_config import get_correction_config
+        from narrative_assistant.correction_config.defaults_repository import (
+            get_defaults_repository,
+        )
 
         repo = get_defaults_repository()
         success = repo.set_override(type_code, subtype_code, request.overrides)
@@ -1357,8 +1366,10 @@ async def delete_type_default_override(
         subtype_code: Código del subtipo (opcional)
     """
     try:
-        from narrative_assistant.correction_config.defaults_repository import get_defaults_repository
         from narrative_assistant.correction_config import get_correction_config
+        from narrative_assistant.correction_config.defaults_repository import (
+            get_defaults_repository,
+        )
 
         repo = get_defaults_repository()
         deleted = repo.delete_override(type_code, subtype_code)
@@ -1385,7 +1396,9 @@ async def delete_all_default_overrides():
     Restaura todos los tipos y subtipos a sus valores hardcoded originales.
     """
     try:
-        from narrative_assistant.correction_config.defaults_repository import get_defaults_repository
+        from narrative_assistant.correction_config.defaults_repository import (
+            get_defaults_repository,
+        )
 
         repo = get_defaults_repository()
         count = repo.delete_all_overrides()
@@ -1407,8 +1420,10 @@ async def get_defaults_status():
     Útil para mostrar badges en la UI indicando qué tipos tienen modificaciones.
     """
     try:
-        from narrative_assistant.correction_config.defaults_repository import get_defaults_repository
         from narrative_assistant.correction_config import TYPES_REGISTRY
+        from narrative_assistant.correction_config.defaults_repository import (
+            get_defaults_repository,
+        )
 
         repo = get_defaults_repository()
         all_overrides = repo.get_all_overrides()

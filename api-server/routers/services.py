@@ -2,19 +2,17 @@
 Router: services
 """
 
-from fastapi import APIRouter
+
 import deps
-import json
-from deps import logger
-from deps import ApiResponse
-from fastapi import HTTPException
-from fastapi import Request
 from deps import (
+    ApiResponse,
     ChatRequest,
     _audience_label,
     _field_label,
     _register_label,
+    logger,
 )
+from fastapi import APIRouter, HTTPException
 
 router = APIRouter()
 
@@ -31,7 +29,7 @@ async def get_llm_status():
         - available_methods: Lista de métodos de inferencia disponibles
     """
     try:
-        from narrative_assistant.llm import is_llm_available, get_llm_client
+        from narrative_assistant.llm import get_llm_client, is_llm_available
 
         available = is_llm_available()
         client = get_llm_client()
@@ -91,7 +89,7 @@ async def start_ollama_service():
         ApiResponse con resultado de la operación
     """
     try:
-        from narrative_assistant.llm.ollama_manager import get_ollama_manager, OllamaStatus
+        from narrative_assistant.llm.ollama_manager import OllamaStatus, get_ollama_manager
 
         manager = get_ollama_manager()
         logger.info(f"Iniciando Ollama - installed: {manager.is_installed}, running: {manager.is_running}")
@@ -154,7 +152,7 @@ async def get_ollama_status():
         ApiResponse con estado de instalación, servicio y modelos
     """
     try:
-        from narrative_assistant.llm.ollama_manager import get_ollama_manager, OllamaStatus
+        from narrative_assistant.llm.ollama_manager import get_ollama_manager
 
         manager = get_ollama_manager()
         status = manager.status
@@ -306,9 +304,9 @@ async def get_languagetool_status():
     """
     try:
         from narrative_assistant.nlp.grammar.languagetool_manager import (
+            get_install_progress,
             get_languagetool_manager,
             is_lt_installing,
-            get_install_progress,
         )
 
         manager = get_languagetool_manager()
@@ -639,10 +637,10 @@ async def get_correction_presets() -> ApiResponse:
     """
     try:
         from narrative_assistant.corrections.config import (
+            AudienceType,
             CorrectionConfig,
             DocumentField,
             RegisterLevel,
-            AudienceType,
         )
 
         presets = [

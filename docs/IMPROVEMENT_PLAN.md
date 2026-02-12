@@ -1761,21 +1761,21 @@ Semana 3: S11 — NLP Avanzado + S12
 > se pierde al reanalizar (bug crítico), y definieron estructura de pricing, founding
 > members, y features de colaboración editorial.
 
-### Sprint SP-1: Persistencia de Trabajo en Reanálisis (~16h, 3-4 días)
+### Sprint SP-1: Persistencia de Trabajo en Reanálisis — COMPLETADO (v0.9.0)
 
 > **Prioridad**: INMEDIATA. Es un bug, no una feature. Los 3 correctores del panel
 > (Carmen, Miguel, Ana) lo calificaron 5/5 y dijeron: "Si pierdo mi trabajo al
 > reanalizar, desinstalo la herramienta." Tier: Corrector (base).
 
-| ID | Acción | Horas | Detalle |
-|----|--------|-------|---------|
-| SP1-01 | Fix content_hash para alertas posicionales | 2h | `spelling_*` incluye `start_char` en hash → si editas antes del typo, hash cambia y dismissal no machea. Eliminar `start_char`, usar `(word, chapter, alert_type)` como hash. Archivo: `alerts/models.py:153-157` |
-| SP1-02 | Verificar que `alert_dismissals` sobrevive cleanup | 1h | `run_cleanup()` en `_analysis_phases.py` ya NO borra `alert_dismissals`. Verificar y añadir test. |
-| SP1-03 | Llamar `apply_dismissals()` tras generación de alertas | 2h | En pipeline de análisis, después de generar alertas: cargar `dismissed_hashes` y marcar como dismissed las que machean. Archivo: `_analysis_phases.py` |
-| SP1-04 | Preservar entity merges entre reanálisis | 4h | Antes de cleanup: exportar merges activos `(canonical_name, merged_names[])`. Después de NER+fusion: re-aplicar merges por `canonical_name` matching. Nuevo: `merge_preservation.py` |
-| SP1-05 | Preservar atributos verificados (`is_verified=1`) | 2h | Antes de cleanup: snapshot de atributos con `is_verified=1`. Después de extracción: restaurar atributos verificados si la entidad existe (por nombre). |
-| SP1-06 | Preservar correcciones manuales (coref/speaker/focalización) | 2h | Las tablas `coreference_corrections`, `speaker_corrections`, `focalization_declarations` ya sobreviven cleanup. Verificar que se aplican en pipeline post-reanálisis. |
-| SP1-07 | Tests de persistencia en reanálisis | 3h | Tests: (a) dismissals sobreviven, (b) merges se re-aplican, (c) atributos verificados restaurados, (d) correcciones speaker aplicadas, (e) content_hash estable sin posiciones |
+| ID | Acción | Estado | Detalle |
+|----|--------|--------|---------|
+| SP1-01 | Fix content_hash para alertas posicionales | DONE | Eliminado `start_char` de hash para `spelling_*` y `grammar_*`. Hash usa `(word, chapter, alert_type)`. |
+| SP1-02 | Preservar trabajo editorial en cleanup | DONE | `run_cleanup()` ya NO borra: `alert_dismissals`, `suppression_rules`, `coreference_corrections`, `speaker_corrections`, `focalization_declarations`. Preserva `entity_merged` en `review_history`. |
+| SP1-03 | Auto-aplicar dismissals tras generación de alertas | DONE | Nueva función `_apply_saved_dismissals()` en pipeline: aplica dismissals por `content_hash` + reglas de supresión activas. |
+| SP1-04 | Preservar entity merges entre reanálisis | DONE | `_reapply_user_merges()` re-aplica fusiones de usuario desde `review_history` después de fusión automática. |
+| SP1-05 | Preservar atributos verificados (`is_verified=1`) | DONE | `run_cleanup()` guarda atributos verificados en `ctx`. `_restore_verified_attributes()` los restaura después de extracción de atributos. |
+| SP1-06 | Preservar correcciones manuales | DONE | Tablas de correcciones ya no se borran (SP1-02). Tests verifican que sobreviven cleanup. |
+| SP1-07 | Tests de persistencia en reanálisis | DONE | 25 tests en `test_sp1_reanalysis_persistence.py`: hash stability, cleanup preservation, auto-dismiss, user merges, verified attributes, manual corrections. |
 
 **Archivos a modificar**:
 - `api-server/routers/_analysis_phases.py` — cleanup + apply_dismissals en pipeline
@@ -1988,4 +1988,4 @@ Sprint S8 ✅ (S8a + S8b + S8c)                     S10 (Timeline)
 
 **Ultima actualizacion**: 2026-02-12
 **Autor**: Claude (Panel de 8 expertos simulados + sesión producto 10-Feb + paneles pricing/sales/editorial 12-Feb)
-**Estado**: S0-S8 completados (v0.8.0). Sprint PP completado (17/17). S7b-S7d completados. Tag: v0.8.6. Pendiente: SP-1..SP-3 (60h, ~3-4 semanas) + S9-S12 (24-37 días, ~6-9 semanas).
+**Estado**: S0-S8 completados (v0.8.0). Sprint PP completado (17/17). S7b-S7d completados. SP-1 completado (v0.9.0). Tag: v0.8.6 → v0.9.0. Pendiente: SP-2..SP-3 (~44h, 2-3 semanas) + S9-S12 (24-37 días, ~6-9 semanas).

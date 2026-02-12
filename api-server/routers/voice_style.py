@@ -2,14 +2,11 @@
 Router: voice_style
 """
 
-from fastapi import APIRouter
+from typing import Optional
+
 import deps
-from deps import logger
-from deps import ApiResponse
-from fastapi import HTTPException
-from fastapi import Query
-from typing import Optional, Any
-from datetime import datetime
+from deps import ApiResponse, logger
+from fastapi import APIRouter, HTTPException, Query
 
 router = APIRouter()
 
@@ -41,10 +38,10 @@ async def get_voice_profiles(
     try:
         import json as json_mod
 
-        from narrative_assistant.voice.profiles import VoiceProfileBuilder
-        from narrative_assistant.nlp.dialogue import detect_dialogues
         from narrative_assistant.entities.repository import get_entity_repository
+        from narrative_assistant.nlp.dialogue import detect_dialogues
         from narrative_assistant.persistence.chapter import get_chapter_repository
+        from narrative_assistant.voice.profiles import VoiceProfileBuilder
 
         # Verificar proyecto
         if not deps.project_manager:
@@ -224,10 +221,10 @@ async def compare_voice_profiles(
         ApiResponse con comparacion de perfiles
     """
     try:
-        from narrative_assistant.voice.profiles import VoiceProfileBuilder
-        from narrative_assistant.nlp.dialogue import detect_dialogues
         from narrative_assistant.entities.repository import get_entity_repository
+        from narrative_assistant.nlp.dialogue import detect_dialogues
         from narrative_assistant.persistence.chapter import get_chapter_repository
+        from narrative_assistant.voice.profiles import VoiceProfileBuilder
 
         if not deps.project_manager:
             return ApiResponse(success=False, error="Project manager not initialized")
@@ -427,11 +424,11 @@ async def get_voice_deviations(
             return ApiResponse(success=True, data=cached)
 
     try:
-        from narrative_assistant.voice.profiles import VoiceProfileBuilder
-        from narrative_assistant.voice.deviations import VoiceDeviationDetector
-        from narrative_assistant.nlp.dialogue import detect_dialogues
         from narrative_assistant.entities.repository import get_entity_repository
+        from narrative_assistant.nlp.dialogue import detect_dialogues
         from narrative_assistant.persistence.chapter import get_chapter_repository
+        from narrative_assistant.voice.deviations import VoiceDeviationDetector
+        from narrative_assistant.voice.profiles import VoiceProfileBuilder
 
         # Verificar proyecto
         if not deps.project_manager:
@@ -592,12 +589,11 @@ async def get_register_analysis(
             return ApiResponse(success=True, data=cached)
 
     try:
-        from narrative_assistant.voice.register import (
-            RegisterChangeDetector,
-            RegisterAnalyzer,
-        )
         from narrative_assistant.nlp.dialogue import detect_dialogues
         from narrative_assistant.persistence.chapter import get_chapter_repository
+        from narrative_assistant.voice.register import (
+            RegisterChangeDetector,
+        )
 
         # Verificar proyecto
         if not deps.project_manager:
@@ -963,8 +959,8 @@ async def create_focalization(project_id: int, data: dict):
     """Crea una nueva declaración de focalización para un capítulo/escena."""
     try:
         from narrative_assistant.focalization import (
-            FocalizationType,
             FocalizationDeclarationService,
+            FocalizationType,
             SQLiteFocalizationRepository,
         )
 
@@ -997,7 +993,7 @@ async def create_focalization(project_id: int, data: dict):
         )
 
         return ApiResponse(success=True, data=declaration.to_dict())
-    except ValueError as e:
+    except ValueError:
         return ApiResponse(success=False, error="Error interno del servidor")
     except HTTPException:
         raise
@@ -1011,8 +1007,8 @@ async def update_focalization(project_id: int, declaration_id: int, data: dict):
     """Actualiza una declaración de focalización existente."""
     try:
         from narrative_assistant.focalization import (
-            FocalizationType,
             FocalizationDeclarationService,
+            FocalizationType,
             SQLiteFocalizationRepository,
         )
 
@@ -1040,7 +1036,7 @@ async def update_focalization(project_id: int, declaration_id: int, data: dict):
         )
 
         return ApiResponse(success=True, data=declaration.to_dict())
-    except ValueError as e:
+    except ValueError:
         return ApiResponse(success=False, error="Error interno del servidor")
     except HTTPException:
         raise
@@ -1089,13 +1085,13 @@ async def detect_focalization_violations(project_id: int):
         return ApiResponse(success=True, data=cached)
 
     try:
+        from narrative_assistant.entities.repository import get_entity_repository
         from narrative_assistant.focalization import (
             FocalizationDeclarationService,
             FocalizationViolationDetector,
             SQLiteFocalizationRepository,
         )
         from narrative_assistant.persistence.chapter import get_chapter_repository
-        from narrative_assistant.entities.repository import get_entity_repository
 
         if not deps.project_manager:
             return ApiResponse(success=False, error="Project manager not initialized")
@@ -1166,13 +1162,13 @@ async def get_register_genre_comparison(
     respecto a lo esperado para el tipo de documento.
     """
     try:
-        from narrative_assistant.voice.register import (
-            RegisterChangeDetector,
-            REGISTER_GENRE_BENCHMARKS,
-            compare_register_with_benchmarks,
-        )
         from narrative_assistant.nlp.dialogue import detect_dialogues
         from narrative_assistant.persistence.chapter import get_chapter_repository
+        from narrative_assistant.voice.register import (
+            REGISTER_GENRE_BENCHMARKS,
+            RegisterChangeDetector,
+            compare_register_with_benchmarks,
+        )
 
         if not deps.project_manager:
             return ApiResponse(success=False, error="Project manager not initialized")

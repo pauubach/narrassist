@@ -16,7 +16,7 @@ import sys
 import threading
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Any
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
@@ -26,7 +26,7 @@ logger = logging.getLogger("narrative_assistant.api")
 # Constants
 # ============================================================================
 
-BACKEND_VERSION = "0.8.6"
+BACKEND_VERSION = "0.9.0"
 IS_EMBEDDED_RUNTIME = os.environ.get("NA_EMBEDDED") == "1" or "python-embed" in (sys.executable or "").lower()
 
 # Minimum required Python version (major, minor)
@@ -109,8 +109,9 @@ def load_narrative_assistant_modules():
 
     Sets module-level globals directly.
     """
-    import deps  # self-import to set module globals
     import importlib.util
+
+    import deps  # self-import to set module globals
 
     if deps.MODULES_LOADED:
         return True
@@ -121,11 +122,11 @@ def load_narrative_assistant_modules():
     # Phase 1: DB/persistence
     try:
         _write_debug("On-demand Phase 1: Loading persistence modules...")
-        from narrative_assistant.persistence.project import ProjectManager
-        from narrative_assistant.persistence.database import get_database as get_db, Database as DB
-        from narrative_assistant.persistence.chapter import ChapterRepository, SectionRepository
         from narrative_assistant.core.config import get_config as get_cfg
-        from narrative_assistant import __version__
+        from narrative_assistant.persistence.chapter import ChapterRepository, SectionRepository
+        from narrative_assistant.persistence.database import Database as DB
+        from narrative_assistant.persistence.database import get_database as get_db
+        from narrative_assistant.persistence.project import ProjectManager
         _write_debug("On-demand Phase 1 OK: persistence imports succeeded")
     except Exception as e:
         error_msg = f"Phase 1 FAILED (persistence): {type(e).__name__}: {e}"
@@ -652,8 +653,8 @@ def _check_languagetool_available(auto_start: bool = False) -> bool:
     if auto_start:
         try:
             from narrative_assistant.nlp.grammar import (
-                is_languagetool_installed,
                 ensure_languagetool_running,
+                is_languagetool_installed,
             )
             if is_languagetool_installed():
                 logger.info("LanguageTool instalado pero no corriendo, intentando iniciar...")
@@ -673,8 +674,8 @@ def find_python_executable() -> tuple[str | None, str | None, str | None]:
     Encuentra el ejecutable de Python del sistema con version 3.10+.
     """
     import os
-    import sys
     import shutil
+    import sys
 
     IS_EMBEDDED_RUNTIME = os.environ.get("NA_EMBEDDED") == "1" or "python-embed" in (sys.executable or "").lower()
 
@@ -683,8 +684,8 @@ def find_python_executable() -> tuple[str | None, str | None, str | None]:
         version_str = f"{version_info.major}.{version_info.minor}.{version_info.micro}"
         return sys.executable, version_str, None
 
-    import subprocess
     import re
+    import subprocess
     from pathlib import Path
 
     def check_python_version(python_cmd: str) -> tuple[str | None, str | None]:

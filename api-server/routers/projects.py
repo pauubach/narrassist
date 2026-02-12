@@ -2,15 +2,12 @@
 Router: projects
 """
 
-from fastapi import APIRouter
+from typing import Optional
+
 import deps
-from deps import logger
-from deps import ApiResponse
-from fastapi import HTTPException
-from fastapi import UploadFile, File
-from fastapi import Body
-from typing import Optional, Any
-from deps import ProjectResponse, _get_project_stats
+from deps import ApiResponse, ProjectResponse, _get_project_stats, logger
+from fastapi import APIRouter, Body, File, HTTPException, UploadFile
+
 from narrative_assistant.alerts.models import AlertStatus
 
 router = APIRouter()
@@ -87,8 +84,8 @@ async def list_projects():
                     deps._write_debug(f"list_projects: post-repair tables={post_names}")
                     logger.info(f"list_projects: Schema repaired, tables now: {post_names}")
                     if 'projects' not in post_names:
-                        logger.error(f"list_projects: Schema repair FAILED, still no 'projects' table")
-                        deps._write_debug(f"list_projects: repair FAILED, still no 'projects'")
+                        logger.error("list_projects: Schema repair FAILED, still no 'projects' table")
+                        deps._write_debug("list_projects: repair FAILED, still no 'projects'")
                         return ApiResponse(success=False, error="Database not initialized properly - 'projects' table missing")
                 except Exception as repair_err:
                     logger.error(f"list_projects: Schema repair failed: {repair_err}", exc_info=True)
@@ -388,7 +385,6 @@ async def create_project(
         ApiResponse con el proyecto creado
     """
     try:
-        import shutil
         import uuid
         from pathlib import Path
 
@@ -462,9 +458,8 @@ async def create_project(
             )
 
         try:
-            from narrative_assistant.persistence.project import ProjectManager, Project
-            from narrative_assistant.parsers.base import detect_format
             from narrative_assistant.parsers import get_parser
+            from narrative_assistant.parsers.base import detect_format
 
             # Detectar formato del documento
             doc_format = detect_format(document_path)
@@ -513,7 +508,7 @@ async def create_project(
             project = create_result.value
 
             if project is None:
-                logger.error(f"create_from_document returned success but value is None")
+                logger.error("create_from_document returned success but value is None")
                 raise HTTPException(status_code=500, detail="Error interno: proyecto no creado")
 
             project_data = ProjectResponse(
@@ -543,7 +538,7 @@ async def create_project(
                 message="Proyecto creado. Use /analyze para iniciar el análisis."
             )
 
-        except Exception as e:
+        except Exception:
             # Limpiar archivo si hay error (solo si fue subido)
             if file and stored_path and Path(stored_path).exists():
                 Path(stored_path).unlink()

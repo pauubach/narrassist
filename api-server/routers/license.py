@@ -4,11 +4,8 @@ Router: license
 Endpoints para gestion de licencias, dispositivos, cuotas (paginas) y features por tier.
 """
 
+from deps import ApiResponse, DeviceDeactivationRequest, LicenseActivationRequest, logger
 from fastapi import APIRouter, Body
-
-import deps
-from deps import ApiResponse, DeviceDeactivationRequest, LicenseActivationRequest
-from deps import logger
 
 router = APIRouter()
 

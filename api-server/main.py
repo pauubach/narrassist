@@ -31,6 +31,7 @@ import os
 import sys
 from pathlib import Path
 
+
 # CRITICAL: Write early debug info FIRST
 def _write_debug(msg):
     """Write debug message to file"""
@@ -87,6 +88,7 @@ def _configure_ssl_with_certifi():
     """Configure SSL to use certifi certificates globally."""
     try:
         import ssl
+
         import certifi
 
         # Create default context with certifi
@@ -112,11 +114,11 @@ def _configure_ssl_with_certifi():
 
 _configure_ssl_with_certifi()
 
-import site
-import shutil
-
 # Setup logging IMMEDIATELY for early debugging
 import logging
+import shutil
+import site
+
 
 # Version: read from pyproject.toml or narrative_assistant package
 def _get_version():
@@ -184,7 +186,7 @@ _early_logger.info("="*80)
 
 try:
     _write_debug("=== sys.path setup starting ===")
-    _early_logger.info(f"=== Initial sys.path setup ===")
+    _early_logger.info("=== Initial sys.path setup ===")
     _early_logger.info(f"Python executable: {sys.executable}")
     _early_logger.info(f"sys.path before modifications: {sys.path[:3]}...")
 
@@ -217,7 +219,7 @@ try:
             if user_site and os.path.exists(user_site) and user_site not in sys.path:
                 sys.path.append(user_site)
                 _write_debug("Added user site to sys.path")
-                _early_logger.info(f"Added user site-packages to sys.path")
+                _early_logger.info("Added user site-packages to sys.path")
         except Exception as site_err:
             _write_debug(f"Could not get user site-packages: {site_err}")
             _early_logger.warning(f"Could not get user site-packages: {site_err}")
@@ -241,7 +243,7 @@ try:
                 if conda_site not in sys.path:
                     sys.path.insert(0, conda_site)
                     _write_debug("Added conda site to sys.path")
-                    _early_logger.info(f"Added Anaconda site-packages to sys.path")
+                    _early_logger.info("Added Anaconda site-packages to sys.path")
                 break
         else:
             _write_debug("No Anaconda installation found")
@@ -277,12 +279,11 @@ deps.IS_EMBEDDED_RUNTIME = IS_EMBEDDED_RUNTIME
 _write_debug("=== PHASE 1: Loading persistence modules ===")
 _DB_MODULES_LOADED = False
 try:
-    from narrative_assistant.persistence.project import ProjectManager
-    from narrative_assistant.persistence.database import get_database, Database
-    from narrative_assistant.persistence.chapter import ChapterRepository, SectionRepository
-    from narrative_assistant.core.config import get_config
-    from narrative_assistant.core.result import Result
     from narrative_assistant import __version__ as NA_VERSION
+    from narrative_assistant.core.config import get_config
+    from narrative_assistant.persistence.chapter import ChapterRepository, SectionRepository
+    from narrative_assistant.persistence.database import Database, get_database
+    from narrative_assistant.persistence.project import ProjectManager
     _DB_MODULES_LOADED = True
     deps.NA_VERSION = NA_VERSION
     _write_debug("Phase 1 OK: persistence modules loaded")
@@ -352,7 +353,6 @@ if _DB_MODULES_LOADED:
 
     try:
         from narrative_assistant.alerts.repository import AlertRepository
-        from narrative_assistant.alerts.models import AlertStatus, AlertSeverity
         deps.alert_repository = AlertRepository()
         _write_debug("Phase 2b OK: AlertRepository loaded")
     except Exception as e:
@@ -399,7 +399,7 @@ try:
 
     logger = logging.getLogger(__name__)
     logger.info(f"Server starting - NA_VERSION: {deps.NA_VERSION}, MODULES_LOADED: {deps.MODULES_LOADED}")
-    _early_logger.info(f"Creating FastAPI app instance...")
+    _early_logger.info("Creating FastAPI app instance...")
 
     app = FastAPI(
         title="Narrative Assistant API",
@@ -499,8 +499,7 @@ try:
     _early_logger.info("license router imported")
 
     _early_logger.info("Importing services router...")
-    from routers import services
-    from routers import collections
+    from routers import collections, services
     _early_logger.info("services router imported")
 
     _early_logger.info("All routers imported successfully")
@@ -614,8 +613,9 @@ async def startup_load_modules():
 
 if __name__ == "__main__":
     import sys
-    import uvicorn
     import traceback
+
+    import uvicorn
 
     _early_logger.info("=== Main block starting ===")
     _write_debug("=== Main block starting ===")
@@ -626,7 +626,7 @@ if __name__ == "__main__":
     if sys.stderr is None:
         sys.stderr = open('nul', 'w') if sys.platform == 'win32' else open('/dev/null', 'w')
     if sys.stdin is None:
-        sys.stdin = open('nul', 'r') if sys.platform == 'win32' else open('/dev/null', 'r')
+        sys.stdin = open('nul') if sys.platform == 'win32' else open('/dev/null')
 
     if not hasattr(sys.stdout, 'isatty'):
         sys.stdout.isatty = lambda: False
@@ -672,10 +672,10 @@ if __name__ == "__main__":
         _early_logger.info("uvicorn.run() returned (server stopped)")
 
     except Exception as e:
-        error_msg = f"\n\n===== ERROR FATAL =====\n"
+        error_msg = "\n\n===== ERROR FATAL =====\n"
         error_msg += f"Error type: {type(e).__name__}\n"
         error_msg += f"Error message: {e}\n"
-        error_msg += f"\nTraceback:\n"
+        error_msg += "\nTraceback:\n"
 
         print(error_msg, file=sys.stderr)
         traceback.print_exc(file=sys.stderr)

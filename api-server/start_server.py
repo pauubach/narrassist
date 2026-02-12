@@ -7,8 +7,8 @@ Uso:
     python start_server.py --production # Modo producción
 """
 
-import sys
 import logging
+import sys
 from pathlib import Path
 
 # Añadir el directorio src/ al path para importar narrative_assistant
@@ -35,8 +35,8 @@ def start_server(production: bool = False):
     logger.info("Narrative Assistant - API Server")
     logger.info("=" * 60)
     logger.info(f"Modo: {'PRODUCTION' if production else 'DEVELOPMENT'}")
-    logger.info(f"URL: http://127.0.0.1:8008")
-    logger.info(f"Docs: http://127.0.0.1:8008/docs")
+    logger.info("URL: http://127.0.0.1:8008")
+    logger.info("Docs: http://127.0.0.1:8008/docs")
     logger.info("=" * 60)
 
     uvicorn.run(

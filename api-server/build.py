@@ -10,10 +10,10 @@ Uso:
     python build.py --clean            # Limpiar build anterior
 """
 
-import sys
+import logging
 import shutil
 import subprocess
-import logging
+import sys
 from pathlib import Path
 
 logging.basicConfig(

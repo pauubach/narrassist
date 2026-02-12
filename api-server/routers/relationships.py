@@ -2,16 +2,11 @@
 Router: relationships
 """
 
-from fastapi import APIRouter
+from typing import Optional
+
 import deps
-import json
-from deps import logger
-from deps import ApiResponse
-from fastapi import HTTPException
-from fastapi import Query
-from typing import Optional, Any
-from datetime import datetime
-from deps import convert_numpy_types
+from deps import ApiResponse, convert_numpy_types, logger
+from fastapi import APIRouter, HTTPException, Query
 
 router = APIRouter()
 
@@ -40,8 +35,8 @@ async def get_project_relationships(project_id: int):
 
     try:
         from narrative_assistant.analysis import (
-            RelationshipClusteringEngine,
             CharacterKnowledgeAnalyzer,
+            RelationshipClusteringEngine,
         )
         from narrative_assistant.entities.repository import get_entity_repository
         from narrative_assistant.persistence.chapter import get_chapter_repository
@@ -207,7 +202,7 @@ async def get_project_relationships(project_id: int):
                     cooccurrence_count += 1
 
         logger.info(f"[RELATIONSHIPS-API] Co-ocurrencias detectadas: {cooccurrence_count}")
-        
+
         # Ejecutar análisis de clustering
         clustering_result = clustering_engine.analyze()
 
@@ -252,7 +247,7 @@ async def get_project_relationships(project_id: int):
         relations_count = len(clustering_result.get("relations", []))
         clusters_count = len(clustering_result.get("clusters", []))
         logger.info(f"[RELATIONSHIPS-API] Resultado: {relations_count} relaciones, {clusters_count} clusters, {len(asymmetries)} asimetrías")
-        
+
         response_data = {
             "project_id": project_id,
             "entity_count": len(entities),
@@ -584,11 +579,12 @@ async def create_relationship(project_id: int, payload: deps.CreateRelationshipR
         ApiResponse con la relación creada
     """
     try:
-        from narrative_assistant.relationships.repository import get_relationship_repository
-        from narrative_assistant.relationships.models import EntityRelationship, RelationType
-        from narrative_assistant.entities.repository import get_entity_repository
         import uuid
         from datetime import datetime
+
+        from narrative_assistant.entities.repository import get_entity_repository
+        from narrative_assistant.relationships.models import EntityRelationship, RelationType
+        from narrative_assistant.relationships.repository import get_relationship_repository
 
         source_entity_id = payload.source_entity_id
         target_entity_id = payload.target_entity_id
@@ -695,11 +691,11 @@ async def analyze_character_behavior(project_id: int, character_id: int):
         ApiResponse con perfil comportamental del personaje
     """
     try:
+        from narrative_assistant.entities.repository import get_entity_repository
         from narrative_assistant.llm import (
             ExpectationInferenceEngine,
             is_llm_available,
         )
-        from narrative_assistant.entities.repository import get_entity_repository
         from narrative_assistant.persistence.chapter import get_chapter_repository
 
         if not is_llm_available():
@@ -807,11 +803,11 @@ async def detect_character_violations(
         ApiResponse con lista de violaciones detectadas
     """
     try:
+        from narrative_assistant.entities.repository import get_entity_repository
         from narrative_assistant.llm import (
             ExpectationInferenceEngine,
             is_llm_available,
         )
-        from narrative_assistant.entities.repository import get_entity_repository
         from narrative_assistant.persistence.chapter import get_chapter_repository
 
         if not is_llm_available():
@@ -958,8 +954,8 @@ async def get_emotional_analysis(project_id: int):
 
     try:
         from narrative_assistant.analysis.emotional_coherence import (
-            get_emotional_coherence_checker,
             EmotionalIncoherence,
+            get_emotional_coherence_checker,
         )
         from narrative_assistant.nlp.dialogue import detect_dialogues
 
@@ -1068,11 +1064,11 @@ async def get_character_emotional_profile(project_id: int, character_name: str):
     - Incoherencias relacionadas con el personaje
     """
     try:
-        from narrative_assistant.nlp.sentiment import get_sentiment_analyzer
         from narrative_assistant.analysis.emotional_coherence import (
             get_emotional_coherence_checker,
         )
         from narrative_assistant.nlp.dialogue import detect_dialogues
+        from narrative_assistant.nlp.sentiment import get_sentiment_analyzer
 
         # Obtener capítulos
         chapters = deps.chapter_repository.get_by_project(project_id)
@@ -1258,8 +1254,8 @@ async def generate_vital_status_alerts(project_id: int):
     que no sea una referencia válida (flashback, recuerdo, etc.).
     """
     try:
-        from narrative_assistant.analysis.vital_status import analyze_vital_status
         from narrative_assistant.alerts import get_alert_engine
+        from narrative_assistant.analysis.vital_status import analyze_vital_status
 
         # Obtener capítulos
         chapters = deps.chapter_repository.get_by_project(project_id)

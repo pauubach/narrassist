@@ -8,15 +8,13 @@ S8a-14: Refactor monolito → funciones standalone.
 """
 
 import json
-import logging
 import threading
 import time
 from collections import Counter
-from pathlib import Path
 from typing import Any
 
 import deps
-from deps import ApiResponse, generate_person_aliases, logger
+from deps import generate_person_aliases, logger
 
 # ============================================================================
 # ProgressTracker: encapsula toda la lógica de progreso
@@ -300,7 +298,35 @@ def run_cleanup(ctx: dict, tracker: ProgressTracker):
             # Borrar alertas existentes
             conn.execute("DELETE FROM alerts WHERE project_id = ?", (project_id,))
             # Borrar historial de revisión
-            conn.execute("DELETE FROM review_history WHERE project_id = ?", (project_id,))
+            # SP-1: Preservar entity_merged en review_history (instrucciones de merge del usuario)
+            conn.execute(
+                "DELETE FROM review_history WHERE project_id = ? AND action_type != 'entity_merged'",
+                (project_id,),
+            )
+            # SP-1: Guardar atributos verificados antes de borrar
+            verified_attrs = conn.execute(
+                "SELECT e.canonical_name, ea.attribute_key, ea.attribute_value, "
+                "ea.attribute_type, ea.confidence "
+                "FROM entity_attributes ea "
+                "JOIN entities e ON ea.entity_id = e.id "
+                "WHERE e.project_id = ? AND ea.is_verified = 1",
+                (project_id,),
+            ).fetchall()
+            if verified_attrs:
+                ctx["_sp1_verified_attrs"] = [
+                    {
+                        "entity_name": r["canonical_name"],
+                        "attribute_key": r["attribute_key"],
+                        "attribute_value": r["attribute_value"],
+                        "attribute_type": r["attribute_type"],
+                        "confidence": r["confidence"],
+                    }
+                    for r in verified_attrs
+                ]
+                logger.info(
+                    f"SP-1: Saved {len(verified_attrs)} verified attributes for restoration"
+                )
+
             # Borrar atributos y evidencias
             conn.execute(
                 "DELETE FROM attribute_evidences WHERE attribute_id IN "
@@ -341,14 +367,13 @@ def run_cleanup(ctx: dict, tracker: ProgressTracker):
             conn.execute("DELETE FROM character_location_events WHERE project_id = ?", (project_id,))
             # Borrar OOC events (S8a-05)
             conn.execute("DELETE FROM ooc_events WHERE project_id = ?", (project_id,))
-            # Borrar focalization
-            conn.execute("DELETE FROM focalization_declarations WHERE project_id = ?", (project_id,))
-            # Borrar correcciones de correferencia y speaker
-            conn.execute("DELETE FROM coreference_corrections WHERE project_id = ?", (project_id,))
-            conn.execute("DELETE FROM speaker_corrections WHERE project_id = ?", (project_id,))
-            # Borrar alert dismissals y suppression rules
-            conn.execute("DELETE FROM alert_dismissals WHERE project_id = ?", (project_id,))
-            conn.execute("DELETE FROM suppression_rules WHERE project_id = ?", (project_id,))
+            # SP-1: Preservar trabajo editorial del usuario entre re-análisis:
+            # - focalization_declarations: declaraciones manuales de POV
+            # - coreference_corrections: correcciones manuales de correferencia
+            # - speaker_corrections: correcciones manuales de speaker
+            # - alert_dismissals: alertas descartadas por content_hash
+            # - suppression_rules: reglas de supresión del usuario
+            # Estas tablas NO se borran.
             # Borrar analysis phases
             conn.execute("DELETE FROM analysis_phases WHERE run_id IN (SELECT id FROM analysis_runs WHERE project_id = ?)", (project_id,))
             conn.execute("DELETE FROM analysis_runs WHERE project_id = ?", (project_id,))
@@ -628,7 +653,6 @@ def claim_heavy_slot_or_queue(ctx: dict, tracker: ProgressTracker) -> bool:
         True si se reclamó el slot (continuar con fases pesadas).
         False si el proyecto fue encolado (detener aquí).
     """
-    from narrative_assistant.persistence.project import ProjectManager
 
     project_id = ctx["project_id"]
     project = ctx["project"]
@@ -1234,6 +1258,9 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
         except Exception as recon_err:
             logger.warning(f"Error reconciliando contadores de menciones: {recon_err}")
 
+        # SP-1: Re-aplicar merges de usuario que no haya descubierto la fusión automática
+        _reapply_user_merges(project_id, entity_repo, entities)
+
         deps.analysis_progress_storage[project_id]["progress"] = 57
         tracker.update_time_remaining()
 
@@ -1580,7 +1607,6 @@ def run_attributes(ctx: dict, tracker: ProgressTracker):
         entity_repo = get_entity_repository()
 
         # Preparar menciones
-        from narrative_assistant.entities.models import EntityType
         character_entities = [
             e for e in entities if e.entity_type.value == "character"
         ]
@@ -1848,6 +1874,9 @@ def run_attributes(ctx: dict, tracker: ProgressTracker):
                         deps.analysis_progress_storage[project_id]["current_action"] = (
                             f"Guardando características... ({attrs_processed}/{total_attrs})"
                         )
+
+    # SP-1: Restaurar is_verified en atributos que el usuario verificó antes
+    _restore_verified_attributes(ctx)
 
     tracker.end_phase("attributes", 5)
     deps.analysis_progress_storage[project_id]["metrics"]["attributes_extracted"] = len(
@@ -2563,6 +2592,210 @@ def run_alerts(ctx: dict, tracker: ProgressTracker):
     logger.info(f"Alerts phase complete: {alerts_created} alerts created")
 
     ctx["alerts_created"] = alerts_created
+
+    # SP-1: Auto-descartar alertas que el usuario ya había descartado
+    _apply_saved_dismissals(project_id)
+
+
+def _restore_verified_attributes(ctx: dict):
+    """
+    SP-1: Restaura is_verified=1 en atributos que el usuario había verificado.
+
+    Busca en los atributos recién creados aquellos que coinciden con los
+    que el usuario verificó en el análisis anterior (guardados en ctx por run_cleanup).
+    """
+    verified_attrs = ctx.get("_sp1_verified_attrs")
+    if not verified_attrs:
+        return
+
+    project_id = ctx["project_id"]
+    try:
+        from narrative_assistant.persistence.database import get_database
+
+        db = get_database()
+        restored = 0
+
+        for va in verified_attrs:
+            entity_name = va["entity_name"]
+            attr_key = va["attribute_key"]
+            attr_value = va["attribute_value"]
+
+            with db.connection() as conn:
+                # Buscar el atributo recién creado que coincida
+                row = conn.execute(
+                    "SELECT ea.id FROM entity_attributes ea "
+                    "JOIN entities e ON ea.entity_id = e.id "
+                    "WHERE e.project_id = ? AND e.canonical_name = ? "
+                    "AND ea.attribute_key = ? AND ea.attribute_value = ? "
+                    "AND ea.is_verified = 0 "
+                    "LIMIT 1",
+                    (project_id, entity_name, attr_key, attr_value),
+                ).fetchone()
+
+            if row:
+                with db.transaction() as conn:
+                    conn.execute(
+                        "UPDATE entity_attributes SET is_verified = 1 WHERE id = ?",
+                        (row["id"],),
+                    )
+                restored += 1
+
+        if restored > 0:
+            logger.info(
+                f"SP-1: Restored is_verified on {restored}/{len(verified_attrs)} attributes"
+            )
+
+    except Exception as e:
+        logger.warning(f"SP-1: Error restoring verified attributes: {e}")
+
+
+def _reapply_user_merges(project_id: int, entity_repo, entities: list):
+    """
+    SP-1: Re-aplica fusiones de usuario preservadas en review_history.
+
+    Después de NER + fusión automática, verifica si hay merges de usuario
+    previos (action_type='entity_merged') que la fusión automática no descubrió.
+    Si ambas entidades existen con sus canonical_names originales, las fusiona.
+    """
+    try:
+        from narrative_assistant.persistence.database import get_database
+
+        db = get_database()
+        with db.connection() as conn:
+            rows = conn.execute(
+                "SELECT old_value_json, new_value_json FROM review_history "
+                "WHERE project_id = ? AND action_type = 'entity_merged' "
+                "ORDER BY created_at ASC",
+                (project_id,),
+            ).fetchall()
+
+        if not rows:
+            return
+
+        # Construir índice de entidades actuales por nombre
+        entities_by_name = {}
+        for ent in entities:
+            if ent.canonical_name:
+                entities_by_name[ent.canonical_name.lower()] = ent
+
+        reapplied = 0
+        for row in rows:
+            try:
+                old_data = json.loads(row["old_value_json"])
+                names_before = old_data.get("canonical_names_before", [])
+
+                if len(names_before) < 2:
+                    continue
+
+                # Buscar si las entidades que fueron fusionadas antes existen ahora
+                # como entidades separadas (la fusión automática no las unió)
+                primary_name = names_before[0].lower()
+                primary = entities_by_name.get(primary_name)
+
+                for secondary_name_raw in names_before[1:]:
+                    secondary_name = secondary_name_raw.lower()
+                    secondary = entities_by_name.get(secondary_name)
+
+                    if not primary or not secondary or primary.id == secondary.id:
+                        continue
+
+                    # Verificar que la fusión automática no las unió ya
+                    if secondary.canonical_name in (primary.aliases or []):
+                        continue
+
+                    # Re-aplicar el merge
+                    if primary.aliases is None:
+                        primary.aliases = []
+                    if secondary.canonical_name not in primary.aliases:
+                        primary.aliases.append(secondary.canonical_name)
+
+                    if primary.merged_from_ids is None:
+                        primary.merged_from_ids = []
+                    if secondary.id and secondary.id not in primary.merged_from_ids:
+                        primary.merged_from_ids.append(secondary.id)
+
+                    entity_repo.update_entity(
+                        entity_id=primary.id,
+                        aliases=primary.aliases,
+                        merged_from_ids=primary.merged_from_ids,
+                    )
+                    entity_repo.move_mentions(secondary.id, primary.id)
+                    entity_repo.delete_entity(secondary.id, hard_delete=False)
+
+                    # Remover del índice
+                    entities_by_name.pop(secondary_name, None)
+
+                    logger.info(
+                        f"SP-1: Re-applied user merge: '{secondary.canonical_name}' → "
+                        f"'{primary.canonical_name}'"
+                    )
+                    reapplied += 1
+
+            except (json.JSONDecodeError, KeyError, TypeError) as e:
+                logger.debug(f"SP-1: Skip malformed merge history entry: {e}")
+
+        if reapplied > 0:
+            logger.info(f"SP-1: Re-applied {reapplied} user merges from previous analysis")
+
+    except Exception as e:
+        logger.warning(f"SP-1: Error reapplying user merges: {e}")
+
+
+def _apply_saved_dismissals(project_id: int):
+    """Aplica dismissals y suppression rules guardados a alertas recién generadas."""
+    try:
+        from narrative_assistant.alerts.repository import get_alert_repository
+        from narrative_assistant.persistence.dismissal_repository import get_dismissal_repository
+
+        alert_repo = get_alert_repository()
+        dismissal_repo = get_dismissal_repository()
+
+        # 1. Aplicar dismissals por content_hash
+        result = alert_repo.apply_dismissals(project_id)
+        if result.is_success and result.value > 0:
+            logger.info(f"SP-1: Auto-dismissed {result.value} alerts from saved dismissals")
+
+        # 2. Aplicar suppression rules
+        from narrative_assistant.persistence.database import get_database
+
+        db = get_database()
+        rules_result = dismissal_repo.get_suppression_rules(project_id, active_only=True)
+        if rules_result.is_failure:
+            return
+
+        rules = rules_result.value
+        if not rules:
+            return
+
+        # Obtener alertas activas y comprobar contra reglas
+        suppressed_count = 0
+        with db.connection() as conn:
+            rows = conn.execute(
+                "SELECT id, alert_type, source_module, content_hash FROM alerts "
+                "WHERE project_id = ? AND status NOT IN ('dismissed', 'resolved', 'auto_resolved')",
+                (project_id,),
+            ).fetchall()
+
+        for row in rows:
+            if dismissal_repo.is_suppressed(
+                project_id,
+                alert_type=row["alert_type"] or "",
+                source_module=row["source_module"] if "source_module" in row else "",
+            ):
+                with db.transaction() as conn:
+                    conn.execute(
+                        "UPDATE alerts SET status = 'dismissed', "
+                        "resolution_note = 'Auto-suprimida por regla de supresión' "
+                        "WHERE id = ?",
+                        (row["id"],),
+                    )
+                suppressed_count += 1
+
+        if suppressed_count > 0:
+            logger.info(f"SP-1: Suppressed {suppressed_count} alerts from active rules")
+
+    except Exception as e:
+        logger.warning(f"SP-1: Error applying saved dismissals: {e}")
 
 
 # ============================================================================
