@@ -81,9 +81,7 @@ class LicenseExpiredError(LicenseError):
 
     def __post_init__(self):
         if self.user_message is None:
-            self.user_message = (
-                "Tu licencia ha expirado. Por favor, renueva tu suscripcion para continuar."
-            )
+            self.user_message = "Tu licencia ha expirado. Por favor, renueva tu suscripcion para continuar."
         super().__post_init__()
 
 
@@ -104,7 +102,9 @@ class LicenseOfflineError(LicenseError):
                 "Conectate a internet para verificar tu licencia."
             )
         else:
-            self.user_message = "No se puede verificar la licencia sin conexion a internet."
+            self.user_message = (
+                "No se puede verificar la licencia sin conexion a internet."
+            )
         super().__post_init__()
 
 
@@ -138,13 +138,17 @@ class DeviceCooldownError(LicenseError):
 
     def __post_init__(self):
         if self.cooldown_ends:
-            hours_remaining = int((self.cooldown_ends - datetime.utcnow()).total_seconds() / 3600)
+            hours_remaining = int(
+                (self.cooldown_ends - datetime.utcnow()).total_seconds() / 3600
+            )
             self.user_message = (
                 f"Este dispositivo fue desactivado recientemente. "
                 f"Podras reactivarlo en {hours_remaining} horas."
             )
         else:
-            self.user_message = "Este dispositivo esta en periodo de espera tras desactivacion."
+            self.user_message = (
+                "Este dispositivo esta en periodo de espera tras desactivacion."
+            )
         super().__post_init__()
 
 
@@ -201,7 +205,9 @@ class TierFeatureError(LicenseError):
 
     def __post_init__(self):
         if self.user_message is None:
-            feature_name = self.feature.display_name if self.feature else "esta funcionalidad"
+            feature_name = (
+                self.feature.display_name if self.feature else "esta funcionalidad"
+            )
             self.user_message = (
                 f"{feature_name} requiere el plan {self.required_tier}. "
                 "Actualiza tu plan para acceder."
@@ -337,7 +343,9 @@ class LicenseVerifier:
 
             # 4. Verificar estado final
             if license_obj.status == LicenseStatus.EXPIRED:
-                return Result.failure(LicenseExpiredError(expired_at=license_obj.expires_at))
+                return Result.failure(
+                    LicenseExpiredError(expired_at=license_obj.expires_at)
+                )
 
             # 5. Calcular cuota restante (paginas)
             quota_remaining = self._calculate_quota_remaining(license_obj)
@@ -351,7 +359,8 @@ class LicenseVerifier:
                 is_offline=license_obj.is_in_grace_period,
                 grace_remaining=license_obj.grace_period_remaining,
                 quota_remaining=quota_remaining,
-                devices_remaining=license_obj.limits.max_devices - license_obj.active_device_count,
+                devices_remaining=license_obj.limits.max_devices
+                - license_obj.active_device_count,
             )
 
             # Cache global
@@ -655,8 +664,16 @@ class LicenseVerifier:
                 (
                     device.status.value,
                     device.activated_at.isoformat() if device.activated_at else None,
-                    device.deactivated_at.isoformat() if device.deactivated_at else None,
-                    device.cooldown_ends_at.isoformat() if device.cooldown_ends_at else None,
+                    (
+                        device.deactivated_at.isoformat()
+                        if device.deactivated_at
+                        else None
+                    ),
+                    (
+                        device.cooldown_ends_at.isoformat()
+                        if device.cooldown_ends_at
+                        else None
+                    ),
                     device.last_seen_at.isoformat() if device.last_seen_at else None,
                     1 if device.is_current_device else 0,
                     device.id,
@@ -1012,12 +1029,16 @@ class LicenseVerifier:
                     (
                         license_obj.tier.value,
                         license_obj.status.value,
-                        license_obj.last_verified_at.isoformat()
-                        if license_obj.last_verified_at
-                        else None,
-                        license_obj.grace_period_ends_at.isoformat()
-                        if license_obj.grace_period_ends_at
-                        else None,
+                        (
+                            license_obj.last_verified_at.isoformat()
+                            if license_obj.last_verified_at
+                            else None
+                        ),
+                        (
+                            license_obj.grace_period_ends_at.isoformat()
+                            if license_obj.grace_period_ends_at
+                            else None
+                        ),
                         json.dumps(license_obj.extra_data),
                         license_obj.id,
                     ),
@@ -1037,16 +1058,26 @@ class LicenseVerifier:
                         license_obj.user_name,
                         license_obj.tier.value,
                         license_obj.status.value,
-                        license_obj.created_at.isoformat()
-                        if license_obj.created_at
-                        else datetime.utcnow().isoformat(),
-                        license_obj.activated_at.isoformat() if license_obj.activated_at else None,
-                        license_obj.last_verified_at.isoformat()
-                        if license_obj.last_verified_at
-                        else None,
-                        license_obj.grace_period_ends_at.isoformat()
-                        if license_obj.grace_period_ends_at
-                        else None,
+                        (
+                            license_obj.created_at.isoformat()
+                            if license_obj.created_at
+                            else datetime.utcnow().isoformat()
+                        ),
+                        (
+                            license_obj.activated_at.isoformat()
+                            if license_obj.activated_at
+                            else None
+                        ),
+                        (
+                            license_obj.last_verified_at.isoformat()
+                            if license_obj.last_verified_at
+                            else None
+                        ),
+                        (
+                            license_obj.grace_period_ends_at.isoformat()
+                            if license_obj.grace_period_ends_at
+                            else None
+                        ),
                         json.dumps(license_obj.extra_data),
                     ),
                 )
@@ -1100,7 +1131,8 @@ class LicenseVerifier:
                         message=response_data.get("error", "Activation failed"),
                         severity=ErrorSeverity.FATAL,
                         user_message=response_data.get(
-                            "message", "No se pudo activar la licencia. Verifica la clave."
+                            "message",
+                            "No se pudo activar la licencia. Verifica la clave.",
                         ),
                     )
                 )
@@ -1279,7 +1311,9 @@ def get_license_info() -> dict | None:
         "status": license_obj.status.value,
         "user_email": license_obj.user_email,
         "user_name": license_obj.user_name,
-        "features": [f.display_name for f in sorted(license_obj.features, key=lambda x: x.value)],
+        "features": [
+            f.display_name for f in sorted(license_obj.features, key=lambda x: x.value)
+        ],
         "devices": {
             "active": license_obj.active_device_count,
             "max": license_obj.limits.max_devices,

@@ -275,12 +275,18 @@ class Device:
             "device_name": self.device_name,
             "os_info": self.os_info,
             "status": self.status.value,
-            "activated_at": self.activated_at.isoformat() if self.activated_at else None,
-            "deactivated_at": self.deactivated_at.isoformat() if self.deactivated_at else None,
-            "cooldown_ends_at": self.cooldown_ends_at.isoformat()
-            if self.cooldown_ends_at
-            else None,
-            "last_seen_at": self.last_seen_at.isoformat() if self.last_seen_at else None,
+            "activated_at": (
+                self.activated_at.isoformat() if self.activated_at else None
+            ),
+            "deactivated_at": (
+                self.deactivated_at.isoformat() if self.deactivated_at else None
+            ),
+            "cooldown_ends_at": (
+                self.cooldown_ends_at.isoformat() if self.cooldown_ends_at else None
+            ),
+            "last_seen_at": (
+                self.last_seen_at.isoformat() if self.last_seen_at else None
+            ),
             "is_current_device": self.is_current_device,
         }
 
@@ -294,18 +300,26 @@ class Device:
             device_name=data.get("device_name", ""),
             os_info=data.get("os_info", ""),
             status=DeviceStatus(data.get("status", "pending")),
-            activated_at=datetime.fromisoformat(data["activated_at"])
-            if data.get("activated_at")
-            else None,
-            deactivated_at=datetime.fromisoformat(data["deactivated_at"])
-            if data.get("deactivated_at")
-            else None,
-            cooldown_ends_at=datetime.fromisoformat(data["cooldown_ends_at"])
-            if data.get("cooldown_ends_at")
-            else None,
-            last_seen_at=datetime.fromisoformat(data["last_seen_at"])
-            if data.get("last_seen_at")
-            else None,
+            activated_at=(
+                datetime.fromisoformat(data["activated_at"])
+                if data.get("activated_at")
+                else None
+            ),
+            deactivated_at=(
+                datetime.fromisoformat(data["deactivated_at"])
+                if data.get("deactivated_at")
+                else None
+            ),
+            cooldown_ends_at=(
+                datetime.fromisoformat(data["cooldown_ends_at"])
+                if data.get("cooldown_ends_at")
+                else None
+            ),
+            last_seen_at=(
+                datetime.fromisoformat(data["last_seen_at"])
+                if data.get("last_seen_at")
+                else None
+            ),
             is_current_device=data.get("is_current_device", False),
         )
 
@@ -319,18 +333,26 @@ class Device:
             device_name=row["device_name"],
             os_info=row["os_info"],
             status=DeviceStatus(row["status"]),
-            activated_at=datetime.fromisoformat(row["activated_at"])
-            if row["activated_at"]
-            else None,
-            deactivated_at=datetime.fromisoformat(row["deactivated_at"])
-            if row["deactivated_at"]
-            else None,
-            cooldown_ends_at=datetime.fromisoformat(row["cooldown_ends_at"])
-            if row["cooldown_ends_at"]
-            else None,
-            last_seen_at=datetime.fromisoformat(row["last_seen_at"])
-            if row["last_seen_at"]
-            else None,
+            activated_at=(
+                datetime.fromisoformat(row["activated_at"])
+                if row["activated_at"]
+                else None
+            ),
+            deactivated_at=(
+                datetime.fromisoformat(row["deactivated_at"])
+                if row["deactivated_at"]
+                else None
+            ),
+            cooldown_ends_at=(
+                datetime.fromisoformat(row["cooldown_ends_at"])
+                if row["cooldown_ends_at"]
+                else None
+            ),
+            last_seen_at=(
+                datetime.fromisoformat(row["last_seen_at"])
+                if row["last_seen_at"]
+                else None
+            ),
             is_current_device=bool(row["is_current_device"]),
         )
 
@@ -359,7 +381,9 @@ class Subscription:
     stripe_subscription_id: str = ""
     stripe_customer_id: str = ""
     tier: LicenseTier = LicenseTier.CORRECTOR
-    status: str = "active"  # Payment provider status: active, past_due, canceled, trialing
+    status: str = (
+        "active"  # Payment provider status: active, past_due, canceled, trialing
+    )
     current_period_start: datetime | None = None
     current_period_end: datetime | None = None
     cancel_at_period_end: bool = False
@@ -388,12 +412,14 @@ class Subscription:
             "stripe_customer_id": self.stripe_customer_id,
             "tier": self.tier.value,
             "status": self.status,
-            "current_period_start": self.current_period_start.isoformat()
-            if self.current_period_start
-            else None,
-            "current_period_end": self.current_period_end.isoformat()
-            if self.current_period_end
-            else None,
+            "current_period_start": (
+                self.current_period_start.isoformat()
+                if self.current_period_start
+                else None
+            ),
+            "current_period_end": (
+                self.current_period_end.isoformat() if self.current_period_end else None
+            ),
             "cancel_at_period_end": self.cancel_at_period_end,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
@@ -409,19 +435,27 @@ class Subscription:
             stripe_customer_id=data.get("stripe_customer_id", ""),
             tier=LicenseTier(data.get("tier", "corrector")),
             status=data.get("status", "active"),
-            current_period_start=datetime.fromisoformat(data["current_period_start"])
-            if data.get("current_period_start")
-            else None,
-            current_period_end=datetime.fromisoformat(data["current_period_end"])
-            if data.get("current_period_end")
-            else None,
+            current_period_start=(
+                datetime.fromisoformat(data["current_period_start"])
+                if data.get("current_period_start")
+                else None
+            ),
+            current_period_end=(
+                datetime.fromisoformat(data["current_period_end"])
+                if data.get("current_period_end")
+                else None
+            ),
             cancel_at_period_end=data.get("cancel_at_period_end", False),
-            created_at=datetime.fromisoformat(data["created_at"])
-            if data.get("created_at")
-            else None,
-            updated_at=datetime.fromisoformat(data["updated_at"])
-            if data.get("updated_at")
-            else None,
+            created_at=(
+                datetime.fromisoformat(data["created_at"])
+                if data.get("created_at")
+                else None
+            ),
+            updated_at=(
+                datetime.fromisoformat(data["updated_at"])
+                if data.get("updated_at")
+                else None
+            ),
         )
 
     @classmethod
@@ -434,15 +468,23 @@ class Subscription:
             stripe_customer_id=row["stripe_customer_id"],
             tier=LicenseTier(row["tier"]),
             status=row["status"],
-            current_period_start=datetime.fromisoformat(row["current_period_start"])
-            if row["current_period_start"]
-            else None,
-            current_period_end=datetime.fromisoformat(row["current_period_end"])
-            if row["current_period_end"]
-            else None,
+            current_period_start=(
+                datetime.fromisoformat(row["current_period_start"])
+                if row["current_period_start"]
+                else None
+            ),
+            current_period_end=(
+                datetime.fromisoformat(row["current_period_end"])
+                if row["current_period_end"]
+                else None
+            ),
             cancel_at_period_end=bool(row["cancel_at_period_end"]),
-            created_at=datetime.fromisoformat(row["created_at"]) if row["created_at"] else None,
-            updated_at=datetime.fromisoformat(row["updated_at"]) if row["updated_at"] else None,
+            created_at=(
+                datetime.fromisoformat(row["created_at"]) if row["created_at"] else None
+            ),
+            updated_at=(
+                datetime.fromisoformat(row["updated_at"]) if row["updated_at"] else None
+            ),
         )
 
 
@@ -506,12 +548,16 @@ class UsageRecord:
             "document_name": self.document_name,
             "word_count": self.word_count,
             "page_count": self.page_count,
-            "analysis_started_at": self.analysis_started_at.isoformat()
-            if self.analysis_started_at
-            else None,
-            "analysis_completed_at": self.analysis_completed_at.isoformat()
-            if self.analysis_completed_at
-            else None,
+            "analysis_started_at": (
+                self.analysis_started_at.isoformat()
+                if self.analysis_started_at
+                else None
+            ),
+            "analysis_completed_at": (
+                self.analysis_completed_at.isoformat()
+                if self.analysis_completed_at
+                else None
+            ),
             "billing_period": self.billing_period,
             "counted_for_quota": self.counted_for_quota,
         }
@@ -527,12 +573,16 @@ class UsageRecord:
             document_name=data.get("document_name", ""),
             word_count=data.get("word_count", 0),
             page_count=data.get("page_count", 0),
-            analysis_started_at=datetime.fromisoformat(data["analysis_started_at"])
-            if data.get("analysis_started_at")
-            else None,
-            analysis_completed_at=datetime.fromisoformat(data["analysis_completed_at"])
-            if data.get("analysis_completed_at")
-            else None,
+            analysis_started_at=(
+                datetime.fromisoformat(data["analysis_started_at"])
+                if data.get("analysis_started_at")
+                else None
+            ),
+            analysis_completed_at=(
+                datetime.fromisoformat(data["analysis_completed_at"])
+                if data.get("analysis_completed_at")
+                else None
+            ),
             billing_period=data.get("billing_period", ""),
             counted_for_quota=data.get("counted_for_quota", True),
         )
@@ -548,12 +598,16 @@ class UsageRecord:
             document_name=row["document_name"],
             word_count=row["word_count"],
             page_count=row.get("page_count", 0),
-            analysis_started_at=datetime.fromisoformat(row["analysis_started_at"])
-            if row["analysis_started_at"]
-            else None,
-            analysis_completed_at=datetime.fromisoformat(row["analysis_completed_at"])
-            if row["analysis_completed_at"]
-            else None,
+            analysis_started_at=(
+                datetime.fromisoformat(row["analysis_started_at"])
+                if row["analysis_started_at"]
+                else None
+            ),
+            analysis_completed_at=(
+                datetime.fromisoformat(row["analysis_completed_at"])
+                if row["analysis_completed_at"]
+                else None
+            ),
             billing_period=row["billing_period"],
             counted_for_quota=bool(row["counted_for_quota"]),
         )
@@ -672,14 +726,18 @@ class License:
             "tier": self.tier.value,
             "status": self.status.value,
             "created_at": self.created_at.isoformat() if self.created_at else None,
-            "activated_at": self.activated_at.isoformat() if self.activated_at else None,
+            "activated_at": (
+                self.activated_at.isoformat() if self.activated_at else None
+            ),
             "expires_at": self.expires_at.isoformat() if self.expires_at else None,
-            "last_verified_at": self.last_verified_at.isoformat()
-            if self.last_verified_at
-            else None,
-            "grace_period_ends_at": self.grace_period_ends_at.isoformat()
-            if self.grace_period_ends_at
-            else None,
+            "last_verified_at": (
+                self.last_verified_at.isoformat() if self.last_verified_at else None
+            ),
+            "grace_period_ends_at": (
+                self.grace_period_ends_at.isoformat()
+                if self.grace_period_ends_at
+                else None
+            ),
             "subscription": self.subscription.to_dict() if self.subscription else None,
             "devices": [d.to_dict() for d in self.devices],
             "extra_data": self.extra_data,
@@ -695,21 +753,31 @@ class License:
             user_name=data.get("user_name", ""),
             tier=LicenseTier(data.get("tier", "corrector")),
             status=LicenseStatus(data.get("status", "active")),
-            created_at=datetime.fromisoformat(data["created_at"])
-            if data.get("created_at")
-            else None,
-            activated_at=datetime.fromisoformat(data["activated_at"])
-            if data.get("activated_at")
-            else None,
-            expires_at=datetime.fromisoformat(data["expires_at"])
-            if data.get("expires_at")
-            else None,
-            last_verified_at=datetime.fromisoformat(data["last_verified_at"])
-            if data.get("last_verified_at")
-            else None,
-            grace_period_ends_at=datetime.fromisoformat(data["grace_period_ends_at"])
-            if data.get("grace_period_ends_at")
-            else None,
+            created_at=(
+                datetime.fromisoformat(data["created_at"])
+                if data.get("created_at")
+                else None
+            ),
+            activated_at=(
+                datetime.fromisoformat(data["activated_at"])
+                if data.get("activated_at")
+                else None
+            ),
+            expires_at=(
+                datetime.fromisoformat(data["expires_at"])
+                if data.get("expires_at")
+                else None
+            ),
+            last_verified_at=(
+                datetime.fromisoformat(data["last_verified_at"])
+                if data.get("last_verified_at")
+                else None
+            ),
+            grace_period_ends_at=(
+                datetime.fromisoformat(data["grace_period_ends_at"])
+                if data.get("grace_period_ends_at")
+                else None
+            ),
             extra_data=data.get("extra_data", {}),
         )
 
@@ -731,17 +799,27 @@ class License:
             user_name=row["user_name"],
             tier=LicenseTier(row["tier"]),
             status=LicenseStatus(row["status"]),
-            created_at=datetime.fromisoformat(row["created_at"]) if row["created_at"] else None,
-            activated_at=datetime.fromisoformat(row["activated_at"])
-            if row["activated_at"]
-            else None,
-            expires_at=datetime.fromisoformat(row["expires_at"]) if row["expires_at"] else None,
-            last_verified_at=datetime.fromisoformat(row["last_verified_at"])
-            if row["last_verified_at"]
-            else None,
-            grace_period_ends_at=datetime.fromisoformat(row["grace_period_ends_at"])
-            if row["grace_period_ends_at"]
-            else None,
+            created_at=(
+                datetime.fromisoformat(row["created_at"]) if row["created_at"] else None
+            ),
+            activated_at=(
+                datetime.fromisoformat(row["activated_at"])
+                if row["activated_at"]
+                else None
+            ),
+            expires_at=(
+                datetime.fromisoformat(row["expires_at"]) if row["expires_at"] else None
+            ),
+            last_verified_at=(
+                datetime.fromisoformat(row["last_verified_at"])
+                if row["last_verified_at"]
+                else None
+            ),
+            grace_period_ends_at=(
+                datetime.fromisoformat(row["grace_period_ends_at"])
+                if row["grace_period_ends_at"]
+                else None
+            ),
             extra_data=json.loads(row["extra_data"]) if row["extra_data"] else {},
         )
 

@@ -25,7 +25,9 @@ def is_licensing_enabled() -> bool:
     return os.environ.get("NA_LICENSING_ENABLED", "false").lower() == "true"
 
 
-def is_feature_allowed(feature: LicenseFeature, tier: LicenseTier | None = None) -> bool:
+def is_feature_allowed(
+    feature: LicenseFeature, tier: LicenseTier | None = None
+) -> bool:
     """
     Comprueba si una feature esta permitida.
 
@@ -42,7 +44,9 @@ def is_feature_allowed(feature: LicenseFeature, tier: LicenseTier | None = None)
     return feature in TIER_FEATURES[tier]
 
 
-def check_manuscript_word_limit(word_count: int, tier: LicenseTier | None = None) -> Result[bool]:
+def check_manuscript_word_limit(
+    word_count: int, tier: LicenseTier | None = None
+) -> Result[bool]:
     """
     Verifica si un manuscrito cumple el limite de palabras del tier.
 
@@ -133,7 +137,9 @@ _FEATURE_CONFIG_MAP: dict[LicenseFeature, list[str]] = {
 }
 
 
-def apply_license_gating(config: UnifiedConfig, tier: LicenseTier | None = None) -> UnifiedConfig:
+def apply_license_gating(
+    config: UnifiedConfig, tier: LicenseTier | None = None
+) -> UnifiedConfig:
     """
     Aplica restricciones de licencia a un UnifiedConfig.
 

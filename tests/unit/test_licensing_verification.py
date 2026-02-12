@@ -243,7 +243,14 @@ def _insert_device(db, license_id, fingerprint="test-fp-001", status="active"):
     return cursor.lastrowid
 
 
-def _insert_usage(db, license_id, fingerprint="doc-fp-001", word_count=1000, billing_period=None, counted=1):
+def _insert_usage(
+    db,
+    license_id,
+    fingerprint="doc-fp-001",
+    word_count=1000,
+    billing_period=None,
+    counted=1,
+):
     """Helper: inserta un registro de uso."""
     if billing_period is None:
         billing_period = UsageRecord.current_billing_period()
@@ -253,7 +260,16 @@ def _insert_usage(db, license_id, fingerprint="doc-fp-001", word_count=1000, bil
         INSERT INTO usage_records (license_id, project_id, document_fingerprint, document_name, word_count, page_count, billing_period, counted_for_quota)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        (license_id, 1, fingerprint, "test.docx", word_count, page_count, billing_period, counted),
+        (
+            license_id,
+            1,
+            fingerprint,
+            "test.docx",
+            word_count,
+            page_count,
+            billing_period,
+            counted,
+        ),
     )
     db._conn.commit()
 
@@ -350,7 +366,9 @@ class TestCheckFeature:
             if feature == LicenseFeature.EXPORT_IMPORT:
                 assert result.is_failure, "EXPORT_IMPORT should be Editorial-only"
             else:
-                assert result.is_success, f"Feature {feature} should be allowed for Profesional"
+                assert (
+                    result.is_success
+                ), f"Feature {feature} should be allowed for Profesional"
 
     def test_editorial_all_features_allowed(self, verifier, db):
         lid = _insert_license(db, tier="editorial")
@@ -363,6 +381,7 @@ class TestCheckFeature:
         """check_feature sin licencia cacheada falla."""
         # Reset global cache
         import narrative_assistant.licensing.verification as v
+
         with v._license_lock:
             v._cached_license = None
 
@@ -398,7 +417,13 @@ class TestQuota:
         """Si el mes anterior se uso toda la cuota, no hay rollover."""
         lid = _insert_license(db, tier="corrector")
         prev_period = UsageRecord.previous_billing_period()
-        _insert_usage(db, lid, fingerprint="prev_doc", word_count=375000, billing_period=prev_period)  # 1500 pages
+        _insert_usage(
+            db,
+            lid,
+            fingerprint="prev_doc",
+            word_count=375000,
+            billing_period=prev_period,
+        )  # 1500 pages
         lic = License(id=lid, tier=LicenseTier.CORRECTOR, status=LicenseStatus.ACTIVE)
         remaining = verifier._calculate_quota_remaining(lic)
         assert remaining == 1500  # Solo base, 0 rollover
@@ -415,7 +440,13 @@ class TestQuota:
         lid = _insert_license(db, tier="corrector")
         # Fill previous month so no rollover
         prev_period = UsageRecord.previous_billing_period()
-        _insert_usage(db, lid, fingerprint="prev_full", word_count=375000, billing_period=prev_period)
+        _insert_usage(
+            db,
+            lid,
+            fingerprint="prev_full",
+            word_count=375000,
+            billing_period=prev_period,
+        )
         # Current month: 2 pages used
         _insert_usage(db, lid, word_count=500)  # 2 pages
         lic = License(id=lid, tier=LicenseTier.CORRECTOR, status=LicenseStatus.ACTIVE)
@@ -427,7 +458,13 @@ class TestQuota:
         lid = _insert_license(db, tier="corrector")
         # Fill previous month too (no rollover)
         prev_period = UsageRecord.previous_billing_period()
-        _insert_usage(db, lid, fingerprint="prev_full", word_count=375000, billing_period=prev_period)  # 1500 pages
+        _insert_usage(
+            db,
+            lid,
+            fingerprint="prev_full",
+            word_count=375000,
+            billing_period=prev_period,
+        )  # 1500 pages
         # Current month: use all 1500
         _insert_usage(db, lid, fingerprint="doc1", word_count=375000)  # 1500 pages
         lic = License(id=lid, tier=LicenseTier.CORRECTOR, status=LicenseStatus.ACTIVE)
@@ -439,9 +476,17 @@ class TestQuota:
         lid = _insert_license(db, tier="corrector")
         # Fill previous month (no rollover)
         prev_period = UsageRecord.previous_billing_period()
-        _insert_usage(db, lid, fingerprint="prev_full", word_count=375000, billing_period=prev_period)
+        _insert_usage(
+            db,
+            lid,
+            fingerprint="prev_full",
+            word_count=375000,
+            billing_period=prev_period,
+        )
         # Current month: exceed limit
-        _insert_usage(db, lid, fingerprint="doc1", word_count=400000)  # 1600 pages > 1500
+        _insert_usage(
+            db, lid, fingerprint="doc1", word_count=400000
+        )  # 1600 pages > 1500
         lic = License(id=lid, tier=LicenseTier.CORRECTOR, status=LicenseStatus.ACTIVE)
         remaining = verifier._calculate_quota_remaining(lic)
         assert remaining == 0
@@ -460,7 +505,13 @@ class TestQuota:
         """Rollover parcial: mes anterior uso 500 paginas → +1000."""
         lid = _insert_license(db, tier="corrector")
         prev_period = UsageRecord.previous_billing_period()
-        _insert_usage(db, lid, fingerprint="prev_doc", word_count=125000, billing_period=prev_period)  # 500 pages
+        _insert_usage(
+            db,
+            lid,
+            fingerprint="prev_doc",
+            word_count=125000,
+            billing_period=prev_period,
+        )  # 500 pages
         lic = License(id=lid, tier=LicenseTier.CORRECTOR, status=LicenseStatus.ACTIVE)
         remaining = verifier._calculate_quota_remaining(lic)
         # 1500 (base) + 1000 (rollover from 500 used of 1500) = 2500
@@ -470,7 +521,13 @@ class TestQuota:
         """Si el mes anterior se uso todo → 0 rollover."""
         lid = _insert_license(db, tier="corrector")
         prev_period = UsageRecord.previous_billing_period()
-        _insert_usage(db, lid, fingerprint="prev_doc", word_count=375000, billing_period=prev_period)  # 1500 pages
+        _insert_usage(
+            db,
+            lid,
+            fingerprint="prev_doc",
+            word_count=375000,
+            billing_period=prev_period,
+        )  # 1500 pages
         lic = License(id=lid, tier=LicenseTier.CORRECTOR, status=LicenseStatus.ACTIVE)
         remaining = verifier._calculate_quota_remaining(lic)
         assert remaining == 1500  # No rollover
@@ -500,7 +557,13 @@ class TestQuota:
         lid = _insert_license(db, tier="corrector")
         # Usar toda la cuota + rollover
         prev_period = UsageRecord.previous_billing_period()
-        _insert_usage(db, lid, fingerprint="prev_full", word_count=375000, billing_period=prev_period)  # 1500 = no rollover
+        _insert_usage(
+            db,
+            lid,
+            fingerprint="prev_full",
+            word_count=375000,
+            billing_period=prev_period,
+        )  # 1500 = no rollover
         _insert_usage(db, lid, fingerprint="cur_full", word_count=375000)  # 1500 = full
         lic = License(id=lid, tier=LicenseTier.CORRECTOR, status=LicenseStatus.ACTIVE)
         result = verifier.check_quota(lic)
@@ -522,6 +585,7 @@ class TestRecordUsage:
 
         # Cache the license
         import narrative_assistant.licensing.verification as v
+
         with v._license_lock:
             v._cached_license = lic
 
@@ -543,6 +607,7 @@ class TestRecordUsage:
         lic = License(id=lid, tier=LicenseTier.CORRECTOR, status=LicenseStatus.ACTIVE)
 
         import narrative_assistant.licensing.verification as v
+
         with v._license_lock:
             v._cached_license = lic
 
@@ -569,6 +634,7 @@ class TestRecordUsage:
     def test_record_usage_no_license(self, verifier):
         """Sin licencia cacheada → fallo."""
         import narrative_assistant.licensing.verification as v
+
         with v._license_lock:
             v._cached_license = None
 
@@ -587,6 +653,7 @@ class TestRecordUsage:
         lic = License(id=lid, tier=LicenseTier.CORRECTOR, status=LicenseStatus.ACTIVE)
 
         import narrative_assistant.licensing.verification as v
+
         with v._license_lock:
             v._cached_license = lic
 
@@ -618,7 +685,10 @@ class TestLicenseErrors:
 
     def test_license_offline_error_no_grace(self):
         err = LicenseOfflineError()
-        assert "sin conexion" in err.user_message.lower() or "No se puede" in err.user_message
+        assert (
+            "sin conexion" in err.user_message.lower()
+            or "No se puede" in err.user_message
+        )
 
     def test_device_limit_error(self):
         err = DeviceLimitError(current_devices=2, max_devices=2)
@@ -630,7 +700,9 @@ class TestLicenseErrors:
         assert "horas" in err.user_message
 
     def test_quota_exceeded_error(self):
-        err = QuotaExceededError(current_usage=1500, max_usage=1500, billing_period="2025-06")
+        err = QuotaExceededError(
+            current_usage=1500, max_usage=1500, billing_period="2025-06"
+        )
         assert "1500 paginas" in err.user_message
 
     def test_tier_feature_error(self):
@@ -699,7 +771,9 @@ class TestVerifyFlow:
     def test_verify_active_license(self, mock_hw_info, mock_fp, verifier, db):
         """Verificar licencia activa con dispositivo registrado."""
         mock_fp.return_value = Result.success("test-fp-001")
-        mock_hw_info.return_value = Result.success(MagicMock(device_name="Test PC", os_info="Windows 11"))
+        mock_hw_info.return_value = Result.success(
+            MagicMock(device_name="Test PC", os_info="Windows 11")
+        )
 
         lid = _insert_license(db, tier="profesional")
         _insert_device(db, lid, fingerprint="test-fp-001")
@@ -724,7 +798,9 @@ class TestVerifyFlow:
     def test_verify_expired_license(self, mock_hw_info, mock_fp, verifier, db):
         """Licencia expirada → fallo."""
         mock_fp.return_value = Result.success("test-fp-001")
-        mock_hw_info.return_value = Result.success(MagicMock(device_name="Test", os_info="Test"))
+        mock_hw_info.return_value = Result.success(
+            MagicMock(device_name="Test", os_info="Test")
+        )
 
         lid = _insert_license(db, tier="corrector", status="expired")
         _insert_device(db, lid, fingerprint="test-fp-001")
@@ -738,14 +814,18 @@ class TestVerifyFlow:
     def test_verify_new_device_auto_register(self, mock_hw_info, mock_fp, verifier, db):
         """Dispositivo nuevo se registra automaticamente si hay hueco."""
         mock_fp.return_value = Result.success("new-device-fp")
-        mock_hw_info.return_value = Result.success(MagicMock(device_name="New PC", os_info="Win"))
+        mock_hw_info.return_value = Result.success(
+            MagicMock(device_name="New PC", os_info="Win")
+        )
 
         lid = _insert_license(db, tier="profesional")  # 2 max devices
 
         result = verifier.verify()
         assert result.is_success
         # Verify device was registered
-        row = db.fetchone("SELECT * FROM devices WHERE hardware_fingerprint = ?", ("new-device-fp",))
+        row = db.fetchone(
+            "SELECT * FROM devices WHERE hardware_fingerprint = ?", ("new-device-fp",)
+        )
         assert row is not None
         assert row["status"] == "active"
 
@@ -754,7 +834,9 @@ class TestVerifyFlow:
     def test_verify_device_limit_reached(self, mock_hw_info, mock_fp, verifier, db):
         """Corrector (1 dispositivo max) con otro ya registrado → fallo."""
         mock_fp.return_value = Result.success("new-device-fp")
-        mock_hw_info.return_value = Result.success(MagicMock(device_name="New", os_info="Win"))
+        mock_hw_info.return_value = Result.success(
+            MagicMock(device_name="New", os_info="Win")
+        )
 
         lid = _insert_license(db, tier="corrector")  # 1 max device
         _insert_device(db, lid, fingerprint="existing-device-fp")
@@ -768,7 +850,9 @@ class TestVerifyFlow:
     def test_verify_device_in_cooldown(self, mock_hw_info, mock_fp, verifier, db):
         """Dispositivo en cooldown → fallo."""
         mock_fp.return_value = Result.success("cooldown-fp")
-        mock_hw_info.return_value = Result.success(MagicMock(device_name="Test", os_info="Win"))
+        mock_hw_info.return_value = Result.success(
+            MagicMock(device_name="Test", os_info="Win")
+        )
 
         lid = _insert_license(db, tier="corrector")
         now = datetime.utcnow()
@@ -778,7 +862,16 @@ class TestVerifyFlow:
             INSERT INTO devices (license_id, hardware_fingerprint, device_name, os_info, status, deactivated_at, cooldown_ends_at, is_current_device)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (lid, "cooldown-fp", "Test", "Win", "inactive", now.isoformat(), cooldown_end, 0),
+            (
+                lid,
+                "cooldown-fp",
+                "Test",
+                "Win",
+                "inactive",
+                now.isoformat(),
+                cooldown_end,
+                0,
+            ),
         )
         db._conn.commit()
 
@@ -791,7 +884,9 @@ class TestVerifyFlow:
     def test_verify_calculates_quota(self, mock_hw_info, mock_fp, verifier, db):
         """Verificar que quota_remaining se calcula correctamente."""
         mock_fp.return_value = Result.success("test-fp-001")
-        mock_hw_info.return_value = Result.success(MagicMock(device_name="Test", os_info="Win"))
+        mock_hw_info.return_value = Result.success(
+            MagicMock(device_name="Test", os_info="Win")
+        )
 
         lid = _insert_license(db, tier="corrector")
         _insert_device(db, lid, fingerprint="test-fp-001")
@@ -799,7 +894,13 @@ class TestVerifyFlow:
 
         # Also fill previous month to avoid rollover noise
         prev_period = UsageRecord.previous_billing_period()
-        _insert_usage(db, lid, fingerprint="prev_full", word_count=375000, billing_period=prev_period)
+        _insert_usage(
+            db,
+            lid,
+            fingerprint="prev_full",
+            word_count=375000,
+            billing_period=prev_period,
+        )
 
         result = verifier.verify()
         assert result.is_success
@@ -914,10 +1015,16 @@ class TestEdgeCases:
         lid = _insert_license(db, tier="corrector")
         # Fill prev month (no rollover)
         prev_period = UsageRecord.previous_billing_period()
-        _insert_usage(db, lid, fingerprint="prev_full", word_count=375000, billing_period=prev_period)
+        _insert_usage(
+            db,
+            lid,
+            fingerprint="prev_full",
+            word_count=375000,
+            billing_period=prev_period,
+        )
         # Current month: 200 + 300 + 500 = 1000 pages
-        _insert_usage(db, lid, fingerprint="doc1", word_count=50000)   # 200 pages
-        _insert_usage(db, lid, fingerprint="doc2", word_count=75000)   # 300 pages
+        _insert_usage(db, lid, fingerprint="doc1", word_count=50000)  # 200 pages
+        _insert_usage(db, lid, fingerprint="doc2", word_count=75000)  # 300 pages
         _insert_usage(db, lid, fingerprint="doc3", word_count=125000)  # 500 pages
 
         lic = License(id=lid, tier=LicenseTier.CORRECTOR, status=LicenseStatus.ACTIVE)
@@ -936,7 +1043,13 @@ class TestEdgeCases:
         """Profesional sin rollover: 3000 base."""
         lid = _insert_license(db, tier="profesional")
         prev_period = UsageRecord.previous_billing_period()
-        _insert_usage(db, lid, fingerprint="prev_full", word_count=750000, billing_period=prev_period)  # 3000 pages
+        _insert_usage(
+            db,
+            lid,
+            fingerprint="prev_full",
+            word_count=750000,
+            billing_period=prev_period,
+        )  # 3000 pages
         lic = License(id=lid, tier=LicenseTier.PROFESIONAL, status=LicenseStatus.ACTIVE)
         remaining = verifier._calculate_quota_remaining(lic)
         assert remaining == 3000
@@ -946,7 +1059,13 @@ class TestEdgeCases:
         lid = _insert_license(db, tier="corrector")
         # Fill prev month
         prev_period = UsageRecord.previous_billing_period()
-        _insert_usage(db, lid, fingerprint="prev_full", word_count=375000, billing_period=prev_period)
+        _insert_usage(
+            db,
+            lid,
+            fingerprint="prev_full",
+            word_count=375000,
+            billing_period=prev_period,
+        )
         # Current: 1500 pages but NOT counted (re-analysis)
         _insert_usage(db, lid, fingerprint="doc1", word_count=375000, counted=0)
         lic = License(id=lid, tier=LicenseTier.CORRECTOR, status=LicenseStatus.ACTIVE)
@@ -1037,3 +1156,39 @@ class TestDeviceSwapCounting:
             )
         db._conn.commit()
         assert verifier._get_swap_count_this_month(lid) == 2
+
+    def test_swap_count_isolated_by_license(self, verifier, db):
+        """Swaps de una licencia no afectan a otra."""
+        lid1 = _insert_license(db, tier="editorial", license_key="KEY-1")
+        lid2 = _insert_license(db, tier="editorial", license_key="KEY-2")
+
+        # 3 swaps para licencia 1
+        did1a = _insert_device(db, lid1, fingerprint="fp-1a")
+        did1b = _insert_device(db, lid1, fingerprint="fp-1b")
+        did1c = _insert_device(db, lid1, fingerprint="fp-1c")
+        verifier.deactivate_device(did1a)
+        verifier.deactivate_device(did1b)
+        verifier.deactivate_device(did1c)
+
+        # Primer swap para licencia 2: sin cooldown (aislado)
+        did2 = _insert_device(db, lid2, fingerprint="fp-2a")
+        result = verifier.deactivate_device(did2)
+        assert result.is_success
+        assert result.value.cooldown_ends_at is None
+
+    def test_fourth_swap_also_has_cooldown(self, verifier, db):
+        """4o swap del mes tambien tiene cooldown."""
+        lid = _insert_license(db, tier="editorial")
+        devices = []
+        for i in range(4):
+            did = _insert_device(db, lid, fingerprint=f"fp-d{i}")
+            devices.append(did)
+
+        for did in devices[:2]:
+            verifier.deactivate_device(did)
+
+        r3 = verifier.deactivate_device(devices[2])
+        assert r3.value.cooldown_ends_at is not None
+
+        r4 = verifier.deactivate_device(devices[3])
+        assert r4.value.cooldown_ends_at is not None

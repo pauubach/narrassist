@@ -52,19 +52,60 @@ class TestIsFeatureAllowed:
     def test_basic_features_allowed_for_corrector(self):
         """Tier CORRECTOR solo tiene features basicas."""
         with patch.dict(os.environ, {"NA_LICENSING_ENABLED": "true"}):
-            assert is_feature_allowed(LicenseFeature.GRAMMAR_SPELLING, LicenseTier.CORRECTOR) is True
-            assert is_feature_allowed(LicenseFeature.NER_COREFERENCE, LicenseTier.CORRECTOR) is True
-            assert is_feature_allowed(LicenseFeature.ATTRIBUTE_CONSISTENCY, LicenseTier.CORRECTOR) is True
-            assert is_feature_allowed(LicenseFeature.NAME_VARIANTS, LicenseTier.CORRECTOR) is True
+            assert (
+                is_feature_allowed(
+                    LicenseFeature.GRAMMAR_SPELLING, LicenseTier.CORRECTOR
+                )
+                is True
+            )
+            assert (
+                is_feature_allowed(
+                    LicenseFeature.NER_COREFERENCE, LicenseTier.CORRECTOR
+                )
+                is True
+            )
+            assert (
+                is_feature_allowed(
+                    LicenseFeature.ATTRIBUTE_CONSISTENCY, LicenseTier.CORRECTOR
+                )
+                is True
+            )
+            assert (
+                is_feature_allowed(LicenseFeature.NAME_VARIANTS, LicenseTier.CORRECTOR)
+                is True
+            )
 
     def test_advanced_features_blocked_for_corrector(self):
         """Tier CORRECTOR no tiene features avanzadas."""
         with patch.dict(os.environ, {"NA_LICENSING_ENABLED": "true"}):
-            assert is_feature_allowed(LicenseFeature.CHARACTER_PROFILING, LicenseTier.CORRECTOR) is False
-            assert is_feature_allowed(LicenseFeature.NETWORK_ANALYSIS, LicenseTier.CORRECTOR) is False
-            assert is_feature_allowed(LicenseFeature.OOC_DETECTION, LicenseTier.CORRECTOR) is False
-            assert is_feature_allowed(LicenseFeature.ANACHRONISM_DETECTION, LicenseTier.CORRECTOR) is False
-            assert is_feature_allowed(LicenseFeature.CLASSICAL_SPANISH, LicenseTier.CORRECTOR) is False
+            assert (
+                is_feature_allowed(
+                    LicenseFeature.CHARACTER_PROFILING, LicenseTier.CORRECTOR
+                )
+                is False
+            )
+            assert (
+                is_feature_allowed(
+                    LicenseFeature.NETWORK_ANALYSIS, LicenseTier.CORRECTOR
+                )
+                is False
+            )
+            assert (
+                is_feature_allowed(LicenseFeature.OOC_DETECTION, LicenseTier.CORRECTOR)
+                is False
+            )
+            assert (
+                is_feature_allowed(
+                    LicenseFeature.ANACHRONISM_DETECTION, LicenseTier.CORRECTOR
+                )
+                is False
+            )
+            assert (
+                is_feature_allowed(
+                    LicenseFeature.CLASSICAL_SPANISH, LicenseTier.CORRECTOR
+                )
+                is False
+            )
 
     def test_profesional_features(self):
         """Tier PROFESIONAL tiene todas las features excepto EXPORT_IMPORT."""
@@ -239,3 +280,36 @@ class TestCheckManuscriptWordLimit:
             assert "75,000" in result.error.user_message
             assert "60,000" in result.error.user_message
             assert "Profesional" in result.error.user_message
+
+    def test_zero_words_passes(self):
+        """0 palabras siempre pasa."""
+        with patch.dict(os.environ, {"NA_LICENSING_ENABLED": "true"}):
+            result = check_manuscript_word_limit(0, LicenseTier.CORRECTOR)
+            assert result.is_success
+
+    def test_one_word_passes(self):
+        """1 palabra pasa para cualquier tier."""
+        with patch.dict(os.environ, {"NA_LICENSING_ENABLED": "true"}):
+            result = check_manuscript_word_limit(1, LicenseTier.CORRECTOR)
+            assert result.is_success
+
+    def test_very_large_manuscript_corrector_fails(self):
+        """Manuscrito de 1M palabras falla para Corrector."""
+        with patch.dict(os.environ, {"NA_LICENSING_ENABLED": "true"}):
+            result = check_manuscript_word_limit(1_000_000, LicenseTier.CORRECTOR)
+            assert result.is_failure
+            assert "1,000,000" in result.error.user_message
+
+    def test_very_large_manuscript_profesional_passes(self):
+        """Manuscrito de 1M palabras pasa para Profesional (ilimitado)."""
+        with patch.dict(os.environ, {"NA_LICENSING_ENABLED": "true"}):
+            result = check_manuscript_word_limit(1_000_000, LicenseTier.PROFESIONAL)
+            assert result.is_success
+
+    def test_corrector_one_over_limit(self):
+        """Exactamente 1 palabra sobre el limite falla."""
+        with patch.dict(os.environ, {"NA_LICENSING_ENABLED": "true"}):
+            result = check_manuscript_word_limit(60_001, LicenseTier.CORRECTOR)
+            assert result.is_failure
+            assert result.error.word_count == 60_001
+            assert result.error.max_words == 60_000

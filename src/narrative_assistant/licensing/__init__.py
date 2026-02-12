@@ -18,11 +18,16 @@ from .fingerprint import (
     get_hardware_info,
     verify_fingerprint,
 )
-from .models import (
+from .gating import (
+    apply_license_gating,
+    check_manuscript_word_limit,
+    get_allowed_features,
+    is_feature_allowed,
+    is_licensing_enabled,
+)
+from .models import (  # Schema; Constantes; Enums; Clases de datos
     DEVICE_DEACTIVATION_COOLDOWN_HOURS,
-    # Schema
     LICENSING_SCHEMA_SQL,
-    # Constantes
     OFFLINE_GRACE_PERIOD_DAYS,
     TIER_FEATURES,
     WORDS_PER_PAGE,
@@ -31,42 +36,29 @@ from .models import (
     License,
     LicenseFeature,
     LicenseStatus,
-    # Enums
     LicenseTier,
     Subscription,
-    # Clases de datos
     TierLimits,
     UsageRecord,
     initialize_licensing_schema,
     words_to_pages,
 )
-from .gating import (
-    apply_license_gating,
-    check_manuscript_word_limit,
-    get_allowed_features,
-    is_feature_allowed,
-    is_licensing_enabled,
-)
-from .verification import (
+from .verification import (  # Errores; Clase principal; Resultados; Funciones publicas
     DeviceCooldownError,
     DeviceLimitError,
-    # Errores
     LicenseError,
     LicenseExpiredError,
     LicenseNotFoundError,
     LicenseOfflineError,
-    ManuscriptTooLargeError,
-    # Clase principal
     LicenseVerifier,
+    ManuscriptTooLargeError,
     QuotaExceededError,
     TierFeatureError,
-    # Resultados
     VerificationResult,
     activate_license,
     check_feature_access,
     check_quota,
     deactivate_device,
-    # Funciones publicas
     get_cached_license,
     get_license_info,
     record_manuscript_usage,

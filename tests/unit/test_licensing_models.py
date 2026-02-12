@@ -149,7 +149,10 @@ class TestLicenseFeature:
             assert feature.display_name, f"Feature {feature} has empty display_name"
 
     def test_from_string(self):
-        assert LicenseFeature("attribute_consistency") == LicenseFeature.ATTRIBUTE_CONSISTENCY
+        assert (
+            LicenseFeature("attribute_consistency")
+            == LicenseFeature.ATTRIBUTE_CONSISTENCY
+        )
 
     def test_invalid_feature_raises(self):
         with pytest.raises(ValueError):
@@ -479,18 +482,14 @@ class TestDevice:
         assert device.cooldown_remaining is None
 
     def test_cooldown_active(self):
-        device = Device(
-            cooldown_ends_at=datetime.utcnow() + timedelta(hours=24)
-        )
+        device = Device(cooldown_ends_at=datetime.utcnow() + timedelta(hours=24))
         assert device.is_in_cooldown
         remaining = device.cooldown_remaining
         assert remaining is not None
         assert remaining.total_seconds() > 0
 
     def test_cooldown_expired(self):
-        device = Device(
-            cooldown_ends_at=datetime.utcnow() - timedelta(hours=1)
-        )
+        device = Device(cooldown_ends_at=datetime.utcnow() - timedelta(hours=1))
         assert not device.is_in_cooldown
         assert device.cooldown_remaining is None
 
@@ -543,17 +542,13 @@ class TestSubscription:
         assert not sub2.is_active
 
     def test_days_until_renewal(self):
-        sub = Subscription(
-            current_period_end=datetime.utcnow() + timedelta(days=10)
-        )
+        sub = Subscription(current_period_end=datetime.utcnow() + timedelta(days=10))
         days = sub.days_until_renewal
         assert days is not None
         assert 9 <= days <= 10
 
     def test_days_until_renewal_expired(self):
-        sub = Subscription(
-            current_period_end=datetime.utcnow() - timedelta(days=5)
-        )
+        sub = Subscription(current_period_end=datetime.utcnow() - timedelta(days=5))
         assert sub.days_until_renewal == 0
 
     def test_days_until_renewal_none(self):
@@ -614,7 +609,10 @@ class TestLicensingSchema:
         assert "CREATE TABLE IF NOT EXISTS subscriptions" in LICENSING_SCHEMA_SQL
         assert "CREATE TABLE IF NOT EXISTS devices" in LICENSING_SCHEMA_SQL
         assert "CREATE TABLE IF NOT EXISTS usage_records" in LICENSING_SCHEMA_SQL
-        assert "CREATE TABLE IF NOT EXISTS license_verification_cache" in LICENSING_SCHEMA_SQL
+        assert (
+            "CREATE TABLE IF NOT EXISTS license_verification_cache"
+            in LICENSING_SCHEMA_SQL
+        )
 
     def test_schema_has_page_count_column(self):
         assert "page_count" in LICENSING_SCHEMA_SQL
@@ -631,5 +629,9 @@ class TestLicensingSchema:
         for line in lines:
             # Solo buscar en definiciones de columnas (sin comments)
             stripped = line.strip()
-            if stripped and not stripped.startswith("--") and not stripped.startswith("CREATE"):
+            if (
+                stripped
+                and not stripped.startswith("--")
+                and not stripped.startswith("CREATE")
+            ):
                 assert "bundle " not in stripped.lower() or "FOREIGN" in stripped

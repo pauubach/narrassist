@@ -149,7 +149,8 @@ class HardwareDetector:
                 import winreg
 
                 key = winreg.OpenKey(
-                    winreg.HKEY_LOCAL_MACHINE, r"HARDWARE\DESCRIPTION\System\CentralProcessor\0"
+                    winreg.HKEY_LOCAL_MACHINE,
+                    r"HARDWARE\DESCRIPTION\System\CentralProcessor\0",
                 )
                 value, _ = winreg.QueryValueEx(key, "ProcessorNameString")
                 return value.strip()
@@ -319,7 +320,8 @@ class HardwareDetector:
                 import winreg
 
                 key = winreg.OpenKey(
-                    winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows NT\CurrentVersion"
+                    winreg.HKEY_LOCAL_MACHINE,
+                    r"SOFTWARE\Microsoft\Windows NT\CurrentVersion",
                 )
                 value, _ = winreg.QueryValueEx(key, "ProductId")
                 return value
@@ -410,7 +412,9 @@ def get_hardware_fingerprint() -> Result[str]:
         generator = FingerprintGenerator()
         fingerprint, info = generator.generate()
 
-        logger.info(f"Hardware fingerprint generado para {info.device_name}: {fingerprint[:16]}...")
+        logger.info(
+            f"Hardware fingerprint generado para {info.device_name}: {fingerprint[:16]}..."
+        )
 
         return Result.success(fingerprint)
 
@@ -467,7 +471,9 @@ def verify_fingerprint(expected: str) -> Result[bool]:
     matches = current == expected
 
     if not matches:
-        logger.warning(f"Fingerprint mismatch: expected {expected[:16]}..., got {current[:16]}...")
+        logger.warning(
+            f"Fingerprint mismatch: expected {expected[:16]}..., got {current[:16]}..."
+        )
 
     return Result.success(matches)
 
