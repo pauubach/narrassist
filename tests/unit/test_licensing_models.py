@@ -126,8 +126,8 @@ class TestLicenseTier:
 class TestLicenseFeature:
     """Tests para las features de funcionalidad."""
 
-    def test_eleven_features_total(self):
-        assert len(LicenseFeature) == 11
+    def test_twelve_features_total(self):
+        assert len(LicenseFeature) == 12
 
     def test_basic_features_exist(self):
         assert LicenseFeature.ATTRIBUTE_CONSISTENCY.value == "attribute_consistency"
@@ -187,18 +187,21 @@ class TestTierFeatures:
         assert LicenseFeature.MULTI_MODEL not in features
         assert LicenseFeature.FULL_REPORTS not in features
 
-    def test_profesional_has_all_features(self):
+    def test_profesional_has_11_features(self):
         features = TIER_FEATURES[LicenseTier.PROFESIONAL]
         assert len(features) == 11
-        for f in LicenseFeature:
-            assert f in features
+        assert LicenseFeature.EXPORT_IMPORT not in features
 
-    def test_editorial_has_all_features(self):
+    def test_editorial_has_all_12_features(self):
         features = TIER_FEATURES[LicenseTier.EDITORIAL]
-        assert len(features) == 11
+        assert len(features) == 12
+        assert LicenseFeature.EXPORT_IMPORT in features
 
-    def test_profesional_editorial_same_features(self):
-        assert TIER_FEATURES[LicenseTier.PROFESIONAL] == TIER_FEATURES[LicenseTier.EDITORIAL]
+    def test_editorial_superset_of_profesional(self):
+        pro = TIER_FEATURES[LicenseTier.PROFESIONAL]
+        edit = TIER_FEATURES[LicenseTier.EDITORIAL]
+        assert pro.issubset(edit)
+        assert LicenseFeature.EXPORT_IMPORT in edit - pro
 
     def test_all_tiers_covered(self):
         for tier in LicenseTier:
@@ -228,16 +231,22 @@ class TestTierLimits:
     def test_profesional_limits(self):
         limits = TierLimits.for_tier(LicenseTier.PROFESIONAL)
         assert limits.max_pages_per_month == 3000
-        assert limits.max_devices == 2
+        assert limits.max_devices == 1
+        assert limits.max_words_per_manuscript == -1
         assert limits.pages_rollover_months == 1
         assert not limits.is_unlimited
 
     def test_editorial_limits(self):
         limits = TierLimits.for_tier(LicenseTier.EDITORIAL)
         assert limits.max_pages_per_month == -1
-        assert limits.max_devices == 10
+        assert limits.max_devices == 3
+        assert limits.max_words_per_manuscript == -1
         assert limits.pages_rollover_months == 0
         assert limits.is_unlimited
+
+    def test_corrector_manuscript_word_limit(self):
+        limits = TierLimits.for_tier(LicenseTier.CORRECTOR)
+        assert limits.max_words_per_manuscript == 60_000
 
     def test_frozen_immutable(self):
         limits = TierLimits.for_tier(LicenseTier.CORRECTOR)
@@ -405,10 +414,9 @@ class TestLicense:
 
     def test_can_add_device_profesional(self):
         lic = License(tier=LicenseTier.PROFESIONAL)
+        assert lic.can_add_device()  # 0 active < 1 max
         lic.devices = [Device(status=DeviceStatus.ACTIVE)]
-        assert lic.can_add_device()  # 1 active < 2 max
-        lic.devices.append(Device(status=DeviceStatus.ACTIVE))
-        assert not lic.can_add_device()  # 2 active == 2 max
+        assert not lic.can_add_device()  # 1 active == 1 max
 
     def test_serialization_roundtrip(self):
         lic = License(
@@ -587,7 +595,7 @@ class TestConstants:
         assert OFFLINE_GRACE_PERIOD_DAYS == 14
 
     def test_device_cooldown_hours(self):
-        assert DEVICE_DEACTIVATION_COOLDOWN_HOURS == 48
+        assert DEVICE_DEACTIVATION_COOLDOWN_HOURS == 168  # 7 dias
 
     def test_words_per_page(self):
         assert WORDS_PER_PAGE == 250

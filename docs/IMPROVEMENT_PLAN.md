@@ -1097,6 +1097,16 @@ NO propagar invalidacion downstream. Comparar `output_hash` antes vs despues.
 | ~~BK-22~~ | ~~Feedback loop: sistema aprende de correcciones~~ | ✅ DONE — detector_calibration table, recalibracion de confianza por ratio FP, get_dismissal_stats() → effective_confidence (commit 3cd35d3, Sprint PP-4) |
 | BK-23 | Estandarizar loading patterns (spinners/barras) | **P3** — BK-23b (skeleton loaders) y BK-23c (z-index + animations) DONE. BK-23a (unificar loading Ollama Tutorial=Settings) PENDIENTE. |
 | ~~BK-24~~ | ~~Conectar 3 endpoints export faltantes~~ | ✅ DONE — /export/characters (routing a character_sheets.py), /export/report (ReviewReportExporter), /export/alerts + CSV (commit c653867, Sprint PP-1) |
+| BK-25 | Revision Intelligence (detección alertas resueltas) | **P2** — Comparar alertas pre/post reanálisis: `resolved` / `still_present` / `new_issue` / `dismissed`. Content diffing como método primario. Parseo de track changes de .docx como enhancement (solo 60% de flujos usan track changes). Tier: Profesional. |
+| BK-26 | Colaboración paralela online (sync tiempo real) | **P3** — Sync en tiempo real entre correctores. Requiere servidor con E2E encryption, zero-knowledge. Solo cuando exista licensing server + demanda real. Tier: Editorial. |
+| BK-27 | Filtrado de alertas por rango de capítulos | **P2** — Para flujo editorial paralelo: "Solo alertas de caps 6-10". Debe incluir alertas cross-chapter (inconsistencia cap 2 que afecta cap 7). Extensión del focus mode existente. Tier: Editorial. |
+| BK-28 | Historial de versiones + tracking de progreso | **P3** — Métricas por versión: alertas, ritmo, formalidad, diálogo. Trends: "V1: 87 alertas → V3: 42". Básico en Profesional, dashboards avanzados en Editorial. |
+| BK-29 | Step-up pricing (packs de páginas one-time) | **P2** — Cuando Corrector llega a 1,500 págs/mes: ofrecer "500 páginas extra por €9". Trigger de upgrade a Profesional. |
+
+> **Panel de expertos (12-Feb-2026)**: Sesión de paneles especializados (correctores editoriales,
+> pricing SaaS, sales & marketing). BK-25..29 identificados en análisis de flujo editorial,
+> persistencia en reanálisis, y estrategia de pricing/licensing. Incluye: Revision Intelligence,
+> colaboración paralela, filtrado por capítulos, historial de versiones, y step-up pricing.
 
 > **Panel de expertos (10-Feb-2026)**: Sesión de 8 expertos simulados (QA, Lingüista, Corrector, Arquitecto,
 > AppSec, Frontend, Product Owner, UX). BK-09..18 son gaps nuevos identificados por análisis cross-módulo,
@@ -1744,6 +1754,98 @@ Semana 3: S11 — NLP Avanzado + S12
 
 ---
 
+## 8d. Sprints de Producto y Licensing (Panel de Expertos, 12-Feb-2026)
+
+> **Contexto**: Sesión de paneles especializados (correctores editoriales 18+ años,
+> pricing SaaS B2B, sales & marketing España). Identificaron que el trabajo editorial
+> se pierde al reanalizar (bug crítico), y definieron estructura de pricing, founding
+> members, y features de colaboración editorial.
+
+### Sprint SP-1: Persistencia de Trabajo en Reanálisis (~16h, 3-4 días)
+
+> **Prioridad**: INMEDIATA. Es un bug, no una feature. Los 3 correctores del panel
+> (Carmen, Miguel, Ana) lo calificaron 5/5 y dijeron: "Si pierdo mi trabajo al
+> reanalizar, desinstalo la herramienta." Tier: Corrector (base).
+
+| ID | Acción | Horas | Detalle |
+|----|--------|-------|---------|
+| SP1-01 | Fix content_hash para alertas posicionales | 2h | `spelling_*` incluye `start_char` en hash → si editas antes del typo, hash cambia y dismissal no machea. Eliminar `start_char`, usar `(word, chapter, alert_type)` como hash. Archivo: `alerts/models.py:153-157` |
+| SP1-02 | Verificar que `alert_dismissals` sobrevive cleanup | 1h | `run_cleanup()` en `_analysis_phases.py` ya NO borra `alert_dismissals`. Verificar y añadir test. |
+| SP1-03 | Llamar `apply_dismissals()` tras generación de alertas | 2h | En pipeline de análisis, después de generar alertas: cargar `dismissed_hashes` y marcar como dismissed las que machean. Archivo: `_analysis_phases.py` |
+| SP1-04 | Preservar entity merges entre reanálisis | 4h | Antes de cleanup: exportar merges activos `(canonical_name, merged_names[])`. Después de NER+fusion: re-aplicar merges por `canonical_name` matching. Nuevo: `merge_preservation.py` |
+| SP1-05 | Preservar atributos verificados (`is_verified=1`) | 2h | Antes de cleanup: snapshot de atributos con `is_verified=1`. Después de extracción: restaurar atributos verificados si la entidad existe (por nombre). |
+| SP1-06 | Preservar correcciones manuales (coref/speaker/focalización) | 2h | Las tablas `coreference_corrections`, `speaker_corrections`, `focalization_declarations` ya sobreviven cleanup. Verificar que se aplican en pipeline post-reanálisis. |
+| SP1-07 | Tests de persistencia en reanálisis | 3h | Tests: (a) dismissals sobreviven, (b) merges se re-aplican, (c) atributos verificados restaurados, (d) correcciones speaker aplicadas, (e) content_hash estable sin posiciones |
+
+**Archivos a modificar**:
+- `api-server/routers/_analysis_phases.py` — cleanup + apply_dismissals en pipeline
+- `src/narrative_assistant/alerts/models.py` — fix content_hash spelling_*
+- `src/narrative_assistant/entities/` — nuevo: merge_preservation.py
+- `tests/unit/test_reanalysis_persistence.py` — nuevo
+
+### Sprint SP-2: Revisión de Licensing (~8h, 2 días)
+
+> **Contexto**: Paneles de pricing y sales identificaron problemas en la estructura
+> actual: Pro con 2 dispositivos canibaliza Editorial, salto €49→€299 demasiado
+> grande, sin límite de manuscrito en Corrector.
+
+| ID | Acción | Horas | Detalle |
+|----|--------|-------|---------|
+| SP2-01 | Profesional: 1 dispositivo (era 2) | 1h | `TierLimits.for_tier(PROFESIONAL).max_devices = 1`. Con 2 swaps/mes, 1 device es suficiente. Evita arbitraje: 2×Pro (€98, 4 devices) vs Editorial (€159, 3 devices). |
+| SP2-02 | Corrector: límite 60k palabras por manuscrito | 2h | Nuevo: `max_words_per_manuscript` en `TierLimits`. Novelas (70-120k) fuerzan upgrade a Pro. Enforce en `gating.py` y pipeline. |
+| SP2-03 | Device swap model: 2/mes + 7 días cooldown | 2h | Nuevo: `DeviceSwapPolicy` dataclass. `max_swaps_per_month=2`, `cooldown_hours=168`. Primer swap inmediato, 2o inmediato, 3o+ espera 7 días. |
+| SP2-04 | Editorial: €159 base (3 puestos) + €49/extra | 1h | Nuevo: `editorial_base_seats=3`, `editorial_extra_seat_price=49` en config. `max_devices` calculado dinámicamente. |
+| SP2-05 | Founding member model | 1h | Nuevo: `FoundingMemberConfig` — prices `{CORRECTOR: 19, PROFESIONAL: 34, EDITORIAL: 119}`, spots `{CORRECTOR: 10, PROFESIONAL: 15, EDITORIAL: 5}`, `upgrade_discount_pct=20`. |
+| SP2-06 | Actualizar LICENSING_PRODUCTION_PLAN.md | 1h | Nueva tabla de precios, cooldown model, founding program, annual pricing (25% off). |
+
+**Tabla de precios final**:
+
+| | Corrector | Profesional | Editorial |
+|---|-----------|-------------|-----------|
+| **Standard** | €24/mo | €49/mo | €159/mo (3 puestos) |
+| **Founder (forever)** | €19/mo (10 plazas) | €34/mo (15 plazas) | €119/mo (5 plazas) |
+| **Founder upgrade bonus** | 20% off tier superior | 20% off tier superior | — |
+| **Anual** | €216/año (25% off) | €441/año | €1,521/año |
+| **Puesto extra (Editorial)** | — | — | +€49/puesto/mo |
+| **Páginas/mo** | 1,500 | 3,000 | Ilimitado |
+| **Manuscrito max** | 60k palabras | Ilimitado | Ilimitado |
+| **Dispositivos** | 1 | 1 | 3 base (+extras) |
+| **Swaps/mes** | 2 + 7d cooldown | 2 + 7d cooldown | 2 + 7d cooldown |
+| **Features** | 4 básicas | 11 completas | 11 + export/import/merge |
+
+**Founding program**: 30 plazas totales (10/15/5). Precio bloqueado para siempre.
+Founders que suben de tier mantienen 20% de descuento sobre el precio standard del tier superior.
+
+### Sprint SP-3: Export/Import Trabajo Editorial (~36h, 7-9 días)
+
+> **Prioridad**: Después de SP-1. Es el diferenciador clave del tier Editorial.
+> File-based (no requiere servidor). Solo metadatos de análisis (nombres de
+> personajes, alertas, atributos), NO texto del manuscrito.
+
+| ID | Acción | Horas | Detalle |
+|----|--------|-------|---------|
+| SP3-01 | Servicio de export (JSON `.narrassist`) | 6h | Exportar: entity merges (canonical_name, merged_names, aliases), alert decisions (content_hash, status, resolution_note), verified attributes (entity_name, category, key, value), suppression rules. Formato JSON versionado (`format_version: 1`). |
+| SP3-02 | Servicio de import con preview | 8h | Import en 2 pasos: (1) preview — mostrar qué se importará, conflictos detectados, estadísticas; (2) confirm — aplicar cambios. Matching primario por `content_hash`, secundario por `(category, entity_names, chapter)`. |
+| SP3-03 | Merge logic para trabajo de múltiples correctores | 6h | Estrategia LATEST_WINS para conflictos. Si corrector A dice "válida" y corrector B dice "inválida" → el más reciente gana. Preview muestra conflictos antes de confirmar. |
+| SP3-04 | API endpoints | 4h | `POST /projects/{id}/export-work` → genera .narrassist, `POST /projects/{id}/import-work/preview` → muestra preview, `POST /projects/{id}/import-work/confirm` → aplica. |
+| SP3-05 | Frontend: botones export/import + modal preview | 8h | Botón "Exportar trabajo" en toolbar proyecto. Botón "Importar trabajo" con modal de preview: tabla de cambios propuestos, conflictos en rojo, checkbox para seleccionar qué importar. |
+| SP3-06 | Feature gating: solo Editorial | 1h | Nuevo `LicenseFeature.EXPORT_IMPORT`. Gated en endpoints + UI. |
+| SP3-07 | Tests | 3h | Export/import roundtrip, merge conflicts, matching parcial, gating enforcement. |
+
+**Seguridad**: El archivo `.narrassist` contiene SOLO metadatos (nombres de personajes,
+descripciones de alertas, atributos). NO contiene texto del manuscrito. Aun así, los
+metadatos pueden revelar trama → el archivo es del corrector, se transfiere por sus
+propios medios (email, USB, Slack). Sin servidor involucrado.
+
+**Flujo editorial típico**:
+1. Coordinador crea proyecto, analiza manuscrito
+2. Exporta trabajo y lo envía a 2 correctores
+3. Corrector A trabaja caps 1-5, Corrector B trabaja caps 6-10
+4. Ambos exportan su trabajo → coordinador importa ambos con merge
+5. Coordinador revisa conflictos en preview → confirma
+
+---
+
 ## 9. Cronograma de Implementación
 
 ### Completado (S0-S7a): ✅
@@ -1764,10 +1866,21 @@ S5 (LLM), S6 (frontend UX), S7a (licensing). Total: ~10 semanas ejecutadas.
 > S8a (18 tareas), S8b (9 tareas), S8c (11 tareas) — todo completado.
 > Tag: v0.8.0
 
-### PRÓXIMO: S9-S12 — NLP Avanzado (~28-44 días, 7-11 semanas)
+### PRÓXIMO: SP-1..SP-3 — Producto y Licensing (~60h, 3-4 semanas)
 
-> Mejoras de calidad NLP. Solo tiene sentido cuando el producto base está pulido (PP)
-> y la pipeline es robusta (S8).
+> Persistencia de trabajo editorial, revisión de pricing, y export/import.
+> SP-1 es prioritario (bug crítico). SP-2 y SP-3 pueden ir en paralelo.
+
+| Sprint | Foco | Tareas clave | Días |
+|--------|------|-------------|------|
+| **SP-1** | Persistencia en reanálisis | Fix content_hash, preservar merges/atributos/dismissals | 3-4d |
+| **SP-2** | Revisión licensing | 1 device Pro, 60k limit, swaps, founding members | 2d |
+| **SP-3** | Export/Import editorial | JSON .narrassist, preview+confirm, merge logic | 7-9d |
+
+### SIGUIENTE: S9-S12 — NLP Avanzado (~28-44 días, 7-11 semanas)
+
+> Mejoras de calidad NLP. Solo tiene sentido cuando el producto base está pulido (PP),
+> la pipeline es robusta (S8), y el trabajo editorial se preserva (SP-1).
 
 | Sprint | Foco | Tareas clave | Días |
 |--------|------|-------------|------|
@@ -1787,6 +1900,11 @@ S5 (LLM), S6 (frontend UX), S7a (licensing). Total: ~10 semanas ejecutadas.
 | **UserGuide PDF exportable** | Aporta valor, pero requiere capturas actualizadas de cada tab. Mejor cuando UI sea estable. | Tras Sprint PP (UI estable) |
 | **Formato EPUB en export** | Relevante para producción editorial. No urgente para corrector que trabaja en Word. | Tras feedback de clientes |
 | **Formato XLSX en export** | Útil para equipos grandes. CSV cubre el 80% del caso de uso. | Si lo piden clientes |
+| **Revision Intelligence** (BK-25) | Detectar alertas resueltas tras reanálisis. Útil pero requiere SP-1 primero + content diffing robusto. | Tras SP-1 + feedback clientes |
+| **Colaboración paralela online** (BK-26) | Sync en tiempo real. Requiere servidor, E2E encryption. Coste alto, demanda incierta. | Tras licensing server + demanda |
+| **Filtrado alertas por capítulos** (BK-27) | Focus mode por rango de capítulos para trabajo paralelo editorial. Cross-chapter awareness. | Tras SP-3 (export/import) |
+| **Historial de versiones** (BK-28) | Tracking de métricas por versión del manuscrito. Útil para coordinadores, no para freelancers. | Tras feedback clientes Editorial |
+| **Step-up pricing** (BK-29) | Packs de páginas one-time (€9/500 págs). Trigger de upgrade Corrector→Pro. | Cuando haya datos de conversión |
 | **Pesos adaptativos nivel 3** (por manuscrito) | Infraestructura existe (`adaptive_weights`), pero nivel 2 (recalibración global) es suficiente primero. | Tras BK-22 (nivel 2) |
 | **Integrar Maverick** (BK-01) | Solo inglés por ahora. Monitorizar releases. | Cuando soporte español |
 | **Integrar BookNLP** (BK-02) | Sin release público multilingüe. | Cuando esté disponible |
@@ -1799,18 +1917,29 @@ S5 (LLM), S6 (frontend UX), S7a (licensing). Total: ~10 semanas ejecutadas.
 ### Roadmap visual completo
 
 ```
-COMPLETADO                                          FUTURO
+COMPLETADO                                          PRÓXIMO (SP)
 ───────────────────────────────────────────────── ──────────────────────
-S0-S6 (NLP + Frontend)                              S9 (Integridad)
-S7a (Licensing) ✅                                  S10 (Timeline)
-S7b ✅ (10/10)                                      S11 (Pro-drop)
-S7c ✅ (6/7, 1 backlog)                             S12 (Decay)
-S7d ✅ (13/13)                                      ───────────────
-Sprint PP ✅ (17/17)                                APARCADO:
-Sprint S8 ✅ (S8a + S8b + S8c)                     Landing web
-  v0.8.0 → v0.8.6 (bugfixes)                       UserGuide PDF
-                                                    EPUB export
-                                                    XLSX export
+S0-S6 (NLP + Frontend)                              SP-1 (Persistencia reanálisis)
+S7a (Licensing) ✅                                  SP-2 (Revisión licensing)
+S7b ✅ (10/10)                                      SP-3 (Export/Import editorial)
+S7c ✅ (6/7, 1 backlog)                             ──────────────────────
+S7d ✅ (13/13)                                      SIGUIENTE (NLP)
+Sprint PP ✅ (17/17)                                S9 (Integridad)
+Sprint S8 ✅ (S8a + S8b + S8c)                     S10 (Timeline)
+  v0.8.0 → v0.8.6 (bugfixes)                       S11 (Pro-drop)
+                                                    S12 (Decay)
+                                                    ──────────────────────
+                                                    BACKLOG:
+                                                    BK-25 Revision Intelligence
+                                                    BK-26 Collab online
+                                                    BK-27 Filtrado por capítulos
+                                                    BK-28 Historial versiones
+                                                    BK-29 Step-up pricing
+                                                    ──────────────────────
+                                                    APARCADO:
+                                                    Landing web
+                                                    UserGuide PDF
+                                                    EPUB/XLSX export
                                                     Maverick/BookNLP
 ```
 
@@ -1821,8 +1950,11 @@ Sprint S8 ✅ (S8a + S8b + S8c)                     Landing web
 | ~~Sprint PP~~ | ~~39h~~ | ✅ COMPLETADO (17/17) |
 | ~~Sprint S8~~ | ~~17-26 días~~ | ✅ COMPLETADO (v0.8.0) |
 | ~~Tareas sueltas~~ | ~~6h~~ | ✅ S7b-09, S7b-10, BK-23a completados (v0.8.0-v0.8.2) |
+| Sprint SP-1 | 16h (3-4 días) | Persistencia reanálisis (bug fix) |
+| Sprint SP-2 | 8h (2 días) | Revisión licensing |
+| Sprint SP-3 | 36h (7-9 días) | Export/Import editorial |
 | Sprint S9-S12 | 24-37 días (6-9 semanas) | NLP avanzado |
-| **TOTAL restante** | **~6-9 semanas** | S9-S12 |
+| **TOTAL restante** | **~10-14 semanas** | SP + S9-S12 |
 
 ---
 
@@ -1854,6 +1986,6 @@ Sprint S8 ✅ (S8a + S8b + S8c)                     Landing web
 
 ---
 
-**Ultima actualizacion**: 2026-02-11
-**Autor**: Claude (Panel de 8 expertos simulados + sesión producto 10-Feb)
-**Estado**: S0-S8 completados (v0.8.0). Sprint PP completado (17/17). S7b-S7d completados. Tag: v0.8.6. Pendiente: S9-S12 (24-37 días, ~6-9 semanas).
+**Ultima actualizacion**: 2026-02-12
+**Autor**: Claude (Panel de 8 expertos simulados + sesión producto 10-Feb + paneles pricing/sales/editorial 12-Feb)
+**Estado**: S0-S8 completados (v0.8.0). Sprint PP completado (17/17). S7b-S7d completados. Tag: v0.8.6. Pendiente: SP-1..SP-3 (60h, ~3-4 semanas) + S9-S12 (24-37 días, ~6-9 semanas).

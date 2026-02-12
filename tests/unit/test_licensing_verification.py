@@ -329,12 +329,15 @@ class TestCheckFeature:
         assert isinstance(result.error, TierFeatureError)
         assert result.error.feature == LicenseFeature.CHARACTER_PROFILING
 
-    def test_profesional_all_features_allowed(self, verifier, db):
+    def test_profesional_features_allowed(self, verifier, db):
         lid = _insert_license(db, tier="profesional")
         lic = License(id=lid, tier=LicenseTier.PROFESIONAL, status=LicenseStatus.ACTIVE)
         for feature in LicenseFeature:
             result = verifier.check_feature(feature, lic)
-            assert result.is_success, f"Feature {feature} should be allowed for Profesional"
+            if feature == LicenseFeature.EXPORT_IMPORT:
+                assert result.is_failure, "EXPORT_IMPORT should be Editorial-only"
+            else:
+                assert result.is_success, f"Feature {feature} should be allowed for Profesional"
 
     def test_editorial_all_features_allowed(self, verifier, db):
         lid = _insert_license(db, tier="editorial")
@@ -813,13 +816,13 @@ class TestDeactivateDevice:
         result = verifier.deactivate_device(99999)
         assert result.is_failure
 
-    def test_deactivate_sets_cooldown_48h(self, verifier, db):
+    def test_deactivate_sets_cooldown_7d(self, verifier, db):
         lid = _insert_license(db, tier="profesional")
         did = _insert_device(db, lid)
 
         result = verifier.deactivate_device(did)
         device = result.value
-        expected = datetime.utcnow() + timedelta(hours=48)
+        expected = datetime.utcnow() + timedelta(hours=168)  # 7 dias
         # Allow 5 seconds tolerance
         diff = abs((device.cooldown_ends_at - expected).total_seconds())
         assert diff < 5

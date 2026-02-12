@@ -64,11 +64,14 @@ class TestIsFeatureAllowed:
             assert is_feature_allowed(LicenseFeature.ANACHRONISM_DETECTION, LicenseTier.CORRECTOR) is False
             assert is_feature_allowed(LicenseFeature.CLASSICAL_SPANISH, LicenseTier.CORRECTOR) is False
 
-    def test_all_features_allowed_for_profesional(self):
-        """Tier PROFESIONAL tiene todas las features."""
+    def test_profesional_features(self):
+        """Tier PROFESIONAL tiene todas las features excepto EXPORT_IMPORT."""
         with patch.dict(os.environ, {"NA_LICENSING_ENABLED": "true"}):
             for feature in LicenseFeature:
-                assert is_feature_allowed(feature, LicenseTier.PROFESIONAL) is True
+                if feature == LicenseFeature.EXPORT_IMPORT:
+                    assert is_feature_allowed(feature, LicenseTier.PROFESIONAL) is False
+                else:
+                    assert is_feature_allowed(feature, LicenseTier.PROFESIONAL) is True
 
     def test_all_features_allowed_for_editorial(self):
         """Tier EDITORIAL tiene todas las features."""
@@ -98,10 +101,11 @@ class TestGetAllowedFeatures:
             assert LicenseFeature.GRAMMAR_SPELLING in features
             assert LicenseFeature.CHARACTER_PROFILING not in features
 
-    def test_all_features_for_profesional(self):
+    def test_profesional_features_exclude_export(self):
         with patch.dict(os.environ, {"NA_LICENSING_ENABLED": "true"}):
             features = get_allowed_features(LicenseTier.PROFESIONAL)
-            assert features == frozenset(LicenseFeature)
+            assert len(features) == 11
+            assert LicenseFeature.EXPORT_IMPORT not in features
 
 
 class TestApplyLicenseGating:

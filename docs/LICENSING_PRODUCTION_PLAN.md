@@ -310,6 +310,34 @@ Complemento: timestamp firmado del servidor como high-water mark.
 | GET | /admin/promos | Listar promos con stats |
 | GET | /admin/dashboard | Stats agregados (MRR, usuarios, uso) |
 
+### Estructura de precios (revisada 12-Feb-2026)
+
+> Panel de pricing, sales y marketing. 3 tiers, sin tier adicional.
+
+| | Corrector | Profesional | Editorial |
+|---|-----------|-------------|-----------|
+| **Precio standard** | €24/mo | €49/mo | €159/mo (3 puestos base) |
+| **Precio anual** | €216/año (25% off) | €441/año (25% off) | €1,521/año (25% off) |
+| **Puesto extra** | — | — | +€49/puesto/mo |
+| **Páginas/mo** | 1,500 | 3,000 | Ilimitado |
+| **Manuscrito max** | 60k palabras | Ilimitado | Ilimitado |
+| **Dispositivos** | 1 | 1 | 3 base (+extras) |
+| **Device swaps** | 2/mes + 7d cooldown | 2/mes + 7d cooldown | 2/mes + 7d cooldown |
+| **Features** | 4 básicas | 11 (todas excepto export/import) | 12 (todas + export/import/merge) |
+
+**Founding member program** (30 plazas totales, precio bloqueado para siempre):
+
+| Tier | Plazas | Precio founder | Descuento |
+|------|:------:|:--------------:|:---------:|
+| Corrector | 10 | €19/mo | 21% |
+| Profesional | 15 | €34/mo | 31% |
+| Editorial | 5 | €119/mo | 25% |
+
+Founders que suben de tier mantienen **20% de descuento** sobre el standard del tier superior.
+
+**Device swap policy**: 2 swaps inmediatos/mes. A partir del 3o, 7 días de cooldown.
+Para Editorial con puestos extra, cada puesto tiene su propio contador de swaps.
+
 ### Coste estimado
 
 ```
@@ -320,7 +348,7 @@ Costes fijos mensuales:
 Por cliente (comisiones Stripe 2.9% + 0.30 EUR):
   Corrector (24 EUR):     neto ~23.00 EUR
   Profesional (49 EUR):   neto ~47.28 EUR
-  Editorial (299 EUR):    neto ~290.03 EUR
+  Editorial (159 EUR):    neto ~154.09 EUR
 
 Break-even: 1 cliente Corrector cubre los costes del servidor.
 ```

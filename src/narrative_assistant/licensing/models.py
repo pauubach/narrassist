@@ -24,8 +24,31 @@ WORDS_PER_PAGE = 250
 # Periodo de gracia offline en dias
 OFFLINE_GRACE_PERIOD_DAYS = 14
 
-# Cooldown al desactivar dispositivo en horas
-DEVICE_DEACTIVATION_COOLDOWN_HOURS = 48
+# Cooldown al desactivar dispositivo en horas (7 dias)
+DEVICE_DEACTIVATION_COOLDOWN_HOURS = 168
+
+# Swaps de dispositivo permitidos por mes (sin cooldown)
+DEVICE_SWAPS_PER_MONTH = 2
+
+# Limite de palabras por manuscrito para tier Corrector
+MAX_WORDS_PER_MANUSCRIPT_CORRECTOR = 60_000
+
+# Editorial: puestos base y precio extra
+EDITORIAL_BASE_SEATS = 3
+EDITORIAL_EXTRA_SEAT_PRICE_EUR = 49
+
+# Founding member program
+FOUNDING_PRICES_EUR = {
+    "corrector": 19,
+    "profesional": 34,
+    "editorial": 119,
+}
+FOUNDING_SPOTS = {
+    "corrector": 10,
+    "profesional": 15,
+    "editorial": 5,
+}
+FOUNDING_UPGRADE_DISCOUNT_PCT = 20  # % descuento al subir de tier
 
 
 # =============================================================================
@@ -84,6 +107,7 @@ class LicenseFeature(Enum):
     CLASSICAL_SPANISH = "classical_spanish"
     MULTI_MODEL = "multi_model"
     FULL_REPORTS = "full_reports"
+    EXPORT_IMPORT = "export_import"
 
     @property
     def display_name(self) -> str:
@@ -100,6 +124,7 @@ class LicenseFeature(Enum):
             LicenseFeature.CLASSICAL_SPANISH: "Espanol clasico (Siglo de Oro)",
             LicenseFeature.MULTI_MODEL: "Analisis multi-modelo",
             LicenseFeature.FULL_REPORTS: "Informes completos",
+            LicenseFeature.EXPORT_IMPORT: "Export/Import trabajo editorial",
         }
         return names[self]
 
@@ -114,13 +139,18 @@ _BASIC_FEATURES: frozenset[LicenseFeature] = frozenset(
     }
 )
 
-# Todas las features (Profesional y Editorial)
+# Features Profesional (todas excepto export/import)
+_PROFESIONAL_FEATURES: frozenset[LicenseFeature] = frozenset(
+    f for f in LicenseFeature if f != LicenseFeature.EXPORT_IMPORT
+)
+
+# Todas las features (Editorial)
 _ALL_FEATURES: frozenset[LicenseFeature] = frozenset(LicenseFeature)
 
 # Mapping tier -> features disponibles
 TIER_FEATURES: dict[LicenseTier, frozenset[LicenseFeature]] = {
     LicenseTier.CORRECTOR: _BASIC_FEATURES,
-    LicenseTier.PROFESIONAL: _ALL_FEATURES,
+    LicenseTier.PROFESIONAL: _PROFESIONAL_FEATURES,
     LicenseTier.EDITORIAL: _ALL_FEATURES,
 }
 
@@ -154,6 +184,7 @@ class TierLimits:
 
     max_pages_per_month: int  # -1 = ilimitado
     max_devices: int
+    max_words_per_manuscript: int = -1  # -1 = ilimitado
     pages_rollover_months: int = 1  # Meses de rollover (0 = sin rollover)
 
     @classmethod
@@ -163,16 +194,17 @@ class TierLimits:
             LicenseTier.CORRECTOR: cls(
                 max_pages_per_month=1500,
                 max_devices=1,
+                max_words_per_manuscript=MAX_WORDS_PER_MANUSCRIPT_CORRECTOR,
                 pages_rollover_months=1,
             ),
             LicenseTier.PROFESIONAL: cls(
                 max_pages_per_month=3000,
-                max_devices=2,
+                max_devices=1,
                 pages_rollover_months=1,
             ),
             LicenseTier.EDITORIAL: cls(
                 max_pages_per_month=-1,  # Ilimitado
-                max_devices=10,
+                max_devices=EDITORIAL_BASE_SEATS,
                 pages_rollover_months=0,  # No aplica
             ),
         }
