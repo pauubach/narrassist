@@ -18,12 +18,8 @@ from collections import Counter
 from dataclasses import dataclass, field
 from enum import Enum
 
-from .character_profiling import (
-    NEGATIVE_WORDS,
-    POSITIVE_WORDS,
-    CharacterProfile,
-    CharacterRole,
-)
+from .character_profiling import (NEGATIVE_WORDS, POSITIVE_WORDS,
+                                  CharacterProfile, CharacterRole)
 
 logger = logging.getLogger(__name__)
 
@@ -108,11 +104,59 @@ MIN_PROFILE_MENTIONS = 5  # Menciones mínimas para confiar en el perfil
 
 # Marcadores de transición narrativa que justifican un cambio
 TRANSITION_MARKERS = {
-    "de repente", "inesperadamente", "sin previo aviso", "de pronto",
-    "para su sorpresa", "contra todo pronóstico", "sin esperarlo",
-    "algo cambió", "todo cambió", "ya no era", "dejó de ser",
-    "se transformó", "se convirtió", "nunca antes",
+    "de repente",
+    "inesperadamente",
+    "sin previo aviso",
+    "de pronto",
+    "para su sorpresa",
+    "contra todo pronóstico",
+    "sin esperarlo",
+    "algo cambió",
+    "todo cambió",
+    "ya no era",
+    "dejó de ser",
+    "se transformó",
+    "se convirtió",
+    "nunca antes",
 }
+
+# Regex para verbos de enmascaramiento emocional (7 familias)
+EMOTIONAL_MASKING_PATTERNS = [
+    re.compile(r"\bfing(?:ió|e|ía|ieron|ida|ido|iendo)\b", re.IGNORECASE),
+    re.compile(r"\bsimul(?:ó|a|aba|aron|ando|ada|ado)\b", re.IGNORECASE),
+    re.compile(r"\baparent(?:ó|a|aba|aron|ando|ada|ado)\b", re.IGNORECASE),
+    re.compile(r"\bdisimul(?:ó|a|aba|aron|ando|ada|ado)\b", re.IGNORECASE),
+    re.compile(r"\bcontuvo\b|\bcontiene\b|\bcontenía\b|\bconteniendo\b", re.IGNORECASE),
+    re.compile(r"\brefren(?:ó|a|aba|ando)\b", re.IGNORECASE),
+    re.compile(r"\bse\s+hizo\b|\bhaciéndose\b|\bhizo\s+como\s+si\b", re.IGNORECASE),
+    re.compile(r"\bocult(?:ó|a|aba|aron|ando|ada|ado)\b", re.IGNORECASE),
+]
+
+MASKABLE_EMOTIONS = {
+    "calma",
+    "tranquilidad",
+    "serenidad",
+    "alegría",
+    "confianza",
+    "indiferencia",
+    "frialdad",
+    "compostura",
+    "entereza",
+    "aplomo",
+}
+
+# Indicadores de contradicción física (masking + leakage corporal)
+PHYSICAL_LEAK_PATTERNS = [
+    re.compile(r"\baunque\b.{0,60}\btembl\w+", re.IGNORECASE),
+    re.compile(r"\bpero\b.{0,60}\btembl\w+", re.IGNORECASE),
+    re.compile(r"\bmientras\b.{0,60}\bsud\w+", re.IGNORECASE),
+    re.compile(
+        r"\ba\s+pesar\b.{0,60}\bvoz\s+(?:quebrada|temblorosa|entrecortada)\b",
+        re.IGNORECASE,
+    ),
+    re.compile(r"\bpero\b.{0,60}\bpuños?\s+(?:apretad|cerrad)\w+", re.IGNORECASE),
+    re.compile(r"\baunque\b.{0,60}\bpálid\w+", re.IGNORECASE),
+]
 
 
 class OutOfCharacterDetector:
@@ -151,9 +195,11 @@ class OutOfCharacterDetector:
 
         # Solo analizar personajes con perfil suficiente
         analyzable = [
-            p for p in profiles
+            p
+            for p in profiles
             if p.presence.total_mentions >= MIN_PROFILE_MENTIONS
-            and p.role in (
+            and p.role
+            in (
                 CharacterRole.PROTAGONIST,
                 CharacterRole.DEUTERAGONIST,
                 CharacterRole.SUPPORTING,
@@ -167,21 +213,15 @@ class OutOfCharacterDetector:
 
             # 1. Desviación de registro de habla
             if chapter_dialogues:
-                events.extend(
-                    self._check_speech_register(profile, chapter_dialogues)
-                )
+                events.extend(self._check_speech_register(profile, chapter_dialogues))
 
             # 2. Desviación emocional
             if chapter_texts:
-                events.extend(
-                    self._check_emotion_shift(profile, chapter_texts)
-                )
+                events.extend(self._check_emotion_shift(profile, chapter_texts))
 
             # 3. Desviación de agentividad
             if chapter_texts:
-                events.extend(
-                    self._check_agency_shift(profile, chapter_texts)
-                )
+                events.extend(self._check_agency_shift(profile, chapter_texts))
 
             report.events.extend(events)
 
@@ -217,7 +257,8 @@ class OutOfCharacterDetector:
         for chapter, dialogues in chapter_dialogues.items():
             # Filtrar diálogos de este personaje
             char_dialogues = [
-                d["text"] for d in dialogues
+                d["text"]
+                for d in dialogues
                 if d.get("speaker_id") == profile.entity_id and d.get("text")
             ]
 
@@ -238,9 +279,14 @@ class OutOfCharacterDetector:
 
             deviation = abs(local_formality - baseline_formality)
             if deviation >= self.formality_threshold:
-                direction = "más formal" if local_formality > baseline_formality else "más informal"
+                direction = (
+                    "más formal"
+                    if local_formality > baseline_formality
+                    else "más informal"
+                )
                 severity = (
-                    DeviationSeverity.ALERT if deviation > 0.5
+                    DeviationSeverity.ALERT
+                    if deviation > 0.5
                     else DeviationSeverity.WARNING
                 )
 
@@ -361,6 +407,51 @@ class OutOfCharacterDetector:
 
         return events
 
+    def _check_emotional_masking(
+        self, text: str, entity_name: str
+    ) -> tuple[bool, bool]:
+        """
+        Detecta si hay masking emocional cerca del nombre del personaje.
+
+        Returns:
+            (has_masking, has_physical_leak)
+        """
+        text_lower = text.lower()
+        name_lower = entity_name.lower()
+
+        # Encontrar posiciones del personaje en el texto
+        name_positions: list[int] = []
+        start = 0
+        while True:
+            pos = text_lower.find(name_lower, start)
+            if pos == -1:
+                break
+            name_positions.append(pos)
+            start = pos + 1
+
+        if not name_positions:
+            return False, False
+
+        for name_pos in name_positions:
+            # Ventana de ~300 chars antes y después
+            window_start = max(0, name_pos - 300)
+            window_end = min(len(text), name_pos + len(name_lower) + 300)
+            window = text[window_start:window_end]
+
+            for pattern in EMOTIONAL_MASKING_PATTERNS:
+                match = pattern.search(window)
+                if not match:
+                    continue
+
+                # Verificar que una emoción enmascarable siga dentro de ~50 chars
+                after_verb = window[match.end() : match.end() + 50].lower()
+                if any(em in after_verb for em in MASKABLE_EMOTIONS):
+                    # Masking confirmado — buscar leakage físico
+                    has_leak = any(lp.search(window) for lp in PHYSICAL_LEAK_PATTERNS)
+                    return True, has_leak
+
+        return False, False
+
     def _mark_intentional_transitions(
         self,
         events: list[OutOfCharacterEvent],
@@ -384,3 +475,20 @@ class OutOfCharacterDetector:
                         event.is_intentional = True
                         event.severity = DeviationSeverity.INFO
                         break
+
+            # Verificar enmascaramiento emocional
+            if not event.is_intentional:
+                has_masking, has_leak = self._check_emotional_masking(
+                    text, event.entity_name
+                )
+                if has_masking:
+                    event.is_intentional = True
+                    if has_leak:
+                        event.severity = DeviationSeverity.INFO
+                        event.description += (
+                            " [masking con contradicción física — plot-relevant]"
+                        )
+                        event.confidence = 0.3
+                    else:
+                        event.severity = DeviationSeverity.INFO
+                        event.confidence = 0.2

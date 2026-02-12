@@ -1087,7 +1087,7 @@ NO propagar invalidacion downstream. Comparar `output_hash` antes vs despues.
 | BK-12 | Cache para fases de enriquecimiento | **P1** — Fases 10-13 (relaciones, voz, prosa) recalculan on-the-fly en cada visita a tab. Sin cache → OOM en hardware limitado (8GB RAM). Blocker para S8a-07..10. |
 | BK-13 | Pro-drop ambigüedad multi-personaje | **P2** — Parcial: `MentionType.ZERO` existe, `coref_mention_extraction.py:416` **ya extrae** zero pronouns con inferencia de género. Falta `ProDropAmbiguityScorer` con scoring multi-factor y `SaliencyTracker`. |
 | BK-14 | Ubicaciones jerárquicas/anidadas | **P2** — Nada implementado. `character_location.py` usa comparación flat de strings. |
-| BK-15 | Emotional masking no modelado | **P2** — Nada implementado. |
+| BK-15 | Emotional masking no modelado | **DONE** — `_check_emotional_masking()` en `out_of_character.py`, 7 familias verbales, leakage físico. 6 tests en `test_ooc_masking.py`. |
 | BK-16 | Hilos narrativos sin resolver (Chekhov's gun) | **P2** — Parcial: `ChekhovElement` dataclass y `_detect_chekhov_elements()` en `chapter_summary.py` funcionan para **objetos/vehicles**. `_check_chekhov()` en `narrative_health.py` integrado en health report. Falta extensión a **personajes** SUPPORTING abandonados. |
 | BK-17 | Glossary → entity disambiguation | **P3** — Nada implementado. |
 | BK-18 | Confidence decay para inferencias stale | **P3** — Nada implementado. `calibration_factor` de BK-22 (S8c) existe como punto de enganche. |
@@ -1163,33 +1163,13 @@ collection_entity_links UNIQUE, self-relationships cleanup).
 
 **Tests**: 16 tests en `tests/unit/test_entity_merge_fk.py` — 1 por tabla + dedup/edge cases.
 
-#### BK-15: Detección de Masking Emocional [HIGH, 3-4h]
+#### BK-15: Detección de Masking Emocional [HIGH, 3-4h] ✅ DONE
 
-> **Ya existe**: Nada. No hay código de masking emocional en el proyecto.
+> **Implementado**: `_check_emotional_masking()` en `out_of_character.py`. 8 regex (7 familias verbales + ocultar), `MASKABLE_EMOTIONS` (10 emociones), `PHYSICAL_LEAK_PATTERNS` (6 regex). Integrado en `_mark_intentional_transitions()`.
 
-**Problema**: "María fingió calma" genera alerta OOC falsa. El sistema confunde masking intencional con inconsistencia de personalidad.
-
-**Patrones a detectar** (7 familias verbales):
-
-| Familia | Ejemplos | Tipo |
-|---------|----------|------|
-| Fingir | fingió, finge, fingía, fingieron, fingida | FEIGN |
-| Simular | simuló, simula, simulaba, simulando | SIMULATE |
-| Aparentar | aparentó, aparenta, aparentaba, aparentando | APPEAR |
-| Disimular | disimulaba, disimula, disimulando, disimulada | CONCEAL |
-| Contener/Refrenar | contuvo, contiene, contenía, refrenó, refrenando | RESTRAIN |
-| Hacerse | se hizo, haciéndose, hizo como si | PRETEND |
-| Ocultar | ocultaba, oculta, ocultando, ocultada | HIDE |
-
-**Emociones enmascarables**: calma, tranquilidad, serenidad, alegría, confianza, indiferencia, frialdad.
-
-**Algoritmo**: `REGEX(MASK_VERB) + (?:su\s+)? + REGEX(MASKABLE_EMOTION)` → marcar `is_intentional=True`, no generar alerta OOC (o generar INFO con confidence ≤ 0.3).
-
-**Excepcción**: Masking + contradicción física ("aparentaba calma aunque sus manos temblaban") → INFO alert, plot-relevant.
-
-**Archivos**: `src/narrative_assistant/analysis/out_of_character.py` — Añadir `_check_emotional_masking()` antes de generar alertas. Añadir `EMOTIONAL_MASKING_MARKERS` y `MASKABLE_EMOTIONS` junto a `TRANSITION_MARKERS` existente.
-
-**Tests**: 5 tests (fingió calma, disimulando miedo, aparentaba+temblaba, no-mask normal OOC, mask con leakage físico).
+**Archivos modificados**:
+- `src/narrative_assistant/analysis/out_of_character.py` — Constantes + método + integración
+- `tests/unit/test_ooc_masking.py` — 6 tests (fingió calma, disimulando, aparentaba+temblaba, normal shift, no-maskable emotion, masking lejos del personaje)
 
 #### BK-17: Glosario → Gazetteer NER [HIGH, 4-5h]
 
