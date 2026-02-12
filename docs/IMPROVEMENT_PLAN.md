@@ -1816,21 +1816,21 @@ Semana 3: S11 — NLP Avanzado + S12
 **Founding program**: 30 plazas totales (10/15/5). Precio bloqueado para siempre.
 Founders que suben de tier mantienen 20% de descuento sobre el precio standard del tier superior.
 
-### Sprint SP-3: Export/Import Trabajo Editorial (~36h, 7-9 días)
+### Sprint SP-3: Export/Import Trabajo Editorial — COMPLETADO (v0.9.2)
 
 > **Prioridad**: Después de SP-1. Es el diferenciador clave del tier Editorial.
 > File-based (no requiere servidor). Solo metadatos de análisis (nombres de
 > personajes, alertas, atributos), NO texto del manuscrito.
 
-| ID | Acción | Horas | Detalle |
-|----|--------|-------|---------|
-| SP3-01 | Servicio de export (JSON `.narrassist`) | 6h | Exportar: entity merges (canonical_name, merged_names, aliases), alert decisions (content_hash, status, resolution_note), verified attributes (entity_name, category, key, value), suppression rules. Formato JSON versionado (`format_version: 1`). |
-| SP3-02 | Servicio de import con preview | 8h | Import en 2 pasos: (1) preview — mostrar qué se importará, conflictos detectados, estadísticas; (2) confirm — aplicar cambios. Matching primario por `content_hash`, secundario por `(category, entity_names, chapter)`. |
-| SP3-03 | Merge logic para trabajo de múltiples correctores | 6h | Estrategia LATEST_WINS para conflictos. Si corrector A dice "válida" y corrector B dice "inválida" → el más reciente gana. Preview muestra conflictos antes de confirmar. |
-| SP3-04 | API endpoints | 4h | `POST /projects/{id}/export-work` → genera .narrassist, `POST /projects/{id}/import-work/preview` → muestra preview, `POST /projects/{id}/import-work/confirm` → aplica. |
-| SP3-05 | Frontend: botones export/import + modal preview | 8h | Botón "Exportar trabajo" en toolbar proyecto. Botón "Importar trabajo" con modal de preview: tabla de cambios propuestos, conflictos en rojo, checkbox para seleccionar qué importar. |
-| SP3-06 | Feature gating: solo Editorial | 1h | Nuevo `LicenseFeature.EXPORT_IMPORT`. Gated en endpoints + UI. |
-| SP3-07 | Tests | 3h | Export/import roundtrip, merge conflicts, matching parcial, gating enforcement. |
+| ID | Acción | Estado | Detalle |
+|----|--------|--------|---------|
+| SP3-01 | Servicio de export (JSON `.narrassist`) | DONE | `editorial_work.py`: export_editorial_work() recoge entity merges, alert decisions, verified attributes, suppression rules. JSON versionado (format_version=1). |
+| SP3-02 | Servicio de import con preview | DONE | preview_import() analiza archivo, detecta conflictos LATEST_WINS. confirm_import() aplica con section toggles y conflict_overrides. |
+| SP3-03 | Merge logic para trabajo de múltiples correctores | DONE | Estrategia LATEST_WINS implementada en _resolve_latest_wins(). Preview muestra conflictos con resolución pre-calculada. |
+| SP3-04 | API endpoints | DONE | `POST /projects/{id}/export-work`, `POST /projects/{id}/import-work/preview`, `POST /projects/{id}/import-work/confirm`. Router: `api-server/routers/editorial_work.py`. |
+| SP3-05 | Frontend: botones export/import + modal preview | DONE | Card "Trabajo Editorial" en ExportDialog.vue. ImportWorkDialog.vue: flujo 3 pasos (upload → preview con stats/conflictos → confirm). |
+| SP3-06 | Feature gating: solo Editorial | DONE | `LicenseFeature.EXPORT_IMPORT` (ya existía en models.py). Gated en 3 endpoints via `_check_export_import_feature()`. |
+| SP3-07 | Tests | DONE | 38 tests: export (7), preview (9), confirm (4), roundtrip (2), QA edge cases (16). |
 
 **Seguridad**: El archivo `.narrassist` contiene SOLO metadatos (nombres de personajes,
 descripciones de alertas, atributos). NO contiene texto del manuscrito. Aun así, los
@@ -1988,4 +1988,4 @@ Sprint S8 ✅ (S8a + S8b + S8c)                     S10 (Timeline)
 
 **Ultima actualizacion**: 2026-02-12
 **Autor**: Claude (Panel de 8 expertos simulados + sesión producto 10-Feb + paneles pricing/sales/editorial 12-Feb)
-**Estado**: S0-S8 completados (v0.8.0). Sprint PP completado (17/17). S7b-S7d completados. SP-1 completado (v0.9.0). Tag: v0.8.6 → v0.9.0. Pendiente: SP-2..SP-3 (~44h, 2-3 semanas) + S9-S12 (24-37 días, ~6-9 semanas).
+**Estado**: S0-S8 completados (v0.8.0). Sprint PP completado (17/17). S7b-S7d completados. SP-1 completado (v0.9.0). SP-3 completado (v0.9.2). Tag: v0.9.2. Pendiente: SP-2 (~8h, 2 días) + S9-S12 (24-37 días, ~6-9 semanas).
