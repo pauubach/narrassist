@@ -13,7 +13,13 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Protocol
 
+from ..persistence.chapter import _SCENE_BREAK_PATTERNS
+
 logger = logging.getLogger(__name__)
+
+# Decay de confianza por distancia de diálogos
+CONFIDENCE_DECAY_RATE = 0.97  # base * 0.97^distance
+CONFIDENCE_FLOOR = 0.30  # mínimo de confianza tras decay
 
 
 # Verbos de habla en espanol
@@ -242,7 +248,9 @@ class DialogueAttribution:
             "confidence": self.confidence.value,
             "attribution_method": self.attribution_method.value,
             "speech_verb": self.speech_verb,
-            "context_snippet": self.context_snippet[:50] if self.context_snippet else "",
+            "context_snippet": (
+                self.context_snippet[:50] if self.context_snippet else ""
+            ),
         }
 
 
@@ -285,7 +293,9 @@ class VoiceProfileProtocol(Protocol):
 class SpeakerAttributor:
     """Atribuidor de hablante para dialogos."""
 
-    def __init__(self, entities: list[Any], voice_profiles: dict[int, Any] | None = None):
+    def __init__(
+        self, entities: list[Any], voice_profiles: dict[int, Any] | None = None
+    ):
         """
         Inicializa el atribuidor.
 
@@ -326,18 +336,48 @@ class SpeakerAttributor:
 
         # Patron 1: "—dijo Juan" o "—respondio Maria"
         self.pattern_verb_name = re.compile(
-            r"[—\-]\s*(" + verbs_pattern + r")\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)", re.IGNORECASE
+            r"[—\-]\s*(" + verbs_pattern + r")\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)",
+            re.IGNORECASE,
         )
 
         # Patron 2: "Juan dijo:" o "Maria respondio:"
         self.pattern_name_verb = re.compile(
-            r"([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+(" + verbs_pattern + r")\s*[:\.]?\s*[—\-]?", re.IGNORECASE
+            r"([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)\s+(" + verbs_pattern + r")\s*[:\.]?\s*[—\-]?",
+            re.IGNORECASE,
         )
 
         # Patron 3: ", dijo Juan" (con coma)
         self.pattern_comma_verb_name = re.compile(
             r",\s*(" + verbs_pattern + r")\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)", re.IGNORECASE
         )
+
+    @staticmethod
+    def _detect_scene_breaks(text: str) -> list[int]:
+        """
+        Detecta posiciones de scene breaks en el texto.
+
+        Reutiliza los patrones de chapter.py (_SCENE_BREAK_PATTERNS).
+
+        Returns:
+            Lista de posiciones (char offset) donde hay scene breaks, ordenadas.
+        """
+        positions: set[int] = set()
+        for pattern in _SCENE_BREAK_PATTERNS:
+            for match in pattern.finditer(text):
+                positions.add(match.start())
+        return sorted(positions)
+
+    def _is_past_scene_break(
+        self,
+        scene_breaks: list[int],
+        last_position: int,
+        current_position: int,
+    ) -> bool:
+        """Verifica si hay un scene break entre dos posiciones."""
+        for sb in scene_breaks:
+            if last_position < sb <= current_position:
+                return True
+        return False
 
     def attribute_dialogues(
         self,
@@ -362,10 +402,18 @@ class SpeakerAttributor:
         # Ordenar dialogos por posicion
         sorted_dialogues = sorted(dialogues, key=lambda d: getattr(d, "start_char", 0))
 
+        # Pre-calcular scene breaks del texto completo
+        scene_breaks: list[int] = []
+        if full_text:
+            scene_breaks = self._detect_scene_breaks(full_text)
+
         # Contexto de escena
         current_participants: list[int] = []
         last_speaker: int | None = None
         last_chapter: int = -1
+        last_dialogue_pos: int = 0
+        # Tracking para confidence decay
+        turns_since_explicit: int = 0
 
         for i, dialogue in enumerate(sorted_dialogues):
             text = getattr(dialogue, "text", "")
@@ -378,6 +426,18 @@ class SpeakerAttributor:
                 current_participants = []
                 last_speaker = None
                 last_chapter = chapter
+                turns_since_explicit = 0
+                last_dialogue_pos = start_char
+
+            # Reset en scene break (BK-10b)
+            elif scene_breaks and self._is_past_scene_break(
+                scene_breaks, last_dialogue_pos, start_char
+            ):
+                current_participants = []
+                last_speaker = None
+                turns_since_explicit = 0
+
+            last_dialogue_pos = start_char
 
             # Obtener contexto del dialogo
             context_after = ""
@@ -413,6 +473,7 @@ class SpeakerAttributor:
                     attr.attribution_method = AttributionMethod.EXPLICIT_VERB
                     attr.speech_verb = "speaker_hint"
                     last_speaker = matched_id
+                    turns_since_explicit = 0
                     if matched_id not in current_participants:
                         current_participants.append(matched_id)
                     attributions.append(attr)
@@ -427,6 +488,7 @@ class SpeakerAttributor:
                             attr.attribution_method = AttributionMethod.EXPLICIT_VERB
                             attr.speech_verb = "speaker_hint"
                             last_speaker = eid
+                            turns_since_explicit = 0
                             if eid not in current_participants:
                                 current_participants.append(eid)
                             attributions.append(attr)
@@ -448,10 +510,14 @@ class SpeakerAttributor:
                 attr.attribution_method = AttributionMethod.EXPLICIT_VERB
                 attr.speech_verb = explicit[1]
                 last_speaker = explicit[0]
+                turns_since_explicit = 0
                 if explicit[0] not in current_participants:
                     current_participants.append(explicit[0])
                 attributions.append(attr)
                 continue
+
+            # A partir de aquí: métodos no explícitos → aplicar decay (BK-10c)
+            turns_since_explicit += 1
 
             # 2. Actualizar participantes de escena por proximidad
             nearby = self._get_nearby_entities(start_char, entity_mentions, window=500)
@@ -465,7 +531,15 @@ class SpeakerAttributor:
                 if other:
                     attr.speaker_id = other[0]
                     attr.speaker_name = self._get_entity_name(other[0])
-                    attr.confidence = AttributionConfidence.MEDIUM
+                    # Aplicar decay de confianza (BK-10c)
+                    decay = max(
+                        CONFIDENCE_FLOOR,
+                        CONFIDENCE_DECAY_RATE**turns_since_explicit,
+                    )
+                    if decay >= 0.74:
+                        attr.confidence = AttributionConfidence.MEDIUM
+                    else:
+                        attr.confidence = AttributionConfidence.LOW
                     attr.attribution_method = AttributionMethod.ALTERNATION
                     last_speaker = other[0]
                     attributions.append(attr)
@@ -516,7 +590,9 @@ class SpeakerAttributor:
             # Aun asi agregar alternativas si hay scores
             if voice_scored:
                 attr.alternative_speakers = [
-                    (eid, self._get_entity_name(eid), sc) for eid, sc in voice_scored if sc > 0.1
+                    (eid, self._get_entity_name(eid), sc)
+                    for eid, sc in voice_scored
+                    if sc > 0.1
                 ][:3]
             attributions.append(attr)
 
@@ -527,7 +603,9 @@ class SpeakerAttributor:
         """Obtiene nombre de entidad por ID."""
         entity = self.entities.get(entity_id)
         if entity:
-            return getattr(entity, "canonical_name", getattr(entity, "name", str(entity_id)))
+            return getattr(
+                entity, "canonical_name", getattr(entity, "name", str(entity_id))
+            )
         return str(entity_id)
 
     def _detect_explicit_speaker(
@@ -584,7 +662,10 @@ class SpeakerAttributor:
         return None
 
     def _get_nearby_entities(
-        self, position: int, entity_mentions: list[tuple[int, int, int]], window: int = 500
+        self,
+        position: int,
+        entity_mentions: list[tuple[int, int, int]],
+        window: int = 500,
     ) -> list[int]:
         """
         Obtiene entidades mencionadas cerca de una posicion.
@@ -615,7 +696,9 @@ class SpeakerAttributor:
 
         return result
 
-    def _score_voice_match(self, text: str, candidates: list[int]) -> list[tuple[int, float]]:
+    def _score_voice_match(
+        self, text: str, candidates: list[int]
+    ) -> list[tuple[int, float]]:
         """
         Puntua cada candidato por similitud con su perfil de voz.
 
@@ -714,7 +797,9 @@ class SpeakerAttributor:
             filler_match = False
             for filler_item in top_fillers:
                 filler_word = (
-                    filler_item[0] if isinstance(filler_item, (list, tuple)) else str(filler_item)
+                    filler_item[0]
+                    if isinstance(filler_item, (list, tuple))
+                    else str(filler_item)
                 )
                 if filler_word and filler_word.lower() in text_lower:
                     filler_match = True
@@ -761,7 +846,9 @@ class SpeakerAttributor:
             return scored[0][0]
         return None
 
-    def get_attribution_stats(self, attributions: list[DialogueAttribution]) -> dict[str, Any]:
+    def get_attribution_stats(
+        self, attributions: list[DialogueAttribution]
+    ) -> dict[str, Any]:
         """
         Genera estadisticas de atribucion.
 
@@ -781,9 +868,15 @@ class SpeakerAttributor:
             }
 
         by_confidence = {
-            "high": sum(1 for a in attributions if a.confidence == AttributionConfidence.HIGH),
-            "medium": sum(1 for a in attributions if a.confidence == AttributionConfidence.MEDIUM),
-            "low": sum(1 for a in attributions if a.confidence == AttributionConfidence.LOW),
+            "high": sum(
+                1 for a in attributions if a.confidence == AttributionConfidence.HIGH
+            ),
+            "medium": sum(
+                1 for a in attributions if a.confidence == AttributionConfidence.MEDIUM
+            ),
+            "low": sum(
+                1 for a in attributions if a.confidence == AttributionConfidence.LOW
+            ),
             "unknown": sum(
                 1 for a in attributions if a.confidence == AttributionConfidence.UNKNOWN
             ),
@@ -822,7 +915,9 @@ class SpeakerAttributor:
         Returns:
             Lista de dialogos sin atribuir
         """
-        return [a for a in attributions if a.confidence == AttributionConfidence.UNKNOWN]
+        return [
+            a for a in attributions if a.confidence == AttributionConfidence.UNKNOWN
+        ]
 
     def get_low_confidence_dialogues(
         self, attributions: list[DialogueAttribution]
@@ -839,7 +934,8 @@ class SpeakerAttributor:
         return [
             a
             for a in attributions
-            if a.confidence in (AttributionConfidence.LOW, AttributionConfidence.UNKNOWN)
+            if a.confidence
+            in (AttributionConfidence.LOW, AttributionConfidence.UNKNOWN)
         ]
 
 

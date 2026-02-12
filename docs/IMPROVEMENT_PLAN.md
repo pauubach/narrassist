@@ -1193,31 +1193,21 @@ collection_entity_links UNIQUE, self-relationships cleanup).
 
 **Tests**: 6 tests (case insensitive, word boundary, priority sobre spaCy, múltiples ocurrencias, overlap parcial, API CRUD).
 
-#### BK-10b: Scene Breaks en Speaker Attribution [MEDIUM, 5-6h]
+#### BK-10b: Scene Breaks en Speaker Attribution ✅ DONE
 
-> **Ya existe**: `chapter.py:621-676` define `_SCENE_BREAK_PATTERNS` (regex para `***`,
-> `---`, `#`) y cuenta scene_breaks para métricas. **Falta**: usar esos patrones en
-> `speaker_attribution.py` para resetear `current_participants` y `last_speaker`.
+Reutiliza `_SCENE_BREAK_PATTERNS` de `chapter.py` en `speaker_attribution.py`. Scene breaks (`***`, `---`, triple newline) resetean `current_participants`, `last_speaker` y `turns_since_explicit`. Método `_detect_scene_breaks()` pre-calcula posiciones; `_is_past_scene_break()` detecta cambio de escena entre diálogos consecutivos.
 
-**Problema**: Capítulos con múltiples escenas (`***`, `---`, blank lines) tratados como conversación única. Contexto de participantes se contamina entre escenas.
+**Archivos**: `src/narrative_assistant/voice/speaker_attribution.py`, `tests/unit/test_scene_breaks_decay.py`.
 
-**Patrones scene break**: Ya definidos en `chapter.py:621` (`_SCENE_BREAK_PATTERNS`). Reutilizar.
+**Tests**: 4 tests (asterisk reset, dash reset, triple newline reset, no-break alternation continues).
 
-**Archivos**: `src/narrative_assistant/voice/speaker_attribution.py` — Añadir `_detect_scene_breaks_in_chapter()`, resetear `current_participants` y `last_speaker` en cada scene break.
+#### BK-10c: Speaker Confidence Decay ✅ DONE
 
-**Tests**: 4 tests (asterisk reset, dash reset, blank line reset, multi-scene alternation correcta).
+Confidence decay gradual: `effective_confidence = base * 0.97^turns_since_explicit`. Floor=0.30. >=0.74 → MEDIUM, <0.74 → LOW. Reset en: verba dicendi explícito, scene break, cambio de capítulo.
 
-#### BK-10c: Speaker Confidence Decay [MEDIUM, 4-5h]
+**Archivos**: `src/narrative_assistant/voice/speaker_attribution.py`, `tests/unit/test_scene_breaks_decay.py`.
 
-> **Ya existe**: Nada. La confidence de speaker es fija actualmente.
-
-**Fórmula**: `effective_confidence = base * 0.97^dialogue_distance`
-- 5 diálogos: 0.86 (alta). 10: 0.74 (media). 30: 0.40 (baja). Floor: 0.30.
-- Reset en: verba dicendi explícito, scene break, cambio de capítulo.
-
-**Archivos**: `src/narrative_assistant/voice/speaker_attribution.py` — Tracking `last_speaker_mention_idx`, apply decay factor.
-
-**Tests**: 3 tests (decay cercano, decay lejano, reset en scene break).
+**Tests**: 3 tests (close=MEDIUM, distant=LOW, scene break resets decay).
 
 **Criterios de éxito S9**: 0 filas huérfanas post-merge; masking emocional no genera FP; glosario inyectado con confidence=1.0; scene breaks resetean contexto speaker; decay reduce confianza con distancia.
 
