@@ -1081,16 +1081,16 @@ NO propagar invalidacion downstream. Comparar `output_hash` antes vs despues.
 | BK-06 | Exportar a Scrivener | Integración con herramienta escritores |
 | BK-08 | Integrar timeline en vital_status | Cruzar temporal_markers con death_events: si flashback_time < death_time → aparición válida. Requiere detección de línea temporal no lineal (prólogos, alternancia pasado/presente). LLM para desambiguación en casos difíciles. |
 | ~~BK-07~~ | ~~Análisis multi-documento~~ | ✅ DONE - Collections, entity links, cross-book analysis, workspace auxiliar |
-| BK-09 | Merge-induced attribute orphaning | **P1** — Al fusionar entidades, `entity_attributes.entity_id` apunta al entity_id absorbido. Atributos desaparecen del UI. Falta CASCADE o rewrite de FK en merge. |
-| BK-10 | Dialogue attribution: correcciones no aplicadas + scene breaks | **P1** — El hard reset por capítulo YA EXISTE (`speaker_attribution.py:376-380`). Los problemas reales son: (a) tabla `speaker_corrections` existe pero `SpeakerAttributor` NO la lee → correcciones del usuario ignoradas, (b) sin detección de cambio de escena intra-capítulo (`chapter.py:621-626` tiene patrones `***`, `---`, triple newline pero no se usan), (c) sin confidence decay intra-capítulo. Ver sub-tareas BK-10a/b/c. |
-| BK-11 | Detección de narrativa no lineal | **P1** — 40% de ficción literaria es no lineal (flashbacks, frame narratives). El sistema usa orden de capítulos como proxy cronológico → falsos positivos masivos en vital_status. Relacionado con BK-08 pero más amplio. |
+| BK-09 | Merge-induced attribute orphaning | **P1** — `move_mentions()` y `move_attributes()` existen en `repository.py`. Falta migrar las otras 13 tablas FK. |
+| BK-10 | Dialogue attribution: correcciones no aplicadas + scene breaks | **P1** — Scene break patterns definidos en `chapter.py:621` (`_SCENE_BREAK_PATTERNS`). Falta: (a) `SpeakerAttributor` no lee `speaker_corrections`, (b) no usa scene breaks para reset, (c) sin confidence decay. |
+| BK-11 | Detección de narrativa no lineal | **P1** — Scaffolding importante: enum `NarrativeOrder` (ANALEPSIS/PROLEPSIS) en `timeline.py:34`, detección por marcadores y saltos en `timeline.py:620-661`, columna BD `narrative_order`. Falta `TemporalMap` con cálculo de edad por story_time. |
 | BK-12 | Cache para fases de enriquecimiento | **P1** — Fases 10-13 (relaciones, voz, prosa) recalculan on-the-fly en cada visita a tab. Sin cache → OOM en hardware limitado (8GB RAM). Blocker para S8a-07..10. |
-| BK-13 | Pro-drop ambigüedad multi-personaje | **P2** — En escenas con 2+ candidatos del mismo género ("Salió corriendo" con María y Ana presentes), heurística "last mentioned" falla. Necesita saliency weighting + LLM fallback. |
-| BK-14 | Ubicaciones jerárquicas/anidadas | **P2** — Tracking trata ubicaciones como flat. "Juan en cocina, María en salón, ambos en casa García" genera falso positivo de viaje imposible. Falta ontología espacial (habitación ⊂ edificio ⊂ ciudad). |
-| BK-15 | Emotional masking no modelado | **P2** — OOC flags `declared=furioso + behavior=calma` como incoherente. No modela ocultación intencional de emociones (noir, thriller psicológico). Indicadores: "dijo con calma forzada", "fingió alegría". |
-| BK-16 | Hilos narrativos sin resolver (Chekhov's gun) | **P2** — No detecta personajes introducidos con alta saliencia (backstory, conflicto) que desaparecen sin resolución. FlawedFictions cat.5. Los editores lo piden como top-3. |
-| BK-17 | Glossary → entity disambiguation | **P3** — Glossary ("El Doctor → Juan Pérez") no se inyecta en NER/coreference pipeline. Usuario define alias manualmente y luego fusiona igualmente. Inyectar en gazetteer. |
-| BK-18 | Confidence decay para inferencias stale | **P3** — Alertas LLM (OOC, anacronismos) persisten con confidence original tras merge de entidades. Input cambió pero score no. S8c lo aborda parcialmente con stale marking. |
+| BK-13 | Pro-drop ambigüedad multi-personaje | **P2** — Parcial: `MentionType.ZERO` existe, `coref_mention_extraction.py:416` **ya extrae** zero pronouns con inferencia de género. Falta `ProDropAmbiguityScorer` con scoring multi-factor y `SaliencyTracker`. |
+| BK-14 | Ubicaciones jerárquicas/anidadas | **P2** — Nada implementado. `character_location.py` usa comparación flat de strings. |
+| BK-15 | Emotional masking no modelado | **P2** — Nada implementado. |
+| BK-16 | Hilos narrativos sin resolver (Chekhov's gun) | **P2** — Parcial: `ChekhovElement` dataclass y `_detect_chekhov_elements()` en `chapter_summary.py` funcionan para **objetos/vehicles**. `_check_chekhov()` en `narrative_health.py` integrado en health report. Falta extensión a **personajes** SUPPORTING abandonados. |
+| BK-17 | Glossary → entity disambiguation | **P3** — Nada implementado. |
+| BK-18 | Confidence decay para inferencias stale | **P3** — Nada implementado. `calibration_factor` de BK-22 (S8c) existe como punto de enganche. |
 | ~~BK-19~~ | ~~UI "Añadir/editar atributo" en EntitiesTab~~ | ✅ DONE — Inline add/edit/delete en EntitiesTab. Formulario con categoria, nombre, valor, confianza auto 1.0 (commit b326317, Sprint PP-2) |
 | ~~BK-20~~ | ~~UI "Corregir hablante" en DialogueAttributionPanel~~ | ✅ DONE — Boton "Corregir" en cada dialogo, dropdown con entidades del capitulo, POST a speaker_corrections (commit 8b52e80, Sprint PP-2) |
 | ~~BK-21~~ | ~~Resolver conflictos atributos en merge~~ | ✅ DONE — MergeEntitiesDialog paso 3: radio buttons para conflictos critical/medium, resoluciones enviadas en POST merge (commit 7a44c73, Sprint PP-2) |
@@ -1128,6 +1128,9 @@ NO propagar invalidacion downstream. Comparar `output_hash` antes vs despues.
 
 #### BK-09: Entity Merge FK Migration [CRITICAL, 6-8h]
 
+> **Ya existe**: `fusion.py:265-266` llama `move_mentions()` y `move_attributes()`
+> (implementados en `repository.py:473,555`). **Falta**: las otras 13 tablas FK.
+
 **Problema**: `EntityFusionService.merge_entities()` solo migra `entity_mentions` y
 `entity_attributes`. Las otras **13 tablas FK** quedan huérfanas → data loss silenciosa.
 
@@ -1161,6 +1164,8 @@ NO propagar invalidacion downstream. Comparar `output_hash` antes vs despues.
 
 #### BK-15: Detección de Masking Emocional [HIGH, 3-4h]
 
+> **Ya existe**: Nada. No hay código de masking emocional en el proyecto.
+
 **Problema**: "María fingió calma" genera alerta OOC falsa. El sistema confunde masking intencional con inconsistencia de personalidad.
 
 **Patrones a detectar** (7 familias verbales):
@@ -1187,6 +1192,8 @@ NO propagar invalidacion downstream. Comparar `output_hash` antes vs despues.
 
 #### BK-17: Glosario → Gazetteer NER [HIGH, 4-5h]
 
+> **Ya existe**: Nada. No hay tabla `user_glossary` ni inyección en NER pipeline.
+
 **Problema**: Términos de usuario (fantasía, sci-fi, dominios específicos) no se inyectan en NER. "Winterfell" no se detecta como location porque spaCy no lo conoce.
 
 **Algoritmo `_inject_glossary_entities()`**:
@@ -1207,15 +1214,21 @@ NO propagar invalidacion downstream. Comparar `output_hash` antes vs despues.
 
 #### BK-10b: Scene Breaks en Speaker Attribution [MEDIUM, 5-6h]
 
+> **Ya existe**: `chapter.py:621-676` define `_SCENE_BREAK_PATTERNS` (regex para `***`,
+> `---`, `#`) y cuenta scene_breaks para métricas. **Falta**: usar esos patrones en
+> `speaker_attribution.py` para resetear `current_participants` y `last_speaker`.
+
 **Problema**: Capítulos con múltiples escenas (`***`, `---`, blank lines) tratados como conversación única. Contexto de participantes se contamina entre escenas.
 
-**Patrones scene break**: `^\s*\*\s*\*\s*\*\s*$`, `^\s*---+\s*$`, `^\s*###\s*$`, `^\s*═{3,}\s*$`, blank lines (3+).
+**Patrones scene break**: Ya definidos en `chapter.py:621` (`_SCENE_BREAK_PATTERNS`). Reutilizar.
 
 **Archivos**: `src/narrative_assistant/voice/speaker_attribution.py` — Añadir `_detect_scene_breaks_in_chapter()`, resetear `current_participants` y `last_speaker` en cada scene break.
 
 **Tests**: 4 tests (asterisk reset, dash reset, blank line reset, multi-scene alternation correcta).
 
 #### BK-10c: Speaker Confidence Decay [MEDIUM, 4-5h]
+
+> **Ya existe**: Nada. La confidence de speaker es fija actualmente.
 
 **Fórmula**: `effective_confidence = base * 0.97^dialogue_distance`
 - 5 diálogos: 0.86 (alta). 10: 0.74 (media). 30: 0.40 (baja). Floor: 0.30.
@@ -1235,6 +1248,9 @@ NO propagar invalidacion downstream. Comparar `output_hash` antes vs despues.
 > Corrector Editorial 15+ años, Arquitecto Python, Product Owner).
 
 #### BK-14: LocationOntology [ROI #1, 12h]
+
+> **Ya existe**: Nada. No hay `location_ontology.py` ni tabla `location_ontology`.
+> `character_location.py` usa comparación flat de strings.
 
 **Problema**: cocina y salón en misma casa → alerta de "ubicación incompatible". 30% de FP en alertas de ubicación son por falta de jerarquía.
 
@@ -1263,6 +1279,17 @@ LocationOntology
 **Tests**: 8 tests (room-in-building, multi-level, different-cities, reachability medieval/modern, unknown=fail-safe, ancestors, descendants, haversine).
 
 #### BK-11: Timeline No Lineal [ROI #2, 15-18h]
+
+> **Ya existe**: Bastante scaffolding:
+> - `temporal/timeline.py:34-39` — enum `NarrativeOrder` con CHRONOLOGICAL, ANALEPSIS, PROLEPSIS
+> - `timeline.py:620-661` — detección de analepsis/prolepsis por marcadores y saltos temporales
+> - `timeline.py:140-144` — `get_analepsis_events()`, `get_prolepsis_events()`
+> - `analysis/narrative_structure.py:36-37` — enum duplicado ANALEPSIS/PROLEPSIS + `PROLEPSIS_PATTERNS`
+> - `database.py:374` — columna `narrative_order` en schema
+>
+> **Falta**: `TemporalMap` con cálculo de edad por story_time (no chapter_number),
+> `is_character_alive_in_chapter()`, `is_location_transition_possible()`, integración
+> con `vital_status.py` y `character_location.py`.
 
 **Problema**: Sistema asume `chapter_number = orden cronológico`. 40% de ficción moderna tiene flashbacks. "María 50 años en cap 1, 20 años en cap 2 (flashback)" → falsa alerta "edad retrocede".
 
@@ -1306,7 +1333,19 @@ TemporalMap
 
 #### BK-13: Pro-drop Ambiguity Scoring [ROI #3, 12-14h]
 
-**Problema**: 40% de prosa española tiene sujetos elididos. `MentionType.ZERO` existe en el enum pero nunca se extrae. "Salió furioso" → ¿quién salió?
+> **Ya existe**: Más de lo documentado:
+> - `coreference_resolver.py:60` — `MentionType.ZERO = "zero"` (enum)
+> - `coref_mention_extraction.py:406-425` — **ya extrae** zero pronouns: detecta verbos
+>   conjugados sin nsubj, infiere género de ADJ predicativo, crea `Mention(type=ZERO)`
+> - `coref.py:37,136` — enum duplicado + peso en voting
+> - `coreference_resolver.py:686,696,1719` — ZERO integrado en scoring y filtrado
+>
+> **Falta**: `ProDropAmbiguityScorer` con scoring multi-factor (saliencia 25%,
+> recencia 30%, concordancia género 20%, estructura discurso 15%, número 10%),
+> `SaliencyTracker`, tablas BD (`character_saliency`, `pro_drop_mentions`).
+> La extracción funciona, el scoring avanzado no.
+
+**Problema**: 40% de prosa española tiene sujetos elididos. `MentionType.ZERO` existe en el enum y **ya se extrae** en `coref_mention_extraction.py:416`. "Salió furioso" → ¿quién salió?
 
 **Algoritmo**:
 ```
@@ -1336,7 +1375,21 @@ ProDropAmbiguityScorer
 
 #### BK-16: Chekhov Tracker [ROI #4, 14-16h]
 
-**Problema**: Personajes SUPPORTING que desaparecen + hilos narrativos sin resolver. `ChekhovElement` dataclass existe en `chapter_summary.py:153-184` pero nunca se llama. Dimensión "chekhov" declarada en `narrative_health.py` pero no implementada.
+> **Ya existe**: Más de lo documentado — la spec dice "nunca se llama" pero sí:
+> - `chapter_summary.py:153` — `ChekhovElement` dataclass completa
+> - `chapter_summary.py:1059-1124` — `_detect_chekhov_elements()` implementado:
+>   busca objetos/vehicles en primeros 3 capítulos, calcula gap y confidence
+> - `chapter_summary.py:520` — **se llama** desde `generate_report()`
+> - `narrative_health.py:970-998` — `_check_chekhov()` implementado con scoring
+>   (fired_ratio, abandoned threads, status OK/WARNING/CRITICAL)
+> - `narrative_health.py:227` — integrado en el health report
+>
+> **Falta**: Tracker standalone para **personajes** SUPPORTING (actual solo detecta
+> objetos/vehicles). `identify_supporting_characters()`, `detect_abandoned_threads()`
+> para relaciones/conflictos, tablas BD (`chekhov_elements`, `abandoned_threads`),
+> endpoint API.
+
+**Problema**: Personajes SUPPORTING que desaparecen + hilos narrativos sin resolver. `ChekhovElement` para objetos **ya funciona**. Falta extensión a personajes secundarios.
 
 **Algoritmo**:
 ```
@@ -1370,6 +1423,9 @@ ChekhovTracker
 > **Especificado**: 11-Feb-2026 por panel de expertos.
 
 #### BK-18: Decay Temporal de Alertas [LOW, 2-3h]
+
+> **Ya existe**: Nada. No hay decay temporal en `alerts/engine.py`.
+> El `calibration_factor` de BK-22 (S8c) existe y es donde se enchufaría.
 
 **Problema**: Alerta de cap 1 misma prioridad que alerta de cap 95. No hay penalización temporal.
 
