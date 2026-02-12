@@ -7,11 +7,13 @@ import pytest
 
 from narrative_assistant.licensing.gating import (
     apply_license_gating,
+    check_manuscript_word_limit,
     get_allowed_features,
     is_feature_allowed,
     is_licensing_enabled,
 )
 from narrative_assistant.licensing.models import LicenseFeature, LicenseTier
+from narrative_assistant.licensing.verification import ManuscriptTooLargeError
 from narrative_assistant.pipelines.unified_analysis import UnifiedConfig
 
 
@@ -186,3 +188,54 @@ class TestUnifiedConfigNewFlags:
         config = UnifiedConfig.express()
         assert config.run_character_profiling is True
         assert config.run_ooc_detection is True
+
+
+class TestCheckManuscriptWordLimit:
+    """Tests para check_manuscript_word_limit()."""
+
+    def test_disabled_licensing_always_passes(self):
+        with patch.dict(os.environ, {"NA_LICENSING_ENABLED": "false"}):
+            result = check_manuscript_word_limit(999_999)
+            assert result.is_success
+
+    def test_corrector_under_limit(self):
+        with patch.dict(os.environ, {"NA_LICENSING_ENABLED": "true"}):
+            result = check_manuscript_word_limit(50_000, LicenseTier.CORRECTOR)
+            assert result.is_success
+
+    def test_corrector_at_limit(self):
+        with patch.dict(os.environ, {"NA_LICENSING_ENABLED": "true"}):
+            result = check_manuscript_word_limit(60_000, LicenseTier.CORRECTOR)
+            assert result.is_success
+
+    def test_corrector_over_limit(self):
+        with patch.dict(os.environ, {"NA_LICENSING_ENABLED": "true"}):
+            result = check_manuscript_word_limit(60_001, LicenseTier.CORRECTOR)
+            assert result.is_failure
+            assert isinstance(result.error, ManuscriptTooLargeError)
+            assert result.error.word_count == 60_001
+            assert result.error.max_words == 60_000
+
+    def test_profesional_unlimited(self):
+        with patch.dict(os.environ, {"NA_LICENSING_ENABLED": "true"}):
+            result = check_manuscript_word_limit(500_000, LicenseTier.PROFESIONAL)
+            assert result.is_success
+
+    def test_editorial_unlimited(self):
+        with patch.dict(os.environ, {"NA_LICENSING_ENABLED": "true"}):
+            result = check_manuscript_word_limit(1_000_000, LicenseTier.EDITORIAL)
+            assert result.is_success
+
+    def test_no_tier_defaults_to_corrector(self):
+        with patch.dict(os.environ, {"NA_LICENSING_ENABLED": "true"}):
+            result = check_manuscript_word_limit(60_001)
+            assert result.is_failure
+            assert isinstance(result.error, ManuscriptTooLargeError)
+
+    def test_error_message_format(self):
+        with patch.dict(os.environ, {"NA_LICENSING_ENABLED": "true"}):
+            result = check_manuscript_word_limit(75_000, LicenseTier.CORRECTOR)
+            assert result.is_failure
+            assert "75,000" in result.error.user_message
+            assert "60,000" in result.error.user_message
+            assert "Profesional" in result.error.user_message

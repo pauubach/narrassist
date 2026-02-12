@@ -844,6 +844,19 @@ CREATE TABLE IF NOT EXISTS license_verification_cache (
 );
 
 CREATE INDEX IF NOT EXISTS idx_verification_cache_license ON license_verification_cache(license_id);
+
+-- Registro de swaps de dispositivo (para conteo mensual)
+CREATE TABLE IF NOT EXISTS device_swaps (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    license_id INTEGER NOT NULL,
+    device_id INTEGER NOT NULL,
+    swapped_at TEXT NOT NULL DEFAULT (datetime('now')),
+    billing_period TEXT NOT NULL,
+    FOREIGN KEY (license_id) REFERENCES licenses(id) ON DELETE CASCADE,
+    FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_device_swaps_license_period ON device_swaps(license_id, billing_period);
 """
 
 

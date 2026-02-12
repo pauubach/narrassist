@@ -21,6 +21,7 @@ from ..core.result import Result
 from .fingerprint import get_hardware_fingerprint, get_hardware_info
 from .models import (
     DEVICE_DEACTIVATION_COOLDOWN_HOURS,
+    DEVICE_SWAPS_PER_MONTH,
     Device,
     DeviceStatus,
     License,
@@ -164,6 +165,26 @@ class QuotaExceededError(LicenseError):
                 f"Has alcanzado el limite de {self.max_usage} paginas este mes "
                 f"({self.current_usage}/{self.max_usage}). "
                 "Espera al proximo periodo o actualiza tu plan."
+            )
+        super().__post_init__()
+
+
+@dataclass
+class ManuscriptTooLargeError(LicenseError):
+    """Manuscrito excede el limite de palabras del tier."""
+
+    word_count: int = 0
+    max_words: int = 0
+    message: str = "Manuscript exceeds word limit"
+    severity: ErrorSeverity = ErrorSeverity.FATAL
+    user_message: str | None = None
+
+    def __post_init__(self):
+        if self.user_message is None:
+            self.user_message = (
+                f"Este manuscrito tiene {self.word_count:,} palabras. "
+                f"Tu plan permite hasta {self.max_words:,} palabras por manuscrito. "
+                "Actualiza a Profesional para manuscritos sin limite."
             )
         super().__post_init__()
 
@@ -666,18 +687,46 @@ class LicenseVerifier:
         device = Device.from_db_row(row)
         device.status = DeviceStatus.INACTIVE
         device.deactivated_at = datetime.utcnow()
-        device.cooldown_ends_at = datetime.utcnow() + timedelta(
-            hours=DEVICE_DEACTIVATION_COOLDOWN_HOURS
-        )
         device.is_current_device = False
 
+        # Contar swaps este mes: primeros 2 sin cooldown, 3o+ con cooldown 7d
+        swap_count = self._get_swap_count_this_month(device.license_id)
+        if swap_count >= DEVICE_SWAPS_PER_MONTH:
+            device.cooldown_ends_at = datetime.utcnow() + timedelta(
+                hours=DEVICE_DEACTIVATION_COOLDOWN_HOURS
+            )
+            logger.info(
+                f"Dispositivo desactivado: {device.device_name}. "
+                f"Swap #{swap_count + 1} este mes — cooldown hasta: {device.cooldown_ends_at}"
+            )
+        else:
+            device.cooldown_ends_at = None
+            logger.info(
+                f"Dispositivo desactivado: {device.device_name}. "
+                f"Swap #{swap_count + 1} este mes — reactivacion inmediata."
+            )
+
         self._update_device(device)
-        logger.info(
-            f"Dispositivo desactivado: {device.device_name}. "
-            f"Cooldown hasta: {device.cooldown_ends_at}"
+
+        # Registrar el swap
+        billing_period = UsageRecord.current_billing_period()
+        db.execute(
+            "INSERT INTO device_swaps (license_id, device_id, billing_period) VALUES (?, ?, ?)",
+            (device.license_id, device.id, billing_period),
         )
 
         return Result.success(device)
+
+    def _get_swap_count_this_month(self, license_id: int) -> int:
+        """Cuenta los swaps de dispositivo del mes actual."""
+        billing_period = UsageRecord.current_billing_period()
+        db = self._get_db()
+        row = db.fetchone(
+            "SELECT COUNT(*) as swap_count FROM device_swaps "
+            "WHERE license_id = ? AND billing_period = ?",
+            (license_id, billing_period),
+        )
+        return row["swap_count"] if row else 0
 
     # =========================================================================
     # Gestion de Cuotas (Paginas con Rollover)

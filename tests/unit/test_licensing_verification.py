@@ -189,6 +189,19 @@ def db():
             expires_at TEXT NOT NULL,
             FOREIGN KEY (license_id) REFERENCES licenses(id) ON DELETE CASCADE
         );
+
+        CREATE TABLE IF NOT EXISTS device_swaps (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            license_id INTEGER NOT NULL,
+            device_id INTEGER NOT NULL,
+            swapped_at TEXT NOT NULL DEFAULT (datetime('now')),
+            billing_period TEXT NOT NULL,
+            FOREIGN KEY (license_id) REFERENCES licenses(id) ON DELETE CASCADE,
+            FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_device_swaps_license_period
+            ON device_swaps(license_id, billing_period);
         """
     )
     yield database
@@ -810,20 +823,29 @@ class TestDeactivateDevice:
         assert result.is_success
         device = result.value
         assert device.status == DeviceStatus.INACTIVE
-        assert device.cooldown_ends_at is not None
+        # Primer swap del mes: sin cooldown (reactivacion inmediata)
+        assert device.cooldown_ends_at is None
 
     def test_deactivate_device_not_found(self, verifier, db):
         result = verifier.deactivate_device(99999)
         assert result.is_failure
 
-    def test_deactivate_sets_cooldown_7d(self, verifier, db):
-        lid = _insert_license(db, tier="profesional")
-        did = _insert_device(db, lid)
+    def test_deactivate_sets_cooldown_7d_on_third_swap(self, verifier, db):
+        """Cooldown 7d solo se aplica a partir del 3er swap del mes."""
+        lid = _insert_license(db, tier="editorial")
+        did1 = _insert_device(db, lid, fingerprint="fp-d1")
+        did2 = _insert_device(db, lid, fingerprint="fp-d2")
+        did3 = _insert_device(db, lid, fingerprint="fp-d3")
 
-        result = verifier.deactivate_device(did)
+        # Primeros 2 swaps: sin cooldown
+        verifier.deactivate_device(did1)
+        verifier.deactivate_device(did2)
+
+        # Tercer swap: cooldown 7 dias
+        result = verifier.deactivate_device(did3)
         device = result.value
-        expected = datetime.utcnow() + timedelta(hours=168)  # 7 dias
-        # Allow 5 seconds tolerance
+        assert device.cooldown_ends_at is not None
+        expected = datetime.utcnow() + timedelta(hours=168)
         diff = abs((device.cooldown_ends_at - expected).total_seconds())
         assert diff < 5
 
@@ -931,3 +953,87 @@ class TestEdgeCases:
         remaining = verifier._calculate_quota_remaining(lic)
         # Should be full: 1500 base + 0 rollover = 1500 (uncounted records ignored)
         assert remaining == 1500
+
+
+# =============================================================================
+# Device Swap Counting (SP2-03)
+# =============================================================================
+
+
+class TestDeviceSwapCounting:
+    """Tests para el conteo de swaps mensuales: 2 gratis, 3o+ con cooldown 7d."""
+
+    def test_first_swap_no_cooldown(self, verifier, db):
+        """Primer swap del mes: sin cooldown."""
+        lid = _insert_license(db, tier="profesional")
+        did = _insert_device(db, lid, fingerprint="fp-swap-1")
+
+        result = verifier.deactivate_device(did)
+        assert result.is_success
+        assert result.value.status == DeviceStatus.INACTIVE
+        assert result.value.cooldown_ends_at is None  # Sin cooldown
+
+    def test_second_swap_no_cooldown(self, verifier, db):
+        """Segundo swap del mes: sin cooldown."""
+        lid = _insert_license(db, tier="editorial")
+        did1 = _insert_device(db, lid, fingerprint="fp-swap-a")
+        did2 = _insert_device(db, lid, fingerprint="fp-swap-b")
+
+        r1 = verifier.deactivate_device(did1)
+        assert r1.is_success
+        assert r1.value.cooldown_ends_at is None
+
+        r2 = verifier.deactivate_device(did2)
+        assert r2.is_success
+        assert r2.value.cooldown_ends_at is None
+
+    def test_third_swap_has_cooldown(self, verifier, db):
+        """Tercer swap del mes: cooldown 7 dias."""
+        lid = _insert_license(db, tier="editorial")
+        did1 = _insert_device(db, lid, fingerprint="fp-c1")
+        did2 = _insert_device(db, lid, fingerprint="fp-c2")
+        did3 = _insert_device(db, lid, fingerprint="fp-c3")
+
+        verifier.deactivate_device(did1)
+        verifier.deactivate_device(did2)
+        r3 = verifier.deactivate_device(did3)
+
+        assert r3.is_success
+        assert r3.value.cooldown_ends_at is not None
+        expected = datetime.utcnow() + timedelta(hours=168)
+        diff = abs((r3.value.cooldown_ends_at - expected).total_seconds())
+        assert diff < 5
+
+    def test_swap_count_resets_monthly(self, verifier, db):
+        """Swaps del mes anterior no cuentan."""
+        lid = _insert_license(db, tier="editorial")
+
+        # Insertar 3 swaps del mes anterior
+        prev_period = UsageRecord.previous_billing_period()
+        for i in range(3):
+            db._conn.execute(
+                "INSERT INTO device_swaps (license_id, device_id, billing_period) VALUES (?, ?, ?)",
+                (lid, i + 1, prev_period),
+            )
+        db._conn.commit()
+
+        # Primer swap del mes actual: deberia ser sin cooldown
+        did = _insert_device(db, lid, fingerprint="fp-new-month")
+        result = verifier.deactivate_device(did)
+        assert result.is_success
+        assert result.value.cooldown_ends_at is None
+
+    def test_get_swap_count_this_month(self, verifier, db):
+        """Helper _get_swap_count_this_month funciona correctamente."""
+        lid = _insert_license(db, tier="corrector")
+        assert verifier._get_swap_count_this_month(lid) == 0
+
+        # Insertar 2 swaps del mes actual
+        billing_period = UsageRecord.current_billing_period()
+        for i in range(2):
+            db._conn.execute(
+                "INSERT INTO device_swaps (license_id, device_id, billing_period) VALUES (?, ?, ?)",
+                (lid, i + 1, billing_period),
+            )
+        db._conn.commit()
+        assert verifier._get_swap_count_this_month(lid) == 2

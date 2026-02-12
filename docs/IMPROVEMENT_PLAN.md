@@ -1783,7 +1783,7 @@ Semana 3: S11 — NLP Avanzado + S12
 - `src/narrative_assistant/entities/` — nuevo: merge_preservation.py
 - `tests/unit/test_reanalysis_persistence.py` — nuevo
 
-### Sprint SP-2: Revisión de Licensing (~8h, 2 días)
+### Sprint SP-2: Revisión de Licensing — COMPLETADO (v0.9.3)
 
 > **Contexto**: Paneles de pricing y sales identificaron problemas en la estructura
 > actual: Pro con 2 dispositivos canibaliza Editorial, salto €49→€299 demasiado
@@ -1988,4 +1988,4 @@ Sprint S8 ✅ (S8a + S8b + S8c)                     S10 (Timeline)
 
 **Ultima actualizacion**: 2026-02-12
 **Autor**: Claude (Panel de 8 expertos simulados + sesión producto 10-Feb + paneles pricing/sales/editorial 12-Feb)
-**Estado**: S0-S8 completados (v0.8.0). Sprint PP completado (17/17). S7b-S7d completados. SP-1 completado (v0.9.0). SP-3 completado (v0.9.2). Tag: v0.9.2. Pendiente: SP-2 (~8h, 2 días) + S9-S12 (24-37 días, ~6-9 semanas).
+**Estado**: S0-S8 completados (v0.8.0). Sprint PP completado (17/17). S7b-S7d completados. SP-1 completado (v0.9.0). SP-2 completado (v0.9.3). SP-3 completado (v0.9.2). Tag: v0.9.3. Pendiente: S9-S12 (24-37 días, ~6-9 semanas).

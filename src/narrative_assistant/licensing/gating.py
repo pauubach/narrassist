@@ -11,7 +11,8 @@ import logging
 import os
 from typing import TYPE_CHECKING
 
-from .models import TIER_FEATURES, LicenseFeature, LicenseTier
+from ..core.result import Result
+from .models import TIER_FEATURES, LicenseFeature, LicenseTier, TierLimits
 
 if TYPE_CHECKING:
     from narrative_assistant.pipelines.unified_analysis import UnifiedConfig
@@ -39,6 +40,40 @@ def is_feature_allowed(feature: LicenseFeature, tier: LicenseTier | None = None)
         tier = LicenseTier.CORRECTOR
 
     return feature in TIER_FEATURES[tier]
+
+
+def check_manuscript_word_limit(word_count: int, tier: LicenseTier | None = None) -> Result[bool]:
+    """
+    Verifica si un manuscrito cumple el limite de palabras del tier.
+
+    Args:
+        word_count: Numero de palabras del manuscrito.
+        tier: Tier de la licencia (default: CORRECTOR).
+
+    Returns:
+        Result con True si cumple el limite, o ManuscriptTooLargeError si lo excede.
+    """
+    if not is_licensing_enabled():
+        return Result.success(True)
+
+    if tier is None:
+        tier = LicenseTier.CORRECTOR
+
+    limits = TierLimits.for_tier(tier)
+    if limits.max_words_per_manuscript == -1:
+        return Result.success(True)
+
+    if word_count > limits.max_words_per_manuscript:
+        from .verification import ManuscriptTooLargeError
+
+        return Result.failure(
+            ManuscriptTooLargeError(
+                word_count=word_count,
+                max_words=limits.max_words_per_manuscript,
+            )
+        )
+
+    return Result.success(True)
 
 
 def get_allowed_features(tier: LicenseTier | None = None) -> frozenset[LicenseFeature]:

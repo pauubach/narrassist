@@ -42,6 +42,7 @@ from .models import (
 )
 from .gating import (
     apply_license_gating,
+    check_manuscript_word_limit,
     get_allowed_features,
     is_feature_allowed,
     is_licensing_enabled,
@@ -54,6 +55,7 @@ from .verification import (
     LicenseExpiredError,
     LicenseNotFoundError,
     LicenseOfflineError,
+    ManuscriptTooLargeError,
     # Clase principal
     LicenseVerifier,
     QuotaExceededError,
@@ -106,6 +108,7 @@ __all__ = [
     "LicenseNotFoundError",
     "LicenseExpiredError",
     "LicenseOfflineError",
+    "ManuscriptTooLargeError",
     "DeviceLimitError",
     "DeviceCooldownError",
     "QuotaExceededError",
@@ -125,5 +128,6 @@ __all__ = [
     "is_licensing_enabled",
     "is_feature_allowed",
     "get_allowed_features",
+    "check_manuscript_word_limit",
     "apply_license_gating",
 ]
