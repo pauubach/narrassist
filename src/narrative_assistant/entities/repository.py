@@ -11,13 +11,8 @@ import threading
 from datetime import datetime
 
 from ..persistence.database import Database, get_database
-from .models import (
-    Entity,
-    EntityImportance,
-    EntityMention,
-    EntityType,
-    MergeHistory,
-)
+from .models import (Entity, EntityImportance, EntityMention, EntityType,
+                     MergeHistory)
 
 logger = logging.getLogger(__name__)
 
@@ -175,7 +170,9 @@ class EntityRepository:
             if current:
                 new_aliases = aliases if aliases is not None else current.aliases
                 new_merged = (
-                    merged_from_ids if merged_from_ids is not None else current.merged_from_ids
+                    merged_from_ids
+                    if merged_from_ids is not None
+                    else current.merged_from_ids
                 )
                 merged_data = json.dumps(
                     {
@@ -404,7 +401,9 @@ class EntityRepository:
         )
         return [EntityMention.from_row(row) for row in rows]
 
-    def get_entity_ids_for_chapter(self, chapter_id: int, chapter_start: int, chapter_end: int) -> set[int]:
+    def get_entity_ids_for_chapter(
+        self, chapter_id: int, chapter_start: int, chapter_end: int
+    ) -> set[int]:
         """Obtiene IDs de entidades con menciones en un capítulo (query única)."""
         rows = self.db.fetchall(
             """SELECT DISTINCT entity_id FROM entity_mentions
@@ -569,6 +568,194 @@ class EntityRepository:
                 (to_entity_id, from_entity_id),
             )
             return cursor.rowcount
+
+    def move_related_data(
+        self, from_entity_id: int, to_entity_id: int
+    ) -> dict[str, int]:
+        """
+        Migra todas las referencias FK de una entidad a otra.
+
+        Cubre las 14 columnas FK en 10 tablas que no se migran
+        con move_mentions() / move_attributes(). Se ejecuta dentro
+        de una sola transacción.
+
+        Args:
+            from_entity_id: ID de la entidad origen (será desactivada)
+            to_entity_id: ID de la entidad destino
+
+        Returns:
+            Dict con conteos de filas afectadas por tabla
+        """
+        counts: dict[str, int] = {}
+
+        with self.db.connection() as conn:
+            # 1. temporal_markers (entity_id → SET NULL)
+            c = conn.execute(
+                "UPDATE temporal_markers SET entity_id = ? WHERE entity_id = ?",
+                (to_entity_id, from_entity_id),
+            )
+            counts["temporal_markers"] = c.rowcount
+
+            # 2. voice_profiles (UNIQUE on project_id, entity_id)
+            #    Si el destino ya tiene perfil, eliminar el origen; sino, mover.
+            existing = conn.execute(
+                "SELECT id FROM voice_profiles WHERE entity_id = ?",
+                (to_entity_id,),
+            ).fetchone()
+            if existing:
+                c = conn.execute(
+                    "DELETE FROM voice_profiles WHERE entity_id = ?",
+                    (from_entity_id,),
+                )
+            else:
+                c = conn.execute(
+                    "UPDATE voice_profiles SET entity_id = ? WHERE entity_id = ?",
+                    (to_entity_id, from_entity_id),
+                )
+            counts["voice_profiles"] = c.rowcount
+
+            # 3. vital_status_events
+            c = conn.execute(
+                "UPDATE vital_status_events SET entity_id = ? WHERE entity_id = ?",
+                (to_entity_id, from_entity_id),
+            )
+            counts["vital_status_events"] = c.rowcount
+
+            # 4. character_location_events
+            c = conn.execute(
+                "UPDATE character_location_events SET entity_id = ? WHERE entity_id = ?",
+                (to_entity_id, from_entity_id),
+            )
+            counts["character_location_events"] = c.rowcount
+
+            # 5. ooc_events
+            c = conn.execute(
+                "UPDATE ooc_events SET entity_id = ? WHERE entity_id = ?",
+                (to_entity_id, from_entity_id),
+            )
+            counts["ooc_events"] = c.rowcount
+
+            # 6-8. relationships (entity1_id + entity2_id + self-ref cleanup)
+            c1 = conn.execute(
+                "UPDATE relationships SET entity1_id = ? WHERE entity1_id = ?",
+                (to_entity_id, from_entity_id),
+            )
+            c2 = conn.execute(
+                "UPDATE relationships SET entity2_id = ? WHERE entity2_id = ?",
+                (to_entity_id, from_entity_id),
+            )
+            c3 = conn.execute(
+                "DELETE FROM relationships WHERE entity1_id = entity2_id",
+            )
+            counts["relationships"] = c1.rowcount + c2.rowcount
+            counts["relationships_self_deleted"] = c3.rowcount
+
+            # 9-10. interactions (entity1_id + entity2_id)
+            c1 = conn.execute(
+                "UPDATE interactions SET entity1_id = ? WHERE entity1_id = ?",
+                (to_entity_id, from_entity_id),
+            )
+            c2 = conn.execute(
+                "UPDATE interactions SET entity2_id = ? WHERE entity2_id = ?",
+                (to_entity_id, from_entity_id),
+            )
+            counts["interactions"] = c1.rowcount + c2.rowcount
+
+            # 11. coreference_corrections (original_entity_id + corrected_entity_id)
+            c1 = conn.execute(
+                "UPDATE coreference_corrections SET original_entity_id = ? WHERE original_entity_id = ?",
+                (to_entity_id, from_entity_id),
+            )
+            c2 = conn.execute(
+                "UPDATE coreference_corrections SET corrected_entity_id = ? WHERE corrected_entity_id = ?",
+                (to_entity_id, from_entity_id),
+            )
+            counts["coreference_corrections"] = c1.rowcount + c2.rowcount
+
+            # 12. speaker_corrections (original_speaker_id + corrected_speaker_id)
+            c1 = conn.execute(
+                "UPDATE speaker_corrections SET original_speaker_id = ? WHERE original_speaker_id = ?",
+                (to_entity_id, from_entity_id),
+            )
+            c2 = conn.execute(
+                "UPDATE speaker_corrections SET corrected_speaker_id = ? WHERE corrected_speaker_id = ?",
+                (to_entity_id, from_entity_id),
+            )
+            counts["speaker_corrections"] = c1.rowcount + c2.rowcount
+
+            # 13-14. collection_entity_links (source + target, skip duplicates)
+            conn.execute(
+                """UPDATE collection_entity_links
+                   SET source_entity_id = ?
+                   WHERE source_entity_id = ?
+                     AND NOT EXISTS (
+                         SELECT 1 FROM collection_entity_links dup
+                         WHERE dup.collection_id = collection_entity_links.collection_id
+                           AND dup.source_entity_id = ?
+                           AND dup.target_entity_id = collection_entity_links.target_entity_id
+                     )""",
+                (to_entity_id, from_entity_id, to_entity_id),
+            )
+            conn.execute(
+                """UPDATE collection_entity_links
+                   SET target_entity_id = ?
+                   WHERE target_entity_id = ?
+                     AND NOT EXISTS (
+                         SELECT 1 FROM collection_entity_links dup
+                         WHERE dup.collection_id = collection_entity_links.collection_id
+                           AND dup.source_entity_id = collection_entity_links.source_entity_id
+                           AND dup.target_entity_id = ?
+                     )""",
+                (to_entity_id, from_entity_id, to_entity_id),
+            )
+            # Limpiar filas huérfanas que no se pudieron mover (duplicados)
+            conn.execute(
+                "DELETE FROM collection_entity_links WHERE source_entity_id = ? OR target_entity_id = ?",
+                (from_entity_id, from_entity_id),
+            )
+            # Limpiar self-links creados por la fusión
+            c = conn.execute(
+                "DELETE FROM collection_entity_links WHERE source_entity_id = target_entity_id",
+            )
+            counts["collection_entity_links"] = (
+                c.rowcount
+            )  # solo self-links eliminados contados
+
+            # 15. scene_tags: location_entity_id
+            c = conn.execute(
+                "UPDATE scene_tags SET location_entity_id = ? WHERE location_entity_id = ?",
+                (to_entity_id, from_entity_id),
+            )
+            counts["scene_tags_location"] = c.rowcount
+
+            # 16. scene_tags: participant_ids (JSON array)
+            #     Parsed in Python to avoid partial-match bugs with SQL REPLACE
+            #     (e.g. id=1 matching inside id=10)
+            rows = conn.execute(
+                "SELECT id, participant_ids FROM scene_tags WHERE participant_ids LIKE ?",
+                (f"%{from_entity_id}%",),
+            ).fetchall()
+            scene_part_count = 0
+            for row in rows:
+                ids = json.loads(row["participant_ids"] or "[]")
+                if from_entity_id in ids:
+                    new_ids = [to_entity_id if x == from_entity_id else x for x in ids]
+                    # Dedup preservando orden
+                    seen: set[int] = set()
+                    deduped: list[int] = []
+                    for x in new_ids:
+                        if x not in seen:
+                            seen.add(x)
+                            deduped.append(x)
+                    conn.execute(
+                        "UPDATE scene_tags SET participant_ids = ? WHERE id = ?",
+                        (json.dumps(deduped), row["id"]),
+                    )
+                    scene_part_count += 1
+            counts["scene_tags_participants"] = scene_part_count
+
+        logger.debug(f"move_related_data({from_entity_id} → {to_entity_id}): {counts}")
+        return counts
 
     def get_attributes_by_entity(self, entity_id: int) -> list[dict]:
         """
@@ -918,8 +1105,12 @@ class EntityRepository:
 
         history = []
         for row in rows:
-            old_data = json.loads(row["old_value_json"]) if row["old_value_json"] else {}
-            new_data = json.loads(row["new_value_json"]) if row["new_value_json"] else {}
+            old_data = (
+                json.loads(row["old_value_json"]) if row["old_value_json"] else {}
+            )
+            new_data = (
+                json.loads(row["new_value_json"]) if row["new_value_json"] else {}
+            )
 
             history.append(
                 MergeHistory(
@@ -929,9 +1120,11 @@ class EntityRepository:
                     source_entity_ids=old_data.get("source_entity_ids", []),
                     source_snapshots=old_data.get("source_snapshots", []),
                     canonical_name_before=old_data.get("canonical_names_before", []),
-                    merged_at=datetime.fromisoformat(row["created_at"])
-                    if row["created_at"]
-                    else None,
+                    merged_at=(
+                        datetime.fromisoformat(row["created_at"])
+                        if row["created_at"]
+                        else None
+                    ),
                     merged_by=new_data.get("merged_by", "user"),
                     note=row["note"],
                 )

@@ -40,7 +40,15 @@ LOCATION_SYNONYMS = {
     "bosque": ["arboleda", "monte", "selva", "espesura", "floresta"],
     "playa": ["costa", "orilla", "litoral", "ribera"],
     # Edificios
-    "casa": ["hogar", "vivienda", "residencia", "domicilio", "morada", "mansión", "chalet"],
+    "casa": [
+        "hogar",
+        "vivienda",
+        "residencia",
+        "domicilio",
+        "morada",
+        "mansión",
+        "chalet",
+    ],
     "edificio": ["inmueble", "construcción", "bloque", "torre"],
     "apartamento": ["piso", "departamento", "flat", "estudio"],
     "iglesia": ["templo", "capilla", "basílica", "catedral", "parroquia"],
@@ -122,6 +130,7 @@ class FusionResult:
     aliases_added: list[str] = None
     mentions_moved: int = 0
     attributes_moved: int = 0
+    related_data_moved: dict[str, int] | None = None
 
     def __post_init__(self):
         if self.aliases_added is None:
@@ -260,15 +269,21 @@ class EntityFusionService:
                 merged_from_ids=entity_ids,
             )
 
-            # Mover menciones y atributos de las otras entidades
+            # Mover menciones, atributos y datos relacionados de las otras entidades
+            all_related: dict[str, int] = {}
             for entity in entities[1:]:
                 mentions_moved = self.repo.move_mentions(entity.id, result_entity_id)
                 attrs_moved = self.repo.move_attributes(entity.id, result_entity_id)
+                related_moved = self.repo.move_related_data(entity.id, result_entity_id)
                 result.mentions_moved += mentions_moved
                 result.attributes_moved += attrs_moved
+                for k, v in related_moved.items():
+                    all_related[k] = all_related.get(k, 0) + v
 
                 # Desactivar la entidad fusionada (soft delete)
                 self.repo.delete_entity(entity.id, hard_delete=False)
+
+            result.related_data_moved = all_related
 
             # Reconciliar conteo de menciones (asegura consistencia)
             self.repo.reconcile_mention_count(result_entity_id)
@@ -478,7 +493,9 @@ class EntityFusionService:
 
         return any(type1 in group and type2 in group for group in compatible_groups)
 
-    def _compute_similarity(self, e1: Entity, e2: Entity) -> tuple[float, str, list[str]]:
+    def _compute_similarity(
+        self, e1: Entity, e2: Entity
+    ) -> tuple[float, str, list[str]]:
         """
         Calcula similaridad entre dos entidades.
 
@@ -512,7 +529,10 @@ class EntityFusionService:
             evidence.append(f"Mismo tipo: {e1.entity_type.value}")
 
         # 4. Detección de sinónimos (solo para ubicaciones)
-        if e1.entity_type == EntityType.LOCATION or e2.entity_type == EntityType.LOCATION:
+        if (
+            e1.entity_type == EntityType.LOCATION
+            or e2.entity_type == EntityType.LOCATION
+        ):
             syn_sim, syn_reason = self._check_synonym_match(e1, e2)
             if syn_sim > max_similarity:
                 max_similarity = syn_sim
@@ -530,7 +550,10 @@ class EntityFusionService:
 
                 # IMPORTANTE: Solo usar la similaridad semántica si should_merge es True
                 # Esto respeta los filtros de tipos incompatibles, estructuras diferentes, etc.
-                if semantic_result.should_merge and semantic_result.similarity > max_similarity:
+                if (
+                    semantic_result.should_merge
+                    and semantic_result.similarity > max_similarity
+                ):
                     max_similarity = semantic_result.similarity
                     reason = semantic_result.reason
                     evidence.append(f"Embeddings: {semantic_result.similarity:.2f}")

@@ -1081,7 +1081,7 @@ NO propagar invalidacion downstream. Comparar `output_hash` antes vs despues.
 | BK-06 | Exportar a Scrivener | Integración con herramienta escritores |
 | BK-08 | Integrar timeline en vital_status | Cruzar temporal_markers con death_events: si flashback_time < death_time → aparición válida. Requiere detección de línea temporal no lineal (prólogos, alternancia pasado/presente). LLM para desambiguación en casos difíciles. |
 | ~~BK-07~~ | ~~Análisis multi-documento~~ | ✅ DONE - Collections, entity links, cross-book analysis, workspace auxiliar |
-| BK-09 | Merge-induced attribute orphaning | **P1** — `move_mentions()` y `move_attributes()` existen en `repository.py`. Falta migrar las otras 13 tablas FK. |
+| ~~BK-09~~ | ~~Merge-induced attribute orphaning~~ | ✅ DONE — `move_related_data()` en `repository.py` migra 14 FK cols en 10 tablas. 16 tests en `test_entity_merge_fk.py`. |
 | BK-10 | Dialogue attribution: correcciones no aplicadas + scene breaks | **P1** — Scene break patterns definidos en `chapter.py:621` (`_SCENE_BREAK_PATTERNS`). Falta: (a) `SpeakerAttributor` no lee `speaker_corrections`, (b) no usa scene breaks para reset, (c) sin confidence decay. |
 | BK-11 | Detección de narrativa no lineal | **P1** — Scaffolding importante: enum `NarrativeOrder` (ANALEPSIS/PROLEPSIS) en `timeline.py:34`, detección por marcadores y saltos en `timeline.py:620-661`, columna BD `narrative_order`. Falta `TemporalMap` con cálculo de edad por story_time. |
 | BK-12 | Cache para fases de enriquecimiento | **P1** — Fases 10-13 (relaciones, voz, prosa) recalculan on-the-fly en cada visita a tab. Sin cache → OOM en hardware limitado (8GB RAM). Blocker para S8a-07..10. |
@@ -1125,42 +1125,43 @@ NO propagar invalidacion downstream. Comparar `output_hash` antes vs despues.
 
 > **Especificado**: 11-Feb-2026 por panel de expertos (QA Senior, Arquitecto Python,
 > Corrector Editorial 15+ años, AppSec Specialist).
+>
+> **Progreso**: BK-09 ✅ completado (12-Feb-2026).
 
-#### BK-09: Entity Merge FK Migration [CRITICAL, 6-8h]
+#### ~~BK-09: Entity Merge FK Migration~~ ✅ COMPLETADO (12-Feb-2026)
 
-> **Ya existe**: `fusion.py:265-266` llama `move_mentions()` y `move_attributes()`
-> (implementados en `repository.py:473,555`). **Falta**: las otras 13 tablas FK.
+> **Implementado**: `repository.py:move_related_data()` migra las 14 columnas FK en 10 tablas
+> dentro de una sola transacción. Llamado desde `fusion.py:merge_entities()` después de
+> `move_mentions()` + `move_attributes()`.
 
-**Problema**: `EntityFusionService.merge_entities()` solo migra `entity_mentions` y
-`entity_attributes`. Las otras **13 tablas FK** quedan huérfanas → data loss silenciosa.
+**Solución**: Un solo método `move_related_data(from_entity_id, to_entity_id)` que ejecuta
+17 operaciones SQL secuenciales con manejo de deduplicación (voice_profiles UNIQUE,
+collection_entity_links UNIQUE, self-relationships cleanup).
 
-**Tablas afectadas** (auditoria completa):
+**Tablas migradas** (14 FK columns en 10 tablas):
 
 | # | Tabla | FK Column(s) | ON DELETE | Estado |
 |---|-------|-------------|-----------|--------|
-| 1 | `entity_mentions` | `entity_id` | CASCADE | ✅ Migrada |
-| 2 | `entity_attributes` | `entity_id` | CASCADE | ✅ Migrada |
-| 3 | `relationships` | `entity1_id`, `entity2_id` | CASCADE | ❌ Huérfana |
-| 4 | `interactions` | `entity1_id`, `entity2_id` | CASCADE | ❌ Huérfana |
-| 5 | `voice_profiles` | `entity_id` | CASCADE | ❌ Huérfana |
-| 6 | `vital_status_events` | `entity_id` | CASCADE | ❌ Huérfana |
-| 7 | `character_location_events` | `entity_id` | CASCADE | ❌ Huérfana |
-| 8 | `ooc_events` | `entity_id` | CASCADE | ❌ Huérfana |
-| 9 | `scene_tags` | `location_entity_id` | SET NULL | ❌ Huérfana |
-| 10 | `temporal_markers` | `entity_id` | SET NULL | ❌ Huérfana |
-| 11 | `coreference_corrections` | `original_entity_id`, `corrected_entity_id` | SET NULL | ❌ Huérfana |
-| 12 | `speaker_corrections` | `original_speaker_id`, `corrected_speaker_id` | SET NULL | ❌ Huérfana |
-| 13 | `collection_entity_links` | `source_entity_id`, `target_entity_id` | CASCADE | ❌ Huérfana |
-| 14 | `enrichment_cache` | `entity_scope` (JSON) | N/A | ⚠️ Parcial |
-| 15 | `alerts` | `entity_ids` (JSON array) | N/A | ⚠️ Parcial |
+| 1 | `entity_mentions` | `entity_id` | CASCADE | ✅ move_mentions() |
+| 2 | `entity_attributes` | `entity_id` | CASCADE | ✅ move_attributes() |
+| 3 | `temporal_markers` | `entity_id` | SET NULL | ✅ move_related_data() |
+| 4 | `voice_profiles` | `entity_id` | CASCADE | ✅ UPSERT (dedup) |
+| 5 | `vital_status_events` | `entity_id` | CASCADE | ✅ move_related_data() |
+| 6 | `character_location_events` | `entity_id` | CASCADE | ✅ move_related_data() |
+| 7 | `ooc_events` | `entity_id` | CASCADE | ✅ move_related_data() |
+| 8 | `relationships` | `entity1_id`, `entity2_id` | CASCADE | ✅ + self-ref cleanup |
+| 9 | `interactions` | `entity1_id`, `entity2_id` | CASCADE/SET NULL | ✅ move_related_data() |
+| 10 | `coreference_corrections` | `original_entity_id`, `corrected_entity_id` | SET NULL | ✅ move_related_data() |
+| 11 | `speaker_corrections` | `original_speaker_id`, `corrected_speaker_id` | SET NULL | ✅ move_related_data() |
+| 12 | `collection_entity_links` | `source_entity_id`, `target_entity_id` | CASCADE | ✅ dedup + self-link cleanup |
+| 13 | `scene_tags` | `location_entity_id` | SET NULL | ✅ move_related_data() |
+| 14 | `scene_tags` | `participant_ids` (JSON) | N/A | ✅ REPLACE en JSON |
 
-**Archivos a modificar**:
-- `src/narrative_assistant/entities/fusion.py` — Añadir 13 llamadas `move_*()` en merge_entities()
-- `src/narrative_assistant/entities/repository.py` — Métodos: move_relationships(), move_interactions(), move_voice_profiles(), move_vital_status_events(), move_location_events(), move_ooc_events(), move_scene_tags(), move_temporal_markers(), move_coref_corrections(), move_speaker_corrections(), move_collection_links(), update_alerts_json(), update_enrichment_cache_json()
+**Archivos modificados**:
+- `src/narrative_assistant/entities/repository.py` — `move_related_data()` (~120 líneas)
+- `src/narrative_assistant/entities/fusion.py` — `FusionResult.related_data_moved` + llamada en merge loop
 
-**Edge cases**: Relaciones duplicadas post-merge (A→C y B→C, merge A+B) → consolidar con max(confidence). Self-relationships (A→A) → transformar a (merged→merged).
-
-**Tests**: 1 test por tabla FK + 1 test integración completo (15 FK) + 1 test verificación 0 huérfanas.
+**Tests**: 16 tests en `tests/unit/test_entity_merge_fk.py` — 1 por tabla + dedup/edge cases.
 
 #### BK-15: Detección de Masking Emocional [HIGH, 3-4h]
 
