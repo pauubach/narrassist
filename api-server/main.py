@@ -494,6 +494,10 @@ try:
     from routers import exports
     _early_logger.info("exports router imported")
 
+    _early_logger.info("Importing editorial_work router...")
+    from routers import editorial_work
+    _early_logger.info("editorial_work router imported")
+
     _early_logger.info("Importing license router...")
     from routers import license
     _early_logger.info("license router imported")
@@ -549,6 +553,9 @@ try:
 
     _early_logger.info("Registering exports router...")
     app.include_router(exports.router)
+
+    _early_logger.info("Registering editorial_work router...")
+    app.include_router(editorial_work.router)
 
     _early_logger.info("Registering license router...")
     app.include_router(license.router)

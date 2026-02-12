@@ -463,6 +463,38 @@
         </template>
       </Card>
 
+      <!-- Trabajo Editorial (.narrassist) -->
+      <Card class="export-option editorial-work-card">
+        <template #title>
+          <div class="export-title">
+            <i class="pi pi-briefcase"></i>
+            <span>Trabajo Editorial</span>
+            <Tag value="Editorial" severity="warn" class="new-tag" />
+          </div>
+        </template>
+        <template #content>
+          <p class="export-description">
+            Comparte decisiones editoriales (fusiones, descartes, atributos verificados) entre correctores sin transferir el manuscrito.
+          </p>
+
+          <div class="editorial-work-actions">
+            <Button
+              label="Exportar trabajo (.narrassist)"
+              icon="pi pi-upload"
+              :loading="loadingEditorialExport"
+              class="flex-grow-1"
+              @click="exportEditorialWork"
+            />
+            <Button
+              label="Importar trabajo"
+              icon="pi pi-download"
+              severity="secondary"
+              @click="showImportDialog = true"
+            />
+          </div>
+        </template>
+      </Card>
+
       <!-- Scrivener Export Card -->
       <Card class="export-card">
         <template #title>
@@ -496,6 +528,13 @@
         </template>
       </Card>
     </div>
+
+    <!-- Import Work Dialog -->
+    <ImportWorkDialog
+      v-model:visible="showImportDialog"
+      :project-id="projectId"
+      @imported="onWorkImported"
+    />
   </Dialog>
 </template>
 
@@ -510,6 +549,7 @@ import Tag from 'primevue/tag'
 import { useToast } from 'primevue/usetoast'
 import { apiUrl } from '@/config/api'
 import { api } from '@/services/apiClient'
+import ImportWorkDialog from './ImportWorkDialog.vue'
 
 const props = defineProps<{
   visible: boolean
@@ -533,6 +573,8 @@ const loadingAlerts = ref(false)
 const loadingPreview = ref(false)
 const loadingCorrected = ref(false)
 const loadingScrivener = ref(false)
+const loadingEditorialExport = ref(false)
+const showImportDialog = ref(false)
 
 // Formatos seleccionados
 const documentFormat = ref<'docx' | 'pdf'>('docx')
@@ -1076,6 +1118,57 @@ async function exportScrivener() {
     loadingScrivener.value = false
   }
 }
+
+async function exportEditorialWork() {
+  loadingEditorialExport.value = true
+  try {
+    const response = await fetch(
+      apiUrl(`/api/projects/${props.projectId}/export-work`),
+      { method: 'POST' }
+    )
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.error || `HTTP ${response.status}`)
+    }
+
+    const blob = await response.blob()
+    const contentDisposition = response.headers.get('Content-Disposition')
+    let filename = `trabajo_editorial_${props.projectName}.narrassist`
+    if (contentDisposition) {
+      const match = contentDisposition.match(/filename="?([^"]+)"?/)
+      if (match) filename = match[1]
+    }
+
+    downloadBlob(blob, filename)
+
+    toast.add({
+      severity: 'success',
+      summary: 'Exportacion exitosa',
+      detail: `Trabajo editorial exportado: ${filename}`,
+      life: 3000,
+    })
+  } catch (error) {
+    console.error('Error exporting editorial work:', error)
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: error instanceof Error ? error.message : 'No se pudo exportar el trabajo editorial',
+      life: 5000,
+    })
+  } finally {
+    loadingEditorialExport.value = false
+  }
+}
+
+function onWorkImported() {
+  toast.add({
+    severity: 'success',
+    summary: 'Importacion completada',
+    detail: 'El trabajo editorial se ha importado correctamente',
+    life: 3000,
+  })
+}
 </script>
 
 <style scoped>
@@ -1367,5 +1460,21 @@ async function exportScrivener() {
 
 .flex-grow-1 {
   flex-grow: 1;
+}
+
+/* Editorial Work Card */
+.editorial-work-card {
+  border: 2px solid var(--orange-200);
+  background: linear-gradient(135deg, var(--surface-50) 0%, var(--orange-50) 100%);
+}
+
+.dark .editorial-work-card {
+  border: 2px solid var(--orange-700);
+  background: linear-gradient(135deg, var(--surface-700) 0%, var(--surface-800) 100%);
+}
+
+.editorial-work-actions {
+  display: flex;
+  gap: 0.75rem;
 }
 </style>
