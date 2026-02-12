@@ -287,8 +287,10 @@ def _reset_singletons():
     """Resetea singletons de repositorios para que usen la BD actual del test."""
     import narrative_assistant.alerts.repository as ar
     import narrative_assistant.persistence.dismissal_repository as dr
+    from narrative_assistant.entities.repository import reset_entity_repository
     ar._alert_repository = None
     dr._dismissal_repository = None
+    reset_entity_repository()
 
 
 class TestApplySavedDismissals:
@@ -612,6 +614,69 @@ class TestUserMergesPreserved:
 
         secondary = entity_repo.get_entity(11)
         assert secondary is None or not secondary.is_active
+
+    def test_undone_merges_not_reapplied(self, isolated_database):
+        """SP1-04: Fusiones deshechas (con [UNDONE] en note) NO se re-aplican."""
+        db = isolated_database
+        _insert_project(db)
+
+        # Crear merge history con nota [UNDONE] (el usuario deshizo el merge)
+        with db.connection() as conn:
+            conn.execute(
+                "INSERT INTO review_history "
+                "(project_id, action_type, target_type, target_id, "
+                "old_value_json, new_value_json, note) "
+                "VALUES (1, 'entity_merged', 'entity', 1, ?, ?, ?)",
+                (
+                    json.dumps({
+                        "source_entity_ids": [1, 2],
+                        "canonical_names_before": ["Pedro", "Pedrito"],
+                        "source_snapshots": [],
+                    }),
+                    json.dumps({"result_entity_id": 1, "merged_by": "user"}),
+                    "User merge [UNDONE at 2026-01-20 12:00:00]",
+                ),
+            )
+
+        # Crear entidades separadas (como si NER las hubiera re-detectado)
+        merged_data = json.dumps({"aliases": [], "merged_ids": []})
+        with db.connection() as conn:
+            conn.execute(
+                "INSERT INTO entities (id, project_id, entity_type, canonical_name, "
+                "merged_from_ids, mention_count, created_at, updated_at) "
+                "VALUES (20, 1, 'character', 'Pedro', ?, 5, datetime('now'), datetime('now'))",
+                (merged_data,),
+            )
+            conn.execute(
+                "INSERT INTO entities (id, project_id, entity_type, canonical_name, "
+                "merged_from_ids, mention_count, created_at, updated_at) "
+                "VALUES (21, 1, 'character', 'Pedrito', ?, 3, datetime('now'), datetime('now'))",
+                (merged_data,),
+            )
+
+        from narrative_assistant.entities.models import Entity, EntityType
+        entities = [
+            Entity(id=20, project_id=1, entity_type=EntityType.CHARACTER,
+                   canonical_name="Pedro", mention_count=5),
+            Entity(id=21, project_id=1, entity_type=EntityType.CHARACTER,
+                   canonical_name="Pedrito", mention_count=3),
+        ]
+
+        _reset_singletons()
+        from narrative_assistant.entities.repository import get_entity_repository
+        entity_repo = get_entity_repository()
+
+        from routers._analysis_phases import _reapply_user_merges
+        _reapply_user_merges(1, entity_repo, entities)
+
+        # Verificar que NO se fusionaron (el undo se respeta)
+        pedro = entity_repo.get_entity(20)
+        pedrito = entity_repo.get_entity(21)
+        assert pedro is not None
+        assert pedrito is not None and pedrito.is_active, \
+            "Undone merge should NOT be re-applied: Pedrito should remain separate"
+        assert "Pedrito" not in (pedro.aliases or []), \
+            "Pedrito should not appear as alias of Pedro"
 
 
 # ============================================================================

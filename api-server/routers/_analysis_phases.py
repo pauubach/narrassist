@@ -2663,7 +2663,7 @@ def _reapply_user_merges(project_id: int, entity_repo, entities: list):
         db = get_database()
         with db.connection() as conn:
             rows = conn.execute(
-                "SELECT old_value_json, new_value_json FROM review_history "
+                "SELECT old_value_json, new_value_json, note FROM review_history "
                 "WHERE project_id = ? AND action_type = 'entity_merged' "
                 "ORDER BY created_at ASC",
                 (project_id,),
@@ -2681,6 +2681,12 @@ def _reapply_user_merges(project_id: int, entity_repo, entities: list):
         reapplied = 0
         for row in rows:
             try:
+                # SP-1: Saltar fusiones deshechas por el usuario
+                note = row["note"] or ""
+                if "[UNDONE" in note:
+                    logger.debug(f"SP-1: Skipping undone merge: {note}")
+                    continue
+
                 old_data = json.loads(row["old_value_json"])
                 names_before = old_data.get("canonical_names_before", [])
 
