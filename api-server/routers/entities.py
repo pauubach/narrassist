@@ -5,16 +5,12 @@ Router: entities
 from typing import Optional
 
 import deps
-from deps import (
-    ApiResponse,
-    EntityResponse,
-    _classify_mention_type,
-    _verify_entity_ownership,
-    logger,
-)
+from deps import (ApiResponse, EntityResponse, _classify_mention_type,
+                  _verify_entity_ownership, logger)
 from fastapi import APIRouter, Query
 
 router = APIRouter()
+
 
 @router.get("/api/projects/{project_id}/entities", response_model=ApiResponse)
 async def list_entities(
@@ -22,7 +18,9 @@ async def list_entities(
     min_relevance: Optional[float] = None,
     min_mentions: Optional[int] = None,
     entity_type: Optional[str] = None,
-    chapter_number: Optional[int] = Query(None, description="Filtrar entidades que aparecen en este capítulo"),
+    chapter_number: Optional[int] = Query(
+        None, description="Filtrar entidades que aparecen en este capítulo"
+    ),
 ):
     """
     Lista todas las entidades de un proyecto con filtros opcionales.
@@ -43,8 +41,10 @@ async def list_entities(
         ApiResponse con lista de entidades
     """
     try:
-        from narrative_assistant.entities.repository import get_entity_repository
-        from narrative_assistant.persistence.chapter import get_chapter_repository
+        from narrative_assistant.entities.repository import \
+            get_entity_repository
+        from narrative_assistant.persistence.chapter import \
+            get_chapter_repository
 
         entity_repo = get_entity_repository()
         entities = entity_repo.get_entities_by_project(project_id)
@@ -52,7 +52,9 @@ async def list_entities(
         # Obtener word_count del proyecto para calcular densidad
         project_result = deps.project_manager.get(project_id)
         project = project_result.value if project_result.is_success else None
-        word_count = project.word_count if project and project.word_count else 50000  # Default
+        word_count = (
+            project.word_count if project and project.word_count else 50000
+        )  # Default
 
         # Obtener capítulos para calcular first_mention_chapter
         chapter_repo = get_chapter_repository()
@@ -76,7 +78,9 @@ async def list_entities(
             )
             if target_chapter:
                 chapter_entity_ids = entity_repo.get_entity_ids_for_chapter(
-                    target_chapter.id, target_chapter.start_char, target_chapter.end_char
+                    target_chapter.id,
+                    target_chapter.start_char,
+                    target_chapter.end_char,
                 )
 
         # Calcular relevance_score para cada entidad
@@ -96,7 +100,9 @@ async def list_entities(
             # Con 2 menciones/1000 palabras -> 0.5
             # Con 5 menciones/1000 palabras -> 0.71
             # Con 10 menciones/1000 palabras -> 0.83
-            relevance_score = mentions_per_k / (mentions_per_k + 2) if mention_count > 0 else 0
+            relevance_score = (
+                mentions_per_k / (mentions_per_k + 2) if mention_count > 0 else 0
+            )
 
             # Aplicar filtros
             if chapter_entity_ids is not None and e.id not in chapter_entity_ids:
@@ -123,21 +129,33 @@ async def list_entities(
                     first_appearance_char=e.first_appearance_char,
                     first_mention_chapter=first_mention_chapter,
                     mention_count=mention_count,
-                    is_active=e.is_active if hasattr(e, 'is_active') else True,
+                    is_active=e.is_active if hasattr(e, "is_active") else True,
                     merged_from_ids=e.merged_from_ids or [],
                     relevance_score=round(relevance_score, 3),
-                    created_at=e.created_at.isoformat() if hasattr(e, 'created_at') and e.created_at else None,
-                    updated_at=e.updated_at.isoformat() if hasattr(e, 'updated_at') and e.updated_at else None,
+                    created_at=(
+                        e.created_at.isoformat()
+                        if hasattr(e, "created_at") and e.created_at
+                        else None
+                    ),
+                    updated_at=(
+                        e.updated_at.isoformat()
+                        if hasattr(e, "updated_at") and e.updated_at
+                        else None
+                    ),
                 )
             )
 
         return ApiResponse(success=True, data=entities_data)
     except Exception as e:
-        logger.error(f"Error listing entities for project {project_id}: {e}", exc_info=True)
+        logger.error(
+            f"Error listing entities for project {project_id}: {e}", exc_info=True
+        )
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
-@router.post("/api/projects/{project_id}/entities/preview-merge", response_model=ApiResponse)
+@router.post(
+    "/api/projects/{project_id}/entities/preview-merge", response_model=ApiResponse
+)
 async def preview_merge_entities(project_id: int, body: deps.EntityIdsRequest):
     """
     Preview de fusión de entidades con análisis de similitud detallado y detección de conflictos.
@@ -167,14 +185,18 @@ async def preview_merge_entities(project_id: int, body: deps.EntityIdsRequest):
                 entities.append(entity)
 
         if len(entities) < 2:
-            return ApiResponse(success=False, error="No se encontraron suficientes entidades válidas")
+            return ApiResponse(
+                success=False, error="No se encontraron suficientes entidades válidas"
+            )
 
         # =====================================================================
         # 1. Calcular similitud detallada entre pares
         # =====================================================================
         try:
             from narrative_assistant.entities.fusion import EntityFusionService
-            from narrative_assistant.entities.semantic_fusion import get_semantic_fusion_service
+            from narrative_assistant.entities.semantic_fusion import \
+                get_semantic_fusion_service
+
             semantic_service = get_semantic_fusion_service()
             fusion_service = EntityFusionService(repository=entity_repo)
         except ImportError:
@@ -188,7 +210,11 @@ async def preview_merge_entities(project_id: int, body: deps.EntityIdsRequest):
             from difflib import SequenceMatcher
 
             def normalize(s):
-                return unicodedata.normalize('NFKD', s.lower()).encode('ascii', 'ignore').decode()
+                return (
+                    unicodedata.normalize("NFKD", s.lower())
+                    .encode("ascii", "ignore")
+                    .decode()
+                )
 
             n1 = normalize(name1)
             n2 = normalize(name2)
@@ -210,7 +236,9 @@ async def preview_merge_entities(project_id: int, body: deps.EntityIdsRequest):
                 "levenshtein": round(sequence_ratio, 3),
                 "jaro_winkler": round(quick_ratio, 3),
                 "containment": round(containment, 3),
-                "combined": round((sequence_ratio * 0.5 + quick_ratio * 0.3 + containment * 0.2), 3)
+                "combined": round(
+                    (sequence_ratio * 0.5 + quick_ratio * 0.3 + containment * 0.2), 3
+                ),
             }
 
         similarity_pairs = []
@@ -220,14 +248,18 @@ async def preview_merge_entities(project_id: int, body: deps.EntityIdsRequest):
                     continue
 
                 # Similitud por nombre
-                name_sim = compute_name_similarity(ent1.canonical_name, ent2.canonical_name)
+                name_sim = compute_name_similarity(
+                    ent1.canonical_name, ent2.canonical_name
+                )
 
                 # Similitud semántica (embeddings)
                 semantic_sim = 0.0
                 semantic_reason = ""
                 if semantic_service:
                     try:
-                        semantic_sim = semantic_service.compute_semantic_similarity(ent1, ent2)
+                        semantic_sim = semantic_service.compute_semantic_similarity(
+                            ent1, ent2
+                        )
                         result = semantic_service.should_merge(ent1, ent2)
                         semantic_reason = result.reason
                     except Exception as e:
@@ -240,17 +272,23 @@ async def preview_merge_entities(project_id: int, body: deps.EntityIdsRequest):
                 else:
                     combined_score = name_sim["combined"]
 
-                similarity_pairs.append({
-                    "entity1_id": ent1.id,
-                    "entity1_name": ent1.canonical_name,
-                    "entity2_id": ent2.id,
-                    "entity2_name": ent2.canonical_name,
-                    "name_similarity": name_sim,
-                    "semantic_similarity": round(semantic_sim, 3),
-                    "semantic_reason": semantic_reason,
-                    "combined_score": round(combined_score, 3),
-                    "recommendation": "merge" if combined_score >= 0.6 else "review" if combined_score >= 0.4 else "keep_separate"
-                })
+                similarity_pairs.append(
+                    {
+                        "entity1_id": ent1.id,
+                        "entity1_name": ent1.canonical_name,
+                        "entity2_id": ent2.id,
+                        "entity2_name": ent2.canonical_name,
+                        "name_similarity": name_sim,
+                        "semantic_similarity": round(semantic_sim, 3),
+                        "semantic_reason": semantic_reason,
+                        "combined_score": round(combined_score, 3),
+                        "recommendation": (
+                            "merge"
+                            if combined_score >= 0.6
+                            else "review" if combined_score >= 0.4 else "keep_separate"
+                        ),
+                    }
+                )
 
         # =====================================================================
         # 2. Calcular preview del resultado fusionado
@@ -271,7 +309,11 @@ async def preview_merge_entities(project_id: int, body: deps.EntityIdsRequest):
         for entity in entities:
             t = entity.entity_type.value
             type_counts[t] = type_counts.get(t, 0) + entity.mention_count
-        suggested_type = max(type_counts.keys(), key=lambda x: type_counts[x]) if type_counts else entities[0].entity_type.value
+        suggested_type = (
+            max(type_counts.keys(), key=lambda x: type_counts[x])
+            if type_counts
+            else entities[0].entity_type.value
+        )
 
         # Sugerir nombre canónico (el más largo que sea nombre propio)
         def score_canonical_name(name: str) -> int:
@@ -284,7 +326,7 @@ async def preview_merge_entities(project_id: int, body: deps.EntityIdsRequest):
             if name and name[0].isupper():
                 score += 30
             # Penalizar si empieza con artículo
-            articles = ['el', 'la', 'los', 'las', 'un', 'una']
+            articles = ["el", "la", "los", "las", "un", "una"]
             if words and words[0].lower() in articles:
                 score -= 50
             # Preferir nombres más largos (hasta cierto punto)
@@ -307,42 +349,52 @@ async def preview_merge_entities(project_id: int, body: deps.EntityIdsRequest):
         # 3. Detectar conflictos de atributos
         # =====================================================================
         conflicts = []
-        all_attributes = {}  # {(category, name): [(value, entity_name, entity_id), ...]}
+        all_attributes = (
+            {}
+        )  # {(category, name): [(value, entity_name, entity_id), ...]}
 
         for entity in entities:
             attrs = entity_repo.get_attributes_by_entity(entity.id)
             for attr in attrs:
-                key = (attr.get('attribute_type', attr.get('category', '')),
-                       attr.get('attribute_key', attr.get('name', '')))
-                value = attr.get('attribute_value', attr.get('value', ''))
+                key = (
+                    attr.get("attribute_type", attr.get("category", "")),
+                    attr.get("attribute_key", attr.get("name", "")),
+                )
+                value = attr.get("attribute_value", attr.get("value", ""))
 
                 if key not in all_attributes:
                     all_attributes[key] = []
-                all_attributes[key].append({
-                    "value": value,
-                    "entity_name": entity.canonical_name,
-                    "entity_id": entity.id,
-                    "confidence": attr.get('confidence', 1.0)
-                })
+                all_attributes[key].append(
+                    {
+                        "value": value,
+                        "entity_name": entity.canonical_name,
+                        "entity_id": entity.id,
+                        "confidence": attr.get("confidence", 1.0),
+                    }
+                )
 
         # Detectar conflictos (mismo atributo, diferentes valores)
         for (category, attr_name), values in all_attributes.items():
             unique_values = set(v["value"].lower().strip() for v in values)
             if len(unique_values) > 1:
-                conflicts.append({
-                    "category": category,
-                    "attribute_name": attr_name,
-                    "conflicting_values": [
-                        {
-                            "value": v["value"],
-                            "entity_name": v["entity_name"],
-                            "entity_id": v["entity_id"],
-                            "confidence": v["confidence"]
-                        }
-                        for v in values
-                    ],
-                    "severity": "high" if category in ["physical", "identity"] else "medium"
-                })
+                conflicts.append(
+                    {
+                        "category": category,
+                        "attribute_name": attr_name,
+                        "conflicting_values": [
+                            {
+                                "value": v["value"],
+                                "entity_name": v["entity_name"],
+                                "entity_id": v["entity_id"],
+                                "confidence": v["confidence"],
+                            }
+                            for v in values
+                        ],
+                        "severity": (
+                            "high" if category in ["physical", "identity"] else "medium"
+                        ),
+                    }
+                )
 
         # Ordenar conflictos por severidad
         severity_order = {"high": 0, "medium": 1, "low": 2}
@@ -351,7 +403,11 @@ async def preview_merge_entities(project_id: int, body: deps.EntityIdsRequest):
         # =====================================================================
         # 4. Calcular recomendación general
         # =====================================================================
-        avg_similarity = sum(p["combined_score"] for p in similarity_pairs) / len(similarity_pairs) if similarity_pairs else 0
+        avg_similarity = (
+            sum(p["combined_score"] for p in similarity_pairs) / len(similarity_pairs)
+            if similarity_pairs
+            else 0
+        )
         has_high_conflicts = any(c["severity"] == "high" for c in conflicts)
 
         if avg_similarity >= 0.6 and not has_high_conflicts:
@@ -365,21 +421,26 @@ async def preview_merge_entities(project_id: int, body: deps.EntityIdsRequest):
                 recommendation_reason = "Similitud media, revisar antes de fusionar"
         else:
             recommendation = "keep_separate"
-            recommendation_reason = "Baja similitud, las entidades podrían ser diferentes"
+            recommendation_reason = (
+                "Baja similitud, las entidades podrían ser diferentes"
+            )
 
-        return ApiResponse(success=True, data={
-            "similarity": {
-                "pairs": similarity_pairs,
-                "average_score": round(avg_similarity, 3),
+        return ApiResponse(
+            success=True,
+            data={
+                "similarity": {
+                    "pairs": similarity_pairs,
+                    "average_score": round(avg_similarity, 3),
+                },
+                "merged_preview": merged_preview,
+                "conflicts": conflicts,
+                "conflict_count": len(conflicts),
+                "has_critical_conflicts": has_high_conflicts,
+                "recommendation": recommendation,
+                "recommendation_reason": recommendation_reason,
+                "entity_count": len(entities),
             },
-            "merged_preview": merged_preview,
-            "conflicts": conflicts,
-            "conflict_count": len(conflicts),
-            "has_critical_conflicts": has_high_conflicts,
-            "recommendation": recommendation,
-            "recommendation_reason": recommendation_reason,
-            "entity_count": len(entities)
-        })
+        )
 
     except Exception as e:
         logger.error(f"Error previewing entity merge: {e}", exc_info=True)
@@ -426,22 +487,28 @@ async def merge_entities(project_id: int, body: deps.MergeEntitiesRequest):
 
             # Guardar snapshot para historial (permite undo)
             source_entity_ids.append(entity_id)
-            source_snapshots.append({
-                "id": entity_id,
-                "canonical_name": entity.canonical_name,
-                "entity_type": entity.entity_type.value,
-                "aliases": entity.aliases,
-                "mention_count": entity.mention_count,
-            })
+            source_snapshots.append(
+                {
+                    "id": entity_id,
+                    "canonical_name": entity.canonical_name,
+                    "entity_type": entity.entity_type.value,
+                    "aliases": entity.aliases,
+                    "mention_count": entity.mention_count,
+                }
+            )
             canonical_names_before.append(entity.canonical_name)
 
             # 1. Transferir menciones a la entidad principal
             mentions_moved = entity_repo.move_mentions(entity_id, primary_entity_id)
-            logger.debug(f"Moved {mentions_moved} mentions from entity {entity_id} to {primary_entity_id}")
+            logger.debug(
+                f"Moved {mentions_moved} mentions from entity {entity_id} to {primary_entity_id}"
+            )
 
             # 2. Transferir atributos a la entidad principal
             attrs_moved = entity_repo.move_attributes(entity_id, primary_entity_id)
-            logger.debug(f"Moved {attrs_moved} attributes from entity {entity_id} to {primary_entity_id}")
+            logger.debug(
+                f"Moved {attrs_moved} attributes from entity {entity_id} to {primary_entity_id}"
+            )
 
             # 3. Combinar aliases (incluir nombre canónico de la entidad fusionada)
             combined_aliases.add(entity.canonical_name)
@@ -455,7 +522,9 @@ async def merge_entities(project_id: int, body: deps.MergeEntitiesRequest):
         if merged_count > 0:
             # Actualizar aliases y merged_from_ids en la entidad principal
             combined_aliases.discard(primary_entity.canonical_name)
-            new_merged_ids = list(set(primary_entity.merged_from_ids + source_entity_ids))
+            new_merged_ids = list(
+                set(primary_entity.merged_from_ids + source_entity_ids)
+            )
 
             entity_repo.update_entity(
                 primary_entity_id,
@@ -485,14 +554,21 @@ async def merge_entities(project_id: int, body: deps.MergeEntitiesRequest):
             attrs = entity_repo.get_attributes_by_entity(primary_entity_id)
             for resolution in body.attribute_resolutions:
                 # Find all attributes with this key
-                matching = [a for a in attrs if a.get("attribute_key") == resolution.attribute_name]
+                matching = [
+                    a
+                    for a in attrs
+                    if a.get("attribute_key") == resolution.attribute_name
+                ]
                 if not matching:
                     continue
 
                 # Keep one with the chosen value, delete the rest
                 kept = False
                 for attr in matching:
-                    if attr.get("attribute_value") == resolution.chosen_value and not kept:
+                    if (
+                        attr.get("attribute_value") == resolution.chosen_value
+                        and not kept
+                    ):
                         kept = True
                         continue
                     # Delete duplicate/conflicting attribute
@@ -509,9 +585,13 @@ async def merge_entities(project_id: int, body: deps.MergeEntitiesRequest):
                     resolutions_applied += 1
 
             if resolutions_applied > 0:
-                logger.info(f"Applied {resolutions_applied} attribute resolutions for entity {primary_entity_id}")
+                logger.info(
+                    f"Applied {resolutions_applied} attribute resolutions for entity {primary_entity_id}"
+                )
 
-        logger.info(f"Merged {merged_count} entities into entity {primary_entity_id} ({primary_entity.canonical_name})")
+        logger.info(
+            f"Merged {merged_count} entities into entity {primary_entity_id} ({primary_entity.canonical_name})"
+        )
 
         # Obtener la entidad actualizada para retornarla
         updated_entity = entity_repo.get_entity(primary_entity_id)
@@ -522,31 +602,40 @@ async def merge_entities(project_id: int, body: deps.MergeEntitiesRequest):
                 "primary_entity_id": primary_entity_id,
                 "merged_count": merged_count,
                 "merged_entity_ids": source_entity_ids,
-                "result_entity": {
-                    "id": updated_entity.id,
-                    "canonical_name": updated_entity.canonical_name,
-                    "aliases": updated_entity.aliases,
-                    "mention_count": updated_entity.mention_count,
-                    "merged_from_ids": updated_entity.merged_from_ids,
-                } if updated_entity else None
+                "result_entity": (
+                    {
+                        "id": updated_entity.id,
+                        "canonical_name": updated_entity.canonical_name,
+                        "aliases": updated_entity.aliases,
+                        "mention_count": updated_entity.mention_count,
+                        "merged_from_ids": updated_entity.merged_from_ids,
+                    }
+                    if updated_entity
+                    else None
+                ),
             },
-            message=f"Se fusionaron {merged_count} entidades en '{primary_entity.canonical_name}'"
+            message=f"Se fusionaron {merged_count} entidades en '{primary_entity.canonical_name}'",
         )
 
     except Exception as e:
-        logger.error(f"Error merging entities for project {project_id}: {e}", exc_info=True)
+        logger.error(
+            f"Error merging entities for project {project_id}: {e}", exc_info=True
+        )
         return ApiResponse(success=False, error="Error interno del servidor")
     else:
         # Invalidación granular (S8c) — best-effort, no bloquea respuesta
         try:
             from routers._invalidation import emit_invalidation_event
+
             all_ids = [body.primary_entity_id] + source_entity_ids
             emit_invalidation_event(deps.get_database(), project_id, "merge", all_ids)
         except Exception:
             pass
 
 
-@router.get("/api/projects/{project_id}/entities/merge-history", response_model=ApiResponse)
+@router.get(
+    "/api/projects/{project_id}/entities/merge-history", response_model=ApiResponse
+)
 async def get_merge_history(project_id: int):
     """
     Obtiene el historial de fusiones de entidades del proyecto.
@@ -560,17 +649,19 @@ async def get_merge_history(project_id: int):
         # Obtener historial de fusiones
         history = entity_repo.get_merge_history(project_id)
 
-        return ApiResponse(success=True, data={
-            "merges": history,
-            "total": len(history)
-        })
+        return ApiResponse(
+            success=True, data={"merges": history, "total": len(history)}
+        )
 
     except Exception as e:
         logger.error(f"Error getting merge history: {e}", exc_info=True)
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
-@router.post("/api/projects/{project_id}/entities/undo-merge/{merge_id}", response_model=ApiResponse)
+@router.post(
+    "/api/projects/{project_id}/entities/undo-merge/{merge_id}",
+    response_model=ApiResponse,
+)
 async def undo_entity_merge(project_id: int, merge_id: int):
     """
     Deshace una fusión de entidades, restaurando las entidades originales.
@@ -596,14 +687,17 @@ async def undo_entity_merge(project_id: int, merge_id: int):
         # Invalidación granular (S8c)
         try:
             from routers._invalidation import emit_invalidation_event
-            emit_invalidation_event(deps.get_database(), project_id, "undo_merge", restored_ids)
+
+            emit_invalidation_event(
+                deps.get_database(), project_id, "undo_merge", restored_ids
+            )
         except Exception:
             pass
 
         return ApiResponse(
             success=True,
             data={"restored_entity_ids": restored_ids},
-            message="Fusión deshecha exitosamente"
+            message="Fusión deshecha exitosamente",
         )
 
     except Exception as e:
@@ -611,7 +705,9 @@ async def undo_entity_merge(project_id: int, merge_id: int):
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
-@router.get("/api/projects/{project_id}/entities/{entity_id}", response_model=ApiResponse)
+@router.get(
+    "/api/projects/{project_id}/entities/{entity_id}", response_model=ApiResponse
+)
 async def get_entity(project_id: int, entity_id: int):
     """
     Obtiene una entidad por su ID.
@@ -624,7 +720,8 @@ async def get_entity(project_id: int, entity_id: int):
         ApiResponse con los datos de la entidad
     """
     try:
-        from narrative_assistant.persistence.chapter import get_chapter_repository
+        from narrative_assistant.persistence.chapter import \
+            get_chapter_repository
 
         # Verificar que la entidad existe y pertenece al proyecto
         entity, error = _verify_entity_ownership(entity_id, project_id)
@@ -652,11 +749,19 @@ async def get_entity(project_id: int, entity_id: int):
             first_appearance_char=entity.first_appearance_char,
             first_mention_chapter=first_mention_chapter,
             mention_count=entity.mention_count or 0,
-            is_active=entity.is_active if hasattr(entity, 'is_active') else True,
+            is_active=entity.is_active if hasattr(entity, "is_active") else True,
             merged_from_ids=entity.merged_from_ids or [],
             relevance_score=None,  # Calculate if needed
-            created_at=entity.created_at.isoformat() if hasattr(entity, 'created_at') and entity.created_at else None,
-            updated_at=entity.updated_at.isoformat() if hasattr(entity, 'updated_at') and entity.updated_at else None,
+            created_at=(
+                entity.created_at.isoformat()
+                if hasattr(entity, "created_at") and entity.created_at
+                else None
+            ),
+            updated_at=(
+                entity.updated_at.isoformat()
+                if hasattr(entity, "updated_at") and entity.updated_at
+                else None
+            ),
         )
 
         return ApiResponse(success=True, data=entity_data)
@@ -666,8 +771,12 @@ async def get_entity(project_id: int, entity_id: int):
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
-@router.put("/api/projects/{project_id}/entities/{entity_id}", response_model=ApiResponse)
-async def update_entity(project_id: int, entity_id: int, body: deps.UpdateEntityRequest):
+@router.put(
+    "/api/projects/{project_id}/entities/{entity_id}", response_model=ApiResponse
+)
+async def update_entity(
+    project_id: int, entity_id: int, body: deps.UpdateEntityRequest
+):
     """
     Actualiza una entidad existente.
 
@@ -695,10 +804,11 @@ async def update_entity(project_id: int, entity_id: int, body: deps.UpdateEntity
         importance = None
         if importance_str:
             from narrative_assistant.entities.models import EntityImportance
+
             importance_map = {
-                'main': EntityImportance.MAIN,
-                'secondary': EntityImportance.SECONDARY,
-                'minor': EntityImportance.MINOR,
+                "main": EntityImportance.MAIN,
+                "secondary": EntityImportance.SECONDARY,
+                "minor": EntityImportance.MINOR,
             }
             importance = importance_map.get(importance_str.lower())
 
@@ -731,7 +841,7 @@ async def update_entity(project_id: int, entity_id: int, body: deps.UpdateEntity
                 "description": updated_entity.description,
                 "mention_count": updated_entity.mention_count,
             },
-            message="Entidad actualizada correctamente"
+            message="Entidad actualizada correctamente",
         )
 
     except Exception as e:
@@ -739,7 +849,9 @@ async def update_entity(project_id: int, entity_id: int, body: deps.UpdateEntity
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
-@router.delete("/api/projects/{project_id}/entities/{entity_id}", response_model=ApiResponse)
+@router.delete(
+    "/api/projects/{project_id}/entities/{entity_id}", response_model=ApiResponse
+)
 async def delete_entity(project_id: int, entity_id: int, hard_delete: bool = False):
     """
     Elimina (o desactiva) una entidad.
@@ -773,7 +885,7 @@ async def delete_entity(project_id: int, entity_id: int, hard_delete: bool = Fal
         return ApiResponse(
             success=True,
             data={"id": entity_id, "name": entity_name, "hard_delete": hard_delete},
-            message=f"Entidad '{entity_name}' {action}"
+            message=f"Entidad '{entity_name}' {action}",
         )
 
     except Exception as e:
@@ -781,7 +893,10 @@ async def delete_entity(project_id: int, entity_id: int, hard_delete: bool = Fal
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
-@router.get("/api/projects/{project_id}/entities/{entity_id}/timeline", response_model=ApiResponse)
+@router.get(
+    "/api/projects/{project_id}/entities/{entity_id}/timeline",
+    response_model=ApiResponse,
+)
 async def get_entity_timeline(project_id: int, entity_id: int):
     """
     Obtiene la línea temporal de una entidad basada en sus menciones.
@@ -816,7 +931,11 @@ async def get_entity_timeline(project_id: int, entity_id: int):
             return ApiResponse(success=True, data=[])
 
         # Obtener capítulos para mapear chapter_id a chapter_number
-        chapters = deps.chapter_repository.get_by_project(project_id) if deps.chapter_repository else []
+        chapters = (
+            deps.chapter_repository.get_by_project(project_id)
+            if deps.chapter_repository
+            else []
+        )
         chapter_map = {ch.id: ch for ch in chapters}
 
         # Agrupar menciones por capítulo
@@ -832,7 +951,11 @@ async def get_entity_timeline(project_id: int, entity_id: int):
         attrs_by_chapter: dict[int, list] = {}
         for attr in attributes:
             # Si el atributo tiene chapter_id o first_mention_chapter
-            ch = getattr(attr, 'chapter_id', None) or getattr(attr, 'first_mention_chapter', None) or 0
+            ch = (
+                getattr(attr, "chapter_id", None)
+                or getattr(attr, "first_mention_chapter", None)
+                or 0
+            )
             if ch not in attrs_by_chapter:
                 attrs_by_chapter[ch] = []
             attrs_by_chapter[ch].append(attr)
@@ -853,53 +976,74 @@ async def get_entity_timeline(project_id: int, entity_id: int):
                 context = first_mention.context_before or ""
                 context += f"**{first_mention.surface_form}**"
                 context += first_mention.context_after or ""
-                timeline_events.append({
-                    "chapter": ch_number,
-                    "chapterTitle": ch_title,
-                    "description": f"Primera aparición: \"{first_mention.surface_form}\"",
-                    "type": "first_appearance",
-                    "mentionCount": len(ch_mentions),
-                    "context": context[:200] if context else None,
-                })
+                timeline_events.append(
+                    {
+                        "chapter": ch_number,
+                        "chapterTitle": ch_title,
+                        "description": f'Primera aparición: "{first_mention.surface_form}"',
+                        "type": "first_appearance",
+                        "mentionCount": len(ch_mentions),
+                        "context": context[:200] if context else None,
+                    }
+                )
             else:
                 # Aparición en capítulo posterior
-                timeline_events.append({
-                    "chapter": ch_number,
-                    "chapterTitle": ch_title,
-                    "description": f"{len(ch_mentions)} menciones en este capítulo",
-                    "type": "appearance",
-                    "mentionCount": len(ch_mentions),
-                })
+                timeline_events.append(
+                    {
+                        "chapter": ch_number,
+                        "chapterTitle": ch_title,
+                        "description": f"{len(ch_mentions)} menciones en este capítulo",
+                        "type": "appearance",
+                        "mentionCount": len(ch_mentions),
+                    }
+                )
 
             # Atributos nuevos en este capítulo
             if ch_id in attrs_by_chapter or ch_number in attrs_by_chapter:
-                ch_attrs = attrs_by_chapter.get(ch_id, []) + attrs_by_chapter.get(ch_number, [])
+                ch_attrs = attrs_by_chapter.get(ch_id, []) + attrs_by_chapter.get(
+                    ch_number, []
+                )
                 for attr in ch_attrs:
-                    attr_name = getattr(attr, 'attribute_key', None) or getattr(attr, 'name', 'atributo')
-                    attr_value = getattr(attr, 'attribute_value', None) or getattr(attr, 'value', '')
-                    timeline_events.append({
-                        "chapter": ch_number,
-                        "chapterTitle": ch_title,
-                        "description": f"Se menciona: {attr_name} = {attr_value}",
-                        "type": "attribute",
-                        "mentionCount": 0,
-                    })
+                    attr_name = getattr(attr, "attribute_key", None) or getattr(
+                        attr, "name", "atributo"
+                    )
+                    attr_value = getattr(attr, "attribute_value", None) or getattr(
+                        attr, "value", ""
+                    )
+                    timeline_events.append(
+                        {
+                            "chapter": ch_number,
+                            "chapterTitle": ch_title,
+                            "description": f"Se menciona: {attr_name} = {attr_value}",
+                            "type": "attribute",
+                            "mentionCount": 0,
+                        }
+                    )
 
         # Ordenar por capítulo
-        timeline_events.sort(key=lambda x: (x["chapter"], x["type"] != "first_appearance"))
+        timeline_events.sort(
+            key=lambda x: (x["chapter"], x["type"] != "first_appearance")
+        )
 
         return ApiResponse(success=True, data=timeline_events)
 
     except Exception as e:
-        logger.error(f"Error getting timeline for entity {entity_id}: {e}", exc_info=True)
+        logger.error(
+            f"Error getting timeline for entity {entity_id}: {e}", exc_info=True
+        )
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
-@router.get("/api/projects/{project_id}/entities/{entity_id}/mentions", response_model=ApiResponse)
+@router.get(
+    "/api/projects/{project_id}/entities/{entity_id}/mentions",
+    response_model=ApiResponse,
+)
 async def get_entity_mentions(
     project_id: int,
     entity_id: int,
-    chapter_number: Optional[int] = Query(None, description="Filtrar menciones por número de capítulo"),
+    chapter_number: Optional[int] = Query(
+        None, description="Filtrar menciones por número de capítulo"
+    ),
 ):
     """
     Obtiene todas las menciones de una entidad en el texto.
@@ -922,7 +1066,11 @@ async def get_entity_mentions(
             return ApiResponse(success=True, data={"mentions": [], "total": 0})
 
         # Obtener capítulos para mapear chapter_id a chapter_number y título
-        chapters = deps.chapter_repository.get_by_project(project_id) if deps.chapter_repository else []
+        chapters = (
+            deps.chapter_repository.get_by_project(project_id)
+            if deps.chapter_repository
+            else []
+        )
         chapter_map = {ch.id: ch for ch in chapters}
 
         # Si se filtra por capítulo, obtener el chapter_id correspondiente
@@ -938,42 +1086,54 @@ async def get_entity_mentions(
         # Serializar menciones con información de capítulo
         mentions_data = []
         for mention in mentions:
-            ch_info = chapter_map.get(mention.chapter_id) if mention.chapter_id else None
+            ch_info = (
+                chapter_map.get(mention.chapter_id) if mention.chapter_id else None
+            )
 
             # Filtrar por capítulo si se especificó
             if chapter_number is not None:
                 mention_in_chapter = False
                 if target_chapter_id and mention.chapter_id == target_chapter_id:
                     mention_in_chapter = True
-                elif target_chapter_obj and (target_chapter_obj.start_char <= mention.start_char < target_chapter_obj.end_char):
+                elif target_chapter_obj and (
+                    target_chapter_obj.start_char
+                    <= mention.start_char
+                    < target_chapter_obj.end_char
+                ):
                     mention_in_chapter = True
                 if not mention_in_chapter:
                     continue
 
-            mentions_data.append({
-                "id": mention.id,
-                "entityId": entity_id,
-                "surfaceForm": mention.surface_form,
-                "startChar": mention.start_char,
-                "endChar": mention.end_char,
-                "chapterId": mention.chapter_id,
-                "chapterNumber": ch_info.chapter_number if ch_info else None,
-                "chapterTitle": ch_info.title if ch_info else None,
-                "contextBefore": mention.context_before,
-                "contextAfter": mention.context_after,
-                "confidence": mention.confidence,
-                "source": mention.source,
-            })
+            mentions_data.append(
+                {
+                    "id": mention.id,
+                    "entityId": entity_id,
+                    "surfaceForm": mention.surface_form,
+                    "startChar": mention.start_char,
+                    "endChar": mention.end_char,
+                    "chapterId": mention.chapter_id,
+                    "chapterNumber": ch_info.chapter_number if ch_info else None,
+                    "chapterTitle": ch_info.title if ch_info else None,
+                    "contextBefore": mention.context_before,
+                    "contextAfter": mention.context_after,
+                    "confidence": mention.confidence,
+                    "source": mention.source,
+                }
+            )
 
         # Ordenar por posición (start_char)
         mentions_data.sort(key=lambda m: (m["chapterNumber"] or 0, m["startChar"]))
 
-        logger.info(f"Entity {entity_id} ({entity.canonical_name}): Found {len(mentions_data)} raw mentions from DB (entity.mention_count={entity.mention_count})")
+        logger.info(
+            f"Entity {entity_id} ({entity.canonical_name}): Found {len(mentions_data)} raw mentions from DB (entity.mention_count={entity.mention_count})"
+        )
 
         # Log muestra de posiciones para debug
         if mentions_data:
             sample = mentions_data[:5]
-            logger.info(f"Entity {entity_id}: Sample positions: {[(m['chapterId'], m['startChar'], m['endChar']) for m in sample]}")
+            logger.info(
+                f"Entity {entity_id}: Sample positions: {[(m['chapterId'], m['startChar'], m['endChar']) for m in sample]}"
+            )
 
         # Filtrar duplicados: menciones que se solapan
         # Estrategia conservadora basada en discusión de expertos:
@@ -986,28 +1146,33 @@ async def get_entity_mentions(
         def has_invalid_extension(text: str) -> bool:
             """Detecta si el texto contiene patrones inválidos para un nombre."""
             # Puntuación que indica límite de nombre
-            if re.search(r'[,;:\.\!\?]', text):
+            if re.search(r"[,;:\.\!\?]", text):
                 return True
             # Artículo + sustantivo común (aposición)
             # "María la vecina", "Pedro el viejo"
-            if re.search(r'\s+(el|la|los|las)\s+[a-záéíóúñ]+$', text, re.IGNORECASE):
+            if re.search(r"\s+(el|la|los|las)\s+[a-záéíóúñ]+$", text, re.IGNORECASE):
                 # Excepciones: partículas de apellido válidas
-                valid_particles = ['de la', 'del', 'de los', 'de las', 'de']
+                valid_particles = ["de la", "del", "de los", "de las", "de"]
                 text_lower = text.lower()
-                if not any(f' {p} ' in text_lower or text_lower.endswith(f' {p}') for p in valid_particles):
+                if not any(
+                    f" {p} " in text_lower or text_lower.endswith(f" {p}")
+                    for p in valid_particles
+                ):
                     return True
             return False
 
         def is_valid_name_extension(short_text: str, long_text: str) -> bool:
             """Verifica si la extensión del nombre corto al largo es válida."""
-            extension = long_text[len(short_text):].strip()
+            extension = long_text[len(short_text) :].strip()
             if not extension:
                 return True
             # Partículas de apellido válidas
-            if re.match(r'^(de la|del|de los|de las|de)\s+[A-ZÁÉÍÓÚÑ]', extension):
+            if re.match(r"^(de la|del|de los|de las|de)\s+[A-ZÁÉÍÓÚÑ]", extension):
                 return True
             # Apellido simple (empieza con mayúscula, sin puntuación)
-            if re.match(r'^[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)?$', extension):
+            if re.match(
+                r"^[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)?$", extension
+            ):
                 return True
             return False
 
@@ -1017,7 +1182,7 @@ async def get_entity_mentions(
         def normalize_surface_form(text: str) -> str:
             """Normaliza texto para comparación (minúsculas, sin espacios extra)."""
             text = text.lower().strip()
-            text = ' '.join(text.split())  # Normalizar espacios
+            text = " ".join(text.split())  # Normalizar espacios
             return text
 
         def calculate_iou(start1: int, end1: int, start2: int, end2: int) -> float:
@@ -1039,14 +1204,16 @@ async def get_entity_mentions(
                 # Menciones con misma posición pero diferente chapter_id son duplicados
                 # debido a errores de asignación durante NER
                 overlaps = not (
-                    mention["endChar"] <= existing["startChar"] or
-                    mention["startChar"] >= existing["endChar"]
+                    mention["endChar"] <= existing["startChar"]
+                    or mention["startChar"] >= existing["endChar"]
                 )
 
                 # Calcular IoU para solapamientos parciales
                 iou = calculate_iou(
-                    mention["startChar"], mention["endChar"],
-                    existing["startChar"], existing["endChar"]
+                    mention["startChar"],
+                    mention["endChar"],
+                    existing["startChar"],
+                    existing["endChar"],
                 )
 
                 # Si IoU > 70%, considerarlas como la misma mención (diferente chapter_id o no)
@@ -1054,10 +1221,12 @@ async def get_entity_mentions(
 
                 # Deduplicar menciones con mismo texto normalizado muy cercanas (< 10 chars)
                 # Esto captura menciones duplicadas que no se solapan exactamente
-                same_text = normalize_surface_form(existing["surfaceForm"]) == normalize_surface_form(mention["surfaceForm"])
+                same_text = normalize_surface_form(
+                    existing["surfaceForm"]
+                ) == normalize_surface_form(mention["surfaceForm"])
                 distance = min(
                     abs(mention["startChar"] - existing["endChar"]),
-                    abs(existing["startChar"] - mention["endChar"])
+                    abs(existing["startChar"] - mention["endChar"]),
                 )
                 very_close = same_text and distance < 10
 
@@ -1065,7 +1234,9 @@ async def get_entity_mentions(
                     # Son la misma mención con posiciones ligeramente diferentes
                     dominated = True
                     removed_count += 1
-                    logger.debug(f"Dedupe: '{mention['surfaceForm']}' muy cercana a '{existing['surfaceForm']}' (dist={distance})")
+                    logger.debug(
+                        f"Dedupe: '{mention['surfaceForm']}' muy cercana a '{existing['surfaceForm']}' (dist={distance})"
+                    )
                     break
 
                 # Si hay alto solapamiento (IoU > 70%), deduplicar aunque chapter_id difiera
@@ -1076,7 +1247,9 @@ async def get_entity_mentions(
                     else:
                         dominated = True
                     removed_count += 1
-                    logger.debug(f"Dedupe IoU: '{mention['surfaceForm']}' vs '{existing['surfaceForm']}' (IoU={iou:.2f})")
+                    logger.debug(
+                        f"Dedupe IoU: '{mention['surfaceForm']}' vs '{existing['surfaceForm']}' (IoU={iou:.2f})"
+                    )
                     break
 
                 if overlaps or high_overlap:
@@ -1089,7 +1262,10 @@ async def get_entity_mentions(
                         longer_is_new = False
 
                     # Mismo texto (ignorando mayúsculas) → duplicado exacto
-                    if existing["surfaceForm"].lower() == mention["surfaceForm"].lower():
+                    if (
+                        existing["surfaceForm"].lower()
+                        == mention["surfaceForm"].lower()
+                    ):
                         dominated = True
                         if mention["confidence"] > existing["confidence"]:
                             to_remove = existing
@@ -1138,29 +1314,39 @@ async def get_entity_mentions(
         filtered_mentions.sort(key=lambda m: (m["chapterNumber"] or 0, m["startChar"]))
 
         if removed_count > 0:
-            logger.info(f"Entity {entity_id} ({entity.canonical_name}): Filtered {removed_count} overlapping mentions, returning {len(filtered_mentions)}")
+            logger.info(
+                f"Entity {entity_id} ({entity.canonical_name}): Filtered {removed_count} overlapping mentions, returning {len(filtered_mentions)}"
+            )
 
-        return ApiResponse(success=True, data={
-            "mentions": filtered_mentions,
-            "total": len(filtered_mentions),
-            "entityName": entity.canonical_name,
-            "entityType": entity.entity_type.value if entity.entity_type else None,
-            # Debug info
-            "_debug": {
-                "raw_mentions_in_db": len(mentions),
-                "after_serialization": len(mentions_data),
-                "after_filtering": len(filtered_mentions),
-                "entity_mention_count_field": entity.mention_count,
-                "removed_duplicates": removed_count,
-            }
-        })
+        return ApiResponse(
+            success=True,
+            data={
+                "mentions": filtered_mentions,
+                "total": len(filtered_mentions),
+                "entityName": entity.canonical_name,
+                "entityType": entity.entity_type.value if entity.entity_type else None,
+                # Debug info
+                "_debug": {
+                    "raw_mentions_in_db": len(mentions),
+                    "after_serialization": len(mentions_data),
+                    "after_filtering": len(filtered_mentions),
+                    "entity_mention_count_field": entity.mention_count,
+                    "removed_duplicates": removed_count,
+                },
+            },
+        )
 
     except Exception as e:
-        logger.error(f"Error getting mentions for entity {entity_id}: {e}", exc_info=True)
+        logger.error(
+            f"Error getting mentions for entity {entity_id}: {e}", exc_info=True
+        )
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
-@router.get("/api/projects/{project_id}/entities/{entity_id}/coreference", response_model=ApiResponse)
+@router.get(
+    "/api/projects/{project_id}/entities/{entity_id}/coreference",
+    response_model=ApiResponse,
+)
 async def get_entity_coreference_info(project_id: int, entity_id: int):
     """
     Obtiene información de correferencia para una entidad.
@@ -1191,14 +1377,17 @@ async def get_entity_coreference_info(project_id: int, entity_id: int):
         mentions = entity_repo.get_mentions_by_entity(entity_id)
 
         if not mentions:
-            return ApiResponse(success=True, data={
-                "entityId": entity_id,
-                "entityName": entity.canonical_name,
-                "methodContributions": [],
-                "mentionsByType": {},
-                "overallConfidence": 0.0,
-                "totalMentions": 0,
-            })
+            return ApiResponse(
+                success=True,
+                data={
+                    "entityId": entity_id,
+                    "entityName": entity.canonical_name,
+                    "methodContributions": [],
+                    "mentionsByType": {},
+                    "overallConfidence": 0.0,
+                    "totalMentions": 0,
+                },
+            )
 
         # Agrupar menciones por fuente/método de detección
         method_counts: dict[str, int] = {}
@@ -1237,11 +1426,13 @@ async def get_entity_coreference_info(project_id: int, entity_id: int):
 
             if mention_type not in type_mentions:
                 type_mentions[mention_type] = []
-            type_mentions[mention_type].append({
-                "text": surface,
-                "confidence": mention.confidence,
-                "source": source,
-            })
+            type_mentions[mention_type].append(
+                {
+                    "text": surface,
+                    "confidence": mention.confidence,
+                    "source": source,
+                }
+            )
 
             # Sumar confianza para promedio
             if mention.confidence is not None:
@@ -1252,28 +1443,45 @@ async def get_entity_coreference_info(project_id: int, entity_id: int):
             if source_lower == "coref" and mention.metadata:
                 try:
                     import json
-                    meta = json.loads(mention.metadata) if isinstance(mention.metadata, str) else mention.metadata
+
+                    meta = (
+                        json.loads(mention.metadata)
+                        if isinstance(mention.metadata, str)
+                        else mention.metadata
+                    )
                     if meta and "method_votes" in meta:
-                        voting_reasoning.append({
-                            "mentionText": meta.get("anaphor_text", surface),
-                            "startChar": meta.get("anaphor_start", mention.start_char),
-                            "endChar": meta.get("anaphor_end", mention.end_char),
-                            "resolvedTo": meta.get("resolved_to", ""),
-                            "finalScore": meta.get("final_score", mention.confidence),
-                            "contextBefore": mention.context_before or "",
-                            "contextAfter": mention.context_after or "",
-                            "methodVotes": [
-                                {
-                                    "method": method_name,
-                                    "methodLabel": source_labels.get(method_name, method_name.capitalize()),
-                                    "score": vote_data.get("score", 0),
-                                    "weight": vote_data.get("weight", 0),
-                                    "weightedScore": vote_data.get("weighted_score", 0),
-                                    "reasoning": vote_data.get("reasoning", ""),
-                                }
-                                for method_name, vote_data in meta["method_votes"].items()
-                            ],
-                        })
+                        voting_reasoning.append(
+                            {
+                                "mentionText": meta.get("anaphor_text", surface),
+                                "startChar": meta.get(
+                                    "anaphor_start", mention.start_char
+                                ),
+                                "endChar": meta.get("anaphor_end", mention.end_char),
+                                "resolvedTo": meta.get("resolved_to", ""),
+                                "finalScore": meta.get(
+                                    "final_score", mention.confidence
+                                ),
+                                "contextBefore": mention.context_before or "",
+                                "contextAfter": mention.context_after or "",
+                                "methodVotes": [
+                                    {
+                                        "method": method_name,
+                                        "methodLabel": source_labels.get(
+                                            method_name, method_name.capitalize()
+                                        ),
+                                        "score": vote_data.get("score", 0),
+                                        "weight": vote_data.get("weight", 0),
+                                        "weightedScore": vote_data.get(
+                                            "weighted_score", 0
+                                        ),
+                                        "reasoning": vote_data.get("reasoning", ""),
+                                    }
+                                    for method_name, vote_data in meta[
+                                        "method_votes"
+                                    ].items()
+                                ],
+                            }
+                        )
                 except (json.JSONDecodeError, TypeError, KeyError):
                     pass
 
@@ -1283,33 +1491,45 @@ async def get_entity_coreference_info(project_id: int, entity_id: int):
 
         for source, count in sorted(method_counts.items(), key=lambda x: -x[1]):
             percentage = (count / total_mentions * 100) if total_mentions > 0 else 0
-            method_contributions.append({
-                "name": source_labels.get(source, source.capitalize()),
-                "method": source,
-                "count": count,
-                "score": percentage / 100,  # Normalizado 0-1 para MethodVotingBar
-                "agreed": percentage >= 20,  # Consideramos "de acuerdo" si aporta >= 20%
-            })
+            method_contributions.append(
+                {
+                    "name": source_labels.get(source, source.capitalize()),
+                    "method": source,
+                    "count": count,
+                    "score": percentage / 100,  # Normalizado 0-1 para MethodVotingBar
+                    "agreed": percentage
+                    >= 20,  # Consideramos "de acuerdo" si aporta >= 20%
+                }
+            )
 
         # Calcular confianza promedio
-        overall_confidence = (total_confidence / confidence_count) if confidence_count > 0 else 0.0
+        overall_confidence = (
+            (total_confidence / confidence_count) if confidence_count > 0 else 0.0
+        )
 
-        return ApiResponse(success=True, data={
-            "entityId": entity_id,
-            "entityName": entity.canonical_name,
-            "methodContributions": method_contributions,
-            "mentionsByType": type_mentions,
-            "votingReasoning": voting_reasoning,
-            "overallConfidence": overall_confidence,
-            "totalMentions": total_mentions,
-        })
+        return ApiResponse(
+            success=True,
+            data={
+                "entityId": entity_id,
+                "entityName": entity.canonical_name,
+                "methodContributions": method_contributions,
+                "mentionsByType": type_mentions,
+                "votingReasoning": voting_reasoning,
+                "overallConfidence": overall_confidence,
+                "totalMentions": total_mentions,
+            },
+        )
 
     except Exception as e:
-        logger.error(f"Error getting coreference info for entity {entity_id}: {e}", exc_info=True)
+        logger.error(
+            f"Error getting coreference info for entity {entity_id}: {e}", exc_info=True
+        )
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
-@router.get("/api/projects/{project_id}/coreference-corrections", response_model=ApiResponse)
+@router.get(
+    "/api/projects/{project_id}/coreference-corrections", response_model=ApiResponse
+)
 async def list_coreference_corrections(project_id: int):
     """Lista todas las correcciones manuales de correferencias de un proyecto."""
     try:
@@ -1327,38 +1547,47 @@ async def list_coreference_corrections(project_id: int):
                    LEFT JOIN entities e_corr ON cc.corrected_entity_id = e_corr.id
                    WHERE cc.project_id = ?
                    ORDER BY cc.created_at DESC""",
-                (project_id,)
+                (project_id,),
             ).fetchall()
 
         corrections = []
         for row in rows:
-            corrections.append({
-                "id": row[0],
-                "mentionStartChar": row[1],
-                "mentionEndChar": row[2],
-                "mentionText": row[3],
-                "chapterNumber": row[4],
-                "originalEntityId": row[5],
-                "correctedEntityId": row[6],
-                "correctionType": row[7],
-                "notes": row[8],
-                "createdAt": row[9],
-                "originalEntityName": row[10],
-                "correctedEntityName": row[11],
-            })
+            corrections.append(
+                {
+                    "id": row[0],
+                    "mentionStartChar": row[1],
+                    "mentionEndChar": row[2],
+                    "mentionText": row[3],
+                    "chapterNumber": row[4],
+                    "originalEntityId": row[5],
+                    "correctedEntityId": row[6],
+                    "correctionType": row[7],
+                    "notes": row[8],
+                    "createdAt": row[9],
+                    "originalEntityName": row[10],
+                    "correctedEntityName": row[11],
+                }
+            )
 
-        return ApiResponse(success=True, data={
-            "projectId": project_id,
-            "corrections": corrections,
-            "totalCorrections": len(corrections),
-        })
+        return ApiResponse(
+            success=True,
+            data={
+                "projectId": project_id,
+                "corrections": corrections,
+                "totalCorrections": len(corrections),
+            },
+        )
     except Exception as e:
         logger.error(f"Error listing coreference corrections: {e}", exc_info=True)
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
-@router.post("/api/projects/{project_id}/coreference-corrections", response_model=ApiResponse)
-async def create_coreference_correction(project_id: int, payload: deps.CoreferenceCorrectionRequest):
+@router.post(
+    "/api/projects/{project_id}/coreference-corrections", response_model=ApiResponse
+)
+async def create_coreference_correction(
+    project_id: int, payload: deps.CoreferenceCorrectionRequest
+):
     """
     Crea una corrección manual de correferencia.
 
@@ -1388,7 +1617,7 @@ async def create_coreference_correction(project_id: int, payload: deps.Coreferen
             existing = conn.execute(
                 """SELECT id FROM coreference_corrections
                    WHERE project_id = ? AND mention_start_char = ? AND mention_end_char = ?""",
-                (project_id, mention_start, mention_end)
+                (project_id, mention_start, mention_end),
             ).fetchone()
 
             if existing:
@@ -1398,7 +1627,7 @@ async def create_coreference_correction(project_id: int, payload: deps.Coreferen
                        SET corrected_entity_id = ?, correction_type = ?, notes = ?,
                            created_at = datetime('now')
                        WHERE id = ?""",
-                    (corrected_entity_id, correction_type, notes, existing[0])
+                    (corrected_entity_id, correction_type, notes, existing[0]),
                 )
                 correction_id = existing[0]
             else:
@@ -1409,9 +1638,17 @@ async def create_coreference_correction(project_id: int, payload: deps.Coreferen
                         chapter_number, original_entity_id, corrected_entity_id,
                         correction_type, notes)
                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                    (project_id, mention_start, mention_end, mention_text,
-                     chapter_number, original_entity_id, corrected_entity_id,
-                     correction_type, notes)
+                    (
+                        project_id,
+                        mention_start,
+                        mention_end,
+                        mention_text,
+                        chapter_number,
+                        original_entity_id,
+                        corrected_entity_id,
+                        correction_type,
+                        notes,
+                    ),
                 )
                 correction_id = cursor.lastrowid
 
@@ -1421,28 +1658,39 @@ async def create_coreference_correction(project_id: int, payload: deps.Coreferen
                     """UPDATE entity_mentions
                        SET entity_id = ?
                        WHERE entity_id = ? AND start_char = ? AND end_char = ?""",
-                    (corrected_entity_id, original_entity_id, mention_start, mention_end)
+                    (
+                        corrected_entity_id,
+                        original_entity_id,
+                        mention_start,
+                        mention_end,
+                    ),
                 )
             elif correction_type == "unlink" and original_entity_id is not None:
                 conn.execute(
                     """DELETE FROM entity_mentions
                        WHERE entity_id = ? AND start_char = ? AND end_char = ?""",
-                    (original_entity_id, mention_start, mention_end)
+                    (original_entity_id, mention_start, mention_end),
                 )
 
             conn.commit()
 
-        return ApiResponse(success=True, data={
-            "correctionId": correction_id,
-            "correctionType": correction_type,
-            "applied": True,
-        })
+        return ApiResponse(
+            success=True,
+            data={
+                "correctionId": correction_id,
+                "correctionType": correction_type,
+                "applied": True,
+            },
+        )
     except Exception as e:
         logger.error(f"Error creating coreference correction: {e}", exc_info=True)
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
-@router.delete("/api/projects/{project_id}/coreference-corrections/{correction_id}", response_model=ApiResponse)
+@router.delete(
+    "/api/projects/{project_id}/coreference-corrections/{correction_id}",
+    response_model=ApiResponse,
+)
 async def delete_coreference_correction(project_id: int, correction_id: int):
     """Elimina una corrección manual de correferencia."""
     try:
@@ -1454,7 +1702,7 @@ async def delete_coreference_correction(project_id: int, correction_id: int):
                           mention_end_char, correction_type
                    FROM coreference_corrections
                    WHERE id = ? AND project_id = ?""",
-                (correction_id, project_id)
+                (correction_id, project_id),
             ).fetchone()
 
             if not row:
@@ -1463,17 +1711,21 @@ async def delete_coreference_correction(project_id: int, correction_id: int):
             original_id, corrected_id, start_char, end_char, corr_type = row
 
             # Revertir: si fue reassign, restaurar entity_id original
-            if corr_type == "reassign" and original_id is not None and corrected_id is not None:
+            if (
+                corr_type == "reassign"
+                and original_id is not None
+                and corrected_id is not None
+            ):
                 conn.execute(
                     """UPDATE entity_mentions
                        SET entity_id = ?
                        WHERE entity_id = ? AND start_char = ? AND end_char = ?""",
-                    (original_id, corrected_id, start_char, end_char)
+                    (original_id, corrected_id, start_char, end_char),
                 )
 
             conn.execute(
                 "DELETE FROM coreference_corrections WHERE id = ? AND project_id = ?",
-                (correction_id, project_id)
+                (correction_id, project_id),
             )
             conn.commit()
 
@@ -1506,7 +1758,7 @@ async def list_rejected_entities(project_id: int):
             WHERE project_id = ?
             ORDER BY created_at DESC
             """,
-            (project_id,)
+            (project_id,),
         )
 
         rejected = [
@@ -1522,7 +1774,10 @@ async def list_rejected_entities(project_id: int):
         return ApiResponse(success=True, data=rejected)
 
     except Exception as e:
-        logger.error(f"Error listing rejected entities for project {project_id}: {e}", exc_info=True)
+        logger.error(
+            f"Error listing rejected entities for project {project_id}: {e}",
+            exc_info=True,
+        )
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
@@ -1542,7 +1797,8 @@ async def reject_entity_text(project_id: int, body: deps.RejectEntityRequest):
         ApiResponse con confirmación
     """
     try:
-        from narrative_assistant.nlp.entity_validator import get_entity_validator
+        from narrative_assistant.nlp.entity_validator import \
+            get_entity_validator
 
         entity_text = body.entity_text.strip()
         reason = body.reason
@@ -1561,30 +1817,41 @@ async def reject_entity_text(project_id: int, body: deps.RejectEntityRequest):
                     SET rejection_reason = ?
                     WHERE project_id = ? AND entity_text = ?
                     """,
-                    (reason, project_id, entity_text.lower().strip())
+                    (reason, project_id, entity_text.lower().strip()),
                 )
 
             # Invalidación granular (S8c)
             try:
                 from routers._invalidation import emit_invalidation_event
-                emit_invalidation_event(deps.get_database(), project_id, "reject", [],
-                                       detail={"entity_text": entity_text})
+
+                emit_invalidation_event(
+                    deps.get_database(),
+                    project_id,
+                    "reject",
+                    [],
+                    detail={"entity_text": entity_text},
+                )
             except Exception:
                 pass
 
             return ApiResponse(
                 success=True,
-                data={"message": f"Entidad '{entity_text}' rechazada correctamente"}
+                data={"message": f"Entidad '{entity_text}' rechazada correctamente"},
             )
         else:
             return ApiResponse(success=False, error="Error al rechazar entidad")
 
     except Exception as e:
-        logger.error(f"Error rejecting entity for project {project_id}: {e}", exc_info=True)
+        logger.error(
+            f"Error rejecting entity for project {project_id}: {e}", exc_info=True
+        )
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
-@router.delete("/api/projects/{project_id}/entities/reject/{entity_text}", response_model=ApiResponse)
+@router.delete(
+    "/api/projects/{project_id}/entities/reject/{entity_text}",
+    response_model=ApiResponse,
+)
 async def unreject_entity_text(project_id: int, entity_text: str):
     """
     Quita un texto de entidad de la lista de rechazadas.
@@ -1599,7 +1866,8 @@ async def unreject_entity_text(project_id: int, entity_text: str):
         ApiResponse con confirmación
     """
     try:
-        from narrative_assistant.nlp.entity_validator import get_entity_validator
+        from narrative_assistant.nlp.entity_validator import \
+            get_entity_validator
 
         if not entity_text:
             return ApiResponse(success=False, error="entity_text es requerido")
@@ -1611,13 +1879,17 @@ async def unreject_entity_text(project_id: int, entity_text: str):
         if success:
             return ApiResponse(
                 success=True,
-                data={"message": f"Entidad '{entity_text}' restaurada correctamente"}
+                data={"message": f"Entidad '{entity_text}' restaurada correctamente"},
             )
         else:
-            return ApiResponse(success=False, error="Entidad no encontrada en lista de rechazadas")
+            return ApiResponse(
+                success=False, error="Entidad no encontrada en lista de rechazadas"
+            )
 
     except Exception as e:
-        logger.error(f"Error unrejecting entity for project {project_id}: {e}", exc_info=True)
+        logger.error(
+            f"Error unrejecting entity for project {project_id}: {e}", exc_info=True
+        )
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
@@ -1672,39 +1944,46 @@ async def list_system_patterns(language: str = "es", only_active: bool = False):
             cat = pattern.category or "other"
             if cat not in by_category:
                 by_category[cat] = []
-            by_category[cat].append({
-                "id": pattern.id,
-                "pattern": pattern.pattern,
-                "patternType": pattern.pattern_type.value,
-                "entityType": pattern.entity_type,
-                "description": pattern.description,
-                "isActive": pattern.is_active,
-            })
-
-        return ApiResponse(success=True, data={
-            "patterns": [
+            by_category[cat].append(
                 {
-                    "id": p.id,
-                    "pattern": p.pattern,
-                    "patternType": p.pattern_type.value,
-                    "entityType": p.entity_type,
-                    "category": p.category,
-                    "description": p.description,
-                    "isActive": p.is_active,
+                    "id": pattern.id,
+                    "pattern": pattern.pattern,
+                    "patternType": pattern.pattern_type.value,
+                    "entityType": pattern.entity_type,
+                    "description": pattern.description,
+                    "isActive": pattern.is_active,
                 }
-                for p in patterns
-            ],
-            "byCategory": by_category,
-            "totalCount": len(patterns),
-            "activeCount": sum(1 for p in patterns if p.is_active),
-        })
+            )
+
+        return ApiResponse(
+            success=True,
+            data={
+                "patterns": [
+                    {
+                        "id": p.id,
+                        "pattern": p.pattern,
+                        "patternType": p.pattern_type.value,
+                        "entityType": p.entity_type,
+                        "category": p.category,
+                        "description": p.description,
+                        "isActive": p.is_active,
+                    }
+                    for p in patterns
+                ],
+                "byCategory": by_category,
+                "totalCount": len(patterns),
+                "activeCount": sum(1 for p in patterns if p.is_active),
+            },
+        )
 
     except Exception as e:
         logger.error(f"Error listing system patterns: {e}", exc_info=True)
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
-@router.patch("/api/entity-filters/system-patterns/{pattern_id}", response_model=ApiResponse)
+@router.patch(
+    "/api/entity-filters/system-patterns/{pattern_id}", response_model=ApiResponse
+)
 async def toggle_system_pattern(pattern_id: int, body: deps.TogglePatternRequest):
     """
     Activa o desactiva un patrón del sistema.
@@ -1727,7 +2006,9 @@ async def toggle_system_pattern(pattern_id: int, body: deps.TogglePatternRequest
         if success:
             return ApiResponse(
                 success=True,
-                data={"message": f"Patrón {'activado' if is_active else 'desactivado'} correctamente"}
+                data={
+                    "message": f"Patrón {'activado' if is_active else 'desactivado'} correctamente"
+                },
             )
         else:
             return ApiResponse(success=False, error="Patrón no encontrado")
@@ -1754,16 +2035,19 @@ async def list_user_rejections():
         repo = get_filter_repository()
         rejections = repo.get_user_rejections()
 
-        return ApiResponse(success=True, data=[
-            {
-                "id": r.id,
-                "entityName": r.entity_name,
-                "entityType": r.entity_type,
-                "reason": r.reason,
-                "rejectedAt": r.rejected_at,
-            }
-            for r in rejections
-        ])
+        return ApiResponse(
+            success=True,
+            data=[
+                {
+                    "id": r.id,
+                    "entityName": r.entity_name,
+                    "entityType": r.entity_type,
+                    "reason": r.reason,
+                    "rejectedAt": r.rejected_at,
+                }
+                for r in rejections
+            ],
+        )
 
     except Exception as e:
         logger.error(f"Error listing user rejections: {e}", exc_info=True)
@@ -1797,8 +2081,8 @@ async def add_user_rejection(body: deps.UserRejectionRequest):
             success=True,
             data={
                 "id": rejection_id,
-                "message": f"Entidad '{entity_name}' añadida a filtros globales"
-            }
+                "message": f"Entidad '{entity_name}' añadida a filtros globales",
+            },
         )
 
     except Exception as e:
@@ -1806,7 +2090,9 @@ async def add_user_rejection(body: deps.UserRejectionRequest):
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
-@router.delete("/api/entity-filters/user-rejections/{rejection_id}", response_model=ApiResponse)
+@router.delete(
+    "/api/entity-filters/user-rejections/{rejection_id}", response_model=ApiResponse
+)
 async def remove_user_rejection(rejection_id: int):
     """
     Elimina un rechazo global del usuario.
@@ -1826,7 +2112,7 @@ async def remove_user_rejection(rejection_id: int):
         db = deps.get_database()
         row = db.fetchone(
             "SELECT entity_name, entity_type FROM user_rejected_entities WHERE id = ?",
-            (rejection_id,)
+            (rejection_id,),
         )
 
         if not row:
@@ -1837,18 +2123,21 @@ async def remove_user_rejection(rejection_id: int):
 
         if success:
             return ApiResponse(
-                success=True,
-                data={"message": "Rechazo eliminado correctamente"}
+                success=True, data={"message": "Rechazo eliminado correctamente"}
             )
         else:
             return ApiResponse(success=False, error="Error eliminando rechazo")
 
     except Exception as e:
-        logger.error(f"Error removing user rejection {rejection_id}: {e}", exc_info=True)
+        logger.error(
+            f"Error removing user rejection {rejection_id}: {e}", exc_info=True
+        )
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
-@router.get("/api/projects/{project_id}/entity-filters/overrides", response_model=ApiResponse)
+@router.get(
+    "/api/projects/{project_id}/entity-filters/overrides", response_model=ApiResponse
+)
 async def list_project_overrides(project_id: int):
     """
     Lista los overrides de entidades de un proyecto.
@@ -1869,24 +2158,31 @@ async def list_project_overrides(project_id: int):
         repo = get_filter_repository()
         overrides = repo.get_project_overrides(project_id)
 
-        return ApiResponse(success=True, data=[
-            {
-                "id": o.id,
-                "entityName": o.entity_name,
-                "entityType": o.entity_type,
-                "action": o.action.value,
-                "reason": o.reason,
-                "createdAt": o.created_at,
-            }
-            for o in overrides
-        ])
+        return ApiResponse(
+            success=True,
+            data=[
+                {
+                    "id": o.id,
+                    "entityName": o.entity_name,
+                    "entityType": o.entity_type,
+                    "action": o.action.value,
+                    "reason": o.reason,
+                    "createdAt": o.created_at,
+                }
+                for o in overrides
+            ],
+        )
 
     except Exception as e:
-        logger.error(f"Error listing project overrides for {project_id}: {e}", exc_info=True)
+        logger.error(
+            f"Error listing project overrides for {project_id}: {e}", exc_info=True
+        )
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
-@router.post("/api/projects/{project_id}/entity-filters/overrides", response_model=ApiResponse)
+@router.post(
+    "/api/projects/{project_id}/entity-filters/overrides", response_model=ApiResponse
+)
 async def add_project_override(project_id: int, body: deps.ProjectOverrideRequest):
     """
     Añade un override de entidad para un proyecto.
@@ -1900,7 +2196,8 @@ async def add_project_override(project_id: int, body: deps.ProjectOverrideReques
         ApiResponse con confirmación
     """
     try:
-        from narrative_assistant.entities.filters import FilterAction, get_filter_repository
+        from narrative_assistant.entities.filters import (
+            FilterAction, get_filter_repository)
 
         entity_name = body.entity_name.strip()
         action = body.action
@@ -1913,24 +2210,31 @@ async def add_project_override(project_id: int, body: deps.ProjectOverrideReques
             entity_name=entity_name,
             action=FilterAction(action),
             entity_type=entity_type,
-            reason=reason
+            reason=reason,
         )
 
-        action_text = "rechazada en este proyecto" if action == "reject" else "forzada a incluir"
+        action_text = (
+            "rechazada en este proyecto" if action == "reject" else "forzada a incluir"
+        )
         return ApiResponse(
             success=True,
             data={
                 "id": override_id,
-                "message": f"Entidad '{entity_name}' {action_text}"
-            }
+                "message": f"Entidad '{entity_name}' {action_text}",
+            },
         )
 
     except Exception as e:
-        logger.error(f"Error adding project override for {project_id}: {e}", exc_info=True)
+        logger.error(
+            f"Error adding project override for {project_id}: {e}", exc_info=True
+        )
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
-@router.delete("/api/projects/{project_id}/entity-filters/overrides/{override_id}", response_model=ApiResponse)
+@router.delete(
+    "/api/projects/{project_id}/entity-filters/overrides/{override_id}",
+    response_model=ApiResponse,
+)
 async def remove_project_override(project_id: int, override_id: int):
     """
     Elimina un override de entidad de un proyecto.
@@ -1950,25 +2254,28 @@ async def remove_project_override(project_id: int, override_id: int):
         row = db.fetchone(
             """SELECT entity_name, entity_type FROM project_entity_overrides
                WHERE id = ? AND project_id = ?""",
-            (override_id, project_id)
+            (override_id, project_id),
         )
 
         if not row:
             return ApiResponse(success=False, error="Override no encontrado")
 
         repo = get_filter_repository()
-        success = repo.remove_project_override(project_id, row["entity_name"], row["entity_type"])
+        success = repo.remove_project_override(
+            project_id, row["entity_name"], row["entity_type"]
+        )
 
         if success:
             return ApiResponse(
-                success=True,
-                data={"message": "Override eliminado correctamente"}
+                success=True, data={"message": "Override eliminado correctamente"}
             )
         else:
             return ApiResponse(success=False, error="Error eliminando override")
 
     except Exception as e:
-        logger.error(f"Error removing project override {override_id}: {e}", exc_info=True)
+        logger.error(
+            f"Error removing project override {override_id}: {e}", exc_info=True
+        )
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
@@ -1996,19 +2303,25 @@ async def check_entity_filter(body: deps.CheckFilterRequest):
         repo = get_filter_repository()
         decision = repo.should_filter_entity(entity_name, entity_type, project_id)
 
-        return ApiResponse(success=True, data={
-            "shouldFilter": decision.should_filter,
-            "reason": decision.reason,
-            "level": decision.level,
-            "ruleId": decision.rule_id,
-        })
+        return ApiResponse(
+            success=True,
+            data={
+                "shouldFilter": decision.should_filter,
+                "reason": decision.reason,
+                "level": decision.level,
+                "ruleId": decision.rule_id,
+            },
+        )
 
     except Exception as e:
         logger.error(f"Error checking entity filter: {e}", exc_info=True)
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
-@router.get("/api/projects/{project_id}/entities/{entity_id}/attributes", response_model=ApiResponse)
+@router.get(
+    "/api/projects/{project_id}/entities/{entity_id}/attributes",
+    response_model=ApiResponse,
+)
 async def list_entity_attributes(project_id: int, entity_id: int):
     """
     Lista todos los atributos de una entidad.
@@ -2034,12 +2347,19 @@ async def list_entity_attributes(project_id: int, entity_id: int):
         return ApiResponse(success=True, data=attributes)
 
     except Exception as e:
-        logger.error(f"Error listing attributes for entity {entity_id}: {e}", exc_info=True)
+        logger.error(
+            f"Error listing attributes for entity {entity_id}: {e}", exc_info=True
+        )
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
-@router.post("/api/projects/{project_id}/entities/{entity_id}/attributes", response_model=ApiResponse)
-async def create_entity_attribute(project_id: int, entity_id: int, body: deps.CreateAttributeRequest):
+@router.post(
+    "/api/projects/{project_id}/entities/{entity_id}/attributes",
+    response_model=ApiResponse,
+)
+async def create_entity_attribute(
+    project_id: int, entity_id: int, body: deps.CreateAttributeRequest
+):
     """
     Crea un nuevo atributo para una entidad.
 
@@ -2074,13 +2394,21 @@ async def create_entity_attribute(project_id: int, entity_id: int, body: deps.Cr
             confidence=confidence,
         )
 
-        logger.info(f"Created attribute {attribute_id} for entity {entity_id}: {name}={value}")
+        logger.info(
+            f"Created attribute {attribute_id} for entity {entity_id}: {name}={value}"
+        )
 
         # Invalidación granular (S8c)
         try:
             from routers._invalidation import emit_invalidation_event
-            emit_invalidation_event(deps.get_database(), project_id, "attribute_create", [entity_id],
-                                   detail={"attribute": name, "value": value})
+
+            emit_invalidation_event(
+                deps.get_database(),
+                project_id,
+                "attribute_create",
+                [entity_id],
+                detail={"attribute": name, "value": value},
+            )
         except Exception:
             pass
 
@@ -2094,16 +2422,26 @@ async def create_entity_attribute(project_id: int, entity_id: int, body: deps.Cr
                 "value": value,
                 "confidence": confidence,
             },
-            message="Atributo creado correctamente"
+            message="Atributo creado correctamente",
         )
 
     except Exception as e:
-        logger.error(f"Error creating attribute for entity {entity_id}: {e}", exc_info=True)
+        logger.error(
+            f"Error creating attribute for entity {entity_id}: {e}", exc_info=True
+        )
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
-@router.put("/api/projects/{project_id}/entities/{entity_id}/attributes/{attribute_id}", response_model=ApiResponse)
-async def update_entity_attribute(project_id: int, entity_id: int, attribute_id: int, body: deps.UpdateAttributeRequest):
+@router.put(
+    "/api/projects/{project_id}/entities/{entity_id}/attributes/{attribute_id}",
+    response_model=ApiResponse,
+)
+async def update_entity_attribute(
+    project_id: int,
+    entity_id: int,
+    attribute_id: int,
+    body: deps.UpdateAttributeRequest,
+):
     """
     Actualiza un atributo existente.
 
@@ -2140,15 +2478,21 @@ async def update_entity_attribute(project_id: int, entity_id: int, attribute_id:
         # Invalidación granular (S8c)
         try:
             from routers._invalidation import emit_invalidation_event
-            emit_invalidation_event(deps.get_database(), project_id, "attribute_edit", [entity_id],
-                                   detail={"attribute_id": attribute_id})
+
+            emit_invalidation_event(
+                deps.get_database(),
+                project_id,
+                "attribute_edit",
+                [entity_id],
+                detail={"attribute_id": attribute_id},
+            )
         except Exception:
             pass
 
         return ApiResponse(
             success=True,
             data={"id": attribute_id},
-            message="Atributo actualizado correctamente"
+            message="Atributo actualizado correctamente",
         )
 
     except Exception as e:
@@ -2156,7 +2500,10 @@ async def update_entity_attribute(project_id: int, entity_id: int, attribute_id:
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
-@router.delete("/api/projects/{project_id}/entities/{entity_id}/attributes/{attribute_id}", response_model=ApiResponse)
+@router.delete(
+    "/api/projects/{project_id}/entities/{entity_id}/attributes/{attribute_id}",
+    response_model=ApiResponse,
+)
 async def delete_entity_attribute(project_id: int, entity_id: int, attribute_id: int):
     """
     Elimina un atributo.
@@ -2188,15 +2535,21 @@ async def delete_entity_attribute(project_id: int, entity_id: int, attribute_id:
         # Invalidación granular (S8c)
         try:
             from routers._invalidation import emit_invalidation_event
-            emit_invalidation_event(deps.get_database(), project_id, "attribute_delete", [entity_id],
-                                   detail={"attribute_id": attribute_id})
+
+            emit_invalidation_event(
+                deps.get_database(),
+                project_id,
+                "attribute_delete",
+                [entity_id],
+                detail={"attribute_id": attribute_id},
+            )
         except Exception:
             pass
 
         return ApiResponse(
             success=True,
             data={"id": attribute_id},
-            message="Atributo eliminado correctamente"
+            message="Atributo eliminado correctamente",
         )
 
     except Exception as e:
@@ -2204,3 +2557,116 @@ async def delete_entity_attribute(project_id: int, entity_id: int, attribute_id:
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
+# ===== Glosario de usuario (BK-17) =====
+
+
+@router.get("/api/projects/{project_id}/glossary", response_model=ApiResponse)
+async def list_glossary(project_id: int):
+    """Lista todos los términos del glosario de un proyecto."""
+    try:
+        from narrative_assistant.persistence.database import get_database
+
+        db = get_database()
+        with db.connection() as conn:
+            rows = conn.execute(
+                "SELECT id, term, entity_type, confidence, created_at "
+                "FROM user_glossary WHERE project_id = ? ORDER BY term",
+                (project_id,),
+            ).fetchall()
+
+        entries = [
+            {
+                "id": r[0],
+                "term": r[1],
+                "entity_type": r[2],
+                "confidence": r[3],
+                "created_at": r[4],
+            }
+            for r in rows
+        ]
+        return ApiResponse(success=True, data=entries)
+
+    except Exception as e:
+        logger.error(f"Error listing glossary: {e}", exc_info=True)
+        return ApiResponse(success=False, error="Error interno del servidor")
+
+
+@router.post("/api/projects/{project_id}/glossary", response_model=ApiResponse)
+async def add_glossary_term(project_id: int, body: dict):
+    """
+    Añade un término al glosario.
+
+    Body: {"term": "Winterfell", "entity_type": "LOC", "confidence": 1.0}
+    """
+    try:
+        term = body.get("term", "").strip()
+        entity_type = body.get("entity_type", "PER").upper()
+        confidence = float(body.get("confidence", 1.0))
+
+        if not term or len(term) < 2:
+            return ApiResponse(
+                success=False, error="El término debe tener al menos 2 caracteres"
+            )
+
+        if entity_type not in ("PER", "LOC", "ORG", "MISC"):
+            return ApiResponse(
+                success=False, error="entity_type debe ser PER, LOC, ORG o MISC"
+            )
+
+        from narrative_assistant.persistence.database import get_database
+
+        db = get_database()
+        with db.connection() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO user_glossary (project_id, term, entity_type, confidence) "
+                "VALUES (?, ?, ?, ?)",
+                (project_id, term, entity_type, confidence),
+            )
+            conn.commit()
+            row = conn.execute(
+                "SELECT id FROM user_glossary WHERE project_id = ? AND term = ? AND entity_type = ?",
+                (project_id, term, entity_type),
+            ).fetchone()
+
+        return ApiResponse(
+            success=True,
+            data={
+                "id": row[0],
+                "term": term,
+                "entity_type": entity_type,
+                "confidence": confidence,
+            },
+            message=f"Término '{term}' añadido al glosario",
+        )
+
+    except Exception as e:
+        logger.error(f"Error adding glossary term: {e}", exc_info=True)
+        return ApiResponse(success=False, error="Error interno del servidor")
+
+
+@router.delete(
+    "/api/projects/{project_id}/glossary/{entry_id}", response_model=ApiResponse
+)
+async def delete_glossary_term(project_id: int, entry_id: int):
+    """Elimina un término del glosario."""
+    try:
+        from narrative_assistant.persistence.database import get_database
+
+        db = get_database()
+        with db.connection() as conn:
+            result = conn.execute(
+                "DELETE FROM user_glossary WHERE id = ? AND project_id = ?",
+                (entry_id, project_id),
+            )
+            conn.commit()
+
+        if result.rowcount == 0:
+            return ApiResponse(success=False, error="Término no encontrado")
+
+        return ApiResponse(
+            success=True, data={"id": entry_id}, message="Término eliminado"
+        )
+
+    except Exception as e:
+        logger.error(f"Error deleting glossary term: {e}", exc_info=True)
+        return ApiResponse(success=False, error="Error interno del servidor")

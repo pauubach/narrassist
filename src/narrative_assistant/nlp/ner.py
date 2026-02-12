@@ -162,9 +162,7 @@ class NERExtractionError(NLPError):
 
     def __post_init__(self):
         self.message = f"NER extraction error: {self.original_error}"
-        self.user_message = (
-            "Error al extraer entidades del texto. Se continuará con los resultados parciales."
-        )
+        self.user_message = "Error al extraer entidades del texto. Se continuará con los resultados parciales."
         super().__post_init__()
 
 
@@ -273,7 +271,9 @@ class NERExtractor(NERValidatorMixin, NERPatternDetectorMixin, NERCoordSplitterM
 
                 self._llm_client = get_llm_client()
                 if self._llm_client and self._llm_client.is_available:
-                    logger.info(f"LLM disponible para NER: {self._llm_client.model_name}")
+                    logger.info(
+                        f"LLM disponible para NER: {self._llm_client.model_name}"
+                    )
                 else:
                     self._llm_client = False
             except Exception as e:
@@ -367,7 +367,9 @@ class NERExtractor(NERValidatorMixin, NERPatternDetectorMixin, NERCoordSplitterM
                     label=label,
                     start_char=ent.start,
                     end_char=ent.end,
-                    confidence=min(ent.score, 0.95),  # Cap: transformer tiende a dar >0.99
+                    confidence=min(
+                        ent.score, 0.95
+                    ),  # Cap: transformer tiende a dar >0.99
                     source="roberta",
                 )
                 result.append(entity)
@@ -593,7 +595,9 @@ JSON:"""
         if not low_confidence:
             return entities
 
-        logger.info(f"Verificando {len(low_confidence)} entidades de baja confianza con LLM")
+        logger.info(
+            f"Verificando {len(low_confidence)} entidades de baja confianza con LLM"
+        )
 
         # Preparar contexto para cada entidad dudosa
         entities_to_verify = []
@@ -695,7 +699,100 @@ JSON:"""
             # En caso de error, mantener todas las entidades
             return entities
 
-    def _postprocess_misc_entities(self, entities: list[ExtractedEntity]) -> list[ExtractedEntity]:
+    def _inject_glossary_entities(
+        self,
+        text: str,
+        project_id: int,
+        existing_entities: list[ExtractedEntity],
+        entities_found: set[tuple[int, int]],
+    ) -> list[ExtractedEntity]:
+        """
+        Inyecta entidades del glosario de usuario en los resultados NER.
+
+        El glosario tiene prioridad sobre spaCy: confidence=1.0.
+        Ordenamos por longitud descendente para que "House Stark" se busque
+        antes que "Stark".
+
+        Args:
+            text: Texto completo
+            project_id: ID del proyecto
+            existing_entities: Entidades ya detectadas
+            entities_found: Set de posiciones ya ocupadas
+
+        Returns:
+            Entidades del glosario encontradas
+        """
+        import re
+
+        try:
+            from ..persistence.database import get_database
+
+            db = get_database()
+            with db.connection() as conn:
+                rows = conn.execute(
+                    "SELECT term, entity_type, confidence FROM user_glossary WHERE project_id = ?",
+                    (project_id,),
+                ).fetchall()
+        except Exception as e:
+            logger.debug(f"No se pudo leer glosario: {e}")
+            return []
+
+        if not rows:
+            return []
+
+        # Ordenar por longitud descendente (match más largo primero)
+        rows = sorted(rows, key=lambda r: len(r[0]), reverse=True)
+
+        glossary_entities: list[ExtractedEntity] = []
+
+        for term, entity_type_str, confidence in rows:
+            try:
+                label = EntityLabel(entity_type_str)
+            except ValueError:
+                label = EntityLabel.PER
+
+            # Búsqueda case-insensitive con word boundaries
+            pattern = re.compile(r"\b" + re.escape(term) + r"\b", re.IGNORECASE)
+            for match in pattern.finditer(text):
+                start, end = match.start(), match.end()
+                pos = (start, end)
+
+                # Verificar que no solape con entidad existente
+                overlaps = False
+                for ex_start, ex_end in entities_found:
+                    if start < ex_end and end > ex_start:
+                        overlaps = True
+                        break
+
+                if overlaps:
+                    continue
+
+                entity = ExtractedEntity(
+                    text=text[start:end],
+                    label=label,
+                    start_char=start,
+                    end_char=end,
+                    confidence=confidence,
+                    source="glossary",
+                )
+                glossary_entities.append(entity)
+                entities_found.add(pos)
+
+                # Alimentar gazetteer dinámico
+                canonical = entity.canonical_form
+                if canonical:
+                    with self._gazetteer_lock:
+                        if len(self.dynamic_gazetteer) < MAX_GAZETTEER_SIZE:
+                            self.dynamic_gazetteer[canonical] = label
+
+        if glossary_entities:
+            logger.info(f"Glosario: {len(glossary_entities)} entidades inyectadas")
+
+        return glossary_entities
+
+    def _postprocess_misc_entities(
+        self, entities: list[ExtractedEntity]
+    ) -> list[ExtractedEntity]:
         """
         Post-procesa entidades MISC para filtrar errores y reclasificar.
 
@@ -843,17 +940,23 @@ JSON:"""
                         ctx_doc = self.nlp(ctx_text)
                         # Heurística simple: si el propio texto empieza con mayúscula
                         # y no tiene indicadores de lugar, asumir persona
-                        is_person = morpho_utils.is_person_context(ctx_doc, 0, len(ctx_text))
+                        is_person = morpho_utils.is_person_context(
+                            ctx_doc, 0, len(ctx_text)
+                        )
                 except Exception:
                     is_person = True  # Default: asumir persona
 
                 if is_person:
                     entity.label = EntityLabel.PER
                     entity.source = f"{entity.source}+reclassified"
-                    logger.debug(f"MISC reclasificado a PER (apellido): '{entity.text}'")
+                    logger.debug(
+                        f"MISC reclasificado a PER (apellido): '{entity.text}'"
+                    )
                     reclassified_count += 1
                 else:
-                    logger.debug(f"MISC no reclasificado (contexto no es persona): '{entity.text}'")
+                    logger.debug(
+                        f"MISC no reclasificado (contexto no es persona): '{entity.text}'"
+                    )
                 result.append(entity)
                 continue
 
@@ -866,7 +969,9 @@ JSON:"""
                 if has_surname:
                     entity.label = EntityLabel.PER
                     entity.source = f"{entity.source}+reclassified_fullname"
-                    logger.debug(f"MISC reclasificado a PER (nombre completo): '{entity.text}'")
+                    logger.debug(
+                        f"MISC reclasificado a PER (nombre completo): '{entity.text}'"
+                    )
                     reclassified_count += 1
                     result.append(entity)
                     continue
@@ -932,7 +1037,9 @@ JSON:"""
             return Result.success(NERResult(processed_chars=0))
 
         result = NERResult(processed_chars=len(text))
-        entities_found: set[tuple[int, int]] = set()  # (start, end) para evitar duplicados
+        entities_found: set[tuple[int, int]] = (
+            set()
+        )  # (start, end) para evitar duplicados
 
         def report_progress(fase: str, pct: float, msg: str):
             """Helper para reportar progreso si hay callback."""
@@ -943,13 +1050,24 @@ JSON:"""
                     logger.debug(f"Error en callback de progreso: {e}")
 
         try:
+            # -1. Inyección de glosario de usuario (máxima prioridad, confidence=1.0)
+            if project_id is not None:
+                glossary_entities = self._inject_glossary_entities(
+                    text, project_id, result.entities, entities_found
+                )
+                result.entities.extend(glossary_entities)
+
             # 0. Preprocesamiento con LLM (si habilitado)
             llm_entities: list[ExtractedEntity] = []
             if self.use_llm_preprocessing:
                 report_progress("ner", 0.0, "Analizando el texto...")
                 llm_entities = self._preprocess_with_llm(text)
-                report_progress("ner", 0.3, f"Encontrados {len(llm_entities)} posibles nombres...")
-                logger.info(f"LLM preprocesador: {len(llm_entities)} entidades detectadas")
+                report_progress(
+                    "ner", 0.3, f"Encontrados {len(llm_entities)} posibles nombres..."
+                )
+                logger.info(
+                    f"LLM preprocesador: {len(llm_entities)} entidades detectadas"
+                )
 
                 # Añadir entidades del LLM primero (tienen prioridad)
                 for entity in llm_entities:
@@ -970,8 +1088,10 @@ JSON:"""
                         overlaps = False
                         for llm_ent in llm_entities:
                             if self._entities_overlap(
-                                entity.start_char, entity.end_char,
-                                llm_ent.start_char, llm_ent.end_char,
+                                entity.start_char,
+                                entity.end_char,
+                                llm_ent.start_char,
+                                llm_ent.end_char,
                             ):
                                 overlaps = True
                                 break
@@ -992,7 +1112,9 @@ JSON:"""
                                     and ent.canonical_form
                                     and len(self.dynamic_gazetteer) < MAX_GAZETTEER_SIZE
                                 ):
-                                    self.dynamic_gazetteer[ent.canonical_form] = ent.label
+                                    self.dynamic_gazetteer[ent.canonical_form] = (
+                                        ent.label
+                                    )
 
             report_progress("ner", 0.4, "Buscando personajes y lugares...")
             doc = self.nlp(text)
@@ -1029,8 +1151,10 @@ JSON:"""
                 overlaps_prior = False
                 for prior_ent in llm_entities + transformer_entities:
                     if self._entities_overlap(
-                        ent.start_char, ent.end_char,
-                        prior_ent.start_char, prior_ent.end_char,
+                        ent.start_char,
+                        ent.end_char,
+                        prior_ent.start_char,
+                        prior_ent.end_char,
                     ):
                         overlaps_prior = True
                         break
@@ -1049,7 +1173,9 @@ JSON:"""
                     ent.text, label, context, entity_pos_in_ctx
                 )
                 if is_fp:
-                    logger.debug(f"Entidad filtrada por morfología: '{ent.text}' - {fp_reason}")
+                    logger.debug(
+                        f"Entidad filtrada por morfología: '{ent.text}' - {fp_reason}"
+                    )
                     continue
 
                 entity = ExtractedEntity(
@@ -1075,8 +1201,12 @@ JSON:"""
 
             # 2. Detección heurística (gazetteer dinámico)
             if self.enable_gazetteer:
-                report_progress("ner", 0.80, "Buscando más apariciones de nombres conocidos...")
-                gazetteer_entities = self._detect_gazetteer_entities(doc, entities_found)
+                report_progress(
+                    "ner", 0.80, "Buscando más apariciones de nombres conocidos..."
+                )
+                gazetteer_entities = self._detect_gazetteer_entities(
+                    doc, entities_found
+                )
                 result.entities.extend(gazetteer_entities)
 
                 # Registrar candidatos para el gazetteer
@@ -1136,7 +1266,8 @@ JSON:"""
                 result.entities = validation_result.valid_entities
                 result.rejected_entities = validation_result.rejected_entities
                 result.validation_scores = {
-                    text: score.to_dict() for text, score in validation_result.scores.items()
+                    text: score.to_dict()
+                    for text, score in validation_result.scores.items()
                 }
                 result.validation_method = validation_result.validation_method
 
@@ -1560,7 +1691,9 @@ Si no hay personajes implícitos, responde: NINGUNO"""
                     break
 
                 entity = ExtractedEntity(
-                    text=text[pos : pos + len(mention_text)],  # Usar capitalización original
+                    text=text[
+                        pos : pos + len(mention_text)
+                    ],  # Usar capitalización original
                     label=EntityLabel.PER,  # Personaje
                     start_char=pos,
                     end_char=pos + len(mention_text),

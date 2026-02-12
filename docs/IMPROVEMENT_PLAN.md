@@ -1089,7 +1089,7 @@ NO propagar invalidacion downstream. Comparar `output_hash` antes vs despues.
 | BK-14 | Ubicaciones jerárquicas/anidadas | **P2** — Nada implementado. `character_location.py` usa comparación flat de strings. |
 | BK-15 | Emotional masking no modelado | **DONE** — `_check_emotional_masking()` en `out_of_character.py`, 7 familias verbales, leakage físico. 6 tests en `test_ooc_masking.py`. |
 | BK-16 | Hilos narrativos sin resolver (Chekhov's gun) | **P2** — Parcial: `ChekhovElement` dataclass y `_detect_chekhov_elements()` en `chapter_summary.py` funcionan para **objetos/vehicles**. `_check_chekhov()` en `narrative_health.py` integrado en health report. Falta extensión a **personajes** SUPPORTING abandonados. |
-| BK-17 | Glossary → entity disambiguation | **P3** — Nada implementado. |
+| BK-17 | Glossary → entity disambiguation | **DONE** — `user_glossary` table (v20), `_inject_glossary_entities()` en NER pipeline, CRUD API endpoints. 6 tests en `test_glossary_ner.py`. |
 | BK-18 | Confidence decay para inferencias stale | **P3** — Nada implementado. `calibration_factor` de BK-22 (S8c) existe como punto de enganche. |
 | ~~BK-19~~ | ~~UI "Añadir/editar atributo" en EntitiesTab~~ | ✅ DONE — Inline add/edit/delete en EntitiesTab. Formulario con categoria, nombre, valor, confianza auto 1.0 (commit b326317, Sprint PP-2) |
 | ~~BK-20~~ | ~~UI "Corregir hablante" en DialogueAttributionPanel~~ | ✅ DONE — Boton "Corregir" en cada dialogo, dropdown con entidades del capitulo, POST a speaker_corrections (commit 8b52e80, Sprint PP-2) |
@@ -1171,9 +1171,9 @@ collection_entity_links UNIQUE, self-relationships cleanup).
 - `src/narrative_assistant/analysis/out_of_character.py` — Constantes + método + integración
 - `tests/unit/test_ooc_masking.py` — 6 tests (fingió calma, disimulando, aparentaba+temblaba, normal shift, no-maskable emotion, masking lejos del personaje)
 
-#### BK-17: Glosario → Gazetteer NER [HIGH, 4-5h]
+#### BK-17: Glosario → Gazetteer NER [HIGH, 4-5h] ✅ DONE
 
-> **Ya existe**: Nada. No hay tabla `user_glossary` ni inyección en NER pipeline.
+> **Implementado**: `user_glossary` table (schema v20), `_inject_glossary_entities()` en NER pipeline, CRUD API. 6 tests.
 
 **Problema**: Términos de usuario (fantasía, sci-fi, dominios específicos) no se inyectan en NER. "Winterfell" no se detecta como location porque spaCy no lo conoce.
 
