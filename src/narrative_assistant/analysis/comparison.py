@@ -196,6 +196,31 @@ class ComparisonService:
                 except Exception as e:
                     logger.warning(f"Content diff failed (non-fatal): {e}")
 
+            # === TRACK CHANGES (S14 Phase 4) ===
+            docx_del_ranges: list[tuple[int, int]] = []
+            try:
+                doc_path_row = conn.execute(
+                    "SELECT document_path FROM projects WHERE id = ?",
+                    (project_id,),
+                ).fetchone()
+                if doc_path_row and doc_path_row[0]:
+                    from pathlib import Path as _Path
+                    doc_path = _Path(doc_path_row[0])
+                    if doc_path.suffix.lower() == ".docx" and doc_path.exists():
+                        from ..parsers.docx_revisions import (
+                            get_deletion_char_ranges,
+                            parse_docx_revisions,
+                        )
+                        revisions = parse_docx_revisions(doc_path)
+                        if revisions.has_revisions:
+                            docx_del_ranges = get_deletion_char_ranges(revisions)
+                            logger.info(
+                                f"Track changes: {revisions.total_changes} revisions, "
+                                f"{len(docx_del_ranges)} deletion ranges"
+                            )
+            except Exception as e:
+                logger.debug(f"Track changes parsing skipped: {e}")
+
             # === ALERTAS ===
             old_alerts = snapshot_repo.get_snapshot_alerts(snapshot.snapshot_id)
             current_alerts = conn.execute(
@@ -207,7 +232,9 @@ class ComparisonService:
             ).fetchall()
 
             alerts_new, alerts_resolved, alerts_unchanged = self._diff_alerts(
-                old_alerts, current_alerts, conn, doc_diff=doc_diff
+                old_alerts, current_alerts, conn,
+                doc_diff=doc_diff,
+                docx_del_ranges=docx_del_ranges,
             )
 
             # === ENTIDADES ===
@@ -336,12 +363,16 @@ class ComparisonService:
         logger.info(f"Alert linking: {links_written} links written for project {project_id}")
         return links_written
 
-    def _diff_alerts(self, old_alerts, current_alerts_rows, conn, doc_diff=None) -> tuple:
+    def _diff_alerts(
+        self, old_alerts, current_alerts_rows, conn,
+        doc_diff=None, docx_del_ranges: list[tuple[int, int]] | None = None,
+    ) -> tuple:
         """
-        Three-pass alert matching:
+        Four-pass alert matching:
         1. Exact content_hash match
         2. Fuzzy match on (alert_type, chapter, entity_names)
         3. Proximity matching with content diff (S14)
+        4. Track changes: w:del ranges from .docx (S14 Phase 4)
         """
         # Build current alert dicts
         current = []
@@ -446,6 +477,21 @@ class ComparisonService:
                 ):
                     resolution_reasons[i] = "text_changed"
                     match_confidences[i] = 0.7
+
+        # Pass 4: Track changes from .docx (S14 Phase 4)
+        # If the document has w:del revisions, check if old alert position
+        # falls within a deleted range → high confidence "text_changed"
+        if docx_del_ranges:
+            for i, oa in enumerate(old_alerts):
+                if i in old_matched or i in resolution_reasons:
+                    continue
+                if oa.start_char is None or oa.end_char is None:
+                    continue
+                for del_start, del_end in docx_del_ranges:
+                    if oa.start_char < del_end and oa.end_char > del_start:
+                        resolution_reasons[i] = "text_changed"
+                        match_confidences[i] = 0.95  # High: explicit track change
+                        break
 
         # For unmatched old alerts without position info or not near changes
         for i in range(len(old_alerts)):
