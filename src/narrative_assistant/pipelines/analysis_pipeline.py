@@ -1965,7 +1965,33 @@ def _run_temporal_analysis(
             f"{len(timeline.anchor_events)} anchors"
         )
 
-        # 3. Verificar consistencia temporal
+        # 3. Level C: cross-chapter temporal linking
+        level_c_ok = False
+        cross_chapter_result = None
+        try:
+            from ..temporal.cross_chapter import build_entity_timelines
+
+            level_c_result = build_entity_timelines(
+                all_markers, entities or [], timeline,
+            )
+            if level_c_result.is_success:
+                cross_chapter_result = level_c_result.value
+                level_c_ok = True
+
+                # Add inferred markers (I-6: separate list)
+                all_markers.extend(cross_chapter_result.inferred_markers)
+
+                logger.info(
+                    f"Level C: {len(cross_chapter_result.entity_timelines)} entity timelines, "
+                    f"{len(cross_chapter_result.inferred_markers)} inferred markers, "
+                    f"{len(cross_chapter_result.new_inconsistencies)} inconsistencies"
+                )
+            else:
+                logger.debug(f"Level C returned failure: {level_c_result.error}")
+        except Exception as e:
+            logger.debug(f"Level C cross-chapter linking failed (graceful degradation): {e}")
+
+        # 4. Verificar consistencia temporal
         checker = TemporalConsistencyChecker()
 
         # Extraer edades de personajes de los marcadores
@@ -1976,7 +2002,16 @@ def _run_temporal_analysis(
                     character_ages[marker.entity_id] = []
                 character_ages[marker.entity_id].append((marker.chapter, marker.age))
 
-        inconsistencies = checker.check(timeline, all_markers, character_ages)
+        # C-2: Si Level C ran ok, skip _check_character_ages (evita duplicados)
+        inconsistencies = checker.check(
+            timeline, all_markers,
+            character_ages=None if level_c_ok else character_ages,
+        )
+
+        # Append Level C inconsistencies
+        if level_c_ok and cross_chapter_result:
+            inconsistencies.extend(cross_chapter_result.new_inconsistencies)
+
         logger.info(f"Found {len(inconsistencies)} temporal inconsistencies")
 
         return Result.success(
@@ -1985,6 +2020,9 @@ def _run_temporal_analysis(
                 "markers": all_markers,
                 "markers_count": len(all_markers),
                 "inconsistencies": inconsistencies,
+                "entity_timelines": (
+                    cross_chapter_result.entity_timelines if cross_chapter_result else {}
+                ),
             }
         )
 

@@ -112,6 +112,10 @@ class InconsistencyType(Enum):
     MARKER_CONFLICT = "marker_conflict"  # Marcadores contradictorios
     CHARACTER_AGE_MISMATCH = "character_age_mismatch"  # Edad no coincide con fechas
     ANACHRONISM = "anachronism"  # Referencia anacrónica
+    # Level C: Cross-chapter linking
+    CROSS_CHAPTER_AGE_REGRESSION = "cross_chapter_age_regression"  # Edad retrocede sin flashback
+    PHASE_AGE_INCOMPATIBLE = "phase_age_incompatible"  # Fase vital incompatible con edad
+    BIRTH_YEAR_CONTRADICTION = "birth_year_contradiction"  # Año de nacimiento contradictorio
 
 
 class InconsistencySeverity(Enum):

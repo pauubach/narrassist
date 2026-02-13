@@ -3,7 +3,7 @@
 > Documento tecnico sobre las capacidades de deteccion de instancias
 > temporales, organizadas por nivel de complejidad.
 >
-> **Estado**: Nivel A y B implementados (v0.7.0)
+> **Estado**: Nivel A, B y C implementados (v0.8.0)
 
 ## Contexto
 
@@ -178,7 +178,7 @@ Si Ollama no esta disponible o el LLM falla:
 
 ---
 
-## Nivel C — Cross-Chapter Temporal Linking (Futuro)
+## Nivel C — Cross-Chapter Temporal Linking (Implementado)
 
 ### Objetivo
 
@@ -193,16 +193,54 @@ Cap 5: "Veinte anios despues, Ana volvio al pueblo" → 1@age:30 (inferido)
 Cap 3: "De nina, Ana jugaba en el rio"              → 1@phase:child (= 1@age:10?)
 ```
 
-### Tecnicas propuestas
+### Modulo: `temporal/cross_chapter.py`
 
-1. **Grafo temporal por entidad**: Nodos = instancias, aristas = relaciones
-2. **Propagacion de restricciones**: `@age:10` + "20 anios despues" → `@age:30`
-3. **Coherencia check**: Cap 1 dice 10, Cap 5 dice 25 "20 anios despues" → alerta
+**Funcion principal**: `build_entity_timelines(markers, entities, timeline)`
 
-### Complejidad
+**Algoritmo en 5 fases**:
 
-Alta. Requiere resolver ambiguedades de correferencia cross-chapter,
-manejar narrativa no lineal, y distinguir tiempo narrativo vs discurso.
+1. **Collect**: Agrupa instancias por entity_id, marca capitulos analepsis
+2. **Sort**: Ordena en story-time (year → age → phase_rank → chapter)
+3. **Link + Detect**: Conecta pares en story-order (progresion, co-ocurrencia, fase-edad)
+   - Fase 3b: Compara discourse order (capitulo) vs story order para regresiones
+4. **Infer**: Calcula anio de nacimiento desde pares (year, age); infiere edades desde offsets
+5. **Discourse**: Detecta regressions en orden de capitulos sin flashback
+
+### Rangos fase-edad (fuzzy, con ±3 tolerancia)
+
+| Fase | Rango base | Con tolerancia |
+|------|-----------|----------------|
+| child | 0-14 | -3 a 17 |
+| teen | 11-21 | 8 a 24 |
+| young | 17-40 | 14 a 43 |
+| adult | 30-70 | 27 a 73 |
+| elder | 55-130 | 52 a 133 |
+
+### Nuevas inconsistencias detectadas
+
+| Tipo | Severidad | Descripcion |
+|------|-----------|-------------|
+| `cross_chapter_age_regression` | CRITICAL | Edad retrocede entre capitulos sin flashback |
+| `phase_age_incompatible` | MEDIUM | Fase vital incompatible con edad explicita |
+| `birth_year_contradiction` | HIGH | Combinaciones (anio, edad) dan nacimientos distintos |
+
+### Integracion con pipeline
+
+En `_run_temporal_analysis`, Level C se ejecuta despues del timeline building:
+- Infiere marcadores adicionales (offsets → edades)
+- Pasa `character_ages=None` al checker base para evitar duplicados (C-2)
+- Agrega sus inconsistencias propias al resultado
+
+### Flashback awareness (C-1)
+
+Recibe el Timeline construido y marca capitulos como analepsis. Regresiones
+en capitulos marcados como flashback se suprimen automaticamente.
+
+### Cobertura estimada (A + B + C combinados)
+
+- **Novelas contemporaneas con flashbacks**: ~90-95%
+- **Narrativa historica con epocas vagas**: ~55-65%
+- **Narrativa experimental**: ~40-50%
 
 ---
 
@@ -239,8 +277,8 @@ Requiere modelos 13B+, latencia 10-30 seg/doc, solo viable como batch.
 
 ```
 v0.6.0   [A] Regex basico ─────────────────── Completado
-v0.7.0   [A] Regex hardened + [B] LLM ────── Completado (actual)
-Futuro   [C] Cross-chapter linking ─────────── Post-TFM
+v0.7.0   [A] Regex hardened + [B] LLM ────── Completado
+v0.8.0   [C] Cross-chapter linking ─────────── Completado (actual)
 Futuro   [D] Narrative-Experts ─────────────── Investigacion
 ```
 
@@ -252,10 +290,12 @@ Futuro   [D] Narrative-Experts ─────────────── Inv
 |---------|-------------|
 | `temporal/markers.py` | Nivel A: regex, AGE_PHASE_ALIASES, LIFE_EVENT_PHASE_MAP |
 | `temporal/llm_extraction.py` | Nivel B: LLM extraction, validation, merge |
+| `temporal/cross_chapter.py` | Nivel C: cross-chapter linking, birth year, regression |
+| `temporal/inconsistencies.py` | Checker + 3 nuevos tipos Level C |
 | `temporal/entity_mentions.py` | Utilidad compartida: carga menciones por capitulo |
 | `temporal/timeline.py` | Timeline builder, flashback validation (LLM Layer 3) |
 | `llm/prompts.py` | TEMPORAL_EXTRACTION_SYSTEM/TEMPLATE/EXAMPLES |
-| `pipelines/analysis_pipeline.py` | Integracion A+B en `_run_temporal_analysis` |
+| `pipelines/analysis_pipeline.py` | Integracion A+B+C en `_run_temporal_analysis` |
 
 ## Tests
 
@@ -263,9 +303,10 @@ Futuro   [D] Narrative-Experts ─────────────── Inv
 |---------|-------|-----------|
 | `test_temporal.py` | 42 | Nivel A basico + edge cases |
 | `test_temporal_level_ab.py` | 47 | Nivel A hardening + Nivel B |
+| `test_cross_chapter.py` | 32 | Nivel C: linking, regression, inference |
 | `test_temporal_entity_mentions_integration.py` | 4 | Shared utility |
 
 ---
 
 *Creado: 2026-02-13*
-*Actualizado: 2026-02-13 — Nivel A hardened + Nivel B implementado*
+*Actualizado: 2026-02-13 — Nivel C cross-chapter linking implementado*
