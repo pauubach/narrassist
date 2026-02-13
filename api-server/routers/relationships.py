@@ -49,7 +49,7 @@ async def get_project_relationships(project_id: int):
         if result.is_failure:
             raise HTTPException(status_code=404, detail=f"Proyecto {project_id} no encontrado")
 
-        project = result.value
+        _ = result.value
 
         # Obtener entidades del proyecto
         entity_repo = get_entity_repository()
@@ -128,7 +128,6 @@ async def get_project_relationships(project_id: int):
 
         # Crear mapeo de chapter_id (BD) a chapter_number
         chapter_id_to_number = {c["id"]: c["chapter_number"] for c in chapters_data}
-        chapter_id_to_data = {c["id"]: c for c in chapters_data}
 
         # Agrupar menciones por capítulo y buscar co-ocurrencias
         mentions_by_chapter = {}
@@ -954,7 +953,6 @@ async def get_emotional_analysis(project_id: int):
 
     try:
         from narrative_assistant.analysis.emotional_coherence import (
-            EmotionalIncoherence,
             get_emotional_coherence_checker,
         )
         from narrative_assistant.nlp.dialogue import detect_dialogues
@@ -1181,7 +1179,6 @@ async def get_vital_status_analysis(project_id: int):
     """
     try:
         from narrative_assistant.analysis.vital_status import (
-            VitalStatusAnalyzer,
             analyze_vital_status,
         )
 

@@ -680,7 +680,6 @@ async def download_progress():
         try:
             real_sizes = get_real_model_sizes()
         except Exception:
-            from narrative_assistant.core.model_manager import ModelType as MT
             real_sizes = {}
             for mt, mi in KNOWN_MODELS.items():
                 real_sizes[mt.value] = mi.size_mb * 1024 * 1024
@@ -691,7 +690,7 @@ async def download_progress():
                 "active_downloads": progress or {},
                 "has_active": has_active,
                 "model_sizes": {
-                    **{k: v for k, v in real_sizes.items()},
+                    **dict(real_sizes.items()),
                     "total": sum(real_sizes.values()),
                 },
             }

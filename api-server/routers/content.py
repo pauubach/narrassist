@@ -32,7 +32,7 @@ async def list_glossary_entries(
         result = deps.project_manager.get(project_id)
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Project not found")
-        project = result.value
+        _ = result.value
 
         from narrative_assistant.persistence.glossary import GlossaryRepository
 
@@ -72,7 +72,7 @@ async def create_glossary_entry(
         result = deps.project_manager.get(project_id)
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Project not found")
-        project = result.value
+        _ = result.value
 
         from narrative_assistant.persistence.glossary import GlossaryEntry, GlossaryRepository
 
@@ -124,7 +124,7 @@ async def get_glossary_entry(
         result = deps.project_manager.get(project_id)
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Project not found")
-        project = result.value
+        _ = result.value
 
         from narrative_assistant.persistence.glossary import GlossaryRepository
 
@@ -156,7 +156,7 @@ async def update_glossary_entry(
         result = deps.project_manager.get(project_id)
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Project not found")
-        project = result.value
+        _ = result.value
 
         from narrative_assistant.persistence.glossary import GlossaryRepository
 
@@ -207,7 +207,7 @@ async def delete_glossary_entry(
         result = deps.project_manager.get(project_id)
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Project not found")
-        project = result.value
+        _ = result.value
 
         from narrative_assistant.persistence.glossary import GlossaryRepository
 
@@ -250,7 +250,7 @@ async def get_glossary_llm_context(
         result = deps.project_manager.get(project_id)
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Project not found")
-        project = result.value
+        _ = result.value
 
         from narrative_assistant.persistence.glossary import GlossaryRepository
 
@@ -292,7 +292,7 @@ async def export_glossary_for_publication(project_id: int) -> ApiResponse:
         result = deps.project_manager.get(project_id)
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Project not found")
-        project = result.value
+        _ = result.value
 
         from narrative_assistant.persistence.glossary import GlossaryRepository
 
@@ -317,7 +317,7 @@ async def export_glossary_for_publication(project_id: int) -> ApiResponse:
 @router.post("/api/projects/{project_id}/glossary/import", response_model=ApiResponse)
 async def import_glossary(
     project_id: int,
-    entries: list[dict] = Body(...),
+    entries: list[dict] = Body(...),  # noqa: B008
     merge: bool = True,
 ) -> ApiResponse:
     """
@@ -332,7 +332,7 @@ async def import_glossary(
         result = deps.project_manager.get(project_id)
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Project not found")
-        project = result.value
+        _ = result.value
 
         from narrative_assistant.persistence.glossary import GlossaryRepository
 
@@ -368,7 +368,7 @@ async def search_glossary(
         result = deps.project_manager.get(project_id)
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Project not found")
-        project = result.value
+        _ = result.value
 
         from narrative_assistant.persistence.glossary import GlossaryRepository
 
@@ -408,7 +408,7 @@ async def get_glossary_summary(project_id: int) -> ApiResponse:
         result = deps.project_manager.get(project_id)
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Project not found")
-        project = result.value
+        _ = result.value
 
         from narrative_assistant.persistence.glossary import GlossaryRepository
 

@@ -147,7 +147,7 @@ async def export_work(project_id: int):
 )
 async def import_work_preview(
     project_id: int,
-    file: UploadFile = File(...),
+    file: UploadFile = File(...),  # noqa: B008
 ):
     """
     Preview de importación: analiza el archivo .narrassist y muestra

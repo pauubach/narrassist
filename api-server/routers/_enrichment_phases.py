@@ -320,8 +320,7 @@ def run_relationships_enrichment(ctx: dict, tracker) -> None:
         entities = _load_entities(db, project_id)
         chapters = _load_chapters(db, project_id)
         chapters_dicts = _chapters_to_dicts(chapters)
-        entities_dicts = _entities_to_dicts(entities)
-        full_text = _build_full_text(chapters)
+        # entities_dicts and full_text computed on demand by individual phases
 
         character_entities = [e for e in entities
                               if (e.entity_type.value if hasattr(e.entity_type, "value")
@@ -430,7 +429,7 @@ def _compute_character_timeline(db, project_id, entities, chapters):
     from narrative_assistant.entities.repository import get_entity_repository
 
     entity_repo = get_entity_repository(db)
-    chapter_map = {ch.id: ch for ch in chapters if hasattr(ch, "id")}
+    # chapter_map omitted — ch_number_map sufficient for current usage
     ch_number_map = {ch.id: ch.chapter_number for ch in chapters if hasattr(ch, "id")}
 
     characters = []

@@ -48,7 +48,7 @@ async def list_projects():
 
                 # Log file info for diagnostics
                 try:
-                    from pathlib import Path as _P
+                    from pathlib import Path as _P  # noqa: N814
                     _db_file = _P(db_path)
                     if _db_file.exists():
                         deps._write_debug(f"list_projects: DB file exists, size={_db_file.stat().st_size} bytes")
@@ -273,7 +273,7 @@ async def get_analysis_status(project_id: int):
         # Obtener estadísticas para determinar qué está ejecutado
         db = deps.get_database()
         stats = _get_project_stats(project_id, db)
-        settings = project.settings or {}
+        _ = project.settings or {}  # settings reserved for future per-project config
 
         # Determinar qué fases están ejecutadas basándose en datos disponibles
         # Esto es una aproximación - idealmente tendríamos un registro de fases ejecutadas
@@ -365,7 +365,7 @@ async def create_project(
     name: str = Body(...),
     description: Optional[str] = Body(None),
     file_path: Optional[str] = Body(None),
-    file: Optional[UploadFile] = File(None),
+    file: Optional[UploadFile] = File(None),  # noqa: B008
     is_demo: Optional[bool] = Body(False),
 ):
     """

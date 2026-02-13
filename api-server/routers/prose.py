@@ -249,7 +249,7 @@ async def get_sticky_sentences(
         result = deps.project_manager.get(project_id)
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Proyecto no encontrado")
-        project = result.value
+        _ = result.value
 
         # Obtener texto de todos los capítulos
         chapters_data = []
@@ -518,7 +518,7 @@ async def get_echo_report(
         result = deps.project_manager.get(project_id)
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Proyecto no encontrado")
-        project = result.value
+        _ = result.value
 
         detector = get_repetition_detector()
         chapters = deps.chapter_repository.get_by_project(project_id)
@@ -1186,7 +1186,7 @@ async def get_pacing_analysis(
         result = deps.project_manager.get(project_id)
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Proyecto no encontrado")
-        project = result.value
+        _ = result.value
 
         analyzer = get_pacing_analyzer()
         chapters = deps.chapter_repository.get_by_project(project_id)
@@ -1502,7 +1502,6 @@ async def get_pacing_genre_comparison(
         from narrative_assistant.analysis.pacing import (
             compare_with_benchmarks,
             compute_tension_curve,
-            get_pacing_analyzer,
         )
 
         result = deps.project_manager.get(project_id)
@@ -1530,7 +1529,6 @@ async def get_pacing_genre_comparison(
         total_doc_words = 0
         chapter_word_counts = []
 
-        analyzer = get_pacing_analyzer()
         for ch in chapters_data:
             content = ch["content"]
             words = content.split()
@@ -1853,7 +1851,7 @@ async def get_age_readability(
         result = deps.project_manager.get(project_id)
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Proyecto no encontrado")
-        project = result.value
+        _ = result.value
 
         analyzer = get_readability_analyzer()
         chapters = deps.chapter_repository.get_by_project(project_id)
@@ -1952,7 +1950,6 @@ async def get_semantic_redundancy(
     """
     try:
         from narrative_assistant.analysis.semantic_redundancy import (
-            RedundancyMode,
             get_semantic_redundancy_detector,
         )
         from narrative_assistant.core import get_resource_manager

@@ -383,7 +383,7 @@ async def detect_document_profile(project_id: str) -> ApiResponse:
         result = deps.project_manager.get(int(project_id))
         if result.is_failure:
             raise HTTPException(status_code=404, detail="Project not found")
-        project = result.value
+        _ = result.value  # noqa: F841
 
         from narrative_assistant.corrections.config import (
             CorrectionConfig,
@@ -1430,7 +1430,7 @@ async def get_defaults_status():
 
         # Agrupar por tipo
         status = {}
-        for type_code in TYPES_REGISTRY.keys():
+        for type_code in TYPES_REGISTRY:
             type_overrides = [o for o in all_overrides if o["type_code"] == type_code]
             has_type_override = any(o["subtype_code"] is None for o in type_overrides)
             subtype_overrides = [o["subtype_code"] for o in type_overrides if o["subtype_code"]]
