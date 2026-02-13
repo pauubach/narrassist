@@ -218,6 +218,98 @@ class TestTemporalMapWithDates:
         assert tmap.is_character_alive_in_chapter(42, 5) is True
 
 
+class TestAliveCheckEdgeCases:
+    """Tests para casos extremos del alive check."""
+
+    def test_alive_in_flashback_without_story_time(self):
+        """Flashback sin story_time → fail-safe: vivo."""
+        tmap = TemporalMap()
+        tmap.add_slice(1, TemporalSlice(chapter=1, day_offset=0))
+        # Cap 3 marcado como analepsis pero SIN story_time ni day_offset
+        tmap.add_slice(
+            3,
+            TemporalSlice(
+                chapter=3,
+                narrative_type=NarrativeType.ANALEPSIS,
+            ),
+        )
+        tmap.register_death(entity_id=1, death_chapter=1)
+        # Sin datos temporales en cap 3, pero es analepsis → fail-safe vivo
+        assert tmap.is_character_alive_in_chapter(1, 3) is True
+
+    def test_mixed_type_comparison_synthetic_date_vs_offset(self):
+        """Comparación date(1,1,X) vs int(day_offset) resuelve correctamente."""
+        from narrative_assistant.temporal.temporal_map import _date_to_offset
+
+        # date(1, 1, 11) = día 10 desde base
+        assert _date_to_offset(date(1, 1, 11), date(1, 1, 1)) == 10
+        # int → passthrough
+        assert _date_to_offset(5, date(1, 1, 1)) == 5
+        # date real → None (no convertible)
+        assert _date_to_offset(date(2020, 1, 1), date(1, 1, 1)) is None
+
+    def test_mixed_type_alive_check_no_crash(self):
+        """Muerte con date, capítulo con day_offset → no crash."""
+        tmap = TemporalMap()
+        # Cap 1: fecha real
+        tmap.add_slice(1, TemporalSlice(chapter=1, story_date=date(2020, 6, 1)))
+        # Cap 3: solo day_offset (incompatible)
+        tmap.add_slice(3, TemporalSlice(chapter=3, day_offset=5))
+        tmap.register_death(entity_id=1, death_chapter=1)
+        # No debe crashear; fail-safe a True
+        result = tmap.is_character_alive_in_chapter(1, 3)
+        assert isinstance(result, bool)
+
+
+class TestTemporalInstances:
+    """Tests para instancias temporales (viajes en el tiempo)."""
+
+    def test_partial_death_of_instance(self):
+        """Muerte de A@45 no mata a A@40 (caso base del documento)."""
+        tmap = TemporalMap()
+        tmap.add_slice(1, TemporalSlice(chapter=1, day_offset=0))
+        tmap.add_slice(3, TemporalSlice(chapter=3, day_offset=5))
+        tmap.add_slice(5, TemporalSlice(chapter=5, day_offset=10))
+
+        # A@45 muere en cap 3 (día 5)
+        tmap.register_death(entity_id=1, death_chapter=3, temporal_instance_id="A@45")
+
+        # A@45 está muerta en cap 5 (día 10 > día 5)
+        assert tmap.is_character_alive_in_chapter(1, 5, temporal_instance_id="A@45") is False
+
+        # A@40 NO fue registrada como muerta → sigue viva
+        assert tmap.is_character_alive_in_chapter(1, 5, temporal_instance_id="A@40") is True
+
+        # Entidad canónica (sin instancia) → sigue viva
+        assert tmap.is_character_alive_in_chapter(1, 5) is True
+
+    def test_canonical_death_affects_all_unspecified(self):
+        """Muerte canónica afecta consultas sin instancia."""
+        tmap = TemporalMap()
+        tmap.add_slice(1, TemporalSlice(chapter=1, day_offset=0))
+        tmap.add_slice(3, TemporalSlice(chapter=3, day_offset=10))
+
+        # Muerte canónica (sin instancia) en cap 1
+        tmap.register_death(entity_id=1, death_chapter=1)
+
+        # Consulta canónica: muerta en cap 3
+        assert tmap.is_character_alive_in_chapter(1, 3) is False
+
+        # Consulta con instancia que NO tiene muerte propia → fallback a canónica
+        assert tmap.is_character_alive_in_chapter(1, 3, temporal_instance_id="A@40") is False
+
+    def test_instance_alive_before_death(self):
+        """Instancia temporal viva antes de su muerte en story_time."""
+        tmap = TemporalMap()
+        tmap.add_slice(1, TemporalSlice(chapter=1, day_offset=0))
+        tmap.add_slice(3, TemporalSlice(chapter=3, day_offset=10))
+
+        tmap.register_death(entity_id=1, death_chapter=3, temporal_instance_id="A@45")
+
+        # Cap 1 (día 0) < muerte (día 10) → viva
+        assert tmap.is_character_alive_in_chapter(1, 1, temporal_instance_id="A@45") is True
+
+
 class TestNonLinearDetector:
     """Tests para NonLinearNarrativeDetector."""
 

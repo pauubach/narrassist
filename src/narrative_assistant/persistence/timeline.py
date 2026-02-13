@@ -31,6 +31,8 @@ class TimelineEventData:
     # Para timelines sin fechas absolutas (Día 0, Día +1, etc.)
     day_offset: int | None = None
     weekday: str | None = None
+    # Instancia temporal (viajes en el tiempo: A@40 vs A@45)
+    temporal_instance_id: str | None = None
     created_at: str | None = None
 
     def to_dict(self) -> dict:
@@ -47,6 +49,7 @@ class TimelineEventData:
             "confidence": self.confidence,
             "day_offset": self.day_offset,
             "weekday": self.weekday,
+            "temporal_instance_id": self.temporal_instance_id,
             "entity_ids": [],  # Placeholder - entities tracked separately
         }
 
@@ -67,6 +70,7 @@ class TimelineEventData:
             confidence=row["confidence"] or 0.5,
             day_offset=row.get("day_offset"),
             weekday=row.get("weekday"),
+            temporal_instance_id=row.get("temporal_instance_id"),
             created_at=row["created_at"],
         )
 
@@ -193,8 +197,9 @@ class TimelineRepository:
                     INSERT INTO timeline_events (
                         project_id, event_id, chapter, paragraph, description,
                         story_date, story_date_resolution, narrative_order,
-                        discourse_position, confidence, day_offset, weekday, created_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        discourse_position, confidence, day_offset, weekday,
+                        temporal_instance_id, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         project_id,
@@ -209,6 +214,7 @@ class TimelineRepository:
                         event.confidence,
                         event.day_offset,
                         event.weekday,
+                        event.temporal_instance_id,
                         now,
                     ),
                 )
@@ -217,28 +223,43 @@ class TimelineRepository:
         logger.info(f"Guardados {len(events)} eventos de timeline para proyecto {project_id}")
         return len(events)
 
-    def get_events(self, project_id: int) -> list[TimelineEventData]:
+    def get_events(
+        self, project_id: int, *, max_events: int = 0
+    ) -> list[TimelineEventData]:
         """
-        Obtiene todos los eventos del timeline de un proyecto.
+        Obtiene los eventos del timeline de un proyecto.
 
         Args:
             project_id: ID del proyecto
+            max_events: Límite máximo de eventos (0 = sin límite)
 
         Returns:
             Lista de eventos ordenados por discourse_position
         """
+        query = """
+            SELECT * FROM timeline_events
+            WHERE project_id = ?
+            ORDER BY discourse_position, chapter, id
+        """
+        params: list = [project_id]
+        if max_events > 0:
+            query += " LIMIT ?"
+            params.append(max_events)
+
         with self.db.connection() as conn:
-            cursor = conn.execute(
-                """
-                SELECT * FROM timeline_events
-                WHERE project_id = ?
-                ORDER BY discourse_position, chapter, id
-                """,
-                (project_id,),
-            )
+            cursor = conn.execute(query, params)
             rows = cursor.fetchall()
 
         return [TimelineEventData.from_row(row) for row in rows]
+
+    def count_events(self, project_id: int) -> int:
+        """Cuenta el total de eventos del timeline de un proyecto."""
+        with self.db.connection() as conn:
+            cursor = conn.execute(
+                "SELECT COUNT(*) FROM timeline_events WHERE project_id = ?",
+                (project_id,),
+            )
+            return cursor.fetchone()[0]
 
     def has_timeline(self, project_id: int) -> bool:
         """

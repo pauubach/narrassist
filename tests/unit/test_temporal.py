@@ -211,6 +211,81 @@ class TestTimelineBuilder:
         assert "events" in json_data
         assert isinstance(json_data["events"], list)
 
+    def test_export_to_json_includes_day_offset_and_weekday(self, builder, sample_chapters):
+        """export_to_json incluye day_offset y weekday en cada evento."""
+        extractor = TemporalMarkerExtractor()
+        markers = extractor.extract("El 15 de marzo de 1985", chapter=1)
+
+        builder.build_from_markers(markers, sample_chapters)
+        json_data = builder.export_to_json()
+
+        for event in json_data["events"]:
+            assert "day_offset" in event
+            assert "weekday" in event
+
+    def test_extreme_offset_no_crash(self, builder, sample_chapters):
+        """Offsets extremos no provocan crash (OverflowError)."""
+        # Ancla con fecha absoluta
+        anchor = TemporalMarker(
+            text="1 de enero de 9990",
+            marker_type=MarkerType.ABSOLUTE_DATE,
+            chapter=1,
+            start_char=0,
+            end_char=20,
+            year=9990,
+            month=1,
+            day=1,
+            confidence=0.9,
+        )
+        # Marcador relativo extremo: 100.000 años después
+        # Esto provocaría OverflowError en date sin protección
+        extreme = TemporalMarker(
+            text="cien mil años después",
+            marker_type=MarkerType.RELATIVE_TIME,
+            chapter=2,
+            start_char=100,
+            end_char=130,
+            direction="future",
+            quantity=100_000,
+            magnitude="año",
+            confidence=0.7,
+        )
+        # No debe crashear
+        timeline = builder.build_from_markers([anchor, extreme], sample_chapters)
+        assert len(timeline.events) >= 1
+
+    def test_extreme_day_offset_clamped(self, builder, sample_chapters):
+        """day_offset se limita a ±365.000."""
+        from narrative_assistant.temporal.timeline import MAX_DAY_OFFSET
+
+        # Ancla relativa (generará day_offset=0 como sintético)
+        anchor = TemporalMarker(
+            text="aquella mañana",
+            marker_type=MarkerType.RELATIVE_TIME,
+            chapter=1,
+            start_char=0,
+            end_char=14,
+            confidence=0.9,
+        )
+        # Relativo extremo: 500.000 días (~1370 años) → debe clamparse
+        extreme = TemporalMarker(
+            text="quinientos mil días después",
+            marker_type=MarkerType.RELATIVE_TIME,
+            chapter=2,
+            start_char=100,
+            end_char=140,
+            direction="future",
+            quantity=500_000,
+            magnitude="día",
+            confidence=0.7,
+        )
+        timeline = builder.build_from_markers([anchor, extreme], sample_chapters)
+        offsets = [e.day_offset for e in timeline.events if e.day_offset is not None]
+        for off in offsets:
+            assert abs(off) <= MAX_DAY_OFFSET, (
+                f"day_offset {off} excede el límite ±{MAX_DAY_OFFSET}"
+            )
+
 
 class TestTemporalConsistencyChecker:
     """Tests para TemporalConsistencyChecker."""

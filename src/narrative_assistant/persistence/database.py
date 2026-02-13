@@ -1254,6 +1254,8 @@ class Database:
             # Timeline: soporte para day_offset (Día 0, Día +1, etc.)
             ("timeline_events", "day_offset", "INTEGER"),
             ("timeline_events", "weekday", "TEXT"),
+            # Timeline: instancia temporal (viajes en el tiempo: A@40 vs A@45)
+            ("timeline_events", "temporal_instance_id", "TEXT"),
             # v14: Colecciones / Sagas (BK-07)
             ("projects", "collection_id", "INTEGER"),
             ("projects", "collection_order", "INTEGER DEFAULT 0"),

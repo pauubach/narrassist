@@ -41,6 +41,10 @@
           <i class="pi pi-book"></i>
           <span>Capitulo {{ event.chapter }}</span>
         </div>
+        <div class="meta-item discourse-pos" title="Orden de aparicion en el texto">
+          <i class="pi pi-sort-numeric-up"></i>
+          <span>#{{ event.discoursePosition + 1 }}</span>
+        </div>
         <div v-if="event.entityIds.length > 0" class="meta-item">
           <i class="pi pi-users"></i>
           <span>{{ event.entityIds.length }} personaje{{ event.entityIds.length > 1 ? 's' : '' }}</span>
@@ -67,7 +71,10 @@
 
     <!-- Linea conectora -->
     <div v-if="showConnector" class="event-connector">
-      <div class="connector-line"></div>
+      <div
+        class="connector-line"
+        :style="connectorColor ? { background: connectorColor } : {}"
+      ></div>
     </div>
   </div>
 </template>
@@ -84,11 +91,13 @@ const props = withDefaults(defineProps<{
   isSelected?: boolean
   isHovered?: boolean
   showConnector?: boolean
+  connectorColor?: string
 }>(), {
   entityNames: () => [],
   isSelected: false,
   isHovered: false,
-  showConnector: true
+  showConnector: true,
+  connectorColor: '',
 })
 
 const emit = defineEmits<{
@@ -322,6 +331,15 @@ const handleMouseLeave = () => {
 
 .meta-item i {
   font-size: 0.875rem;
+}
+
+.discourse-pos {
+  background: var(--surface-100);
+  padding: 0.125rem 0.5rem;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.75rem;
+  color: var(--text-color-secondary);
 }
 
 .confidence.confidence-high {

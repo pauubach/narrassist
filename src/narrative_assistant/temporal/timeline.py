@@ -18,6 +18,9 @@ from .markers import MONTHS, MarkerType, TemporalMarker
 
 logger = logging.getLogger(__name__)
 
+# Límite razonable para day_offset: ±1000 años
+MAX_DAY_OFFSET = 365_000
+
 
 class TimelineResolution(Enum):
     """Resolución temporal de un evento."""
@@ -82,6 +85,10 @@ class TimelineEvent:
 
     # Clasificación narrativa
     narrative_order: NarrativeOrder = NarrativeOrder.CHRONOLOGICAL
+
+    # Instancia temporal (para viajes en el tiempo: A@40 vs A@45)
+    # None = instancia única (caso normal)
+    temporal_instance_id: str | None = None
 
     # Personajes involucrados
     entity_ids: list[int] = field(default_factory=list)
@@ -433,10 +440,24 @@ class TimelineBuilder:
             if reference_event:
                 if reference_event.story_date and offset:
                     # Hay fecha absoluta: calcular nueva fecha
-                    if direction == "future":
-                        new_date = reference_event.story_date + offset
-                    elif direction == "past":
-                        new_date = reference_event.story_date - offset
+                    try:
+                        if direction == "future":
+                            new_date = reference_event.story_date + offset
+                        elif direction == "past":
+                            new_date = reference_event.story_date - offset
+                    except (OverflowError, ValueError):
+                        logger.warning(
+                            "Overflow al calcular fecha: %s %s %s — "
+                            "convirtiendo a day_offset",
+                            reference_event.story_date, direction, offset,
+                        )
+                        # Fallback a day_offset relativo
+                        new_day_offset = (
+                            offset_days if direction == "future" else -offset_days
+                        )
+                        new_day_offset = max(
+                            -MAX_DAY_OFFSET, min(MAX_DAY_OFFSET, new_day_offset)
+                        )
                 elif reference_event.day_offset is not None:
                     # Sin fecha absoluta: usar day_offset
                     if direction == "future":
@@ -445,6 +466,10 @@ class TimelineBuilder:
                         new_day_offset = reference_event.day_offset - offset_days
                     else:
                         new_day_offset = reference_event.day_offset + offset_days
+                    # Clamp para evitar valores absurdos
+                    new_day_offset = max(
+                        -MAX_DAY_OFFSET, min(MAX_DAY_OFFSET, new_day_offset)
+                    )
 
             # Crear evento
             self.event_counter += 1
@@ -993,6 +1018,9 @@ class TimelineBuilder:
                     "story_date_resolution": event.story_date_resolution.value,
                     "discourse_position": event.discourse_position,
                     "narrative_order": event.narrative_order.value,
+                    "day_offset": event.day_offset,
+                    "weekday": event.weekday,
+                    "temporal_instance_id": event.temporal_instance_id,
                     "entity_ids": event.entity_ids,
                     "confidence": event.confidence,
                 }

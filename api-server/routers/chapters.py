@@ -427,9 +427,16 @@ async def get_project_timeline(project_id: int, force_refresh: bool = False):
 
         timeline_repo = TimelineRepository()
 
+        # Límite de eventos para proteger al frontend
+        MAX_TIMELINE_EVENTS = 5000
+
         if not force_refresh and timeline_repo.has_timeline(project_id):
             # Leer desde BD (rápido)
-            events = timeline_repo.get_events(project_id)
+            total_count = timeline_repo.count_events(project_id)
+            events = timeline_repo.get_events(
+                project_id, max_events=MAX_TIMELINE_EVENTS
+            )
+            truncated = total_count > MAX_TIMELINE_EVENTS
             markers_count = timeline_repo.get_markers_count(project_id)
 
             # Contar tipos de eventos
@@ -440,7 +447,7 @@ async def get_project_timeline(project_id: int, force_refresh: bool = False):
             # Convertir a formato esperado por el frontend
             events_data = [e.to_dict() for e in events]
 
-            logger.info(f"Timeline loaded from DB for project {project_id}: {len(events)} events")
+            logger.info(f"Timeline loaded from DB for project {project_id}: {len(events)} events (total: {total_count})")
 
             return ApiResponse(
                 success=True,
@@ -454,6 +461,8 @@ async def get_project_timeline(project_id: int, force_refresh: bool = False):
                     "mermaid": None,  # No disponible desde BD
                     "inconsistencies": [],  # Las inconsistencias están en alerts
                     "from_cache": True,
+                    "truncated": truncated,
+                    "total_events": total_count,
                 },
                 message="Timeline cargado desde base de datos"
             )
@@ -584,10 +593,16 @@ async def get_project_timeline(project_id: int, force_refresh: bool = False):
             for inc in inconsistencies
         ]
 
+        all_events = json_data["events"]
+        total_events = len(all_events)
+        truncated = total_events > MAX_TIMELINE_EVENTS
+        if truncated:
+            all_events = all_events[:MAX_TIMELINE_EVENTS]
+
         return ApiResponse(
             success=True,
             data={
-                "events": json_data["events"],
+                "events": all_events,
                 "markers_count": len(all_markers),
                 "anchor_count": json_data["anchor_events"],
                 "analepsis_count": json_data["analepsis_count"],
@@ -596,6 +611,8 @@ async def get_project_timeline(project_id: int, force_refresh: bool = False):
                 "mermaid": mermaid,
                 "inconsistencies": inconsistencies_data,
                 "from_cache": False,
+                "truncated": truncated,
+                "total_events": total_events,
             }
         )
 

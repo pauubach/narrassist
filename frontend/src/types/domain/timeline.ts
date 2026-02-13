@@ -36,6 +36,8 @@ export interface TimelineEvent {
   weekday: string | null    // Día de la semana si se menciona (lunes, martes, etc.)
   discoursePosition: number
   narrativeOrder: NarrativeOrder
+  /** Instancia temporal para viajes en el tiempo (A@40 vs A@45) */
+  temporalInstanceId: string | null
   entityIds: number[]
   confidence: number
 }
@@ -71,4 +73,8 @@ export interface Timeline {
   timeSpan: TimeSpan | null
   mermaid: string
   inconsistencies: TemporalInconsistency[]
+  /** True si la respuesta fue truncada por límite de eventos */
+  truncated: boolean
+  /** Total de eventos sin truncar (solo informativo cuando truncated=true) */
+  totalEvents: number
 }

@@ -34,6 +34,8 @@ export interface ApiTimelineEvent {
   weekday: string | null     // Día de la semana si se menciona
   discourse_position: number
   narrative_order: ApiNarrativeOrder
+  /** Instancia temporal para viajes en el tiempo (A@40 vs A@45) */
+  temporal_instance_id: string | null
   entity_ids: number[]
   confidence: number
 }
@@ -66,4 +68,8 @@ export interface ApiTimelineResponse {
   } | null
   mermaid: string
   inconsistencies: ApiTemporalInconsistency[]
+  /** True si se truncaron eventos por límite */
+  truncated?: boolean
+  /** Total de eventos sin truncar */
+  total_events?: number
 }

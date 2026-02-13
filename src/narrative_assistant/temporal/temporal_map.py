@@ -17,6 +17,20 @@ from enum import Enum
 logger = logging.getLogger(__name__)
 
 
+def _date_to_offset(value: date | int | None, base: date) -> int | None:
+    """Convierte un valor temporal a day_offset si es posible.
+
+    - int → lo devuelve tal cual.
+    - date con año sintético (1) → calcula offset desde base.
+    - date con año real → no convertible (retorna None).
+    """
+    if isinstance(value, int):
+        return value
+    if isinstance(value, date) and value.year == 1:
+        return (value - base).days
+    return None
+
+
 class NarrativeType(str, Enum):
     """Tipo narrativo de un segmento temporal."""
 
@@ -87,9 +101,9 @@ class TemporalMap:
     def __init__(self) -> None:
         self._slices: dict[int, TemporalSlice] = {}  # chapter → slice
         self._age_refs: dict[int, list[AgeReference]] = {}  # entity_id → refs
-        self._death_times: dict[int, date | int | None] = (
-            {}
-        )  # entity_id → story_date or day_offset
+        # (entity_id, temporal_instance_id) → story_date or day_offset
+        # temporal_instance_id=None es la instancia canónica (caso normal)
+        self._death_times: dict[tuple[int, str | None], date | int | None] = {}
 
     @classmethod
     def from_timeline(cls, timeline) -> "TemporalMap":
@@ -145,20 +159,32 @@ class TemporalMap:
             self._age_refs[ref.entity_id] = []
         self._age_refs[ref.entity_id].append(ref)
 
-    def register_death(self, entity_id: int, death_chapter: int) -> None:
+    def register_death(
+        self,
+        entity_id: int,
+        death_chapter: int,
+        temporal_instance_id: str | None = None,
+    ) -> None:
         """
-        Registra la muerte de un personaje, usando story_time del capítulo.
+        Registra la muerte de un personaje (o de una instancia temporal),
+        usando story_time del capítulo.
+
+        Args:
+            entity_id: ID canónico de la entidad
+            death_chapter: Capítulo donde muere
+            temporal_instance_id: Instancia temporal (ej. "A@45"). None = canónica.
         """
+        key = (entity_id, temporal_instance_id)
         slice_ = self._slices.get(death_chapter)
         if slice_:
             if slice_.story_date:
-                self._death_times[entity_id] = slice_.story_date
+                self._death_times[key] = slice_.story_date
             elif slice_.day_offset is not None:
-                self._death_times[entity_id] = slice_.day_offset
+                self._death_times[key] = slice_.day_offset
             else:
-                self._death_times[entity_id] = None
+                self._death_times[key] = None
         else:
-            self._death_times[entity_id] = None
+            self._death_times[key] = None
 
     def get_story_time(self, chapter: int) -> date | int | None:
         """
@@ -228,27 +254,57 @@ class TemporalMap:
 
         return max(0, int(age))
 
-    def is_character_alive_in_chapter(self, entity_id: int, chapter: int) -> bool:
+    def is_character_alive_in_chapter(
+        self,
+        entity_id: int,
+        chapter: int,
+        temporal_instance_id: str | None = None,
+    ) -> bool:
         """
-        Verifica si un personaje está vivo en un capítulo dado.
+        Verifica si un personaje (o instancia temporal) está vivo en un capítulo.
 
         Compara story_time del capítulo con story_time de la muerte.
+        Si el capítulo es una analepsis (flashback), el personaje se considera
+        vivo si el story_time del flashback es anterior a la muerte, incluso
+        si discursivamente aparece después.
+
+        Args:
+            entity_id: ID canónico de la entidad
+            chapter: Capítulo a consultar
+            temporal_instance_id: Instancia temporal específica. None busca
+                primero la canónica; si no hay, busca cualquiera registrada.
+
         Si no hay datos temporales, retorna True (fail-safe).
         """
-        if entity_id not in self._death_times:
-            return True  # No registrado como muerto
+        # Buscar clave de muerte: primero la instancia solicitada, luego canónica
+        key = (entity_id, temporal_instance_id)
+        if key not in self._death_times:
+            # Fallback: buscar la instancia canónica (None)
+            key = (entity_id, None)
+            if key not in self._death_times:
+                return True  # No registrado como muerto
 
-        death_time = self._death_times[entity_id]
+        death_time = self._death_times[key]
         if death_time is None:
             return True  # Sin datos temporales de muerte → fail-safe
 
+        # Obtener story_time del capítulo consultado
         chapter_time = self.get_story_time(chapter)
         if chapter_time is None:
+            # Sin story_time pero es analepsis → probablemente antes de la muerte
+            narrative_type = self.get_narrative_type(chapter)
+            if narrative_type == NarrativeType.ANALEPSIS:
+                return True  # Flashback sin fecha concreta → fail-safe a vivo
             return True  # Sin datos temporales del capítulo → fail-safe
 
         # Comparar tiempos
         delta = self._compare_story_times(death_time, chapter_time)
         if delta is None:
+            # Tipos incompatibles (date vs int) — intentar resolución heurística
+            # Si el capítulo es analepsis, asumir que está antes de la muerte
+            narrative_type = self.get_narrative_type(chapter)
+            if narrative_type == NarrativeType.ANALEPSIS:
+                return True
             return True  # No se puede comparar → fail-safe
 
         # delta > 0 → chapter_time es posterior a death_time → muerto
@@ -279,6 +335,8 @@ class TemporalMap:
         Compara dos tiempos de historia y devuelve diferencia en horas.
 
         Positivo si t2 > t1, negativo si t2 < t1.
+        Soporta comparación mixta date/int convirtiendo fechas sintéticas
+        (año 1) a day_offset equivalente.
         """
         if t1 is None or t2 is None:
             return None
@@ -292,5 +350,12 @@ class TemporalMap:
         if isinstance(t1, int) and isinstance(t2, int):
             return float((t2 - t1) * 24)
 
-        # Tipos incompatibles
+        # Mixto: intentar convertir date sintéticas (año 1) a day_offset
+        synthetic_base = date(1, 1, 1)
+        t1_offset = _date_to_offset(t1, synthetic_base)
+        t2_offset = _date_to_offset(t2, synthetic_base)
+        if t1_offset is not None and t2_offset is not None:
+            return float((t2_offset - t1_offset) * 24)
+
+        # Tipos incompatibles sin resolución posible
         return None

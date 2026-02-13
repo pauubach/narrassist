@@ -67,7 +67,15 @@
         <span class="tooltip-chapter">Cap. {{ hoveredEvent.chapter }}</span>
       </div>
       <p class="tooltip-description">{{ hoveredEvent.description }}</p>
-      <div v-if="hoveredEvent.storyDate" class="tooltip-date">
+      <div v-if="hoveredEvent.storyDate && hoveredEvent.storyDate.getFullYear() > 1" class="tooltip-date">
+        <i class="pi pi-calendar"></i>
+        {{ formatDate(hoveredEvent.storyDate) }}
+      </div>
+      <div v-else-if="hoveredEvent.dayOffset !== null && hoveredEvent.dayOffset !== undefined" class="tooltip-date">
+        <i class="pi pi-calendar"></i>
+        Dia +{{ hoveredEvent.dayOffset }}
+      </div>
+      <div v-else-if="hoveredEvent.storyDate" class="tooltip-date">
         <i class="pi pi-calendar"></i>
         {{ formatDate(hoveredEvent.storyDate) }}
       </div>
@@ -182,12 +190,30 @@ const getNarrativeOrderLabel = (order: NarrativeOrder): string => {
   }
 }
 
+// Resolve an event to a usable Date for the horizontal timeline
+const resolveEventDate = (event: TimelineEvent): Date | null => {
+  // Real date (year > 1)
+  if (event.storyDate && event.storyDate.getFullYear() > 1) {
+    return event.storyDate
+  }
+  // dayOffset → synthetic date starting at year 1
+  if (event.dayOffset !== null && event.dayOffset !== undefined) {
+    return new Date(1, 0, 1 + event.dayOffset)
+  }
+  // Synthetic storyDate (year === 1) — use as-is
+  if (event.storyDate) {
+    return event.storyDate
+  }
+  return null
+}
+
 // Build timeline items
 const buildItems = computed(() => {
   const items: DataItem[] = []
 
   for (const event of props.events) {
-    if (!event.storyDate) continue
+    const date = resolveEventDate(event)
+    if (!date) continue
 
     const color = narrativeOrderColors[event.narrativeOrder] || '#6b7280'
     const entityNames = getEventEntities(event)
@@ -198,7 +224,7 @@ const buildItems = computed(() => {
         <span class="item-text">${truncate(event.description, 40)}</span>
         ${entityNames.length > 0 ? `<span class="item-entities">${entityNames.slice(0, 2).join(', ')}${entityNames.length > 2 ? '...' : ''}</span>` : ''}
       </div>`,
-      start: event.storyDate,
+      start: date,
       group: getGroupId(event),
       className: `event-${event.narrativeOrder}`,
       style: `background-color: ${color}; border-color: ${color};`,
@@ -341,24 +367,26 @@ const initTimeline = () => {
   })
 }
 
-// Get min date from events
+// Get min date from events (considers resolved dates including synthetic)
 const getMinDate = (): Date => {
   let min = new Date()
   for (const event of props.events) {
-    if (event.storyDate && event.storyDate < min) {
-      min = event.storyDate
+    const date = resolveEventDate(event)
+    if (date && date < min) {
+      min = date
     }
   }
   // Add some padding
   return new Date(min.getTime() - 1000 * 60 * 60 * 24 * 30)  // 30 days before
 }
 
-// Get max date from events
+// Get max date from events (considers resolved dates including synthetic)
 const getMaxDate = (): Date => {
   let max = new Date(0)
   for (const event of props.events) {
-    if (event.storyDate && event.storyDate > max) {
-      max = event.storyDate
+    const date = resolveEventDate(event)
+    if (date && date > max) {
+      max = date
     }
   }
   // Add some padding

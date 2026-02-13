@@ -32,6 +32,7 @@ export function transformTimelineEvent(apiEvent: ApiTimelineEvent): TimelineEven
     weekday: apiEvent.weekday ?? null,
     discoursePosition: apiEvent.discourse_position,
     narrativeOrder: apiEvent.narrative_order,
+    temporalInstanceId: apiEvent.temporal_instance_id ?? null,
     entityIds: apiEvent.entity_ids || [],
     confidence: apiEvent.confidence
   }
@@ -69,14 +70,18 @@ export function transformTimeline(apiResponse: ApiTimelineResponse): Timeline {
     }
   }
 
+  const events = (apiResponse.events || []).map(transformTimelineEvent)
+
   return {
-    events: (apiResponse.events || []).map(transformTimelineEvent),
+    events,
     markersCount: apiResponse.markers_count || 0,
     anchorCount: apiResponse.anchor_count || 0,
     analepsiCount: apiResponse.analepsis_count || 0,
     prolepsiCount: apiResponse.prolepsis_count || 0,
     timeSpan,
     mermaid: apiResponse.mermaid || '',
-    inconsistencies: (apiResponse.inconsistencies || []).map(transformInconsistency)
+    inconsistencies: (apiResponse.inconsistencies || []).map(transformInconsistency),
+    truncated: apiResponse.truncated ?? false,
+    totalEvents: apiResponse.total_events ?? events.length,
   }
 }

@@ -143,6 +143,14 @@
 
     <!-- Main Content -->
     <div v-else class="timeline-content">
+      <!-- Truncation Warning -->
+      <div v-if="timeline.truncated" class="truncation-warning">
+        <i class="pi pi-exclamation-triangle"></i>
+        <span>
+          Se muestran {{ timeline.events.length }} de {{ timeline.totalEvents }} eventos.
+          Los restantes se omitieron para mantener el rendimiento.
+        </span>
+      </div>
       <!-- Vista Horizontal (vis-timeline) -->
       <template v-if="viewMode === 'horizontal'">
         <VisTimeline
@@ -197,34 +205,84 @@
               </Tag>
             </div>
             <div v-if="group.isExpanded" class="chapter-events">
-              <TimelineEventVue
-                v-for="(event, index) in group.events"
-                :key="event.id"
-                :event="event"
-                :entity-names="getEntityNames(event.entityIds)"
-                :is-selected="selectedEvent?.id === event.id"
-                :is-hovered="hoveredEvent?.id === event.id"
-                :show-connector="index < group.events.length - 1"
-                @click="handleEventClick"
-                @hover="handleEventHover"
-              />
+              <template v-for="(event, index) in group.events" :key="event.id">
+                <TimelineEventVue
+                  :event="event"
+                  :entity-names="getEntityNames(event.entityIds)"
+                  :is-selected="selectedEvent?.id === event.id"
+                  :is-hovered="hoveredEvent?.id === event.id"
+                  :show-connector="index < group.events.length - 1"
+                  :connector-color="getConnectorColor(group.events, index)"
+                  @click="handleEventClick"
+                  @hover="handleEventHover"
+                />
+                <!-- Gap indicator between consecutive events -->
+                <div
+                  v-if="index < group.events.length - 1 && getGapDays(event, group.events[index + 1]) !== null && Math.abs(getGapDays(event, group.events[index + 1])!) > 1"
+                  class="time-gap"
+                  :class="getGapDays(event, group.events[index + 1])! >= 0 ? 'gap-forward' : 'gap-backward'"
+                >
+                  <div class="gap-line"></div>
+                  <span class="gap-label">
+                    <i :class="getGapDays(event, group.events[index + 1])! >= 0 ? 'pi pi-arrow-down' : 'pi pi-arrow-up'"></i>
+                    {{ formatGap(getGapDays(event, group.events[index + 1])!) }}
+                  </span>
+                  <div class="gap-line"></div>
+                </div>
+              </template>
             </div>
           </div>
         </div>
 
-        <!-- Lista de eventos sin agrupar -->
+        <!-- Lista virtualizada para muchos eventos (>100) -->
+        <VirtualScroller
+          v-else-if="shouldVirtualize"
+          :items="filteredEvents"
+          :item-size="140"
+          class="events-list events-virtual"
+        >
+          <template #item="{ item: event, options }">
+            <TimelineEventVue
+              :key="event.id"
+              :event="event"
+              :entity-names="getEntityNames(event.entityIds)"
+              :is-selected="selectedEvent?.id === event.id"
+              :is-hovered="hoveredEvent?.id === event.id"
+              :show-connector="options.index < filteredEvents.length - 1"
+              :connector-color="getConnectorColor(filteredEvents, options.index)"
+              @click="handleEventClick"
+              @hover="handleEventHover"
+            />
+          </template>
+        </VirtualScroller>
+
+        <!-- Lista normal de eventos sin agrupar -->
         <div v-else class="events-list">
-          <TimelineEventVue
-            v-for="(event, index) in filteredEvents"
-            :key="event.id"
-            :event="event"
-            :entity-names="getEntityNames(event.entityIds)"
-            :is-selected="selectedEvent?.id === event.id"
-            :is-hovered="hoveredEvent?.id === event.id"
-            :show-connector="index < filteredEvents.length - 1"
-            @click="handleEventClick"
-            @hover="handleEventHover"
-          />
+          <template v-for="(event, index) in filteredEvents" :key="event.id">
+            <TimelineEventVue
+              :event="event"
+              :entity-names="getEntityNames(event.entityIds)"
+              :is-selected="selectedEvent?.id === event.id"
+              :is-hovered="hoveredEvent?.id === event.id"
+              :show-connector="index < filteredEvents.length - 1"
+              :connector-color="getConnectorColor(filteredEvents, index)"
+              @click="handleEventClick"
+              @hover="handleEventHover"
+            />
+            <!-- Gap indicator between consecutive events -->
+            <div
+              v-if="index < filteredEvents.length - 1 && getGapDays(event, filteredEvents[index + 1]) !== null && Math.abs(getGapDays(event, filteredEvents[index + 1])!) > 1"
+              class="time-gap"
+              :class="getGapDays(event, filteredEvents[index + 1])! >= 0 ? 'gap-forward' : 'gap-backward'"
+            >
+              <div class="gap-line"></div>
+              <span class="gap-label">
+                <i :class="getGapDays(event, filteredEvents[index + 1])! >= 0 ? 'pi pi-arrow-down' : 'pi pi-arrow-up'"></i>
+                {{ formatGap(getGapDays(event, filteredEvents[index + 1])!) }}
+              </span>
+              <div class="gap-line"></div>
+            </div>
+          </template>
         </div>
       </template>
 
@@ -405,6 +463,7 @@ import ProgressSpinner from 'primevue/progressspinner'
 import Dialog from 'primevue/dialog'
 import Divider from 'primevue/divider'
 import Chip from 'primevue/chip'
+import VirtualScroller from 'primevue/virtualscroller'
 import TimelineEventVue from './TimelineEvent.vue'
 import VisTimeline from './VisTimeline.vue'
 import { useWorkspaceStore } from '@/stores/workspace'
@@ -476,6 +535,10 @@ const narrativeOrderOptions = [
   { label: 'Analepsis', value: 'analepsis' },
   { label: 'Prolepsis', value: 'prolepsis' }
 ]
+
+// Virtualización: usar VirtualScroller cuando hay muchos eventos
+const VIRTUAL_THRESHOLD = 100
+const shouldVirtualize = computed(() => filteredEvents.value.length > VIRTUAL_THRESHOLD)
 
 // Agrupación por capítulo
 const groupByChapter = ref(true)  // Agrupar eventos por capítulo por defecto
@@ -753,6 +816,53 @@ const getConfidenceClass = (confidence: number): string => {
   return 'confidence-low'
 }
 
+// Colores por tipo narrativo para conectores
+const narrativeOrderColors: Record<string, string> = {
+  chronological: '#10b981',
+  analepsis: '#3b82f6',
+  prolepsis: '#f59e0b',
+}
+
+// Obtener el color del conector entre dos eventos consecutivos
+const getConnectorColor = (events: TimelineEvent[], index: number): string => {
+  if (index >= events.length - 1) return ''
+  const nextEvent = events[index + 1]
+  return narrativeOrderColors[nextEvent.narrativeOrder] || ''
+}
+
+// Obtener diferencia en dias entre dos eventos
+const getGapDays = (a: TimelineEvent, b: TimelineEvent): number | null => {
+  const aHasDate = a.storyDate && a.storyDate.getFullYear() > 1
+  const bHasDate = b.storyDate && b.storyDate.getFullYear() > 1
+  const aHasOffset = a.dayOffset !== null && a.dayOffset !== undefined
+  const bHasOffset = b.dayOffset !== null && b.dayOffset !== undefined
+
+  if (aHasDate && bHasDate) {
+    return Math.round((b.storyDate!.getTime() - a.storyDate!.getTime()) / (1000 * 60 * 60 * 24))
+  }
+  if (aHasOffset && bHasOffset) {
+    return b.dayOffset! - a.dayOffset!
+  }
+  return null
+}
+
+// Formatear diferencia temporal entre eventos
+const formatGap = (days: number): string => {
+  const abs = Math.abs(days)
+  let text: string
+  if (abs === 0) return ''
+  if (abs === 1) text = '1 dia'
+  else if (abs < 30) text = `${abs} dias`
+  else if (abs < 365) {
+    const months = Math.floor(abs / 30)
+    text = months === 1 ? '1 mes' : `${months} meses`
+  } else {
+    const years = Math.floor(abs / 365)
+    text = years === 1 ? '1 ano' : `${years} anos`
+  }
+  return days > 0 ? `${text} despues` : `${text} antes`
+}
+
 // Handlers
 const handleEventClick = (event: TimelineEvent) => {
   selectedEvent.value = event
@@ -1024,6 +1134,26 @@ watch(() => props.projectId, () => {
   flex-shrink: 0;
 }
 
+/* Truncation Warning */
+.truncation-warning {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  border-radius: 8px;
+  color: #92400e;
+  font-size: 0.875rem;
+}
+
+.truncation-warning i {
+  color: #d97706;
+  font-size: 1.125rem;
+  flex-shrink: 0;
+}
+
 /* Main Content */
 .timeline-content {
   flex: 1;
@@ -1103,6 +1233,19 @@ watch(() => props.projectId, () => {
   gap: 1rem;
 }
 
+/* Virtual scroller */
+.events-virtual {
+  height: calc(100vh - 280px);
+  min-height: 400px;
+}
+
+.events-virtual :deep(.p-virtualscroller-content) {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 0.25rem 0;
+}
+
 .events-list.grouped {
   gap: 0.5rem;
 }
@@ -1154,6 +1297,53 @@ watch(() => props.projectId, () => {
   gap: 0.75rem;
   border-top: 1px solid var(--surface-200);
   background: var(--surface-ground);
+}
+
+/* Time Gap Indicators */
+.time-gap {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.25rem 0;
+  margin: 0.125rem 0 0.125rem 28px;
+}
+
+.time-gap .gap-line {
+  flex: 1;
+  height: 1px;
+}
+
+.time-gap .gap-label {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+  padding: 0.125rem 0.625rem;
+  border-radius: 10px;
+}
+
+.time-gap .gap-label i {
+  font-size: 0.6875rem;
+}
+
+.time-gap.gap-forward .gap-line {
+  background: #10b981;
+}
+
+.time-gap.gap-forward .gap-label {
+  color: #059669;
+  background: #ecfdf5;
+}
+
+.time-gap.gap-backward .gap-line {
+  background: #3b82f6;
+}
+
+.time-gap.gap-backward .gap-label {
+  color: #2563eb;
+  background: #eff6ff;
 }
 
 /* Inconsistencies Panel */
