@@ -1502,20 +1502,19 @@ Semana 3: S11 — NLP Avanzado + S12
 
 > **Mecanismo propuesto por Arquitecto + Lingüista**:
 >
-> 1. **Nivel 1 — Memoria de sesión** (ya parcial): Dismissals persisten, correcciones speaker
->    persisten, merges persisten. Cuando se reanaliza, se aplican. **Falta**: conectar
->    `speaker_corrections` al pipeline (BK-10a).
+> 1. **Nivel 1 — Memoria de sesión** ✅ DONE: Dismissals persisten, correcciones speaker
+>    persisten, merges persisten. Cuando se reanaliza, se aplican. `speaker_corrections`
+>    conectado al pipeline (BK-10a).
 >
-> 2. **Nivel 2 — Recalibración de confianza**: Usar `get_dismissal_stats()` (ya calcula ratio
->    FP por tipo de detector) para ajustar `effective_confidence = original * (1 - fp_rate)`.
->    Si detector X tiene 60% de rechazo → sus alertas bajan de confianza automáticamente.
+> 2. **Nivel 2 — Recalibración de confianza** ✅ DONE (BK-22): `detector_calibration` table,
+>    `_get_calibration_factor()` en AlertEngine. Se recomputa desde alertas actuales.
 >
-> 3. **Nivel 3 — Pesos adaptativos por manuscrito**: Si el corrector consistentemente rechaza
->    alertas de un tipo (ej: "registro informal en diálogos"), el sistema baja la sensibilidad
->    para ese detector en ese manuscrito. Ya existe infraestructura: `adaptive_weights` en
->    `coreference_resolver.py` (`load/save/update_adaptive_weights()`).
+> 3. **Nivel 3 — Pesos adaptativos por manuscrito + per-entity** ✅ DONE: `project_detector_weights`
+>    table (schema v24). Cascading lookup: per-entity → project-level → 1.0. Learning rate
+>    fraccionado para alertas multi-entity. Pesos sobreviven re-análisis (a diferencia del
+>    nivel 2 que recomputa). Entity merge transfiere pesos con media ponderada. 31 tests.
 >
-> **Prioridad**: Nivel 1 → BK-10a (quick win). Nivel 2 → BK-22 (sprint futuro). Nivel 3 → backlog.
+> **Estado**: Los 3 niveles implementados y funcionando.
 
 ### 8c.2 Export — El Puente con Word
 
@@ -2093,7 +2092,7 @@ Infraestructura existente (55% — backend core completo):
 | ~~**Filtrado alertas por capítulos** (BK-27)~~ | ~~Promovido a Sprint S13~~ | — |
 | ~~**Historial de versiones** (BK-28)~~ | ~~Promovido a Sprint S15 (fase 1)~~ | — |
 | ~~**Step-up pricing** (BK-29)~~ | ~~Promovido a Sprint S16~~ | — |
-| ~~**Pesos adaptativos nivel 3**~~ (por manuscrito) | ✅ DONE — `project_detector_weights` table (v23), `update_adaptive_weight()` en AlertEngine, hooks en dismiss/resolve endpoints, 19 tests. Pesos persisten entre re-análisis. | — |
+| ~~**Pesos adaptativos nivel 3**~~ (por manuscrito + per-entity) | ✅ DONE — `project_detector_weights` table (v24), cascading lookup per-entity → project → 1.0, fractional LR para multi-entity, entity merge weight transfer, `_extract_entity_names()` helper, 31 tests. Pesos persisten entre re-análisis. | — |
 | **Integrar Maverick** (BK-01) | Solo inglés por ahora. Monitorizar releases. | Cuando soporte español |
 | **Integrar BookNLP** (BK-02) | Sin release público multilingüe. | Cuando esté disponible |
 | **FlawedFictions benchmark** (BK-03) | Dataset no publicado. | Cuando se publique |
