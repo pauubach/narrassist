@@ -73,10 +73,12 @@ jobs:
 
       - name: Run Ruff
         run: |
-          ruff check src/ tests/ --output-format=github
+          ruff check src/ tests/ api-server/ --output-format=github
 
       - name: Run MyPy
         run: |
+          # Informational: many false positives from dynamic imports and missing stubs.
+          # Not blocking until baseline is established.
           mypy src/narrative_assistant --ignore-missing-imports || true
 
   # Tests de integración (requieren modelos NLP)
@@ -106,6 +108,8 @@ jobs:
 
       - name: Run integration tests
         run: |
+          # Informational: integration tests require NLP models (~2GB) not available in CI.
+          # Full integration suite runs locally. CI captures what it can.
           pytest tests/integration -v --tb=short -x --junitxml=junit-integration.xml || true
 
       - name: Upload test results
@@ -139,6 +143,8 @@ jobs:
 
       - name: Run performance tests
         run: |
+          # Informational: performance tests are slow (~60min) and track regressions.
+          # Only run on manual trigger (workflow_dispatch). Results uploaded as artifacts.
           pytest tests/performance -v --tb=short -m slow --junitxml=junit-perf.xml || true
 
       - name: Upload test results

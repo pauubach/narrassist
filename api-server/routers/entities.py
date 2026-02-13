@@ -5,8 +5,13 @@ Router: entities
 from typing import Optional
 
 import deps
-from deps import (ApiResponse, EntityResponse, _classify_mention_type,
-                  _verify_entity_ownership, logger)
+from deps import (
+    ApiResponse,
+    EntityResponse,
+    _classify_mention_type,
+    _verify_entity_ownership,
+    logger,
+)
 from fastapi import APIRouter, Query
 
 router = APIRouter()
@@ -41,10 +46,8 @@ async def list_entities(
         ApiResponse con lista de entidades
     """
     try:
-        from narrative_assistant.entities.repository import \
-            get_entity_repository
-        from narrative_assistant.persistence.chapter import \
-            get_chapter_repository
+        from narrative_assistant.entities.repository import get_entity_repository
+        from narrative_assistant.persistence.chapter import get_chapter_repository
 
         entity_repo = get_entity_repository()
         entities = entity_repo.get_entities_by_project(project_id)
@@ -194,8 +197,7 @@ async def preview_merge_entities(project_id: int, body: deps.EntityIdsRequest):
         # =====================================================================
         try:
             from narrative_assistant.entities.fusion import EntityFusionService
-            from narrative_assistant.entities.semantic_fusion import \
-                get_semantic_fusion_service
+            from narrative_assistant.entities.semantic_fusion import get_semantic_fusion_service
 
             semantic_service = get_semantic_fusion_service()
             fusion_service = EntityFusionService(repository=entity_repo)
@@ -720,8 +722,7 @@ async def get_entity(project_id: int, entity_id: int):
         ApiResponse con los datos de la entidad
     """
     try:
-        from narrative_assistant.persistence.chapter import \
-            get_chapter_repository
+        from narrative_assistant.persistence.chapter import get_chapter_repository
 
         # Verificar que la entidad existe y pertenece al proyecto
         entity, error = _verify_entity_ownership(entity_id, project_id)
@@ -1797,8 +1798,7 @@ async def reject_entity_text(project_id: int, body: deps.RejectEntityRequest):
         ApiResponse con confirmación
     """
     try:
-        from narrative_assistant.nlp.entity_validator import \
-            get_entity_validator
+        from narrative_assistant.nlp.entity_validator import get_entity_validator
 
         entity_text = body.entity_text.strip()
         reason = body.reason
@@ -1866,8 +1866,7 @@ async def unreject_entity_text(project_id: int, entity_text: str):
         ApiResponse con confirmación
     """
     try:
-        from narrative_assistant.nlp.entity_validator import \
-            get_entity_validator
+        from narrative_assistant.nlp.entity_validator import get_entity_validator
 
         if not entity_text:
             return ApiResponse(success=False, error="entity_text es requerido")
@@ -2196,8 +2195,7 @@ async def add_project_override(project_id: int, body: deps.ProjectOverrideReques
         ApiResponse con confirmación
     """
     try:
-        from narrative_assistant.entities.filters import (
-            FilterAction, get_filter_repository)
+        from narrative_assistant.entities.filters import FilterAction, get_filter_repository
 
         entity_name = body.entity_name.strip()
         action = body.action
@@ -2554,119 +2552,4 @@ async def delete_entity_attribute(project_id: int, entity_id: int, attribute_id:
 
     except Exception as e:
         logger.error(f"Error deleting attribute {attribute_id}: {e}", exc_info=True)
-        return ApiResponse(success=False, error="Error interno del servidor")
-
-
-# ===== Glosario de usuario (BK-17) =====
-
-
-@router.get("/api/projects/{project_id}/glossary", response_model=ApiResponse)
-async def list_glossary(project_id: int):
-    """Lista todos los términos del glosario de un proyecto."""
-    try:
-        from narrative_assistant.persistence.database import get_database
-
-        db = get_database()
-        with db.connection() as conn:
-            rows = conn.execute(
-                "SELECT id, term, entity_type, confidence, created_at "
-                "FROM user_glossary WHERE project_id = ? ORDER BY term",
-                (project_id,),
-            ).fetchall()
-
-        entries = [
-            {
-                "id": r[0],
-                "term": r[1],
-                "entity_type": r[2],
-                "confidence": r[3],
-                "created_at": r[4],
-            }
-            for r in rows
-        ]
-        return ApiResponse(success=True, data=entries)
-
-    except Exception as e:
-        logger.error(f"Error listing glossary: {e}", exc_info=True)
-        return ApiResponse(success=False, error="Error interno del servidor")
-
-
-@router.post("/api/projects/{project_id}/glossary", response_model=ApiResponse)
-async def add_glossary_term(project_id: int, body: dict):
-    """
-    Añade un término al glosario.
-
-    Body: {"term": "Winterfell", "entity_type": "LOC", "confidence": 1.0}
-    """
-    try:
-        term = body.get("term", "").strip()
-        entity_type = body.get("entity_type", "PER").upper()
-        confidence = float(body.get("confidence", 1.0))
-
-        if not term or len(term) < 2:
-            return ApiResponse(
-                success=False, error="El término debe tener al menos 2 caracteres"
-            )
-
-        if entity_type not in ("PER", "LOC", "ORG", "MISC"):
-            return ApiResponse(
-                success=False, error="entity_type debe ser PER, LOC, ORG o MISC"
-            )
-
-        from narrative_assistant.persistence.database import get_database
-
-        db = get_database()
-        with db.connection() as conn:
-            conn.execute(
-                "INSERT OR REPLACE INTO user_glossary (project_id, term, entity_type, confidence) "
-                "VALUES (?, ?, ?, ?)",
-                (project_id, term, entity_type, confidence),
-            )
-            conn.commit()
-            row = conn.execute(
-                "SELECT id FROM user_glossary WHERE project_id = ? AND term = ? AND entity_type = ?",
-                (project_id, term, entity_type),
-            ).fetchone()
-
-        return ApiResponse(
-            success=True,
-            data={
-                "id": row[0],
-                "term": term,
-                "entity_type": entity_type,
-                "confidence": confidence,
-            },
-            message=f"Término '{term}' añadido al glosario",
-        )
-
-    except Exception as e:
-        logger.error(f"Error adding glossary term: {e}", exc_info=True)
-        return ApiResponse(success=False, error="Error interno del servidor")
-
-
-@router.delete(
-    "/api/projects/{project_id}/glossary/{entry_id}", response_model=ApiResponse
-)
-async def delete_glossary_term(project_id: int, entry_id: int):
-    """Elimina un término del glosario."""
-    try:
-        from narrative_assistant.persistence.database import get_database
-
-        db = get_database()
-        with db.connection() as conn:
-            result = conn.execute(
-                "DELETE FROM user_glossary WHERE id = ? AND project_id = ?",
-                (entry_id, project_id),
-            )
-            conn.commit()
-
-        if result.rowcount == 0:
-            return ApiResponse(success=False, error="Término no encontrado")
-
-        return ApiResponse(
-            success=True, data={"id": entry_id}, message="Término eliminado"
-        )
-
-    except Exception as e:
-        logger.error(f"Error deleting glossary term: {e}", exc_info=True)
         return ApiResponse(success=False, error="Error interno del servidor")

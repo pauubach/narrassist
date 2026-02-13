@@ -16,6 +16,12 @@ from typing import Any
 import deps
 from deps import generate_person_aliases, logger
 
+
+class AnalysisCancelledError(Exception):
+    """Excepción tipada para cancelación de análisis por el usuario."""
+    pass
+
+
 # ============================================================================
 # ProgressTracker: encapsula toda la lógica de progreso
 # ============================================================================
@@ -174,7 +180,7 @@ class ProgressTracker:
                 self.project_id, {}
             ).get("status") == "cancelled"
         if cancelled:
-            raise Exception("Análisis cancelado por el usuario")
+            raise AnalysisCancelledError("Análisis cancelado por el usuario")
 
     def persist_progress(self):
         """Persiste el progreso actual en la BD."""
@@ -2882,6 +2888,19 @@ def handle_analysis_error(ctx: dict, error: Exception):
 
     project_id = ctx["project_id"]
     project = ctx["project"]
+
+    # Cancelación por el usuario: no es un error, es una acción intencional
+    if isinstance(error, AnalysisCancelledError):
+        logger.info(f"Analysis cancelled by user for project {project_id}")
+        deps.analysis_progress_storage[project_id]["status"] = "cancelled"
+        deps.analysis_progress_storage[project_id]["current_phase"] = "Análisis cancelado por el usuario"
+        try:
+            project.analysis_status = "cancelled"
+            proj_manager = ProjectManager(ctx["db_session"])
+            proj_manager.update(project)
+        except Exception as db_error:
+            logger.error(f"Failed to update project status to cancelled: {db_error}")
+        return
 
     logger.exception(f"Error during analysis for project {project_id}: {error}")
     deps.analysis_progress_storage[project_id]["status"] = "error"

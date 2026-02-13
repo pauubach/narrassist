@@ -6,6 +6,122 @@ El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1
 
 ---
 
+## [0.9.3] - 2026-02-10
+
+### Added
+- SP-2: Licensing revision
+- SP-3: Export/import trabajo editorial (.narrassist format)
+- BK-16: Chekhov tracker for supporting characters
+- BK-13: Pro-drop ambiguity scoring with multi-factor saliency
+- BK-14: LocationOntology with hierarchy, gazetteer, and reachability
+- BK-11: TemporalMap + NonLinearDetector for non-linear narratives
+- BK-10b/c: Scene breaks + confidence decay in speaker attribution
+- BK-17: Glossary-to-NER pipeline injection
+- BK-15: Emotional masking detection in OOC
+- BK-09: Migrate all FK references on entity merge
+
+### Fixed
+- Undo-merge preserved across re-analysis
+
+---
+
+## [0.9.0] - 2026-02-07
+
+### Added
+- SP-1: Re-analysis work preservation (alerts, merges, dismissals)
+- Licensing revision + work preservation plan (SP-1/SP-2/SP-3)
+
+---
+
+## [0.8.6] - 2026-02-06
+
+### Fixed
+- StructureDetector.detect() wrong call signature in analysis phases
+
+---
+
+## [0.8.5] - 2026-02-05
+
+### Added
+- Retry logic for HuggingFace downloads
+- Model verify button in Settings
+
+---
+
+## [0.8.2] - 2026-02-04
+
+### Added
+- Character evolution charts: presence/sentiment by chapter, location transitions (S9)
+
+---
+
+## [0.8.1] - 2026-02-03
+
+### Added
+- Unified download progress
+- Anachronisms panel
+- Character profile modal (BK-23a, S7b-09, S7b-10)
+
+---
+
+## [0.8.0] - 2026-02-02
+
+### Added
+- Granular enrichment invalidation system (S8c)
+- Tab status badges, friendly empty states, failed overlay (S8b)
+- Cache-first reads to relationships and archetypes endpoints (S8a-13)
+- Visual polish: skeleton loaders, z-index tokens (BK-23b, BK-23c)
+- Detector confidence recalibration from dismissal history (BK-22)
+- Speaker corrections UI (BK-20)
+- Inline attribute add/edit/delete in EntitiesTab (BK-19)
+- Attribute conflict resolution in entity merge wizard (BK-21)
+
+### Fixed
+- Race condition guards, localStorage quota handling, API retry with backoff
+- XSS defense-in-depth (DOMPurify) + TextHighlighter O(n²) → sweep-line
+
+---
+
+## [0.7.22] - 2026-02-01
+
+### Changed
+- Refactor: extract NER monolith (4237→1583 lines)
+- 253 frontend tests added (186→439 total)
+- Extract monoliths into mixins (attributes, coreference, unified_analysis)
+
+---
+
+## [0.7.21] - 2026-01-31
+
+### Added
+- S8a enrichment pipeline: 13-phase analysis, cache-first endpoints, 3-tier concurrency
+
+---
+
+## [0.7.20] - 2026-01-31
+
+### Added
+- S8a pipeline persistence + monolith extraction + expert backlog (BK-09..18)
+
+---
+
+## [0.7.18] - 2026-01-30
+
+### Added
+- S7b-d sprint: feature gating, pipeline fixes, UX, model download fix
+
+---
+
+## [0.7.17] - 2026-01-30
+
+### Added
+- S7a licensing migration (modules→features, manuscripts→pages, rollover)
+
+### Fixed
+- Ruff lint errors in licensing (import sort, unused import, dict.keys)
+
+---
+
 ## [0.3.22] - 2026-01-29
 
 ### Added
@@ -458,6 +574,6 @@ Las versiones 0.0.x fueron desarrollo interno sin changelog formal.
 
 ---
 
-*Documento actualizado: 2026-02-04*
+*Documento actualizado: 2026-02-13*
 
 > **Nota**: Para el estado actual completo del proyecto, ver [PROJECT_STATUS.md](PROJECT_STATUS.md) y [IMPROVEMENT_PLAN.md](IMPROVEMENT_PLAN.md).
