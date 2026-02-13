@@ -1,10 +1,11 @@
 """
-Repositorio de snapshots de análisis (BK-05).
+Repositorio de snapshots de análisis (BK-05, BK-25).
 
-Captura el estado de alertas y entidades antes de re-analizar,
-permitiendo comparar el estado antes/después.
+Captura el estado de alertas, entidades y textos de capítulos antes de
+re-analizar, permitiendo comparar el estado antes/después con content diffing.
 """
 
+import hashlib
 import json
 import logging
 from dataclasses import dataclass
@@ -32,6 +33,7 @@ class SnapshotAlert:
     entity_ids: str = "[]"
     related_entity_names: str = "[]"
     extra_data: str = "{}"
+    snapshot_alert_id: int | None = None  # S14: ID for alert linking
 
 
 @dataclass
@@ -189,10 +191,32 @@ class SnapshotRepository:
                         ),
                     )
 
+                # Copiar textos de capítulos para content diffing (S14, BK-25)
+                chapters = conn.execute(
+                    """SELECT chapter_number, content
+                       FROM chapters WHERE project_id = ?
+                       ORDER BY chapter_number""",
+                    (project_id,),
+                ).fetchall()
+                chapter_count = 0
+                for ch in chapters:
+                    ch_hash = hashlib.md5(
+                        (ch[1] or "").encode("utf-8")
+                    ).hexdigest()
+                    conn.execute(
+                        """INSERT INTO snapshot_chapters
+                           (snapshot_id, project_id, chapter_number,
+                            content_hash, content_text)
+                           VALUES (?, ?, ?, ?, ?)""",
+                        (snapshot_id, project_id, ch[0], ch_hash, ch[1] or ""),
+                    )
+                    chapter_count += 1
+
                 conn.commit()
                 logger.info(
                     f"Snapshot {snapshot_id} created for project {project_id}: "
-                    f"{alert_count} alerts, {entity_count} entities"
+                    f"{alert_count} alerts, {entity_count} entities, "
+                    f"{chapter_count} chapters"
                 )
                 return snapshot_id
 
@@ -231,7 +255,7 @@ class SnapshotRepository:
             rows = conn.execute(
                 """SELECT alert_type, category, severity, title, description,
                           chapter, start_char, end_char, excerpt, content_hash,
-                          confidence, entity_ids, related_entity_names, extra_data
+                          confidence, entity_ids, related_entity_names, extra_data, id
                    FROM snapshot_alerts WHERE snapshot_id = ?""",
                 (snapshot_id,),
             ).fetchall()
@@ -244,6 +268,7 @@ class SnapshotRepository:
                     entity_ids=r[11] or "[]",
                     related_entity_names=r[12] or "[]",
                     extra_data=r[13] or "{}",
+                    snapshot_alert_id=r[14] if len(r) > 14 else None,
                 )
                 for r in rows
             ]
@@ -266,6 +291,23 @@ class SnapshotRepository:
                 )
                 for r in rows
             ]
+
+    def get_snapshot_chapter_texts(self, snapshot_id: int) -> dict[int, str]:
+        """
+        Obtiene los textos de capítulos de un snapshot.
+
+        Returns:
+            Dict {chapter_number: content_text}.
+        """
+        db = self._get_db()
+        with db.connection() as conn:
+            rows = conn.execute(
+                """SELECT chapter_number, content_text
+                   FROM snapshot_chapters WHERE snapshot_id = ?
+                   ORDER BY chapter_number""",
+                (snapshot_id,),
+            ).fetchall()
+            return {r[0]: r[1] for r in rows}
 
     def cleanup_old_snapshots(self, project_id: int, keep: int = MAX_SNAPSHOTS_PER_PROJECT) -> int:
         """

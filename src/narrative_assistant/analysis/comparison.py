@@ -25,6 +25,11 @@ class AlertDiff:
     chapter: int | None = None
     confidence: float = 0.8
     content_hash: str = ""
+    # S14: Revision Intelligence fields
+    resolution_reason: str = ""  # "text_changed", "detector_improved", ""
+    match_confidence: float = 0.0  # Confianza del matching (0-1)
+    start_char: int | None = None
+    end_char: int | None = None
 
 
 @dataclass
@@ -73,13 +78,17 @@ class ComparisonReport:
                 "new": [
                     {"alert_type": a.alert_type, "category": a.category,
                      "severity": a.severity, "title": a.title,
-                     "chapter": a.chapter, "confidence": a.confidence}
+                     "chapter": a.chapter, "confidence": a.confidence,
+                     "start_char": a.start_char, "end_char": a.end_char}
                     for a in self.alerts_new
                 ],
                 "resolved": [
                     {"alert_type": a.alert_type, "category": a.category,
                      "severity": a.severity, "title": a.title,
-                     "chapter": a.chapter, "confidence": a.confidence}
+                     "chapter": a.chapter, "confidence": a.confidence,
+                     "resolution_reason": a.resolution_reason,
+                     "match_confidence": a.match_confidence,
+                     "start_char": a.start_char, "end_char": a.end_char}
                     for a in self.alerts_resolved
                 ],
                 "unchanged": self.alerts_unchanged,
@@ -159,17 +168,46 @@ class ComparisonService:
                 else False
             )
 
+            # === CONTENT DIFFING (S14) ===
+            doc_diff = None
+            if fp_changed:
+                try:
+                    old_chapter_texts = snapshot_repo.get_snapshot_chapter_texts(
+                        snapshot.snapshot_id
+                    )
+                    if old_chapter_texts:
+                        current_chapter_texts = {}
+                        ch_rows = conn.execute(
+                            """SELECT chapter_number, content
+                               FROM chapters WHERE project_id = ?""",
+                            (project_id,),
+                        ).fetchall()
+                        for ch_row in ch_rows:
+                            current_chapter_texts[ch_row[0]] = ch_row[1] or ""
+
+                        from .content_diff import compute_chapter_diffs
+                        doc_diff = compute_chapter_diffs(
+                            old_chapter_texts, current_chapter_texts
+                        )
+                        logger.info(
+                            f"Content diff computed: {len(doc_diff.chapter_diffs)} chapters, "
+                            f"added={doc_diff.chapters_added}, removed={doc_diff.chapters_removed}"
+                        )
+                except Exception as e:
+                    logger.warning(f"Content diff failed (non-fatal): {e}")
+
             # === ALERTAS ===
             old_alerts = snapshot_repo.get_snapshot_alerts(snapshot.snapshot_id)
             current_alerts = conn.execute(
                 """SELECT alert_type, category, severity, title, description,
-                          chapter, content_hash, confidence, entity_ids
+                          chapter, content_hash, confidence, entity_ids,
+                          start_char, end_char, id
                    FROM alerts WHERE project_id = ?""",
                 (project_id,),
             ).fetchall()
 
             alerts_new, alerts_resolved, alerts_unchanged = self._diff_alerts(
-                old_alerts, current_alerts, conn
+                old_alerts, current_alerts, conn, doc_diff=doc_diff
             )
 
             # === ENTIDADES ===
@@ -201,11 +239,109 @@ class ComparisonService:
             total_entities_after=len(current_entities),
         )
 
-    def _diff_alerts(self, old_alerts, current_alerts_rows, conn) -> tuple:
+    def compare_and_link(self, project_id: int) -> ComparisonReport | None:
         """
-        Two-pass alert matching:
+        Compare + write alert links to DB (S14, BK-25).
+
+        Calls compare() and then writes previous_snapshot_alert_id,
+        match_confidence, and resolution_reason to matching current alerts.
+        """
+        from ..persistence.snapshot import SnapshotRepository
+
+        snapshot_repo = SnapshotRepository(self._get_db())
+        snapshot = snapshot_repo.get_latest_snapshot(project_id)
+        if not snapshot:
+            return None
+
+        report = self.compare(project_id)
+        if report is None:
+            return None
+
+        # Write links: match current alerts to their snapshot predecessors
+        try:
+            self._write_alert_links(project_id, snapshot.snapshot_id)
+        except Exception as e:
+            logger.warning(f"Alert linking failed (non-fatal): {e}")
+
+        return report
+
+    def _write_alert_links(self, project_id: int, snapshot_id: int) -> int:
+        """
+        Write alert links after comparison (S14-06).
+
+        For each current alert that matches a snapshot alert (by content_hash
+        or fuzzy match), writes previous_snapshot_alert_id + match_confidence.
+        For resolved alerts, writes resolution_reason.
+
+        Returns number of links written.
+        """
+        from ..persistence.snapshot import SnapshotRepository
+
+        db = self._get_db()
+        snapshot_repo = SnapshotRepository(db)
+        old_alerts = snapshot_repo.get_snapshot_alerts(snapshot_id)
+        if not old_alerts:
+            return 0
+
+        links_written = 0
+
+        with db.connection() as conn:
+            current_rows = conn.execute(
+                """SELECT id, content_hash, alert_type, chapter, title, entity_ids
+                   FROM alerts WHERE project_id = ?""",
+                (project_id,),
+            ).fetchall()
+
+            # Build lookup from old alerts
+            old_by_hash: dict[str, int] = {}
+            for oa in old_alerts:
+                if oa.content_hash and oa.snapshot_alert_id:
+                    old_by_hash[oa.content_hash] = oa.snapshot_alert_id
+
+            old_by_key: dict[tuple, int] = {}
+            for oa in old_alerts:
+                if oa.snapshot_alert_id:
+                    key = (oa.alert_type, oa.chapter, oa.title)
+                    old_by_key[key] = oa.snapshot_alert_id
+
+            for row in current_rows:
+                alert_id = row[0]
+                content_hash = row[1] or ""
+                alert_type = row[2]
+                chapter = row[3]
+                title = row[4]
+
+                # Pass 1: exact hash match
+                snap_alert_id = old_by_hash.get(content_hash)
+                confidence = 1.0
+
+                # Pass 2: fuzzy key match
+                if snap_alert_id is None:
+                    key = (alert_type, chapter, title)
+                    snap_alert_id = old_by_key.get(key)
+                    confidence = 0.7
+
+                if snap_alert_id is not None:
+                    conn.execute(
+                        """UPDATE alerts
+                           SET previous_snapshot_alert_id = ?,
+                               match_confidence = ?
+                           WHERE id = ?""",
+                        (snap_alert_id, confidence, alert_id),
+                    )
+                    links_written += 1
+
+            conn.commit()
+
+        logger.info(f"Alert linking: {links_written} links written for project {project_id}")
+        return links_written
+
+    def _diff_alerts(self, old_alerts, current_alerts_rows, conn, doc_diff=None) -> tuple:
+        """
+        Three-pass alert matching:
         1. Exact content_hash match
         2. Fuzzy match on (alert_type, chapter, entity_names)
+        3. Proximity matching with content diff (S14)
         """
         # Build current alert dicts
         current = []
@@ -229,11 +365,16 @@ class ComparisonService:
                 "chapter": row[5], "content_hash": row[6] or "",
                 "confidence": row[7] or 0.8,
                 "entity_names": entity_names,
+                "start_char": row[9] if len(row) > 9 else None,
+                "end_char": row[10] if len(row) > 10 else None,
+                "alert_id": row[11] if len(row) > 11 else None,
             })
 
-        # Track matched indices
+        # Track matched indices + match pairs for linking
         old_matched = set()
         new_matched = set()
+        # S14: Map new_index → (old_index, confidence) for alert linking
+        match_pairs: dict[int, tuple[int, float]] = {}
 
         # Pass 1: Exact content_hash
         old_by_hash = {}
@@ -248,6 +389,7 @@ class ComparisonService:
                     if i not in old_matched:
                         old_matched.add(i)
                         new_matched.add(j)
+                        match_pairs[j] = (i, 1.0)
                         break
 
         # Pass 2: Fuzzy match for remaining
@@ -269,12 +411,47 @@ class ComparisonService:
                     if old_names and new_names and old_names & new_names:
                         old_matched.add(i)
                         new_matched.add(j)
+                        match_pairs[j] = (i, 0.8)
                         break
                     # Fallback: title similarity
                     if oa.title and ca["title"] and oa.title == ca["title"]:
                         old_matched.add(i)
                         new_matched.add(j)
+                        match_pairs[j] = (i, 0.7)
                         break
+
+        # Pass 3: Proximity matching with content diff (S14)
+        # For unmatched old alerts, check if their position falls in a removed/modified area
+        resolution_reasons: dict[int, str] = {}  # old_alert_index → reason
+        match_confidences: dict[int, float] = {}  # old_alert_index → confidence
+
+        if doc_diff is not None:
+            from .content_diff import is_position_in_modified_area, is_position_in_removed_range
+
+            for i, oa in enumerate(old_alerts):
+                if i in old_matched:
+                    # Already matched — set confidence from pass (1=exact, 2=fuzzy)
+                    match_confidences[i] = 1.0  # Known match
+                    continue
+                if oa.chapter is None or oa.start_char is None or oa.end_char is None:
+                    continue
+
+                if is_position_in_removed_range(
+                    oa.chapter, oa.start_char, oa.end_char, doc_diff
+                ):
+                    resolution_reasons[i] = "text_changed"
+                    match_confidences[i] = 0.9
+                elif is_position_in_modified_area(
+                    oa.chapter, oa.start_char, oa.end_char, doc_diff
+                ):
+                    resolution_reasons[i] = "text_changed"
+                    match_confidences[i] = 0.7
+
+        # For unmatched old alerts without position info or not near changes
+        for i in range(len(old_alerts)):
+            if i not in old_matched and i not in resolution_reasons:
+                resolution_reasons[i] = "detector_improved"
+                match_confidences[i] = 0.5
 
         # Classify
         alerts_new = [
@@ -286,6 +463,8 @@ class ComparisonService:
                 chapter=current[j]["chapter"],
                 confidence=current[j]["confidence"],
                 content_hash=current[j]["content_hash"],
+                start_char=current[j].get("start_char"),
+                end_char=current[j].get("end_char"),
             )
             for j in range(len(current)) if j not in new_matched
         ]
@@ -299,6 +478,10 @@ class ComparisonService:
                 chapter=old_alerts[i].chapter,
                 confidence=old_alerts[i].confidence,
                 content_hash=old_alerts[i].content_hash,
+                resolution_reason=resolution_reasons.get(i, ""),
+                match_confidence=match_confidences.get(i, 0.0),
+                start_char=old_alerts[i].start_char,
+                end_char=old_alerts[i].end_char,
             )
             for i in range(len(old_alerts)) if i not in old_matched
         ]

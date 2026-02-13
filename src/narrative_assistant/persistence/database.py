@@ -1263,6 +1263,10 @@ class Database:
             ("entity_attributes", "chapter_id", "INTEGER"),
             # v17: Demo project flag (PP-3c)
             ("projects", "is_demo", "INTEGER DEFAULT 0"),
+            # v21: Alert linking para Revision Intelligence (S14, BK-25)
+            ("alerts", "previous_snapshot_alert_id", "INTEGER"),
+            ("alerts", "match_confidence", "REAL"),
+            ("alerts", "resolution_reason", "TEXT"),
         ]
         for table, column, col_def in migrations:
             try:
@@ -1301,6 +1305,18 @@ class Database:
                 UNIQUE (project_id, term, entity_type)
             )""",
             "CREATE INDEX IF NOT EXISTS idx_glossary_project ON user_glossary(project_id)",
+            # v21: Snapshot chapter texts para content diffing (S14, BK-25)
+            """CREATE TABLE IF NOT EXISTS snapshot_chapters (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                snapshot_id INTEGER NOT NULL,
+                project_id INTEGER NOT NULL,
+                chapter_number INTEGER NOT NULL,
+                content_hash TEXT DEFAULT '',
+                content_text TEXT NOT NULL DEFAULT '',
+                FOREIGN KEY (snapshot_id) REFERENCES analysis_snapshots(id) ON DELETE CASCADE,
+                FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+            )""",
+            "CREATE INDEX IF NOT EXISTS idx_snap_chapters_snapshot ON snapshot_chapters(snapshot_id)",
         ]
         for sql in table_migrations:
             try:

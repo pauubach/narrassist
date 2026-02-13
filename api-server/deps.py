@@ -316,6 +316,15 @@ class AlertResponse(BaseModel):
     updated_at: Optional[str] = None
     resolved_at: Optional[str] = None
     extra_data: Optional[dict] = None
+    # S14: Revision Intelligence fields
+    previous_alert_summary: Optional[str] = None
+    match_confidence: Optional[float] = None
+    resolution_reason: Optional[str] = None
+
+
+class MarkResolvedRequest(BaseModel):
+    """Request para confirmar resolución manual de alerta."""
+    resolution_reason: Optional[str] = "manual"
 
 
 class DownloadModelsRequest(BaseModel):

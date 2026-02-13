@@ -93,6 +93,12 @@ export interface Alert {
    * de cada valor conflictivo para navegación múltiple.
    */
   extraData?: AlertExtraData
+  /** S14: Resumen de la alerta previa (si fue vinculada) */
+  previousAlertSummary?: string
+  /** S14: Confianza del matching con alerta anterior (0-1) */
+  matchConfidence?: number
+  /** S14: Razón de resolución (text_changed, detector_improved, manual) */
+  resolutionReason?: string
 }
 
 /** Filtros para alertas */
@@ -111,4 +117,39 @@ export interface AlertStats {
   bySeverity: Record<AlertSeverity, number>
   byCategory: Record<AlertCategory, number>
   byStatus: Record<AlertStatus, number>
+}
+
+// ============================================================================
+// S14: Revision Intelligence domain types
+// ============================================================================
+
+/** Alerta en un diff de comparación */
+export interface ComparisonAlertDiff {
+  alertType: string
+  category: string
+  severity: string
+  title: string
+  chapter?: number
+  confidence: number
+  resolutionReason?: string
+  matchConfidence?: number
+  spanStart?: number
+  spanEnd?: number
+}
+
+/** Detalle completo de comparación entre versiones */
+export interface ComparisonDetail {
+  hasComparison: boolean
+  projectId?: number
+  snapshotId?: number
+  snapshotCreatedAt?: string
+  documentChanged?: boolean
+  alertsNew: ComparisonAlertDiff[]
+  alertsResolved: ComparisonAlertDiff[]
+  alertsUnchanged: number
+  entitiesAdded: { name: string; type: string }[]
+  entitiesRemoved: { name: string; type: string }[]
+  entitiesUnchanged: number
+  totalAlertsBefore: number
+  totalAlertsAfter: number
 }

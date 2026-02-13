@@ -32,6 +32,14 @@ const routes: RouteRecordRaw[] = [
     })
   },
   {
+    path: '/projects/:id/revision',
+    name: 'revision',
+    component: () => import('../views/RevisionView.vue'),
+    meta: {
+      title: 'Revision Intelligence - Narrative Assistant'
+    }
+  },
+  {
     // Redirigir la ruta legacy de alertas al tab de alertas del proyecto
     path: '/projects/:id/alerts',
     name: 'alerts',

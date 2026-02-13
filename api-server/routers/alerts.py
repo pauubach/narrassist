@@ -154,6 +154,14 @@ async def list_alerts(
         alerts_data = []
         for a in alerts:
             resolved_start, resolved_end = _resolve_alert_positions(a, chapters_cache)
+            # S14: Build previous alert summary if linked
+            prev_summary = None
+            match_conf = getattr(a, 'match_confidence', None)
+            resolution_reason = getattr(a, 'resolution_reason', None)
+            prev_snap_id = getattr(a, 'previous_snapshot_alert_id', None)
+            if prev_snap_id:
+                prev_summary = f"Linked to snapshot alert #{prev_snap_id}"
+
             alerts_data.append(AlertResponse(
                 id=a.id,
                 project_id=a.project_id,
@@ -176,6 +184,9 @@ async def list_alerts(
                 updated_at=a.updated_at.isoformat() if hasattr(a, 'updated_at') and a.updated_at else None,
                 resolved_at=a.resolved_at.isoformat() if hasattr(a, 'resolved_at') and a.resolved_at else None,
                 extra_data=getattr(a, 'extra_data', None) or {},
+                previous_alert_summary=prev_summary,
+                match_confidence=match_conf,
+                resolution_reason=resolution_reason,
             ))
 
         return ApiResponse(success=True, data=alerts_data)
@@ -635,6 +646,85 @@ async def delete_suppression_rule(project_id: int, rule_id: int):
         return ApiResponse(success=True, message="Regla eliminada")
     except Exception as e:
         logger.error(f"Error deleting suppression rule {rule_id}: {e}", exc_info=True)
+        return ApiResponse(success=False, error="Error interno del servidor")
+
+
+# =========================================================================
+# S14: Revision Intelligence endpoints
+# =========================================================================
+
+
+@router.put("/api/projects/{project_id}/alerts/{alert_id}/mark-resolved", response_model=ApiResponse)
+async def mark_alert_resolved(project_id: int, alert_id: int, body: deps.MarkResolvedRequest):
+    """
+    Confirma manualmente la resolución de una alerta (S14-07).
+
+    Marca como resuelta y registra el motivo (manual, text_changed, etc.).
+    """
+    try:
+        alert, error = _verify_alert_ownership(alert_id, project_id)
+        if error:
+            return error
+
+        alert.status = AlertStatus.RESOLVED
+
+        deps.alert_repository.update(alert)
+
+        # Write resolution_reason to DB
+        try:
+            from narrative_assistant.persistence.database import get_database
+            db = get_database()
+            with db.connection() as conn:
+                conn.execute(
+                    """UPDATE alerts SET resolution_reason = ? WHERE id = ?""",
+                    (body.resolution_reason or "manual", alert_id),
+                )
+                conn.commit()
+        except Exception:
+            pass  # Column may not exist in older schemas
+
+        logger.info(
+            f"Alert {alert_id} marked resolved: reason={body.resolution_reason}"
+        )
+        return ApiResponse(
+            success=True,
+            data={"id": alert_id, "status": "resolved", "resolution_reason": body.resolution_reason},
+            message="Alerta marcada como resuelta",
+        )
+    except Exception as e:
+        logger.error(f"Error marking alert {alert_id} resolved: {e}", exc_info=True)
+        return ApiResponse(success=False, error="Error interno del servidor")
+
+
+@router.get("/api/projects/{project_id}/comparison/detail", response_model=ApiResponse)
+async def get_comparison_detail(project_id: int):
+    """
+    Obtiene el detalle completo de la última comparación (S14-07).
+
+    Incluye alertas nuevas, resueltas (con resolution_reason), y sin cambio.
+    """
+    try:
+        from narrative_assistant.analysis.comparison import ComparisonService
+
+        service = ComparisonService()
+        report = service.compare(project_id)
+
+        if report is None:
+            return ApiResponse(
+                success=True,
+                data={"has_comparison": False},
+                message="No hay comparación disponible",
+            )
+
+        return ApiResponse(
+            success=True,
+            data={
+                "has_comparison": True,
+                **report.to_dict(),
+            },
+        )
+    except Exception as e:
+        logger.error(f"Error getting comparison detail: {e}", exc_info=True)
         return ApiResponse(success=False, error="Error interno del servidor")
 
 

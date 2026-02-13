@@ -82,4 +82,49 @@ export interface ApiAlert {
   resolved_at: string | null
   /** Datos adicionales específicos del tipo de alerta (sources para inconsistencias, etc.) */
   extra_data?: ApiAlertExtraData | null
+  /** S14: Revision Intelligence fields */
+  previous_alert_summary?: string | null
+  match_confidence?: number | null
+  resolution_reason?: string | null
+}
+
+// ============================================================================
+// S14: Comparison / Revision Intelligence API types
+// ============================================================================
+
+export interface ApiComparisonAlertDiff {
+  alert_type: string
+  category: string
+  severity: string
+  title: string
+  chapter: number | null
+  confidence: number
+  resolution_reason?: string
+  match_confidence?: number
+  start_char?: number | null
+  end_char?: number | null
+}
+
+export interface ApiComparisonDetail {
+  has_comparison: boolean
+  project_id?: number
+  snapshot_id?: number
+  snapshot_created_at?: string
+  document_fingerprint_changed?: boolean
+  alerts?: {
+    new: ApiComparisonAlertDiff[]
+    resolved: ApiComparisonAlertDiff[]
+    unchanged: number
+  }
+  entities?: {
+    added: { canonical_name: string; entity_type: string }[]
+    removed: { canonical_name: string; entity_type: string }[]
+    unchanged: number
+  }
+  summary?: {
+    total_alerts_before: number
+    total_alerts_after: number
+    total_entities_before: number
+    total_entities_after: number
+  }
 }

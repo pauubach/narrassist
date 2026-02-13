@@ -11,6 +11,8 @@ import type {
   ApiAlertCategory,
   ApiAlertExtraData,
   ApiAlertSource,
+  ApiComparisonDetail,
+  ApiComparisonAlertDiff,
 } from '../api/alerts'
 
 import type {
@@ -20,6 +22,8 @@ import type {
   AlertCategory,
   AlertExtraData,
   AlertSource,
+  ComparisonDetail,
+  ComparisonAlertDiff,
 } from '../domain/alerts'
 
 import { safeDate } from './projects'
@@ -182,6 +186,9 @@ export function transformAlert(api: ApiAlert): Alert {
     createdAt: safeDate(api.created_at, new Date())!,
     resolvedAt: safeDate(api.resolved_at),
     extraData: transformAlertExtraData(api.extra_data),
+    previousAlertSummary: api.previous_alert_summary ?? undefined,
+    matchConfidence: api.match_confidence ?? undefined,
+    resolutionReason: api.resolution_reason ?? undefined,
   }
 }
 
@@ -287,5 +294,42 @@ export function getAlertLocation(alert: Alert | ApiAlert): {
     chapter: apiAlert.chapter ?? undefined,
     start: apiAlert.start_char ?? undefined,
     end: apiAlert.end_char ?? undefined,
+  }
+}
+
+// =============================================================================
+// S14: Comparison / Revision Intelligence transformers
+// =============================================================================
+
+function transformComparisonAlertDiff(api: ApiComparisonAlertDiff): ComparisonAlertDiff {
+  return {
+    alertType: api.alert_type,
+    category: api.category,
+    severity: api.severity,
+    title: api.title,
+    chapter: api.chapter ?? undefined,
+    confidence: api.confidence,
+    resolutionReason: api.resolution_reason,
+    matchConfidence: api.match_confidence,
+    spanStart: api.start_char ?? undefined,
+    spanEnd: api.end_char ?? undefined,
+  }
+}
+
+export function transformComparisonDetail(api: ApiComparisonDetail): ComparisonDetail {
+  return {
+    hasComparison: api.has_comparison,
+    projectId: api.project_id,
+    snapshotId: api.snapshot_id,
+    snapshotCreatedAt: api.snapshot_created_at,
+    documentChanged: api.document_fingerprint_changed,
+    alertsNew: (api.alerts?.new ?? []).map(transformComparisonAlertDiff),
+    alertsResolved: (api.alerts?.resolved ?? []).map(transformComparisonAlertDiff),
+    alertsUnchanged: api.alerts?.unchanged ?? 0,
+    entitiesAdded: (api.entities?.added ?? []).map(e => ({ name: e.canonical_name, type: e.entity_type })),
+    entitiesRemoved: (api.entities?.removed ?? []).map(e => ({ name: e.canonical_name, type: e.entity_type })),
+    entitiesUnchanged: api.entities?.unchanged ?? 0,
+    totalAlertsBefore: api.summary?.total_alerts_before ?? 0,
+    totalAlertsAfter: api.summary?.total_alerts_after ?? 0,
   }
 }

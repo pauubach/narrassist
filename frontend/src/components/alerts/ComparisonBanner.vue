@@ -1,11 +1,13 @@
 <script setup lang="ts">
 /**
- * ComparisonBanner — resumen de cambios tras reanálisis (BK-25 MVP, S13-07).
+ * ComparisonBanner — resumen de cambios tras reanálisis (BK-25, S13-07 + S14).
  *
  * Muestra un banner con "↓N resueltas · ↑N nuevas · =N sin cambio"
- * tras completar un reanálisis. Clic abre ComparisonDetail modal.
+ * tras completar un reanálisis. Clic navega a RevisionDashboard (S14)
+ * o abre modal de detalle simple.
  */
 import { computed, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import { api } from '@/services/apiClient'
@@ -22,6 +24,8 @@ const props = defineProps<{
   projectId: number
   analysisCompleted?: boolean
 }>()
+
+const router = useRouter()
 
 const summary = ref<ComparisonSummary | null>(null)
 const showDetail = ref(false)
@@ -68,7 +72,7 @@ watch(() => props.analysisCompleted, (val) => {
     class="comparison-banner"
     :class="{ positive: isPositive, negative: isNegative, neutral: !isPositive && !isNegative }"
   >
-    <div class="banner-content" @click="showDetail = true">
+    <div class="banner-content" @click="router.push({ name: 'revision', params: { id: props.projectId } })">
       <i class="pi pi-chart-line banner-icon" />
       <span class="banner-text">
         <span v-if="summary!.resolved > 0" class="resolved-count">

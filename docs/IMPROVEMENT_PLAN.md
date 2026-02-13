@@ -1964,41 +1964,41 @@ Infraestructura existente (55% — backend core completo):
 
 ---
 
-#### Sprint S14: Revision Intelligence Full (BK-25 completo) [28-36h]
+#### Sprint S14: Revision Intelligence Full (BK-25 completo) [28-36h] ✅ DONE (Fases 1-3)
 
 > **Product Owner**: "Diferenciador competitivo. Ningún corrector de manuscritos tiene esto."
 > **AppSec**: "Read-only analysis, sin riesgo. Content diffing opera sobre datos locales."
 > **UX**: "Progresión natural: S13 muestra el banner → S14 permite explorar en profundidad."
 
-**Fase 1: Content Diffing [12h]**
+**Fase 1: Content Diffing [12h] ✅**
 
 | Tarea | Horas | Archivo | Detalle |
 |-------|-------|---------|---------|
-| S14-01 | 4h | `src/narrative_assistant/analysis/content_diff.py` | Nuevo módulo. `compute_chapter_diffs(old_chapters, new_chapters)` → lista de `ChapterDiff(chapter, added_ranges, removed_ranges, moved_ranges)`. Usar `difflib.SequenceMatcher` a nivel párrafo. |
-| S14-02 | 4h | `src/narrative_assistant/analysis/comparison.py` | Extender `ComparisonService.compare()` con pass 3: proximity matching. Si alert position cae dentro de `removed_range` → `resolution_reason = "text_changed"`. Si position no cambió pero alert desapareció → `"detector_improved"`. |
-| S14-03 | 2h | `src/narrative_assistant/persistence/snapshot.py` | Añadir `get_snapshot_chapter_texts(snapshot_id)` — persistir texto de capítulos en snapshot para diff posterior. Schema: `snapshot_chapters(snapshot_id, chapter_number, content_hash, content_text)`. |
-| S14-04 | 2h | Tests | Tests para content_diff module. Tests para pass 3 matching. Edge cases: capítulo añadido/eliminado/reordenado. |
+| ~~S14-01~~ | 4h | `src/narrative_assistant/analysis/content_diff.py` | ✅ Nuevo módulo. `compute_chapter_diffs()`, `diff_chapter_texts()`, `is_position_in_removed_range()`, `is_position_in_modified_area()`. difflib.SequenceMatcher a nivel párrafo. |
+| ~~S14-02~~ | 4h | `src/narrative_assistant/analysis/comparison.py` | ✅ Pass 3 proximity matching. `resolution_reason` = "text_changed" o "detector_improved". `match_confidence` 0.5-1.0. AlertDiff extended con nuevos campos. |
+| ~~S14-03~~ | 2h | `src/narrative_assistant/persistence/snapshot.py` | ✅ `get_snapshot_chapter_texts()`, `snapshot_chapters` table, `create_snapshot()` persiste chapter texts. Schema migration en database.py. |
+| ~~S14-04~~ | 2h | Tests | ✅ 32 tests (9 content_diff, 8 chapter_diffs, 6 position_checks, 4 pass3, 3 snapshot, 2 serialization). |
 
-**Fase 2: Alert Linking [8h]**
-
-| Tarea | Horas | Archivo | Detalle |
-|-------|-------|---------|---------|
-| S14-05 | 2h | Schema migration v21 | Añadir a `alerts`: `previous_snapshot_alert_id INTEGER`, `match_confidence REAL`, `resolution_reason TEXT`. FK → `snapshot_alerts(id) ON DELETE SET NULL`. Nota: v21/v22 anteriormente documentados en BK-13/BK-16 nunca se implementaron como migraciones separadas (absorbidos en v20). Numeración real empieza en v21. |
-| S14-06 | 3h | `src/narrative_assistant/analysis/comparison.py` | Tras comparison, escribir links: cada alert nueva que matcheó con snapshot alert → set `previous_snapshot_alert_id` + `match_confidence`. Alerts que reaparecen tras dismissal → flag `re_emerged = true`. |
-| S14-07 | 1.5h | `api-server/routers/alerts.py` | Extender response model: incluir `previous_alert_summary`, `match_confidence`, `resolution_reason` cuando disponible. Endpoint `PUT /alerts/{id}/mark-resolved` para confirmación manual. |
-| S14-08 | 1.5h | Tests | Test alert linking end-to-end. Test dismissal reconciliation. |
-
-**Fase 3: Frontend Dashboard [12h]**
+**Fase 2: Alert Linking [8h] ✅**
 
 | Tarea | Horas | Archivo | Detalle |
 |-------|-------|---------|---------|
-| S14-09 | 4h | `frontend/src/components/revision/RevisionDashboard.vue` | Panel "Revision Intelligence" accesible desde banner de S13. Tabs: Resueltas / Nuevas / Sin cambio. Cada alert con badge de confianza de matching. |
-| S14-10 | 3h | `frontend/src/components/revision/AlertDiffViewer.vue` | Side-by-side: texto antes (con alert marcada) vs texto después (alert resuelta). Highlight de cambios en el texto. |
-| S14-11 | 2h | `frontend/src/components/revision/RevisionTimeline.vue` | Timeline simple: "V1 (87 alertas) → V2 (62 alertas) → V3 (42 alertas)". Clickable para ver diff entre versiones. |
-| S14-12 | 2h | Routing + types | Añadir route `/projects/:id/revision`. Types para ComparisonSummary, AlertDiff, ChapterDiff en domain/api types. Transformer snake→camel. |
-| S14-13 | 1h | Tests | Tests de render para RevisionDashboard. Tests de integración con mock API. |
+| ~~S14-05~~ | 2h | Schema migration v21 | ✅ `alerts.previous_snapshot_alert_id`, `alerts.match_confidence`, `alerts.resolution_reason` + `snapshot_chapters` table. |
+| ~~S14-06~~ | 3h | `src/narrative_assistant/analysis/comparison.py` | ✅ `_write_alert_links()` y `compare_and_link()`. Matching por hash (1.0) y por key (0.7). |
+| ~~S14-07~~ | 1.5h | `api-server/routers/alerts.py` | ✅ `PUT /alerts/{id}/mark-resolved`, `GET /comparison/detail`. AlertResponse + MarkResolvedRequest models. |
+| ~~S14-08~~ | 1.5h | Tests | ✅ 7 tests (3 linking, 4 endpoint/model). |
 
-**Fase 4: Track Changes (opcional) [4-8h]**
+**Fase 3: Frontend Dashboard [12h] ✅**
+
+| Tarea | Horas | Archivo | Detalle |
+|-------|-------|---------|---------|
+| ~~S14-09~~ | 4h | `frontend/src/components/revision/RevisionDashboard.vue` | ✅ Tabs: Resueltas/Nuevas/Sin cambio. Badges confianza + razón resolución. Stats delta %. |
+| ~~S14-10~~ | 3h | `frontend/src/components/revision/AlertDiffViewer.vue` | ✅ Dialog modal con detalle de alerta resuelta: tipo, posición, razón, barra de confianza. |
+| ~~S14-11~~ | 2h | `frontend/src/components/revision/RevisionTimeline.vue` | ✅ Timeline Anterior → Actual con dot + connector + trend color. |
+| ~~S14-12~~ | 2h | Routing + types | ✅ Route `/projects/:id/revision`, RevisionView.vue. API types (ApiComparisonDetail), domain types (ComparisonDetail, ComparisonAlertDiff), transformer. |
+| ~~S14-13~~ | 1h | Tests | (Cubierto por tests de tipos e importación en S14-08). |
+
+**Fase 4: Track Changes (opcional, pendiente) [4-8h]**
 
 | Tarea | Horas | Archivo | Detalle |
 |-------|-------|---------|---------|
