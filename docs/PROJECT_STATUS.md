@@ -1,11 +1,11 @@
 # Estado Actual del Proyecto
 
-Fecha de verificación: 2026-02-13  
-Fuente de verdad para plan: `docs/IMPROVEMENT_PLAN_EXECUTION_READY_2026-02-13.md`
+Fecha de verificación: 2026-02-13
+Fuente de verdad operativa: `docs/PLAN_ACTIVE.md`
 
 ## Resumen ejecutivo
 
-El proyecto está en un estado funcional alto, con avances reales en S13 y S14.  
+El proyecto está en un estado funcional alto, con avances reales en S13 y S14.
 No obstante, hay desalineaciones entre implementación, pruebas y documentación que conviene cerrar antes de continuar con S15/S16.
 
 ## Estado verificado por sprint
@@ -49,3 +49,6 @@ No obstante, hay desalineaciones entre implementación, pruebas y documentación
 
 El estado largo y legacy anterior se movió a:
 - `docs/_archive/obsolete/PROJECT_STATUS_LEGACY_2026-02-13.md`
+
+El plan transicional usado para esta limpieza se archivó en:
+- `docs/_archive/planning/IMPROVEMENT_PLAN_EXECUTION_READY_2026-02-13.md`

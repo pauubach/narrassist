@@ -1,6 +1,6 @@
 # Plan de Mejora (Execution-Ready)
 
-Fecha: 2026-02-13  
+Fecha: 2026-02-13
 Base: `docs/IMPROVEMENT_PLAN.md` + contraste con código actual
 
 ## 1) Objetivo

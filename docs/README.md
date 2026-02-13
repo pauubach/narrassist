@@ -6,9 +6,9 @@ Ultima actualizacion: 2026-02-13 | Version: 0.9.4
 
 | Documento | Uso |
 |---|---|
+| `PLAN_ACTIVE.md` | Sprints activos, backlog vivo, ideas y criterios operativos |
 | `PROJECT_STATUS.md` | Estado real verificado de implementación |
 | `ROADMAP.md` | Prioridades operativas próximas |
-| `IMPROVEMENT_PLAN_EXECUTION_READY_2026-02-13.md` | Plan ejecutable y criterios de decisión |
 | `IMPROVEMENT_PLAN.md` | Historial completo de planificación y contexto |
 | `CHANGELOG.md` | Historial de cambios por versión |
 | `AUDIT_INDEX.md` | Índice de auditorías activas y archivadas |
@@ -17,8 +17,9 @@ Ultima actualizacion: 2026-02-13 | Version: 0.9.4
 
 1. `00-overview/goals-and-scope.md`
 2. `02-architecture/database-schema.md`
-3. `PROJECT_STATUS.md`
-4. `ROADMAP.md`
+3. `PLAN_ACTIVE.md`
+4. `PROJECT_STATUS.md`
+5. `ROADMAP.md`
 
 ## Estructura recomendada de uso
 
@@ -38,4 +39,5 @@ Ultima actualizacion: 2026-02-13 | Version: 0.9.4
 
 - `PROJECT_STATUS.md` legacy movido a `docs/_archive/obsolete/PROJECT_STATUS_LEGACY_2026-02-13.md`.
 - `ROADMAP.md` legacy movido a `docs/_archive/obsolete/ROADMAP_LEGACY_2026-02-13.md`.
-- Índices de auditoría corregidos para evitar enlaces rotos.
+- Auditorías cerradas movidas a `docs/_archive/audits/`.
+- Plan transicional movido a `docs/_archive/planning/IMPROVEMENT_PLAN_EXECUTION_READY_2026-02-13.md`.
