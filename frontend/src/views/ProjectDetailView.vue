@@ -243,19 +243,24 @@
           </AnalysisRequired>
 
           <!-- Tab Alertas -->
-          <AlertsTab
-            v-else-if="workspaceStore.activeTab === 'alerts'"
-            :alerts="alerts"
-            :chapters="chapters"
-            :loading="loading"
-            :analysis-executed="project.analysisStatus === 'completed'"
-            @alert-select="onAlertSelect"
-            @alert-navigate="onAlertNavigate"
-            @alert-resolve="onAlertResolve"
-            @alert-dismiss="onAlertDismiss"
-            @refresh="loadAlerts(project.id)"
-            @open-correction-config="correctionConfigModalRef?.show()"
-          />
+          <template v-else-if="workspaceStore.activeTab === 'alerts'">
+            <ComparisonBanner
+              :project-id="project.id"
+              :analysis-completed="project.analysisStatus === 'completed'"
+            />
+            <AlertsTab
+              :alerts="alerts"
+              :chapters="chapters"
+              :loading="loading"
+              :analysis-executed="project.analysisStatus === 'completed'"
+              @alert-select="onAlertSelect"
+              @alert-navigate="onAlertNavigate"
+              @alert-resolve="onAlertResolve"
+              @alert-dismiss="onAlertDismiss"
+              @refresh="loadAlerts(project.id)"
+              @open-correction-config="correctionConfigModalRef?.show()"
+            />
+          </template>
 
           <!-- Tab Timeline -->
           <AnalysisRequired
@@ -424,6 +429,7 @@ import { AnalysisRequired } from '@/components/analysis'
 import { TimelineView } from '@/components/timeline'
 import { ChaptersPanel, AlertsPanel, CharactersPanel, AssistantPanel } from '@/components/sidebar'
 import { ProjectSummary, EntityInspector, AlertInspector, ChapterInspector, TextSelectionInspector } from '@/components/inspector'
+import ComparisonBanner from '@/components/alerts/ComparisonBanner.vue'
 import DocumentTypeChip from '@/components/DocumentTypeChip.vue'
 import CorrectionConfigModal from '@/components/workspace/CorrectionConfigModal.vue'
 import type { SidebarTab } from '@/stores/workspace'

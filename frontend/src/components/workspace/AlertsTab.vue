@@ -7,6 +7,7 @@ import MultiSelect from 'primevue/multiselect'
 import Dialog from 'primevue/dialog'
 import DsBadge from '@/components/ds/DsBadge.vue'
 import DsEmptyState from '@/components/ds/DsEmptyState.vue'
+import ChapterRangeSelector from '@/components/alerts/ChapterRangeSelector.vue'
 import SequentialCorrectionMode from './SequentialCorrectionMode.vue'
 import type { Alert, AlertSeverity, AlertStatus, AlertSource } from '@/types'
 import { useAlertUtils } from '@/composables/useAlertUtils'
@@ -101,6 +102,7 @@ onMounted(() => {
 const selectedCategories = ref<string[]>([])
 const selectedStatuses = ref<string[]>(['active'])
 const selectedChapter = ref<number | null>(null)
+const chapterRange = ref<{ min: number | null; max: number | null }>({ min: null, max: null })
 const minConfidence = ref<number | null>(null)
 
 // Opciones de filtros
@@ -169,9 +171,17 @@ const filteredAlerts = computed(() => {
     result = result.filter(a => selectedStatuses.value.includes(a.status))
   }
 
-  // Filtrar por capítulo
+  // Filtrar por capítulo (single o rango)
   if (selectedChapter.value !== null) {
     result = result.filter(a => a.chapter === selectedChapter.value)
+  } else if (chapterRange.value.min != null || chapterRange.value.max != null) {
+    const { min, max } = chapterRange.value
+    result = result.filter(a => {
+      if (a.chapter == null) return false
+      if (min != null && a.chapter < min) return false
+      if (max != null && a.chapter > max) return false
+      return true
+    })
   }
 
   // Filtrar por confianza
@@ -210,6 +220,7 @@ function clearFilters() {
   selectedCategories.value = []
   selectedStatuses.value = ['active']
   selectedChapter.value = null
+  chapterRange.value = { min: null, max: null }
   minConfidence.value = null
 }
 
@@ -339,13 +350,10 @@ function handleNavigateFromSequential(source?: AlertSource) {
           :max-selected-labels="2"
         />
 
-        <Select
-          v-model="selectedChapter"
-          :options="chapterOptions"
-          option-label="label"
-          option-value="value"
-          placeholder="Capítulo"
-          class="chapter-filter"
+        <ChapterRangeSelector
+          :chapters="props.chapters"
+          :project-id="props.projectId"
+          @range-change="chapterRange = $event"
         />
 
         <Select
@@ -369,7 +377,7 @@ function handleNavigateFromSequential(source?: AlertSource) {
         />
 
         <Button
-          v-if="searchQuery || selectedSeverities.length || selectedCategories.length || selectedChapter !== null || minConfidence !== null"
+          v-if="searchQuery || selectedSeverities.length || selectedCategories.length || selectedChapter !== null || chapterRange.min != null || chapterRange.max != null || minConfidence !== null"
           label="Limpiar filtros"
           icon="pi pi-times"
           text

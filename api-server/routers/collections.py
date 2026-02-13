@@ -70,6 +70,29 @@ async def get_comparison(project_id: int):
     return {"has_comparison": True, **report.to_dict()}
 
 
+@router.get("/projects/{project_id}/comparison/summary")
+async def get_comparison_summary(project_id: int):
+    """Resumen compacto de la comparación pre/post reanálisis (S13, BK-25 MVP)."""
+    service = _get_comparison_service()
+    report = service.compare(project_id)
+    if report is None:
+        return {
+            "has_comparison": False,
+            "resolved": 0,
+            "new": 0,
+            "unchanged": 0,
+            "document_changed": False,
+        }
+    d = report.to_dict()
+    return {
+        "has_comparison": True,
+        "resolved": len(d.get("alerts_resolved", [])),
+        "new": len(d.get("alerts_new", [])),
+        "unchanged": d.get("alerts_unchanged", 0),
+        "document_changed": d.get("document_changed", False),
+    }
+
+
 # ==================== BK-07: Collections CRUD ====================
 
 @router.post("/collections")

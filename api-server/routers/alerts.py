@@ -63,6 +63,8 @@ async def list_alerts(
     current_chapter: Optional[int] = None,
     severity: Optional[str] = None,
     focus: bool = False,
+    chapter_min: Optional[int] = None,
+    chapter_max: Optional[int] = None,
 ):
     """
     Lista todas las alertas de un proyecto, opcionalmente priorizadas.
@@ -73,6 +75,8 @@ async def list_alerts(
         current_chapter: Capítulo actual para priorizar alertas cercanas
         severity: Filtrar por severidad (critical, warning, info)
         focus: Si True, modo focus: solo alertas critical y warning con confianza >= 0.7
+        chapter_min: Filtrar alertas desde este capítulo (inclusive)
+        chapter_max: Filtrar alertas hasta este capítulo (inclusive)
 
     Returns:
         ApiResponse con lista de alertas (priorizadas si current_chapter se especifica)
@@ -82,9 +86,18 @@ async def list_alerts(
 
         # Obtener alertas - usar método priorizado si se especifica capítulo
         if current_chapter is not None:
-            result = alert_repo.get_by_project_prioritized(project_id, current_chapter=current_chapter)
+            result = alert_repo.get_by_project_prioritized(
+                project_id,
+                current_chapter=current_chapter,
+                chapter_min=chapter_min,
+                chapter_max=chapter_max,
+            )
         else:
-            result = alert_repo.get_by_project(project_id)
+            result = alert_repo.get_by_project(
+                project_id,
+                chapter_min=chapter_min,
+                chapter_max=chapter_max,
+            )
         if result.is_failure:
             return ApiResponse(success=False, error="Error obteniendo alertas")
 

@@ -132,22 +132,38 @@ class AlertRepository:
             logger.error(f"Failed to get alert {alert_id}: {e}")
             return Result.failure(error)
 
-    def get_by_project(self, project_id: int) -> Result[list[Alert]]:
+    def get_by_project(
+        self,
+        project_id: int,
+        chapter_min: int | None = None,
+        chapter_max: int | None = None,
+    ) -> Result[list[Alert]]:
         """
         Obtiene todas las alertas de un proyecto.
 
         Args:
             project_id: ID del proyecto
+            chapter_min: Filtrar desde este capítulo (inclusive)
+            chapter_max: Filtrar hasta este capítulo (inclusive)
 
         Returns:
             Result con lista de alertas
         """
         try:
+            query = "SELECT * FROM alerts WHERE project_id = ?"
+            params: list = [project_id]
+
+            if chapter_min is not None:
+                query += " AND chapter >= ?"
+                params.append(chapter_min)
+            if chapter_max is not None:
+                query += " AND chapter <= ?"
+                params.append(chapter_max)
+
+            query += " ORDER BY created_at DESC"
+
             with self.db.connection() as conn:
-                cursor = conn.execute(
-                    "SELECT * FROM alerts WHERE project_id = ? ORDER BY created_at DESC",
-                    (project_id,),
-                )
+                cursor = conn.execute(query, params)
                 rows = cursor.fetchall()
 
             alerts = [self._row_to_alert(row) for row in rows]
@@ -167,6 +183,8 @@ class AlertRepository:
         project_id: int,
         current_chapter: int | None = None,
         status_filter: list[AlertStatus] | None = None,
+        chapter_min: int | None = None,
+        chapter_max: int | None = None,
     ) -> Result[list[Alert]]:
         """
         Obtiene alertas priorizadas por relevancia al capítulo actual.
@@ -182,6 +200,8 @@ class AlertRepository:
             project_id: ID del proyecto
             current_chapter: Capítulo que el usuario está viendo (None = sin priorización)
             status_filter: Lista de estados a incluir (None = todos)
+            chapter_min: Filtrar desde este capítulo (inclusive)
+            chapter_max: Filtrar hasta este capítulo (inclusive)
 
         Returns:
             Result con lista de alertas priorizadas
@@ -213,6 +233,14 @@ class AlertRepository:
             nearby_end = chapter_for_priority + 2
 
             params: list = [chapter_for_priority, nearby_start, nearby_end, project_id]
+
+            # Filtro por rango de capítulos (BK-27)
+            if chapter_min is not None:
+                query += " AND chapter >= ?"
+                params.append(chapter_min)
+            if chapter_max is not None:
+                query += " AND chapter <= ?"
+                params.append(chapter_max)
 
             # Añadir filtro de status si se especifica
             if status_filter:
