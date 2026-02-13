@@ -13,135 +13,36 @@ from routers._partial_analysis import PartialAnalysisRequest
 router = APIRouter()
 
 
-def _resume_queued_heavy_analysis(queued_entry: dict):
-    """
-    Resume análisis de un proyecto que completó Tier 1 y estaba esperando el slot pesado.
-
-    Usa el tier1_context guardado para saltar directamente a las fases pesadas
-    sin re-parsear, re-clasificar ni re-detectar capítulos.
-    """
-    import threading
-    import time as time_module
-
-    ctx = queued_entry["tier1_context"]
-    tracker = queued_entry["tracker"]
-    project_id = ctx["project_id"]
-    logger.info(f"Resuming heavy phases for queued project {project_id}")
-
-    def _run_heavy():
-        from routers._analysis_phases import (
-            handle_analysis_error,
-            release_heavy_slot,
-            run_alerts,
-            run_attributes,
-            run_completion,
-            run_consistency,
-            run_finally_cleanup,
-            run_fusion,
-            run_grammar,
-            run_llm_entity_validation,
-            run_ner,
-            run_ollama_healthcheck,
-            run_reconciliation,
-        )
-        from routers._enrichment_phases import (
-            capture_entity_fingerprint,
-            invalidate_enrichment_if_mutated,
-            run_health_enrichment,
-            run_prose_enrichment,
-            run_relationships_enrichment,
-            run_voice_enrichment,
-        )
-
-        try:
-            # Fresh DB session for the new thread
-            ctx["db_session"] = deps.get_database()
-            tracker.db_session = ctx["db_session"]
-            ctx["queued_for_heavy"] = False
-            ctx["heavy_slot_released"] = False
-
-            # Claim heavy slot
-            with deps._progress_lock:
-                deps._heavy_analysis_project_id = project_id
-                deps._heavy_analysis_claimed_at = time_module.time()
-                storage = deps.analysis_progress_storage.get(project_id)
-                if storage:
-                    storage["status"] = "running"
-                    storage["current_phase"] = "Preparando análisis profundo..."
-                    storage["current_action"] = ""
-
-            # Update project status from queued back to analyzing
-            try:
-                from narrative_assistant.persistence.project import ProjectManager
-                project = ctx["project"]
-                project.analysis_status = "analyzing"
-                proj_manager = ProjectManager(ctx["db_session"])
-                proj_manager.update(project)
-            except Exception as e:
-                logger.warning(f"Could not update project status: {e}")
-
-            # Continue from where Tier 1 left off
-            run_ollama_healthcheck(ctx, tracker)
-
-            # Tier 2: Heavy phases (exclusive — one project at a time)
-            run_ner(ctx, tracker)
-            run_llm_entity_validation(ctx, tracker)
-            run_fusion(ctx, tracker)
-            run_attributes(ctx, tracker)
-            run_consistency(ctx, tracker)
-            run_grammar(ctx, tracker)
-            run_alerts(ctx, tracker)
-
-            # Release heavy slot — enrichment is CPU-only
-            release_heavy_slot(ctx)
-
-            # Capture entity fingerprint before enrichment
-            entity_fp = capture_entity_fingerprint(ctx["db_session"], project_id)
-
-            # Tier 3: Enrichment phases (CPU-only)
-            run_relationships_enrichment(ctx, tracker)
-            run_voice_enrichment(ctx, tracker)
-            run_prose_enrichment(ctx, tracker)
-            run_health_enrichment(ctx, tracker)
-
-            # Check for entity mutations during enrichment
-            invalidate_enrichment_if_mutated(ctx["db_session"], project_id, entity_fp)
-
-            # Final reconciliation + completion
-            run_reconciliation(ctx, tracker)
-            run_completion(ctx, tracker)
-
-        except Exception as e:
-            handle_analysis_error(ctx, e)
-
-        finally:
-            run_finally_cleanup(ctx)
-
-    thread = threading.Thread(target=_run_heavy, daemon=True)
-    thread.start()
-
-
 def _start_queued_analysis(queued_entry: dict):
     """
-    Legacy fallback: re-starts full analysis for a queued project.
-
-    Prefer _resume_queued_heavy_analysis when tier1_context is available.
+    Re-lanza el análisis de un proyecto encolado con metadata ligera (F-005).
     """
-    if "tier1_context" in queued_entry:
-        return _resume_queued_heavy_analysis(queued_entry)
-
     import asyncio
     import threading
 
     project_id = queued_entry["project_id"]
-    logger.info(f"Fallback: re-starting full analysis for project {project_id}")
+    mode = queued_entry.get("mode", "full")
+    partial_phases = list(queued_entry.get("partial_phases", []))
+    partial_force = bool(queued_entry.get("partial_force", False))
+    logger.info(f"Auto-start queued analysis for project {project_id} (mode={mode})")
 
     def _trigger():
         try:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             try:
-                loop.run_until_complete(start_analysis(project_id, file=None))
+                if mode == "partial":
+                    if not partial_phases:
+                        logger.warning(
+                            "Queued partial analysis missing phases for project "
+                            f"{project_id}; falling back to full analysis."
+                        )
+                        loop.run_until_complete(start_analysis(project_id, file=None))
+                        return
+                    request = PartialAnalysisRequest(phases=partial_phases, force=partial_force)
+                    loop.run_until_complete(start_partial_analysis(project_id, request))
+                else:
+                    loop.run_until_complete(start_analysis(project_id, file=None))
             finally:
                 loop.close()
         except Exception as e:
@@ -186,7 +87,7 @@ async def reanalyze_project(project_id: int):
         if not project.document_path:
             return ApiResponse(
                 success=False,
-                error="No se encontró la ruta del documento original. Por favor, elimine el proyecto y créelo de nuevo."
+                error="No se encontró la ruta del documento original. Por favor, elimine el proyecto y créelo de nuevo.",
             )
 
         document_path = Path(project.document_path)
@@ -195,10 +96,12 @@ async def reanalyze_project(project_id: int):
         if not document_path.exists():
             return ApiResponse(
                 success=False,
-                error=f"El documento original no se encuentra en: {document_path}. Verifique que el archivo existe."
+                error=f"El documento original no se encuentra en: {document_path}. Verifique que el archivo existe.",
             )
 
-        logger.info(f"Re-analyzing project '{project.name}' (ID: {project_id}) from: {document_path}")
+        logger.info(
+            f"Re-analyzing project '{project.name}' (ID: {project_id}) from: {document_path}"
+        )
 
         # Llamar al endpoint de análisis que tiene el progreso en background
         # El documento ya está guardado en project.document_path
@@ -212,7 +115,7 @@ async def reanalyze_project(project_id: int):
 
 
 @router.post("/api/projects/{project_id}/analyze", response_model=ApiResponse)
-async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None)):
+async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None)):  # noqa: B008
     """
     Inicia el análisis asíncrono de un proyecto.
 
@@ -239,10 +142,10 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
         project = result.value
 
         # Guard de concurrencia: no permitir doble análisis del mismo proyecto
-        if project.analysis_status == "analyzing":
+        if project.analysis_status in ("analyzing", "queued"):
             return ApiResponse(
                 success=False,
-                error="Ya hay un análisis en curso para este proyecto. Espera a que termine."
+                error="Ya hay un análisis en curso para este proyecto. Espera a que termine.",
             )
 
         # Determinar el archivo a usar
@@ -252,13 +155,17 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
         if file and file.filename:
             # Validar tamaño (50 MB máximo)
             MAX_UPLOAD_BYTES = 50 * 1024 * 1024
-            with tempfile.NamedTemporaryFile(delete=False, suffix=Path(file.filename).suffix) as tmp_file:
+            with tempfile.NamedTemporaryFile(
+                delete=False, suffix=Path(file.filename).suffix
+            ) as tmp_file:
                 size = 0
                 while chunk := file.file.read(8192):
                     size += len(chunk)
                     if size > MAX_UPLOAD_BYTES:
                         Path(tmp_file.name).unlink(missing_ok=True)
-                        return ApiResponse(success=False, error="El archivo supera el límite de 50 MB")
+                        return ApiResponse(
+                            success=False, error="El archivo supera el límite de 50 MB"
+                        )
                     tmp_file.write(chunk)
                 tmp_path = Path(tmp_file.name)
             use_temp_file = True
@@ -269,16 +176,14 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
             tmp_path = Path(project.document_path)
             if not tmp_path.exists():
                 return ApiResponse(
-                    success=False,
-                    error=f"El documento no se encuentra: {project.document_path}"
+                    success=False, error=f"El documento no se encuentra: {project.document_path}"
                 )
             use_temp_file = False
             logger.info(f"Analysis started for project {project_id}")
             logger.info(f"Using stored document: {tmp_path}")
         else:
             return ApiResponse(
-                success=False,
-                error="Se requiere un archivo o que el proyecto tenga document_path"
+                success=False, error="Se requiere un archivo o que el proyecto tenga document_path"
             )
 
         # Two-tier concurrency: Phase 1 (parsing/classification/structure) runs immediately
@@ -291,6 +196,7 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
 
         # Inicializar progreso (protegido por lock)
         import time as time_module
+
         now = time_module.time()
         with deps._progress_lock:
             deps.analysis_progress_storage[project_id] = {
@@ -300,19 +206,84 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                 "current_phase": "Iniciando análisis...",
                 "current_action": "Preparando documento",
                 "phases": [
-                    {"id": "parsing", "name": "Lectura del documento", "completed": False, "current": False},
-                    {"id": "classification", "name": "Clasificando tipo de documento", "completed": False, "current": False},
-                    {"id": "structure", "name": "Identificando capítulos", "completed": False, "current": False},
-                    {"id": "ner", "name": "Buscando personajes y lugares", "completed": False, "current": False},
-                    {"id": "fusion", "name": "Unificando entidades", "completed": False, "current": False},
-                    {"id": "attributes", "name": "Analizando características", "completed": False, "current": False},
-                    {"id": "consistency", "name": "Verificando coherencia", "completed": False, "current": False},
-                    {"id": "grammar", "name": "Revisando gramática y ortografía", "completed": False, "current": False},
-                    {"id": "alerts", "name": "Preparando observaciones", "completed": False, "current": False},
-                    {"id": "relationships", "name": "Analizando relaciones", "completed": False, "current": False},
-                    {"id": "voice", "name": "Perfilando voces", "completed": False, "current": False},
-                    {"id": "prose", "name": "Evaluando escritura", "completed": False, "current": False},
-                    {"id": "health", "name": "Salud narrativa", "completed": False, "current": False},
+                    {
+                        "id": "parsing",
+                        "name": "Lectura del documento",
+                        "completed": False,
+                        "current": False,
+                    },
+                    {
+                        "id": "classification",
+                        "name": "Clasificando tipo de documento",
+                        "completed": False,
+                        "current": False,
+                    },
+                    {
+                        "id": "structure",
+                        "name": "Identificando capítulos",
+                        "completed": False,
+                        "current": False,
+                    },
+                    {
+                        "id": "ner",
+                        "name": "Buscando personajes y lugares",
+                        "completed": False,
+                        "current": False,
+                    },
+                    {
+                        "id": "fusion",
+                        "name": "Unificando entidades",
+                        "completed": False,
+                        "current": False,
+                    },
+                    {
+                        "id": "attributes",
+                        "name": "Analizando características",
+                        "completed": False,
+                        "current": False,
+                    },
+                    {
+                        "id": "consistency",
+                        "name": "Verificando coherencia",
+                        "completed": False,
+                        "current": False,
+                    },
+                    {
+                        "id": "grammar",
+                        "name": "Revisando gramática y ortografía",
+                        "completed": False,
+                        "current": False,
+                    },
+                    {
+                        "id": "alerts",
+                        "name": "Preparando observaciones",
+                        "completed": False,
+                        "current": False,
+                    },
+                    {
+                        "id": "relationships",
+                        "name": "Analizando relaciones",
+                        "completed": False,
+                        "current": False,
+                    },
+                    {
+                        "id": "voice",
+                        "name": "Perfilando voces",
+                        "completed": False,
+                        "current": False,
+                    },
+                    {
+                        "id": "prose",
+                        "name": "Evaluando escritura",
+                        "completed": False,
+                        "current": False,
+                    },
+                    {
+                        "id": "health",
+                        "name": "Salud narrativa",
+                        "completed": False,
+                        "current": False,
+                    },
                 ],
                 "metrics": {},
                 "estimated_seconds_remaining": 60,
@@ -362,7 +333,8 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
             )
 
             start_time = time.time()
-            phases = deps.analysis_progress_storage[project_id]["phases"]
+            with deps._progress_lock:
+                phases = deps.analysis_progress_storage[project_id]["phases"]
 
             phase_weights = {
                 "parsing": 0.01,
@@ -380,10 +352,19 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                 "health": 0.06,
             }
             phase_order = [
-                "parsing", "classification", "structure",
-                "ner", "fusion", "attributes",
-                "consistency", "grammar", "alerts",
-                "relationships", "voice", "prose", "health",
+                "parsing",
+                "classification",
+                "structure",
+                "ner",
+                "fusion",
+                "attributes",
+                "consistency",
+                "grammar",
+                "alerts",
+                "relationships",
+                "voice",
+                "prose",
+                "health",
             ]
 
             # --- S8a-14: Thin orchestrator using extracted phase functions ---
@@ -406,6 +387,7 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                 "use_temp_file": use_temp_file,
                 "start_time": start_time,
                 "queued_for_heavy": False,
+                "queue_mode": "full",
             }
 
             try:
@@ -428,6 +410,7 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                         f"queued for heavy (slot busy: #{deps._heavy_analysis_project_id})"
                     )
                     from narrative_assistant.persistence.project import ProjectManager
+
                     project.analysis_status = "queued"
                     proj_manager = ProjectManager(db_session)
                     proj_manager.update(project)
@@ -471,7 +454,6 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
             finally:
                 run_finally_cleanup(ctx)
 
-
         # Pre-check: verificar que los modelos críticos están disponibles
         # antes de lanzar el thread, para dar un error claro al usuario
         try:
@@ -480,6 +462,7 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                 ModelType,
                 get_model_manager,
             )
+
             mm = get_model_manager()
             missing_models = []
             model_labels = {
@@ -505,7 +488,7 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                 return ApiResponse(
                     success=False,
                     error=f"Modelos no descargados: {names}. "
-                          "Descárgalos desde Configuración > Verificar modelos."
+                    "Descárgalos desde Configuración > Verificar modelos.",
                 )
         except Exception as e:
             logger.warning(f"Error en pre-check de modelos: {e}")
@@ -518,7 +501,7 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
         return ApiResponse(
             success=True,
             message="Análisis iniciado correctamente",
-            data={"project_id": project_id, "status": "running"}
+            data={"project_id": project_id, "status": "running"},
         )
 
     except HTTPException:
@@ -551,33 +534,26 @@ async def start_partial_analysis(project_id: int, request: PartialAnalysisReques
 
         result = deps.project_manager.get(project_id)
         if result.is_failure:
-            raise HTTPException(
-                status_code=404, detail=f"Proyecto {project_id} no encontrado"
-            )
+            raise HTTPException(status_code=404, detail=f"Proyecto {project_id} no encontrado")
         project = result.value
 
         # Guard: no doble análisis
-        if project.analysis_status == "analyzing":
+        if project.analysis_status in ("analyzing", "queued"):
             return ApiResponse(
-                success=False,
-                error="Ya hay un análisis en curso para este proyecto."
+                success=False, error="Ya hay un análisis en curso para este proyecto."
             )
 
         # Validate frontend phase names
         from routers._partial_analysis import FRONTEND_TO_BACKEND
+
         unknown = [p for p in request.phases if p not in FRONTEND_TO_BACKEND]
         if unknown:
-            return ApiResponse(
-                success=False,
-                error=f"Fases desconocidas: {', '.join(unknown)}"
-            )
+            return ApiResponse(success=False, error=f"Fases desconocidas: {', '.join(unknown)}")
 
         # Resolve backend phases
         db_session = deps.get_database()
         completed = get_completed_phases(db_session, project_id)
-        phases_to_run = resolve_backend_phases(
-            request.phases, completed, request.force
-        )
+        phases_to_run = resolve_backend_phases(request.phases, completed, request.force)
 
         if not phases_to_run:
             return ApiResponse(
@@ -588,16 +564,13 @@ async def start_partial_analysis(project_id: int, request: PartialAnalysisReques
 
         # Verify document exists
         if not project.document_path:
-            return ApiResponse(
-                success=False,
-                error="El proyecto no tiene documento asociado."
-            )
+            return ApiResponse(success=False, error="El proyecto no tiene documento asociado.")
         from pathlib import Path
+
         tmp_path = Path(project.document_path)
         if not tmp_path.exists():
             return ApiResponse(
-                success=False,
-                error=f"El documento no se encuentra: {project.document_path}"
+                success=False, error=f"El documento no se encuentra: {project.document_path}"
             )
 
         # Update project status
@@ -607,10 +580,9 @@ async def start_partial_analysis(project_id: int, request: PartialAnalysisReques
 
         # Initialize progress (only partial phases)
         import time as time_module
+
         now = time_module.time()
-        progress_phases, partial_weights, partial_order = build_partial_progress(
-            phases_to_run
-        )
+        progress_phases, partial_weights, partial_order = build_partial_progress(phases_to_run)
 
         with deps._progress_lock:
             deps.analysis_progress_storage[project_id] = {
@@ -642,6 +614,9 @@ async def start_partial_analysis(project_id: int, request: PartialAnalysisReques
             "use_temp_file": False,
             "start_time": now,
             "queued_for_heavy": False,
+            "queue_mode": "partial",
+            "partial_frontend_phases": request.phases,
+            "partial_force": request.force,
         }
 
         thread = threading.Thread(
@@ -694,8 +669,8 @@ async def get_analysis_progress(project_id: int):
                         "status": "idle",
                         "progress": 0,
                         "current_phase": "Sin análisis en curso",
-                        "phases": []
-                    }
+                        "phases": [],
+                    },
                 )
 
             progress = deps.analysis_progress_storage[project_id].copy()
@@ -715,14 +690,20 @@ async def get_analysis_progress(project_id: int):
                         progress["estimated_seconds_remaining"] = adjusted_estimate
 
                         if adjusted_estimate <= 15:
-                            deps.analysis_progress_storage[project_id]["estimated_seconds_remaining"] = 45
-                            deps.analysis_progress_storage[project_id]["_last_progress_update"] = now
+                            deps.analysis_progress_storage[project_id][
+                                "estimated_seconds_remaining"
+                            ] = 45
+                            deps.analysis_progress_storage[project_id]["_last_progress_update"] = (
+                                now
+                            )
                             progress["estimated_seconds_remaining"] = 45
 
         return ApiResponse(success=True, data=progress)
 
     except Exception as e:
-        logger.error(f"Error getting analysis progress for project {project_id}: {e}", exc_info=True)
+        logger.error(
+            f"Error getting analysis progress for project {project_id}: {e}", exc_info=True
+        )
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
@@ -744,8 +725,12 @@ async def cancel_analysis(project_id: int):
         with deps._progress_lock:
             # Check if project is in the heavy analysis queue
             heavy_idx = next(
-                (i for i, q in enumerate(deps._heavy_analysis_queue) if q["project_id"] == project_id),
-                None
+                (
+                    i
+                    for i, q in enumerate(deps._heavy_analysis_queue)
+                    if q["project_id"] == project_id
+                ),
+                None,
             )
             if heavy_idx is not None:
                 deps._heavy_analysis_queue.pop(heavy_idx)
@@ -764,14 +749,14 @@ async def cancel_analysis(project_id: int):
                     data={
                         "project_id": project_id,
                         "status": "cancelled",
-                        "message": "Análisis en cola cancelado"
-                    }
+                        "message": "Análisis en cola cancelado",
+                    },
                 )
 
             # Also check legacy queue (backward compatibility)
             queue_idx = next(
                 (i for i, q in enumerate(deps._analysis_queue) if q["project_id"] == project_id),
-                None
+                None,
             )
             if queue_idx is not None:
                 deps._analysis_queue.pop(queue_idx)
@@ -790,26 +775,26 @@ async def cancel_analysis(project_id: int):
                     data={
                         "project_id": project_id,
                         "status": "cancelled",
-                        "message": "Análisis en cola cancelado"
-                    }
+                        "message": "Análisis en cola cancelado",
+                    },
                 )
 
             if project_id not in deps.analysis_progress_storage:
                 return ApiResponse(
-                    success=False,
-                    error="No hay análisis en curso para este proyecto"
+                    success=False, error="No hay análisis en curso para este proyecto"
                 )
 
             current_status = deps.analysis_progress_storage[project_id].get("status")
             if current_status in ("completed", "error", "cancelled"):
                 return ApiResponse(
-                    success=False,
-                    error=f"El análisis ya ha terminado con estado: {current_status}"
+                    success=False, error=f"El análisis ya ha terminado con estado: {current_status}"
                 )
 
             # Marcar como cancelado
             deps.analysis_progress_storage[project_id]["status"] = "cancelled"
-            deps.analysis_progress_storage[project_id]["current_phase"] = "Análisis cancelado por el usuario"
+            deps.analysis_progress_storage[project_id]["current_phase"] = (
+                "Análisis cancelado por el usuario"
+            )
 
         logger.info(f"Analysis cancelled for project {project_id}")
 
@@ -818,8 +803,8 @@ async def cancel_analysis(project_id: int):
             data={
                 "project_id": project_id,
                 "status": "cancelled",
-                "message": "Análisis cancelado exitosamente"
-            }
+                "message": "Análisis cancelado exitosamente",
+            },
         )
 
     except Exception as e:
@@ -861,7 +846,7 @@ async def stream_analysis_progress(project_id: int):
         last_phase = ""
         keepalive_interval = 15  # segundos
         last_keepalive = time.time()
-        max_wait_time = 600  # 10 minutos máximo
+        max_wait_time = deps.HEAVY_SLOT_TIMEOUT_SECONDS  # alineado con heavy slot
 
         start_time = time.time()
 
@@ -875,7 +860,9 @@ async def stream_analysis_progress(project_id: int):
                 # Obtener progreso actual (lectura protegida)
                 with deps._progress_lock:
                     has_progress = project_id in deps.analysis_progress_storage
-                    progress_data = deps.analysis_progress_storage[project_id].copy() if has_progress else None
+                    progress_data = (
+                        deps.analysis_progress_storage[project_id].copy() if has_progress else None
+                    )
 
                 if not has_progress:
                     await asyncio.sleep(0.5)
@@ -898,7 +885,9 @@ async def stream_analysis_progress(project_id: int):
                         "phase": current_phase,
                         "action": current_action,
                         "phases": progress_data.get("phases", []),
-                        "estimated_seconds_remaining": progress_data.get("estimated_seconds_remaining"),
+                        "estimated_seconds_remaining": progress_data.get(
+                            "estimated_seconds_remaining"
+                        ),
                     }
                     yield f"event: progress\ndata: {json.dumps(event_data)}\n\n"
                     last_progress = current_progress
@@ -949,5 +938,3 @@ async def stream_analysis_progress(project_id: int):
             "X-Accel-Buffering": "no",  # Deshabilitar buffering en nginx
         },
     )
-
-

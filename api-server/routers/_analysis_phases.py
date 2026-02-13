@@ -19,6 +19,7 @@ from deps import generate_person_aliases, logger
 
 class AnalysisCancelledError(Exception):
     """Excepción tipada para cancelación de análisis por el usuario."""
+
     pass
 
 
@@ -26,17 +27,25 @@ class AnalysisCancelledError(Exception):
 # Thread-safe progress helper (F-006)
 # ============================================================================
 
-def _update_storage(project_id: int, **updates):
+
+def _update_storage(
+    project_id: int, *, metrics_update: dict[str, Any] | None = None, **updates
+) -> None:
     """Thread-safe update de progress storage para código sin tracker."""
     with deps._progress_lock:
         storage = deps.analysis_progress_storage.get(project_id)
-        if storage:
+        if not storage:
+            return
+        if metrics_update:
+            storage.setdefault("metrics", {}).update(metrics_update)
+        if updates:
             storage.update(updates)
 
 
 # ============================================================================
 # ProgressTracker: encapsula toda la lógica de progreso
 # ============================================================================
+
 
 class ProgressTracker:
     """Encapsula la lógica de progreso, time-estimation y cancelación.
@@ -185,10 +194,18 @@ class ProgressTracker:
                 # Pendiente
                 pending_weight += w
                 base_times = {
-                    "parsing": 2, "structure": 2, "ner": 30,
-                    "fusion": 10, "attributes": 15, "consistency": 3,
-                    "grammar": 5, "alerts": 3,
-                    "relationships": 8, "voice": 10, "prose": 10, "health": 8,
+                    "parsing": 2,
+                    "structure": 2,
+                    "ner": 30,
+                    "fusion": 10,
+                    "attributes": 15,
+                    "consistency": 3,
+                    "grammar": 5,
+                    "alerts": 3,
+                    "relationships": 8,
+                    "voice": 10,
+                    "prose": 10,
+                    "health": 8,
                 }
                 min_time_remaining += base_times.get(phase_id, 5)
 
@@ -208,9 +225,11 @@ class ProgressTracker:
             total_remaining = int(phase_remaining + future_time)
         else:
             with deps._progress_lock:
-                word_count = deps.analysis_progress_storage.get(
-                    self.project_id, {}
-                ).get("metrics", {}).get("word_count", 500)
+                word_count = (
+                    deps.analysis_progress_storage.get(self.project_id, {})
+                    .get("metrics", {})
+                    .get("word_count", 500)
+                )
             base_estimate = 60 + int(word_count * 0.2)
             total_remaining = int(base_estimate * remaining_weight)
 
@@ -223,16 +242,17 @@ class ProgressTracker:
     def check_cancelled(self):
         """Verifica si el análisis fue cancelado por el usuario."""
         with deps._progress_lock:
-            cancelled = deps.analysis_progress_storage.get(
-                self.project_id, {}
-            ).get("status") == "cancelled"
+            cancelled = (
+                deps.analysis_progress_storage.get(self.project_id, {}).get("status") == "cancelled"
+            )
         if cancelled:
             raise AnalysisCancelledError("Análisis cancelado por el usuario")
 
     def persist_progress(self):
         """Persiste el progreso actual en la BD."""
         try:
-            pct = deps.analysis_progress_storage.get(self.project_id, {}).get("progress", 0)
+            with deps._progress_lock:
+                pct = deps.analysis_progress_storage.get(self.project_id, {}).get("progress", 0)
             normalized = round(pct / 100.0, 2)
             with self.db_session.connection() as conn:
                 conn.execute(
@@ -246,6 +266,7 @@ class ProgressTracker:
 # ============================================================================
 # Database helpers (moved from analysis.py to avoid circular import)
 # ============================================================================
+
 
 def persist_chapters_to_db(chapters_data: list, project_id: int, db):
     """Persiste los capítulos y secciones en la base de datos."""
@@ -283,7 +304,9 @@ def persist_chapters_to_db(chapters_data: list, project_id: int, db):
                     )
                     total_sections += sections_created
 
-        logger.info(f"Persisted {len(chapters_data)} chapters and {total_sections} sections to database")
+        logger.info(
+            f"Persisted {len(chapters_data)} chapters and {total_sections} sections to database"
+        )
     except Exception as e:
         logger.error(f"Error persisting chapters: {e}", exc_info=True)
         raise  # S7c-05: Don't silently swallow — chapters are needed for NER
@@ -329,10 +352,12 @@ def _persist_sections_recursive(
 # Pre-analysis steps
 # ============================================================================
 
+
 def run_snapshot(ctx: dict, tracker: ProgressTracker):
     """Captura snapshot pre-reanálisis (BK-05)."""
     try:
         from narrative_assistant.persistence.snapshot import SnapshotRepository
+
         snapshot_repo = SnapshotRepository()
         snapshot_repo.create_snapshot(ctx["project_id"])
         snapshot_repo.cleanup_old_snapshots(ctx["project_id"])
@@ -407,7 +432,10 @@ def run_cleanup(ctx: dict, tracker: ProgressTracker):
             conn.execute("DELETE FROM timeline_events WHERE project_id = ?", (project_id,))
             conn.execute("DELETE FROM temporal_markers WHERE project_id = ?", (project_id,))
             # Borrar escenas
-            conn.execute("DELETE FROM scene_tags WHERE scene_id IN (SELECT id FROM scenes WHERE project_id = ?)", (project_id,))
+            conn.execute(
+                "DELETE FROM scene_tags WHERE scene_id IN (SELECT id FROM scenes WHERE project_id = ?)",
+                (project_id,),
+            )
             conn.execute("DELETE FROM scenes WHERE project_id = ?", (project_id,))
             # Borrar datos de voz y pacing
             conn.execute("DELETE FROM register_changes WHERE project_id = ?", (project_id,))
@@ -417,7 +445,9 @@ def run_cleanup(ctx: dict, tracker: ProgressTracker):
             # Borrar vital status events (S8a-03)
             conn.execute("DELETE FROM vital_status_events WHERE project_id = ?", (project_id,))
             # Borrar character location events (S8a-04)
-            conn.execute("DELETE FROM character_location_events WHERE project_id = ?", (project_id,))
+            conn.execute(
+                "DELETE FROM character_location_events WHERE project_id = ?", (project_id,)
+            )
             # Borrar OOC events (S8a-05)
             conn.execute("DELETE FROM ooc_events WHERE project_id = ?", (project_id,))
             # SP-1: Preservar trabajo editorial del usuario entre re-análisis:
@@ -428,7 +458,10 @@ def run_cleanup(ctx: dict, tracker: ProgressTracker):
             # - suppression_rules: reglas de supresión del usuario
             # Estas tablas NO se borran.
             # Borrar analysis phases
-            conn.execute("DELETE FROM analysis_phases WHERE run_id IN (SELECT id FROM analysis_runs WHERE project_id = ?)", (project_id,))
+            conn.execute(
+                "DELETE FROM analysis_phases WHERE run_id IN (SELECT id FROM analysis_runs WHERE project_id = ?)",
+                (project_id,),
+            )
             conn.execute("DELETE FROM analysis_runs WHERE project_id = ?", (project_id,))
             # Borrar enrichment cache (S8a-16)
             conn.execute("DELETE FROM enrichment_cache WHERE project_id = ?", (project_id,))
@@ -447,6 +480,7 @@ def apply_license_and_settings(ctx: dict, tracker: ProgressTracker):
     if is_licensing_enabled():
         try:
             from narrative_assistant.licensing.verification import get_cached_license
+
             cached = get_cached_license()
             tier = cached.tier if cached else None
             analysis_config = apply_license_gating(analysis_config, tier)
@@ -459,9 +493,12 @@ def apply_license_and_settings(ctx: dict, tracker: ProgressTracker):
     # Apply project settings
     try:
         import json
+
         project = ctx["project"]
-        project_settings = project.settings if isinstance(project.settings, dict) else (
-            json.loads(project.settings) if project.settings else {}
+        project_settings = (
+            project.settings
+            if isinstance(project.settings, dict)
+            else (json.loads(project.settings) if project.settings else {})
         )
         analysis_features = project_settings.get("analysis_features", {})
         if analysis_features:
@@ -493,12 +530,12 @@ def apply_license_and_settings(ctx: dict, tracker: ProgressTracker):
 # Phase 1: Parsing
 # ============================================================================
 
+
 def run_parsing(ctx: dict, tracker: ProgressTracker):
     """Fase 1: Lee y parsea el documento."""
     from narrative_assistant.parsers.base import detect_format, get_parser
     from narrative_assistant.persistence.project import ProjectManager
 
-    project_id = ctx["project_id"]
     tmp_path = ctx["tmp_path"]
 
     tracker.start_phase("parsing", 0, "Leyendo el documento...")
@@ -546,15 +583,16 @@ def run_parsing(ctx: dict, tracker: ProgressTracker):
 # Phase 2: Classification
 # ============================================================================
 
+
 def run_classification(ctx: dict, tracker: ProgressTracker):
     """Fase 2: Clasifica el tipo de documento."""
-    project_id = ctx["project_id"]
     full_text = ctx["full_text"]
 
     tracker.start_phase("classification", 1, "Clasificando tipo de documento...")
 
     try:
         from narrative_assistant.parsers.document_classifier import DocumentClassifier
+
         classifier = DocumentClassifier()
         classification = classifier.classify(full_text)
 
@@ -573,6 +611,7 @@ def run_classification(ctx: dict, tracker: ProgressTracker):
             if hasattr(project, "document_type"):
                 project.document_type = document_type
             from narrative_assistant.persistence.project import ProjectManager
+
             proj_manager = ProjectManager(ctx["db_session"])
             proj_manager.update(project)
         except Exception as e:
@@ -590,6 +629,7 @@ def run_classification(ctx: dict, tracker: ProgressTracker):
 # Phase 3: Structure
 # ============================================================================
 
+
 def run_structure(ctx: dict, tracker: ProgressTracker):
     """Fase 3: Detecta la estructura del documento (capítulos, secciones)."""
     project_id = ctx["project_id"]
@@ -600,6 +640,7 @@ def run_structure(ctx: dict, tracker: ProgressTracker):
     tracker.start_phase("structure", 2, "Identificando la estructura del documento...")
 
     from narrative_assistant.parsers.structure_detector import StructureDetector
+
     detector = StructureDetector()
 
     # Detectar estructura pasando el RawDocument completo
@@ -611,37 +652,45 @@ def run_structure(ctx: dict, tracker: ProgressTracker):
             content = ch.get_text(full_text)
             sections_data = []
             for sec in ch.sections:
-                sections_data.append({
-                    "title": sec.title,
-                    "level": sec.level,
-                    "start_char": sec.start_char,
-                    "end_char": sec.end_char,
-                })
-            chapters_data.append({
-                "chapter_number": ch.number,
-                "title": ch.title or f"Capítulo {ch.number}",
-                "content": content,
-                "start_char": ch.start_char,
-                "end_char": ch.end_char,
-                "word_count": len(content.split()),
-                "structure_type": ch.structure_type.value if hasattr(ch.structure_type, 'value') else str(ch.structure_type),
-                "sections": sections_data,
-            })
+                sections_data.append(
+                    {
+                        "title": sec.title,
+                        "level": sec.level,
+                        "start_char": sec.start_char,
+                        "end_char": sec.end_char,
+                    }
+                )
+            chapters_data.append(
+                {
+                    "chapter_number": ch.number,
+                    "title": ch.title or f"Capítulo {ch.number}",
+                    "content": content,
+                    "start_char": ch.start_char,
+                    "end_char": ch.end_char,
+                    "word_count": len(content.split()),
+                    "structure_type": ch.structure_type.value
+                    if hasattr(ch.structure_type, "value")
+                    else str(ch.structure_type),
+                    "sections": sections_data,
+                }
+            )
 
     chapters_count = len(chapters_data)
 
     if chapters_count == 0:
         # Crear un capítulo único con todo el texto
-        chapters_data = [{
-            "chapter_number": 1,
-            "title": "Documento completo",
-            "start_char": 0,
-            "end_char": len(full_text),
-            "content": full_text,
-            "word_count": ctx["word_count"],
-            "structure_type": "flat",
-            "sections": [],
-        }]
+        chapters_data = [
+            {
+                "chapter_number": 1,
+                "title": "Documento completo",
+                "start_char": 0,
+                "end_char": len(full_text),
+                "content": full_text,
+                "word_count": ctx["word_count"],
+                "structure_type": "flat",
+                "sections": [],
+            }
+        ]
         chapters_count = 1
 
     # Persistir capítulos en BD
@@ -649,6 +698,7 @@ def run_structure(ctx: dict, tracker: ProgressTracker):
 
     # Cargar capítulos con IDs de BD
     from narrative_assistant.persistence.chapter_repository import ChapterRepository
+
     chapter_repo = ChapterRepository(db_session)
     chapters_with_ids = chapter_repo.get_by_project(project_id)
 
@@ -698,6 +748,7 @@ def run_structure(ctx: dict, tracker: ProgressTracker):
 # Tier 2 gate: Claim heavy analysis slot
 # ============================================================================
 
+
 def claim_heavy_slot_or_queue(ctx: dict, tracker: ProgressTracker) -> bool:
     """
     Intenta reclamar el slot de análisis pesado.
@@ -708,11 +759,12 @@ def claim_heavy_slot_or_queue(ctx: dict, tracker: ProgressTracker) -> bool:
     """
 
     project_id = ctx["project_id"]
-    project = ctx["project"]
-
     with deps._progress_lock:
         # S8a-18: Check watchdog timeout — if heavy slot has been held too long, force-release
-        if deps._heavy_analysis_project_id is not None and deps._heavy_analysis_claimed_at is not None:
+        if (
+            deps._heavy_analysis_project_id is not None
+            and deps._heavy_analysis_claimed_at is not None
+        ):
             elapsed = time.time() - deps._heavy_analysis_claimed_at
             if elapsed > deps.HEAVY_SLOT_TIMEOUT_SECONDS:
                 stale_pid = deps._heavy_analysis_project_id
@@ -729,12 +781,16 @@ def claim_heavy_slot_or_queue(ctx: dict, tracker: ProgressTracker) -> bool:
                     stale_storage["error"] = "Análisis excedió el tiempo máximo"
 
         if deps._heavy_analysis_project_id is not None:
-            # Heavy slot busy — queue this project with full Tier 1 context
-            deps._heavy_analysis_queue.append({
+            # Heavy slot busy — queue lightweight metadata only (F-005)
+            queue_entry: dict[str, Any] = {
                 "project_id": project_id,
-                "tier1_context": ctx,
-                "tracker": tracker,
-            })
+                "mode": ctx.get("queue_mode", "full"),
+            }
+            if queue_entry["mode"] == "partial":
+                queue_entry["partial_phases"] = list(ctx.get("partial_frontend_phases", []))
+                queue_entry["partial_force"] = bool(ctx.get("partial_force", False))
+
+            deps._heavy_analysis_queue.append(queue_entry)
             deps.analysis_progress_storage[project_id]["status"] = "queued_for_heavy"
             deps.analysis_progress_storage[project_id]["current_phase"] = (
                 "Estructura lista — en cola para análisis profundo"
@@ -755,6 +811,7 @@ def run_ollama_healthcheck(ctx: dict, tracker: ProgressTracker):
 
     try:
         from narrative_assistant.llm.ollama_manager import is_ollama_available
+
         ollama_available = is_ollama_available()
         if not ollama_available:
             logger.warning("Ollama no disponible, continuando sin LLM")
@@ -770,13 +827,12 @@ def run_ollama_healthcheck(ctx: dict, tracker: ProgressTracker):
 # Phase 4: NER
 # ============================================================================
 
+
 def _filter_overlapping_entities(raw_entities: list) -> list:
     """Elimina entidades solapadas, prefiriendo la más larga."""
     if not raw_entities:
         return []
-    sorted_ents = sorted(
-        raw_entities, key=lambda e: (e.start_char, -(e.end_char - e.start_char))
-    )
+    sorted_ents = sorted(raw_entities, key=lambda e: (e.start_char, -(e.end_char - e.start_char)))
     result = []
     for ent in sorted_ents:
         overlaps = False
@@ -812,20 +868,19 @@ def run_ner(ctx: dict, tracker: ProgressTracker):
     def ner_progress_callback(fase: str, pct: float, msg: str):
         ner_range = ner_pct_end - ner_pct_start
         ner_progress = ner_pct_start + int(pct * ner_range)
-        deps.analysis_progress_storage[project_id]["progress"] = ner_progress
-        deps.analysis_progress_storage[project_id]["current_action"] = msg
+        _update_storage(project_id, progress=ner_progress, current_action=msg)
         tracker.update_time_remaining()
 
     # Verificar si el modelo transformer NER necesita descargarse
     try:
         from narrative_assistant.core.model_manager import ModelType, get_model_manager
+
         manager = get_model_manager()
         if not manager.get_model_path(ModelType.TRANSFORMER_NER):
-            deps.analysis_progress_storage[project_id]["current_phase"] = (
-                "Descargando modelo NER (~500 MB, solo la primera vez)..."
-            )
-            deps.analysis_progress_storage[project_id]["current_action"] = (
-                "Esto puede tardar unos minutos..."
+            _update_storage(
+                project_id,
+                current_phase="Descargando modelo NER (~500 MB, solo la primera vez)...",
+                current_action="Esto puede tardar unos minutos...",
             )
     except Exception:
         pass
@@ -866,15 +921,14 @@ def run_ner(ctx: dict, tracker: ProgressTracker):
             f"DEBUG NER grouping: {len(raw_entities)} raw mentions -> "
             f"{len(entity_mentions)} unique entities"
         )
-        sorted_entities = sorted(
-            entity_mentions.items(), key=lambda x: len(x[1]), reverse=True
-        )[:10]
+        sorted_entities = sorted(entity_mentions.items(), key=lambda x: len(x[1]), reverse=True)[
+            :10
+        ]
         for key, mentions in sorted_entities:
             logger.info(f"  Entity '{key}': {len(mentions)} mentions")
 
         logger.info(
-            f"NER: {len(raw_entities)} menciones totales, "
-            f"{len(entity_mentions)} entidades únicas"
+            f"NER: {len(raw_entities)} menciones totales, {len(entity_mentions)} entidades únicas"
         )
 
         # Recolectar nombres canónicos para evitar conflictos de aliases
@@ -1002,9 +1056,7 @@ def run_ner(ctx: dict, tracker: ProgressTracker):
                 if entities_created % 5 == 0 and total_entities_to_create > 0:
                     sub_pct = entities_created / total_entities_to_create
                     sub_progress = ner_pct_start + int(sub_pct * (ner_pct_end - ner_pct_start))
-                    deps.analysis_progress_storage[project_id]["progress"] = min(
-                        ner_pct_end, sub_progress
-                    )
+                    _update_storage(project_id, progress=min(ner_pct_end, sub_progress))
                     tracker.update_time_remaining()
 
             except Exception as e:
@@ -1021,15 +1073,14 @@ def run_ner(ctx: dict, tracker: ProgressTracker):
 # Phase 3.25: LLM validation of entities
 # ============================================================================
 
+
 def run_llm_entity_validation(ctx: dict, tracker: ProgressTracker):
     """Fase 3.25: Filtra entidades inválidas usando LLM."""
     project_id = ctx["project_id"]
     entities = ctx["entities"]
     entity_repo = ctx["entity_repo"]
 
-    deps.analysis_progress_storage[project_id]["current_action"] = (
-        "Verificando personajes detectados..."
-    )
+    _update_storage(project_id, current_action="Verificando personajes detectados...")
     try:
         from narrative_assistant.llm.client import get_llm_client
 
@@ -1038,8 +1089,7 @@ def run_llm_entity_validation(ctx: dict, tracker: ProgressTracker):
             return
 
         entities_to_validate = [
-            {"name": e.canonical_name, "type": e.entity_type.value}
-            for e in entities
+            {"name": e.canonical_name, "type": e.entity_type.value} for e in entities
         ]
 
         validation_prompt = f"""Revisa esta lista de entidades extraídas de un texto narrativo.
@@ -1115,6 +1165,7 @@ JSON:"""
 # Phase 3.5: Entity Fusion + Coreference
 # ============================================================================
 
+
 def _name_score(ent) -> int:
     """Calcula un score para decidir cuál nombre es más descriptivo."""
     name = ent.canonical_name
@@ -1150,7 +1201,7 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
     find_chapter_id_for_position = ctx["find_chapter_id_for_position"]
 
     tracker.start_phase("fusion", 4, "Unificando entidades mencionadas de diferentes formas...")
-    deps.analysis_progress_storage[project_id]["current_action"] = "Preparando unificación..."
+    _update_storage(project_id, current_action="Preparando unificación...")
 
     fusion_pct_start, fusion_pct_end = tracker.get_phase_progress_range("fusion")
     coref_result = None
@@ -1163,9 +1214,7 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
         entity_repo = get_entity_repository()
         ctx["entity_repo"] = entity_repo
 
-        deps.analysis_progress_storage[project_id]["current_action"] = (
-            f"Comparando {len(entities)} entidades..."
-        )
+        _update_storage(project_id, current_action=f"Comparando {len(entities)} entidades...")
 
         # 1. Fusión semántica por tipo
         entities_by_type: dict[EntityType, list] = {}
@@ -1217,8 +1266,9 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
 
         # Ejecutar fusiones
         if fusion_pairs:
-            deps.analysis_progress_storage[project_id]["current_action"] = (
-                f"Unificando {len(fusion_pairs)} pares de nombres similares..."
+            _update_storage(
+                project_id,
+                current_action=f"Unificando {len(fusion_pairs)} pares de nombres similares...",
             )
 
         for idx, (keep_entity, merge_entity) in enumerate(fusion_pairs):
@@ -1245,9 +1295,7 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
                     aliases=keep_entity.aliases,
                     merged_from_ids=keep_entity.merged_from_ids,
                 )
-                entity_repo.increment_mention_count(
-                    keep_entity.id, merge_entity.mention_count or 0
-                )
+                entity_repo.increment_mention_count(keep_entity.id, merge_entity.mention_count or 0)
 
                 # Recalcular importancia
                 new_mention_count = keep_entity.mention_count
@@ -1285,9 +1333,12 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
                 )
 
                 if (idx + 1) % 5 == 0:
-                    deps.analysis_progress_storage[project_id]["current_action"] = (
-                        f"Unificando nombres: {keep_entity.canonical_name}... "
-                        f"({idx + 1}/{len(fusion_pairs)})"
+                    _update_storage(
+                        project_id,
+                        current_action=(
+                            f"Unificando nombres: {keep_entity.canonical_name}... "
+                            f"({idx + 1}/{len(fusion_pairs)})"
+                        ),
                     )
 
             except Exception as e:
@@ -1299,8 +1350,9 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
         entities = [e for e in entities if e.id not in merged_entity_ids]
 
         if fusion_pairs:
-            deps.analysis_progress_storage[project_id]["current_action"] = (
-                f"Unificados {len(merged_entity_ids)} personajes duplicados"
+            _update_storage(
+                project_id,
+                current_action=f"Unificados {len(merged_entity_ids)} personajes duplicados",
             )
 
         # Reconciliar contadores
@@ -1314,12 +1366,13 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
         # SP-1: Re-aplicar merges de usuario que no haya descubierto la fusión automática
         _reapply_user_merges(project_id, entity_repo, entities)
 
-        deps.analysis_progress_storage[project_id]["progress"] = 57
+        _update_storage(project_id, progress=57)
         tracker.update_time_remaining()
 
         # 2. Resolución de correferencias
-        deps.analysis_progress_storage[project_id]["current_phase"] = (
-            "Identificando referencias cruzadas entre personajes..."
+        _update_storage(
+            project_id,
+            current_phase="Identificando referencias cruzadas entre personajes...",
         )
 
         try:
@@ -1361,9 +1414,7 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
                 logger.debug(f"  Método {method.value}: {count} resoluciones")
 
             # Vincular cadenas con entidades
-            character_entities = [
-                e for e in entities if e.entity_type == EntityType.CHARACTER
-            ]
+            character_entities = [e for e in entities if e.entity_type == EntityType.CHARACTER]
 
             for chain in coref_result.chains:
                 if not chain.main_mention:
@@ -1384,10 +1435,7 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
                         break
                     if ent.aliases:
                         for alias in ent.aliases:
-                            if (
-                                chain.main_mention
-                                and alias.lower() == chain.main_mention.lower()
-                            ):
+                            if chain.main_mention and alias.lower() == chain.main_mention.lower():
                                 matching_entity = ent
                                 break
                     if not matching_entity:
@@ -1401,16 +1449,12 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
 
                 if matching_entity:
                     pronoun_count = sum(
-                        1
-                        for m in chain.mentions
-                        if m.mention_type == CorefMentionType.PRONOUN
+                        1 for m in chain.mentions if m.mention_type == CorefMentionType.PRONOUN
                     )
 
                     if pronoun_count > 0:
                         try:
-                            entity_repo.increment_mention_count(
-                                matching_entity.id, pronoun_count
-                            )
+                            entity_repo.increment_mention_count(matching_entity.id, pronoun_count)
                             matching_entity.mention_count = (
                                 matching_entity.mention_count or 0
                             ) + pronoun_count
@@ -1446,8 +1490,7 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
                     for mention in chain.mentions:
                         if (
                             mention.mention_type == CorefMentionType.PROPER_NOUN
-                            and mention.text.lower()
-                            != matching_entity.canonical_name.lower()
+                            and mention.text.lower() != matching_entity.canonical_name.lower()
                         ):
                             if matching_entity.aliases is None:
                                 matching_entity.aliases = []
@@ -1473,10 +1516,11 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
         except Exception as e:
             logger.warning(f"Error en resolución de correferencias: {e}")
 
-        deps.analysis_progress_storage[project_id]["progress"] = fusion_pct_end
-        deps.analysis_progress_storage[project_id]["metrics"]["entities_found"] = len(entities)
-        deps.analysis_progress_storage[project_id]["current_action"] = (
-            f"Encontrados {len(entities)} personajes y elementos únicos"
+        _update_storage(
+            project_id,
+            progress=fusion_pct_end,
+            current_action=f"Encontrados {len(entities)} personajes y elementos únicos",
+            metrics_update={"entities_found": len(entities)},
         )
         tracker.end_phase("fusion", 4)
 
@@ -1492,9 +1536,7 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
             from narrative_assistant.nlp.mention_finder import get_mention_finder
 
             mention_finder = get_mention_finder()
-            deps.analysis_progress_storage[project_id]["current_action"] = (
-                "Buscando menciones adicionales..."
-            )
+            _update_storage(project_id, current_action="Buscando menciones adicionales...")
 
             entity_names = [e.canonical_name for e in entities if e.canonical_name]
             aliases_dict = {}
@@ -1515,7 +1557,7 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
                 existing_positions=existing_positions,
             )
 
-            from narrative_assistant.entities.models import EntityMention as EM
+            from narrative_assistant.entities.models import EntityMention as EntityMentionModel
 
             mentions_by_entity: dict[str, list] = {}
             for am in additional_mentions:
@@ -1530,7 +1572,7 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
                     new_mentions = mentions_by_entity[name]
                     for am in new_mentions:
                         ch_id = find_chapter_id_for_position(am.start_char)
-                        mention = EM(
+                        mention = EntityMentionModel(
                             entity_id=entity.id,
                             surface_form=am.surface_form,
                             start_char=am.start_char,
@@ -1547,8 +1589,9 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
 
             if additional_count > 0:
                 logger.info(f"MentionFinder: Added {additional_count} additional mentions")
-                deps.analysis_progress_storage[project_id]["current_action"] = (
-                    f"Encontradas {additional_count} menciones adicionales"
+                _update_storage(
+                    project_id,
+                    current_action=f"Encontradas {additional_count} menciones adicionales",
                 )
 
         except Exception as mf_err:
@@ -1598,9 +1641,7 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
                         f"-> {new_importance.value}"
                     )
             except Exception as e:
-                logger.warning(
-                    f"Error recalculando importancia de '{entity.canonical_name}': {e}"
-                )
+                logger.warning(f"Error recalculando importancia de '{entity.canonical_name}': {e}")
 
     except Exception as e:
         logger.warning(f"Error en fusión de entidades (continuando sin fusión): {e}")
@@ -1620,6 +1661,7 @@ def run_fusion(ctx: dict, tracker: ProgressTracker):
 # ============================================================================
 # Phase 5: Attributes
 # ============================================================================
+
 
 def run_attributes(ctx: dict, tracker: ProgressTracker):
     """Fase 5: Extracción de atributos de personajes."""
@@ -1642,6 +1684,7 @@ def run_attributes(ctx: dict, tracker: ProgressTracker):
         # Detectar GPU
         try:
             from narrative_assistant.core.device import get_device_detector
+
             detector = get_device_detector()
             has_gpu = detector.device_type.value in ("cuda", "mps")
         except Exception:
@@ -1650,9 +1693,7 @@ def run_attributes(ctx: dict, tracker: ProgressTracker):
         use_embeddings = has_gpu
         if use_embeddings:
             logger.info("GPU detectada - habilitando análisis de embeddings para atributos")
-            deps.analysis_progress_storage[project_id]["current_action"] = (
-                "Análisis avanzado con GPU activado"
-            )
+            _update_storage(project_id, current_action="Análisis avanzado con GPU activado")
         else:
             logger.info("Sin GPU - usando métodos rápidos para atributos (LLM, patrones)")
 
@@ -1660,9 +1701,7 @@ def run_attributes(ctx: dict, tracker: ProgressTracker):
         entity_repo = get_entity_repository()
 
         # Preparar menciones
-        character_entities = [
-            e for e in entities if e.entity_type.value == "character"
-        ]
+        character_entities = [e for e in entities if e.entity_type.value == "character"]
 
         if character_entities:
             entity_mentions = []
@@ -1670,9 +1709,7 @@ def run_attributes(ctx: dict, tracker: ProgressTracker):
                 if e.id:
                     db_mentions = entity_repo.get_mentions_by_entity(e.id)
                     for m in db_mentions:
-                        entity_mentions.append(
-                            (e.canonical_name, m.start_char, m.end_char)
-                        )
+                        entity_mentions.append((e.canonical_name, m.start_char, m.end_char))
                 if not any(name == e.canonical_name for name, _, _ in entity_mentions):
                     entity_mentions.append(
                         (
@@ -1710,9 +1747,7 @@ def run_attributes(ctx: dict, tracker: ProgressTracker):
                                 )
                             )
 
-            logger.info(
-                f"Extrayendo atributos: {len(entity_mentions)} menciones de entidades"
-            )
+            logger.info(f"Extrayendo atributos: {len(entity_mentions)} menciones de entidades")
 
             # Procesar en lotes
             total_chars = len(character_entities)
@@ -1723,27 +1758,25 @@ def run_attributes(ctx: dict, tracker: ProgressTracker):
                 batch_end = min(batch_start + batch_size, total_chars)
                 batch_chars = character_entities[batch_start:batch_end]
 
-                batch_names = [
-                    e.canonical_name for e in batch_chars if e.canonical_name
-                ][:3]
+                batch_names = [e.canonical_name for e in batch_chars if e.canonical_name][:3]
                 if len(batch_chars) > 3:
                     names_str = ", ".join(batch_names) + "..."
                 else:
                     names_str = ", ".join(batch_names)
 
-                deps.analysis_progress_storage[project_id]["current_action"] = (
-                    f"Analizando: {names_str} ({batch_end}/{total_chars})"
+                _update_storage(
+                    project_id,
+                    current_action=f"Analizando: {names_str} ({batch_end}/{total_chars})",
                 )
 
                 batch_progress = 0.1 + (0.35 * batch_end / max(total_chars, 1))
-                deps.analysis_progress_storage[project_id]["progress"] = (
-                    attr_pct_start + int((attr_pct_end - attr_pct_start) * batch_progress)
+                _update_storage(
+                    project_id,
+                    progress=attr_pct_start + int((attr_pct_end - attr_pct_start) * batch_progress),
                 )
 
                 batch_entity_names = {
-                    e.canonical_name.lower()
-                    for e in batch_chars
-                    if e.canonical_name
+                    e.canonical_name.lower() for e in batch_chars if e.canonical_name
                 }
                 batch_mentions = [
                     (name, start, end)
@@ -1767,29 +1800,22 @@ def run_attributes(ctx: dict, tracker: ProgressTracker):
                                 if batch_result.is_success and batch_result.value:
                                     all_extracted_attrs.extend(batch_result.value.attributes)
                             except concurrent.futures.TimeoutError:
-                                logger.warning(
-                                    f"Timeout extrayendo atributos para: {names_str}"
-                                )
+                                logger.warning(f"Timeout extrayendo atributos para: {names_str}")
                     except Exception as e:
-                        logger.warning(
-                            f"Error extrayendo atributos para {names_str}: {e}"
-                        )
+                        logger.warning(f"Error extrayendo atributos para {names_str}: {e}")
 
                 tracker.check_cancelled()
 
             # Resultado combinado
             from narrative_assistant.nlp.attributes import AttributeExtractionResult
 
-            attr_result = Result.success(
-                AttributeExtractionResult(attributes=all_extracted_attrs)
-            )
+            attr_result = Result.success(AttributeExtractionResult(attributes=all_extracted_attrs))
             logger.info(f"Atributos extraídos: {len(all_extracted_attrs)}")
 
-            deps.analysis_progress_storage[project_id]["progress"] = (
-                attr_pct_start + int((attr_pct_end - attr_pct_start) * 0.5)
-            )
-            deps.analysis_progress_storage[project_id]["current_action"] = (
-                "Registrando características encontradas..."
+            _update_storage(
+                project_id,
+                progress=attr_pct_start + int((attr_pct_end - attr_pct_start) * 0.5),
+                current_action="Registrando características encontradas...",
             )
 
             if attr_result.is_success and attr_result.value:
@@ -1825,8 +1851,16 @@ def run_attributes(ctx: dict, tracker: ProgressTracker):
                         )
 
                         pronouns = {
-                            "él", "ella", "ellos", "ellas",
-                            "su", "sus", "este", "esta", "ese", "esa",
+                            "él",
+                            "ella",
+                            "ellos",
+                            "ellas",
+                            "su",
+                            "sus",
+                            "este",
+                            "esta",
+                            "ese",
+                            "esa",
                         }
                         pronoun_attrs_before = sum(
                             1
@@ -1867,8 +1901,7 @@ def run_attributes(ctx: dict, tracker: ProgressTracker):
                         )
                 else:
                     logger.info(
-                        "Sin cadenas de correferencia - atributos de pronombres "
-                        "no se resolverán"
+                        "Sin cadenas de correferencia - atributos de pronombres no se resolverán"
                     )
 
                 # Persistir atributos
@@ -1890,9 +1923,7 @@ def run_attributes(ctx: dict, tracker: ProgressTracker):
                     if matching_entity:
                         try:
                             attr_key = (
-                                attr.key.value
-                                if hasattr(attr.key, "value")
-                                else str(attr.key)
+                                attr.key.value if hasattr(attr.key, "value") else str(attr.key)
                             )
                             attr_type = (
                                 attr.category.value
@@ -1917,24 +1948,21 @@ def run_attributes(ctx: dict, tracker: ProgressTracker):
 
                     attrs_processed += 1
                     if attrs_processed % 10 == 0 or attrs_processed == total_attrs:
-                        save_progress = 0.6 + (
-                            0.35 * attrs_processed / max(total_attrs, 1)
-                        )
-                        deps.analysis_progress_storage[project_id]["progress"] = (
-                            attr_pct_start
-                            + int((attr_pct_end - attr_pct_start) * save_progress)
-                        )
-                        deps.analysis_progress_storage[project_id]["current_action"] = (
-                            f"Guardando características... ({attrs_processed}/{total_attrs})"
+                        save_progress = 0.6 + (0.35 * attrs_processed / max(total_attrs, 1))
+                        _update_storage(
+                            project_id,
+                            progress=attr_pct_start
+                            + int((attr_pct_end - attr_pct_start) * save_progress),
+                            current_action=(
+                                f"Guardando características... ({attrs_processed}/{total_attrs})"
+                            ),
                         )
 
     # SP-1: Restaurar is_verified en atributos que el usuario verificó antes
     _restore_verified_attributes(ctx)
 
     tracker.end_phase("attributes", 5)
-    deps.analysis_progress_storage[project_id]["metrics"]["attributes_extracted"] = len(
-        attributes
-    )
+    _update_storage(project_id, metrics_update={"attributes_extracted": len(attributes)})
     logger.info(f"Attribute extraction complete: {len(attributes)} attributes")
 
     ctx["attributes"] = attributes
@@ -1943,6 +1971,7 @@ def run_attributes(ctx: dict, tracker: ProgressTracker):
 # ============================================================================
 # Phase 6: Consistency (+ vital status, locations, OOC, anachronisms, classical)
 # ============================================================================
+
 
 def run_consistency(ctx: dict, tracker: ProgressTracker):
     """Fase 6: Verificación de consistencia y sub-análisis."""
@@ -1972,9 +2001,7 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
     location_report = None
     chapter_progress_report = None
 
-    deps.analysis_progress_storage[project_id]["current_action"] = (
-        "Verificando estado vital de personajes..."
-    )
+    _update_storage(project_id, current_action="Verificando estado vital de personajes...")
 
     # Preparar datos para sub-fases
     chapters_for_analysis = [
@@ -1992,9 +2019,7 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
             "id": e.id,
             "canonical_name": e.canonical_name,
             "entity_type": (
-                e.entity_type.value
-                if hasattr(e.entity_type, "value")
-                else str(e.entity_type)
+                e.entity_type.value if hasattr(e.entity_type, "value") else str(e.entity_type)
             ),
             "aliases": e.aliases if hasattr(e, "aliases") else [],
         }
@@ -2048,9 +2073,15 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
                              confidence, death_type)
                             VALUES (?, ?, ?, 'death', ?, ?, ?, ?, ?, ?)""",
                             (
-                                project_id, de.entity_id, de.entity_name,
-                                de.chapter, de.start_char, de.end_char,
-                                de.excerpt, de.confidence, de.death_type,
+                                project_id,
+                                de.entity_id,
+                                de.entity_name,
+                                de.chapter,
+                                de.start_char,
+                                de.end_char,
+                                de.excerpt,
+                                de.confidence,
+                                de.death_type,
                             ),
                         )
                     # Insertar post-mortem appearances
@@ -2062,17 +2093,21 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
                              confidence, death_chapter, appearance_type, is_valid)
                             VALUES (?, ?, ?, 'post_mortem_appearance', ?, ?, ?, ?, ?, ?, ?, ?)""",
                             (
-                                project_id, pm.entity_id, pm.entity_name,
+                                project_id,
+                                pm.entity_id,
+                                pm.entity_name,
                                 pm.appearance_chapter,
-                                pm.appearance_start_char, pm.appearance_end_char,
-                                pm.appearance_excerpt, pm.confidence,
-                                pm.death_chapter, pm.appearance_type,
+                                pm.appearance_start_char,
+                                pm.appearance_end_char,
+                                pm.appearance_excerpt,
+                                pm.confidence,
+                                pm.death_chapter,
+                                pm.appearance_type,
                                 1 if pm.is_valid else 0,
                             ),
                         )
-                persisted = (
-                    len(vital_status_report.death_events)
-                    + len(vital_status_report.post_mortem_appearances)
+                persisted = len(vital_status_report.death_events) + len(
+                    vital_status_report.post_mortem_appearances
                 )
                 logger.info(f"Persisted {persisted} vital status events to DB")
             except Exception as persist_err:
@@ -2089,9 +2124,7 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
     tracker.check_cancelled()
 
     # Sub-fase 5.2: Ubicaciones
-    deps.analysis_progress_storage[project_id]["current_action"] = (
-        "Verificando ubicaciones de personajes..."
-    )
+    _update_storage(project_id, current_action="Verificando ubicaciones de personajes...")
 
     try:
         from narrative_assistant.analysis.character_location import (
@@ -2132,10 +2165,17 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
                              change_type, confidence)
                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                             (
-                                project_id, le.entity_id, le.entity_name,
-                                le.location_name, le.chapter,
-                                le.start_char, le.end_char, le.excerpt,
-                                le.change_type.value if hasattr(le.change_type, "value") else str(le.change_type),
+                                project_id,
+                                le.entity_id,
+                                le.entity_name,
+                                le.location_name,
+                                le.chapter,
+                                le.start_char,
+                                le.end_char,
+                                le.excerpt,
+                                le.change_type.value
+                                if hasattr(le.change_type, "value")
+                                else str(le.change_type),
                                 le.confidence,
                             ),
                         )
@@ -2144,9 +2184,7 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
                     f"character location events to DB"
                 )
             except Exception as persist_err:
-                logger.warning(
-                    f"Error persisting character locations (continuing): {persist_err}"
-                )
+                logger.warning(f"Error persisting character locations (continuing): {persist_err}")
 
         else:
             logger.warning(f"Character location analysis failed: {location_result.error}")
@@ -2159,9 +2197,7 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
     tracker.check_cancelled()
 
     # Sub-fase 5.3: Resumen por capítulo
-    deps.analysis_progress_storage[project_id]["current_action"] = (
-        "Generando resumen de avance narrativo..."
-    )
+    _update_storage(project_id, current_action="Generando resumen de avance narrativo...")
 
     try:
         from narrative_assistant.analysis.chapter_summary import analyze_chapter_progress
@@ -2188,8 +2224,9 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
     # Sub-fase 5.4: Out-of-character
     ooc_report = None
     if analysis_config.run_ooc_detection:
-        deps.analysis_progress_storage[project_id]["current_action"] = (
-            "Detectando comportamiento fuera de personaje..."
+        _update_storage(
+            project_id,
+            current_action="Detectando comportamiento fuera de personaje...",
         )
         try:
             from narrative_assistant.analysis.character_profiling import CharacterProfiler
@@ -2209,12 +2246,8 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
                 )
             ]
             if character_entities:
-                chapter_texts = {
-                    ch["chapter_number"]: ch["content"] for ch in chapters_data
-                }
-                profiles = profiler.build_profiles(
-                    character_entities, chapters_data, chapter_texts
-                )
+                chapter_texts = {ch["chapter_number"]: ch["content"] for ch in chapters_data}
+                profiles = profiler.build_profiles(character_entities, chapters_data, chapter_texts)
                 if profiles:
                     ooc_detector = OutOfCharacterDetector()
                     ooc_report = ooc_detector.detect(
@@ -2241,11 +2274,19 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
                                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                                     (
                                         project_id,
-                                        ev.entity_id, ev.entity_name,
-                                        ev.deviation_type.value if hasattr(ev.deviation_type, "value") else str(ev.deviation_type),
-                                        ev.severity.value if hasattr(ev.severity, "value") else str(ev.severity),
-                                        ev.description, ev.expected, ev.actual,
-                                        ev.chapter, ev.excerpt,
+                                        ev.entity_id,
+                                        ev.entity_name,
+                                        ev.deviation_type.value
+                                        if hasattr(ev.deviation_type, "value")
+                                        else str(ev.deviation_type),
+                                        ev.severity.value
+                                        if hasattr(ev.severity, "value")
+                                        else str(ev.severity),
+                                        ev.description,
+                                        ev.expected,
+                                        ev.actual,
+                                        ev.chapter,
+                                        ev.excerpt,
                                         ev.confidence,
                                         1 if ev.is_intentional else 0,
                                     ),
@@ -2264,9 +2305,7 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
     # Sub-fase 5.5: Anacronismos
     anachronism_report = None
     if analysis_config.run_anachronism_detection:
-        deps.analysis_progress_storage[project_id]["current_action"] = (
-            "Detectando anacronismos..."
-        )
+        _update_storage(project_id, current_action="Detectando anacronismos...")
         try:
             from narrative_assistant.temporal.anachronisms import AnachronismDetector
 
@@ -2279,8 +2318,7 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
                 )
             else:
                 logger.info(
-                    "Anachronism detection: no anachronisms found "
-                    "(period may not be detected)"
+                    "Anachronism detection: no anachronisms found (period may not be detected)"
                 )
         except ImportError as e:
             logger.warning(f"Anachronism detection module not available: {e}")
@@ -2292,9 +2330,7 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
     # Sub-fase 5.6: Español clásico
     classical_normalization = None
     if analysis_config.run_classical_spanish:
-        deps.analysis_progress_storage[project_id]["current_action"] = (
-            "Detectando español clásico..."
-        )
+        _update_storage(project_id, current_action="Detectando español clásico...")
         try:
             from narrative_assistant.nlp.classical_spanish import ClassicalSpanishNormalizer
 
@@ -2316,25 +2352,24 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
         tracker.check_cancelled()
 
     # Guardar métricas
-    deps.analysis_progress_storage[project_id]["metrics"]["vital_status_deaths"] = (
-        len(vital_status_report.death_events) if vital_status_report else 0
-    )
-    deps.analysis_progress_storage[project_id]["metrics"]["location_events"] = (
-        len(location_report.location_events) if location_report else 0
-    )
-    deps.analysis_progress_storage[project_id]["metrics"]["ooc_events"] = (
-        len(ooc_report.events) if ooc_report else 0
-    )
-    deps.analysis_progress_storage[project_id]["metrics"]["anachronisms_found"] = (
-        len(anachronism_report.anachronisms)
-        if anachronism_report and anachronism_report.anachronisms
-        else 0
+    _update_storage(
+        project_id,
+        metrics_update={
+            "vital_status_deaths": (
+                len(vital_status_report.death_events) if vital_status_report else 0
+            ),
+            "location_events": (len(location_report.location_events) if location_report else 0),
+            "ooc_events": len(ooc_report.events) if ooc_report else 0,
+            "anachronisms_found": (
+                len(anachronism_report.anachronisms)
+                if anachronism_report and anachronism_report.anachronisms
+                else 0
+            ),
+        },
     )
 
     tracker.end_phase("consistency", 6)
-    deps.analysis_progress_storage[project_id]["metrics"]["inconsistencies_found"] = len(
-        inconsistencies
-    )
+    _update_storage(project_id, metrics_update={"inconsistencies_found": len(inconsistencies)})
     logger.info(f"Consistency analysis complete: {len(inconsistencies)} inconsistencies")
 
     ctx["inconsistencies"] = inconsistencies
@@ -2349,6 +2384,7 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
 # ============================================================================
 # Phase 7: Grammar
 # ============================================================================
+
 
 def run_grammar(ctx: dict, tracker: ProgressTracker):
     """Fase 7: Análisis gramatical y correcciones editoriales."""
@@ -2396,9 +2432,7 @@ def run_grammar(ctx: dict, tracker: ProgressTracker):
     # Correcciones editoriales
     correction_issues = []
     try:
-        deps.analysis_progress_storage[project_id]["current_phase"] = (
-            "Buscando repeticiones y errores tipográficos..."
-        )
+        _update_storage(project_id, current_phase="Buscando repeticiones y errores tipográficos...")
 
         from narrative_assistant.corrections import CorrectionConfig
         from narrative_assistant.corrections.orchestrator import CorrectionOrchestrator
@@ -2435,11 +2469,12 @@ def run_grammar(ctx: dict, tracker: ProgressTracker):
         logger.warning(f"Error in corrections analysis: {e}")
 
     tracker.end_phase("grammar", 7)
-    deps.analysis_progress_storage[project_id]["metrics"]["grammar_issues_found"] = len(
-        grammar_issues
-    )
-    deps.analysis_progress_storage[project_id]["metrics"]["correction_suggestions"] = len(
-        correction_issues
+    _update_storage(
+        project_id,
+        metrics_update={
+            "grammar_issues_found": len(grammar_issues),
+            "correction_suggestions": len(correction_issues),
+        },
     )
     logger.info(
         f"Grammar analysis complete: {len(grammar_issues)} grammar issues, "
@@ -2454,6 +2489,7 @@ def run_grammar(ctx: dict, tracker: ProgressTracker):
 # ============================================================================
 # Phase 8: Alerts
 # ============================================================================
+
 
 def run_alerts(ctx: dict, tracker: ProgressTracker):
     """Fase 8: Creación de alertas a partir de todos los hallazgos."""
@@ -2607,9 +2643,7 @@ def run_alerts(ctx: dict, tracker: ProgressTracker):
         for event in ooc_report.events:
             try:
                 severity = (
-                    AlertSeverity.WARNING
-                    if event.severity.value == "high"
-                    else AlertSeverity.INFO
+                    AlertSeverity.WARNING if event.severity.value == "high" else AlertSeverity.INFO
                 )
                 alert_result = alert_engine.create_alert(
                     project_id=project_id,
@@ -2620,11 +2654,7 @@ def run_alerts(ctx: dict, tracker: ProgressTracker):
                     description=event.description,
                     explanation=event.explanation,
                     confidence=event.confidence,
-                    chapter=(
-                        event.chapter_number
-                        if hasattr(event, "chapter_number")
-                        else None
-                    ),
+                    chapter=(event.chapter_number if hasattr(event, "chapter_number") else None),
                 )
                 if alert_result.is_success:
                     alerts_created += 1
@@ -2654,7 +2684,7 @@ def run_alerts(ctx: dict, tracker: ProgressTracker):
                 logger.warning(f"Error creating anachronism alert: {e}")
 
     tracker.end_phase("alerts", 8)
-    deps.analysis_progress_storage[project_id]["metrics"]["alerts_generated"] = alerts_created
+    _update_storage(project_id, metrics_update={"alerts_generated": alerts_created})
     logger.info(f"Alerts phase complete: {alerts_created} alerts created")
 
     ctx["alerts_created"] = alerts_created
@@ -2852,7 +2882,7 @@ def _apply_saved_dismissals(project_id: int):
             if dismissal_repo.is_suppressed(
                 project_id,
                 alert_type=row["alert_type"] or "",
-                source_module=row["source_module"] if "source_module" in row else "",
+                source_module=row["source_module"] or "",
             ):
                 with db.transaction() as conn:
                     conn.execute(
@@ -2873,6 +2903,7 @@ def _apply_saved_dismissals(project_id: int):
 # ============================================================================
 # Reconciliation + Completion
 # ============================================================================
+
 
 def run_reconciliation(ctx: dict, tracker: ProgressTracker):
     """Reconciliación final de contadores de menciones."""
@@ -2941,6 +2972,7 @@ def run_completion(ctx: dict, tracker: ProgressTracker):
 # Error handling
 # ============================================================================
 
+
 def handle_analysis_error(ctx: dict, error: Exception):
     """Maneja errores durante el análisis."""
     from narrative_assistant.core.errors import ModelNotLoadedError
@@ -2997,6 +3029,7 @@ def handle_analysis_error(ctx: dict, error: Exception):
 # Finally block: cleanup + queue management
 # ============================================================================
 
+
 def _release_heavy_and_start_next(project_id: int, ctx: dict | None = None) -> None:
     """Release heavy slot and auto-start next queued project.
 
@@ -3014,10 +3047,11 @@ def _release_heavy_and_start_next(project_id: int, ctx: dict | None = None) -> N
         if deps._heavy_analysis_queue:
             next_heavy = deps._heavy_analysis_queue.pop(0)
 
-    # Auto-start next queued project with saved Tier 1 context
+    # Auto-start next queued project
     if next_heavy:
-        from routers.analysis import _resume_queued_heavy_analysis
-        _resume_queued_heavy_analysis(next_heavy)
+        from routers.analysis import _start_queued_analysis
+
+        _start_queued_analysis(next_heavy)
 
 
 def release_heavy_slot(ctx: dict):
@@ -3056,9 +3090,7 @@ def run_finally_cleanup(ctx: dict):
     def _cleanup_progress(pid: int):
         with deps._progress_lock:
             stored = deps.analysis_progress_storage.get(pid)
-            if stored and stored.get("status") in (
-                "completed", "error", "failed", "cancelled"
-            ):
+            if stored and stored.get("status") in ("completed", "error", "failed", "cancelled"):
                 deps.analysis_progress_storage.pop(pid, None)
 
     cleanup_timer = threading.Timer(300, _cleanup_progress, args=[project_id])
