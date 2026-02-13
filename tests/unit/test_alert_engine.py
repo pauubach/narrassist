@@ -11,12 +11,7 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 
 from narrative_assistant.alerts.engine import AlertEngine, get_alert_engine
-from narrative_assistant.alerts.models import (
-    Alert,
-    AlertCategory,
-    AlertSeverity,
-    AlertStatus,
-)
+from narrative_assistant.alerts.models import Alert, AlertCategory, AlertSeverity, AlertStatus
 from narrative_assistant.analysis.attribute_consistency import (
     AttributeInconsistency,
     AttributeKey,
@@ -88,7 +83,9 @@ class TestAlertEngineCreateFromAttributeInconsistency:
         # Verificar que se llamó al repo.create
         engine.repo.create.assert_called_once()
 
-    def test_create_from_attribute_inconsistency_without_positional_inconsistency(self, engine):
+    def test_create_from_attribute_inconsistency_without_positional_inconsistency(
+        self, engine
+    ):
         """
         Verifica que NO se puede pasar un objeto AttributeInconsistency directamente.
 
@@ -115,9 +112,9 @@ class TestAlertEngineCreateFromAttributeInconsistency:
         sig = inspect.signature(engine.create_from_attribute_inconsistency)
         param_names = list(sig.parameters.keys())
 
-        assert "inconsistency" not in param_names, (
-            "create_from_attribute_inconsistency no debe tener parámetro 'inconsistency'"
-        )
+        assert (
+            "inconsistency" not in param_names
+        ), "create_from_attribute_inconsistency no debe tener parámetro 'inconsistency'"
 
     def test_create_from_attribute_inconsistency_all_params_required(self, engine):
         """Verifica que todos los parámetros requeridos están presentes."""
@@ -235,9 +232,11 @@ class TestAlertEngineIntegrationWithInconsistency:
             "project_id": 1,  # Viene del contexto
             "entity_name": inc.entity_name,
             "entity_id": inc.entity_id,
-            "attribute_key": inc.attribute_key.value
-            if hasattr(inc.attribute_key, "value")
-            else str(inc.attribute_key),
+            "attribute_key": (
+                inc.attribute_key.value
+                if hasattr(inc.attribute_key, "value")
+                else str(inc.attribute_key)
+            ),
             "value1": inc.value1,
             "value2": inc.value2,
             "value1_source": {
@@ -320,3 +319,78 @@ class TestAlertEngineGrammarIssues:
 
         assert result.is_success
         engine.repo.create.assert_called_once()
+
+
+class TestConfidenceDecay:
+    """Tests para BK-18: Decay temporal de confianza."""
+
+    @pytest.fixture
+    def engine(self):
+        """AlertEngine con repo mockeado y total_chapters inyectado."""
+        repo = Mock()
+        repo.create.side_effect = lambda alert: Result.success(alert)
+        engine = AlertEngine.__new__(AlertEngine)
+        engine.repo = repo
+        engine.alert_handlers = {}
+        engine._calibration_cache = {}
+        engine._total_chapters_cache = {}
+        return engine
+
+    def test_decay_nearby_chapter(self, engine):
+        """Alerta en capítulo cercano al último → poca pérdida de confianza."""
+        result = engine.create_alert(
+            project_id=1,
+            category=AlertCategory.CONSISTENCY,
+            severity=AlertSeverity.WARNING,
+            alert_type="attribute_inconsistency",
+            title="Test",
+            description="desc",
+            explanation="expl",
+            confidence=0.9,
+            chapter=9,
+            _total_chapters=10,  # distance = 1
+        )
+        assert result.is_success
+        alert = result.value
+        # 0.9 * 0.97^1 = 0.873
+        assert alert.confidence >= 0.85
+        assert alert.confidence < 0.9
+
+    def test_decay_distant_chapter(self, engine):
+        """Alerta en capítulo 1 de un libro de 50 capítulos → mucha pérdida."""
+        result = engine.create_alert(
+            project_id=1,
+            category=AlertCategory.CONSISTENCY,
+            severity=AlertSeverity.WARNING,
+            alert_type="attribute_inconsistency",
+            title="Test",
+            description="desc",
+            explanation="expl",
+            confidence=0.9,
+            chapter=1,
+            _total_chapters=50,  # distance = 49
+        )
+        assert result.is_success
+        alert = result.value
+        # 0.9 * 0.97^49 ≈ 0.9 * 0.218 ≈ 0.196
+        assert alert.confidence < 0.3
+        assert alert.confidence >= AlertEngine.DECAY_FLOOR
+
+    def test_no_decay_for_grammar(self, engine):
+        """Alertas de gramática NO aplican decay temporal."""
+        result = engine.create_alert(
+            project_id=1,
+            category=AlertCategory.GRAMMAR,
+            severity=AlertSeverity.INFO,
+            alert_type="grammar_error",
+            title="Test",
+            description="desc",
+            explanation="expl",
+            confidence=0.9,
+            chapter=1,
+            _total_chapters=50,
+        )
+        assert result.is_success
+        alert = result.value
+        # Sin decay → confianza original (solo calibración, factor=1.0)
+        assert alert.confidence == 0.9

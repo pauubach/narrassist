@@ -38,6 +38,18 @@ class AlertEngine:
     - Recalibra confianza según historial de descartes (BK-22)
     """
 
+    # BK-18: Tipos de alerta que aplican decay temporal
+    DECAY_ALERT_TYPES = frozenset(
+        {
+            "attribute_inconsistency",
+            "temporal_anachronism",
+            "relationship_contradiction",
+            "character_location_impossibility",
+        }
+    )
+    DECAY_RATE = 0.97  # factor por capítulo de distancia
+    DECAY_FLOOR = 0.15  # confianza mínima para evitar alertas vanishing
+
     def __init__(self, repository: AlertRepository | None = None):
         """
         Inicializa el motor de alertas.
@@ -49,8 +61,12 @@ class AlertEngine:
         self.alert_handlers: dict[str, Callable[[Any], Alert]] = {}
         # Cache de calibración en memoria: {(project_id, alert_type, source_module): factor}
         self._calibration_cache: dict[tuple[int, str, str], float] = {}
+        # BK-18: Cache de total de capítulos por proyecto
+        self._total_chapters_cache: dict[int, int] = {}
 
-    def register_handler(self, alert_type: str, handler: Callable[[Any], Alert]) -> None:
+    def register_handler(
+        self, alert_type: str, handler: Callable[[Any], Alert]
+    ) -> None:
         """
         Registra un handler para convertir resultados de detector a alertas.
 
@@ -96,7 +112,22 @@ class AlertEngine:
 
         # Aplicar calibración de confianza (BK-22)
         factor = self._get_calibration_factor(project_id, alert_type, source_module)
-        effective_confidence = round(original_confidence * factor, 4)
+        effective_confidence = original_confidence * factor
+
+        # BK-18: Decay temporal — alertas de capítulos lejanos pierden confianza
+        chapter = kwargs.get("chapter")
+        if chapter is not None and alert_type in self.DECAY_ALERT_TYPES:
+            total_chapters = kwargs.pop("_total_chapters", None)
+            if total_chapters is None:
+                total_chapters = self._get_total_chapters(project_id)
+            if total_chapters > 0:
+                chapter_distance = max(0, total_chapters - chapter)
+                decay = self.DECAY_RATE**chapter_distance
+                effective_confidence = max(
+                    self.DECAY_FLOOR, effective_confidence * decay
+                )
+
+        effective_confidence = round(effective_confidence, 4)
 
         alert = Alert(
             id=0,  # Se asignará por la DB
@@ -147,7 +178,9 @@ class AlertEngine:
                 errors.append(result.error)
 
         if errors:
-            logger.warning(f"Created {len(created_alerts)} alerts with {len(errors)} errors")
+            logger.warning(
+                f"Created {len(created_alerts)} alerts with {len(errors)} errors"
+            )
             return Result.partial(created_alerts, errors)
 
         logger.info(f"Created {len(created_alerts)} alerts for project {project_id}")
@@ -217,27 +250,39 @@ class AlertEngine:
         alert.status = status
         alert.resolution_note = note
 
-        if status in [AlertStatus.RESOLVED, AlertStatus.DISMISSED, AlertStatus.AUTO_RESOLVED]:
+        if status in [
+            AlertStatus.RESOLVED,
+            AlertStatus.DISMISSED,
+            AlertStatus.AUTO_RESOLVED,
+        ]:
             alert.resolved_at = datetime.now()
 
         result = self.repo.update(alert)
 
         if result.is_success:
-            logger.info(f"Alert {alert_id} status changed: {old_status.value} → {status.value}")
+            logger.info(
+                f"Alert {alert_id} status changed: {old_status.value} → {status.value}"
+            )
 
         return result
 
     def dismiss_alert(self, alert_id: int, reason: str = "") -> Result[Alert]:
         """Descarta una alerta (falso positivo)."""
-        return self.update_alert_status(alert_id, AlertStatus.DISMISSED, f"Descartada: {reason}")
+        return self.update_alert_status(
+            alert_id, AlertStatus.DISMISSED, f"Descartada: {reason}"
+        )
 
     def resolve_alert(self, alert_id: int, resolution: str = "") -> Result[Alert]:
         """Marca una alerta como resuelta."""
-        return self.update_alert_status(alert_id, AlertStatus.RESOLVED, f"Resuelto: {resolution}")
+        return self.update_alert_status(
+            alert_id, AlertStatus.RESOLVED, f"Resuelto: {resolution}"
+        )
 
     def acknowledge_alert(self, alert_id: int) -> Result[Alert]:
         """Marca una alerta como vista/reconocida."""
-        return self.update_alert_status(alert_id, AlertStatus.ACKNOWLEDGED, "Usuario vio la alerta")
+        return self.update_alert_status(
+            alert_id, AlertStatus.ACKNOWLEDGED, "Usuario vio la alerta"
+        )
 
     def get_summary(self, project_id: int) -> Result[dict[str, Any]]:
         """
@@ -406,8 +451,12 @@ class AlertEngine:
                 "chapter": value1_source.get("chapter"),
                 "page": value1_source.get("page", 1),
                 "line": value1_source.get("line", 1),
-                "start_char": value1_source.get("start_char", value1_source.get("position", 0)),
-                "end_char": value1_source.get("end_char", value1_source.get("start_char", 0) + 100),
+                "start_char": value1_source.get(
+                    "start_char", value1_source.get("position", 0)
+                ),
+                "end_char": value1_source.get(
+                    "end_char", value1_source.get("start_char", 0) + 100
+                ),
                 "excerpt": value1_source.get("text", value1_source.get("excerpt", "")),
                 "value": value1,
             },
@@ -415,8 +464,12 @@ class AlertEngine:
                 "chapter": value2_source.get("chapter"),
                 "page": value2_source.get("page", 1),
                 "line": value2_source.get("line", 1),
-                "start_char": value2_source.get("start_char", value2_source.get("position", 0)),
-                "end_char": value2_source.get("end_char", value2_source.get("start_char", 0) + 100),
+                "start_char": value2_source.get(
+                    "start_char", value2_source.get("position", 0)
+                ),
+                "end_char": value2_source.get(
+                    "end_char", value2_source.get("start_char", 0) + 100
+                ),
                 "excerpt": value2_source.get("text", value2_source.get("excerpt", "")),
                 "value": value2,
             },
@@ -646,7 +699,8 @@ class AlertEngine:
             alert_type=f"{category}_{issue_type}",
             title=f"{title_prefix}: {explanation[:50]}{'...' if len(explanation) > 50 else ''}",
             description=description,
-            explanation=AlertFormatter.format_context(context, prefix="Contexto") or explanation,
+            explanation=AlertFormatter.format_context(context, prefix="Contexto")
+            or explanation,
             suggestion=suggestion,
             chapter=chapter,
             start_char=start_char,
@@ -690,14 +744,18 @@ class AlertEngine:
             alerts_data.append(
                 {
                     "category": AlertCategory.ORTHOGRAPHY,
-                    "severity": self.calculate_severity_from_confidence(issue.confidence),
+                    "severity": self.calculate_severity_from_confidence(
+                        issue.confidence
+                    ),
                     "alert_type": f"spelling_{issue.error_type.value}",
                     "title": f"Error ortográfico: '{issue.word}'",
                     "description": issue.explanation,
                     "explanation": AlertFormatter.format_context(issue.sentence),
-                    "suggestion": f"Sugerencias: {', '.join(issue.suggestions[:3])}"
-                    if issue.suggestions
-                    else None,
+                    "suggestion": (
+                        f"Sugerencias: {', '.join(issue.suggestions[:3])}"
+                        if issue.suggestions
+                        else None
+                    ),
                     "chapter": chapter,
                     "start_char": issue.start_char,
                     "end_char": issue.end_char,
@@ -742,12 +800,16 @@ class AlertEngine:
             alerts_data.append(
                 {
                     "category": AlertCategory.GRAMMAR,
-                    "severity": self.calculate_severity_from_confidence(issue.confidence),
+                    "severity": self.calculate_severity_from_confidence(
+                        issue.confidence
+                    ),
                     "alert_type": f"grammar_{issue.error_type.value}",
                     "title": f"Error gramatical: {issue.explanation[:50]}",
-                    "description": f"'{issue.text}' → '{issue.suggestion}'"
-                    if issue.suggestion
-                    else f"'{issue.text}'",
+                    "description": (
+                        f"'{issue.text}' → '{issue.suggestion}'"
+                        if issue.suggestion
+                        else f"'{issue.text}'"
+                    ),
                     "explanation": AlertFormatter.format_context(issue.sentence),
                     "suggestion": issue.suggestion,
                     "chapter": chapter,
@@ -1048,10 +1110,14 @@ class AlertEngine:
             return Result.success(None)  # type: ignore
 
         severity = (
-            AlertSeverity.WARNING if attribution_confidence == "unknown" else AlertSeverity.INFO
+            AlertSeverity.WARNING
+            if attribution_confidence == "unknown"
+            else AlertSeverity.INFO
         )
 
-        speakers_str = ", ".join(possible_speakers) if possible_speakers else "desconocido"
+        speakers_str = (
+            ", ".join(possible_speakers) if possible_speakers else "desconocido"
+        )
 
         return self.create_alert(
             project_id=project_id,
@@ -1135,7 +1201,9 @@ class AlertEngine:
             "temporal_jump": f"Cambio emocional abrupto de {entity_name}",
             "narrator_bias": f"Inconsistencia del narrador sobre {entity_name}",
         }
-        title = title_map.get(incoherence_type, f"Incoherencia emocional: {entity_name}")
+        title = title_map.get(
+            incoherence_type, f"Incoherencia emocional: {entity_name}"
+        )
 
         return self.create_alert(
             project_id=project_id,
@@ -1200,7 +1268,9 @@ class AlertEngine:
         Returns:
             Result con la alerta creada
         """
-        severity = AlertSeverity.CRITICAL if confidence >= 0.8 else AlertSeverity.WARNING
+        severity = (
+            AlertSeverity.CRITICAL if confidence >= 0.8 else AlertSeverity.WARNING
+        )
 
         # Descripción según tipo de aparición
         if appearance_type == "dialogue":
@@ -1312,7 +1382,8 @@ class AlertEngine:
             title=title,
             description=description,
             explanation=explanation,
-            suggestion=suggestion or "Revisar el equilibrio del ritmo narrativo en este segmento",
+            suggestion=suggestion
+            or "Revisar el equilibrio del ritmo narrativo en este segmento",
             chapter=chapter,
             confidence=confidence,
             source_module="pacing_analyzer",
@@ -1411,7 +1482,9 @@ class AlertEngine:
             "vocabulary_anomaly": "Vocabulario atípico",
             "register_inconsistency": "Inconsistencia de registro",
         }
-        title = type_titles.get(variation_type, f"Variación estilística: {variation_type}")
+        title = type_titles.get(
+            variation_type, f"Variación estilística: {variation_type}"
+        )
 
         return self.create_alert(
             project_id=project_id,
@@ -1605,10 +1678,13 @@ class AlertEngine:
             f"(forma habitual: '{canonical_form}', {canonical_count} menciones)"
         )
 
-        chapters_affected = sorted(set(
-            m["chapter_id"] for m in variant_mentions
-            if m.get("chapter_id") is not None
-        ))
+        chapters_affected = sorted(
+            set(
+                m["chapter_id"]
+                for m in variant_mentions
+                if m.get("chapter_id") is not None
+            )
+        )
         ch_list = ", ".join(str(c) for c in chapters_affected[:5])
         if len(chapters_affected) > 5:
             ch_list += f" (+{len(chapters_affected) - 5} más)"
@@ -1642,9 +1718,9 @@ class AlertEngine:
             start_char=first.get("start_char"),
             end_char=first.get("end_char"),
             excerpt=(
-                first.get("context_before", "") +
-                variant_form +
-                first.get("context_after", "")
+                first.get("context_before", "")
+                + variant_form
+                + first.get("context_after", "")
             ),
             entity_ids=[entity_id],
             confidence=confidence,
@@ -1722,7 +1798,9 @@ class AlertEngine:
 
         return self.create_alerts_batch(project_id, alerts_data)
 
-    def _get_dialogue_issue_title(self, issue_type: str, consecutive_count: int = 1) -> str:
+    def _get_dialogue_issue_title(
+        self, issue_type: str, consecutive_count: int = 1
+    ) -> str:
         """Genera título para problema de diálogo."""
         title_map = {
             "orphan_no_attribution": "Diálogo sin atribución de hablante",
@@ -1769,6 +1847,30 @@ class AlertEngine:
             return factor
         except Exception:
             return 1.0
+
+    def _get_total_chapters(self, project_id: int) -> int:
+        """Obtiene total de capítulos de un proyecto (con cache)."""
+        cache = getattr(self, "_total_chapters_cache", None)
+        if cache is None:
+            self._total_chapters_cache = {}
+            cache = self._total_chapters_cache
+
+        if project_id in cache:
+            return cache[project_id]
+
+        try:
+            from ..persistence.database import get_database
+
+            db = get_database()
+            row = db.fetchone(
+                "SELECT COUNT(*) as cnt FROM chapters WHERE project_id = ?",
+                (project_id,),
+            )
+            total = row["cnt"] if row else 0
+            self._total_chapters_cache[project_id] = total
+            return total
+        except Exception:
+            return 0
 
     def recalibrate_detector(
         self, project_id: int, alert_type: str, source_module: str
@@ -1825,7 +1927,15 @@ class AlertEngine:
                     calibration_factor = excluded.calibration_factor,
                     updated_at = datetime('now')
                 """,
-                (project_id, alert_type, source_module, total, dismissed, fp_rate, factor),
+                (
+                    project_id,
+                    alert_type,
+                    source_module,
+                    total,
+                    dismissed,
+                    fp_rate,
+                    factor,
+                ),
             )
 
             # Invalidar cache
@@ -1839,7 +1949,9 @@ class AlertEngine:
             return factor
 
         except Exception as e:
-            logger.warning(f"Recalibration failed for {alert_type}/{source_module}: {e}")
+            logger.warning(
+                f"Recalibration failed for {alert_type}/{source_module}: {e}"
+            )
             return 1.0
 
     def recalibrate_project(self, project_id: int) -> dict[str, float]:
@@ -1873,7 +1985,9 @@ class AlertEngine:
                 k: v for k, v in self._calibration_cache.items() if k[0] != project_id
             }
 
-            logger.info(f"Recalibrated {len(results)} detectors for project {project_id}")
+            logger.info(
+                f"Recalibrated {len(results)} detectors for project {project_id}"
+            )
             return results
         except Exception as e:
             logger.warning(f"Project recalibration failed: {e}")
