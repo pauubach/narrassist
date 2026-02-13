@@ -123,7 +123,7 @@ watch(() => props.projectId, loadDetail)
 
     <template v-else>
       <TabView>
-        <TabPanel>
+        <TabPanel value="resolved">
           <template #header>
             <span>
               <i class="pi pi-check-circle" />
@@ -169,7 +169,7 @@ watch(() => props.projectId, loadDetail)
           </div>
         </TabPanel>
 
-        <TabPanel>
+        <TabPanel value="new">
           <template #header>
             <span>
               <i class="pi pi-exclamation-circle" />
@@ -198,7 +198,7 @@ watch(() => props.projectId, loadDetail)
           </div>
         </TabPanel>
 
-        <TabPanel>
+        <TabPanel value="unchanged">
           <template #header>
             <span>
               <i class="pi pi-minus-circle" />

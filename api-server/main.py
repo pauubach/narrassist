@@ -279,7 +279,7 @@ deps.IS_EMBEDDED_RUNTIME = IS_EMBEDDED_RUNTIME
 _write_debug("=== PHASE 1: Loading persistence modules ===")
 _DB_MODULES_LOADED = False
 try:
-    from narrative_assistant import __version__ as NA_VERSION
+    from narrative_assistant import __version__ as NA_VERSION  # noqa: N812
     from narrative_assistant.core.config import get_config
     from narrative_assistant.persistence.chapter import ChapterRepository, SectionRepository
     from narrative_assistant.persistence.database import Database, get_database
@@ -371,8 +371,10 @@ if deps.project_manager is not None:
         _early_logger.info("Modules loaded successfully (NLP deps available)")
     else:
         _missing = []
-        if not _numpy_ok: _missing.append("numpy")
-        if not _spacy_ok: _missing.append("spacy")
+        if not _numpy_ok:
+            _missing.append("numpy")
+        if not _spacy_ok:
+            _missing.append("spacy")
         deps.MODULES_ERROR = f"NLP dependencies missing: {', '.join(_missing)}"
         _write_debug(f"Modules partially loaded: {deps.MODULES_ERROR}")
         _early_logger.warning(f"Modules partially loaded: {deps.MODULES_ERROR}")
@@ -628,12 +630,13 @@ if __name__ == "__main__":
     _write_debug("=== Main block starting ===")
 
     # Fix para PyInstaller: DEBE ir ANTES de cualquier otra cosa
+    _devnull = 'nul' if sys.platform == 'win32' else '/dev/null'
     if sys.stdout is None:
-        sys.stdout = open('nul', 'w') if sys.platform == 'win32' else open('/dev/null', 'w')
+        sys.stdout = open(_devnull, 'w')  # noqa: SIM115
     if sys.stderr is None:
-        sys.stderr = open('nul', 'w') if sys.platform == 'win32' else open('/dev/null', 'w')
+        sys.stderr = open(_devnull, 'w')  # noqa: SIM115
     if sys.stdin is None:
-        sys.stdin = open('nul') if sys.platform == 'win32' else open('/dev/null')
+        sys.stdin = open(_devnull)  # noqa: SIM115
 
     if not hasattr(sys.stdout, 'isatty'):
         sys.stdout.isatty = lambda: False

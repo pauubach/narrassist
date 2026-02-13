@@ -124,7 +124,7 @@ def load_narrative_assistant_modules():
         _write_debug("On-demand Phase 1: Loading persistence modules...")
         from narrative_assistant.core.config import get_config as get_cfg
         from narrative_assistant.persistence.chapter import ChapterRepository, SectionRepository
-        from narrative_assistant.persistence.database import Database as DB
+        from narrative_assistant.persistence.database import Database as DB  # noqa: N814
         from narrative_assistant.persistence.database import get_database as get_db
         from narrative_assistant.persistence.project import ProjectManager
         _write_debug("On-demand Phase 1 OK: persistence imports succeeded")
@@ -217,8 +217,10 @@ def load_narrative_assistant_modules():
             return True
         else:
             _missing = []
-            if not _numpy_ok: _missing.append("numpy")
-            if not _spacy_ok: _missing.append("spacy")
+            if not _numpy_ok:
+                _missing.append("numpy")
+            if not _spacy_ok:
+                _missing.append("spacy")
             deps.MODULES_LOADED = False
             deps.MODULES_ERROR = f"NLP dependencies missing: {', '.join(_missing)}"
             _write_debug(f"=== load_narrative_assistant_modules() PARTIAL: {deps.MODULES_ERROR} ===")
@@ -505,7 +507,7 @@ class CorrectionConfigUpdate(BaseModel):
     """Modelo para actualizar configuración de corrección."""
     customizations: Optional[dict] = None  # Solo los parámetros personalizados
     config: Optional[dict] = None  # Compat: config completa (legacy)
-    selectedPreset: Optional[str] = None
+    selectedPreset: Optional[str] = None  # noqa: N815
 
 
 # Categorías permitidas por tipo de entidad (alineado con frontend).

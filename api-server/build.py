@@ -106,7 +106,7 @@ def run_pyinstaller(onefile: bool = False):
         logger.warning("Por ahora se usará el modo carpeta (recomendado para Tauri)")
 
     try:
-        result = subprocess.run(cmd, cwd=API_SERVER_DIR, check=True)
+        subprocess.run(cmd, cwd=API_SERVER_DIR, check=True)
         logger.info("=" * 60)
         logger.info("✓ Build completado exitosamente")
         logger.info("=" * 60)
