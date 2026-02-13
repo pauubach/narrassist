@@ -1085,10 +1085,10 @@ NO propagar invalidacion downstream. Comparar `output_hash` antes vs despues.
 | BK-10 | Dialogue attribution: correcciones no aplicadas + scene breaks | **P1** — Scene break patterns definidos en `chapter.py:621` (`_SCENE_BREAK_PATTERNS`). Falta: (a) `SpeakerAttributor` no lee `speaker_corrections`, (b) no usa scene breaks para reset, (c) sin confidence decay. |
 | ~~BK-11~~ | ~~Detección de narrativa no lineal~~ | ✅ DONE — `TemporalMap` en `temporal_map.py`, `NonLinearNarrativeDetector` en `non_linear_detector.py`. `vital_status.py` usa `is_character_alive_in_chapter()` (story_time) en vez de `chapter >=`. 15 tests. |
 | BK-12 | Cache para fases de enriquecimiento | **P1** — Fases 10-13 (relaciones, voz, prosa) recalculan on-the-fly en cada visita a tab. Sin cache → OOM en hardware limitado (8GB RAM). Blocker para S8a-07..10. |
-| BK-13 | Pro-drop ambigüedad multi-personaje | **P2** — Parcial: `MentionType.ZERO` existe, `coref_mention_extraction.py:416` **ya extrae** zero pronouns con inferencia de género. Falta `ProDropAmbiguityScorer` con scoring multi-factor y `SaliencyTracker`. |
+| ~~BK-13~~ | ~~Pro-drop ambigüedad multi-personaje~~ | ✅ DONE — `ProDropAmbiguityScorer` y `SaliencyTracker` en `pro_drop_scorer.py`. Scoring multi-factor (recency, saliency, gender, discourse, number). Ambiguity score 0-1. Integrado en `HeuristicsCorefMethod` para `MentionType.ZERO`. `_weighted_vote()` almacena `_ambiguity` en detalle. 10 tests. |
 | ~~BK-14~~ | ~~Ubicaciones jerárquicas/anidadas~~ | ✅ DONE — `LocationOntology` en `location_ontology.py`: jerarquía 7 niveles, gazetteer ~50 ciudades, haversine, alias, reachability por periodo histórico. 19 tests. |
 | BK-15 | Emotional masking no modelado | **DONE** — `_check_emotional_masking()` en `out_of_character.py`, 7 familias verbales, leakage físico. 6 tests en `test_ooc_masking.py`. |
-| BK-16 | Hilos narrativos sin resolver (Chekhov's gun) | **P2** — Parcial: `ChekhovElement` dataclass y `_detect_chekhov_elements()` en `chapter_summary.py` funcionan para **objetos/vehicles**. `_check_chekhov()` en `narrative_health.py` integrado en health report. Falta extensión a **personajes** SUPPORTING abandonados. |
+| ~~BK-16~~ | ~~Hilos narrativos sin resolver (Chekhov's gun)~~ | ✅ DONE — `ChekhovTracker` en `chekhov_tracker.py`: detecta personajes SUPPORTING/MINOR que desaparecen (threshold 70%). `SupportingCharacterData` con diálogo/acciones/partners. `detect_abandoned_character_threads()` genera `AbandonedThread`. Integrado en `_detect_chekhov_elements()`. 8 tests. |
 | BK-17 | Glossary → entity disambiguation | **DONE** — `user_glossary` table (v20), `_inject_glossary_entities()` en NER pipeline, CRUD API endpoints. 6 tests en `test_glossary_ner.py`. |
 | BK-18 | Confidence decay para inferencias stale | **P3** — Nada implementado. `calibration_factor` de BK-22 (S8c) existe como punto de enganche. |
 | ~~BK-19~~ | ~~UI "Añadir/editar atributo" en EntitiesTab~~ | ✅ DONE — Inline add/edit/delete en EntitiesTab. Formulario con categoria, nombre, valor, confianza auto 1.0 (commit b326317, Sprint PP-2) |
@@ -1264,7 +1264,7 @@ Muertes detectadas se registran automáticamente en el temporal_map.
 
 ---
 
-### Sprint S11: Pro-drop + Chekhov (~26-30h, 6-7 días)
+### Sprint S11: Pro-drop + Chekhov (~26-30h, 6-7 días) ✅ COMPLETADO
 
 > **Especificado**: 11-Feb-2026 por panel de expertos.
 
@@ -1889,7 +1889,7 @@ S5 (LLM), S6 (frontend UX), S7a (licensing). Total: ~10 semanas ejecutadas.
 |--------|------|-------------|------|
 | **S9** ✅ | Integridad datos + diálogos | BK-09 (merge FK), BK-15 (masking), BK-17 (glossary→NER), BK-10b/c (scene breaks + decay) | 6-9d |
 | **S10** ✅ | Timeline no lineal | BK-14 (ubicaciones jerárquicas), BK-11 (narrativa no lineal — 40% ficción). ~~BK-12 absorbido por S8a~~ | 8-13d |
-| **S11** | Pro-drop + Chekhov | BK-13 (ambigüedad multi-candidato), BK-16 (hilos narrativos sin resolver) | 8-13d |
+| **S11** ✅ | Pro-drop + Chekhov | BK-13 (ambigüedad multi-candidato), BK-16 (hilos narrativos sin resolver) | 8-13d |
 | **S12** | Confidence decay | BK-18 (decay gradual post-merge) | 1-2d |
 
 ### APARCADO: Ideas documentadas, no planificadas
@@ -1991,4 +1991,4 @@ Sprint S10 ✅ (BK-14 + BK-11)                      BACKLOG:
 
 **Ultima actualizacion**: 2026-02-13
 **Autor**: Claude (Panel de 8 expertos simulados + sesión producto 10-Feb + paneles pricing/sales/editorial 12-Feb)
-**Estado**: S0-S10 completados. Sprint PP completado (17/17). S7b-S7d completados. SP-1 completado (v0.9.0). SP-2 completado (v0.9.3). SP-3 completado (v0.9.2). Tag: v0.9.3. Pendiente: S11-S12 (9-15 días, ~2-4 semanas).
+**Estado**: S0-S11 completados. Sprint PP completado (17/17). S7b-S7d completados. SP-1 completado (v0.9.0). SP-2 completado (v0.9.3). SP-3 completado (v0.9.2). Tag: v0.9.3. Pendiente: S12 (1-2 días).
