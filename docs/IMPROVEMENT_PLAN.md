@@ -1083,10 +1083,10 @@ NO propagar invalidacion downstream. Comparar `output_hash` antes vs despues.
 | ~~BK-07~~ | ~~Análisis multi-documento~~ | ✅ DONE - Collections, entity links, cross-book analysis, workspace auxiliar |
 | ~~BK-09~~ | ~~Merge-induced attribute orphaning~~ | ✅ DONE — `move_related_data()` en `repository.py` migra 14 FK cols en 10 tablas. 16 tests en `test_entity_merge_fk.py`. |
 | BK-10 | Dialogue attribution: correcciones no aplicadas + scene breaks | **P1** — Scene break patterns definidos en `chapter.py:621` (`_SCENE_BREAK_PATTERNS`). Falta: (a) `SpeakerAttributor` no lee `speaker_corrections`, (b) no usa scene breaks para reset, (c) sin confidence decay. |
-| BK-11 | Detección de narrativa no lineal | **P1** — Scaffolding importante: enum `NarrativeOrder` (ANALEPSIS/PROLEPSIS) en `timeline.py:34`, detección por marcadores y saltos en `timeline.py:620-661`, columna BD `narrative_order`. Falta `TemporalMap` con cálculo de edad por story_time. |
+| ~~BK-11~~ | ~~Detección de narrativa no lineal~~ | ✅ DONE — `TemporalMap` en `temporal_map.py`, `NonLinearNarrativeDetector` en `non_linear_detector.py`. `vital_status.py` usa `is_character_alive_in_chapter()` (story_time) en vez de `chapter >=`. 15 tests. |
 | BK-12 | Cache para fases de enriquecimiento | **P1** — Fases 10-13 (relaciones, voz, prosa) recalculan on-the-fly en cada visita a tab. Sin cache → OOM en hardware limitado (8GB RAM). Blocker para S8a-07..10. |
 | BK-13 | Pro-drop ambigüedad multi-personaje | **P2** — Parcial: `MentionType.ZERO` existe, `coref_mention_extraction.py:416` **ya extrae** zero pronouns con inferencia de género. Falta `ProDropAmbiguityScorer` con scoring multi-factor y `SaliencyTracker`. |
-| BK-14 | Ubicaciones jerárquicas/anidadas | **P2** — Nada implementado. `character_location.py` usa comparación flat de strings. |
+| ~~BK-14~~ | ~~Ubicaciones jerárquicas/anidadas~~ | ✅ DONE — `LocationOntology` en `location_ontology.py`: jerarquía 7 niveles, gazetteer ~50 ciudades, haversine, alias, reachability por periodo histórico. 19 tests. |
 | BK-15 | Emotional masking no modelado | **DONE** — `_check_emotional_masking()` en `out_of_character.py`, 7 familias verbales, leakage físico. 6 tests en `test_ooc_masking.py`. |
 | BK-16 | Hilos narrativos sin resolver (Chekhov's gun) | **P2** — Parcial: `ChekhovElement` dataclass y `_detect_chekhov_elements()` en `chapter_summary.py` funcionan para **objetos/vehicles**. `_check_chekhov()` en `narrative_health.py` integrado en health report. Falta extensión a **personajes** SUPPORTING abandonados. |
 | BK-17 | Glossary → entity disambiguation | **DONE** — `user_glossary` table (v20), `_inject_glossary_entities()` en NER pipeline, CRUD API endpoints. 6 tests en `test_glossary_ner.py`. |
@@ -1121,12 +1121,12 @@ NO propagar invalidacion downstream. Comparar `output_hash` antes vs despues.
 
 ## 8b. Plan de Trabajo BK-09..18 (Panel de Expertos, 10-Feb-2026)
 
-### Sprint S9: Integridad de Datos y Diálogos (~25-31h, 5-7 días)
+### Sprint S9: Integridad de Datos y Diálogos ✅ COMPLETADO
 
 > **Especificado**: 11-Feb-2026 por panel de expertos (QA Senior, Arquitecto Python,
 > Corrector Editorial 15+ años, AppSec Specialist).
 >
-> **Progreso**: BK-09 ✅ completado (12-Feb-2026).
+> **Completado**: BK-09 (12-Feb), BK-15/BK-17/BK-10b/BK-10c (12-Feb).
 
 #### ~~BK-09: Entity Merge FK Migration~~ ✅ COMPLETADO (12-Feb-2026)
 
@@ -1213,88 +1213,54 @@ Confidence decay gradual: `effective_confidence = base * 0.97^turns_since_explic
 
 ---
 
-### Sprint S10: Ubicaciones Jerárquicas + Timeline No Lineal (~27-30h, 6-8 días)
+### Sprint S10: Ubicaciones Jerárquicas + Timeline No Lineal ✅ COMPLETADO (13-Feb-2026)
 
 > **Especificado**: 11-Feb-2026 por panel de expertos (Lingüista Computacional,
 > Corrector Editorial 15+ años, Arquitecto Python, Product Owner).
-
-#### BK-14: LocationOntology [ROI #1, 12h]
-
-> **Ya existe**: Nada. No hay `location_ontology.py` ni tabla `location_ontology`.
-> `character_location.py` usa comparación flat de strings.
-
-**Problema**: cocina y salón en misma casa → alerta de "ubicación incompatible". 30% de FP en alertas de ubicación son por falta de jerarquía.
-
-**Arquitectura**:
-```
-LocationOntology
-├── locations: dict[str, LocationNode]  # nombre → nodo
-├── hierarchy: dict[str, set[str]]      # padre → hijos
-├── are_compatible(loc1, loc2) → bool
-│   ├── Same location → True
-│   ├── Ancestor relationship → True (cocina⊂casa)
-│   └── Different cities → False
-└── is_reachable(loc1, loc2, hours, period) → bool
-    ├── Medieval: 40km/day
-    └── Modern: 1000km/day (tren/avión)
-```
-
-**Schema BD (v19)**: `location_ontology` (location_name, parent_id, coordinates, period), `location_gazetteer` (100+ ciudades españolas pre-pobladas).
-
-**Desafíos español**: "Valencia" = ciudad o comunidad (contexto). Nombres arcaicos ("Hispalis" = Sevilla). Mix ficción+real ("Macondo" + "Madrid").
-
-**Archivos a crear**: `src/narrative_assistant/analysis/location_ontology.py` (400 líneas), `src/narrative_assistant/analysis/location_builder.py` (200 líneas, LLM-assisted).
-
-**Archivos a modificar**: `src/narrative_assistant/analysis/character_location.py` — Reemplazar `_are_locations_incompatible()` con ontología. `persistence/database.py` — Schema v19.
-
-**Tests**: 8 tests (room-in-building, multi-level, different-cities, reachability medieval/modern, unknown=fail-safe, ancestors, descendants, haversine).
-
-#### BK-11: Timeline No Lineal [ROI #2, 15-18h]
-
-> **Ya existe**: Bastante scaffolding:
-> - `temporal/timeline.py:34-39` — enum `NarrativeOrder` con CHRONOLOGICAL, ANALEPSIS, PROLEPSIS
-> - `timeline.py:620-661` — detección de analepsis/prolepsis por marcadores y saltos temporales
-> - `timeline.py:140-144` — `get_analepsis_events()`, `get_prolepsis_events()`
-> - `analysis/narrative_structure.py:36-37` — enum duplicado ANALEPSIS/PROLEPSIS + `PROLEPSIS_PATTERNS`
-> - `database.py:374` — columna `narrative_order` en schema
 >
-> **Falta**: `TemporalMap` con cálculo de edad por story_time (no chapter_number),
-> `is_character_alive_in_chapter()`, `is_location_transition_possible()`, integración
-> con `vital_status.py` y `character_location.py`.
+> **Completado**: 13-Feb-2026. BK-14 + BK-11 implementados. 34 nuevos tests, 1609 regression OK.
 
-**Problema**: Sistema asume `chapter_number = orden cronológico`. 40% de ficción moderna tiene flashbacks. "María 50 años en cap 1, 20 años en cap 2 (flashback)" → falsa alerta "edad retrocede".
+#### ~~BK-14: LocationOntology~~ ✅ COMPLETADO (13-Feb-2026)
 
-**Arquitectura**:
-```
-TemporalMap
-├── temporal_map: dict[chapter → TemporalSlice]
-│   └── TemporalSlice(chapter, discourse_position, story_time,
-│       narrative_type: CHRONOLOGICAL|ANALEPSIS|PROLEPSIS|PARALLEL)
-├── get_character_age_in_chapter(entity_id, chapter) → int
-│   └── reference_age + (story_time_diff / 365.25)
-├── is_character_alive_in_chapter(entity_id, chapter) → bool
-│   └── story_time vs death_time (no chapter_number)
-└── is_location_transition_possible(entity_id, loc1, ch1, loc2, ch2) → bool
-    └── story_time gap → LocationOntology.is_reachable(hours)
-```
+**Implementado**: `location_ontology.py` (~350 líneas) con:
+- `LocationType` enum (7 niveles: ROOM < BUILDING < DISTRICT < CITY < REGION < COUNTRY + FICTIONAL/UNKNOWN)
+- `HistoricalPeriod` enum (MEDIEVAL 40km/d, EARLY_MODERN 60, INDUSTRIAL 300, MODERN 1000)
+- `LocationOntology` class: `are_compatible()` (jerarquía), `is_reachable()` (haversine + velocidad), `resolve()` (alias)
+- Gazetteer español: ~50 ciudades con coordenadas + aliases (Ciudad Condal→Barcelona, Hispalis→Sevilla)
+- `ROOM_TYPES` (18), `BUILDING_TYPES` (24), `EXTERIOR_TYPES` (15) pre-poblados
+- Fail-safe: UNKNOWN/FICTIONAL/no encontrado → siempre compatible (evita FP)
 
-**Detección de flashbacks** (marcadores español):
-- Subjuntivo + imperfecto: "Si hubiera sabido..."
-- Presente histórico: "Llegó a la puerta y ve que está abierta"
-- Adverbios temporales: "tres meses antes", "aquel otoño", "de niño"
-- LLM-assisted para detección ambigua
+**Modificado**: `character_location.py` — `_are_locations_incompatible()` delega a `ontology.are_compatible()`.
+`check_impossible_travel()` soporta cross-chapter con `hours_between` + `period`.
 
-**Schema BD (v20)**: `chapter_timeline_context` (chapter, discourse_position, story_date, narrative_type, is_embedded, parent_timeline_chapter). `character_age_timeline` (entity_id, story_date, age, source_chapter, confidence).
+**Sin cambios de BD** — La ontología es in-memory (no necesita schema v19).
 
-**Archivos a crear**: `src/narrative_assistant/temporal/temporal_map.py`, `src/narrative_assistant/temporal/non_linear_detector.py`
+**Tests**: 19 tests en `test_location_ontology.py` + 42 existentes sin regresión.
 
-**Archivos a modificar**: `vital_status.py` (usar TemporalMap en vez de chapter ≥), `character_location.py` (story_time gap en vez de chapter count).
+#### ~~BK-11: Timeline No Lineal~~ ✅ COMPLETADO (13-Feb-2026)
 
-**Dependencias**: BK-14 (LocationOntology) para is_reachable() — opcional, funciona sin ella.
+**Implementado**: `temporal_map.py` (~250 líneas) con:
+- `NarrativeType` enum (CHRONOLOGICAL, ANALEPSIS, PROLEPSIS, PARALLEL)
+- `TemporalSlice` dataclass (chapter → story_date/day_offset + narrative_type + embedded info)
+- `AgeReference` dataclass (entity_id, age, chapter, story_date)
+- `TemporalMap` class: `from_timeline()`, `get_story_time()`, `get_narrative_type()`,
+  `get_character_age_in_chapter()`, `is_character_alive_in_chapter()`, `get_story_time_gap_hours()`
 
-**Tests**: 8 tests (age-in-present, age-in-flashback, consistency-no-error, inconsistency-detected, alive-before-death, alive-in-flashback, location-transition-with-time, nested-flashbacks).
+**Implementado**: `non_linear_detector.py` (~170 líneas) con:
+- `NonLinearSignal` dataclass (chapter, positions, signal_type, direction, confidence)
+- `NonLinearNarrativeDetector`: 4 patrones subjuntivo imperfecto, 6 retrospectivos, 7 prospectivos
+- `classify_chapter()`: min_signals → "analepsis"/"prolepsis"/"chronological"
 
-**Criterios de éxito S10**: cocina⊂casa → 0 FP; flashbacks detectados → edad calculada por story_time; gazetteer español con 100+ ubicaciones; reachability parametrizada por periodo histórico.
+**Modificado**: `vital_status.py` — `VitalStatusAnalyzer` acepta `temporal_map` opcional.
+`check_post_mortem_appearances()` usa `is_character_alive_in_chapter()` (story_time) en vez de `chapter >=`.
+Muertes detectadas se registran automáticamente en el temporal_map.
+
+**Exportado**: `temporal/__init__.py` — `TemporalMap`, `TemporalSlice`, `NarrativeType`,
+`AgeReference`, `NonLinearNarrativeDetector`, `NonLinearSignal`.
+
+**Sin cambios de BD** — Schema queda en v20.
+
+**Tests**: 15 tests en `test_temporal_map.py` (8 TemporalMap + 1 dates + 6 NonLinearDetector) + 57 existentes sin regresión.
 
 ---
 
@@ -1893,6 +1859,16 @@ S5 (LLM), S6 (frontend UX), S7a (licensing). Total: ~10 semanas ejecutadas.
 > S8a (18 tareas), S8b (9 tareas), S8c (11 tareas) — todo completado.
 > Tag: v0.8.0
 
+### Completado: Sprint S9 — Integridad de Datos y Diálogos ✅
+
+> BK-09 (merge FK), BK-15 (masking), BK-17 (glossary→NER), BK-10b/c (scene breaks + decay).
+
+### Completado: Sprint S10 — Ubicaciones Jerárquicas + Timeline No Lineal ✅
+
+> BK-14 (LocationOntology: jerarquía 7 niveles, gazetteer ~50 ciudades, haversine, reachability).
+> BK-11 (TemporalMap + NonLinearDetector: story_time alive checks, age calculation, flashback detection).
+> 34 nuevos tests, 1609 regression OK. Completado 13-Feb-2026.
+
 ### PRÓXIMO: SP-1..SP-3 — Producto y Licensing (~60h, 3-4 semanas)
 
 > Persistencia de trabajo editorial, revisión de pricing, y export/import.
@@ -1911,8 +1887,8 @@ S5 (LLM), S6 (frontend UX), S7a (licensing). Total: ~10 semanas ejecutadas.
 
 | Sprint | Foco | Tareas clave | Días |
 |--------|------|-------------|------|
-| **S9** | Integridad datos + diálogos | BK-09 (merge FK), BK-15 (masking), BK-17 (glossary→NER), BK-10b/c (scene breaks + decay) | 6-9d |
-| **S10** | Timeline no lineal | BK-14 (ubicaciones jerárquicas), BK-11 (narrativa no lineal — 40% ficción). ~~BK-12 absorbido por S8a~~ | 8-13d |
+| **S9** ✅ | Integridad datos + diálogos | BK-09 (merge FK), BK-15 (masking), BK-17 (glossary→NER), BK-10b/c (scene breaks + decay) | 6-9d |
+| **S10** ✅ | Timeline no lineal | BK-14 (ubicaciones jerárquicas), BK-11 (narrativa no lineal — 40% ficción). ~~BK-12 absorbido por S8a~~ | 8-13d |
 | **S11** | Pro-drop + Chekhov | BK-13 (ambigüedad multi-candidato), BK-16 (hilos narrativos sin resolver) | 8-13d |
 | **S12** | Confidence decay | BK-18 (decay gradual post-merge) | 1-2d |
 
@@ -1951,13 +1927,11 @@ S7a (Licensing) ✅                                  SP-2 (Revisión licensing)
 S7b ✅ (10/10)                                      SP-3 (Export/Import editorial)
 S7c ✅ (6/7, 1 backlog)                             ──────────────────────
 S7d ✅ (13/13)                                      SIGUIENTE (NLP)
-Sprint PP ✅ (17/17)                                S9 (Integridad)
-Sprint S8 ✅ (S8a + S8b + S8c)                     S10 (Timeline)
-  v0.8.0 → v0.8.6 (bugfixes)                       S11 (Pro-drop)
-                                                    S12 (Decay)
-                                                    ──────────────────────
-                                                    BACKLOG:
-                                                    BK-25 Revision Intelligence
+Sprint PP ✅ (17/17)                                S11 (Pro-drop)
+Sprint S8 ✅ (S8a + S8b + S8c)                     S12 (Decay)
+Sprint S9 ✅ (BK-09/15/17/10b/10c)                 ──────────────────────
+Sprint S10 ✅ (BK-14 + BK-11)                      BACKLOG:
+  v0.8.0 → v0.8.6 (bugfixes)                       BK-25 Revision Intelligence
                                                     BK-26 Collab online
                                                     BK-27 Filtrado por capítulos
                                                     BK-28 Historial versiones
@@ -1980,8 +1954,10 @@ Sprint S8 ✅ (S8a + S8b + S8c)                     S10 (Timeline)
 | Sprint SP-1 | 16h (3-4 días) | Persistencia reanálisis (bug fix) |
 | Sprint SP-2 | 8h (2 días) | Revisión licensing |
 | Sprint SP-3 | 36h (7-9 días) | Export/Import editorial |
-| Sprint S9-S12 | 24-37 días (6-9 semanas) | NLP avanzado |
-| **TOTAL restante** | **~10-14 semanas** | SP + S9-S12 |
+| ~~Sprint S9~~ | ~~25-31h (5-7 días)~~ | ✅ COMPLETADO (BK-09/15/17/10b/10c) |
+| ~~Sprint S10~~ | ~~27-30h (6-8 días)~~ | ✅ COMPLETADO (BK-14 + BK-11) |
+| Sprint S11-S12 | 9-15 días (2-4 semanas) | NLP avanzado (pro-drop + decay) |
+| **TOTAL restante** | **~2-4 semanas** | S11-S12 |
 
 ---
 
@@ -2013,6 +1989,6 @@ Sprint S8 ✅ (S8a + S8b + S8c)                     S10 (Timeline)
 
 ---
 
-**Ultima actualizacion**: 2026-02-12
+**Ultima actualizacion**: 2026-02-13
 **Autor**: Claude (Panel de 8 expertos simulados + sesión producto 10-Feb + paneles pricing/sales/editorial 12-Feb)
-**Estado**: S0-S8 completados (v0.8.0). Sprint PP completado (17/17). S7b-S7d completados. SP-1 completado (v0.9.0). SP-2 completado (v0.9.3). SP-3 completado (v0.9.2). Tag: v0.9.3. Pendiente: S9-S12 (24-37 días, ~6-9 semanas).
+**Estado**: S0-S10 completados. Sprint PP completado (17/17). S7b-S7d completados. SP-1 completado (v0.9.0). SP-2 completado (v0.9.3). SP-3 completado (v0.9.2). Tag: v0.9.3. Pendiente: S11-S12 (9-15 días, ~2-4 semanas).
