@@ -9,20 +9,19 @@ import pytest
 from narrative_assistant.entities.models import Entity, EntityType
 from narrative_assistant.temporal.llm_extraction import (
     LLMTemporalInstance,
+    _parse_llm_response,
+    _validate_item,
     build_instance_id,
     extract_temporal_instances_llm,
     merge_with_regex_instances,
     resolve_entity_ids,
-    _parse_llm_response,
-    _validate_item,
 )
 from narrative_assistant.temporal.markers import (
+    _METAPHORICAL_AGE_THRESHOLD,
     AGE_PHASE_ALIASES,
     LIFE_EVENT_PHASE_MAP,
     TemporalMarkerExtractor,
-    _METAPHORICAL_AGE_THRESHOLD,
 )
-
 
 # ============================================================================
 # Level A: Extended Phase Aliases
