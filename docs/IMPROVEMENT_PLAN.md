@@ -2093,7 +2093,7 @@ Infraestructura existente (55% — backend core completo):
 | ~~**Filtrado alertas por capítulos** (BK-27)~~ | ~~Promovido a Sprint S13~~ | — |
 | ~~**Historial de versiones** (BK-28)~~ | ~~Promovido a Sprint S15 (fase 1)~~ | — |
 | ~~**Step-up pricing** (BK-29)~~ | ~~Promovido a Sprint S16~~ | — |
-| **Pesos adaptativos nivel 3** (por manuscrito) | Infraestructura existe (`adaptive_weights`), pero nivel 2 (recalibración global) es suficiente primero. | Tras BK-22 (nivel 2) |
+| ~~**Pesos adaptativos nivel 3**~~ (por manuscrito) | ✅ DONE — `project_detector_weights` table (v23), `update_adaptive_weight()` en AlertEngine, hooks en dismiss/resolve endpoints, 19 tests. Pesos persisten entre re-análisis. | — |
 | **Integrar Maverick** (BK-01) | Solo inglés por ahora. Monitorizar releases. | Cuando soporte español |
 | **Integrar BookNLP** (BK-02) | Sin release público multilingüe. | Cuando esté disponible |
 | **FlawedFictions benchmark** (BK-03) | Dataset no publicado. | Cuando se publique |

@@ -36,7 +36,13 @@ class AlertEngine:
     - Filtra y busca alertas
     - Genera resúmenes y estadísticas
     - Recalibra confianza según historial de descartes (BK-22)
+    - Aplica pesos adaptativos per-project (nivel 3)
     """
+
+    # Nivel 3: learning rate para pesos adaptativos por proyecto
+    ADAPTIVE_LEARNING_RATE = 0.03
+    ADAPTIVE_WEIGHT_FLOOR = 0.1
+    ADAPTIVE_WEIGHT_CEIL = 1.0
 
     # BK-18: Tipos de alerta que aplican decay temporal
     DECAY_ALERT_TYPES = frozenset(
@@ -63,6 +69,8 @@ class AlertEngine:
         self._calibration_cache: dict[tuple[int, str, str], float] = {}
         # BK-18: Cache de total de capítulos por proyecto
         self._total_chapters_cache: dict[int, int] = {}
+        # Nivel 3: Cache de pesos adaptativos per-project: {(project_id, alert_type): weight}
+        self._adaptive_weights_cache: dict[tuple[int, str], float] = {}
 
     def register_handler(
         self, alert_type: str, handler: Callable[[Any], Alert]
@@ -126,6 +134,11 @@ class AlertEngine:
                 effective_confidence = max(
                     self.DECAY_FLOOR, effective_confidence * decay
                 )
+
+        # Nivel 3: Pesos adaptativos per-project acumulados de feedback del usuario
+        adaptive_weight = self._get_adaptive_weight(project_id, alert_type)
+        if adaptive_weight < 1.0:
+            effective_confidence *= adaptive_weight
 
         effective_confidence = round(effective_confidence, 4)
 
@@ -2000,6 +2013,158 @@ class AlertEngine:
         else:
             self._calibration_cache = {
                 k: v for k, v in self._calibration_cache.items() if k[0] != project_id
+            }
+
+    # =====================================================================
+    # Nivel 3: Pesos adaptativos per-project
+    # =====================================================================
+
+    def _get_adaptive_weight(self, project_id: int, alert_type: str) -> float:
+        """
+        Obtiene el peso adaptativo para (project, alert_type).
+
+        Busca en cache primero, luego en DB. Devuelve 1.0 si no hay datos.
+        """
+        cache = getattr(self, "_adaptive_weights_cache", None)
+        if cache is None:
+            self._adaptive_weights_cache = {}
+            cache = self._adaptive_weights_cache
+
+        cache_key = (project_id, alert_type)
+        if cache_key in cache:
+            return cache[cache_key]
+
+        try:
+            from ..persistence.database import get_database
+
+            db = get_database()
+            row = db.fetchone(
+                "SELECT weight FROM project_detector_weights "
+                "WHERE project_id = ? AND alert_type = ?",
+                (project_id, alert_type),
+            )
+            weight = row["weight"] if row else 1.0
+            self._adaptive_weights_cache[cache_key] = weight
+            return weight
+        except Exception:
+            return 1.0
+
+    def update_adaptive_weight(
+        self,
+        project_id: int,
+        alert_type: str,
+        dismissed: bool,
+    ) -> float:
+        """
+        Actualiza el peso adaptativo tras feedback del usuario.
+
+        Args:
+            project_id: ID del proyecto
+            alert_type: Tipo de alerta
+            dismissed: True si el usuario descartó, False si confirmó/resolvió
+
+        Returns:
+            Nuevo peso
+        """
+        try:
+            from ..persistence.database import get_database
+
+            db = get_database()
+
+            row = db.fetchone(
+                "SELECT weight, feedback_count, dismiss_count, confirm_count "
+                "FROM project_detector_weights "
+                "WHERE project_id = ? AND alert_type = ?",
+                (project_id, alert_type),
+            )
+
+            if row:
+                weight = row["weight"]
+                feedback_count = row["feedback_count"]
+                dismiss_count = row["dismiss_count"]
+                confirm_count = row["confirm_count"]
+            else:
+                weight = 1.0
+                feedback_count = 0
+                dismiss_count = 0
+                confirm_count = 0
+
+            if dismissed:
+                weight -= self.ADAPTIVE_LEARNING_RATE
+                dismiss_count += 1
+            else:
+                weight += self.ADAPTIVE_LEARNING_RATE * 0.5
+                confirm_count += 1
+
+            weight = round(
+                max(self.ADAPTIVE_WEIGHT_FLOOR, min(self.ADAPTIVE_WEIGHT_CEIL, weight)),
+                4,
+            )
+            feedback_count += 1
+
+            db.execute(
+                """INSERT INTO project_detector_weights
+                    (project_id, alert_type, weight, feedback_count,
+                     dismiss_count, confirm_count, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+                ON CONFLICT (project_id, alert_type)
+                DO UPDATE SET
+                    weight = excluded.weight,
+                    feedback_count = excluded.feedback_count,
+                    dismiss_count = excluded.dismiss_count,
+                    confirm_count = excluded.confirm_count,
+                    updated_at = datetime('now')
+                """,
+                (project_id, alert_type, weight, feedback_count, dismiss_count, confirm_count),
+            )
+
+            # Invalidar cache
+            cache_key = (project_id, alert_type)
+            cache = getattr(self, "_adaptive_weights_cache", {})
+            cache[cache_key] = weight
+
+            logger.debug(
+                f"Adaptive weight updated: project={project_id} type={alert_type} "
+                f"weight={weight} (dismissed={dismissed})"
+            )
+            return weight
+        except Exception as e:
+            logger.warning(f"Failed to update adaptive weight: {e}")
+            return 1.0
+
+    def get_adaptive_weights(self, project_id: int) -> dict[str, float]:
+        """Obtiene todos los pesos adaptativos de un proyecto."""
+        try:
+            from ..persistence.database import get_database
+
+            db = get_database()
+            rows = db.fetchall(
+                "SELECT alert_type, weight, feedback_count, dismiss_count, confirm_count "
+                "FROM project_detector_weights WHERE project_id = ? ORDER BY weight ASC",
+                (project_id,),
+            )
+            return {
+                r["alert_type"]: {
+                    "weight": r["weight"],
+                    "feedback_count": r["feedback_count"],
+                    "dismiss_count": r["dismiss_count"],
+                    "confirm_count": r["confirm_count"],
+                }
+                for r in rows
+            }
+        except Exception:
+            return {}
+
+    def clear_adaptive_weights_cache(self, project_id: int | None = None) -> None:
+        """Limpia la cache de pesos adaptativos."""
+        cache = getattr(self, "_adaptive_weights_cache", None)
+        if cache is None:
+            return
+        if project_id is None:
+            cache.clear()
+        else:
+            self._adaptive_weights_cache = {
+                k: v for k, v in cache.items() if k[0] != project_id
             }
 
 

@@ -456,6 +456,8 @@ def run_cleanup(ctx: dict, tracker: ProgressTracker):
             # - speaker_corrections: correcciones manuales de speaker
             # - alert_dismissals: alertas descartadas por content_hash
             # - suppression_rules: reglas de supresión del usuario
+            # - project_detector_weights: pesos adaptativos nivel 3 (acumulan feedback)
+            # - detector_calibration: se recomputa, pero no se borra
             # Estas tablas NO se borran.
             # Borrar analysis phases
             conn.execute(

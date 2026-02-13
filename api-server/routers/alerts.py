@@ -255,6 +255,16 @@ async def update_alert_status(project_id: int, alert_id: int, body: deps.AlertSt
                 engine.recalibrate_detector(
                     project_id, alert.alert_type, getattr(alert, 'source_module', '')
                 )
+                # Nivel 3: actualizar peso adaptativo per-project
+                engine.update_adaptive_weight(project_id, alert.alert_type, dismissed=True)
+            except Exception:
+                pass  # best-effort
+        elif new_status_str == 'resolved':
+            # Nivel 3: confirmar peso adaptativo (alerta fue útil)
+            try:
+                from narrative_assistant.alerts.engine import get_alert_engine
+                engine = get_alert_engine()
+                engine.update_adaptive_weight(project_id, alert.alert_type, dismissed=False)
             except Exception:
                 pass  # best-effort
         elif new_status_str in ('open', 'active', 'reopen') and deps.dismissal_repository:
@@ -406,13 +416,14 @@ async def dismiss_batch(project_id: int, body: deps.BatchDismissRequest):
                 reason=reason,
             )
 
-            # Recalibrar detectores afectados (BK-22)
+            # Recalibrar detectores afectados (BK-22) + pesos adaptativos (nivel 3)
             try:
                 from narrative_assistant.alerts.engine import get_alert_engine
                 engine = get_alert_engine()
                 affected = {(item["alert_type"], item["source_module"]) for item in dismissal_items}
                 for alert_type, source_module in affected:
                     engine.recalibrate_detector(project_id, alert_type, source_module)
+                    engine.update_adaptive_weight(project_id, alert_type, dismissed=True)
             except Exception:
                 pass  # best-effort
 
@@ -555,6 +566,27 @@ async def get_calibration_data(project_id: int):
         return ApiResponse(success=True, data={"calibrations": calibrations})
     except Exception as e:
         logger.error(f"Error getting calibration for project {project_id}: {e}", exc_info=True)
+        return ApiResponse(success=False, error="Error interno del servidor")
+
+
+# =========================================================================
+# Adaptive Weights endpoints (nivel 3)
+# =========================================================================
+
+
+@router.get("/api/projects/{project_id}/alerts/adaptive-weights", response_model=ApiResponse)
+async def get_adaptive_weights(project_id: int):
+    """Obtiene los pesos adaptativos per-project acumulados del feedback del usuario."""
+    try:
+        from narrative_assistant.alerts.engine import get_alert_engine
+        engine = get_alert_engine()
+        weights = engine.get_adaptive_weights(project_id)
+        return ApiResponse(
+            success=True,
+            data={"weights": weights, "count": len(weights)},
+        )
+    except Exception as e:
+        logger.error(f"Error getting adaptive weights for project {project_id}: {e}", exc_info=True)
         return ApiResponse(success=False, error="Error interno del servidor")
 
 
