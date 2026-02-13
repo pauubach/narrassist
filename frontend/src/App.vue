@@ -24,6 +24,7 @@
           </span>
         </div>
       </div>
+      <QuotaWarningBanner @upgrade="showTierComparison = true" />
       <RouterView />
     </main>
     <KeyboardShortcutsDialog
@@ -48,6 +49,10 @@
       @update:visible="showManageData = $event"
     />
     <ModelSetupDialog :hidden="showTutorial" />
+    <TierComparisonDialog
+      :visible="showTierComparison"
+      @update:visible="showTierComparison = $event"
+    />
   </div>
 </template>
 
@@ -68,6 +73,8 @@ import UserGuideDialog from '@/components/UserGuideDialog.vue'
 import MenuBar from '@/components/MenuBar.vue'
 import DataManagementDialog from '@/components/DataManagementDialog.vue'
 import ModelSetupDialog from '@/components/ModelSetupDialog.vue'
+import QuotaWarningBanner from '@/components/license/QuotaWarningBanner.vue'
+import TierComparisonDialog from '@/components/license/TierComparisonDialog.vue'
 import { useSystemStore } from '@/stores/system'
 const router = useRouter()
 const route = useRoute()
@@ -90,6 +97,7 @@ const showAbout = ref(false)
 const showTutorial = ref(false)
 const showUserGuide = ref(false)
 const showManageData = ref(false)
+const showTierComparison = ref(false)
 
 // Detect Tauri environment - check immediately and also on mount
 // __TAURI__ is injected by Tauri's webview, check multiple ways

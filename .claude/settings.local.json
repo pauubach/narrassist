@@ -123,7 +123,10 @@
       "WebFetch(domain:cultureandlanguagecenter.com)",
       "WebFetch(domain:jackmoreno.com)",
       "WebFetch(domain:api.github.com)",
-      "WebFetch(domain:discuss.streamlit.io)"
+      "WebFetch(domain:discuss.streamlit.io)",
+      "mcp__ide__getDiagnostics",
+      "WebSearch",
+      "WebFetch(domain:arxiv.org)"
     ],
     "additionalDirectories": [
       "d:\\repos\\tfm"

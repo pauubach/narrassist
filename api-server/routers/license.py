@@ -4,6 +4,8 @@ Router: license
 Endpoints para gestion de licencias, dispositivos, cuotas (paginas) y features por tier.
 """
 
+from datetime import datetime, timedelta
+
 from deps import ApiResponse, DeviceDeactivationRequest, LicenseActivationRequest, logger
 from fastapi import APIRouter, Body
 
@@ -297,6 +299,123 @@ async def get_license_usage():
 
     except Exception as e:
         logger.error(f"Error getting usage: {e}", exc_info=True)
+        return ApiResponse(success=False, error="Error interno del servidor")
+
+
+@router.get("/api/license/quota-status", response_model=ApiResponse)
+async def get_quota_status():
+    """
+    Estado ligero de cuota con porcentaje, nivel de aviso y dias restantes del periodo.
+
+    Returns:
+        ApiResponse con pages_used, pages_max, pages_remaining, percentage,
+        warning_level, days_remaining_in_period, unlimited.
+    """
+    try:
+        verifier = get_license_verifier()
+        if not verifier:
+            return ApiResponse(
+                success=True,
+                data={
+                    "pages_used": 0,
+                    "pages_max": 0,
+                    "pages_remaining": 0,
+                    "percentage": 0,
+                    "warning_level": "none",
+                    "days_remaining_in_period": 0,
+                    "unlimited": False,
+                },
+            )
+
+        result = verifier.verify()
+        if result.is_failure:
+            return ApiResponse(
+                success=True,
+                data={
+                    "pages_used": 0,
+                    "pages_max": 0,
+                    "pages_remaining": 0,
+                    "percentage": 0,
+                    "warning_level": "none",
+                    "days_remaining_in_period": 0,
+                    "unlimited": False,
+                },
+            )
+
+        verification = result.value
+        license_obj = verification.license
+
+        if not license_obj:
+            return ApiResponse(
+                success=True,
+                data={
+                    "pages_used": 0,
+                    "pages_max": 0,
+                    "pages_remaining": 0,
+                    "percentage": 0,
+                    "warning_level": "none",
+                    "days_remaining_in_period": 0,
+                    "unlimited": False,
+                },
+            )
+
+        limits = license_obj.limits
+        is_unlimited = limits.is_unlimited
+
+        # Calcular paginas
+        quota_remaining = verification.quota_remaining
+        pages_max = limits.max_pages_per_month
+        pages_used = (
+            pages_max - quota_remaining
+            if quota_remaining is not None
+            else 0
+        )
+        pages_remaining = quota_remaining if quota_remaining is not None else 0
+
+        # Porcentaje y nivel de aviso
+        if is_unlimited or pages_max <= 0:
+            percentage = 0
+            warning_level = "none"
+        else:
+            percentage = min(100, round(pages_used / pages_max * 100))
+            if percentage >= 100:
+                warning_level = "critical"
+            elif percentage >= 90:
+                warning_level = "danger"
+            elif percentage >= 80:
+                warning_level = "warning"
+            else:
+                warning_level = "none"
+
+        # Dias restantes en el periodo de facturacion
+        days_remaining_in_period = 0
+        if license_obj.subscription and license_obj.subscription.current_period_end:
+            delta = license_obj.subscription.current_period_end - datetime.utcnow()
+            days_remaining_in_period = max(0, delta.days)
+        else:
+            # Fallback: estimar fin de mes natural
+            now = datetime.utcnow()
+            if now.month == 12:
+                next_month = now.replace(year=now.year + 1, month=1, day=1)
+            else:
+                next_month = now.replace(month=now.month + 1, day=1)
+            days_remaining_in_period = max(0, (next_month - now).days)
+
+        return ApiResponse(
+            success=True,
+            data={
+                "pages_used": pages_used,
+                "pages_max": pages_max,
+                "pages_remaining": pages_remaining,
+                "percentage": percentage,
+                "warning_level": warning_level,
+                "days_remaining_in_period": days_remaining_in_period,
+                "unlimited": is_unlimited,
+            },
+        )
+
+    except Exception as e:
+        logger.error(f"Error getting quota status: {e}", exc_info=True)
         return ApiResponse(success=False, error="Error interno del servidor")
 
 

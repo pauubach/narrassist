@@ -20,6 +20,7 @@ export type LicenseFeature =
   | 'multi_model'
   | 'full_reports'
 export type LicenseStatus = 'no_license' | 'active' | 'expired' | 'grace_period' | 'suspended'
+export type QuotaWarningLevel = 'none' | 'warning' | 'danger' | 'critical'
 
 export interface LicenseInfo {
   status: LicenseStatus
@@ -103,6 +104,19 @@ export const useLicenseStore = defineStore('license', () => {
   const devicesRemaining = computed(() => {
     if (!licenseInfo.value) return 0
     return Math.max(0, licenseInfo.value.devices_max - licenseInfo.value.devices_used)
+  })
+
+  const quotaPercentage = computed(() => {
+    if (!licenseInfo.value || licenseInfo.value.unlimited || licenseInfo.value.pages_max <= 0) return 0
+    return Math.round((licenseInfo.value.pages_used / licenseInfo.value.pages_max) * 100)
+  })
+
+  const quotaWarningLevel = computed<QuotaWarningLevel>(() => {
+    const pct = quotaPercentage.value
+    if (pct >= 100) return 'critical'
+    if (pct >= 90) return 'danger'
+    if (pct >= 80) return 'warning'
+    return 'none'
   })
 
   // Acciones
@@ -238,6 +252,8 @@ export const useLicenseStore = defineStore('license', () => {
     features,
     pagesRemaining,
     devicesRemaining,
+    quotaPercentage,
+    quotaWarningLevel,
 
     // Acciones
     fetchLicenseStatus,
