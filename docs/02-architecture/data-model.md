@@ -8,10 +8,12 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                         ENTIDADES CORE                                   │
+│                    ENTIDADES CORE (20 tipos)                             │
 │                                                                          │
 │   ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐         │
 │   │CHARACTER │    │ LOCATION │    │  OBJECT  │    │  EVENT   │         │
+│   │ ANIMAL   │    │ BUILDING │    │ VEHICLE  │    │TIME_PERIOD│        │
+│   │ CREATURE │    │  REGION  │    │  WORK    │    │ CONCEPT  │         │
 │   └─────┬────┘    └─────┬────┘    └─────┬────┘    └─────┬────┘         │
 │         │               │               │               │                │
 │         └───────────────┴───────────────┼───────────────┘                │
@@ -40,34 +42,40 @@ La tabla `entity` es el núcleo del modelo. Almacena personajes, lugares, objeto
 class Entity:
     id: int
     project_id: int
-    entity_type: str  # 'character', 'location', 'object', 'organization', 'event'
+    entity_type: str  # Ver EntityType (20 tipos) en enums-reference.md
     canonical_name: str
     aliases: List[str]  # JSON array
-    importance: str  # 'protagonist', 'main', 'secondary', 'minor', 'mentioned'
+    importance: str  # 'principal', 'high', 'medium', 'low', 'minimal'
     first_chapter: Optional[int]
     last_chapter: Optional[int]
     validated_by_user: bool
 ```
 
-### Tipos de entidad
+### Tipos de entidad (20 tipos)
 
-| Tipo | Descripción | Fuente de detección |
-|------|-------------|---------------------|
-| `character` | Personajes | NER (PER) |
-| `location` | Lugares | NER (LOC) |
-| `object` | Objetos significativos | Manual / Patrones |
-| `organization` | Organizaciones | NER (ORG) |
-| `event` | Eventos importantes | Manual / Extracción |
+| Categoría | Tipos | Fuente de detección |
+|-----------|-------|---------------------|
+| Seres vivos | `character`, `animal`, `creature` | NER (PER) |
+| Lugares | `location`, `building`, `region` | NER (LOC) |
+| Objetos | `object`, `vehicle` | Manual / Patrones |
+| Grupos | `organization`, `faction`, `family` | NER (ORG) |
+| Temporales | `event`, `time_period` | Manual / Extracción |
+| Conceptuales | `concept`, `religion`, `magic_system` | Manual / LLM |
+| Culturales | `work`, `title`, `language`, `custom` | Manual / LLM |
+
+> Ver lista completa en [enums-reference.md](./enums-reference.md#tipos-de-entidad-entitytype)
 
 ### Importancia
 
 | Nivel | Criterio |
 |-------|----------|
-| `protagonist` | POV principal, >30% de menciones |
-| `main` | Personajes clave, >10% de menciones |
-| `secondary` | Apariciones regulares |
-| `minor` | Pocas apariciones |
-| `mentioned` | Solo mencionados, sin acción |
+| `principal` | POV principal, >30% de menciones |
+| `high` | Personajes clave, >10% de menciones |
+| `medium` | Apariciones regulares |
+| `low` | Pocas apariciones |
+| `minimal` | Solo mencionados, sin acción |
+
+> Valores legacy (`protagonist`, `main`, `secondary`, `minor`) se mapean automáticamente.
 
 ---
 
@@ -154,13 +162,13 @@ class Alert:
     id: int
     project_id: int
     alert_type: str
-    severity: str  # 'critical', 'high', 'medium', 'low', 'info'
+    severity: str  # 'critical', 'warning', 'info', 'hint'
     confidence: float  # 0.0 - 1.0
     title: str
     description: str
     source_references: List[Dict]  # JSON: [{chapter, page, excerpt}]
     related_entity_ids: List[int]
-    status: str  # 'pending', 'accepted', 'dismissed', 'false_positive'
+    status: str  # 'new', 'open', 'acknowledged', 'in_progress', 'resolved', 'dismissed', 'auto_resolved'
     resolution_note: Optional[str]
 ```
 
@@ -180,12 +188,14 @@ class Alert:
 ### Estados de alerta
 
 ```
-pending ──► accepted ──► (resuelto)
-   │
-   └──────► dismissed ──► (ignorado)
-   │
-   └──────► false_positive ──► (marca para mejorar modelo)
+new → open → acknowledged → in_progress → resolved
+               ↓               ↓
+           dismissed        dismissed
+
+[cualquiera] → auto_resolved (cuando el texto cambia)
 ```
+
+> Ver transiciones completas en [enums-reference.md](./enums-reference.md#estados-de-alerta-alertstatus)
 
 ---
 

@@ -64,13 +64,13 @@ pero presenta debilidades en:
 | **Correferencias** | `nlp/coreference_resolver.py` | ⚠️ Parcial | **Crítica** |
 | **Atributos** | `nlp/attributes.py`, `nlp/extraction/` | ⚠️ Parcial | **Crítica** |
 | **Consistencia atributos** | `analysis/attribute_consistency.py` | ✅ Funcional | Alta |
-| **Temporal** | `temporal/` | ⚠️ Básico | Alta |
+| **Temporal** | `temporal/` | ✅ Level A+B+C | Alta |
 | **Diálogos** | `nlp/dialogue.py` | ✅ Funcional | Media |
 | **Speaker attribution** | `nlp/cesp_resolver.py` | ⚠️ Parcial | Alta |
 | **Correcciones** | `corrections/` | ✅ Funcional | Media |
 | **LLM (Ollama)** | Integrado en votación | ✅ Funcional | Media |
 | **Embeddings** | `nlp/embeddings.py` | ✅ Funcional | Baja |
-| **Frontend atributos** | `EntitiesTab.vue` | ❌ Bug | **Crítica** |
+| **Frontend atributos** | `EntitiesTab.vue` | ✅ Funcional | Baja |
 
 ### 2.2 Pipeline Unificado (6 Fases)
 
@@ -1097,9 +1097,9 @@ NO propagar invalidacion downstream. Comparar `output_hash` antes vs despues.
 | ~~BK-22~~ | ~~Feedback loop: sistema aprende de correcciones~~ | ✅ DONE — detector_calibration table, recalibracion de confianza por ratio FP, get_dismissal_stats() → effective_confidence (commit 3cd35d3, Sprint PP-4) |
 | ~~BK-23~~ | ~~Estandarizar loading patterns (spinners/barras)~~ | ✅ DONE — BK-23a (`DsDownloadProgress.vue`, v0.8.0), BK-23b (skeleton loaders), BK-23c (z-index + animations consolidados). |
 | ~~BK-24~~ | ~~Conectar 3 endpoints export faltantes~~ | ✅ DONE — /export/characters (routing a character_sheets.py), /export/report (ReviewReportExporter), /export/alerts + CSV (commit c653867, Sprint PP-1) |
-| BK-25 | Revision Intelligence (detección alertas resueltas) | **P2** — Comparar alertas pre/post reanálisis: `resolved` / `still_present` / `new_issue` / `dismissed`. Content diffing como método primario. Parseo de track changes de .docx como enhancement (solo 60% de flujos usan track changes). Tier: Profesional. |
+| ~~BK-25~~ | ~~Revision Intelligence (detección alertas resueltas)~~ | ✅ DONE — S14: `ComparisonService` 3 fases (content diffing, fingerprint matching, LLM verification). Dashboard con resolved/still_present/new_issue. Banner comparación en alertas. Commit 97b145f. |
 | BK-26 | Colaboración paralela online (sync tiempo real) | **P3** — Sync en tiempo real entre correctores. Requiere servidor con E2E encryption, zero-knowledge. Solo cuando exista licensing server + demanda real. Tier: Editorial. |
-| BK-27 | Filtrado de alertas por rango de capítulos | **P2** — Para flujo editorial paralelo: "Solo alertas de caps 6-10". Debe incluir alertas cross-chapter (inconsistencia cap 2 que afecta cap 7). Extensión del focus mode existente. Tier: Editorial. |
+| ~~BK-27~~ | ~~Filtrado de alertas por rango de capítulos~~ | ✅ DONE — S13: `chapter_range` filter en alertas, cross-chapter inclusion. Commit d36b50c. |
 | BK-28 | Historial de versiones + tracking de progreso | **P3** — Métricas por versión: alertas, ritmo, formalidad, diálogo. Trends: "V1: 87 alertas → V3: 42". Básico en Profesional, dashboards avanzados en Editorial. |
 | BK-29 | Step-up pricing (packs de páginas one-time) | **P2** — Cuando Corrector llega a 1,500 págs/mes: ofrecer "500 páginas extra por €9". Trigger de upgrade a Profesional. |
 
@@ -2105,22 +2105,25 @@ Infraestructura existente (55% — backend core completo):
 ### Roadmap visual completo
 
 ```
-COMPLETADO                                          PRÓXIMO (Editorial Intelligence)
+COMPLETADO                                          PRÓXIMO (Version + Monetización)
 ───────────────────────────────────────────────── ──────────────────────────────────
-S0-S6 (NLP + Frontend) ✅                          S13 (BK-27 filtrado + BK-25 MVP)
-S7a-S7d (Licensing + UX) ✅                        S14 (BK-25 Revision Intelligence)
+S0-S6 (NLP + Frontend) ✅                          S15 (BK-28 Version tracking)
+S7a-S7d (Licensing + UX) ✅                        S16 (BK-29 Step-up pricing)
 Sprint PP ✅ (17/17)                                ──────────────────────────────────
-Sprint S8 ✅ (S8a + S8b + S8c)                     SIGUIENTE (Version + Monetización)
-Sprint S9 ✅ (BK-09/15/17/10b/10c)                 S15 (BK-28 Version tracking)
-Sprint S10 ✅ (BK-14/11/12)                        S16 (BK-29 Step-up pricing)
-Sprint S11 ✅ (BK-13/16)                           ──────────────────────────────────
-Sprint S12 ✅ (BK-18)                              APARCADO:
-Sprint SP-1/2/3 ✅                                  BK-26 Collab online
-  v0.8.0 → v0.9.4                                  Landing web, UserGuide PDF
-                                                    EPUB/XLSX export, Maverick/BookNLP
+Sprint S8 ✅ (S8a + S8b + S8c)                     APARCADO:
+Sprint S9 ✅ (BK-09/15/17/10b/10c)                 BK-26 Collab online
+Sprint S10 ✅ (BK-14/11/12)                        Landing web, UserGuide PDF
+Sprint S11 ✅ (BK-13/16)                           EPUB/XLSX export, Maverick/BookNLP
+Sprint S12 ✅ (BK-18)                              ──────────────────────────────────
+Sprint SP-1/2/3 ✅                                  TEMPORAL DETECTION:
+Sprint S13 ✅ (BK-27 + BK-25 MVP)                  Level A (regex) ✅
+Sprint S14 ✅ (BK-25 Revision Intelligence)         Level B (LLM per-chapter) ✅
+  + Level A/B/C temporal detection ✅                Level C (cross-chapter linking) ✅
+  + 3-layer flashback scoring ✅                     Level D (Narrative-Experts) — futuro
+  v0.8.0 → v0.9.4
 
 Dependencias:
-  S13 ──→ S14 ──→ S15
+  S15 (independiente)
   S16A (independiente, desktop-only)
   S16B (requiere backend billing público + Stripe)
 ```
@@ -2139,12 +2142,12 @@ Dependencias:
 | ~~Sprint S10~~ | ~~27-30h (6-8 días)~~ | ✅ COMPLETADO (BK-14 + BK-11 + BK-12) |
 | ~~Sprint S11~~ | ~~16-26h (4-7 días)~~ | ✅ COMPLETADO (BK-13 + BK-16) |
 | ~~Sprint S12~~ | ~~2-3h (1 día)~~ | ✅ COMPLETADO (BK-18) |
-| Sprint S13 | 7-9h (1-2 días) | BK-27 + BK-25 MVP |
-| Sprint S14 | 28-36h (5-7 días) | BK-25 completo (content diffing, dashboard) |
+| ~~Sprint S13~~ | ~~7-9h (1-2 días)~~ | ✅ COMPLETADO (BK-27 + BK-25 MVP) |
+| ~~Sprint S14~~ | ~~28-36h (5-7 días)~~ | ✅ COMPLETADO (BK-25 Revision Intelligence fases 1-3) |
 | Sprint S15 | 20-25h (4-5 días) | BK-28 fase 1 (version metrics, sparkline) |
 | Sprint S16A | 12h (2-3 días) | BK-29 UX (quota warnings, tier comparison) |
 | Sprint S16B | 20-28h (4-6 días) | BK-29 pagos (requiere backend billing público) |
-| **TOTAL restante** | **~67-98h (~3-4 semanas)** | S13 + S14 + S15 + S16A (+S16B condicionado) |
+| **TOTAL restante** | **~52-65h (~2-3 semanas)** | S15 + S16A (+S16B condicionado) |
 
 ---
 

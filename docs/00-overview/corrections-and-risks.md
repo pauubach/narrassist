@@ -2,6 +2,11 @@
 
 [← Volver a Overview](./README.md) | [← Índice principal](../../README.md)
 
+> **Nota (2026-02-13)**: Muchas de estas limitaciones ya tienen mitigaciones implementadas
+> (voting multi-modelo, gazetteer, pro-drop heurísticas, classical Spanish normalizer).
+> Los riesgos fundamentales de NLP siguen vigentes. Ver tests adversariales en
+> `tests/adversarial/` para los 96 xfails que documentan los límites actuales.
+
 ---
 
 ## IMPORTANTE: LEER ANTES DE IMPLEMENTAR

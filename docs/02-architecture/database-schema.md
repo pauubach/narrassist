@@ -2,6 +2,12 @@
 
 [← Volver a Arquitectura](./README.md) | [← Índice principal](../../README.md)
 
+> **Nota (2026-02-13)**: Este documento muestra el schema original. La base de datos actual
+> tiene ~30 tablas adicionales (temporal markers, analysis runs, voice profiles, character
+> profiles, etc.) que se crean via migraciones en `persistence/database.py`.
+> Los valores de enums (AlertStatus, EntityImportance) han cambiado — ver
+> [enums-reference.md](./enums-reference.md) para los valores actuales.
+
 ---
 
 ## Configuración SQLite

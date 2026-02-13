@@ -35,11 +35,13 @@ Ubicación: `src/narrative_assistant/entities/`
 
 | Valor | Descripción |
 |-------|-------------|
-| `CRITICAL` | Protagonista/crucial |
-| `HIGH` | Muy importante |
-| `MEDIUM` | Importancia media |
-| `LOW` | Secundario |
-| `MINIMAL` | Mención menor |
+| `PRINCIPAL` | Importancia máxima (protagonista, lugar central) |
+| `HIGH` | Importancia alta (co-protagonistas) |
+| `MEDIUM` | Importancia media (secundarios recurrentes) |
+| `LOW` | Importancia baja (personajes menores) |
+| `MINIMAL` | Importancia mínima (solo mencionado una vez) |
+
+> Valores legacy (`SECONDARY`, `PRIMARY`, `CRITICAL`) se mapean automáticamente via `_missing_`.
 
 ### Dataclass `Entity`
 

@@ -2,6 +2,12 @@
 
 [← Volver a Arquitectura](./README.md) | [← Índice principal](../../README.md)
 
+> **DEPRECATED (2026-02-13)**: Este documento describe el diseño original del pipeline progresivo.
+> La implementación actual usa `UnifiedAnalysisPipeline` con 8 fases
+> (ver [enums-reference.md](./enums-reference.md#fases-de-análisis-analysisphase)).
+> Los conceptos de progreso y event bus siguen vigentes pero las fases concretas,
+> pesos y código de ejemplo NO reflejan el sistema actual.
+
 ---
 
 ## Principio Fundamental

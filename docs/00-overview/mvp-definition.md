@@ -2,6 +2,11 @@
 
 [← Volver a Overview](./README.md) | [← Índice principal](../../README.md)
 
+> **Contexto**: Este documento define el MVP original. Todas las capacidades P0 y P1 están
+> implementadas (v0.9.4). El sistema actual va más allá del MVP con detección temporal
+> multinivel, perfilado de personajes, análisis de voz y ortografía.
+> Ver [PROJECT_STATUS.md](../PROJECT_STATUS.md) para el estado actual.
+
 ---
 
 ## Las 12 Capacidades del MVP
