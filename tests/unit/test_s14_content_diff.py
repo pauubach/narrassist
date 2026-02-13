@@ -21,7 +21,6 @@ from narrative_assistant.analysis.content_diff import (
     is_position_in_removed_range,
 )
 
-
 # ============================================================================
 # S14-01: content_diff module tests
 # ============================================================================

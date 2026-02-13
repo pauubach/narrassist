@@ -94,9 +94,9 @@ const isFoundingMember = computed(() => {
 const plans = computed(() => {
   if (isFoundingMember.value) {
     return [
-      { key: 'corrector' as const, name: 'Corrector', price: '19 \u20AC/mes', priceNote: '(founder)' },
-      { key: 'profesional' as const, name: 'Profesional', price: '34 \u20AC/mes', priceNote: '(founder)' },
-      { key: 'editorial' as const, name: 'Editorial', price: '119 \u20AC/mes', priceNote: '(founder)' },
+      { key: 'corrector' as const, name: 'Corrector', price: '19 \u20AC/mes', priceNote: '(fundador)' },
+      { key: 'profesional' as const, name: 'Profesional', price: '34 \u20AC/mes', priceNote: '(fundador)' },
+      { key: 'editorial' as const, name: 'Editorial', price: '119 \u20AC/mes', priceNote: '(fundador)' },
     ]
   }
   return [
@@ -106,7 +106,6 @@ const plans = computed(() => {
   ]
 })
 
-type PlanKey = 'corrector' | 'profesional' | 'editorial'
 interface FeatureRow {
   label: string
   corrector: boolean | string

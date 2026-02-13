@@ -128,14 +128,6 @@ const statusOptions = [
   { label: 'Descartadas', value: 'dismissed' }
 ]
 
-const chapterOptions = computed(() => [
-  { label: 'Todos los capítulos', value: null },
-  ...props.chapters.map(ch => ({
-    label: `Cap. ${ch.chapterNumber}: ${ch.title}`,
-    value: ch.chapterNumber
-  }))
-])
-
 const confidenceOptions = [
   { label: 'Cualquier confianza', value: null },
   { label: '> 90%', value: 90 },

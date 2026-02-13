@@ -41,7 +41,8 @@ export default defineConfig({
         manualChunks: {
           'vue-vendor': ['vue', 'vue-router', 'pinia'],
           'ui-vendor': ['primevue'],
-          'vis-network': ['vis-network', 'vis-data'],
+          'vis-network': ['vis-network/standalone'],
+          'vis-timeline': ['vis-timeline/standalone', 'vis-data/standalone'],
           'chart': ['chart.js'],
         }
       }

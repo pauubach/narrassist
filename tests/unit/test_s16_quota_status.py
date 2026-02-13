@@ -54,6 +54,7 @@ def _make_license(tier="corrector", unlimited=False, max_pages=1500, sub_days=15
     lic.expires_at = None
     lic.grace_period_remaining = None
     lic.is_in_grace_period = False
+    lic.extra_data = {}
     return lic
 
 
@@ -220,6 +221,44 @@ class TestQuotaStatusEndpoint:
 
         assert response.success is True
         assert response.data["warning_level"] == "none"
+
+
+# ============================================================================
+# S16-04: license status founder flag
+# ============================================================================
+
+
+class TestLicenseStatusEndpoint:
+    """Tests para GET /api/license/status."""
+
+    @pytest.fixture(autouse=True)
+    def _setup(self):
+        from routers.license import get_license_status
+
+        self.endpoint = get_license_status
+
+    def test_no_verifier_sets_founding_member_false(self):
+        """Sin verificador, el flag founder debe ser False."""
+        with patch("routers.license.get_license_verifier", return_value=None):
+            response = _call(self.endpoint)
+
+        assert response.success is True
+        assert response.data["is_founding_member"] is False
+
+    def test_status_includes_founding_member_true(self):
+        """Si la licencia está marcada como founder, el endpoint lo refleja."""
+        lic = _make_license()
+        lic.extra_data = {"founding_member": True}
+        verification = _make_verification(lic, quota_remaining=1200)
+
+        verifier = MagicMock()
+        verifier.verify.return_value = MagicMock(is_failure=False, value=verification)
+
+        with patch("routers.license.get_license_verifier", return_value=verifier):
+            response = _call(self.endpoint)
+
+        assert response.success is True
+        assert response.data["is_founding_member"] is True
 
 
 # ============================================================================

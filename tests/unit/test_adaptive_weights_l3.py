@@ -5,9 +5,11 @@ Pesos adaptativos que se acumulan del feedback del usuario y persisten
 entre re-análisis. Diferente de detector_calibration (que se recomputa).
 """
 
+import asyncio
 import sqlite3
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -130,9 +132,9 @@ class TestAdaptiveWeightEngine:
 
     def _make_db_and_engine(self, tmp_path):
         """Create a test DB and an AlertEngine using it."""
-        from narrative_assistant.persistence.database import Database
         from narrative_assistant.alerts.engine import AlertEngine
         from narrative_assistant.alerts.repository import AlertRepository
+        from narrative_assistant.persistence.database import Database
 
         db = Database(db_path=tmp_path / "test.db")
         with db.connection() as conn:
@@ -272,10 +274,10 @@ class TestAdaptiveWeightApplied:
 
     def test_weight_reduces_confidence(self, tmp_path):
         """Un peso < 1.0 reduce la confianza de la alerta creada."""
-        from narrative_assistant.persistence.database import Database
         from narrative_assistant.alerts.engine import AlertEngine
         from narrative_assistant.alerts.models import Alert, AlertCategory, AlertSeverity
         from narrative_assistant.alerts.repository import AlertRepository
+        from narrative_assistant.persistence.database import Database
 
         db = Database(db_path=tmp_path / "test.db")
         with db.connection() as conn:
@@ -321,10 +323,10 @@ class TestAdaptiveWeightApplied:
 
     def test_full_weight_no_reduction(self, tmp_path):
         """Con peso 1.0 (sin feedback), la confianza no cambia."""
-        from narrative_assistant.persistence.database import Database
         from narrative_assistant.alerts.engine import AlertEngine
         from narrative_assistant.alerts.models import Alert, AlertCategory, AlertSeverity
         from narrative_assistant.alerts.repository import AlertRepository
+        from narrative_assistant.persistence.database import Database
 
         db = Database(db_path=tmp_path / "test.db")
         with db.connection() as conn:
@@ -400,9 +402,9 @@ class TestAdaptiveWeightPersistence:
 
     def test_weight_accumulates_across_analyses(self, tmp_path):
         """Pesos se acumulan entre múltiples análisis."""
-        from narrative_assistant.persistence.database import Database
         from narrative_assistant.alerts.engine import AlertEngine
         from narrative_assistant.alerts.repository import AlertRepository
+        from narrative_assistant.persistence.database import Database
 
         db = Database(db_path=tmp_path / "test.db")
         with db.connection() as conn:
@@ -456,6 +458,127 @@ class TestAdaptiveWeightsEndpoint:
 
 
 # ============================================================================
+# Router hooks: resolve-all / dismiss-batch
+# ============================================================================
+
+
+class TestAdaptiveWeightRouterHooks:
+    """Tests para hooks de pesos adaptativos en endpoints de alertas."""
+
+    def test_resolve_all_updates_adaptive_weights(self, monkeypatch):
+        """resolve-all debe confirmar pesos adaptativos para alertas abiertas."""
+        import deps
+        from routers.alerts import resolve_all_alerts
+
+        from narrative_assistant.alerts.models import AlertStatus
+
+        open_alert = SimpleNamespace(
+            project_id=1,
+            alert_type="attribute_inconsistency",
+            status=AlertStatus.NEW,
+            extra_data={"entity_name": "Pedro"},
+        )
+        already_closed = SimpleNamespace(
+            project_id=1,
+            alert_type="attribute_inconsistency",
+            status=AlertStatus.RESOLVED,
+            extra_data={"entity_name": "María"},
+        )
+
+        alert_repo = MagicMock()
+        alert_repo.get_by_project.return_value = SimpleNamespace(
+            is_failure=False, value=[open_alert, already_closed]
+        )
+
+        engine = MagicMock()
+        monkeypatch.setattr(deps, "alert_repository", alert_repo)
+
+        with patch("narrative_assistant.alerts.engine.get_alert_engine", return_value=engine):
+            response = asyncio.run(resolve_all_alerts(1))
+
+        assert response.success is True
+        alert_repo.update.assert_called_once_with(open_alert)
+        engine.update_adaptive_weight.assert_called_once_with(
+            1,
+            "attribute_inconsistency",
+            dismissed=False,
+            entity_names=["Pedro"],
+        )
+
+    def test_dismiss_batch_uses_get_and_updates_adaptive_weights(self, monkeypatch):
+        """dismiss-batch usa get() (no get_by_id) y actualiza pesos por entidad."""
+        import deps
+        from routers.alerts import dismiss_batch
+
+        from narrative_assistant.alerts.models import AlertStatus
+
+        # Repo sin get_by_id: si el endpoint lo usara, fallaría.
+        class AlertRepoNoGetById:
+            def __init__(self, alerts_by_id):
+                self._alerts = alerts_by_id
+                self.updated = []
+
+            def get(self, alert_id: int):
+                alert = self._alerts.get(alert_id)
+                if alert is None:
+                    return SimpleNamespace(is_success=False, value=None)
+                return SimpleNamespace(is_success=True, value=alert)
+
+            def update(self, alert):
+                self.updated.append(alert)
+                return SimpleNamespace(is_success=True, value=alert)
+
+        alerts_by_id = {
+            1: SimpleNamespace(
+                project_id=1,
+                alert_type="attribute_inconsistency",
+                source_module="attribute_consistency",
+                content_hash="h1",
+                status=AlertStatus.NEW,
+                extra_data={"entity_name": "Pedro"},
+            ),
+            2: SimpleNamespace(
+                project_id=1,
+                alert_type="attribute_inconsistency",
+                source_module="attribute_consistency",
+                content_hash="h2",
+                status=AlertStatus.NEW,
+                extra_data={"entity_name": "María"},
+            ),
+        }
+
+        alert_repo = AlertRepoNoGetById(alerts_by_id)
+        dismissal_repo = MagicMock()
+        engine = MagicMock()
+
+        monkeypatch.setattr(deps, "alert_repository", alert_repo)
+        monkeypatch.setattr(deps, "dismissal_repository", dismissal_repo)
+
+        body = deps.BatchDismissRequest(
+            alert_ids=[1, 2],
+            reason="false_positive",
+            scope="instance",
+        )
+
+        with patch("narrative_assistant.alerts.engine.get_alert_engine", return_value=engine):
+            response = asyncio.run(dismiss_batch(1, body))
+
+        assert response.success is True
+        assert len(alert_repo.updated) == 2
+        assert all(a.status == AlertStatus.DISMISSED for a in alert_repo.updated)
+        dismissal_repo.dismiss_batch.assert_called_once()
+        engine.recalibrate_detector.assert_called_once_with(
+            1, "attribute_inconsistency", "attribute_consistency"
+        )
+        engine.update_adaptive_weight.assert_called_once()
+        args, kwargs = engine.update_adaptive_weight.call_args
+        assert args[0] == 1
+        assert args[1] == "attribute_inconsistency"
+        assert kwargs["dismissed"] is True
+        assert set(kwargs["entity_names"]) == {"Pedro", "María"}
+
+
+# ============================================================================
 # Per-entity adaptive weight tests
 # ============================================================================
 
@@ -465,9 +588,9 @@ class TestPerEntityAdaptiveWeights:
 
     def _make_db_and_engine(self, tmp_path):
         """Create a test DB and an AlertEngine using it."""
-        from narrative_assistant.persistence.database import Database
         from narrative_assistant.alerts.engine import AlertEngine
         from narrative_assistant.alerts.repository import AlertRepository
+        from narrative_assistant.persistence.database import Database
 
         db = Database(db_path=tmp_path / "test.db")
         with db.connection() as conn:
@@ -585,11 +708,11 @@ class TestPerEntityAdaptiveWeights:
 
     def test_per_entity_weight_applied_in_create_alert(self, tmp_path):
         """Per-entity weight se aplica al crear alerta via extra_data[entity_name]."""
-        from narrative_assistant.persistence.database import Database
         from narrative_assistant.alerts.engine import AlertEngine
         from narrative_assistant.alerts.models import AlertCategory, AlertSeverity
         from narrative_assistant.alerts.repository import AlertRepository
         from narrative_assistant.core.result import Result
+        from narrative_assistant.persistence.database import Database
 
         db = Database(db_path=tmp_path / "test.db")
         with db.connection() as conn:

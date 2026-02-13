@@ -19,7 +19,6 @@ from narrative_assistant.parsers.docx_revisions import (
     parse_docx_revisions,
 )
 
-
 # ============================================================================
 # Helper: create minimal .docx with track changes
 # ============================================================================
@@ -31,7 +30,7 @@ def _create_docx_with_revisions(path: Path, insertions: list[str] = None, deleti
     runs = []
 
     # Normal text
-    runs.append(f'''
+    runs.append('''
         <w:r>
             <w:t xml:space="preserve">Texto normal del documento. </w:t>
         </w:r>
