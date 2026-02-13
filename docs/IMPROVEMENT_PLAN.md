@@ -1998,20 +1998,20 @@ Infraestructura existente (55% — backend core completo):
 | ~~S14-12~~ | 2h | Routing + types | ✅ Route `/projects/:id/revision`, RevisionView.vue. API types (ApiComparisonDetail), domain types (ComparisonDetail, ComparisonAlertDiff), transformer. |
 | ~~S14-13~~ | 1h | Tests | (Cubierto por tests de tipos e importación en S14-08). |
 
-**Fase 4: Track Changes (opcional, pendiente) [4-8h]**
+**Fase 4: Track Changes ✅ [4-8h]**
 
 | Tarea | Horas | Archivo | Detalle |
 |-------|-------|---------|---------|
-| S14-14 | 4h | `src/narrative_assistant/parsers/docx_revisions.py` | Parser de `word/document.xml` revisiones (`w:ins`, `w:del`, `w:rPr/w:rStyle`). Extraer lista de `Revision(type, text, author, date, position)`. Solo ~60% de flujos editoriales usan track changes. |
-| S14-15 | 2h | `src/narrative_assistant/analysis/comparison.py` | Integrar revisions como pass 4 de matching: si alert position coincide con `w:del` → alta confianza de resolución intencional. |
-| S14-16 | 1h | Tests | Test con .docx de prueba con track changes. |
+| ~~S14-14~~ | 4h | `src/narrative_assistant/parsers/docx_revisions.py` | ✅ Parser de `word/document.xml` revisiones (`w:ins`, `w:del`, `w:rPr/w:rStyle`). Extrae `Revision(type, text, author, date, position)`. |
+| ~~S14-15~~ | 2h | `src/narrative_assistant/analysis/comparison.py` | ✅ Integrado como pass 4 de matching: si alert position coincide con `w:del` → confianza 0.95. |
+| ~~S14-16~~ | 1h | Tests | ✅ 14 tests: parser + char ranges + pass 4 matching + priority vs pass 3. |
 
 **Dependencias S14**: S13 completado (BK-25 MVP establece la UI base).
 **Criterio de éxito**: Corrector ve exactamente qué alertas se resolvieron, dónde cambió el texto, y puede confirmar resoluciones.
 
 ---
 
-#### Sprint S15: Version Tracking (BK-28 fase 1) [20-25h]
+#### Sprint S15: Version Tracking (BK-28 fase 1) [20-25h] ✅
 
 > **Product Owner**: "Útil para coordinadores editoriales, no para freelancers. Tier Editorial."
 > **Arquitecto**: "Los snapshots ya existen. Solo falta persistir métricas agregadas por versión
@@ -2020,13 +2020,13 @@ Infraestructura existente (55% — backend core completo):
 
 | Tarea | Horas | Archivo | Detalle |
 |-------|-------|---------|---------|
-| S15-01 | 2h | Schema migration v22 | `version_metrics(id, project_id, version_num AUTO, snapshot_id FK, alert_count, word_count, entity_count, health_score, formality_avg, dialogue_ratio, created_at)`. Trigger: insert al completar análisis (post-phase 13). |
-| S15-02 | 3h | `api-server/routers/projects.py` | `GET /projects/{id}/versions` — lista de versiones con métricas. `GET /projects/{id}/versions/trend` — serie temporal simplificada para sparkline. |
-| S15-03 | 2h | `api-server/routers/_enrichment_phases.py` | Hook post-phase 13: extraer métricas de enrichment cache y escribir en `version_metrics`. Reutilizar `narrative_health` score. |
-| S15-04 | 4h | `frontend/src/components/project/VersionSparkline.vue` | Sparkline SVG inline (sin dependencia de charting library). Muestra trend de alert_count últimas 10 versiones. Tooltip con fecha + counts. |
-| S15-05 | 4h | `frontend/src/components/project/VersionHistory.vue` | Tabla expandible con todas las versiones: fecha, alert_count, word_count, health_score. Botón "Comparar" entre 2 versiones seleccionadas (reutiliza ComparisonService de S14). |
-| S15-06 | 3h | `frontend/src/components/project/VersionComparison.vue` | Modal con diff de métricas entre 2 versiones. Barras de progreso comparativas. Enlace a RevisionDashboard (S14) si existe snapshot. |
-| S15-07 | 2h | Tests | Tests para version_metrics creation. Test API para trends. Test sparkline render. |
+| ~~S15-01~~ | 2h | Schema migration v22 | ✅ `version_metrics` table con 12 columnas. Schema v22. En SCHEMA_SQL + table_migrations. |
+| ~~S15-02~~ | 3h | `api-server/routers/projects.py` | ✅ `GET /versions` lista con métricas. `GET /versions/trend` serie temporal + delta. |
+| ~~S15-03~~ | 2h | `api-server/routers/_enrichment_phases.py` | ✅ `write_version_metrics()` hook post-Phase 13. Lee health_score, formality_avg, dialogue_ratio del cache/DB. |
+| ~~S15-04~~ | 4h | `frontend/src/components/project/VersionSparkline.vue` | ✅ SVG inline sparkline, trend coloring, delta badge, hover dots con tooltip. |
+| ~~S15-05~~ | 4h | `frontend/src/components/project/VersionHistory.vue` | ✅ DataTable con selección múltiple, deltas entre versiones, health tags, botón comparar. |
+| ~~S15-06~~ | 3h | `frontend/src/components/project/VersionComparison.vue` | ✅ Dialog modal con barras comparativas, delta improved/worsened, enlace a RevisionDashboard. |
+| ~~S15-07~~ | 2h | Tests | ✅ 18 tests: schema, hook, endpoints, tipos frontend, componentes. |
 
 **Dependencias S15**: S13 (comparison infra). S14 recomendado pero no bloqueante.
 **Criterio de éxito**: Coordinador editorial ve tendencia de calidad del manuscrito a lo largo del tiempo.

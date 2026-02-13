@@ -1141,3 +1141,113 @@ def _compute_narrative_health(progress_data, chapters_dicts, entities_dicts, tot
         abandoned_threads=abandoned_threads,
     )
     return report.to_dict() if hasattr(report, "to_dict") else report
+
+
+# ============================================================================
+# S15: Version metrics (post-Phase 13 hook)
+# ============================================================================
+
+def write_version_metrics(ctx: dict) -> None:
+    """S15-03: Persist aggregated metrics for this analysis as a version.
+
+    Called after Phase 13 completes. Reads metrics from enrichment_cache
+    and analysis context to build a version_metrics row.
+    """
+    project_id = ctx["project_id"]
+    db = ctx["db_session"]
+
+    try:
+        with db.connection() as conn:
+            # Determine next version_num for this project
+            row = conn.execute(
+                "SELECT COALESCE(MAX(version_num), 0) FROM version_metrics WHERE project_id = ?",
+                (project_id,),
+            ).fetchone()
+            next_version = (row[0] if row else 0) + 1
+
+            # Get latest snapshot_id (if any)
+            snap_row = conn.execute(
+                "SELECT id FROM analysis_snapshots WHERE project_id = ? ORDER BY created_at DESC LIMIT 1",
+                (project_id,),
+            ).fetchone()
+            snapshot_id = snap_row[0] if snap_row else None
+
+            # Alert count (open alerts)
+            alert_row = conn.execute(
+                "SELECT COUNT(*) FROM alerts WHERE project_id = ? AND status != 'resolved'",
+                (project_id,),
+            ).fetchone()
+            alert_count = alert_row[0] if alert_row else 0
+
+            # Word count + chapter count from project
+            proj_row = conn.execute(
+                "SELECT word_count, chapter_count FROM projects WHERE id = ?",
+                (project_id,),
+            ).fetchone()
+            word_count = proj_row[0] if proj_row else ctx.get("word_count", 0)
+            chapter_count = proj_row[1] if proj_row else ctx.get("chapters_count", 0)
+
+            # Entity count
+            entity_row = conn.execute(
+                "SELECT COUNT(*) FROM entities WHERE project_id = ?",
+                (project_id,),
+            ).fetchone()
+            entity_count = entity_row[0] if entity_row else 0
+
+            # Health score from enrichment_cache (narrative_health)
+            health_score = None
+            health_row = conn.execute(
+                """SELECT result_json FROM enrichment_cache
+                   WHERE project_id = ? AND enrichment_type = 'narrative_health'
+                   AND status = 'completed' LIMIT 1""",
+                (project_id,),
+            ).fetchone()
+            if health_row and health_row[0]:
+                try:
+                    health_data = json.loads(health_row[0])
+                    health_score = health_data.get("overall_score") or health_data.get("health_score")
+                except (json.JSONDecodeError, TypeError):
+                    pass
+
+            # Formality avg from enrichment_cache (register_analysis)
+            formality_avg = None
+            reg_row = conn.execute(
+                """SELECT result_json FROM enrichment_cache
+                   WHERE project_id = ? AND enrichment_type = 'register_analysis'
+                   AND status = 'completed' LIMIT 1""",
+                (project_id,),
+            ).fetchone()
+            if reg_row and reg_row[0]:
+                try:
+                    reg_data = json.loads(reg_row[0])
+                    summary = reg_data.get("summary", {})
+                    formality_avg = summary.get("avg_formality") or summary.get("formality_avg")
+                except (json.JSONDecodeError, TypeError):
+                    pass
+
+            # Dialogue ratio — average across chapters
+            dialogue_ratio = None
+            dr_rows = conn.execute(
+                "SELECT dialogue_ratio FROM chapters WHERE project_id = ? AND dialogue_ratio IS NOT NULL",
+                (project_id,),
+            ).fetchall()
+            if dr_rows:
+                dialogue_ratio = sum(r[0] for r in dr_rows) / len(dr_rows)
+
+            conn.execute(
+                """INSERT OR REPLACE INTO version_metrics
+                   (project_id, version_num, snapshot_id, alert_count, word_count,
+                    entity_count, chapter_count, health_score, formality_avg, dialogue_ratio)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (project_id, next_version, snapshot_id, alert_count, word_count,
+                 entity_count, chapter_count, health_score, formality_avg, dialogue_ratio),
+            )
+            conn.commit()
+
+            logger.info(
+                f"[S15] Version {next_version} metrics written for project {project_id}: "
+                f"alerts={alert_count}, words={word_count}, health={health_score}"
+            )
+
+    except Exception as e:
+        logger.warning(f"[S15] Failed to write version metrics for project {project_id}: {e}")

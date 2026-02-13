@@ -67,6 +67,44 @@ export interface ApiProject {
   recommended_analysis?: ApiRecommendedAnalysis | null
 }
 
+/** Versión con métricas tal como la devuelve la API (S15, BK-28) */
+export interface ApiVersionMetrics {
+  id: number
+  project_id: number
+  version_num: number
+  snapshot_id: number | null
+  alert_count: number
+  word_count: number
+  entity_count: number
+  chapter_count: number
+  health_score: number | null
+  formality_avg: number | null
+  dialogue_ratio: number | null
+  created_at: string
+}
+
+/** Punto de trend para sparkline (S15) */
+export interface ApiVersionTrendPoint {
+  version_num: number
+  alert_count: number
+  health_score: number | null
+  word_count: number
+  created_at: string
+}
+
+/** Delta entre últimas 2 versiones (S15) */
+export interface ApiVersionDelta {
+  alert_count: number
+  health_score: number | null
+  word_count: number
+}
+
+/** Respuesta del endpoint /versions/trend (S15) */
+export interface ApiVersionTrend {
+  trend: ApiVersionTrendPoint[]
+  delta: ApiVersionDelta | null
+}
+
 /** Sección tal como la devuelve la API */
 export interface ApiSection {
   id: number

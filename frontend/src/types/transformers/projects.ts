@@ -4,8 +4,14 @@
  * Funciones para convertir entre tipos API y Domain.
  */
 
-import type { ApiProject, ApiChapter, ApiSection, ApiRecommendedAnalysis } from '../api/projects'
-import type { Project, Chapter, Section, RecommendedAnalysis } from '../domain/projects'
+import type {
+  ApiProject, ApiChapter, ApiSection, ApiRecommendedAnalysis,
+  ApiVersionMetrics, ApiVersionTrend,
+} from '../api/projects'
+import type {
+  Project, Chapter, Section, RecommendedAnalysis,
+  VersionMetrics, VersionTrend,
+} from '../domain/projects'
 import { transformAlertSeverity } from './alerts'
 
 // =============================================================================
@@ -115,4 +121,44 @@ export function transformChapter(api: ApiChapter): Chapter {
 /** Transforma un array de capítulos */
 export function transformChapters(apiChapters: ApiChapter[]): Chapter[] {
   return apiChapters.map(transformChapter)
+}
+
+// =============================================================================
+// S15: Version tracking transformers
+// =============================================================================
+
+/** Transforma version metrics de API a Domain */
+export function transformVersionMetrics(api: ApiVersionMetrics): VersionMetrics {
+  return {
+    id: api.id,
+    projectId: api.project_id,
+    versionNum: api.version_num,
+    snapshotId: api.snapshot_id,
+    alertCount: api.alert_count,
+    wordCount: api.word_count,
+    entityCount: api.entity_count,
+    chapterCount: api.chapter_count,
+    healthScore: api.health_score,
+    formalityAvg: api.formality_avg,
+    dialogueRatio: api.dialogue_ratio,
+    createdAt: safeDate(api.created_at, new Date())!,
+  }
+}
+
+/** Transforma version trend de API a Domain */
+export function transformVersionTrend(api: ApiVersionTrend): VersionTrend {
+  return {
+    trend: api.trend.map(p => ({
+      versionNum: p.version_num,
+      alertCount: p.alert_count,
+      healthScore: p.health_score,
+      wordCount: p.word_count,
+      createdAt: safeDate(p.created_at, new Date())!,
+    })),
+    delta: api.delta ? {
+      alertCount: api.delta.alert_count,
+      healthScore: api.delta.health_score,
+      wordCount: api.delta.word_count,
+    } : null,
+  }
 }

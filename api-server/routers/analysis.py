@@ -330,6 +330,7 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                 run_prose_enrichment,
                 run_relationships_enrichment,
                 run_voice_enrichment,
+                write_version_metrics,
             )
 
             start_time = time.time()
@@ -440,6 +441,9 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
                 run_voice_enrichment(ctx, tracker)
                 run_prose_enrichment(ctx, tracker)
                 run_health_enrichment(ctx, tracker)
+
+                # S15: Write version metrics after all enrichment phases
+                write_version_metrics(ctx)
 
                 # S8a-17: Check for entity mutations during enrichment
                 invalidate_enrichment_if_mutated(ctx["db_session"], project_id, entity_fp)

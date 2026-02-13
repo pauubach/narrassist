@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 _database_lock = threading.Lock()
 
 # Versión del schema actual
-SCHEMA_VERSION = 20
+SCHEMA_VERSION = 22
 
 # Tablas esenciales que deben existir para una BD válida
 # Solo incluir las tablas básicas definidas en SCHEMA_SQL
@@ -1067,8 +1067,43 @@ CREATE TABLE IF NOT EXISTS user_glossary (
 
 CREATE INDEX IF NOT EXISTS idx_glossary_project ON user_glossary(project_id);
 
+-- Snapshot chapter texts para content diffing (S14, BK-25)
+CREATE TABLE IF NOT EXISTS snapshot_chapters (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    snapshot_id INTEGER NOT NULL,
+    project_id INTEGER NOT NULL,
+    chapter_number INTEGER NOT NULL,
+    content_hash TEXT DEFAULT '',
+    content_text TEXT NOT NULL DEFAULT '',
+    FOREIGN KEY (snapshot_id) REFERENCES analysis_snapshots(id) ON DELETE CASCADE,
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_snap_chapters_snapshot ON snapshot_chapters(snapshot_id);
+
+-- Version metrics para tracking de progreso editorial (S15, BK-28)
+CREATE TABLE IF NOT EXISTS version_metrics (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    version_num INTEGER NOT NULL,
+    snapshot_id INTEGER,
+    alert_count INTEGER NOT NULL DEFAULT 0,
+    word_count INTEGER NOT NULL DEFAULT 0,
+    entity_count INTEGER NOT NULL DEFAULT 0,
+    chapter_count INTEGER NOT NULL DEFAULT 0,
+    health_score REAL,
+    formality_avg REAL,
+    dialogue_ratio REAL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    FOREIGN KEY (snapshot_id) REFERENCES analysis_snapshots(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_version_metrics_project ON version_metrics(project_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_version_metrics_unique ON version_metrics(project_id, version_num);
+
 -- Insertar versión del schema
-INSERT OR REPLACE INTO schema_info (key, value) VALUES ('version', '20');
+INSERT OR REPLACE INTO schema_info (key, value) VALUES ('version', '22');
 """
 
 
@@ -1317,6 +1352,25 @@ class Database:
                 FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
             )""",
             "CREATE INDEX IF NOT EXISTS idx_snap_chapters_snapshot ON snapshot_chapters(snapshot_id)",
+            # v22: Version metrics para tracking de progreso editorial (S15, BK-28)
+            """CREATE TABLE IF NOT EXISTS version_metrics (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                version_num INTEGER NOT NULL,
+                snapshot_id INTEGER,
+                alert_count INTEGER NOT NULL DEFAULT 0,
+                word_count INTEGER NOT NULL DEFAULT 0,
+                entity_count INTEGER NOT NULL DEFAULT 0,
+                chapter_count INTEGER NOT NULL DEFAULT 0,
+                health_score REAL,
+                formality_avg REAL,
+                dialogue_ratio REAL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+                FOREIGN KEY (snapshot_id) REFERENCES analysis_snapshots(id) ON DELETE SET NULL
+            )""",
+            "CREATE INDEX IF NOT EXISTS idx_version_metrics_project ON version_metrics(project_id)",
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_version_metrics_unique ON version_metrics(project_id, version_num)",
         ]
         for sql in table_migrations:
             try:

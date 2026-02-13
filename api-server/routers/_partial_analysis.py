@@ -550,6 +550,7 @@ def run_partial_analysis_thread(
         run_prose_enrichment,
         run_relationships_enrichment,
         run_voice_enrichment,
+        write_version_metrics,
     )
 
     project_id = ctx["project_id"]
@@ -647,6 +648,9 @@ def run_partial_analysis_thread(
                 run_health_enrichment(ctx, tracker)
 
             invalidate_enrichment_if_mutated(db_session, project_id, entity_fp)
+
+        # S15: Write version metrics after enrichment
+        write_version_metrics(ctx)
 
         # --- Completion ---
         run_reconciliation(ctx, tracker)

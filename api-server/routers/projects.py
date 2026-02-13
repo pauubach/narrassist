@@ -6,7 +6,7 @@ from typing import Optional
 
 import deps
 from deps import ApiResponse, ProjectResponse, _get_project_stats, logger
-from fastapi import APIRouter, Body, File, HTTPException, UploadFile
+from fastapi import APIRouter, Body, File, HTTPException, Query, UploadFile
 
 from narrative_assistant.alerts.models import AlertStatus
 
@@ -574,6 +574,107 @@ async def delete_project(project_id: int):
         return ApiResponse(success=True, message="Proyecto eliminado exitosamente")
     except Exception as e:
         logger.error(f"Error deleting project {project_id}: {e}", exc_info=True)
+        return ApiResponse(success=False, error="Error interno del servidor")
+
+
+# ============================================================================
+# S15: Version Tracking (BK-28)
+# ============================================================================
+
+
+@router.get("/api/projects/{project_id}/versions", response_model=ApiResponse)
+async def list_versions(project_id: int, limit: int = Query(50, ge=1, le=200)):
+    """S15-02: Lista versiones con métricas para un proyecto.
+
+    Returns:
+        Lista de version_metrics ordenadas por version_num descendente.
+    """
+    try:
+        db = deps.get_database()
+        with db.connection() as conn:
+            rows = conn.execute(
+                """SELECT id, project_id, version_num, snapshot_id,
+                          alert_count, word_count, entity_count, chapter_count,
+                          health_score, formality_avg, dialogue_ratio, created_at
+                   FROM version_metrics
+                   WHERE project_id = ?
+                   ORDER BY version_num DESC
+                   LIMIT ?""",
+                (project_id, limit),
+            ).fetchall()
+
+        versions = []
+        for r in rows:
+            versions.append({
+                "id": r[0],
+                "project_id": r[1],
+                "version_num": r[2],
+                "snapshot_id": r[3],
+                "alert_count": r[4],
+                "word_count": r[5],
+                "entity_count": r[6],
+                "chapter_count": r[7],
+                "health_score": r[8],
+                "formality_avg": r[9],
+                "dialogue_ratio": r[10],
+                "created_at": r[11],
+            })
+
+        return ApiResponse(success=True, data=versions)
+    except Exception as e:
+        logger.error(f"Error listing versions for project {project_id}: {e}", exc_info=True)
+        return ApiResponse(success=False, error="Error interno del servidor")
+
+
+@router.get("/api/projects/{project_id}/versions/trend", response_model=ApiResponse)
+async def get_version_trend(project_id: int, limit: int = Query(10, ge=2, le=50)):
+    """S15-02: Serie temporal simplificada para sparkline.
+
+    Returns:
+        Lista de {version_num, alert_count, health_score, created_at} para las
+        últimas N versiones, ordenadas cronológicamente (ASC).
+    """
+    try:
+        db = deps.get_database()
+        with db.connection() as conn:
+            rows = conn.execute(
+                """SELECT version_num, alert_count, health_score, word_count, created_at
+                   FROM version_metrics
+                   WHERE project_id = ?
+                   ORDER BY version_num DESC
+                   LIMIT ?""",
+                (project_id, limit),
+            ).fetchall()
+
+        # Revert to chronological order (ASC) for sparkline rendering
+        trend = []
+        for r in reversed(rows):
+            trend.append({
+                "version_num": r[0],
+                "alert_count": r[1],
+                "health_score": r[2],
+                "word_count": r[3],
+                "created_at": r[4],
+            })
+
+        # Calculate deltas if at least 2 versions
+        delta = None
+        if len(trend) >= 2:
+            latest = trend[-1]
+            prev = trend[-2]
+            delta = {
+                "alert_count": latest["alert_count"] - prev["alert_count"],
+                "health_score": (
+                    round(latest["health_score"] - prev["health_score"], 2)
+                    if latest["health_score"] is not None and prev["health_score"] is not None
+                    else None
+                ),
+                "word_count": latest["word_count"] - prev["word_count"],
+            }
+
+        return ApiResponse(success=True, data={"trend": trend, "delta": delta})
+    except Exception as e:
+        logger.error(f"Error getting version trend for project {project_id}: {e}", exc_info=True)
         return ApiResponse(success=False, error="Error interno del servidor")
 
 

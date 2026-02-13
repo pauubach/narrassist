@@ -85,6 +85,44 @@ export interface Project {
   recommendedAnalysis?: RecommendedAnalysis
 }
 
+/** Versión con métricas para uso en componentes (S15, BK-28) */
+export interface VersionMetrics {
+  id: number
+  projectId: number
+  versionNum: number
+  snapshotId: number | null
+  alertCount: number
+  wordCount: number
+  entityCount: number
+  chapterCount: number
+  healthScore: number | null
+  formalityAvg: number | null
+  dialogueRatio: number | null
+  createdAt: Date
+}
+
+/** Punto de trend para sparkline (S15) */
+export interface VersionTrendPoint {
+  versionNum: number
+  alertCount: number
+  healthScore: number | null
+  wordCount: number
+  createdAt: Date
+}
+
+/** Delta entre últimas 2 versiones (S15) */
+export interface VersionDelta {
+  alertCount: number
+  healthScore: number | null
+  wordCount: number
+}
+
+/** Datos de trend completos (S15) */
+export interface VersionTrend {
+  trend: VersionTrendPoint[]
+  delta: VersionDelta | null
+}
+
 /** Sección dentro de un capítulo (H2, H3, H4) */
 export interface Section {
   id: number
