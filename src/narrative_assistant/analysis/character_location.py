@@ -17,6 +17,8 @@ from enum import Enum
 
 from ..core.errors import NLPError
 from ..core.result import Result
+from .location_ontology import (HistoricalPeriod, LocationOntology,
+                                get_default_ontology)
 
 logger = logging.getLogger(__name__)
 
@@ -158,15 +160,24 @@ class CharacterLocationAnalyzer:
         r"(?P<name>\w+)\s+(?:cruzó|atravesó)\s+(?:la\s+|el\s+)?(?P<loc>\w+(?:\s+\w+){0,3})",
     ]
 
-    def __init__(self):
+    def __init__(self, ontology: LocationOntology | None = None):
+        self._ontology = ontology if ontology is not None else get_default_ontology()
         self._compile_patterns()
 
     def _compile_patterns(self):
         """Compila los patrones regex."""
-        self.compiled_arrival = [re.compile(p, re.IGNORECASE) for p in self.ARRIVAL_PATTERNS]
-        self.compiled_departure = [re.compile(p, re.IGNORECASE) for p in self.DEPARTURE_PATTERNS]
-        self.compiled_presence = [re.compile(p, re.IGNORECASE) for p in self.PRESENCE_PATTERNS]
-        self.compiled_transition = [re.compile(p, re.IGNORECASE) for p in self.TRANSITION_PATTERNS]
+        self.compiled_arrival = [
+            re.compile(p, re.IGNORECASE) for p in self.ARRIVAL_PATTERNS
+        ]
+        self.compiled_departure = [
+            re.compile(p, re.IGNORECASE) for p in self.DEPARTURE_PATTERNS
+        ]
+        self.compiled_presence = [
+            re.compile(p, re.IGNORECASE) for p in self.PRESENCE_PATTERNS
+        ]
+        self.compiled_transition = [
+            re.compile(p, re.IGNORECASE) for p in self.TRANSITION_PATTERNS
+        ]
 
     def analyze(
         self,
@@ -189,11 +200,17 @@ class CharacterLocationAnalyzer:
             report = CharacterLocationReport(project_id=project_id)
 
             # Filtrar personajes (PER) y ubicaciones (LOC)
-            characters = {e["name"].lower(): e for e in entities if e.get("entity_type") == "PER"}
-            locations = {e["name"].lower(): e for e in entities if e.get("entity_type") == "LOC"}
+            characters = {
+                e["name"].lower(): e for e in entities if e.get("entity_type") == "PER"
+            }
+            locations = {
+                e["name"].lower(): e for e in entities if e.get("entity_type") == "LOC"
+            }
 
             # Tracking de última ubicación conocida por personaje
-            last_known_location: dict[int, tuple[str, int]] = {}  # entity_id -> (location, chapter)
+            last_known_location: dict[int, tuple[str, int]] = (
+                {}
+            )  # entity_id -> (location, chapter)
 
             for chapter in sorted(chapters, key=lambda c: c.get("number", 0)):
                 chapter_num = chapter.get("number", 0)
@@ -203,7 +220,9 @@ class CharacterLocationAnalyzer:
                     continue
 
                 # Detectar eventos de ubicación
-                events = self._detect_location_events(content, chapter_num, characters, locations)
+                events = self._detect_location_events(
+                    content, chapter_num, characters, locations
+                )
 
                 for event in events:
                     report.location_events.append(event)
@@ -234,7 +253,10 @@ class CharacterLocationAnalyzer:
                             report.inconsistencies.append(inconsistency)
 
                     # Actualizar última ubicación conocida
-                    last_known_location[event.entity_id] = (event.location_name, chapter_num)
+                    last_known_location[event.entity_id] = (
+                        event.location_name,
+                        chapter_num,
+                    )
 
             # Guardar ubicaciones actuales
             for entity_id, (loc, _) in last_known_location.items():
@@ -260,7 +282,12 @@ class CharacterLocationAnalyzer:
         for pattern in self.compiled_arrival:
             for match in pattern.finditer(text):
                 event = self._create_event(
-                    match, characters, locations, chapter, text, LocationChangeType.ARRIVAL
+                    match,
+                    characters,
+                    locations,
+                    chapter,
+                    text,
+                    LocationChangeType.ARRIVAL,
                 )
                 if event:
                     events.append(event)
@@ -269,7 +296,12 @@ class CharacterLocationAnalyzer:
         for pattern in self.compiled_departure:
             for match in pattern.finditer(text):
                 event = self._create_event(
-                    match, characters, locations, chapter, text, LocationChangeType.DEPARTURE
+                    match,
+                    characters,
+                    locations,
+                    chapter,
+                    text,
+                    LocationChangeType.DEPARTURE,
                 )
                 if event:
                     events.append(event)
@@ -278,7 +310,12 @@ class CharacterLocationAnalyzer:
         for pattern in self.compiled_presence:
             for match in pattern.finditer(text):
                 event = self._create_event(
-                    match, characters, locations, chapter, text, LocationChangeType.PRESENCE
+                    match,
+                    characters,
+                    locations,
+                    chapter,
+                    text,
+                    LocationChangeType.PRESENCE,
                 )
                 if event:
                     events.append(event)
@@ -287,7 +324,12 @@ class CharacterLocationAnalyzer:
         for pattern in self.compiled_transition:
             for match in pattern.finditer(text):
                 event = self._create_event(
-                    match, characters, locations, chapter, text, LocationChangeType.TRANSITION
+                    match,
+                    characters,
+                    locations,
+                    chapter,
+                    text,
+                    LocationChangeType.TRANSITION,
                 )
                 if event:
                     events.append(event)
@@ -349,19 +391,26 @@ class CharacterLocationAnalyzer:
             logger.warning(f"Error creando evento de ubicación: {e}")
             return None
 
-
     def check_impossible_travel(
         self,
         report: CharacterLocationReport,
+        hours_between: float | None = None,
+        period: HistoricalPeriod = HistoricalPeriod.MODERN,
     ) -> list[LocationInconsistency]:
         """
         Detecta viajes imposibles: un personaje en dos ubicaciones distantes
         sin tiempo narrativo suficiente entre ambas.
 
         Se basa en:
-        - Ubicaciones conocidas como distantes (ciudades diferentes)
+        - Ontología jerárquica de ubicaciones (are_compatible)
+        - Reachability con distancias geográficas y periodo histórico
         - Cambios de ubicación dentro del mismo capítulo sin transición
-        - Interior/exterior incompatibles simultáneos
+
+        Args:
+            report: Reporte de ubicaciones a verificar
+            hours_between: Horas entre capítulos para check cross-chapter.
+                          Si es None, solo verifica mismo capítulo.
+            period: Periodo histórico para velocidad de viaje.
 
         Returns:
             Lista de inconsistencias de viaje imposible.
@@ -383,76 +432,79 @@ class CharacterLocationAnalyzer:
                 prev = events[i - 1]
                 curr = events[i]
 
-                # Solo verificar mismo capítulo (en capítulos diferentes
-                # se asume que hay tiempo suficiente)
-                if prev.chapter != curr.chapter:
-                    continue
-
-                # Verificar si las ubicaciones son incompatibles
+                # Transición explícita = ok
                 if curr.change_type == LocationChangeType.TRANSITION:
-                    continue  # Transición explícita = ok
-
-                loc1 = prev.location_name.lower()
-                loc2 = curr.location_name.lower()
-
-                if loc1 == loc2:
                     continue
 
-                # Verificar incompatibilidad conocida
-                if self._are_locations_incompatible(loc1, loc2):
-                    inconsistencies.append(
-                        LocationInconsistency(
-                            entity_id=entity_id,
-                            entity_name=curr.entity_name,
-                            location1_name=prev.location_name,
-                            location1_chapter=prev.chapter,
-                            location1_excerpt=prev.excerpt,
-                            location2_name=curr.location_name,
-                            location2_chapter=curr.chapter,
-                            location2_excerpt=curr.excerpt,
-                            explanation=(
-                                f"{curr.entity_name} aparece en {curr.location_name} "
-                                f"pero estaba en {prev.location_name} en el mismo capítulo "
-                                f"sin transición explícita"
-                            ),
-                            confidence=0.75,
+                loc1 = prev.location_name
+                loc2 = curr.location_name
+
+                if loc1.lower() == loc2.lower():
+                    continue
+
+                if prev.chapter == curr.chapter:
+                    # Mismo capítulo: verificar compatibilidad jerárquica
+                    if not self._ontology.are_compatible(loc1, loc2):
+                        inconsistencies.append(
+                            LocationInconsistency(
+                                entity_id=entity_id,
+                                entity_name=curr.entity_name,
+                                location1_name=prev.location_name,
+                                location1_chapter=prev.chapter,
+                                location1_excerpt=prev.excerpt,
+                                location2_name=curr.location_name,
+                                location2_chapter=curr.chapter,
+                                location2_excerpt=curr.excerpt,
+                                explanation=(
+                                    f"{curr.entity_name} aparece en {curr.location_name} "
+                                    f"pero estaba en {prev.location_name} en el mismo capítulo "
+                                    f"sin transición explícita"
+                                ),
+                                confidence=0.75,
+                            )
                         )
-                    )
+                elif hours_between is not None:
+                    # Cross-chapter: verificar alcanzabilidad
+                    if not self._ontology.are_compatible(loc1, loc2):
+                        if not self._ontology.is_reachable(
+                            loc1, loc2, hours_between, period
+                        ):
+                            inconsistencies.append(
+                                LocationInconsistency(
+                                    entity_id=entity_id,
+                                    entity_name=curr.entity_name,
+                                    location1_name=prev.location_name,
+                                    location1_chapter=prev.chapter,
+                                    location1_excerpt=prev.excerpt,
+                                    location2_name=curr.location_name,
+                                    location2_chapter=curr.chapter,
+                                    location2_excerpt=curr.excerpt,
+                                    explanation=(
+                                        f"{curr.entity_name} viaja de {prev.location_name} "
+                                        f"a {curr.location_name} entre capítulos "
+                                        f"{prev.chapter} y {curr.chapter}, "
+                                        f"pero la distancia es inalcanzable en "
+                                        f"{hours_between:.0f}h ({period.value})"
+                                    ),
+                                    confidence=0.70,
+                                )
+                            )
 
         return inconsistencies
 
-    @staticmethod
-    def _are_locations_incompatible(loc1: str, loc2: str) -> bool:
+    def _are_locations_incompatible(self, loc1: str, loc2: str) -> bool:
         """
         Determina si dos ubicaciones son incompatibles (no se puede estar
-        en ambas simultáneamente).
+        en ambas simultáneamente). Delega a la ontología.
         """
-        # Ubicaciones que son claramente diferentes ciudades/regiones
-        CITY_KEYWORDS = {
-            "madrid", "barcelona", "sevilla", "valencia", "bilbao",
-            "toledo", "granada", "córdoba", "salamanca", "zaragoza",
-            "lisboa", "paris", "londres", "roma", "berlín",
-        }
-
-        # Si ambos son nombres de ciudades conocidas y diferentes
-        if loc1 in CITY_KEYWORDS and loc2 in CITY_KEYWORDS:
-            return True
-
-        # Interior vs exterior incompatibles
-        INTERIOR = {"casa", "habitación", "cuarto", "sala", "cocina", "dormitorio", "despacho"}
-        EXTERIOR = {"jardín", "plaza", "calle", "campo", "bosque", "playa", "montaña"}
-
-        if (loc1 in INTERIOR and loc2 in EXTERIOR) or (loc1 in EXTERIOR and loc2 in INTERIOR):
-            # Estos podrían estar contiguos, menor confianza
-            return False  # No incompatibles por sí solos
-
-        return False
+        return not self._ontology.are_compatible(loc1, loc2)
 
 
 def analyze_character_locations(
     project_id: int,
     chapters: list[dict],
     entities: list[dict],
+    ontology: LocationOntology | None = None,
 ) -> Result[CharacterLocationReport]:
     """
     Función de conveniencia para analizar ubicaciones de personajes.
@@ -461,11 +513,12 @@ def analyze_character_locations(
         project_id: ID del proyecto
         chapters: Lista de capítulos
         entities: Lista de entidades
+        ontology: Ontología de ubicaciones (opcional, usa la default)
 
     Returns:
         Result con CharacterLocationReport
     """
-    analyzer = CharacterLocationAnalyzer()
+    analyzer = CharacterLocationAnalyzer(ontology=ontology)
     result = analyzer.analyze(project_id, chapters, entities)
 
     # Añadir detección de viajes imposibles
