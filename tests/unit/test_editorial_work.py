@@ -24,7 +24,6 @@ from narrative_assistant.persistence.editorial_work import (
     preview_import,
 )
 
-
 # ---- Helpers ----
 
 

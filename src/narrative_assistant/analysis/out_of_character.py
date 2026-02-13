@@ -18,8 +18,12 @@ from collections import Counter
 from dataclasses import dataclass, field
 from enum import Enum
 
-from .character_profiling import (NEGATIVE_WORDS, POSITIVE_WORDS,
-                                  CharacterProfile, CharacterRole)
+from .character_profiling import (
+    NEGATIVE_WORDS,
+    POSITIVE_WORDS,
+    CharacterProfile,
+    CharacterRole,
+)
 
 logger = logging.getLogger(__name__)
 

@@ -5,11 +5,15 @@ from datetime import date
 import pytest
 
 from narrative_assistant.temporal.non_linear_detector import (
-    NonLinearNarrativeDetector, NonLinearSignal)
-from narrative_assistant.temporal.temporal_map import (AgeReference,
-                                                       NarrativeType,
-                                                       TemporalMap,
-                                                       TemporalSlice)
+    NonLinearNarrativeDetector,
+    NonLinearSignal,
+)
+from narrative_assistant.temporal.temporal_map import (
+    AgeReference,
+    NarrativeType,
+    TemporalMap,
+    TemporalSlice,
+)
 
 
 class TestTemporalMap:

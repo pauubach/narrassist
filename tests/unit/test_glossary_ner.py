@@ -5,8 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from narrative_assistant.nlp.ner import (EntityLabel, ExtractedEntity,
-                                         NERExtractor)
+from narrative_assistant.nlp.ner import EntityLabel, ExtractedEntity, NERExtractor
 
 
 class _FakeNERExtractor:

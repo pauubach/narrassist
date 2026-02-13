@@ -7,11 +7,12 @@ Verifica el scoring de ambigüedad para resolución de sujetos omitidos
 
 import pytest
 
-from narrative_assistant.nlp.coreference_resolver import (Gender, Mention,
-                                                          MentionType, Number)
-from narrative_assistant.nlp.pro_drop_scorer import (CandidateScore,
-                                                     ProDropAmbiguityScorer,
-                                                     SaliencyTracker)
+from narrative_assistant.nlp.coreference_resolver import Gender, Mention, MentionType, Number
+from narrative_assistant.nlp.pro_drop_scorer import (
+    CandidateScore,
+    ProDropAmbiguityScorer,
+    SaliencyTracker,
+)
 
 # ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -266,7 +267,10 @@ class TestProDropIntegration:
         # Verifica que MentionType.ZERO no captura impersonales con "se"
         # CorefMentionExtractionMixin es un mixin usado por el resolver
         from narrative_assistant.nlp.coreference_resolver import (
-            CorefConfig, CoreferenceVotingResolver, CorefMethod)
+            CorefConfig,
+            CoreferenceVotingResolver,
+            CorefMethod,
+        )
 
         config = CorefConfig(
             enabled_methods=[CorefMethod.HEURISTICS],
@@ -287,8 +291,7 @@ class TestProDropIntegration:
 
     def test_heuristics_uses_saliency_tracker(self):
         """HeuristicsCorefMethod con SaliencyTracker produce ranking diferente."""
-        from narrative_assistant.nlp.coreference_resolver import \
-            HeuristicsCorefMethod
+        from narrative_assistant.nlp.coreference_resolver import HeuristicsCorefMethod
 
         method = HeuristicsCorefMethod()
 

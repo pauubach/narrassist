@@ -1257,8 +1257,8 @@ class HeuristicsCorefMethod:
     def __init__(self):
         # Frecuencia de menciones (se actualiza antes de resolver)
         self._mention_freq: dict[str, int] = {}
-        self._saliency_tracker: "SaliencyTracker | None" = None
-        self._pro_drop_scorer: "ProDropAmbiguityScorer | None" = None
+        self._saliency_tracker = None
+        self._pro_drop_scorer = None
 
     def set_mention_frequencies(self, mentions: list["Mention"]) -> None:
         """Calcula frecuencia de nombres propios para saliencia."""

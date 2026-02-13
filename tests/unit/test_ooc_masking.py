@@ -3,10 +3,17 @@
 import pytest
 
 from narrative_assistant.analysis.character_profiling import (
-    ActionIndicator, CharacterProfile, CharacterRole, PresenceIndicator,
-    SentimentIndicator)
+    ActionIndicator,
+    CharacterProfile,
+    CharacterRole,
+    PresenceIndicator,
+    SentimentIndicator,
+)
 from narrative_assistant.analysis.out_of_character import (
-    DeviationSeverity, DeviationType, OutOfCharacterDetector)
+    DeviationSeverity,
+    DeviationType,
+    OutOfCharacterDetector,
+)
 
 
 def _make_profile(

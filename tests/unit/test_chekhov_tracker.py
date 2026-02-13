@@ -7,8 +7,7 @@ que desaparecen del manuscrito sin resolver su arco.
 
 import pytest
 
-from narrative_assistant.analysis.chekhov_tracker import (
-    ChekhovTracker, SupportingCharacterData)
+from narrative_assistant.analysis.chekhov_tracker import ChekhovTracker, SupportingCharacterData
 
 # ── Helpers ──────────────────────────────────────────────────────────────
 

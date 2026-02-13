@@ -3,9 +3,16 @@
 import pytest
 
 from narrative_assistant.analysis.location_ontology import (
-    BUILDING_TYPES, EXTERIOR_TYPES, ROOM_TYPES, SPANISH_GAZETTEER,
-    HistoricalPeriod, LocationNode, LocationOntology, LocationType,
-    get_default_ontology)
+    BUILDING_TYPES,
+    EXTERIOR_TYPES,
+    ROOM_TYPES,
+    SPANISH_GAZETTEER,
+    HistoricalPeriod,
+    LocationNode,
+    LocationOntology,
+    LocationType,
+    get_default_ontology,
+)
 
 
 class TestLocationOntologyBasic:

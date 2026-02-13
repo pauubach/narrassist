@@ -11,8 +11,13 @@ import threading
 from datetime import datetime
 
 from ..persistence.database import Database, get_database
-from .models import (Entity, EntityImportance, EntityMention, EntityType,
-                     MergeHistory)
+from .models import (
+    Entity,
+    EntityImportance,
+    EntityMention,
+    EntityType,
+    MergeHistory,
+)
 
 logger = logging.getLogger(__name__)
 

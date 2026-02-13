@@ -17,8 +17,7 @@ from enum import Enum
 
 from ..core.errors import NLPError
 from ..core.result import Result
-from .location_ontology import (HistoricalPeriod, LocationOntology,
-                                get_default_ontology)
+from .location_ontology import HistoricalPeriod, LocationOntology, get_default_ontology
 
 logger = logging.getLogger(__name__)
 

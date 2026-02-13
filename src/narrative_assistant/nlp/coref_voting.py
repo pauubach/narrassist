@@ -9,10 +9,18 @@ from __future__ import annotations
 import logging
 import re
 
-from .coreference_resolver import (FIRST_PERSON_PRONOUNS, NARRATOR_PATTERNS,
-                                   CorefCandidate, CoreferenceChain,
-                                   CorefMethod, Gender, Mention, MentionType,
-                                   MentionVotingDetail, Number)
+from .coreference_resolver import (
+    FIRST_PERSON_PRONOUNS,
+    NARRATOR_PATTERNS,
+    CorefCandidate,
+    CoreferenceChain,
+    CorefMethod,
+    Gender,
+    Mention,
+    MentionType,
+    MentionVotingDetail,
+    Number,
+)
 
 logger = logging.getLogger(__name__)
 

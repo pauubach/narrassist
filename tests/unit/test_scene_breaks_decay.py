@@ -5,7 +5,10 @@ from dataclasses import dataclass
 import pytest
 
 from narrative_assistant.voice.speaker_attribution import (
-    AttributionConfidence, AttributionMethod, SpeakerAttributor)
+    AttributionConfidence,
+    AttributionMethod,
+    SpeakerAttributor,
+)
 
 
 @dataclass
