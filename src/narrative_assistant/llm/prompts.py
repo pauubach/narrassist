@@ -413,6 +413,60 @@ Responde en JSON:
 
 
 # ============================================================================
+# TEMPORAL INSTANCE EXTRACTION (Level B)
+# ============================================================================
+
+TEMPORAL_EXTRACTION_SYSTEM = """Eres un analista narrativo experto especializado en cronología de personajes.
+Tu tarea es identificar la edad, fase vital o momento temporal de cada personaje
+mencionado en un fragmento de texto narrativo.
+
+Reglas estrictas:
+1. Solo reporta información EXPLÍCITA o CLARAMENTE implícita en el texto
+2. NO inventes edades ni fases que no se puedan deducir del texto
+3. Si no hay información temporal para un personaje, NO lo incluyas
+4. La evidencia debe ser una cita textual EXACTA del fragmento
+5. Responde SIEMPRE en JSON válido, sin texto adicional"""
+
+TEMPORAL_EXTRACTION_TEMPLATE = """Personajes conocidos: {entity_names}
+
+Texto:
+---
+{chapter_text}
+---
+
+Para cada personaje del que puedas determinar edad, fase vital o época temporal,
+genera una entrada JSON. Tipos válidos:
+- "age": edad numérica explícita (valor: número entero)
+- "phase": fase vital (valores: "child", "teen", "young", "adult", "elder")
+- "year": año concreto asociado al personaje (valor: número entero)
+- "offset": años relativos respecto al presente narrativo (valor: entero con signo)
+
+Responde SOLO con un array JSON:
+[
+  {{
+    "entity": "nombre del personaje",
+    "type": "age|phase|year|offset",
+    "value": 40,
+    "evidence": "cita textual exacta del fragmento",
+    "confidence": 0.8
+  }}
+]
+
+Si no hay información temporal para ningún personaje, responde: []"""
+
+TEMPORAL_EXTRACTION_EXAMPLES = [
+    {
+        "input": "Personajes: Ana, Pedro\nTexto: Ana, ya jubilada, recordaba sus años de universidad con Pedro.",
+        "output": '[{"entity": "Ana", "type": "phase", "value": "elder", "evidence": "ya jubilada", "confidence": 0.85}, {"entity": "Ana", "type": "phase", "value": "young", "evidence": "sus años de universidad", "confidence": 0.75}]',
+    },
+    {
+        "input": "Personajes: Juan\nTexto: Juan rondaba los cuarenta cuando estalló la guerra en 1936.",
+        "output": '[{"entity": "Juan", "type": "age", "value": 40, "evidence": "rondaba los cuarenta", "confidence": 0.75}, {"entity": "Juan", "type": "year", "value": 1936, "evidence": "estalló la guerra en 1936", "confidence": 0.90}]',
+    },
+]
+
+
+# ============================================================================
 # UTILIDADES (actualización)
 # ============================================================================
 
@@ -425,4 +479,5 @@ RECOMMENDED_TEMPERATURES = {
     "narrative_of_thought": 0.2,
     "timeline_self_reflection": 0.1,
     "flashback_validation": 0.1,
+    "temporal_extraction": 0.2,
 }

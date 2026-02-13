@@ -1876,7 +1876,76 @@ def _run_temporal_analysis(
                 )
             all_markers.extend(chapter_markers)
 
-        logger.info(f"Extracted {len(all_markers)} temporal markers from {len(chapters)} chapters")
+        logger.info(f"Extracted {len(all_markers)} temporal markers (Level A) from {len(chapters)} chapters")
+
+        # Level B: extracción LLM per-chapter (complementa regex)
+        llm_instance_count = 0
+        if entities:
+            try:
+                from ..temporal.llm_extraction import (
+                    build_instance_id,
+                    extract_temporal_instances_llm,
+                    merge_with_regex_instances,
+                    resolve_entity_ids,
+                )
+
+                entity_name_to_id = {e.canonical_name.lower(): e.id for e in entities if e.id}
+                entity_names = [e.canonical_name for e in entities]
+
+                # Recopilar instance IDs ya detectados por regex
+                regex_ids: set[str] = set()
+                for m in all_markers:
+                    if m.temporal_instance_id:
+                        regex_ids.add(m.temporal_instance_id)
+
+                for chapter in chapters:
+                    llm_instances = extract_temporal_instances_llm(
+                        chapter_text=chapter.content,
+                        entity_names=entity_names,
+                    )
+                    if not llm_instances:
+                        continue
+
+                    llm_instances = resolve_entity_ids(llm_instances, entity_name_to_id)
+                    new_instances = merge_with_regex_instances(regex_ids, llm_instances)
+
+                    for inst in new_instances:
+                        iid = build_instance_id(inst)
+                        if iid:
+                            regex_ids.add(iid)  # Evitar duplicados entre capítulos
+                            from ..temporal.markers import MarkerType, TemporalMarker
+
+                            marker = TemporalMarker(
+                                text=inst.evidence or inst.entity_name,
+                                marker_type=MarkerType.CHARACTER_AGE,
+                                start_char=0,
+                                end_char=0,
+                                chapter=chapter.number,
+                                entity_id=inst.entity_id,
+                                confidence=inst.confidence,
+                                temporal_instance_id=iid,
+                            )
+                            # Rellenar campos según tipo
+                            if inst.instance_type == "age":
+                                marker.age = int(inst.value)
+                            elif inst.instance_type == "phase":
+                                marker.age_phase = str(inst.value)
+                            elif inst.instance_type == "year":
+                                marker.year = int(inst.value)
+                            elif inst.instance_type == "offset":
+                                marker.relative_year_offset = int(inst.value)
+
+                            all_markers.append(marker)
+                            llm_instance_count += 1
+
+                if llm_instance_count > 0:
+                    logger.info(
+                        f"Level B (LLM) added {llm_instance_count} new temporal instances"
+                    )
+            except Exception as e:
+                logger.debug(f"Level B temporal extraction failed (graceful degradation): {e}")
+
+        logger.info(f"Total temporal markers: {len(all_markers)} (Level A + B)")
 
         # 2. Construir timeline (con contenido para análisis lingüístico)
         builder = TimelineBuilder()

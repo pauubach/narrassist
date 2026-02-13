@@ -125,24 +125,71 @@ WORD_TO_NUM = {
 # Normalización de fases vitales para construir instancias temporales estables
 # cuando el texto no da una edad numérica explícita.
 AGE_PHASE_ALIASES = {
+    # Sustantivos/adjetivos directos
     "niño": "child",
     "niña": "child",
     "pequeño": "child",
     "pequeña": "child",
+    "bebé": "child",
+    "criatura": "child",
+    "chiquillo": "child",
+    "chiquilla": "child",
+    "crío": "child",
+    "cría": "child",
     "adolescente": "teen",
+    "muchacho": "teen",
+    "muchacha": "teen",
+    "chaval": "teen",
+    "chavala": "teen",
+    "chico": "teen",
+    "chica": "teen",
     "joven": "young",
+    "mozo": "young",
+    "moza": "young",
     "adulto": "adult",
     "adulta": "adult",
+    "maduro": "adult",
+    "madura": "adult",
     "mayor": "elder",
     "viejo": "elder",
     "vieja": "elder",
+    "anciano": "elder",
+    "anciana": "elder",
+    "abuelo": "elder",
+    "abuela": "elder",
+    # Sustantivos abstractos (fases como concepto)
     "infancia": "child",
     "niñez": "child",
     "juventud": "young",
     "adolescencia": "teen",
+    "pubertad": "teen",
     "madurez": "adult",
     "vejez": "elder",
+    "senectud": "elder",
 }
+
+# Eventos vitales que implican una fase de edad.
+LIFE_EVENT_PHASE_MAP: dict[str, tuple[str, float]] = {
+    # evento → (fase, confianza)
+    "guardería": ("child", 0.85),
+    "colegio": ("child", 0.70),
+    "escuela primaria": ("child", 0.85),
+    "instituto": ("teen", 0.80),
+    "bachillerato": ("teen", 0.85),
+    "universidad": ("young", 0.80),
+    "facultad": ("young", 0.80),
+    "carrera": ("young", 0.70),
+    "servicio militar": ("young", 0.80),
+    "mili": ("young", 0.80),
+    "boda": ("adult", 0.60),
+    "jubilación": ("elder", 0.85),
+    "retiro": ("elder", 0.70),
+    "residencia de ancianos": ("elder", 0.90),
+    "geriátrico": ("elder", 0.90),
+}
+
+# Edades metafóricas o hiperbólicas que NO deben generar instancias.
+_METAPHORICAL_AGE_THRESHOLD = 130
 
 # Fases para desdobles temporales explícitos ("yo del futuro/pasado").
 TEMPORAL_SELF_PHASE_ALIASES = {
@@ -284,6 +331,16 @@ TEMPORAL_PATTERNS: dict[MarkerType, list[tuple[str, float]]] = {
         (r"\bten[íi]a\s+(\d{1,3})\s+años\b", 0.85),
         # "cumplió X años"
         (r"\bcumpli[óo]\s+(\d{1,3})\s+años\b", 0.9),
+        # "recién cumplidos los X" (variante)
+        (r"\breci[eé]n\s+cumplidos?\s+los\s+(\d{1,3})\b", 0.9),
+        # "rondaba los X" / "rondaba los cincuenta"
+        (r"\brondaba\s+los\s+(\d{1,3})\b", 0.75),
+        # "pasados los X" / "superados los X"
+        (r"\b(?:pasados?|superados?)\s+los\s+(\d{1,3})\b", 0.75),
+        # "cerca de los X años"
+        (r"\bcerca\s+de\s+los\s+(\d{1,3})\s+años\b", 0.70),
+        # "apenas X años"
+        (r"\bapenas\s+(\d{1,3})\s+años\b", 0.80),
     ],
     MarkerType.DURATION: [
         # "durante X días/meses/años"
@@ -844,7 +901,15 @@ class TemporalMarkerExtractor:
             # Buscamos el primer grupo numérico real en lugar de asumir groups[0].
             for group in groups:
                 if group and group.isdigit():
-                    marker.age = int(group)
+                    age_val = int(group)
+                    # Guardia contra edades metafóricas ("mil años", "cien años encima")
+                    if age_val <= _METAPHORICAL_AGE_THRESHOLD:
+                        marker.age = age_val
+                    else:
+                        logger.debug(
+                            "Descartada edad %d (>%d, probable metáfora): %r",
+                            age_val, _METAPHORICAL_AGE_THRESHOLD, marker.text,
+                        )
                     break
 
             # Si no hay edad numérica explícita, intentamos inferir fase de vida.
@@ -971,7 +1036,11 @@ class TemporalMarkerExtractor:
             before_start = max(0, mention_start - 24)
             before_text = text[before_start:mention_start]
             phase_match = re.search(
-                r"(niño|niña|pequeño|pequeña|adolescente|joven|adulto|adulta|mayor|viejo|vieja)\s*$",
+                r"(niño|niña|pequeño|pequeña|bebé|criatura|chiquillo|chiquilla|crío|cría"
+                r"|adolescente|muchacho|muchacha|chaval|chavala|chico|chica"
+                r"|joven|mozo|moza"
+                r"|adulto|adulta|maduro|madura"
+                r"|mayor|viejo|vieja|anciano|anciana)\s*$",
                 before_text,
                 re.IGNORECASE,
             )
@@ -993,6 +1062,33 @@ class TemporalMarkerExtractor:
                     )
                     marker.temporal_instance_id = self._build_temporal_instance_id(marker)
                     _add_marker(marker)
+
+            # 1b) Evento vital cercano que implica fase ("en la universidad", "tras la jubilación")
+            event_window_start = max(0, mention_start - 120)
+            event_window_end = min(len(text), mention_end + 120)
+            event_window = text[event_window_start:event_window_end].lower()
+            for event_text, (event_phase, event_conf) in LIFE_EVENT_PHASE_MAP.items():
+                if event_text in event_window:
+                    # Verificar que no ya haya marcador de fase para esta mención
+                    sig_check = (entity_id, f"{entity_id}@phase:{event_phase}")
+                    if any(s[:2] == sig_check for s in seen_signatures):
+                        continue
+                    event_idx = event_window.index(event_text)
+                    abs_start = event_window_start + event_idx
+                    abs_end = abs_start + len(event_text)
+                    marker = TemporalMarker(
+                        text=text[abs_start:abs_end],
+                        marker_type=MarkerType.CHARACTER_AGE,
+                        start_char=abs_start,
+                        end_char=abs_end,
+                        chapter=chapter,
+                        entity_id=entity_id,
+                        age_phase=event_phase,
+                        confidence=event_conf,
+                    )
+                    marker.temporal_instance_id = self._build_temporal_instance_id(marker)
+                    _add_marker(marker)
+                    break  # Un evento vital por mención es suficiente
 
             # Ventana contextual alrededor de la mención para cues implícitos.
             window_start = max(0, mention_start - 64)

@@ -1,7 +1,9 @@
 # Temporal Instance Detection: Niveles y Limites Semanticos
 
-> Documento tecnico sobre las capacidades actuales de deteccion de instancias
-> temporales y las mejoras posibles organizadas por nivel de complejidad.
+> Documento tecnico sobre las capacidades de deteccion de instancias
+> temporales, organizadas por nivel de complejidad.
+>
+> **Estado**: Nivel A y B implementados (v0.7.0)
 
 ## Contexto
 
@@ -23,125 +25,156 @@ flashbacks, prolepsis y saltos temporales.
 
 ## Nivel A — Regex + Heuristicas (Implementado)
 
-### Capacidades actuales
+### Patrones de edad explicita
 
-**Patrones de edad explicita** (`markers.py`):
-- "cuando tenia 40 anios" → `@age:40`
-- "a los 40 anios" → `@age:40`
-- "con 40 anios" → `@age:40`
-- "cumplio 40 anios" → `@age:40`
-- "recien cumplidos los 40" → `@age:40`
+| Patron | Ejemplo | Confianza |
+|--------|---------|-----------|
+| `cuando tenia X anios` | "cuando tenia 40 anios" | 0.90 |
+| `a los X anios` | "a los 40 anios" | 0.85 |
+| `con X anios` | "con 40 anios" | 0.85 |
+| `X anios cumplidos` | "40 anios cumplidos" | 0.90 |
+| `tenia X anios` | "tenia 40 anios" | 0.85 |
+| `cumplio X anios` | "cumplio 40 anios" | 0.90 |
+| `rondaba los X` | "rondaba los 40" | 0.75 |
+| `pasados los X` | "pasados los 60" | 0.75 |
+| `cerca de los X anios` | "cerca de los 30 anios" | 0.70 |
+| `apenas X anios` | "apenas 15 anios" | 0.80 |
 
-**Fases vitales** (AGE_PHASE_ALIASES):
-- ninio/nina, pequenio/pequenia → `@phase:child`
-- adolescente → `@phase:teen`
-- joven → `@phase:young`
-- adulto/adulta → `@phase:adult`
-- mayor, viejo/vieja → `@phase:elder`
+### Fases vitales (39 alias)
 
-**Deteccion de adyacencia** (linea 974):
-- "la pequenia Ana" → mira si hay mencion de entidad adyacente → `1@phase:child`
-- "el joven Pedro" → `2@phase:young`
+| Fase | Alias |
+|------|-------|
+| `child` | ninio/nina, pequenio/pequenia, bebe, criatura, chiquillo/a, crio/cria, infancia, niniez |
+| `teen` | adolescente, muchacho/a, chaval/a, chico/a, adolescencia, pubertad |
+| `young` | joven, mozo/moza, juventud |
+| `adult` | adulto/a, maduro/a, madurez |
+| `elder` | mayor, viejo/a, anciano/a, abuelo/a, vejez, senectud |
 
-**Offsets relativos**:
-- "hace 5 anios" → `@offset_years:-5`
-- "3 anios atras" → `@offset_years:-3`
-- "dentro de 2 anios" → `@offset_years:+2`
-- "5 anios despues" → `@offset_years:+5`
+### Deteccion de adyacencia al nombre
 
-**Anios absolutos**:
-- "en 1985" → `@year:1985`
-- "primavera de 1990" → `@year:1990`
+Todos los alias se detectan como fase cuando preceden al nombre de un personaje:
+- "el anciano Pedro" → `2@phase:elder`
+- "la muchacha Ana" → `1@phase:teen`
+- "el bebe Juan" → `3@phase:child`
+
+### Inferencia por evento vital (15 eventos)
+
+| Evento | Fase inferida | Confianza |
+|--------|---------------|-----------|
+| guarderia, escuela primaria | child | 0.85 |
+| colegio | child | 0.70 |
+| instituto, bachillerato | teen | 0.80-0.85 |
+| universidad, facultad | young | 0.80 |
+| servicio militar, mili | young | 0.80 |
+| boda | adult | 0.60 |
+| jubilacion, retiro | elder | 0.70-0.85 |
+| residencia de ancianos, geriatrico | elder | 0.90 |
+
+Ejemplo: "Ana recordaba sus anios de universidad" → `1@phase:young` (0.80)
+
+### Guardia contra edades metaforicas
+
+Edades > 130 se descartan automaticamente como metaforas/hiperboles:
+- "tenia mil anios encima" → descartado (1000 > 130)
+- "cien anios de soledad" → descartado (solo si > 130; 100 si pasa)
 
 ### Limites del Nivel A
 
 | Limite | Ejemplo que falla | Causa |
 |--------|------------------|-------|
-| Edad implicita | "ya era un hombre maduro" | No hay numero, no hay alias exacto |
-| Contexto narrativo | "tras la guerra, envejecio" | Requiere inferencia temporal |
-| Pro-drop | "Tenia 40 anios" (sin sujeto) | Necesita resolucion de correferencia |
+| Edad implicita sin pattern | "ya era un hombre hecho y derecho" | No hay alias exacto |
+| Contexto narrativo complejo | "tras la guerra, envejecio" | Requiere inferencia |
+| Pro-drop | "Tenia 40 anios" (sin sujeto) | Necesita correferencia |
 | Epocas vagas | "en la belle epoque" | No mapea a rango de anios |
-| Edad relativa | "10 anios mayor que Pedro" | Requiere razonamiento sobre otra entidad |
-| Ironia/metafora | "tenia mil anios encima" | Falso positivo (mil no es edad real) |
+| Edad relativa | "10 anios mayor que Pedro" | Requiere razonamiento |
 
 ### Cobertura estimada
 
-- **Novelas contemporaneas con flashbacks**: ~65-75% de instancias temporales
-- **Narrativa historica con epocas vagas**: ~30-40%
-- **Narrativa experimental (flujo de conciencia)**: ~15-25%
+- **Novelas contemporaneas con flashbacks**: ~70-80%
+- **Narrativa historica con epocas vagas**: ~35-45%
+- **Narrativa experimental**: ~20-30%
 
 ---
 
-## Nivel B — LLM Per-Chapter Prompts (Propuesto)
+## Nivel B — LLM Per-Chapter Extraction (Implementado)
 
-### Objetivo
-
-Usar el LLM local (Ollama) para extraer instancias temporales que escapan
-al regex, procesando capitulo por capitulo.
-
-### Diseno propuesto
+### Arquitectura
 
 ```
-Entrada: texto del capitulo + lista de entidades conocidas
-Prompt: "Extrae la edad, fase vital o epoca de cada personaje mencionado"
-Salida: JSON con instancias detectadas
+Capitulo + Lista de personajes
+       |
+       v
+  [Prompt CoT + few-shot]
+       |
+       v
+  [Ollama (qwen2.5/llama3.2/mistral)]
+       |
+       v
+  [JSON parse + validacion]
+       |
+       v
+  [Merge con Nivel A (regex prioridad)]
+       |
+       v
+  Instancias temporales finales
 ```
 
-**Prompt template** (ejemplo):
+### Modulo: `temporal/llm_extraction.py`
 
+**Funcion principal**: `extract_temporal_instances_llm(chapter_text, entity_names)`
+
+**Validaciones aplicadas a cada deteccion LLM**:
+1. Tipo valido (age, phase, year, offset)
+2. Confianza >= 0.6 (umbral por defecto)
+3. Entidad conocida (nombre existe en la lista)
+4. Valor en rango razonable (age: 0-130, year: 0-2100, offset: ±200)
+5. Evidencia textual verificable (la cita debe existir en el texto original)
+6. Si la evidencia no se encuentra, confianza * 0.6 (penalizacion)
+
+### Prompt template
+
+- **System**: Analista narrativo experto en cronologia de personajes
+- **Few-shot**: 2 ejemplos (jubilacion → elder, rondaba los cuarenta + guerra 1936)
+- **Temperatura**: 0.2 (conservador)
+- **Max tokens**: 500
+- **Texto truncado**: Maximo 3000 caracteres por capitulo
+
+### Integracion con el pipeline
+
+El pipeline `_run_temporal_analysis` ejecuta ambos niveles secuencialmente:
+
+```python
+# 1. Nivel A: regex (rapido, alta precision)
+chapter_markers = marker_extractor.extract_with_entities(...)
+
+# 2. Nivel B: LLM (complementa, no reemplaza)
+llm_instances = extract_temporal_instances_llm(chapter.content, entity_names)
+llm_instances = resolve_entity_ids(llm_instances, entity_name_to_id)
+new_instances = merge_with_regex_instances(regex_ids, llm_instances)
 ```
-Dado el siguiente fragmento narrativo y la lista de personajes,
-identifica la edad, fase vital o epoca temporal de cada personaje
-mencionado. Solo incluye informacion EXPLICITA o claramente implicita
-en el texto.
 
-Personajes: {entity_names}
+**Merge**: Regex siempre tiene prioridad. LLM solo anade instancias nuevas
+(que no coincidan con ningun `temporal_instance_id` ya detectado por regex).
 
-Texto:
----
-{chapter_text}
----
+### Graceful degradation
 
-Responde en JSON:
-[
-  {
-    "entity": "nombre",
-    "type": "age|phase|year|offset",
-    "value": "40|child|1985|+5",
-    "evidence": "cita textual",
-    "confidence": 0.0-1.0
-  }
-]
-```
-
-### Ventajas sobre Nivel A
-
-| Mejora | Ejemplo | Nivel A | Nivel B |
-|--------|---------|---------|---------|
-| Edad implicita | "era un hombre maduro" | Miss | `@phase:adult` (0.7) |
-| Contexto narrativo | "Desde la jubilacion..." | Miss | `@phase:elder` (0.8) |
-| Epocas | "durante la Transicion" | Miss | `@year:1978` (0.6) |
-| Relaciones edad | "su hermana menor" | Miss | Inferencia relativa |
+Si Ollama no esta disponible o el LLM falla:
+- `is_llm_available()` retorna `False` → skip silencioso
+- Excepciones capturadas con logger.debug → no rompe el pipeline
+- El Nivel A sigue funcionando normalmente
 
 ### Limites del Nivel B
 
-- **Alucinaciones**: El LLM puede inventar edades no mencionadas
-- **Costo computacional**: 1-3 segundos por capitulo con qwen2.5 7B
-- **Inconsistencia inter-chapter**: Cada capitulo se procesa aislado
-- **Dependencia de modelo**: Calidad varia entre llama3.2, mistral, qwen2.5
+- **Alucinaciones**: Mitigadas con validacion de evidencia textual
+- **Costo**: ~1-3 seg/capitulo con qwen2.5 7B en CPU
+- **Sin cross-chapter**: Cada capitulo se procesa aislado
+- **Variabilidad inter-modelo**: Calidad depende del modelo Ollama disponible
 
-### Mitigaciones
+### Cobertura estimada (A + B combinados)
 
-1. **Umbral de confianza minimo** (0.6): Descartar detecciones inciertas
-2. **Evidencia obligatoria**: Solo aceptar si incluye cita textual verificable
-3. **Votacion multi-modelo**: Confirmar con >= 2 modelos (ya tenemos infraestructura)
-4. **Cross-check con Nivel A**: Priorizar regex cuando ambos detectan
-
-### Estimacion de mejora
-
-- Cobertura: +15-25% sobre Nivel A
-- Precision: ~80-90% (con mitigaciones)
-- Latencia adicional: ~1-3 seg/capitulo
+- **Novelas contemporaneas con flashbacks**: ~85-90%
+- **Narrativa historica con epocas vagas**: ~50-60%
+- **Narrativa experimental**: ~35-45%
 
 ---
 
@@ -160,38 +193,22 @@ Cap 5: "Veinte anios despues, Ana volvio al pueblo" → 1@age:30 (inferido)
 Cap 3: "De nina, Ana jugaba en el rio"              → 1@phase:child (= 1@age:10?)
 ```
 
-### Tecnicas
+### Tecnicas propuestas
 
 1. **Grafo temporal por entidad**: Nodos = instancias, aristas = relaciones
-   temporales (offset, secuencia narrativa)
-2. **Propagacion de restricciones**: Si `@age:10` + "20 anios despues" →
-   `@age:30` automatico
-3. **Coherencia check**: Si Cap 1 dice 10 y Cap 5 dice 25 "20 anios despues" →
-   alerta de inconsistencia
-
-### Requisitos
-
-- Nivel B funcionando (para capturar instancias implicitas)
-- Modelo de grafo temporal (nuevo modulo)
-- Ventana de contexto multi-capitulo para el LLM
+2. **Propagacion de restricciones**: `@age:10` + "20 anios despues" → `@age:30`
+3. **Coherencia check**: Cap 1 dice 10, Cap 5 dice 25 "20 anios despues" → alerta
 
 ### Complejidad
 
-Alta. Requiere:
-- Resolver ambiguedades de correferencia cross-chapter
-- Manejar narrativa no lineal (flashbacks dentro de flashbacks)
-- Distinguir tiempo narrativo vs tiempo del discurso
+Alta. Requiere resolver ambiguedades de correferencia cross-chapter,
+manejar narrativa no lineal, y distinguir tiempo narrativo vs discurso.
 
 ---
 
 ## Nivel D — Narrative-Experts Decomposition (Investigacion)
 
-### Objetivo
-
-Descomponer el analisis temporal en sub-tareas especializadas, cada una
-manejada por un agente/prompt experto.
-
-### Arquitectura (inspirada en Narrative-Experts, ACL 2024)
+### Arquitectura propuesta (inspirada en ACL 2024)
 
 ```
 Coordinador
@@ -201,92 +218,54 @@ Coordinador
   └── Agente Validador → cross-check coherencia global
 ```
 
-### Referencia academica
+### Referencias academicas
 
 - **TimeChara** (Wang et al., 2024): Benchmark para deteccion de
-  alucinaciones punto-en-el-tiempo en personajes. Demuestra que los LLMs
-  actuales (GPT-4, Llama) cometen errores significativos al responder
-  "como era X en el anio Y". Precision ~60-75% segun modelo.
+  alucinaciones punto-en-el-tiempo. Precision LLM: ~60-75%.
 
-- **Temporal Blind Spots in LLMs** (Fatemi et al., 2024): Los LLMs tienen
-  dificultades sistematicas con razonamiento temporal, especialmente:
-  - Ordenacion de eventos con pistas implicitas
-  - Duracion y solapamiento de intervalos
-  - Relaciones temporales transitivas (A antes de B, B antes de C → A antes de C)
+- **Temporal Blind Spots in LLMs** (Fatemi et al., 2024): Dificultades
+  sistematicas con razonamiento temporal (ordenacion, duracion, transitividad).
 
-- **Narrative-Experts** (Chen et al., 2024): Descomposicion de analisis
-  narrativo complejo en sub-tareas especializadas con agentes LLM mejora
-  precision un 15-30% vs single-prompt.
+- **Narrative-Experts** (Chen et al., 2024): Descomposicion en sub-tareas
+  mejora precision 15-30% vs single-prompt.
 
 ### Viabilidad
 
-- Requiere modelos mas capaces (7B minimo, idealmente 13B+)
-- Latencia alta (10-30 seg por documento completo)
-- Mayor consumo de GPU/CPU
-- Solo viable como analisis batch, no interactivo
+Requiere modelos 13B+, latencia 10-30 seg/doc, solo viable como batch.
 
 ---
 
-## Hoja de Ruta Recomendada
+## Hoja de Ruta
 
 ```
-Actual:  [A] Regex + heuristicas ─────────────────── Implementado (v0.6.0)
-Corto:   [B] LLM per-chapter prompts ────────────── Sprint S7-S8
-Medio:   [C] Cross-chapter linking ──────────────── Post-TFM
-Largo:   [D] Narrative-Experts ──────────────────── Investigacion futura
-```
-
-### Prioridad: Nivel B
-
-El Nivel B es el siguiente paso natural porque:
-
-1. **Infraestructura existente**: Ya tenemos Ollama, votacion multi-modelo,
-   y prompt engineering (Sprint S5)
-2. **Impacto alto**: +15-25% cobertura con precision aceptable
-3. **Riesgo bajo**: Se integra como capa adicional sobre Nivel A (no reemplaza)
-4. **Precedente**: El flashback validation ya usa LLM con exito (3-layer scoring)
-
-### Integracion con el pipeline existente
-
-```python
-# Flujo propuesto para Nivel B
-def extract_temporal_instances(chapter, entities):
-    # 1. Nivel A: regex (rapido, alta precision)
-    regex_instances = marker_extractor.extract_with_entities(chapter, entities)
-
-    # 2. Nivel B: LLM (lento, mayor cobertura)
-    llm_instances = llm_temporal_extractor.extract(chapter, entities)
-
-    # 3. Merge: regex tiene prioridad; LLM solo anade nuevas detecciones
-    merged = merge_instances(regex_instances, llm_instances,
-                            min_confidence=0.6)
-
-    return merged
+v0.6.0   [A] Regex basico ─────────────────── Completado
+v0.7.0   [A] Regex hardened + [B] LLM ────── Completado (actual)
+Futuro   [C] Cross-chapter linking ─────────── Post-TFM
+Futuro   [D] Narrative-Experts ─────────────── Investigacion
 ```
 
 ---
 
-## Metricas de Evaluacion
+## Ficheros clave
 
-Para medir el progreso entre niveles, se proponen estas metricas:
+| Fichero | Descripcion |
+|---------|-------------|
+| `temporal/markers.py` | Nivel A: regex, AGE_PHASE_ALIASES, LIFE_EVENT_PHASE_MAP |
+| `temporal/llm_extraction.py` | Nivel B: LLM extraction, validation, merge |
+| `temporal/entity_mentions.py` | Utilidad compartida: carga menciones por capitulo |
+| `temporal/timeline.py` | Timeline builder, flashback validation (LLM Layer 3) |
+| `llm/prompts.py` | TEMPORAL_EXTRACTION_SYSTEM/TEMPLATE/EXAMPLES |
+| `pipelines/analysis_pipeline.py` | Integracion A+B en `_run_temporal_analysis` |
 
-| Metrica | Descripcion | Target Nivel B |
-|---------|-------------|----------------|
-| **Recall** | % de instancias reales detectadas | >= 80% |
-| **Precision** | % de detecciones correctas | >= 85% |
-| **F1** | Media armonica | >= 0.82 |
-| **Latencia** | Tiempo adicional por capitulo | < 3 seg |
-| **Falsos positivos** | Instancias inventadas | < 5% |
+## Tests
 
-### Corpus de evaluacion
-
-Para validar, se necesita un corpus anotado con:
-- 5-10 fragmentos narrativos con flashbacks
-- Instancias temporales gold-standard anotadas manualmente
-- Mezcla de edades explicitas, implicitas y contextuales
+| Fichero | Tests | Cobertura |
+|---------|-------|-----------|
+| `test_temporal.py` | 42 | Nivel A basico + edge cases |
+| `test_temporal_level_ab.py` | 47 | Nivel A hardening + Nivel B |
+| `test_temporal_entity_mentions_integration.py` | 4 | Shared utility |
 
 ---
 
-*Documento creado: 2026-02-13*
-*Ultima actualizacion: 2026-02-13*
-*Relacionado: [ENTITY_TIMELINE_ATTRIBUTES_AUDIT_2026-02-13.md](ENTITY_TIMELINE_ATTRIBUTES_AUDIT_2026-02-13.md)*
+*Creado: 2026-02-13*
+*Actualizado: 2026-02-13 — Nivel A hardened + Nivel B implementado*
