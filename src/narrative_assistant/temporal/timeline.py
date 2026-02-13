@@ -159,12 +159,22 @@ class TimelineBuilder:
     Ejemplo de uso:
         builder = TimelineBuilder()
         timeline = builder.build_from_markers(markers, chapters)
+
+    La detección de analepsis/prolepsis usa un sistema de scoring de 3 capas:
+    - Capa 1 (Estructural): High-water mark + magnitud del salto temporal
+    - Capa 2 (Lingüística): NonLinearDetector sobre texto de capítulo + marcadores
+    - Capa 3 (LLM): Validación opcional para casos borderline
     """
 
-    def __init__(self):
+    DEFAULT_MIN_CONFIDENCE = 0.6
+
+    def __init__(self, min_analepsis_confidence: float = DEFAULT_MIN_CONFIDENCE):
         """Inicializa el constructor de timeline."""
         self.timeline = Timeline()
         self.event_counter = 0
+        self._chapter_contents: dict[int, str] = {}
+        self._min_confidence = min_analepsis_confidence
+        self._non_linear_detector = None  # Lazy-init NonLinearNarrativeDetector
 
     def build_from_markers(
         self,
@@ -178,12 +188,20 @@ class TimelineBuilder:
             markers: Lista de marcadores temporales
             chapters: Lista de capítulos con estructura:
                       {"number": int, "title": str, "start_position": int}
+                      Opcionalmente con "content": str para análisis lingüístico
 
         Returns:
             Timeline construido
         """
         self.timeline = Timeline()
         self.event_counter = 0
+
+        # Almacenar contenido de capítulos para análisis lingüístico (Capa 2)
+        self._chapter_contents = {}
+        for ch in chapters:
+            content = ch.get("content", "")
+            if content:
+                self._chapter_contents[ch.get("number", 0)] = content
 
         # 1. Crear eventos base para cada capítulo
         for chapter in chapters:
@@ -208,7 +226,7 @@ class TimelineBuilder:
         age_markers = [m for m in markers if m.marker_type == MarkerType.CHARACTER_AGE]
         self._process_age_markers(age_markers)
 
-        # 5. Detectar analepsis/prolepsis
+        # 5. Detectar analepsis/prolepsis con scoring de 3 capas
         self._detect_narrative_order()
 
         logger.info(
@@ -542,19 +560,13 @@ class TimelineBuilder:
 
     def _detect_narrative_order(self) -> None:
         """
-        Detecta analepsis y prolepsis comparando orden cronológico vs discurso.
+        Detecta analepsis y prolepsis con sistema de scoring de 3 capas.
 
-        Usa un algoritmo de "marca de agua alta" (high-water mark) para seguir
-        la pista cronológica global, no solo comparar con el evento anterior.
+        Capa 1 (Estructural): High-water mark + magnitud del salto temporal
+        Capa 2 (Lingüística): NonLinearDetector sobre texto de capítulo + marcadores
+        Capa 3 (LLM): Validación opcional para casos borderline (0.3-0.7)
 
-        Una ANALEPSIS ocurre cuando:
-        1. El evento actual está ANTES cronológicamente que la marca de agua
-        2. Y hay evidencia adicional (marcadores retrospectivos o salto temporal significativo)
-
-        Esto evita falsos positivos cuando la narrativa simplemente salta en el tiempo
-        sin indicar explícitamente un flashback.
-
-        Soporta tanto fechas absolutas (story_date) como offsets relativos (day_offset).
+        Clasifica como ANALEPSIS/PROLEPSIS si score >= min_analepsis_confidence.
         """
         chronological = self.timeline.get_chronological_order()
         discourse = self.timeline.get_discourse_order()
@@ -592,75 +604,78 @@ class TimelineBuilder:
         prolepsis_count = 0
 
         # High-water mark: máxima posición cronológica vista hasta ahora
-        # Esto permite detectar analepsis correctamente en secuencias lineales
         chrono_high_water = -1
 
-        # Comparar con orden del discurso
         for i, event in enumerate(dated_discourse):
             chrono_pos_current = chrono_index.get(event.id, -1)
 
             if chrono_pos_current == -1:
-                continue  # Evento no encontrado en el índice
+                continue
 
             if i == 0:
-                # Primer evento: establecer marca de agua inicial
                 chrono_high_water = chrono_pos_current
                 continue
 
-            # Verificar evidencia de analepsis/prolepsis
-            has_retrospective_marker = self._has_retrospective_evidence(event)
-            has_prospective_marker = self._has_prospective_evidence(event)
-
             # Calcular diferencia temporal con el high water
-            time_diff_days = self._calculate_time_difference(
-                dated_chrono[chrono_high_water] if chrono_high_water < len(dated_chrono) else None,
-                event,
+            hw_event = (
+                dated_chrono[chrono_high_water]
+                if chrono_high_water < len(dated_chrono)
+                else None
             )
+            time_diff_days = self._calculate_time_difference(hw_event, event)
 
-            # ANALEPSIS: el evento actual está ANTES cronológicamente
+            # === ANALEPSIS: backward jump ===
             if chrono_pos_current < chrono_high_water:
-                # Requiere evidencia adicional para clasificar como flashback:
-                # - Marcadores retrospectivos ("recordó", "años atrás", direction=past)
-                # - O un salto temporal muy significativo (>90 días hacia atrás)
-                if has_retrospective_marker:
+                position_gap = chrono_high_water - chrono_pos_current
+
+                structural = self._compute_structural_score(
+                    time_diff_days, position_gap,
+                )
+                linguistic = self._compute_linguistic_score(event, direction="past")
+                score = 0.4 * structural + 0.6 * linguistic
+
+                # Layer 3: LLM validation for borderline cases
+                if 0.3 <= score <= 0.7:
+                    score = self._validate_with_llm(event, score, direction="past")
+
+                if score >= self._min_confidence:
                     event.narrative_order = NarrativeOrder.ANALEPSIS
+                    event.confidence = score
                     analepsis_count += 1
                     logger.info(
-                        f"[TIMELINE] ANALEPSIS detectada (con marcador): '{event.description[:50]}...' "
-                        f"(pos discurso={i}, pos crono={chrono_pos_current} < high_water={chrono_high_water})"
-                    )
-                elif time_diff_days is not None and time_diff_days < -90:
-                    # Salto muy significativo hacia el pasado (>3 meses)
-                    event.narrative_order = NarrativeOrder.ANALEPSIS
-                    analepsis_count += 1
-                    logger.info(
-                        f"[TIMELINE] ANALEPSIS detectada (por salto temporal): '{event.description[:50]}...' "
-                        f"(salto de {abs(time_diff_days)} días al pasado)"
+                        f"[TIMELINE] ANALEPSIS (score={score:.2f}): "
+                        f"'{event.description[:50]}' "
+                        f"(structural={structural:.2f}, linguistic={linguistic:.2f})"
                     )
                 else:
-                    # Sin evidencia suficiente - podría ser solo la narrativa saltando
                     logger.debug(
-                        f"[TIMELINE] Posible analepsis descartada (sin evidencia): '{event.description[:50]}...' "
-                        f"(pos crono={chrono_pos_current} < high_water={chrono_high_water}, diff={time_diff_days} días)"
+                        f"[TIMELINE] Posible analepsis descartada (score={score:.2f}): "
+                        f"'{event.description[:50]}' "
+                        f"(structural={structural:.2f}, linguistic={linguistic:.2f})"
                     )
 
-            # PROLEPSIS: salto significativo hacia el futuro
+            # === PROLEPSIS: large forward jump ===
             elif chrono_pos_current > chrono_high_water + 3:
-                if time_diff_days is not None and time_diff_days > 365:  # Más de un año
-                    if has_prospective_marker:
-                        event.narrative_order = NarrativeOrder.PROLEPSIS
-                        prolepsis_count += 1
-                        logger.info(
-                            f"[TIMELINE] PROLEPSIS detectada: '{event.description[:50]}...' "
-                            f"(salto de {time_diff_days} días)"
-                        )
-                    elif time_diff_days > 730:  # Más de 2 años sin marcador
-                        event.narrative_order = NarrativeOrder.PROLEPSIS
-                        prolepsis_count += 1
-                        logger.info(
-                            f"[TIMELINE] PROLEPSIS detectada (por salto temporal): '{event.description[:50]}...' "
-                            f"(salto de {time_diff_days} días)"
-                        )
+                position_gap = chrono_pos_current - chrono_high_water
+
+                structural = self._compute_structural_score(
+                    time_diff_days, position_gap,
+                )
+                linguistic = self._compute_linguistic_score(event, direction="future")
+                score = 0.4 * structural + 0.6 * linguistic
+
+                if 0.3 <= score <= 0.7:
+                    score = self._validate_with_llm(event, score, direction="future")
+
+                if score >= self._min_confidence:
+                    event.narrative_order = NarrativeOrder.PROLEPSIS
+                    event.confidence = score
+                    prolepsis_count += 1
+                    logger.info(
+                        f"[TIMELINE] PROLEPSIS (score={score:.2f}): "
+                        f"'{event.description[:50]}' "
+                        f"(structural={structural:.2f}, linguistic={linguistic:.2f})"
+                    )
 
             # Actualizar marca de agua alta
             chrono_high_water = max(chrono_high_water, chrono_pos_current)
@@ -669,92 +684,221 @@ class TimelineBuilder:
             f"[TIMELINE] Resultado: {analepsis_count} analepsis, {prolepsis_count} prolepsis"
         )
 
-    def _has_retrospective_evidence(self, event: TimelineEvent) -> bool:
-        """
-        Verifica si el evento tiene evidencia de ser un flashback/analepsis.
+    # ------------------------------------------------------------------
+    # Capa 1: Score estructural
+    # ------------------------------------------------------------------
 
-        Busca:
-        - Marcadores temporales con direction='past'
-        - Verbos de memoria en la descripción (recordó, evocó, rememoró)
-        - Expresiones retrospectivas (años atrás, tiempo antes)
+    def _compute_structural_score(
+        self, time_diff_days: int | None, position_gap: int,
+    ) -> float:
         """
-        # Verbos y expresiones que indican flashback
+        Score estructural basado en magnitud del salto temporal y gap de posición.
+
+        Returns: 0.0-1.0
+        """
+        score = 0.4  # Base: existe un salto en el orden narrativo
+
+        # Bonus por magnitud temporal
+        if time_diff_days is not None:
+            abs_diff = abs(time_diff_days)
+            if abs_diff > 365:
+                score += 0.3
+            elif abs_diff > 180:
+                score += 0.2
+            elif abs_diff > 90:
+                score += 0.1
+
+        # Bonus por gap de posición cronológica
+        if position_gap >= 5:
+            score += 0.15
+        elif position_gap >= 2:
+            score += 0.05
+
+        return min(1.0, score)
+
+    # ------------------------------------------------------------------
+    # Capa 2: Score lingüístico
+    # ------------------------------------------------------------------
+
+    def _compute_linguistic_score(
+        self, event: TimelineEvent, direction: str,
+    ) -> float:
+        """
+        Score lingüístico combinando NonLinearDetector sobre texto de capítulo
+        y patrones en descripción/marcadores del evento.
+
+        Returns: 0.0-1.0
+        """
+        # Sub-capa A: NonLinearDetector sobre texto completo del capítulo
+        text_score = 0.0
+        chapter_text = self._chapter_contents.get(event.chapter, "")
+        if chapter_text:
+            if self._non_linear_detector is None:
+                from .non_linear_detector import NonLinearNarrativeDetector
+
+                self._non_linear_detector = NonLinearNarrativeDetector()
+
+            signals = self._non_linear_detector.detect_signals(
+                chapter_text, event.chapter,
+            )
+            matching = [s for s in signals if s.direction == direction]
+            if matching:
+                avg_conf = sum(s.confidence for s in matching) / len(matching)
+                # Saturación: 3 señales a confianza media ~= 0.7
+                text_score = min(1.0, len(matching) * avg_conf / 3.0)
+
+        # Sub-capa B: patrones en descripción y marcadores del evento
+        if direction == "past":
+            marker_score = self._compute_retrospective_score(event)
+        else:
+            marker_score = self._compute_prospective_score(event)
+
+        # Usar la señal más fuerte
+        return max(text_score, marker_score)
+
+    def _compute_retrospective_score(self, event: TimelineEvent) -> float:
+        """
+        Score 0-1 de evidencia retrospectiva en descripción y marcadores.
+        """
         retrospective_patterns = [
-            "recordó",
-            "recordaba",
-            "evocó",
-            "evocaba",
-            "rememoró",
-            "rememoraba",
-            "vino a su mente",
-            "le vino a la memoria",
-            "pensó en aquel",
-            "años atrás",
-            "tiempo atrás",
-            "meses atrás",
-            "días atrás",
-            "en el pasado",
-            "en aquella época",
-            "en aquel entonces",
-            "hacía tiempo",
-            "hacía años",
-            "hacía meses",
-            "cuando era",
-            "de joven",
-            "de niño",
-            "de pequeño",
+            "recordó", "recordaba", "evocó", "evocaba",
+            "rememoró", "rememoraba", "vino a su mente",
+            "le vino a la memoria", "pensó en aquel",
+            "años atrás", "tiempo atrás", "meses atrás", "días atrás",
+            "en el pasado", "en aquella época", "en aquel entonces",
+            "hacía tiempo", "hacía años", "hacía meses",
+            "cuando era", "de joven", "de niño", "de pequeño",
+            "volvió a pensar en", "trajo a su memoria",
+            "aquellos días", "en otro tiempo", "por aquel entonces",
         ]
+
+        score = 0.0
 
         # Verificar descripción del evento
         desc_lower = event.description.lower()
-        if any(pattern in desc_lower for pattern in retrospective_patterns):
-            return True
+        if any(p in desc_lower for p in retrospective_patterns):
+            score = max(score, 0.6)
 
         # Verificar marcadores asociados
         for marker in event.markers:
             if hasattr(marker, "direction") and marker.direction == "past":
-                return True
-            # Verificar texto del marcador
+                score = max(score, 0.5)
             marker_lower = marker.text.lower()
-            if any(pattern in marker_lower for pattern in ["antes", "atrás", "anterior", "pasado"]):
-                return True
+            if any(p in marker_lower for p in retrospective_patterns):
+                score = max(score, 0.5)
+            if any(
+                kw in marker_lower
+                for kw in ["antes", "atrás", "anterior", "pasado"]
+            ):
+                score = max(score, 0.3)
 
-        return False
+        return score
 
-    def _has_prospective_evidence(self, event: TimelineEvent) -> bool:
+    def _compute_prospective_score(self, event: TimelineEvent) -> float:
         """
-        Verifica si el evento tiene evidencia de ser una prolepsis/flashforward.
-
-        Busca:
-        - Marcadores temporales con direction='future'
-        - Verbos de anticipación (presagiaba, vendría, ocurriría)
-        - Expresiones prospectivas (años después, en el futuro)
+        Score 0-1 de evidencia prospectiva en descripción y marcadores.
         """
         prospective_patterns = [
-            "años después",
-            "tiempo después",
-            "meses después",
-            "en el futuro",
-            "vendría",
-            "ocurriría",
-            "sucedería",
-            "presagiaba",
-            "anticipaba",
-            "no sabía que",
-            "llegaría el día",
-            "algún día",
-            "más adelante",
+            "años después", "tiempo después", "meses después",
+            "en el futuro", "vendría", "ocurriría", "sucedería",
+            "presagiaba", "anticipaba", "no sabía que",
+            "llegaría el día", "algún día", "más adelante",
+            "con el tiempo", "andando el tiempo",
         ]
 
+        score = 0.0
+
         desc_lower = event.description.lower()
-        if any(pattern in desc_lower for pattern in prospective_patterns):
-            return True
+        if any(p in desc_lower for p in prospective_patterns):
+            score = max(score, 0.6)
 
         for marker in event.markers:
             if hasattr(marker, "direction") and marker.direction == "future":
-                return True
+                score = max(score, 0.5)
+            marker_lower = marker.text.lower()
+            if any(p in marker_lower for p in prospective_patterns):
+                score = max(score, 0.5)
 
-        return False
+        return score
+
+    # ------------------------------------------------------------------
+    # Capa 3: Validación LLM (opcional)
+    # ------------------------------------------------------------------
+
+    def _validate_with_llm(
+        self, event: TimelineEvent, current_score: float, direction: str,
+    ) -> float:
+        """
+        Validación LLM opcional para casos borderline.
+
+        Solo se ejecuta si el LLM está disponible. Si no, devuelve el score actual
+        (graceful degradation).
+        """
+        try:
+            from narrative_assistant.llm.client import get_llm_client, is_llm_available
+
+            if not is_llm_available():
+                return current_score
+
+            chapter_text = self._chapter_contents.get(event.chapter, "")
+            if not chapter_text:
+                return current_score
+
+            from narrative_assistant.llm.prompts import (
+                FLASHBACK_VALIDATION_SYSTEM,
+                FLASHBACK_VALIDATION_TEMPLATE,
+                RECOMMENDED_TEMPERATURES,
+                build_prompt,
+            )
+
+            excerpt = chapter_text[:500]
+            prompt = build_prompt(
+                FLASHBACK_VALIDATION_TEMPLATE,
+                prev_event="(contexto temporal previo)",
+                current_event=event.description[:100],
+                time_diff=f"Dirección: {'pasado' if direction == 'past' else 'futuro'}",
+                chapter_excerpt=excerpt,
+            )
+
+            client = get_llm_client()
+            if not client:
+                return current_score
+
+            response = client.complete(
+                prompt,
+                system=FLASHBACK_VALIDATION_SYSTEM,
+                temperature=RECOMMENDED_TEMPERATURES.get("flashback_validation", 0.1),
+                max_tokens=200,
+            )
+
+            if response:
+                import json as json_mod
+
+                try:
+                    data = json_mod.loads(response)
+                    llm_confidence = float(data.get("confidence", 0.5))
+                    classification = data.get("classification", "").upper()
+
+                    if direction == "past" and classification == "FLASHBACK":
+                        return max(current_score, llm_confidence)
+                    elif direction == "future" and classification == "FLASHFORWARD":
+                        return max(current_score, llm_confidence)
+                    elif classification == "CHRONOLOGICAL":
+                        return min(current_score, 1.0 - llm_confidence)
+                except (json_mod.JSONDecodeError, ValueError, TypeError):
+                    logger.debug(
+                        "LLM response could not be parsed for flashback validation"
+                    )
+        except ImportError:
+            logger.debug("LLM module not available for flashback validation")
+        except Exception as e:
+            logger.debug(f"LLM validation failed: {e}")
+
+        return current_score
+
+    # ------------------------------------------------------------------
+    # Cálculo de diferencia temporal (con soporte mixto date/offset)
+    # ------------------------------------------------------------------
 
     def _calculate_time_difference(
         self, ref_event: TimelineEvent | None, target_event: TimelineEvent
@@ -762,21 +906,46 @@ class TimelineBuilder:
         """
         Calcula diferencia en días entre dos eventos.
 
+        Soporta comparación mixta story_date/day_offset usando anclas cruzadas.
+
         Returns:
-            Diferencia en días (negativo si target está antes de ref), o None si no se puede calcular.
+            Diferencia en días (negativo si target está antes de ref), o None.
         """
         if not ref_event:
             return None
 
-        # Intentar con fechas absolutas
+        # Ambos con fecha absoluta
         if ref_event.story_date and target_event.story_date:
-            delta = target_event.story_date - ref_event.story_date
-            return delta.days
+            return (target_event.story_date - ref_event.story_date).days
 
-        # Intentar con day_offset
+        # Ambos con day_offset
         if ref_event.day_offset is not None and target_event.day_offset is not None:
             return target_event.day_offset - ref_event.day_offset
 
+        # Mixto: cross-reference via ancla que tenga ambos tipos
+        ref_offset = self._to_comparable_offset(ref_event)
+        target_offset = self._to_comparable_offset(target_event)
+        if ref_offset is not None and target_offset is not None:
+            return target_offset - ref_offset
+
+        return None
+
+    def _to_comparable_offset(self, event: TimelineEvent) -> int | None:
+        """Convierte un evento a offset comparable usando anclas cruzadas."""
+        if event.day_offset is not None:
+            return event.day_offset
+        if event.story_date:
+            for anchor_id in self.timeline.anchor_events:
+                anchor = self.timeline.get_event_by_id(anchor_id)
+                if (
+                    anchor
+                    and anchor.story_date
+                    and anchor.day_offset is not None
+                ):
+                    return (
+                        anchor.day_offset
+                        + (event.story_date - anchor.story_date).days
+                    )
         return None
 
     def export_to_mermaid(self) -> str:

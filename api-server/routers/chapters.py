@@ -496,13 +496,14 @@ async def get_project_timeline(project_id: int, force_refresh: bool = False):
 
         logger.info(f"Timeline extraction: {len(chapters)} chapters, {len(all_markers)} total markers")
 
-        # Construir timeline
+        # Construir timeline (con contenido para análisis lingüístico)
         builder = TimelineBuilder()
         chapter_data = [
             {
                 "number": ch.chapter_number,
                 "title": ch.title or f"Capítulo {ch.chapter_number}",
                 "start_position": ch.start_char,
+                "content": ch.content,
             }
             for ch in chapters
         ]

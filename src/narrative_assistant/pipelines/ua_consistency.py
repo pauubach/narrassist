@@ -109,6 +109,9 @@ class PipelineConsistencyMixin:
                     "start_position": ch.get("start_char", 0)
                     if isinstance(ch, dict)
                     else getattr(ch, "start_char", 0),
+                    "content": ch.get("content", "")
+                    if isinstance(ch, dict)
+                    else getattr(ch, "content", ""),
                 }
                 for i, ch in enumerate(context.chapters)
             ]

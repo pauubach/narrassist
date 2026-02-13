@@ -63,6 +63,21 @@ class NonLinearNarrativeDetector:
         r"[Ee]n\s+(?:aquella|aquel)\s+(?:época|entonces|tiempo|momento)",
         r"[Cc]uando\s+(?:era|tenía|vivía)\s+\w+",
         r"[Hh]acía\s+(?:mucho|tiempo|años|meses|semanas)",
+        # Verbos de memoria
+        r"(?:[Rr]ecordó|[Rr]ecordaba|[Ee]vocó|[Ee]vocaba|[Rr]ememoró|[Rr]ememoraba)\s+\w+",
+        r"[Vv]olvió\s+a\s+pensar\s+en",
+        r"[Tt]rajo\s+a\s+su\s+memoria",
+        r"[Ll]e\s+vino\s+(?:el\s+recuerdo|a\s+la\s+memoria)",
+        r"[Vv]ino\s+a\s+su\s+mente",
+        # Expresiones temporales retrospectivas
+        r"[Aa]quellos\s+días",
+        r"[Ee]n\s+otro\s+tiempo",
+        r"[Aa]ntes\s+de\s+todo",
+        r"[Pp]or\s+aquel\s+entonces",
+        r"[Tt]odavía\s+no\s+había\s+\w+",
+        r"[Aa]ún\s+no\s+(?:conocía|sabía|había)\s+\w+",
+        # Pluscuamperfecto (indica acción anterior a otra pasada)
+        r"[Hh]abía\s+(?:sido|vivido|conocido|tenido|estado|hecho|dicho|visto|ido|dado)",
     ]
 
     # Señales prospectivas: indican flashforward
@@ -74,6 +89,11 @@ class NonLinearNarrativeDetector:
         r"[Ee]n\s+el\s+futuro",
         r"[Ll]o\s+que\s+(?:vendría|ocurriría|sucedería|pasaría)",
         r"[Nn]o\s+(?:sabía|imaginaba|sospechaba)\s+que",
+        # Más señales prospectivas
+        r"[Ll]legaría\s+el\s+(?:día|momento)",
+        r"[Mm]ás\s+adelante",
+        r"[Cc]on\s+el\s+tiempo",
+        r"[Aa]ndando\s+el\s+tiempo",
     ]
 
     def __init__(self) -> None:

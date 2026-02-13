@@ -1302,6 +1302,7 @@ def collect_export_data(
                             "number": ch.chapter_number,
                             "title": ch.title or f"Capitulo {ch.chapter_number}",
                             "start_position": ch.start_char,
+                            "content": ch.content,
                         }
                         for ch in chapters
                     ]

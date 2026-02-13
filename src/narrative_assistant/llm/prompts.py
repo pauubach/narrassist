@@ -378,6 +378,41 @@ Responde en JSON:
 
 
 # ============================================================================
+# FLASHBACK VALIDATION (Layer 3: LLM validation for borderline cases)
+# ============================================================================
+
+FLASHBACK_VALIDATION_SYSTEM = """Eres un analista narrativo experto.
+Tu tarea es determinar si un capítulo es un flashback (analepsis) o flashforward (prolepsis)
+basándote en el texto del capítulo y su contexto temporal en la narrativa.
+
+Reglas:
+1. Un flashback muestra eventos que ocurrieron ANTES del punto actual de la narrativa
+2. Un flashforward anticipa eventos que ocurrirán DESPUÉS
+3. No todo salto temporal es un flashback: avances cronológicos normales no cuentan
+4. Busca señales lingüísticas: verbos de memoria, subjuntivo, cambio de tiempo verbal
+5. Sé conservador: si no hay evidencia clara, clasifica como CHRONOLOGICAL"""
+
+FLASHBACK_VALIDATION_TEMPLATE = """Contexto temporal:
+- Evento previo: {prev_event}
+- Evento actual: {current_event}
+- Diferencia temporal: {time_diff}
+
+Extracto del capítulo actual (primeros 500 caracteres):
+---
+{chapter_excerpt}
+---
+
+¿Este capítulo es un flashback, flashforward o simplemente sigue la cronología?
+
+Responde en JSON:
+{{
+  "classification": "FLASHBACK|FLASHFORWARD|CHRONOLOGICAL",
+  "confidence": 0.0-1.0,
+  "reasoning": "explicación breve"
+}}"""
+
+
+# ============================================================================
 # UTILIDADES (actualización)
 # ============================================================================
 
@@ -389,4 +424,5 @@ RECOMMENDED_TEMPERATURES = {
     "coreference": 0.2,
     "narrative_of_thought": 0.2,
     "timeline_self_reflection": 0.1,
+    "flashback_validation": 0.1,
 }

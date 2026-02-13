@@ -1827,13 +1827,14 @@ def _run_temporal_analysis(
 
         logger.info(f"Extracted {len(all_markers)} temporal markers from {len(chapters)} chapters")
 
-        # 2. Construir timeline
+        # 2. Construir timeline (con contenido para análisis lingüístico)
         builder = TimelineBuilder()
         chapter_data = [
             {
                 "number": ch.number,
                 "title": ch.title or f"Capítulo {ch.number}",
                 "start_position": ch.start_char,
+                "content": ch.content,
             }
             for ch in chapters
         ]
