@@ -69,8 +69,8 @@ class AlertEngine:
         self._calibration_cache: dict[tuple[int, str, str], float] = {}
         # BK-18: Cache de total de capítulos por proyecto
         self._total_chapters_cache: dict[int, int] = {}
-        # Nivel 3: Cache de pesos adaptativos per-project: {(project_id, alert_type): weight}
-        self._adaptive_weights_cache: dict[tuple[int, str], float] = {}
+        # Nivel 3: Cache de pesos adaptativos: {(project_id, alert_type, entity_name): weight}
+        self._adaptive_weights_cache: dict[tuple[int, str, str], float] = {}
 
     def register_handler(
         self, alert_type: str, handler: Callable[[Any], Alert]
@@ -135,10 +135,12 @@ class AlertEngine:
                     self.DECAY_FLOOR, effective_confidence * decay
                 )
 
-        # Nivel 3: Pesos adaptativos per-project acumulados de feedback del usuario
-        adaptive_weight = self._get_adaptive_weight(project_id, alert_type)
-        if adaptive_weight < 1.0:
-            effective_confidence *= adaptive_weight
+        # Nivel 3: Pesos adaptativos per-project/per-entity
+        # Cascada: per-entity (si disponible) > project-level > 1.0
+        extra_data = kwargs.get("extra_data", {})
+        entity_name = extra_data.get("entity_name", "") if isinstance(extra_data, dict) else ""
+        adaptive_weight = self._get_adaptive_weight(project_id, alert_type, entity_name)
+        effective_confidence *= adaptive_weight
 
         effective_confidence = round(effective_confidence, 4)
 
@@ -2019,32 +2021,60 @@ class AlertEngine:
     # Nivel 3: Pesos adaptativos per-project
     # =====================================================================
 
-    def _get_adaptive_weight(self, project_id: int, alert_type: str) -> float:
+    def _get_adaptive_weight(
+        self, project_id: int, alert_type: str, entity_name: str = ""
+    ) -> float:
         """
-        Obtiene el peso adaptativo para (project, alert_type).
+        Obtiene el peso adaptativo con cascada: per-entity > project-level > 1.0.
 
-        Busca en cache primero, luego en DB. Devuelve 1.0 si no hay datos.
+        Args:
+            project_id: ID del proyecto
+            alert_type: Tipo de alerta
+            entity_name: Nombre canónico de entidad (vacío = solo project-level)
         """
         cache = getattr(self, "_adaptive_weights_cache", None)
         if cache is None:
             self._adaptive_weights_cache = {}
             cache = self._adaptive_weights_cache
 
-        cache_key = (project_id, alert_type)
-        if cache_key in cache:
-            return cache[cache_key]
+        norm_name = entity_name.strip().lower() if entity_name else ""
+
+        # Cascada: per-entity > project-level > 1.0
+        if norm_name:
+            entity_key = (project_id, alert_type, norm_name)
+            if entity_key in cache:
+                return cache[entity_key]
+
+            try:
+                from ..persistence.database import get_database
+                db = get_database()
+                row = db.fetchone(
+                    "SELECT weight FROM project_detector_weights "
+                    "WHERE project_id = ? AND alert_type = ? AND entity_canonical_name = ?",
+                    (project_id, alert_type, norm_name),
+                )
+                if row:
+                    weight = row["weight"]
+                    cache[entity_key] = weight
+                    return weight
+            except Exception:
+                pass
+            # Fall through to project-level
+
+        project_key = (project_id, alert_type, "")
+        if project_key in cache:
+            return cache[project_key]
 
         try:
             from ..persistence.database import get_database
-
             db = get_database()
             row = db.fetchone(
                 "SELECT weight FROM project_detector_weights "
-                "WHERE project_id = ? AND alert_type = ?",
+                "WHERE project_id = ? AND alert_type = ? AND entity_canonical_name = ''",
                 (project_id, alert_type),
             )
             weight = row["weight"] if row else 1.0
-            self._adaptive_weights_cache[cache_key] = weight
+            cache[project_key] = weight
             return weight
         except Exception:
             return 1.0
@@ -2054,18 +2084,50 @@ class AlertEngine:
         project_id: int,
         alert_type: str,
         dismissed: bool,
+        entity_names: list[str] | None = None,
     ) -> float:
         """
         Actualiza el peso adaptativo tras feedback del usuario.
+
+        Siempre actualiza el peso project-level. Si se proporcionan entity_names,
+        también actualiza pesos per-entity (con learning rate fraccionado si son
+        múltiples entidades).
 
         Args:
             project_id: ID del proyecto
             alert_type: Tipo de alerta
             dismissed: True si el usuario descartó, False si confirmó/resolvió
+            entity_names: Nombres canónicos de entidades afectadas (opcional)
 
         Returns:
-            Nuevo peso
+            Nuevo peso project-level
         """
+        # Siempre actualizar project-level
+        project_weight = self._update_single_weight(
+            project_id, alert_type, "", dismissed, self.ADAPTIVE_LEARNING_RATE,
+        )
+
+        # Per-entity: learning rate fraccionado entre entidades
+        if entity_names:
+            unique_names = list({n.strip().lower() for n in entity_names if n.strip()})
+            if unique_names:
+                entity_lr = self.ADAPTIVE_LEARNING_RATE / len(unique_names)
+                for name in unique_names:
+                    self._update_single_weight(
+                        project_id, alert_type, name, dismissed, entity_lr,
+                    )
+
+        return project_weight
+
+    def _update_single_weight(
+        self,
+        project_id: int,
+        alert_type: str,
+        entity_canonical_name: str,
+        dismissed: bool,
+        learning_rate: float,
+    ) -> float:
+        """Actualiza un único registro de peso en la BD."""
         try:
             from ..persistence.database import get_database
 
@@ -2074,8 +2136,8 @@ class AlertEngine:
             row = db.fetchone(
                 "SELECT weight, feedback_count, dismiss_count, confirm_count "
                 "FROM project_detector_weights "
-                "WHERE project_id = ? AND alert_type = ?",
-                (project_id, alert_type),
+                "WHERE project_id = ? AND alert_type = ? AND entity_canonical_name = ?",
+                (project_id, alert_type, entity_canonical_name),
             )
 
             if row:
@@ -2090,10 +2152,10 @@ class AlertEngine:
                 confirm_count = 0
 
             if dismissed:
-                weight -= self.ADAPTIVE_LEARNING_RATE
+                weight -= learning_rate
                 dismiss_count += 1
             else:
-                weight += self.ADAPTIVE_LEARNING_RATE * 0.5
+                weight += learning_rate * 0.5
                 confirm_count += 1
 
             weight = round(
@@ -2104,10 +2166,10 @@ class AlertEngine:
 
             db.execute(
                 """INSERT INTO project_detector_weights
-                    (project_id, alert_type, weight, feedback_count,
-                     dismiss_count, confirm_count, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
-                ON CONFLICT (project_id, alert_type)
+                    (project_id, alert_type, entity_canonical_name, weight,
+                     feedback_count, dismiss_count, confirm_count, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                ON CONFLICT (project_id, alert_type, entity_canonical_name)
                 DO UPDATE SET
                     weight = excluded.weight,
                     feedback_count = excluded.feedback_count,
@@ -2115,43 +2177,50 @@ class AlertEngine:
                     confirm_count = excluded.confirm_count,
                     updated_at = datetime('now')
                 """,
-                (project_id, alert_type, weight, feedback_count, dismiss_count, confirm_count),
+                (project_id, alert_type, entity_canonical_name, weight,
+                 feedback_count, dismiss_count, confirm_count),
             )
 
             # Invalidar cache
-            cache_key = (project_id, alert_type)
+            cache_key = (project_id, alert_type, entity_canonical_name)
             cache = getattr(self, "_adaptive_weights_cache", {})
             cache[cache_key] = weight
 
+            entity_label = f" entity={entity_canonical_name}" if entity_canonical_name else ""
             logger.debug(
-                f"Adaptive weight updated: project={project_id} type={alert_type} "
-                f"weight={weight} (dismissed={dismissed})"
+                f"Adaptive weight updated: project={project_id} type={alert_type}"
+                f"{entity_label} weight={weight} (dismissed={dismissed})"
             )
             return weight
         except Exception as e:
             logger.warning(f"Failed to update adaptive weight: {e}")
             return 1.0
 
-    def get_adaptive_weights(self, project_id: int) -> dict[str, float]:
-        """Obtiene todos los pesos adaptativos de un proyecto."""
+    def get_adaptive_weights(self, project_id: int) -> dict[str, dict]:
+        """Obtiene todos los pesos adaptativos de un proyecto (project + per-entity)."""
         try:
             from ..persistence.database import get_database
 
             db = get_database()
             rows = db.fetchall(
-                "SELECT alert_type, weight, feedback_count, dismiss_count, confirm_count "
+                "SELECT alert_type, entity_canonical_name, weight, "
+                "feedback_count, dismiss_count, confirm_count "
                 "FROM project_detector_weights WHERE project_id = ? ORDER BY weight ASC",
                 (project_id,),
             )
-            return {
-                r["alert_type"]: {
+            result = {}
+            for r in rows:
+                entity = r["entity_canonical_name"] or ""
+                key = f"{r['alert_type']}/{entity}" if entity else r["alert_type"]
+                result[key] = {
                     "weight": r["weight"],
+                    "alert_type": r["alert_type"],
+                    "entity": entity,
                     "feedback_count": r["feedback_count"],
                     "dismiss_count": r["dismiss_count"],
                     "confirm_count": r["confirm_count"],
                 }
-                for r in rows
-            }
+            return result
         except Exception:
             return {}
 

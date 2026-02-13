@@ -759,6 +759,68 @@ class EntityRepository:
                     scene_part_count += 1
             counts["scene_tags_participants"] = scene_part_count
 
+            # 17. project_detector_weights: merge per-entity adaptive weights
+            #     Keyed on canonical_name, so we need both entity names
+            from_name_row = conn.execute(
+                "SELECT canonical_name, project_id FROM entities WHERE id = ?",
+                (from_entity_id,),
+            ).fetchone()
+            to_name_row = conn.execute(
+                "SELECT canonical_name FROM entities WHERE id = ?",
+                (to_entity_id,),
+            ).fetchone()
+            weight_merge_count = 0
+            if from_name_row and to_name_row:
+                from_norm = from_name_row["canonical_name"].strip().lower()
+                to_norm = to_name_row["canonical_name"].strip().lower()
+                pid = from_name_row["project_id"]
+                if from_norm and to_norm and from_norm != to_norm:
+                    # Get source weights
+                    src_rows = conn.execute(
+                        "SELECT alert_type, weight, feedback_count, dismiss_count, confirm_count "
+                        "FROM project_detector_weights "
+                        "WHERE project_id = ? AND entity_canonical_name = ?",
+                        (pid, from_norm),
+                    ).fetchall()
+                    for sr in src_rows:
+                        at = sr["alert_type"]
+                        # Check if target already has weight for this alert_type
+                        tgt = conn.execute(
+                            "SELECT weight, feedback_count, dismiss_count, confirm_count "
+                            "FROM project_detector_weights "
+                            "WHERE project_id = ? AND alert_type = ? AND entity_canonical_name = ?",
+                            (pid, at, to_norm),
+                        ).fetchone()
+                        if tgt:
+                            # Weighted average
+                            sc, tc = sr["feedback_count"], tgt["feedback_count"]
+                            total = max(sc + tc, 1)
+                            merged_w = round((sr["weight"] * sc + tgt["weight"] * tc) / total, 4)
+                            conn.execute(
+                                "UPDATE project_detector_weights "
+                                "SET weight = ?, feedback_count = ?, dismiss_count = ?, "
+                                "confirm_count = ?, updated_at = datetime('now') "
+                                "WHERE project_id = ? AND alert_type = ? AND entity_canonical_name = ?",
+                                (merged_w, sc + tc, sr["dismiss_count"] + tgt["dismiss_count"],
+                                 sr["confirm_count"] + tgt["confirm_count"], pid, at, to_norm),
+                            )
+                        else:
+                            # Transfer source weight to target name
+                            conn.execute(
+                                "UPDATE project_detector_weights "
+                                "SET entity_canonical_name = ? "
+                                "WHERE project_id = ? AND alert_type = ? AND entity_canonical_name = ?",
+                                (to_norm, pid, at, from_norm),
+                            )
+                        weight_merge_count += 1
+                    # Clean up any remaining source weights (from merged rows)
+                    conn.execute(
+                        "DELETE FROM project_detector_weights "
+                        "WHERE project_id = ? AND entity_canonical_name = ?",
+                        (pid, from_norm),
+                    )
+            counts["detector_weights"] = weight_merge_count
+
         logger.debug(f"move_related_data({from_entity_id} → {to_entity_id}): {counts}")
         return counts
 

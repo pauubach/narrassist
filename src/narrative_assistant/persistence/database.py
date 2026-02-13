@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 _database_lock = threading.Lock()
 
 # Versión del schema actual
-SCHEMA_VERSION = 23
+SCHEMA_VERSION = 24
 
 # Tablas esenciales que deben existir para una BD válida
 # Solo incluir las tablas básicas definidas en SCHEMA_SQL
@@ -1113,19 +1113,21 @@ CREATE TABLE IF NOT EXISTS project_detector_weights (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     project_id INTEGER NOT NULL,
     alert_type TEXT NOT NULL,
+    entity_canonical_name TEXT NOT NULL DEFAULT '',
     weight REAL NOT NULL DEFAULT 1.0,
     feedback_count INTEGER NOT NULL DEFAULT 0,
     dismiss_count INTEGER NOT NULL DEFAULT 0,
     confirm_count INTEGER NOT NULL DEFAULT 0,
     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
-    UNIQUE (project_id, alert_type)
+    UNIQUE (project_id, alert_type, entity_canonical_name)
 );
 
 CREATE INDEX IF NOT EXISTS idx_proj_det_weights_project ON project_detector_weights(project_id);
+CREATE INDEX IF NOT EXISTS idx_proj_det_weights_entity ON project_detector_weights(project_id, alert_type, entity_canonical_name);
 
 -- Insertar versión del schema
-INSERT OR REPLACE INTO schema_info (key, value) VALUES ('version', '23');
+INSERT OR REPLACE INTO schema_info (key, value) VALUES ('version', '24');
 """
 
 
@@ -1393,20 +1395,22 @@ class Database:
             )""",
             "CREATE INDEX IF NOT EXISTS idx_version_metrics_project ON version_metrics(project_id)",
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_version_metrics_unique ON version_metrics(project_id, version_num)",
-            # v23: Pesos adaptativos por proyecto (nivel 3)
+            # v23→v24: Pesos adaptativos por proyecto + per-entity (nivel 3)
             """CREATE TABLE IF NOT EXISTS project_detector_weights (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 project_id INTEGER NOT NULL,
                 alert_type TEXT NOT NULL,
+                entity_canonical_name TEXT NOT NULL DEFAULT '',
                 weight REAL NOT NULL DEFAULT 1.0,
                 feedback_count INTEGER NOT NULL DEFAULT 0,
                 dismiss_count INTEGER NOT NULL DEFAULT 0,
                 confirm_count INTEGER NOT NULL DEFAULT 0,
                 updated_at TEXT NOT NULL DEFAULT (datetime('now')),
                 FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
-                UNIQUE (project_id, alert_type)
+                UNIQUE (project_id, alert_type, entity_canonical_name)
             )""",
             "CREATE INDEX IF NOT EXISTS idx_proj_det_weights_project ON project_detector_weights(project_id)",
+            "CREATE INDEX IF NOT EXISTS idx_proj_det_weights_entity ON project_detector_weights(project_id, alert_type, entity_canonical_name)",
         ]
         for sql in table_migrations:
             try:

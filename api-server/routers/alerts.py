@@ -19,6 +19,23 @@ from narrative_assistant.alerts.models import AlertStatus
 router = APIRouter()
 
 
+def _extract_entity_names(alert) -> list[str]:
+    """Extrae nombres de entidad de una alerta (de extra_data o entity_ids)."""
+    names = []
+    extra = getattr(alert, "extra_data", {}) or {}
+    if isinstance(extra, dict):
+        # Muchos alert types guardan entity_name en extra_data
+        name = extra.get("entity_name", "")
+        if name:
+            names.append(name)
+        # Algunos guardan múltiples
+        for key in ("entity1_name", "entity2_name"):
+            n = extra.get(key, "")
+            if n:
+                names.append(n)
+    return names
+
+
 def _resolve_alert_positions(alert, chapters_cache: dict | None = None) -> tuple[int | None, int | None]:
     """
     Intenta resolver start_char/end_char para alertas que no los tienen.
@@ -255,8 +272,11 @@ async def update_alert_status(project_id: int, alert_id: int, body: deps.AlertSt
                 engine.recalibrate_detector(
                     project_id, alert.alert_type, getattr(alert, 'source_module', '')
                 )
-                # Nivel 3: actualizar peso adaptativo per-project
-                engine.update_adaptive_weight(project_id, alert.alert_type, dismissed=True)
+                # Nivel 3: actualizar peso adaptativo per-project + per-entity
+                entity_names = _extract_entity_names(alert)
+                engine.update_adaptive_weight(
+                    project_id, alert.alert_type, dismissed=True, entity_names=entity_names
+                )
             except Exception:
                 pass  # best-effort
         elif new_status_str == 'resolved':
@@ -264,7 +284,10 @@ async def update_alert_status(project_id: int, alert_id: int, body: deps.AlertSt
             try:
                 from narrative_assistant.alerts.engine import get_alert_engine
                 engine = get_alert_engine()
-                engine.update_adaptive_weight(project_id, alert.alert_type, dismissed=False)
+                entity_names = _extract_entity_names(alert)
+                engine.update_adaptive_weight(
+                    project_id, alert.alert_type, dismissed=False, entity_names=entity_names
+                )
             except Exception:
                 pass  # best-effort
         elif new_status_str in ('open', 'active', 'reopen') and deps.dismissal_repository:
@@ -423,7 +446,19 @@ async def dismiss_batch(project_id: int, body: deps.BatchDismissRequest):
                 affected = {(item["alert_type"], item["source_module"]) for item in dismissal_items}
                 for alert_type, source_module in affected:
                     engine.recalibrate_detector(project_id, alert_type, source_module)
-                    engine.update_adaptive_weight(project_id, alert_type, dismissed=True)
+                # Per-entity weights from batch: collect entity names per alert_type
+                entity_names_by_type: dict[str, list[str]] = {}
+                for aid in alert_ids:
+                    a = deps.alert_repository.get_by_id(aid)
+                    if a:
+                        names = _extract_entity_names(a)
+                        if names:
+                            entity_names_by_type.setdefault(a.alert_type, []).extend(names)
+                for alert_type, _ in affected:
+                    engine.update_adaptive_weight(
+                        project_id, alert_type, dismissed=True,
+                        entity_names=entity_names_by_type.get(alert_type),
+                    )
             except Exception:
                 pass  # best-effort
 
