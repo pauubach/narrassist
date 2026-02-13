@@ -1090,7 +1090,7 @@ NO propagar invalidacion downstream. Comparar `output_hash` antes vs despues.
 | BK-15 | Emotional masking no modelado | **DONE** — `_check_emotional_masking()` en `out_of_character.py`, 7 familias verbales, leakage físico. 6 tests en `test_ooc_masking.py`. |
 | ~~BK-16~~ | ~~Hilos narrativos sin resolver (Chekhov's gun)~~ | ✅ DONE — `ChekhovTracker` en `chekhov_tracker.py`: detecta personajes SUPPORTING/MINOR que desaparecen (threshold 70%). `SupportingCharacterData` con diálogo/acciones/partners. `detect_abandoned_character_threads()` genera `AbandonedThread`. Integrado en `_detect_chekhov_elements()`. 8 tests. |
 | BK-17 | Glossary → entity disambiguation | **DONE** — `user_glossary` table (v20), `_inject_glossary_entities()` en NER pipeline, CRUD API endpoints. 6 tests en `test_glossary_ner.py`. |
-| BK-18 | Confidence decay para inferencias stale | **P3** — Nada implementado. `calibration_factor` de BK-22 (S8c) existe como punto de enganche. |
+| ~~BK-18~~ | ~~Confidence decay para inferencias stale~~ | ✅ DONE — Decay temporal en `AlertEngine.create_alert()`: `effective_confidence *= 0.97^chapter_distance`, floor 0.15. Solo para attribute_inconsistency, temporal_anachronism, relationship_contradiction, character_location_impossibility. Cache de total_chapters. 3 tests. |
 | ~~BK-19~~ | ~~UI "Añadir/editar atributo" en EntitiesTab~~ | ✅ DONE — Inline add/edit/delete en EntitiesTab. Formulario con categoria, nombre, valor, confianza auto 1.0 (commit b326317, Sprint PP-2) |
 | ~~BK-20~~ | ~~UI "Corregir hablante" en DialogueAttributionPanel~~ | ✅ DONE — Boton "Corregir" en cada dialogo, dropdown con entidades del capitulo, POST a speaker_corrections (commit 8b52e80, Sprint PP-2) |
 | ~~BK-21~~ | ~~Resolver conflictos atributos en merge~~ | ✅ DONE — MergeEntitiesDialog paso 3: radio buttons para conflictos critical/medium, resoluciones enviadas en POST merge (commit 7a44c73, Sprint PP-2) |
@@ -1355,7 +1355,7 @@ ChekhovTracker
 
 ---
 
-### Sprint S12: Confidence Decay Temporal (~2-3h, 0.5 días)
+### Sprint S12: Confidence Decay Temporal (~2-3h, 0.5 días) ✅ COMPLETADO
 
 > **Especificado**: 11-Feb-2026 por panel de expertos.
 
@@ -1890,7 +1890,7 @@ S5 (LLM), S6 (frontend UX), S7a (licensing). Total: ~10 semanas ejecutadas.
 | **S9** ✅ | Integridad datos + diálogos | BK-09 (merge FK), BK-15 (masking), BK-17 (glossary→NER), BK-10b/c (scene breaks + decay) | 6-9d |
 | **S10** ✅ | Timeline no lineal | BK-14 (ubicaciones jerárquicas), BK-11 (narrativa no lineal — 40% ficción). ~~BK-12 absorbido por S8a~~ | 8-13d |
 | **S11** ✅ | Pro-drop + Chekhov | BK-13 (ambigüedad multi-candidato), BK-16 (hilos narrativos sin resolver) | 8-13d |
-| **S12** | Confidence decay | BK-18 (decay gradual post-merge) | 1-2d |
+| **S12** ✅ | Confidence decay | BK-18 (decay gradual post-merge) | 1-2d |
 
 ### APARCADO: Ideas documentadas, no planificadas
 
@@ -1991,4 +1991,4 @@ Sprint S10 ✅ (BK-14 + BK-11)                      BACKLOG:
 
 **Ultima actualizacion**: 2026-02-13
 **Autor**: Claude (Panel de 8 expertos simulados + sesión producto 10-Feb + paneles pricing/sales/editorial 12-Feb)
-**Estado**: S0-S11 completados. Sprint PP completado (17/17). S7b-S7d completados. SP-1 completado (v0.9.0). SP-2 completado (v0.9.3). SP-3 completado (v0.9.2). Tag: v0.9.3. Pendiente: S12 (1-2 días).
+**Estado**: S0-S12 completados. Sprint PP completado (17/17). S7b-S7d completados. SP-1 completado (v0.9.0). SP-2 completado (v0.9.3). SP-3 completado (v0.9.2). Tag: v0.9.3. Todos los sprints planificados completados.
