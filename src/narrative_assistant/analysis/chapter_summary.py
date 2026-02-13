@@ -176,7 +176,9 @@ class ChekhovElement:
             "setup_context": self.setup_context[:200] if self.setup_context else "",
             "payoff_chapter": self.payoff_chapter,
             "payoff_position": self.payoff_position,
-            "payoff_context": self.payoff_context[:200] if self.payoff_context else None,
+            "payoff_context": (
+                self.payoff_context[:200] if self.payoff_context else None
+            ),
             "is_fired": self.is_fired,
             "confidence": self.confidence,
             "llm_analysis": self.llm_analysis,
@@ -255,7 +257,9 @@ class ChapterSummary:
     absent_characters: list[str] = field(default_factory=list)
 
     key_events: list[NarrativeEvent] = field(default_factory=list)
-    llm_events: list[NarrativeEvent] = field(default_factory=list)  # Eventos detectados por LLM
+    llm_events: list[NarrativeEvent] = field(
+        default_factory=list
+    )  # Eventos detectados por LLM
 
     total_interactions: int = 0
     conflict_interactions: int = 0
@@ -505,12 +509,16 @@ class ChapterSummaryAnalyzer:
                 last_ch = last_appearances.get(char_id, 0)
                 if last_ch not in recent_chapters and last_ch > 0:
                     report.dormant_characters.append(char_name)
-            report.active_characters = report.total_characters - len(report.dormant_characters)
+            report.active_characters = report.total_characters - len(
+                report.dormant_characters
+            )
         else:
             report.active_characters = report.total_characters
 
         # Calcular arcos de personajes (básico)
-        report.character_arcs = self._calculate_character_arcs(report.chapters, all_characters)
+        report.character_arcs = self._calculate_character_arcs(
+            report.chapters, all_characters
+        )
 
         # Análisis avanzado con LLM
         if self.mode != AnalysisMode.BASIC:
@@ -564,7 +572,9 @@ class ChapterSummaryAnalyzer:
             )
             return {row["id"]: row["first_chapter"] for row in cursor.fetchall()}
 
-    def _get_mentions_by_chapter(self, project_id: int, chapter_id: int) -> dict[int, list[dict]]:
+    def _get_mentions_by_chapter(
+        self, project_id: int, chapter_id: int
+    ) -> dict[int, list[dict]]:
         """Obtiene menciones agrupadas por entidad para un capítulo."""
         with self.db.connection() as conn:
             cursor = conn.execute(
@@ -588,7 +598,9 @@ class ChapterSummaryAnalyzer:
 
             return mentions_by_entity
 
-    def _get_interactions_by_chapter(self, project_id: int, chapter_id: int) -> list[dict]:
+    def _get_interactions_by_chapter(
+        self, project_id: int, chapter_id: int
+    ) -> list[dict]:
         """Obtiene interacciones para un capítulo."""
         with self.db.connection() as conn:
             cursor = conn.execute(
@@ -650,7 +662,9 @@ class ChapterSummaryAnalyzer:
             elif tone in ("warm", "affectionate"):
                 summary.positive_interactions += 1
 
-        summary.locations_mentioned = self._get_locations_by_chapter(project_id, chapter_id)
+        summary.locations_mentioned = self._get_locations_by_chapter(
+            project_id, chapter_id
+        )
 
         characters_in_chapter: set[int] = set()
 
@@ -779,7 +793,9 @@ class ChapterSummaryAnalyzer:
 
         return summary
 
-    def _detect_pattern_events(self, summary: ChapterSummary, text: str, chapter_num: int) -> None:
+    def _detect_pattern_events(
+        self, summary: ChapterSummary, text: str, chapter_num: int
+    ) -> None:
         """Detecta eventos usando patrones regex."""
         # Revelaciones
         for pattern in REVELATION_PATTERNS:
@@ -829,7 +845,9 @@ class ChapterSummaryAnalyzer:
                 )
                 break
 
-    def _analyze_chapter_with_llm(self, summary: ChapterSummary, chapter_text: str) -> None:
+    def _analyze_chapter_with_llm(
+        self, summary: ChapterSummary, chapter_text: str
+    ) -> None:
         """Analiza el capítulo con LLM para extraer eventos significativos."""
         if not self.ollama_client:
             return
@@ -890,7 +908,9 @@ class ChapterSummaryAnalyzer:
                 summary.llm_summary = data.get("summary")
 
         except Exception as e:
-            logger.warning(f"Error en análisis LLM del capítulo {summary.chapter_number}: {e}")
+            logger.warning(
+                f"Error en análisis LLM del capítulo {summary.chapter_number}: {e}"
+            )
 
     def _generate_text_summary(self, summary: ChapterSummary) -> str:
         """Genera un resumen textual del capítulo."""
@@ -922,7 +942,9 @@ class ChapterSummaryAnalyzer:
             if summary.positive_interactions > 0:
                 int_desc.append(f"{summary.positive_interactions} positivas")
             if int_desc:
-                parts.append(f"{summary.total_interactions} interacciones ({', '.join(int_desc)})")
+                parts.append(
+                    f"{summary.total_interactions} interacciones ({', '.join(int_desc)})"
+                )
 
         if summary.locations_mentioned:
             locs = summary.locations_mentioned[:3]
@@ -937,7 +959,11 @@ class ChapterSummaryAnalyzer:
         if summary.dominant_tone != "neutral":
             parts.append(tone_names.get(summary.dominant_tone, ""))
 
-        return ". ".join(filter(None, parts)) + "." if parts else "Sin información destacada."
+        return (
+            ". ".join(filter(None, parts)) + "."
+            if parts
+            else "Sin información destacada."
+        )
 
     def _calculate_character_arcs(
         self, chapters: list[ChapterSummary], all_characters: dict[int, str]
@@ -951,7 +977,9 @@ class ChapterSummaryAnalyzer:
             for char in chapter.characters_present:
                 if char.entity_id not in presence_map:
                     presence_map[char.entity_id] = []
-                presence_map[char.entity_id].append((chapter.chapter_number, char.mention_count))
+                presence_map[char.entity_id].append(
+                    (chapter.chapter_number, char.mention_count)
+                )
 
         for char_id, presences in presence_map.items():
             if len(presences) < 2:
@@ -1113,9 +1141,7 @@ class ChapterSummaryAnalyzer:
                 setup_context = ""
                 setup_position = 0
                 if ctx_row:
-                    setup_context = (
-                        f"{ctx_row['context_before'] or ''} {name} {ctx_row['context_after'] or ''}"
-                    )
+                    setup_context = f"{ctx_row['context_before'] or ''} {name} {ctx_row['context_after'] or ''}"
                     setup_position = ctx_row["start_char"]
 
                 # Determinar si es "unfired" (sin payoff claro)
@@ -1137,7 +1163,28 @@ class ChapterSummaryAnalyzer:
                 if not is_fired or mention_count <= 2:
                     elements.append(element)
 
+        # BK-16: Extender Chekhov a personajes secundarios
+        try:
+            from .chekhov_tracker import ChekhovTracker
+
+            tracker = ChekhovTracker(self.db)
+            total_chapters = self._get_total_chapters(project_id)
+            character_elements = tracker.track_characters(project_id, total_chapters)
+            elements.extend(character_elements)
+        except Exception as e:
+            logger.warning(f"Error tracking Chekhov characters: {e}")
+
         return elements
+
+    def _get_total_chapters(self, project_id: int) -> int:
+        """Obtiene el número total de capítulos de un proyecto."""
+        with self.db.connection() as conn:
+            cursor = conn.execute(
+                "SELECT COUNT(*) as cnt FROM chapters WHERE project_id = ?",
+                (project_id,),
+            )
+            row = cursor.fetchone()
+            return row["cnt"] if row else 0
 
 
 def analyze_chapter_progress(
@@ -1168,7 +1215,9 @@ def analyze_chapter_progress(
         if cache_key in _cache:
             ts, cached_report = _cache[cache_key]
             if now - ts < _CACHE_TTL_SECONDS:
-                logger.debug(f"Cache hit for chapter progress: project={project_id}, mode={mode}")
+                logger.debug(
+                    f"Cache hit for chapter progress: project={project_id}, mode={mode}"
+                )
                 return cached_report
             else:
                 del _cache[cache_key]
