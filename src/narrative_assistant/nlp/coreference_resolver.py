@@ -205,7 +205,7 @@ def update_adaptive_weights(
     if correct_method and correct_method in new_weights:
         new_weights[correct_method] += learning_rate
 
-    for method in (incorrect_methods or []):
+    for method in incorrect_methods or []:
         if method in new_weights:
             new_weights[method] = max(0.05, new_weights[method] - learning_rate * 0.5)
 
@@ -215,6 +215,7 @@ def update_adaptive_weights(
         new_weights = {m: w / total for m, w in new_weights.items()}
 
     return new_weights
+
 
 # Mapeo de pronombres españoles a género/número
 # IMPORTANTE: Los posesivos están en SPANISH_POSSESSIVES, no aquí
@@ -777,7 +778,9 @@ class CorefResult:
     chains: list[CoreferenceChain] = field(default_factory=list)
     unresolved: list[Mention] = field(default_factory=list)
     method_contributions: dict[CorefMethod, int] = field(default_factory=dict)
-    voting_details: dict[tuple[int, int], MentionVotingDetail] = field(default_factory=dict)
+    voting_details: dict[tuple[int, int], MentionVotingDetail] = field(
+        default_factory=dict
+    )
     processing_time_ms: float = 0.0
 
     @property
@@ -836,16 +839,25 @@ def _select_coref_model() -> str:
 
                     resp = requests.get("http://localhost:11434/api/tags", timeout=2)
                     if resp.status_code == 200:
-                        models = [m["name"].split(":")[0] for m in resp.json().get("models", [])]
+                        models = [
+                            m["name"].split(":")[0]
+                            for m in resp.json().get("models", [])
+                        ]
                         if "qwen2.5" in models:
-                            logger.info("S2-05: Usando Qwen 2.5 para correferencias (mejor español)")
+                            logger.info(
+                                "S2-05: Usando Qwen 2.5 para correferencias (mejor español)"
+                            )
                             return "qwen2.5"
                         if "mistral" in models:
                             return "mistral"
                 except Exception as e:
-                    logger.debug(f"Error obteniendo lista de modelos Ollama disponibles: {e}")
+                    logger.debug(
+                        f"Error obteniendo lista de modelos Ollama disponibles: {e}"
+                    )
     except Exception as e:
-        logger.debug(f"Error conectando con servidor Ollama para detectar modelo preferido: {e}")
+        logger.debug(
+            f"Error conectando con servidor Ollama para detectar modelo preferido: {e}"
+        )
 
     return "llama3.2"  # Fallback
 
@@ -854,7 +866,9 @@ def _select_coref_model() -> str:
 class CorefConfig:
     """Configuración del sistema de correferencias."""
 
-    enabled_methods: list[CorefMethod] = field(default_factory=_get_default_coref_methods)
+    enabled_methods: list[CorefMethod] = field(
+        default_factory=_get_default_coref_methods
+    )
     method_weights: dict[CorefMethod, float] = field(
         default_factory=lambda: DEFAULT_COREF_WEIGHTS.copy()
     )
@@ -979,7 +993,9 @@ class EmbeddingsCorefMethod:
 
             # Calcular similitud
             try:
-                similarity = self.embeddings.similarity(anaphor_context, candidate_context)
+                similarity = self.embeddings.similarity(
+                    anaphor_context, candidate_context
+                )
 
                 # Boost si hay concordancia de género/número
                 if (
@@ -1034,7 +1050,9 @@ class LLMCorefMethod:
 
                         self._client = get_llm_client()
                         if self._client:
-                            logger.info(f"Cliente LLM conectado para correferencias: {self.model}")
+                            logger.info(
+                                f"Cliente LLM conectado para correferencias: {self.model}"
+                            )
                     except Exception as e:
                         logger.warning(f"No se pudo conectar LLM: {e}")
         return self._client
@@ -1101,7 +1119,9 @@ RAZÓN: [explicación breve]"""
 
         # Buscar número de candidato
         candidate_match = re.search(r"CANDIDATO:\s*(\d+)", response, re.IGNORECASE)
-        confidence_match = re.search(r"CONFIANZA:\s*(alta|media|baja)", response, re.IGNORECASE)
+        confidence_match = re.search(
+            r"CONFIANZA:\s*(alta|media|baja)", response, re.IGNORECASE
+        )
         reason_match = re.search(r"RAZ[OÓ]N:\s*(.+?)(?:\n|$)", response, re.IGNORECASE)
 
         if candidate_match:
@@ -1111,10 +1131,19 @@ RAZÓN: [explicación breve]"""
                     # Mapear confianza
                     conf_map = {"alta": 0.9, "media": 0.7, "baja": 0.5}
                     confidence = conf_map.get(
-                        confidence_match.group(1).lower() if confidence_match else "media", 0.7
+                        (
+                            confidence_match.group(1).lower()
+                            if confidence_match
+                            else "media"
+                        ),
+                        0.7,
                     )
 
-                    reason = reason_match.group(1).strip() if reason_match else "LLM selection"
+                    reason = (
+                        reason_match.group(1).strip()
+                        if reason_match
+                        else "LLM selection"
+                    )
                     results.append((candidates[idx], confidence, reason))
             except (ValueError, IndexError):
                 pass
@@ -1170,7 +1199,10 @@ class MorphoCorefMethod:
                 if anaphor.gender == candidate.gender:
                     score += 0.4
                     reasons.append("género coincide")
-                elif anaphor.gender == Gender.NEUTRAL or candidate.gender == Gender.NEUTRAL:
+                elif (
+                    anaphor.gender == Gender.NEUTRAL
+                    or candidate.gender == Gender.NEUTRAL
+                ):
                     score += 0.2
                     reasons.append("género compatible")
                 else:
@@ -1225,6 +1257,8 @@ class HeuristicsCorefMethod:
     def __init__(self):
         # Frecuencia de menciones (se actualiza antes de resolver)
         self._mention_freq: dict[str, int] = {}
+        self._saliency_tracker: "SaliencyTracker | None" = None
+        self._pro_drop_scorer: "ProDropAmbiguityScorer | None" = None
 
     def set_mention_frequencies(self, mentions: list["Mention"]) -> None:
         """Calcula frecuencia de nombres propios para saliencia."""
@@ -1233,6 +1267,12 @@ class HeuristicsCorefMethod:
             if m.mention_type == MentionType.PROPER_NOUN:
                 key = m.text.lower()
                 self._mention_freq[key] = self._mention_freq.get(key, 0) + 1
+
+        # BK-13: Construir SaliencyTracker y ProDropAmbiguityScorer
+        from .pro_drop_scorer import ProDropAmbiguityScorer, SaliencyTracker
+
+        self._saliency_tracker = SaliencyTracker.build_from_mentions(mentions)
+        self._pro_drop_scorer = ProDropAmbiguityScorer()
 
     def resolve(
         self,
@@ -1244,13 +1284,38 @@ class HeuristicsCorefMethod:
         if not candidates:
             return []
 
+        # BK-13: Para menciones ZERO, usar ProDropAmbiguityScorer
+        if (
+            anaphor.mention_type == MentionType.ZERO
+            and self._pro_drop_scorer is not None
+            and self._saliency_tracker is not None
+        ):
+            scored = self._pro_drop_scorer.score_candidates(
+                anaphor, candidates, self._saliency_tracker, context
+            )
+            if scored:
+                from .pro_drop_scorer import ProDropAmbiguityScorer
+
+                ambiguity = ProDropAmbiguityScorer.calculate_ambiguity(scored)
+                results = []
+                for cs in scored:
+                    # Ajustar confianza según ambigüedad
+                    adjusted = cs.score * (1.0 - ambiguity * 0.5)
+                    reasoning = cs.reasoning
+                    if ambiguity > 0.5:
+                        reasoning += f" [ambigüedad={ambiguity:.2f}]"
+                    results.append((cs.mention, adjusted, reasoning))
+                return results
+
         results = []
 
         # Para posesivos, calcular quién es el candidato más reciente en misma/anterior oración
         # Este candidato recibe un bonus muy alto
         most_recent_in_scope: Mention | None = None
         if anaphor.mention_type == MentionType.POSSESSIVE:
-            most_recent_in_scope = self._find_most_recent_subject_candidate(anaphor, candidates)
+            most_recent_in_scope = self._find_most_recent_subject_candidate(
+                anaphor, candidates
+            )
 
         for candidate in candidates:
             score = 0.0
@@ -1274,7 +1339,7 @@ class HeuristicsCorefMethod:
 
             # Saliencia: preferir candidatos mencionados frecuentemente
             # (basado en frecuencia de nombre canónico en candidatos)
-            if hasattr(self, '_mention_freq') and self._mention_freq:
+            if hasattr(self, "_mention_freq") and self._mention_freq:
                 canonical = candidate.text.lower()
                 freq = self._mention_freq.get(canonical, 0)
                 if freq >= 5:
@@ -1310,7 +1375,9 @@ class HeuristicsCorefMethod:
                         reasons.append("sujeto más reciente")
 
                     # BONUS por distancia de oración
-                    sentence_distance = abs(anaphor.sentence_idx - candidate.sentence_idx)
+                    sentence_distance = abs(
+                        anaphor.sentence_idx - candidate.sentence_idx
+                    )
                     if sentence_distance == 0:
                         # Mismo oración: muy alta probabilidad
                         score += 0.25
@@ -1475,13 +1542,17 @@ class CoreferenceVotingResolver(
 
         # Separar anáforas y posibles antecedentes
         anaphors = [m for m in mentions if self._is_anaphor(m)]
-        potential_antecedents = [m for m in mentions if self._is_potential_antecedent(m)]
+        potential_antecedents = [
+            m for m in mentions if self._is_potential_antecedent(m)
+        ]
 
         # Si hay narrador, añadirlo como antecedente potencial
         if narrator_info:
             narrator_name, narrator_gender = narrator_info
             # Buscar si ya existe en antecedentes
-            narrator_exists = any(m.text == narrator_name for m in potential_antecedents)
+            narrator_exists = any(
+                m.text == narrator_name for m in potential_antecedents
+            )
             if not narrator_exists:
                 for pattern in NARRATOR_PATTERNS:
                     match = re.search(pattern, text, re.IGNORECASE)
@@ -1504,14 +1575,16 @@ class CoreferenceVotingResolver(
 
         # Pasar frecuencias de mención al método heurístico para saliencia
         heur_method = self._methods.get(CorefMethod.HEURISTICS)
-        if heur_method and hasattr(heur_method, 'set_mention_frequencies'):
+        if heur_method and hasattr(heur_method, "set_mention_frequencies"):
             heur_method.set_mention_frequencies(mentions)
 
         # Si hay narrador, resolver primero los pronombres de primera persona
         # y excluirlos de la resolución normal
         first_person_already_resolved: set[int] = set()
         if narrator_info:
-            first_person_resolved = self._resolve_first_person(text, mentions, narrator_info)
+            first_person_resolved = self._resolve_first_person(
+                text, mentions, narrator_info
+            )
             for anaphor, antecedent, score in first_person_resolved:
                 first_person_already_resolved.add(anaphor.start_char)
 
@@ -1561,20 +1634,24 @@ class CoreferenceVotingResolver(
                     )
 
                 # Almacenar detalle de votación para esta mención
-                result.voting_details[(anaphor.start_char, anaphor.end_char)] = MentionVotingDetail(
-                    anaphor_text=anaphor.text,
-                    anaphor_start=anaphor.start_char,
-                    anaphor_end=anaphor.end_char,
-                    resolved_to=best_candidate.text,
-                    final_score=round(final_score, 3),
-                    method_votes=method_detail,
+                result.voting_details[(anaphor.start_char, anaphor.end_char)] = (
+                    MentionVotingDetail(
+                        anaphor_text=anaphor.text,
+                        anaphor_start=anaphor.start_char,
+                        anaphor_end=anaphor.end_char,
+                        resolved_to=best_candidate.text,
+                        final_score=round(final_score, 3),
+                        method_votes=method_detail,
+                    )
                 )
             else:
                 result.unresolved.append(anaphor)
 
         # Añadir resoluciones de primera persona al narrador
         if narrator_info and first_person_already_resolved:
-            first_person_resolved = self._resolve_first_person(text, mentions, narrator_info)
+            first_person_resolved = self._resolve_first_person(
+                text, mentions, narrator_info
+            )
             for anaphor, antecedent, score in first_person_resolved:
                 resolved_pairs.append((anaphor, antecedent, score))
                 # Marcar como contribución del narrador (usamos HEURISTICS como indicador)
@@ -1583,20 +1660,22 @@ class CoreferenceVotingResolver(
                 )
 
                 # Detalle de votación para primera persona -> narrador
-                result.voting_details[(anaphor.start_char, anaphor.end_char)] = MentionVotingDetail(
-                    anaphor_text=anaphor.text,
-                    anaphor_start=anaphor.start_char,
-                    anaphor_end=anaphor.end_char,
-                    resolved_to=antecedent.text,
-                    final_score=round(score, 3),
-                    method_votes={
-                        "heuristics": {
-                            "score": round(score, 3),
-                            "reasoning": f"Pronombre 1ª persona → narrador '{antecedent.text}'",
-                            "weight": 1.0,
-                            "weighted_score": round(score, 3),
-                        }
-                    },
+                result.voting_details[(anaphor.start_char, anaphor.end_char)] = (
+                    MentionVotingDetail(
+                        anaphor_text=anaphor.text,
+                        anaphor_start=anaphor.start_char,
+                        anaphor_end=anaphor.end_char,
+                        resolved_to=antecedent.text,
+                        final_score=round(score, 3),
+                        method_votes={
+                            "heuristics": {
+                                "score": round(score, 3),
+                                "reasoning": f"Pronombre 1ª persona → narrador '{antecedent.text}'",
+                                "weight": 1.0,
+                                "weighted_score": round(score, 3),
+                            }
+                        },
+                    )
                 )
 
         # Construir cadenas de correferencia
@@ -1676,7 +1755,9 @@ def resolve_coreferences_voting(
     return resolver.resolve_document(text, chapters)
 
 
-def build_pronoun_resolution_map(coref_result: CorefResult) -> dict[tuple[int, int], str]:
+def build_pronoun_resolution_map(
+    coref_result: CorefResult,
+) -> dict[tuple[int, int], str]:
     """
     Construye un mapa de posiciones de pronombres a sus antecedentes resueltos.
 
@@ -1721,7 +1802,9 @@ def build_pronoun_resolution_map(coref_result: CorefResult) -> dict[tuple[int, i
                 key = (mention.start_char, mention.end_char)
                 resolution_map[key] = main_name
 
-    logger.debug(f"Mapa de resolución construido: {len(resolution_map)} pronombres mapeados")
+    logger.debug(
+        f"Mapa de resolución construido: {len(resolution_map)} pronombres mapeados"
+    )
     return resolution_map
 
 

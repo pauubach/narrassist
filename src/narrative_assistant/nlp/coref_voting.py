@@ -9,18 +9,10 @@ from __future__ import annotations
 import logging
 import re
 
-from .coreference_resolver import (
-    FIRST_PERSON_PRONOUNS,
-    NARRATOR_PATTERNS,
-    CorefCandidate,
-    CoreferenceChain,
-    CorefMethod,
-    Gender,
-    Mention,
-    MentionType,
-    MentionVotingDetail,
-    Number,
-)
+from .coreference_resolver import (FIRST_PERSON_PRONOUNS, NARRATOR_PATTERNS,
+                                   CorefCandidate, CoreferenceChain,
+                                   CorefMethod, Gender, Mention, MentionType,
+                                   MentionVotingDetail, Number)
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +83,9 @@ class CorefVotingMixin:
 
             # Asignar al narrador
             resolved.append((m, narrator_mention, 0.9))
-            logger.debug(f"'{m.text}' (pos {m.start_char}) -> narrador '{narrator_name}'")
+            logger.debug(
+                f"'{m.text}' (pos {m.start_char}) -> narrador '{narrator_name}'"
+            )
 
         return resolved
 
@@ -196,6 +190,18 @@ class CorefVotingMixin:
                 "weighted_score": round(score * weight, 3),
             }
 
+        # BK-13: Calcular ambigüedad entre el mejor y segundo candidato
+        sorted_scores = sorted(candidate_scores.values(), reverse=True)
+        if len(sorted_scores) >= 2 and sorted_scores[0] > 0:
+            ambiguity = 1.0 - (sorted_scores[0] - sorted_scores[1]) / sorted_scores[0]
+            ambiguity = max(0.0, min(1.0, ambiguity))
+        else:
+            ambiguity = 0.0
+        method_votes_detail["_ambiguity"] = {
+            "score": round(ambiguity, 3),
+            "reasoning": "margen entre mejor y segundo candidato",
+        }
+
         return best_candidate, best_score, method_votes_detail
 
     def _build_chains(
@@ -244,11 +250,15 @@ class CorefVotingMixin:
         # Crear cadenas
         chains = []
         for root, members in groups.items():
-            chain = CoreferenceChain(mentions=sorted(members, key=lambda m: m.start_char))
+            chain = CoreferenceChain(
+                mentions=sorted(members, key=lambda m: m.start_char)
+            )
 
             # Calcular confianza promedio
             relevant_scores = [
-                score for a, ant, score in resolved_pairs if a in members or ant in members
+                score
+                for a, ant, score in resolved_pairs
+                if a in members or ant in members
             ]
             if relevant_scores:
                 chain.confidence = sum(relevant_scores) / len(relevant_scores)
