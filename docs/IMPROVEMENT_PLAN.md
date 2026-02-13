@@ -1079,7 +1079,7 @@ NO propagar invalidacion downstream. Comparar `output_hash` antes vs despues.
 | BK-04 | Fine-tune PlanTL RoBERTa en ficción | Si acumulamos datos etiquetados |
 | ~~BK-05~~ | ~~Comparativa antes/después~~ | ✅ DONE - Snapshot pre-reanálisis + ComparisonService (two-pass matching) |
 | ~~BK-06~~ | ~~Exportar a Scrivener~~ | ✅ DONE — `scrivener_exporter.py` (~400 líneas), endpoint `GET /export/scrivener`, ZIP con estructura .scriv compatible Scrivener 3 |
-| BK-08 | Integrar timeline en vital_status | Cruzar temporal_markers con death_events: si flashback_time < death_time → aparición válida. Requiere detección de línea temporal no lineal (prólogos, alternancia pasado/presente). LLM para desambiguación en casos difíciles. |
+| ~~BK-08~~ | ~~Integrar timeline en vital_status~~ | ✅ DONE — Pluperfect death patterns, irrealis filtering, TemporalMap pipeline integration, expanded context windows. 5 integration tests + 62 total passing. `_analysis_phases.py` builds TemporalMap from ctx timeline and passes to `analyze_vital_status()`. |
 | ~~BK-07~~ | ~~Análisis multi-documento~~ | ✅ DONE - Collections, entity links, cross-book analysis, workspace auxiliar |
 | ~~BK-09~~ | ~~Merge-induced attribute orphaning~~ | ✅ DONE — `move_related_data()` en `repository.py` migra 14 FK cols en 10 tablas. 16 tests en `test_entity_merge_fk.py`. |
 | ~~BK-10~~ | ~~Dialogue attribution: correcciones + scene breaks~~ | ✅ DONE — BK-10b/c (scene breaks + confidence decay) en commit cf11a00. `SpeakerAttributor` integrado con `speaker_corrections` y `_SCENE_BREAK_PATTERNS`. |
@@ -1998,4 +1998,4 @@ Sprint S10 ✅ (BK-14 + BK-11)                      BACKLOG:
 
 **Ultima actualizacion**: 2026-02-13
 **Autor**: Claude (Panel de 8 expertos simulados + sesión producto 10-Feb + paneles pricing/sales/editorial 12-Feb)
-**Estado**: S0-S12 completados. Sprint PP completado (17/17). S7b-S7d completados. SP-1 completado (v0.9.0). SP-2 completado (v0.9.3). SP-3 completado (v0.9.2). Tag: v0.9.3. Todos los sprints planificados completados.
+**Estado**: S0-S12 completados. Sprint PP completado (17/17). S7b-S7d completados. SP-1 completado (v0.9.0). SP-2 completado (v0.9.3). SP-3 completado (v0.9.2). BK-08 completado (v0.9.4). 23/29 BK completados. Tag: v0.9.4. Todos los sprints planificados completados.
