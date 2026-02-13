@@ -1,7 +1,7 @@
 # Roadmap - Narrative Assistant
 
-> **Ultima actualizacion**: 2026-02-10
-> **Version actual**: 0.7.17
+> **Ultima actualizacion**: 2026-02-13
+> **Version actual**: 0.9.4
 > **Estado actual**: Ver [PROJECT_STATUS.md](PROJECT_STATUS.md)
 > **Historial de cambios**: Ver [CHANGELOG.md](CHANGELOG.md)
 > **Plan de mejora**: Ver [IMPROVEMENT_PLAN.md](IMPROVEMENT_PLAN.md)
@@ -69,13 +69,13 @@ Todas las features core están implementadas:
 
 ## Métricas Objetivo
 
-| Métrica | Actual (v0.3.37) | Objetivo v1.0.0 |
+| Métrica | Actual (v0.9.4) | Objetivo v1.0.0 |
 |---------|------------------|-----------------|
-| Detectores | 14 | 25 |
+| Detectores | 25+ | 30 |
 | Gazetteer | ~5,000 | 100,000 |
-| Endpoints API | 170 | 200+ |
-| Componentes Vue | 83 | 110+ |
-| Tests | 966+ | 2,000+ |
+| Endpoints API | 170+ | 200+ |
+| Componentes Vue | 105 | 110+ |
+| Tests | 1,699+ (activos) | 2,000+ |
 | Idiomas UI | 1 (ES) | 3 (ES, EN, CA) |
 
 ---

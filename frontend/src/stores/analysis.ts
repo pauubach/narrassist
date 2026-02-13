@@ -455,7 +455,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
     delete _errors.value[projectId]
 
     try {
-      await api.post(`/api/projects/${projectId}/analyze`, { phases, force })
+      await api.post(`/api/projects/${projectId}/analyze/partial`, { phases, force })
       await loadExecutedPhases(projectId)
       return true
     } catch (err) {

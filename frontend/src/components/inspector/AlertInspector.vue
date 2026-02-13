@@ -45,7 +45,8 @@ const { getSeverityLabel, getSeverityColor, getSeverityIcon, getCategoryConfig }
 const severityLabel = computed(() => getSeverityLabel(props.alert.severity))
 const severityColor = computed(() => getSeverityColor(props.alert.severity))
 const severityIcon = computed(() => getSeverityIcon(props.alert.severity))
-const categoryLabel = computed(() => getCategoryConfig(props.alert.category).label)
+const categoryConfig = computed(() => getCategoryConfig(props.alert.category))
+const categoryLabel = computed(() => categoryConfig.value.label)
 
 const confidencePercent = computed(() => Math.round(props.alert.confidence * 100))
 
@@ -111,6 +112,12 @@ function getSourceLocation(source: AlertSource): string {
         <span>{{ severityLabel }}</span>
       </div>
       <span class="category-label">{{ categoryLabel }}</span>
+    </div>
+
+    <!-- Tarjeta de categoría: ¿Por qué se genera esta alerta? -->
+    <div class="category-info-card">
+      <i :class="categoryConfig.icon" class="category-info-icon"></i>
+      <span class="category-info-text">{{ categoryConfig.description }}</span>
     </div>
 
     <!-- Contenido -->
@@ -270,6 +277,26 @@ function getSourceLocation(source: AlertSource): string {
 .category-label {
   font-size: var(--ds-font-size-sm);
   color: var(--ds-color-text-secondary);
+}
+
+.category-info-card {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  padding: var(--ds-space-2) var(--ds-space-4);
+  background: var(--ds-surface-ground);
+  border-bottom: 1px solid var(--ds-surface-border);
+}
+
+.category-info-icon {
+  font-size: 0.875rem;
+  color: var(--ds-color-text-secondary);
+}
+
+.category-info-text {
+  font-size: var(--ds-font-size-xs);
+  color: var(--ds-color-text-secondary);
+  font-style: italic;
 }
 
 .inspector-body {

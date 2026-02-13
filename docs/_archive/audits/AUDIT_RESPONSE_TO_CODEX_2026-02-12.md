@@ -23,7 +23,7 @@
 ### 3. Removed legacy glossary routes from `entities.py`
 **Source**: CODE_FINDINGS F-001
 **What**: Deleted 3 legacy endpoints (GET/POST/DELETE for `/glossary`) from `entities.py:2560-2672`. Kept the complete implementation in `content.py` (13 endpoints with GlossaryRepository).
-**Why**: Dead code causing route shadowing confusion. In FastAPI, last-registered router wins, so `content.py` routes were actually serving correctly — but the dead code in `entities.py` was confusing and risk-prone. Removed ~113 lines.
+**Why**: Dead code causing route shadowing confusion. In Starlette/FastAPI, routes are matched in registration order (first match wins — `starlette/routing.py` iterates `self.routes` and returns on first `Match.FULL`). Since `entities.py` was registered before `content.py`, the legacy routes in `entities.py` were actually shadowing the proper `content.py` implementations. Removed ~113 lines to eliminate both the dead code and the shadowing risk.
 
 ### 4. Updated `docs/PROJECT_STATUS.md` version
 **Source**: AUDIT_FULL + CODEBASE_REVIEW
@@ -58,7 +58,7 @@
 
 | Finding | Why Skipped |
 |---------|-------------|
-| **F-002 Partial analysis FE/BE mismatch** | Challenger found NO evidence of `runPartialAnalysis` sending `{phases, force}` to the current API. The frontend code and backend endpoint don't show this mismatch. May have been a planned feature that was never implemented, or the audit referenced stale code. Needs verification with actual app testing. |
+| **F-002 Partial analysis FE/BE mismatch** | **FIXED.** New endpoint `POST /api/projects/{id}/analyze/partial` accepts `{phases, force}` JSON body. Backend maps frontend phase names → backend phases, auto-resolves dependencies, loads context from DB for skipped prerequisites, and only runs requested phases. Frontend URL updated to `/analyze/partial`. See `api-server/routers/_partial_analysis.py`. |
 | **F-004 Tier 1 concurrency limit** | By design: Tier 1 is lightweight (parsing, regex, structure detection). The heavy NLP/LLM phases ARE gated by the heavy slot system. For a desktop app with a single user, unlimited Tier 1 threads is a reasonable tradeoff. A semaphore can be added later if real-world usage shows issues. |
 | **F-005 Queue stores full context** | Memory math was incorrect (audit claimed 320 MB/project, reality is ~1-5 MB due to Python string references). The practical risk is low for a single-user desktop app. Optimization deferred to post-thesis. |
 | **F-006 FE/BE state contract** | Valid concern (transformer defaults to `completed` for unknown states), but low-priority. The frontend transformer's fallback behavior works in practice. |
@@ -100,9 +100,9 @@
 
 ### Things that need correction
 1. **xfail count**: You said various numbers. Reality: 5 `@pytest.mark.xfail` decorators + 87 `pytest.xfail()` runtime calls = 92 total. All in adversarial tests, all for documented NLP limitations.
-2. **F-001 route shadowing**: In FastAPI, LAST registered router wins (not first). So `content.py` routes ARE active. The dead code in `entities.py` wasn't causing a crash — it was dead code.
+2. **F-001 route shadowing**: ~~In FastAPI, LAST registered router wins~~ **Correction**: Starlette uses first-match semantics (`routing.py` iterates routes in order, returns on first `Match.FULL`). Since `entities.py` was included at line 531 and `content.py` at line 552 in `main.py`, the legacy glossary routes in `entities.py` were actually **winning** over the proper `content.py` implementations. The fix (removing dead routes) was correct and more important than originally stated.
 3. **F-005 memory math**: Python dicts store references, not copies. Real overhead is ~1-5 MB per queued project, not 320 MB.
-4. **Severity inflation**: 3 out of 5 CRITICAL findings in CODE_FINDINGS were overstated for a TFM desktop app context. F-002 may not even exist as described.
+4. **Severity inflation**: 2 out of 5 CRITICAL findings in CODE_FINDINGS were overstated for a TFM desktop app context (F-004 concurrency, F-005 memory). F-002 has been confirmed as a real contract mismatch (see correction above).
 
 ---
 
@@ -115,7 +115,7 @@ You verify that my 8 fixes are correct and don't introduce regressions.
 
 ### Phase 2: Deep Dive on Disputed Findings
 We jointly investigate:
-1. **F-002**: Does `runPartialAnalysis` actually exist in the frontend? What does the UI show?
+1. **F-002**: Contract mismatch confirmed. Backend needs `phases: list[str]` and `force: bool` parameters added to `start_analysis()`, or frontend needs to stop sending them.
 2. **F-004**: Should we add a Tier 1 semaphore? What's the realistic concurrent upload scenario?
 3. **F-009**: Is the concurrency guard bug reproducible?
 

@@ -23,11 +23,27 @@ class AnalysisCancelledError(Exception):
 
 
 # ============================================================================
+# Thread-safe progress helper (F-006)
+# ============================================================================
+
+def _update_storage(project_id: int, **updates):
+    """Thread-safe update de progress storage para código sin tracker."""
+    with deps._progress_lock:
+        storage = deps.analysis_progress_storage.get(project_id)
+        if storage:
+            storage.update(updates)
+
+
+# ============================================================================
 # ProgressTracker: encapsula toda la lógica de progreso
 # ============================================================================
 
 class ProgressTracker:
-    """Encapsula la lógica de progreso, time-estimation y cancelación."""
+    """Encapsula la lógica de progreso, time-estimation y cancelación.
+
+    Todas las escrituras a analysis_progress_storage pasan por _write()
+    que adquiere deps._progress_lock para thread-safety (F-006).
+    """
 
     def __init__(
         self,
@@ -45,6 +61,17 @@ class ProgressTracker:
         self.current_phase_key = "parsing"
         self.phase_start_times: dict[str, float] = {}
         self.phase_durations: dict[str, float] = {}
+
+    def _write(self, **updates):
+        """Thread-safe update de progress storage (F-006)."""
+        with deps._progress_lock:
+            storage = deps.analysis_progress_storage.get(self.project_id)
+            if storage:
+                for key, value in updates.items():
+                    if key == "metrics_update" and isinstance(value, dict):
+                        storage.setdefault("metrics", {}).update(value)
+                    else:
+                        storage[key] = value
 
     def get_phase_progress_range(self, phase_id: str) -> tuple[int, int]:
         """Calcula el rango de progreso (inicio, fin) para una fase basado en pesos."""
@@ -64,15 +91,13 @@ class ProgressTracker:
         self.phase_start_times[phase_key] = time.time()
         pct_start, _ = self.get_phase_progress_range(phase_key)
         self.phases[phase_index]["current"] = True
-        storage = deps.analysis_progress_storage[self.project_id]
-        storage["progress"] = pct_start
-        storage["current_phase"] = message
+        self._write(progress=pct_start, current_phase=message)
 
     def end_phase(self, phase_key: str, phase_index: int):
         """Marca el fin de una fase."""
         _, pct_end = self.get_phase_progress_range(phase_key)
         self.phase_durations[phase_key] = time.time() - self.phase_start_times[phase_key]
-        deps.analysis_progress_storage[self.project_id]["progress"] = pct_end
+        self._write(progress=pct_end)
         self.phases[phase_index]["completed"] = True
         self.phases[phase_index]["current"] = False
         self.phases[phase_index]["duration"] = round(self.phase_durations[phase_key], 1)
@@ -84,30 +109,50 @@ class ProgressTracker:
         """Update progress within a phase (fraction 0.0 to 1.0)."""
         pct_start, pct_end = self.get_phase_progress_range(phase_key)
         pct = int(pct_start + (pct_end - pct_start) * fraction)
-        storage = deps.analysis_progress_storage.get(self.project_id)
-        if storage:
-            storage["progress"] = pct
-            storage["current_action"] = message
+        self._write(progress=pct, current_action=message)
 
     def complete_phase(self, phase_key: str, phase_index: int):
         """Alias for end_phase."""
         self.end_phase(phase_key, phase_index)
 
+    def _resolve_index(self, phase_key: str) -> int:
+        """Resolve phase index from phase_order (for partial analysis)."""
+        try:
+            return self.phase_order.index(phase_key)
+        except ValueError:
+            return 0
+
+    def start_phase_by_key(self, phase_key: str, message: str):
+        """Start a phase resolving index from phase_order (partial analysis)."""
+        self.start_phase(phase_key, self._resolve_index(phase_key), message)
+
+    def end_phase_by_key(self, phase_key: str):
+        """End a phase resolving index from phase_order (partial analysis)."""
+        self.end_phase(phase_key, self._resolve_index(phase_key))
+
+    def complete_phase_by_key(self, phase_key: str):
+        """Alias for end_phase_by_key."""
+        self.end_phase_by_key(phase_key)
+
     def set_progress(self, pct: int):
         """Establece el porcentaje de progreso."""
-        deps.analysis_progress_storage[self.project_id]["progress"] = pct
+        self._write(progress=pct)
 
     def set_message(self, message: str):
         """Establece el mensaje de fase actual."""
-        deps.analysis_progress_storage[self.project_id]["current_phase"] = message
+        self._write(current_phase=message)
 
     def set_action(self, action: str):
         """Establece la acción actual (sub-tarea)."""
-        deps.analysis_progress_storage[self.project_id]["current_action"] = action
+        self._write(current_action=action)
 
     def set_metric(self, key: str, value: Any):
         """Establece una métrica en el storage."""
-        deps.analysis_progress_storage[self.project_id]["metrics"][key] = value
+        self._write(metrics_update={key: value})
+
+    def set_status(self, status: str, **extra):
+        """Establece el status (thread-safe, para transiciones críticas)."""
+        self._write(status=status, **extra)
 
     def update_time_remaining(self):
         """Calcula tiempo restante usando tiempos reales de fases completadas."""
@@ -162,15 +207,17 @@ class ProgressTracker:
             future_time = speed * pending_weight
             total_remaining = int(phase_remaining + future_time)
         else:
-            word_count = deps.analysis_progress_storage[self.project_id].get(
-                "metrics", {}
-            ).get("word_count", 500)
+            with deps._progress_lock:
+                word_count = deps.analysis_progress_storage.get(
+                    self.project_id, {}
+                ).get("metrics", {}).get("word_count", 500)
             base_estimate = 60 + int(word_count * 0.2)
             total_remaining = int(base_estimate * remaining_weight)
 
-        storage = deps.analysis_progress_storage[self.project_id]
-        storage["estimated_seconds_remaining"] = max(min_time_remaining, total_remaining)
-        storage["_last_progress_update"] = time.time()
+        self._write(
+            estimated_seconds_remaining=max(min_time_remaining, total_remaining),
+            _last_progress_update=time.time(),
+        )
         self.persist_progress()
 
     def check_cancelled(self):
@@ -1954,6 +2001,18 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
         for e in entities
     ]
 
+    # BK-08: Construir TemporalMap para narrativas no lineales
+    temporal_map = None
+    try:
+        from narrative_assistant.temporal.temporal_map import TemporalMap
+
+        timeline = ctx.get("timeline")
+        if timeline is not None:
+            temporal_map = TemporalMap.from_timeline(timeline)
+            logger.info(f"Built TemporalMap with {len(temporal_map._slices)} slices")
+    except Exception as e:
+        logger.warning(f"Failed to build TemporalMap: {e}. Falling back to chapter comparison.")
+
     try:
         from narrative_assistant.analysis.vital_status import analyze_vital_status
 
@@ -1961,6 +2020,7 @@ def run_consistency(ctx: dict, tracker: ProgressTracker):
             project_id=project_id,
             chapters=chapters_for_analysis,
             entities=entities_for_analysis,
+            temporal_map=temporal_map,
         )
 
         if vital_result.is_success:
@@ -2841,26 +2901,26 @@ def run_completion(ctx: dict, tracker: ProgressTracker):
     chapters_count = ctx["chapters_count"]
     start_time = ctx["start_time"]
 
-    deps.analysis_progress_storage[project_id]["status"] = "completed"
-    deps.analysis_progress_storage[project_id]["current_phase"] = "Análisis completado"
-    deps.analysis_progress_storage[project_id]["estimated_seconds_remaining"] = 0
-
     total_duration = round(time.time() - start_time, 1)
-    deps.analysis_progress_storage[project_id]["metrics"]["total_duration_seconds"] = (
-        total_duration
-    )
 
-    metrics = deps.analysis_progress_storage[project_id]["metrics"]
-    deps.analysis_progress_storage[project_id]["stats"] = {
-        "entities": metrics.get("entities_found", len(entities)),
-        "alerts": metrics.get("alerts_generated", alerts_created),
-        "chapters": metrics.get("chapters_found", chapters_count),
-        "corrections": metrics.get("correction_suggestions", 0),
-        "grammar": metrics.get("grammar_issues_found", 0),
-        "attributes": metrics.get("attributes_extracted", len(attributes)),
-        "words": metrics.get("word_count", word_count),
-        "duration": total_duration,
-    }
+    # F-006: Atomic status transition — lock protects against cancel race
+    with deps._progress_lock:
+        storage = deps.analysis_progress_storage.get(project_id, {})
+        storage["status"] = "completed"
+        storage["current_phase"] = "Análisis completado"
+        storage["estimated_seconds_remaining"] = 0
+        storage.setdefault("metrics", {})["total_duration_seconds"] = total_duration
+        metrics = storage.get("metrics", {})
+        storage["stats"] = {
+            "entities": metrics.get("entities_found", len(entities)),
+            "alerts": metrics.get("alerts_generated", alerts_created),
+            "chapters": metrics.get("chapters_found", chapters_count),
+            "corrections": metrics.get("correction_suggestions", 0),
+            "grammar": metrics.get("grammar_issues_found", 0),
+            "attributes": metrics.get("attributes_extracted", len(attributes)),
+            "words": metrics.get("word_count", word_count),
+            "duration": total_duration,
+        }
 
     project.analysis_status = "completed"
     project.analysis_progress = 1.0
@@ -2892,8 +2952,10 @@ def handle_analysis_error(ctx: dict, error: Exception):
     # Cancelación por el usuario: no es un error, es una acción intencional
     if isinstance(error, AnalysisCancelledError):
         logger.info(f"Analysis cancelled by user for project {project_id}")
-        deps.analysis_progress_storage[project_id]["status"] = "cancelled"
-        deps.analysis_progress_storage[project_id]["current_phase"] = "Análisis cancelado por el usuario"
+        with deps._progress_lock:
+            storage = deps.analysis_progress_storage.get(project_id, {})
+            storage["status"] = "cancelled"
+            storage["current_phase"] = "Análisis cancelado por el usuario"
         try:
             project.analysis_status = "cancelled"
             proj_manager = ProjectManager(ctx["db_session"])
@@ -2903,7 +2965,6 @@ def handle_analysis_error(ctx: dict, error: Exception):
         return
 
     logger.exception(f"Error during analysis for project {project_id}: {error}")
-    deps.analysis_progress_storage[project_id]["status"] = "error"
 
     err_str = str(error)
     if (
@@ -2918,8 +2979,11 @@ def handle_analysis_error(ctx: dict, error: Exception):
     else:
         user_msg = f"Error en el análisis: {err_str}"
 
-    deps.analysis_progress_storage[project_id]["current_phase"] = user_msg
-    deps.analysis_progress_storage[project_id]["error"] = user_msg
+    with deps._progress_lock:
+        storage = deps.analysis_progress_storage.get(project_id, {})
+        storage["status"] = "error"
+        storage["current_phase"] = user_msg
+        storage["error"] = user_msg
 
     try:
         project.analysis_status = "error"

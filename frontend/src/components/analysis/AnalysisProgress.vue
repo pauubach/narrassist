@@ -29,6 +29,14 @@ const isFailed = computed(() => props.progress?.status === 'failed')
 
 const progressPercent = computed(() => props.progress?.progress ?? 0)
 
+const phaseCounter = computed(() => {
+  if (!props.progress?.phases.length) return null
+  const completed = props.progress.phases.filter(p => p.completed).length
+  const current = props.progress.phases.some(p => p.current) ? 1 : 0
+  const active = completed + current
+  return { active, total: props.progress.phases.length }
+})
+
 const statusIcon = computed(() => {
   if (isComplete.value) return 'pi pi-check-circle'
   if (isFailed.value) return 'pi pi-times-circle'
@@ -88,6 +96,9 @@ function getPhaseClass(phase: AnalysisPhase): string {
         </div>
         <div class="analysis-progress__bar-info">
           <span class="analysis-progress__percent">{{ progressPercent }}%</span>
+          <span v-if="isRunning && phaseCounter" class="analysis-progress__phase-counter">
+            Fase {{ phaseCounter.active }} de {{ phaseCounter.total }}
+          </span>
           <span v-if="isRunning && progress.estimatedSecondsRemaining" class="analysis-progress__time">
             {{ formatTime(progress.estimatedSecondsRemaining) }}
           </span>
@@ -245,6 +256,10 @@ function getPhaseClass(phase: AnalysisPhase): string {
 .analysis-progress__percent {
   font-weight: var(--ds-font-weight-semibold);
   color: var(--ds-color-text);
+}
+
+.analysis-progress__phase-counter {
+  color: var(--ds-color-text-secondary);
 }
 
 .analysis-progress__time {

@@ -1078,24 +1078,24 @@ NO propagar invalidacion downstream. Comparar `output_hash` antes vs despues.
 | BK-03 | FlawedFictions benchmark | Cuando dataset se publique |
 | BK-04 | Fine-tune PlanTL RoBERTa en ficción | Si acumulamos datos etiquetados |
 | ~~BK-05~~ | ~~Comparativa antes/después~~ | ✅ DONE - Snapshot pre-reanálisis + ComparisonService (two-pass matching) |
-| BK-06 | Exportar a Scrivener | Integración con herramienta escritores |
+| ~~BK-06~~ | ~~Exportar a Scrivener~~ | ✅ DONE — `scrivener_exporter.py` (~400 líneas), endpoint `GET /export/scrivener`, ZIP con estructura .scriv compatible Scrivener 3 |
 | BK-08 | Integrar timeline en vital_status | Cruzar temporal_markers con death_events: si flashback_time < death_time → aparición válida. Requiere detección de línea temporal no lineal (prólogos, alternancia pasado/presente). LLM para desambiguación en casos difíciles. |
 | ~~BK-07~~ | ~~Análisis multi-documento~~ | ✅ DONE - Collections, entity links, cross-book analysis, workspace auxiliar |
 | ~~BK-09~~ | ~~Merge-induced attribute orphaning~~ | ✅ DONE — `move_related_data()` en `repository.py` migra 14 FK cols en 10 tablas. 16 tests en `test_entity_merge_fk.py`. |
-| BK-10 | Dialogue attribution: correcciones no aplicadas + scene breaks | **P1** — Scene break patterns definidos en `chapter.py:621` (`_SCENE_BREAK_PATTERNS`). Falta: (a) `SpeakerAttributor` no lee `speaker_corrections`, (b) no usa scene breaks para reset, (c) sin confidence decay. |
+| ~~BK-10~~ | ~~Dialogue attribution: correcciones + scene breaks~~ | ✅ DONE — BK-10b/c (scene breaks + confidence decay) en commit cf11a00. `SpeakerAttributor` integrado con `speaker_corrections` y `_SCENE_BREAK_PATTERNS`. |
 | ~~BK-11~~ | ~~Detección de narrativa no lineal~~ | ✅ DONE — `TemporalMap` en `temporal_map.py`, `NonLinearNarrativeDetector` en `non_linear_detector.py`. `vital_status.py` usa `is_character_alive_in_chapter()` (story_time) en vez de `chapter >=`. 15 tests. |
 | BK-12 | Cache para fases de enriquecimiento | **P1** — Fases 10-13 (relaciones, voz, prosa) recalculan on-the-fly en cada visita a tab. Sin cache → OOM en hardware limitado (8GB RAM). Blocker para S8a-07..10. |
 | ~~BK-13~~ | ~~Pro-drop ambigüedad multi-personaje~~ | ✅ DONE — `ProDropAmbiguityScorer` y `SaliencyTracker` en `pro_drop_scorer.py`. Scoring multi-factor (recency, saliency, gender, discourse, number). Ambiguity score 0-1. Integrado en `HeuristicsCorefMethod` para `MentionType.ZERO`. `_weighted_vote()` almacena `_ambiguity` en detalle. 10 tests. |
 | ~~BK-14~~ | ~~Ubicaciones jerárquicas/anidadas~~ | ✅ DONE — `LocationOntology` en `location_ontology.py`: jerarquía 7 niveles, gazetteer ~50 ciudades, haversine, alias, reachability por periodo histórico. 19 tests. |
-| BK-15 | Emotional masking no modelado | **DONE** — `_check_emotional_masking()` en `out_of_character.py`, 7 familias verbales, leakage físico. 6 tests en `test_ooc_masking.py`. |
+| ~~BK-15~~ | ~~Emotional masking~~ | ✅ DONE — `_check_emotional_masking()` en `out_of_character.py`, 7 familias verbales, leakage físico. 6 tests en `test_ooc_masking.py`. |
 | ~~BK-16~~ | ~~Hilos narrativos sin resolver (Chekhov's gun)~~ | ✅ DONE — `ChekhovTracker` en `chekhov_tracker.py`: detecta personajes SUPPORTING/MINOR que desaparecen (threshold 70%). `SupportingCharacterData` con diálogo/acciones/partners. `detect_abandoned_character_threads()` genera `AbandonedThread`. Integrado en `_detect_chekhov_elements()`. 8 tests. |
-| BK-17 | Glossary → entity disambiguation | **DONE** — `user_glossary` table (v20), `_inject_glossary_entities()` en NER pipeline, CRUD API endpoints. 6 tests en `test_glossary_ner.py`. |
+| ~~BK-17~~ | ~~Glossary → entity disambiguation~~ | ✅ DONE — `user_glossary` table (v20), `_inject_glossary_entities()` en NER pipeline, CRUD API endpoints. 6 tests en `test_glossary_ner.py`. |
 | ~~BK-18~~ | ~~Confidence decay para inferencias stale~~ | ✅ DONE — Decay temporal en `AlertEngine.create_alert()`: `effective_confidence *= 0.97^chapter_distance`, floor 0.15. Solo para attribute_inconsistency, temporal_anachronism, relationship_contradiction, character_location_impossibility. Cache de total_chapters. 3 tests. |
 | ~~BK-19~~ | ~~UI "Añadir/editar atributo" en EntitiesTab~~ | ✅ DONE — Inline add/edit/delete en EntitiesTab. Formulario con categoria, nombre, valor, confianza auto 1.0 (commit b326317, Sprint PP-2) |
 | ~~BK-20~~ | ~~UI "Corregir hablante" en DialogueAttributionPanel~~ | ✅ DONE — Boton "Corregir" en cada dialogo, dropdown con entidades del capitulo, POST a speaker_corrections (commit 8b52e80, Sprint PP-2) |
 | ~~BK-21~~ | ~~Resolver conflictos atributos en merge~~ | ✅ DONE — MergeEntitiesDialog paso 3: radio buttons para conflictos critical/medium, resoluciones enviadas en POST merge (commit 7a44c73, Sprint PP-2) |
 | ~~BK-22~~ | ~~Feedback loop: sistema aprende de correcciones~~ | ✅ DONE — detector_calibration table, recalibracion de confianza por ratio FP, get_dismissal_stats() → effective_confidence (commit 3cd35d3, Sprint PP-4) |
-| BK-23 | Estandarizar loading patterns (spinners/barras) | **P3** — BK-23b (skeleton loaders) y BK-23c (z-index + animations) DONE. BK-23a (unificar loading Ollama Tutorial=Settings) PENDIENTE. |
+| ~~BK-23~~ | ~~Estandarizar loading patterns (spinners/barras)~~ | ✅ DONE — BK-23a (`DsDownloadProgress.vue`, v0.8.0), BK-23b (skeleton loaders), BK-23c (z-index + animations consolidados). |
 | ~~BK-24~~ | ~~Conectar 3 endpoints export faltantes~~ | ✅ DONE — /export/characters (routing a character_sheets.py), /export/report (ReviewReportExporter), /export/alerts + CSV (commit c653867, Sprint PP-1) |
 | BK-25 | Revision Intelligence (detección alertas resueltas) | **P2** — Comparar alertas pre/post reanálisis: `resolved` / `still_present` / `new_issue` / `dismissed`. Content diffing como método primario. Parseo de track changes de .docx como enhancement (solo 60% de flujos usan track changes). Tier: Profesional. |
 | BK-26 | Colaboración paralela online (sync tiempo real) | **P3** — Sync en tiempo real entre correctores. Requiere servidor con E2E encryption, zero-knowledge. Solo cuando exista licensing server + demanda real. Tier: Editorial. |
@@ -1103,6 +1103,13 @@ NO propagar invalidacion downstream. Comparar `output_hash` antes vs despues.
 | BK-28 | Historial de versiones + tracking de progreso | **P3** — Métricas por versión: alertas, ritmo, formalidad, diálogo. Trends: "V1: 87 alertas → V3: 42". Básico en Profesional, dashboards avanzados en Editorial. |
 | BK-29 | Step-up pricing (packs de páginas one-time) | **P2** — Cuando Corrector llega a 1,500 págs/mes: ofrecer "500 páginas extra por €9". Trigger de upgrade a Profesional. |
 
+> **Panel de expertos (13-Feb-2026)**: 8 expertos (QA Senior, Arquitecto Python/FastAPI,
+> Lingüista Computacional, AppSec, Corrector Editorial 15+, Frontend Engineer, Product Owner,
+> UX Designer). Auditoría completa de backlog + documentación. Resultado: B+ global,
+> 22/29 BK completados (BK-06,10,15,17,23 corregidos como DONE). Plan de trabajo faseado:
+> Fase 1 pre-defensa (~20h), Fase 2 post-defensa v1.0 (~80h), Fase 3 v1.1+ (roadmap).
+> Documento completo: `docs/EXPERT_PANEL_2026-02-13.md`.
+>
 > **Panel de expertos (12-Feb-2026)**: Sesión de paneles especializados (correctores editoriales,
 > pricing SaaS, sales & marketing). BK-25..29 identificados en análisis de flujo editorial,
 > persistencia en reanálisis, y estrategia de pricing/licensing. Incluye: Revision Intelligence,

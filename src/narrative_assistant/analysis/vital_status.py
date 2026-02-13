@@ -158,10 +158,18 @@ class VitalStatusAnalyzer:
 
     # Patrones para muerte reportada (se informa de la muerte)
     DEATH_REPORTED_PATTERNS = [
-        r"(?P<name>\w+)\s+(?:ha\s+muerto|está\s+muerto|había\s+muerto)",
-        r"(?:supieron|descubrieron|se\s+enteraron)\s+(?:de\s+)?que\s+(?P<name>\w+)\s+(?:había\s+muerto|murió)",
+        r"(?P<name>\w+)\s+(?:ha\s+muerto|está\s+muerto)",
+        r"(?:supieron|descubrieron|se\s+enteraron)\s+(?:de\s+)?que\s+(?P<name>\w+)\s+(?:murió|falleció)",
         r"(?:anunciaron|comunicaron|informaron)\s+(?:de\s+)?(?:la\s+muerte|el\s+fallecimiento)\s+de\s+(?P<name>\w+)",
         r"(?P<name>\w+)\s+(?:no\s+sobrevivió|no\s+lo\s+logró)",
+    ]
+
+    # Patrones para muerte en pluscuamperfecto (pasado relativo, ambigua)
+    DEATH_PLUPERFECT_PATTERNS = [
+        r"(?P<name>\w+)\s+(?:había\s+muerto|había\s+fallecido|ya\s+había\s+muerto)",
+        r"(?P<name>\w+)\s+(?:había\s+sido\s+asesinado|había\s+sido\s+ejecutado)",
+        r"(?:hacía|hace)\s+\w+\s+que\s+(?P<name>\w+)\s+(?:murió|falleció|había\s+muerto)",
+        r"(?:supieron|descubrieron|se\s+enteraron)\s+(?:de\s+)?que\s+(?P<name>\w+)\s+había\s+(?:muerto|fallecido)",
     ]
 
     # Patrones para muerte implícita (presumido muerto)
@@ -244,6 +252,7 @@ class VitalStatusAnalyzer:
             (self.DEATH_DIRECT_PATTERNS, "direct"),
             (self.DEATH_CAUSED_PATTERNS, "caused"),
             (self.DEATH_REPORTED_PATTERNS, "reported"),
+            (self.DEATH_PLUPERFECT_PATTERNS, "pluperfect"),
             (self.DEATH_IMPLIED_PATTERNS, "implied"),
         ]
 
@@ -266,16 +275,24 @@ class VitalStatusAnalyzer:
                         if existing.chapter < chapter:
                             continue  # Ya murió antes
 
-                    # Extraer contexto
-                    context_start = max(0, match.start() - 50)
-                    context_end = min(len(text), match.end() + 50)
+                    # Extraer contexto (expandido para capturar marcadores)
+                    context_start = max(0, match.start() - 100)
+                    context_end = min(len(text), match.end() + 100)
                     excerpt = text[context_start:context_end]
+
+                    # BK-08: Descartar muertes especulativas (irrealis)
+                    if self._is_speculative_death(excerpt):
+                        logger.debug(
+                            f"Skipping speculative death for {name} in chapter {chapter}"
+                        )
+                        continue
 
                     # Calcular confianza según tipo
                     confidence_map = {
                         "direct": 0.95,
                         "caused": 0.90,
                         "reported": 0.85,
+                        "pluperfect": 0.65,
                         "implied": 0.60,
                     }
 
@@ -348,8 +365,9 @@ class VitalStatusAnalyzer:
                         continue
 
                     # Extraer contexto amplio para verificar validez
-                    context_start = max(0, match.start() - 100)
-                    context_end = min(len(text), match.end() + 100)
+                    # BK-08: Expandido a 250 chars para capturar marcadores de flashback
+                    context_start = max(0, match.start() - 250)
+                    context_end = min(len(text), match.end() + 250)
                     context = text[context_start:context_end]
 
                     # Verificar si es referencia válida (recuerdo, flashback, etc.)
@@ -422,6 +440,19 @@ class VitalStatusAnalyzer:
         ]
         context_lower = context.lower()
         return any(marker in context_lower for marker in flashback_markers)
+
+    def _is_speculative_death(self, context: str) -> bool:
+        """Verifica si una mención de muerte es especulativa (irrealis), no factual."""
+        irrealis_markers = [
+            r"\bsi\s+(?:hubiera|hubiese|habría|hubiere)\b",
+            r"\bcomo\s+si\b",
+            r"\b(?:imagina|imaginaba)(?:ba|mos|n)?\s+que\b",
+            r"\bhabría\s+(?:podido|sabido|sido|fallecido|muerto|perecido)\b",
+            r"\bpodría\s+haber\s+(?:muerto|fallecido|perecido)\b",
+            r"\bqué\s+pasaría\s+si\b",
+        ]
+        context_lower = context.lower()
+        return any(re.search(m, context_lower) for m in irrealis_markers)
 
     def analyze_chapter(
         self,

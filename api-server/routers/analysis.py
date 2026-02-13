@@ -8,6 +8,8 @@ import deps
 from deps import ApiResponse, logger
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
+from routers._partial_analysis import PartialAnalysisRequest
+
 router = APIRouter()
 
 
@@ -523,6 +525,149 @@ async def start_analysis(project_id: int, file: Optional[UploadFile] = File(None
         raise
     except Exception as e:
         logger.error(f"Error starting analysis for project {project_id}: {e}", exc_info=True)
+        return ApiResponse(success=False, error="Error interno del servidor")
+
+
+@router.post("/api/projects/{project_id}/analyze/partial", response_model=ApiResponse)
+async def start_partial_analysis(project_id: int, request: PartialAnalysisRequest):
+    """
+    Inicia un análisis parcial: ejecuta solo las fases solicitadas.
+
+    A diferencia de /analyze (full analysis con file upload),
+    este endpoint acepta JSON con la lista de fases del frontend
+    y solo ejecuta las que faltan (o todas si force=True).
+    """
+    from routers._partial_analysis import (
+        build_partial_progress,
+        get_completed_phases,
+        resolve_backend_phases,
+        run_partial_analysis_thread,
+    )
+
+    try:
+        # Validar proyecto
+        if not deps.project_manager:
+            return ApiResponse(success=False, error="Project manager not initialized")
+
+        result = deps.project_manager.get(project_id)
+        if result.is_failure:
+            raise HTTPException(
+                status_code=404, detail=f"Proyecto {project_id} no encontrado"
+            )
+        project = result.value
+
+        # Guard: no doble análisis
+        if project.analysis_status == "analyzing":
+            return ApiResponse(
+                success=False,
+                error="Ya hay un análisis en curso para este proyecto."
+            )
+
+        # Validate frontend phase names
+        from routers._partial_analysis import FRONTEND_TO_BACKEND
+        unknown = [p for p in request.phases if p not in FRONTEND_TO_BACKEND]
+        if unknown:
+            return ApiResponse(
+                success=False,
+                error=f"Fases desconocidas: {', '.join(unknown)}"
+            )
+
+        # Resolve backend phases
+        db_session = deps.get_database()
+        completed = get_completed_phases(db_session, project_id)
+        phases_to_run = resolve_backend_phases(
+            request.phases, completed, request.force
+        )
+
+        if not phases_to_run:
+            return ApiResponse(
+                success=True,
+                message="Todas las fases solicitadas ya están completadas.",
+                data={"project_id": project_id, "status": "up_to_date"},
+            )
+
+        # Verify document exists
+        if not project.document_path:
+            return ApiResponse(
+                success=False,
+                error="El proyecto no tiene documento asociado."
+            )
+        from pathlib import Path
+        tmp_path = Path(project.document_path)
+        if not tmp_path.exists():
+            return ApiResponse(
+                success=False,
+                error=f"El documento no se encuentra: {project.document_path}"
+            )
+
+        # Update project status
+        project.analysis_status = "analyzing"
+        project.analysis_progress = 0.0
+        deps.project_manager.update(project)
+
+        # Initialize progress (only partial phases)
+        import time as time_module
+        now = time_module.time()
+        progress_phases, partial_weights, partial_order = build_partial_progress(
+            phases_to_run
+        )
+
+        with deps._progress_lock:
+            deps.analysis_progress_storage[project_id] = {
+                "project_id": project_id,
+                "status": "running",
+                "progress": 0,
+                "current_phase": "Iniciando análisis parcial...",
+                "current_action": f"{len(phases_to_run)} fases seleccionadas",
+                "phases": progress_phases,
+                "metrics": {},
+                "estimated_seconds_remaining": 30,
+                "_start_time": now,
+                "_last_progress_update": now,
+            }
+
+        logger.info(
+            f"Partial analysis started for project {project_id}: "
+            f"phases={phases_to_run}, force={request.force}"
+        )
+
+        # Build context and spawn thread
+        import threading
+
+        ctx = {
+            "project_id": project_id,
+            "project": project,
+            "db_session": db_session,
+            "tmp_path": tmp_path,
+            "use_temp_file": False,
+            "start_time": now,
+            "queued_for_heavy": False,
+        }
+
+        thread = threading.Thread(
+            target=run_partial_analysis_thread,
+            args=(ctx, phases_to_run, request.force),
+            daemon=True,
+        )
+        thread.start()
+
+        return ApiResponse(
+            success=True,
+            message="Análisis parcial iniciado correctamente",
+            data={
+                "project_id": project_id,
+                "status": "running",
+                "phases": phases_to_run,
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Error starting partial analysis for project {project_id}: {e}",
+            exc_info=True,
+        )
         return ApiResponse(success=False, error="Error interno del servidor")
 
 

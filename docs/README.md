@@ -1,7 +1,7 @@
 # Narrative Assistant - Documentacion
 
-**Ultima actualizacion**: 2026-02-10
-**Version**: 0.7.17
+**Ultima actualizacion**: 2026-02-13
+**Version**: 0.9.4
 
 ---
 
@@ -86,7 +86,7 @@ docs/
 ├── PYTHON_EMBED.md                # Python embebido (Tauri)
 ├── COREFERENCE_RESOLUTION.md      # Sistema de correferencias
 ├── LICENSING_PRODUCTION_PLAN.md   # Plan produccion licencias
-├── AUDIT_FINDINGS.md              # Auditoria v0.7.16
+├── AUDIT_INDEX.md                 # Índice de documentos de auditoría
 ├── ARCHITECTURE_AUDIT_2026-02.md  # Auditoria arquitectonica
 ├── WCAG_COLOR_AUDIT.md            # Auditoria accesibilidad
 ├── OPTIMIZATION_STATUS.md         # Estado optimizaciones

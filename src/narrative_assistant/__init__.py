@@ -7,7 +7,7 @@ Herramienta offline de análisis narrativo para correctores profesionales.
 # Version: try importlib.metadata first, then fallback to hardcoded version
 # IMPORTANT: This fallback is critical for embedded Python where the package
 # is not installed via pip, so importlib.metadata.version() fails.
-_FALLBACK_VERSION = "0.9.3"
+_FALLBACK_VERSION = "0.9.4"
 
 try:
     from importlib.metadata import version

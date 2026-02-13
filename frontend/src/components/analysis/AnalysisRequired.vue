@@ -93,10 +93,7 @@ const runningDescription = computed(() => {
 })
 
 const runButtonLabel = computed(() => {
-  if (hasMissingDependencies.value) {
-    return `Ejecutar ${phasesToRun.value.length} análisis`
-  }
-  return `Ejecutar ${phaseLabel.value}`
+  return 'Ejecutar análisis completo'
 })
 
 // Actions

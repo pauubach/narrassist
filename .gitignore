@@ -48,6 +48,13 @@ nul
 temp_*/
 clean_registry.ps1
 
+# Coverage
+.coverage
+htmlcov/
+
+# MCP config (local)
+.mcp.json
+
 # Test results and reports
 frontend/test-results/
 frontend/playwright-report/

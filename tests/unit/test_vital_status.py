@@ -317,8 +317,8 @@ class TestVitalStatusAnalyzer:
         assert events[0].death_type == "caused"
 
     def test_detect_death_reported(self, analyzer):
-        """Test detección de muerte reportada."""
-        text = "Descubrieron que María había muerto la noche anterior."
+        """Test detección de muerte reportada (presente perfecto)."""
+        text = "María ha muerto esta mañana en el hospital."
         events = analyzer.detect_death_events(text, chapter=8)
 
         assert len(events) == 1
@@ -785,3 +785,141 @@ class TestValidReferencePatterns:
         # Debe detectar apariciones inválidas
         assert len(appearances) >= 1
         assert any(not a.is_valid for a in appearances)
+
+
+# ============================================================================
+# BK-08: Integration tests — vital_status + temporal_map
+# ============================================================================
+
+
+class TestVitalStatusWithTemporalMapIntegration:
+    """Tests de integración vital_status + temporal_map (BK-08)."""
+
+    def test_flashback_before_death_not_flagged(self):
+        """Flashback anterior a muerte no debe marcarse como inconsistencia."""
+        from datetime import date
+
+        from narrative_assistant.temporal.temporal_map import (
+            NarrativeType,
+            TemporalMap,
+            TemporalSlice,
+        )
+
+        temporal_map = TemporalMap()
+        temporal_map.add_slice(1, TemporalSlice(
+            chapter=1, story_date=date(2020, 1, 1),
+            narrative_type=NarrativeType.CHRONOLOGICAL,
+        ))
+        temporal_map.add_slice(2, TemporalSlice(
+            chapter=2, story_date=date(2020, 6, 1),
+            narrative_type=NarrativeType.CHRONOLOGICAL,
+        ))
+        temporal_map.add_slice(3, TemporalSlice(
+            chapter=3, story_date=date(2020, 3, 1),
+            narrative_type=NarrativeType.ANALEPSIS,
+        ))
+
+        chapters = [
+            {"number": 1, "content": "Juan está sano.", "story_date": date(2020, 1, 1)},
+            {"number": 2, "content": "Juan murió de neumonía.", "story_date": date(2020, 6, 1)},
+            {"number": 3, "content": "En marzo, Juan sonrió en la playa.", "story_date": date(2020, 3, 1)},
+        ]
+        entities = [{"id": 1, "entity_type": "character", "canonical_name": "Juan", "aliases": []}]
+
+        result = analyze_vital_status(1, chapters, entities, temporal_map=temporal_map)
+        assert result.is_success
+        report = result.value
+
+        assert len(report.death_events) == 1
+        assert report.death_events[0].chapter == 2
+        # Cap 3 es flashback anterior a muerte → no debe ser inconsistencia
+        inconsistencies = report.inconsistencies
+        for inc in inconsistencies:
+            assert inc.appearance_chapter != 3, (
+                "Flashback anterior a muerte no debe marcarse como inconsistencia"
+            )
+
+    def test_day_offset_temporal_map(self):
+        """Temporal map con day_offset funciona correctamente."""
+        from narrative_assistant.temporal.temporal_map import (
+            NarrativeType,
+            TemporalMap,
+            TemporalSlice,
+        )
+
+        temporal_map = TemporalMap()
+        temporal_map.add_slice(1, TemporalSlice(
+            chapter=1, day_offset=0,
+            narrative_type=NarrativeType.CHRONOLOGICAL,
+        ))
+        temporal_map.add_slice(2, TemporalSlice(
+            chapter=2, day_offset=5,
+            narrative_type=NarrativeType.CHRONOLOGICAL,
+        ))
+        temporal_map.add_slice(3, TemporalSlice(
+            chapter=3, day_offset=-365,
+            narrative_type=NarrativeType.ANALEPSIS,
+        ))
+
+        chapters = [
+            {"number": 1, "content": "Hoy es el día 0.", "day_offset": 0},
+            {"number": 2, "content": "Cinco días después, Elena murió.", "day_offset": 5},
+            {"number": 3, "content": "Un año antes, Elena bailó bajo la lluvia.", "day_offset": -365},
+        ]
+        entities = [{"id": 1, "entity_type": "character", "canonical_name": "Elena", "aliases": []}]
+
+        result = analyze_vital_status(1, chapters, entities, temporal_map=temporal_map)
+        assert result.is_success
+        report = result.value
+
+        assert len(report.death_events) == 1
+        # Cap 3 (day -365) es anterior a muerte (day 5) → no inconsistencia
+        for inc in report.inconsistencies:
+            assert inc.appearance_chapter != 3
+
+    def test_fallback_without_temporal_map(self):
+        """Sin temporal_map, usa comparación lineal por capítulo."""
+        chapters = [
+            {"number": 1, "content": "Pedro está aquí."},
+            {"number": 2, "content": "Pedro murió trágicamente."},
+            {"number": 3, "content": "Pedro se levantó y habló."},
+        ]
+        entities = [{"id": 1, "entity_type": "character", "canonical_name": "Pedro", "aliases": []}]
+
+        result = analyze_vital_status(1, chapters, entities, temporal_map=None)
+        assert result.is_success
+        report = result.value
+
+        assert len(report.death_events) == 1
+        # Cap 3 es posterior a muerte sin temporal_map → debe detectar
+        assert len(report.post_mortem_appearances) >= 1
+
+    def test_speculative_death_not_recorded(self):
+        """Muerte especulativa (irrealis) no debe registrarse como real."""
+        chapters = [
+            {"number": 1, "content": "Si Ana hubiera muerto, todo sería diferente."},
+            {"number": 2, "content": "Ana caminó por el parque."},
+        ]
+        entities = [{"id": 1, "entity_type": "character", "canonical_name": "Ana", "aliases": []}]
+
+        result = analyze_vital_status(1, chapters, entities)
+        assert result.is_success
+        report = result.value
+
+        # No debe registrar muerte especulativa
+        assert len(report.death_events) == 0
+
+    def test_pluperfect_death_detected_with_lower_confidence(self):
+        """Muerte en pluscuamperfecto detectada con confianza reducida."""
+        chapters = [
+            {"number": 1, "content": "Carlos había muerto tres años antes."},
+        ]
+        entities = [{"id": 1, "entity_type": "character", "canonical_name": "Carlos", "aliases": []}]
+
+        result = analyze_vital_status(1, chapters, entities)
+        assert result.is_success
+        report = result.value
+
+        assert len(report.death_events) == 1
+        assert report.death_events[0].death_type == "pluperfect"
+        assert report.death_events[0].confidence == 0.65
