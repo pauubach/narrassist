@@ -4,7 +4,7 @@ Router: license
 Endpoints para gestion de licencias, dispositivos, cuotas (paginas) y features por tier.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from deps import ApiResponse, DeviceDeactivationRequest, LicenseActivationRequest, logger
 from fastapi import APIRouter, Body

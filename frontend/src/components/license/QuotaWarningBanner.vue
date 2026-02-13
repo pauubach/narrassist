@@ -94,11 +94,15 @@ const bannerTitle = computed(() => {
   return `Has usado ${pagesUsed.value} de ${pagesMax.value} paginas este mes`
 })
 
+const daysRemaining = computed(() => licenseStore.daysRemainingInPeriod)
+
 const bannerHint = computed(() => {
   const level = licenseStore.quotaWarningLevel
-  if (level === 'critical') return 'No puedes analizar mas documentos hasta el proximo periodo.'
-  if (level === 'danger') return 'Considera ampliar tu plan para evitar interrupciones.'
-  return 'Tu cuota mensual esta llegando al limite.'
+  const days = daysRemaining.value
+  const daysText = days !== null ? ` Se renueva en ${days} dias.` : ''
+  if (level === 'critical') return `No puedes analizar mas documentos hasta el proximo periodo.${daysText}`
+  if (level === 'danger') return `Considera ampliar tu plan para evitar interrupciones.${daysText}`
+  return `Tu cuota mensual esta llegando al limite.${daysText}`
 })
 
 const actionLabel = computed(() => {

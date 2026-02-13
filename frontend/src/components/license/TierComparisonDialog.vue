@@ -27,6 +27,7 @@
               <div class="plan-header">
                 <span class="plan-name">{{ plan.name }}</span>
                 <span class="plan-price">{{ plan.price }}</span>
+                <span v-if="plan.priceNote" class="plan-price-note">{{ plan.priceNote }}</span>
               </div>
             </th>
           </tr>
@@ -87,14 +88,23 @@ const isVisible = computed({
 const currentTier = computed(() => licenseStore.tier)
 
 const isFoundingMember = computed(() => {
-  return licenseStore.licenseInfo?.is_trial === false && licenseStore.isLicensed
+  return licenseStore.licenseInfo?.is_founding_member === true
 })
 
-const plans = [
-  { key: 'corrector' as const, name: 'Corrector', price: '19 \u20AC/mes' },
-  { key: 'profesional' as const, name: 'Profesional', price: '34 \u20AC/mes' },
-  { key: 'editorial' as const, name: 'Editorial', price: '119 \u20AC/mes' },
-]
+const plans = computed(() => {
+  if (isFoundingMember.value) {
+    return [
+      { key: 'corrector' as const, name: 'Corrector', price: '19 \u20AC/mes', priceNote: '(founder)' },
+      { key: 'profesional' as const, name: 'Profesional', price: '34 \u20AC/mes', priceNote: '(founder)' },
+      { key: 'editorial' as const, name: 'Editorial', price: '119 \u20AC/mes', priceNote: '(founder)' },
+    ]
+  }
+  return [
+    { key: 'corrector' as const, name: 'Corrector', price: '24 \u20AC/mes', priceNote: '' },
+    { key: 'profesional' as const, name: 'Profesional', price: '49 \u20AC/mes', priceNote: '' },
+    { key: 'editorial' as const, name: 'Editorial', price: '159 \u20AC/mes', priceNote: '' },
+  ]
+})
 
 type PlanKey = 'corrector' | 'profesional' | 'editorial'
 interface FeatureRow {
@@ -241,6 +251,12 @@ const featureRows: FeatureRow[] = [
 .plan-price {
   font-size: 0.8rem;
   color: var(--p-text-muted-color);
+}
+
+.plan-price-note {
+  font-size: 0.7rem;
+  color: var(--p-yellow-600);
+  font-weight: 500;
 }
 
 /* Current tier highlight */

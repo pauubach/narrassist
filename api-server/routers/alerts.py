@@ -368,11 +368,27 @@ async def resolve_all_alerts(project_id: int):
 
         # Filtrar alertas abiertas y resolverlas
         resolved_count = 0
+        resolved_alerts = []
         for alert in all_alerts:
             if alert.status.value in ['new', 'open', 'acknowledged', 'in_progress']:
                 alert.status = AlertStatus.RESOLVED
                 alert_repo.update(alert)
                 resolved_count += 1
+                resolved_alerts.append(alert)
+
+        # Nivel 3: actualizar pesos adaptativos (confirmar = alerta fue útil)
+        if resolved_alerts:
+            try:
+                from narrative_assistant.alerts.engine import get_alert_engine
+                engine = get_alert_engine()
+                for alert in resolved_alerts:
+                    entity_names = _extract_entity_names(alert)
+                    engine.update_adaptive_weight(
+                        project_id, alert.alert_type, dismissed=False,
+                        entity_names=entity_names,
+                    )
+            except Exception as e:
+                logger.warning(f"Error updating adaptive weights in resolve-all: {e}")
 
         logger.info(f"Resolved {resolved_count} alerts for project {project_id}")
 
@@ -449,8 +465,9 @@ async def dismiss_batch(project_id: int, body: deps.BatchDismissRequest):
                 # Per-entity weights from batch: collect entity names per alert_type
                 entity_names_by_type: dict[str, list[str]] = {}
                 for aid in alert_ids:
-                    a = deps.alert_repository.get_by_id(aid)
-                    if a:
+                    result = deps.alert_repository.get(aid)
+                    if result and result.is_success and result.value:
+                        a = result.value
                         names = _extract_entity_names(a)
                         if names:
                             entity_names_by_type.setdefault(a.alert_type, []).extend(names)
@@ -459,8 +476,8 @@ async def dismiss_batch(project_id: int, body: deps.BatchDismissRequest):
                         project_id, alert_type, dismissed=True,
                         entity_names=entity_names_by_type.get(alert_type),
                     )
-            except Exception:
-                pass  # best-effort
+            except Exception as e:
+                logger.warning(f"Error updating adaptive weights in batch dismiss: {e}")
 
         count = len(alert_ids)
         logger.info(f"Batch dismissed {count} alerts for project {project_id}")

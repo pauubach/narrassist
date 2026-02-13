@@ -2051,10 +2051,10 @@ Infraestructura existente (55% — backend core completo):
 
 | Tarea | Horas | Archivo | Detalle |
 |-------|-------|---------|---------|
-| S16-01 | 2h | `frontend/src/components/license/QuotaWarning.vue` | Banner persistente: "Has usado 1,200 de 1,500 páginas este mes" (80%). A 90%: naranja con CTA "Ampliar". A 100%: rojo con "Límite alcanzado". |
+| S16-01 | 2h | `frontend/src/components/license/QuotaWarningBanner.vue` | Banner persistente: "Has usado 1,200 de 1,500 páginas este mes" (80%). A 90%: naranja con CTA "Ampliar". A 100%: rojo con "Límite alcanzado". |
 | S16-02 | 2h | `frontend/src/stores/license.ts` | Computed `quotaPercentage`, `quotaWarningLevel`. Auto-fetch al montar app. |
-| S16-03 | 2h | `api-server/routers/license.py` | `GET /license/quota-status` — devuelve `{used, limit, percentage, warning_level, days_remaining}`. |
-| S16-04 | 3h | `frontend/src/components/license/TierComparison.vue` | Feature matrix: Corrector vs Pro vs Editorial. Highlight current tier. CTA "Contactar para upgrade" (no pago directo). |
+| S16-03 | 2h | `api-server/routers/license.py` | `GET /api/license/quota-status` — devuelve `{used, limit, percentage, warning_level, days_remaining}`. |
+| S16-04 | 3h | `frontend/src/components/license/TierComparisonDialog.vue` | Feature matrix: Corrector vs Pro vs Editorial. Highlight current tier. CTA "Contactar para upgrade" (no pago directo). |
 | S16-05 | 1h | Tests | Test quota calculations. Test warning levels. |
 | S16-06 | 2h | Tests + docs | Test tier comparison render. Documentar tiers en FAQ. |
 

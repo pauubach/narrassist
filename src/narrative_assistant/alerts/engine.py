@@ -138,8 +138,18 @@ class AlertEngine:
         # Nivel 3: Pesos adaptativos per-project/per-entity
         # Cascada: per-entity (si disponible) > project-level > 1.0
         extra_data = kwargs.get("extra_data", {})
-        entity_name = extra_data.get("entity_name", "") if isinstance(extra_data, dict) else ""
-        adaptive_weight = self._get_adaptive_weight(project_id, alert_type, entity_name)
+        entity_names = []
+        if isinstance(extra_data, dict):
+            for key in ("entity_name", "entity1_name", "entity2_name"):
+                name = extra_data.get(key, "")
+                if name:
+                    entity_names.append(name)
+        if entity_names:
+            # Promedio de pesos per-entity (para alertas multi-entidad)
+            weights = [self._get_adaptive_weight(project_id, alert_type, n) for n in entity_names]
+            adaptive_weight = sum(weights) / len(weights)
+        else:
+            adaptive_weight = self._get_adaptive_weight(project_id, alert_type, "")
         effective_confidence *= adaptive_weight
 
         effective_confidence = round(effective_confidence, 4)

@@ -1418,6 +1418,71 @@ class Database:
             except Exception as e:
                 logger.warning(f"Error en migración de tabla: {e}")
 
+        # v24: Migrar project_detector_weights de v23 (sin entity_canonical_name)
+        # a v24 (con entity_canonical_name + UNIQUE constraint actualizada).
+        # SQLite no permite ALTER TABLE para cambiar UNIQUE constraints,
+        # así que recreamos la tabla si la columna falta.
+        self._migrate_detector_weights_v24(conn)
+
+    def _migrate_detector_weights_v24(self, conn) -> None:
+        """Migra project_detector_weights de v23 a v24 (añade entity_canonical_name).
+
+        Si la tabla existe pero no tiene la columna entity_canonical_name,
+        recrea la tabla con el nuevo schema (SQLite no soporta ALTER UNIQUE).
+        """
+        try:
+            cols = conn.execute(
+                "PRAGMA table_info(project_detector_weights)"
+            ).fetchall()
+            if not cols:
+                return  # Tabla no existe, se creará por table_migrations
+            col_names = {c[1] for c in cols}
+            if "entity_canonical_name" in col_names:
+                return  # Ya migrada
+
+            logger.info("[MIGRATE] v24: Reconstruyendo project_detector_weights con entity_canonical_name")
+
+            conn.execute("""
+                CREATE TABLE project_detector_weights_new (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    project_id INTEGER NOT NULL,
+                    alert_type TEXT NOT NULL,
+                    entity_canonical_name TEXT NOT NULL DEFAULT '',
+                    weight REAL NOT NULL DEFAULT 1.0,
+                    feedback_count INTEGER NOT NULL DEFAULT 0,
+                    dismiss_count INTEGER NOT NULL DEFAULT 0,
+                    confirm_count INTEGER NOT NULL DEFAULT 0,
+                    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+                    UNIQUE (project_id, alert_type, entity_canonical_name)
+                )
+            """)
+            conn.execute("""
+                INSERT INTO project_detector_weights_new
+                    (project_id, alert_type, entity_canonical_name, weight,
+                     feedback_count, dismiss_count, confirm_count, updated_at)
+                SELECT project_id, alert_type, '', weight,
+                       feedback_count, dismiss_count, confirm_count, updated_at
+                FROM project_detector_weights
+            """)
+            conn.execute("DROP TABLE project_detector_weights")
+            conn.execute(
+                "ALTER TABLE project_detector_weights_new "
+                "RENAME TO project_detector_weights"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_proj_det_weights_project "
+                "ON project_detector_weights(project_id)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_proj_det_weights_entity "
+                "ON project_detector_weights(project_id, alert_type, entity_canonical_name)"
+            )
+            conn.commit()
+            logger.info("[MIGRATE] v24: project_detector_weights migrada exitosamente")
+        except Exception as e:
+            logger.warning(f"[MIGRATE] v24 detector_weights migration error: {e}")
+
     def _create_schema_from_scratch(self) -> None:
         """Crea el schema completo desde cero."""
         try:

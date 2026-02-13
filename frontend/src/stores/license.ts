@@ -34,6 +34,7 @@ export interface LicenseInfo {
   unlimited: boolean
   expires_at: string | null
   is_trial: boolean
+  is_founding_member?: boolean
   offline_days_remaining: number | null
 }
 
@@ -53,6 +54,16 @@ export interface UsageInfo {
   unlimited: boolean
 }
 
+export interface QuotaStatus {
+  pages_used: number
+  pages_max: number
+  pages_remaining: number
+  percentage: number
+  warning_level: QuotaWarningLevel
+  days_remaining_in_period: number
+  unlimited: boolean
+}
+
 
 
 export const useLicenseStore = defineStore('license', () => {
@@ -62,6 +73,7 @@ export const useLicenseStore = defineStore('license', () => {
   const licenseInfo = ref<LicenseInfo | null>(null)
   const devices = ref<DeviceInfo[]>([])
   const usage = ref<UsageInfo | null>(null)
+  const quotaStatus = ref<QuotaStatus | null>(null)
 
   // Computados
   const isLicensed = computed(() => {
@@ -206,6 +218,16 @@ export const useLicenseStore = defineStore('license', () => {
     }
   }
 
+  async function fetchQuotaStatus() {
+    try {
+      quotaStatus.value = await api.get<QuotaStatus>('/api/license/quota-status')
+    } catch (e) {
+      console.error('Error fetching quota status:', e)
+    }
+  }
+
+  const daysRemainingInPeriod = computed(() => quotaStatus.value?.days_remaining_in_period ?? null)
+
   async function checkFeatureAccess(featureName: LicenseFeature): Promise<boolean> {
     try {
       const data = await api.get<{ has_access: boolean }>(`/api/license/check-feature/${featureName}`)
@@ -233,6 +255,7 @@ export const useLicenseStore = defineStore('license', () => {
 
   // Inicializacion
   fetchLicenseStatus()
+  fetchQuotaStatus()
 
   return {
     // Estado
@@ -241,6 +264,7 @@ export const useLicenseStore = defineStore('license', () => {
     licenseInfo,
     devices,
     usage,
+    quotaStatus,
 
     // Computados
     isLicensed,
@@ -254,6 +278,7 @@ export const useLicenseStore = defineStore('license', () => {
     devicesRemaining,
     quotaPercentage,
     quotaWarningLevel,
+    daysRemainingInPeriod,
 
     // Acciones
     fetchLicenseStatus,
@@ -262,6 +287,7 @@ export const useLicenseStore = defineStore('license', () => {
     fetchDevices,
     deactivateDevice,
     fetchUsage,
+    fetchQuotaStatus,
     checkFeatureAccess,
     recordUsage,
     hasFeature,

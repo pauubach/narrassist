@@ -5,7 +5,6 @@ Pesos adaptativos que se acumulan del feedback del usuario y persisten
 entre re-análisis. Diferente de detector_calibration (que se recomputa).
 """
 
-import json
 import sqlite3
 import sys
 from pathlib import Path
@@ -803,3 +802,62 @@ class TestEntityMergeWeightTransfer:
             assert row[1] == 15  # feedback_count sumados
             assert row[2] == 11  # dismiss_count sumados
             assert row[3] == 4   # confirm_count sumados
+
+
+# ============================================================================
+# v23 → v24 migration test
+# ============================================================================
+
+
+class TestV23ToV24Migration:
+    """Test que la migración de v23 (sin entity_canonical_name) a v24 funciona."""
+
+    def test_migration_adds_entity_column(self, tmp_path):
+        """Simular BD v23 y verificar que la migración reconstruye la tabla."""
+        # Primero crear una BD completa v24 para tener todas las tablas
+        from narrative_assistant.persistence.database import Database
+        db_path = tmp_path / "test_v23.db"
+        db = Database(db_path=db_path)
+
+        # Ahora simular "v23" rebajando la tabla project_detector_weights
+        with db.connection() as conn:
+            conn.execute(_INSERT_PROJECT, (1, "Test", 5000, 10))
+            # Drop v24 table and recreate as v23 (without entity_canonical_name)
+            conn.execute("DROP TABLE IF EXISTS project_detector_weights")
+            conn.execute("""CREATE TABLE project_detector_weights (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                alert_type TEXT NOT NULL,
+                weight REAL NOT NULL DEFAULT 1.0,
+                feedback_count INTEGER NOT NULL DEFAULT 0,
+                dismiss_count INTEGER NOT NULL DEFAULT 0,
+                confirm_count INTEGER NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+                UNIQUE (project_id, alert_type)
+            )""")
+            conn.execute(
+                "INSERT INTO project_detector_weights (project_id, alert_type, weight, "
+                "feedback_count, dismiss_count, confirm_count) "
+                "VALUES (1, 'attribute_inconsistency', 0.7, 10, 8, 2)"
+            )
+            conn.commit()
+
+        # Reopen with Database (triggers migrations)
+        db2 = Database(db_path=db_path)
+
+        with db2.connection() as conn:
+            cols = conn.execute("PRAGMA table_info(project_detector_weights)").fetchall()
+            col_names = {c[1] for c in cols}
+            assert "entity_canonical_name" in col_names
+
+            # Datos preservados
+            row = conn.execute(
+                "SELECT weight, feedback_count, entity_canonical_name "
+                "FROM project_detector_weights "
+                "WHERE project_id = 1 AND alert_type = 'attribute_inconsistency'"
+            ).fetchone()
+            assert row is not None
+            assert row[0] == pytest.approx(0.7)
+            assert row[1] == 10
+            assert row[2] == ""  # Migrated rows get empty string
