@@ -5,7 +5,6 @@
  * El store usa estado per-project para evitar contaminación entre proyectos.
  */
 
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useAnalysisStore, ANALYSIS_DEPENDENCIES, type ExecutedPhases } from '../analysis'
 

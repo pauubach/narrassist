@@ -1289,11 +1289,39 @@ def collect_export_data(
                     marker_extractor = TemporalMarkerExtractor()
                     all_markers = []
 
+                    # Reusar menciones de entidades para que la exportación conserve
+                    # la misma semántica temporal que la API (instancias A@40, A@phase:young).
+                    entity_mentions_by_chapter: dict[int, list[tuple[int, int, int]]] = {}
+                    if entity_repository:
+                        try:
+                            from ..temporal.entity_mentions import load_entity_mentions_by_chapter
+
+                            entities = entity_repository.get_entities_by_project(
+                                project_id, active_only=True,
+                            )
+                            entity_mentions_by_chapter = load_entity_mentions_by_chapter(
+                                entities, chapters, entity_repository,
+                            )
+                        except Exception as e:
+                            logger.debug(
+                                f"Could not load entity mentions for export timeline extraction: {e}"
+                            )
+
                     for chapter in chapters:
-                        chapter_markers = marker_extractor.extract(
-                            text=chapter.content,
-                            chapter=chapter.chapter_number,
+                        chapter_mentions = entity_mentions_by_chapter.get(
+                            chapter.chapter_number, []
                         )
+                        if chapter_mentions:
+                            chapter_markers = marker_extractor.extract_with_entities(
+                                text=chapter.content,
+                                entity_mentions=chapter_mentions,
+                                chapter=chapter.chapter_number,
+                            )
+                        else:
+                            chapter_markers = marker_extractor.extract(
+                                text=chapter.content,
+                                chapter=chapter.chapter_number,
+                            )
                         all_markers.extend(chapter_markers)
 
                     builder = TimelineBuilder()

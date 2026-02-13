@@ -67,6 +67,10 @@
         <span class="tooltip-chapter">Cap. {{ hoveredEvent.chapter }}</span>
       </div>
       <p class="tooltip-description">{{ hoveredEvent.description }}</p>
+      <div v-if="hoveredEvent.temporalInstanceId" class="tooltip-instance">
+        <i class="pi pi-history"></i>
+        {{ formatTemporalInstance(hoveredEvent.temporalInstanceId) }}
+      </div>
       <div v-if="hoveredEvent.storyDate && hoveredEvent.storyDate.getFullYear() > 1" class="tooltip-date">
         <i class="pi pi-calendar"></i>
         {{ formatDate(hoveredEvent.storyDate) }}
@@ -96,6 +100,7 @@ import Button from 'primevue/button'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import type { TimelineEvent as DomainTimelineEvent, NarrativeOrder } from '@/types'
+import { formatTemporalInstance } from '@/utils/temporal'
 
 // Re-alias to avoid confusion with vis-timeline Timeline
 type TimelineEvent = DomainTimelineEvent
@@ -231,11 +236,15 @@ const buildItems = computed(() => {
 
     const color = narrativeOrderColors[event.narrativeOrder] || '#6b7280'
     const entityNames = getEventEntities(event)
+    const temporalInstance = event.temporalInstanceId
+      ? `<span class="item-instance">${formatTemporalInstance(event.temporalInstanceId)}</span>`
+      : ''
 
     items.push({
       id: event.id,
       content: `<div class="timeline-item-content">
         <span class="item-text">${truncate(event.description, 40)}</span>
+        ${temporalInstance}
         ${entityNames.length > 0 ? `<span class="item-entities">${entityNames.slice(0, 2).join(', ')}${entityNames.length > 2 ? '...' : ''}</span>` : ''}
       </div>`,
       start: date,
@@ -543,6 +552,7 @@ watch(groupBy, () => {
 }
 
 .tooltip-date,
+.tooltip-instance,
 .tooltip-entities {
   display: flex;
   align-items: center;
@@ -553,6 +563,7 @@ watch(groupBy, () => {
 }
 
 .tooltip-date i,
+.tooltip-instance i,
 .tooltip-entities i {
   font-size: 0.75rem;
 }
@@ -614,6 +625,12 @@ watch(groupBy, () => {
 .timeline-item-content .item-entities {
   font-size: 0.6875rem;
   opacity: 0.85;
+}
+
+.timeline-item-content .item-instance {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  opacity: 0.9;
 }
 
 /* Groups */

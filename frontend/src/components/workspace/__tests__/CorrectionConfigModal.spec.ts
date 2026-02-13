@@ -10,7 +10,6 @@
  * - Modal title con tipo/subtipo
  */
 
-import { describe, it, expect } from 'vitest'
 
 // ── Pure functions extracted from CorrectionConfigModal ─────
 

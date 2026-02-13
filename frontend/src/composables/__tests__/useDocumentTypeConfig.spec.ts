@@ -1,4 +1,3 @@
-import { describe, it, expect } from 'vitest'
 import { ref, computed } from 'vue'
 import { useDocumentTypeConfig } from '../useDocumentTypeConfig'
 import type { DocumentType, RecommendedAnalysis } from '@/types/domain/projects'

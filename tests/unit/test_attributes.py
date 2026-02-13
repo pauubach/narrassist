@@ -4,7 +4,7 @@ Tests unitarios para extracción de atributos.
 
 import pytest
 
-from narrative_assistant.nlp.attributes import AttributeExtractor, AttributeKey
+from narrative_assistant.nlp.attributes import AttributeCategory, AttributeExtractor, AttributeKey
 
 
 class TestAttributeExtractor:
@@ -701,3 +701,51 @@ class TestPossessiveEntityResolution:
         # If resolved, should be Juan, not María
         if eye_attrs:
             assert all(a.entity_name != "María" for a in eye_attrs)
+
+
+class TestAttributeExtractorNonPerson:
+    """Cobertura para atributos de lugares y objetos."""
+
+    @pytest.fixture
+    def extractor(self):
+        return AttributeExtractor(
+            use_llm=False,
+            use_embeddings=False,
+            use_dependency_extraction=False,
+            use_patterns=True,
+            filter_metaphors=False,
+        )
+
+    def test_map_location_keys(self, extractor):
+        assert extractor._map_attribute_key("climate") == AttributeKey.CLIMATE
+        assert extractor._map_attribute_key("terrain") == AttributeKey.TERRAIN
+        assert extractor._map_attribute_key("size") == AttributeKey.SIZE
+        assert extractor._map_attribute_key("location") == AttributeKey.LOCATION
+
+    def test_extract_location_value_from_sentence(self, extractor):
+        sentence = "El valle era húmedo y montañoso."
+        assert extractor._extract_value_from_sentence(sentence, "climate") in {"húmedo", "húmeda"}
+        assert extractor._extract_value_from_sentence(sentence, "terrain") in {
+            "montañoso",
+            "montañosa",
+        }
+
+    def test_extract_object_material_condition_from_sentence(self, extractor):
+        sentence = "La espada de acero estaba oxidada."
+        assert extractor._extract_value_from_sentence(sentence, "material") == "acero"
+        assert extractor._extract_value_from_sentence(sentence, "condition") in {
+            "oxidado",
+            "oxidada",
+        }
+
+    def test_infer_defaults_by_entity_type(self, extractor):
+        assert (
+            extractor._infer_category("húmedo", None, entity_type="LOC")
+            == AttributeCategory.GEOGRAPHIC
+        )
+        assert extractor._infer_key("húmedo", None, entity_type="LOC") == AttributeKey.CLIMATE
+        assert extractor._infer_key("desconocido", None, entity_type="LOC") == AttributeKey.LOCATION
+        assert (
+            extractor._infer_key("desconocido", None, entity_type="OBJECT")
+            == AttributeKey.CONDITION
+        )

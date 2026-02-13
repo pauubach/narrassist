@@ -12,7 +12,6 @@
  * - Helpers de conflictos de atributos
  */
 
-import { describe, it, expect } from 'vitest'
 
 // ── Entity Mock Helper ──────────────────────────────────────
 

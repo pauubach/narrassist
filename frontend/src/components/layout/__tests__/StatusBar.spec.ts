@@ -5,7 +5,6 @@
  * sin montar el componente (evita dependencias de PrimeVue, Tauri, etc.)
  */
 
-import { describe, it, expect } from 'vitest'
 
 // ── Phase Progress Logic ─────────────────────────────────────
 // Replica la lógica de calculatePhaseProgress y steps del StatusBar

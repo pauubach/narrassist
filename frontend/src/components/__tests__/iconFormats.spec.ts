@@ -5,7 +5,6 @@
  * Usar solo "pi-<icon-name>" sin el prefijo "pi" causa que el icono no se muestre.
  */
 
-import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync, statSync } from 'fs'
 import { join } from 'path'
 

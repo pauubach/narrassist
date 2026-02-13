@@ -5,7 +5,6 @@
  * (evita dependencias de PrimeVue, router, stores, etc.)
  */
 
-import { describe, it, expect } from 'vitest'
 
 // ── Mock Entity ─────────────────────────────────────────────
 

@@ -542,7 +542,12 @@ def run_full_analysis(
 
         # STEP 12: Análisis temporal (timeline)
         if config.run_temporal and report.chapters:
-            temporal_result = _run_temporal_analysis(raw_document.full_text, report.chapters)
+            temporal_result = _run_temporal_analysis(
+                raw_document.full_text,
+                report.chapters,
+                project_id=project_id,
+                entities=report.entities,
+            )
             if temporal_result.is_failure:
                 report.errors.append(temporal_result.error)
                 logger.warning("Temporal analysis failed")
@@ -1448,9 +1453,23 @@ def _run_legacy_attribute_extraction(text: str, entities: list[Entity]) -> Resul
 
         for entity in entities:
             pattern = r"\b" + re.escape(entity.canonical_name) + r"\b"
+            entity_type = (
+                entity.entity_type.value
+                if hasattr(entity, "entity_type") and hasattr(entity.entity_type, "value")
+                else str(entity.entity_type)
+                if hasattr(entity, "entity_type")
+                else None
+            )
 
             for match in re.finditer(pattern, text, re.IGNORECASE):
-                entity_mentions.append((entity.canonical_name, match.start(), match.end()))
+                entity_mentions.append(
+                    (
+                        entity.canonical_name,
+                        match.start(),
+                        match.end(),
+                        entity_type,
+                    )
+                )
 
         logger.debug(f"Found {len(entity_mentions)} entity mentions for attribute extraction")
 
@@ -1800,6 +1819,8 @@ def _create_alerts_from_inconsistencies(
 def _run_temporal_analysis(
     text: str,
     chapters: list[ChapterInfo],
+    project_id: int | None = None,
+    entities: list[Entity] | None = None,
 ) -> Result[dict[str, Any]]:
     """
     Ejecuta análisis temporal completo.
@@ -1809,6 +1830,8 @@ def _run_temporal_analysis(
     Args:
         text: Texto completo del documento
         chapters: Lista de capítulos con información de posición
+        project_id: ID del proyecto para resolver menciones persistidas (opcional)
+        entities: Entidades detectadas para filtrar menciones relevantes (opcional)
 
     Returns:
         Result con dict conteniendo timeline, marcadores e inconsistencias
@@ -1818,11 +1841,39 @@ def _run_temporal_analysis(
         marker_extractor = TemporalMarkerExtractor()
         all_markers = []
 
+        # Cargar menciones de entidades por capítulo cuando tenemos contexto de proyecto.
+        # Esto permite generar temporal_instance_id estables (A@40, A@phase:young)
+        # también en el pipeline batch, no solo en el endpoint de timeline.
+        entity_mentions_by_chapter: dict[int, list[tuple[int, int, int]]] = {}
+        if project_id is not None and entities:
+            try:
+                from ..persistence.chapter import ChapterRepository
+                from ..temporal.entity_mentions import load_entity_mentions_by_chapter
+
+                chapter_repo = ChapterRepository()
+                db_chapters = chapter_repo.get_by_project(project_id)
+                entity_repo = get_entity_repository()
+                entity_mentions_by_chapter = load_entity_mentions_by_chapter(
+                    entities, db_chapters, entity_repo,
+                )
+            except Exception as e:
+                logger.debug(
+                    f"Could not load entity mentions for temporal analysis pipeline: {e}"
+                )
+
         for chapter in chapters:
-            chapter_markers = marker_extractor.extract(
-                text=chapter.content,
-                chapter=chapter.number,
-            )
+            chapter_mentions = entity_mentions_by_chapter.get(chapter.number, [])
+            if chapter_mentions:
+                chapter_markers = marker_extractor.extract_with_entities(
+                    text=chapter.content,
+                    entity_mentions=chapter_mentions,
+                    chapter=chapter.number,
+                )
+            else:
+                chapter_markers = marker_extractor.extract(
+                    text=chapter.content,
+                    chapter=chapter.number,
+                )
             all_markers.extend(chapter_markers)
 
         logger.info(f"Extracted {len(all_markers)} temporal markers from {len(chapters)} chapters")

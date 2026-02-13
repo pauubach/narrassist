@@ -490,16 +490,39 @@ async def get_project_timeline(project_id: int, force_refresh: bool = False):
             TemporalMarkerExtractor,
             TimelineBuilder,
         )
+        from narrative_assistant.temporal.entity_mentions import load_entity_mentions_by_chapter
 
         # Extraer marcadores temporales
         marker_extractor = TemporalMarkerExtractor()
         all_markers = []
 
+        # Cargar menciones de personajes por capítulo para asociar edades y
+        # construir temporal_instance_id (A@40, A@45) desde el extractor.
+        entity_mentions_by_chapter: dict[int, list[tuple[int, int, int]]] = {}
+        try:
+            if deps.entity_repository:
+                entities = deps.entity_repository.get_entities_by_project(
+                    project_id, active_only=True,
+                )
+                entity_mentions_by_chapter = load_entity_mentions_by_chapter(
+                    entities, chapters, deps.entity_repository,
+                )
+        except Exception as e:
+            logger.debug(f"Could not load entity mentions for temporal extraction: {e}")
+
         for chapter in chapters:
-            chapter_markers = marker_extractor.extract(
-                text=chapter.content,
-                chapter=chapter.chapter_number,
-            )
+            chapter_mentions = entity_mentions_by_chapter.get(chapter.chapter_number, [])
+            if chapter_mentions:
+                chapter_markers = marker_extractor.extract_with_entities(
+                    text=chapter.content,
+                    entity_mentions=chapter_mentions,
+                    chapter=chapter.chapter_number,
+                )
+            else:
+                chapter_markers = marker_extractor.extract(
+                    text=chapter.content,
+                    chapter=chapter.chapter_number,
+                )
             all_markers.extend(chapter_markers)
             logger.debug(f"Chapter {chapter.chapter_number}: {len(chapter_markers)} markers, text length: {len(chapter.content)}")
 
@@ -1215,4 +1238,3 @@ async def get_chapter_scenes(project_id: int, chapter_number: int):
     except Exception as e:
         logger.error(f"Error getting chapter scenes: {e}", exc_info=True)
         return ApiResponse(success=False, error="Error interno del servidor")
-

@@ -152,7 +152,7 @@ class AttributeExtractionPipeline:
         self,
         text: str,
         entity_names: list[str],
-        entity_mentions: list[tuple[str, int, int]] | None = None,
+        entity_mentions: list[tuple[str, int, int, str | None]] | None = None,
         chapter: int | None = None,
     ) -> list[AggregatedAttribute]:
         """
@@ -161,7 +161,7 @@ class AttributeExtractionPipeline:
         Args:
             text: Texto a analizar
             entity_names: Nombres de entidades conocidas
-            entity_mentions: Lista de menciones con posiciones (name, start, end)
+            entity_mentions: Lista de menciones con posiciones (name, start, end, type)
             chapter: Número de capítulo (opcional)
 
         Returns:

@@ -5,7 +5,6 @@
  * y LanguageTool state machine.
  */
 
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useSystemStore, type LTState as _LTState, type ModelsStatus, type SystemCapabilities } from '../system'
 

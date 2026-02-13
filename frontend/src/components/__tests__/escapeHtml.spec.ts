@@ -6,7 +6,6 @@
  * antes de renderizarse con v-html.
  */
 
-import { describe, it, expect } from 'vitest'
 
 /**
  * Replica de la función escapeHtml de DocumentViewer.vue (línea 818).

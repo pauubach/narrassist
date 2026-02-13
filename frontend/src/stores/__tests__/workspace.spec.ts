@@ -1,4 +1,3 @@
-import { describe, it, expect, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useWorkspaceStore, TAB_LAYOUT_CONFIG } from '../workspace'
 

@@ -8,7 +8,6 @@
  * 4. No hay campos faltantes en los tipos
  */
 
-import { describe, it, expect } from 'vitest'
 import { transformProject, transformChapter } from '../transformers/projects'
 import { transformEntity } from '../transformers/entities'
 import { transformAlert } from '../transformers/alerts'

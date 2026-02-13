@@ -180,6 +180,7 @@ class TimelineBuilder:
         self.timeline = Timeline()
         self.event_counter = 0
         self._chapter_contents: dict[int, str] = {}
+        self._chapter_temporal_instances: dict[int, str] = {}
         self._min_confidence = min_analepsis_confidence
         self._non_linear_detector = None  # Lazy-init NonLinearNarrativeDetector
 
@@ -202,6 +203,7 @@ class TimelineBuilder:
         """
         self.timeline = Timeline()
         self.event_counter = 0
+        self._chapter_temporal_instances = self._infer_chapter_temporal_instances(markers)
 
         # Almacenar contenido de capítulos para análisis lingüístico (Capa 2)
         self._chapter_contents = {}
@@ -246,15 +248,70 @@ class TimelineBuilder:
     def _create_chapter_event(self, chapter: dict) -> TimelineEvent:
         """Crea un evento base para un capítulo."""
         self.event_counter += 1
+        chapter_number = chapter.get("number", 0)
         event = TimelineEvent(
             id=self.event_counter,
             description=f"Capítulo {chapter.get('number', '?')}: {chapter.get('title', 'Sin título')}",
-            chapter=chapter.get("number", 0),
+            chapter=chapter_number,
             paragraph=0,
             discourse_position=chapter.get("start_position", 0),
+            # Justificación: cuando un capítulo está dominado por una sola instancia
+            # temporal (p.ej. "Juan a los 40"), propagamos esa instancia al evento base
+            # para que la UI pueda diferenciar A@40 vs A@45.
+            temporal_instance_id=self._chapter_temporal_instances.get(chapter_number),
         )
         self.timeline.add_event(event)
         return event
+
+    def _infer_chapter_temporal_instances(
+        self,
+        markers: list[TemporalMarker],
+    ) -> dict[int, str]:
+        """
+        Infiera una instancia temporal dominante por capítulo.
+
+        Solo asigna instancia si hay una única candidata inequívoca en el capítulo.
+        """
+        candidates_by_chapter: dict[int, set[str]] = defaultdict(set)
+        for marker in markers:
+            if not marker.chapter:
+                continue
+            instance_id = self._resolve_marker_temporal_instance_id(marker)
+            if instance_id:
+                candidates_by_chapter.setdefault(marker.chapter, set()).add(instance_id)
+
+        chapter_instances: dict[int, str] = {}
+        for chapter, candidates in candidates_by_chapter.items():
+            if len(candidates) == 1:
+                chapter_instances[chapter] = next(iter(candidates))
+        return chapter_instances
+
+    def _resolve_marker_temporal_instance_id(self, marker: TemporalMarker) -> str | None:
+        """
+        Resuelve el temporal_instance_id a partir del marcador.
+
+        Reglas:
+        - Priorizar valor precomputado por extractor.
+        - Fallback explícito por edad/fase/offset/año + entity_id.
+        """
+        marker_instance = getattr(marker, "temporal_instance_id", None)
+        if marker_instance:
+            return marker_instance
+
+        if marker.entity_id is None:
+            return None
+        if marker.age is not None:
+            return f"{marker.entity_id}@age:{marker.age}"
+        marker_phase = getattr(marker, "age_phase", None)
+        if marker_phase:
+            return f"{marker.entity_id}@phase:{marker_phase}"
+        marker_year_offset = getattr(marker, "relative_year_offset", None)
+        if marker_year_offset is not None:
+            sign = "+" if marker_year_offset >= 0 else ""
+            return f"{marker.entity_id}@offset_years:{sign}{marker_year_offset}"
+        if marker.year is not None:
+            return f"{marker.entity_id}@year:{marker.year}"
+        return None
 
     def _create_synthetic_anchor(
         self,
@@ -326,6 +383,9 @@ class TimelineBuilder:
                     event.story_date_resolution = resolution
                     event.confidence = marker.confidence
                     event.markers.append(marker)
+                    marker_instance = self._resolve_marker_temporal_instance_id(marker)
+                    if marker_instance:
+                        event.temporal_instance_id = marker_instance
                     if event.id not in self.timeline.anchor_events:
                         self.timeline.anchor_events.append(event.id)
                 return
@@ -342,6 +402,7 @@ class TimelineBuilder:
             story_date_resolution=resolution,
             confidence=marker.confidence,
             markers=[marker],
+            temporal_instance_id=self._resolve_marker_temporal_instance_id(marker),
         )
         self.timeline.add_event(event)
 
@@ -493,6 +554,7 @@ class TimelineBuilder:
                 relative_offset=offset,
                 confidence=marker.confidence * 0.8,
                 markers=[marker],
+                temporal_instance_id=self._resolve_marker_temporal_instance_id(marker),
             )
             self.timeline.add_event(event)
 
@@ -566,18 +628,29 @@ class TimelineBuilder:
     def _process_age_markers(self, markers: list[TemporalMarker]) -> None:
         """Procesa marcadores de edad de personajes."""
         for marker in markers:
-            if not marker.age:
+            marker_instance = self._resolve_marker_temporal_instance_id(marker)
+            if not marker.age and not marker_instance:
                 continue
+
+            if marker.age is not None:
+                description = f"Edad mencionada: {marker.text}"
+            elif getattr(marker, "relative_year_offset", None) is not None:
+                offset = marker.relative_year_offset
+                sign = "+" if offset >= 0 else ""
+                description = f"Instancia relativa ({sign}{offset} años): {marker.text}"
+            else:
+                description = f"Instancia temporal: {marker.text}"
 
             # Crear evento para la mención de edad
             self.event_counter += 1
             event = TimelineEvent(
                 id=self.event_counter,
-                description=f"Edad mencionada: {marker.text}",
+                description=description,
                 chapter=marker.chapter or 0,
                 paragraph=marker.paragraph or 0,
                 discourse_position=marker.start_char,
                 entity_ids=[marker.entity_id] if marker.entity_id else [],
+                temporal_instance_id=marker_instance,
                 confidence=marker.confidence,
                 markers=[marker],
             )

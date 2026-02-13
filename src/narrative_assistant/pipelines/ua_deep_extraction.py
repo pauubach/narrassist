@@ -77,10 +77,22 @@ class PipelineDeepExtractionMixin:
             entity_repo = get_entity_repository()
             for entity in context.entities:
                 mentions = entity_repo.get_mentions_by_entity(entity.id)
+                entity_type = None
+                if hasattr(entity, "entity_type"):
+                    entity_type = (
+                        entity.entity_type.value
+                        if hasattr(entity.entity_type, "value")
+                        else str(entity.entity_type)
+                    )
                 for mention in mentions:
                     # Usar el nombre canónico para que _find_nearest_entity lo asocie correctamente
                     entity_mentions.append(
-                        (entity.canonical_name, mention.start_char, mention.end_char)
+                        (
+                            entity.canonical_name,
+                            mention.start_char,
+                            mention.end_char,
+                            entity_type,
+                        )
                     )
 
             logger.debug(
@@ -109,8 +121,8 @@ class PipelineDeepExtractionMixin:
 
                     # Filtrar menciones que están en este capítulo
                     chapter_mentions = [
-                        (name, start - chapter_start, end - chapter_start)
-                        for name, start, end in entity_mentions
+                        (name, start - chapter_start, end - chapter_start, entity_type)
+                        for name, start, end, entity_type in entity_mentions
                         if chapter_start <= start < ch.get("end_char", float("inf"))
                     ]
 

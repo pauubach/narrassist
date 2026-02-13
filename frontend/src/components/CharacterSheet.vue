@@ -272,6 +272,7 @@ import VoiceProfile from '@/components/VoiceProfile.vue'
 import CharacterKnowledgeAnalysis from '@/components/CharacterKnowledgeAnalysis.vue'
 import type { Entity, CharacterAttribute, CharacterRelationship } from '@/types'
 import { useAlertUtils } from '@/composables/useAlertUtils'
+import { ATTRIBUTE_CONFIG } from '@/config/attributes'
 
 // Traduce claves de atributos en inglés a etiquetas en español
 const ATTRIBUTE_LABELS: Record<string, string> = {
@@ -338,34 +339,6 @@ const emit = defineEmits<{
   'delete-relationship': [id: number | undefined]
   'undo-merge': []
 }>()
-
-// Configuración de atributos válidos por tipo de entidad
-const ATTRIBUTE_CONFIG: Record<string, { categories: string[], icon: string, label: string }[]> = {
-  character: [
-    { categories: ['physical'], icon: 'pi pi-user', label: 'Atributos físicos' },
-    { categories: ['psychological'], icon: 'pi pi-comments', label: 'Atributos psicológicos' },
-  ],
-  location: [
-    { categories: ['physical', 'geographic'], icon: 'pi pi-map', label: 'Características del lugar' },
-    { categories: ['atmosphere'], icon: 'pi pi-sun', label: 'Atmósfera y ambiente' },
-  ],
-  object: [
-    { categories: ['physical', 'appearance'], icon: 'pi pi-box', label: 'Características físicas' },
-    { categories: ['function', 'history'], icon: 'pi pi-info-circle', label: 'Función e historia' },
-  ],
-  organization: [
-    { categories: ['structure'], icon: 'pi pi-sitemap', label: 'Estructura' },
-    { categories: ['purpose', 'history'], icon: 'pi pi-flag', label: 'Propósito e historia' },
-  ],
-  event: [
-    { categories: ['temporal'], icon: 'pi pi-calendar', label: 'Información temporal' },
-    { categories: ['participants', 'consequences'], icon: 'pi pi-users', label: 'Participantes y consecuencias' },
-  ],
-  concept: [
-    { categories: ['definition'], icon: 'pi pi-book', label: 'Definición' },
-    { categories: ['examples', 'related'], icon: 'pi pi-link', label: 'Ejemplos y relaciones' },
-  ],
-}
 
 // Computed
 const isMerged = computed(() => {

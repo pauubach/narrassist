@@ -542,15 +542,44 @@ def _normalize_entity_mentions(
 def _is_person_entity(entity_type: str | None) -> bool:
     """Verifica si el tipo de entidad es una persona."""
     if entity_type is None:
-        return True  # Si no hay tipo, asumir que puede ser persona
-    return entity_type.upper() in ("PER", "PERSON", "PERS")
+        return False
+    normalized = entity_type.strip().upper()
+    return normalized in (
+        "PER",
+        "PERSON",
+        "PERS",
+        "CHARACTER",
+        "ANIMAL",
+        "CREATURE",
+    )
 
 
 def _is_location_entity(entity_type: str | None) -> bool:
     """Verifica si el tipo de entidad es una ubicación."""
     if entity_type is None:
-        return False  # Si no hay tipo, no asumir ubicación
-    return entity_type.upper() in ("LOC", "LOCATION", "GPE")
+        return False
+    normalized = entity_type.strip().upper()
+    return normalized in (
+        "LOC",
+        "LOCATION",
+        "GPE",
+        "BUILDING",
+        "REGION",
+        "PLACE",
+    )
+
+
+def _is_object_entity(entity_type: str | None) -> bool:
+    """Verifica si el tipo de entidad representa objeto/artefacto."""
+    if entity_type is None:
+        return False
+    normalized = entity_type.strip().upper()
+    return normalized in ("OBJECT", "VEHICLE", "ITEM", "ARTIFACT", "WORK")
+
+
+def _mentions_have_explicit_types(mentions: list[EntityMention]) -> bool:
+    """Indica si las menciones incluyen al menos un entity_type explícito."""
+    return any(entity_type is not None for _n, _s, _e, entity_type in mentions)
 
 
 # Patrones de extracción: (regex, key, categoría, confianza_base)
@@ -1581,7 +1610,7 @@ class AttributeExtractor(AttributeContextMixin, AttributeVotingMixin, AttributeE
     def extract_attributes(
         self,
         text: str,
-        entity_mentions: list[tuple[str, int, int]] | None = None,
+        entity_mentions: list[tuple] | None = None,
         chapter_id: int | None = None,
     ) -> Result[AttributeExtractionResult]:
         """
@@ -1676,7 +1705,7 @@ class AttributeExtractor(AttributeContextMixin, AttributeVotingMixin, AttributeE
     def _extract_by_llm(
         self,
         text: str,
-        entity_mentions: list[tuple[str, int, int]] | None,
+        entity_mentions: list[tuple] | None,
         chapter_id: int | None,
         llm_client: Any,
     ) -> list[ExtractedAttribute]:
@@ -1688,33 +1717,44 @@ class AttributeExtractor(AttributeContextMixin, AttributeVotingMixin, AttributeE
         """
         attributes: list[ExtractedAttribute] = []
 
-        # Construir lista de entidades conocidas (solo personas para atributos físicos)
-        known_entities = []
+        # Construir lista de entidades conocidas.
+        # Si tenemos tipos explícitos, los incluimos como hint para reducir alucinaciones.
+        known_entities: list[str] = []
+        known_entity_names: set[str] = set()
+        known_entity_names_lower: set[str] = set()
+        mention_type_by_name: dict[str, str | None] = {}
         if entity_mentions:
             normalized = _normalize_entity_mentions(entity_mentions)
-            # Filtrar solo personas para extracción de atributos físicos
-            known_entities = list(
-                {
-                    name
-                    for name, _, _, entity_type in normalized
-                    if entity_type is None or _is_person_entity(entity_type)
-                }
-            )
+            known_entity_names = {name for name, _s, _e, _t in normalized}
+            known_entity_names_lower = {name.lower() for name in known_entity_names}
+            for name, _s, _e, entity_type in normalized:
+                mention_type_by_name.setdefault(name.lower(), entity_type)
+            if _mentions_have_explicit_types(normalized):
+                known_entities = sorted(
+                    {
+                        f"{name}<{(entity_type or 'unknown').lower()}>"
+                        for name, _s, _e, entity_type in normalized
+                    }
+                )
+            else:
+                # Compatibilidad legacy: si no hay tipos, mantener lista plana de nombres.
+                known_entities = sorted(known_entity_names)
 
         # Limitar texto para no sobrecargar el LLM
         text_sample = text[:3000] if len(text) > 3000 else text
 
-        prompt = f"""Extrae atributos físicos de personajes. Responde SOLO con JSON válido.
+        prompt = f"""Extrae atributos de entidades narrativas (personajes, lugares, objetos). Responde SOLO con JSON válido.
 
 TEXTO:
 {text_sample}
 
-PERSONAJES: {", ".join(known_entities) if known_entities else "Detectar"}
+ENTIDADES: {", ".join(known_entities) if known_entities else "Detectar"}
 
 REGLAS:
 - Una entrada por CADA mención (si un atributo aparece dos veces, dos entradas)
 - Ignora metáforas
-- Keys válidas: eye_color, hair_color, hair_type, hair_modification, age, height, build, profession
+- Keys válidas: eye_color, hair_color, hair_type, hair_modification, age, height, build, profession, personality, climate, terrain, size, location, material, color, condition
+- Categorías válidas: physical, psychological, social, ability, geographic, architectural, material, appearance, function, state
 - hair_modification valores: natural, teñido, decolorado, mechas, reflejos (detectar "rubia de bote" = teñido)
 - IMPORTANTE: Si el atributo se refiere a un pronombre (Él, Ella, él, ella), resuelve el pronombre al nombre del personaje más cercano mencionado antes. Ejemplo: "Juan entró. Él era carpintero" -> entity="Juan", key="profession", value="carpintero"
 
@@ -1744,22 +1784,45 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                         # Verificar que la entidad está en el texto (evitar alucinaciones)
                         if entity_name not in text and entity_name.lower() not in text.lower():
                             # Si hay entity_mentions, verificar si está en la lista
-                            if known_entities and entity_name not in known_entities:
+                            if (
+                                known_entity_names
+                                and entity_name.lower() not in known_entity_names_lower
+                            ):
                                 logger.debug(f"LLM alucinó entidad '{entity_name}' no presente en texto/menciones")
                                 continue
 
-                    # Mapear categoría
-                    cat_str = attr_data.get("category", "physical").lower()
-                    category = {
-                        "physical": AttributeCategory.PHYSICAL,
-                        "psychological": AttributeCategory.PSYCHOLOGICAL,
-                        "social": AttributeCategory.SOCIAL,
-                        "ability": AttributeCategory.ABILITY,
-                    }.get(cat_str, AttributeCategory.PHYSICAL)
+                    # Validar compatibilidad tipo↔key si hay tipos explícitos
+                    key_str_raw = attr_data.get("key", "other").lower()
+                    if known_entity_names and entity_name:
+                        entity_type_hint = mention_type_by_name.get(entity_name.lower())
+                        if entity_type_hint and not self._is_key_compatible_with_type(
+                            key_str_raw, entity_type_hint,
+                        ):
+                            logger.debug(
+                                f"LLM asignó key '{key_str_raw}' incompatible con tipo "
+                                f"'{entity_type_hint}' para '{entity_name}'"
+                            )
+                            continue
 
                     # Mapear key
                     key_str = attr_data.get("key", "other").lower()
                     key = self._map_attribute_key(key_str)
+
+                    # Mapear categoría (fallback por key si no viene o viene inválida)
+                    cat_str = attr_data.get("category", "").lower()
+                    category_map = {
+                        "physical": AttributeCategory.PHYSICAL,
+                        "psychological": AttributeCategory.PSYCHOLOGICAL,
+                        "social": AttributeCategory.SOCIAL,
+                        "ability": AttributeCategory.ABILITY,
+                        "geographic": AttributeCategory.GEOGRAPHIC,
+                        "architectural": AttributeCategory.ARCHITECTURAL,
+                        "material": AttributeCategory.MATERIAL,
+                        "appearance": AttributeCategory.APPEARANCE,
+                        "function": AttributeCategory.FUNCTION,
+                        "state": AttributeCategory.STATE,
+                    }
+                    category = category_map.get(cat_str, self._default_category_for_key(key))
 
                     # Encontrar posición en texto
                     evidence = attr_data.get("evidence", "")
@@ -1797,7 +1860,7 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
     def _extract_by_embeddings(
         self,
         text: str,
-        entity_mentions: list[tuple[str, int, int]] | None,
+        entity_mentions: list[tuple] | None,
         chapter_id: int | None,
         embeddings_model: Any,
     ) -> list[ExtractedAttribute]:
@@ -1873,6 +1936,52 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                 "profesor",
                 "abogado",
             ],
+            # Lugares
+            ("geographic", "climate"): [
+                "el clima es húmedo",
+                "ambiente seco y árido",
+                "zona templada",
+                "región tropical",
+            ],
+            ("geographic", "terrain"): [
+                "terreno montañoso",
+                "zona costera",
+                "llanura extensa",
+                "bosque denso",
+                "desierto rocoso",
+            ],
+            ("geographic", "size"): [
+                "ciudad pequeña",
+                "región enorme",
+                "pueblo diminuto",
+                "territorio vasto",
+            ],
+            ("geographic", "location"): [
+                "al norte de",
+                "al sur de",
+                "junto al río",
+                "en la costa",
+                "en el valle",
+            ],
+            # Objetos
+            ("material", "material"): [
+                "espada de acero",
+                "anillo de oro",
+                "escudo de madera",
+                "objeto de cristal",
+            ],
+            ("appearance", "color"): [
+                "capa roja",
+                "túnica negra",
+                "objeto azul",
+                "brillo dorado",
+            ],
+            ("state", "condition"): [
+                "arma oxidada",
+                "objeto roto",
+                "edificio derruido",
+                "artefacto intacto",
+            ],
         }
 
         try:
@@ -1900,8 +2009,12 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
 
                             if similarity > 0.5:  # Umbral de similitud
                                 # Encontrar entidad en la oración
-                                entity = self._find_entity_in_sentence(
-                                    sentence, entity_mentions, text
+                                target_entity_class = self._target_entity_class_for_key(key_str)
+                                entity = self._find_entity_in_sentence_for_class(
+                                    sentence,
+                                    entity_mentions,
+                                    text,
+                                    target_entity_class=target_entity_class,
                                 )
 
                                 if entity:
@@ -1913,7 +2026,16 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                                             "physical": AttributeCategory.PHYSICAL,
                                             "psychological": AttributeCategory.PSYCHOLOGICAL,
                                             "social": AttributeCategory.SOCIAL,
-                                        }.get(category_str, AttributeCategory.PHYSICAL)
+                                            "geographic": AttributeCategory.GEOGRAPHIC,
+                                            "material": AttributeCategory.MATERIAL,
+                                            "appearance": AttributeCategory.APPEARANCE,
+                                            "state": AttributeCategory.STATE,
+                                        }.get(
+                                            category_str,
+                                            self._default_category_for_key(
+                                                self._map_attribute_key(key_str)
+                                            ),
+                                        )
 
                                         key = self._map_attribute_key(key_str)
 
@@ -1949,7 +2071,7 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
     def _extract_by_patterns(
         self,
         text: str,
-        entity_mentions: list[tuple[str, int, int]] | None,
+        entity_mentions: list[tuple] | None,
         chapter_id: int | None,
     ) -> list[ExtractedAttribute]:
         """
@@ -2200,6 +2322,10 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
             "title": AttributeKey.TITLE,
             "relationship": AttributeKey.RELATIONSHIP,
             "nationality": AttributeKey.NATIONALITY,
+            "climate": AttributeKey.CLIMATE,
+            "terrain": AttributeKey.TERRAIN,
+            "size": AttributeKey.SIZE,
+            "location": AttributeKey.LOCATION,
             "color": AttributeKey.COLOR,
             "material": AttributeKey.MATERIAL,
             "condition": AttributeKey.CONDITION,
@@ -2293,6 +2419,14 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                     "build",
                     "age",
                     "profession",
+                    "personality",
+                    "climate",
+                    "terrain",
+                    "size",
+                    "location",
+                    "material",
+                    "color",
+                    "condition",
                 ]:
                     attributes.append(
                         {
@@ -2328,6 +2462,152 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
             return 0.0
         return float(dot / (norm1 * norm2))
 
+    # Keys exclusivas de personaje (no tienen sentido para lugar/objeto).
+    _PERSON_ONLY_KEYS = frozenset({
+        "eye_color", "hair_color", "hair_type", "hair_modification",
+        "age", "apparent_age", "height", "build", "skin",
+        "distinctive_feature", "facial_hair", "personality",
+        "temperament", "fear", "desire",
+    })
+    # Keys exclusivas de lugar.
+    _LOCATION_ONLY_KEYS = frozenset({"climate", "terrain"})
+
+    def _is_key_compatible_with_type(self, key_str: str, entity_type: str) -> bool:
+        """Rechaza combinaciones tipo↔key claramente incompatibles."""
+        if _is_location_entity(entity_type) and key_str in self._PERSON_ONLY_KEYS:
+            return False
+        if _is_object_entity(entity_type) and key_str in self._PERSON_ONLY_KEYS:
+            return False
+        if _is_person_entity(entity_type) and key_str in self._LOCATION_ONLY_KEYS:
+            return False
+        return True
+
+    def _default_category_for_key(self, key: AttributeKey) -> AttributeCategory:
+        """Inferencia de categoría por clave cuando no viene explícita."""
+        if key in {
+            AttributeKey.EYE_COLOR,
+            AttributeKey.HAIR_COLOR,
+            AttributeKey.HAIR_TYPE,
+            AttributeKey.HAIR_MODIFICATION,
+            AttributeKey.AGE,
+            AttributeKey.APPARENT_AGE,
+            AttributeKey.HEIGHT,
+            AttributeKey.BUILD,
+            AttributeKey.SKIN,
+            AttributeKey.DISTINCTIVE_FEATURE,
+            AttributeKey.FACIAL_HAIR,
+        }:
+            return AttributeCategory.PHYSICAL
+        if key in {
+            AttributeKey.PERSONALITY,
+            AttributeKey.TEMPERAMENT,
+            AttributeKey.FEAR,
+            AttributeKey.DESIRE,
+        }:
+            return AttributeCategory.PSYCHOLOGICAL
+        if key in {
+            AttributeKey.PROFESSION,
+            AttributeKey.TITLE,
+            AttributeKey.RELATIONSHIP,
+            AttributeKey.NATIONALITY,
+        }:
+            return AttributeCategory.SOCIAL
+        if key in {
+            AttributeKey.CLIMATE,
+            AttributeKey.TERRAIN,
+            AttributeKey.SIZE,
+            AttributeKey.LOCATION,
+        }:
+            return AttributeCategory.GEOGRAPHIC
+        if key == AttributeKey.MATERIAL:
+            return AttributeCategory.MATERIAL
+        if key == AttributeKey.COLOR:
+            return AttributeCategory.APPEARANCE
+        if key == AttributeKey.CONDITION:
+            return AttributeCategory.STATE
+        return AttributeCategory.SOCIAL
+
+    def _target_entity_class_for_key(self, key_str: str) -> str:
+        """Devuelve clase de entidad esperada para una clave de atributo."""
+        key = self._map_attribute_key(key_str)
+        if key in {
+            AttributeKey.CLIMATE,
+            AttributeKey.TERRAIN,
+            AttributeKey.SIZE,
+            AttributeKey.LOCATION,
+        }:
+            return "location"
+        if key in {AttributeKey.MATERIAL, AttributeKey.COLOR, AttributeKey.CONDITION}:
+            return "object"
+        return "person"
+
+    def _find_entity_in_sentence_for_class(
+        self,
+        sentence: str,
+        entity_mentions: list[tuple] | None,
+        full_text: str,
+        target_entity_class: str,
+    ) -> str | None:
+        """
+        Busca entidad compatible con una clase (person/location/object).
+
+        Si no hay tipos explícitos de entidad, mantiene fallback legacy por proximidad.
+        """
+        if target_entity_class == "person":
+            return self._find_entity_in_sentence(sentence, entity_mentions, full_text)
+
+        if not entity_mentions:
+            return None
+
+        normalized_mentions = _normalize_entity_mentions(entity_mentions)
+        has_explicit_types = _mentions_have_explicit_types(normalized_mentions)
+
+        def match_type(entity_type: str | None) -> bool:
+            if not has_explicit_types:
+                return True
+            if target_entity_class == "location":
+                return _is_location_entity(entity_type)
+            if target_entity_class == "object":
+                return _is_object_entity(entity_type)
+            return False
+
+        filtered_mentions = [
+            (name, start, end)
+            for name, start, end, entity_type in normalized_mentions
+            if match_type(entity_type)
+        ]
+
+        if not filtered_mentions:
+            return None
+
+        sentence_lower = sentence.lower()
+        sentence_start = full_text.find(sentence)
+        sentence_end = sentence_start + len(sentence) if sentence_start >= 0 else len(full_text)
+
+        # Priorizar menciones explícitas dentro de la oración (nombre textual).
+        in_sentence = []
+        for name, start, end in filtered_mentions:
+            if sentence_start >= 0 and start >= sentence_start and end <= sentence_end:
+                in_sentence.append((name, end - start))
+            elif name.lower() in sentence_lower:
+                in_sentence.append((name, len(name)))
+        if in_sentence:
+            in_sentence.sort(key=lambda x: x[1], reverse=True)
+            return in_sentence[0][0]
+
+        # Fallback por cercanía antes de la oración.
+        if sentence_start >= 0:
+            before = [
+                (name, sentence_start - end)
+                for name, _s, end in filtered_mentions
+                if end <= sentence_start
+            ]
+            if before:
+                before.sort(key=lambda x: x[1])
+                return before[0][0]
+
+        return filtered_mentions[0][0]
+
     def _find_entity_in_sentence(
         self,
         sentence: str,
@@ -2359,12 +2639,14 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
 
         # Normalizar menciones al formato de 4 elementos
         normalized_mentions = _normalize_entity_mentions(entity_mentions)
+        has_explicit_types = _mentions_have_explicit_types(normalized_mentions)
 
-        # Filtrar solo personas (excluir LOC, ORG) para atributos físicos
+        # Filtrar solo personas para atributos de personaje.
+        # Compatibilidad legacy: si NO hay tipos explícitos, usamos todas.
         person_mentions = [
             (name, start, end, entity_type)
             for name, start, end, entity_type in normalized_mentions
-            if entity_type is None or _is_person_entity(entity_type)
+            if (not has_explicit_types) or _is_person_entity(entity_type)
         ]
 
         if not person_mentions:
@@ -2672,6 +2954,73 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                 if prof in sentence_lower:
                     return prof
 
+        elif key_str == "climate":
+            climate_values = [
+                "húmedo", "húmeda", "seco", "seca", "templado", "templada",
+                "tropical", "frío", "fría", "cálido", "cálida", "árido", "árida",
+                "lluvioso", "lluviosa",
+            ]
+            for climate in climate_values:
+                if climate in sentence_lower:
+                    return climate
+
+        elif key_str == "terrain":
+            terrain_values = [
+                "montañoso", "montañosa", "llano", "llana", "costero", "costera",
+                "desértico", "desértica", "boscoso", "boscosa", "urbano", "urbana",
+                "rural", "rocoso", "rocosa", "fértil",
+            ]
+            for terrain in terrain_values:
+                if terrain in sentence_lower:
+                    return terrain
+
+        elif key_str == "size":
+            size_values = [
+                "enorme", "gigante", "vasto", "vasta", "amplio", "amplia",
+                "grande", "mediano", "mediana", "pequeño", "pequeña",
+                "diminuto", "diminuta",
+            ]
+            for size in size_values:
+                if size in sentence_lower:
+                    return size
+
+        elif key_str == "location":
+            import re as regex_module
+
+            patterns = [
+                r"\b(?:al\s+)?(norte|sur|este|oeste)\s+de\s+([a-záéíóúüñ\s]+)",
+                r"\b(?:junto|cerca)\s+a(?:l)?\s+([a-záéíóúüñ\s]+)",
+                r"\ben\s+(la\s+costa|el\s+valle|la\s+montaña|la\s+ciudad|el\s+pueblo)\b",
+            ]
+            for pattern in patterns:
+                match = regex_module.search(pattern, sentence_lower, regex_module.IGNORECASE)
+                if match:
+                    return match.group(0).strip()
+
+        elif key_str == "material":
+            material_values = [
+                "oro", "plata", "bronce", "hierro", "acero", "cobre", "madera",
+                "cristal", "vidrio", "cuero", "hueso", "obsidiana", "piedra",
+            ]
+            for material in material_values:
+                if material in sentence_lower:
+                    return material
+
+        elif key_str == "color":
+            for color in COLORS:
+                if color in sentence_lower:
+                    return color
+
+        elif key_str == "condition":
+            condition_values = [
+                "roto", "rota", "deteriorado", "deteriorada", "intacto", "intacta",
+                "oxidado", "oxidada", "nuevo", "nueva", "viejo", "vieja",
+                "destruido", "destruida", "dañado", "dañada", "gastado", "gastada",
+            ]
+            for condition in condition_values:
+                if condition in sentence_lower:
+                    return condition
+
         return None
 
     # _is_metaphor -> moved to mixin
@@ -2679,7 +3028,7 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
     def _extract_by_dependency(
         self,
         text: str,
-        entity_mentions: list[tuple[str, int, int]] | None,
+        entity_mentions: list[tuple] | None,
         chapter_id: int | None,
     ) -> list[ExtractedAttribute]:
         """
@@ -2710,14 +3059,14 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
         try:
             doc = nlp(text)
 
-            # Crear índice de menciones para búsqueda rápida (solo personas)
+            # Índices de menciones para búsqueda y tipo de entidad.
             mention_spans = {}
+            mention_type_by_name: dict[str, str | None] = {}
             if entity_mentions:
                 normalized = _normalize_entity_mentions(entity_mentions)
                 for name, start, end, entity_type in normalized:
-                    # Solo incluir personas para atributos físicos
-                    if entity_type is None or _is_person_entity(entity_type):
-                        mention_spans[(start, end)] = name
+                    mention_spans[(start, end)] = name
+                    mention_type_by_name.setdefault(name.lower(), entity_type)
 
             for sent in doc.sents:
                 # Buscar verbos copulativos y descriptivos
@@ -2745,8 +3094,17 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                                 subject, mention_spans, doc
                             )
                             if entity_name and len(attribute_value) > 1:
-                                category = self._infer_category(attribute_value, attr_token)
-                                key = self._infer_key(attribute_value, attr_token)
+                                entity_type = mention_type_by_name.get(entity_name.lower())
+                                category = self._infer_category(
+                                    attribute_value,
+                                    attr_token,
+                                    entity_type=entity_type,
+                                )
+                                key = self._infer_key(
+                                    attribute_value,
+                                    attr_token,
+                                    entity_type=entity_type,
+                                )
 
                                 confidence = 0.55
                                 if confidence >= self.min_confidence:
@@ -2790,8 +3148,17 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
                                 subject, mention_spans, doc
                             )
                             if entity_name and len(attribute_value) > 1:
-                                category = self._infer_category(attribute_value, attr_token)
-                                key = self._infer_key(attribute_value, attr_token)
+                                entity_type = mention_type_by_name.get(entity_name.lower())
+                                category = self._infer_category(
+                                    attribute_value,
+                                    attr_token,
+                                    entity_type=entity_type,
+                                )
+                                key = self._infer_key(
+                                    attribute_value,
+                                    attr_token,
+                                    entity_type=entity_type,
+                                )
 
                                 confidence = 0.55
                                 if confidence >= self.min_confidence:
@@ -2839,13 +3206,22 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
 
                                 confidence = 0.5
                                 if confidence >= self.min_confidence:
+                                    entity_type = mention_type_by_name.get(entity_name.lower())
                                     # Calcular sentence_idx para CESP
                                     sent_list = list(doc.sents)
                                     sent_idx = sent_list.index(sent) if sent in sent_list else 0
                                     attr = ExtractedAttribute(
                                         entity_name=entity_name,
-                                        category=AttributeCategory.PHYSICAL,
-                                        key=AttributeKey.DISTINCTIVE_FEATURE,
+                                        category=self._infer_category(
+                                            obj_text,
+                                            obj,
+                                            entity_type=entity_type,
+                                        ),
+                                        key=self._infer_key(
+                                            obj_text,
+                                            obj,
+                                            entity_type=entity_type,
+                                        ),
                                         value=obj_text.lower(),
                                         source_text=sent.text,
                                         start_char=sent.start_char,
@@ -2859,18 +3235,30 @@ RESPONDE SOLO JSON (sin markdown, sin explicaciones):
 
                     # === Patrón 3: Entidad con modificador adjetival ===
                     # "el valiente Juan", "la hermosa María"
-                    if token.pos_ == "PROPN" and token.ent_type_ in ("PER", "PERSON", ""):
+                    if token.pos_ == "PROPN":
                         for child in token.children:
                             if child.pos_ == "ADJ" and child.dep_ == "amod":
                                 confidence = 0.6
                                 if confidence >= self.min_confidence:
+                                    entity_type = mention_type_by_name.get(
+                                        token.text.lower(),
+                                        token.ent_type_ or None,
+                                    )
                                     # Calcular sentence_idx para CESP
                                     sent_list = list(doc.sents)
                                     sent_idx = sent_list.index(sent) if sent in sent_list else 0
                                     attr = ExtractedAttribute(
                                         entity_name=token.text,
-                                        category=self._infer_category(child.text, child),
-                                        key=self._infer_key(child.text, child),
+                                        category=self._infer_category(
+                                            child.text,
+                                            child,
+                                            entity_type=entity_type,
+                                        ),
+                                        key=self._infer_key(
+                                            child.text,
+                                            child,
+                                            entity_type=entity_type,
+                                        ),
                                         value=child.text.lower(),
                                         source_text=sent.text,
                                         start_char=sent.start_char,

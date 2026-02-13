@@ -77,6 +77,79 @@ class TestTemporalMarkerExtractor:
         assert len(age_markers) >= 1
         assert age_markers[0].age == 20
 
+    def test_extract_with_entities_sets_temporal_instance_id(self, extractor):
+        """Si hay entidad+edad, se genera temporal_instance_id estable."""
+        text = "Juan, a los 40 años, volvió al pueblo."
+        markers = extractor.extract_with_entities(
+            text=text,
+            entity_mentions=[(1, 0, 4)],  # (entity_id, start, end)
+            chapter=1,
+        )
+
+        age_markers = [m for m in markers if m.marker_type == MarkerType.CHARACTER_AGE]
+        assert len(age_markers) >= 1
+        assert age_markers[0].entity_id == 1
+        assert age_markers[0].temporal_instance_id == "1@age:40"
+
+    def test_extract_character_age_from_recien_cumplidos(self, extractor):
+        """Parsea correctamente patrones con grupos opcionales: 'recién cumplidos los X'."""
+        text = "Recién cumplidos los 41, Ana se mudó de ciudad."
+        markers = extractor.extract(text)
+
+        age_markers = [m for m in markers if m.marker_type == MarkerType.CHARACTER_AGE]
+        assert len(age_markers) >= 1
+        assert any(m.age == 41 for m in age_markers)
+
+    def test_extract_with_entities_sets_phase_instance_id(self, extractor):
+        """Sin edad numérica, 'de joven' genera instancia temporal estable por fase."""
+        text = "Ana, de joven, soñaba con viajar en el tiempo."
+        markers = extractor.extract_with_entities(
+            text=text,
+            entity_mentions=[(2, 0, 3)],
+            chapter=1,
+        )
+
+        age_markers = [m for m in markers if m.marker_type == MarkerType.CHARACTER_AGE]
+        assert len(age_markers) >= 1
+
+        young_marker = next((m for m in age_markers if "joven" in m.text.lower()), None)
+        assert young_marker is not None
+        assert young_marker.age is None
+        assert young_marker.age_phase == "young"
+        assert young_marker.temporal_instance_id == "2@phase:young"
+
+    def test_extract_with_entities_infers_phase_from_adjacent_mention(self, extractor):
+        """Infiere fase implícita en adjetivo pegado a la mención ('joven Juan')."""
+        text = "El joven Juan habló con el viejo Juan."
+        first = text.find("Juan")
+        second = text.find("Juan", first + 1)
+        markers = extractor.extract_with_entities(
+            text=text,
+            entity_mentions=[(1, first, first + 4), (1, second, second + 4)],
+            chapter=1,
+        )
+
+        age_markers = [m for m in markers if m.marker_type == MarkerType.CHARACTER_AGE]
+        instances = {m.temporal_instance_id for m in age_markers if m.temporal_instance_id}
+        assert "1@phase:young" in instances
+        assert "1@phase:elder" in instances
+
+    def test_extract_with_entities_infers_relative_offset_instance(self, extractor):
+        """Infiere instancia temporal por desfase relativo ('dentro de 5 años')."""
+        text = "Juan se encontró con su yo de dentro de 5 años."
+        markers = extractor.extract_with_entities(
+            text=text,
+            entity_mentions=[(1, 0, 4)],
+            chapter=1,
+        )
+
+        offset_marker = next(
+            (m for m in markers if m.temporal_instance_id == "1@offset_years:+5"),
+            None,
+        )
+        assert offset_marker is not None
+        assert offset_marker.relative_year_offset == 5
+
     def test_extract_season_epoch(self, extractor):
         """Detecta referencias a estaciones/épocas."""
         text = "Durante aquel verano vivieron felices."
@@ -222,6 +295,55 @@ class TestTimelineBuilder:
         for event in json_data["events"]:
             assert "day_offset" in event
             assert "weekday" in event
+
+    def test_temporal_instance_id_propagates_to_events_and_json(self, builder, sample_chapters):
+        """La instancia temporal detectada viaja a eventos operativos y export JSON."""
+        marker = TemporalMarker(
+            text="a los 40 años",
+            marker_type=MarkerType.CHARACTER_AGE,
+            start_char=5,
+            end_char=18,
+            chapter=1,
+            entity_id=1,
+            age=40,
+            temporal_instance_id="1@age:40",
+            confidence=0.9,
+        )
+
+        timeline = builder.build_from_markers([marker], sample_chapters)
+
+        assert any(
+            event.temporal_instance_id == "1@age:40" for event in timeline.events
+        )
+
+        chapter_event = next(e for e in timeline.events if e.chapter == 1 and e.paragraph == 0)
+        assert chapter_event.temporal_instance_id == "1@age:40"
+
+        json_data = builder.export_to_json()
+        assert any(
+            event.get("temporal_instance_id") == "1@age:40" for event in json_data["events"]
+        )
+
+    def test_phase_instance_without_numeric_age_creates_timeline_event(
+        self, builder, sample_chapters
+    ):
+        """Marcadores por fase implícita deben crear evento aunque no haya edad numérica."""
+        marker = TemporalMarker(
+            text="joven Juan",
+            marker_type=MarkerType.CHARACTER_AGE,
+            start_char=3,
+            end_char=13,
+            chapter=1,
+            entity_id=1,
+            age_phase="young",
+            temporal_instance_id="1@phase:young",
+            confidence=0.7,
+        )
+
+        timeline = builder.build_from_markers([marker], sample_chapters)
+        assert any(
+            event.temporal_instance_id == "1@phase:young" for event in timeline.events
+        )
 
     def test_extreme_offset_no_crash(self, builder, sample_chapters):
         """Offsets extremos no provocan crash (OverflowError)."""
@@ -456,3 +578,123 @@ class TestAnachronismDetector:
         text = "El personaje caminaba por la calle."
         report = detector.detect(text)
         assert len(report.anachronisms) == 0
+
+
+class TestTemporalInstanceEdgeCases:
+    """Tests de gaps de cobertura para instancias temporales."""
+
+    @pytest.fixture
+    def extractor(self):
+        return TemporalMarkerExtractor()
+
+    @pytest.fixture
+    def builder(self):
+        return TimelineBuilder()
+
+    @pytest.fixture
+    def sample_chapters(self):
+        return [
+            {"number": 1, "title": "Cap 1", "content": "Texto del capítulo 1.", "start_position": 0},
+            {"number": 2, "title": "Cap 2", "content": "Texto del capítulo 2.", "start_position": 100},
+        ]
+
+    def test_negative_offset_hace_n_anios(self, extractor):
+        """'hace 5 años' genera offset negativo -5."""
+        text = "Juan recordaba lo que pasó hace 5 años."
+        markers = extractor.extract_with_entities(
+            text=text,
+            entity_mentions=[(1, 0, 4)],
+            chapter=1,
+        )
+        offset_marker = next(
+            (m for m in markers if getattr(m, "relative_year_offset", None) is not None),
+            None,
+        )
+        assert offset_marker is not None
+        assert offset_marker.relative_year_offset == -5
+        assert offset_marker.temporal_instance_id == "1@offset_years:-5"
+
+    def test_negative_offset_anios_atras(self, extractor):
+        """'3 años atrás' genera offset negativo -3."""
+        text = "María, 3 años atrás, vivía en otra ciudad."
+        markers = extractor.extract_with_entities(
+            text=text,
+            entity_mentions=[(2, 0, 5)],
+            chapter=1,
+        )
+        offset_marker = next(
+            (m for m in markers if getattr(m, "relative_year_offset", None) is not None),
+            None,
+        )
+        assert offset_marker is not None
+        assert offset_marker.relative_year_offset == -3
+        assert offset_marker.temporal_instance_id == "2@offset_years:-3"
+
+    def test_pequeno_as_phase(self, extractor):
+        """'pequeño Juan' genera instancia @phase:child (B1 fix)."""
+        text = "El pequeño Juan corría por los campos."
+        first_juan = text.find("Juan")
+        markers = extractor.extract_with_entities(
+            text=text,
+            entity_mentions=[(1, first_juan, first_juan + 4)],
+            chapter=1,
+        )
+        instances = {
+            m.temporal_instance_id
+            for m in markers
+            if m.temporal_instance_id
+        }
+        assert "1@phase:child" in instances
+
+    def test_multiple_instances_same_chapter(self, builder, sample_chapters):
+        """Dos instancias distintas en el mismo capítulo: no se asigna al evento base."""
+        marker_a = TemporalMarker(
+            text="a los 40", marker_type=MarkerType.CHARACTER_AGE,
+            start_char=0, end_char=8, chapter=1, entity_id=1,
+            age=40, temporal_instance_id="1@age:40", confidence=0.9,
+        )
+        marker_b = TemporalMarker(
+            text="a los 20", marker_type=MarkerType.CHARACTER_AGE,
+            start_char=50, end_char=58, chapter=1, entity_id=1,
+            age=20, temporal_instance_id="1@age:20", confidence=0.9,
+        )
+        timeline = builder.build_from_markers([marker_a, marker_b], sample_chapters)
+        # El evento base del capítulo no debería tener instancia (ambiguo: hay 2)
+        chapter_event = next(
+            (e for e in timeline.events if e.chapter == 1 and e.paragraph == 0),
+            None,
+        )
+        assert chapter_event is not None
+        assert chapter_event.temporal_instance_id is None
+
+    def test_legacy_mentions_without_type_still_work(self, extractor):
+        """Menciones legacy sin entity_type siguen detectando edad."""
+        text = "Pedro, a los 30 años, decidió viajar."
+        markers = extractor.extract_with_entities(
+            text=text,
+            entity_mentions=[(1, 0, 5)],
+            chapter=1,
+        )
+        age_markers = [m for m in markers if m.age == 30]
+        assert len(age_markers) >= 1
+
+    def test_resolve_offset_years_sign_format(self, builder, sample_chapters):
+        """Verifica formato correcto de sign en offset_years: +N y -N."""
+        marker_pos = TemporalMarker(
+            text="dentro de 5 años", marker_type=MarkerType.CHARACTER_AGE,
+            start_char=0, end_char=16, chapter=1, entity_id=1,
+            relative_year_offset=5, temporal_instance_id="1@offset_years:+5",
+            confidence=0.8,
+        )
+        marker_neg = TemporalMarker(
+            text="hace 3 años", marker_type=MarkerType.CHARACTER_AGE,
+            start_char=0, end_char=11, chapter=2, entity_id=1,
+            relative_year_offset=-3, temporal_instance_id="1@offset_years:-3",
+            confidence=0.8,
+        )
+        timeline = builder.build_from_markers(
+            [marker_pos, marker_neg], sample_chapters,
+        )
+        instances = {e.temporal_instance_id for e in timeline.events if e.temporal_instance_id}
+        assert "1@offset_years:+5" in instances
+        assert "1@offset_years:-3" in instances

@@ -499,6 +499,54 @@ class CorrectionConfigUpdate(BaseModel):
     selectedPreset: Optional[str] = None
 
 
+# Categorías permitidas por tipo de entidad (alineado con frontend).
+ATTRIBUTE_CATEGORIES_BY_ENTITY_TYPE: dict[str, set[str]] = {
+    "character": {"physical", "psychological", "social", "ability"},
+    "animal": {"physical", "behavior", "social"},
+    "creature": {"physical", "ability", "social"},
+    "location": {"geographic", "architectural"},
+    "building": {"architectural", "state"},
+    "region": {"geographic", "history"},
+    "object": {"material", "appearance", "state", "function"},
+    "vehicle": {"material", "appearance", "state", "function"},
+    "organization": {"structure", "purpose", "history"},
+    "faction": {"structure", "purpose", "history"},
+    "family": {"structure", "history", "social"},
+    "event": {"temporal", "participants", "consequences"},
+    "time_period": {"temporal", "history"},
+    "concept": {"definition", "examples", "related"},
+    "religion": {"definition", "history", "social"},
+    "magic_system": {"definition", "function", "history"},
+    "work": {"appearance", "history", "definition"},
+    "title": {"social", "history"},
+    "language": {"definition", "history"},
+    "custom": {"definition", "history", "social"},
+}
+
+# Fallback seguro (tipo desconocido): subconjunto transversal mínimo.
+DEFAULT_ATTRIBUTE_CATEGORIES: set[str] = {
+    "physical",
+    "social",
+    "state",
+    "other",
+}
+
+
+def get_allowed_attribute_categories(entity_type: str | None) -> set[str]:
+    """Retorna categorías válidas para el tipo de entidad."""
+    if not entity_type:
+        return DEFAULT_ATTRIBUTE_CATEGORIES
+    normalized = entity_type.lower()
+    return ATTRIBUTE_CATEGORIES_BY_ENTITY_TYPE.get(normalized, DEFAULT_ATTRIBUTE_CATEGORIES)
+
+
+def is_valid_attribute_category(entity_type: str | None, category: str) -> bool:
+    """Valida categoría de atributo según tipo de entidad."""
+    if not category:
+        return False
+    return category.lower() in get_allowed_attribute_categories(entity_type)
+
+
 # ============================================================================
 # Helper functions
 # ============================================================================

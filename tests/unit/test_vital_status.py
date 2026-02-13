@@ -877,6 +877,46 @@ class TestVitalStatusWithTemporalMapIntegration:
         for inc in report.inconsistencies:
             assert inc.appearance_chapter != 3
 
+    def test_death_registers_temporal_instance_when_age_is_explicit(self):
+        """Si la muerte menciona edad, registra instancia temporal en TemporalMap."""
+        from narrative_assistant.temporal.temporal_map import (
+            NarrativeType,
+            TemporalMap,
+            TemporalSlice,
+        )
+
+        temporal_map = TemporalMap()
+        temporal_map.add_slice(2, TemporalSlice(
+            chapter=2,
+            day_offset=10,
+            narrative_type=NarrativeType.CHRONOLOGICAL,
+        ))
+        temporal_map.add_slice(3, TemporalSlice(
+            chapter=3,
+            day_offset=20,
+            narrative_type=NarrativeType.CHRONOLOGICAL,
+        ))
+
+        analyzer = VitalStatusAnalyzer(project_id=1, temporal_map=temporal_map)
+        analyzer.register_entity(1, "Juan")
+
+        events = analyzer.detect_death_events("Juan murió a los 45 años.", chapter=2)
+        assert len(events) == 1
+        assert events[0].temporal_instance_id == "1@age:45"
+
+        assert (
+            temporal_map.is_character_alive_in_chapter(
+                1, 3, temporal_instance_id="1@age:45"
+            )
+            is False
+        )
+        assert (
+            temporal_map.is_character_alive_in_chapter(
+                1, 3, temporal_instance_id="1@age:40"
+            )
+            is True
+        )
+
     def test_fallback_without_temporal_map(self):
         """Sin temporal_map, usa comparación lineal por capítulo."""
         chapters = [

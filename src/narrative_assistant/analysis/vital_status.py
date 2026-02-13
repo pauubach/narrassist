@@ -46,6 +46,8 @@ class DeathEvent:
     excerpt: str  # Texto donde se menciona la muerte
     death_type: str  # "direct", "narrated", "reported", "implied"
     confidence: float = 0.8
+    # Instancia temporal (ej. "1@age:45"). None = muerte canónica de la entidad.
+    temporal_instance_id: str | None = None
 
     # Metadatos
     detected_at: datetime = field(default_factory=datetime.now)
@@ -60,6 +62,7 @@ class DeathEvent:
             "excerpt": self.excerpt,
             "death_type": self.death_type,
             "confidence": self.confidence,
+            "temporal_instance_id": self.temporal_instance_id,
         }
 
 
@@ -226,6 +229,32 @@ class VitalStatusAnalyzer:
         """Obtiene el ID de entidad para un nombre."""
         return self._name_to_id.get(name.lower())
 
+    @staticmethod
+    def _extract_temporal_instance_id(excerpt: str, entity_id: int) -> str | None:
+        """
+        Detecta una instancia temporal explícita en el contexto de muerte.
+
+        Heurística inicial (determinista):
+        - "<...> a los 45 años", "con 45 años", "tenía 45 años"
+        - "<...> en 1985"
+        """
+        if not excerpt:
+            return None
+
+        age_match = re.search(
+            r"(?:a\s+los|con|ten[íi]a)\s+(\d{1,3})\s+años",
+            excerpt,
+            re.IGNORECASE,
+        )
+        if age_match:
+            return f"{entity_id}@age:{int(age_match.group(1))}"
+
+        year_match = re.search(r"\b(?:en|del?)\s+(19\d{2}|20[0-2]\d)\b", excerpt, re.IGNORECASE)
+        if year_match:
+            return f"{entity_id}@year:{int(year_match.group(1))}"
+
+        return None
+
     def detect_death_events(
         self,
         text: str,
@@ -305,6 +334,9 @@ class VitalStatusAnalyzer:
                         excerpt=excerpt,
                         death_type=death_type,
                         confidence=confidence_map.get(death_type, 0.7),
+                        temporal_instance_id=self._extract_temporal_instance_id(
+                            excerpt, entity_id
+                        ),
                     )
 
                     events.append(event)
@@ -313,7 +345,13 @@ class VitalStatusAnalyzer:
 
                     # Registrar muerte en temporal_map si disponible
                     if self._temporal_map is not None:
-                        self._temporal_map.register_death(entity_id, chapter)
+                        # Justificación: sin temporal_instance_id se mata la entidad canónica
+                        # completa, rompiendo casos A@40 vs A@45.
+                        self._temporal_map.register_death(
+                            entity_id,
+                            chapter,
+                            temporal_instance_id=event.temporal_instance_id,
+                        )
 
                     logger.info(
                         f"Death event detected: {event.entity_name} in chapter {chapter} "
@@ -344,7 +382,11 @@ class VitalStatusAnalyzer:
         for entity_id, death_event in self._death_events.items():
             # Verificar si el personaje está vivo en este capítulo
             if self._temporal_map is not None:
-                if self._temporal_map.is_character_alive_in_chapter(entity_id, chapter):
+                if self._temporal_map.is_character_alive_in_chapter(
+                    entity_id,
+                    chapter,
+                    temporal_instance_id=death_event.temporal_instance_id,
+                ):
                     continue
             else:
                 # Fallback: comparación lineal por capítulo

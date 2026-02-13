@@ -595,11 +595,27 @@ class AttributeEntityResolutionMixin:
         }
     )
 
-    def _infer_category(self, value: str, token):
+    def _infer_category(self, value: str, token, entity_type: str | None = None):
         """Infiere la categoría del atributo basándose en el valor y POS."""
-        from .attributes import BUILD_TYPES, COLORS, PERSONALITY_TRAITS, AttributeCategory
+        from .attributes import (
+            BUILD_TYPES,
+            COLORS,
+            PERSONALITY_TRAITS,
+            AttributeCategory,
+            _is_location_entity,
+            _is_object_entity,
+        )
 
         value_lower = value.lower()
+
+        if _is_location_entity(entity_type):
+            return AttributeCategory.GEOGRAPHIC
+
+        if _is_object_entity(entity_type):
+            # Para objetos, adjetivos suelen ser apariencia/estado material.
+            if token and token.pos_ == "ADJ":
+                return AttributeCategory.APPEARANCE
+            return AttributeCategory.PHYSICAL
 
         # Físicos
         if value_lower in BUILD_TYPES or value_lower in COLORS:
@@ -615,7 +631,7 @@ class AttributeEntityResolutionMixin:
 
         return AttributeCategory.SOCIAL
 
-    def _infer_key(self, value: str, token=None):
+    def _infer_key(self, value: str, token=None, entity_type: str | None = None):
         """
         Infiere la clave específica de un atributo extraído por dependency parsing.
 
@@ -630,9 +646,66 @@ class AttributeEntityResolutionMixin:
         Returns:
             AttributeKey más probable
         """
-        from .attributes import BUILD_TYPES, PERSONALITY_TRAITS, AttributeKey
+        from .attributes import (
+            BUILD_TYPES,
+            COLORS,
+            PERSONALITY_TRAITS,
+            AttributeKey,
+            _is_location_entity,
+            _is_object_entity,
+        )
 
         value_lower = value.lower()
+
+        if _is_location_entity(entity_type):
+            climate_terms = {
+                "húmedo", "húmeda", "seco", "seca", "templado", "templada",
+                "tropical", "frío", "fría", "cálido", "cálida", "árido", "árida",
+                "lluvioso", "lluviosa",
+            }
+            if value_lower in climate_terms:
+                return AttributeKey.CLIMATE
+
+            terrain_terms = {
+                "montañoso", "montañosa", "llano", "llana", "costero", "costera",
+                "boscoso", "boscosa", "desértico", "desértica", "rocoso", "rocosa",
+                "urbano", "urbana", "rural", "fértil",
+            }
+            if value_lower in terrain_terms:
+                return AttributeKey.TERRAIN
+
+            size_terms = {
+                "enorme", "gigante", "vasto", "vasta", "amplio", "amplia",
+                "grande", "mediano", "mediana", "pequeño", "pequeña",
+                "diminuto", "diminuta",
+            }
+            if value_lower in size_terms:
+                return AttributeKey.SIZE
+
+            # Default útil para lugares: mejor LOCATION que OTHER.
+            return AttributeKey.LOCATION
+
+        if _is_object_entity(entity_type):
+            material_terms = {
+                "oro", "plata", "bronce", "hierro", "acero", "cobre", "madera",
+                "cristal", "vidrio", "cuero", "hueso", "obsidiana", "piedra",
+            }
+            if value_lower in material_terms:
+                return AttributeKey.MATERIAL
+
+            if value_lower in COLORS:
+                return AttributeKey.COLOR
+
+            condition_terms = {
+                "roto", "rota", "deteriorado", "deteriorada", "intacto", "intacta",
+                "oxidado", "oxidada", "nuevo", "nueva", "viejo", "vieja",
+                "destruido", "destruida", "dañado", "dañada", "gastado", "gastada",
+            }
+            if value_lower in condition_terms:
+                return AttributeKey.CONDITION
+
+            # Default útil para objetos: estado/condición.
+            return AttributeKey.CONDITION
 
         # Color de pelo: "era rubio", "era moreno", "era castaño"
         if value_lower in self._HAIR_COLOR_ADJECTIVES:

@@ -196,14 +196,13 @@ async def preview_merge_entities(project_id: int, body: deps.EntityIdsRequest):
         # 1. Calcular similitud detallada entre pares
         # =====================================================================
         try:
-            from narrative_assistant.entities.fusion import EntityFusionService
-            from narrative_assistant.entities.semantic_fusion import get_semantic_fusion_service
+            from narrative_assistant.entities.semantic_fusion import (
+                get_semantic_fusion_service,
+            )
 
             semantic_service = get_semantic_fusion_service()
-            fusion_service = EntityFusionService(repository=entity_repo)
         except ImportError:
             semantic_service = None
-            fusion_service = None
 
         # Calcular similitud por nombre (Levenshtein/SequenceMatcher)
         def compute_name_similarity(name1: str, name2: str) -> dict:
@@ -961,9 +960,18 @@ async def get_entity_timeline(project_id: int, entity_id: int):
                 attrs_by_chapter[ch] = []
             attrs_by_chapter[ch].append(attr)
 
-        # Generar timeline
+        # Generar timeline.
+        # Ordenamos por chapter_number narrativo (si existe) para que la
+        # "primera aparición" sea coherente aunque los chapter_id no sean secuenciales.
         timeline_events = []
-        sorted_chapters = sorted(mentions_by_chapter.keys())
+        sorted_chapters = sorted(
+            mentions_by_chapter.keys(),
+            key=lambda cid: (
+                chapter_map[cid].chapter_number
+                if cid in chapter_map and chapter_map[cid] is not None
+                else cid
+            ),
+        )
 
         for idx, ch_id in enumerate(sorted_chapters):
             ch_mentions = mentions_by_chapter[ch_id]
@@ -973,7 +981,11 @@ async def get_entity_timeline(project_id: int, entity_id: int):
 
             # Primera aparición
             if idx == 0:
-                first_mention = ch_mentions[0]
+                # Si hay posiciones, usar la mención más temprana del capítulo.
+                # Evita depender del orden no determinista del repositorio.
+                first_mention = sorted(
+                    ch_mentions, key=lambda m: getattr(m, "start_char", 0)
+                )[0]
                 context = first_mention.context_before or ""
                 context += f"**{first_mention.surface_form}**"
                 context += first_mention.context_after or ""
@@ -1001,9 +1013,10 @@ async def get_entity_timeline(project_id: int, entity_id: int):
 
             # Atributos nuevos en este capítulo
             if ch_id in attrs_by_chapter or ch_number in attrs_by_chapter:
-                ch_attrs = attrs_by_chapter.get(ch_id, []) + attrs_by_chapter.get(
-                    ch_number, []
-                )
+                ch_attrs = list(attrs_by_chapter.get(ch_id, []))
+                # Evita duplicar el mismo lote cuando chapter_id == chapter_number.
+                if ch_number != ch_id:
+                    ch_attrs.extend(attrs_by_chapter.get(ch_number, []))
                 for attr in ch_attrs:
                     attr_name = getattr(attr, "attribute_key", None) or getattr(
                         attr, "name", "atributo"
@@ -2382,6 +2395,23 @@ async def create_entity_attribute(
         name = body.name
         value = body.value
         confidence = body.confidence
+
+        entity_type = (
+            entity.entity_type.value
+            if hasattr(entity, "entity_type") and hasattr(entity.entity_type, "value")
+            else str(entity.entity_type)
+            if hasattr(entity, "entity_type")
+            else None
+        )
+        if not deps.is_valid_attribute_category(entity_type, category):
+            allowed = sorted(deps.get_allowed_attribute_categories(entity_type))
+            return ApiResponse(
+                success=False,
+                error=(
+                    f"Categoría '{category}' no permitida para tipo '{entity_type}'. "
+                    f"Permitidas: {', '.join(allowed)}"
+                ),
+            )
 
         # Crear atributo
         attribute_id = entity_repo.create_attribute(

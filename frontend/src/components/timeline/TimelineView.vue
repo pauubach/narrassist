@@ -56,6 +56,16 @@
           class="filter-dropdown"
           show-clear
         />
+        <Select
+          v-if="temporalInstanceOptions.length > 0"
+          v-model="filterTemporalInstance"
+          :options="temporalInstanceOptions"
+          option-label="label"
+          option-value="value"
+          placeholder="Instancia temporal"
+          class="filter-dropdown"
+          show-clear
+        />
         <Button
           v-tooltip.bottom="'Recargar timeline'"
           icon="pi pi-refresh"
@@ -395,6 +405,10 @@
                 {{ getNarrativeOrderLabel(selectedEvent.narrativeOrder) }}
               </Tag>
             </div>
+            <div v-if="selectedEvent.temporalInstanceId" class="detail-item">
+              <span class="label">Instancia temporal:</span>
+              <span>{{ formatTemporalInstance(selectedEvent.temporalInstanceId) }}</span>
+            </div>
           </div>
         </div>
 
@@ -470,6 +484,7 @@ import { useWorkspaceStore } from '@/stores/workspace'
 import { transformTimeline } from '@/types/transformers'
 import { useAlertUtils } from '@/composables/useAlertUtils'
 import { api } from '@/services/apiClient'
+import { formatTemporalInstance } from '@/utils/temporal'
 import type {
   Timeline,
   TimelineEvent,
@@ -524,6 +539,7 @@ const viewModeOptions = [
 // Filtros y ordenamiento
 const sortOrder = ref<'chronological' | 'discourse'>('chronological')
 const filterNarrativeOrder = ref<NarrativeOrder | null>(null)
+const filterTemporalInstance = ref<string | null>(null)
 
 const sortOptions = [
   { label: 'Orden cronologico', value: 'chronological' },
@@ -535,6 +551,18 @@ const narrativeOrderOptions = [
   { label: 'Analepsis', value: 'analepsis' },
   { label: 'Prolepsis', value: 'prolepsis' }
 ]
+
+const temporalInstanceOptions = computed(() => {
+  if (!timeline.value) return []
+  const seen = new Set<string>()
+  for (const event of timeline.value.events) {
+    if (event.temporalInstanceId) seen.add(event.temporalInstanceId)
+  }
+  return Array.from(seen).sort().map(instanceId => ({
+    value: instanceId,
+    label: formatTemporalInstance(instanceId),
+  }))
+})
 
 // Virtualización: usar VirtualScroller cuando hay muchos eventos
 const VIRTUAL_THRESHOLD = 100
@@ -592,6 +620,10 @@ const filteredEvents = computed(() => {
     events = events.filter(e => e.narrativeOrder === filterNarrativeOrder.value)
   }
 
+  if (filterTemporalInstance.value) {
+    events = events.filter(e => e.temporalInstanceId === filterTemporalInstance.value)
+  }
+
   // Ordenar
   if (sortOrder.value === 'chronological') {
     events.sort((a, b) => {
@@ -609,10 +641,10 @@ const filteredEvents = computed(() => {
       if (aHasOffset && bHasOffset) {
         return a.dayOffset! - b.dayOffset!
       }
-      // Priorizar los que tienen tiempo conocido
-      if (aHasDate || aHasOffset) return -1
-      if (bHasDate || bHasOffset) return 1
-      return 0
+      // Cross-type: rank por calidad de info temporal (transitivo y determinista)
+      const aRank = aHasDate ? 2 : aHasOffset ? 1 : 0
+      const bRank = bHasDate ? 2 : bHasOffset ? 1 : 0
+      return bRank - aRank
     })
   } else {
     events.sort((a, b) => a.discoursePosition - b.discoursePosition)

@@ -62,6 +62,8 @@ class TemporalMarker:
         quantity: Cantidad numérica
         entity_id: ID de entidad asociada (para edades)
         age: Edad detectada
+        age_phase: Fase de vida detectada cuando no hay edad numérica ("joven", "viejo", etc.)
+        relative_year_offset: Desfase relativo de años para instancias implícitas (+5, -3)
         confidence: Nivel de confianza (0-1)
     """
 
@@ -78,6 +80,11 @@ class TemporalMarker:
     # Para edades
     entity_id: int | None = None
     age: int | None = None
+    age_phase: str | None = None
+    relative_year_offset: int | None = None
+    # Instancia temporal (ej. "12@age:40", "12@year:1985")
+    # Se popula cuando hay suficiente evidencia (entidad + marcador temporal).
+    temporal_instance_id: str | None = None
     # Metadata adicional
     year: int | None = None
     month: int | None = None
@@ -113,6 +120,34 @@ WORD_TO_NUM = {
     "varios": 3,
     "pocos": 2,
     "muchos": 10,
+}
+
+# Normalización de fases vitales para construir instancias temporales estables
+# cuando el texto no da una edad numérica explícita.
+AGE_PHASE_ALIASES = {
+    "niño": "child",
+    "niña": "child",
+    "pequeño": "child",
+    "pequeña": "child",
+    "adolescente": "teen",
+    "joven": "young",
+    "adulto": "adult",
+    "adulta": "adult",
+    "mayor": "elder",
+    "viejo": "elder",
+    "vieja": "elder",
+    "infancia": "child",
+    "niñez": "child",
+    "juventud": "young",
+    "adolescencia": "teen",
+    "madurez": "adult",
+    "vejez": "elder",
+}
+
+# Fases para desdobles temporales explícitos ("yo del futuro/pasado").
+TEMPORAL_SELF_PHASE_ALIASES = {
+    "futuro": "future_self",
+    "pasado": "past_self",
 }
 
 # Meses en español
@@ -769,9 +804,9 @@ class TemporalMarkerExtractor:
         text_lower = marker.text.lower()
 
         # Dirección
-        if any(w in text_lower for w in ["después", "siguiente", "más tarde", "al cabo"]):
+        if any(w in text_lower for w in ["después", "siguiente", "más tarde", "al cabo", "dentro de"]):
             marker.direction = "future"
-        elif any(w in text_lower for w in ["antes", "anterior", "atrás"]):
+        elif any(w in text_lower for w in ["antes", "anterior", "atrás", "hace"]):
             marker.direction = "past"
 
         # Magnitud y cantidad
@@ -805,11 +840,222 @@ class TemporalMarkerExtractor:
         """Parsea información de edad."""
         groups = match.groups()
         if groups:
-            age_str = groups[0]
-            if age_str.isdigit():
-                marker.age = int(age_str)
+            # Hay patrones con múltiples grupos (p. ej. "(los )?(\\d{1,3})").
+            # Buscamos el primer grupo numérico real en lugar de asumir groups[0].
+            for group in groups:
+                if group and group.isdigit():
+                    marker.age = int(group)
+                    break
+
+            # Si no hay edad numérica explícita, intentamos inferir fase de vida.
+            if marker.age is None:
+                marker.age_phase = self._infer_age_phase(marker.text)
 
         return marker
+
+    @staticmethod
+    def _infer_age_phase(text: str) -> str | None:
+        """Infiere fase vital canónica a partir del texto del marcador."""
+        text_lower = text.lower()
+        for alias, canonical_phase in AGE_PHASE_ALIASES.items():
+            if re.search(rf"\b{re.escape(alias)}\b", text_lower):
+                return canonical_phase
+        return None
+
+    @staticmethod
+    def _build_temporal_instance_id(marker: TemporalMarker) -> str | None:
+        """
+        Construye un identificador de instancia temporal estable.
+
+        Formato:
+        - edad: "<entity_id>@age:<n>"
+        - fase: "<entity_id>@phase:<name>"
+        - offset relativo: "<entity_id>@offset_years:+/-n"
+        - año:  "<entity_id>@year:<yyyy>"
+        """
+        if marker.entity_id is None:
+            return None
+        if marker.age is not None:
+            return f"{marker.entity_id}@age:{marker.age}"
+        if marker.age_phase:
+            # Justificación: para narrativas de viaje temporal con "yo joven/viejo",
+            # necesitamos distinguir instancias aunque no exista edad numérica.
+            return f"{marker.entity_id}@phase:{marker.age_phase}"
+        if marker.relative_year_offset is not None:
+            sign = "+" if marker.relative_year_offset >= 0 else ""
+            return f"{marker.entity_id}@offset_years:{sign}{marker.relative_year_offset}"
+        if marker.year is not None:
+            return f"{marker.entity_id}@year:{marker.year}"
+        return None
+
+    @staticmethod
+    def _distance_to_mention(
+        marker_start: int,
+        marker_end: int,
+        mention_start: int,
+        mention_end: int,
+    ) -> int:
+        """Distancia mínima entre un span de marcador y uno de mención."""
+        if mention_end < marker_start:
+            return marker_start - mention_end
+        if mention_start > marker_end:
+            return mention_start - marker_end
+        return 0  # Solapan
+
+    def _find_closest_entity_id(
+        self,
+        marker_start: int,
+        marker_end: int,
+        entity_mentions: list[tuple[int, int, int]],
+        max_distance: int = 200,
+    ) -> int | None:
+        """
+        Busca la entidad más cercana al marcador (antes o después).
+
+        Justificación: cubre tanto "Juan, a los 40 años" como "a los 40 años, Juan".
+        """
+        closest_entity = None
+        min_distance = float("inf")
+        for entity_id, mention_start, mention_end in entity_mentions:
+            distance = self._distance_to_mention(
+                marker_start,
+                marker_end,
+                mention_start,
+                mention_end,
+            )
+            if distance < min_distance and distance <= max_distance:
+                min_distance = distance
+                closest_entity = entity_id
+        return closest_entity
+
+    def _infer_implicit_markers_near_mentions(
+        self,
+        text: str,
+        entity_mentions: list[tuple[int, int, int]],
+        chapter: int | None,
+        existing_markers: list[TemporalMarker],
+    ) -> list[TemporalMarker]:
+        """
+        Genera marcadores de instancia temporal implícita alrededor de menciones.
+
+        Heurísticas cubiertas:
+        - Adjetivo de fase junto al nombre ("joven Juan", "viejo Juan")
+        - Desdoble temporal explícito ("yo del futuro/pasado", "versión futura")
+        - Desfase relativo ("dentro de 5 años", "5 años después/antes")
+        """
+        inferred: list[TemporalMarker] = []
+        occupied_spans = [(m.start_char, m.end_char) for m in existing_markers]
+        seen_signatures: set[tuple[int | None, str | None, int, int]] = set()
+
+        def _add_marker(candidate: TemporalMarker) -> None:
+            span = (candidate.start_char, candidate.end_char)
+            if any(self._spans_overlap(span, used) for used in occupied_spans):
+                return
+            signature = (
+                candidate.entity_id,
+                candidate.temporal_instance_id,
+                candidate.start_char,
+                candidate.end_char,
+            )
+            if signature in seen_signatures:
+                return
+            seen_signatures.add(signature)
+            inferred.append(candidate)
+            occupied_spans.append(span)
+
+        for entity_id, mention_start, mention_end in entity_mentions:
+            if mention_end <= mention_start:
+                continue
+
+            # 1) Fase vital adyacente al nombre ("joven Juan", "viejo Juan").
+            before_start = max(0, mention_start - 24)
+            before_text = text[before_start:mention_start]
+            phase_match = re.search(
+                r"(niño|niña|pequeño|pequeña|adolescente|joven|adulto|adulta|mayor|viejo|vieja)\s*$",
+                before_text,
+                re.IGNORECASE,
+            )
+            if phase_match:
+                phase_word = phase_match.group(1).lower()
+                phase = AGE_PHASE_ALIASES.get(phase_word)
+                if phase:
+                    abs_start = before_start + phase_match.start(1)
+                    abs_end = mention_end
+                    marker = TemporalMarker(
+                        text=text[abs_start:abs_end],
+                        marker_type=MarkerType.CHARACTER_AGE,
+                        start_char=abs_start,
+                        end_char=abs_end,
+                        chapter=chapter,
+                        entity_id=entity_id,
+                        age_phase=phase,
+                        confidence=0.66,
+                    )
+                    marker.temporal_instance_id = self._build_temporal_instance_id(marker)
+                    _add_marker(marker)
+
+            # Ventana contextual alrededor de la mención para cues implícitos.
+            window_start = max(0, mention_start - 64)
+            window_end = min(len(text), mention_end + 140)
+            window = text[window_start:window_end]
+
+            # 2) Desdobles tipo "yo del futuro/pasado" o "versión futura/pasada".
+            for pattern in (
+                r"\b(?:yo|versi[oó]n|doble|copia)\s+del\s+(futuro|pasado)\b",
+                r"\b(?:yo|versi[oó]n|doble|copia)\s+(futuro|pasado)\b",
+            ):
+                for match in re.finditer(pattern, window, re.IGNORECASE):
+                    plane_word = match.group(1).lower()
+                    phase = TEMPORAL_SELF_PHASE_ALIASES.get(plane_word)
+                    if not phase:
+                        continue
+                    abs_start = window_start + match.start()
+                    abs_end = window_start + match.end()
+                    marker = TemporalMarker(
+                        text=text[abs_start:abs_end],
+                        marker_type=MarkerType.CHARACTER_AGE,
+                        start_char=abs_start,
+                        end_char=abs_end,
+                        chapter=chapter,
+                        entity_id=entity_id,
+                        age_phase=phase,
+                        confidence=0.62,
+                    )
+                    marker.temporal_instance_id = self._build_temporal_instance_id(marker)
+                    _add_marker(marker)
+
+            # 3) Instancias por desplazamiento relativo en años sin edad explícita.
+            offset_patterns = (
+                (r"\bdentro\s+de\s+(\d{1,3})\s+años\b", +1),
+                (r"\b(\d{1,3})\s+años\s+(después|más\s+tarde)\b", +1),
+                (r"\b(\d{1,3})\s+años\s+(antes|atrás)\b", -1),
+                (r"\bhace\s+(\d{1,3})\s+años\b", -1),
+            )
+            for pattern, sign in offset_patterns:
+                for match in re.finditer(pattern, window, re.IGNORECASE):
+                    qty_str = match.group(1)
+                    if not qty_str or not qty_str.isdigit():
+                        continue
+                    years = int(qty_str)
+                    abs_start = window_start + match.start()
+                    abs_end = window_start + match.end()
+                    marker = TemporalMarker(
+                        text=text[abs_start:abs_end],
+                        marker_type=MarkerType.CHARACTER_AGE,
+                        start_char=abs_start,
+                        end_char=abs_end,
+                        chapter=chapter,
+                        entity_id=entity_id,
+                        relative_year_offset=sign * years,
+                        direction="future" if sign > 0 else "past",
+                        quantity=years,
+                        magnitude="año",
+                        confidence=0.60,
+                    )
+                    marker.temporal_instance_id = self._build_temporal_instance_id(marker)
+                    _add_marker(marker)
+
+        return inferred
 
     def _parse_absolute_date(
         self,
@@ -883,22 +1129,41 @@ class TemporalMarkerExtractor:
         """
         markers = self.extract(text, chapter)
 
-        # Asociar edades con entidades
+        # Asociar edades con entidades (soporta mención antes o después del marcador).
         for marker in markers:
             if marker.marker_type == MarkerType.CHARACTER_AGE:
-                # Buscar entidad más cercana antes del marcador
-                closest_entity = None
-                min_distance = float("inf")
+                marker.entity_id = self._find_closest_entity_id(
+                    marker.start_char,
+                    marker.end_char,
+                    entity_mentions,
+                )
+                # Justificación: sin entity_id no podemos distinguir "A@40" de "B@40".
+                # La instancia temporal debe anclarse al ID canónico de la entidad.
+                marker.temporal_instance_id = self._build_temporal_instance_id(marker)
+            elif marker.marker_type == MarkerType.RELATIVE_TIME:
+                # Heurística: ciertos relativos en años también identifican instancia
+                # ("dentro de 5 años", "hace 3 años", "5 años después").
+                # Los tratamos como offset relativo cuando hay entidad cercana.
+                marker.entity_id = self._find_closest_entity_id(
+                    marker.start_char,
+                    marker.end_char,
+                    entity_mentions,
+                )
+                if marker.entity_id and marker.magnitude == "año" and marker.quantity:
+                    sign = -1 if marker.direction == "past" else 1
+                    marker.relative_year_offset = sign * marker.quantity
+                    marker.temporal_instance_id = self._build_temporal_instance_id(marker)
 
-                for entity_id, _start, end in entity_mentions:
-                    if end <= marker.start_char:
-                        distance = marker.start_char - end
-                        # Máximo 200 caracteres de distancia
-                        if distance < min_distance and distance < 200:
-                            min_distance = distance
-                            closest_entity = entity_id
-
-                marker.entity_id = closest_entity
+        # Heurística adicional para instancias implícitas sin edad explícita.
+        implicit_markers = self._infer_implicit_markers_near_mentions(
+            text=text,
+            entity_mentions=entity_mentions,
+            chapter=chapter,
+            existing_markers=markers,
+        )
+        if implicit_markers:
+            markers.extend(implicit_markers)
+            markers = sorted(markers, key=lambda m: (m.start_char, m.end_char))
 
         return markers
 

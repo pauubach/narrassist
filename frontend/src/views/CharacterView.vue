@@ -123,7 +123,6 @@
             option-label="label"
             option-value="value"
             class="w-full"
-            disabled
           />
         </div>
 
@@ -241,7 +240,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useProjectsStore } from '@/stores/projects'
 import { useToast } from 'primevue/usetoast'
@@ -260,6 +259,7 @@ import UndoMergeDialog from '@/components/UndoMergeDialog.vue'
 import type { Entity, CharacterAttribute, CharacterRelationship } from '@/types'
 import { transformEntity, transformEntities } from '@/types/transformers'
 import { api } from '@/services/apiClient'
+import { getAttributeCategoriesForEntityType } from '@/config/attributes'
 
 const route = useRoute()
 const router = useRouter()
@@ -317,10 +317,9 @@ const importanceOptions = [
   { label: 'Principal', value: 'main' }
 ]
 
-const attributeCategories = [
-  { label: 'Físico', value: 'physical' },
-  { label: 'Psicológico', value: 'psychological' }
-]
+const attributeCategories = computed(() =>
+  getAttributeCategoriesForEntityType(character.value?.type || 'character')
+)
 
 const relationshipTypes = [
   { label: 'Familiar', value: 'family' },
@@ -329,6 +328,19 @@ const relationshipTypes = [
   { label: 'Romántica', value: 'romantic' },
   { label: 'Profesional', value: 'professional' }
 ]
+
+watch(
+  attributeCategories,
+  (categories) => {
+    if (categories.length === 0) return
+    // Justificación: al cambiar tipo de entidad, forzamos una categoría válida.
+    // Evita enviar categorías incompatibles al backend (ej. "physical" en location).
+    if (!categories.some(c => c.value === newAttribute.value.category)) {
+      newAttribute.value.category = categories[0].value
+    }
+  },
+  { immediate: true }
+)
 
 // Funciones
 const loadCharacter = async () => {
@@ -426,9 +438,13 @@ const saveCharacter = async () => {
 }
 
 const onAddAttribute = (category: string) => {
+  const available = attributeCategories.value.map(c => c.value)
+  const safeCategory = available.includes(category)
+    ? category
+    : (available[0] || 'physical')
   newAttribute.value = {
     entityId: characterId.value,
-    category: category,
+    category: safeCategory,
     name: '',
     value: ''
   }

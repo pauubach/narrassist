@@ -28,6 +28,12 @@
           :value="getNarrativeOrderLabel(event.narrativeOrder)"
           class="event-type-tag"
         />
+        <Tag
+          v-if="event.temporalInstanceId"
+          severity="contrast"
+          :value="formatTemporalInstance(event.temporalInstanceId)"
+          class="event-instance-tag"
+        />
       </div>
 
       <!-- Descripcion del evento -->
@@ -84,6 +90,7 @@
 import Tag from 'primevue/tag'
 import Chip from 'primevue/chip'
 import type { TimelineEvent, NarrativeOrder, TimelineResolution } from '@/types'
+import { formatTemporalInstance } from '@/utils/temporal'
 
 const props = withDefaults(defineProps<{
   event: TimelineEvent
@@ -304,6 +311,11 @@ const handleMouseLeave = () => {
 
 .event-type-tag {
   font-size: 0.75rem;
+}
+
+.event-instance-tag {
+  font-size: 0.75rem;
+  margin-left: 0.5rem;
 }
 
 .event-description h4 {

@@ -7,7 +7,6 @@
  * - Botón de reintentar (opcional)
  */
 
-import { describe, it, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import AnalysisErrorState from '../shared/AnalysisErrorState.vue'
 

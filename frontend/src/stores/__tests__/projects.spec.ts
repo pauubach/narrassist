@@ -5,7 +5,6 @@
  * El store depende de api client y transformers, ambos mockeados.
  */
 
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useProjectsStore } from '../projects'
 import type { Project as _Project } from '@/types'
