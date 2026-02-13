@@ -126,7 +126,7 @@ const comparisonVersions = computed(() => {
       :loading="loading"
       :paginator="versions.length > 10"
       :rows="10"
-      stripedRows
+      striped-rows
       size="small"
       data-key="id"
       :selection-mode="versions.length >= 2 ? undefined : undefined"
