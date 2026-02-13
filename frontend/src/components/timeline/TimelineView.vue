@@ -674,7 +674,10 @@ const loadAnachronisms = async () => {
 const formatDateShort = (date: Date): string => {
   // Para fechas sinteticas (ano 1), mostrar como "Dia X"
   if (date.getFullYear() === 1) {
-    const baseDate = new Date(1, 0, 1)
+    // Evitar el comportamiento especial de JS para años 0..99 (1 => 1901).
+    const baseDate = new Date(0)
+    baseDate.setFullYear(1, 0, 1)
+    baseDate.setHours(0, 0, 0, 0)
     const diffTime = date.getTime() - baseDate.getTime()
     const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24))
     return `Dia ${diffDays}`

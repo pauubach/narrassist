@@ -549,6 +549,13 @@ async def get_project_timeline(project_id: int, force_refresh: bool = False):
                     narrative_order=event.narrative_order.value if event.narrative_order else "CHRONOLOGICAL",
                     discourse_position=event.discourse_position,
                     confidence=event.confidence,
+                    # Importante: estos campos deben persistirse para que el timeline
+                    # cacheado en BD conserve exactamente la semántica temporal de memoria.
+                    # Si se omiten, al leer desde caché se pierden Día 0/dayOffset y la
+                    # instancia temporal (A@40 vs A@45), generando inconsistencias de UI/lógica.
+                    day_offset=event.day_offset,
+                    weekday=event.weekday,
+                    temporal_instance_id=event.temporal_instance_id,
                 ))
 
             markers_data = []
@@ -1208,5 +1215,4 @@ async def get_chapter_scenes(project_id: int, chapter_number: int):
     except Exception as e:
         logger.error(f"Error getting chapter scenes: {e}", exc_info=True)
         return ApiResponse(success=False, error="Error interno del servidor")
-
 

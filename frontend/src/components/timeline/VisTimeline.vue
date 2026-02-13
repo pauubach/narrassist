@@ -73,7 +73,7 @@
       </div>
       <div v-else-if="hoveredEvent.dayOffset !== null && hoveredEvent.dayOffset !== undefined" class="tooltip-date">
         <i class="pi pi-calendar"></i>
-        Dia +{{ hoveredEvent.dayOffset }}
+        {{ formatDayOffset(hoveredEvent.dayOffset) }}
       </div>
       <div v-else-if="hoveredEvent.storyDate" class="tooltip-date">
         <i class="pi pi-calendar"></i>
@@ -159,7 +159,10 @@ const getChapterNumber = (event: TimelineEvent): number => {
 // Format date
 const formatDate = (date: Date): string => {
   if (date.getFullYear() === 1) {
-    const baseDate = new Date(1, 0, 1)
+    // Evitar el quirk de JS para años 0..99 (new Date(1,...) => 1901).
+    const baseDate = new Date(0)
+    baseDate.setFullYear(1, 0, 1)
+    baseDate.setHours(0, 0, 0, 0)
     const diffTime = date.getTime() - baseDate.getTime()
     const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24))
     return `Día ${diffDays}`
@@ -169,6 +172,12 @@ const formatDate = (date: Date): string => {
     month: 'short',
     year: 'numeric'
   }).format(date)
+}
+
+// Formatea offsets relativos sin ambigüedad de signo ("Día +3", "Día -2", "Día 0").
+const formatDayOffset = (offset: number): string => {
+  if (offset === 0) return 'Día 0'
+  return offset > 0 ? `Día +${offset}` : `Día ${offset}`
 }
 
 // Narrative order helpers
@@ -196,9 +205,14 @@ const resolveEventDate = (event: TimelineEvent): Date | null => {
   if (event.storyDate && event.storyDate.getFullYear() > 1) {
     return event.storyDate
   }
-  // dayOffset → synthetic date starting at year 1
+  // dayOffset -> synthetic date starting at year 1.
+  // Usamos setFullYear() porque new Date(1, ...) en JS significa 1901
+  // (quirk para años 0..99) y desplaza indebidamente la línea temporal.
   if (event.dayOffset !== null && event.dayOffset !== undefined) {
-    return new Date(1, 0, 1 + event.dayOffset)
+    const syntheticDate = new Date(0)
+    syntheticDate.setFullYear(1, 0, 1 + event.dayOffset)
+    syntheticDate.setHours(0, 0, 0, 0)
+    return syntheticDate
   }
   // Synthetic storyDate (year === 1) — use as-is
   if (event.storyDate) {
