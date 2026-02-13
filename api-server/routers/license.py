@@ -45,6 +45,7 @@ async def get_license_status():
                     "pages_remaining": 0,
                     "expires_at": None,
                     "is_trial": False,
+                    "is_founding_member": False,
                     "offline_days_remaining": None,
                 }
             )
@@ -97,6 +98,7 @@ async def get_license_status():
                     if license_obj.subscription
                     else False
                 ),
+                "is_founding_member": license_obj.extra_data.get("founding_member", False),
                 "offline_days_remaining": (
                     license_obj.grace_period_remaining.days
                     if license_obj.grace_period_remaining
