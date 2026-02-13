@@ -121,7 +121,9 @@ class VitalStatusReport:
         return {
             "project_id": self.project_id,
             "death_events": [e.to_dict() for e in self.death_events],
-            "post_mortem_appearances": [a.to_dict() for a in self.post_mortem_appearances],
+            "post_mortem_appearances": [
+                a.to_dict() for a in self.post_mortem_appearances
+            ],
             "inconsistencies_count": len(self.inconsistencies),
             "entities_status": {k: v.value for k, v in self.entities_status.items()},
         }
@@ -194,8 +196,9 @@ class VitalStatusAnalyzer:
         r"(?P<name>\w+)\s+(?:sonrió|rió|lloró|suspiró|frunció)",
     ]
 
-    def __init__(self, project_id: int):
+    def __init__(self, project_id: int, temporal_map=None):
         self.project_id = project_id
+        self._temporal_map = temporal_map
 
         # Estado interno
         self._death_events: dict[int, DeathEvent] = {}  # entity_id -> DeathEvent
@@ -291,6 +294,10 @@ class VitalStatusAnalyzer:
                     self._death_events[entity_id] = event
                     found_in_chapter.add(entity_id)
 
+                    # Registrar muerte en temporal_map si disponible
+                    if self._temporal_map is not None:
+                        self._temporal_map.register_death(entity_id, chapter)
+
                     logger.info(
                         f"Death event detected: {event.entity_name} in chapter {chapter} "
                         f"(type: {death_type}, confidence: {event.confidence:.2f})"
@@ -318,9 +325,14 @@ class VitalStatusAnalyzer:
         appearances = []
 
         for entity_id, death_event in self._death_events.items():
-            # Solo verificar si murió en capítulo anterior
-            if death_event.chapter >= chapter:
-                continue
+            # Verificar si el personaje está vivo en este capítulo
+            if self._temporal_map is not None:
+                if self._temporal_map.is_character_alive_in_chapter(entity_id, chapter):
+                    continue
+            else:
+                # Fallback: comparación lineal por capítulo
+                if death_event.chapter >= chapter:
+                    continue
 
             entity_name = death_event.entity_name
             entity_name.lower()
@@ -344,7 +356,10 @@ class VitalStatusAnalyzer:
                     is_valid = self._is_valid_reference(context, entity_name)
 
                     # Determinar tipo de aparición
-                    if "dijo" in match.group(0).lower() or "preguntó" in match.group(0).lower():
+                    if (
+                        "dijo" in match.group(0).lower()
+                        or "preguntó" in match.group(0).lower()
+                    ):
                         appearance_type = "dialogue"
                     else:
                         appearance_type = "action"
@@ -384,7 +399,9 @@ class VitalStatusAnalyzer:
         """
         for pattern in self.VALID_REFERENCE_PATTERNS:
             # Reemplazar placeholder de nombre
-            pattern_with_name = pattern.replace(r"(?P<name>\w+)", re.escape(entity_name))
+            pattern_with_name = pattern.replace(
+                r"(?P<name>\w+)", re.escape(entity_name)
+            )
             if re.search(pattern_with_name, context, re.IGNORECASE):
                 return True
             # También probar el patrón original
@@ -457,6 +474,7 @@ def analyze_vital_status(
     project_id: int,
     chapters: list[dict],
     entities: list[dict],
+    temporal_map=None,
 ) -> Result[VitalStatusReport]:
     """
     Analiza el estado vital de personajes en todo el proyecto.
@@ -465,12 +483,13 @@ def analyze_vital_status(
         project_id: ID del proyecto
         chapters: Lista de capítulos con texto
         entities: Lista de entidades con nombres y aliases
+        temporal_map: TemporalMap opcional para narrativas no lineales
 
     Returns:
         Result con VitalStatusReport
     """
     try:
-        analyzer = VitalStatusAnalyzer(project_id)
+        analyzer = VitalStatusAnalyzer(project_id, temporal_map=temporal_map)
 
         # Registrar entidades
         for entity in entities:
@@ -493,7 +512,9 @@ def analyze_vital_status(
             if not text:
                 continue
 
-            death_events, appearances = analyzer.analyze_chapter(text, chapter_num, start_offset)
+            death_events, appearances = analyzer.analyze_chapter(
+                text, chapter_num, start_offset
+            )
 
             all_death_events.extend(death_events)
             all_appearances.extend(appearances)

@@ -8,34 +8,19 @@ Proporciona herramientas para:
 - Identificar analepsis y prolepsis
 """
 
-from .inconsistencies import (
-    InconsistencySeverity,
-    InconsistencyType,
-    TemporalCheckResult,
-    TemporalConsistencyChecker,
-    TemporalDetectionConfig,
-    # Voting system
-    TemporalDetectionMethod,
-    # Basic checker
-    TemporalInconsistency,
-    VotingTemporalChecker,
-    check_temporal_consistency_voting,
-    get_voting_temporal_checker,
-    reset_voting_temporal_checker,
-)
-from .markers import (
-    WORD_TO_NUM,
-    MarkerType,
-    TemporalMarker,
-    TemporalMarkerExtractor,
-)
-from .timeline import (
-    NarrativeOrder,
-    Timeline,
-    TimelineBuilder,
-    TimelineEvent,
-    TimelineResolution,
-)
+from .inconsistencies import (  # Voting system; Basic checker
+    InconsistencySeverity, InconsistencyType, TemporalCheckResult,
+    TemporalConsistencyChecker, TemporalDetectionConfig,
+    TemporalDetectionMethod, TemporalInconsistency, VotingTemporalChecker,
+    check_temporal_consistency_voting, get_voting_temporal_checker,
+    reset_voting_temporal_checker)
+from .markers import (WORD_TO_NUM, MarkerType, TemporalMarker,
+                      TemporalMarkerExtractor)
+from .non_linear_detector import NonLinearNarrativeDetector, NonLinearSignal
+from .temporal_map import (AgeReference, NarrativeType, TemporalMap,
+                           TemporalSlice)
+from .timeline import (NarrativeOrder, Timeline, TimelineBuilder,
+                       TimelineEvent, TimelineResolution)
 
 __all__ = [
     # Markers
@@ -62,4 +47,12 @@ __all__ = [
     "get_voting_temporal_checker",
     "reset_voting_temporal_checker",
     "check_temporal_consistency_voting",
+    # Temporal Map (non-linear narratives)
+    "TemporalMap",
+    "TemporalSlice",
+    "NarrativeType",
+    "AgeReference",
+    # Non-linear detector
+    "NonLinearNarrativeDetector",
+    "NonLinearSignal",
 ]
