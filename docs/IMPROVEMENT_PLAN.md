@@ -1084,7 +1084,7 @@ NO propagar invalidacion downstream. Comparar `output_hash` antes vs despues.
 | ~~BK-09~~ | ~~Merge-induced attribute orphaning~~ | ✅ DONE — `move_related_data()` en `repository.py` migra 14 FK cols en 10 tablas. 16 tests en `test_entity_merge_fk.py`. |
 | ~~BK-10~~ | ~~Dialogue attribution: correcciones + scene breaks~~ | ✅ DONE — BK-10b/c (scene breaks + confidence decay) en commit cf11a00. `SpeakerAttributor` integrado con `speaker_corrections` y `_SCENE_BREAK_PATTERNS`. |
 | ~~BK-11~~ | ~~Detección de narrativa no lineal~~ | ✅ DONE — `TemporalMap` en `temporal_map.py`, `NonLinearNarrativeDetector` en `non_linear_detector.py`. `vital_status.py` usa `is_character_alive_in_chapter()` (story_time) en vez de `chapter >=`. 15 tests. |
-| BK-12 | Cache para fases de enriquecimiento | **P1** — Fases 10-13 (relaciones, voz, prosa) recalculan on-the-fly en cada visita a tab. Sin cache → OOM en hardware limitado (8GB RAM). Blocker para S8a-07..10. |
+| ~~BK-12~~ | ~~Cache para fases de enriquecimiento~~ | ✅ DONE — Absorbido por S8a. `enrichment_cache` table (schema v20), `_enrichment_phases.py` (fases 10-13, 24 enrichment types), `_enrichment_cache.py` (`get_cached_enrichment()` con `allow_stale`), `_invalidation.py` (granular stale marking). 20+ endpoints leen del cache. Early cutoff por `output_hash`. |
 | ~~BK-13~~ | ~~Pro-drop ambigüedad multi-personaje~~ | ✅ DONE — `ProDropAmbiguityScorer` y `SaliencyTracker` en `pro_drop_scorer.py`. Scoring multi-factor (recency, saliency, gender, discourse, number). Ambiguity score 0-1. Integrado en `HeuristicsCorefMethod` para `MentionType.ZERO`. `_weighted_vote()` almacena `_ambiguity` en detalle. 10 tests. |
 | ~~BK-14~~ | ~~Ubicaciones jerárquicas/anidadas~~ | ✅ DONE — `LocationOntology` en `location_ontology.py`: jerarquía 7 niveles, gazetteer ~50 ciudades, haversine, alias, reachability por periodo histórico. 19 tests. |
 | ~~BK-15~~ | ~~Emotional masking~~ | ✅ DONE — `_check_emotional_masking()` en `out_of_character.py`, 7 familias verbales, leakage físico. 6 tests en `test_ooc_masking.py`. |
@@ -1106,7 +1106,7 @@ NO propagar invalidacion downstream. Comparar `output_hash` antes vs despues.
 > **Panel de expertos (13-Feb-2026)**: 8 expertos (QA Senior, Arquitecto Python/FastAPI,
 > Lingüista Computacional, AppSec, Corrector Editorial 15+, Frontend Engineer, Product Owner,
 > UX Designer). Auditoría completa de backlog + documentación. Resultado: B+ global,
-> 22/29 BK completados (BK-06,10,15,17,23 corregidos como DONE). Plan de trabajo faseado:
+> 24/29 BK completados (BK-06,10,15,17,23,08,12 corregidos como DONE). Plan de trabajo faseado:
 > Fase 1 pre-defensa (~20h), Fase 2 post-defensa v1.0 (~80h), Fase 3 v1.1+ (roadmap).
 > Documento completo: `docs/EXPERT_PANEL_2026-02-13.md`.
 >
@@ -1887,17 +1887,195 @@ S5 (LLM), S6 (frontend UX), S7a (licensing). Total: ~10 semanas ejecutadas.
 | **SP-2** | Revisión licensing | 1 device Pro, 60k limit, swaps, founding members | 2d |
 | **SP-3** | Export/Import editorial | JSON .narrassist, preview+confirm, merge logic | 7-9d |
 
-### SIGUIENTE: S9-S12 — NLP Avanzado (~28-44 días, 7-11 semanas)
+### ~~COMPLETADO: S9-S12 — NLP Avanzado~~ ✅
 
-> Mejoras de calidad NLP. Solo tiene sentido cuando el producto base está pulido (PP),
-> la pipeline es robusta (S8), y el trabajo editorial se preserva (SP-1).
+> Mejoras de calidad NLP completadas. Todos los sprints ✅.
 
 | Sprint | Foco | Tareas clave | Días |
 |--------|------|-------------|------|
 | **S9** ✅ | Integridad datos + diálogos | BK-09 (merge FK), BK-15 (masking), BK-17 (glossary→NER), BK-10b/c (scene breaks + decay) | 6-9d |
-| **S10** ✅ | Timeline no lineal | BK-14 (ubicaciones jerárquicas), BK-11 (narrativa no lineal — 40% ficción). ~~BK-12 absorbido por S8a~~ | 8-13d |
+| **S10** ✅ | Timeline no lineal | BK-14 (ubicaciones jerárquicas), BK-11 (narrativa no lineal — 40% ficción). ~~BK-12 absorbido por S8a~~ ✅ | 8-13d |
 | **S11** ✅ | Pro-drop + Chekhov | BK-13 (ambigüedad multi-candidato), BK-16 (hilos narrativos sin resolver) | 8-13d |
 | **S12** ✅ | Confidence decay | BK-18 (decay gradual post-merge) | 1-2d |
+
+### SIGUIENTE: S13-S16 — Editorial Intelligence + Monetización (~75-110h, ~20-30 días)
+
+> Panel de expertos (13-Feb-2026): Todos los sprints NLP (S0-S12) completados. BK-12 absorbido por S8a.
+> Los 4 BK restantes accionables (BK-25, BK-27, BK-28, BK-29) son product/business features.
+> BK-26 (collab online) permanece aparcado.
+>
+> **Decisión panel**: S13 (BK-27 + BK-25 MVP) es el sprint de mayor ROI: 7-9h para impacto editorial
+> diario. S14 (BK-25 full) es el diferenciador competitivo. S15 (BK-28) y S16 (BK-29) pueden
+> posponerse hasta tener feedback de clientes reales.
+
+**Criterios no funcionales obligatorios** (por sprint):
+- Latencia API nueva p95 < 300 ms en proyecto mediano (~30 capítulos)
+- No aumentar RAM pico de análisis > 15% respecto baseline
+- Tests y lint en verde antes de cerrar sprint
+- Crecimiento de DB por snapshot/versión bajo límite definido (con retención existente de 10 snapshots)
+
+| Sprint | Foco | Tareas clave | Días |
+|--------|------|-------------|------|
+| **S13** | Editorial workflow | BK-27 (filtrado capítulos) + BK-25 MVP (comparison banner) | 1-2d |
+| **S14** | Revision Intelligence full | BK-25 completo (content diffing, alert linking, dashboard) | 5-7d |
+| **S15** | Version tracking | BK-28 fase 1 (métricas por versión, sparkline trends) | 4-5d |
+| **S16A** | Monetización UX | BK-29 (quota warnings, tier comparison — desktop-only) | 2-3d |
+| **S16B** | Monetización pagos | BK-29 (page packs, Stripe — requiere backend billing público) | 4-6d |
+
+#### Sprint S13: Editorial Workflow (BK-27 + BK-25 MVP) [7-9h]
+
+> **Corrector Editorial**: "Es lo que más necesito. Trabajo en 3-4 capítulos al día de un manuscrito
+> de 30. No quiero ver alertas de capítulos que no me tocan."
+> **Product Owner**: "Mayor ROI del backlog: 7h de trabajo → impacto editorial diario."
+> **Arquitecto**: "Trivial — SQL WHERE + 2 query params + ComparisonService existente."
+
+**BK-27: Filtrado de alertas por rango de capítulos [4-6h]**
+
+Infraestructura existente (85%):
+- `get_by_project_prioritized()` prioriza por `current_chapter` ±2
+- Focus mode filtra por severity/confidence
+- Campo `chapter` en todas las alertas
+
+| Tarea | Horas | Archivo | Detalle |
+|-------|-------|---------|---------|
+| S13-01 | 1h | `api-server/routers/alerts.py` | Añadir `chapter_min`, `chapter_max` query params a `list_alerts()`. SQL: `AND chapter BETWEEN ? AND ?`. Cross-chapter: usar `extra_data.related_chapters` (JSON array) para incluir alertas cuyo capítulo relacionado caiga en el rango. |
+| S13-02 | 1h | `src/narrative_assistant/alerts/repository.py` | Extender `get_by_project_prioritized()` con filtro de rango. Nota: `idx_alerts_chapter ON alerts(chapter)` ya existe (database.py:265). Evaluar índice compuesto `(project_id, chapter, status)` solo si profiling lo justifica. |
+| S13-03 | 2h | `frontend/src/components/alerts/ChapterRangeSelector.vue` | Dos dropdowns (Desde/Hasta) poblados desde chapters del proyecto. Persistir en `localStorage` por proyecto. Emitir `@range-change`. |
+| S13-04 | 0.5h | `frontend/src/components/alerts/AlertsTab.vue` | Integrar ChapterRangeSelector. Pasar chapter_min/max a API call. Actualizar badge count con filtro activo. |
+| S13-05 | 0.5h | Tests | Test unitario para filtro de rango en repository. Test API con chapter_min/max. |
+
+**BK-25 MVP: Comparison banner tras reanálisis [3h]**
+
+Infraestructura existente (55% — backend core completo):
+- `ComparisonService.compare()` con two-pass matching (exact hash + fuzzy)
+- `analysis_snapshots` + `snapshot_alerts` tables
+- `run_snapshot()` se ejecuta antes de cada reanálisis
+- Endpoint `/comparison` devuelve `ComparisonReport`
+
+| Tarea | Horas | Archivo | Detalle |
+|-------|-------|---------|---------|
+| S13-06 | 0.5h | `api-server/routers/collections.py` | Añadir `GET /projects/{id}/comparison/summary` — devuelve solo counts: `{resolved: N, new: N, unchanged: N, document_changed: bool}`. Reutiliza `ComparisonService`. |
+| S13-07 | 1.5h | `frontend/src/components/analysis/ComparisonBanner.vue` | Banner post-reanálisis: "↓12 resueltas · ↑3 nuevas · =45 sin cambio". Color verde si resolved > new, naranja si new > resolved. Clic → modal con lista. |
+| S13-08 | 0.5h | `frontend/src/components/analysis/ComparisonDetail.vue` | Modal con dos listas: alertas resueltas (tachadas, verde) y alertas nuevas (badge, naranja). Cada item muestra tipo + entidad + capítulo. |
+| S13-09 | 0.5h | Tests | Test unitario para summary endpoint. Test de integración ComparisonBanner render. |
+
+**Dependencias S13**: Ninguna (toda la infra existe)
+**Criterio de éxito**: Corrector puede filtrar alertas por rango de capítulos + ve resumen de cambios tras reanálisis.
+
+---
+
+#### Sprint S14: Revision Intelligence Full (BK-25 completo) [28-36h]
+
+> **Product Owner**: "Diferenciador competitivo. Ningún corrector de manuscritos tiene esto."
+> **AppSec**: "Read-only analysis, sin riesgo. Content diffing opera sobre datos locales."
+> **UX**: "Progresión natural: S13 muestra el banner → S14 permite explorar en profundidad."
+
+**Fase 1: Content Diffing [12h]**
+
+| Tarea | Horas | Archivo | Detalle |
+|-------|-------|---------|---------|
+| S14-01 | 4h | `src/narrative_assistant/analysis/content_diff.py` | Nuevo módulo. `compute_chapter_diffs(old_chapters, new_chapters)` → lista de `ChapterDiff(chapter, added_ranges, removed_ranges, moved_ranges)`. Usar `difflib.SequenceMatcher` a nivel párrafo. |
+| S14-02 | 4h | `src/narrative_assistant/analysis/comparison.py` | Extender `ComparisonService.compare()` con pass 3: proximity matching. Si alert position cae dentro de `removed_range` → `resolution_reason = "text_changed"`. Si position no cambió pero alert desapareció → `"detector_improved"`. |
+| S14-03 | 2h | `src/narrative_assistant/persistence/snapshot.py` | Añadir `get_snapshot_chapter_texts(snapshot_id)` — persistir texto de capítulos en snapshot para diff posterior. Schema: `snapshot_chapters(snapshot_id, chapter_number, content_hash, content_text)`. |
+| S14-04 | 2h | Tests | Tests para content_diff module. Tests para pass 3 matching. Edge cases: capítulo añadido/eliminado/reordenado. |
+
+**Fase 2: Alert Linking [8h]**
+
+| Tarea | Horas | Archivo | Detalle |
+|-------|-------|---------|---------|
+| S14-05 | 2h | Schema migration v21 | Añadir a `alerts`: `previous_snapshot_alert_id INTEGER`, `match_confidence REAL`, `resolution_reason TEXT`. FK → `snapshot_alerts(id) ON DELETE SET NULL`. Nota: v21/v22 anteriormente documentados en BK-13/BK-16 nunca se implementaron como migraciones separadas (absorbidos en v20). Numeración real empieza en v21. |
+| S14-06 | 3h | `src/narrative_assistant/analysis/comparison.py` | Tras comparison, escribir links: cada alert nueva que matcheó con snapshot alert → set `previous_snapshot_alert_id` + `match_confidence`. Alerts que reaparecen tras dismissal → flag `re_emerged = true`. |
+| S14-07 | 1.5h | `api-server/routers/alerts.py` | Extender response model: incluir `previous_alert_summary`, `match_confidence`, `resolution_reason` cuando disponible. Endpoint `PUT /alerts/{id}/mark-resolved` para confirmación manual. |
+| S14-08 | 1.5h | Tests | Test alert linking end-to-end. Test dismissal reconciliation. |
+
+**Fase 3: Frontend Dashboard [12h]**
+
+| Tarea | Horas | Archivo | Detalle |
+|-------|-------|---------|---------|
+| S14-09 | 4h | `frontend/src/components/revision/RevisionDashboard.vue` | Panel "Revision Intelligence" accesible desde banner de S13. Tabs: Resueltas / Nuevas / Sin cambio. Cada alert con badge de confianza de matching. |
+| S14-10 | 3h | `frontend/src/components/revision/AlertDiffViewer.vue` | Side-by-side: texto antes (con alert marcada) vs texto después (alert resuelta). Highlight de cambios en el texto. |
+| S14-11 | 2h | `frontend/src/components/revision/RevisionTimeline.vue` | Timeline simple: "V1 (87 alertas) → V2 (62 alertas) → V3 (42 alertas)". Clickable para ver diff entre versiones. |
+| S14-12 | 2h | Routing + types | Añadir route `/projects/:id/revision`. Types para ComparisonSummary, AlertDiff, ChapterDiff en domain/api types. Transformer snake→camel. |
+| S14-13 | 1h | Tests | Tests de render para RevisionDashboard. Tests de integración con mock API. |
+
+**Fase 4: Track Changes (opcional) [4-8h]**
+
+| Tarea | Horas | Archivo | Detalle |
+|-------|-------|---------|---------|
+| S14-14 | 4h | `src/narrative_assistant/parsers/docx_revisions.py` | Parser de `word/document.xml` revisiones (`w:ins`, `w:del`, `w:rPr/w:rStyle`). Extraer lista de `Revision(type, text, author, date, position)`. Solo ~60% de flujos editoriales usan track changes. |
+| S14-15 | 2h | `src/narrative_assistant/analysis/comparison.py` | Integrar revisions como pass 4 de matching: si alert position coincide con `w:del` → alta confianza de resolución intencional. |
+| S14-16 | 1h | Tests | Test con .docx de prueba con track changes. |
+
+**Dependencias S14**: S13 completado (BK-25 MVP establece la UI base).
+**Criterio de éxito**: Corrector ve exactamente qué alertas se resolvieron, dónde cambió el texto, y puede confirmar resoluciones.
+
+---
+
+#### Sprint S15: Version Tracking (BK-28 fase 1) [20-25h]
+
+> **Product Owner**: "Útil para coordinadores editoriales, no para freelancers. Tier Editorial."
+> **Arquitecto**: "Los snapshots ya existen. Solo falta persistir métricas agregadas por versión
+> y un endpoint para trends. Schema trivial."
+> **UX**: "Sparkline en el header del proyecto, NO como tab separado. Mínimo y elegante."
+
+| Tarea | Horas | Archivo | Detalle |
+|-------|-------|---------|---------|
+| S15-01 | 2h | Schema migration v22 | `version_metrics(id, project_id, version_num AUTO, snapshot_id FK, alert_count, word_count, entity_count, health_score, formality_avg, dialogue_ratio, created_at)`. Trigger: insert al completar análisis (post-phase 13). |
+| S15-02 | 3h | `api-server/routers/projects.py` | `GET /projects/{id}/versions` — lista de versiones con métricas. `GET /projects/{id}/versions/trend` — serie temporal simplificada para sparkline. |
+| S15-03 | 2h | `api-server/routers/_enrichment_phases.py` | Hook post-phase 13: extraer métricas de enrichment cache y escribir en `version_metrics`. Reutilizar `narrative_health` score. |
+| S15-04 | 4h | `frontend/src/components/project/VersionSparkline.vue` | Sparkline SVG inline (sin dependencia de charting library). Muestra trend de alert_count últimas 10 versiones. Tooltip con fecha + counts. |
+| S15-05 | 4h | `frontend/src/components/project/VersionHistory.vue` | Tabla expandible con todas las versiones: fecha, alert_count, word_count, health_score. Botón "Comparar" entre 2 versiones seleccionadas (reutiliza ComparisonService de S14). |
+| S15-06 | 3h | `frontend/src/components/project/VersionComparison.vue` | Modal con diff de métricas entre 2 versiones. Barras de progreso comparativas. Enlace a RevisionDashboard (S14) si existe snapshot. |
+| S15-07 | 2h | Tests | Tests para version_metrics creation. Test API para trends. Test sparkline render. |
+
+**Dependencias S15**: S13 (comparison infra). S14 recomendado pero no bloqueante.
+**Criterio de éxito**: Coordinador editorial ve tendencia de calidad del manuscrito a lo largo del tiempo.
+
+---
+
+#### Sprint S16: Monetización (BK-29) [30-40h]
+
+> **Product Owner**: "Revenue-critical pero timing-dependent. Solo tiene sentido con clientes."
+> **AppSec**: "Flujos de pago son high-risk. Stripe SDK + webhooks + validación server-side.
+> Nunca confiar en el frontend para validar pagos."
+> **UX**: "Quota warning como banner persistente (no modal) al 80%. Upgrade path como
+> comparación de features, no como pop-up agresivo."
+>
+> **NOTA ARQUITECTÓNICA (revisión Codex)**: La app es Tauri desktop-only. Los webhooks de Stripe
+> necesitan un servidor público para recibir callbacks. Por tanto, S16 se divide en:
+> - **S16A** (desktop, sin pagos): UX de cuota + comparación de tiers. Puede salir independiente.
+> - **S16B** (requiere backend público): Stripe checkout + webhooks + validación server-side.
+> S16B NO debe implementarse hasta tener un backend de billing fiable (e.g., Cloud Functions,
+> servidor dedicado) con verificación de firma, idempotencia y reconciliación.
+
+**S16A: Quota Warnings + Tier UX [12h] (desktop-only, sin pagos)**
+
+| Tarea | Horas | Archivo | Detalle |
+|-------|-------|---------|---------|
+| S16-01 | 2h | `frontend/src/components/license/QuotaWarning.vue` | Banner persistente: "Has usado 1,200 de 1,500 páginas este mes" (80%). A 90%: naranja con CTA "Ampliar". A 100%: rojo con "Límite alcanzado". |
+| S16-02 | 2h | `frontend/src/stores/license.ts` | Computed `quotaPercentage`, `quotaWarningLevel`. Auto-fetch al montar app. |
+| S16-03 | 2h | `api-server/routers/license.py` | `GET /license/quota-status` — devuelve `{used, limit, percentage, warning_level, days_remaining}`. |
+| S16-04 | 3h | `frontend/src/components/license/TierComparison.vue` | Feature matrix: Corrector vs Pro vs Editorial. Highlight current tier. CTA "Contactar para upgrade" (no pago directo). |
+| S16-05 | 1h | Tests | Test quota calculations. Test warning levels. |
+| S16-06 | 2h | Tests + docs | Test tier comparison render. Documentar tiers en FAQ. |
+
+**S16B: Page Packs + Pagos [20-28h] (requiere backend público de billing)**
+
+| Tarea | Horas | Archivo | Detalle |
+|-------|-------|---------|---------|
+| S16-07 | 4h | Backend billing (fuera de Tauri) | Servidor público mínimo: `POST /billing/checkout` (crear Stripe session), `POST /billing/webhook` (recibir confirmación). Verificación de firma Stripe. Idempotencia por `payment_intent_id`. |
+| S16-08 | 3h | Schema + models | `page_packs(id, license_id, pages, price_eur, stripe_payment_id, status, purchased_at, expires_at)`. Modelo `PagePack` en `licensing/models.py`. Schema v24. |
+| S16-09 | 4h | `src/narrative_assistant/licensing/verification.py` | Extender `_calculate_quota_remaining()`: sumar packs activos al límite mensual. `activate_pack()` — marca pack como activo tras polling al billing server. |
+| S16-10 | 4h | `frontend/src/components/license/PackPurchase.vue` | Modal con opciones de pack. Abre URL de Stripe Checkout en navegador externo. Polling local para detectar confirmación. |
+| S16-11 | 3h | `api-server/routers/license.py` | `POST /license/activate-pack` (polling → billing server confirma → activar localmente). `GET /license/packs` (historial de packs). |
+| S16-12 | 2h | Tests | Test pack activation flow (mock billing server). Test quota with packs. Test reconciliación. |
+
+**Dependencias S16A**: Ninguna (datos de cuota ya existen localmente).
+**Dependencias S16B**: Backend público de billing configurado. Stripe account. Clientes reales.
+**Criterio de éxito S16A**: Corrector ve cuántas páginas le quedan y qué incluye cada tier.
+**Criterio de éxito S16B**: Corrector compra pack de 500 páginas y se activa automáticamente.
+
+---
 
 ### APARCADO: Ideas documentadas, no planificadas
 
@@ -1910,11 +2088,11 @@ S5 (LLM), S6 (frontend UX), S7a (licensing). Total: ~10 semanas ejecutadas.
 | **UserGuide PDF exportable** | Aporta valor, pero requiere capturas actualizadas de cada tab. Mejor cuando UI sea estable. | Tras Sprint PP (UI estable) |
 | **Formato EPUB en export** | Relevante para producción editorial. No urgente para corrector que trabaja en Word. | Tras feedback de clientes |
 | **Formato XLSX en export** | Útil para equipos grandes. CSV cubre el 80% del caso de uso. | Si lo piden clientes |
-| **Revision Intelligence** (BK-25) | Detectar alertas resueltas tras reanálisis. Útil pero requiere SP-1 primero + content diffing robusto. | Tras SP-1 + feedback clientes |
+| ~~**Revision Intelligence** (BK-25)~~ | ~~Promovido a Sprint S13 (MVP) + S14 (full)~~ | — |
 | **Colaboración paralela online** (BK-26) | Sync en tiempo real. Requiere servidor, E2E encryption. Coste alto, demanda incierta. | Tras licensing server + demanda |
-| **Filtrado alertas por capítulos** (BK-27) | Focus mode por rango de capítulos para trabajo paralelo editorial. Cross-chapter awareness. | Tras SP-3 (export/import) |
-| **Historial de versiones** (BK-28) | Tracking de métricas por versión del manuscrito. Útil para coordinadores, no para freelancers. | Tras feedback clientes Editorial |
-| **Step-up pricing** (BK-29) | Packs de páginas one-time (€9/500 págs). Trigger de upgrade Corrector→Pro. | Cuando haya datos de conversión |
+| ~~**Filtrado alertas por capítulos** (BK-27)~~ | ~~Promovido a Sprint S13~~ | — |
+| ~~**Historial de versiones** (BK-28)~~ | ~~Promovido a Sprint S15 (fase 1)~~ | — |
+| ~~**Step-up pricing** (BK-29)~~ | ~~Promovido a Sprint S16~~ | — |
 | **Pesos adaptativos nivel 3** (por manuscrito) | Infraestructura existe (`adaptive_weights`), pero nivel 2 (recalibración global) es suficiente primero. | Tras BK-22 (nivel 2) |
 | **Integrar Maverick** (BK-01) | Solo inglés por ahora. Monitorizar releases. | Cuando soporte español |
 | **Integrar BookNLP** (BK-02) | Sin release público multilingüe. | Cuando esté disponible |
@@ -1927,28 +2105,24 @@ S5 (LLM), S6 (frontend UX), S7a (licensing). Total: ~10 semanas ejecutadas.
 ### Roadmap visual completo
 
 ```
-COMPLETADO                                          PRÓXIMO (SP)
-───────────────────────────────────────────────── ──────────────────────
-S0-S6 (NLP + Frontend)                              SP-1 (Persistencia reanálisis)
-S7a (Licensing) ✅                                  SP-2 (Revisión licensing)
-S7b ✅ (10/10)                                      SP-3 (Export/Import editorial)
-S7c ✅ (6/7, 1 backlog)                             ──────────────────────
-S7d ✅ (13/13)                                      SIGUIENTE (NLP)
-Sprint PP ✅ (17/17)                                S11 (Pro-drop)
-Sprint S8 ✅ (S8a + S8b + S8c)                     S12 (Decay)
-Sprint S9 ✅ (BK-09/15/17/10b/10c)                 ──────────────────────
-Sprint S10 ✅ (BK-14 + BK-11)                      BACKLOG:
-  v0.8.0 → v0.8.6 (bugfixes)                       BK-25 Revision Intelligence
-                                                    BK-26 Collab online
-                                                    BK-27 Filtrado por capítulos
-                                                    BK-28 Historial versiones
-                                                    BK-29 Step-up pricing
-                                                    ──────────────────────
-                                                    APARCADO:
-                                                    Landing web
-                                                    UserGuide PDF
-                                                    EPUB/XLSX export
-                                                    Maverick/BookNLP
+COMPLETADO                                          PRÓXIMO (Editorial Intelligence)
+───────────────────────────────────────────────── ──────────────────────────────────
+S0-S6 (NLP + Frontend) ✅                          S13 (BK-27 filtrado + BK-25 MVP)
+S7a-S7d (Licensing + UX) ✅                        S14 (BK-25 Revision Intelligence)
+Sprint PP ✅ (17/17)                                ──────────────────────────────────
+Sprint S8 ✅ (S8a + S8b + S8c)                     SIGUIENTE (Version + Monetización)
+Sprint S9 ✅ (BK-09/15/17/10b/10c)                 S15 (BK-28 Version tracking)
+Sprint S10 ✅ (BK-14/11/12)                        S16 (BK-29 Step-up pricing)
+Sprint S11 ✅ (BK-13/16)                           ──────────────────────────────────
+Sprint S12 ✅ (BK-18)                              APARCADO:
+Sprint SP-1/2/3 ✅                                  BK-26 Collab online
+  v0.8.0 → v0.9.4                                  Landing web, UserGuide PDF
+                                                    EPUB/XLSX export, Maverick/BookNLP
+
+Dependencias:
+  S13 ──→ S14 ──→ S15
+  S16A (independiente, desktop-only)
+  S16B (requiere backend billing público + Stripe)
 ```
 
 ### Estimaciones restantes
@@ -1958,13 +2132,19 @@ Sprint S10 ✅ (BK-14 + BK-11)                      BACKLOG:
 | ~~Sprint PP~~ | ~~39h~~ | ✅ COMPLETADO (17/17) |
 | ~~Sprint S8~~ | ~~17-26 días~~ | ✅ COMPLETADO (v0.8.0) |
 | ~~Tareas sueltas~~ | ~~6h~~ | ✅ S7b-09, S7b-10, BK-23a completados (v0.8.0-v0.8.2) |
-| Sprint SP-1 | 16h (3-4 días) | Persistencia reanálisis (bug fix) |
-| Sprint SP-2 | 8h (2 días) | Revisión licensing |
-| Sprint SP-3 | 36h (7-9 días) | Export/Import editorial |
+| ~~Sprint SP-1~~ | ~~16h (3-4 días)~~ | ✅ COMPLETADO (v0.9.0) |
+| ~~Sprint SP-2~~ | ~~8h (2 días)~~ | ✅ COMPLETADO (v0.9.3) |
+| ~~Sprint SP-3~~ | ~~36h (7-9 días)~~ | ✅ COMPLETADO (v0.9.2) |
 | ~~Sprint S9~~ | ~~25-31h (5-7 días)~~ | ✅ COMPLETADO (BK-09/15/17/10b/10c) |
-| ~~Sprint S10~~ | ~~27-30h (6-8 días)~~ | ✅ COMPLETADO (BK-14 + BK-11) |
-| Sprint S11-S12 | 9-15 días (2-4 semanas) | NLP avanzado (pro-drop + decay) |
-| **TOTAL restante** | **~2-4 semanas** | S11-S12 |
+| ~~Sprint S10~~ | ~~27-30h (6-8 días)~~ | ✅ COMPLETADO (BK-14 + BK-11 + BK-12) |
+| ~~Sprint S11~~ | ~~16-26h (4-7 días)~~ | ✅ COMPLETADO (BK-13 + BK-16) |
+| ~~Sprint S12~~ | ~~2-3h (1 día)~~ | ✅ COMPLETADO (BK-18) |
+| Sprint S13 | 7-9h (1-2 días) | BK-27 + BK-25 MVP |
+| Sprint S14 | 28-36h (5-7 días) | BK-25 completo (content diffing, dashboard) |
+| Sprint S15 | 20-25h (4-5 días) | BK-28 fase 1 (version metrics, sparkline) |
+| Sprint S16A | 12h (2-3 días) | BK-29 UX (quota warnings, tier comparison) |
+| Sprint S16B | 20-28h (4-6 días) | BK-29 pagos (requiere backend billing público) |
+| **TOTAL restante** | **~67-98h (~3-4 semanas)** | S13 + S14 + S15 + S16A (+S16B condicionado) |
 
 ---
 
@@ -1998,4 +2178,4 @@ Sprint S10 ✅ (BK-14 + BK-11)                      BACKLOG:
 
 **Ultima actualizacion**: 2026-02-13
 **Autor**: Claude (Panel de 8 expertos simulados + sesión producto 10-Feb + paneles pricing/sales/editorial 12-Feb)
-**Estado**: S0-S12 completados. Sprint PP completado (17/17). S7b-S7d completados. SP-1 completado (v0.9.0). SP-2 completado (v0.9.3). SP-3 completado (v0.9.2). BK-08 completado (v0.9.4). 23/29 BK completados. Tag: v0.9.4. Todos los sprints planificados completados.
+**Estado**: S0-S12 completados. Sprint PP completado (17/17). S7b-S7d completados. SP-1..3 completados. BK-08/BK-12 completados (v0.9.4). 24/29 BK completados. Tag: v0.9.4. Próximo: S13 (BK-27 + BK-25 MVP).
