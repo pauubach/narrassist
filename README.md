@@ -45,7 +45,7 @@
 - **Grafo de relaciones**: Visualización interactiva de conexiones entre personajes (vis-network)
 - **Perfil de voz**: Cómo habla cada personaje (formalidad, muletillas, longitud)
 - **Arco emocional**: Evolución emocional a lo largo del manuscrito
-- **Línea temporal visual**: Línea temporal horizontal con eventos y relaciones causales (vis-timeline)
+- **Línea temporal visual**: Vista de lista o interactiva con eventos y relaciones causales
 
 ### Sistema de Revisión Inteligente
 
