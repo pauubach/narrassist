@@ -180,16 +180,16 @@ class GlossaryRepository:
         """Crea la tabla si no existe."""
         try:
             # Verificar si la tabla existe
-            cursor = self.db.execute(
+            row = self.db.fetchone(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name='project_glossary'"
             )
-            if cursor.fetchone() is None:
+            if row is None:
                 # Crear tabla
-                for statement in self.CREATE_TABLE_SQL.split(";"):
-                    statement = statement.strip()
-                    if statement:
-                        self.db.execute(statement)
-                self.db.commit()
+                with self.db.connection() as conn:
+                    for statement in self.CREATE_TABLE_SQL.split(";"):
+                        statement = statement.strip()
+                        if statement:
+                            conn.execute(statement)
                 logger.info("Tabla project_glossary creada")
         except Exception as e:
             logger.error(f"Error creando tabla glossary: {e}")
@@ -210,37 +210,37 @@ class GlossaryRepository:
         now = datetime.now().isoformat()
 
         try:
-            cursor = self.db.execute(
-                """
-                INSERT INTO project_glossary (
-                    project_id, term, definition, variants_json,
-                    category, subcategory, context_notes, related_terms_json,
-                    usage_example, is_technical, is_invented, is_proper_noun,
-                    include_in_publication_glossary, usage_count, first_chapter,
-                    created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    entry.project_id,
-                    entry.term,
-                    entry.definition,
-                    json.dumps(entry.variants),
-                    entry.category,
-                    entry.subcategory,
-                    entry.context_notes,
-                    json.dumps(entry.related_terms),
-                    entry.usage_example,
-                    int(entry.is_technical),
-                    int(entry.is_invented),
-                    int(entry.is_proper_noun),
-                    int(entry.include_in_publication_glossary),
-                    entry.usage_count,
-                    entry.first_chapter,
-                    now,
-                    now,
-                ),
-            )
-            self.db.commit()
+            with self.db.connection() as conn:
+                cursor = conn.execute(
+                    """
+                    INSERT INTO project_glossary (
+                        project_id, term, definition, variants_json,
+                        category, subcategory, context_notes, related_terms_json,
+                        usage_example, is_technical, is_invented, is_proper_noun,
+                        include_in_publication_glossary, usage_count, first_chapter,
+                        created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        entry.project_id,
+                        entry.term,
+                        entry.definition,
+                        json.dumps(entry.variants),
+                        entry.category,
+                        entry.subcategory,
+                        entry.context_notes,
+                        json.dumps(entry.related_terms),
+                        entry.usage_example,
+                        int(entry.is_technical),
+                        int(entry.is_invented),
+                        int(entry.is_proper_noun),
+                        int(entry.include_in_publication_glossary),
+                        entry.usage_count,
+                        entry.first_chapter,
+                        now,
+                        now,
+                    ),
+                )
 
             entry.id = cursor.lastrowid
             entry.created_at = datetime.fromisoformat(now)
@@ -256,20 +256,18 @@ class GlossaryRepository:
 
     def get(self, entry_id: int) -> GlossaryEntry | None:
         """Obtiene una entrada por ID."""
-        cursor = self.db.execute(
+        row = self.db.fetchone(
             "SELECT * FROM project_glossary WHERE id = ?",
             (entry_id,),
         )
-        row = cursor.fetchone()
         return GlossaryEntry.from_row(dict(row)) if row else None
 
     def get_by_term(self, project_id: int, term: str) -> GlossaryEntry | None:
         """Busca una entrada por término exacto (case insensitive)."""
-        cursor = self.db.execute(
+        row = self.db.fetchone(
             "SELECT * FROM project_glossary WHERE project_id = ? AND term = ? COLLATE NOCASE",
             (project_id, term),
         )
-        row = cursor.fetchone()
         return GlossaryEntry.from_row(dict(row)) if row else None
 
     def find_by_term_or_variant(self, project_id: int, search_term: str) -> GlossaryEntry | None:
@@ -278,35 +276,53 @@ class GlossaryRepository:
 
         Útil para el detector de inconsistencias.
         """
+        search_term = search_term.strip()
+        if not search_term:
+            return None
+
         # Primero buscar por término principal
         entry = self.get_by_term(project_id, search_term)
         if entry:
             return entry
 
-        # Buscar en variantes (requiere escaneo de JSON)
-        cursor = self.db.execute(
-            """
-            SELECT * FROM project_glossary
-            WHERE project_id = ?
-            AND (
-                variants_json LIKE ?
-                OR variants_json LIKE ?
-                OR variants_json LIKE ?
+        # Buscar en variantes con matching exacto usando JSON1.
+        try:
+            row = self.db.fetchone(
+                """
+                SELECT DISTINCT pg.* FROM project_glossary pg
+                JOIN json_each(pg.variants_json) v
+                WHERE pg.project_id = ?
+                  AND LOWER(CAST(v.value AS TEXT)) = LOWER(?)
+                LIMIT 1
+                """,
+                (project_id, search_term),
             )
-            """,
-            (
-                project_id,
-                f'["{search_term.lower()}",%',  # Primer elemento
-                f'%,"{search_term.lower()}"%',  # Elemento medio
-                f'%,"{search_term.lower()}"]',  # Último elemento
-            ),
-        )
-        row = cursor.fetchone()
-        if row:
-            entry = GlossaryEntry.from_row(dict(row))
-            # Verificar que realmente está en variantes (case insensitive)
-            if search_term.lower() in [v.lower() for v in entry.variants]:
-                return entry
+            if row:
+                return GlossaryEntry.from_row(dict(row))
+        except Exception:
+            logger.debug("json_each no disponible; usando fallback LIKE en variants_json")
+            # Fallback para SQLite sin JSON1: prefiltro por LIKE + verificación precisa en Python.
+            row = self.db.fetchone(
+                """
+                SELECT * FROM project_glossary
+                WHERE project_id = ?
+                AND (
+                    variants_json LIKE ?
+                    OR variants_json LIKE ?
+                    OR variants_json LIKE ?
+                )
+                """,
+                (
+                    project_id,
+                    f'["{search_term.lower()}",%',  # Primer elemento
+                    f'%,"{search_term.lower()}"%',  # Elemento medio
+                    f'%,"{search_term.lower()}"]',  # Último elemento
+                ),
+            )
+            if row:
+                entry = GlossaryEntry.from_row(dict(row))
+                if search_term.lower() in [v.lower() for v in entry.variants]:
+                    return entry
 
         return None
 
@@ -343,8 +359,8 @@ class GlossaryRepository:
 
         sql += " ORDER BY term COLLATE NOCASE"
 
-        cursor = self.db.execute(sql, params)
-        return [GlossaryEntry.from_row(dict(row)) for row in cursor.fetchall()]
+        rows = self.db.fetchall(sql, tuple(params))
+        return [GlossaryEntry.from_row(dict(row)) for row in rows]
 
     def update(self, entry: GlossaryEntry) -> bool:
         """Actualiza una entrada existente."""
@@ -384,28 +400,27 @@ class GlossaryRepository:
                 entry.id,
             ),
         )
-        self.db.commit()
 
         entry.updated_at = datetime.fromisoformat(now)
         return True
 
     def delete(self, entry_id: int) -> bool:
         """Elimina una entrada del glosario."""
-        cursor = self.db.execute(
-            "DELETE FROM project_glossary WHERE id = ?",
-            (entry_id,),
-        )
-        self.db.commit()
-        return cursor.rowcount > 0
+        with self.db.connection() as conn:
+            cursor = conn.execute(
+                "DELETE FROM project_glossary WHERE id = ?",
+                (entry_id,),
+            )
+            return cursor.rowcount > 0
 
     def delete_all_for_project(self, project_id: int) -> int:
         """Elimina todas las entradas de un proyecto."""
-        cursor = self.db.execute(
-            "DELETE FROM project_glossary WHERE project_id = ?",
-            (project_id,),
-        )
-        self.db.commit()
-        return cursor.rowcount
+        with self.db.connection() as conn:
+            cursor = conn.execute(
+                "DELETE FROM project_glossary WHERE project_id = ?",
+                (project_id,),
+            )
+            return cursor.rowcount
 
     def increment_usage(self, entry_id: int, count: int = 1) -> None:
         """Incrementa el contador de uso de un término."""
@@ -413,7 +428,6 @@ class GlossaryRepository:
             "UPDATE project_glossary SET usage_count = usage_count + ? WHERE id = ?",
             (count, entry_id),
         )
-        self.db.commit()
 
     def get_all_terms(self, project_id: int) -> set[str]:
         """

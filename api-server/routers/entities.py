@@ -2,6 +2,7 @@
 Router: entities
 """
 
+import bisect
 from typing import Optional
 
 import deps
@@ -63,11 +64,17 @@ async def list_entities(
         chapter_repo = get_chapter_repository()
         chapters = chapter_repo.get_by_project(project_id)
 
-        # Crear mapa de posición -> capítulo
+        # Mapa posición→capítulo con bisect: O(log n) en vez de O(n) por búsqueda
+        _sorted_chapters = sorted(chapters, key=lambda ch: ch.start_char)
+        _chapter_starts = [ch.start_char for ch in _sorted_chapters]
+
         def get_chapter_for_position(pos: int) -> Optional[int]:
             if pos is None:
                 return None
-            for ch in chapters:
+            # bisect_right devuelve el índice tras el último start_char <= pos
+            idx = bisect.bisect_right(_chapter_starts, pos) - 1
+            if idx >= 0:
+                ch = _sorted_chapters[idx]
                 if ch.start_char <= pos < ch.end_char:
                     return ch.chapter_number
             return 1  # Default al capítulo 1 si no se encuentra

@@ -1627,13 +1627,19 @@ class LLMArbitrator:
             return (False, 0.0, "LLM no disponible")
 
         try:
+            from narrative_assistant.llm.sanitization import sanitize_for_prompt
+
             # Preparar contexto de votos para el LLM
             vote_summary = self._summarize_votes(votes)
 
+            # Sanitizar texto del manuscrito antes de enviarlo al LLM (A-10)
+            safe_word = sanitize_for_prompt(word, max_length=100)
+            safe_sentence = sanitize_for_prompt(sentence, max_length=500)
+
             prompt = f"""Eres un experto en ortografía española. Analiza si la palabra marcada es un error ortográfico.
 
-PALABRA: "{word}"
-CONTEXTO: "{sentence}"
+PALABRA: "{safe_word}"
+CONTEXTO: "{safe_sentence}"
 
 OPINIONES DE CORRECTORES:
 {vote_summary}

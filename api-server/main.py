@@ -433,6 +433,27 @@ try:
     )
     _early_logger.info("CORS middleware added successfully")
 
+    # Middlewares de seguridad: Rate Limiting y CSRF Protection
+    # Nota: los middlewares se ejecutan en orden inverso al de registro,
+    # así que CSRF se registra último para ejecutarse primero.
+    _early_logger.info("Adding security middlewares (rate limiting + CSRF)...")
+    try:
+        from middleware import CSRFProtectionMiddleware, RateLimitMiddleware
+
+        # Rate limiting: 10 req/min para análisis, 100 req/min para el resto
+        app.add_middleware(
+            RateLimitMiddleware,
+            analysis_rpm=10,
+            default_rpm=100,
+        )
+        # CSRF: validación de Origin/Referer para métodos que modifican estado
+        app.add_middleware(CSRFProtectionMiddleware)
+        _early_logger.info("Security middlewares added successfully")
+    except Exception as mw_err:
+        # No es fatal: la app funciona sin estos middlewares
+        _early_logger.warning(f"Security middlewares not loaded: {mw_err}")
+        _write_debug(f"WARNING: Security middlewares failed: {mw_err}")
+
 except Exception as e:
     _early_logger.error(f"FATAL: Error during FastAPI initialization: {type(e).__name__}: {e}", exc_info=True)
     _write_debug(f"FATAL: FastAPI initialization failed: {e}")

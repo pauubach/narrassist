@@ -78,18 +78,8 @@ async def get_project_relationships(project_id: int):
         chapters = chapter_repo.get_by_project(project_id)
         logger.info(f"[RELATIONSHIPS-API] Capítulos encontrados: {len(chapters) if chapters else 0}")
 
-        # Obtener menciones de entidades
-        all_mentions = []
-        for entity in entities:
-            mentions = entity_repo.get_mentions_by_entity(entity.id)
-            for m in mentions:
-                all_mentions.append({
-                    "entity_id": entity.id,
-                    "entity_name": entity.canonical_name,
-                    "start_char": m.start_char,
-                    "end_char": m.end_char,
-                    "chapter_id": m.chapter_id,
-                })
+        # Obtener menciones de entidades — query batch con JOIN (evita N+1)
+        all_mentions = entity_repo.get_mentions_by_project(project_id)
         logger.info(f"[RELATIONSHIPS-API] Menciones totales: {len(all_mentions)}")
 
         # 1. Análisis de clustering/relaciones
@@ -1636,16 +1626,8 @@ async def get_character_network(project_id: int):
         entity_names = {e.id: e.canonical_name for e in entities}
         cooccurrences = []
 
-        all_mentions = []
-        for entity in entities:
-            mentions = entity_repo.get_mentions_by_entity(entity.id)
-            for m in mentions:
-                all_mentions.append({
-                    "entity_id": entity.id,
-                    "start_char": m.start_char,
-                    "end_char": m.end_char,
-                    "chapter_id": m.chapter_id,
-                })
+        # Query batch con JOIN — evita N+1 (una query por entidad)
+        all_mentions = entity_repo.get_mentions_by_project(project_id)
 
         chapter_id_to_number = {c.id: c.chapter_number for c in chapters}
 
@@ -1748,21 +1730,22 @@ async def get_character_timeline(project_id: int):
         chapter_id_to_number = {c.id: c.chapter_number for c in chapters}
         chapter_titles = {c.chapter_number: c.title or f"Cap. {c.chapter_number}" for c in chapters}
 
-        # Construir timeline por personaje
+        # Construir timeline por personaje — query batch con JOIN (evita N+1)
+        all_mentions = entity_repo.get_mentions_by_project(project_id)
+
+        # Pre-agrupar menciones por entity_id y capítulo
+        mentions_per_entity: dict[int, dict[int, int]] = {}
+        for m in all_mentions:
+            ch_num = chapter_id_to_number.get(m["chapter_id"])
+            if ch_num is not None:
+                mentions_per_entity.setdefault(m["entity_id"], {})
+                by_ch = mentions_per_entity[m["entity_id"]]
+                by_ch[ch_num] = by_ch.get(ch_num, 0) + 1
+
         characters_timeline = []
 
         for entity in entities:
-            mentions = entity_repo.get_mentions_by_entity(entity.id)
-            if not mentions:
-                continue
-
-            # Agrupar menciones por capítulo
-            by_chapter: dict[int, int] = {}
-            for m in mentions:
-                ch_num = chapter_id_to_number.get(m.chapter_id)
-                if ch_num is not None:
-                    by_chapter[ch_num] = by_chapter.get(ch_num, 0) + 1
-
+            by_chapter = mentions_per_entity.get(entity.id)
             if not by_chapter:
                 continue
 
@@ -1844,18 +1827,17 @@ async def get_character_profiles(project_id: int):
         if not entities:
             return ApiResponse(success=True, data={"profiles": [], "count": 0})
 
-        # Construir datos de entrada
-        mentions = []
-        for entity in entities:
-            entity_mentions = entity_repo.get_mentions_by_entity(entity.id)
-            chapter_id_map = {c.id: c.chapter_number for c in chapters}
-            for m in entity_mentions:
-                ch_num = chapter_id_map.get(m.chapter_id, 0)
-                mentions.append({
-                    "entity_id": entity.id,
-                    "entity_name": entity.canonical_name,
-                    "chapter": ch_num,
-                })
+        # Construir datos de entrada — query batch con JOIN (evita N+1)
+        chapter_id_map = {c.id: c.chapter_number for c in chapters}
+        raw_mentions = entity_repo.get_mentions_by_project(project_id)
+        mentions = [
+            {
+                "entity_id": m["entity_id"],
+                "entity_name": m["entity_name"],
+                "chapter": chapter_id_map.get(m["chapter_id"], 0),
+            }
+            for m in raw_mentions
+        ]
 
         # Textos de capítulos para acciones/sentimiento
         chapter_texts = {c.chapter_number: c.content for c in chapters}

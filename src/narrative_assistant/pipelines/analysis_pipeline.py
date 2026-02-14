@@ -2395,7 +2395,7 @@ def _create_alerts_from_voice_deviations(
         severity_map = {
             "high": AlertSeverity.WARNING,
             "medium": AlertSeverity.INFO,
-            "low": AlertSeverity.SUGGESTION,
+            "low": AlertSeverity.HINT,
         }
 
         # Mapeo de tipo de desviación a categoría
@@ -2554,7 +2554,7 @@ def _create_alerts_from_focalization_violations(
         severity_map = {
             "high": AlertSeverity.WARNING,
             "medium": AlertSeverity.INFO,
-            "low": AlertSeverity.SUGGESTION,
+            "low": AlertSeverity.HINT,
         }
 
         for violation in violations:

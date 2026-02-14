@@ -1155,8 +1155,11 @@ class SemanticFusionService:
                 logger.debug("LLM no disponible para verificación de alias")
                 return False, 0.0
 
-            name1 = entity1.canonical_name
-            name2 = entity2.canonical_name
+            from ..llm.sanitization import sanitize_for_prompt
+
+            # Sanitizar nombres del manuscrito antes de enviarlo al LLM (A-10)
+            name1 = sanitize_for_prompt(entity1.canonical_name, max_length=200)
+            name2 = sanitize_for_prompt(entity2.canonical_name, max_length=200)
 
             prompt = f"""En un texto narrativo en español, ¿estas dos referencias podrían ser la MISMA persona/entidad?
 

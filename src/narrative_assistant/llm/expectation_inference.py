@@ -824,6 +824,12 @@ Extrae la siguiente información sobre el personaje:
         violations = []
 
         try:
+            from narrative_assistant.llm.sanitization import sanitize_for_prompt
+
+            # Sanitizar texto del manuscrito antes de enviarlo al LLM (A-10)
+            safe_name = sanitize_for_prompt(profile.character_name, max_length=200)
+            safe_text = sanitize_for_prompt(text[:2000], max_length=2000)
+
             # Preparar contexto del personaje
             traits_text = (
                 ", ".join(profile.personality_traits[:10])
@@ -848,7 +854,7 @@ Extrae la siguiente información sobre el personaje:
 
             prompt = f"""Analiza si el siguiente texto contiene comportamientos que contradicen la caracterización establecida del personaje.
 
-PERSONAJE: {profile.character_name}
+PERSONAJE: {safe_name}
 
 RASGOS DE PERSONALIDAD: {traits_text}
 
@@ -858,7 +864,7 @@ EXPECTATIVAS COMPORTAMENTALES:
 {expectations_text}
 
 TEXTO A ANALIZAR:
-"{text[:2000]}"
+"{safe_text}"
 
 Si encuentras violaciones de las expectativas, responde con JSON:
 {{

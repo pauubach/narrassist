@@ -506,6 +506,32 @@ class LocalLLMClient:
             return None
 
 
+def _validate_ollama_host(host: str) -> str:
+    """Valida que el host de Ollama sea seguro (A-12: solo localhost)."""
+    import urllib.parse as urlparse
+
+    try:
+        parsed = urlparse.urlparse(host)
+    except Exception:
+        logger.warning(f"URL de host inválida: {host}, usando default")
+        return "http://localhost:11434"
+
+    if parsed.scheme not in ("http", "https"):
+        logger.warning(f"Esquema no permitido: {parsed.scheme}, usando default")
+        return "http://localhost:11434"
+
+    allowed_hosts = {"localhost", "127.0.0.1", "::1", "[::1]"}
+    hostname = (parsed.hostname or "").lower()
+    if hostname not in allowed_hosts:
+        logger.warning(
+            f"Host no permitido en NA_OLLAMA_HOST: {hostname}. "
+            "Solo localhost permitido por seguridad. Usando default."
+        )
+        return "http://localhost:11434"
+
+    return host
+
+
 def _load_config() -> LocalLLMConfig:
     """
     Carga la configuración del LLM local.
@@ -520,14 +546,26 @@ def _load_config() -> LocalLLMConfig:
     if backend not in ("ollama", "transformers", "auto", "none"):
         backend = "ollama"
 
+    # A-12: Validar host de Ollama desde variable de entorno
+    ollama_host = _validate_ollama_host(
+        os.getenv("NA_OLLAMA_HOST", "http://localhost:11434")
+    )
+
     config = LocalLLMConfig(
         backend=backend,  # type: ignore
-        ollama_host=os.getenv("NA_OLLAMA_HOST", "http://localhost:11434"),
+        ollama_host=ollama_host,
         ollama_model=os.getenv("NA_OLLAMA_MODEL", "llama3.2"),
     )
 
-    if model_path := os.getenv("NA_LLM_MODEL_PATH"):
-        config.transformers_model_path = Path(model_path)
+    # A-04: Validar ruta del modelo desde variable de entorno
+    if model_path_str := os.getenv("NA_LLM_MODEL_PATH"):
+        model_path = Path(model_path_str).resolve()
+        if model_path.is_absolute() and model_path.exists():
+            config.transformers_model_path = model_path
+        else:
+            logger.warning(
+                f"NA_LLM_MODEL_PATH inválido o no existe: {model_path_str}"
+            )
 
     return config
 

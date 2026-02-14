@@ -1,7 +1,7 @@
 # Build and Deployment Guide - Narrative Assistant
 
 > **Última actualización**: 2026-02-13
-> **Versión**: 0.9.4
+> **Versión**: 0.9.5
 
 ---
 

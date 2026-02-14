@@ -406,6 +406,35 @@ class EntityRepository:
         )
         return [EntityMention.from_row(row) for row in rows]
 
+    def get_mentions_by_project(
+        self, project_id: int
+    ) -> list[dict]:
+        """
+        Obtiene todas las menciones de un proyecto con JOIN a entidades.
+
+        Evita el patrón N+1: una sola query en vez de una por entidad.
+        Retorna dicts con entity_id, entity_name, start_char, end_char, chapter_id.
+        """
+        rows = self.db.fetchall(
+            """SELECT m.entity_id, e.canonical_name AS entity_name,
+                      m.start_char, m.end_char, m.chapter_id
+               FROM entity_mentions m
+               JOIN entities e ON e.id = m.entity_id
+               WHERE e.project_id = ? AND e.is_active = 1
+               ORDER BY m.start_char""",
+            (project_id,),
+        )
+        return [
+            {
+                "entity_id": r["entity_id"],
+                "entity_name": r["entity_name"],
+                "start_char": r["start_char"],
+                "end_char": r["end_char"],
+                "chapter_id": r["chapter_id"],
+            }
+            for r in rows
+        ]
+
     def get_entity_ids_for_chapter(
         self, chapter_id: int, chapter_start: int, chapter_end: int
     ) -> set[int]:
@@ -734,12 +763,21 @@ class EntityRepository:
             counts["scene_tags_location"] = c.rowcount
 
             # 16. scene_tags: participant_ids (JSON array)
-            #     Parsed in Python to avoid partial-match bugs with SQL REPLACE
-            #     (e.g. id=1 matching inside id=10)
-            rows = conn.execute(
-                "SELECT id, participant_ids FROM scene_tags WHERE participant_ids LIKE ?",
-                (f"%{from_entity_id}%",),
-            ).fetchall()
+            #     Usa json_each para matching exacto, con fallback LIKE + filtro Python
+            try:
+                rows = conn.execute(
+                    """SELECT id, participant_ids FROM scene_tags
+                       WHERE EXISTS (
+                           SELECT 1 FROM json_each(participant_ids)
+                           WHERE CAST(value AS INTEGER) = ?
+                       )""",
+                    (from_entity_id,),
+                ).fetchall()
+            except Exception:
+                rows = conn.execute(
+                    "SELECT id, participant_ids FROM scene_tags WHERE participant_ids LIKE ?",
+                    (f"%{from_entity_id}%",),
+                ).fetchall()
             scene_part_count = 0
             for row in rows:
                 ids = json.loads(row["participant_ids"] or "[]")
@@ -1243,13 +1281,26 @@ class EntityRepository:
             Lista de entidades que coinciden
         """
         if fuzzy:
-            sql = """
-                SELECT * FROM entities
-                WHERE project_id = ? AND is_active = 1
-                AND (canonical_name LIKE ? OR merged_from_ids LIKE ?)
-            """
             pattern = f"%{name}%"
-            rows = self.db.fetchall(sql, (project_id, pattern, pattern))
+            try:
+                sql = """
+                    SELECT DISTINCT e.* FROM entities e
+                    LEFT JOIN json_each(json_extract(e.merged_from_ids, '$.aliases')) a
+                    WHERE e.project_id = ? AND e.is_active = 1
+                    AND (
+                        e.canonical_name LIKE ?
+                        OR LOWER(CAST(a.value AS TEXT)) LIKE LOWER(?)
+                    )
+                """
+                rows = self.db.fetchall(sql, (project_id, pattern, pattern))
+            except Exception:
+                logger.debug("json_each no disponible; usando fallback LIKE en merged_from_ids")
+                sql = """
+                    SELECT * FROM entities
+                    WHERE project_id = ? AND is_active = 1
+                    AND (canonical_name LIKE ? OR merged_from_ids LIKE ?)
+                """
+                rows = self.db.fetchall(sql, (project_id, pattern, pattern))
         else:
             sql = """
                 SELECT * FROM entities

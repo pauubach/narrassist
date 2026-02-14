@@ -42,6 +42,15 @@ INJECTION_PATTERNS = [
     r"(?i)pretend\s+you\s+are",
     r"(?i)act\s+as\s+if",
     r"(?i)you\s+are\s+now\s+(?:a|an|the)\s+",
+    # Patrones adicionales de inyección (A-10)
+    r"(?i)respond\s+only\s+with",
+    r"(?i)output\s+the\s+(?:system|initial)\s+prompt",
+    r"(?i)repeat\s+(?:your|the)\s+(?:system|initial)\s+(?:prompt|instructions?)",
+    r"(?i)translate\s+(?:the|your)\s+(?:system|above)\s+(?:prompt|message)",
+    r"(?i)(?:olvida|ignora)\s+(?:todas?\s+)?(?:las\s+)?instrucciones?\s+anteriores?",
+    r"(?i)nuevas?\s+instrucciones?\s*:",
+    r"(?i)ahora\s+eres\s+(?:un|una)\s+",
+    r"(?i)actúa\s+como\s+si",
 ]
 
 # Caracteres de control que no deberían estar en texto narrativo

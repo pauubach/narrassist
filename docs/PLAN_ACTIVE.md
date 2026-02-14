@@ -105,6 +105,65 @@ Serie F (auditoria tecnica 2026-02):
 - Fuente de estado: `docs/_archive/audits/AUDIT_RESPONSE_INDEX_2026-02-12.md`.
 - Si cambia el alcance (release comercial, requisitos tribunal/cliente), mover `SCOPE_DECISION` a backlog activo.
 
+## Auditoria 2026-02-14 (Claude + Codex)
+
+Fuente: `docs/audits/2026-02-14_audit_claude.md`, `docs/audits/2026-02-14_auditoria_integral_codex.md`.
+
+Hallazgos aplicados en esta sesion:
+- CI quality gates: eliminado `|| true`, mypy scoped a modulos criticos.
+- Cobertura frontend: vitest istanbul + happy-dom fix (Codex).
+- JSON LIKE → json_each: glossary, scenes, entities (Claude + Codex).
+- Dependabot: `.github/dependabot.yml` (pip, npm, actions, cargo).
+- WCAG dark mode: DsBadge entity/severity badges contrast fix.
+- Symlink rejection en sanitization.py.
+- CSRF + rate limiting middleware.
+- N+1 batch query en relationships router.
+- O(log n) bisect chapter lookup en entities router.
+- Prompt injection sanitization en 12 archivos adicionales.
+- Ollama path/host validation.
+- NLP model version pinning (spaCy SHA256, HF revision SHAs).
+- AlertSeverity.SUGGESTION → HINT (Codex).
+- axios actualizado a 1.13.5 (Codex).
+- Entitlements.plist network client (macOS).
+
+### Ideas de producto (pendientes de evaluacion)
+
+| # | Idea | Impacto | Esfuerzo | ROI | Origen |
+|---|------|---------|----------|-----|--------|
+| I-01 | **Smart Alert Triage** — filtro por confidence + saliency scoring | Alto | M | 5/5 | Claude |
+| I-02 | **Quick Manuscript Profiling** — scan 30s → style guide template | Alto | M | 5/5 | Claude |
+| I-03 | **Incremental Re-Analysis** — solo re-analizar secciones modificadas | Alto | M | 5/5 | Claude |
+| I-04 | **Alert Workflow Templates** — batch actions predefinidas | Alto | M | 4/5 | Claude |
+| I-05 | **Keyboard Shortcuts Panel** (Alt+?) | Medio | S | 3/5 | Claude |
+| I-06 | **WebSocket Streaming** — resultados live durante analisis | Medio | M | 4/5 | Claude |
+| I-07 | **Emotional Arc Heatmap** — visualizacion temporal de emociones | Medio | M | 3/5 | Claude |
+| I-08 | **Anachronism Deep Detector** — base de datos historica | Medio | L | 3/5 | Claude |
+| I-09 | **Pluggable Detector Framework** — plugins custom de usuario | Medio | M | 3/5 | Claude |
+| I-10 | **Accesibilidad visual** — daltonismo, dislexia, AAA. Opciones: (a) preset dedicado, (b) interruptor adaptativo | Medio | M | 4/5 | Claude |
+| I-11 | **Feature maturity matrix** — implemented/partial/planned visible en producto | Medio | S | 3/5 | Codex |
+| I-12 | **Trazabilidad decisiones usuario** sobre alertas para aprendizaje adaptativo | Medio | M | 3/5 | Codex |
+| I-13 | **Arrow/Parquet Export** — para investigadores | Bajo | S | 2/5 | Claude |
+
+### Ideas tecnicas (pendientes de evaluacion)
+
+| # | Idea | Impacto | Esfuerzo | Origen |
+|---|------|---------|----------|--------|
+| T-01 | **Retirar pipeline legacy** — plan de migracion + flag temporal | Alto | L | Codex |
+| T-02 | **Plan por fases mypy** — reducir 1136 errores (pipelines→cli→nlp/style) | Alto | L | Codex |
+| T-03 | **Golden datasets por idioma/genero** para regresion NLP | Alto | M | Codex |
+| T-04 | **API docs auto-generadas** desde OpenAPI en cada build | Medio | M | Codex + Claude |
+| T-05 | **Benchmark nocturno por detector** — precision, recall, latencia con corpus fijo | Medio | M | Codex + Claude |
+| T-06 | **Normalizar JSON LIKE restantes** → tablas relacionales auxiliares | Medio | M | Codex (parcial hecho) |
+| T-07 | **Dividir routers monoliticos** por subdominios | Medio | L | Codex + Claude |
+| T-08 | **Smoke tests cross-platform** — arranque sidecar + health + flujo basico | Medio | M | Codex |
+| T-09 | **Contract tests backend-frontend** para endpoints criticos | Medio | M | Codex |
+| T-10 | **NLP Benchmark Dashboard** — F1 trends por detector | Medio | M | Claude |
+| T-11 | **Collaborative Collections** — equipos editoriales | Alto | L | Claude |
+| T-12 | **Definition of Done tecnico** — tipos, tests, docs, seguridad, performance | Bajo | S | Codex |
+
+Top 3 ROI producto: I-01, I-02, I-03.
+Top 3 ROI tecnico: T-02, T-01, T-03.
+
 ## Ideas futuras (medio/largo plazo)
 
 - Colaboracion online (BK-26).

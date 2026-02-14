@@ -65,8 +65,12 @@ class CorefNarratorMixin:
         llm_client,
     ) -> tuple[str, Gender] | None:
         """Detecta el narrador usando LLM para análisis semántico."""
-        # Tomar solo los primeros 2000 caracteres para eficiencia
-        text_sample = text[:2000] if len(text) > 2000 else text
+        from narrative_assistant.llm.sanitization import sanitize_for_prompt
+
+        # Sanitizar texto del manuscrito antes de enviarlo al LLM (A-10)
+        text_sample = sanitize_for_prompt(
+            text[:2000] if len(text) > 2000 else text, max_length=2000
+        )
 
         prompt = f"""Analiza el siguiente texto narrativo en español.
 

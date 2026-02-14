@@ -389,24 +389,40 @@ class SceneRepository:
 
     def get_scenes_with_participant(self, project_id: int, entity_id: int) -> list[Scene]:
         """Obtiene escenas donde participa un personaje específico."""
-        rows = self.db.fetchall(
-            """
-            SELECT s.* FROM scenes s
-            JOIN scene_tags st ON st.scene_id = s.id
-            WHERE s.project_id = ?
-              AND st.participant_ids LIKE ?
-            ORDER BY s.chapter_id, s.scene_number
-            """,
-            (project_id, f"%{entity_id}%"),  # Simple LIKE match on JSON
-        )
-        # Filter more precisely in Python
-        result = []
-        for row in rows:
-            scene = self._row_to_scene(row)
-            tags = self.get_scene_tags(scene.id)
-            if tags and entity_id in tags.participant_ids:
-                result.append(scene)
-        return result
+        try:
+            rows = self.db.fetchall(
+                """
+                SELECT DISTINCT s.* FROM scenes s
+                JOIN scene_tags st ON st.scene_id = s.id
+                JOIN json_each(st.participant_ids) p
+                WHERE s.project_id = ?
+                  AND CAST(p.value AS INTEGER) = ?
+                ORDER BY s.chapter_id, s.scene_number
+                """,
+                (project_id, entity_id),
+            )
+            return [self._row_to_scene(row) for row in rows]
+        except Exception:
+            # Fallback para entornos SQLite sin JSON1.
+            logger.debug("json_each no disponible; usando fallback LIKE para participant_ids")
+            rows = self.db.fetchall(
+                """
+                SELECT s.* FROM scenes s
+                JOIN scene_tags st ON st.scene_id = s.id
+                WHERE s.project_id = ?
+                  AND st.participant_ids LIKE ?
+                ORDER BY s.chapter_id, s.scene_number
+                """,
+                (project_id, f"%{entity_id}%"),
+            )
+            # Filtrado preciso en Python para evitar falsos positivos del LIKE.
+            result = []
+            for row in rows:
+                scene = self._row_to_scene(row)
+                tags = self.get_scene_tags(scene.id)
+                if tags and entity_id in tags.participant_ids:
+                    result.append(scene)
+            return result
 
     # =========================================================================
     # Private helpers

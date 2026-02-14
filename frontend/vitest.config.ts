@@ -6,13 +6,29 @@ export default defineConfig({
   plugins: [vue()],
   test: {
     environment: 'happy-dom',
+    setupFiles: ['./tests/setup/happy-dom-errors.ts'],
+    environmentOptions: {
+      happyDOM: {
+        settings: {
+          // Evita navegación/cargas externas que dejan tareas asíncronas vivas.
+          disableIframePageLoading: true,
+          disableJavaScriptFileLoading: true,
+          disableCSSFileLoading: true,
+          navigation: {
+            disableMainFrameNavigation: true,
+            disableChildFrameNavigation: true,
+            disableChildPageNavigation: true
+          }
+        }
+      }
+    },
     globals: true,
     include: ['src/**/*.{test,spec}.{js,ts}'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
       include: ['src/**/*.{ts,vue}'],
-      exclude: ['src/**/*.d.ts', 'src/main.ts']
+      exclude: ['src/**/*.d.ts', 'src/main.ts', 'src/**/__tests__/**']
     }
   },
   resolve: {

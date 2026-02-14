@@ -13,5 +13,9 @@
     <!-- Acceso a archivos seleccionados por el usuario -->
     <key>com.apple.security.files.user-selected.read-write</key>
     <true/>
+
+    <!-- Acceso a red (requerido para verificación de licencias y descarga inicial de modelos) -->
+    <key>com.apple.security.network.client</key>
+    <true/>
 </dict>
 </plist>

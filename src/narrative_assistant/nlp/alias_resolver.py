@@ -644,10 +644,15 @@ class AliasResolver:
         if not self._llm_client:
             return aliases
 
-        # Preparar prompt
-        entities_str = ", ".join(getattr(e, "text", str(e)) for e in (known_entities or [])[:20])
+        from narrative_assistant.llm.sanitization import sanitize_for_prompt
+
+        # Sanitizar datos del manuscrito antes de enviarlo al LLM (A-10)
+        entities_str = ", ".join(
+            sanitize_for_prompt(getattr(e, "text", str(e)), max_length=100)
+            for e in (known_entities or [])[:20]
+        )
         aliases_str = "\n".join(
-            f"- {a.text} ({a.alias_type.value}): contexto '{a.context[:100]}...'"
+            f"- {sanitize_for_prompt(a.text, max_length=100)} ({a.alias_type.value}): contexto '{sanitize_for_prompt(a.context[:100], max_length=100)}...'"
             for a in aliases[:10]
         )
 

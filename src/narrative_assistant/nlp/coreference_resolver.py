@@ -1067,6 +1067,11 @@ class LLMCorefMethod:
         if not self.client or not candidates:
             return []
 
+        from narrative_assistant.llm.sanitization import sanitize_for_prompt
+
+        # Sanitizar contexto del manuscrito antes de enviarlo al LLM (A-10)
+        safe_context = sanitize_for_prompt(context, max_length=2000)
+
         # Construir prompt para el LLM
         candidates_text = "\n".join(
             [
@@ -1078,7 +1083,7 @@ class LLMCorefMethod:
         prompt = f"""Analiza la siguiente correferencia en español.
 
 CONTEXTO:
-"{context}"
+"{safe_context}"
 
 MENCIÓN A RESOLVER: "{anaphor.text}" (tipo: {anaphor.mention_type.value})
 

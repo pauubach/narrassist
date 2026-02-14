@@ -54,6 +54,7 @@ clean_registry.ps1
 # Coverage
 .coverage
 htmlcov/
+frontend/coverage/
 
 # MCP config (local)
 .mcp.json

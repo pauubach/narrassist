@@ -82,11 +82,11 @@ jobs:
         run: |
           ruff check src/ tests/ api-server/ --output-format=github
 
-      - name: Run MyPy
+      - name: Run MyPy (critical modules)
         run: |
-          # Informational: many false positives from dynamic imports and missing stubs.
-          # Not blocking until baseline is established.
-          mypy src/narrative_assistant --ignore-missing-imports || true
+          # Verificar módulos críticos donde errores de tipo pueden causar bugs runtime.
+          # Excluir pipelines/ (legacy, 800+ errores) y cli.py (deprecated).
+          mypy src/narrative_assistant/core src/narrative_assistant/persistence src/narrative_assistant/parsers src/narrative_assistant/alerts --ignore-missing-imports
 
   # Validaciones frontend en PR/push
   frontend-checks:
@@ -117,9 +117,7 @@ jobs:
       - name: Frontend tests
         working-directory: frontend
         run: |
-          # Informational: hay specs placeholder sin casos activos todavía.
-          # Ejecutamos vitest para visibilidad, sin bloquear CI por ahora.
-          npm run test:run || true
+          npm run test:run
 
       - name: Frontend build
         working-directory: frontend
@@ -153,9 +151,8 @@ jobs:
 
       - name: Run integration tests
         run: |
-          # Informational: integration tests require NLP models (~2GB) not available in CI.
-          # Full integration suite runs locally. CI captures what it can.
-          pytest tests/integration -v --tb=short -x --junitxml=junit-integration.xml || true
+          pytest tests/integration -v --tb=short -x --junitxml=junit-integration.xml
+        continue-on-error: true
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
@@ -188,9 +185,8 @@ jobs:
 
       - name: Run performance tests
         run: |
-          # Informational: performance tests are slow (~60min) and track regressions.
-          # Only run on manual trigger (workflow_dispatch). Results uploaded as artifacts.
-          pytest tests/performance -v --tb=short -m slow --junitxml=junit-perf.xml || true
+          pytest tests/performance -v --tb=short -m slow --junitxml=junit-perf.xml
+        continue-on-error: true
 
       - name: Upload test results
         uses: actions/upload-artifact@v4

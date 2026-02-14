@@ -853,9 +853,13 @@ class ChapterSummaryAnalyzer:
             return
 
         try:
-            # Truncar texto si es muy largo
+            from narrative_assistant.llm.sanitization import sanitize_for_prompt
+
+            # Sanitizar texto del manuscrito antes de enviarlo al LLM (A-10)
             max_chars = 6000
-            text_to_analyze = chapter_text[:max_chars]
+            text_to_analyze = sanitize_for_prompt(
+                chapter_text[:max_chars], max_length=max_chars
+            )
             if len(chapter_text) > max_chars:
                 text_to_analyze += "\n[... texto truncado ...]"
 
@@ -1024,17 +1028,23 @@ class ChapterSummaryAnalyzer:
             return
 
         try:
-            # Preparar resúmenes de capítulos
+            from narrative_assistant.llm.sanitization import sanitize_for_prompt
+
+            # Sanitizar resúmenes antes de enviarlo al LLM (A-10)
             chapter_summaries = []
             for ch in report.chapters:
                 summary_text = ch.llm_summary or ch.auto_summary
-                chapter_summaries.append(f"Cap. {ch.chapter_number}: {summary_text}")
+                chapter_summaries.append(
+                    f"Cap. {ch.chapter_number}: {sanitize_for_prompt(summary_text, max_length=500)}"
+                )
 
             main_chars = list(all_characters.values())[:10]
 
             prompt = NARRATIVE_ARCS_PROMPT.format(
                 chapter_summaries="\n".join(chapter_summaries),
-                main_characters=", ".join(main_chars),
+                main_characters=", ".join(
+                    sanitize_for_prompt(c, max_length=100) for c in main_chars
+                ),
             )
 
             response = self.ollama_client.generate(

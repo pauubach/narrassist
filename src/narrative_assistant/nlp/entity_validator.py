@@ -1024,10 +1024,12 @@ class EntityValidator:
                 }
             )
 
-        # Construir prompt
+        from ..llm.sanitization import sanitize_for_prompt
+
+        # Sanitizar contextos del manuscrito antes de enviarlo al LLM (A-10)
         entities_json = "\n".join(
             [
-                f'  - "{ec["text"]}" (detectado como {ec["type"]}): "{ec["context"]}"'
+                f'  - "{sanitize_for_prompt(ec["text"], max_length=100)}" (detectado como {ec["type"]}): "{sanitize_for_prompt(ec["context"], max_length=200)}"'
                 for ec in entity_contexts
             ]
         )

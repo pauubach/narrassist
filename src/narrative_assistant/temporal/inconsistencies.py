@@ -726,6 +726,12 @@ class LLMTemporalValidator:
         if not self.is_available:
             return inconsistency.confidence, "LLM no disponible"
 
+        from ..llm.sanitization import sanitize_for_prompt
+
+        # Sanitizar texto del manuscrito antes de enviarlo al LLM (A-10)
+        safe_context = sanitize_for_prompt(context[:1500], max_length=1500)
+        safe_timeline = sanitize_for_prompt(timeline_summary[:500], max_length=500)
+
         prompt = f"""Analiza esta posible inconsistencia temporal en una narrativa en español.
 
 INCONSISTENCIA DETECTADA:
@@ -735,10 +741,10 @@ INCONSISTENCIA DETECTADA:
 - Encontrado: {inconsistency.found or "N/A"}
 
 CONTEXTO NARRATIVO:
-{context[:1500]}
+{safe_context}
 
 RESUMEN DEL TIMELINE:
-{timeline_summary[:500]}
+{safe_timeline}
 
 ¿Es esto realmente una inconsistencia temporal o podría haber una explicación narrativa válida?
 

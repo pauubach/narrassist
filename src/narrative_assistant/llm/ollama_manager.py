@@ -171,6 +171,10 @@ class OllamaManager:
             config: Configuración opcional
         """
         self._config = config or OllamaConfig()
+
+        # A-12: Validar URL del host (solo localhost permitido por seguridad)
+        self._validate_host_url(self._config.host)
+
         self._lock = threading.Lock()
         self._status = OllamaStatus.NOT_INSTALLED
         self._downloaded_models: set[str] = set()
@@ -188,6 +192,32 @@ class OllamaManager:
         # Verificar estado inicial
         self._update_status()
 
+    @staticmethod
+    def _validate_host_url(host: str) -> None:
+        """Valida que la URL del host sea segura (A-12: solo localhost)."""
+        import urllib.parse as urlparse
+
+        try:
+            parsed = urlparse.urlparse(host)
+        except Exception:
+            raise ValueError(f"URL de host inválida: {host}")
+
+        # Solo permitir esquemas http/https
+        if parsed.scheme not in ("http", "https"):
+            raise ValueError(
+                f"Esquema no permitido en host Ollama: {parsed.scheme}. "
+                "Solo http/https están permitidos."
+            )
+
+        # Solo permitir conexiones a localhost (seguridad: manuscritos no salen)
+        allowed_hosts = {"localhost", "127.0.0.1", "::1", "[::1]"}
+        hostname = (parsed.hostname or "").lower()
+        if hostname not in allowed_hosts:
+            raise ValueError(
+                f"Host no permitido: {hostname}. "
+                "Ollama solo puede conectar a localhost por seguridad."
+            )
+
     def _detect_platform(self) -> InstallationPlatform:
         """Detecta la plataforma actual."""
         system = platform.system().lower()
@@ -200,18 +230,23 @@ class OllamaManager:
         return InstallationPlatform.UNKNOWN
 
     def _setup_state_dir(self) -> None:
-        """Configura el directorio de estado."""
+        """Configura el directorio de estado (A-04: validación con pathlib)."""
         if self._config.state_dir:
-            state_dir = self._config.state_dir
+            state_dir = Path(self._config.state_dir).resolve()
         else:
             # Usar directorio de datos de la aplicacion
             try:
                 from narrative_assistant.core.config import get_config
 
                 app_config = get_config()
-                state_dir = app_config.data_dir
+                state_dir = Path(app_config.data_dir).resolve()
             except Exception:
                 state_dir = Path.home() / ".narrative_assistant"
+
+        # Validar que la ruta es absoluta y no contiene componentes sospechosos
+        if not state_dir.is_absolute():
+            logger.warning(f"state_dir no es absoluto, usando default: {state_dir}")
+            state_dir = Path.home() / ".narrative_assistant"
 
         state_dir.mkdir(parents=True, exist_ok=True)
         self._state_file = state_dir / "ollama_state.json"
@@ -263,6 +298,19 @@ class OllamaManager:
             self._update_status()
             return self._status
 
+    def _get_windows_common_paths(self) -> list[Path]:
+        """Rutas comunes de instalación de Ollama en Windows (A-04: centralizado)."""
+        paths: list[Path] = []
+        for env_var in ("LOCALAPPDATA", "PROGRAMFILES"):
+            raw = os.environ.get(env_var, "")
+            if not raw:
+                continue
+            # Validar que el directorio base existe antes de construir la ruta
+            base = Path(raw)
+            if base.is_absolute() and base.is_dir():
+                paths.append(base / "Programs" / "Ollama" / "ollama.exe")
+        return paths
+
     @property
     def is_installed(self) -> bool:
         """Verifica si Ollama esta instalado."""
@@ -272,11 +320,7 @@ class OllamaManager:
 
         # En Windows, verificar rutas comunes de instalacion
         if self._platform == InstallationPlatform.WINDOWS:
-            common_paths = [
-                Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "Ollama" / "ollama.exe",
-                Path(os.environ.get("PROGRAMFILES", "")) / "Ollama" / "ollama.exe",
-            ]
-            for path in common_paths:
+            for path in self._get_windows_common_paths():
                 if path.exists():
                     return True
 
@@ -289,13 +333,9 @@ class OllamaManager:
         if which_result:
             return which_result
 
-        # En Windows, buscar en rutas comunes
+        # En Windows, buscar en rutas comunes (A-04: reutiliza método centralizado)
         if self._platform == InstallationPlatform.WINDOWS:
-            common_paths = [
-                Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "Ollama" / "ollama.exe",
-                Path(os.environ.get("PROGRAMFILES", "")) / "Ollama" / "ollama.exe",
-            ]
-            for path in common_paths:
+            for path in self._get_windows_common_paths():
                 if path.exists():
                     return str(path)
 

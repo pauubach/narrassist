@@ -432,10 +432,16 @@ class LLMRelationMethod:
         if not self.client or not self.client.is_available:
             return []
 
-        # Limitar texto para eficiencia
-        text_sample = text[:3000] if len(text) > 3000 else text
+        from narrative_assistant.llm.sanitization import sanitize_for_prompt
 
-        entities_str = ", ".join(entities[:20]) if entities else "no especificadas"
+        # Sanitizar texto del manuscrito antes de enviarlo al LLM (A-10)
+        text_sample = sanitize_for_prompt(
+            text[:3000] if len(text) > 3000 else text, max_length=3000
+        )
+
+        entities_str = ", ".join(
+            sanitize_for_prompt(e, max_length=100) for e in entities[:20]
+        ) if entities else "no especificadas"
 
         prompt = f"""Analiza el siguiente texto narrativo en español y extrae las relaciones entre personajes.
 

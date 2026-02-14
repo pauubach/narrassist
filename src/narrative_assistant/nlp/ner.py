@@ -1638,10 +1638,16 @@ def extract_implicit_characters(
             logger.debug("LLM no disponible para detección de personajes implícitos")
             return Result.success([])
 
-        # Tomar solo los primeros 3000 caracteres para eficiencia
-        text_sample = text[:3000] if len(text) > 3000 else text
+        from ..llm.sanitization import sanitize_for_prompt
 
-        known_str = ", ".join(known_entities) if known_entities else "ninguno"
+        # Sanitizar texto del manuscrito antes de enviarlo al LLM (A-10)
+        text_sample = sanitize_for_prompt(
+            text[:3000] if len(text) > 3000 else text, max_length=3000
+        )
+
+        known_str = ", ".join(
+            sanitize_for_prompt(e, max_length=100) for e in known_entities
+        ) if known_entities else "ninguno"
 
         prompt = f"""Analiza el siguiente texto narrativo en español y encuentra TODOS los personajes mencionados.
 

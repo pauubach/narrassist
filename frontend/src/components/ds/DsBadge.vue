@@ -418,6 +418,39 @@ const classes = computed(() => {
   color: #334155; /* slate-700 */
 }
 
+/* Dark mode: texto oscuro en badges filled para cumplir WCAG AA 4.5:1
+   Los colores de entidad en dark mode son más brillantes (#BA68C8, #4DB6AC, etc.)
+   y no alcanzan 4.5:1 con texto blanco. Con #1a1a1a todos superan 4.5:1. */
+:global(.dark) .ds-badge--filled.ds-badge--entity-character,
+:global(.dark) .ds-badge--filled.ds-badge--entity-location,
+:global(.dark) .ds-badge--filled.ds-badge--entity-organization,
+:global(.dark) .ds-badge--filled.ds-badge--entity-object,
+:global(.dark) .ds-badge--filled.ds-badge--entity-event,
+:global(.dark) .ds-badge--filled.ds-badge--entity-animal,
+:global(.dark) .ds-badge--filled.ds-badge--entity-creature,
+:global(.dark) .ds-badge--filled.ds-badge--entity-building,
+:global(.dark) .ds-badge--filled.ds-badge--entity-region,
+:global(.dark) .ds-badge--filled.ds-badge--entity-vehicle,
+:global(.dark) .ds-badge--filled.ds-badge--entity-faction,
+:global(.dark) .ds-badge--filled.ds-badge--entity-family,
+:global(.dark) .ds-badge--filled.ds-badge--entity-time_period,
+:global(.dark) .ds-badge--filled.ds-badge--entity-religion,
+:global(.dark) .ds-badge--filled.ds-badge--entity-magic_system,
+:global(.dark) .ds-badge--filled.ds-badge--entity-work,
+:global(.dark) .ds-badge--filled.ds-badge--entity-title,
+:global(.dark) .ds-badge--filled.ds-badge--entity-language,
+:global(.dark) .ds-badge--filled.ds-badge--entity-other {
+  color: #1a1a1a;
+}
+
+/* Dark mode: texto oscuro en severity badges filled (excepto medium que ya lo tiene) */
+:global(.dark) .ds-badge--filled.ds-badge--severity-critical,
+:global(.dark) .ds-badge--filled.ds-badge--severity-high,
+:global(.dark) .ds-badge--filled.ds-badge--severity-low,
+:global(.dark) .ds-badge--filled.ds-badge--severity-info {
+  color: #1a1a1a;
+}
+
 /* Icon */
 .ds-badge__icon {
   font-size: 0.85em;

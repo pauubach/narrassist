@@ -243,6 +243,13 @@ def validate_file_path(
         ValueError: Si la extensión no está permitida
         PermissionError: Si hay un intento de path traversal
     """
+    # SEGURIDAD: Rechazar symlinks antes de resolver
+    # (previene ataques donde symlink apunta fuera de directorios seguros)
+    if path.is_symlink():
+        raise PermissionError(
+            f"Symlinks no permitidos por seguridad: {path}"
+        )
+
     # Resolver a path absoluto
     resolved = path.resolve()
 

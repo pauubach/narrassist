@@ -1740,15 +1740,19 @@ class AttributeExtractor(AttributeContextMixin, AttributeVotingMixin, AttributeE
                 # Compatibilidad legacy: si no hay tipos, mantener lista plana de nombres.
                 known_entities = sorted(known_entity_names)
 
-        # Limitar texto para no sobrecargar el LLM
-        text_sample = text[:3000] if len(text) > 3000 else text
+        from narrative_assistant.llm.sanitization import sanitize_for_prompt
+
+        # Sanitizar texto del manuscrito antes de enviarlo al LLM (A-10)
+        text_sample = sanitize_for_prompt(
+            text[:3000] if len(text) > 3000 else text, max_length=3000
+        )
 
         prompt = f"""Extrae atributos de entidades narrativas (personajes, lugares, objetos). Responde SOLO con JSON válido.
 
 TEXTO:
 {text_sample}
 
-ENTIDADES: {", ".join(known_entities) if known_entities else "Detectar"}
+ENTIDADES: {", ".join(sanitize_for_prompt(e, max_length=100) for e in known_entities) if known_entities else "Detectar"}
 
 REGLAS:
 - Una entrada por CADA mención (si un atributo aparece dos veces, dos entradas)

@@ -38,6 +38,31 @@ logger = logging.getLogger(__name__)
 _manager_lock = threading.Lock()
 _model_manager: Optional["ModelManager"] = None
 
+# =============================================================================
+# Versiones pinneadas de modelos NLP (C-04: reproducibilidad entre entornos)
+#
+# IMPORTANTE: Estas versiones garantizan resultados reproducibles.
+# Para actualizar un modelo, cambiar la versión/revisión Y el hash SHA256.
+# Si el hash no se conoce, usar None (se verificará solo la estructura).
+# =============================================================================
+
+# --- spaCy: versión pinneada del modelo es_core_news_lg ---
+# URL: https://github.com/explosion/spacy-models/releases/download/es_core_news_lg-3.7.0/
+SPACY_MODEL_VERSION = "3.7.0"
+SPACY_MODEL_WHL_SHA256 = "08020b83e0c6da1584e567551a5e0de7b15dc0534eaaee21acc1ce908d1be742"
+
+# --- HuggingFace: revisión (commit SHA) pinneada para modelos de embeddings ---
+# Repo: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+HF_EMBEDDINGS_REVISION = "e8f8c211226b894fcb81acc59f3b34ba3efd5f42"
+
+# --- HuggingFace: revisión pinneada para modelo transformer NER ---
+# Repo: mrm8488/bert-spanish-cased-finetuned-ner
+HF_TRANSFORMER_NER_REVISION = "b11721d41d9e948da32fcdabeeef4fb0f3ebcdf7"
+
+# --- HuggingFace: revisión pinneada para modelo transformer NER fallback ---
+# Repo: Davlan/xlm-roberta-base-ner-hrl
+HF_TRANSFORMER_NER_FALLBACK_REVISION = "253f557bd8249b8515114cfd7f71974fe5fa4d2f"
+
 
 class ModelType(Enum):
     """Tipos de modelos soportados."""
@@ -59,11 +84,15 @@ class ModelInfo:
     source_url: str  # URL informativo (no se usa directamente)
     subdirectory: str  # Subdirectorio dentro de models/
     required: bool = True  # False = optional enhancement, won't block setup
+    # Versión pinneada del modelo (para spaCy: "3.7.0", para HF: commit SHA)
+    pinned_version: str | None = None
+    # Revisión/commit de HuggingFace (para snapshot_download revision=)
+    hf_revision: str | None = None
 
 
-# Definición de modelos conocidos con sus hashes
-# NOTA: Los hashes pueden variar entre versiones. Si falla verificación,
-# actualizar o establecer a None para omitir verificación.
+# Definición de modelos conocidos con sus hashes y versiones pinneadas.
+# NOTA: Los hashes y versiones deben actualizarse juntos al cambiar de versión.
+# Si falla verificación de hash, se emite un WARNING (no bloquea la carga).
 # Los tamaños son estimados iniciales; se obtienen dinámicamente cuando es posible.
 KNOWN_MODELS: dict[ModelType, ModelInfo] = {
     ModelType.SPACY: ModelInfo(
@@ -71,28 +100,31 @@ KNOWN_MODELS: dict[ModelType, ModelInfo] = {
         name="es_core_news_lg",
         display_name="Análisis gramatical y lingüístico",
         size_mb=540,
-        sha256=None,
+        sha256=SPACY_MODEL_WHL_SHA256,
         source_url="https://github.com/explosion/spacy-models",
         subdirectory="spacy",
+        pinned_version=SPACY_MODEL_VERSION,
     ),
     ModelType.EMBEDDINGS: ModelInfo(
         model_type=ModelType.EMBEDDINGS,
         name="paraphrase-multilingual-MiniLM-L12-v2",
         display_name="Análisis de similitud y contexto",
         size_mb=470,
-        sha256=None,
+        sha256=None,  # No aplicable: modelo compuesto de múltiples archivos
         source_url="https://huggingface.co/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
         subdirectory="embeddings",
+        hf_revision=HF_EMBEDDINGS_REVISION,
     ),
     ModelType.TRANSFORMER_NER: ModelInfo(
         model_type=ModelType.TRANSFORMER_NER,
         name="mrm8488/bert-spanish-cased-finetuned-ner",
         display_name="Reconocimiento de personajes y lugares",
         size_mb=440,
-        sha256=None,
+        sha256=None,  # No aplicable: modelo compuesto de múltiples archivos
         source_url="https://huggingface.co/mrm8488/bert-spanish-cased-finetuned-ner",
         subdirectory="transformer_ner",
         required=True,  # NER transformer always downloads during analysis if missing
+        hf_revision=HF_TRANSFORMER_NER_REVISION,
     ),
 }
 
@@ -107,6 +139,7 @@ TRANSFORMER_NER_FALLBACKS: list[ModelInfo] = [
         sha256=None,
         source_url="https://huggingface.co/Davlan/xlm-roberta-base-ner-hrl",
         subdirectory="transformer_ner",
+        hf_revision=HF_TRANSFORMER_NER_FALLBACK_REVISION,
     ),
 ]
 
@@ -570,6 +603,9 @@ class ModelManager:
         """
         Descarga directa del .whl de spaCy desde GitHub con progreso real.
 
+        Usa la versión pinneada del modelo si está definida en ModelInfo.
+        Verifica hash SHA256 del .whl si está disponible (warning, no error fatal).
+
         Returns None si no se puede hacer descarga directa (fallback necesario).
         """
         import tempfile
@@ -582,10 +618,24 @@ class ModelManager:
         except ImportError:
             return None
 
-        # Determinar versión compatible del modelo
-        model_version = self._resolve_spacy_model_version(model_info.name, spacy.about.__version__)
+        # Determinar versión: preferir versión pinneada para reproducibilidad
+        model_version = self._resolve_spacy_model_version(
+            model_info.name, spacy.about.__version__, model_info.pinned_version
+        )
         if not model_version:
             return None
+
+        # Informar si se usa versión pinneada vs dinámica
+        if model_info.pinned_version and model_version == model_info.pinned_version:
+            logger.info(
+                f"Usando versión pinneada de spaCy model: {model_info.name}-{model_version}"
+            )
+        elif model_info.pinned_version and model_version != model_info.pinned_version:
+            logger.warning(
+                f"Versión pinneada {model_info.pinned_version} no compatible con "
+                f"spaCy {spacy.about.__version__}, usando {model_version} en su lugar. "
+                f"Los resultados pueden diferir entre entornos."
+            )
 
         model_full = f"{model_info.name}-{model_version}"
         url = (
@@ -635,6 +685,11 @@ class ModelManager:
                             speed_bps=speed,
                         )
                         last_update = now
+
+            # Verificar hash SHA256 del .whl descargado (warning si no coincide)
+            # Solo verificar si la versión descargada coincide con la pinneada
+            expected_hash = model_info.sha256 if model_version == model_info.pinned_version else None
+            self._verify_whl_hash(tmp_path, expected_hash)
 
             # Extraer modelo del .whl
             _update_download_progress(
@@ -691,6 +746,9 @@ class ModelManager:
                 logger.warning("No se extrajeron archivos del .whl")
                 return None
 
+            # Escribir marcador de versión para trazabilidad
+            self._write_version_marker(target_dir, model_info, actual_version=model_version)
+
             _update_download_progress(
                 model_info.model_type,
                 phase="completed",
@@ -701,7 +759,10 @@ class ModelManager:
             if progress_callback:
                 progress_callback("Modelo instalado correctamente", 1.0)
 
-            logger.info(f"Modelo spaCy instalado en: {target_dir} ({extracted_count} archivos)")
+            logger.info(
+                f"Modelo spaCy instalado en: {target_dir} ({extracted_count} archivos, "
+                f"versión {model_version})"
+            )
             return Result.success(target_dir)
 
         finally:
@@ -709,13 +770,49 @@ class ModelManager:
                 tmp_path.unlink(missing_ok=True)
 
     @staticmethod
-    def _resolve_spacy_model_version(model_name: str, spacy_version: str) -> str | None:
+    def _resolve_spacy_model_version(
+        model_name: str,
+        spacy_version: str,
+        pinned_version: str | None = None,
+    ) -> str | None:
         """
         Determina la versión compatible del modelo spaCy para la versión instalada.
 
-        Intenta usar la API de compatibilidad de spaCy. Si falla, usa la
-        convención major.minor.0 que funciona para la mayoría de casos.
+        Prioridad:
+        1. Versión pinneada (si es compatible con la versión de spaCy instalada)
+        2. API de compatibilidad de spaCy
+        3. Convención major.minor.0 como fallback
+
+        Args:
+            model_name: Nombre del modelo (ej: es_core_news_lg)
+            spacy_version: Versión de spaCy instalada
+            pinned_version: Versión pinneada del modelo (ej: "3.7.0"), o None
+
+        Returns:
+            Versión del modelo a descargar, o None si no se puede determinar
         """
+        # Si hay versión pinneada, verificar compatibilidad con spaCy instalado
+        if pinned_version:
+            # Verificar que el major.minor de la versión pinneada coincida con spaCy
+            try:
+                pinned_major_minor = ".".join(pinned_version.split(".")[:2])
+                spacy_major_minor = ".".join(spacy_version.split(".")[:2])
+
+                if pinned_major_minor == spacy_major_minor:
+                    logger.debug(
+                        f"Versión pinneada {pinned_version} compatible con spaCy {spacy_version}"
+                    )
+                    return pinned_version
+                else:
+                    logger.warning(
+                        f"Versión pinneada {pinned_version} (major.minor={pinned_major_minor}) "
+                        f"no coincide con spaCy {spacy_version} (major.minor={spacy_major_minor}). "
+                        f"Buscando versión compatible dinámicamente..."
+                    )
+            except (IndexError, ValueError):
+                logger.debug(f"No se pudo parsear versión pinneada: {pinned_version}")
+
+        # Resolución dinámica: consultar API de compatibilidad de spaCy
         try:
             from spacy.cli._util import get_compatibility
 
@@ -773,6 +870,16 @@ class ModelManager:
             if progress_callback:
                 progress_callback(f"Descargando {model_info.display_name}...", 0.1)
 
+            # En el fallback, spacy.cli.download NO recibe versión pinneada
+            # (descarga la versión compatible automáticamente).
+            # Esto puede resultar en una versión diferente a la pinneada.
+            if model_info.pinned_version:
+                logger.warning(
+                    f"Fallback de spaCy: no se puede garantizar versión pinneada "
+                    f"{model_info.pinned_version}. Se descargará la versión compatible "
+                    f"automáticamente. Los resultados pueden diferir entre entornos."
+                )
+
             logger.info(f"Fallback: ejecutando spacy download {model_info.name}")
             download(model_info.name)
 
@@ -789,10 +896,23 @@ class ModelManager:
             nlp = spacy.load(model_info.name)
             source_path = Path(nlp.path)
 
+            # Detectar versión real instalada para el marcador
+            actual_version = None
+            try:
+                # El path de spaCy suele incluir la versión: .../es_core_news_lg-3.7.0/
+                path_name = source_path.name
+                if "-" in path_name:
+                    actual_version = path_name.split("-", 1)[1]
+            except (IndexError, ValueError):
+                pass
+
             logger.info(f"Copiando de {source_path} a {target_dir}")
             if target_dir.exists():
                 shutil.rmtree(target_dir)
             shutil.copytree(source_path, target_dir)
+
+            # Escribir marcador de versión para trazabilidad
+            self._write_version_marker(target_dir, model_info, actual_version=actual_version)
 
             _update_download_progress(
                 model_info.model_type,
@@ -804,7 +924,7 @@ class ModelManager:
             if progress_callback:
                 progress_callback("Modelo instalado correctamente", 1.0)
 
-            logger.info(f"Modelo spaCy instalado en: {target_dir}")
+            logger.info(f"Modelo spaCy instalado en: {target_dir} (versión: {actual_version or 'desconocida'})")
             return Result.success(target_dir)
 
         except Exception as e:
@@ -862,7 +982,16 @@ class ModelManager:
                 repo_id = f"sentence-transformers/{model_info.name}"
                 tracker_class = _create_hf_progress_tracker(model_info.model_type)
 
-                logger.info(f"Descargando modelo embeddings: {repo_id}")
+                # Usar revisión pinneada para reproducibilidad entre entornos
+                hf_revision = model_info.hf_revision
+                if hf_revision:
+                    logger.info(
+                        f"Descargando modelo embeddings: {repo_id} "
+                        f"(revisión pinneada: {hf_revision[:12]}...)"
+                    )
+                else:
+                    logger.info(f"Descargando modelo embeddings: {repo_id} (última versión)")
+
                 target_dir.mkdir(parents=True, exist_ok=True)
 
                 self._snapshot_download_with_retry(
@@ -870,7 +999,11 @@ class ModelManager:
                     local_dir=str(target_dir),
                     tqdm_class=tracker_class,
                     ignore_patterns=["*.onnx", "*.h5", "tf_*", "openvino/*", "onnx/*", "rust_model.ot"],
+                    revision=hf_revision,
                 )
+
+                # Escribir marcador de versión para trazabilidad
+                self._write_version_marker(target_dir, model_info, actual_version=hf_revision)
 
                 _update_download_progress(
                     model_info.model_type,
@@ -957,7 +1090,16 @@ class ModelManager:
                     repo_id = attempt_info.name
                     tracker_class = _create_hf_progress_tracker(attempt_info.model_type)
 
-                    logger.info(f"Descargando modelo transformer NER: {repo_id}")
+                    # Usar revisión pinneada para reproducibilidad
+                    hf_revision = attempt_info.hf_revision
+                    if hf_revision:
+                        logger.info(
+                            f"Descargando modelo transformer NER: {repo_id} "
+                            f"(revisión pinneada: {hf_revision[:12]}...)"
+                        )
+                    else:
+                        logger.info(f"Descargando modelo transformer NER: {repo_id} (última versión)")
+
                     attempt_dir.mkdir(parents=True, exist_ok=True)
 
                     self._snapshot_download_with_retry(
@@ -965,7 +1107,11 @@ class ModelManager:
                         local_dir=str(attempt_dir),
                         tqdm_class=tracker_class,
                         ignore_patterns=["*.onnx", "*.h5", "tf_*", "flax_*", "openvino/*", "onnx/*"],
+                        revision=hf_revision,
                     )
+
+                    # Escribir marcador de versión para trazabilidad
+                    self._write_version_marker(attempt_dir, attempt_info, actual_version=hf_revision)
 
                     _update_download_progress(
                         attempt_info.model_type,
@@ -1047,11 +1193,25 @@ class ModelManager:
         tqdm_class: type | None = None,
         ignore_patterns: list[str] | None = None,
         max_retries: int = 5,
+        revision: str | None = None,
     ) -> None:
-        """snapshot_download con reintentos para errores transitorios."""
+        """
+        snapshot_download con reintentos para errores transitorios.
+
+        Args:
+            repo_id: ID del repositorio en HuggingFace (ej: sentence-transformers/...)
+            local_dir: Directorio local de destino
+            tqdm_class: Clase tqdm personalizada para progreso
+            ignore_patterns: Patrones de archivos a ignorar
+            max_retries: Número máximo de reintentos
+            revision: Commit SHA o tag para pinning de versión (reproducibilidad)
+        """
         import time
 
         from huggingface_hub import snapshot_download
+
+        if revision:
+            logger.info(f"Descargando {repo_id} con revisión pinneada: {revision[:12]}...")
 
         for retry in range(max_retries):
             try:
@@ -1061,6 +1221,7 @@ class ModelManager:
                     local_dir_use_symlinks=False,
                     tqdm_class=tqdm_class,
                     ignore_patterns=ignore_patterns,
+                    revision=revision,
                 )
                 return
             except Exception as dl_err:
@@ -1165,6 +1326,99 @@ class ModelManager:
                 sha256_hash.update(chunk)
         return sha256_hash.hexdigest()
 
+    def _verify_whl_hash(self, whl_path: Path, expected_hash: str | None) -> bool:
+        """
+        Verifica el hash SHA256 de un archivo .whl descargado.
+
+        Solo emite WARNING si no coincide (no bloquea la instalación).
+        Esto permite que instalaciones existentes sigan funcionando
+        aunque se actualice el hash esperado.
+
+        Args:
+            whl_path: Ruta al archivo .whl descargado
+            expected_hash: Hash SHA256 esperado, o None para omitir
+
+        Returns:
+            True si el hash coincide o si no hay hash esperado
+        """
+        if not expected_hash:
+            logger.debug("Sin hash esperado, omitiendo verificación de integridad")
+            return True
+
+        if not whl_path.exists():
+            logger.warning(f"Archivo no encontrado para verificación de hash: {whl_path}")
+            return False
+
+        actual_hash = self._compute_file_hash(whl_path)
+
+        if actual_hash == expected_hash:
+            logger.info(f"Verificación de integridad OK: {whl_path.name} (SHA256 coincide)")
+            return True
+        else:
+            # WARNING, no error fatal — no queremos romper instalaciones existentes
+            logger.warning(
+                f"Hash SHA256 del archivo descargado NO coincide con el esperado.\n"
+                f"  Archivo: {whl_path.name}\n"
+                f"  Esperado: {expected_hash}\n"
+                f"  Obtenido: {actual_hash}\n"
+                f"  Esto puede indicar una versión diferente del modelo o archivo corrupto.\n"
+                f"  El modelo se instalará igualmente pero los resultados pueden diferir."
+            )
+            return False
+
+    def _write_version_marker(self, model_dir: Path, model_info: ModelInfo, actual_version: str | None = None) -> None:
+        """
+        Escribe un archivo .version con metadatos de la versión instalada.
+
+        Permite verificar en el futuro qué versión fue instalada.
+
+        Args:
+            model_dir: Directorio del modelo instalado
+            model_info: Información del modelo
+            actual_version: Versión real descargada (puede diferir de la pinneada)
+        """
+        import json
+        import time
+
+        version_file = model_dir / ".version"
+        version_data = {
+            "model_name": model_info.name,
+            "model_type": model_info.model_type.value,
+            "pinned_version": model_info.pinned_version,
+            "hf_revision": model_info.hf_revision,
+            "actual_version": actual_version or model_info.pinned_version or model_info.hf_revision,
+            "expected_sha256": model_info.sha256,
+            "installed_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        }
+
+        try:
+            with open(version_file, "w", encoding="utf-8") as f:
+                json.dump(version_data, f, indent=2, ensure_ascii=False)
+            logger.debug(f"Marcador de versión escrito en: {version_file}")
+        except OSError as e:
+            # No es crítico si falla, solo un marcador informativo
+            logger.debug(f"No se pudo escribir marcador de versión: {e}")
+
+    def _read_version_marker(self, model_dir: Path) -> dict | None:
+        """
+        Lee el archivo .version de un modelo instalado.
+
+        Returns:
+            Diccionario con metadatos de versión, o None si no existe
+        """
+        import json
+
+        version_file = model_dir / ".version"
+        if not version_file.exists():
+            return None
+
+        try:
+            with open(version_file, encoding="utf-8") as f:
+                return json.load(f)
+        except (OSError, json.JSONDecodeError) as e:
+            logger.debug(f"No se pudo leer marcador de versión: {e}")
+            return None
+
     def _check_internet_connection(self, timeout: float = 3.0) -> bool:
         """
         Verifica si hay conexión a internet.
@@ -1188,7 +1442,8 @@ class ModelManager:
 
     def get_all_models_status(self) -> dict[str, dict]:
         """
-        Retorna el estado de todos los modelos conocidos.
+        Retorna el estado de todos los modelos conocidos, incluyendo
+        información de versión pinneada e instalada.
 
         Returns:
             Dict con información de cada modelo
@@ -1197,6 +1452,20 @@ class ModelManager:
 
         for model_type, model_info in KNOWN_MODELS.items():
             model_path = self.get_model_path(model_type)
+
+            # Leer marcador de versión si el modelo está instalado
+            version_info: dict | None = None
+            if model_path:
+                # El marcador puede estar en model_path o en su padre
+                # (dependiendo de si spaCy resolvió a un subdir versionado)
+                version_info = self._read_version_marker(model_path)
+                if not version_info and model_path.parent != self.models_dir:
+                    version_info = self._read_version_marker(model_path.parent)
+
+            # Determinar la versión pinneada esperada
+            pinned = model_info.pinned_version or model_info.hf_revision
+            installed_version = version_info.get("actual_version") if version_info else None
+
             status[model_info.name] = {
                 "type": model_type.value,
                 "display_name": model_info.display_name,
@@ -1204,6 +1473,12 @@ class ModelManager:
                 "installed": model_path is not None,
                 "path": str(model_path) if model_path else None,
                 "required": model_info.required,
+                # Información de versión para diagnóstico de reproducibilidad
+                "pinned_version": pinned,
+                "installed_version": installed_version,
+                "version_match": (
+                    installed_version == pinned if (installed_version and pinned) else None
+                ),
             }
 
         return status
