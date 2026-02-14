@@ -1,6 +1,6 @@
 # Narrative Assistant - Documentación
 
-Ultima actualizacion: 2026-02-13 | Version: 0.9.4
+Ultima actualizacion: 2026-02-14 | Version: 0.9.5
 
 ## Documentos canónicos (mantener actualizados)
 
@@ -12,6 +12,10 @@ Ultima actualizacion: 2026-02-13 | Version: 0.9.4
 | `IMPROVEMENT_PLAN.md` | Historial completo de planificación y contexto |
 | `CHANGELOG.md` | Historial de cambios por versión |
 | `AUDIT_INDEX.md` | Índice de auditorías activas y archivadas |
+| `COREFERENCE_RESOLUTION.md` | Sistema de correferencias multi-método |
+| `LICENSING_PRODUCTION_PLAN.md` | Plan de monetización y licencias |
+| `BUILD_AND_DEPLOY.md` | Construcción de instaladores |
+| `PYTHON_EMBED.md` | Estrategia de empaquetado multi-plataforma |
 
 ## Para arrancar rápido
 
