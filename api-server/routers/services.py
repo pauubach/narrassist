@@ -3,8 +3,6 @@ Router: services
 """
 
 
-import sys
-
 import deps
 from deps import (
     ApiResponse,

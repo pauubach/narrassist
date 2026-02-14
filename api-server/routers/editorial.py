@@ -227,7 +227,9 @@ def _rescan_typography_alerts(project_id: int, effective_config: dict) -> dict:
             return result
 
         from narrative_assistant.alerts.engine import AlertEngine
-        from narrative_assistant.corrections.config import CorrectionConfig as LegacyCorrectionConfig
+        from narrative_assistant.corrections.config import (
+            CorrectionConfig as LegacyCorrectionConfig,
+        )
         from narrative_assistant.corrections.orchestrator import CorrectionOrchestrator
 
         # 1. Construir config legacy desde la effective_config del nuevo sistema
